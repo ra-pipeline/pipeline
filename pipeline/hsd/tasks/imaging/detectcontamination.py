@@ -283,10 +283,11 @@ def detect_contamination(context, imageitem):
     masked_average_spectrum = masked_average_spectrum2
 
     # Make figures
-    make_figures(peak_sn, mask_map, rms_threshold, rms_map,
-                 masked_average_spectrum, all_average_spectrum,
-                 naxis3, peak_sn_threshold, spectrum_at_peak, idy, idx, output_name,
-                 fspec, dspec)
+    with matplotlib.rc_context(matplotlib.rcParamsDefault):
+        make_figures(peak_sn, mask_map, rms_threshold, rms_map,
+                     masked_average_spectrum, all_average_spectrum,
+                     naxis3, peak_sn_threshold, spectrum_at_peak, idy, idx, output_name,
+                     fspec, dspec)
 
     # warn if absorption feature is detected
     warn_deep_absorption_feature(masked_average_spectrum, imageitem)
