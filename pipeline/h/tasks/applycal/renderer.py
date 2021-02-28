@@ -8,7 +8,7 @@ import itertools
 import operator
 import os
 import shutil
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, Optional
 
 import pipeline.domain.measures as measures
 import pipeline.infrastructure
@@ -17,6 +17,7 @@ import pipeline.infrastructure.filenamer as filenamer
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.utils as utils
+from pipeline.h.tasks.applycal.applycal import ApplycalResults
 from pipeline.domain.measurementset import MeasurementSet
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure.basetask import ResultsList
@@ -389,8 +390,36 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         return amp_vs_freq_summary_plots, amp_vs_uv_summary_plots, max_uvs
 
     @staticmethod
-    def science_plots_for_result(context, result, plotter_cls, fields, uvrange=None, renderer_cls=None):
-        overrides = {'coloraxis': 'spw'}
+    def science_plots_for_result(
+            context: Context, 
+            result: ApplycalResults,
+            plotter_cls, 
+            fields: List[int], 
+            uvrange: Optional[str]=None, 
+            renderer_cls=None, 
+            preserve_coloraxis: bool=False
+    ) -> List[Plot]:
+        """
+        Create science plots for result
+
+        Create science plots for result.
+        Args:
+            context:            Pipeline Context
+            result:             Applycal Results
+            plotter_cls:        Plotter class
+            fields:             Listr of field_ids
+            uvrange:            uvrange
+            renderer_cls:       Renderer class
+            preserve_coloraxis: True to preserve predefined 'coloraxis' (for SD)
+                                False to override 'coloraxis' with 'spw' (default)
+        Returns:
+            List[Plot]: List of Plot instances.
+        """
+        if preserve_coloraxis:
+            # PIPE-710: SD needs to preserve 'coloraxis'
+            overrides = {}
+        else:
+            overrides = {'coloraxis': 'spw'}
 
         if uvrange is not None:
             overrides['uvrange'] = uvrange

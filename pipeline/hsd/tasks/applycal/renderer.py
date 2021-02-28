@@ -115,7 +115,8 @@ class T2_4MDetailsSDApplycalRenderer(super_renderer.T2_4MDetailsApplycalRenderer
             plots = self.science_plots_for_result(context,
                                                   result,
                                                   applycal.RealVsFrequencySummaryChart,
-                                                  [brightest_field.id], None)
+                                                  [brightest_field.id], None,
+                                                  preserve_coloraxis=True )
             for plot in plots:
                 plot.parameters['source'] = representative_source
             amp_vs_freq_summary_plots[vis].extend(plots)
@@ -134,7 +135,8 @@ class T2_4MDetailsSDApplycalRenderer(super_renderer.T2_4MDetailsApplycalRenderer
                                                       result,
                                                       applycal.RealVsFrequencySummaryChart,
                                                       fields, None,
-                                                      super_renderer.ApplycalAmpVsFreqSciencePlotRenderer)
+                                                      super_renderer.ApplycalAmpVsFreqSciencePlotRenderer,
+                                                      preserve_coloraxis=True )
                 amp_vs_freq_detail_plots[vis] = plots
 
         for d, plotter_cls in (
