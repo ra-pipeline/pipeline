@@ -72,6 +72,31 @@ def getPath(filename):
     return path
 
 
+def create_thumbnail_async(original_file):
+    if not os.path.exists(original_file):
+        return None
+
+    if THUMBNAIL_CMD is None:
+        return original_file
+
+    thumb_dir = os.path.join(os.path.dirname(original_file), 'thumbs')
+    thumb_file = os.path.join(thumb_dir, os.path.basename(original_file))
+
+    if not os.path.exists(thumb_dir):
+        os.mkdir(thumb_dir)
+
+    try:
+        # generate thumbnail
+        cmd = THUMBNAIL_CMD(original_file, thumb_file)
+
+        # fire and forget
+        subprocess.Popen(cmd)
+    except Exception:
+        thumb_file = None
+
+    return thumb_file
+
+
 class Parameters(object):
     """
     Provides a set of utility functions that describe how the plot parameters
@@ -277,11 +302,14 @@ class Plot(object):
         parameters - a dictionary of parameters, eg. { 'ant' : 1, 'spw' : 2 }. These
             parameters should be known to the logging.Parameters class.
         """
+        self.abspath = os.path.abspath(filename)
+        # create thumbnail asynchronously
+        create_thumbnail_async(self.abspath)
+
         if parameters is None:
             parameters = {}
 
         self.basename = os.path.basename(filename)
-        self.abspath = os.path.abspath(filename)
         self.field = field
         self.x_axis = x_axis
         self.y_axis = y_axis
