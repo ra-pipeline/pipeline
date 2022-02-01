@@ -1,3 +1,5 @@
+import os
+
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure as infrastructure
@@ -111,6 +113,8 @@ class BandpassWorker(basetask.StandardTaskTemplate):
 
         # execute the jobs
         for job in jobs:
+            if job.kw['append'] and not os.path.exists(job.kw['caltable']):
+                job.kw['append'] = False
             self._executor.execute(job)
 
         # create the data selection target defining which data this caltable 
