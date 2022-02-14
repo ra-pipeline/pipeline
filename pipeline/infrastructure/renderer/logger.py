@@ -72,31 +72,6 @@ def getPath(filename):
     return path
 
 
-def create_thumbnail_async(original_file):
-    if not os.path.exists(original_file):
-        return None
-
-    if THUMBNAIL_CMD is None:
-        return original_file
-
-    thumb_dir = os.path.join(os.path.dirname(original_file), 'thumbs')
-    thumb_file = os.path.join(thumb_dir, os.path.basename(original_file))
-
-    if not os.path.exists(thumb_dir):
-        os.mkdir(thumb_dir)
-
-    try:
-        # generate thumbnail
-        cmd = THUMBNAIL_CMD(original_file, thumb_file)
-
-        # fire and forget
-        subprocess.Popen(cmd)
-    except Exception:
-        thumb_file = None
-
-    return thumb_file
-
-
 class Parameters(object):
     """
     Provides a set of utility functions that describe how the plot parameters
@@ -303,13 +278,16 @@ class Plot(object):
             parameters should be known to the logging.Parameters class.
         """
         self.abspath = os.path.abspath(filename)
+        self.basename = os.path.basename(filename)
+        thumb_dir = os.path.join(os.path.dirname(self.abspath), 'thumbs')
+        self.thumb_file = os.path.join(thumb_dir, os.path.basename(self.abspath))
         # create thumbnail asynchronously
-        create_thumbnail_async(self.abspath)
+        self.bg_process = None
+        self._create_thumbnail(background=True)
 
         if parameters is None:
             parameters = {}
 
-        self.basename = os.path.basename(filename)
         self.field = field
         self.x_axis = x_axis
         self.y_axis = y_axis
@@ -360,27 +338,24 @@ class Plot(object):
 
     @property
     def thumbnail(self):
-        thumb_dir = os.path.join(os.path.dirname(self.abspath), 'thumbs')
-        thumb_file = os.path.join(thumb_dir, os.path.basename(self.abspath))
-
-        if os.path.exists(thumb_file):
-            return thumb_file
+        if os.path.exists(self.thumb_file):
+            return self.thumb_file
 
         return self._create_thumbnail()
 
-    def _create_thumbnail(self):
+    def _create_thumbnail(self, background=False):
         """
         Create a scaled-down copy of the plot, returning the filename to be
         used as a thumbnail.
+
+        background - run THUMBNAIL_CMD background
 
         :rtype: string
         """
         if THUMBNAIL_CMD is None:
             return self.abspath
 
-        thumb_dir = os.path.join(os.path.dirname(self.abspath), 'thumbs')
-        thumb_file = os.path.join(thumb_dir, os.path.basename(self.abspath))
-
+        thumb_dir = os.path.dirname(self.thumb_file)
         if not os.path.exists(thumb_dir):
             os.mkdir(thumb_dir) 
 
@@ -393,15 +368,39 @@ class Plot(object):
         # or ImageMagick; all that remains is to append, in order, the output
         # and input files
         LOG.trace('Creating thumbnail with %s(%s, %s)',
-                  THUMBNAIL_CMD, self.abspath, thumb_file)
-        cmd = THUMBNAIL_CMD(self.abspath, thumb_file)
+                  THUMBNAIL_CMD, self.abspath, self.thumb_file)
+        cmd = THUMBNAIL_CMD(self.abspath, self.thumb_file)
+
+        # Run THUMBNAIL_CMD concurrently. The self.bg_process attribute holds
+        # a reference to Popen object so that status of the background job can
+        # be examined later. Immediately return without waiting for a completion
+        # of the background process. Return value is self.basename because
+        # thumbnail may or may not be created at this point.
+        if background and self.bg_process is None:
+            self.bg_process = subprocess.Popen(cmd)
+            return self.basename
 
         try:
-            with open(os.devnull, 'w') as dev_null:
-                ret = subprocess.call(cmd, stdout=dev_null, stderr=dev_null)
+            retry = True
+            if self.bg_process:
+                retry = False
+                try:
+                    ret = self.bg_process.wait(timeout=10)
+                    retry = ret != 0
+                except Exception as e:
+                    # Any error or timeout. Kill running process and retry.
+                    LOG.trace('Background job for %s failed: %s' % self.basename, e)
+                    ret = -1
+                    retry = True
+                    self.bg_process.kill()
+                    self.bg_process = None
+
+            if retry:
+                with open(os.devnull, 'w') as dev_null:
+                    ret = subprocess.call(cmd, stdout=dev_null, stderr=dev_null)
             if ret is 0:
                 # return code is 0: thumbnail file successfully created
-                return thumb_file
+                return self.thumb_file
             else:
                 LOG.warning('Error creating thumbnail for %s' % 
                             os.path.basename(self.abspath))
