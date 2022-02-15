@@ -283,7 +283,8 @@ class Plot(object):
         self.thumb_file = os.path.join(thumb_dir, os.path.basename(self.abspath))
         # create thumbnail asynchronously
         self.bg_process = None
-        self._create_thumbnail(background=True)
+        if not os.path.exists(self.thumb_file):
+            self._create_thumbnail(background=True)
 
         if parameters is None:
             parameters = {}
