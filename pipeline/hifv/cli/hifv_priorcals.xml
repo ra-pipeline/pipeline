@@ -15,9 +15,15 @@
         <value/>
     </param>
 
-    <param name="tecmaps" type="bool">
-	<shortdescription>Run tecmaps priorcal</shortdescription>
-	<description>Run tecmaps priorcal</description>
+    <param name="show_tec_maps" type="bool">
+	<shortdescription>Plot tec maps</shortdescription>
+	<description>Plot tec maps</description>
+	<value type="bool">True</value>
+    </param>
+
+    <param name="apply_tec_correction" type="bool">
+	<shortdescription>Apply tec correction</shortdescription>
+	<description>Apply tec correction</description>
 	<value type="bool">False</value>
     </param>
 

@@ -15,29 +15,31 @@ class SpwPhaseupQAHandler(pqa.QAPlugin):
     generating_task = spwphaseup.SpwPhaseup
 
     def handle(self, context, result):
-        vis= result.inputs['vis']
+        vis = result.inputs['vis']
         ms = context.observing_run.get_ms(vis)
 
-        # Check first for the combined spw map. Next the
-        # narrow to wide spw mzp. Note that the input
-        # field and intent parameters are no longer used.
-        if result.combine_spwmap:
-            score1 = self._phaseup_mapping_fraction(ms, True, result.combine_spwmap)
-        else:
-            score1 = self._phaseup_mapping_fraction(ms, False, result.phaseup_spwmap)
+        scores = []
+
+        # Step through each spwmapping to create QA scores.
+        for (intent, field), spwmapping in result.spwmaps.items():
+            # For PHASE calibrator fields, score the spwmapping based on
+            # fraction of unmapped science spws.
+            if intent == 'PHASE':
+                scores.append(qacalc.score_phaseup_mapping_fraction(ms, intent, field, spwmapping))
+            # For CHECK fields, score the spwmapping based on whether or not
+            # it is combining spws.
+            elif intent == 'CHECK':
+                scores.append(qacalc.score_combine_spwmapping(ms, intent, field, spwmapping))
+
+        # Create QA score for whether or not the phaseup caltable was created succesfully.
         if not result.phaseup_result.final:
-            score2 = qacalc.score_path_exists(ms.name, list(result.phaseup_result.error)[0].gaintable, 'caltable')
+            gaintable = list(result.phaseup_result.error)[0].gaintable
         else:
-            score2 = qacalc.score_path_exists(ms.name, result.phaseup_result.final[0].gaintable, 'caltable')
-        scores = [score1, score2]
+            gaintable = result.phaseup_result.final[0].gaintable
+        scores.append(qacalc.score_path_exists(ms.name, gaintable, 'caltable'))
 
+        # Add scores to QA pool in result.
         result.qa.pool.extend(scores)
-
-    def _phaseup_mapping_fraction(self, ms, fullcombine, phaseup_spwmap):
-        """
-        Check whether or not there has been spw phaseup mapping . 
-        """
-        return qacalc.score_phaseup_mapping_fraction(ms, fullcombine, phaseup_spwmap)
 
 
 class SpwPhaseupListQAHandler(pqa.QAPlugin):

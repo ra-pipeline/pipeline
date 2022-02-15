@@ -2,7 +2,7 @@ import collections
 import itertools
 import operator
 import os
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Optional
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.utils as utils
@@ -110,8 +110,9 @@ class ObservingRun(object):
         return candidates
 
     def get_measurement_sets_of_type(self, dtypes: List[DataType],
-                                     msonly: bool=True) -> Union[List[MeasurementSet],
-                                                                 Tuple[collections.OrderedDict, DataType]]:
+                                     msonly: bool=True, source: Optional[str]=None,
+                                     spw: Optional[str]=None) -> Union[List[MeasurementSet],
+                                                               Tuple[collections.OrderedDict, DataType]]:
         """
         Return a list of MeasurementSet domain object with matching DataType.
 
@@ -126,20 +127,25 @@ class ObservingRun(object):
                 list. Search stops at the first DataType with which at least
                 one MS is found.
             msonly: If True, return a list of MS domain object only.
+            source: Filter for particular source name selection (comma
+                separated list of names).
+            spw: Filter for particular real spw specification (comma separated
+                list of real spw IDs).
 
         Returns:
             When msonly is True, a list of MeasurementSet domain objects of
-            a matching DataType is returned.
+            a matching DataType (and optionally sources and spws) is returned.
             Otherwise, a tuple of an ordered dictionary and a matched DataType
-            is returned. The ordered dictionary stores matching MS domain
-            objects as keys and matching data column names as values. The order
-            of elements is that appears in measurement_sets list attribute.
+            (and optionally sources and spws) is returned. The ordered dictionary
+            stores matching MS domain objects as keys and matching data column
+            names as values. The order of elements is that appears in
+            measurement_sets list attribute.
         """
         found = []
         column = []
         for dtype in dtypes:
             for ms in self.measurement_sets:
-                dcol = ms.get_data_column(dtype)
+                dcol = ms.get_data_column(dtype, source, spw)
                 if dcol is not None:
                     found.append(ms)
                     column.append(dcol)
@@ -152,8 +158,11 @@ class ObservingRun(object):
         if msonly:
             return found
         else:
-            ms_dict = collections.OrderedDict( (m, c) for m, c in zip(found, column))
-            return ms_dict, dtype
+            if len(found) > 0:
+                ms_dict = collections.OrderedDict( (m, c) for m, c in zip(found, column))
+                return ms_dict, dtype
+            else:
+                return collections.OrderedDict(), None
 
     def get_fields(self, names=None):
         """

@@ -104,17 +104,6 @@ results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
         <value/>
     </param>
 
-    <param name="intent" subparam="true" type="string">
-        <shortdescription>Set of data selection observing intents</shortdescription>
-        <description>A string containing a comma delimited list of intents against which
-            the selected fields are matched. Defaults to the equivalent of
-            'AMPLITUDE,PHASE,BANDPASS'.
-
-            example: intent='', intent='PHASE'
-        </description>
-        <value/>
-    </param>
-
     <param name="spw" subparam="true" type="string">
         <shortdescription>Set of data selection spectral window/channels</shortdescription>
         <description>The list of spectral windows and channels for which gain solutions are
@@ -152,17 +141,6 @@ results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
         <any type="variant"/>
         <value type="string">inf</value>
     </param>
-
-     <param name="combine" type="string">
-        <shortdescription>Data axes which to combine for solve (scan, spw, and/or field)</shortdescription>
-        <description>Data axes to combine for solving. Options are '', 'scan', 'spw',
-          'field' or any comma-separated combination.
-
-          default: ''
-          example: combine=''
-        </description>
-        <value type="string"/>
-     </param>
 
     <param name="refant" subparam="true" type="string">
         <shortdescription>Reference antenna names</shortdescription>
@@ -274,7 +252,6 @@ results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
             <default param="targetphasetable"><value type="stringVec"/></default>
             <default param="amptable"><value type="stringVec"/></default>
             <default param="field"><value type="string"/></default>
-            <default param="intent"><value type="string"/></default>
             <default param="spw"><value type="string"/></default>
             <default param="antenna"><value type="string"/></default>
             <default param="smodel"><value type="doubleVec"/></default>
@@ -292,7 +269,6 @@ results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
             <default param="targetphasetable"><value type="stringVec"/></default>
             <default param="amptable"><value type="stringVec"/></default>
             <default param="field"><value type="string"/></default>
-            <default param="intent"><value type="string"/></default>
             <default param="spw"><value type="string"/></default>
             <default param="antenna"><value type="string"/></default>
             <default param="smodel"><value type="doubleVec"/></default>

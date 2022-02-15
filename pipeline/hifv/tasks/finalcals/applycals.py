@@ -32,7 +32,7 @@ class ApplycalsInputs(applycal.IFApplycalInputs):
     field = vdp.VisDependentProperty(default='')
     spw = vdp.VisDependentProperty(default='')
     intent = vdp.VisDependentProperty(default='')
-    flagbackup = vdp.VisDependentProperty(default=False)
+    flagbackup = vdp.VisDependentProperty(default=True)
     calwt = vdp.VisDependentProperty(default=False)
     gainmap = vdp.VisDependentProperty(default=False)
 

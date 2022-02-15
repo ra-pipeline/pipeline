@@ -12,6 +12,9 @@ LOG = infrastructure.get_logger(__name__)
 
 
 class TecMapsInputs(vdp.StandardInputs):
+    show_tec_maps = vdp.VisDependentProperty(default=True)
+    apply_tec_correction = vdp.VisDependentProperty(default=False)
+
     @vdp.VisDependentProperty
     def caltable(self):
         namer = caltable_heuristic.TecMapstable()
@@ -22,11 +25,14 @@ class TecMapsInputs(vdp.StandardInputs):
     def parameter(self):
         return []
 
-    def __init__(self, context, output_dir=None, vis=None, caltable=None, caltype=None, parameter=None):
+    def __init__(self, context, output_dir=None, vis=None, show_tec_maps=None, apply_tec_correction=None,
+                 caltable=None, caltype=None, parameter=None):
         super(TecMapsInputs, self).__init__()
         self.context = context
         self.output_dir = output_dir
         self.vis = vis
+        self.show_tec_maps = show_tec_maps
+        self.apply_tec_correction = apply_tec_correction
         self.parameter = parameter
         self.caltable = caltable
         self.caltype = caltype
@@ -87,21 +93,34 @@ class TecMaps(basetask.StandardTaskTemplate):
 
         tec_image = None
         tec_rms_image = None
-        tec_image, tec_rms_image, tec_plotfile = tec_maps.create(vis=inputs.vis, doplot=True, imname='iono')
 
-        gencal_args = inputs.to_casa_args()
-        gencal_args['infile'] = tec_image
-        gencal_job = casa_tasks.gencal(**gencal_args)
-        self._executor.execute(gencal_job)
+        if self.inputs.show_tec_maps or self.inputs.apply_tec_correction:
 
-        callist = []
-        calto = callibrary.CalTo(vis=inputs.vis)
-        calfrom = callibrary.CalFrom(gencal_args['caltable'], caltype='tecim', interp='', calwt=False)
-        calapp = callibrary.CalApplication(calto, calfrom)
-        callist.append(calapp)
+            callist = []
+            try:
+                tec_image, tec_rms_image, tec_plotfile = tec_maps.create(vis=inputs.vis, doplot=True, imname='iono')
+            except UnboundLocalError as e:
+                LOG.warning("TEC Maps error returned. CASA {!s}".format(e))
+                return TecMapsResults(pool=callist, final=callist, tec_image=None,
+                                      tec_rms_image=None, tec_plotfile=None)
 
-        return TecMapsResults(pool=callist, final=callist, tec_image=tec_image, tec_rms_image=tec_rms_image,
-                              tec_plotfile=tec_plotfile)
+            if self.inputs.apply_tec_correction:
+                gencal_args = inputs.to_casa_args()
+                gencal_args.pop('show_tec_maps')
+                gencal_args.pop('apply_tec_correction')
+                gencal_args['infile'] = tec_image
+                gencal_job = casa_tasks.gencal(**gencal_args)
+                self._executor.execute(gencal_job)
+
+                calto = callibrary.CalTo(vis=inputs.vis)
+                calfrom = callibrary.CalFrom(gencal_args['caltable'], caltype='tecim', interp='', calwt=False)
+                calapp = callibrary.CalApplication(calto, calfrom)
+                callist.append(calapp)
+
+            return TecMapsResults(pool=callist, final=callist, tec_image=tec_image, tec_rms_image=tec_rms_image,
+                                  tec_plotfile=tec_plotfile)
+        else:
+            return None
 
     def analyse(self, result):
         # double-check that the caltable was actually generated
@@ -119,7 +138,11 @@ class TecMaps(basetask.StandardTaskTemplate):
     def _do_tecmaps(self):
         # Private class method for reference only
         # tec_image, tec_rms_image = tec_maps.create('vlass3C48.ms')
-        tec_maps.create(vis=self.vis, doplot=True, imname='iono')
+        try:
+            tec_maps.create(vis=self.vis, doplot=True, imname='iono')
+        except UnboundLocalError as e:
+            LOG.warning("TEC Maps error returned. CASA {!s}".format(e))
+            return None
         # gencal_job = casa_tasks.gencal(**gencal_args)
         gencal_job = casa_tasks.gencal(vis=self.vis, caltable='file.tec', caltype='tecim', infile='iono.IGS_TEC.im')
         self._executor.execute(gencal_job)

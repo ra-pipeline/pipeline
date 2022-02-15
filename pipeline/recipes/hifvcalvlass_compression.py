@@ -42,7 +42,7 @@ def hifvcalvlass(vislist, importonly=False, pipelinemode='automatic', interactiv
         # Gain curves, opacities, antenna position corrections,
         # requantizer gains (NB: requires CASA 4.1!)
         # tecmaps default is False
-        hifv_priorcals(tecmaps=False, swpow_spw='6,14')
+        hifv_priorcals(show_tec_maps=True, apply_tec_correction=False, swpow_spw='6,14')
 
         # Syspower task
         hifv_syspower(pipelinemode=pipelinemode)

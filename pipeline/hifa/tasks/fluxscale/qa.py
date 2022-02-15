@@ -321,7 +321,6 @@ def gaincalSNR(context, ms, tsysTable, flux, field, spws, intent='PHASE', requir
 
     wrapper = CaltableWrapperFactory.from_caltable(tsysTable)
 
-
     # keys: CALIBRATE_PHASE spws, values: corresponding Tsys values
     get_snr_info = False  # Flag value to get SNR info or not
     median_tsys = {}
@@ -336,12 +335,25 @@ def gaincalSNR(context, ms, tsysTable, flux, field, spws, intent='PHASE', requir
         else:
             median_tsys[phase_spw.id] = numpy.ma.median(scan_data['FPARAM'])
 
-    # PIPE-1208: If any scan is fully masked we retrieve the SNR estimated from hifa_spwphaseup
+    # PIPE-1208: If any scan is fully masked, attempt to retrieve the info on
+    # estimated SNRs that was derived during hifa_spwphaseup.
     snr_info = None
     if get_snr_info:
-        snr_info = ms.spwphaseup_snr_info
+        # Check if a SpW mapping was registered for current field and intent.
+        spwmap = ms.spwmaps.get((intent, field.name), None)
+        if spwmap:
+            # If a direct match exists, then use the corresponding SNR info.
+            snr_info = {int(k): v for k, v in spwmap.snr_info}
+        else:
+            # Otherwise, retrieve SNR info from the first SpW mapping that
+            # matches the current intent.
+            for (spwmap_intent, _), spwmap in ms.spwmaps.items():
+                if spwmap_intent == intent:
+                    snr_info = {int(k): v for k, v in spwmap.snr_info}
+                    break
+        # Report if the retrieval of SNR info from hifa_spwphaseup failed.
         if snr_info is None:
-            LOG.error("Estimated SNR from hifa_spwphaseup could not be retrieved")
+            LOG.error(f"{ms.basename}: Estimated SNR from hifa_spwphaseup could not be retrieved.")
 
     # 6) compute the expected channel-averaged SNR
     # TODO Ask Todd if this is an error or a confusingly-named variable
@@ -396,11 +408,12 @@ def gaincalSNR(context, ms, tsysTable, flux, field, spws, intent='PHASE', requir
                         min([aggregate_bandwidth, max_effective_bandwidth_per_baseband * num_basebands]) /
                         min([spw.bandwidth, max_effective_bandwidth_per_baseband]))
                 )
-                LOG.info(f"{ms.basename}: for SpW {spw.id} SNR extracted from hifa_spwphaseup ({snr_value})")
+                LOG.info(f"{ms.basename}: for SpW {spw.id} SNR extracted from hifa_spwphaseup ({snr_value:.1f}).")
             else:
                 mydict[spw.id]['snr'] = Decimal('0.0')
                 mydict[spw.id]['snr_aggregate'] = Decimal('0.0')
-                LOG.error(f"{ms.basename}: for SpW {spw.id}  SNR could not be extracted from hifa_spwphaseup, SNR set to 0")
+                LOG.error(f"{ms.basename}: for SpW {spw.id} SNR could not be extracted from hifa_spwphaseup, SNR set to"
+                          f" 0.")
         else:
             mydict[spw.id]['snr'] = snr_per_spw
             mydict[spw.id]['snr_aggregate'] = spw_to_flux_density[spw.id] / aggregate_bandwidth_sensitivity
@@ -437,7 +450,7 @@ def gaincalSNR(context, ms, tsysTable, flux, field, spws, intent='PHASE', requir
         calspw = bandwidth_switching[spw]
         if mydict[calspw.id]['snr'] >= required_snr:
             mydict[calspw.id]['status'] = 'normal_bw_switching' if spw != calspw else 'normal'
-            msg = ('spw {} ({}) calibrated by spw {} has sufficient S/N: {}'
+            msg = ('spw {} ({}) calibrated by spw {} has sufficient S/N: {:.1f}'
                    ''.format(spw.id, spw.bandwidth, calspw.id, mydict[calspw.id]['snr']))
         elif mydict[calspw.id]['snr_widest_spw'] >= required_snr:
             mydict[calspw.id]['status'] = 'spwmap'

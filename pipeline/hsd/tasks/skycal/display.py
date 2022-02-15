@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import numpy
 import traceback
 
+from typing import TYPE_CHECKING, Any, List
+
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.logger as logger
 from pipeline.h.tasks.common.displays import common as common
@@ -12,22 +14,65 @@ from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.displays.plotstyle import casa5style_plot
 
+if TYPE_CHECKING:
+    from pipeline.domain import Field, MeasurementSet
+    from pipeline.hsd.tasks.skycal.skycal import SDSkyCalResults
+    from pipeline.infrastructure.callibrary import CalApplication
+    from pipeline.infrastructure.launcher import Context
+
 LOG = logging.get_logger(__name__)
 
 
+def get_field_from_ms(ms: 'MeasurementSet', field: str) -> List['Field']:
+    """Return list of fields that matches field selection.
+
+    Matching with field id takes priority over
+    the matching with field name.
+
+    Args:
+        ms: MeasurementSet domain object
+        field: Field selection string
+
+    Returns:
+        List of field domain objects
+    """
+    field_list = []
+    if field.isdigit():
+        # regard field as FIELD_ID
+        field_list = ms.get_fields(field_id=int(field))
+
+    if len(field_list) == 0:
+        # regard field as FIELD_NAME
+        field_list = ms.get_fields(name=field)
+
+    return field_list
+
+
 class SingleDishSkyCalDisplayBase(object):
-    def init_with_field(self, context, result, field):
+    """Base display class for skycal stage."""
+    def init_with_field(self, context: 'Context', result: 'SDSkyCalResults', field: str) -> None:
+        """Initialize attributes using field information.
+
+        Args:
+            context: Pipeline context
+            result: SDSkyCalResults instance
+            field: Field string. Either field id or field name.
+                   Matching with field id takes priority over
+                   the matching with field name.
+
+        Raises:
+            RuntimeError: Invalid field selection
+        """
         vis = self._vis
         ms = context.observing_run.get_ms(vis)
-        num_fields = len(ms.fields)
-        if field.isdigit() and int(field) < num_fields:
-            self.field_id = int(field)
-            self.field_name = ms.get_fields(self.field_id)[0].clean_name
-        else:
-            self.field_name = field
-            fields = ms.get_fields(name=field)
-            assert len(fields) == 1
-            self.field_id = fields[0].id
+        fields = get_field_from_ms(ms, field)
+        if len(fields) == 0:
+            # failed to find field domain object with field
+            raise RuntimeError(f'No match found for field "{field}".')
+
+        self.field_id = fields[0].id
+        self.field_name = fields[0].clean_name
+
         LOG.debug('field: ID %s Name \'%s\''%(self.field_id, self.field_name))
         old_prefix = self._figroot.replace('.png', '')
         self._figroot = self._figroot.replace('.png', '-%s.png' % (self.field_name))
@@ -137,7 +182,36 @@ class SingleDishPlotmsLeaf(object):
     Class to execute plotms and return a plot wrapper. Task arguments for plotms
     is customized for single dish usecase.
     """
-    def __init__(self, context, result, calapp, xaxis, yaxis, spw='', ant='', coloraxis='', **kwargs):
+    def __init__(
+        self,
+        context: 'Context',
+        result: 'SDSkyCalResults',
+        calapp: 'CalApplication',
+        xaxis: str,
+        yaxis: str,
+        spw: str = '',
+        ant: str = '',
+        coloraxis: str = '',
+        **kwargs: Any
+    ) -> None:
+        """Construct SingleDishPlotmsLeaf instance.
+
+        The constructor has an API that accepts additional parameters
+        to customize plotms but currently those parameters are ignored.
+
+        Args:
+            context: Pipeline context
+            result: SDSkyCalResults instance
+            calapp: CalApplication instance
+            xaxis: X-axis type of the plot
+            yaxis: Y-axis type of the plot
+            spw: Spectral window selection. Defaults to '' (all spw).
+            ant: Antenna selection. Defaults to '' (all antenna).
+            coloraxis: Color axis type. Defaults to ''.
+
+        Raises:
+            RuntimeError: Invalid field selection in calapp
+        """
         LOG.debug('__init__(caltable={caltable}, spw={spw}, ant={ant})'.format(caltable=calapp.gaintable, spw=spw,
                                                                                ant=ant))
         self.xaxis = xaxis
@@ -151,15 +225,13 @@ class SingleDishPlotmsLeaf(object):
 
         ms = context.observing_run.get_ms(self.vis)
 
-        num_fields = len(ms.fields)
-        if self.field.isdigit() and int(self.field) < num_fields:
-            self.field_id = int(self.field)
-            self.field_name = ms.get_fields(self.field_id)[0].clean_name
-        else:
-            self.field_name = self.field
-            fields = ms.get_fields(name=self.field)
-            assert len(fields) == 1
-            self.field_id = fields[0].id
+        fields = get_field_from_ms(ms, self.field)
+        if len(fields) == 0:
+            # failed to find field domain object with field
+            raise RuntimeError(f'No match found for field "{self.field}".')
+
+        self.field_id = fields[0].id
+        self.field_name = fields[0].clean_name
 
         LOG.debug('field: ID %s Name \'%s\'' % (self.field_id, self.field_name))
 

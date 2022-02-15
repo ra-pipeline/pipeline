@@ -24,8 +24,6 @@ class Field(object):
         valid_spws: A list of unique SpectralWindow objects associated with
             this field
         flux_densities: A list of unique flux measurments from setjy
-        data_column: a dictionary of data type (key) and data column name
-            (value) combination
     """
 
     def __init__(self, field_id: int, name: str, source_id: int,
@@ -51,8 +49,6 @@ class Field(object):
         self.states = set()
         self.valid_spws = set()
         self.flux_densities = set()
-
-        self.data_column = {}
 
     def __repr__(self):
         name = self.name

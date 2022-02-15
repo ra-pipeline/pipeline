@@ -86,7 +86,11 @@
         <Command xmlns="">hifv_priorcals</Command>
         <ParameterSet>
             <Parameter>
-                <Keyword xmlns="">tecmaps</Keyword>
+                <Keyword xmlns="">show_tec_maps</Keyword>
+                <Value xmlns="">True</Value>
+            </Parameter>
+            <Parameter>
+                <Keyword xmlns="">apply_tec_correction</Keyword>
                 <Value xmlns="">False</Value>
             </Parameter>
             <Parameter>

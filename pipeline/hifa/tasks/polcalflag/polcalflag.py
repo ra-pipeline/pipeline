@@ -98,49 +98,23 @@ class Polcalflag(basetask.StandardTaskTemplate):
             vis=inputs.vis, mode='save', versionname=flag_backup_name_prepcf)
         self._executor.execute(task)
 
-        # Since this task is run before hifa_timegaincal, we need to compute local
-        # phase and amplitude cal tables for the polarization intents.
-
-        # Determine the parameters to use for the gaincal to create the
-        # phase-only caltable.
-        if inputs.ms.combine_spwmap:
-            phase_combine = 'spw'
-            phaseup_spwmap = inputs.ms.combine_spwmap
-            phase_interp = 'linearPD,linear'
-            # Note: at present, phaseupsolint is specified as a fixed
-            # value, defined in inputs. In the future, phaseupsolint may
-            # need to be set based on exposure times; if so, see discussion
-            # in CAS-10158 and logic in hifa.tasks.fluxscale.GcorFluxscale.
-        else:
-            phase_combine = ''
-            phaseup_spwmap = inputs.ms.phaseup_spwmap
-            phase_interp = None
+        # Since this task is run before hifa_timegaincal, we need to compute
+        # local phase and amplitude cal tables for the polarization intents.
 
         # Create phase caltable and merge it into the local context.
+        # PIPE-1154: always use combine='' for phase solves of polarisation
+        # calibrators, with no explicit spw mapping nor override for interp.
         LOG.info('Compute phase gaincal table.')
-        self._do_gaincal(
-            intent=inputs.intent, gaintype='G', calmode='p',
-            combine=phase_combine, solint=inputs.phaseupsolint,
-            minsnr=inputs.minsnr, refant=inputs.refant,
-            spwmap=phaseup_spwmap, interp=phase_interp,
-            merge=True)
+        self._do_gaincal(intent=inputs.intent, gaintype='G', calmode='p', combine='', solint=inputs.phaseupsolint,
+                         minsnr=inputs.minsnr, refant=inputs.refant, merge=True)
 
         # Create amplitude caltable and merge it into the local context.
         # CAS-10491: for scan-based (solint='inf') amplitude solves that
         # will be applied to the calibrator, set interp to 'nearest'.
         LOG.info('Compute amplitude gaincal table.')
-        if inputs.solint == 'inf':
-            self._do_gaincal(
-                intent=inputs.intent, gaintype='T', calmode='a',
-                combine='', solint=inputs.solint,
-                minsnr=inputs.minsnr, refant=inputs.refant,
-                interp='nearest,linear', merge=True)
-        else:
-            self._do_gaincal(
-                intent=inputs.intent, gaintype='T', calmode='a',
-                combine='', solint=inputs.solint,
-                minsnr=inputs.minsnr, refant=inputs.refant,
-                interp='linear,linear', merge=True)
+        amp_interp = 'nearest,linear' if inputs.solint == 'inf' else 'linear,linear'
+        self._do_gaincal(intent=inputs.intent, gaintype='T', calmode='a', combine='', solint=inputs.solint,
+                         minsnr=inputs.minsnr, refant=inputs.refant, interp=amp_interp, merge=True)
 
         # Ensure that any flagging applied to the MS by this applycal is
         # reverted at the end, even in the case of exceptions.
@@ -206,8 +180,7 @@ class Polcalflag(basetask.StandardTaskTemplate):
         if cafflags:
             # Re-apply the newly found flags from correctedampflag.
             LOG.info('Re-applying flags from correctedampflag.')
-            fsinputs = FlagdataSetter.Inputs(
-                context=inputs.context, vis=inputs.vis, table=inputs.vis, inpfile=[])
+            fsinputs = FlagdataSetter.Inputs(context=inputs.context, vis=inputs.vis, table=inputs.vis, inpfile=[])
             fstask = FlagdataSetter(fsinputs)
             fstask.flags_to_set(cafflags)
             _ = self._executor.execute(fstask)
@@ -245,14 +218,13 @@ class Polcalflag(basetask.StandardTaskTemplate):
 
         return callib_map
 
-    def _do_gaincal(self, caltable=None, intent=None, gaintype='G',
-                    calmode=None, combine=None, solint=None, antenna=None,
-                    uvrange='', minsnr=None, refant=None, minblperant=None,
-                    spwmap=None, interp=None, append=None, merge=True):
+    def _do_gaincal(self, caltable=None, intent=None, gaintype='G', calmode=None, combine=None, solint=None,
+                    antenna=None, uvrange='', minsnr=None, refant=None, minblperant=None, interp=None, append=None,
+                    merge=True):
         inputs = self.inputs
         ms = inputs.ms
 
-        # Get the science spws
+        # Get the science spws and scans for specified intent.
         request_spws = ms.get_spectral_windows()
         targeted_scans = ms.get_scans(scan_intent=intent)
 
@@ -332,33 +304,21 @@ class Polcalflag(basetask.StandardTaskTemplate):
                 task = gaincal.GTypeGaincal(task_inputs)
                 result = self._executor.execute(task)
 
-                # modify the result so that this caltable is only applied to
-                # the intent from which the calibration was derived
+                # Modify the result so that this caltable is only applied to
+                # the intent from which the calibration was derived, and modify
+                # the interp if provided.
                 calapp_overrides = dict(intent=intent)
-
-                # Adjust the spw map if provided.
-                if spwmap:
-                    calapp_overrides['spwmap'] = spwmap
-
-                # https://open-jira.nrao.edu/browse/PIPE-367?focusedCommentId=141097&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-141097
-                #
-                # '... then to apply this table you need the same spw map that
-                # is printed in the spwphaseup stage'
-                if combine == 'spw':
-                    calapp_overrides['spwmap'] = ms.combine_spwmap
-
-                # Adjust the interp if provided.
                 if interp:
                     calapp_overrides['interp'] = interp
 
-                calapp = result.final[0]
-                modified = callibrary.copy_calapplication(calapp, **calapp_overrides)
+                # Create modified CalApplication and replace CalApp in result
+                # with this new one.
+                modified = callibrary.copy_calapplication(result.final[0], **calapp_overrides)
                 result.pool[0] = modified
                 result.final[0] = modified
 
-                # If requested, merge the result...
+                # If requested, merge result into the local context.
                 if merge:
-                    # Merge result to the local context
                     result.accept(inputs.context)
 
     def _identify_refants_to_update(self, result):

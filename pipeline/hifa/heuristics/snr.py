@@ -305,18 +305,21 @@ def get_tsysinfo(ms, fieldnamelist, intent, spwidlist):
     # Get atmospheric scans associated with the field name list
     atmscans = get_scans_for_field_intent(ms, fieldnamelist, 'ATMOSPHERE')
 
-    # No atmospheric scans found
-    #    If phase calibrator examine the TARGET atmospheric scans
-    if not atmscans and intent == 'PHASE':
+    # If no atmospheric scans were found, and the intent specifies a phase
+    # calibrator or check source, then try to find atmospheric scans associated
+    # with the science target fields.
+    if not atmscans and intent in ['CHECK', 'PHASE']:
+        fieldlist = [f.name for f in ms.get_fields(intent='TARGET')]
+        if fieldlist:
+            atmscans = get_scans_for_field_intent(ms, fieldlist, 'ATMOSPHERE')
 
-        # Get science target names
-        scifields = ms.get_fields(intent='TARGET')
-        if len(scifields) <= 0:
-            return tsysdict
-        scifieldlist = [scifield.name for scifield in scifields]
-
-        # Find atmospheric scans associated with the science target
-        atmscans = get_scans_for_field_intent(ms, scifieldlist, 'ATMOSPHERE')
+    # If still no atmospheric scans were found, and the intent specifies a
+    # check source, then try to find atmospheric scans associated with the
+    # phase calibrator fields.
+    if not atmscans and intent == 'CHECK':
+        fieldlist = [f.name for f in ms.get_fields(intent='PHASE')]
+        if fieldlist:
+            atmscans = get_scans_for_field_intent(ms, fieldlist, 'ATMOSPHERE')
 
     # Still no atmospheric scans found
     #    Return
@@ -388,11 +391,20 @@ def get_tsysinfo(ms, fieldnamelist, intent, spwidlist):
                     ftsysdict['snr_scan'] = obscan.id
                     break
 
+            # PIPE-1154: if no scan for field name list and intent occurred
+            # after the Tsys scan, then fall back to picking the most recent
+            # scan that occurred before the Tsys scan (assuming obscans are
+            # sorted chronologically).
+            if 'snr_scan' not in ftsysdict:
+                for obscan in obscans:
+                    if obscan.id < atmscan.id:
+                        ftsysdict['snr_scan'] = obscan.id
+
             ftsysdict['tsys_scan'] = atmscan.id
             ftsysdict['tsys_spw'] = bestspwid
             break
 
-        # Update the spw dictinary
+        # Update the spw dictionary
         if ftsysdict:
             LOG.info('    Matched spw %d to a Tsys spw %d' % (spwid, bestspwid))
             tsysdict[spwid] = ftsysdict

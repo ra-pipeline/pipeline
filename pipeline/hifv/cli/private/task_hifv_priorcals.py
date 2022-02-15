@@ -5,7 +5,8 @@ from casatasks import casalog
 import pipeline.h.cli.utils as utils
 
 
-def hifv_priorcals(vis=None, tecmaps=None, swpow_spw=None, pipelinemode=None, dryrun=None, acceptresults=None):
+def hifv_priorcals(vis=None, show_tec_maps=None, apply_tec_correction=None, swpow_spw=None,
+                   pipelinemode=None, dryrun=None, acceptresults=None):
 
     ##########################################################################
     #                                                                        #

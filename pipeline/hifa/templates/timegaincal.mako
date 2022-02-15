@@ -4,30 +4,6 @@ import os
 import pipeline.infrastructure.filenamer as filenamer
 import pipeline.infrastructure.renderer.htmlrenderer as hr
 
-def get_mapping(ms, spwid):
-    if ms.combine_spwmap:
-        return 'of <strong>combined</strong> solution '
-    else:
-        return ' for spectral window <strong>' + str(spwid) + '</strong>'
-
-def get_mapped_window(ms, spwid):
-    if ms.combine_spwmap:
-        return 'the <strong>combined</strong> solution '
-    elif ms.phaseup_spwmap:
-        return 'spectral window <strong>' + str(ms.phaseup_spwmap[spwid]) + '</strong>'
-    else:
-        return spwid
-
-def get_mapped_scispws(ms):
-    if ms.combine_spwmap:
-        spws = [str(spw.id) for spw in ms.get_spectral_windows()]
-        return 'the following spectral windows ' + ','.join(spws) + ' have been combined' 
-    elif ms.phaseup_spwmap:
-        spws = [str(spw.id) for spw in ms.get_spectral_windows() if spw.id != ms.phaseup_spwmap[spw.id]]
-        return 'the following spectral windows '  + ','.join(spws) + ' have been remapped' 
-    else:
-        return 'no spectral windows have been combined or remapped'
-
 def get_ant_str_for_caption_text(parameters):
     ants = parameters.get('ant', "")
     if ants:
@@ -81,13 +57,14 @@ def get_ant_str_for_caption_title(parameters):
         <tr>
             <th scope="col" rowspan="2">Measurement Set</th>
 			<th scope="col" colspan="2">Solution Parameters</th>
-			<th scope="col" colspan="3">Applied To</th>
+			<th scope="col" colspan="4">Applied To</th>
             <th scope="col" rowspan="2">Calibration Table</th>
 		</tr>
 		<tr>
 			<th>Type</th>
             <th>Interval</th>
 			<th>Scan Intent</th>
+            <th>Field</th>
 			<th>Spectral Windows</th>
             <th>Gainfield</th>
         </tr>
@@ -99,6 +76,7 @@ def get_ant_str_for_caption_title(parameters):
 		  	<td>${application.calmode}</td>
 		  	<td>${application.solint}</td>
 		  	<td>${application.intent}</td>
+		  	<td>${application.field}</td>
 		  	<td>${application.spw}</td>
             <td>${application.gainfield}</td>
 		  	<td>${application.gaintable}</td>
@@ -130,17 +108,25 @@ def get_ant_str_for_caption_title(parameters):
 		see detailed plots per spectral window and antenna.</p> 
 	</%def>
 
+    <%def name="ms_preamble(ms)">
+        % if ms in spw_mapping:
+            <p>${spw_mapping[ms]}</p>
+        %endif
+    </%def>
+
 	<%def name="mouseover(plot)">Click to show phase vs time for spectral window ${plot.parameters['spw']}</%def>
 
-	<%def name="fancybox_caption(plot)">Spectral window ${plot.parameters['spw']}</%def>
+	<%def name="fancybox_caption(plot)">
+        ${plot.parameters['vis']}<br>
+        Spectral window ${plot.parameters['spw']}
+    </%def>
 
 	<%def name="caption_title(plot)">
 		Spectral window ${plot.parameters['spw']}
 	</%def>
 
 	<%def name="caption_text(plot, intent)"> 
-		Phase vs time ${get_mapping(pcontext.observing_run.get_ms(name=plot.parameters['vis']), plot.parameters['spw'])},
-                all antennas and correlations.</%def>
+		Phase vs time, all antennas and correlations.</%def>
 
 </%self:plot_group>
 
@@ -215,22 +201,27 @@ def get_ant_str_for_caption_title(parameters):
 	</%def>
 
     <%def name="ms_preamble(ms)">
+        % if ms in spw_mapping:
+        <p>${spw_mapping[ms]}</p>
+        %endif
         <p>Plots show the diagnostic phase calibration for ${ms}.
             <!-- calculated using solint='${diagnostic_solints[ms]['phase']}'. -->
-            </p>
+        </p>
     </%def>
 
 	<%def name="mouseover(plot)">Click to show phase vs time for spectral window ${plot.parameters['spw']}</%def>
 
-	<%def name="fancybox_caption(plot)">Spectral window ${plot.parameters['spw']}</%def>
+	<%def name="fancybox_caption(plot)">
+		${plot.parameters['vis']}<br>
+		Spectral window ${plot.parameters['spw']}<br>
+	</%def>
 
 	<%def name="caption_title(plot)">
 		Spectral window ${plot.parameters['spw']}
 	</%def>
 
-	<%def name="caption_text(plot, intent)"> 
-		Phase vs time ${get_mapping(pcontext.observing_run.get_ms(name=plot.parameters['vis']), plot.parameters['spw'])},
-                all antennas and correlations.
+	<%def name="caption_text(plot, intent)">
+		Phase vs time, all antennas and correlations.
 	</%def>
 
 </%self:plot_group>
@@ -258,12 +249,9 @@ def get_ant_str_for_caption_title(parameters):
             heading to see detailed plots per spectral window and antenna.</p>
 	</%def>
 
-        <%def name="ms_preamble(ms)">
-                <p>Plots show the diagnostic phase offsets for ${ms} calculated
-            using solint='inf'.</p>
-
-            <p><strong>Note that ${get_mapped_scispws(pcontext.observing_run.get_ms(name=ms))}</strong></p>
-        </%def>
+    <%def name="ms_preamble(ms)">
+        <p>Plots show the diagnostic phase offsets for ${ms} calculated using solint='inf'.</p>
+    </%def>
 
 	<%def name="mouseover(plot)">Click to show phase offset vs time for spectral window ${plot.parameters['spw']}</%def>
 
@@ -274,9 +262,8 @@ def get_ant_str_for_caption_title(parameters):
 	</%def>
 
 	<%def name="caption_text(plot, intent)"> 
-		Phase offset vs time for spectral window <strong>${plot.parameters['spw']}</strong>, which has been 
-		mapped to ${get_mapped_window(pcontext.observing_run.get_ms(name=plot.parameters['vis']), plot.parameters['spw'])},
-                all antennas and correlations.
+		Phase offset vs time for spectral window <strong>${plot.parameters['spw']}</strong>,
+        all antennas and correlations.
 	</%def>
 
 </%self:plot_group>

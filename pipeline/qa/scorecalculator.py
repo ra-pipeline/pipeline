@@ -34,6 +34,7 @@ __all__ = ['score_polintents',                                # ALMA specific
            'score_number_antenna_offsets',                    # ALMA specific
            'score_missing_derived_fluxes',                    # ALMA specific
            'score_derived_fluxes_snr',                        # ALMA specific
+           'score_combine_spwmapping',                        # ALMA specific
            'score_phaseup_mapping_fraction',                  # ALMA specific
            'score_refspw_mapping_fraction',                   # ALMA specific
            'score_missing_phaseup_snrs',                      # ALMA specific
@@ -1566,21 +1567,43 @@ def score_refspw_mapping_fraction(ms, ref_spwmap):
 
 
 @log_qa
-def score_phaseup_mapping_fraction(ms, fullcombine, phaseup_spwmap):
+def score_combine_spwmapping(ms, intent, field, spwmapping):
+    """
+    Evaluate whether or not a spw mapping is using combine.
+    If not, then set score to 1. If so, then set score to the sub-optimal
+    threshold (for blue info message).
+    """
+    if spwmapping.combine:
+        score = rutils.SCORE_THRESHOLD_SUBOPTIMAL
+        longmsg = f'Using combined spw mapping for {ms.basename}, intent={intent}, field={field}'
+        shortmsg = 'Using combined spw mapping'
+    else:
+        score = 1.0
+        longmsg = f'No combined spw mapping for {ms.basename}, intent={intent}, field={field}'
+        shortmsg = 'No combined spw mapping'
+
+    origin = pqa.QAOrigin(metric_name='score_check_phaseup_combine_mapping',
+                          metric_score=spwmapping.combine,
+                          metric_units='Using combined spw mapping')
+
+    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin)
+
+
+@log_qa
+def score_phaseup_mapping_fraction(ms, intent, field, spwmapping):
     """
     Compute the fraction of science spws that have not been
     mapped to other probably wider windows.
     """
-
-    if not phaseup_spwmap:
+    if not spwmapping.spwmap:
         nunmapped = len([spw for spw in ms.get_spectral_windows(science_windows_only=True)])
         score = 1.0
-        longmsg = 'No spw mapping for %s ' % ms.basename
+        longmsg = f'No spw mapping for {ms.basename}, intent={intent}, field={field}'
         shortmsg = 'No spw mapping'
-    elif fullcombine is True:
+    elif spwmapping.combine:
         nunmapped = 0
         score = rutils.SCORE_THRESHOLD_WARNING
-        longmsg = 'Combined spw mapping for %s ' % ms.basename
+        longmsg = f'Combined spw mapping for {ms.basename}, intent={intent}, field={field}'
         shortmsg = 'Combined spw mapping'
     else:
         # Expected science windows
@@ -1591,25 +1614,25 @@ def score_phaseup_mapping_fraction(ms, fullcombine, phaseup_spwmap):
         nunmapped = 0
         samesideband = True
         for spwid, scispw in zip(scispwids, scispws):
-            if spwid == phaseup_spwmap[spwid]:
+            if spwid == spwmapping.spwmap[spwid]:
                 nunmapped += 1
             else:
-                if scispw.sideband != ms.get_spectral_window(phaseup_spwmap[spwid]).sideband:
+                if scispw.sideband != ms.get_spectral_window(spwmapping.spwmap[spwid]).sideband:
                     samesideband = False
 
         if nunmapped >= nexpected:
             score = 1.0
-            longmsg = 'No spw mapping for %s ' % ms.basename
+            longmsg = f'No spw mapping for {ms.basename}, intent={intent}, field={field}'
             shortmsg = 'No spw mapping'
         else:
             # Replace the previous score with a warning
             if samesideband is True:
                 score = rutils.SCORE_THRESHOLD_SUBOPTIMAL
-                longmsg = 'Spw mapping within sidebands for %s' % ms.basename
+                longmsg = f'Spw mapping within sidebands for {ms.basename}, intent={intent}, field={field}'
                 shortmsg = 'Spw mapping within sidebands'
             else:
                 score = rutils.SCORE_THRESHOLD_WARNING
-                longmsg = 'Spw mapping across sidebands required for %s' % ms.basename
+                longmsg = f'Spw mapping across sidebands required for {ms.basename}, intent={intent}, field={field}'
                 shortmsg = 'Spw mapping across sidebands'
 
     origin = pqa.QAOrigin(metric_name='score_phaseup_mapping_fraction',

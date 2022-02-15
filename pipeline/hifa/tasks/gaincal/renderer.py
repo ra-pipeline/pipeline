@@ -16,16 +16,17 @@ from . import display as gaincal_displays
 
 LOG = logging.get_logger(__name__)
 
-GaincalApplication = collections.namedtuple('GaincalApplication', 'ms gaintable calmode solint intent spw gainfield')
+GaincalApplication = collections.namedtuple('GaincalApplication',
+                                            'ms gaintable calmode solint intent field spw gainfield')
 
 
 class T2_4MDetailsGaincalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def __init__(self, uri='timegaincal.mako', description='Gain calibration', always_rerender=False):
-        super(T2_4MDetailsGaincalRenderer, self).__init__(
-            uri=uri, description=description, always_rerender=always_rerender)
+        super().__init__(uri=uri, description=description, always_rerender=always_rerender)
 
     def update_mako_context(self, ctx, context, results):
         applications = []
+        spw_mapping = {}
 
         amp_vs_time_summaries = collections.defaultdict(list)
         phase_vs_time_summaries = {}
@@ -50,6 +51,9 @@ class T2_4MDetailsGaincalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         for result in results:
             vis = os.path.basename(result.inputs['vis'])
             ms = context.observing_run.get_ms(vis)
+
+            # Get the SpW mapping info for current MS.
+            spw_mapping[vis] = self.get_spw_mappings(ms)
 
             # Get gain cal applications for current MS.
             ms_applications = self.get_gaincal_applications(context, result, ms)
@@ -206,6 +210,7 @@ class T2_4MDetailsGaincalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         # just created
         ctx.update({
             'applications': applications,
+            'spw_mapping': spw_mapping,
             'amp_vs_time_plots': amp_vs_time_summaries,
             'phase_vs_time_plots': phase_vs_time_summaries,
             'diagnostic_amp_vs_time_plots': diagnostic_amp_vs_time_summaries,
@@ -246,9 +251,11 @@ class T2_4MDetailsGaincalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             gaintable = os.path.basename(calapp.gaintable)
             spw = ', '.join(calapp.spw.split(','))
 
-            to_intent = ', '.join(calapp.calto.intent.split(','))
+            to_intent = ', '.join(sorted(calapp.calto.intent.split(',')))
             if to_intent == '':
                 to_intent = 'ALL'
+
+            to_field = ', '.join(sorted(calapp.calto.field.split(',')))
 
             calmode = utils.get_origin_input_arg(calapp, 'calmode')
             calmode = calmode_map.get(calmode, calmode)
@@ -256,10 +263,27 @@ class T2_4MDetailsGaincalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             assert(len(calapp.calfrom) == 1)
             gainfield = calapp.calfrom[0].gainfield
 
-            a = GaincalApplication(ms.basename, gaintable, calmode, solint, to_intent, spw, gainfield)
+            a = GaincalApplication(ms.basename, gaintable, calmode, solint, to_intent, to_field, spw, gainfield)
             applications.append(a)
 
         return applications
+
+    @staticmethod
+    def get_spw_mappings(ms):
+        combined = []
+        mapped = []
+        for ifld, spwmap in ms.spwmaps.items():
+            if spwmap.combine:
+                combined.append(f"{ifld.field} ({ifld.intent})")
+            else:
+                mapped.append(f"{ifld.field} ({ifld.intent})")
+
+        # Construct string summarizing SpW mapping for MS.
+        combined_str = f"Spectral windows combined for {', '.join(combined)}." if combined else ""
+        mapped_str = f"Spectral windows mapped for {', '.join(mapped)}." if mapped else ""
+        summary_str = ' '.join([combined_str, mapped_str]).strip()
+
+        return summary_str
 
 
 class GaincalPhaseVsTimePlotRenderer(basetemplates.JsonPlotRenderer):
