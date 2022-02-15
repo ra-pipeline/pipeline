@@ -298,6 +298,20 @@ class Plot(object):
         self.qa_score = qa_score
         self.command = command
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        bg_process = state.pop('bg_process', None)
+        if bg_process:
+            try:
+                bg_process.wait(timeout=10)
+            except Exception:
+                bg_process.kill()
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.bg_process = None
+
     @property
     def css_class(self):
         """
