@@ -354,6 +354,14 @@ class Plot(object):
     @property
     def thumbnail(self):
         if os.path.exists(self.thumb_file):
+            if self.bg_process is not None:
+                try:
+                    self.bg_process.wait(timeout=10)
+                except Exception:
+                    self.bg_process.kill()
+                finally:
+                    self.bg_process = None
+
             return self.thumb_file
 
         return self._create_thumbnail()
@@ -408,6 +416,7 @@ class Plot(object):
                     ret = -1
                     retry = True
                     self.bg_process.kill()
+                finally:
                     self.bg_process = None
 
             if retry:
