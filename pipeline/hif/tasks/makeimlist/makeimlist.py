@@ -484,6 +484,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                             try:
                                 # Get a field domain object. Make sure that it has the necessary intent. Otherwise the list of spw IDs
                                 # will not match with the available science spw IDs.
+                                # Using all intents (inputs.intent) here. Further filtering is performed in the next block.
                                 if ms_domain_obj.get_fields(field_intent[0], intent=inputs.intent) != []:
                                     field_domain_obj = ms_domain_obj.get_fields(field_intent[0], intent=inputs.intent)[0]
                                     # Get all science spw IDs for this field and record the ones that are present in this MS
@@ -525,6 +526,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                     filtered_spwlist = []
                     valid_data[str(vislist)] = {}
                     for vis in vislist:
+                        ms_domain_obj = inputs.context.observing_run.get_ms(vis)
                         valid_data[vis] = {}
                         for field_intent in field_intent_list:
                             valid_data[vis][field_intent] = {}
@@ -532,25 +534,28 @@ class MakeImList(basetask.StandardTaskTemplate):
                                 valid_data[str(vislist)][field_intent] = {}
                             # Check only possible field/spw combinations to speed up
                             if vislist_field_spw_combinations.get(field_intent[0], None) is not None:
-                                observed_vis_list = vislist_field_spw_combinations.get(field_intent[0], None).get('vislist', None)
-                                observed_spwids_list = vislist_field_spw_combinations.get(field_intent[0], None).get('spwids', None)
-                                if observed_vis_list is not None and observed_spwids_list is not None:
-                                    # Save spws in main list
-                                    all_spw_keys.extend(map(str, observed_spwids_list))
-                                    # Also save cont selection
-                                    all_spw_keys.append(','.join(map(str, observed_spwids_list)))
-                                    for observed_spwid in map(str, observed_spwids_list):
-                                        valid_data[vis][field_intent][str(observed_spwid)] = self.heuristics.has_data(field_intent_list=[field_intent], spwspec=observed_spwid, vislist=[vis])[field_intent]
-                                        if not valid_data[vis][field_intent][str(observed_spwid)] and vis in observed_vis_list:
-                                            LOG.warning('Data for EB {}, field {}, observed_spwid {} is completely flagged.'.format(
-                                                os.path.basename(vis), field_intent[0], observed_spwid))
-                                        # Aggregated value per vislist (replace with lookup pattern later)
-                                        if str(observed_spwid) not in valid_data[str(vislist)][field_intent]:
-                                            valid_data[str(vislist)][field_intent][str(observed_spwid)] = valid_data[vis][field_intent][str(observed_spwid)]
-                                        else:
-                                            valid_data[str(vislist)][field_intent][str(observed_spwid)] = valid_data[str(vislist)][field_intent][str(observed_spwid)] or valid_data[vis][field_intent][str(observed_spwid)]
-                                        if valid_data[vis][field_intent][str(observed_spwid)]:
-                                            filtered_spwlist.append(observed_spwid)
+                                # Check if this field is present in the current MS and has the necessary intent.
+                                # Using get_fields(name=...) since it does not throw an exception if the field is not found.
+                                if ms_domain_obj.get_fields(name=field_intent[0], intent=field_intent[1]) != []:
+                                    observed_vis_list = vislist_field_spw_combinations.get(field_intent[0], None).get('vislist', None)
+                                    observed_spwids_list = vislist_field_spw_combinations.get(field_intent[0], None).get('spwids', None)
+                                    if observed_vis_list is not None and observed_spwids_list is not None:
+                                        # Save spws in main list
+                                        all_spw_keys.extend(map(str, observed_spwids_list))
+                                        # Also save cont selection
+                                        all_spw_keys.append(','.join(map(str, observed_spwids_list)))
+                                        for observed_spwid in map(str, observed_spwids_list):
+                                            valid_data[vis][field_intent][str(observed_spwid)] = self.heuristics.has_data(field_intent_list=[field_intent], spwspec=observed_spwid, vislist=[vis])[field_intent]
+                                            if not valid_data[vis][field_intent][str(observed_spwid)] and vis in observed_vis_list:
+                                                LOG.warning('Data for EB {}, field {}, observed_spwid {} is completely flagged.'.format(
+                                                    os.path.basename(vis), field_intent[0], observed_spwid))
+                                            # Aggregated value per vislist (replace with lookup pattern later)
+                                            if str(observed_spwid) not in valid_data[str(vislist)][field_intent]:
+                                                valid_data[str(vislist)][field_intent][str(observed_spwid)] = valid_data[vis][field_intent][str(observed_spwid)]
+                                            else:
+                                                valid_data[str(vislist)][field_intent][str(observed_spwid)] = valid_data[str(vislist)][field_intent][str(observed_spwid)] or valid_data[vis][field_intent][str(observed_spwid)]
+                                            if valid_data[vis][field_intent][str(observed_spwid)]:
+                                                filtered_spwlist.append(observed_spwid)
                     filtered_spwlist = sorted(list(set(filtered_spwlist)), key=int)
                 else:
                     continue

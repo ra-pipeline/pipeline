@@ -428,12 +428,12 @@ class Plot(object):
             else:
                 LOG.warning('Error creating thumbnail for %s' % 
                             os.path.basename(self.abspath))
-                return self.basename   
+                return self.abspath   
         except OSError as e:
             # command not available. Return the full-sized image filename
             LOG.warning('Error creating thumbnail for %s: %s' % 
                         (os.path.basename(self.abspath), e))
-            return self.basename
+            return self.abspath
 
     def __repr__(self):
         return '<Plot(\'%s\')>' % self.abspath 

@@ -46,6 +46,12 @@ class HeuristicsParameter(object):
     # for MAD
     DistanceThresholdFactor = 75
 
+    # Distance threshold factor for raster gap detection
+    RasterGapThresholdFactor = 0.05
+
+    # Threshold for "Round-trip" raster scan detection
+    RoundTripRasterScanThresholdFactor = 0.6
+
 
 def get_func_compute_mad() -> Callable:
     """Return function to compute median absolute deviation (MAD).
@@ -578,15 +584,27 @@ def find_raster_gap(ra: np.ndarray, dec: np.ndarray, dtrow_list: List[np.ndarray
     """
     distance_list = get_raster_distance(ra, dec, dtrow_list)
     delta_distance = distance_list[1:] - distance_list[:-1]
-    LOG.info('delta_distance = %s', delta_distance)
-    idx = np.where(delta_distance < 0)[0] + 1
-    delta = idx[1:] - idx[:-1]
-    if np.any(delta == 1):
-        # possibly one-way raster mapping which is not supported
+    threshold = HeuristicsParameter.RasterGapThresholdFactor * np.median(delta_distance)
+    LOG.debug('delta_distance = %s', delta_distance)
+    LOG.debug('threshold = %s', threshold)
+    idx = np.where(delta_distance < threshold)[0] + 1
+    raster_gap = np.concatenate([[0], idx, [len(dtrow_list)]])
+    delta = raster_gap[1:] - raster_gap[:-1]
+    LOG.debug('idx = %s, raster_gap = %s', idx, raster_gap)
+    LOG.debug('delta = %s', delta)
+    # check if the direction of raster mapping is one-way (go back to
+    # the start position of previous raster frame) or round-trip
+    # (start from the end position of previous raster frame)
+    # For the latter case, all raster rows in the raster frames taken
+    # along returning direction are separated by the above threshold
+    # so that most of the elements in delta become 1
+    ndelta1 = len(np.where(delta == 1)[0])
+    LOG.debug('ndelta1 = %s', ndelta1)
+    if ndelta1 > HeuristicsParameter.RoundTripRasterScanThresholdFactor * len(raster_gap):
+        # possibly round-trip raster mapping which is not supported
         msg = 'The pattern seems to be raster but is not supported by this heuristics.'
         LOG.warning(msg)
         raise RasterScanHeuristicsFailure(msg)
-    raster_gap = np.concatenate([[0], idx, [len(dtrow_list)]])
     return raster_gap
 
 
