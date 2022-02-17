@@ -124,7 +124,7 @@ def set_unit(ms, calapp):
             data_units[field_id] = 'K'
         else:
             LOG.warning('Calibration of {} (field {}) is not correct. Missing pscal and/or tsyscal.'.format(ms.basename, field_name))
-        if 'amp' in caltypes:
+        if 'amp' in caltypes or 'gaincal' in caltypes:
             if data_units[field_id] == 'K':
                 data_units[field_id] = 'Jy'
 
