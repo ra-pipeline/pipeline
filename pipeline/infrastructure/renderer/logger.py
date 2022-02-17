@@ -397,11 +397,11 @@ class Plot(object):
         # Run THUMBNAIL_CMD concurrently. The self.bg_process attribute holds
         # a reference to Popen object so that status of the background job can
         # be examined later. Immediately return without waiting for a completion
-        # of the background process. Return value is self.basename because
+        # of the background process. Return value is self.abspath because
         # thumbnail may or may not be created at this point.
         if background and self.bg_process is None:
             self.bg_process = subprocess.Popen(cmd)
-            return self.basename
+            return self.abspath
 
         try:
             retry = True
