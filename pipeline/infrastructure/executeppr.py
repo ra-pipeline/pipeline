@@ -23,6 +23,7 @@ from . import utils
 from . import vdp
 from . import casa_tools
 from . import exceptions
+from . import pipelineasync
 from . import task_registry
 
 
@@ -256,6 +257,9 @@ def executeppr(pprXmlFile: str, importonly: bool = True,
                 task_args['vis'] = files
                 task_args['session'] = sessions
 
+            # start event loop for background process
+            pipelineasync.start_event_loop()
+
             remapped_args = argmapper.convert_args(pipeline_task_class, task_args, convert_nulls=False)
             inputs = vdp.InputsContainer(pipeline_task_class, context, **remapped_args)
             task = pipeline_task_class(inputs)
@@ -303,6 +307,10 @@ def executeppr(pprXmlFile: str, importonly: bool = True,
             casa_tools.post_to_log(errstr, echo_to_screen=echo_to_screen)
             errorfile = utils.write_errorexit_file(workingDir, 'errorexit', 'txt')
             break
+
+        finally:
+            # stop event loop
+            pipelineasync.stop_event_loop()
 
         # Stop execution if result is a failed task result or a list
         # containing a failed task result.

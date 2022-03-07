@@ -28,6 +28,8 @@ import string
 import subprocess
 
 from pipeline.infrastructure import logging
+from pipeline.infrastructure import pipelineasync
+
 
 LOG = logging.get_logger(__name__)
 
@@ -303,9 +305,9 @@ class Plot(object):
         bg_process = state.pop('bg_process', None)
         if bg_process:
             try:
-                bg_process.wait(timeout=10)
+                pipelineasync.wait_task(bg_process, timeout=3600)
             except Exception:
-                bg_process.kill()
+                pipelineasync.cancel_task(bg_process, timeout=10)
         return state
 
     def __setstate__(self, state):
@@ -356,9 +358,9 @@ class Plot(object):
         if os.path.exists(self.thumb_file):
             if self.bg_process is not None:
                 try:
-                    self.bg_process.wait(timeout=10)
+                    pipelineasync.wait_task(self.bg_process, timeout=3600)
                 except Exception:
-                    self.bg_process.kill()
+                    pipelineasync.cancel_task(self.bg_process, timeout=10)
                 finally:
                     self.bg_process = None
 
@@ -400,7 +402,8 @@ class Plot(object):
         # of the background process. Return value is self.abspath because
         # thumbnail may or may not be created at this point.
         if background and self.bg_process is None:
-            self.bg_process = subprocess.Popen(cmd)
+            pipelineasync.start_event_loop()
+            self.bg_process = pipelineasync.schedule_task(cmd)
             return self.abspath
 
         try:
@@ -408,14 +411,14 @@ class Plot(object):
             if self.bg_process:
                 retry = False
                 try:
-                    ret = self.bg_process.wait(timeout=10)
+                    ret = pipelineasync.wait_task(self.bg_process, timeout=3600)
                     retry = ret != 0
                 except Exception as e:
                     # Any error or timeout. Kill running process and retry.
                     LOG.trace('Background job for %s failed: %s' % self.basename, e)
                     ret = -1
                     retry = True
-                    self.bg_process.kill()
+                    pipelineasync.cancel_task(self.bg_process, timeout=10)
                 finally:
                     self.bg_process = None
 

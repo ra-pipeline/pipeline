@@ -3,6 +3,7 @@ import pprint
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.api as api
 import pipeline.infrastructure.argmapper as argmapper
+import pipeline.infrastructure.pipelineasync as pipelineasync
 import pipeline.infrastructure.vdp as vdp
 from pipeline.infrastructure import exceptions, task_registry, utils
 from . import cli
@@ -68,17 +69,24 @@ def execute_task(context, casa_task, casa_args):
         _print_inputs(casa_task, casa_args, task_inputs)
         return None
 
-    # Execute the class, collecting the results
-    results = _execute_task(casa_task, task_inputs, dry_run)
+    try:
+        # start event loop for background process
+        pipelineasync.start_event_loop()
 
-    # write the command invoked (eg. hif_setjy) to the result so that the
-    # weblog can print help from the XML task definition rather than the
-    # python class
-    results.taskname = casa_task
+        # Execute the class, collecting the results
+        results = _execute_task(casa_task, task_inputs, dry_run)
 
-    # accept the results if desired
-    if accept_results and not dry_run:
-        _merge_results(context, results)
+        # write the command invoked (eg. hif_setjy) to the result so that the
+        # weblog can print help from the XML task definition rather than the
+        # python class
+        results.taskname = casa_task
+
+        # accept the results if desired
+        if accept_results and not dry_run:
+            _merge_results(context, results)
+    finally:
+        # stop event loop
+        pipelineasync.stop_event_loop()
 
     tracebacks = utils.get_tracebacks(results)
     if len(tracebacks) > 0:
