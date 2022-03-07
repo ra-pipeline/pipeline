@@ -16,6 +16,7 @@ from pipeline.hifa.heuristics.phasespwmap import combine_spwmap
 from pipeline.hifa.heuristics.phasespwmap import simple_n2wspwmap
 from pipeline.hifa.heuristics.phasespwmap import snr_n2wspwmap
 from pipeline.hifa.tasks.gaincalsnr import gaincalsnr
+from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import task_registry
 
 LOG = infrastructure.get_logger(__name__)
@@ -134,13 +135,21 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         # Derive the optimal spectral window maps.
         spwmaps = self._derive_spwmaps(spwmap_intents, exclude_intents)
 
-        # Compute the spw-to-spw phase offsets ("phaseup") cal table.
-        LOG.info('Computing spw phaseup table for {}'.format(inputs.ms.basename))
+        # Compute the spw-to-spw phase offsets ("phaseup") cal table and accept
+        # into local context.
         phaseupresult = self._do_phaseup()
 
+        # Compute diagnostic phase caltable for phase intent/fields, with the
+        # spw-to-spw phase offset corrections included in pre-apply.
+        diag_phase_results = self._do_diagnostic_phasecal(spwmaps)
+
+        # Compute what SNR is achieved for PHASE fields after the SpW phase-up
+        # correction.
+        snr_info = self._compute_median_snr(diag_phase_results)
+
         # Create the results object.
-        result = SpwPhaseupResults(vis=inputs.vis, phaseup_result=phaseupresult, spwmaps=spwmaps,
-                                   phasecal_mapping=phasecal_mapping, unregister_existing=inputs.unregister_existing)
+        result = SpwPhaseupResults(vis=inputs.vis, phasecal_mapping=phasecal_mapping, phaseup_result=phaseupresult,
+                                   snr_info=snr_info, spwmaps=spwmaps, unregister_existing=inputs.unregister_existing)
 
         return result
 
@@ -226,7 +235,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
 
         return mapping
 
-    def _derive_spwmaps(self, spwmap_intents: str, exclude_intents: str) -> Dict:
+    def _derive_spwmaps(self, spwmap_intents: str, exclude_intents: str) -> Dict[IntentField, SpwMapping]:
         """
         Compute separate optimal spectral window mapping for each field
         covering one of the intents specified by "spwmap_intents", unless the
@@ -293,6 +302,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         # task weblog; these will get populated if an SNR test is run
         # (depending on the spw mapping mode).
         snrs = []
+        combined_snrs = []
         spwids = []
 
         # Compute the spw map according to the rules defined by each
@@ -334,7 +344,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                 # Run a test on the combined spws to identify spws whose
                 # combined SNR would not meet the threshold set by
                 # inputs.phasesnr.
-                low_combinedsnr_spws = self._do_combined_snr_test(spwids, snrs, spwmap)
+                low_combinedsnr_spws, combined_snrs = self._do_combined_snr_test(spwids, snrs, spwmap)
 
             # If some, but not all, spws have good SNR values, then try to use
             # an SNR-based approach for, but fall back to combined spw mapping
@@ -369,7 +379,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                     # Run a test on the combined spws to identify spws whose
                     # combined SNR would not meet the threshold set by
                     # inputs.phasesnr.
-                    low_combinedsnr_spws = self._do_combined_snr_test(spwids, snrs, spwmap)
+                    low_combinedsnr_spws, combined_snrs = self._do_combined_snr_test(spwids, snrs, spwmap)
 
         elif inputs.hm_spwmapmode == 'combine':
             spwmap = combine_spwmap(scispws)
@@ -385,7 +395,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             LOG.info(f'Using standard spw map {spwmap} for {inputs.ms.basename}, intent={intent}, field={field}')
 
         # Collect SNR info.
-        snr_info = self._get_snr_info(spwids, snrs)
+        snr_info = self._get_snr_info(spwids, snrs, combined_snrs)
 
         return SpwMapping(combine, spwmap, low_combinedsnr_spws, snr_info)
 
@@ -447,7 +457,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
 
         return nosnr, spwids, snrs, goodsnrs
 
-    def _do_combined_snr_test(self, spwlist: List, perspwsnr: List, spwmap: List) -> List:
+    def _do_combined_snr_test(self, spwlist: List, perspwsnr: List, spwmap: List) -> Tuple[List, Dict]:
         """
         Calculate combined SNRs from the "per-SpW SNR" and return a list of SpW
         IDs that does not meet phase SNR threshold. Grouping of SpWs is
@@ -464,15 +474,18 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
 
         Returns:
             List of spectral window IDs whose combined phase SNR is below the
-            threshold specified by inputs.phasesnr.
+            threshold specified by inputs.phasesnr, and dictionary containing
+            for a given reference SpW the corresponding mapped SpWs and
+            combined SNR.
         """
         LOG.info("Start combined SpW SNR test")
         LOG.debug('- spwlist to analyze: {}'.format(spwlist))
         LOG.debug('- per SpW SNR: {}'.format(perspwsnr))
         LOG.debug('- spwmap = {}'.format(spwmap))
 
-        # Initialize return list.
+        # Initialize return objects.
         low_snr_spwids = []
+        combined_snrs = {}
 
         # Filter reference SpW IDs of each group.
         unique_mappedspw = {spwmap[spwid] for spwid in spwlist}
@@ -487,14 +500,18 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                     snr = perspwsnr[i]
                     if snr is None:
                         LOG.error('SNR not calculated for spw={}. Cannot calculate combined SNR'.format(spwid))
-                        return []
+                        return [], {}
                     snrlist.append(perspwsnr[i])
                     combined_idx.append(i)
 
             # calculate combined SNR from per spw SNR
             combined_snr = numpy.linalg.norm(snrlist)
+            combined_spws = [spwlist[j] for j in combined_idx]
             LOG.info('Reference SpW ID = {} (Combined SpWs = {}) : Combined SNR = {}'
-                     ''.format(mappedspwid, str([spwlist[j] for j in combined_idx]), combined_snr))
+                     ''.format(mappedspwid, str(combined_spws), combined_snr))
+            # For current reference SpW, store list of combined SpWs and
+            # the combined SNR.
+            combined_snrs[str(mappedspwid)] = (combined_spws, combined_snr)
 
             # If the combined SNR does not meet the phase SNR threshold, then
             # add these to the list of low combined SNR spws.
@@ -504,17 +521,40 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         # Log results from SNR test.
         LOG.info('SpW IDs that has low combined SNR (threshold: {}) = {}'.format(self.inputs.phasesnr, low_snr_spwids))
 
-        return low_snr_spwids
+        return low_snr_spwids, combined_snrs
 
-    def _do_phaseup(self) -> GaincalResults:
+    def _do_gaincal(self, caltable=None, field=None, intent=None, gaintype=None, combine=None, minblperant=None,
+                    minsnr=None) -> GaincalResults:
+        """
+        Runs gaincal worker task separately for each SpectralSpec present
+        among the requested SpWs, each appending to the same caltable.
+
+        The CalApplications in the result are modified to set calwt to False.
+
+        Args:
+            caltable: name of output caltable
+            field: field selection string
+            intent: intent selection string
+            gaintype: gain type to use
+            combine: selects whether to combine SpWs
+            minblperant: minimum baselines per antenna
+            minsnr: minimum SNR
+
+        Returns:
+            Results object from gaincal worker task.
+        """
         inputs = self.inputs
         ms = inputs.ms
 
-        # Get the science spws
+        # Identify which science spws were selected by inputs parameter.
         request_spws = ms.get_spectral_windows(task_arg=inputs.spw)
-        targeted_scans = ms.get_scans(scan_intent=inputs.intent, spw=inputs.spw)
 
-        # boil it down to just the valid spws for these fields and request
+        # Identify which scans covered the requested intent, field, and any of
+        # the requested spws.
+        targeted_scans = ms.get_scans(scan_intent=intent, spw=inputs.spw, field=field)
+
+        # Among the requested spws, identify which have a scan among the
+        # targeted scans.
         scan_spws = {spw for scan in targeted_scans for spw in scan.spws if spw in request_spws}
 
         # Create a separate phase solution caltable for each SpectralSpec
@@ -531,25 +571,30 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                 LOG.info('No data to process for spectral spec {}. Continuing...'.format(spectral_spec))
                 continue
 
+            # Initialize gaincal inputs.
             task_args = {
                 'output_dir': inputs.output_dir,
                 'vis': inputs.vis,
-                'caltable': inputs.caltable,
-                'field': inputs.field,
-                'intent': inputs.intent,
+                'caltable': caltable,
+                'field': field,
+                'intent': intent,
                 'spw': tuning_spw_str,
                 'solint': 'inf',
-                'gaintype': 'G',
+                'gaintype': gaintype,
                 'calmode': 'p',
-                'minsnr': inputs.minsnr,
-                'combine': inputs.combine,
+                'minsnr': minsnr,
+                'combine': combine,
                 'refant': inputs.refant,
-                'minblperant': inputs.minblperant,
+                'minblperant': minblperant,
             }
             task_inputs = gtypegaincal.GTypeGaincalInputs(inputs.context, **task_args)
-            phaseup_task = gtypegaincal.GTypeGaincal(task_inputs)
-            tuning_result = self._executor.execute(phaseup_task)
-            original_calapps.extend(tuning_result.pool)
+
+            # Initialize and execute gaincal task.
+            phasecal_task = gtypegaincal.GTypeGaincal(task_inputs)
+            phasecal_result = self._executor.execute(phasecal_task)
+
+            # Collect CalApplications.
+            original_calapps.extend(phasecal_result.pool)
 
         # Phase solution caltables should always be registered to be applied
         # with calwt=False (PIPE-1154). Create an updated version of each
@@ -557,10 +602,114 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         # existing CalApplications in latest tuning result with complete list
         # of all updated CalApplications, and return this as the final result.
         processed_calapps = [callibrary.copy_calapplication(c, calwt=False) for c in original_calapps]
-        tuning_result.pool = processed_calapps
-        tuning_result.final = processed_calapps
+        phasecal_result.pool = processed_calapps
+        phasecal_result.final = processed_calapps
+
+        return phasecal_result
+
+    def _do_phaseup(self) -> GaincalResults:
+        """
+        Creates the SpW-to-SpW phase-up caltable, and merges the resulting
+        table into the local task context.
+
+        Returns:
+            Results object from gaincal worker task.
+        """
+        inputs = self.inputs
+
+        # Create spw-to-spw phaseup caltable.
+        LOG.info(f'Computing spw phase-up table for {inputs.ms.basename}')
+        tuning_result = self._do_gaincal(caltable=inputs.caltable, field=inputs.field, intent=inputs.intent,
+                                         gaintype='G', combine=inputs.combine, minsnr=inputs.minsnr,
+                                         minblperant=inputs.minblperant)
+
+        # Accept this spw-to-spw phase offsets result into the local context,
+        # to ensure the caltable is included in pre-apply for subsequent steps
+        # in this task.
+        tuning_result.accept(inputs.context)
 
         return tuning_result
+
+    def _do_diagnostic_phasecal(self, spwmaps: Dict[IntentField, SpwMapping]) -> List[GaincalResults]:
+        """
+        Creates the diagnostic phase caltable for each phase calibrator field,
+        where the SpW-to-SpW phase-up caltable should be included in pre-apply
+        (since it was merged into local context). This table is later used to
+        assess the median SNR achieved for each phase calibrator in each SpW
+        after the SpW-to-SpW phase-up is applied (PIPE-665).
+
+        Use phase gaincal parameters appropriate for the SpW mapping derived
+        earlier for each phase calibrator field. Similar to hifa_timegaincal,
+        set minblperant to 4 and minsnr to 3.
+
+        Args:
+            spwmaps: dictionary with (Intent, Field) combinations as keys and
+                corresponding spectral window mapping as values.
+
+        Returns:
+            List of result objects from gaincal worker task(s) that produced
+            the diagnostic phase caltable(s).
+        """
+        inputs = self.inputs
+
+        # Derive separate phase solutions for each PHASE field.
+        intent = 'PHASE'
+        gaincal_results = []
+        for field in inputs.ms.get_fields(intent=intent):
+            # Get optimal value for phase solution parameters 'combine' and
+            # 'gaintype' for current PHASE field from SpW mappings derived
+            # earlier in this task.
+            combine, gaintype = self._get_phasecal_params(spwmaps, intent, field.name)
+
+            # Create diagnostic phase caltables.
+            # PIPE-665: for the diagnostic phase caltables, always use
+            # minsnr=3, minblperant=4.
+            LOG.info(f'Computing diagnostic phase caltable for {inputs.ms.basename}, intent={intent},'
+                     f' field={field.name}.')
+            gaincal_results.append(self._do_gaincal(field=field.name, intent=intent, gaintype=gaintype, combine=combine,
+                                                    minblperant=4, minsnr=3))
+
+        return gaincal_results
+
+    def _compute_median_snr(self, gaincal_results: List[GaincalResults]) -> Dict[Tuple[str, str], float]:
+        """
+        This method evaluates the diagnostic phase caltable(s) produced in an
+        earlier step to compute the median SNR for each phase calibrator field
+        and for each SpW.
+
+        Args:
+            gaincal_results: List of gaincal worker task results representing
+            the diagnostic phase caltable(s).
+
+        Returns:
+            Dictionary with phase calibrator field name and SpW as keys, and
+            corresponding median SNR as values.
+        """
+        inputs = self.inputs
+
+        LOG.info(f'Computing median phase SNR information for {inputs.ms.basename}.')
+
+        snr_info = collections.defaultdict(dict)
+        for result in gaincal_results:
+            # Retrieve field and caltable.
+            caltable = result.final[0].gaintable
+            field = result.inputs['field']
+
+            with casa_tools.TableReader(caltable) as table:
+                spws = table.getcol("SPECTRAL_WINDOW_ID")
+                snrs = table.getcol("SNR")
+
+            # For each unique SpW, compute median SNR and store in snr_info,
+            # and log a warning if the median SNR is still below the SNR
+            # threshold.
+            for spw in sorted(set(spws)):
+                snr_info[(field, spw)] = numpy.median(snrs[:, 0, numpy.where(spws == spw)[0]])
+
+                if snr_info[(field, spw)] < inputs.phasesnr:
+                    LOG.warning(f"{result.inputs['vis']}, field {field}, SpW {spw}: median SNR"
+                                f" ({snr_info[(field, spw)]}) is below the low-SNR threshold ({inputs.phasesnr}).")
+
+        return snr_info
 
     @staticmethod
     def _get_intent_field(ms: MeasurementSet, intents: str, exclude_intents: str = None) -> List[Tuple[str, str]]:
@@ -603,7 +752,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         LOG.info('Temporarily resetting spwmaps for %s', ms.basename)
         ms.spwmaps = {}
 
-    def _get_snr_info(self, spwids: List[int], snrs: List[float]) -> List[Tuple[int, float]]:
+    def _get_snr_info(self, spwids: List[int], snrs: List[float], combined_snrs: Dict) -> List[Tuple[str, float]]:
         """
         Helper method that takes phase SNR info from the SNR test, and returns
         return phase SNR info for all SpWs specified in inputs.spw.
@@ -611,26 +760,52 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         Args:
             spwids: list of SpW IDs for which phase SNRs were determined.
             snrs: list of phase SNRs.
+            combined_snrs: dictionary of reference SpWs with list of
+                corresponding combined SpW and combined phase SNR.
 
         Returns:
-            List of tuples, specifying SpW ID and corresponding phase SNR.
+            List of tuples, specifying string representing SpW(s) and
+            corresponding phase SNR.
         """
         spw_snr = {str(k): v for k, v in zip(spwids, snrs)}
         snr_info = []
+
         # Create entry for each SpW specified by inputs.
         for spwid in self.inputs.spw.split(','):
-            # If no SNR info was available, set to None, otherwise use the
-            # derived value.
-            snr = None
-            if spwid in spw_snr:
-                snr = spw_snr[spwid]
-            snr_info.append((spwid, snr))
+            # If this SpW is the reference SpW for a group of combined SpWs
+            # then add an entry to list the combined SNR.
+            if spwid in combined_snrs:
+                combined_spws = ', '.join(str(s) for s in combined_snrs[spwid][0])
+                combined_snr = combined_snrs[spwid][1]
+                snr_info.append((f'Combined ({combined_spws})', combined_snr))
+
+            # Retrieve SNR info for individual SpW if available.
+            snr = spw_snr.get(spwid, None)
+            snr_info.append((str(spwid), snr))
+
         return snr_info
+
+    @staticmethod
+    def _get_phasecal_params(spwmaps, intent, field):
+        # By default, no spw mapping or combining, and gaintype='G'.
+        combine = ''
+        gaintype = 'G'
+
+        # Try to retrieve SpW mapping info for requested intent and field.
+        spwmapping = spwmaps.get((intent, field), None)
+
+        # If a mapping was found, and it requires SpW combination, then update
+        # combine and gaintype accordingly.
+        if spwmapping and spwmapping.combine:
+            combine = 'spw'
+            gaintype = 'T'
+
+        return combine, gaintype
 
 
 class SpwPhaseupResults(basetask.Results):
-    def __init__(self, vis: str = None, phaseup_result: GaincalResults = None, spwmaps: Dict = None,
-                 phasecal_mapping: Dict = None, unregister_existing: Optional[bool] = False):
+    def __init__(self, vis: str = None, phasecal_mapping: Dict = None, phaseup_result: GaincalResults = None,
+                 snr_info: Dict = None, spwmaps: Dict = None, unregister_existing: Optional[bool] = False):
         """
         Initialise the phaseup spw mapping results object.
         """
@@ -642,6 +817,7 @@ class SpwPhaseupResults(basetask.Results):
         self.vis = vis
         self.phasecal_mapping = phasecal_mapping
         self.phaseup_result = phaseup_result
+        self.snr_info = snr_info
         self.spwmaps = spwmaps
         self.unregister_existing = unregister_existing
 

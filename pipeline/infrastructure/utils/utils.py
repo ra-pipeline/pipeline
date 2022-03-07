@@ -18,12 +18,14 @@ from .conversion import range_to_list, dequote
 from .. import casa_tools
 from .. import logging
 
+import casaplotms.private.plotmstool as plotmstool
+
 LOG = logging.get_logger(__name__)
 
 __all__ = ['find_ranges', 'dict_merge', 'are_equal', 'approx_equal', 'get_num_caltable_polarizations',
            'flagged_intervals', 'get_field_identifiers', 'get_receiver_type_for_spws', 'get_spectralspec_to_spwid_map',
            'get_casa_quantity', 'get_si_prefix', 'absolute_path', 'relative_path', 'get_task_result_count',
-           'place_repr_source_first', 'get_casa_session_details']
+           'place_repr_source_first', 'shutdown_plotms', 'get_casa_session_details']
 
 
 def find_ranges(data: Union[str, List[int]]) -> str:
@@ -412,6 +414,26 @@ def place_repr_source_first(itemlist: Union[List[str], List[Tuple]], repr_source
         LOG.warning('Could not reorder field list to place representative source first')
 
     return itemlist
+
+
+def shutdown_plotms():
+    """Shutdown the existing plotms process in the current CASA session.
+
+    This utility function shuts down the persist plotms process in the current CASA session, so the next plotms call
+    can start from a new proc. It's implemented as a short-term workaround for two plotms behaviors due to the persistent
+    state of plotms once it's called in a CASA session.
+        1. a plotms process always uses the initial working directory to construct the output plot path when the 
+           figure name is specified as a relative path (see CAS-13626), even after the working directory has changed 
+           in the Python perspective.
+        2. a plotms process always uses the same casa logfile when it was started for its logging, even after 
+           the casa log file location has been altered.
+
+    Note: This function follows the practice illustrated inside casaplotms.private.plotmstool.__stub_check()
+    """
+    if plotmstool.__proc is not None:
+        plotmstool.__proc.kill()
+        plotmstool.__stub = None
+        plotmstool.__uri = None
 
 
 def get_casa_session_details():

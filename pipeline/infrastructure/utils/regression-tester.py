@@ -7,8 +7,12 @@ test_* methods for testing.
 
 import os
 import shutil
+import datetime
+import platform
 import pytest
 from typing import Tuple, Optional, List
+
+import casatasks.private.tec_maps as tec_maps 
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.casa_tools as casa_tools
@@ -16,7 +20,8 @@ import pipeline.recipereducer
 from pipeline.infrastructure.renderer import regression
 import pipeline.infrastructure.executeppr as almappr
 import pipeline.infrastructure.executevlappr as vlappr
-from pipeline.infrastructure.utils import get_casa_session_details
+import pipeline.infrastructure.logging as logging
+from pipeline.infrastructure.utils import shutdown_plotms, get_casa_session_details
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -49,7 +54,6 @@ class PipelineRegression(object):
         if os.path.isdir(self.output_dir):
             shutil.rmtree(self.output_dir)
         os.mkdir(self.output_dir)
-        os.chdir(self.output_dir)
 
     def __sanitize_regression_string(self, instring: str) -> Tuple:
         """Sanitize to get numeric values, remove newline chars and change to float.
@@ -84,7 +88,13 @@ class PipelineRegression(object):
             omp_num_threads: specify the number of OpenMP threads used for this regression test instance, regardless of 
                              the default value of the current CASA session. An explicit setting could mitigate potential small 
                              numerical difference from threading-sensitive CASA tasks (e.g. setjy/tclean, which relies 
-                             on the FFTW library).
+                             on the FFTW library).            
+
+        note: Because a PL execution depends on global CASA states, only one test can run under 
+        a CASA process at the same. Therefore a parallelization based on process-forking might not work
+        properly (e.g., xdist: --forked).  However, it's okay to group tests under several independent
+        subprocesses (e.g., xdist: -n 4)
+
         """
         # Run the Pipeline using cal+imag ALMA IF recipe
         # set datapath in ~/.casa/config.py, e.g. datapath = ['/users/jmasters/pl-testdata.git']
@@ -92,12 +102,36 @@ class PipelineRegression(object):
 
         # optionally set OpenMP nthreads to a specified value.
         if omp_num_threads is not None:
-            # note: casa_tools.casalog.ompGetNumThreads() and get_casa_session_details()['omp_num_threads'] are equivalent.
+            # casa_tools.casalog.ompGetNumThreads() and get_casa_session_details()['omp_num_threads'] are equivalent.
             default_nthreads = get_casa_session_details()['omp_num_threads']
             casa_tools.casalog.ompSetNumThreads(omp_num_threads)
 
         try:
             # run the pipeline for new results
+
+            # switch from the pytest-call working directory to the root folder for this test.
+            os.chdir(self.output_dir)
+
+            # create the sub-directory structure for this test and switch to "working/"
+            dd_list = ['products', 'working', 'rawdata'] if ppr else ['products', 'working']
+            for dd in dd_list:
+                try:
+                    os.mkdir(dd)
+                except FileExistsError:
+                    LOG.warning(f"Directory \'{dd} exists.  Continuing")
+            os.chdir('working')
+
+            # PIPE-1301: shut down the existing plotms process to avoid side-effects from changing CWD.
+            # This is implemented as a workaround for CAS-13626
+            shutdown_plotms()
+            
+            # PIPE-1432: reset casatasks/tec_maps.workDir as it's unaware of a CWD change.
+            if hasattr(tec_maps, 'workDir'):
+                tec_maps.workDir = os.getcwd()+'/'            
+
+            # switch to per-test casa/PL logfile paths and backup the default(initial) casa logfile name
+            _, _, last_casa_logfile = self.__reset_logfiles(prepend=True)
+
             if ppr:
                 self.__run_ppr(input_vis, ppr, telescope)
             else:
@@ -114,6 +148,10 @@ class PipelineRegression(object):
 
             # Compare new results with expected results
             self.__compare_results(new_file, default_relative_tolerance)
+
+            # restore the default logfile state
+            self.__reset_logfiles(casa_logfile=last_casa_logfile)
+
         finally:
             os.chdir(self.current_path)
 
@@ -178,21 +216,25 @@ class PipelineRegression(object):
             input_vis : MS name
             ppr : PPR file name
             telescope : string 'alma' or 'vla'
+        
+        note: this private method is expected be called under "working/"
         """
-        for dd in ('rawdata', 'products', 'working'):
-            try:
-                os.mkdir(dd)
-            except FileExistsError:
-                LOG.warning(f"Directory \'{dd} exists.  Continuing")
+
+        # executeppr expects the rawdata in ../rawdata
+        os.symlink(input_vis, f'../rawdata/{os.path.basename(input_vis)}')
+
+        # save a copy of PPR in the directory one level above "working/".
         ppr_path = casa_tools.utils.resolve(ppr)
-        shutil.copyfile(ppr_path, os.path.basename(ppr_path))
-        os.symlink(input_vis, f'rawdata/{os.path.basename(input_vis)}')
-        os.chdir('working')
+        ppr_local = f'../{os.path.basename(ppr_path)}'
+        shutil.copyfile(ppr_path, ppr_local)
+
+        # executeppr expects this environment avariable pointing to "working/".
         os.environ['SCIPIPE_ROOTDIR'] = os.getcwd()
+
         if telescope is 'alma':
-            almappr.executeppr(f'../{os.path.basename(ppr_path)}', importonly=False)
+            almappr.executeppr(ppr_local, importonly=False)
         elif telescope is 'vla':
-            vlappr.executeppr(f'../{os.path.basename(ppr_path)}', importonly=False)
+            vlappr.executeppr(ppr_local, importonly=False)
         else:
             LOG.error("Telescope is not 'alma' or 'vla'.  Can't run executeppr.")
 
@@ -202,14 +244,40 @@ class PipelineRegression(object):
 
         Args:
             input_vis : MS name
+
+        note: this private method is expected be called under "working/"
         """
         LOG.warning("Running without Pipeline Processing Request (PPR).  Using recipereducer instead.")
-        try:
-            os.mkdir('working')
-        except FileExistsError:
-            LOG.warning(f"Directory working exists.  Continuing")
-        os.chdir('working')
+        
         pipeline.recipereducer.reduce(vis=[input_vis], procedure=self.recipe)
+
+    def __reset_logfiles(self, casacalls_logfile=None, casa_logfile=None, prepend=False):
+        """Put CASA/Pipeline logfiles into the test working directory."""
+
+        # reset casacalls-*.txt
+        if casacalls_logfile is None:
+            casacalls_logfile = 'casacalls-{!s}.txt'.format(platform.node().split('.')[0])
+        else:
+            casacalls_logfile = casacalls_logfile
+        _ = logging.get_logger('CASACALLS', stream=None, format='%(message)s', addToCasaLog=False,
+                               filename=casacalls_logfile)
+        # reset casa-*.log
+        if casa_logfile is None:
+            now_str = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+            casa_logfile = os.path.abspath(f'casa-{now_str}.log')
+        else:
+            casa_logfile = os.path.abspath(casa_logfile)
+        last_casa_logfile = casa_tools.casalog.logfile()
+        casa_tools.casalog.setlogfile(casa_logfile)
+
+        # prepend the content of the last CASA logfile in the new logfile.
+        if prepend and os.path.exists(last_casa_logfile):
+            with open(last_casa_logfile, 'r') as infile:
+                with open(casa_logfile, 'a') as outfile:
+                    outfile.write(infile.read())
+
+        return casacalls_logfile, casa_logfile, last_casa_logfile
+
 
 # The methods below are test methods called from pytest.
 
@@ -259,7 +327,7 @@ def test_uid___A002_X85c183_X36f_SPW15_23__PPR__regression():
 
     # copy files use restore task into products folder
     input_products = casa_tools.utils.resolve(f'{input_dir}/products')
-    shutil.copytree(input_products, './products')
+    shutil.copytree(input_products, 'uid___A002_X85c183_X36f_SPW15_23.ms/products')
 
     pr.run(ppr='pl-regressiontest/uid___A002_X85c183_X36f_SPW15_23/PPR.xml')
 
@@ -296,7 +364,7 @@ def test_uid___mg2_20170525142607_180419__PPR__regression():
 
     # copy files use restore task into products folder
     input_products = casa_tools.utils.resolve(f'{input_dir}/products')
-    shutil.copytree(input_products, './products')
+    shutil.copytree(input_products, 'mg2-20170525142607-180419_PPR/products')
 
     pr.run(ppr=f'{input_dir}/PPR.xml')
 
@@ -333,7 +401,8 @@ def test_13A_537__procedure_hifv__regression():
                             input_dir=input_dir,
                             visname='13A-537.sb24066356.eb24324502.56514.05971091435',
                             expectedoutput=(f'{input_dir}/' +
-                                            '13A-537.casa-6.2.1.7-pipeline-2021.2.0.128.results.txt'))
+                                            '13A-537.casa-6.2.1.7-pipeline-2021.2.0.128.results.txt'),
+                            output_dir='13A_537__procedure_hifv__regression')
 
     pr.run(telescope='vla', omp_num_threads=1)
 
@@ -351,7 +420,8 @@ def test_13A_537__calibration__PPR__regression():
     pr = PipelineRegression(input_dir=input_dir,
                             visname='13A-537.sb24066356.eb24324502.56514.05971091435',
                             expectedoutput=(f'{input_dir}/' +
-                                            '13A-537.casa-6.2.1.7-pipeline-2021.2.0.128.results.txt'))
+                                            '13A-537.casa-6.2.1.7-pipeline-2021.2.0.128.results.txt'),
+                            output_dir='13A_537__calibration__PPR__regression')
 
     pr.run(ppr=f'{input_dir}/PPR_13A-537.xml', telescope='vla', omp_num_threads=1)
 
@@ -367,11 +437,12 @@ def test_13A_537__restore__PPR__regression():
     pr = PipelineRegression(input_dir=input_dir,
                             visname='13A-537.sb24066356.eb24324502.56514.05971091435',
                             expectedoutput=(f'{input_dir}/' +
-                                            '13A-537.casa-6.2.1.7-pipeline-2021.2.0.128.restore.results.txt'))
+                                            '13A-537.casa-6.2.1.7-pipeline-2021.2.0.128.restore.results.txt'),
+                            output_dir='13A_537__restore__PPR__regression')
 
     # copy files use restore task into products folder
     input_products = casa_tools.utils.resolve(f'{input_dir}/products')
-    shutil.copytree(input_products, './products')
+    shutil.copytree(input_products, '13A_537__restore__PPR__regression/products')
 
     pr.run(ppr=f'{input_dir}/PPR_13A-537_restore.xml', telescope='vla')
 
