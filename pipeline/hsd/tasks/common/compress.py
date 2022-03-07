@@ -18,27 +18,35 @@ class CompressedObj(object):
 
 
 def compress_object(obj, protocol=pickle.HIGHEST_PROTOCOL, compresslevel=9):
-    size_org = asizeof.asizeof(obj)
-    start = time.time()
+    start = time.time() if LOG.isEnabledFor(logging.DEBUG) else None
+
     try:
         compressed = bz2.compress(pickle.dumps(obj, protocol), compresslevel=compresslevel)
-    except:
+    except Exception:
         compressed = obj
-    end = time.time()
-    size_comp = asizeof.asizeof(compressed)
-    LOG.debug('compress: size before {0} after {1} ({2} %)'.format(size_org, size_comp, float(size_comp)/float(size_org) * 100))
-    LOG.debug('elapsed {0} sec'.format(end - start))
+
+    if LOG.isEnabledFor(logging.DEBUG):
+        size_org = asizeof.asizeof(obj)
+        size_comp = asizeof.asizeof(compressed)
+        LOG.debug('compress: size before {0} after {1} ({2} %)'.format(size_org, size_comp, float(size_comp)/float(size_org) * 100))
+        end = time.time()
+        LOG.debug('elapsed {0} sec'.format(end - start))
+
     return compressed
 
 
 def decompress_object(obj):
-    size_comp = asizeof.asizeof(obj)
-    start = time.time()
+    start = time.time() if LOG.isEnabledFor(logging.DEBUG) else None
+
     decompressed = pickle.loads(bz2.decompress(obj))
-    end = time.time()
-    size_org = asizeof.asizeof(decompressed)
-    LOG.debug('decompress: size before {0} after {1} ({2} %)'.format(size_org, size_comp, float(size_comp)/float(size_org) * 100))
-    LOG.debug('elapsed {0} sec'.format(end - start))
+
+    if LOG.isEnabledFor(logging.DEBUG):
+        size_comp = asizeof.asizeof(obj)
+        size_org = asizeof.asizeof(decompressed)
+        LOG.debug('decompress: size before {0} after {1} ({2} %)'.format(size_org, size_comp, float(size_comp)/float(size_org) * 100))
+        end = time.time()
+        LOG.debug('elapsed {0} sec'.format(end - start))
+
     return decompressed
 
 
