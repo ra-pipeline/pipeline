@@ -3,7 +3,7 @@ import asyncio
 import atexit
 import threading
 import time
-from typing import Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from pipeline.infrastructure import logging
 
