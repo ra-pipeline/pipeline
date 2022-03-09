@@ -16,7 +16,6 @@ import pipeline.infrastructure.utils as utils
 from .SDFlagPlotter import SDFlagPlotter
 from .worker import _get_permanent_flag_summary, _get_iteration
 from .. import common
-from ..common import compress
 from ..common import utils as sdutils
 
 LOG = infrastructure.get_logger(__name__)
@@ -95,7 +94,7 @@ class SDBLFlagSummary(object):
         FigFileDir += "/"
 
         flagSummary = []
-        plot_list = compress.CompressedList()
+        plot_list = []
         # loop over members (practically, per antenna loop in an MS)
         for (antid, fieldid, spwid, pollist) in zip(antid_list, fieldid_list, spwid_list, pols_list):
             LOG.debug('Performing flagging for %s Antenna %d Field %d Spw %d' % (ms.basename, antid, fieldid, spwid))
@@ -149,10 +148,19 @@ class SDBLFlagSummary(object):
 
                 # create plots
                 ### instance to be made outside pol loop if overplotting pols
-                flagplotter = SDFlagPlotter( self.ms, datatable, antid, spwid, field_name, time_gap, FigFileDir )
+                flagplotter = SDFlagPlotter( self.ms, datatable, antid, spwid, time_gap, FigFileDir )
                 flagplotter.register_data( pol, is_baselined, FlagRule_local, PermanentFlag, NPp_dict, final_thres )
                 plots = flagplotter.create_plots( FigFileRoot )
-                plot_list.extend(map(lambda p: compress.CompressedObj(p), plots))
+                for plot in plots:
+                    plot_list.append( { 'FigFileDir' : FigFileDir,
+                                        'FigFileRoot' : FigFileRoot,
+                                        'plot' : plot['file'],
+                                        'vis' : self.ms.name,
+                                        'type' : plot['type'],
+                                        'ant' : ant_name,
+                                        'spw' : spwid,
+                                        'pol' : pol,
+                                        'field' : field_name } )
 
                 # delete variables not used after all
                 del FlagRule_local, NPp_dict

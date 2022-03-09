@@ -1,7 +1,6 @@
 """Renderer hsd_blflag."""
 import os
 import collections
-import itertools
 from typing import Dict, List, Tuple
 
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
@@ -57,12 +56,29 @@ class T2_4MDetailsBLFlagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                     'dovirtual': dovirtual})
 
         # statistics plots
-        wrappers = [p for p in itertools.chain(*(r.outcome['plots'] for r in result))]
+        plots_list = []
+        for r in result:
+            plots_list.extend( r.outcome['plots'] )
+        wrappers = []
+        for plot in plots_list:
+            wrapper = logger.Plot( plot['FigFileDir']+plot['plot'],
+                                    x_axis="Xaxis",
+                                    y_axis="Yaxis",
+                                    field=plot['field'],
+                                    parameters = {
+                                        'vis' : plot['vis'],
+                                        'type' : plot['type'],
+                                        'spw' : plot['spw'],
+                                        'ant' : plot['ant'],
+                                        'field' : plot['field'],
+                                        'pol' : plot['pol']
+                                    } )
+            wrappers.append( wrapper )
 
         renderer = SDBLFlagStatisticsPlotRenderer( context, result, wrappers )
         with renderer.get_file() as fileobj:
             fileobj.write(renderer.render())
-        vis_list = [p.parameters.get('vis') for p in wrappers]
+        vis_list = [ p.get('vis') for p in plots_list ]
         subpages = {}
         for vis in vis_list:
             subpages[vis] = os.path.basename(renderer.path)
@@ -183,14 +199,14 @@ def make_summary_table_per_eb( accum_flag:Dict, subpages:Dict ) -> Tuple[List[st
         frac_before = accum_flag[ms_name]['flagdata_before']*100.0/accum_flag[ms_name]['flagdata_total']
         frac_after  = accum_flag[ms_name]['flagdata_after']*100.0/accum_flag[ms_name]['flagdata_total']
         html = "<A href={} class=\"replace\" data-vis=\"{}\">Plots</A>".format( subpages[ms_name], ms_name )
-        tr = FlagSummaryEB_TR( ms_name,
-                               '{:.3f} %'.format(accum_flag[ms_name]['RmsPostFitFlag']*100.0/row_total),
-                               '{:.3f} %'.format(accum_flag[ms_name]['RmsPreFitFlag']*100.0/row_total),
-                               '{:.3f} %'.format(accum_flag[ms_name]['RunMeanPostFitFlag']*100.0/row_total),
-                               '{:.3f} %'.format(accum_flag[ms_name]['RunMeanPreFitFlag']*100.0/row_total),
-                               '{:.3f} %'.format(accum_flag[ms_name]['RmsExpectedPostFitFlag']*100.0/row_total),
-                               '{:.3f} %'.format(accum_flag[ms_name]['RmsExpectedPreFitFlag']*100.0/row_total),
-                               '{:.3f} %'.format(accum_flag[ms_name]['TsysFlag']*100.0/row_total),
+        tr = FlagSummaryEB_TR( ms_name, 
+                               '{:.3f} %'.format(accum_flag[ms_name]['RmsPostFitFlag']*100.0/row_total), 
+                               '{:.3f} %'.format(accum_flag[ms_name]['RmsPreFitFlag']*100.0/row_total), 
+                               '{:.3f} %'.format(accum_flag[ms_name]['RunMeanPostFitFlag']*100.0/row_total), 
+                               '{:.3f} %'.format(accum_flag[ms_name]['RunMeanPreFitFlag']*100.0/row_total), 
+                               '{:.3f} %'.format(accum_flag[ms_name]['RmsExpectedPostFitFlag']*100.0/row_total), 
+                               '{:.3f} %'.format(accum_flag[ms_name]['RmsExpectedPreFitFlag']*100.0/row_total), 
+                               '{:.3f} %'.format(accum_flag[ms_name]['TsysFlag']*100.0/row_total), 
                                '{:.3f} %'.format( frac_before ),
                                '{:.3f} %'.format( frac_after - frac_before ),
                                '{:.3f} %'.format( frac_after ) )
