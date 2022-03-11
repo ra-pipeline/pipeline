@@ -22,7 +22,8 @@ __all__ = [
 
 # global variable to hold thread instance
 ASYNC_THREAD = None
-
+# ASYNC_OVERHEAD = 0
+# ASYNC_EXEC = 0
 
 # get event loop
 def get_idling_loop():
@@ -146,8 +147,10 @@ async def run_command(cmd: Tuple[str], loop: asyncio.AbstractEventLoop) -> Optio
         Return code or None
     """
     global ASYNC_SEMAPHORE
+    # global ASYNC_EXEC
 
-    LOG.debug('running command %s', cmd)
+    # LOG.debug('running command %s', cmd)
+    # exec_start = time.time()
 
     # run system command asynchronously
     #
@@ -159,7 +162,11 @@ async def run_command(cmd: Tuple[str], loop: asyncio.AbstractEventLoop) -> Optio
         result = await p.wait()
     finally:
         ASYNC_SEMAPHORE.release()
-    LOG.debug('completed cmd result: %s', result)
+    # exec_end = time.time()
+    # exec_duration = exec_end - exec_start
+    # ASYNC_EXEC += exec_duration
+    # LOG.info('execution took %s sec (%s sec in total)', exec_duration, ASYNC_EXEC)
+    # LOG.debug('completed cmd result: %s', result)
     return result
 
 
@@ -174,8 +181,15 @@ def schedule_task(cmd: Tuple[str]) -> Optional['Future']:
         if event loop is running. Otherwise, return None.
     """
     global ASYNC_LOOP
+    # global ASYNC_OVERHEAD
     if ASYNC_LOOP.is_running():
-        return asyncio.run_coroutine_threadsafe(run_command(cmd, ASYNC_LOOP), ASYNC_LOOP)
+        # schedule_start = time.time()
+        task = asyncio.run_coroutine_threadsafe(run_command(cmd, ASYNC_LOOP), ASYNC_LOOP)
+        # schedule_end = time.time()
+        # schedule_duration = schedule_end - schedule_start
+        # ASYNC_OVERHEAD += schedule_duration
+        # LOG.info('scheduling took %s sec (%s sec in total)', schedule_duration, ASYNC_OVERHEAD)
+        return task
     else:
         return None
 
