@@ -313,6 +313,8 @@ class Plot(object):
     def __setstate__(self, state):
         self.__dict__.update(state)
         self.bg_process = None
+        if os.path.exists(self.abspath) and not os.path.exists(self.thumb_file):
+            self._create_thumbnail(background=True)
 
     @property
     def css_class(self):
