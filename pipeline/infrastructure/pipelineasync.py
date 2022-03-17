@@ -124,9 +124,10 @@ def close_event_loop() -> None:
 
     stop_event_loop()
 
-    LOG.debug('Stopped event loop.')
-    LOG.debug('Closing evnet loop...')
-    ASYNC_LOOP.close()
+    if not ASYNC_LOOP.is_closed():
+        LOG.debug('Stopped event loop.')
+        LOG.debug('Closing evnet loop...')
+        ASYNC_LOOP.close()
 
 
 # ensure to close thread for event loop
