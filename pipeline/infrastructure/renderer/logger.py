@@ -404,7 +404,6 @@ class Plot(object):
         # of the background process. Return value is self.abspath because
         # thumbnail may or may not be created at this point.
         if background and self.bg_process is None:
-            pipelineasync.start_event_loop()
             self.bg_process = pipelineasync.schedule_task(cmd)
             return self.abspath
 

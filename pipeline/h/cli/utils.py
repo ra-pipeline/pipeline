@@ -69,24 +69,17 @@ def execute_task(context, casa_task, casa_args):
         _print_inputs(casa_task, casa_args, task_inputs)
         return None
 
-    try:
-        # start event loop for background process
-        pipelineasync.start_event_loop()
+    # Execute the class, collecting the results
+    results = _execute_task(casa_task, task_inputs, dry_run)
 
-        # Execute the class, collecting the results
-        results = _execute_task(casa_task, task_inputs, dry_run)
+    # write the command invoked (eg. hif_setjy) to the result so that the
+    # weblog can print help from the XML task definition rather than the
+    # python class
+    results.taskname = casa_task
 
-        # write the command invoked (eg. hif_setjy) to the result so that the
-        # weblog can print help from the XML task definition rather than the
-        # python class
-        results.taskname = casa_task
-
-        # accept the results if desired
-        if accept_results and not dry_run:
-            _merge_results(context, results)
-    finally:
-        # stop event loop
-        pipelineasync.stop_event_loop()
+    # accept the results if desired
+    if accept_results and not dry_run:
+        _merge_results(context, results)
 
     tracebacks = utils.get_tracebacks(results)
     if len(tracebacks) > 0:
@@ -122,10 +115,16 @@ def _execute_task(casa_task, task_inputs, dry_run):
 
 def _merge_results(context, results):
     try:
+        # start event loop
+        pipelineasync.start_event_loop()
+
         results.accept(context)
     except Exception:
         LOG.critical('Warning: Check merge to context for {}'.format(results.__class__.__name__))
         raise
+    finally:
+        # stop event loop
+        pipelineasync.stop_event_loop()
 
 
 def _print_inputs(casa_task, casa_args, task_inputs):
