@@ -74,7 +74,7 @@ instance/
 docs/_build/**
 docs/source/_apidoc/**
 docs/source/_autosummary/**
-docs/source/_taskdoc/**
+docs/source/_taskdocs/**
 
 # CASA log files
 casa-*.log
