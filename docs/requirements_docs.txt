@@ -1,0 +1,13 @@
+# The dependency versions are not specified, so the CASA shipped-in modules could get upgraded accidentally.
+# nbsphinx requires 'pandoc' (e.g. from macports or apt, not 'pandoc' from PyPI) to work properly.
+sphinx
+sphinxcontrib-bibtex
+sphinx-astrorefs
+sphinx-copybutton
+nbsphinx 
+sphinx_rtd_theme
+commonmark
+recommonmark
+future
+ipympl
+nodejs

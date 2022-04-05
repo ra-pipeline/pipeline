@@ -71,7 +71,15 @@ instance/
 .scrapy
 
 # Sphinx documentation
-docs/_build/
+docs/_build/**
+docs/source/_apidoc/**
+docs/source/_autosummary/**
+docs/source/_taskdoc/**
+
+# CASA log files
+casa-*.log
+docs/casa-*.log
+docs/source/casa-*.log
 
 # PyBuilder
 target/

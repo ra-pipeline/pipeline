@@ -1,0 +1,2 @@
+The orginal script `create_docs.py` was written by J. Masters and located under pipeline/doc. 
+A small modifcations has since been made and the generation of task-related .rst now has been integrated into `make taskdoc`. 
