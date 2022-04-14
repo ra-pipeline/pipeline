@@ -14,5 +14,7 @@ class Sensitivity(dict):
         self['uvtaper'] = None         # list
         self['sensitivity'] = None     # quanta
         self['effective_bw'] = None    # quanta
+        self['pbcor_image_min'] = None # quanta
+        self['pbcor_image_max'] = None # quanta
 
         dict.__init__(self, *args, **kwargs)

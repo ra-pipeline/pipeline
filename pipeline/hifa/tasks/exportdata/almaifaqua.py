@@ -237,12 +237,12 @@ def xml_for_extracted_flux_measurements(all_measurements, ms):
     return result
 
 
-def _hifa_preimagecheck_sensitivity_exporter(stage_results):
+def _sensitivity_exporter(stage_results):
     # XML exporter expects this function to return a list of dictionaries
     l = []
     for result in stage_results:
         l.extend(result.sensitivities_for_aqua)
     return l
 
-aqua.TASK_NAME_TO_SENSITIVITY_EXPORTER['hifa_imageprecheck'] = _hifa_preimagecheck_sensitivity_exporter
-aqua.TASK_NAME_TO_SENSITIVITY_EXPORTER['hif_makeimages'] = _hifa_preimagecheck_sensitivity_exporter
+aqua.TASK_NAME_TO_SENSITIVITY_EXPORTER['hifa_imageprecheck'] = _sensitivity_exporter
+aqua.TASK_NAME_TO_SENSITIVITY_EXPORTER['hif_makeimages'] = _sensitivity_exporter

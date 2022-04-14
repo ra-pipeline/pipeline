@@ -80,7 +80,7 @@ class UVcontSub(applycal.Applycal):
             return result
 
         # Import the new measurement set.
-        to_import = os.path.abspath(result.outputvis)
+        to_import = os.path.relpath(result.outputvis)
         observing_run = tablereader.ObservingRunReader.get_observing_run(to_import)
 
         # Adopt same session as source measurement set

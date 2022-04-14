@@ -651,10 +651,11 @@ def xml_for_sensitivity(d):
         return str(qa.getvalue(quanta)[0])
 
     try:
-        bandwidth = qa.quantity(d['bandwidth'])
-        bandwidth_hz = value(qa.convert(bandwidth, 'Hz'))
-        if bandwidth_hz == '0.0':
+        if d['bandwidth'] is None:
             bandwidth_hz = 'N/A'
+        else:
+            bandwidth = qa.quantity(d['bandwidth'])
+            bandwidth_hz = value(qa.convert(bandwidth, 'Hz'))
     except:
         bandwidth_hz = 'N/A'
 
@@ -667,51 +668,76 @@ def xml_for_sensitivity(d):
         effective_bw_hz = 'N/A'
 
     try:
-        major = qa.quantity(d['beam']['major'])
-        major_arcsec = value(qa.convert(major, 'arcsec'))
-        if major_arcsec == '0.0':
+        if d['beam']['major'] is None:
             major_arcsec = 'N/A'
+        else:
+            major = qa.quantity(d['beam']['major'])
+            major_arcsec = value(qa.convert(major, 'arcsec'))
     except:
         major_arcsec = 'N/A'
 
     try:
-        minor = qa.quantity(d['beam']['minor'])
-        minor_arcsec = value(qa.convert(minor, 'arcsec'))
-        if minor_arcsec == '0.0':
+        if d['beam']['minor'] is None:
             minor_arcsec = 'N/A'
+        else:
+            minor = qa.quantity(d['beam']['minor'])
+            minor_arcsec = value(qa.convert(minor, 'arcsec'))
     except:
         minor_arcsec = 'N/A'
 
     try:
-        cell_x = qa.quantity(d['cell'][0])
-        cell_x_arcsec = value(qa.convert(cell_x, 'arcsec'))
-        if cell_x_arcsec == '0.0':
+        if d['cell'][0] is None:
             cell_x_arcsec = 'N/A'
+        else:
+            cell_x = qa.quantity(d['cell'][0])
+            cell_x_arcsec = value(qa.convert(cell_x, 'arcsec'))
     except:
         cell_x_arcsec = 'N/A'
 
     try:
-        cell_y = qa.quantity(d['cell'][1])
-        cell_y_arcsec = value(qa.convert(cell_y, 'arcsec'))
-        if cell_y_arcsec == '0.0':
+        if d['cell'][1] is None:
             cell_y_arcsec = 'N/A'
+        else:
+            cell_y = qa.quantity(d['cell'][1])
+            cell_y_arcsec = value(qa.convert(cell_y, 'arcsec'))
     except:
         cell_y_arcsec = 'N/A'
 
     try:
-        positionangle = qa.quantity(d['beam']['positionangle'])
-        positionangle_deg = value(qa.convert(positionangle, 'deg'))
-        # Do not check for 0.0. Could be a real value.
+        if d['beam']['positionangle'] is None:
+            positionangle_deg = 'N/A'
+        else:
+            positionangle = qa.quantity(d['beam']['positionangle'])
+            positionangle_deg = value(qa.convert(positionangle, 'deg'))
     except:
         positionangle_deg = 'N/A'
 
     try:
-        sensitivity = qa.quantity(d['sensitivity'])
-        sensitivity_jy_per_beam = value(qa.convert(sensitivity, 'Jy/beam'))
-        if sensitivity_jy_per_beam == '0.0':
+        if d['sensitivity'] is None:
             sensitivity_jy_per_beam  = 'N/A'
+        else:
+            sensitivity = qa.quantity(d['sensitivity'])
+            sensitivity_jy_per_beam = value(qa.convert(sensitivity, 'Jy/beam'))
     except:
         sensitivity_jy_per_beam  = 'N/A'
+
+    try:
+        if d['pbcor_image_min'] is None:
+            pbcor_image_min_jy_per_beam = 'N/A'
+        else:
+            pbcor_image_min = qa.quantity(d['pbcor_image_min'])
+            pbcor_image_min_jy_per_beam = value(qa.convert(pbcor_image_min, 'Jy/beam'))
+    except:
+        pbcor_image_min_jy_per_beam = 'N/A'
+
+    try:
+        if d['pbcor_image_max'] is None:
+            pbcor_image_max_jy_per_beam = 'N/A'
+        else:
+            pbcor_image_max = qa.quantity(d['pbcor_image_max'])
+            pbcor_image_max_jy_per_beam = value(qa.convert(pbcor_image_max, 'Jy/beam'))
+    except:
+        pbcor_image_max_jy_per_beam = 'N/A'
 
     xml = ElementTree.Element('Sensitivity',
         Array=d['array'],
@@ -728,6 +754,8 @@ def xml_for_sensitivity(d):
         UVTaper=str(d.get('uvtaper', '')),
         SensitivityJyPerBeam=sensitivity_jy_per_beam,
         MsSpwId=d['spw'],
+        PbcorImageMinJyPerBeam=pbcor_image_min_jy_per_beam,
+        PbcorImageMaxJyPerBeam=pbcor_image_max_jy_per_beam
       )
 
     return xml

@@ -38,9 +38,41 @@ class SpwPhaseupQAHandler(pqa.QAPlugin):
             gaintable = result.phaseup_result.final[0].gaintable
         scores.append(qacalc.score_path_exists(ms.name, gaintable, 'caltable'))
 
-        # Create QA score for median SNR per field and per SpW.
-        for (field, spw), median_snr in result.snr_info.items():
-            scores.append(qacalc.score_phaseup_spw_median_snr(ms, field, spw, median_snr, result.inputs['phasesnr']))
+        # Create QA scores for median SNR per field and per SpW, but skip this
+        # for SpWs that have been re-mapped.
+        for (intent, field, spw), median_snr in result.snr_info.items():
+            # Skip if encountering unhandled intent.
+            if intent not in ['CHECK', 'PHASE']:
+                LOG.warning(f"{ms.basename}: unexpected intent '{intent}' encountered in SNR info result, cannot"
+                            f" assign a QA score.")
+                continue
+
+            # Get SpW mapping info for current intent and field.
+            spwmapping = result.spwmaps.get((intent, field), None)
+
+            # If SpW mapping info exists for the current intent and field and
+            # the current SpW is not be mapped to itself, then skip the QA
+            # score calculation. Note: if the SpW map is empty, that means by
+            # default that each SpW is mapped to itself, i.e. QA scoring gets
+            # skipped.
+            if spwmapping and spwmapping.spwmap and spwmapping.spwmap[spw] != spw:
+                continue
+
+            # Check which QA score heuristic to use, based on intent.
+            if intent == 'CHECK':
+                score = qacalc.score_phaseup_spw_median_snr_for_check(ms, field, spw, median_snr,
+                                                                      result.inputs['phasesnr'])
+            elif intent == 'PHASE':
+                score = qacalc.score_phaseup_spw_median_snr_for_phase(ms, field, spw, median_snr,
+                                                                      result.inputs['phasesnr'])
+
+            # If other SpWs are mapped to current SpW, then mention this in the
+            # QA score message.
+            if spwmapping.spwmap.count(spw) > 1:
+                score.longmsg += f' This SpW has one or more other SpWs mapped to it.'
+
+            # Add score to list of scores.
+            scores.append(score)
 
         # Add scores to QA pool in result.
         result.qa.pool.extend(scores)

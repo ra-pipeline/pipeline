@@ -432,6 +432,8 @@ def shutdown_plotms():
     """
     if plotmstool.__proc is not None:
         plotmstool.__proc.kill()
+        outs, errs = plotmstool.__proc.communicate()
+        plotmstool.__proc = None
         plotmstool.__stub = None
         plotmstool.__uri = None
 

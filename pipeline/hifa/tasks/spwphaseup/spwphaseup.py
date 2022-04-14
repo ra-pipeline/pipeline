@@ -139,13 +139,14 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         # into local context.
         phaseupresult = self._do_phaseup()
 
-        # Compute diagnostic phase caltable for phase intent/fields, with the
-        # spw-to-spw phase offset corrections included in pre-apply.
+        # Compute diagnostic phase caltables for both phase calibrator fields
+        # and check source fields, with the spw-to-spw phase offset corrections
+        # included in pre-apply.
         diag_phase_results = self._do_diagnostic_phasecal(spwmaps)
 
         # Compute what SNR is achieved for PHASE fields after the SpW phase-up
         # correction.
-        snr_info = self._compute_median_snr(diag_phase_results)
+        snr_info = self._compute_median_snr(diag_phase_results, spwmaps)
 
         # Create the results object.
         result = SpwPhaseupResults(vis=inputs.vis, phasecal_mapping=phasecal_mapping, phaseup_result=phaseupresult,
@@ -305,9 +306,17 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         combined_snrs = []
         spwids = []
 
-        # Compute the spw map according to the rules defined by each
-        # mapping mode.
-        if inputs.hm_spwmapmode == 'auto':
+        # PIPE-1436: if there is only one science SpW, then no SpW re-mapping
+        # can be done. In this case, just run the SNR test.
+        if len(scispws) == 1:
+            LOG.info(f'Only 1 science SpW found for {inputs.ms.basename}, intent={intent}, field={field}, so using'
+                     f' standard SpW map for this data selection.')
+            # Run a task to estimate the gaincal SNR for given intent and field.
+            nosnrs, spwids, snrs, goodsnrs = self._do_snrtest(intent, field)
+
+        # If there are multiple science SpWs, then continue with computing the
+        # optimal SpW map according to the rules defined by each mapping mode.
+        elif inputs.hm_spwmapmode == 'auto':
 
             # Run a task to estimate the gaincal SNR for given intent and field.
             nosnrs, spwids, snrs, goodsnrs = self._do_snrtest(intent, field)
@@ -632,15 +641,17 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
 
     def _do_diagnostic_phasecal(self, spwmaps: Dict[IntentField, SpwMapping]) -> List[GaincalResults]:
         """
-        Creates the diagnostic phase caltable for each phase calibrator field,
-        where the SpW-to-SpW phase-up caltable should be included in pre-apply
-        (since it was merged into local context). This table is later used to
-        assess the median SNR achieved for each phase calibrator in each SpW
-        after the SpW-to-SpW phase-up is applied (PIPE-665).
+        Creates diagnostic phase caltables for each phase calibrator field and
+        each check source field, where the SpW-to-SpW phase-up caltable should
+        be included in pre-apply (since it was merged into local context).
+
+        These tables are used later in this stage to assess the median SNR
+        achieved for each phase calibrator / check source in each SpW after the
+        SpW-to-SpW phase-up is applied (PIPE-665).
 
         Use phase gaincal parameters appropriate for the SpW mapping derived
-        earlier for each phase calibrator field. Similar to hifa_timegaincal,
-        set minblperant to 4 and minsnr to 3.
+        earlier for each phase calibrator / check source field. Similar to
+        hifa_timegaincal, set minblperant to 4 and minsnr to 3.
 
         Args:
             spwmaps: dictionary with (Intent, Field) combinations as keys and
@@ -652,37 +663,41 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         """
         inputs = self.inputs
 
-        # Derive separate phase solutions for each PHASE field.
-        intent = 'PHASE'
+        # Derive separate phase solutions for each PHASE and each CHECK field.
+        intents = ['PHASE', 'CHECK']
         gaincal_results = []
-        for field in inputs.ms.get_fields(intent=intent):
-            # Get optimal value for phase solution parameters 'combine' and
-            # 'gaintype' for current PHASE field from SpW mappings derived
-            # earlier in this task.
-            combine, gaintype = self._get_phasecal_params(spwmaps, intent, field.name)
+        for intent in intents:
+            for field in inputs.ms.get_fields(intent=intent):
+                # Get optimal value for phase solution parameters 'combine' and
+                # 'gaintype' for current field from SpW mappings derived
+                # earlier in this task.
+                combine, gaintype = self._get_phasecal_params(spwmaps, intent, field.name)
 
-            # Create diagnostic phase caltables.
-            # PIPE-665: for the diagnostic phase caltables, always use
-            # minsnr=3, minblperant=4.
-            LOG.info(f'Computing diagnostic phase caltable for {inputs.ms.basename}, intent={intent},'
-                     f' field={field.name}.')
-            gaincal_results.append(self._do_gaincal(field=field.name, intent=intent, gaintype=gaintype, combine=combine,
-                                                    minblperant=4, minsnr=3))
+                # Create diagnostic phase caltables.
+                # PIPE-665: for the diagnostic phase caltables, always use
+                # minsnr=3, minblperant=4.
+                LOG.info(f'Computing diagnostic phase caltable for {inputs.ms.basename}, intent={intent},'
+                         f' field={field.name}.')
+                gaincal_results.append(self._do_gaincal(field=field.name, intent=intent, gaintype=gaintype,
+                                                        combine=combine, minblperant=4, minsnr=3))
 
         return gaincal_results
 
-    def _compute_median_snr(self, gaincal_results: List[GaincalResults]) -> Dict[Tuple[str, str], float]:
+    def _compute_median_snr(self, gaincal_results: List[GaincalResults], spwmaps: Dict[IntentField, SpwMapping])\
+            -> Dict[Tuple[str, str, str], float]:
         """
         This method evaluates the diagnostic phase caltable(s) produced in an
-        earlier step to compute the median SNR for each phase calibrator field
-        and for each SpW.
+        earlier step to compute the median SNR for each phase calibrator /
+        check source field, and for each SpW.
 
         Args:
             gaincal_results: List of gaincal worker task results representing
-            the diagnostic phase caltable(s).
+                the diagnostic phase caltable(s).
+            spwmaps: dictionary with (Intent, Field) combinations as keys and
+                corresponding spectral window mapping as values.
 
         Returns:
-            Dictionary with phase calibrator field name and SpW as keys, and
+            Dictionary with intent, field name, and SpW as keys, and
             corresponding median SNR as values.
         """
         inputs = self.inputs
@@ -691,23 +706,46 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
 
         snr_info = collections.defaultdict(dict)
         for result in gaincal_results:
-            # Retrieve field and caltable.
+            # Retrieve intent, field, and caltable.
             caltable = result.final[0].gaintable
             field = result.inputs['field']
+            intent = result.inputs['intent']
 
+            # Get SpW mapping info for current intent and field.
+            spwmapping = spwmaps.get((intent, field), None)
+
+            # Get SpWs and SNR info from caltable.
             with casa_tools.TableReader(caltable) as table:
                 spws = table.getcol("SPECTRAL_WINDOW_ID")
                 snrs = table.getcol("SNR")
 
-            # For each unique SpW, compute median SNR and store in snr_info,
-            # and log a warning if the median SNR is still below the SNR
-            # threshold.
+            # Evaluate each unique SpW separately.
             for spw in sorted(set(spws)):
-                snr_info[(field, spw)] = numpy.median(snrs[:, 0, numpy.where(spws == spw)[0]])
+                # Compute median SNR and store in snr_info.
+                snr_info[(intent, field, spw)] = numpy.median(snrs[:, 0, numpy.where(spws == spw)[0]])
 
-                if snr_info[(field, spw)] < inputs.phasesnr:
-                    LOG.warning(f"{result.inputs['vis']}, field {field}, SpW {spw}: median SNR"
-                                f" ({snr_info[(field, spw)]}) is below the low-SNR threshold ({inputs.phasesnr}).")
+                # If SpW mapping info exists for the current intent and field
+                # and the current SpW is not be mapped to itself, then continue
+                # with the next SpW. Otherwise, check whether to log a warning
+                # for low SNR. Note: if the SpW map is empty, that means by
+                # default that each SpW is mapped to itself, i.e. reason enough
+                # to skip.
+                if spwmapping and spwmapping.spwmap and spwmapping.spwmap[spw] != spw:
+                    continue
+
+                # If the median SNR is still below the SNR threshold, log a
+                # warning.
+                if snr_info[(intent, field, spw)] < inputs.phasesnr:
+                    msg = f"{result.inputs['vis']}, intent {intent}, field {field}, SpW {spw}: median SNR" \
+                          f" ({snr_info[(intent, field, spw)]:.1f}) is below the low-SNR threshold" \
+                          f" ({inputs.phasesnr})."
+
+                    # If the current SpW has other SpWs mapped to it, then
+                    # mention this explicitly.
+                    if spwmapping.spwmap.count(spw) > 1:
+                        msg += f' This SpW has one or more other SpWs mapped to it.'
+
+                    LOG.warning(msg)
 
         return snr_info
 
@@ -755,7 +793,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
     def _get_snr_info(self, spwids: List[int], snrs: List[float], combined_snrs: Dict) -> List[Tuple[str, float]]:
         """
         Helper method that takes phase SNR info from the SNR test, and returns
-        return phase SNR info for all SpWs specified in inputs.spw.
+        phase SNR info for all SpWs specified in inputs.spw.
 
         Args:
             spwids: list of SpW IDs for which phase SNRs were determined.

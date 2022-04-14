@@ -389,9 +389,10 @@ class MetaDataReader(object):
             collections.defaultdict: dictionary of invalid pointing data
         """
         if len(self.invalid_pointing_data) > 0:
-            LOG.warning('{}: There are rows without corresponding POINTING data'.format(self.ms.basename))
-            LOG.warning('Affected antennas are: {}'.format(' '.join(
-                [self.ms.antennas[k].name for k in self.invalid_pointing_data])))
+            LOG.warning('There are rows without corresponding POINTING data. Affected rows are identified and will be flagged in hsd_flagdata stage.')
+            LOG.warning('Affected antennas are: {} in {}'.format(
+                ' '.join([self.ms.antennas[k].name for k in self.invalid_pointing_data]),
+                self.ms.basename))
 
         return self.invalid_pointing_data
 
@@ -713,9 +714,8 @@ class MetaDataReader(object):
                 try:
                     pointing_directions = msmd.pointingdirection(row, interpolate=True)
                 except RuntimeError as e:
-                    LOG.warning(e)
-                    if str(e).find('SSMIndex::getIndex - access to non-existing row') != -1:
-                        LOG.warning('{}: Missing pointing data for row {} (antenna {} time {})'.format(ms.basename, rows[irow], Tant[irow], Tmjd[irow]))
+                    if 'SSMIndex::getIndex - access to non-existing row' in str(e):
+                        LOG.info('{}: Missing pointing data for row {} (antenna {} time {})'.format(ms.basename, rows[irow], Tant[irow], Tmjd[irow]))
 
                         # register DataTable row to self.invalid_pointing_data
                         dt_row = ID + irow
@@ -733,6 +733,7 @@ class MetaDataReader(object):
                         Tflagrow[irow] = True
                         continue
                     else:
+                        LOG.warning(e)
                         raise e
 
                 pointing_direction = pointing_directions['antenna1']['pointingdirection']  # antenna2 should be the same

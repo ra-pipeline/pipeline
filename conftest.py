@@ -24,6 +24,8 @@ def pytest_addoption(parser):
                      help=nologfile_help)
     parser.addoption("--pyclean", action="store_true", default=False,
                      help="Clean up .pyc to reproduce certain warnings only issued when the bytecode is compiled.")
+    parser.addoption("--remove-workdir", action="store_true", default=False,
+                     help="Remove individual working directories from regression tests.")
 
 
 def pytest_sessionstart(session):
@@ -42,6 +44,12 @@ def pytest_sessionstart(session):
             p.rmdir()
 
 
+def pytest_configure(config):
+    # pytest.config (global) is deprecated from pytest ver>5.0.
+    # we save a copy of its content under `pytest.pytestconfig` for an easy access from helper classes.
+    pytest.pytestconfig = config
+
+
 def pytest_collection_finish(session):
     """Exit after collection if only collect test."""
 
@@ -57,7 +65,7 @@ def pytest_collection_finish(session):
 @pytest.fixture(scope="session", autouse=True)
 def redirect_casalog_for_workers(request):
     """Remove casalog for each worker, if requested."""
-
+    
     if request.config.getoption("--nologfile") and hasattr(request.config, 'workerinput'):
         redirect_casalog()
 

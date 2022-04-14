@@ -237,7 +237,9 @@ class MakeImages(basetask.StandardTaskTemplate):
                            cell=cell,
                            robust=target['robust'],
                            uvtaper=target['uvtaper'],
-                           sensitivity=cqa.quantity(result.image_rms, 'Jy/beam'))
+                           sensitivity=cqa.quantity(result.image_rms, 'Jy/beam'),
+                           pbcor_image_min=cqa.quantity(result.image_min, 'Jy/beam'),
+                           pbcor_image_max=cqa.quantity(result.image_max, 'Jy/beam'))
 
 
 class CleanTaskFactory(object):
