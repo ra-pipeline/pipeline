@@ -5,7 +5,6 @@ import threading
 import time
 from typing import TYPE_CHECKING, Optional, Tuple
 
-import pipeline.environment as environment
 from pipeline.infrastructure import logging
 
 if TYPE_CHECKING:
@@ -25,6 +24,10 @@ __all__ = [
 ASYNC_THREAD = None
 # ASYNC_OVERHEAD = 0
 # ASYNC_EXEC = 0
+
+
+# semaphore to limit number of concurrent process
+ASYNC_SEMAPHORE = None
 
 
 # get event loop
@@ -50,12 +53,6 @@ def get_idling_loop():
 # pipeline specific event loop
 ASYNC_LOOP = get_idling_loop()
 
-# semaphore to limit number of concurrent process
-ASYNC_SEMAPHORE = asyncio.Semaphore(
-    min(6, environment.logical_cpu_cores // 2),
-    loop=ASYNC_LOOP
-)
-
 
 # running event loop on the thread
 def loop_in_thread(loop: asyncio.AbstractEventLoop) -> None:
@@ -76,6 +73,17 @@ def create_thread() -> threading.Thread:
         Thread instance
     """
     global ASYNC_LOOP
+    global ASYNC_SEMAPHORE
+
+    if ASYNC_SEMAPHORE is None:
+        # workaround to avoid circular imports
+        import pipeline.environment as environment
+
+        ASYNC_SEMAPHORE = asyncio.Semaphore(
+            min(6, environment.logical_cpu_cores // 2),
+            loop=ASYNC_LOOP
+        )
+
     return threading.Thread(target=loop_in_thread, args=(ASYNC_LOOP,))
 
 
