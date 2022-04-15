@@ -15,6 +15,7 @@ LOG = logging.get_logger(__name__)
 
 __all__ = [
     'close_event_loop',
+    'is_loop_running',
     'schedule_task',
     'start_event_loop',
     'stop_event_loop',
@@ -147,6 +148,17 @@ def close_event_loop() -> None:
 
 # ensure to close thread for event loop
 atexit.register(close_event_loop)
+
+
+# check if event loop is running
+def is_loop_running() -> bool:
+    """Check if event loop is currently running.
+
+    Returns:
+        Return True if the loop is running, False otherwise.
+    """
+    global ASYNC_LOOP
+    return ASYNC_LOOP.is_running()
 
 
 # run command in the event loop

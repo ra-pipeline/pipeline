@@ -285,7 +285,8 @@ class Plot(object):
         self.thumb_file = os.path.join(thumb_dir, os.path.basename(self.abspath))
         # create thumbnail asynchronously
         self.bg_process = None
-        if os.path.exists(self.abspath) and not os.path.exists(self.thumb_file):
+        if pipelineasync.is_loop_running() and \
+                os.path.exists(self.abspath) and not os.path.exists(self.thumb_file):
             self._create_thumbnail(background=True)
 
         if parameters is None:
@@ -313,7 +314,8 @@ class Plot(object):
     def __setstate__(self, state):
         self.__dict__.update(state)
         self.bg_process = None
-        if os.path.exists(self.abspath) and not os.path.exists(self.thumb_file):
+        if pipelineasync.is_loop_running() and \
+                os.path.exists(self.abspath) and not os.path.exists(self.thumb_file):
             self._create_thumbnail(background=True)
 
     @property
