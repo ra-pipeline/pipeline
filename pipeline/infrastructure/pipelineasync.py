@@ -80,7 +80,7 @@ def create_thread() -> threading.Thread:
         # workaround to avoid circular imports
         import pipeline.environment as environment
 
-        semaphore = min(6, environment.logical_cpu_cores // 2)
+        semaphore = min(4, environment.logical_cpu_cores // 2)
         LOG.debug(f'creating Semaphore with value {semaphore}')
         ASYNC_SEMAPHORE = asyncio.Semaphore(
             semaphore,
