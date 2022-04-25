@@ -60,7 +60,10 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
             inputs = display.ClusterDisplay.Inputs(context, result=r)
             task = display.ClusterDisplay(inputs)
             plots.append(task.plot())
-            sparsemap_plots.extend(r.outcome['plots'])
+            plots_decompress = [
+                x.decompress() if isinstance(x, compress.CompressedObj) else x for x in r.outcome['plots']
+            ]
+            sparsemap_plots.extend(plots_decompress)
 
         plot_group = self._group_by_axes(plots)
         plot_detail = collections.OrderedDict()  # key is field name, subkeys are 'title', 'html', 'cover_plots'
@@ -103,6 +106,9 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
                     'cover_only': plot_cover,
                     'dovirtual': dovirtual})
 
+        # join async processes
+        _ = [p.thumbnail for p in sparsemap_plots]
+
         # profile map before and after baseline subtracton
         maptype_list = ['before', 'after', 'before', 'after']
         subtype_list = ['raw', 'raw', 'avg', 'flatness']
@@ -110,11 +116,7 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
             plot_list = self._plots_per_field_with_type(sparsemap_plots, maptype, subtype)
             summary = self._summary_plots(plot_list)
             subpage = collections.OrderedDict()
-            # flattened = [plot for inner in plot_list.values() for plot in inner]
-            flattened = compress.CompressedList()
-            for inner in plot_list.values():
-                for plot in inner:
-                    flattened.append(plot)
+            flattened = [plot for inner in plot_list.values() for plot in inner]
             if subtype != 'flatness':
                 datatype = 'Raw' if subtype == 'raw' else 'Averaged'
                 plot_title = '{} Sparse Profile Map {} Baseline Subtraction'.format(datatype, maptype.lower())
@@ -216,18 +218,13 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
             List of Plot objects with desired type classfied by field
         """
         plot_group = {}
-        for x in plots:
-            if isinstance(x, compress.CompressedObj):
-                p = x.decompress()
-            else:
-                p = x
+        for p in plots:
             if type_string in p.parameters['type'] and subtype_string in p.parameters['type']:
                 key = p.field
                 if key in plot_group:
-                    plot_group[key].append(x)
+                    plot_group[key].append(p)
                 else:
-                    plot_group[key] = [x]
-            del p
+                    plot_group[key] = [p]
         return plot_group
 
     @staticmethod
@@ -245,17 +242,12 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
         summary_plots = {}
         for field_name, plots in plot_group.items():
             spw_list = []
-            summary_plots[field_name] = compress.CompressedList()
-            for xplot in plots:
-                if isinstance(xplot, compress.CompressedObj):
-                    plot = xplot.decompress()
-                else:
-                    plot = xplot
+            summary_plots[field_name] = []
+            for plot in plots:
                 spw = plot.parameters['spw']
                 if spw not in spw_list:
                     spw_list.append(spw)
-                    summary_plots[field_name].append(xplot)
-                del plot
+                    summary_plots[field_name].append(plot)
         return summary_plots
 
     @staticmethod
