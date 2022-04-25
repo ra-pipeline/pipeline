@@ -61,8 +61,14 @@ class SDBaselineQAHandler(pqa.QAPlugin):
                                                             field_id_list,
                                                             spw_id_list,
                                                             lines_list))
+        # decompress plots in advance
+        # this triggers async execution of convert command to create
+        # thumbnail for each figure
+        result_plots = [
+            x.decompress() if isinstance(x, compress.CompressedObj) else x for x in result.outcome['plots']
+        ]
         for figfile, stat in result.outcome['baseline_quality_stat'].items():
-            plot = _get_plot(result.outcome['plots'], figfile)
+            plot = _get_plot(result_plots, figfile)
             if plot is None:
                 LOG.warning(f'Unable to find plot instance for {figfile}')
                 continue
@@ -71,7 +77,10 @@ class SDBaselineQAHandler(pqa.QAPlugin):
             del plot
         result.qa.pool.extend(scores)
 
-def _get_plot(plots: List[logger.Plot], figfile: str) -> Optional[Union[compress.CompressedObj, logger.Plot]]:
+        # join async processes
+        _ = [p.thumbnail for p in result_plots]
+
+def _get_plot(plots: List[logger.Plot], figfile: str) -> Optional[logger.Plot]:
     """
     Return Plot instance that matches figure file name.
 
