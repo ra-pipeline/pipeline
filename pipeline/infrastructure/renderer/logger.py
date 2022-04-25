@@ -359,15 +359,15 @@ class Plot(object):
 
     @property
     def thumbnail(self):
-        if os.path.exists(self.thumb_file):
-            if self.bg_process is not None:
-                try:
-                    pipelineasync.wait_task(self.bg_process, timeout=3600)
-                except Exception:
-                    pipelineasync.cancel_task(self.bg_process, timeout=10)
-                finally:
-                    self.bg_process = None
+        if self.bg_process is not None:
+            try:
+                pipelineasync.wait_task(self.bg_process, timeout=3600)
+            except Exception:
+                pipelineasync.cancel_task(self.bg_process, timeout=10)
+            finally:
+                self.bg_process = None
 
+        if os.path.exists(self.thumb_file):
             return self.thumb_file
 
         return self._create_thumbnail()
