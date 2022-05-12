@@ -251,7 +251,7 @@ results object for the pipeline task is returned.
     <param name="minsnr" subparam="true" type="double">
         <shortdescription>Solutions below this SNR are rejected</shortdescription>
         <description>Solutions below this SNR are rejected</description>
-        <value>3.0</value>
+        <value>2.75</value>
     </param>
 
     <param name="solnorm" subparam="true" type="bool">
@@ -429,7 +429,7 @@ results object for the pipeline task is returned.
                 <default param="combine"><value type="string">scan</value></default>
                 <default param="refant"><value type="string"/></default>
                 <default param="minblperant"><value type="int">4</value></default>
-                <default param="minsnr"><value type="double">3.0</value></default>
+                <default param="minsnr"><value type="double">2.75</value></default>
                 <default param="solnorm"><value type="bool">True</value></default>
                 <default param="antnegsig"><value type="double">4.0</value></default>
                 <default param="antpossig"><value type="double">4.6</value></default>
@@ -453,7 +453,7 @@ results object for the pipeline task is returned.
                 <default param="combine"><value type="string">scan</value></default>
                 <default param="refant"><value type="string"/></default>
                 <default param="minblperant"><value type="int">4</value></default>
-                <default param="minsnr"><value type="double">3.0</value></default>
+                <default param="minsnr"><value type="double">2.75</value></default>
                 <default param="solnorm"><value type="bool">True</value></default>
                 <default param="antnegsig"><value type="double">4.0</value></default>
                 <default param="antpossig"><value type="double">4.6</value></default>

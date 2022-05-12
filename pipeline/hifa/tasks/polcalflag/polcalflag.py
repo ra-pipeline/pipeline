@@ -51,7 +51,7 @@ class PolcalflagResults(basetask.Results):
 
 class PolcalflagInputs(vdp.StandardInputs):
 
-    minsnr = vdp.VisDependentProperty(default=3.0)
+    minsnr = vdp.VisDependentProperty(default=2.75)
     phaseupsolint = vdp.VisDependentProperty(default='int')
     refant = vdp.VisDependentProperty(default='')
     solint = vdp.VisDependentProperty(default='inf')
