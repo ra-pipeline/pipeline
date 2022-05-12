@@ -426,11 +426,12 @@ class LeafComposite(object):
         all antenna numbers present in any of the input calapps' caltables. For each antenna number key, 
         the value is a list of all the input calapps with caltables with that antenna. 
         """        
-        dict_calapp = collections.defaultdict(set)
+        dict_calapp = collections.defaultdict(list)
         for cal in calapps:
-          with casa_tools.TableReader(cal.gaintable) as tb:
-              for elt in set(tb.getcol(column_name)):
-                   dict_calapp[elt].add(cal)
+            with casa_tools.TableReader(cal.gaintable) as tb:
+                for elt in set(tb.getcol(column_name)):
+                    if cal not in dict_calapp[elt]:
+                        dict_calapp[elt].append(cal)
         return dict_calapp
 
 
@@ -478,8 +479,8 @@ class SpwComposite(LeafComposite):
             dict_calapp_spws = self._create_calapp_contents_dict(calapp, 'SPECTRAL_WINDOW_ID')
             table_spws = sorted(dict_calapp_spws.keys())
             
-            # In the following call, list(dict_calapp_spw[spw]) is list of calapps with that spw present 
-            children = [self.leaf_class(context, result, list(dict_calapp_spws[spw]), xaxis, yaxis,
+            # In the following call, dict_calapp_spw[spw] is a list of calapps with that spw present 
+            children = [self.leaf_class(context, result, dict_calapp_spws[spw], xaxis, yaxis,
                         spw=int(spw), ant=ant, pol=pol, **kwargs)
                         for spw in table_spws]    
         else: 
@@ -539,9 +540,9 @@ class SpwAntComposite(LeafComposite):
 
                     kwargs.update({"plotrange": [0, 0, ymin, ymax]})
 
-                # In the following call, list(dict_calapp_spw[spw]) is list of calapps with that spw
+                # In the following call, dict_calapp_spw[spw] is the list of calapps with that spw
                 children.append(
-                    self.leaf_class(context, result, list(dict_calapp_spws[spw]), xaxis, yaxis, spw=int(spw), pol=pol, **kwargs))
+                    self.leaf_class(context, result, dict_calapp_spws[spw], xaxis, yaxis, spw=int(spw), pol=pol, **kwargs))
         else: 
             # Identify spws in caltable
             with casa_tools.TableReader(calapp.gaintable) as tb:
@@ -591,8 +592,8 @@ class AntComposite(LeafComposite):
             dict_calapp_ants = self._create_calapp_contents_dict(calapp, 'ANTENNA1')
             table_ants = sorted(dict_calapp_ants.keys())
 
-            # In the following call list(dict_calapp_ants[ant]) is list of calapps with antenna=ant present 
-            children = [self.leaf_class(context, result, list(dict_calapp_ants[ant]), xaxis, yaxis,
+            # In the following call dict_calapp_ants[ant] is the list of calapps with antenna=ant present 
+            children = [self.leaf_class(context, result, dict_calapp_ants[ant], xaxis, yaxis,
                         ant=int(ant), spw=spw, pol=pol, **kwargs)
                         for ant in table_ants]
         else: 

@@ -56,11 +56,17 @@ class GcorFluxscaleResults(commonfluxresults.FluxCalibrationResults):
             fluxscale_measurements = collections.defaultdict(list)
         self.fluxscale_measurements = fluxscale_measurements
 
+        self.calapps_for_check_sources = [] 
+
     def merge_with_context(self, context):
         # Update the measurement set with the calibrated visibility based flux
         # measurements for later use in imaging (PIPE-644, PIPE-660).
         ms = context.observing_run.get_ms(self.vis)
         ms.derived_fluxes = self.measurements
+
+        # Store these calapps in the context so that they can be plotted in hifa_timegaincal's
+        # diagnostic phase vs. time plots. See PIPE-1377 for more information.
+        ms.phase_calapps_for_check_sources = self.calapps_for_check_sources
 
 
 class GcorFluxscaleInputs(fluxscale.FluxscaleInputs):
@@ -143,7 +149,7 @@ class GcorFluxscale(basetask.StandardTaskTemplate):
         result.uvrange = uvrange
 
         # Create the phase caltables and merge into the local context.
-        self._do_phasecals(allantenna, filtered_refant, minblperant, resantenna, uvrange)
+        result.calapps_for_check_sources = self._do_phasecals(allantenna, filtered_refant, minblperant, resantenna, uvrange)
 
         # Now do the amplitude-only gaincal. This will produce the caltable
         # that fluxscale will analyse.
@@ -570,13 +576,22 @@ class GcorFluxscale(basetask.StandardTaskTemplate):
         exclude_intents = amp_intent | non_pc_intents
         intent_field_to_assess = self._get_intent_field(inputs.ms, intents=pc_intents,
                                                         exclude_intents=exclude_intents)
+
+        # List of calapps for check sources solutions to be saved to the context so they can be
+        # used in hifa_timegaincal's diagnostic phase vs. time plots. See PIPE-1377.
+        calapps_for_check_sources = []                                                        
         for intent, field in intent_field_to_assess:
-            self._do_phasecal_for_intent_field(intent, field, allantenna, filtered_refant)
+            result = self._do_phasecal_for_intent_field(intent, field, allantenna, filtered_refant)
+            if intent == 'CHECK':
+                calapps_for_check_sources.extend(result.final)
+
 
         # PIPE-1154: for the remaining calibrator intents, compute phase
         # solutions using full set of antennas.
         if non_pc_intents:
             self._do_phasecal_for_other_calibrators(non_pc_intents, allantenna, filtered_refant)
+        
+        return calapps_for_check_sources
 
     @staticmethod
     def _get_intent_field(ms: MeasurementSet, intents: Set, exclude_intents: Set = None) -> List[Tuple[str, str]]:
@@ -627,9 +642,12 @@ class GcorFluxscale(basetask.StandardTaskTemplate):
         # Create phase caltable and merge it into the local context so that the
         # caltable is included in pre-apply for subsequent gaincal.
         LOG.info(f'Compute phase gaincal table for intent={intent}, field={field}.')
-        self._do_gaincal(field=field, intent=intent, gaintype=gaintype, calmode='p', combine=combine,
+
+        result = self._do_gaincal(field=field, intent=intent, gaintype=gaintype, calmode='p', combine=combine,
                          solint=solint, antenna=antenna, uvrange='', minsnr=inputs.minsnr, refant=refant,
                          spwmap=spwmap, interp=interp, merge=True)
+
+        return result
 
     def _do_phasecal_for_other_calibrators(self, intent, antenna, refant):
         inputs = self.inputs

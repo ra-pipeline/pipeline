@@ -60,6 +60,8 @@ class MeasurementSet(object):
             prevent modification
         origin_ms: A path to the first generation MeasurementSet from which
             the current MS is generated.
+        phase_calapps_for_check_sources : The phase calapps for the check sources 
+            from hifa_gfluxscale
     """
 
     def __init__(self, name: str, session: Optional[str] = None):
@@ -118,6 +120,12 @@ class MeasurementSet(object):
         # to put the lock on a custom refant list class, but some tasks check
         # the type of reference_antenna directly which prevents that approach.
         self.reference_antenna_locked: bool = False
+
+        # This contains the phase calapps for the check sources from hifa_gfluxscale.
+        # Added for ALMA IF to support PIPE-1377
+        # These calapps are saved off from hifa_gfluxscale and saved here 
+        # so they can be added to the Diagnostic Phase Vs Time plots for hifa_timegaincal
+        self.phase_calapps_for_check_sources = []
 
     def _calc_filesize(self):
         """
