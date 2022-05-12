@@ -598,14 +598,20 @@ class GcorFluxscale(basetask.StandardTaskTemplate):
         if exclude_intents is None:
             exclude_intents = set()
 
-        intent_field = []
+        # PIPE-1493: only collect unique combinations of field name and intent.
+        # This means that if multiple fields with different IDs have the same
+        # name, then these will appear only once in the list of intents-fields
+        # to process. This assumes that there is no scenario where there are
+        # legitimately multiple different field IDs that have the same name,
+        # and that should be processed separately.
+        intent_field = set()
         for intent in intents:
             for field in ms.get_fields(intent=intent):
                 # Check whether found field also covers any of the intents to
                 # skip.
                 excluded_intents_found = field.intents.intersection(exclude_intents)
                 if not excluded_intents_found:
-                    intent_field.append((intent, field.name))
+                    intent_field.add((intent, field.name))
                 else:
                     # Log a message to explain why no phase caltable will be
                     # derived for this particular combination of field and
@@ -615,7 +621,7 @@ class GcorFluxscale(basetask.StandardTaskTemplate):
                               f' and intent {intent} because this field also covers calibrator intent(s)'
                               f' {excluded_intents_str}')
 
-        return intent_field
+        return sorted(intent_field)
 
     def _do_phasecal_for_amp_calibrator(self, refant, minblperant, antenna, uvrange):
         inputs = self.inputs
