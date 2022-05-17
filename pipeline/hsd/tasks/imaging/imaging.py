@@ -1141,14 +1141,14 @@ class SDImaging(basetask.StandardTaskTemplate):
                                                                                      msobj.get_antenna(antid)[0].name,
                                                                                      str(pol_names)))
             if raster_info is None:
-                LOG.warning('Raster scan analysis failed. Skipping further calculation.')
+                LOG.warning('Raster scan analysis failed. Skipping further calculation for this data selection.')
                 continue
 
             dt = datatable_dict[msobj.basename]
             _index_list = common.get_index_list_for_ms(dt, [msobj.origin_ms], [antid], [fieldid],
                                                        [spwid])
             if len(_index_list) == 0: #this happens when permanent flag is set to all selection.
-                LOG.info('No unflagged row in DataTable. Skipping further calculation.')
+                LOG.info('No unflagged row in DataTable. Skipping further calculation for this data selection.')
                 continue
             # effective BW
             with casa_tools.MSMDReader(infile) as msmd:
@@ -1175,6 +1175,9 @@ class SDImaging(basetask.StandardTaskTemplate):
             # obtain Wx, and Wy
             width = cqa.getvalue(cqa.convert(raster_info.width, ang_unit))[0]
             height = cqa.getvalue(cqa.convert(raster_info.height, ang_unit))[0]
+            if width <= 0.0 or height <= 0.0:
+                LOG.info('Invalid map extent. Skipping further calculation for this data selection.')
+                continue
             # obtain T_OS,f
             unit = dt.getcolkeyword('EXPOSURE', 'UNIT')
             t_on_tot = cqa.getvalue(cqa.convert(cqa.quantity(dt.getcol('EXPOSURE').take(_index_list, axis=-1).sum(), unit), time_unit))[0]
@@ -1193,11 +1196,19 @@ class SDImaging(basetask.StandardTaskTemplate):
             LOG.info('The actual on source time = {} {}'.format(t_on_act, time_unit))
             LOG.info('- total time on source = {} {}'.format(t_on_tot, time_unit))
             LOG.info('- flagged Fraction = {} %'.format(100*frac_flagged))
+            # PIPE-1394
+            if t_on_act <= 0.0 :
+                LOG.info('No valid ON-source integration. Skipping further calculation for this data selection.')
+                continue
+
             # obtain calibration tables applied
             calto = callibrary.CalTo(vis=calmsobj.name, field=str(fieldid))
             calst = context.callibrary.applied.trimmed(context, calto)
             # obtain T_sub,on, T_sub,off
             t_sub_on = cqa.getvalue(cqa.convert(raster_info.row_duration, time_unit))[0]
+            if t_sub_on == 0.0:
+                LOG.info('Invalid sub-scan duration. Skipping further calculation for this data selection.')
+                continue
             sky_field = calmsobj.calibration_strategy['field_strategy'][fieldid]
             try:
                 skytab = ''
@@ -1230,6 +1241,9 @@ class SDImaging(basetask.StandardTaskTemplate):
                     t.close()
             t_sub_off = cqa.getvalue(cqa.convert(cqa.quantity(interval.mean(), interval_unit), time_unit))[0]
             LOG.info('Subscan Time ON = {} {}, OFF = {} {}'.format(t_sub_on, time_unit, t_sub_off, time_unit))
+            if t_sub_off == 0.0:
+                LOG.info('No valid OFF-source scan. Skipping further calculation for this data selection.')
+                continue
             # obtain factors by convolution function (THIS ASSUMES SF kernel with either convsupport = 6 (ALMA) or 3 (NRO)
             # TODO: Ggeneralize factor for SF, and Gaussian convolution function
             conv2d = 0.3193 if is_nro else 0.1597
@@ -1273,6 +1287,9 @@ class SDImaging(basetask.StandardTaskTemplate):
             c_proj = numpy.sqrt( (cy_val* numpy.sin(ang))**2 + (cx_val*numpy.cos(ang))**2)
             inv_variant_on = effBW * numpy.abs(cx_val * cy_val) * t_on_act / width / height
             inv_variant_off = effBW * c_proj * t_sub_off * t_on_act / t_sub_on / height
+            if inv_variant_on == 0.0 or inv_variant_off == 0.0:
+                LOG.info('Unable to calculate theoretical sensitivity for this data selection. Skipping calculation.')
+                continue
 
             for ipol in polids:
                 sq_rms += (jy_per_k*mean_tsys_per_pol[ipol])**2 * (conv2d**2/inv_variant_on + conv1d**2/inv_variant_off)
