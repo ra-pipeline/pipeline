@@ -129,6 +129,7 @@ class T2_4MDetailsSDApplycalRenderer(super_renderer.T2_4MDetailsApplycalRenderer
             'amp_vs_time_subpages': [],
             'amp_vs_uv_subpages': [],
             'phase_vs_time_subpages': [],
+            'outliers_path_link': ''
         })
 
     def create_single_dish_science_plots(self, context: Context, results: ResultsList) \

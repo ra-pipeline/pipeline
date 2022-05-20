@@ -29,7 +29,7 @@ LinearFitParameters = collections.namedtuple(
 # Outlier describes an outlier data selection with why it's an outlier, and by how much
 Outlier = collections.namedtuple(
     'Outlier',
-    ['vis', 'intent', 'scan', 'spw', 'ant', 'pol', 'num_sigma', 'reason']
+    ['vis', 'intent', 'scan', 'spw', 'ant', 'pol', 'num_sigma', 'phase_offset_gt90deg', 'reason']
 )
 # ValueAndUncertainty is a simple 2-tuple to hold a value and the uncertainty in that value
 ValueAndUncertainty = collections.namedtuple(
@@ -65,13 +65,18 @@ def score_all_scans(ms, intent: str, flag_all: bool = False, memory_gb: int = ME
     :return: outliers that deviate from a reference fit
     """
     outliers = []
-    for scan in sorted(ms.get_scans(scan_intent=intent), key=operator.attrgetter('id')):
+    wrappers = {}
+    scans = sorted(ms.get_scans(scan_intent=intent), key=operator.attrgetter('id'))
+    for scan in scans:
         spws = sorted([spw for spw in scan.spws if spw.type in ('FDM', 'TDM')],
                       key=operator.attrgetter('id'))
         for spw in spws:
             LOG.info('Applycal QA analysis: processing {} scan {} spw {}'.format(ms.basename, scan.id, spw.id))
 
             wrapper = mswrapper.MSWrapper.create_averages_from_ms(ms.name, scan.id, spw.id, memory_gb)
+            if spw.id not in wrappers:
+                wrappers[spw.id] = []
+            wrappers[spw.id].append(wrapper)
 
             fits = get_best_fits_per_ant(wrapper)
 
@@ -84,6 +89,26 @@ def score_all_scans(ms, intent: str, flag_all: bool = False, memory_gb: int = ME
             )
 
             outliers.extend(score_all(fits, outlier_fn, flag_all))
+
+    # Score all scans for a given spw
+    for spw_id in wrappers.keys():
+        if len(wrappers[spw_id]) > 1:
+            LOG.info('Applycal QA analysis: processing {} scan average spw {}'.format(ms.basename, spw_id))
+            # Average wrappers
+            average_wrapper = mswrapper.MSWrapper.create_averages_from_combination(wrappers[spw_id])
+            average_fits = get_best_fits_per_ant(average_wrapper)
+            outlier_fn = functools.partial(
+                Outlier,
+                vis={ms.basename, },
+                intent={intent, },
+                spw={spw_id, },
+                scan={-1, }
+            )
+
+            # Score average
+            outliers.extend(score_all(average_fits, outlier_fn, flag_all))
+        else:
+            LOG.info('Applycal QA analysis: skipping {} scan average spw {} due to single scan'.format(ms.basename, spw_id))
 
     return outliers
 
@@ -105,7 +130,9 @@ def get_best_fits_per_ant(wrapper):
     corrected_data = V_k['corrected_data']
     sigma = V_k['sigma']
 
-    num_antennas, num_pols, num_chans = corrected_data.shape
+    num_antennas, _, num_chans = corrected_data.shape
+    # Filter cross-pol data
+    pol_indices = tuple(np.where((wrapper.corr_axis=='XX') | (wrapper.corr_axis=='YY'))[0])
 
     all_fits = []
 
@@ -119,7 +146,7 @@ def get_best_fits_per_ant(wrapper):
         amp_model_fn = get_linear_function(band_midpoint, frequency_scale)
         ang_model_fn = get_angular_linear_function(band_midpoint, frequency_scale)
 
-        for pol in range(num_pols):
+        for pol in pol_indices:
             visibilities = corrected_data[ant, pol, :]
             ta_sigma = sigma[ant, pol, :]
 
@@ -289,7 +316,22 @@ def score_X_vs_freq_fits(all_fits, attr, ref_value_fn, outlier_fn, sigma_thresho
     outlier_fn = functools.partial(outlier_fn, reason={reason, })
 
     accessor = operator.attrgetter(attr)
-    return score_fits(all_fits, ref_value_fn, accessor, outlier_fn, sigma_threshold)
+    outliers = score_fits(all_fits, ref_value_fn, accessor, outlier_fn, sigma_threshold)
+
+    # Check for >90deg phase offsets which should have extra QA messages
+    if y_axis == 'phase':
+        for i in range(len(outliers)):
+            if outliers[i].phase_offset_gt90deg:
+                outliers[i] = Outlier(vis=outliers[i].vis,
+                                      intent=outliers[i].intent,
+                                      scan=outliers[i].scan,
+                                      spw=outliers[i].spw,
+                                      ant=outliers[i].ant,
+                                      pol=outliers[i].pol,
+                                      num_sigma=outliers[i].num_sigma,
+                                      phase_offset_gt90deg=outliers[i].phase_offset_gt90deg,
+                                      reason={f'gt90deg_offset_{y_axis}_vs_freq.{fit_parameter}', })
+    return outliers
 
 
 def score_fits(all_fits, reference_value_fn, accessor, outlier_fn, sigma_threshold):
@@ -325,9 +367,8 @@ def score_fits(all_fits, reference_value_fn, accessor, outlier_fn, sigma_thresho
             value = accessor(fit).value
             this_sigma = np.sqrt(reference_sigma ** 2 + unc ** 2)
             num_sigma = np.abs((value - reference_val) / this_sigma)
-
             if num_sigma > sigma_threshold:
-                outlier = outlier_fn(ant={ant, }, pol={pol, }, num_sigma=num_sigma)
+                outlier = outlier_fn(ant={ant, }, pol={pol, }, num_sigma=num_sigma, phase_offset_gt90deg=abs(fit.phase.intercept.value) > 0.5 * np.pi)
                 outliers.append(outlier)
 
     return outliers

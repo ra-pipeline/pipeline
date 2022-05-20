@@ -732,4 +732,6 @@ def format_spwmap(spwmap, scispws):
 	</%def>
 </%self:plot_group>
 
+<p>${outliers_path_link}
+
 %endif

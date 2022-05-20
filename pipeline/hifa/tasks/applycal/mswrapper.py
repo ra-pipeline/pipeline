@@ -134,7 +134,7 @@ class MSWrapper(object):
         data = self[mask]
 
         # create new object for the filtered data
-        return MSWrapper(self.scan, self.spw, self.filename, data, self.corr_axis, self.freq_axis)
+        return MSWrapper(self.filename, self.scan, self.spw, data, self.corr_axis, self.freq_axis)
 
     def xor_filter(self, antenna1=None, antenna2=None, **kwargs):
         """
@@ -431,10 +431,10 @@ class MSWrapper(object):
 
         return MSWrapper(filename, scan, spw, None, corr_axis, freq_axis, V=V)
 
-    def __init__(self, scan, spw, filename, data, corr_axis, freq_axis, V=None):
+    def __init__(self, filename, scan, spw, data, corr_axis, freq_axis, V=None):
+        self.filename = filename
         self.scan = scan
         self.spw = spw
-        self.filename = filename
         self.data = data
         self.corr_axis = corr_axis
         self.freq_axis = freq_axis

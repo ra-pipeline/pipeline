@@ -245,7 +245,7 @@ class T2_4MDetailsfinalcalsRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
 
 class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
-    def __init__(self, uri='applycal.mako', 
+    def __init__(self, uri='applycals.mako', 
                  description='Apply calibrations from context',
                  always_rerender=False):
         super(T2_4MDetailsVLAApplycalRenderer, self).__init__(

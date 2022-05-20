@@ -1,5 +1,4 @@
 import pytest
-import numpy as np
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.tablereader import MeasurementSetReader
 
@@ -22,36 +21,36 @@ SCAN_ID = 10
 SPW_ID = 0
 # This is the list of outliers before applying the changes of PIPE-401
 OUTLIERS_OLD = [
-    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={10}, spw={0},
-            ant={2}, pol={0}, num_sigma=46.45925775941749, reason={'phase_vs_freq.slope'}),
-    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={10}, spw={0},
-            ant={5}, pol={0}, num_sigma=50.427459137967354, reason={'phase_vs_freq.slope'}),
-    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={10}, spw={0},
-            ant={6}, pol={0}, num_sigma=81.1260146003469, reason={'phase_vs_freq.slope'}),
-    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={10}, spw={0},
-            ant={7}, pol={0}, num_sigma=46.58214904798901, reason={'phase_vs_freq.slope'}),
-    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={10}, spw={0},
-            ant={10}, pol={0}, num_sigma=53.79134545208964, reason={'phase_vs_freq.slope'}),
-    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={10}, spw={0},
-            ant={4}, pol={1}, num_sigma=71.97263166794389, reason={'phase_vs_freq.slope'}),
-    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={10}, spw={0},
-            ant={7}, pol={1}, num_sigma=181.57460781948814, reason={'phase_vs_freq.slope'}),
-    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={10}, spw={0},
-            ant={8}, pol={1}, num_sigma=59.71412966520033, reason={'phase_vs_freq.slope'}),
-    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={10}, spw={0},
-            ant={10}, pol={1}, num_sigma=44.56921373526944, reason={'phase_vs_freq.slope'}),
-    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={10}, spw={0},
-            ant={3}, pol={0}, num_sigma=66.38239011759642, reason={'phase_vs_freq.intercept'}),
-    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={10}, spw={0},
-            ant={6}, pol={0}, num_sigma=78.72179148843134, reason={'phase_vs_freq.intercept'}),
-    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={10}, spw={0},
-            ant={7}, pol={0}, num_sigma=500.397537042222, reason={'phase_vs_freq.intercept'}),
-    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={10}, spw={0},
-            ant={4}, pol={1}, num_sigma=84.51872790161062, reason={'phase_vs_freq.intercept'}),
-    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={10}, spw={0},
-            ant={7}, pol={1}, num_sigma=139.932017593615, reason={'phase_vs_freq.intercept'}),
-    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={10}, spw={0},
-            ant={10}, pol={1}, num_sigma=84.22975284611235, reason={'phase_vs_freq.intercept'})
+    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={SCAN_ID}, spw={SPW_ID},
+            ant={2}, pol={0}, num_sigma=46.45925775941749, reason={'phase_vs_freq.slope'}, phase_offset_gt90deg={False}),
+    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={SCAN_ID}, spw={SPW_ID},
+            ant={5}, pol={0}, num_sigma=50.427459137967354, reason={'phase_vs_freq.slope'}, phase_offset_gt90deg={False}),
+    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={SCAN_ID}, spw={SPW_ID},
+            ant={6}, pol={0}, num_sigma=81.1260146003469, reason={'phase_vs_freq.slope'}, phase_offset_gt90deg={False}),
+    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={SCAN_ID}, spw={SPW_ID},
+            ant={7}, pol={0}, num_sigma=46.58214904798901, reason={'phase_vs_freq.slope'}, phase_offset_gt90deg={False}),
+    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={SCAN_ID}, spw={SPW_ID},
+            ant={10}, pol={0}, num_sigma=53.79134545208964, reason={'phase_vs_freq.slope'}, phase_offset_gt90deg={False}),
+    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={SCAN_ID}, spw={SPW_ID},
+            ant={4}, pol={1}, num_sigma=71.97263166794389, reason={'phase_vs_freq.slope'}, phase_offset_gt90deg={False}),
+    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={SCAN_ID}, spw={SPW_ID},
+            ant={7}, pol={1}, num_sigma=181.57460781948814, reason={'phase_vs_freq.slope'}, phase_offset_gt90deg={False}),
+    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={SCAN_ID}, spw={SPW_ID},
+            ant={8}, pol={1}, num_sigma=59.71412966520033, reason={'phase_vs_freq.slope'}, phase_offset_gt90deg={False}),
+    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={SCAN_ID}, spw={SPW_ID},
+            ant={10}, pol={1}, num_sigma=44.56921373526944, reason={'phase_vs_freq.slope'}, phase_offset_gt90deg={False}),
+    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={SCAN_ID}, spw={SPW_ID},
+            ant={3}, pol={0}, num_sigma=66.38239011759642, reason={'phase_vs_freq.intercept'}, phase_offset_gt90deg={False}),
+    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={SCAN_ID}, spw={SPW_ID},
+            ant={6}, pol={0}, num_sigma=78.72179148843134, reason={'phase_vs_freq.intercept'}, phase_offset_gt90deg={False}),
+    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={SCAN_ID}, spw={SPW_ID},
+            ant={7}, pol={0}, num_sigma=500.397537042222, reason={'phase_vs_freq.intercept'}, phase_offset_gt90deg={False}),
+    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={SCAN_ID}, spw={SPW_ID},
+            ant={4}, pol={1}, num_sigma=84.51872790161062, reason={'phase_vs_freq.intercept'}, phase_offset_gt90deg={False}),
+    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={SCAN_ID}, spw={SPW_ID},
+            ant={7}, pol={1}, num_sigma=139.932017593615, reason={'phase_vs_freq.intercept'}, phase_offset_gt90deg={False}),
+    Outlier(vis={'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target.ms'}, intent={'TARGET'}, scan={SCAN_ID}, spw={SPW_ID},
+            ant={10}, pol={1}, num_sigma=84.22975284611235, reason={'phase_vs_freq.intercept'}, phase_offset_gt90deg={False})
 ]
 
 
