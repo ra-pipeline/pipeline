@@ -74,21 +74,22 @@ class UVcontSub(applycal.Applycal):
 
     def analyse(self, result):
 
-        # Check for existence of the output vis. 
-        if not os.path.exists(result.outputvis):
-            LOG.debug('Error creating target line MS %s' % (os.path.basename(result.outputvis)))
-            return result
+        if not result.mitigation_error:
+            # Check for existence of the output vis. 
+            if not os.path.exists(result.outputvis):
+                LOG.debug('Error creating target line MS %s' % (os.path.basename(result.outputvis)))
+                return result
 
-        # Import the new measurement set.
-        to_import = os.path.relpath(result.outputvis)
-        observing_run = tablereader.ObservingRunReader.get_observing_run(to_import)
+            # Import the new measurement set.
+            to_import = os.path.relpath(result.outputvis)
+            observing_run = tablereader.ObservingRunReader.get_observing_run(to_import)
 
-        # Adopt same session as source measurement set
-        for ms in observing_run.measurement_sets:
-            LOG.debug('Setting session to %s for %s', self.inputs.ms.session, ms.basename)
-            ms.session = self.inputs.ms.session
-            ms.set_data_column(DataType.REGCAL_LINE_SCIENCE, 'DATA')
-        result.line_mses.extend(observing_run.measurement_sets)
+            # Adopt same session as source measurement set
+            for ms in observing_run.measurement_sets:
+                LOG.debug('Setting session to %s for %s', self.inputs.ms.session, ms.basename)
+                ms.session = self.inputs.ms.session
+                ms.set_data_column(DataType.REGCAL_LINE_SCIENCE, 'DATA')
+            result.line_mses.extend(observing_run.measurement_sets)
 
         return result
 

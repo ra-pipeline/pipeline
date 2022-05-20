@@ -4,7 +4,8 @@ import os
 
 columns = {'cleanmask' : ('Clean Mask', 'Clean Mask'),
 	   'flux' : ('Primary Beam', 'Primary Beam'),
-	   'pbcorimage' : ('Image', 'Image'),
+	   'pbcorimage' : ('Pb-corrected Image', 'Pb-corrected Image'),
+	   'image' : ('Image', 'Image'),	   
 	   'residual' : ('Residual', 'Residual'),
 	   'model' : ('Final Model', 'Final Model'),
 	   'psf' : ('PSF', 'PSF'),

@@ -111,9 +111,7 @@ class VLAExportData(exportdata.ExportData):
                                                    self.inputs.imaging_products_only)
 
         # Export the AQUA report
-        aquareport_name = 'pipeline_aquareport.xml'
-        pipe_aqua_reportfile = self._export_aqua_report(self.inputs.context, oussid, aquareport_name,
-                                                        self.inputs.products_dir)
+        pipe_aqua_reportfile = self._export_aqua_report(self.inputs.context, oussid, self.inputs.products_dir)
 
         # Update the manifest
         if auxfproducts is not None or pipe_aqua_reportfile is not None:
@@ -202,11 +200,11 @@ finally:
 
         return os.path.basename(out_script_file)
 
-    def _export_aqua_report (self, context, oussid, aquareport_name, products_dir):
+    def _export_aqua_report (self, context, oussid, products_dir):
         """
         Save the AQUA report.
         """
-        aqua_file = os.path.join(context.output_dir, aquareport_name)
+        aqua_file = os.path.join(context.output_dir, context.logs['aqua_report'])
 
         report_generator = vlaifaqua.VLAAquaXmlGenerator()
         LOG.info('Generating pipeline AQUA report')
@@ -218,11 +216,16 @@ finally:
             return 'Undefined'
 
         ps = context.project_structure
-        out_aqua_file = self.NameBuilder.aqua_report(aquareport_name,
+        out_aqua_file = self.NameBuilder.aqua_report(context.logs['aqua_report'],
                                                      project_structure=ps,
                                                      ousstatus_entity_id=oussid,
                                                      output_dir=products_dir)
 
         LOG.info('Copying AQUA report %s to %s', aqua_file, out_aqua_file)
         shutil.copy(aqua_file, out_aqua_file)
+
+        # put aqua report into html directory, so it can be linked to the weblog
+        LOG.info('Copying AQUA report %s to %s', aqua_file, context.report_dir)
+        shutil.copy(aqua_file, context.report_dir)
+
         return os.path.basename(out_aqua_file)

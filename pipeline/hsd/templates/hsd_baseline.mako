@@ -95,7 +95,9 @@ line detection stage.</p>
 <li><a href="#avgbeforebaseline">Averaged Spectral Data Before Baseline Subtraction</a></li>
 <li><a href="#rawafterbaseline">Raw Spectral Data After Baseline Subtraction</a></li>
 <li><a href="#flatnessafterbaseline">Baseline Flatness After baseline Subtraction</a></li>
+% if detail is not None:
 <li><a href="#clusteranalysis">Line Detection by Clustering Analysis</a></li>
+% endif
 </ul>
 
 <h2 id="rawbeforebaseline" class="jumptarget">Spectral Data Before Baseline Subtraction</h2>
@@ -269,6 +271,8 @@ for baseline subtraction.</p>
 	<div class="clearfix"></div><!--  flush plots, break to next row -->
 %endfor
 
+% if detail is not None:
+
 <h2 id="clusteranalysis" class="jumptarget">Line Detection by Clustering Analysis</h2>
 
 % if len(detail) == 0:
@@ -343,4 +347,6 @@ for baseline subtraction.</p>
   <p>No Lines are detected for ${field}.</p>
   % endif
 % endfor
+% endif
+
 % endif

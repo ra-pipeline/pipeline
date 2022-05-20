@@ -157,7 +157,8 @@ class Context(object):
         self.logs: Dict[str, str] = dict(
             casa_commands='casa_commands.log',
             pipeline_script='casa_pipescript.py',
-            pipeline_restore_script='casa_piperestorescript.py'
+            pipeline_restore_script='casa_piperestorescript.py',
+            aqua_report='pipeline_aquareport.xml'
         )
 
         event = ContextCreatedEvent(context_name=self.name, output_dir=self.output_dir)

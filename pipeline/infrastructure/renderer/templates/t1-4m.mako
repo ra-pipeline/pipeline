@@ -91,6 +91,7 @@ $(document).ready(function() {
 		${li_anchor_to_file(pcontext.logs['pipeline_script'], 'pipeline equivalent script')}
 		${li_anchor_to_file(pcontext.logs['pipeline_restore_script'], 'pipeline restore script')}
 		${li_anchor_to_file(pcontext.project_structure.ppr_file, 'pipeline processing request', False)}
+		${li_anchor_to_file(pcontext.logs['aqua_report'], 'AQUA report', False)}
 		</ul>	
 	</div>
 </div>

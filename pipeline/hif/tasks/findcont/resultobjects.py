@@ -20,63 +20,64 @@ class FindContResult(basetask.Results):
         self.single_range_channel_fractions = single_range_channel_fractions
 
     def merge_with_context(self, context):
-        # write the new ranges to the continuum file
-        contfile_handler = contfilehandler.ContFileHandler(context.contfile)
-        contfile_handler.write(self.cont_ranges)
+        if not self.mitigation_error:
+            # write the new ranges to the continuum file
+            contfile_handler = contfilehandler.ContFileHandler(context.contfile)
+            contfile_handler.write(self.cont_ranges)
 
-        # Store new selection for subsequent mfs or cont imaging step.
-        # NOTE: This only works for the default setup, not for a user supplied list.
-        # TODO: Catch user supplied list case.
-        clean_list_pending = []
-        for i, target in enumerate(context.clean_list_pending):
-            new_target = target
-            target_ok = True
-            if target['specmode'] in ('mfs', 'cont'):
-                source_name = utils.dequote(target['field'])
-                spwids = target['spw']
-                new_spwids = []
-                new_spw_sel = 'NEW' in [self.result_cont_ranges[source_name][spwid]['status'] for spwid in spwids.split(',')]
+            # Store new selection for subsequent mfs or cont imaging step.
+            # NOTE: This only works for the default setup, not for a user supplied list.
+            # TODO: Catch user supplied list case.
+            clean_list_pending = []
+            for i, target in enumerate(context.clean_list_pending):
+                new_target = target
+                target_ok = True
+                if target['specmode'] in ('mfs', 'cont'):
+                    source_name = utils.dequote(target['field'])
+                    spwids = target['spw']
+                    new_spwids = []
+                    new_spw_sel = 'NEW' in [self.result_cont_ranges[source_name][spwid]['status'] for spwid in spwids.split(',')]
 
-                all_continuum = True
-                if new_spw_sel:
-                    spwsel = {}
-                    for spwid in spwids.split(','):
-                        if (self.cont_ranges['fields'][source_name][spwid] == ['NONE']) and (target['intent'] == 'TARGET'):
-                            spwsel['spw%s' % (spwid)] = ''
-                            LOG.warning('No continuum frequency range information found for %s, spw %s.' % (target['field'], spwid))
-                            all_continuum = False
-                        elif self.cont_ranges['fields'][source_name][spwid] == ['ALL']:
-                            spwsel['spw%s' % (spwid)] = 'ALL'
-                        else:
-                            new_spwids.append(spwid)
-                            spwsel['spw%s' % (spwid)] = ';'.join(['%.10f~%.10fGHz' % (float(cont_range['range'][0]), float(cont_range['range'][1])) for cont_range in self.cont_ranges['fields'][source_name][spwid] if isinstance(cont_range, dict)])
-                            refers = numpy.array([cont_range['refer'] for cont_range in self.cont_ranges['fields'][source_name][spwid] if isinstance(cont_range, dict)])
-                            if (refers == 'TOPO').all():
-                                refer = 'TOPO'
-                            elif (refers == 'LSRK').all():
-                                refer = 'LSRK'
-                            elif (refers == 'SOURCE').all():
-                                refer = 'SOURCE'
-                            else:
-                                refer = 'UNDEFINED'
-                            spwsel['spw%s' % (spwid)] = '%s %s' % (spwsel['spw%s' % (spwid)], refer)
-                            if 'ALL' not in self.cont_ranges['fields'][source_name][spwid]:
+                    all_continuum = True
+                    if new_spw_sel:
+                        spwsel = {}
+                        for spwid in spwids.split(','):
+                            if (self.cont_ranges['fields'][source_name][spwid] == ['NONE']) and (target['intent'] == 'TARGET'):
+                                spwsel['spw%s' % (spwid)] = ''
+                                LOG.warning('No continuum frequency range information found for %s, spw %s.' % (target['field'], spwid))
                                 all_continuum = False
+                            elif self.cont_ranges['fields'][source_name][spwid] == ['ALL']:
+                                spwsel['spw%s' % (spwid)] = 'ALL'
+                            else:
+                                new_spwids.append(spwid)
+                                spwsel['spw%s' % (spwid)] = ';'.join(['%.10f~%.10fGHz' % (float(cont_range['range'][0]), float(cont_range['range'][1])) for cont_range in self.cont_ranges['fields'][source_name][spwid] if isinstance(cont_range, dict)])
+                                refers = numpy.array([cont_range['refer'] for cont_range in self.cont_ranges['fields'][source_name][spwid] if isinstance(cont_range, dict)])
+                                if (refers == 'TOPO').all():
+                                    refer = 'TOPO'
+                                elif (refers == 'LSRK').all():
+                                    refer = 'LSRK'
+                                elif (refers == 'SOURCE').all():
+                                    refer = 'SOURCE'
+                                else:
+                                    refer = 'UNDEFINED'
+                                spwsel['spw%s' % (spwid)] = '%s %s' % (spwsel['spw%s' % (spwid)], refer)
+                                if 'ALL' not in self.cont_ranges['fields'][source_name][spwid]:
+                                    all_continuum = False
 
-                    new_spwids = ','.join(new_spwids)
-                    if (new_spwids == '') and (target['intent'] == 'TARGET'):
-                        LOG.warning('No continuum selection for target %s, spw %s. Will not image this selection.' % (
-                            new_target['field'], new_target['spw']))
-                        target_ok = False
-                    else:
-                        new_target['spw'] = new_spwids
-                        new_target['spwsel_lsrk'] = spwsel
-                        new_target['spwsel_all_cont'] = all_continuum
+                        new_spwids = ','.join(new_spwids)
+                        if (new_spwids == '') and (target['intent'] == 'TARGET'):
+                            LOG.warning('No continuum selection for target %s, spw %s. Will not image this selection.' % (
+                                new_target['field'], new_target['spw']))
+                            target_ok = False
+                        else:
+                            new_target['spw'] = new_spwids
+                            new_target['spwsel_lsrk'] = spwsel
+                            new_target['spwsel_all_cont'] = all_continuum
 
-            if target_ok:
-                clean_list_pending.append(new_target)
+                if target_ok:
+                    clean_list_pending.append(new_target)
 
-        context.clean_list_pending = clean_list_pending
+            context.clean_list_pending = clean_list_pending
 
         # Remove heuristics objects to avoid accumulating large amounts of unnecessary memory
         for target in self.inputs['target_list']:

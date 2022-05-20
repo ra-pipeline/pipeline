@@ -68,7 +68,7 @@ class ExportvlassdataInputs(exportdata.ExportDataInputs):
 class Exportvlassdata(basetask.StandardTaskTemplate):
     Inputs = ExportvlassdataInputs
 
-    NameBuilder = exportdata.PipelineProductNameBuiler
+    NameBuilder = exportdata.PipelineProductNameBuilder
 
     def prepare(self):
 

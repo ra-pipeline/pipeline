@@ -22,10 +22,10 @@ from . import nrotemplategenerator
 LOG = infrastructure.get_logger(__name__)
 
 
-class NROPipelineNameBuilder(exportdata.PipelineProductNameBuiler):
+class NROPipelineNameBuilder(exportdata.PipelineProductNameBuilder):
     """Name(str) building utility methods class for NRO Pipeline.
     
-    Methods in this class overrides those in PipelineProductNameBuiler and
+    Methods in this class overrides those in PipelineProductNameBuilder and
     constructs names (paths) of products in the absence of valid OUS status ID
     nor session name in Nobeyama datasets."""
 

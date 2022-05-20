@@ -739,6 +739,13 @@ class TCleanPlotsRenderer(basetemplates.CommonRenderer):
             colorder = ['pbcorimage', 'residual', 'cleanmask', 'mom0_fc', 'mom8_fc', 'spectra']
         else:
             colorder = ['pbcorimage', 'residual', 'cleanmask']
+        
+        if 'VLA' in result.imaging_mode:
+            # PIPE-1462: use non-pbcor images for VLA in the tclean details page.
+            # Because 'mtmfs' CASA/tclean doesn't generate pbcor images for VLA and silently passes with a warning when pbcor=True,
+            # pbcor images are not produced from hif.tasks.tclean (see PIPE-1201/CAS-11636)
+            # Here, we set a fallback with non-pbcor images.
+            colorder = ['image' if im_type == 'pbcorimage' else im_type for im_type in colorder]
 
         self.extra_data = {
             'plots_dict': plots_dict,

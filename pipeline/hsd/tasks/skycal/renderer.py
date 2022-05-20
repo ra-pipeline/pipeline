@@ -1,6 +1,13 @@
+"""Renderer module for skycal task."""
 import collections
 import os
 
+from typing import TYPE_CHECKING, Any, Dict, List
+if TYPE_CHECKING:
+    from pipeline.domain.field import Field
+    from pipeline.infrastructure.launcher import Context
+    from pipeline.domain import MeasurementSet
+    from pipeline.infrastructure.basetask import ResultsList
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.utils as utils
@@ -13,13 +20,34 @@ LOG = logging.get_logger(__name__)
 
 
 class T2_4MDetailsSingleDishSkyCalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
-    def __init__(self, uri='skycal.mako',
-                 description='Single-Dish Sky Calibration', 
-                 always_rerender=False):
+    """Weblog renderer class for skycal task."""
+    
+    def __init__(self, 
+                 uri: str = 'skycal.mako', 
+                 description: str = 'Single-Dish Sky Calibration', 
+                 always_rerender: bool = False) -> None:
+        """Initialize T2_4MDetailsSingleDishSkyCalRenderer instance.
+
+        Args:
+            uri: Name of Mako template file. Defaults to 'skycal.mako'.
+            description: Description of the task. This is embedded into the task detail page.
+                         Defaults to 'Single-Dish Sky Calibration'.
+            always_rerender: Always rerender the page if True. Defaults to False.
+        """
         super(T2_4MDetailsSingleDishSkyCalRenderer, self).__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
-    def update_mako_context(self, ctx, context, results):
+    def update_mako_context(self, 
+                            ctx: Dict[str, Any], 
+                            context: 'Context', 
+                            results: 'ResultsList') -> None:
+        """Update context for weblog rendering.
+
+        Args:
+            ctx: Context for weblog rendering.
+            context: Pipeline context.
+            results: ResultsList instance. Should hold a list of SDSkyCalResults instance.
+        """
         stage_dir = os.path.join(context.report_dir, 
                                  'stage%d' % results.stage_number)
         if not os.path.exists(stage_dir):
@@ -53,7 +81,7 @@ class T2_4MDetailsSingleDishSkyCalRenderer(basetemplates.T2_4MDetailsDefaultRend
             # calibration table summary
             ms_applications = self.get_skycal_applications(context, result, ms)
             applications.extend(ms_applications)
-
+            
             # iterate over CalApplication instances
             final_original = result.final
 
@@ -188,7 +216,17 @@ class T2_4MDetailsSingleDishSkyCalRenderer(basetemplates.T2_4MDetailsDefaultRend
                     'elev_diff_subpages': elev_diff_subpages,
                     'reference_coords': reference_coords})
 
-    def get_skycal_applications(self, context, result, ms):
+    def get_skycal_applications(self, context: 'Context', result: skycal_task.SDSkyCalResults, ms: 'MeasurementSet') -> List[Dict]:
+        """Get application information from SDSkyCalResults instance and set them into a list.
+        
+        Args:
+            context: Pipeline context.
+            result: SDSkyCalResults instance.
+            ms: MeasurementSet domain object.
+            
+        Returns:
+            A list "application" containing dictionary; they are used to a table in skycal.mako file.
+        """
         applications = []
 
         calmode_map = {'ps': 'Position-switch',
@@ -215,7 +253,17 @@ class T2_4MDetailsSingleDishSkyCalRenderer(basetemplates.T2_4MDetailsDefaultRend
 
         return applications
 
-    def _get_reference_coord(self, context, ms, field):
+    def _get_reference_coord(self, context: 'Context', ms: 'MeasurementSet', field: 'Field') -> str:
+        """Get celestial coordinates and the reference.
+        
+        Args:
+            context: Pipeline context.
+            ms: MeasurementSet domain object.
+            field: field domain object.
+            
+        Returns:
+            Reference, RA and Declination.
+        """
         LOG.debug('_get_reference_coord({ms}, {field})'.format(ms=ms.basename, field=field.name))
         spws = ms.get_spectral_windows(science_windows_only=True)
         dd = ms.get_data_description(spw=spws[0].id)

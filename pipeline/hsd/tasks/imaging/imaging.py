@@ -1022,8 +1022,8 @@ class SDImaging(basetask.StandardTaskTemplate):
         rep_angle = numpy.nanmedian([cqa.getvalue(r.scan_angle) for r in raster_infos if r is not None])
         center_ra = numpy.nanmedian(__extract_values('center_ra', center_unit))
         center_dec = numpy.nanmedian(__extract_values('center_dec', center_unit))
-        width = rep_width - beam_size*2.
-        height = rep_height - beam_size*2.
+        width = rep_width - beam_size
+        height = rep_height - beam_size
         if width <=0 or height <=0: # No valid region selected.
             return None
         if org_direction is not None:
