@@ -24,6 +24,11 @@ from . import hsdn
 
 from .domain import measures
 from casashell.private.stack_manip import find_frame
+from casatasks import casalog
+
+# Modify filter to get INFO1 message which the pipeline
+# treats as ATTENTION level.
+casalog.filter('INFO1')
 
 LOG = infrastructure.get_logger(__name__)
 

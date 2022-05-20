@@ -304,8 +304,8 @@ class MeasurementSetReader(object):
                 sbinfo = SBSummaryTable.get_sbsummary_info(ms, msmd.observatorynames())
 
                 if sbinfo.repSource is None:
-                    LOG.warning('Unable to identify representative target for %s. Will try to fall back to existing'
-                                ' science target sources in the imaging tasks.' % ms.basename)
+                    LOG.attention('Unable to identify representative target for %s. Will try to fall back to existing'
+                                  ' science target sources in the imaging tasks.' % ms.basename)
                 else:
                     if sbinfo.repSource == 'none':
                         LOG.warning('Representative target for %s is set to "none". Will try to fall back to existing'

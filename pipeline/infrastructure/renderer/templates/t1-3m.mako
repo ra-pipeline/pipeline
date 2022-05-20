@@ -32,9 +32,10 @@ def get_lowest_scoring_results(topic, context):
 			minresult.qa.representative)
 
 tablerow_css_classes = {'QA Error'   : 'danger alert-danger',
-						'QA Warning' : 'warning alert-warning',
-						'Error'      : 'danger alert-danger',
-						'Warning'    : 'warning alert-warning'}
+			'QA Warning' : 'warning alert-warning',
+			'Error'      : 'danger alert-danger',
+			'Warning'    : 'warning alert-warning',
+			'Attention'  : 'attention alert-attention'}
 
 def get_tablerow_class(row):
 	return tablerow_css_classes.get(row.type, '')

@@ -307,8 +307,8 @@ class FlagDeterALMA(flagdeterbase.FlagDeterBase):
         # these to be separated by semi-colon.
         if to_flag:
             chan_to_flag = utils.find_ranges(to_flag).replace(',', ';')
-            LOG.warning('{} - Flagging edge channels for ACA spectral window {}, channel(s) {}, due to proximity'
-                        ' to edge of baseband.'.format(self.inputs.ms.basename, spw.id, chan_to_flag))
+            LOG.attention('{} - Flagging edge channels for ACA spectral window {}, channel(s) {}, due to proximity'
+                          ' to edge of baseband.'.format(self.inputs.ms.basename, spw.id, chan_to_flag))
             to_flag = ['{}:{}'.format(spw.id, chan_to_flag)]
 
         return to_flag

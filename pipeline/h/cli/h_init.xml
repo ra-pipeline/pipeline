@@ -34,11 +34,12 @@ the results object for the pipeline task is returned.
 	<shortdescription>Log level for pipeline messages</shortdescription>
 	<description>Log level for pipeline messages. Log messages below this threshold will not be displayed.</description>
 
-	<value>info</value>
+	<value>attention</value>
 	<allowed kind="enum">
 	    <value>trace</value>
 	    <value>debug</value>
 	    <value>info</value>
+	    <value>attention</value>
 	    <value>warning</value>
 	    <value>error</value>
 	    <value>critical</value>

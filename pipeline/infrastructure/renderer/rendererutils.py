@@ -146,6 +146,8 @@ def get_symbol_badge(result):
         symbol = '<span class="glyphicon glyphicon-remove-sign alert-danger transparent-bg" aria-hidden="true"></span>'
     elif get_warnings_badge(result):
         symbol = '<span class="glyphicon glyphicon-exclamation-sign alert-warning transparent-bg" aria-hidden="true"></span>'
+    elif get_attentions_badge(result):
+        symbol = '<span class="glyphicon glyphicon-exclamation-sign alert-attention transparent-bg" aria-hidden="true"></span>'
     elif get_suboptimal_badge(result):
         symbol = '<span class="glyphicon glyphicon-question-sign alert-info transparent-bg" aria-hidden="true"></span>'
     else:
@@ -158,6 +160,15 @@ def get_failures_badge(result):
     n = len(failure_tracebacks)
     if n > 0:
         return '<span class="badge alert-important pull-right">%s</span>' % n
+    else:
+        return ''
+
+
+def get_attentions_badge(result):
+    attention_logrecords = utils.get_logrecords(result, logging.ATTENTION)
+    l = len(attention_logrecords)
+    if l > 0:
+        return '<span class="badge alert-attention pull-right">%s</span>' % l
     else:
         return ''
 
@@ -319,6 +330,9 @@ def get_notification_trs(result, alerts_info, alerts_success):
         notifications.append(n)
     for logrecord in utils.get_logrecords(result, logging.WARNING):
         n = format_notification('warning alert-warning', 'Warning!', logrecord.msg)
+        notifications.append(n)
+    for logrecord in utils.get_logrecords(result, logging.ATTENTION):
+        n = format_notification('attention alert-attention', 'Attention!', logrecord.msg)
         notifications.append(n)
 
     if alerts_info:

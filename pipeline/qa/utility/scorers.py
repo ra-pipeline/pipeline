@@ -8,14 +8,23 @@ from scipy.special import erf
 
 class erfScorer(object):
 
-    def __init__(self, level1, level2):
-        self.level1 = level1
-        self.level2 = level2
-        self.slope = 6.0 / np.sqrt(2.0) / (level1 - level2)
-        self.offset = 3.0 / np.sqrt(2.0) * (1.0 - 2.0 * level1 / (level1 - level2))
+    def __init__(self, good_level, bad_level, lowest_score=0.0):
+        """
+        Error function based scorer between two levels with
+        optional lower score limit so that the QA score ranges
+        from lowest_score to 1.0.
+        """
+
+        assert 0.0 <= lowest_score < 1.0, "Erf scorer lowest score must be in [0,1)."
+
+        self.good_level = good_level
+        self.bad_level = bad_level
+        self.lowest_score = lowest_score
+        self.slope = 6.0 / np.sqrt(2.0) / (good_level - bad_level)
+        self.offset = 3.0 / np.sqrt(2.0) * (1.0 - 2.0 * good_level / (good_level - bad_level))
 
     def __call__(self, x):
-        return (erf(x * self.slope + self.offset) + 1.0) / 2.0
+        return (1.0 - self.lowest_score) * (erf(x * self.slope + self.offset) + 1.0) / 2.0 + self.lowest_score
 
 
 class gaussScorer(object):

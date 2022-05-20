@@ -77,7 +77,7 @@ def _identify_ants_to_demote(flagging_state, ms, antenna_id_to_name):
         # Convert antenna IDs to names and create a string.
         ants_str = ", ".join(map(str, [antenna_id_to_name[iant]
                                        for iant in ants_flagged]))
-        LOG.warning(
+        LOG.attention(
             "{msname} - for intent {intent} (field {fieldid}: "
             "{fieldname}) and spw {spw}, the following antennas "
             "are fully flagged: {ants}".format(
@@ -150,7 +150,7 @@ def _identify_ants_to_remove(result, ms, metric_to_test, ants_fully_flagged, ant
         ants_str = ", ".join(
             map(str, [antenna_id_to_name[iant]
                       for iant in ants_fully_flagged_in_all_spws_any_intent]))
-        LOG.warning(
+        LOG.attention(
             '{0} - the following antennas are fully flagged in all Tsys '
             'spws for one or more fields with the intent "BANDPASS", '
             '"PHASE", and/or "AMPLITUDE": {1}'.format(ms.basename, ants_str))
@@ -532,15 +532,6 @@ class Tsysflag(basetask.StandardTaskTemplate):
 
                         # Reset the refant removal list in the result to be empty.
                         result.refants_to_remove = set()
-                    else:
-                        # Log a warning if any antennas are to be removed from
-                        # the refant list.
-                        LOG.warning(
-                            '{0} - the following reference antennas are '
-                            'removed from the refant list because they are '
-                            'fully flagged in all Tsys spws in the '
-                            '"BANDPASS", "PHASE", and/or "AMPLITUDE" '
-                            'intents: {1}'.format(ms.basename, ant_msg))
 
                 # Identify intersection between refants and candidate
                 # antennas to demote, skipping those that are to be
@@ -576,15 +567,6 @@ class Tsysflag(basetask.StandardTaskTemplate):
 
                         # Reset the refant demotion list in the result to be empty.
                         result.refants_to_demote = set()
-                    else:
-                        # Log a warning if any antennas are to be demoted from
-                        # the refant list.
-                        LOG.warning(
-                            '{0} - the following antennas are moved to the end '
-                            'of the refant list because they are fully '
-                            'flagged for one or more Tsys spws, in one or more '
-                            'fields with intent "BANDPASS", "PHASE", and/or '
-                            '"AMPLITUDE": {1}'.format(ms.basename, ant_msg))
 
             # If no list of reference antennas was registered with the MS,
             # raise a warning.
@@ -877,8 +859,8 @@ class Tsysflag(basetask.StandardTaskTemplate):
         # Count fully flagged spectra, raise warning if there were any.
         nflagged = allflags.count(True)
         if nflagged > 0:
-            LOG.warning("{}: {} out of {} spectra were fully flagged in all channels (for any polarisation) prior to"
-                        " evaluation of flagging heuristics.".format(os.path.basename(caltable), nflagged,
+            LOG.attention("{}: {} out of {} spectra were fully flagged in all channels (for any polarisation) prior to"
+                          " evaluation of flagging heuristics.".format(os.path.basename(caltable), nflagged,
                                                                      len(allflags)))
 
 

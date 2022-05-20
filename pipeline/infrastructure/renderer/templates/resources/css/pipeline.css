@@ -1342,6 +1342,12 @@ a.text-success:hover {
 a.text-info:hover {
   color: #245269;
 }
+.text-attention {
+  color: #22708f;
+}
+a.text-attention:hover {
+  color: #225269;
+}
 .text-warning {
   color: #8a6d3b;
 }
@@ -1372,6 +1378,12 @@ a.bg-success:hover {
 }
 a.bg-info:hover {
   background-color: #afd9ee;
+}
+.bg-attention {
+  background-color: #99edf7;
+}
+a.bg-attention:hover {
+  background-color: #99d9ee;
 }
 .bg-warning {
   background-color: #fcf8e3;
@@ -4953,6 +4965,17 @@ a.thumbnail.active {
 }
 .alert-info .alert-link {
   color: #245269;
+}
+.alert-attention {
+  background-color: #99edf7;
+  border-color: #99e8f1;
+  color: #22708f;
+}
+.alert-attention hr {
+  border-top-color: #99e1ec;
+}
+.alert-attention .alert-link {
+  color: #445269;
 }
 .alert-warning {
   background-color: #fcf8e3;

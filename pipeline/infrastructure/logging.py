@@ -11,7 +11,7 @@ import pipeline.extern.logutils.colorize as colorize
 
 from logging import CRITICAL, WARNING, ERROR, INFO, DEBUG
 
-# Register two new logging levels with the standard logger
+# Register three new logging levels with the standard logger
 TRACE = 5
 logging.addLevelName(TRACE, 'TRACE')
 colorize.ColorizingStreamHandler.level_map[TRACE] = (None, 'blue', False)
@@ -20,13 +20,18 @@ TODO = 13
 logging.addLevelName(TODO, 'TODO')
 colorize.ColorizingStreamHandler.level_map[TODO] = ('black', 'yellow', True)
 
-LOGGING_LEVELS = {'critical' : CRITICAL,
-                  'error'    : ERROR,
-                  'warning'  : WARNING,
-                  'info'     : INFO,
-                  'debug'    : DEBUG,
-                  'todo'     : TODO,
-                  'trace'    : TRACE}
+ATTENTION = 25
+logging.addLevelName(ATTENTION, 'ATTENTION')
+colorize.ColorizingStreamHandler.level_map[ATTENTION] = ('white', 'blue', False)
+
+LOGGING_LEVELS = {'critical'  : CRITICAL,
+                  'error'     : ERROR,
+                  'warning'   : WARNING,
+                  'attention' : ATTENTION,
+                  'info'      : INFO,
+                  'debug'     : DEBUG,
+                  'todo'      : TODO,
+                  'trace'     : TRACE}
 
 # Begin with a default log level of NOTSET. All loggers created at module level
 # import time will use this logging level.
@@ -90,6 +95,8 @@ class CASALogHandler(logging.Handler):
             return 'ERROR'
         if lvl >= WARNING:
             return 'WARN'
+        if lvl >= ATTENTION:
+            return 'INFO1'
         if lvl >= INFO:
             return 'INFO'
         if lvl >= DEBUG:
@@ -165,8 +172,21 @@ def get_logger(name,
         if self.isEnabledFor(TODO):
             self._log(TODO, msg, args, **kwargs)
 
+    def attention(self, msg, *args, **kwargs):
+        """
+        Log 'msg % args' with severity 'ATTENTION'.
+
+        To pass exception information, use the keyword argument exc_info with
+        a true value, e.g.
+
+        logger.info("Houston, we have a %s", "interesting problem", exc_info=1)
+        """
+        if self.isEnabledFor(ATTENTION):
+            self._log(ATTENTION, msg, args, **kwargs)
+
     logger.trace = types.MethodType(trace, logger)
     logger.todo = types.MethodType(todo, logger)
+    logger.attention = types.MethodType(attention, logger)
 
     logger.setLevel(logging_level)
     fmt = UTCFormatter(format, datefmt)
