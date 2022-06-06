@@ -172,8 +172,14 @@ def _as_task_call(task_class, task_args):
 def reduce(vis=None, infiles=None, procedure='procedure_hifa_calimage.xml',
            context=None, name=None, loglevel='info', plotlevel='default',
            session=None, exitstage=None, startstage=None):
-    if vis is None:
-        vis = []
+
+    if not isinstance(vis, (list, str)):
+        raise TypeError("The input parameter 'vis' must be a list or a string")
+    else:
+        if isinstance(vis, str):
+            vislist = [vis]
+        else:
+            vislist = vis
 
     if infiles is None:
         infiles = []
@@ -185,12 +191,12 @@ def reduce(vis=None, infiles=None, procedure='procedure_hifa_calimage.xml',
         context.set_state('ProjectStructure', 'recipe_name', procedure_title)
 
     if session is None:
-        session = ['default'] * len(vis)
+        session = ['default'] * len(vislist)
 
     if startstage is None:
         startstage = 0
 
-    task_args = TaskArgs(vis, infiles, session)
+    task_args = TaskArgs(vislist, infiles, session)
     task_generator = _get_tasks(context, task_args, procedure)
     try:
         procedure_stage_nr = 0
