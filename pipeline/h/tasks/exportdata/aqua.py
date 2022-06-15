@@ -201,16 +201,15 @@ class AquaXmlGenerator(object):
         ordered_results = sorted(all_results, key=operator.attrgetter('stage_number'))
         for stage_result in ordered_results:
             # Create the generic stage element
-            stage_name, stage_score = _get_pipeline_stage_and_score(stage_result)
+            stage_name, representative_score, subscores = _get_pipeline_stage_and_scores(stage_result)
             stage_element = ElementTree.Element('Stage',
                                                 Number=str(stage_result.stage_number),
-                                                Name=stage_name,
-                                                Score=str(stage_score))
+                                                Name=stage_name)
 
             all_scores = stage_result.qa.pool
 
             # calculate which items have specific renderers and which require
-            # procesing by the generic renderer
+            # processing by the generic renderer
             needs_specific = [qa_score for qa_score in all_scores
                               if any([fn.handles(qa_score.origin.metric_name) for fn in _AQUA_REGISTRY])]
             needs_generic = [qa_score for qa_score in all_scores
@@ -223,8 +222,39 @@ class AquaXmlGenerator(object):
             specific_elements = self._get_xml_for_qa_scores(needs_specific, _AQUA_REGISTRY)
             generic_elements = self._get_xml_for_qa_scores(needs_generic, generic_registry)
 
-            stage_element.extend(specific_elements)
+            ###stage_element.extend(specific_elements)
             # stage_element.extend(generic_elements)
+
+            # add representative score element
+            EBs = ','.join(representative_score.applies_to.vis)
+            if EBs == '':
+                EBs = 'N/A'
+            Spw = ','.join(sorted(representative_score.applies_to.spw))
+            if Spw == '':
+                Spw = 'N/A'
+            Intent = ','.join(sorted(representative_score.applies_to.intent))
+            if Intent == '':
+                Intent = 'N/A'
+            score_element = ElementTree.Element('RepresentativeScore', Score=str(representative_score.score), Reason=representative_score.longmsg)
+            score_element.extend([ElementTree.Element('Metric', Name=representative_score.origin.metric_name, Value=str(representative_score.origin.metric_score), Units=representative_score.origin.metric_units)])
+            score_element.extend([ElementTree.Element('DataSelection', EBs=EBs, Spw=Spw, Intent=Intent)])
+            stage_element.extend([score_element])
+
+            # add subscore elements
+            for QA_score in subscores:
+                EBs = ','.join(QA_score.applies_to.vis)
+                if EBs == '':
+                    EBs = 'N/A'
+                Spw = ','.join(sorted(QA_score.applies_to.spw))
+                if Spw == '':
+                    Spw = 'N/A'
+                Intent = ','.join(sorted(QA_score.applies_to.intent))
+                if Intent == '':
+                    Intent = 'N/A'
+                score_element = ElementTree.Element('SubScore', Score=str(QA_score.score), Reason=QA_score.longmsg)
+                score_element.extend([ElementTree.Element('Metric', Name=QA_score.origin.metric_name, Value=str(QA_score.origin.metric_score), Units=QA_score.origin.metric_units)])
+                score_element.extend([ElementTree.Element('DataSelection', EBs=EBs, Spw=Spw, Intent=Intent)])
+                stage_element.extend([score_element])
 
             xml_root.append(stage_element)
 
@@ -335,8 +365,8 @@ class AquaXmlGenerator(object):
 
     def _xml_for_topic(self, topic_name, context, topic_results):
         # the overall topic score is defined as the minimum score of all
-        # representative scores for each task in  that topic, which themselves
-        # are the minimum of the scores for that task
+        # representative scores for each task in that topic, which themselves
+        # are (often) the minimum of the scores for that task
         try:
             min_score = min([r.qa.representative for r in topic_results if r.qa.representative.score is not None], key=operator.attrgetter('score'))
             score = str(min_score.score)
@@ -573,14 +603,15 @@ def _create_value_formatter(format_spec):
     return f
 
 
-def _get_pipeline_stage_and_score(result):
+def _get_pipeline_stage_and_scores(result):
     """
     Get the CASA equivalent task name which is stored by the infrastructure
     as  <task_name> (<arg1> = <value1>, ...)
     """
     stage_name = result.pipeline_casa_task.split('(')[0]
-    score = result.qa.representative.score
-    return stage_name, score
+    subscores = result.qa.pool
+    representative_score = result.qa.representative
+    return stage_name, representative_score, subscores
 
 
 def sensitivity_xml_for_stages(context, results, name=''):
@@ -598,7 +629,7 @@ def sensitivity_xml_for_stages(context, results, name=''):
     ordered_results = sorted(results, key=operator.attrgetter('stage_number'))
     for stage_result in ordered_results:
         # Create the generic stage element
-        stage_name, stage_score = _get_pipeline_stage_and_score(stage_result)
+        stage_name, _, _ = _get_pipeline_stage_and_scores(stage_result)
 
         for task_name, exporter in TASK_NAME_TO_SENSITIVITY_EXPORTER.items():
             if stage_name == task_name:
@@ -619,14 +650,14 @@ def xml_for_sensitivity_stage(context, stage_results, exporter, name):
     :return: XML for all sensitivities reported by the result stage
     :rtype: xml.etree.cElementTree.Element
     """
-    stage_name, stage_score = _get_pipeline_stage_and_score(stage_results)
+    stage_name, representative_score, _ = _get_pipeline_stage_and_scores(stage_results)
 
     tagname = name if name != '' else 'SensitivityEstimates'
 
     xml_root = ElementTree.Element(tagname,
                                    Origin=stage_name,
                                    Number=str(stage_results.stage_number),
-                                   Score=str(stage_score))
+                                   Score=str(representative_score.score))
 
     sensitivity_dicts = exporter(stage_results)
 
