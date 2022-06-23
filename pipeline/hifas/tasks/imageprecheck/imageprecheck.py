@@ -251,8 +251,10 @@ class ImagePreCheck(hifa_task_imageprecheck.ImagePreCheck):
                     calcsb = False
                     sensitivities.append(Sensitivity(
                         array=array,
+                        intent='TARGET',
                         field=repr_field,
                         spw=str(repr_spw),
+                        is_representative=True,
                         bandwidth=cqa.quantity(sens_bw, 'Hz'),
                         bwmode='repBW',
                         beam=beams[(robust, str(default_uvtaper), 'repBW')],
@@ -264,8 +266,10 @@ class ImagePreCheck(hifa_task_imageprecheck.ImagePreCheck):
                 except:
                     sensitivities.append(Sensitivity(
                         array=array,
+                        intent='TARGET',
                         field=repr_field,
                         spw=str(repr_spw),
+                        is_representative=True,
                         bandwidth=cqa.quantity(0.0, 'Hz'),
                         bwmode='repBW',
                         beam=beams[(robust, str(default_uvtaper), 'repBW')],
@@ -307,8 +311,10 @@ class ImagePreCheck(hifa_task_imageprecheck.ImagePreCheck):
 
                     sensitivities.append(Sensitivity(
                         array=array,
+                        intent='TARGET',
                         field=repr_field,
                         spw=cont_spw,
+                        is_representative=True,
                         bandwidth=_bandwidth,
                         bwmode=cont_sens_bw_mode,
                         beam=beams[(robust, str(default_uvtaper), 'aggBW')],
@@ -321,8 +327,10 @@ class ImagePreCheck(hifa_task_imageprecheck.ImagePreCheck):
                 for _ in cont_sens_bw_modes:
                     sensitivities.append(Sensitivity(
                         array=array,
+                        intent='TARGET',
                         field=repr_field,
                         spw=cont_spw,
+                        is_representative=True,
                         bandwidth=cqa.quantity(0.0, 'Hz'),
                         bwmode='aggBW',
                         beam=beams[(robust, str(default_uvtaper), 'aggBW')],
@@ -403,8 +411,10 @@ class ImagePreCheck(hifa_task_imageprecheck.ImagePreCheck):
                             image_heuristics.calc_sensitivities(inputs.vis, repr_field, 'TARGET', str(repr_spw), nbin, {}, 'cube', gridder, cells[(hm_robust, str(hm_uvtaper), 'repBW')], imsizes[(hm_robust, str(hm_uvtaper), 'repBW')], 'briggs', hm_robust, hm_uvtaper, True, known_per_spw_cont_sensitivities_all_chan, calcsb)
                         sensitivities.append(Sensitivity(
                             array=array,
+                            intent='TARGET',
                             field=repr_field,
                             spw=str(repr_spw),
+                            is_representative=True,
                             bandwidth=cqa.quantity(sens_bw, 'Hz'),
                             bwmode='repBW',
                             beam=beams[(hm_robust, str(hm_uvtaper), 'repBW')],
@@ -416,8 +426,10 @@ class ImagePreCheck(hifa_task_imageprecheck.ImagePreCheck):
                     except Exception as e:
                         sensitivities.append(Sensitivity(
                             array=array,
+                            intent='TARGET',
                             field=repr_field,
                             spw=str(repr_spw),
+                            is_representative=True,
                             bandwidth=cqa.quantity(0.0, 'Hz'),
                             bwmode='repBW',
                             beam=beams[(hm_robust, str(hm_uvtaper), 'repBW')],
@@ -451,8 +463,10 @@ class ImagePreCheck(hifa_task_imageprecheck.ImagePreCheck):
                     for cont_sens_bw_mode in cont_sens_bw_modes:
                         sensitivities.append(Sensitivity(
                             array=array,
+                            intent='TARGET',
                             field=repr_field,
                             spw=str(repr_spw),
+                            is_representative=True,
                             bandwidth=_bandwidth,
                             bwmode=cont_sens_bw_mode,
                             beam=beams[(hm_robust, str(hm_uvtaper), 'aggBW')],
@@ -465,8 +479,10 @@ class ImagePreCheck(hifa_task_imageprecheck.ImagePreCheck):
                     for _ in cont_sens_bw_modes:
                         sensitivities.append(Sensitivity(
                             array=array,
+                            intent='TARGET',
                             field=repr_field,
                             spw=str(repr_spw),
+                            is_representative=True,
                             bandwidth=cqa.quantity(0.0, 'Hz'),
                             bwmode='repBW',
                             beam=beams[(hm_robust, str(hm_uvtaper), 'aggBW')],

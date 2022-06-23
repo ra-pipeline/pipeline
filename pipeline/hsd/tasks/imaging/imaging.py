@@ -747,15 +747,19 @@ class SDImaging(basetask.StandardTaskTemplate):
 
                 file_index = [common.get_ms_idx(context, name) for name in combined_infiles]
                 sensitivity = Sensitivity(array='TP',
+                                          intent='TARGET',
                                           field=source_name,
                                           spw=str(combined_spws[0]),
+                                          is_representative=True,
                                           bandwidth=cqa.quantity(chan_width, 'Hz'),
                                           bwmode='repBW',
                                           beam=beam, cell=qcell,
                                           sensitivity=cqa.quantity(image_rms, brightnessunit))
                 theoretical_noise = Sensitivity(array='TP',
+                                          intent='TARGET',
                                           field=source_name,
                                           spw=str(combined_spws[0]),
+                                          is_representative=True,
                                           bandwidth=cqa.quantity(chan_width, 'Hz'),
                                           bwmode='repBW',
                                           beam=beam, cell=qcell,

@@ -656,7 +656,7 @@ def xml_for_sensitivity_stage(context, stage_results, exporter, name):
 
     xml_root = ElementTree.Element(tagname,
                                    Origin=stage_name,
-                                   Number=str(stage_results.stage_number),
+                                   StageNumber=str(stage_results.stage_number),
                                    Score=str(representative_score.score))
 
     sensitivity_dicts = exporter(stage_results)
@@ -680,6 +680,14 @@ def xml_for_sensitivity(d):
 
     def value(quanta):
         return str(qa.getvalue(quanta)[0])
+
+    try:
+        if d['is_representative'] is None:
+            is_representative = 'N/A'
+        else:
+            is_representative = str(d['is_representative'])
+    except:
+        is_representative = 'N/A'
 
     try:
         if d['bandwidth'] is None:
@@ -780,11 +788,13 @@ def xml_for_sensitivity(d):
         BwMode=d['bwmode'],
         CellXArcsec=cell_x_arcsec,
         CellYArcsec=cell_y_arcsec,
+        Intent=d['intent'],
         Field=d['field'],
         Robust=str(d.get('robust', '')),
         UVTaper=str(d.get('uvtaper', '')),
         SensitivityJyPerBeam=sensitivity_jy_per_beam,
         MsSpwId=d['spw'],
+        IsRepresentative=is_representative,
         PbcorImageMinJyPerBeam=pbcor_image_min_jy_per_beam,
         PbcorImageMaxJyPerBeam=pbcor_image_max_jy_per_beam
       )
