@@ -284,10 +284,9 @@ class Lowgainflag(basetask.StandardTaskTemplate):
                     # Log a warning if any antennas are to be demoted from
                     # the refant list.
                     LOG.warning(
-                        '{} - the following antennas are moved to the end '
-                        'of the refant list because they are fully '
-                        'flagged for one or more spws: '
-                        '{}'.format(ms.basename, ant_msg))
+                        '{} - the following antennas have been fully flagged '
+                        'in one or more spws, and moved to the end '
+                        'of the refant list: {}'.format(ms.basename, ant_msg))
 
                     # Update result to set the refants to demote:
                     result.refants_to_demote = refants_to_demote

@@ -337,9 +337,6 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             # No spws have good SNR values, use combined spw mapping, and test
             # which spws have too low combined phase SNR.
             elif len([goodsnr for goodsnr in goodsnrs if goodsnr is True]) == 0:
-                LOG.warning(f'Low SNR for all spws - Forcing combined spw mapping for {inputs.ms.basename},'
-                            f' intent={intent}, field={field}')
-
                 # Report spws for which no SNR estimate was available.
                 if None in goodsnrs:
                     LOG.warning('Spws without SNR measurements {}'
@@ -359,8 +356,6 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             # an SNR-based approach for, but fall back to combined spw mapping
             # if necessary.
             else:
-                LOG.warning(f'Some low SNR spws - using highest good SNR window for these in {inputs.ms.basename}')
-
                 # Report spws for which no SNR estimate was available.
                 if None in goodsnrs:
                     LOG.warning('Spws without SNR measurements {}'
@@ -732,20 +727,6 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                 # to skip.
                 if spwmapping and spwmapping.spwmap and spwmapping.spwmap[spw] != spw:
                     continue
-
-                # If the median achieved SNR is still below the SNR threshold, log a
-                # warning.
-                if snr_info[(intent, field, spw)] < inputs.phasesnr:
-                    msg = f"{result.inputs['vis']}, intent {intent}, field {field}, SpW {spw}: median achieved SNR" \
-                          f" ({snr_info[(intent, field, spw)]:.1f}) is below the low-SNR threshold" \
-                          f" ({inputs.phasesnr})."
-
-                    # If the current SpW has other SpWs mapped to it, then
-                    # mention this explicitly.
-                    if spwmapping.spwmap.count(spw) > 1:
-                        msg += f' This SpW has one or more other SpWs mapped to it.'
-
-                    LOG.warning(msg)
 
         return snr_info
 

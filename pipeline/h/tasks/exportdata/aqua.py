@@ -206,59 +206,79 @@ class AquaXmlGenerator(object):
                                                 Number=str(stage_result.stage_number),
                                                 Name=stage_name)
 
-            all_scores = stage_result.qa.pool
-
-            # calculate which items have specific renderers and which require
-            # processing by the generic renderer
-            needs_specific = [qa_score for qa_score in all_scores
-                              if any([fn.handles(qa_score.origin.metric_name) for fn in _AQUA_REGISTRY])]
-            needs_generic = [qa_score for qa_score in all_scores
-                             if not any([fn.handles(qa_score.origin.metric_name) for fn in _AQUA_REGISTRY])]
-
-            # create a pseudo registry for the generic XML generator
-            generic_registry = {GenericMetricXmlGenerator()}
-
-            # generate XML for those with a specific renderer
-            specific_elements = self._get_xml_for_qa_scores(needs_specific, _AQUA_REGISTRY)
-            generic_elements = self._get_xml_for_qa_scores(needs_generic, generic_registry)
-
-            ###stage_element.extend(specific_elements)
-            # stage_element.extend(generic_elements)
-
             # add representative score element
-            EBs = ','.join(representative_score.applies_to.vis)
-            if EBs == '':
-                EBs = 'N/A'
-            Spw = ','.join(sorted(representative_score.applies_to.spw))
-            if Spw == '':
-                Spw = 'N/A'
-            Intent = ','.join(sorted(representative_score.applies_to.intent))
-            if Intent == '':
-                Intent = 'N/A'
             score_element = ElementTree.Element('RepresentativeScore', Score=str(representative_score.score), Reason=representative_score.longmsg)
-            score_element.extend([ElementTree.Element('Metric', Name=representative_score.origin.metric_name, Value=str(representative_score.origin.metric_score), Units=representative_score.origin.metric_units)])
-            score_element.extend([ElementTree.Element('DataSelection', EBs=EBs, Spw=Spw, Intent=Intent)])
-            stage_element.extend([score_element])
+
+            # add corresponding metric element
+            score_element.extend(self._get_xml_for_qa_metric(representative_score))
+
+            # add corresponding data selection element
+            score_element.extend(self._get_xml_for_qa_data_selection(representative_score))
+
+            # add score element to stage
+            stage_element.append(score_element)
 
             # add subscore elements
-            for QA_score in subscores:
-                EBs = ','.join(QA_score.applies_to.vis)
-                if EBs == '':
-                    EBs = 'N/A'
-                Spw = ','.join(sorted(QA_score.applies_to.spw))
-                if Spw == '':
-                    Spw = 'N/A'
-                Intent = ','.join(sorted(QA_score.applies_to.intent))
-                if Intent == '':
-                    Intent = 'N/A'
-                score_element = ElementTree.Element('SubScore', Score=str(QA_score.score), Reason=QA_score.longmsg)
-                score_element.extend([ElementTree.Element('Metric', Name=QA_score.origin.metric_name, Value=str(QA_score.origin.metric_score), Units=QA_score.origin.metric_units)])
-                score_element.extend([ElementTree.Element('DataSelection', EBs=EBs, Spw=Spw, Intent=Intent)])
-                stage_element.extend([score_element])
+            for qa_score in subscores:
+                score_element = ElementTree.Element('SubScore', Score=str(qa_score.score), Reason=qa_score.longmsg)
+
+                # add corresponding metric element
+                score_element.extend(self._get_xml_for_qa_metric(qa_score))
+
+                # add corresponding data selection element
+                score_element.extend(self._get_xml_for_qa_data_selection(qa_score))
+
+                # add score element to stage
+                stage_element.append(score_element)
 
             xml_root.append(stage_element)
 
         return xml_root
+
+    def _get_xml_for_qa_metric(self, qa_score):
+        """
+        Generate XML element for QA metric
+
+        :param qa_score: QAScore
+        :return: XML element
+        """
+
+        # create a pseudo registry for the generic XML generator
+        generic_registry = {GenericMetricXmlGenerator()}
+
+        if any(fn.handles(qa_score.origin.metric_name) for fn in _AQUA_REGISTRY):
+            return self._get_xml_for_qa_scores([qa_score], _AQUA_REGISTRY)
+        else:
+            return self._get_xml_for_qa_scores([qa_score], generic_registry)
+
+    def _get_xml_for_qa_data_selection(self, qa_score):
+        """
+        Generate XML element for QA data selection
+
+        :param qa_score: QAScore
+        :return: XML element
+        """
+        target_asdms = qa_score.applies_to.vis
+        if target_asdms:
+            Asdm = ','.join([vis_to_asdm(a) for a in target_asdms])
+        else:
+            Asdm = 'N/A'
+
+        target_session = qa_score.applies_to.session
+        if target_session:
+            Session = ','.join([str(s) for s in target_session])
+        else:
+            Session = 'N/A'
+
+        Spw = ','.join(sorted(qa_score.applies_to.spw))
+        if Spw == '':
+            Spw = 'N/A'
+
+        Intent = ','.join(sorted(qa_score.applies_to.intent))
+        if Intent == '':
+            Intent = 'N/A'
+
+        return [ElementTree.Element('DataSelection', Asdm=Asdm, Session=Session, Spw=Spw, Intent=Intent)]
 
     def _get_xml_for_qa_scores(self, items, registry):
         """
@@ -456,8 +476,8 @@ class MetricXmlGenerator(object):
             'Name': str,
             'Value': str,
             'Asdm': vis_to_asdm,
-            'QaScore': str,
-            'QaMessage': str,
+            'Score': str,
+            'Reason': str,
             'Units': str,
             'Session': str
         }
@@ -505,17 +525,7 @@ class MetricXmlGenerator(object):
             Name=self.attr_formatters['Name'](origin.metric_name),
             Value=self.attr_formatters['Value'](origin.metric_score),
             Units=self.attr_formatters['Units'](origin.metric_units),
-            QaScore=self.attr_formatters['QaScore'](score_value),
-            QaMessage=self.attr_formatters['QaMessage'](score_message)
         )
-
-        target_asdms = qa_score.applies_to.vis
-        if target_asdms:
-            init_args['Asdm'] = ','.join([self.attr_formatters['Asdm'](a) for a in target_asdms])
-
-        target_session = qa_score.applies_to.session
-        if target_session:
-            init_args['Session'] = ','.join([self.attr_formatters['Session'](s) for s in target_session])
 
         return ElementTree.Element('Metric', **init_args)
 

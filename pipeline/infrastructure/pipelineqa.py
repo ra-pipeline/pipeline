@@ -328,7 +328,7 @@ class QARegistry(object):
 
         # register the capturing log handler, buffering all messages so that
         # we can add them to the result - and subsequently, the weblog
-        logging_handler = logging.CapturingHandler(logging.WARNING)
+        logging_handler = logging.CapturingHandler(logging.ATTENTION)
         logging.add_handler(logging_handler)
 
         try:

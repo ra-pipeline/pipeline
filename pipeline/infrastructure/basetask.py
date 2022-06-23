@@ -628,8 +628,8 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
         self._executor = Executor(self.inputs.context, dry_run)
 
         # create a new log handler that will capture all messages above
-        # WARNING level.
-        handler = logging.CapturingHandler(logging.WARNING)
+        # ATTENTION level.
+        handler = logging.CapturingHandler(logging.ATTENTION)
 
         try:
             # if this task does not handle multiple input mses but was

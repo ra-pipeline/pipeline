@@ -21,7 +21,8 @@ class TcleanQAHandler(pqa.QAPlugin):
     def handle(self, context, result):
         # calculate QA score comparing RMS against clean threshold
 
-        imageScorer = scorers.erfScorer(1.0, 5.0)
+        # Add offset of 0.34 to avoid any red scores
+        imageScorer = scorers.erfScorer(1.0, 5.0, 0.34)
 
         # Basic imaging score
         observatory = context.observing_run.measurement_sets[0].antenna_array.name
@@ -100,7 +101,7 @@ class TcleanQAHandler(pqa.QAPlugin):
                     result.qa.pool.append(pqa.QAScore(-0.1, longmsg='Exception scoring MOM8 FC image result: %s' % (e), shortmsg='Exception scoring MOM8 FC image result'), weblog_location=pqa.WebLogLocation.UNSET)
 
             # Check source score
-            #    Be careful about the source name vs field name issue
+            # Be careful about the source name vs field name issue
             if result.intent == 'CHECK' and result.inputs['specmode'] == 'mfs':
                 try:
                     mses = [context.observing_run.get_ms(name=vis) for vis in result.inputs['vis']]
