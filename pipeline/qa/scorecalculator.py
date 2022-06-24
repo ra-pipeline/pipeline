@@ -1636,7 +1636,9 @@ def score_combine_spwmapping(ms, intent, field, spwmapping):
                           metric_score=spwmapping.combine,
                           metric_units='Using combined spw mapping')
 
-    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin)
+    applies_to = pqa.TargetDataSelection(vis={ms.basename}, intent={intent}, field={field})
+
+    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin, applies_to=applies_to)
 
 
 @log_qa
@@ -1689,7 +1691,9 @@ def score_phaseup_mapping_fraction(ms, intent, field, spwmapping):
                           metric_score=nunmapped,
                           metric_units='Number of unmapped science spws')
 
-    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin)
+    applies_to = pqa.TargetDataSelection(vis={ms.basename}, intent={intent}, field={field})
+
+    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin, applies_to=applies_to)
 
 
 @log_qa
@@ -1723,7 +1727,9 @@ def score_phaseup_spw_median_snr_for_phase(ms, field, spw, median_snr, snr_thres
                           metric_score=median_snr,
                           metric_units='Median SNR')
 
-    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin)
+    applies_to = pqa.TargetDataSelection(vis={ms.basename}, field={field}, spw={spw})
+
+    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin, applies_to=applies_to)
 
 
 @log_qa
@@ -1757,7 +1763,9 @@ def score_phaseup_spw_median_snr_for_check(ms, field, spw, median_snr, snr_thres
                           metric_score=median_snr,
                           metric_units='Median SNR')
 
-    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin)
+    applies_to = pqa.TargetDataSelection(vis={ms.basename}, field={field}, spw={spw})
+
+    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin, applies_to=applies_to)
 
 @log_qa
 def score_missing_phaseup_snrs(ms, spwids, phsolints):
@@ -1790,7 +1798,9 @@ def score_missing_phaseup_snrs(ms, spwids, phsolints):
                           metric_score=nmissing,
                           metric_units='Number of spws with missing SNR measurements')
 
-    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin)
+    applies_to = pqa.TargetDataSelection(vis={ms.basename}, spw={spwid for spwid in spwids})
+
+    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin, applies_to=applies_to)
 
 
 @log_qa
@@ -1826,7 +1836,9 @@ def score_poor_phaseup_solutions(ms, spwids, nphsolutions, min_nsolutions):
                           metric_score=npoor,
                           metric_units='Number of poor phaseup solutions')
 
-    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin)
+    applies_to = pqa.TargetDataSelection(vis={ms.basename}, spw={spwid for spwid in spwids})
+
+    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin, applies_to=applies_to)
 
 
 @log_qa
