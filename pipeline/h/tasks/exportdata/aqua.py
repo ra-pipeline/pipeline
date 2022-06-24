@@ -270,7 +270,7 @@ class AquaXmlGenerator(object):
         else:
             Session = 'N/A'
 
-        Spw = ','.join(sorted(qa_score.applies_to.spw))
+        Spw = ','.join(sorted(map(str, qa_score.applies_to.spw)))
         if Spw == '':
             Spw = 'N/A'
 
