@@ -5,6 +5,8 @@ import os
 import platform
 import re
 import sys
+import grpc
+import traceback
 
 import almatasks
 import casaplotms
@@ -241,6 +243,10 @@ class JobRequest(object):
 
         try:
             return self.fn(*self.args, **self.kw)
+        except grpc.RpcError as rpc_error:
+            LOG.warning('RPC error from JobRequest: {!s}'.format(rpc_error))
+            tb = traceback.format_exc()
+            LOG.trace(tb)          
         finally:
             for hook in POSTHOOKS:
                 hook(self)
