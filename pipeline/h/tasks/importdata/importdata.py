@@ -1,5 +1,6 @@
 import contextlib
 import os
+import ast
 import shutil
 import tarfile
 import collections
@@ -59,6 +60,18 @@ class ImportDataInputs(vdp.StandardInputs):
         self.process_caldevice = process_caldevice
         self.save_flagonline = save_flagonline
         self.session = session
+
+    @datacolumns.convert
+    def datacolumns(self, value):
+        # Convert PPR strings to dicts or list of dicts
+        if type(value) == str:
+            pyobj = ast.literal_eval(value)
+            if isinstance(pyobj, dict) or isinstance(pyobj, list):
+                return pyobj
+            else:
+                raise TypeError('datacolumns must be a dictionary or a list of dictionaries')
+        else:
+            return value
 
     def to_casa_args(self):
         raise NotImplementedError
