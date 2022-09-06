@@ -776,6 +776,23 @@ class MeasurementSet(object):
 
         return corrstring
 
+    def get_vla_corrlist_from_spw(self, spw=None):
+        """Get all VLA correlation labels as a list of string from selected spw(s).
+
+        Args:
+            spw: a spw selection string or None. Defaults to None.
+
+        Returns:
+            list: a list of correlation labels.
+        """
+        ddindex = self.get_vla_datadesc()
+        corrs = set()
+        for dd in ddindex.values():
+            if spw in ('', '*', None) or (isinstance(spw, str) and str(dd['spw']) in spw.split(',')):
+                corrs = corrs.union(dd['corrdesc'])
+
+        return sorted(corrs)
+
     def get_alma_corrstring(self):
         """Get correlation string for ALMA for the science windows
 

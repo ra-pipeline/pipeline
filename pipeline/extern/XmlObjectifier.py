@@ -275,12 +275,13 @@ def castType(value):
                 value = True
 
     # PIPE-585: workaround if the value string is intended to represent a list or tuple
+    # Added dict after detecting issues in PIPE-1428.
     if isinstance(value, str):
         try:
             pyobj = ast.literal_eval(value)
-            if isinstance(pyobj, list) and value.strip()[0] == '[':
-                value = pyobj
-            if isinstance(pyobj, tuple) and value.strip()[0] == '(':
+            if (isinstance(pyobj, list) and value.strip()[0] == '[') or \
+               (isinstance(pyobj, tuple) and value.strip()[0] == '(') or \
+               (isinstance(pyobj, dict) and value.strip()[0] == '{'):
                 value = pyobj
         except (ValueError, SyntaxError):
             pass

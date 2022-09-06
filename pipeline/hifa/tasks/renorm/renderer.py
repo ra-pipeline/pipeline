@@ -158,7 +158,7 @@ def make_renorm_plots(results, weblog_dir: str) -> Dict[str, List[logger.Plot]]:
                             y_axis='Renorm Scaling',
                             parameters={'vis': vis,
                                         'field': source,
-                                        'spw': spw,
+                                        'spw': int(spw),
                                         'link' : specplot,
                                         'caption' : caption})
                     summary_plots[vis_html].append(plot)

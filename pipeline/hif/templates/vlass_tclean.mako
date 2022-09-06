@@ -14,8 +14,6 @@ columns = {
     'model' : 'Final Model',
     'psf' : 'PSF'
 }
-
-colorder = ['image', 'residual', 'cleanmask']
 %>
 <%inherit file="t2-4m_details-base.mako"/>
 

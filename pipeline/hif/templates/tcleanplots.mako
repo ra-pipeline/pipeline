@@ -3,21 +3,28 @@ rsc_path = ""
 import os
 
 columns = {'cleanmask' : ('Clean Mask', 'Clean Mask'),
-	   'flux' : ('Primary Beam', 'Primary Beam'),
-	   'pbcorimage' : ('Pb-corrected Image', 'Pb-corrected Image'),
-	   'image' : ('Image', 'Image'),	   
-	   'residual' : ('Residual', 'Residual'),
-	   'model' : ('Final Model', 'Final Model'),
-	   'psf' : ('PSF', 'PSF'),
-	   'mom0_fc': ('Line-free Moment 0', 'Integrated intensity (moment 0) of line-free channels after continuum subtraction'),
-	   'mom8_fc': ('Line-free Moment 8', 'Integrated intensity (moment 8) of line-free channels after continuum subtraction'),
-	   'spectra': ('Spectra', 'Spectrum from flattened clean mask and per channel MAD')}
+           'flux' : ('Primary Beam', 'Primary Beam'),
+           'pbcorimage' : ('Pb-corrected Image', 'Pb-corrected Image'),
+           'image' : ('Image', 'Image'),
+           'residual' : ('Residual', 'Residual'),
+           'model' : ('Final Model', 'Final Model'),
+           'psf' : ('PSF', 'PSF'),
+           'mom0_fc': ('Line-free Moment', 'Integ. int. (mom0) of line-free channels'),
+           'mom8_fc': ('Line-free Moment', 'Maximum int. (mom8) of line-free channels'),
+           'spectra': ('Spectra / Mask', 'Spectra from flattened clean mask'),
+           'psf_per_channel': ('Beam per channel', 'Beam per channel')}
 
-def get_plot(plots, prefix, field, spw, i, colname):
-	try:
-		return plots[prefix][field][spw][i][colname]
-	except KeyError:
-		return None
+def get_plot(plots, prefix, field, spw, i, colname, moment=None):
+    try:
+        if moment is not None:
+            return plots[prefix][field][spw][i][colname][moment]
+        else:
+            for m in ('mean', 'mom8', 'mom0', 'N/A'):
+                if m in plots[prefix][field][spw][i][colname]:
+                    return plots[prefix][field][spw][i][colname][m]
+            return None
+    except KeyError:
+        return None
 %>
 <script>
     pipeline.pages.tclean_plots.ready();
@@ -50,78 +57,91 @@ def get_plot(plots, prefix, field, spw, i, colname):
 
 <div class="row">
 <table class="table table-striped">
-	<thead>
-		<tr>
-			<th>Iteration</th>
-		    % for colname in colorder:
-	        	<th>${columns[colname][0]}</th>
-		    % endfor
-		</tr>
-	</thead>
-	<tbody>
+    <thead>
+        <tr>
+            <th>Iterations</th>
+            % for colname, moment in colorders[0]:
+                <th>${columns[colname][0]}s</th>
+            % endfor
+        </tr>
+    </thead>
+    <tbody>
 
-		% for i in sorted(plots_dict[prefix][field][spw].keys())[::-1]:
-		<tr>
-		    <!-- iteration row heading -->
-		    <td class="vertical-align"><p class="text-center">${i}
+        % for i in sorted(plots_dict[prefix][field][spw].keys())[::-1]:
+            % for colorder in colorders:
+                <tr>
+                    <!-- iteration row heading -->
+                    <td class="vertical-align"><p class="text-center">${i}
                     %if i==0 and cube_all_cont:
                         <br>findCont=AllCont<br>no cleaning
                     %endif
                     </p></td>
-		    <!-- plots for this iteration, in column order -->
-	        % for colname in colorder:
-	        <td>
-	            <% plot = get_plot(plots_dict, prefix, field, spw, i, colname) %>
-	            <!-- use bootstrap markup for thumbnails -->
-	            % if plot is not None:
-	            <div class="thumbnail">
-	                <a href="${os.path.relpath(plot.abspath, pcontext.report_dir)}"
-	                   title="Iteration ${i}: ${columns[colname][1]}"
-                       data-caption="${columns[colname][1]}<br>Iteration ${i}"
-	                   data-fancybox="iteration-${colname}"
-	                   >
-	                   <img data-src="${os.path.relpath(plot.thumbnail, pcontext.report_dir)}"
-	                   		title="Iteration ${i}: ${columns[colname][1]}"
-	                   		alt="Iteration ${i}: ${columns[colname][1]}"
-	                   		class="lazyload img-responsive">
-	                </a>
-	            </div>
-	            % endif
-	        </td>
-	        % endfor <!-- /colname loop-->
-	    </tr>
-		% endfor <!-- /iteration loop -->
+                    <!-- plots for this iteration, in column order -->
+                % for colname, moment in colorder:
+                <td>
+                    <% plot = get_plot(plots_dict, prefix, field, spw, i, colname, moment) %>
+                    <!-- use bootstrap markup for thumbnails -->
+                    % if plot is not None:
+                    <div class="thumbnail">
+                        <a href="${os.path.relpath(plot.abspath, pcontext.report_dir)}"
+                           title="Iteration ${i}: ${columns[colname][1]}"
+                           data-caption="${columns[colname][1]}<br>Iteration ${i}"
+                           data-fancybox="iteration-${colname}">
+                            <img data-src="${os.path.relpath(plot.thumbnail, pcontext.report_dir)}"
+                                 title="Iteration ${i}: ${columns[colname][1]}"
+                                 alt="Iteration ${i}: ${columns[colname][1]}"
+                                 class="lazyload img-responsive">
+                        </a>
+                        % if cube_mode:
+                        <div class="caption">
+                            <% moment_label = '' if moment is None else f' ({moment})' %>
+                            <p class="text-center">${columns[colname][1]}${moment_label}</p>
+                        </div>
+                        % endif
+                    </div>
+                    % endif
+                </td>
+                % endfor <!-- /colname,moment loop-->
+            % endfor <!-- /colorders loop-->
+            </tr>
+        % endfor <!-- /iteration loop -->
 
-		<tr>
-			<td></td>
-		    % for colname in ['flux', 'psf', 'model']:
-		    	<td>
-					<!-- model/psf/flux plots are associated with the final iteration -->
-		                <% 
-		                lastiter = sorted(plots_dict[prefix][field][spw].keys())[-1]
-		                plot = get_plot(plots_dict, prefix, field, spw, lastiter, colname)
-		                %>
-		            % if plot is not None:
-		                <div class="thumbnail">
-		                    <a data-fancybox
-		                       href="${os.path.relpath(plot.abspath, pcontext.report_dir)}"
+        <tr>
+            <td></td>
+            <%
+            if cube_mode:
+                colnames = ['flux', 'psf', 'model', 'psf_per_channel']
+            else:
+                colnames = ['flux', 'psf', 'model']
+            %>
+
+            % for colname in colnames:
+                <td>
+                    <!-- model/psf/flux plots are associated with the final iteration -->
+                    <% 
+                    lastiter = sorted(plots_dict[prefix][field][spw].keys())[-1]
+                    plot = get_plot(plots_dict, prefix, field, spw, lastiter, colname)
+                    %>
+                    % if plot is not None:
+                        <div class="thumbnail">
+                            <a data-fancybox
+                               href="${os.path.relpath(plot.abspath, pcontext.report_dir)}"
                                data-caption="${columns[colname][1]}"
-		                       title="${columns[colname][1]}">
-								<img data-src="${os.path.relpath(plot.thumbnail, pcontext.report_dir)}"
-									 title="${columns[colname][1]}"
-								     alt="${columns[colname][1]}"]
-								     class="lazyload img-responsive">
-							</a>
-							<div class="caption">
-								<p class="text-center">${columns[colname][1]}</p>
-		               		</div>
-		         		</div>
-		            % endif
-		        </td>
-		    % endfor <!-- /colname loop -->	
-		</tr>
-
-	</tbody>
+                               title="${columns[colname][1]}">
+                                <img data-src="${os.path.relpath(plot.thumbnail, pcontext.report_dir)}"
+                                     title="${columns[colname][1]}"
+                                     alt="${columns[colname][1]}"]
+                                     class="lazyload img-responsive">
+                            </a>
+                            <div class="caption">
+                                <p class="text-center">${columns[colname][1]}</p>
+                            </div>
+                        </div>
+                    % endif
+                </td>
+            % endfor <!-- /colname loop -->
+        </tr>
+    </tbody>
 </table>
 </div>
 
@@ -132,7 +152,7 @@ When the beam shape is significantly non-Gaussian, the dotted contour of the 50%
 of the PSF image will become distinctly visible apart from the fitted synthesized beam, 
 which is shown as the solid contour.
 </li>
-%if 'mom0_fc' in colorder: 
+%if cube_mode:
 <li>
 The Line-free Moment 0 and Moment 8 images are created from the line-free
 (continuum) channels identified in the hif_findcont stage. In the absence of
@@ -152,6 +172,3 @@ More details about all these plots can be found in the ALMA Pipeline User Guide.
 </li> 
 %endif
 </ul>
-
-
-

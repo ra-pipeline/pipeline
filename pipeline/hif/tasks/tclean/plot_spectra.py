@@ -828,6 +828,6 @@ def plot_spectra(image_robust_rms_and_spectra, rec_info, plotfile, msname, spw, 
     fig = plt.gcf()
     fig.set_size_inches(8,6)
     fig.canvas.flush_events()
-    plt.savefig(plotfile)
+    plt.savefig(plotfile, bbox_inches='tight')
     plt.clf()
     plt.close()

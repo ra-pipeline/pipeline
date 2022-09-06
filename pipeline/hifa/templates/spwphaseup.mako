@@ -30,7 +30,7 @@ def format_field(field_name, field_id):
 <ul>
     <li><a href="#results">Results</a></li>
     <li><a href="#structure">Phase RMS structure plots</a></li>
-<ul>
+</ul>
 
 <p>This task computes the spectral window map that will be used to apply the time gaincal phase solutions
 and the caltable containing per spw phase offsets.</p>

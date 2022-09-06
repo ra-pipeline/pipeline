@@ -651,7 +651,11 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             prefix = row.image_file.split('.')[0]
             try:
                 final_iter = sorted(plots_dict[prefix][row.field][str(row.spw)].keys())[-1]
-                plot = get_plot(plots_dict, prefix, row.field, str(row.spw), final_iter, 'image')
+                # cube and repBW mode use mom8
+                plot = get_plot(plots_dict, prefix, row.field, str(row.spw), final_iter, 'image', 'mom8')
+                if plot is None:
+                    # mfs and cont mode use mean
+                    plot = get_plot(plots_dict, prefix, row.field, str(row.spw), final_iter, 'image', 'mean')
 
                 renderer = TCleanPlotsRenderer(context, results, row.result,
                                                plots_dict, prefix, row.field, str(row.spw), row.pol,
@@ -676,9 +680,17 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 final_rows.append(new_row)
             except IOError as e:
                 LOG.error(e)
-            except:
+            except Exception as e:
+                # Probably some detail page rendering exception.
+                LOG.error(e)
                 final_rows.append(row)
-
+        
+        # PIPE-1595: sort targets by field/spw/pol for VLA, so multiple bands of the same objects will 
+        # stay in the same weblog table row. Note that this additional VLA-only sorting might introduce 
+        # a difference between the target sequences of hif_makeimages and hif_makeimlist (see PIPE-1302).
+        if final_rows and 'VLA' in final_rows[0].result.imaging_mode:
+            final_rows.sort(key=lambda row: (row.vis, row.field, utils.natural_sort_key(row.spw), row.pol))
+        
         chk_fit_rows = []
         for row in final_rows:
             if row.frequency is not None:
@@ -731,33 +743,31 @@ class TCleanPlotsRenderer(basetemplates.CommonRenderer):
         valid_chars = "_.-%s%s" % (string.ascii_letters, string.digits)
         self.path = os.path.join(self.dirname, filenamer.sanitize(outfile, valid_chars))
 
-        # Determine whether this target was run with specmode = 'cube',
-        # in which case the weblog will need to show the MOM0_FC and
-        # MOM8_FC columns.
-        show_mom0_8_fc = result.specmode == 'cube'
-
-        if show_mom0_8_fc:
-            colorder = ['pbcorimage', 'residual', 'cleanmask', 'mom0_fc', 'mom8_fc', 'spectra']
+        if result.specmode in ('mfs', 'cont'):
+            colorders = [[('pbcorimage', None), ('residual', None), ('cleanmask', None)]]
         else:
-            colorder = ['pbcorimage', 'residual', 'cleanmask']
-        
+            colorders = [[('pbcorimage', 'mom8'), ('residual', 'mom8'), ('mom8_fc', None), ('spectra', None)],
+                         [('pbcorimage', 'mom0'), ('residual', 'mom0'), ('mom0_fc', None), ('cleanmask', None)]]
+
         if 'VLA' in result.imaging_mode:
             # PIPE-1462: use non-pbcor images for VLA in the tclean details page.
             # Because 'mtmfs' CASA/tclean doesn't generate pbcor images for VLA and silently passes with a warning when pbcor=True,
             # pbcor images are not produced from hif.tasks.tclean (see PIPE-1201/CAS-11636)
             # Here, we set a fallback with non-pbcor images.
-            colorder = ['image' if im_type == 'pbcorimage' else im_type for im_type in colorder]
+            for i, colorder in enumerate(colorders):
+                colorders[i] = [('image', moment) if im_type == 'pbcorimage' else (im_type, moment) for im_type, moment in colorder]
 
         self.extra_data = {
             'plots_dict': plots_dict,
             'prefix': prefix.split('.')[0],
             'field': field,
             'spw': spw,
-            'colorder': colorder,
             'qa_previous': urls[0],
             'qa_next': urls[2],
             'base_url': os.path.join(self.dirname, 't2-4m_details.html'),
-            'cube_all_cont': cube_all_cont
+            'cube_all_cont': cube_all_cont,
+            'cube_mode': result.specmode in ('cube', 'repBW'),
+            'colorders': colorders
         }
 
     def update_mako_context(self, mako_context):
@@ -789,9 +799,9 @@ class TCleanTablesRenderer(basetemplates.CommonRenderer):
         mako_context.update(self.extra_data)
 
 
-def get_plot(plots, prefix, field, spw, i, colname):
+def get_plot(plots, prefix, field, spw, i, colname, moment):
     try:
-        return plots[prefix][field][spw][i][colname]
+        return plots[prefix][field][spw][i][colname][moment]
     except KeyError:
         return None
 
@@ -803,8 +813,10 @@ def make_plot_dict(plots):
     spws = sorted({p.parameters['virtspw'] for p in plots})
     iterations = sorted({p.parameters['iter'] for p in plots})
     types = sorted({p.parameters['type'] for p in plots})
+    moments = sorted({p.parameters['moment'] for p in plots})
 
-    iteration_dim = lambda: collections.defaultdict(dict)
+    type_dim = lambda: collections.defaultdict(dict)
+    iteration_dim = lambda: collections.defaultdict(type_dim)
     spw_dim = lambda: collections.defaultdict(iteration_dim)
     field_dim = lambda: collections.defaultdict(spw_dim)
     plots_dict = collections.defaultdict(field_dim)
@@ -813,14 +825,16 @@ def make_plot_dict(plots):
             for spw in spws:
                 for iteration in iterations:
                     for t in types:
-                        matching = [p for p in plots
-                                    if p.parameters['prefix'] == prefix
-                                    and p.parameters['field'] == field
-                                    and p.parameters['virtspw'] == spw
-                                    and p.parameters['iter'] == iteration
-                                    and p.parameters['type'] == t]
-                        if matching:
-                            plots_dict[prefix][field][spw][iteration][t] = matching[0]
+                        for moment in moments:
+                            matching = [p for p in plots
+                                        if p.parameters['prefix'] == prefix
+                                        and p.parameters['field'] == field
+                                        and p.parameters['virtspw'] == spw
+                                        and p.parameters['iter'] == iteration
+                                        and p.parameters['type'] == t
+                                        and p.parameters['moment'] == moment]
+                            if matching:
+                                plots_dict[prefix][field][spw][iteration][t][moment] = matching[0]
 
     return plots_dict
 
@@ -1496,7 +1510,11 @@ class T2_4MDetailsTcleanVlassCubeRenderer(basetemplates.T2_4MDetailsDefaultRende
             prefix = row.image_file.split('.')[0]
             try:
                 final_iter = sorted(plots_dict[prefix][row.field+': '+str(row.spw)][str(row.pol)].keys())[-1]
-                plot = get_plot(plots_dict, prefix, row.field+': '+str(row.spw), str(row.pol), final_iter, 'image')
+                # cube and repBW mode use mom8
+                plot = get_plot(plots_dict, prefix, row.field+': '+str(row.spw), str(row.pol), final_iter, 'image', 'mom8')
+                if plot is None:
+                    # mfs and cont mode use mean
+                    plot = get_plot(plots_dict, prefix, row.field+': '+str(row.spw), str(row.pol), final_iter, 'image', 'mean')
 
                 renderer = TCleanPlotsRenderer(context, results, row.result,
                                                plots_dict, prefix, row.field+': '+str(row.spw), str(row.pol), row.pol,
@@ -1519,11 +1537,13 @@ class T2_4MDetailsTcleanVlassCubeRenderer(basetemplates.T2_4MDetailsDefaultRende
 
                 new_row = ImageRow(**values)
                 final_rows.append(new_row)
-            except Exception as e:
-                # IOError
+            except IOError as e:
                 LOG.error(e)
-            except:
+            except Exception as e:
+                # Probably some detail page rendering exception.
+                LOG.error(e)
                 final_rows.append(row)
+
         # primary sort images by vis, field, secondary sort on spw, then by pol
         final_rows.sort(key=lambda row: (row.vis, utils.natural_sort_key(row.field+': '+str(row.spw)), row.pol))
 
@@ -1550,8 +1570,10 @@ def make_plot_dict_stokes(plots):
     spws = sorted({p.parameters['stokes'] for p in plots})
     iterations = sorted({p.parameters['iter'] for p in plots})
     types = sorted({p.parameters['type'] for p in plots})
+    moments = sorted({p.parameters['moment'] for p in plots})
 
-    def iteration_dim(): return collections.defaultdict(dict)
+    def type_dim(): return collections.defaultdict(dict)
+    def iteration_dim(): return collections.defaultdict(type_dim)
     def spw_dim(): return collections.defaultdict(iteration_dim)
     def field_dim(): return collections.defaultdict(spw_dim)
     plots_dict = collections.defaultdict(field_dim)
@@ -1561,13 +1583,15 @@ def make_plot_dict_stokes(plots):
             for spw in spws:
                 for iteration in iterations:
                     for t in types:
-                        matching = [p for p in plots
-                                    if p.parameters['prefix'] == prefix
-                                    and p.parameters['field']+': '+p.parameters['virtspw'] == field
-                                    and p.parameters['stokes'] == spw
-                                    and p.parameters['iter'] == iteration
-                                    and p.parameters['type'] == t]
-                        if matching:
-                            plots_dict[prefix][field][spw][iteration][t] = matching[0]
+                        for moment in moments:
+                            matching = [p for p in plots
+                                        if p.parameters['prefix'] == prefix
+                                        and p.parameters['field']+': '+p.parameters['virtspw'] == field
+                                        and p.parameters['stokes'] == spw
+                                        and p.parameters['iter'] == iteration
+                                        and p.parameters['type'] == t
+                                        and p.parameters['moment'] == moment]
+                            if matching:
+                                plots_dict[prefix][field][spw][iteration][t][moment] = matching[0]
 
     return plots_dict

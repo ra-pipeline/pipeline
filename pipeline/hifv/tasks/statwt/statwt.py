@@ -79,6 +79,7 @@ class Statwt(basetask.StandardTaskTemplate):
         fields = ','.join(str(x) for x in fielddict) if fielddict != {} else ''
 
         wtables = {}
+
         if self.inputs.statwtmode == 'VLASS-SE':
             wtables['before'] = self._make_weight_table(suffix='before', dryrun=False)
 
@@ -90,8 +91,7 @@ class Statwt(basetask.StandardTaskTemplate):
         # flag statistics after task
         flag_summaries.append(self._do_flagsummary('statwt', field=fields))
 
-        if self.inputs.statwtmode == 'VLASS-SE':
-            wtables['after'] = self._make_weight_table(suffix='after', dryrun=False)
+        wtables['after'] = self._make_weight_table(suffix='after', dryrun=False)
 
         return StatwtResults(jobs=[statwt_result], flag_summaries=flag_summaries, wtables=wtables)
 
@@ -165,10 +165,15 @@ class Statwt(basetask.StandardTaskTemplate):
         if isdir:
             shutil.rmtree(outputvis)
 
+        if self.inputs.statwtmode == 'VLASS-SE': 
+            datacolumn = 'DATA'
+        else: 
+            datacolumn = 'CORRECTED'
+
         task_args = {'vis': self.inputs.vis,
                      'outputvis': outputvis,
-                     'spw': '*:0',
-                     'datacolumn': 'DATA',
+                     'spw': '*:0', # Channel 0 for all spwids 
+                     'datacolumn': datacolumn,
                      'keepflags': False}
         job = casa_tasks.split(**task_args)
         self._executor.execute(job)
@@ -192,8 +197,8 @@ class Statwt(basetask.StandardTaskTemplate):
                 stb.close()
 
         gaincal_spws = ','.join([str(s) for s in spws])
+
         job = casa_tasks.gaincal(vis=outputvis, caltable=wtable, solint='int',
                                  minsnr=0, calmode='ap', spw=gaincal_spws, append=False)
         self._executor.execute(job)
-
         return wtable

@@ -389,10 +389,9 @@ class T1_1Renderer(RendererBase):
             time_end = utils.get_epoch_as_datetime(ms.end_time)
 
             target_scans = [s for s in ms.scans if 'TARGET' in s.intents]
-            if scan_has_intent(target_scans, 'REFERENCE'):
-                # target scans have OFF-source integrations. Need to do harder way.
-                autocorr_only = is_singledish_ms(context)
-                time_on_source =  utils.total_time_on_target_on_source(ms, autocorr_only)
+            is_single_dish_data = is_singledish_ms(context)
+            if scan_has_intent(target_scans, 'REFERENCE') or is_single_dish_data:
+                time_on_source = utils.total_time_on_target_on_source(ms, is_single_dish_data)
             else:
                 time_on_source = utils.total_time_on_source(target_scans)
             time_on_source = utils.format_timedelta(time_on_source)
@@ -797,10 +796,10 @@ class T2_1DetailsRenderer(object):
 
         time_on_source = utils.total_time_on_source(ms.scans) 
         science_scans = [scan for scan in ms.scans if 'TARGET' in scan.intents]
-        if scan_has_intent(science_scans, 'REFERENCE'):
-            # target scans have OFF-source integrations. Need to do harder way.
-            autocorr_only = is_singledish_ms(context)
-            time_on_science =  utils.total_time_on_target_on_source(ms, autocorr_only)
+        is_single_dish_data = is_singledish_ms(context)
+        if scan_has_intent(science_scans, 'REFERENCE') or is_single_dish_data:
+            # target scans have OFF-source integrations or Single Dish Data. Need to do harder way.
+            time_on_science = utils.total_time_on_target_on_source(ms, is_single_dish_data)
         else:
             time_on_science = utils.total_time_on_source(science_scans)
 

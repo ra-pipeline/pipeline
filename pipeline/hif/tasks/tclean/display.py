@@ -11,6 +11,7 @@ import pipeline.infrastructure.renderer.logger as logger
 from pipeline.h.tasks.common.displays import sky as sky
 from pipeline.infrastructure import casa_tools
 from .plot_spectra import plot_spectra
+from .plot_beams import plot_beams
 from pipeline.infrastructure.utils import get_stokes
 
 LOG = infrastructure.get_logger(__name__)
@@ -49,6 +50,7 @@ class CleanSummary(object):
             extension = '.tt0' if r.multiterm else ''
 
             # psf map
+            # TODO: Check if r.imaging_mode should be used
             if self.context.imaging_mode == 'VLASS-SE-CUBE':
                 # PIPE-1401: use the same selecting list constructed from the Stokes plane present in the PSF image.
                 stokes_list = get_stokes(r.psf + extension)
@@ -67,13 +69,19 @@ class CleanSummary(object):
             for i, iteration in [(k, r.iterations[k]) for k in sorted(r.iterations)]:
                 # process image for this iteration
                 if 'image' in iteration:
-                    collapse_function = 'max' if (('cube' in iteration.get('image', '')) or ('repBW' in iteration.get('image', ''))) else 'mean'
+                    collapse_function = 'mom8' if (('cube' in iteration.get('image', '')) or ('repBW' in iteration.get('image', ''))) else 'mean'
+
+                    image_path = iteration['image'].replace('.image', '.image%s' % (extension))
 
                     # PB corrected
-                    image_path = iteration['image'].replace('.image', '.image%s' % (extension))
                     plot_wrappers.extend(
                         sky.SkyDisplay().plot_per_stokes(self.context, image_path, reportdir=stage_dir, intent=r.intent, stokes_list=stokes_list,
                                                          collapseFunction=collapse_function))
+                    # For cubes (i.e. when mom8 is selected above) also make mom0 of the PB corrected image (PIPE-652)
+                    if collapse_function == 'mom8':
+                        plot_wrappers.extend(
+                            sky.SkyDisplay().plot_per_stokes(self.context, image_path, reportdir=stage_dir, intent=r.intent, stokes_list=stokes_list,
+                                                             collapseFunction='mom0'))
 
                     # Non PB corrected
                     image_path = image_path.replace('.pbcor', '')
@@ -81,7 +89,7 @@ class CleanSummary(object):
                     # CAS-8847: For the non-pbcor MOM8 image displayed in the weblog set the color range to: +1
                     # sigmaCube to max([peakCube,+8sigmaCube]). The pbcor MOM8 images are ok as is for now.
                     extra_args = {}
-                    if collapse_function == 'max':
+                    if collapse_function == 'mom8':
                         if image_path not in self.image_stats:
                             LOG.trace('No cached image statistics found for {!s}'.format(image_path))
                             with casa_tools.ImageReader(image_path) as image:
@@ -104,9 +112,18 @@ class CleanSummary(object):
                                                    collapseFunction=collapse_function, **extra_args))
 
                 # residual for this iteration
-                plot_wrappers.extend(
-                    sky.SkyDisplay().plot_per_stokes(self.context, iteration['residual'] + extension, reportdir=stage_dir,
-                                               intent=r.intent, stokes_list=stokes_list))
+                if r.imaging_mode == 'ALMA':
+                    # ALMA requested a change to mom8 and mom0 displays (PIPE-652)
+                    plot_wrappers.extend(
+                        sky.SkyDisplay().plot_per_stokes(self.context, iteration['residual'] + extension, reportdir=stage_dir,
+                                                   intent=r.intent, stokes_list=stokes_list, collapseFunction='mom8'))
+                    plot_wrappers.extend(
+                        sky.SkyDisplay().plot_per_stokes(self.context, iteration['residual'] + extension, reportdir=stage_dir,
+                                                   intent=r.intent, stokes_list=stokes_list, collapseFunction='mom0'))
+                else:
+                    plot_wrappers.extend(
+                        sky.SkyDisplay().plot_per_stokes(self.context, iteration['residual'] + extension, reportdir=stage_dir,
+                                                   intent=r.intent, stokes_list=stokes_list))
 
                 # model for this iteration (currently only last but allow for others in future)
                 if 'model' in iteration and os.path.exists(iteration['model'] + extension):
@@ -144,13 +161,13 @@ class CleanSummary(object):
 
                 # cleanmask - not for iter 0
                 if i > 0:
-                    collapse_function = 'max' if (('cube' in iteration.get('cleanmask', '')) or ('repBW' in iteration.get('cleanmask', ''))) else 'mean'
+                    collapse_function = 'mom8' if (('cube' in iteration.get('cleanmask', '')) or ('repBW' in iteration.get('cleanmask', ''))) else 'mean'
                     plot_wrappers.extend(
                         sky.SkyDisplay().plot_per_stokes(self.context, iteration.get('cleanmask', ''), reportdir=stage_dir,
                                                          intent=r.intent, stokes_list=stokes_list, collapseFunction=collapse_function,
                                                          **{'cmap': copy.copy(matplotlib.cm.YlOrRd)}))
 
-                # cube spectra for this iteration
+                # cube spectra and PSF per channel plot for this iteration
                 if ('cube' in iteration.get('image', '')) or ('repBW' in iteration.get('image', '')):
                     imagename = r.image_robust_rms_and_spectra['nonpbcor_imagename']
                     with casa_tools.ImageReader(imagename) as image:
@@ -159,6 +176,7 @@ class CleanSummary(object):
                     parameters = {k: miscinfo[k] for k in ['virtspw', 'iter'] if k in miscinfo}
                     parameters['field'] = '%s (%s)' % (miscinfo['field'], miscinfo['intent'])
                     parameters['type'] = 'spectra'
+                    parameters['moment'] = 'N/A'
                     try:
                         parameters['prefix'] = miscinfo['filnam01']
                     except:
@@ -174,11 +192,18 @@ class CleanSummary(object):
                         LOG.warning('Could not determine receiver type. Assuming TSB.')
                         rec_info = {'type': 'TSB', 'LO1': '0GHz'}
 
+                    # Diagnostic spectra
                     plotfile = '%s.spectrum.png' % (os.path.join(stage_dir, os.path.basename(imagename)))
                     field_id = int(r.field_ids[0].split(',')[0])
                     plot_spectra(r.image_robust_rms_and_spectra, rec_info, plotfile, ref_ms.name, str(real_spw), field_id)
-
                     plot_wrappers.append(logger.Plot(plotfile, parameters=parameters))
+
+                    # PSF per channels plot
+                    psf_per_channel_plotfile = '%s.beams.png' % (os.path.join(stage_dir, os.path.basename(r.psf)))
+                    plot_beams(r.psf, psf_per_channel_plotfile)
+                    psf_per_channel_parameters = copy.deepcopy(parameters)
+                    psf_per_channel_parameters['type'] = 'psf_per_channel'
+                    plot_wrappers.append(logger.Plot(psf_per_channel_plotfile, parameters=psf_per_channel_parameters))
 
         return [p for p in plot_wrappers if p is not None]
 

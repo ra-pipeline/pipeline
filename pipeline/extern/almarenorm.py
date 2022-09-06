@@ -459,7 +459,7 @@ class ACreNorm(object):
 
         # Version
 
-        self.RNversion='v1.3-2021/08/05-alipnick'
+        self.RNversion='v1.4-2022/08/12-alipnick'
 
         # LM added 
         # file for logger named per EB and runtime - will make a new file every run
@@ -556,7 +556,8 @@ class ACreNorm(object):
         if len(self.fdmspws) != 0:
             self.tdm_only = False
             bandFreq = spwInfo[str(self.fdmspws[0])]['Chan1Freq']
-            self.num_corrs = self.msmeta.ncorrforpol(self.msmeta.polidfordatadesc(self.fdmspws[0]))
+            # Maybe a better way?
+            self.num_corrs = self.msmeta.ncorrforpol(self.msmeta.polidfordatadesc(self.msmeta.datadescids(spw=self.fdmspws[0])[0]))
             # AC data will only use the parallel hands, so if 4 correlations are detected in the FDM
             # window, we set the full_pol flag to True and reset num_corrs to 2.
             if self.num_corrs == 4:
@@ -577,7 +578,7 @@ class ACreNorm(object):
             self.logReNorm.write('No FDM windows found! Renormalization unnecessary.')
             self.tdm_only = True
             bandFreq = spwInfo['0']['Chan1Freq']
-            self.num_corrs = self.msmeta.ncorrforpol(self.msmeta.polidfordatadesc(self.msmeta.tdmspws()[-1]))
+            self.num_corrs = self.msmeta.ncorrforpol(self.msmeta.polidfordatadesc(self.msmeta.datadescids(spw=self.msmeta.tdmspws()[-1])[0]))
         
         self.Band = int(self.getband(bandFreq))
 
@@ -1530,6 +1531,10 @@ class ACreNorm(object):
                     print(' e.g. {"22":"100~150"}')
                     casalog.post('*** Terminating renormalization run ***', 'INFO', 'ReNormalize')   
                     raise SyntaxError('excludechan requires a channel range separator of "~" (tilde)')
+        elif excludechan is None:
+            excludechan={}
+        elif type(excludechan) is str:
+            excludechan={}
         self.rnstats['inputs']['excludechan'] = excludechan
 
         # LM added - bwthreshspw (dictionary)
@@ -2075,17 +2080,34 @@ class ACreNorm(object):
                                                     print('replacing scan with good for '+str(self.AntName[lpAnt]))
                                                     self.rnstats['N'][target][str(ispw)][:,:,lpAnt]= N[:,:,lpAnt] 
                                                 if (self.corrATM and not skipAtmCorr) or excludechan:
-                                                    if lpAnt not in antflagged and np.sum(self.rnstats['N_atm'][target][str(ispw)][:,:,lpAnt])/(2.*nCha)!=1.0:
-                                                        self.rnstats['N_atm'][target][str(ispw)][:,:,lpAnt]=self.rnstats['N_atm'][target][str(ispw)][:,:,lpAnt]*ngoodscan/(ngoodscan+1)  + N_atm[:,:,lpAnt]/(ngoodscan+1)
-                                                    elif lpAnt not in antflagged and np.sum(self.rnstats['N_atm'][target][str(ispw)][:,:,lpAnt])/(2.*nCha)==1.0:
-                                                        self.rnstats['N_atm'][target][str(ispw)][:,:,lpAnt]= N_atm[:,:,lpAnt]
+                                                    try: 
+                                                        if lpAnt not in antflagged and np.sum(self.rnstats['N_atm'][target][str(ispw)][:,:,lpAnt])/(2.*nCha)!=1.0:
+                                                            self.rnstats['N_atm'][target][str(ispw)][:,:,lpAnt]=self.rnstats['N_atm'][target][str(ispw)][:,:,lpAnt]*ngoodscan/(ngoodscan+1)  + N_atm[:,:,lpAnt]/(ngoodscan+1)
+                                                        elif lpAnt not in antflagged and np.sum(self.rnstats['N_atm'][target][str(ispw)][:,:,lpAnt])/(2.*nCha)==1.0:
+                                                            self.rnstats['N_atm'][target][str(ispw)][:,:,lpAnt]= N_atm[:,:,lpAnt]
+                                                    # If we end up here, then the atmAutoExclude algorithm has only just 
+                                                    # started excluding scans. So we need to instantiate the N_atm dict
+                                                    # with everything that is contained in N so far and then we can add
+                                                    # the new data.
+                                                    except KeyError:
+                                                        self.rnstats['N_atm'][target][str(ispw)]=self.rnstats['N'][target][str(ispw)]
+                                                        if lpAnt not in antflagged and np.sum(self.rnstats['N_atm'][target][str(ispw)][:,:,lpAnt])/(2.*nCha)!=1.0:
+                                                            self.rnstats['N_atm'][target][str(ispw)][:,:,lpAnt]=self.rnstats['N_atm'][target][str(ispw)][:,:,lpAnt]*ngoodscan/(ngoodscan+1)  + N_atm[:,:,lpAnt]/(ngoodscan+1)
+                                                        elif lpAnt not in antflagged and np.sum(self.rnstats['N_atm'][target][str(ispw)][:,:,lpAnt])/(2.*nCha)==1.0:
+                                                            self.rnstats['N_atm'][target][str(ispw)][:,:,lpAnt]= N_atm[:,:,lpAnt]
                                             # remember to add to the scans assessed
                                             ngoodscan+=1
                                         else:
                                             # if no flagged antennas were passed we do the default cumulative average as normal
                                             self.rnstats['N'][target][str(ispw)]=self.rnstats['N'][target][str(ispw)]*ngoodscan/(ngoodscan+1)  + N/(ngoodscan+1)
                                             if (self.corrATM and not skipAtmCorr) or excludechan:
-                                                self.rnstats['N_atm'][target][str(ispw)]=self.rnstats['N_atm'][target][str(ispw)]*ngoodscan/(ngoodscan+1)  + N_atm/(ngoodscan+1)
+                                                try:
+                                                    self.rnstats['N_atm'][target][str(ispw)]=self.rnstats['N_atm'][target][str(ispw)]*ngoodscan/(ngoodscan+1)  + N_atm/(ngoodscan+1)
+                                                # If we end up here, then the atmAutoExclude algorithm has only just 
+                                                # started excluding scans. So we need to instantiate the N_atm dict
+                                                # with everything that is contained in N so far plus the new data.
+                                                except KeyError:
+                                                    self.rnstats['N_atm'][target][str(ispw)]=self.rnstats['N'][target][str(ispw)]*ngoodscan/(ngoodscan+1) + N_atm/(ngoodscan+1)
                                             ngoodscan+=1
                                     ## Non flagged antenna cases
                                     else:
@@ -2885,14 +2907,18 @@ class ACreNorm(object):
                     ax_atm.yaxis.set_label_position('right')
                     
                     # Enforce a range of 100
-                    ax_atm.set_ylim(peak-100,peak)
-                    
-                    # Make sure that we don't label values that are less than 0 since that
-                    # has no physical meaning.
-                    fig.canvas.draw()
-                    yticks = [yt for yt in ax_atm.get_yticks()]
-                    ax_atm.set_yticklabels(['' if yt<0 else str(int(yt)) for yt in yticks])
+                    atm_ymax = peak
+                    atm_ymin = peak-100
+                    ax_atm.set_ylim(atm_ymin, atm_ymax)
 
+                    ## Make sure that we don't label values that are less than 0 since that
+                    ## has no physical meaning.
+                    yvals = np.arange(round(atm_ymin), round(atm_ymax))
+                    yvals_mod = yvals%20
+                    ylabels = yvals[list(np.where(yvals_mod==0)[0])]
+                    ylabels_mask = ylabels >= 0 
+                    ax_atm.set_yticks(ylabels[ylabels_mask])
+                    ax_atm.set_yticklabels([str(int(ylbl)) for ylbl in ylabels[ylabels_mask]])
 
                     # Gather stats for pipeline development
                     if 'atmStats' not in self.rnstats.keys():
@@ -3779,14 +3805,23 @@ class ACreNorm(object):
             else:
                 peak = max(ATMprof*100.)+10
                 ax_atm.set_ylabel('ATM Transmission (%)')                
-            ax_atm.set_ylim(peak-100,peak)
             ax_atm.yaxis.set_label_position('right')
             
             # Avoid labelling values less than 0% since they have no physical meaning.
-            fig.canvas.draw()
-            yticks = [yt for yt in ax_atm.get_yticks()]
-            ax_atm.set_yticklabels(['' if yt<0 else str(int(yt)) for yt in yticks])
-        
+            # Enforce a range of 100
+            atm_ymax = peak
+            atm_ymin = peak-100
+            ax_atm.set_ylim(atm_ymin, atm_ymax)
+
+            ## Make sure that we don't label values that are less than 0 since that
+            ## has no physical meaning.
+            yvals = np.arange(round(atm_ymin), round(atm_ymax))
+            yvals_mod = yvals%20
+            ylabels = yvals[list(np.where(yvals_mod==0)[0])]
+            ylabels_mask = ylabels >= 0 
+            ax_atm.set_yticks(ylabels[ylabels_mask])
+            ax_atm.set_yticklabels([str(int(ylbl)) for ylbl in ylabels[ylabels_mask]])
+            
         # Save the plotted figure, setting up the plot directory if it doesn't already exist.
         if not os.path.exists('RN_plots'):
             os.mkdir('RN_plots')

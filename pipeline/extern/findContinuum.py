@@ -10,7 +10,7 @@ This file can be found in a typical pipeline distribution directory, e.g.:
 /lustre/naasc/sciops/comm/rindebet/pipeline/branches/trunk/pipeline/extern
 As of March 7, 2019 (version 3.36), it is compatible with both python 2 and 3.
 
-Code changes for Pipeline2022 from PIPE-1221: (as of July 04, 2022)
+Code changes for Pipeline2022 from PIPE-1221: (as of Aug 21, 2022)
 0) fix for PIPE-1227 (look for .virtspw first)
 1) Do not remove pbmom if it already exists (for speeding up manual use case)
 2) import pickle and add useJointMaskPrior control parameter for mom0mom8jointMask
@@ -33,6 +33,7 @@ Code changes for Pipeline2022 from PIPE-1221: (as of July 04, 2022)
 19) in .extraMask, reset sigmaFindContinuum to sigmaFindContinuumForExtraMask=2.5
 20) fix crash in representativeSpw, remove call to isSingleContinuum
 21) do not revert if momDiffSNR < momDiffLevel
+22) cast spw list intersection to int (since msmd produces inconsistent types)
 
 Code changes for Pipeline2021 from PIPE-824: (as of July 20, 2021)
 0) fix for PRTSPR-50321
@@ -228,7 +229,7 @@ def version(showfile=True):
     """
     Returns the CVS revision number.
     """
-    myversion = "$Id: findContinuumCycle9.py,v 5.35 2022/07/05 14:29:38 we Exp $" 
+    myversion = "$Id: findContinuumCycle9.py,v 5.36 2022/08/21 20:48:39 we Exp $" 
     if (showfile):
         print("Loaded from %s" % (__file__))
     return myversion
@@ -8728,7 +8729,7 @@ def representativeSpwBandwidth(vis, intent='TARGET', mymsmd=None, verbose=False)
     spw = np.intersect1d(myspws[spwname], mymsmd.spwsforintent('*'+intent+'*'))
 #    spw = np.intersect1d(mymsmd.spwsfornames(info['representativeWindow'])[spwname], mymsmd.spwsforintent('*'+intent+'*'))
     if len(spw) == 1:
-        spw = spw[0]
+        spw = int(spw[0]) # intersection of uint64 (from spwsfornames) with int64 (from spwsforintent) yields float!
         bandwidth = mymsmd.bandwidths()[spw]
         nchan = mymsmd.nchan(spw)
     else:

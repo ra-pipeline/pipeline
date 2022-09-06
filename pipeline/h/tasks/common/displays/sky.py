@@ -23,6 +23,7 @@
 import copy
 import os
 import string
+import shutil
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
@@ -37,6 +38,7 @@ import pipeline.infrastructure.renderer.logger as logger
 from matplotlib.offsetbox import AnnotationBbox, HPacker, TextArea
 from pipeline.hif.tasks.makeimages.resultobjects import MakeImagesResult
 from pipeline.infrastructure import casa_tools
+from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure.utils import get_stokes
 
 LOG = infrastructure.get_logger(__name__)
@@ -58,8 +60,11 @@ def sanitize(text):
     return filename
 
 
-def plotfilename(image, reportdir):
-    name = '%s.sky.png' % (os.path.basename(image))
+def plotfilename(image, reportdir, collapseFunction=None):
+    if collapseFunction is None:
+        name = '%s.sky.png' % (os.path.basename(image))
+    else:
+        name = '%s.%s.sky.png' % (os.path.basename(image), collapseFunction)
     name = sanitize(name)
     name = os.path.join(reportdir, name)
     return name
@@ -117,6 +122,7 @@ class SkyDisplay(object):
         parameters = {k: miscinfo[k] for k in ['virtspw', 'pol', 'field', 'type', 'iter'] if k in miscinfo}
         parameters['ant'] = None
         parameters['band'] = band
+        parameters['moment'] = collapseFunction
         if isinstance(stokes, str):
             # PIPE-1401: only save the 'stokes' keyword when it was explicitly requested.
             parameters['stokes'] = stokes
@@ -137,9 +143,9 @@ class SkyDisplay(object):
 
         if isinstance(stokes, str):
             # PIPE-1410: only attach the Stokes suffix when it's explicily specified.
-            plotfile = plotfilename(image=os.path.basename(result)+f'.{stokes}', reportdir=reportdir)
+            plotfile = plotfilename(image=os.path.basename(result)+f'.{stokes}', reportdir=reportdir, collapseFunction=collapseFunction)
         else:
-            plotfile = plotfilename(image=os.path.basename(result), reportdir=reportdir)
+            plotfile = plotfilename(image=os.path.basename(result), reportdir=reportdir, collapseFunction=collapseFunction)
 
         LOG.info('Plotting %s' % result)
 
@@ -165,6 +171,20 @@ class SkyDisplay(object):
                 if collapseFunction == 'center':
                     collapsed = image.collapse(function='mean', chans=str(
                         image.summary()['shape'][3]//2), stokes=stokes_select, axes=3)
+                elif collapseFunction == 'mom0':
+                    # image.collapse does not have a true "mom0" option. "sum" is close, but the
+                    # scaling is different.
+                    # TODO: Switch the whole _plot_panel method to using immoments(?) Though the
+                    #       downside is that images can no longer be made just in memory. They
+                    #       always have to be written to disk.
+                    tmpfile = f'{os.path.basename(result)}_mom0_tmp.img'
+                    job = casa_tasks.immoments(imagename=result, moments=[0], outfile=tmpfile, stokes=stokes_select)
+                    job.execute(dry_run=False)
+                    assert os.path.exists(tmpfile)
+                    collapsed = image.newimagefromimage(infile=tmpfile)
+                    shutil.rmtree(tmpfile)
+                elif collapseFunction == 'mom8':
+                    collapsed = image.collapse(function='max', stokes=stokes_select, axes=3)
                 else:
                     # Note: in case 'max' and non-pbcor image a moment 0 map was written to disk
                     # in the past. With PIPE-558 this is done in hif/tasks/tclean.py tclean._calc_mom0_8()
@@ -294,7 +314,7 @@ class SkyDisplay(object):
             ax.set_xlabel('%s (%s)' % (coord_names[0], coord_units[0]))
             ax.set_ylabel('%s (%s)' % (coord_names[1], coord_units[1]))
 
-            mode_texts = {'mean': 'mean', 'max': 'peak line int. (mom8)', 'center': 'center slice'}
+            mode_texts = {'mean': 'mean', 'mom0': 'integ. line int. (mom0)', 'max': 'peak line int. (mom8)', 'mom8': 'peak line int. (mom8)', 'center': 'center slice'}
             image_info = {'display': mode_texts[collapseFunction]}
             image_info.update(miscinfo)
             if 'type' in image_info:

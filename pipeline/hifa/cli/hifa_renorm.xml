@@ -22,32 +22,46 @@
 
     <param name="threshold" type="float">
         <shortdescription>Apply correction if max correction is above threshold and apply=True</shortdescription>
-        <description>Apply correction if max correction is above threshold and apply=True</description>
+        <description>Apply correction if max correction is above threshold and apply=True. 
+            Default is 1.02 (i.e. 2%)
+        </description>
         <value>1.02</value>
     </param>
 
     <param name="correctATM" type="bool">
         <shortdescription>Correct for ATM residual features</shortdescription>
-        <description>Use the ATM model transmission profiles to try correct
+        <description>Use the ATM model transmission profiles to try and correct
             for any ATM residual features that get into the scaling spectra
         </description>
         <value>False</value>
     </param>  
 
-    <param name="spw" subparam="true" type="string">
+    <param name="spw" type="string">
         <shortdescription>List of spectral windows to use in data selection</shortdescription>
-        <description>The list of spectral windows. Set to spw='' by default,
-            which means the task will select all spectral windows.
+        <description>The list of spectral windows to evaluate. Set to spw='' by default,
+            which means the task will select all relevant (science FDM) spectral windows.
 
-            Example: spw='11,13,15,17'
+            Example: spw="11,13,15,17"
         </description>
         <value/>
     </param>
 
-    <param name="excludechan" subparam="true" type="string">
+    <param name="excludechan" type="any">
         <shortdescription>Channels to exclude</shortdescription>
-        <description>Channels to exclude, e.g. excludechan="{'22':'100~150'}"</description>
-        <value/>
+        <description>Channels to exclude in either channel or frequency space (TOPO, GHz)
+            Examples: excludechan="{'22':'100~150;800~850', '24':'100~200'}"
+                      excludechan="{'22':'230.1GHz~230.2GHz'}"
+        </description>
+        <any type="variant"/>
+        <value type="string">{}</value>
+    </param>
+
+    <param name="atm_auto_exclude" type="bool">
+        <shortdescription>Automatically find and exclude regions with atmospheric features.</shortdescription>
+        <description>Automatically find and exclude regions with atmospheric features.
+                Default is False
+        </description>
+        <value>False</value>
     </param>
 
     <param type="string" name="pipelinemode">

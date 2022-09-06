@@ -6,7 +6,8 @@ import pipeline.h.cli.utils as utils
 
 
 def hifa_renorm(vis=None, apply=None, threshold=None, correctATM=False, spw=None,
-                excludechan=None, pipelinemode=None, dryrun=None, acceptresults=None):
+                excludechan=None, atm_auto_exclude=None, pipelinemode=None, dryrun=None,
+                acceptresults=None):
 
     #                                                                        #
     #  CASA task interface boilerplate code starts here. No edits should be  #
