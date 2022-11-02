@@ -1301,29 +1301,6 @@ class Tclean(cleanbase.CleanBase):
 
         return clean_result
 
-    # Remove pointing table.
-    def _empty_pointing_table(self):
-        # Concerned that simply renaming things directly
-        # will corrupt the table cache, so do things using only the
-        # table tool.
-        for vis in self.inputs.vis:
-            with casa_tools.TableReader('%s/POINTING' % vis, nomodify=False) as table:
-                # make a copy of the table
-                LOG.debug('Making copy of POINTING table')
-                copy = table.copy('%s/POINTING_COPY' % vis, valuecopy=True)
-                LOG.debug('Removing all POINTING table rows')
-                table.removerows(list(range(table.nrows())))
-                copy.done()
-
-    # Restore pointing table
-    def _restore_pointing_table(self):
-        for vis in self.inputs.vis:
-            # restore the copy of the POINTING table
-            with casa_tools.TableReader('%s/POINTING_COPY' % vis, nomodify=False) as table:
-                LOG.debug('Copying back into POINTING table')
-                original = table.copy('%s/POINTING' % vis, valuecopy=True)
-                original.done()
-
     def _calc_moment_image(self, imagename=None, moments=None, outfile=None, chans=None, iter=None):
         '''
         Computes moment image, writes it to disk and updates moment image metadata.
