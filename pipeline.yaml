@@ -1,0 +1,46 @@
+############################################################################
+#
+# setup:
+#   conda env create -f pipeline.yaml
+#   conda activate pipeline
+#   pip install casatools casadata casatasks casaplotms casampi casaviewer almatasks casashell
+#   pip install bdsf
+#
+# update:
+#   conda update all
+#   conda env update -f pipeline.yaml
+#
+# execute:
+#   xvfb-run -a python run_pipeline.py
+#
+############################################################################
+name: pipeline
+channels:
+  - conda-forge
+dependencies:
+  - python=3.8 # currently, casa6 modules whls are not available for py39.
+  - ipython
+  - pip
+  - numpy
+  - matplotlib
+  - scipy
+  - certifi
+  - protobuf=3.20 # casatplotms requires ver<=3.20 at this moment
+  # extra/optional
+  - astropy
+  - pympler
+  - jupyterlab
+  - future
+  - johnnydep
+  - line_profiler
+  - memory_profiler
+  - pylint
+  - flake8
+  - isort
+  - black
+  - pytest
+  - pydocstyle
+  - pycodestyle
+  - pytest-cov
+  - pytest-pep8
+
