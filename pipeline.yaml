@@ -1,24 +1,34 @@
 ############################################################################
 #
 # setup:
-#   conda env create -f pipeline.yaml
-#   conda activate pipeline
-#   pip install casatools casadata casatasks casaplotms casampi casaviewer almatasks casashell
-#   pip install bdsf
 #
-# update:
-#   conda update all
-#   conda env update -f pipeline.yaml
+#   install mambaforge: the recommended minimal conda installer
+#     https://github.com/conda-forge/miniforge#mambaforge
+#
+#   step-by-step to reproduce the Pipeline/CASA environment
+#     $ mamba env create -f pipeline.yaml
+#     $ mamba activate pipeline
+#     $ pip install -r requirements.txt
+#
+#   update:
+#     $ # conda update -n pipeline --all
+#     $ mamba env update -f pipeline.yaml
 #
 # execute:
-#   xvfb-run -a python run_pipeline.py
+#     $ xvfb-run -a python run_pipeline.py
 #
 ############################################################################
+
 name: pipeline
+
 channels:
   - conda-forge
+  - defaults
+
 dependencies:
-  - python=3.8 # currently, casa6 modules whls are not available for py39.
+  # core
+  - python=3.8 # the casa packages wheels are not available for Python 3.9 yet, therefore
+               # Python 3.8 is used.
   - ipython
   - pip
   - numpy
@@ -43,4 +53,3 @@ dependencies:
   - pycodestyle
   - pytest-cov
   - pytest-pep8
-
