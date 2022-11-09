@@ -6,9 +6,8 @@
 #     https://github.com/conda-forge/miniforge#mambaforge
 #  
 #   step-by-step to reproduce the Pipeline/CASA environment
-#     $ mamba env create -f pipeline_docs.yaml
+#     $ mamba env create -f docs/pipeline_docs.yaml
 #     $ mamba activate pipeline
-#     $ pip install -r requirements.txt
 #     $ pip install -r docs/requirements_docs.txt
 #
 #   update:
@@ -55,6 +54,7 @@ dependencies:
   - pytest-cov
   - pytest-pep8
   # build docs
+  - mako # required because we would like to run create_docs.py outside of the Pipeline/extern setup.
   - sphinx
   - sphinxcontrib-bibtex
   - sphinx-copybutton
