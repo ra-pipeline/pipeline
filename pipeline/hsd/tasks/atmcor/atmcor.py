@@ -619,6 +619,20 @@ class SerialSDATMCorrection(basetask.StandardTaskTemplate):
         best_model_index = -1
         LOG.info(f'default_model: {default_model}')
 
+        # representative spw and source
+        ms = self.inputs.ms
+        rep_source_name, rep_spw_id = ms.get_representative_source_spw()
+        # assuming field_name == source_name
+        rep_fields = ms.get_fields(rep_source_name)
+        if len(rep_fields) > 0:
+            rep_field_id = rep_fields[0].id
+        else:
+            rep_field_id = None
+        LOG.info(
+            'performing atmospheric model heuristics using '
+            f'field {rep_field_id} and spw {rep_spw_id}'
+        )
+
         # handle list inputs
         if isinstance(args['atmtype'], list):
             atmtype_list = [int(x) for x in args['atmtype']]
@@ -639,7 +653,9 @@ class SerialSDATMCorrection(basetask.StandardTaskTemplate):
                 defatmtype=default_model.atmtype,
                 defmaxalt=default_model.maxalt,
                 deflapserate=default_model.dtem_dh,
-                defscaleht=default_model.h0
+                defscaleht=default_model.h0,
+                forcefield=rep_field_id,
+                forcespws=rep_spw_id
             )
             best_model = ATMModelParam(*heuristics_result[0][ms_name])
 
