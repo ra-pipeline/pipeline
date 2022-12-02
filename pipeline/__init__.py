@@ -27,6 +27,12 @@ from .domain import measures
 from casashell.private.stack_manip import find_frame
 from casatasks import casalog
 
+import pympler.asizeof as asizeof
+
+# workaround for the problem of asizeof on numpy objects
+# that replaces _isnumpy function the one always return False
+asizeof._isnumpy = lambda obj: False
+
 # Modify filter to get INFO1 message which the pipeline
 # treats as ATTENTION level.
 casalog.filter('INFO1')
