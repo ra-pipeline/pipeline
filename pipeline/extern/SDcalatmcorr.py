@@ -1096,7 +1096,7 @@ def getCalAtmData(ms, spws, spwsetup):
     return (tground_all, pground_all, hground_all, tmatm_all, tsys, trec, tau, antatm)
 
 def makeNANmetrics(fieldid, spwid, nmodels):
-    metricdtypes = np.dtype([('maxabs', np.float), ('maxabserr', np.float), ('intabs', np.float), ('intabserr', np.float), ('maxabsdiff', np.float), ('maxabsdifferr', np.float), ('intabsdiff', np.float), ('intabsdifferr', np.float), ('intsqdiff', np.float), ('intsqdifferr', np.float)])
+    metricdtypes = np.dtype([('maxabs', float), ('maxabserr', float), ('intabs', float), ('intabserr', float), ('maxabsdiff', float), ('maxabsdifferr', float), ('intabsdiff', float), ('intabsdifferr', float), ('intsqdiff', float), ('intsqdifferr', float)])
     metrics = {fieldid: {spwid: np.zeros(nmodels, dtype = metricdtypes)}}
     for k in range(nmodels):
         metrics[fieldid][spwid]['maxabs'][k] = np.nan
@@ -1367,10 +1367,10 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
         lapserate = [lapserate]
     if ('int' in str(type(scaleht))) or ('float' in str(type(scaleht))):
         scaleht = [scaleht]
-    modtypes = np.dtype([('atmtype', np.int), ('maxalt', np.float), ('lapserate', np.float), ('scaleht', np.float)])
+    modtypes = np.dtype([('atmtype', int), ('maxalt', float), ('lapserate', float), ('scaleht', float)])
     models = np.array([model for model in product(atmtype, maxalt, lapserate, scaleht)], dtype = modtypes)
     nmodels = len(models)
-    metricdtypes = np.dtype([('maxabs', np.float), ('maxabserr', np.float), ('intabs', np.float), ('intabserr', np.float), ('maxabsdiff', np.float), ('maxabsdifferr', np.float), ('intabsdiff', np.float), ('intabsdifferr', np.float), ('intsqdiff', np.float), ('intsqdifferr', np.float)])
+    metricdtypes = np.dtype([('maxabs', float), ('maxabserr', float), ('intabs', float), ('intabserr', float), ('maxabsdiff', float), ('maxabsdifferr', float), ('intabsdiff', float), ('intabsdifferr', float), ('intsqdiff', float), ('intsqdifferr', float)])
     print('fieldid: '+str(fieldid)+' spwstoprocess: '+str(spwstoprocess))
     #Create metric output dictionary
     if (len(spwstoprocess) > 0) and (jyperkfactor is not None):

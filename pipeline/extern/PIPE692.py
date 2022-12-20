@@ -371,7 +371,7 @@ class SSFanalysis(object):
         '''
 
         # overlap in elements 
-        over = np.int(np.round(over / diffTime))
+        over = int(np.round(over / diffTime))
         
         # handle nans as some elements in the array could be flagged, so 
         # use finite ones only
@@ -536,7 +536,7 @@ class SSFanalysis(object):
         '''
 
         ## code
-        over = np.int(np.round(over / diffTime))
+        over = int(np.round(over / diffTime))
         # Make an int for using elements
         # will be slightl inaccuracies is there are long timegaps in the data
         # but this is minimal 
