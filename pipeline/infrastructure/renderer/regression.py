@@ -36,6 +36,7 @@ from pipeline.h.tasks.common.commonfluxresults import FluxCalibrationResults
 from pipeline.hif.tasks.applycal.ifapplycal import IFApplycal
 from pipeline.hifa.tasks.fluxscale.gcorfluxscale import GcorFluxscale
 from pipeline.hifa.tasks.gfluxscaleflag.resultobjects import GfluxscaleflagResults
+from pipeline.hifa.tasks.importdata.almaimportdata import ALMAImportData, ALMAImportDataResults
 from pipeline.hsd.tasks.applycal.applycal import HpcSDApplycal
 from pipeline.hsd.tasks.baselineflag.baselineflag import SDBLFlagResults
 from pipeline.hsd.tasks.baselineflag.baselineflag import HpcSDBLFlag
@@ -56,12 +57,15 @@ from pipeline.h.tasks.common.commonfluxresults import FluxCalibrationResults
 from pipeline.hifv.tasks.statwt.statwt import Statwt, StatwtResults
 from pipeline.hifv.tasks.importdata.importdata import VLAImportData, VLAImportDataResults
 from pipeline.hifv.tasks.flagging.flagdetervla import FlagDeterVLA, FlagDeterVLAResults
+from pipeline.hifa.tasks.flagging.flagdeteralma import FlagDeterALMA, FlagDeterALMAResults
 from pipeline.hifv.tasks.testBPdcals.testBPdcals import testBPdcals, testBPdcalsResults
 from pipeline.hifv.tasks.semiFinalBPdcals.semiFinalBPdcals import semiFinalBPdcals, semiFinalBPdcalsResults
 from pipeline.hifv.tasks.finalcals.finalcals import Finalcals, FinalcalsResults
 from pipeline.hifv.tasks.finalcals.applycals import Applycals
 from pipeline.hifv.tasks.flagging.checkflag import Checkflag, CheckflagResults
 from pipeline.hifv.tasks.flagging.targetflag import Targetflag, TargetflagResults
+from pipeline.hifa.tasks.antpos import ALMAAntpos
+from pipeline.hif.tasks.antpos.antpos import AntposResults
 from pipeline.domain.measurementset import MeasurementSet
 
 LOG = logging.get_logger(__name__)
@@ -571,6 +575,37 @@ class PriorcalsRegressionExtractor(RegressionExtractor):
         return d
 
 
+class ALMAImportDataRegressionExtractor(RegressionExtractor):
+    """
+        Regression test result extractor for hifa_importdata
+
+        The extracted values are:
+           - number of EBs
+        """
+
+    result_cls = ALMAImportDataResults
+    child_cls = None
+    generating_task = ALMAImportData
+
+    def handle(self, result: ALMAImportDataResults) -> OrderedDict:
+        """
+        Extract values for testing.
+
+        Args:
+            result: ALMAImportDataResults object
+
+        Returns:
+            OrderedDict[str, float]
+        """
+        prefix = get_prefix(result, self.generating_task)
+
+        d = OrderedDict()
+
+        d['{}.numEBs'.format(prefix)] = len(result.mses)
+
+        return d
+
+
 class VLASetjyRegressionExtractor(RegressionExtractor):
     """
     Regression test result extractor for hifv_vlasetjy
@@ -960,6 +995,72 @@ class NRORestoredataRegressionExtractor(RegressionExtractor):
 
         return d
 
+class FlagDeterALMARegressionExtractor(RegressionExtractor):
+    """
+    Regression test result extractor for hifa_flagdata.
+
+    The extracted values are:
+        -
+    """
+
+    result_cls = FlagDeterALMAResults
+    child_cls = None
+    generating_task = FlagDeterALMA
+
+    def handle(self, result:FlagDeterALMAResults) -> OrderedDict:
+        """
+        Extract values for testing.
+
+        Args:
+            result: FlagDeterALMAResults object
+        
+        Returns:
+            OrderedDict[str, float]
+        """
+        prefix = get_prefix(result, self.generating_task)
+
+        d = OrderedDict()
+        # Will this work with just the QA and, also, will it just include the one requested metric? 
+
+        qa_entries = extract_qa_score_regression(prefix, result)
+        d.update(qa_entries)
+
+        return d
+
+
+class ALMAAntPosRegressionExtractor(RegressionExtractor):
+    """
+    Regression test result extractor for hifa_antpos
+
+    The extracted values are:
+        -
+    """
+
+    result_cls = AntposResults
+    child_cls = None
+    generating_task = ALMAAntpos
+
+    def handle(self, result:AntposResults) -> OrderedDict:
+        """
+        Extract values for testing.
+
+        Args:
+            result: AntposResults object
+        
+        Returns:
+            OrderedDict[str, float]
+        """
+        prefix = get_prefix(result, self.generating_task)
+
+        d = OrderedDict()
+        # Will this work with just the QA and, also, will it just include the one requested metric? 
+
+        qa_entries = extract_qa_score_regression(prefix, result)
+        d.update(qa_entries)
+
+        return d
+
+
 
 def get_prefix(result:Results, task:StandardTaskTemplate) -> str:
     """
@@ -1017,9 +1118,18 @@ def extract_regression_results(context: Context) -> List[str]:
         String list for logging
     """
     unified = OrderedDict()
+
+    # extract results from results
     for results_proxy in context.results:
         results = results_proxy.read()
         unified = union(unified, registry.handle(results))
+
+    # extract values not stored in typical results objects 
+    #TESTFIRST add #eb to this right here to see if it works. Test on short pltest. 
+#    numEBs = len(context.observing_run.measurement_sets) 
+#    d = OrderedDict()
+#    d['numEB'] = numEBs
+#    unified = union(unified, d)
 
     # return unified
     return ['{}={}'.format(k, v) for k, v in unified.items()]
