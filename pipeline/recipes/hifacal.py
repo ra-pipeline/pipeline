@@ -105,8 +105,8 @@ def hifacal(vislist, importonly=True, dbservice=True, pipelinemode='automatic',
         # Check product size limits and mitigate imaging parameters
         hif_checkproductsize(maxcubesize=40.0, maxcubelimit=60.0, maxproductsize=500.0)
 
-        # Run renormalization assesment without applying correction
-        hifa_renorm(pipelinemode=pipelinemode)
+        # Run renormalization and apply correction
+        hifa_renorm(apply=True, atm_auto_exclude=True)
 
         # Export the data
         hifa_exportdata(pipelinemode=pipelinemode)

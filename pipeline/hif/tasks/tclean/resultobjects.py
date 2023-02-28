@@ -662,6 +662,18 @@ class TcleanResult(basetask.Results):
         self.iterations[iteration]['planeid_array'] = planeid_array
 
     @property
+    # SummaryMinor dictionary from CASA/tclean return, as a function of minor iteration number
+    def summaryminor(self):
+        iters = sorted(self.iterations.keys())
+        if len(iters) > 0:
+            return self.iterations[iters[-1]].get('summaryminor', None)
+        else:
+            return None
+
+    def set_summaryminor(self, iteration, summaryminor):
+        self.iterations[iteration]['summaryminor'] = summaryminor
+
+    @property
     # Total cleaned flux as a function of minor iteration number
     def totalflux_array(self):
         iters = sorted(self.iterations.keys())

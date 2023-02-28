@@ -88,7 +88,7 @@ def percent_flagged(flagsummary):
     flagged = flagsummary.flagged
     total = flagsummary.total
 
-    if total is 0:
+    if total == 0:
         return 'N/A'
     else:
         return '%0.3f%%' % (100.0 * flagged / total)
@@ -98,7 +98,7 @@ def percent_flagged_diff(flagsummary1, flagsummary2):
     flagged2 = flagsummary2.flagged
     total = flagsummary1.total
 
-    if total is 0:
+    if total == 0:
         return 'N/A'
     else:
         return '%0.3f%%' % (100.0 * (flagged2-flagged1) / total)

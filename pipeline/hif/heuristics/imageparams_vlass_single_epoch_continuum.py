@@ -108,7 +108,9 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         if self.vlass_stage == 3:
             return ''
         else:
-            return ['3arcsec']
+            # PIPE-1679: the previous default value of '3arcsec' has been changed to '3/(pi/(4ln(2)))arcsec' 
+            # since CASA ver>=6.5.3 to maintain the beam size consistency due to the math correction from CAS-13260.
+            return ['2.6476arcsec']
 
     def uvrange(self, field=None, spwspec=None) -> tuple:
         """Tclean uvrange parameter heuristics."""
@@ -495,7 +497,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         A threshold of 10x sigma (measured on image) and a pblimit of 0.4 is applied.
         """
         # Only for first imaging stage, restoration with QL mask, and if there is a mask
-        if self.vlass_stage == 1 and iteration == 1 and cleanmask is not '':
+        if self.vlass_stage == 1 and iteration == 1 and cleanmask != '':
             # Check if files exist
             warn_message = '%s does not exist, flux fraction outside mask cannot be computed.'
             if not os.path.exists(image):

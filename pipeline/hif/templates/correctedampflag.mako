@@ -9,7 +9,7 @@ def percent_flagged(flagsummary):
     flagged = flagsummary.flagged
     total = flagsummary.total
 
-    if total is 0:
+    if total == 0:
         return 'N/A'
     else:
         return '%0.1f%%' % (100.0 * flagged / total)

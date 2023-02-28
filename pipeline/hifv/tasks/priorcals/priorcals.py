@@ -198,7 +198,7 @@ def correct_ant_posns(vis_name, print_offsets=False):
     ants = []
     parms = []
     for ant_num_sta in ant_num_stas:
-        if ant_num_sta[3] != 0.0 or ant_num_sta[4] != 0.0 or ant_num_sta[3] != 0.0:
+        if ant_num_sta[3] != 0.0 or ant_num_sta[4] != 0.0 or ant_num_sta[5] != 0.0:
             if print_offsets:
                 LOG.info("Offsets for antenna %4s on pad %3s: %8.5f  %8.5f  %8.5f" %
                          (ant_num_sta[1], ant_num_sta[2], ant_num_sta[3], ant_num_sta[4], ant_num_sta[5]))

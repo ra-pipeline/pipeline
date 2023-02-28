@@ -9,7 +9,7 @@ def get_td_for_percent_flagged(flagsummary, step):
     flagged = flagsummary.flagged
     total = flagsummary.total
 
-    if total is 0:
+    if total == 0:
         return '<td>N/A</td>'
 
     pflagged = (100.0 * flagged / total)

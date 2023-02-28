@@ -47,7 +47,7 @@ class SetjyInputs(vdp.StandardInputs):
         # hard-coded as the default value in the task interface return the
         # default tuple which is composed of the reference frequency, the
         # Stokes fluxdensity and the spectral index
-        if self.fluxdensity is not -1:
+        if self.fluxdensity != -1:
             return self.reffreq, self.fluxdensity, self.spix
 
         # There is no ms object.
@@ -151,12 +151,11 @@ class SetjyInputs(vdp.StandardInputs):
                     LOG.debug('Ignoring records from file for solar system calibrator')
                     flux = (reffreq, -1, 0.0)
 
-                flux_by_spw.append(flux[0] if len(flux) is 1 else flux)
+                flux_by_spw.append(flux[0] if len(flux) == 1 else flux)
 
-            field_flux.append(flux_by_spw[0] if len(flux_by_spw) is 1 
-                              else flux_by_spw)
+            field_flux.append(flux_by_spw[0] if len(flux_by_spw) == 1 else flux_by_spw)
 
-        return field_flux[0] if len(field_flux) is 1 else field_flux
+        return field_flux[0] if len(field_flux) == 1 else field_flux
 
     @vdp.VisDependentProperty
     def reffile(self):
@@ -181,13 +180,13 @@ class SetjyInputs(vdp.StandardInputs):
         for field in utils.safe_split(self.field):
             if str(field).isdigit():
                 matching_fields = self.ms.get_fields(field)
-                assert len(matching_fields) is 1
+                assert len(matching_fields) == 1
                 field_names.append(matching_fields[0].name)
             else:
                 field_names.append(field)
 
         standards = [heu_standard(field) for field in field_names]
-        return standards[0] if len(standards) is 1 else standards
+        return standards[0] if len(standards) == 1 else standards
 
     def __init__(self, context, output_dir=None, vis=None,
                  field=None, intent=None, spw=None,
@@ -282,7 +281,7 @@ class Setjy(basetask.StandardTaskTemplate):
             if field_name.isdigit():
                 field_is_unique = False
             else: 
-                field_is_unique = True if len(fields) is 1 else False
+                field_is_unique = True if len(fields) == 1 else False
 
             for field in fields:
 
@@ -323,7 +322,7 @@ class Setjy(basetask.StandardTaskTemplate):
                     # Flux densities coming from a non-lookup are added to the
                     # results so that user-provided calibrator fluxes are
                     # committed back to the domain objects
-                    if inputs.refspectra[1] is not -1:
+                    if inputs.refspectra[1] != -1:
                         try:
                             (I, Q, U, V) = inputs.refspectra[1]
                             spix = decimal.Decimal(str(inputs.refspectra[2]))

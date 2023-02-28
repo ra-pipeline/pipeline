@@ -2,8 +2,8 @@ import abc
 import os
 import pickle
 import tempfile
+from inspect import signature
 
-from pipeline.extern.asizeof import asizeof
 from pipeline.domain.unitformat import file_size
 
 try:
@@ -21,6 +21,7 @@ except ImportError:
 
 from pipeline.infrastructure import exceptions
 from pipeline.infrastructure import logging
+from pipeline.infrastructure.utils import get_obj_size
 
 # global variable for toggling MPI usage
 USE_MPI = True
@@ -41,7 +42,7 @@ class AsyncTask(object):
         :return: an AsyncTask object
         """
         LOG.debug('pushing tier0executable {} from the client: {}'.format(
-            executable, file_size.format(asizeof(executable))))
+            executable, file_size.format(get_obj_size(executable))))
         self.__pid = mpiclient.push_command_request(
             'pipeline.infrastructure.mpihelpers.mpiexec(tier0_executable)',
             block=False,
@@ -282,9 +283,8 @@ class Tier0FunctionCall(object):
         self.__kwargs = kwargs
 
         # the following code is used to get a nice repr format
-        code = fn.__code__
-        arg_count = code.co_argcount
-        arg_names = code.co_varnames[:arg_count]
+        arg_names = list(signature(fn).parameters)
+        arg_count = len(arg_names)
 
         def format_arg_value(arg_val):
             arg, val = arg_val

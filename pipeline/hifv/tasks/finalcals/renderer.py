@@ -480,7 +480,7 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
 
             # give the sole science target name if there's only one science target
             # in this ms.
-            if len(fields) is 1:
+            if len(fields) == 1:
                 LOG.info('Only one %s target for Source #%s. Bypassing '
                          'brightest target selection.', intent, source_id)
                 result[source_id] = fields[0]

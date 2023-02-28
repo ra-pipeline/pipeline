@@ -214,7 +214,7 @@ def score_kspw(context, result):
             LOG.warning('Cannot calculate internal spw-spw consistency for {} ({}): no catalogue measurement for '
                         'highest SNR spw ({})'.format(msg_fieldname, msg_intents, highest_snr_measurement.spw_id))
             continue
-        assert (len(catalogue_fluxes) is 1)
+        assert (len(catalogue_fluxes) == 1)
         catalogue_flux = catalogue_fluxes[0]
 
         # r_snr = ratio of derived flux to catalogue flux for highest SNR spw
@@ -232,7 +232,7 @@ def score_kspw(context, result):
             if not catalogue_fluxes:
                 LOG.info('No catalogue measurement for {} ({}) spw {}'.format(msg_fieldname, msg_intents, m.spw_id))
                 continue
-            assert (len(catalogue_fluxes) is 1)
+            assert (len(catalogue_fluxes) == 1)
             catalogue_flux = catalogue_fluxes[0]
             r_spw = m.I.to_units(FluxDensityUnits.JANSKY) / catalogue_flux.I.to_units(FluxDensityUnits.JANSKY)
             k_spw = r_spw / r_snr

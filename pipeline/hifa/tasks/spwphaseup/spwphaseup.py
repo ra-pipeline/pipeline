@@ -9,6 +9,7 @@ import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
+from pipeline.h.tasks.common import commonhelpermethods
 from pipeline.domain.measurementset import MeasurementSet
 from pipeline.hif.tasks.gaincal import gtypegaincal
 from pipeline.hif.tasks.gaincal.common import GaincalResults
@@ -147,7 +148,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
 
         # Compute what SNR is achieved for PHASE fields after the SpW phase-up
         # correction.
-        snr_info = self._compute_median_snr(diag_phase_results, spwmaps)
+        snr_info = self._compute_median_snr(diag_phase_results)
 
         # Do the decoherence assessment
         phaserms_qa, phaserms_results, phaserms_cycletime, phaserms_totaltime, phaserms_antout \
@@ -686,8 +687,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
 
         return gaincal_results
 
-    def _compute_median_snr(self, gaincal_results: List[GaincalResults], spwmaps: Dict[IntentField, SpwMapping])\
-            -> Dict[Tuple[str, str, str], float]:
+    def _compute_median_snr(self, gaincal_results: List[GaincalResults]) -> Dict[Tuple[str, str, str], float]:
         """
         This method evaluates the diagnostic phase caltable(s) produced in an
         earlier step to compute the median achieved SNR for each phase calibrator /
@@ -696,8 +696,6 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         Args:
             gaincal_results: List of gaincal worker task results representing
                 the diagnostic phase caltable(s).
-            spwmaps: dictionary with (Intent, Field) combinations as keys and
-                corresponding spectral window mapping as values.
 
         Returns:
             Dictionary with intent, field name, and SpW as keys, and
@@ -714,9 +712,6 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             field = result.inputs['field']
             intent = result.inputs['intent']
 
-            # Get SpW mapping info for current intent and field.
-            spwmapping = spwmaps.get((intent, field), None)
-
             # Get SpWs and SNR info from caltable.
             with casa_tools.TableReader(caltable) as table:
                 spws = table.getcol("SPECTRAL_WINDOW_ID")
@@ -724,17 +719,24 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
 
             # Evaluate each unique SpW separately.
             for spw in sorted(set(spws)):
-                # Compute median achieved SNR and store in snr_info.
-                snr_info[(intent, field, spw)] = numpy.median(snrs[:, 0, numpy.where(spws == spw)[0]])
+                # Get indices in caltable data corresponding to current SpW.
+                ind_spw = numpy.where(spws == spw)[0]
 
-                # If SpW mapping info exists for the current intent and field
-                # and the current SpW is not be mapped to itself, then continue
-                # with the next SpW. Otherwise, check whether to log a warning
-                # for low SNR. Note: if the SpW map is empty, that means by
-                # default that each SpW is mapped to itself, i.e. reason enough
-                # to skip.
-                if spwmapping and spwmapping.spwmap and spwmapping.spwmap[spw] != spw:
-                    continue
+                # Get number of correlations for this SpW.
+                corr_type = commonhelpermethods.get_corr_products(inputs.ms, spw)
+                ncorrs = len(corr_type)
+
+                # Compute median achieved SNR and store in snr_info. If this
+                # SpW covers a single polarisation, then compute the median SNR
+                # using only the one corresponding column in the caltable.
+                if ncorrs == 1:
+                    # Identify which column in caltable to use for computing
+                    # the median SNR.
+                    ind_col = commonhelpermethods.get_pol_id(inputs.ms, spw, corr_type[0])
+                    snr_info[(intent, field, spw)] = numpy.median(snrs[ind_col, 0, ind_spw])
+                # Otherwise, i.e. SpW is multi-pol, use all columns.
+                else:
+                    snr_info[(intent, field, spw)] = numpy.median(snrs[:, 0, ind_spw])
 
         return snr_info
 

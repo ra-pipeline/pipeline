@@ -35,6 +35,8 @@ from pipeline.infrastructure.utils import absolute_path
 from pipeline.h.tasks.exportdata.aqua import export_to_disk as aqua_export_to_disk
 import pipeline.infrastructure.project as project
 from pipeline.infrastructure import task_registry
+from pipeline.hsd.tasks.importdata.importdata import SDImportDataResults
+from pipeline.hsd.tasks.restoredata.restoredata import SDRestoreDataResults
 from . import almasdaqua
 
 # the logger for this module
@@ -521,12 +523,40 @@ class SDExportData(exportdata.ExportData):
                 filename, filext = os.path.splitext(filename)
             tmpvislist.append(filename)
         restore_task_name = 'hsd_restoredata'
+        hm_rasterscan = self._get_hm_rasterscan_value(context)
         args = collections.OrderedDict(vis=tmpvislist, session=session_list,
-                                       ocorr_mode='ao')
+                                       ocorr_mode='ao', hm_rasterscan=hm_rasterscan)
         return self._export_casa_restore_script_template(context, script_name,
                                                          products_dir, oussid,
                                                          restore_task_name,
                                                          args)
+
+    def _get_hm_rasterscan_value(self, context: Context) -> str:
+        """Retrieve hm_rasterscan value from Results object.
+
+        This method checks if either SDImportDataResults or
+        SDRestoreDataResults object is registered to Pipeline context.
+        If exists, hm_rasterscan value is retrieved from the results
+        object. If no SDImportDataResults nor SDRestoreDataResults
+        object is registered, 'time' will be returned.
+
+        Args:
+            context: Pipeline context
+
+        Returns:
+            The hm_rasterscan value.
+        """
+        results_filter = filter(
+            lambda x: isinstance(x, basetask.ResultsList) and isinstance(x[0], (SDImportDataResults, SDRestoreDataResults)),
+            map(lambda x: x.read(), context.results)
+        )
+        importdata_results = next(results_filter, None)
+        if importdata_results:
+            hm_rasterscan = importdata_results.inputs.get('hm_rasterscan', 'time')
+        else:
+            hm_rasterscan = 'time'
+
+        return hm_rasterscan
 
     def _export_casa_restore_script_template(self, context: Context,
                                              script_name: str,

@@ -39,6 +39,8 @@ class MakeImListInputs(vdp.StandardInputs):
     calcsb = vdp.VisDependentProperty(default=False)
     datacolumn = vdp.VisDependentProperty(default='')
     parallel = vdp.VisDependentProperty(default='automatic')
+    robust = vdp.VisDependentProperty(default=None)
+    uvtaper = vdp.VisDependentProperty(default=None)
 
     # properties requiring some processing or MS-dependent logic -------------------------------------------------------
 

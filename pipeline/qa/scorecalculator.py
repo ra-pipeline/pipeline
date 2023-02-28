@@ -356,7 +356,7 @@ def score_ms_history_entries_present(all_mses, mses_with_history):
         # log a message like 'Entries were found in the HISTORY table for
         # a.ms and b.ms'
         basenames = utils.commafy([ms.basename for ms in mses_with_history], quotes=False)
-        if len(mses_with_history) is 1:
+        if len(mses_with_history) == 1:
             longmsg = ('Unexpected entries were found in the HISTORY table of %s. '
                        'This measurement set may already be processed.' % basenames)
         else:
@@ -3244,13 +3244,13 @@ def score_fluxservice(result):
         return pqa.QAScore(score, longmsg=msg, shortmsg=msg, origin=origin)
     elif result.inputs['dbservice'] is True:
         msg = ""
-        if result.fluxservice is 'FIRSTURL':
+        if result.fluxservice == 'FIRSTURL':
             msg += "Flux catalog service used.  "
             score = 1.0
-        elif result.fluxservice is 'BACKUPURL':
+        elif result.fluxservice == 'BACKUPURL':
             msg += "Backup flux catalog service used.  "
             score = 0.9
-        elif result.fluxservice is 'FAIL':
+        elif result.fluxservice == 'FAIL':
             msg += "Neither primary or backup flux service could be queried.  ASDM values used."
             score = 0.3
 

@@ -371,7 +371,7 @@ class Plot(object):
         try:
             with open(os.devnull, 'w') as dev_null:
                 ret = subprocess.call(cmd, stdout=dev_null, stderr=dev_null)
-            if ret is 0:
+            if ret == 0:
                 # return code is 0: thumbnail file successfully created
                 return thumb_file
             else:

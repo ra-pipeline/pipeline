@@ -100,7 +100,9 @@ class TecMaps(basetask.StandardTaskTemplate):
             try:
                 tec_image, tec_rms_image, tec_plotfile = tec_maps.create(vis=inputs.vis, doplot=True, imname='iono')
             except UnboundLocalError as e:
-                LOG.warning("TEC Maps error returned. CASA {!s}".format(e))
+                LOG.warning("TEC information or retrieval service is unavailable")
+                LOG.warning("    CASA error: {!s}".format(e))
+
                 return TecMapsResults(pool=callist, final=callist, tec_image=None,
                                       tec_rms_image=None, tec_plotfile=None)
 

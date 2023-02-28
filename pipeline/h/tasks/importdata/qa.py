@@ -136,7 +136,7 @@ class ImportDataQAHandler(pqa.QAPlugin):
 
             for intent in bad_scans:
                 scan_ids = [scan.id for scan in bad_scans[intent]]
-                multi = False if len(scan_ids) is 1 else True
+                multi = False if len(scan_ids) == 1 else True
                 # log something like 'More than 12% of PHASE scans 1, 2, and 7 
                 # in vla.ms are flagged'
                 LOG.warning('More than %s%% of %s scan%s %s in %s %s flagged'

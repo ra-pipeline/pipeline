@@ -319,7 +319,7 @@ class CleanBase(basetask.StandardTaskTemplate):
             'niter':         inputs.niter,
             'threshold':     inputs.threshold,
             'deconvolver':   inputs.deconvolver,
-            'interactive':   0,
+            'interactive':   False,
             'nchan':         inputs.nchan,
             'start':         inputs.start,
             'width':         inputs.width,
@@ -336,8 +336,9 @@ class CleanBase(basetask.StandardTaskTemplate):
             'perchanweightdensity':  inputs.hm_perchanweightdensity,
             'npixels':    inputs.hm_npixels,
             'parallel':     parallel,
-            'wbawp':        inputs.wbawp
-            }
+            'wbawp':        inputs.wbawp,
+            'fullsummary':   True
+        }
 
         # Set special phasecenter and outframe for ephemeris objects.
         # Needs to be done here since the explicit coordinates are
@@ -548,6 +549,10 @@ class CleanBase(basetask.StandardTaskTemplate):
         # process is no longer needed (PIPE-980). See removed code at:
         # https://open-bitbucket.nrao.edu/projects/PIPE/repos/pipeline/browse/pipeline/hif/tasks/tclean/cleanbase.py?at=15e495a29d0bfc93892c65eceb660d61a1805790#521
 
+        # PIPE-1672: use fullsummary=False for cube imaging to avoid potential MPIbuffer-related issues.
+        if 'cube' in tclean_job_parameters['specmode']:
+            tclean_job_parameters['fullsummary'] = False
+
         job = casa_tasks.tclean(**tclean_job_parameters)
         tclean_result = self._executor.execute(job)
 
@@ -556,26 +561,50 @@ class CleanBase(basetask.StandardTaskTemplate):
 
         tclean_stopcode_ignore = inputs.heuristics.tclean_stopcode_ignore(iter, inputs.hm_masking)
         if inputs.niter > 0:
+
             tclean_stopcode = tclean_result['stopcode']
             tclean_iterdone = tclean_result['iterdone']
             tclean_niter = tclean_result['niter']
             tclean_nmajordone = tclean_result['nmajordone']
+            result.set_tclean_stopcode(tclean_stopcode)
+            result.set_tclean_stopreason(tclean_stopcode)
+            result.set_tclean_iterdone(tclean_iterdone)
+            result.set_nmajordone(iter, tclean_nmajordone)
 
-            # Note: The return structure of tclean_result['summaryminor'] will change after CAS-6692 and
-            # the code block below is subjected to change after CASA ver >= 6.4.4.
-            # Before CAS-6692, for the tclean_result['summaryminor'] 2D array with 6 rows,
-            #   0 : iteration number
-            #   1 : peak residual
-            #   2 : model flux
-            #   3 : cyclethreshold
-            #   4 : deconvolver id (for multi-field)
-            #   5 : subimage id (channel id, stokes id..)
-            # see https://open-jira.nrao.edu/browse/CAS-6692?focusedCommentId=60810&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-60810
+            # The return structure of tclean_result['summaryminor'] has changed after CAS-6692 (CASA ver>=6.5).
+            # Before CAS-6692, tclean_result['summaryminor'] is a 2D array with 6 rows,
+            #   idx=0 : iteration number
+            #   idx=1 : peak residual
+            #   idx=2 : model flux
+            #   idx=3 : cyclethreshold
+            #   idx=4 : deconvolver id (for multi-field)
+            #   idx=5 : subimage id (related to channel id, stokes id..)
+            # https://open-jira.nrao.edu/browse/CAS-6692?focusedCommentId=60810&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-60810
+            # note that the subimage id (also called planeid or chunckid here) is formulated as:
+            #   chunkid = chanid+polid*nSubChans
+            # which can be obscure and depending on the MPI setup:
+            # https://open-jira.nrao.edu/browse/CAS-6692?focusedCommentId=190256&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-190256
+            #
+            # After CAS-6692, tclean_result['summaryminor'] is described in details on the latest CASAdocs:
+            # https://casadocs.readthedocs.io/en/latest/notebooks/synthesis_imaging.html#Returned-Dictionary
+            #
+            # Also see the comparison from one practical example:
+            # https://open-jira.nrao.edu/browse/CAS-6692?focusedCommentId=190220&page=com.atlassian.jira.plugin.system.issuetabpanels%3Acomment-tabpanel#comment-190220
 
-            tclean_nminordone = tclean_result['summaryminor'][0, :]
-            tclean_peakresidual = tclean_result['summaryminor'][1, :]
-            tclean_totalflux = tclean_result['summaryminor'][2, :]
-            tclean_planeid = tclean_result['summaryminor'][5, :]
+            if isinstance(tclean_result['summaryminor'], dict):
+                # after CAS-6692
+                tclean_summaryminor = tclean_result['summaryminor']
+                result.set_summaryminor(iter, tclean_summaryminor)
+            else:
+                # before CAS-6692
+                tclean_nminordone = tclean_result['summaryminor'][0, :]
+                tclean_peakresidual = tclean_result['summaryminor'][1, :]
+                tclean_totalflux = tclean_result['summaryminor'][2, :]
+                tclean_planeid = tclean_result['summaryminor'][5, :]
+                result.set_nminordone_array(iter, tclean_nminordone)
+                result.set_peakresidual_array(iter, tclean_peakresidual)
+                result.set_totalflux_array(iter, tclean_totalflux)
+                result.set_planeid_array(iter, tclean_planeid)
 
             LOG.info('tclean used %d iterations' % tclean_iterdone)
 
@@ -586,24 +615,19 @@ class CleanBase(basetask.StandardTaskTemplate):
             if tclean_stopcode == 1:
                 result.error = CleanBaseError('tclean reached niter limit. Field: %s SPW: %s' %
                                               (inputs.field, inputs.spw), 'Reached niter limit')
-                LOG.log(logging.INFO if tclean_stopcode in tclean_stopcode_ignore else logging.WARNING,
-                        'tclean reached niter limit of {} for {} / spw{} / iter{} !'.format(tclean_niter, utils.dequote(inputs.field), inputs.spw, iter))
-
-            result.set_tclean_stopcode(tclean_stopcode)
-            result.set_tclean_stopreason(tclean_stopcode)
-            result.set_tclean_iterdone(tclean_iterdone)
-            result.set_nmajordone(iter, tclean_nmajordone)
-            result.set_nminordone_array(iter, tclean_nminordone)
-            result.set_peakresidual_array(iter, tclean_peakresidual)
-            result.set_totalflux_array(iter, tclean_totalflux)
-            result.set_planeid_array(iter, tclean_planeid)            
+                LOG.log(
+                    logging.INFO if tclean_stopcode in tclean_stopcode_ignore else logging.WARNING,
+                    'tclean reached niter limit of {} for {} / spw{} / iter{} !'.format(
+                        tclean_niter, utils.dequote(inputs.field),
+                        inputs.spw, iter))
 
             if tclean_stopcode in [5, 6]:
                 result.error = CleanBaseError('tclean stopped to prevent divergence (stop code %d). Field: %s SPW: %s' %
                                               (tclean_stopcode, inputs.field, inputs.spw),
                                               'tclean stopped to prevent divergence.')
                 LOG.log(logging.INFO if tclean_stopcode in tclean_stopcode_ignore else logging.WARNING,
-                        'tclean stopped to prevent divergence (stop code {}). Field: {} SPW: {} iter{} !'.format(tclean_stopcode, inputs.field, inputs.spw, iter))
+                        'tclean stopped to prevent divergence (stop code {}). Field: {} SPW: {} iter{} !'.format(
+                            tclean_stopcode, inputs.field, inputs.spw, iter))
 
         # Collect images to be examined and stored in TcleanResult
         im_names = {}

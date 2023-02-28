@@ -99,7 +99,7 @@ class AntennaArray(object):
                                               measures.DistanceUnits.METRE)
             baselines.append(Baseline(ant1, ant2, domain_length))
 
-        if len(baselines) is 0:
+        if len(baselines) == 0:
             zero_length = measures.Distance(0.0,
                                             measures.DistanceUnits.METRE)
             baselines.append(Baseline(self.antennas[0], self.antennas[0], zero_length))

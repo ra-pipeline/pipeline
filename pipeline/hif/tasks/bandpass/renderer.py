@@ -192,7 +192,7 @@ class T2_4MDetailsBandpassRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                            for dt in utils.get_intervals(context, calapp)]
                 solint = 'Per integration (%s)' % utils.commafy(in_secs, quotes=False, conjunction='or')
 
-            assert(len(calapp.origin) is 1)
+            assert(len(calapp.origin) == 1)
             origin = calapp.origin[0]
             calmode = origin.inputs.get('calmode', 'N/A')
             calmode = calmode_map.get(calmode, calmode)
@@ -277,7 +277,7 @@ class BaseBandpassPlotRenderer(basetemplates.JsonPlotRenderer):
             return
 
         antennas = ms.get_antenna(plot.parameters['ant'])
-        assert len(antennas) is 1, 'plot antennas != 1'
+        assert len(antennas) == 1, 'plot antennas != 1'
         antenna = antennas[0]
 
         num_pols = self._num_pols[vis]

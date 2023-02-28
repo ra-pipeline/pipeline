@@ -174,7 +174,7 @@ class TsyscalPlotRenderer(basetemplates.JsonPlotRenderer):
 def create_url_fn(root, plots):
     vis_set = {p.parameters['vis'] for p in plots}
 
-    if len(vis_set) is 1:
+    if len(vis_set) == 1:
         return lambda x: filenamer.sanitize('%s-%s.html' % (root, x))
     else:
         return lambda x: filenamer.sanitize('%s-all_data.html' % root)

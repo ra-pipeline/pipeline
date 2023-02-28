@@ -12,9 +12,12 @@ from xml.etree.ElementTree import Element
 import pipeline.h.tasks.exportdata.exportdata as exportdata
 import pipeline.hsd.tasks.exportdata.exportdata as sdexportdata
 import pipeline.infrastructure as infrastructure
+import pipeline.infrastructure.basetask as basetask
 from pipeline.infrastructure import task_registry
 from pipeline.infrastructure.launcher import Context
 from pipeline.infrastructure.project import ProjectStructure
+from pipeline.hsdn.tasks.importdata.importdata import NROImportDataResults
+from pipeline.hsdn.tasks.restoredata.restoredata import NRORestoreDataResults
 from . import manifest
 from . import nrotemplategenerator
 
@@ -24,7 +27,7 @@ LOG = infrastructure.get_logger(__name__)
 
 class NROPipelineNameBuilder(exportdata.PipelineProductNameBuilder):
     """Name(str) building utility methods class for NRO Pipeline.
-    
+
     Methods in this class overrides those in PipelineProductNameBuilder and
     constructs names (paths) of products in the absence of valid OUS status ID
     nor session name in Nobeyama datasets."""
@@ -211,9 +214,38 @@ class NROExportData(sdexportdata.SDExportData):
         """
         tmpvislist = list(map(os.path.basename, vislist))
         restore_task_name = 'hsdn_restoredata'
+        hm_rasterscan = self._get_hm_rasterscan_value(context)
         args = collections.OrderedDict(vis=tmpvislist,
-                                       reffile='./nroscalefile.csv')
+                                       reffile='./nroscalefile.csv',
+                                       hm_rasterscan=hm_rasterscan)
         return self._export_casa_restore_script_template(context, script_name,
                                                          products_dir, oussid,
                                                          restore_task_name,
                                                          args)
+
+    def _get_hm_rasterscan_value(self, context: Context) -> str:
+        """Retrieve hm_rasterscan value from Results object.
+
+        This method checks if either NROImportDataResults or
+        NRORestoreDataResults object is registered to Pipeline context.
+        If exists, hm_rasterscan value is retrieved from the results
+        object. If no NROImportDataResults nor NRORestoreDataResults
+        object is registered, 'time' will be returned.
+
+        Args:
+            context: Pipeline context
+
+        Returns:
+            The hm_rasterscan value.
+        """
+        results_filter = filter(
+            lambda x: isinstance(x, basetask.ResultsList) and isinstance(x[0], (NROImportDataResults, NRORestoreDataResults)),
+            map(lambda x: x.read(), context.results)
+        )
+        importdata_results = next(results_filter, None)
+        if importdata_results:
+            hm_rasterscan = importdata_results.inputs.get('hm_rasterscan', 'time')
+        else:
+            hm_rasterscan = 'time'
+
+        return hm_rasterscan

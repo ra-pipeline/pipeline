@@ -1,11 +1,11 @@
 """Renderer for hsd_atmcor stage."""
 import collections
 import glob
-import itertools
 import os
 import re
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Generator, List, Tuple
 
+import pipeline.infrastructure.casa_tools as casa_tools
 import pipeline.infrastructure.filenamer as filenamer
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
@@ -132,6 +132,24 @@ def identify_heuristics_plots(stage_dir: str, results: 'SDATMCorrectionResults')
     return heuristics_plots
 
 
+def iterate_field_spw(vis: str, field_id_list: List[int], spw_id_list: List[int]) -> Generator[Tuple[int, int], None, None]:
+    """Yields valid pair of field_id and spw_id.
+
+    Args:
+        vis: Name of MS
+        field_id_list: List of field ids
+        spw_id_list: List of spw ids
+
+    Yields:
+        valid (field_id, spw_id) pair
+    """
+    with casa_tools.MSMDReader(vis) as msmd:
+        for spw_id in spw_id_list:
+            fields = set(msmd.fieldsforspw(spw_id))
+            for field_id in fields.intersection(field_id_list):
+                yield field_id, spw_id
+
+
 class SDATMCorrHeuristicsDetailPlotRenderer(basetemplates.JsonPlotRenderer):
     """Renderer class for ATM heuristics detail plots."""
 
@@ -222,7 +240,7 @@ class T2_4MDetailsSingleDishATMCorRenderer(basetemplates.T2_4MDetailsDefaultRend
                 atmtype=r.task_args['atmtype'], output_dir=stage_dir
             )
             summaries = collections.OrderedDict()
-            for field_id, spw_id in itertools.product(field_ids, selected_spws):
+            for field_id, spw_id in iterate_field_spw(vis, field_ids, selected_spws):
                 LOG.info(f'field {field_id} spw {spw_id}')
                 spw = str(spw_id)
                 plotter.set_field(field_id)

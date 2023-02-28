@@ -43,7 +43,7 @@ def get_task_description(result_obj, context, include_stage=True):
     if not isinstance(result_obj, (list, basetask.ResultsList)):
         return get_task_description([result_obj, ], context)
 
-    if len(result_obj) is 0:
+    if len(result_obj) == 0:
         msg = 'Cannot get description for zero-length results list'
         LOG.error(msg)
         return msg
@@ -153,7 +153,7 @@ def get_task_name(result_obj, include_stage=True):
         if not isinstance(result_obj, (list, basetask.ResultsList)):
             return get_task_name([result_obj, ])
 
-        if len(result_obj) is 0:
+        if len(result_obj) == 0:
             msg = 'Cannot get task name for zero-length results list'
             LOG.error(msg)
             return msg
@@ -196,7 +196,7 @@ def get_stage_number(result_obj):
     if not isinstance(result_obj, collections.Iterable):
         return get_stage_number([result_obj, ])
 
-    if len(result_obj) is 0:
+    if len(result_obj) == 0:
         msg = 'Cannot get stage number for zero-length results list'
         LOG.error(msg)
         return msg
@@ -2031,7 +2031,7 @@ def get_results_by_time(context, resultslist):
     # as this is a ResultsList with important properties attached, results
     # should be sorted in place.
     if hasattr(resultslist, 'sort'):
-        if len(resultslist) is not 1:
+        if len(resultslist) != 1:
             try:
                 # sort the list of results by the MS start time
                 resultslist.sort(key=lambda r: get_ms_start_time_for_result(context, r))

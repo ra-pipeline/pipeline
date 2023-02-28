@@ -206,14 +206,14 @@ class ImageParamsHeuristics(object):
             ms = self.observing_run.get_ms(name=vis)
             fields = ms.fields
 
-            if intent.strip() is not '':
+            if intent.strip() != '':
                 for eachintent in intent_list:
                     re_intent = eachintent.replace('*', '.*')
                     field_intent_result.update(
                         [(fld.name, eachintent) for fld in fields if
                          re.search(pattern=re_intent, string=str(fld.intents))])
 
-                if field.strip() is not '':
+                if field.strip() != '':
                     # remove items from field_intent_result that are not
                     # consistent with the fields in field_list
                     temp_result = set()
@@ -223,7 +223,7 @@ class ImageParamsHeuristics(object):
                     field_intent_result = temp_result
 
             else:
-                if field.strip() is not '':
+                if field.strip() != '':
                     for f in field_list:
                         fintents_list = [fld.intents for fld in fields if utils.dequote(fld.name) == utils.dequote(f)]
                         for fintents in fintents_list:

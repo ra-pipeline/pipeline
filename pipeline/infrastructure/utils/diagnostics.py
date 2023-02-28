@@ -47,15 +47,15 @@ def enable_memstats():
                     str(shared), str(total)))
 
             vm_accuracy = ps_mem.shared_val_accuracy()
-            if vm_accuracy is -1:
+            if vm_accuracy == -1:
                 LOG.warning("Shared memory is not reported by this system. "
                             "Values reported will be too large, and totals "
                             "are not reported")
-            elif vm_accuracy is 0:
+            elif vm_accuracy == 0:
                 LOG.warning("Shared memory is not reported accurately by "
                             "this system. Values reported could be too "
                             "large, and totals are not reported.")
-            elif vm_accuracy is 1:
+            elif vm_accuracy == 1:
                 LOG.warning("Shared memory is slightly over-estimated by "
                             "this system for each program, so totals are "
                             "not reported.")

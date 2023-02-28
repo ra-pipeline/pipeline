@@ -170,7 +170,7 @@ class CalApplication(object):
                 list of strings
         """
         l = [cf.calwt for cf in self.calfrom]
-        return l[0] if len(l) is 1 else l
+        return l[0] if len(l) == 1 else l
 
     def exists(self):
         """
@@ -201,7 +201,7 @@ class CalApplication(object):
                 list of strings
         """
         l = [cf.gainfield for cf in self.calfrom]
-        return l[0] if len(l) is 1 else l
+        return l[0] if len(l) == 1 else l
 
     @property
     def gaintable(self):
@@ -212,7 +212,7 @@ class CalApplication(object):
                 list of strings
         """
         l = [cf.gaintable for cf in self.calfrom]
-        return l[0] if len(l) is 1 else l
+        return l[0] if len(l) == 1 else l
 
     @property
     def intent(self):
@@ -232,7 +232,7 @@ class CalApplication(object):
                 list of strings
         """
         l = [cf.interp for cf in self.calfrom]
-        return l[0] if len(l) is 1 else l
+        return l[0] if len(l) == 1 else l
 
     @property
     def spw(self):
@@ -253,7 +253,7 @@ class CalApplication(object):
         """
         # convert tuples back into lists for the CASA argument
         l = [list(cf.spwmap) for cf in self.calfrom]
-        return l[0] if len(l) is 1 else l
+        return l[0] if len(l) == 1 else l
 
     @property
     def vis(self):
@@ -802,8 +802,7 @@ class DictCalState(collections.defaultdict):
                   for (ct_tuple, cf_list) in utils.flatten_dict(self))
 
         if hide_empty:
-            return ((ct_tuple, cf_list) for ct_tuple, cf_list in active
-                    if len(cf_list) is not 0)
+            return ((ct_tuple, cf_list) for ct_tuple, cf_list in active if len(cf_list) != 0)
 
         return active
 
@@ -1054,9 +1053,9 @@ sequence_to_range = lambda l: (l[0], l[-1] + 1)
 def sequence_to_casa_range(seq):
     def as_casa_range(seq):
         size = len(seq)
-        if size is 0:
+        if size == 0:
             return ''
-        elif size is 1:
+        elif size == 1:
             return '{}'.format(seq[0])
         else:
             return '{}~{}'.format(seq[0], seq[-1])
@@ -2035,7 +2034,7 @@ def fix_cycle0_data_selection(context, calstate):
             final_calstate += IntervalCalState.from_calapplication(context, calto, calfroms)
             continue
 
-        if calto.intent is not '':
+        if calto.intent != '':
             fields_with_intent = ms.get_fields(task_arg=calto.field, intent=calto.intent)
             field_names = {f.name for f in fields_with_intent}
 

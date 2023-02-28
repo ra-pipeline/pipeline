@@ -340,7 +340,7 @@ class FindCont(basetask.StandardTaskTemplate):
                                             phasecenter=phasecenter, stokes='I', weighting=weighting,
                                             robust=robust, uvtaper=uvtaper, npixels=0, restoration=False,
                                             restoringbeam=[], pbcor=False, usepointing=usepointing,
-                                            savemodel='none', parallel=parallel)
+                                            savemodel='none', parallel=parallel, fullsummary=False)
                     self._executor.execute(job)
 
                     # Try detecting continuum frequency ranges

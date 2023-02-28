@@ -834,9 +834,9 @@ class PhaseVsBaselineData(object):
     def __init__(self, data, ms, corr_id, refant_id):
         # While it is possible to do so, we shouldn't calculate statistics for
         # mixed antennas/spws/scans.
-        if len(set(data.antenna)) is 0:
+        if len(set(data.antenna)) == 0:
             raise ValueError('No antennas defined in data selection')
-        if len(set(data.spw)) is 0:
+        if len(set(data.spw)) == 0:
             raise ValueError('No spw defined in data selection')
         if len(set(data.antenna)) > 1:
             raise ValueError('Data slice contains multiple antennas. Got %s' % data.antenna)
@@ -852,7 +852,7 @@ class PhaseVsBaselineData(object):
 
         self._cache = cachetools.LRUCache(maxsize=100)
 
-        if len(self.data_for_corr) is 0:
+        if len(self.data_for_corr) == 0:
             raise ValueError('No data for spw %s ant %s scan %s' % (data.spw[0],
                                                                     data.antenna[0],
                                                                     data.scan))

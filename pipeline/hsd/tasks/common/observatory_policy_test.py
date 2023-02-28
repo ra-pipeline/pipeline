@@ -43,6 +43,12 @@ def test_alma_imaging_policy():
     margin = policy_cls.get_image_margin()
     assert margin == 10
 
+    conv1d = policy_cls.get_conv1d()
+    assert conv1d == 0.3954
+
+    conv2d = policy_cls.get_conv2d()
+    assert conv2d == 0.1597
+
 
 def test_nro_imaging_policy():
     """Test NRO imaging policy.
@@ -60,3 +66,9 @@ def test_nro_imaging_policy():
 
     margin = policy_cls.get_image_margin()
     assert margin == 0
+
+    conv1d = policy_cls.get_conv1d()
+    assert conv1d == 0.5592
+
+    conv2d = policy_cls.get_conv2d()
+    assert conv2d == 0.3193

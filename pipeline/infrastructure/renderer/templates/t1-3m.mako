@@ -4,7 +4,6 @@ import pipeline.infrastructure.renderer.htmlrenderer as hr
 import pipeline.infrastructure.renderer.rendererutils as rendererutils
 import pipeline.infrastructure.pipelineqa as pipelineqa
 import pipeline.domain.measures as measures
-import pipeline.extern.asizeof as asizeof
 import pipeline.infrastructure.logging as logging
 import math
 

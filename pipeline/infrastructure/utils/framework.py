@@ -58,7 +58,7 @@ def is_top_level_task():
             not mpihelpers.MPIEnvironment.is_mpi_client)):  # running as MPI server
         return False
 
-    return task_depth() is 1
+    return task_depth() == 1
 
 
 def get_calfroms(context, vis, caltypes=None):
@@ -359,7 +359,7 @@ def plotms_iterate(
         src_filenames = []
 
         # If there's only one job, queue the original job for execution
-        if len(component_jobs) is 1:
+        if len(component_jobs) == 1:
             job_to_execute = component_jobs[0]
         else:
             # set the final kwargs for the iteraxis-enabled job

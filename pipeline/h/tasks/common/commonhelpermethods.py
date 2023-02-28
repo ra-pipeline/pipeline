@@ -1,4 +1,5 @@
 import pipeline.infrastructure as infrastructure
+from pipeline.domain.measurementset import MeasurementSet
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -33,3 +34,11 @@ def get_corr_axis(ms, spwid):
     datadescs = [dd for dd in ms.data_descriptions if dd.spw.id == spwid]
     # return datadescs[0].corr_axis
     return datadescs[0].polarizations
+
+
+def get_pol_id(ms: MeasurementSet, spwid: int, corr: str) -> int:
+    """Get polarization ID for given MS, SpW id, and correlation type.
+    """
+    datadesc = ms.get_data_description(id=spwid)
+    pol_id = datadesc.get_polarization_id(corr)
+    return pol_id

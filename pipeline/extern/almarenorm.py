@@ -4231,12 +4231,111 @@ class ACreNorm(object):
             A list of list pairs suggesting ranges for input into the excludechan 
             option of renormalization().
         """
+
+
         def subsets(chans):
             """
             Purpose: Find subset ranges within an array of consecutive values and
                      return the sub-ranges.
             """
-            from more_itertools import consecutive_groups
+            class groupby:
+                # A subset task of the itertools package.
+                # https://docs.python.org/3/library/itertools.html#itertools.groupby
+
+                # [k for k, g in groupby('AAAABBBCCDAABBB')] --> A B C D A B
+                # [list(g) for k, g in groupby('AAAABBBCCD')] --> AAAA BBB CC D
+                def __init__(self, iterable, key=None):
+                    if key is None:
+                        key = lambda x: x
+                    self.keyfunc = key
+                    self.it = iter(iterable)
+                    self.tgtkey = self.currkey = self.currvalue = object()
+
+                def __iter__(self):
+                    return self
+
+                def __next__(self):
+                    self.id = object()
+                    while self.currkey == self.tgtkey:
+                        self.currvalue = next(self.it)    # Exit on StopIteration
+                        self.currkey = self.keyfunc(self.currvalue)
+                    self.tgtkey = self.currkey
+                    return (self.currkey, self._grouper(self.tgtkey, self.id))
+
+                def _grouper(self, tgtkey, id):
+                    while self.id is id and self.currkey == tgtkey:
+                        yield self.currvalue
+                        try:
+                            self.currvalue = next(self.it)
+                        except StopIteration:
+                            return
+                        self.currkey = self.keyfunc(self.currvalue)
+
+            def itemgetter(*items):
+                # A subset task of the operator package.
+                # https://docs.python.org/3/library/operator.html#operator.itemgetter
+                if len(items) == 1:
+                    item = items[0]
+                    def g(obj):
+                        return obj[item]
+                else:
+                    def g(obj):
+                        return tuple(obj[item] for item in items)
+                return g
+
+            def consecutive_groups(iterable, ordering=lambda x: x):
+                """
+                A subset of the more-itertools package.
+                https://more-itertools.readthedocs.io/en/stable
+                        /_modules/more_itertools/more.html#consecutive_groups
+
+                Yield groups of consecutive items using :func:`itertools.groupby`.
+                The *ordering* function determines whether two items are adjacent by
+                returning their position.
+
+                By default, the ordering function is the identity function. This is
+                suitable for finding runs of numbers:
+
+                    >>> iterable = [1, 10, 11, 12, 20, 30, 31, 32, 33, 40]
+                    >>> for group in consecutive_groups(iterable):
+                    ...     print(list(group))
+                    [1]
+                    [10, 11, 12]
+                    [20]
+                    [30, 31, 32, 33]
+                    [40]
+
+                For finding runs of adjacent letters, try using the :meth:`index` method
+                of a string of letters:
+
+                    >>> from string import ascii_lowercase
+                    >>> iterable = 'abcdfgilmnop'
+                    >>> ordering = ascii_lowercase.index
+                    >>> for group in consecutive_groups(iterable, ordering):
+                    ...     print(list(group))
+                    ['a', 'b', 'c', 'd']
+                    ['f', 'g']
+                    ['i']
+                    ['l', 'm', 'n', 'o', 'p']
+
+                Each group of consecutive items is an iterator that shares it source with
+                *iterable*. When an an output group is advanced, the previous group is
+                no longer available unless its elements are copied (e.g., into a ``list``).
+
+                    >>> iterable = [1, 2, 11, 12, 21, 22]
+                    >>> saved_groups = []
+                    >>> for group in consecutive_groups(iterable):
+                    ...     saved_groups.append(list(group))  # Copy group elements
+                    >>> saved_groups
+                    [[1, 2], [11, 12], [21, 22]]
+
+                Borrowed for PL use from https://pypi.org/project/more-itertools/
+                """
+                for k, g in groupby(
+                    enumerate(iterable), key=lambda x: x[0] - ordering(x[1])
+                ):
+                    yield map(itemgetter(1), g)
+
             subsets = [list(group) for group in consecutive_groups(chans)]
             ranges = []
             for ss in subsets:

@@ -96,7 +96,7 @@ def make_flux_table(context, results):
         vis_cell = os.path.basename(single_result.vis)
 
         # measurements will be empty if fluxscale derivation failed
-        if len(single_result.measurements) is 0:
+        if len(single_result.measurements) == 0:
             continue
 
         for field_arg in sorted(single_result.measurements, key=lambda fld: ms_for_result.get_fields(fld)[0].id):

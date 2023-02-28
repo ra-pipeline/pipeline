@@ -3,6 +3,7 @@ import datetime
 import decimal
 import math
 import re
+import numbers
 
 import pipeline.infrastructure.utils as utils
 
@@ -136,7 +137,7 @@ class ComparableUnit(object):
     def __truediv__(self, other):
         if isinstance(other, self.__class__):
             return self.to_units() / other.to_units()
-        if not isinstance(other, (int, float, decimal.Decimal)):
+        if not isinstance(other, numbers.Number):
             raise TypeError("unsupported operand type(s) for /: '%s' and '%s'" % (self.__class__.__name__,
                                                                                   other.__class__.__name__))
         return self.__class__(self.value / decimal.Decimal(str(other)), self.units)
@@ -144,7 +145,7 @@ class ComparableUnit(object):
     def __floordiv__(self, other):
         if isinstance(other, self.__class__):
             return self.to_units() // other.to_units()
-        if not isinstance(other, (int, float, decimal.Decimal)):
+        if not isinstance(other, numbers.Number):
             raise TypeError("unsupported operand type(s) for //: '%s' and '%s'" % (self.__class__.__name__,
                                                                                    other.__class__.__name__))
         return self.__class__(self.value // decimal.Decimal(str(other)), self.units)
@@ -162,14 +163,14 @@ class ComparableUnit(object):
         return self.value > other.to_units(self.units)
 
     def __itruediv__(self, other):
-        if not isinstance(other, (int, float, decimal.Decimal)):
+        if not isinstance(other, numbers.Number):
             raise TypeError("unsupported operand type(s) for /=: '%s' and '%s'" % (self.__class__.__name__,
                                                                                    other.__class__.__name__))
         self.value /= other
         return self
 
     def __ifloordiv__(self, other):
-        if not isinstance(other, (int, float, decimal.Decimal)):
+        if not isinstance(other, numbers.Number):
             raise TypeError("unsupported operand type(s) for //=: '%s' and '%s'" % (self.__class__.__name__,
                                                                                    other.__class__.__name__))
         self.value //= other
@@ -188,13 +189,13 @@ class ComparableUnit(object):
         return self.value < other.to_units(self.units)
 
     def __mul__(self, other):
-        if not isinstance(other, (int, float, decimal.Decimal)):
+        if not isinstance(other, numbers.Number):
             raise TypeError("unsupported operand type(s) for *: '%s' and '%s'" % (self.__class__.__name__,
                                                                                   other.__class__.__name__))
         return self.__class__(self.value * other, self.units)
 
     def __rmul__(self, other):
-        if not isinstance(other, (int, float, decimal.Decimal)):
+        if not isinstance(other, numbers.Number):
             raise TypeError("unsupported operand type(s) for *: '%s' and '%s'" % (self.__class__.__name__,
                                                                                   other.__class__.__name__))
         return self.__class__(self.value * other, self.units)

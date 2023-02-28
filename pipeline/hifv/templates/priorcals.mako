@@ -12,11 +12,15 @@ from pipeline.infrastructure.renderer import rendererutils
 using the CASA task <b>gencal</b>.</p>
 
 	<h2>Gain Curves</h2>
-	Gain curve table written to:
 	
 	%for single_result in result:
-	    <p><b>${os.path.basename(single_result.gc_result.inputs['caltable'])}</b></p>
-        %endfor
+	    %if single_result.gc_result:
+	        Gain curve table written to:
+	        <p><b>${os.path.basename(single_result.gc_result.inputs['caltable'])}</b></p>
+	    %else:
+	        No gain curve table written
+	    %endif
+    %endfor
 
 
 <%self:plot_group plot_dict="${opacity_plots}"
@@ -105,13 +109,17 @@ using the CASA task <b>gencal</b>.</p>
                       </table>
             % endif
         %endfor
-        
-	<h2>Requantizer gains</h2>
-	Requantizer gains written to:
+
+    <h2>Requantizer gains</h2>
+    %if single_result.rq_result:
+	    Requantizer gains written to:
 	
-	%for single_result in result:
-	    <p><b>${os.path.basename(single_result.rq_result.inputs['caltable'])}</b></p>
-    %endfor
+	    %for single_result in result:
+	        <p><b>${os.path.basename(single_result.rq_result.inputs['caltable'])}</b></p>
+        %endfor
+    %else:
+        No requantizer gain table written
+    %endif
 
 
     %if single_result.tecmaps_result:

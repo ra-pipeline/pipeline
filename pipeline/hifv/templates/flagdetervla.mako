@@ -77,7 +77,7 @@ def total_for_mses(mses, row):
 			fs = flags[ms][agent][row]
 			if not (agent == 'before' or agent == 'anos' or agent == 'shadow' or agent == 'intents'):
 			    flagged += fs.flagged
-	if total is 0:
+	if total == 0:
 		return 'N/A'
 	else: 
 		return '%0.3f%%' % (100.0 * flagged / total)
@@ -94,7 +94,7 @@ def total_for_agent(agent, row, mses=flags.keys()):
 			# agent was not activated for this MS.
 			if 'before' in flags[ms]:
 			    total += flags[ms]['before'][row].total
-	if total is 0:
+	if total == 0:
 		return 'N/A'
 	else:
 		return '%0.3f%%' % (100.0 * flagged / total)

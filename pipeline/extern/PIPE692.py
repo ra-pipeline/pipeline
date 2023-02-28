@@ -50,13 +50,13 @@ class SSFanalysis(object):
         # NOTE TO DEV - this can come from context but I do not know how - its a caltable from the bandpass stage
         # here I have to have the long if/else check in order to find any caltables that are averaged
         self.caltable=[]
-        self.caltable = glob.glob(self.visUse+'*bandpass.s*intint.gpcal.tbl')
+        self.caltable = sorted(glob.glob(self.visUse+'*bandpass.s*intint.gpcal.tbl'))
         if len(self.caltable)>0:
-            self.caltable=self.caltable[0]
+            self.caltable=self.caltable[-1]
         else:
-            self.caltable = glob.glob(self.visUse+'*bandpass.s*int*s.gpcal.tbl')
+            self.caltable = sorted(glob.glob(self.visUse+'*bandpass.s*int*s.gpcal.tbl'))
             if len(self.caltable)>0:
-                self.caltable=self.caltable[0]
+                self.caltable=self.caltable[-1]
             else:
                 ## should not get here, and in real PL will have correct caltable input
                 print('ERROR NO CALTABLE TO ASSESS')

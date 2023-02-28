@@ -6,7 +6,7 @@ recalibrating a subset of the ASDMs belonging to a member OUS, using pipeline
 flagging and calibration data products.
 """
 import os
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 import pipeline.h.tasks.restoredata.restoredata as restoredata
 import pipeline.infrastructure as infrastructure
@@ -28,10 +28,12 @@ class NRORestoreDataInputs(restoredata.RestoreDataInputs):
 
     reffile = vdp.VisDependentProperty(default='')
     caltable = vdp.VisDependentProperty(default='')
+    hm_rasterscan = vdp.VisDependentProperty(default='time')
 
     def __init__(self, context: Context, vis: List[str] = None, caltable: vdp.VisDependentProperty = None,
                  reffile: vdp.VisDependentProperty = None, products_dir: str = None,
-                 copytoraw: vdp.VisDependentProperty = None, rawdata_dir: str = None, output_dir: str = None):
+                 copytoraw: vdp.VisDependentProperty = None, rawdata_dir: str = None, output_dir: str = None,
+                 hm_rasterscan: Optional[str] = None):
         """
         Initialise the Inputs, initialising any property values to those given here.
 
@@ -44,6 +46,7 @@ class NRORestoreDataInputs(restoredata.RestoreDataInputs):
             copytoraw: copy the required data products from products_dir to rawdata_dir
             rawdata_dir: the raw data directory for ASDM(s) and products
             output_dir: the working directory for the restored data
+            hm_rasterscan: Heuristics method for raster scan analysis
         """
         super(NRORestoreDataInputs, self).__init__(context, vis=vis, products_dir=products_dir,
                                                    copytoraw=copytoraw, rawdata_dir=rawdata_dir,
@@ -51,6 +54,7 @@ class NRORestoreDataInputs(restoredata.RestoreDataInputs):
 
         self.caltable = caltable
         self.reffile = reffile
+        self.hm_rasterscan = hm_rasterscan
 
 
 class NRORestoreDataResults(restoredata.RestoreDataResults):
@@ -161,8 +165,8 @@ class NRORestoreData(restoredata.RestoreData):
 
         LOG.debug('_do_importasdm inputs = {0}'.format(inputs))
 
-        container = vdp.InputsContainer(importdata.NROImportData, inputs.context, vis=vislist, 
-                                        output_dir=None)
+        container = vdp.InputsContainer(importdata.NROImportData, inputs.context, vis=vislist,
+                                        output_dir=None, hm_rasterscan=inputs.hm_rasterscan)
         importdata_task = importdata.NROImportData(container)
         return self._executor.execute(importdata_task, merge=True)
 

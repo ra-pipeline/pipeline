@@ -24,7 +24,7 @@ class SDK2JyCalInputs(vdp.StandardInputs):
     """Inputs class for SDK2JyCal task."""
 
     reffile = vdp.VisDependentProperty(default='jyperk.csv')
-    dbservice = vdp.VisDependentProperty(default=True)
+    dbservice = vdp.VisDependentProperty(default=False)
     endpoint = vdp.VisDependentProperty(default='asdm')
 
     @vdp.VisDependentProperty

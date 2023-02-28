@@ -43,7 +43,7 @@ class PhaseOffsetPlotHelper(object):
         return self.colour_map[state][pol]
 
     def get_figfile(self, spw, antennas):
-        if len(antennas) is 1:
+        if len(antennas) == 1:
             antenna = '.ant%s' % antennas[0].name
         else:
             antenna = ''
@@ -191,7 +191,7 @@ class PhaseOffsetPlot(object):
         plt.subplots_adjust(wspace=0.0)
 
         plothelper = self._plothelper
-        flag_annotate = len(antennas) is 1
+        flag_annotate = len(antennas) == 1
         for scan_idx, scan in enumerate(scans):
             for antenna in antennas:    
                 axis = axes[scan_idx]
@@ -238,14 +238,14 @@ class PhaseOffsetPlot(object):
                                  if dd.spw.id == spw.id]
                     # discard WVR and other strange data descriptions
                     corr_axes = {x for x in corr_axes if x not in [(), ('I',)]}
-                    assert len(corr_axes) is 1, ('Data descriptions have different '
+                    assert len(corr_axes) == 1, ('Data descriptions have different '
                                                  'corr axes for scan %s. Got %s'
                                                  '' % (scan.id, corr_axes))
                     # go from set(('XX', 'YY')) to the ('XX', 'YY')
                     corr_axes = corr_axes.pop()
 
                     for corr_idx, corr_axis in enumerate(corr_axes):
-                        if len(data.time) is 0:
+                        if len(data.time) == 0:
                             LOG.info('No data to plot for antenna %s scan %s corr %s' %
                                      (antenna.name, scan.id, corr_axis))
                             continue
@@ -337,7 +337,7 @@ class PhaseOffsetPlot(object):
                                           'spw': spw.id,
                                           'ant': antenna_names})
 
-        if plothelper.plot_per_antenna and len(antennas) is 1:
+        if plothelper.plot_per_antenna and len(antennas) == 1:
             wrapper.qa_score = self._score_retriever.get_score(spw, antennas[0])
 
         if not os.path.exists(figfile):

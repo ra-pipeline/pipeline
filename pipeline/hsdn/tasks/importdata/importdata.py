@@ -11,7 +11,6 @@ Created on Dec 4, 2017
 import os
 from typing import Any, Dict, List, Optional
 
-import pipeline.h.tasks.importdata.importdata as importdata
 import pipeline.hsd.tasks.importdata.importdata as sd_importdata
 import pipeline.infrastructure as infrastructure
 from pipeline.domain.fluxmeasurement import FluxMeasurement
@@ -23,14 +22,15 @@ from pipeline.infrastructure.launcher import Context
 LOG = infrastructure.get_logger(__name__)
 
 
-class NROImportDataInputs(importdata.ImportDataInputs):
+class NROImportDataInputs(sd_importdata.SDImportDataInputs):
     """Class of inputs of NROImportData.
 
     This class extends importdata.ImportDataInputs.
     """
 
     def __init__(self, context: Context, vis: Optional[List[str]]=None, output_dir: Optional[str]=None, session: Optional[List[str]]=None,
-                 datacolumns: Optional[Dict]=None, overwrite: Optional[bool]=None, nocopy: Optional[bool]=None, createmms: Optional[str]=None):
+                 datacolumns: Optional[Dict]=None, overwrite: Optional[bool]=None, nocopy: Optional[bool]=None, createmms: Optional[str]=None,
+                 hm_rasterscan: Optional[str] = None):
         """Initialise NROImportDataInputs class.
 
         Args:
@@ -41,6 +41,7 @@ class NROImportDataInputs(importdata.ImportDataInputs):
             overwrite: flag of overwrite existing files on import
             nocopy: flag of disable copying of MS to working directory
             createmms: operation string to create an MMS
+            hm_rasterscan: Heuristics method for raster scan analysis
         """
         # no-op parameters for MS
         asis = ''
@@ -54,7 +55,8 @@ class NROImportDataInputs(importdata.ImportDataInputs):
                                                   process_caldevice=process_caldevice, session=session,
                                                   overwrite=overwrite, nocopy=nocopy, save_flagonline=save_flagonline,
                                                   bdfflags=bdfflags, lazy=lazy, createmms=createmms,
-                                                  ocorr_mode=ocorr_mode, datacolumns=datacolumns)
+                                                  ocorr_mode=ocorr_mode, datacolumns=datacolumns,
+                                                  hm_rasterscan=hm_rasterscan)
 
 
 class NROImportDataResults(sd_importdata.SDImportDataResults):

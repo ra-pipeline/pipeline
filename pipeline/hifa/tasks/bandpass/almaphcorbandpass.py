@@ -274,7 +274,7 @@ class ALMAPhcorBandpass(bandpassworker.BandpassWorker):
             return inputs.phaseupsolint
 
         # If phaseup solints are all the same return the first one
-        if len(set(tmpsolints)) is 1:
+        if len(set(tmpsolints)) == 1:
             LOG.info("Best phaseup solint estimate is '%s'" % tmpsolints[0])
             return tmpsolints[0]
 

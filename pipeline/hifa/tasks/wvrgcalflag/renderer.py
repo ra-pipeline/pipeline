@@ -159,13 +159,13 @@ class T2_4MDetailsWvrgcalflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
             msg = ('WVR data are not expected for %s, which %s not observed '
                    'using 12m antennas.'
                    '' % (utils.commafy(ms_non12, quotes=False, conjunction='or'),
-                         'was' if len(ms_non12) is 1 else 'were'))
+                         'was' if len(ms_non12) == 1 else 'were'))
             ctx['alerts_info'] = [msg]
         elif ms_toofew12:
             msg = ("No WVR correction computed for {}, which {} observed"
                    " with too few 12m antennas."
                    "".format(utils.commafy(ms_toofew12, quotes=False, conjunction='or'),
-                             'was' if len(ms_toofew12) is 1 else 'were'))
+                             'was' if len(ms_toofew12) == 1 else 'were'))
             ctx['alerts_info'] = [msg]
 
         # Phase vs time for the overview plot should be for the widest window

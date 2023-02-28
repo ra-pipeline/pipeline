@@ -937,7 +937,7 @@ class SessionGcorFluxscale(basetask.StandardTaskTemplate):
                     no_amplitude_field_names = {f.name for f in no_amplitude_ms.fields}
                     fields_to_adopt = no_amplitude_field_names.intersection(set(averaged.keys()))
 
-                    if len(fields_to_adopt) is 0:
+                    if len(fields_to_adopt) == 0:
                         LOG.error('Could not find a flux calibration to adopt for '
                                   '{!s}.'.format(no_amplitude_ms.basename))
                         continue
@@ -975,7 +975,7 @@ class SessionGcorFluxscale(basetask.StandardTaskTemplate):
 def get_field_name(context, vis, identifier):
     ms = context.observing_run.get_ms(vis)
     fields = set(ms.get_fields(task_arg=identifier))
-    if len(fields) is not 1:
+    if len(fields) != 1:
         raise KeyError('{!r} does not uniquely identify a field: ({!s} matches found)'
                        ''.format(identifier, len(fields)))
     fields = fields.pop()
@@ -1006,7 +1006,7 @@ def collect_flux_measurements(context, vis_result_tuples):
 
             for m in measurements:
                 spws = ms.get_spectral_windows(task_arg=m.spw_id)
-                assert(len(spws) is 1)
+                assert(len(spws) == 1)
                 spw = spws.pop()
                 d[field_name].append((vis, spw.name, m))
 

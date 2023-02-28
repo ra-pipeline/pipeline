@@ -285,7 +285,7 @@ class Results(api.Results):
                 LOG.error(tb)
 
                 # Create a special result object representing the failed task.
-                failedresult = FailedTaskResults(self[0].task, ex, tb)
+                failedresult = FailedTaskResults(self._get_task(), ex, tb)
                 # Copy over necessary properties from real result.
                 failedresult.stage_number = self.stage_number
                 failedresult.inputs = self.inputs
@@ -372,6 +372,9 @@ class Results(api.Results):
             return True
 
         return False
+
+    def _get_task(self):
+        return getattr(self, 'task', None)
 
 
 class FailedTaskResults(Results):
@@ -493,6 +496,12 @@ class ResultsList(Results):
     def merge_with_context(self, context):
         for result in self.__results:
             result.merge_with_context(context)
+
+    def _get_task(self):
+        if len(self) > 0:
+            return self[0]._get_task()
+        else:
+            return None
 
 
 class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
@@ -745,7 +754,7 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
         # The following code loops through the MSes specified in vis,
         # executing the task for the first value (head) and then appending the
         # results of executing the remainder of the MS list (tail).
-        if len(self.inputs.vis) is 0:
+        if len(self.inputs.vis) == 0:
             # we don't return an empty list as the timestamp decorator wants
             # to set attributes on this value, which it can't on a built-in
             # list

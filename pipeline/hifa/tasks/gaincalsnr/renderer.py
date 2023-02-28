@@ -32,7 +32,7 @@ def make_gaincalsnr_table(context, results):
         vis_cell = os.path.basename(single_result.vis)
 
         # measurements will be empty if fluxscale derivation failed
-        if len(single_result.spwids) is 0:
+        if len(single_result.spwids) == 0:
             continue
 
         for i in range(len(single_result.spwids)):

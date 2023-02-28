@@ -1,4 +1,5 @@
 import ast
+from copy import deepcopy
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -61,12 +62,6 @@ class RenormInputs(vdp.StandardInputs):
         # turn comma seperated string into a list of integers
         return [int(x) for x in value.split(',')]
 
-    @excludechan.convert
-    def excludechan(self, value):
-        pyobj = ast.literal_eval(value)
-        if isinstance(pyobj, dict):
-            return pyobj
-
     def __init__(self, context, vis=None, apply=None, threshold=None, correctATM=None, spw=None, excludechan=None, atm_auto_exclude=False):
         super(RenormInputs, self).__init__()
         self.context = context
@@ -86,6 +81,11 @@ class Renorm(basetask.StandardTaskTemplate):
     def prepare(self):
         inp = self.inputs
         alltdm = True  # assume no FDM present
+
+        if type(inp.excludechan) is not dict:
+            msg = "excludechan parameter requires dictionary input. {0} with type {1} is not valid input.".format(inp.excludechan, type(inp.excludechan).__name__)
+            LOG.error(msg)
+            raise TypeError(msg)
 
         LOG.info("This Renorm class is running.")
 
@@ -116,9 +116,11 @@ class Renorm(basetask.StandardTaskTemplate):
             atmExcludeCmd = {}
 
             if not alltdm:
+                # Make a copy of the excludechan input so it isn't modified by almarenorm.py, see: PIPE-1612
+                excludechan_copy = deepcopy(inp.excludechan)
 
                 rn.renormalize(docorr=inp.apply, docorrThresh=inp.threshold, correctATM=inp.correctATM,
-                               spws=inp.spw, excludechan=inp.excludechan, atmAutoExclude=inp.atm_auto_exclude)
+                               spws=inp.spw, excludechan=excludechan_copy, atmAutoExclude=inp.atm_auto_exclude)
                 rn.plotSpectra(includeSummary=False)
 
                 # if we tried to renormalize, and it was done, store info in the results
@@ -129,9 +131,9 @@ class Renorm(basetask.StandardTaskTemplate):
                 # Only populate the following variables used for QA and to the populate the weblog
                 # if this was run in a 'valid' way: on data which has not already been corrected 
                 # (not corrApplied) and on data which has a corrected column. If apply=False, it
-                # doesn't matter if the corrected column exists because the correction isn't
-                # actually done.
-                if (corrColExists or (not inp.apply)) and not corrApplied:
+                # doesn't matter if the corrected column exists or if the data has already been 
+                # corrected, because the correction isn't actually done.
+                if (corrColExists or (not inp.apply)) and (not corrApplied or (not inp.apply)):
                     # get stats (dictionary) indexed by source, spw
                     stats = rn.rnpipestats
                     # get all factors for QA

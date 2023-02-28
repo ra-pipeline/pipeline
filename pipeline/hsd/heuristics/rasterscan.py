@@ -9,14 +9,14 @@ observing region.
 Note that it does not check if observing pattern is raster.
 """
 # import standard modules
-from typing import Callable, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 # import 3rd party modules
 import numpy as np
-import scipy
 
 # import pipeline submodules
 import pipeline.infrastructure.api as api
+import pipeline.infrastructure.utils.compatibility as compatibility
 import pipeline.infrastructure.logging as logging
 
 LOG = logging.get_logger(__name__)
@@ -51,33 +51,6 @@ class HeuristicsParameter(object):
 
     # Threshold for "Round-trip" raster scan detection
     RoundTripRasterScanThresholdFactor = 0.6
-
-
-def get_func_compute_mad() -> Callable:
-    """Return function to compute median absolute deviation (MAD).
-
-    This absorbs the API difference depending on SciPy version.
-
-    Raises:
-        NotImplementedError: SciPy version is too old (lower than 1.3.0)
-
-    Returns:
-        function: function to compute MAD
-    """
-    # assuming X.Y.Z style version string
-    scipy_version = scipy.version.full_version
-    versioning = map(int, scipy_version.split('.'))
-    major = next(versioning)
-    minor = next(versioning)
-    if major > 1 or (major == 1 and minor >= 5):
-        return lambda x: scipy.stats.median_abs_deviation(x, scale='normal')
-    elif major == 1 and minor >= 3:
-        return scipy.stats.median_absolute_deviation
-    else:
-        raise NotImplementedError('No MAD function available in scipy. Use scipy 1.3 or higher.')
-
-
-compute_mad = get_func_compute_mad()
 
 
 def distance(x0: float, y0: float, x1: float, y1: float) -> np.ndarray:
@@ -412,7 +385,12 @@ def find_distance_gap(delta_ra: np.ndarray, delta_dec: np.ndarray) -> np.ndarray
     for i in range(num_loop):
         dist = distance[mask]
         dmed = np.median(dist)
-        # dstd = dist.std()
+        # TODO: replace the following two lines with scipy function call:
+        #
+        # dstd = scipy.stats.median_abs_deviation(dist, scale='normal')
+        #
+        # This should be done after we drop support of CASA py3.6 release.
+        compute_mad = compatibility.get_scipy_function_for_mad()
         dstd = compute_mad(dist)
         distance_threshold = factor * dstd
         tmp = np.abs(distance - dmed) <= distance_threshold

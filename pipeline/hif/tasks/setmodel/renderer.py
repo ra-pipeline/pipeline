@@ -94,7 +94,7 @@ def make_flux_table(context, results):
                                   'stage%s' % single_result.stage_number)
 
         # measurements will be empty if fluxscale derivation failed
-        if len(single_result.measurements) is 0:
+        if len(single_result.measurements) == 0:
             continue
 
         # copy flux.csv file across to weblog directory

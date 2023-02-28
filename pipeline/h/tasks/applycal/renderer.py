@@ -744,7 +744,7 @@ def _get_data_selection_for_plot(context, result, intent):
     intent = ','.join(intent).upper()
 
     vis = {calapp.vis for calapp in result.applied}
-    assert (len(vis) is 1)
+    assert (len(vis) == 1)
     vis = vis.pop()
 
     wanted = set(intent.split(','))

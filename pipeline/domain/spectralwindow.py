@@ -61,7 +61,7 @@ def compress(values):
     return the list as given.
     """
     deltas = set(numpy.diff(values))
-    if len(deltas) is 1:
+    if len(deltas) == 1:
         delta = deltas.pop()
         return ArithmeticProgression(values[0], delta, len(values))
     else:

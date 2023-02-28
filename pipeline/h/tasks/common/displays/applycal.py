@@ -71,13 +71,13 @@ class PlotmsLeaf(object):
         if field != '':
             matching = self._ms.get_fields(field)
 
-            if len(matching) is 1:
+            if len(matching) == 1:
                 field_name = matching[0].name
                 field_id = matching[0].id
                 # in case the arg is an ID, check that returned field doesn't
                 # contain a duplicate name
                 matching_by_name = self._ms.get_fields(field_name)
-                if len(matching_by_name) is 1:
+                if len(matching_by_name) == 1:
                     # if the argument was the field ID but the field name is 
                     # unique. Therefore, we can use the field name.
                     field = field_name
@@ -309,7 +309,7 @@ class BasebandComposite(common.LeafComposite):
             rx = 'all' if overplot_receivers else spw.band
             receivers[rx][spw.baseband].append(spw.id)
 
-        is_single_receiver = len(receivers) is 1
+        is_single_receiver = len(receivers) == 1
 
         children = []
         if 'spws' in kwargs:

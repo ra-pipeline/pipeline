@@ -109,7 +109,7 @@ def reorder_dicts(order_mapping, d):
     # Only reorder when it makes a difference. The test is not len(d)<2 as the
     # dict could be a single key pointing to another collection that needs
     # sorting.
-    if len(d) is 0:
+    if len(d) == 0:
         return d
 
     # reorder any dict values first

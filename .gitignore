@@ -154,12 +154,5 @@ tags
 # VSCode
 .vscode/
 
-# ignore auto-generated files and directories
-pipeline/*/cli/*.py
-pipeline/*/cli/gotasks/
-# but do not ignore cli.py or utils.py, which are required by all tasks
-!**/cli/cli.py
-!**/cli/utils.py
-
 # ignore _version.py, created by setup.py
 _version.py
