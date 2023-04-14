@@ -108,7 +108,9 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         if self.vlass_stage == 3:
             return ''
         else:
-            return ['3arcsec']
+            # PIPE-1679: the previous default value of '3arcsec' has been changed to '3/(pi/(4ln(2)))arcsec' 
+            # since CASA ver>=6.5.3 to maintain the beam size consistency due to the math correction from CAS-13260.
+            return ['2.6476arcsec']
 
     def uvrange(self, field=None, spwspec=None) -> tuple:
         """Tclean uvrange parameter heuristics."""

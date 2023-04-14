@@ -101,7 +101,6 @@ class WeightMS(basetask.StandardTaskTemplate):
         result = WeightMSResults(task=self.__class__,
                                  success=True,
                                  outcome=outfile)
-        result.task = self.__class__
 
         return result
 

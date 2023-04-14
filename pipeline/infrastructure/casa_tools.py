@@ -6,6 +6,7 @@ import operator
 import os
 import platform
 import sys
+from inspect import signature
 
 import casatools
 from casatasks import casalog
@@ -38,9 +39,8 @@ def log_call(fn, level):
 
         # get the argument names and default argument values for the given
         # function
-        code = fn.__code__
-        argcount = code.co_argcount
-        argnames = code.co_varnames[:argcount]
+        argnames = list(signature(fn).parameters)
+        argcount = len(argnames)
 
         positional = {k: v for k, v in zip(argnames, args)}
 

@@ -20,6 +20,7 @@ class CleanTarget(dict):
         self['specmode'] = None        # string
         self['gridder'] = None         # string
         self['datacolumn'] = None      # string
+        self['datatype_info'] = None   # string
         self['deconvolver'] = None     # string
         self['imagename'] = None       # string
         self['start'] = None           # string

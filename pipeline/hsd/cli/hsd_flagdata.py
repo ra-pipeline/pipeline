@@ -1,0 +1,117 @@
+import sys
+
+import pipeline.h.cli.utils as utils
+
+def hsd_flagdata(vis=None, autocorr=None, shadow=None, scan=None,
+                 scannumber=None, intents=None, edgespw=None, fracspw=None,
+                 fracspwfps=None, online=None, fileonline=None, template=None,
+                 filetemplate=None, pointing=None, filepointing=None, incompleteraster=None,
+                 hm_tbuff=None, tbuff=None, qa0=None, qa2=None,
+                 pipelinemode=None, flagbackup=None, dryrun=None,
+                 acceptresults=None):
+
+    """
+    hsd_flagdata ---- Do basic flagging of a list of MeasurementSets
+
+    
+    The hsd_flagdata data performs basic flagging operations on a list of
+    MeasurementSets including:
+    
+    o applying online flags
+    o applying a flagging template
+    o shadowed antenna data flagging
+    o scan-based flagging by intent or scan number
+    o edge channel flagging
+    
+    Output:
+    
+    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
+    the results object for the pipeline task is returned.
+
+    --------- parameter descriptions ---------------------------------------------
+
+    vis              The list of input MeasurementSets. Defaults to the list of MeasurementSets
+                     defined in the pipeline context.
+    autocorr         Flag autocorrelation data.
+    shadow           Flag shadowed antennas.
+    scan             Flag a list of specified scans.
+    scannumber       A string containing a comma delimited list of scans to be
+                     flagged.
+    intents          A string containing a comma delimited list of intents against
+                     which the scans to be flagged are matched.
+                     
+                     example: '*BANDPASS*'
+    edgespw          Flag the edge spectral window channels.
+    fracspw          Fraction of the baseline correlator TDM edge channels to be flagged.
+    fracspwfps       Fraction of the ACS correlator TDM edge channels to be flagged.
+    online           Apply the online flags.
+    fileonline       File containing the online flags. These are computed by the
+                     h_init or hif_importdata data tasks. If the online flags files
+                     are undefined a name of the form 'msname.flagonline.txt' is assumed.
+    template         Apply a flagging template.
+    filetemplate     The name of a text file that contains the flagging template
+                     for RFI, birdies, telluric lines, etc.  If the template flags files
+                     is undefined a name of the form 'msname.flagtemplate.txt' is assumed.
+    pointing         Apply a flagging template for pointing flag.
+    filepointing     The name of a text file that contains the flagging template
+                     for pointing flag. If the template flags files is undefined a name of
+                     the form 'msname.flagpointing.txt' is assumed.
+    incompleteraster Apply commands to flag incomplete raster sequence.
+                     If this is False, relevant commands in filepointing are
+                     simply commented out.
+    hm_tbuff         The heuristic for computing the default time interval padding parameter.
+                     The options are 'halfint' and 'manual'. In 'halfint' mode tbuff is set to
+                     half the maximum of the median integration time of the science and calibrator target
+                     observations.
+    tbuff            The time in seconds used to pad flagging command time intervals if
+                     hm_tbuff='manual'.
+    qa0              QA0 flags
+    qa2              QA2 flags
+    pipelinemode     The pipeline operating mode. In 'automatic' mode the pipeline
+                     determines the values of all context defined pipeline inputs automatically.
+                     In interactive mode the user can set the pipeline context defined parameters
+                     manually.  In 'getinputs' mode the user can check the settings of all
+                     pipeline parameters without running the task.
+    flagbackup       Back up any pre-existing flags before applying new ones.
+    dryrun           Run the commands (True) or generate the commands to be run but
+                     do not execute (False).
+    acceptresults    Add the results of the task to the pipeline context (True) or
+                     reject them (False).
+
+    --------- examples -----------------------------------------------------------
+
+    
+    1. Do basic flagging on a MeasurementSet
+    
+    hsd_flagdata()
+    
+    2. Do basic flagging on a MeasurementSet flagging additional scans selected
+    by number as well.
+    
+    hsd_flagdata(scannumber='13,18')
+
+
+    """
+
+
+    ##########################################################################
+    #                                                                        #
+    #  CASA task interface boilerplate code starts here. No edits should be  #
+    #  needed beyond this point.                                             #
+    #                                                                        #
+    ##########################################################################
+
+    # create a dictionary containing all the arguments given in the
+    # constructor
+    all_inputs = vars()
+
+    # get the name of this function for the weblog, eg. 'hif_flagdata'
+    task_name = sys._getframe().f_code.co_name
+
+    # get the context on which this task operates
+    context = utils.get_context()
+
+    # execute the task
+    results = utils.execute_task(context, task_name, all_inputs)
+
+    return results

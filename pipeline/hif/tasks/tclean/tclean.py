@@ -43,6 +43,7 @@ class TcleanInputs(cleanbase.CleanBaseInputs):
     calcsb = vdp.VisDependentProperty(default=False)
     cleancontranges = vdp.VisDependentProperty(default=False)
     datacolumn = vdp.VisDependentProperty(default=None)
+    datatype_info = vdp.VisDependentProperty(default=None)
     hm_cleaning = vdp.VisDependentProperty(default='rms')
     masklimit = vdp.VisDependentProperty(default=4.0)
     mosweight = vdp.VisDependentProperty(default=None)
@@ -119,7 +120,7 @@ class TcleanInputs(cleanbase.CleanBaseInputs):
     def __init__(self, context, output_dir=None, vis=None, imagename=None, intent=None, field=None, spw=None,
                  spwsel_lsrk=None, spwsel_topo=None, uvrange=None, specmode=None, gridder=None, deconvolver=None,
                  nterms=None, outframe=None, imsize=None, cell=None, phasecenter=None, stokes=None, nchan=None,
-                 start=None, width=None, nbin=None, datacolumn=None, pblimit=None, cfcache=None,
+                 start=None, width=None, nbin=None, datacolumn=None, datatype_info=None, pblimit=None, cfcache=None,
                  restoringbeam=None, hm_masking=None, hm_sidelobethreshold=None, hm_noisethreshold=None,
                  hm_lownoisethreshold=None, hm_negativethreshold=None, hm_minbeamfrac=None, hm_growiterations=None,
                  hm_dogrowprune=None, hm_minpercentchange=None, hm_fastnoise=None, hm_nsigma=None,
@@ -135,7 +136,7 @@ class TcleanInputs(cleanbase.CleanBaseInputs):
                  # End of extra parameters
                  heuristics=None, pbmask=None):
         super(TcleanInputs, self).__init__(context, output_dir=output_dir, vis=vis,
-                                           imagename=imagename, antenna=antenna, datacolumn=datacolumn,
+                                           imagename=imagename, antenna=antenna, datacolumn=datacolumn, datatype_info=datatype_info,
                                            intent=intent, field=field, spw=spw, uvrange=uvrange, specmode=specmode,
                                            gridder=gridder, deconvolver=deconvolver, uvtaper=uvtaper, nterms=nterms,
                                            cycleniter=cycleniter, cyclefactor=cyclefactor,
@@ -181,6 +182,7 @@ class TcleanInputs(cleanbase.CleanBaseInputs):
         self.usepointing = usepointing
         self.mosweight = mosweight
         self.datacolumn = datacolumn
+        self.datatype_info = datatype_info
         self.pblimit = pblimit
         self.cfcache = cfcache
         self.cfcache_nowb = cfcache_nowb
@@ -1152,7 +1154,10 @@ class Tclean(cleanbase.CleanBase):
                                                   pblimit_cleanmask=self.pblimit_cleanmask,
                                                   cont_freq_ranges=self.cont_freq_ranges)
 
-            self._update_miscinfo(result.image.replace('.image', '.image'+extension), max([len(field_ids.split(',')) for field_ids in self.image_heuristics.field(inputs.intent, inputs.field)]), pbcor_image_min, pbcor_image_max)
+            self._update_miscinfo(result.image.replace('.image', '.image'+extension),
+                                  max([len(field_ids.split(','))
+                                       for field_ids in self.image_heuristics.field(inputs.intent, inputs.field)]),
+                                  pbcor_image_min, pbcor_image_max)
 
             keep_iterating, hm_masking = self.image_heuristics.keep_iterating(iteration, inputs.hm_masking,
                                                                               result.tclean_stopcode,
@@ -1239,6 +1244,7 @@ class Tclean(cleanbase.CleanBase):
                                                   specmode=inputs.specmode,
                                                   gridder=inputs.gridder,
                                                   datacolumn=inputs.datacolumn,
+                                                  datatype_info=inputs.datatype_info,
                                                   deconvolver=inputs.deconvolver,
                                                   nterms=inputs.nterms,
                                                   cycleniter=inputs.cycleniter,

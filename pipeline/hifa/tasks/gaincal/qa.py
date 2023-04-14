@@ -293,14 +293,15 @@ class TimegaincalQAPool(pqa.QAScorePool):
                     score = 0.85
                     unique_ant_id_selections = collections.OrderedDict((tuple(poor_stats_ant_ids), None) for poor_stats_ant_ids in poor_stats_spw_ids.values())
                     for unique_ant_id_selection in unique_ant_id_selections:
-                        spw_ids_selection = ','.join(str(spw_id) for spw_id in poor_stats_spw_ids if tuple(poor_stats_spw_ids[spw_id]) == unique_ant_id_selection)
+                        spw_ids_selection_list = [spw_id for spw_id in poor_stats_spw_ids if tuple(poor_stats_spw_ids[spw_id]) == unique_ant_id_selection]
+                        spw_ids_selection = ','.join(str(spw_id) for spw_id in spw_ids_selection_list)
                         antenna_names = ', '.join([antenna_id_to_name[ant_id] for ant_id in sorted(unique_ant_id_selection)])
                         longmsg = f'Phase offsets: insufficient data to evaluate stability for {ms.basename} SPW {spw_ids_selection} Antenna{"" if len(unique_ant_id_selection) == 1 else "s"} {antenna_names}'
                         shortmsg = 'Phase offsets: insufficient data'
                         origin = pqa.QAOrigin(metric_name='Number of solutions',
                                               metric_score=-999,
                                               metric_units='N/A')
-                        data_selection = pqa.TargetDataSelection(vis={ms.basename}, spw={spw_id}, intent={'PHASE'})
+                        data_selection = pqa.TargetDataSelection(vis={ms.basename}, spw=set(spw_ids_selection_list), intent={'PHASE'})
                         weblog_location = pqa.WebLogLocation.ACCORDION
                         public_phase_offsets_scores.append(pqa.QAScore(score=score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin, applies_to=data_selection, weblog_location=weblog_location))
 

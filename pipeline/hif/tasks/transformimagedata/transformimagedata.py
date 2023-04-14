@@ -219,9 +219,9 @@ class Transformimagedata(mssplit.MsSplit):
         if inputs.modify_weights:
             LOG.info('Re-initializing the weights in ' + ms.name)
             if inputs.wtmode:
-                task = casa_tasks.initweights(ms.name, wtmode=inputs.wtmode)
+                task = casa_tasks.initweights(vis=ms.name, wtmode=inputs.wtmode)
             else:
-                task = casa_tasks.initweights(ms.name)
+                task = casa_tasks.initweights(vis=ms.name)
             self._executor.execute(task)
 
         return result

@@ -3,6 +3,7 @@ import collections
 import itertools
 import os
 import tempfile
+from inspect import signature
 
 from pipeline.infrastructure import basetask
 from pipeline.infrastructure import exceptions
@@ -233,9 +234,7 @@ class VDPTaskFactory(object):
 
 def remove_unexpected_args(fn, fn_args):
     # get the argument names for the function
-    code = fn.__code__
-    arg_count = code.co_argcount
-    arg_names = code.co_varnames[:arg_count]
+    arg_names = list(signature(fn).parameters)
 
     # identify arguments that are not expected by the function
     unexpected = [k for k in fn_args if k not in arg_names]

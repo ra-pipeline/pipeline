@@ -63,6 +63,7 @@ import inspect
 import numbers
 import os
 import pprint
+from inspect import signature
 
 from pipeline.domain import DataType
 
@@ -377,11 +378,8 @@ class InputsContainer(object):
                 # user intends for the class to use the default mode. Inspect
                 # the constructor to find what that value is.
                 constructor = task_cls.Inputs.__init__
-                code = constructor.__code__
-                argcount = code.co_argcount
-                argnames = code.co_varnames[:argcount]
-                fn_defaults = constructor.__defaults__ or list()
-                argdefs = dict(zip(argnames[-len(fn_defaults):], fn_defaults))
+                argdefs = {name: param.default for name, param in signature(
+                    constructor).parameters.items() if param.default is not param.empty}
 
                 # user intends for the class to use the default mode. Inspect
                 # the constructor to find what that value is

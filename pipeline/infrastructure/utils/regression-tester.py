@@ -297,13 +297,13 @@ def test_uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small__procedure_hifa_calimage
 
     Recipe name:                procedure_hifa_calimage
     Dataset:                    uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small.ms
-    Expected results version:   casa-6.1.1-15-pipeline-2020.1.0.40
+    Expected results version:   ccasa-6.5.3-26-pipeline-2023.0.0.3
     """
     pr = PipelineRegression(recipe='procedure_hifa_calimage.xml',
                             input_dir='pl-unittest',
                             visname='uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small.ms',
                             expectedoutput=('pl-regressiontest/uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small/' +
-                                            'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small.casa-6.1.1-15-pipeline-2020.1.0.40.results.txt'))
+                                            'uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small.casa-6.5.3-26-pipeline-2023.0.0.3.results.txt'))
 
     pr.run(ppr='pl-regressiontest/uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small/PPR.xml')
 
@@ -403,7 +403,7 @@ def test_13A_537__procedure_hifv__regression():
 
     Recipe name:                procedure_hifv
     Dataset:                    13A-537/13A-537.sb24066356.eb24324502.56514.05971091435
-    Expected results version:   casa-6.2.1.7-pipeline-2021.2.0.128
+    Expected results version:   casa-6.5.4-2-pipeline-2023.0.0.22
     """
 
     input_dir = 'pl-regressiontest/13A-537'
@@ -412,7 +412,7 @@ def test_13A_537__procedure_hifv__regression():
                             input_dir=input_dir,
                             visname='13A-537.sb24066356.eb24324502.56514.05971091435',
                             expectedoutput=(f'{input_dir}/' +
-                                            '13A-537.casa-6.2.1.7-pipeline-2021.2.0.128.results.txt'),
+                                            '13A-537.casa-6.5.4-2-pipeline-2023.0.0.22.results.txt'),
                             output_dir='13A_537__procedure_hifv__regression')
 
     pr.run(telescope='vla', omp_num_threads=1)
@@ -423,7 +423,7 @@ def test_13A_537__calibration__PPR__regression():
 
     PPR name:                   PPR_13A-537.xml
     Dataset:                    13A-537/13A-537.sb24066356.eb24324502.56514.05971091435
-    Expected results version:   casa-6.2.1.7-pipeline-2021.2.0.128
+    Expected results version:   casa-6.5.4-2-pipeline-2023.0.0.22
     """
 
     input_dir = 'pl-regressiontest/13A-537'
@@ -431,7 +431,7 @@ def test_13A_537__calibration__PPR__regression():
     pr = PipelineRegression(input_dir=input_dir,
                             visname='13A-537.sb24066356.eb24324502.56514.05971091435',
                             expectedoutput=(f'{input_dir}/' +
-                                            '13A-537.casa-6.2.1.7-pipeline-2021.2.0.128.results.txt'),
+                                            '13A-537.casa-6.5.4-2-pipeline-2023.0.0.22.results.txt'),
                             output_dir='13A_537__calibration__PPR__regression')
 
     pr.run(ppr=f'{input_dir}/PPR_13A-537.xml', telescope='vla', omp_num_threads=1)

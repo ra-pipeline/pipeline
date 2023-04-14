@@ -129,23 +129,27 @@ class ObservingRun(object):
             msonly: If True, return a list of MS domain object only.
             source: Filter for particular source name selection (comma
                 separated list of names).
-            spw: Filter for particular real spw specification (comma separated
-                list of real spw IDs).
+            spw: Filter for particular virtual spw specification (comma
+                separated list of real virtual IDs).
 
         Returns:
             When msonly is True, a list of MeasurementSet domain objects of
             a matching DataType (and optionally sources and spws) is returned.
             Otherwise, a tuple of an ordered dictionary and a matched DataType
-            (and optionally sources and spws) is returned. The ordered dictionary
-            stores matching MS domain objects as keys and matching data column
-            names as values. The order of elements is that appears in
-            measurement_sets list attribute.
+            (and optionally sources and spws) is returned. The ordered
+            dictionary stores matching MS domain objects as keys and matching
+            data column names as values. The order of elements is that appears
+            in measurement_sets list attribute.
         """
         found = []
         column = []
         for dtype in dtypes:
             for ms in self.measurement_sets:
-                dcol = ms.get_data_column(dtype, source, spw)
+                if spw is not None:
+                    real_spw_ids = ','.join(str(self.virtual2real_spw_id(spw_id, ms)) for spw_id in spw.split(','))
+                else:
+                    real_spw_ids = None
+                dcol = ms.get_data_column(dtype, source, real_spw_ids)
                 if dcol is not None:
                     found.append(ms)
                     column.append(dcol)

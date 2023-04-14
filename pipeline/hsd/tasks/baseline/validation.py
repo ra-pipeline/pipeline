@@ -35,7 +35,6 @@ class ValidateLineInputs(vdp.StandardInputs):
     # Search order of input vis
     processing_data_type = [DataType.ATMCORR, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
-    window = vdp.VisDependentProperty(default=[])
     edge = vdp.VisDependentProperty(default=(0, 0))
     nsigma = vdp.VisDependentProperty(default=3.0)
     xorder = vdp.VisDependentProperty(default=-1.0)
@@ -223,8 +222,8 @@ class ValidateLineSinglePointing(basetask.StandardTaskTemplate):
         indexer = DataTableIndexer(self.inputs.context)
 
         # for Pre-Defined Spectrum Window
-        if len(window) != 0 and windowmode == 'replace':
-            LOG.info('Skip clustering analysis since predefined line window is set.')
+        if windowmode == 'replace' and (window is None or len(window) > 0):
+            LOG.info(f'Skip line validation: windowmode="{windowmode}", window="{window}"')
             lines = _to_validated_lines(detect_signal)
             # TODO: review whether this relies on order of dictionary values.
             signal = list(detect_signal.values())[0]
@@ -241,18 +240,17 @@ class ValidateLineSinglePointing(basetask.StandardTaskTemplate):
                                          success=True,
                                          outcome=outcome)
 
-            result.task = self.__class__
-
             return result
 
         # Dictionary for final output
         lines = []
 
         # register manually specified line windows to lines
-        for w in window:
-            center = float(sum(w)) / 2
-            width = max(w) - min(w)
-            lines.append([center, width, True])
+        if window is not None:
+            for w in window:
+                center = float(sum(w)) / 2
+                width = max(w) - min(w)
+                lines.append([center, width, True])
 
         LOG.info('Accept all detected lines without clustering analysis.')
 
@@ -298,8 +296,6 @@ class ValidateLineSinglePointing(basetask.StandardTaskTemplate):
         result = ValidateLineResults(task=self.__class__,
                                      success=True,
                                      outcome=outcome)
-
-        result.task = self.__class__
 
         return result
 
@@ -560,8 +556,8 @@ class ValidateLineRaster(basetask.StandardTaskTemplate):
         indexer = DataTableIndexer(self.inputs.context)
 
         # for Pre-Defined Spectrum Window
-        if len(window) != 0 and windowmode == 'replace':
-            LOG.info('Skip clustering analysis since predefined line window is set.')
+        if windowmode == 'replace' and (window is None or len(window) > 0):
+            LOG.info(f'Skip line validation: windowmode="{windowmode}", window="{window}"')
             lines = _to_validated_lines(detect_signal)
             # TODO: review whether this relies on order of dictionary values.
             signal = list(detect_signal.values())[0]
@@ -581,11 +577,14 @@ class ValidateLineRaster(basetask.StandardTaskTemplate):
             return result
 
         manual_window = []
+        manual_range = []
         # register manually specified line windows to lines
-        for w in window:
-            center = float(sum(w)) / 2
-            width = max(w) - min(w)
-            manual_window.append([center, width, True, 0.0])
+        if window is not None:
+            for w in window:
+                center = float(sum(w)) / 2
+                width = max(w) - min(w)
+                manual_window.append([center, width, True, 0.0])
+            manual_range.extend(window)
 
         iteration = self.inputs.iteration
 
@@ -644,10 +643,10 @@ class ValidateLineRaster(basetask.StandardTaskTemplate):
         LOG.debug('Npos = %s', Npos)
         # 2010/6/9 for non-detection
         if Npos == 0 or len(Region2) == 0:
-            if len(manual_window) == 0:
+            if len(manual_range) == 0:
                 signal = [[-1, -1]]
             else:
-                signal = manual_window
+                signal = manual_range
             for i in index_list:
                 origin_vis, row = indexer.serial2perms(i)
                 datatable = datatable_dict[origin_vis]
@@ -660,8 +659,6 @@ class ValidateLineRaster(basetask.StandardTaskTemplate):
             result = ValidateLineResults(task=self.__class__,
                                          success=True,
                                          outcome=outcome)
-
-            result.task = self.__class__
 
             return result
 
@@ -707,10 +704,10 @@ class ValidateLineRaster(basetask.StandardTaskTemplate):
         # 2017/8/15 for non-detection after cleaninig
         #if Ncluster == 0:
         if sum([r[0] for r in clustering_results.values()]) == 0:
-            if len(manual_window) == 0:
+            if len(manual_range) == 0:
                 signal = [[-1, -1]]
             else:
-                signal = manual_window
+                signal = manual_range
             for i in index_list:
                 origin_vis, row = indexer.serial2perms(i)
                 datatable = datatable_dict[origin_vis]
@@ -723,7 +720,6 @@ class ValidateLineRaster(basetask.StandardTaskTemplate):
             result = ValidateLineResults(task=self.__class__,
                                          success=True,
                                          outcome=outcome)
-            result.task = self.__class__
             return result
 
         ### 2011/05/17 anti-scaling of the line width
@@ -753,9 +749,9 @@ class ValidateLineRaster(basetask.StandardTaskTemplate):
         for vrow in index_list:
             if vrow in RealSignal:
                 signal = self.__merge_lines(RealSignal[vrow][2], self.nchan)
-                signal.extend(window)
+                signal.extend(manual_range)
             else:
-                signal = window
+                signal = manual_range
                 if len(signal) == 0:
                     signal = [[-1, -1]]
                 #RealSignal[row] = [PosList[0][tmp_index], PosList[1][tmp_index], signal]
@@ -801,8 +797,6 @@ class ValidateLineRaster(basetask.StandardTaskTemplate):
         result = ValidateLineResults(task=self.__class__,
                                      success=True,
                                      outcome=outcome)
-
-        result.task = self.__class__
 
         return result
 
@@ -2618,8 +2612,7 @@ class SVDSolver2D(object):
         LOG.trace('nx, ny = %s, %s', nx, ny)
         assert nx == ny
         if self.N < nx:
-            self.storage.resize(nx * self.L)
-            #self.G.resize((nx, self.L))
+            self.storage = numpy.resize(self.storage, nx * self.L)
         self.N = nx
         assert self.L <= self.N
 

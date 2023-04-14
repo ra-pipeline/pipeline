@@ -107,7 +107,7 @@ class MaskMaker(MaskMakerNoLine):
         flag = self.flag.copy()
         for line in self.lines[row]:
             if line[0] != -1:
-                flag[line[0]:line[1]] = 0
+                flag[line[0]:line[1] + 1] = 0  # line[1] is an index of the end of the line
         return flag
 
 

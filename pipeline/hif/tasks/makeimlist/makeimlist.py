@@ -39,6 +39,8 @@ class MakeImListInputs(vdp.StandardInputs):
     calcsb = vdp.VisDependentProperty(default=False)
     datacolumn = vdp.VisDependentProperty(default='')
     parallel = vdp.VisDependentProperty(default='automatic')
+    robust = vdp.VisDependentProperty(default=None)
+    uvtaper = vdp.VisDependentProperty(default=None)
 
     # properties requiring some processing or MS-dependent logic -------------------------------------------------------
 
@@ -202,11 +204,6 @@ class MakeImListInputs(vdp.StandardInputs):
         self.known_synthesized_beams = known_synthesized_beams
 
 
-# tell the infrastructure to give us mstransformed data when possible by
-# registering our preference for imaging measurement sets
-#api.ImagingMeasurementSetsPreferred.register(MakeImListInputs)
-
-
 @task_registry.set_equivalent_casa_task('hif_makeimlist')
 @task_registry.set_casa_commands_comment('A list of target sources to be imaged is constructed.')
 class MakeImList(basetask.StandardTaskTemplate):
@@ -254,22 +251,22 @@ class MakeImList(basetask.StandardTaskTemplate):
         if not isinstance(inputs.vis, list):
             inputs.vis = [inputs.vis]
 
-        if inputs.datacolumn not in (None, ''):
-            datacolumn = inputs.datacolumn
+        if inputs.intent == 'TARGET':
+            if inputs.specmode in ('mfs', 'cont'):
+                datatypes = [DataType.SELFCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+            else:
+                datatypes = [DataType.SELFCAL_LINE_SCIENCE, DataType.REGCAL_LINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
         else:
-            datacolumn = ''
+            datatypes = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
         # Select the correct vis list
+        datacolumn = inputs.datacolumn
+        selected_datatype = None
+        selected_datatype_info = 'N/A'
         if inputs.vis in ('', [''], [], None):
-            if inputs.intent == 'TARGET':
-                if inputs.specmode in ('mfs', 'cont'):
-                    datatypes = [DataType.SELFCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
-                else:
-                    datatypes = [DataType.SELFCAL_LINE_SCIENCE, DataType.REGCAL_LINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
-            else:
-                datatypes = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
-
             ms_objects_and_columns, selected_datatype = inputs.context.observing_run.get_measurement_sets_of_type(dtypes=datatypes, msonly=False)
+            global_datatype_info = f'{str(selected_datatype).split(".")[-1]}'
+            selected_datatype_info = global_datatype_info
 
             if ms_objects_and_columns == collections.OrderedDict():
                 result.set_info({'msg': 'No data found. No imaging targets were created.',
@@ -283,21 +280,23 @@ class MakeImList(basetask.StandardTaskTemplate):
             if selected_datatype == DataType.RAW:
                 LOG.warn('Falling back to raw data for imaging.')
 
-            columns = list(ms_objects_and_columns.values())
-            if not all(column == columns[0] for column in columns):
+            global_columns = list(ms_objects_and_columns.values())
+            if not all(global_column == global_columns[0] for global_column in global_columns):
                 LOG.warn(f'Data type based column selection changes among MSes: {",".join(f"{k.basename}: {v}" for k,v in ms_objects_and_columns.items())}.')
 
-            if datacolumn != '':
-                LOG.info(f'Manual override of datacolumn to {datacolumn}. Data type based datacolumn would have been "{"data" if columns[0] == "DATA" else "corrected"}".')
+            if inputs.datacolumn not in (None, ''):
+                global_datacolumn = inputs.datacolumn
+                LOG.info(f'Manual override of datacolumn to {global_datacolumn}. Data type based datacolumn would have been "{"data" if global_columns[0] == "DATA" else "corrected"}".')
             else:
-                if columns[0] == 'DATA':
-                    datacolumn = 'data'
-                elif columns[0] == 'CORRECTED_DATA':
-                    datacolumn = 'corrected'
+                if global_columns[0] == 'DATA':
+                    global_datacolumn = 'data'
+                elif global_columns[0] == 'CORRECTED_DATA':
+                    global_datacolumn = 'corrected'
                 else:
-                    LOG.warn(f'Unknown column name {columns[0]}')
-                    datacolumn = ''
+                    LOG.warn(f'Unknown column name {global_columns[0]}')
+                    global_datacolumn = ''
 
+            datacolumn = global_datacolumn
             inputs.vis = [k.basename for k in ms_objects_and_columns.keys()]
 
         image_heuristics_factory = imageparams_factory.ImageParamsHeuristicsFactory()
@@ -515,6 +514,12 @@ class MakeImList(basetask.StandardTaskTemplate):
                         else:
                             max_num_targets += len(spwids_for_field)
 
+                # Save original vislist_field_spw_combinations dictionary to be able to generate
+                # proper messages if the vis list changes when falling back to a different data
+                # type for a given source/spw combination later on. The vislist_field_spw_combinations
+                # dictionary is possibly being modified on-the-fly below.
+                original_vislist_field_spw_combinations = copy.deepcopy(vislist_field_spw_combinations)
+
                 # Remove bad spws and record actual vis/field/spw combinations containing data.
                 # Record all spws with actual data in a global list.
                 # Need all spw keys (individual and cont) to distribute the
@@ -547,7 +552,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                                         for observed_spwid in map(str, observed_spwids_list):
                                             valid_data[vis][field_intent][str(observed_spwid)] = self.heuristics.has_data(field_intent_list=[field_intent], spwspec=observed_spwid, vislist=[vis])[field_intent]
                                             if not valid_data[vis][field_intent][str(observed_spwid)] and vis in observed_vis_list:
-                                                LOG.warning('Data for EB {}, field {}, observed_spwid {} is completely flagged.'.format(
+                                                LOG.warning('Data for EB {}, field {}, spw {} is completely flagged.'.format(
                                                     os.path.basename(vis), field_intent[0], observed_spwid))
                                             # Aggregated value per vislist (replace with lookup pattern later)
                                             if str(observed_spwid) not in valid_data[str(vislist)][field_intent]:
@@ -831,11 +836,6 @@ class MakeImList(basetask.StandardTaskTemplate):
                         if not valid_field_spwspec_combination:
                             continue
 
-                        # Save the specific vislist in a copy of the heuristics object tailored to the
-                        # current imaging target
-                        target_heuristics = copy.deepcopy(self.heuristics)
-                        target_heuristics.vislist = vislist_field_spw_combinations[field_intent[0]]['vislist']
-
                         # For 'cont' mode we still need to restrict the virtual spw ID list to just
                         # the ones that were actually observed for this field.
                         adjusted_spwspec = ','.join(map(str, actual_spwids))
@@ -847,6 +847,47 @@ class MakeImList(basetask.StandardTaskTemplate):
                         cont_ranges_spwsel_dict = {}
                         all_continuum_spwsel_dict = {}
                         spwsel_spwid_dict = {}
+
+                        # Check if the globally selected data type is available for this field/spw combination.
+                        # If not, fall back to next available data type.
+                        if selected_datatype is not None:
+                            # TODO: Filter out spws without requested data type for cont mode?
+                            local_ms_objects_and_columns, local_selected_datatype = inputs.context.observing_run.get_measurement_sets_of_type(dtypes=datatypes, msonly=False, source=field_intent[0], spw=adjusted_spwspec)
+                            if local_selected_datatype != selected_datatype:
+                                LOG.warn(f'Data type {str(selected_datatype).split(".")[-1]} is not available for field {field_intent[0]} SPW {adjusted_spwspec}. Falling back to data type {str(local_selected_datatype).split(".")[-1]}.')
+                                selected_datatype_info = f'{str(local_selected_datatype).split(".")[-1]} instead of {str(selected_datatype).split(".")[-1]}'
+
+                                local_columns = list(local_ms_objects_and_columns.values())
+                                if not all(local_column == local_columns[0] for local_column in local_columns):
+                                    LOG.warn(f'Data type based column selection changes among MSes: {",".join(f"{k.basename}: {v}" for k,v in local_ms_objects_and_columns.items())}.')
+
+                                if inputs.datacolumn not in (None, ''):
+                                    LOG.info(f'Manual override of datacolumn to {global_datacolumn}. Data type based datacolumn would have been "{"data" if local_columns[0] == "DATA" else "corrected"}".')
+                                else:
+                                    if local_columns[0] == 'DATA':
+                                        local_datacolumn = 'data'
+                                    elif local_columns[0] == 'CORRECTED_DATA':
+                                        local_datacolumn = 'corrected'
+                                    else:
+                                        LOG.warn(f'Unknown column name {local_columns[0]}')
+                                        local_datacolumn = ''
+
+                                    datacolumn = local_datacolumn
+                            else:
+                                selected_datatype_info = global_datatype_info
+                                datacolumn = global_datacolumn
+
+                            if vislist_field_spw_combinations[field_intent[0]]['vislist'] != [k.basename for k in local_ms_objects_and_columns.keys()]:
+                                if original_vislist_field_spw_combinations[field_intent[0]]['vislist'] != [k.basename for k in local_ms_objects_and_columns.keys()]:
+                                    LOG.warn(f'''Modifying vis list from {original_vislist_field_spw_combinations[field_intent[0]]['vislist']} to {[k.basename for k in local_ms_objects_and_columns.keys()]} for fallback data type {str(local_selected_datatype).split(".")[-1]}.''')
+                                vislist_field_spw_combinations[field_intent[0]]['vislist'] = [k.basename for k in local_ms_objects_and_columns.keys()]
+                        else:
+                            local_selected_datatype = None
+
+                        # Save the specific vislist in a copy of the heuristics object tailored to the
+                        # current imaging target
+                        target_heuristics = copy.deepcopy(self.heuristics)
+                        target_heuristics.vislist = vislist_field_spw_combinations[field_intent[0]]['vislist']
 
                         for spwid in adjusted_spwspec.split(','):
                             cont_ranges_spwsel_dict[spwid], all_continuum_spwsel_dict[spwid] = target_heuristics.cont_ranges_spwsel()
@@ -983,6 +1024,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                                 heuristics=target_heuristics,
                                 vis=filtered_vislist,
                                 datacolumn=datacolumn,
+                                datatype_info=selected_datatype_info,
                                 is_per_eb=inputs.per_eb if inputs.per_eb else None,
                                 usepointing=usepointing,
                                 mosweight=mosweight

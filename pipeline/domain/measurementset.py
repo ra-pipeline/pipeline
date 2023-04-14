@@ -1296,7 +1296,7 @@ class MeasurementSet(object):
             A name of column of a dtype. Returns None if dtype is not defined
             in the MS.
         """
-        if not (dtype in self.data_column.keys()):
+        if dtype not in self.data_column.keys():
             return None
 
         if source is None and spw is None:
@@ -1319,5 +1319,8 @@ class MeasurementSet(object):
                 key = (source_name, spw_id)
                 if dtype not in self.data_types_per_source_and_spw.get(key, []):
                     data_exists_for_all_source_spw_combinations = False
+
         if data_exists_for_all_source_spw_combinations:
             return self.data_column[dtype]
+        else:
+            return None

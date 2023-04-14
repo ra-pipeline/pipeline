@@ -57,8 +57,14 @@ def get_heuristic(arg):
 
 def execute_task(context, casa_task, casa_args):
     pipelinemode = casa_args.get('pipelinemode', None)
+    if pipelinemode is None:
+        pipelinemode = 'automatic'
     dry_run = casa_args.get('dryrun', None)
+    if dry_run is None:
+        dry_run = False
     accept_results = casa_args.get('acceptresults', True)
+    if accept_results is None:
+        accept_results = True
 
     # get the pipeline task inputs
     task_inputs = _get_task_inputs(casa_task, context, casa_args)

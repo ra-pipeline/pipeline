@@ -30,7 +30,7 @@ ImageRow = collections.namedtuple('ImageInfo', (
     'final_nsigma_mad_label final_nsigma_mad residual_ratio non_pbcor_label non_pbcor '
     'pbcor score fractional_bw_label fractional_bw aggregate_bw_label aggregate_bw aggregate_bw_num '
     'nsigma_label nsigma vis_amp_ratio_label vis_amp_ratio  '
-    'image_file nchan plot qa_url iterdone stopcode stopreason '
+    'image_file datatype_info nchan plot qa_url iterdone stopcode stopreason '
     'chk_pos_offset chk_frac_beam_offset chk_fitflux chk_fitpeak_fitflux_ratio img_snr '
     'chk_gfluxscale chk_gfluxscale_snr chk_fitflux_gfluxscale_ratio cube_all_cont tclean_command result '
     'model_pos_flux model_neg_flux model_flux_inner_deg nmajordone_total nmajordone_per_iter majorcycle_stat_plot '
@@ -76,6 +76,7 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             maxiter = max(r.iterations.keys())
 
             vis = ','.join([os.path.basename(v).strip('.ms') for v in r.vis])
+            datatype_info = r.datatype_info
 
             field = None
             fieldname = None
@@ -537,6 +538,7 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             # cache. We will later set plot to the correct value.
             row = ImageRow(
                 vis=vis,
+                datatype_info=datatype_info,
                 field=field,
                 fieldname=fieldname,
                 intent=intent,
@@ -654,20 +656,24 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 # Probably some detail page rendering exception.
                 LOG.error(e)
                 final_rows.append(row)
-        
-        # PIPE-1595: sort targets by field/spw/pol for VLA, so multiple bands of the same objects will 
-        # stay in the same weblog table row. Note that this additional VLA-only sorting might introduce 
+
+        # PIPE-1595: sort targets by field/spw/pol for VLA, so multiple bands of the same objects will
+        # stay in the same weblog table row. Note that this additional VLA-only sorting might introduce
         # a difference between the target sequences of hif_makeimages and hif_makeimlist (see PIPE-1302).
         if final_rows and 'VLA' in final_rows[0].result.imaging_mode:
             final_rows.sort(key=lambda row: (row.vis, row.field, utils.natural_sort_key(row.spw), row.pol))
-        
+
         chk_fit_rows = []
         for row in final_rows:
             if row.frequency is not None:
                 chk_fit_rows.append((row.vis, row.fieldname, row.spw, row.aggregate_bw_num, row.chk_pos_offset, row.chk_frac_beam_offset, row.chk_fitflux, row.img_snr, row.chk_fitpeak_fitflux_ratio, row.chk_gfluxscale, row.chk_gfluxscale_snr, row.chk_fitflux_gfluxscale_ratio))
         chk_fit_rows = utils.merge_td_columns(chk_fit_rows, num_to_merge=2)
 
+        # PIPE-1723: display a message in the weblog depending on the observatory
+        imaging_mode = clean_results[0].imaging_mode  if len(clean_results)>0  else  None
+
         ctx.update({
+            'imaging_mode': imaging_mode,
             'plots': plots,
             'plots_dict': plots_dict,
             'image_info': final_rows,
@@ -855,6 +861,7 @@ class T2_4MDetailsTcleanVlassCubeRenderer(basetemplates.T2_4MDetailsDefaultRende
             field = fieldname = intent = None
 
             vis = ','.join([os.path.basename(v).strip('.ms') for v in r.vis])
+            datatype_info = r.datatype_info
             image_path = r.iterations[maxiter]['image'].replace('.image', f'.image{extension}')
 
             LOG.info('Getting properties of %s for the weblog' % image_path)
@@ -1364,6 +1371,7 @@ class T2_4MDetailsTcleanVlassCubeRenderer(basetemplates.T2_4MDetailsDefaultRende
 
                 row = ImageRow(
                     vis=vis,
+                    datatype_info=datatype_info,
                     field=field,
                     fieldname=fieldname,
                     intent=intent,

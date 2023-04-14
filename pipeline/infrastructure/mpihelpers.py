@@ -2,6 +2,7 @@ import abc
 import os
 import pickle
 import tempfile
+from inspect import signature
 
 from pipeline.domain.unitformat import file_size
 
@@ -282,9 +283,8 @@ class Tier0FunctionCall(object):
         self.__kwargs = kwargs
 
         # the following code is used to get a nice repr format
-        code = fn.__code__
-        arg_count = code.co_argcount
-        arg_names = code.co_varnames[:arg_count]
+        arg_names = list(signature(fn).parameters)
+        arg_count = len(arg_names)
 
         def format_arg_value(arg_val):
             arg, val = arg_val

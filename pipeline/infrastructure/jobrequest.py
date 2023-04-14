@@ -5,6 +5,7 @@ import os
 import platform
 import re
 import sys
+from inspect import signature
 
 import almatasks
 import casaplotms
@@ -189,9 +190,8 @@ class JobRequest(object):
 
         # get the argument names and default argument values for the given
         # function
-        code = fn.__code__
-        argcount = code.co_argcount
-        argnames = code.co_varnames[:argcount]
+        argnames = list(signature(fn).parameters)
+        argcount = len(argnames)
         fn_defaults = fn.__defaults__ or list()
         argdefs = dict(zip(argnames[-len(fn_defaults):], fn_defaults))
 

@@ -82,6 +82,10 @@ $(document).ready(function() {
                     <th>Observation End</th>
                     <td>${obs_end}&nbsp;UTC</td>
                 </tr>
+                <tr>
+                    <th>Number of Execution Blocks</th>
+                    <td>${number_of_execblocks}</td>
+                </tr>
             </tbody>
         </table>
     </div>

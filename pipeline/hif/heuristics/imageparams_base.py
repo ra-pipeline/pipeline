@@ -1729,6 +1729,12 @@ class ImageParamsHeuristics(object):
                     if gridder == 'mosaic':
                         # Correct for mosaic overlap factor
                         source_name = [f.source.name for f in ms.fields if (utils.dequote(f.name) == utils.dequote(field) and intent in f.intents)][0]
+                        # PIPE-1708: "Integer" source names consisting of just
+                        # digits cause confusion in the mosaic overlap factor
+                        # calculation. Adopting the "solution" of enquoting
+                        # such names.
+                        if source_name.isdigit():
+                            source_name = '"{}"'.format(source_name)
                         diameter = np.median([a.diameter for a in ms.antennas])
                         overlap_factor = mosaicoverlap.mosaicOverlapFactorMS(ms, source_name, intSpw, diameter)
                         LOG.info('Dividing by mosaic overlap improvement factor of %s corrects sensitivity for EB %s'
