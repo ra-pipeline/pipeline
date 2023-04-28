@@ -26,6 +26,7 @@ import pipeline.infrastructure.executeppr as almappr
 import pipeline.infrastructure.executevlappr as vlappr
 import pipeline.infrastructure.logging as logging
 from pipeline.infrastructure.utils import shutdown_plotms, get_casa_session_details
+from pipeline.infrastructure.mpihelpers import chdir as mpi_chdir
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -181,7 +182,7 @@ class PipelineRegression(object):
             # run the pipeline for new results
 
             # switch from the pytest-call working directory to the root folder for this test.
-            os.chdir(self.output_dir)
+            mpi_chdir(self.output_dir)
 
             if not(self.compare_only):
                 # create the sub-directory structure for this test and switch to "working/"
@@ -191,7 +192,7 @@ class PipelineRegression(object):
                         os.mkdir(dd)
                     except FileExistsError:
                         pass
-                os.chdir('working')
+                mpi_chdir('working')
 
                 # PIPE-1301: shut down the existing plotms process to avoid side-effects from changing CWD.
                 # This is implemented as a workaround for CAS-13626
@@ -209,7 +210,7 @@ class PipelineRegression(object):
                 else:
                     self.__run_reducer(input_vis)
             else: 
-                os.chdir('working')
+                mpi_chdir('working')
 
             # Get new results
             new_results = self.__get_results_of_from_current_context()
@@ -228,7 +229,7 @@ class PipelineRegression(object):
                 # restore the default logfile state
                 self.__reset_logfiles(casa_logfile=last_casa_logfile)
 
-            os.chdir(self.current_path)
+            mpi_chdir(self.current_path)
             
             # clean up if requested
             if not self.compare_only and self.remove_workdir and os.path.isdir(self.output_dir):

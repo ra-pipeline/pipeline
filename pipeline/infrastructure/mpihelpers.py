@@ -417,6 +417,13 @@ def parse_mpi_input_parameter(input_arg):
         raise ValueError('Arg must be one of true, false or automatic. Got %s' % input_arg)
 
 
+def chdir(path):
+    """Change cwd on both the client and mpiserver processes."""
+    os.chdir(path)
+    if mpiclient is not None and mpi_server_list is not None:
+        mpiclient.push_command_request(f'os.chdir({path!r})', block=True, target_server=mpi_server_list)
+
+
 mpiclient = None
 mpi_server_list = None
 
