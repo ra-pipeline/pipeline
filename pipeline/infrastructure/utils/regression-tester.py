@@ -26,7 +26,7 @@ import pipeline.infrastructure.executeppr as almappr
 import pipeline.infrastructure.executevlappr as vlappr
 import pipeline.infrastructure.logging as logging
 from pipeline.infrastructure.utils import shutdown_plotms, get_casa_session_details
-from pipeline.infrastructure.mpihelpers import chdir as mpi_chdir
+from pipeline.infrastructure import mpihelpers
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -182,7 +182,7 @@ class PipelineRegression(object):
             # run the pipeline for new results
 
             # switch from the pytest-call working directory to the root folder for this test.
-            mpi_chdir(self.output_dir)
+            mpihelpers.chdir(self.output_dir)
 
             if not(self.compare_only):
                 # create the sub-directory structure for this test and switch to "working/"
@@ -192,7 +192,7 @@ class PipelineRegression(object):
                         os.mkdir(dd)
                     except FileExistsError:
                         pass
-                mpi_chdir('working')
+                mpihelpers.chdir('working')
 
                 # PIPE-1301: shut down the existing plotms process to avoid side-effects from changing CWD.
                 # This is implemented as a workaround for CAS-13626
@@ -210,7 +210,7 @@ class PipelineRegression(object):
                 else:
                     self.__run_reducer(input_vis)
             else: 
-                mpi_chdir('working')
+                mpihelpers.chdir('working')
 
             # Get new results
             new_results = self.__get_results_of_from_current_context()
@@ -229,7 +229,7 @@ class PipelineRegression(object):
                 # restore the default logfile state
                 self.__reset_logfiles(casa_logfile=last_casa_logfile)
 
-            mpi_chdir(self.current_path)
+            mpihelpers.chdir(self.current_path)
             
             # clean up if requested
             if not self.compare_only and self.remove_workdir and os.path.isdir(self.output_dir):
@@ -358,8 +358,6 @@ class PipelineRegression(object):
         # reset casacalls-*.txt
         if casacalls_logfile is None:
             casacalls_logfile = 'casacalls-{!s}.txt'.format(platform.node().split('.')[0])
-        else:
-            casacalls_logfile = casacalls_logfile
         _ = logging.get_logger('CASACALLS', stream=None, format='%(message)s', addToCasaLog=False,
                                filename=casacalls_logfile)
         # reset casa-*.log
@@ -369,7 +367,7 @@ class PipelineRegression(object):
         else:
             casa_logfile = os.path.abspath(casa_logfile)
         last_casa_logfile = casa_tools.casalog.logfile()
-        casa_tools.casalog.setlogfile(casa_logfile)
+        mpihelpers.setlogfile(casa_logfile)
 
         # prepend the content of the last CASA logfile in the new logfile.
         if prepend and os.path.exists(last_casa_logfile) and casa_logfile != last_casa_logfile:

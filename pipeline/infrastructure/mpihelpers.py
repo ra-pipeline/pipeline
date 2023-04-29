@@ -6,6 +6,7 @@ from inspect import signature
 import pprint 
 
 from pipeline.domain.unitformat import file_size
+import pipeline.infrastructure.casa_tools as casa_tools
 
 try:
     from casampi.MPIEnvironment import MPIEnvironment
@@ -422,6 +423,14 @@ def chdir(path):
     os.chdir(path)
     if mpiclient is not None and mpi_server_list is not None:
         mpiclient.push_command_request(f'os.chdir({path!r})', block=True, target_server=mpi_server_list)
+
+
+def setlogfile(filename):
+    """Set casalog file on both the client and mpiserver processes."""
+    casa_tools.casalog.setlogfile(filename)
+    if mpiclient is not None and mpi_server_list is not None:
+        mpiclient.push_command_request(
+            f'pipeline.infrastructure.casa_tools.casalog.setlogfile({filename!r})', block=True, target_server=mpi_server_list)
 
 
 mpiclient = None
