@@ -19,15 +19,20 @@ import re
 import shutil
 import string
 import tarfile
-from typing import Collection, Dict, List, Optional, Sequence, Tuple, Union
-from urllib.parse import urlparse
+import platform
+import datetime
+from typing import Collection, Dict, List, Tuple, Optional, Sequence, Union
 
 import casaplotms
 import numpy as np
 import numpy.typing as npt
 
-from .. import casa_tools, logging, mpihelpers
-from .conversion import dequote, range_to_list
+from .conversion import range_to_list, dequote
+from .. import casa_tools
+from .. import logging
+from .. import mpihelpers
+
+import casaplotms.private.plotmstool as plotmstool
 
 LOG = logging.get_logger(__name__)
 
@@ -36,8 +41,7 @@ __all__ = ['find_ranges', 'dict_merge', 'are_equal', 'approx_equal', 'get_num_ca
            'imstat_items', 'get_stokes', 'get_taskhistory_fromimage', 'glob_ordered', 'deduplicate',
            'get_casa_quantity', 'get_si_prefix', 'absolute_path', 'relative_path', 'get_task_result_count',
            'place_repr_source_first', 'shutdown_plotms', 'get_casa_session_details', 'get_obj_size', 'get_products_dir',
-           'export_weblog_as_tar', 'ensure_products_dir_exists', 'ignore_pointing', 'request_omp_threading',
-           'open_with_lock', 'nested_dict', 'string_to_val', 'remove_trailing_string', 'list_to_str', 'validate_url']
+           'export_weblog_as_tar', 'ensure_products_dir_exists', 'reset_logfiles']
 
 
 def find_ranges(data: Union[str, List[int]]) -> str:
@@ -842,104 +846,33 @@ def get_products_dir(context):
         return context.products_dir
 
 
-class pl_defaultdict(collections.defaultdict):
-    def __repr__(self):
-        return str(dict(self))
-
-    def as_plain_dict(self):
-        return to_plain_dict(self)
-
-
-def nested_dict():
-    return pl_defaultdict(nested_dict)
-
-
-def to_plain_dict(default_dict):
-    plain_dict = dict()
-    for k, v in default_dict.items():
-        if isinstance(v, collections.defaultdict):
-            plain_dict[k] = to_plain_dict(v)
-        else:
-            plain_dict[k] = v
-
-    return plain_dict
-
-
-def string_to_val(s):
+def reset_logfiles(casacalls_logfile=None, casa_logfile=None, prepend=False):
+    """Reset CASA/Pipeline logfiles for the current CASA/Pipeline session.
+    
+    This function is intended to be used at the beginning of each regression test after the 
+    regreion-testers switches to a new working directory.
     """
-    Convert a string to a Python data type.
-    """
-    try:
-        pyobj = ast.literal_eval(s)
-        # PIPE-1030: prevent a string like "1,2,3" from being unexpectedly translated into tuple
-        if type(pyobj) is tuple and s.strip()[0] != '(':
-            pyobj = s
-        return pyobj
-    except ValueError:
-        return s
-    except SyntaxError:
-        return s
 
-
-def remove_trailing_string(s, t):
-    """
-    Remove a trailing string if it exists.
-    """
-    if s.endswith(t):
-        return s[:-len(t)]
+    # reset casacalls-*.txt
+    if casacalls_logfile is None:
+        casacalls_logfile = 'casacalls-{!s}.txt'.format(platform.node().split('.')[0])
+    _ = logging.get_logger('CASACALLS', stream=None, format='%(message)s', addToCasaLog=False,
+                           filename=casacalls_logfile)
+    # reset casa-*.log
+    if casa_logfile is None:
+        now_str = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+        casa_logfile = os.path.abspath(f'casa-{now_str}.log')
     else:
-        return s
+        casa_logfile = os.path.abspath(casa_logfile)
+    last_casa_logfile = casa_tools.casalog.logfile()
+    casa_tools.casalog.setlogfile(casa_logfile)
 
+    if not mpihelpers.is_mpi_server() and prepend:
+        # prepend the content of the last CASA logfile in the new logfile.
+        # we only run this from the client side to avoid a race condition.
+        if os.path.exists(last_casa_logfile) and casa_logfile != last_casa_logfile:
+            with open(last_casa_logfile, 'r') as infile:
+                with open(casa_logfile, 'a') as outfile:
+                    outfile.write(infile.read())
 
-def list_to_str(value: Union[List[Union[Number, str]], npt.NDArray]) -> str:
-    """Convert list or numpy.ndarray into string.
-
-    The list/ndarray should be 1-dimensional. In that case, the function
-    returns comma-separated sequence of its elements. Otherwise it just
-    returns default string representation of the value, str(value).
-
-    Args:
-        value: 1-dimensional list or numpy array
-
-    Returns:
-        String representation of the value. If input value is in
-        compliance with the requirement, it will be comma-separated
-        sequence of elements.
-    """
-    if isinstance(value, (list, np.ndarray)) \
-       and all(isinstance(x, (Number, str)) for x in value):
-        # use np.ndarray.tolist to ensure all the elements
-        # have Python builtin types
-        ret = str(np.asarray(value).tolist())
-    else:
-        ret = str(value)
-    return ret
-
-
-def validate_url(url: str) -> bool:
-    """Validates whether a given URL is properly formatted.
-
-    This function checks if the URL follows a valid format using a regular expression.
-    It also ensures that the parsed URL contains both a scheme (e.g., "http" or "https")
-    and a network location (netloc), which are required components for a valid URL.
-
-    Args:
-        url (str): The URL to validate.
-
-    Returns:
-        bool: True if the URL is valid, False otherwise.
-    """
-    url_regex = re.compile(
-        r'^(https?:\/\/)?'  # HTTP or HTTPS
-        r'([\w.-]+)'        # Domain name or IP address
-        r'(:\d+)?'          # Optional port
-        r'(\/[^\s]*)?$',    # Optional path
-        re.IGNORECASE
-    )
-
-    if not url_regex.match(url):
-        return False
-
-    parsed = urlparse(url)
-
-    return all([parsed.scheme, parsed.netloc])
+    return

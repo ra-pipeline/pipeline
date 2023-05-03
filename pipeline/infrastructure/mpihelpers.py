@@ -6,7 +6,6 @@ from inspect import signature
 import pprint 
 
 from pipeline.domain.unitformat import file_size
-import pipeline.infrastructure.casa_tools as casa_tools
 
 try:
     from casampi.MPIEnvironment import MPIEnvironment
@@ -390,6 +389,11 @@ def is_mpi_ready():
                 mpiclient])  # MPICommandClient ready
 
 
+def is_mpi_server():
+    """check if the current process is on an MPI server."""
+    return MPIEnvironment.is_mpi_enabled and not MPIEnvironment.is_mpi_client
+
+
 def _splitall(path):
     allparts = []
     while True:
@@ -418,19 +422,18 @@ def parse_mpi_input_parameter(input_arg):
         raise ValueError('Arg must be one of true, false or automatic. Got %s' % input_arg)
 
 
-def chdir(path):
-    """Change cwd on both the client and mpiserver processes."""
-    os.chdir(path)
+def exec_func(fn, *args, include_client=True, **kwargs):
+    """execute the same identical function on the client and individual mpiserver processes.
+    
+    This function is mostfly useful for certain MPI client/servers setup tasks, e.g. switch CWD.
+    """
+    if include_client:
+        fn(*args, **kwargs)
+    executable = Tier0FunctionCall(fn, *args, **kwargs)
     if mpiclient is not None and mpi_server_list is not None:
-        mpiclient.push_command_request(f'os.chdir({path!r})', block=True, target_server=mpi_server_list)
-
-
-def setlogfile(filename):
-    """Set casalog file on both the client and mpiserver processes."""
-    casa_tools.casalog.setlogfile(filename)
-    if mpiclient is not None and mpi_server_list is not None:
-        mpiclient.push_command_request(
-            f'pipeline.infrastructure.casa_tools.casalog.setlogfile({filename!r})', block=True, target_server=mpi_server_list)
+        mpiclient.push_command_request('pipeline.infrastructure.mpihelpers.mpiexec(tier0_executable)',
+                                       block=True, target_server=mpi_server_list,
+                                       parameters={'tier0_executable': executable})
 
 
 mpiclient = None

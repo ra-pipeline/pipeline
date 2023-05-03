@@ -10,7 +10,6 @@ import shutil
 import datetime
 import glob
 import os
-import platform
 import pytest
 import re
 from packaging import version
@@ -24,8 +23,7 @@ import pipeline.recipereducer
 from pipeline.infrastructure.renderer import regression
 import pipeline.infrastructure.executeppr as almappr
 import pipeline.infrastructure.executevlappr as vlappr
-import pipeline.infrastructure.logging as logging
-from pipeline.infrastructure.utils import shutdown_plotms, get_casa_session_details
+from pipeline.infrastructure.utils import shutdown_plotms, get_casa_session_details, reset_logfiles
 from pipeline.infrastructure import mpihelpers
 
 LOG = infrastructure.get_logger(__name__)
@@ -182,35 +180,36 @@ class PipelineRegression(object):
             # run the pipeline for new results
 
             # switch from the pytest-call working directory to the root folder for this test.
-            mpihelpers.chdir(self.output_dir)
+            mpihelpers.exec_func(os.chdir, self.output_dir)
+
+            # create the sub-directory structure for this test and switch to "working/"
+            dd_list = ['products', 'working', 'rawdata'] if ppr else ['products', 'working']
+            for dd in dd_list:
+                try:
+                    os.mkdir(dd)
+                except FileExistsError:
+                    pass
+
+            mpihelpers.exec_func(os.chdir, 'working')
+
+            # switch to per-test casa/PL logfile paths and backup the default(initial) casa logfile name
+            now_str = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+            casa_logfile = f'casa-{now_str}.log'
+            mpihelpers.exec_func(reset_logfiles, casa_logfile=casa_logfile, prepend=True)
+
+            # PIPE-1301: shut down the existing plotms process to avoid side-effects from changing CWD.
+            # This is implemented as a workaround for CAS-13626, and should run after all log files get reset.
+            mpihelpers.exec_func(shutdown_plotms)
+
+            # PIPE-1432: reset casatasks/tec_maps.workDir as it's unaware of a CWD change.
+            if hasattr(tec_maps, 'workDir'):
+                tec_maps.workDir = os.getcwd()+'/'
 
             if not(self.compare_only):
-                # create the sub-directory structure for this test and switch to "working/"
-                dd_list = ['products', 'working', 'rawdata'] if ppr else ['products', 'working']
-                for dd in dd_list:
-                    try:
-                        os.mkdir(dd)
-                    except FileExistsError:
-                        pass
-                mpihelpers.chdir('working')
-
-                # PIPE-1301: shut down the existing plotms process to avoid side-effects from changing CWD.
-                # This is implemented as a workaround for CAS-13626
-                shutdown_plotms()
-                
-                # PIPE-1432: reset casatasks/tec_maps.workDir as it's unaware of a CWD change.
-                if hasattr(tec_maps, 'workDir'):
-                    tec_maps.workDir = os.getcwd()+'/'            
-
-                # switch to per-test casa/PL logfile paths and backup the default(initial) casa logfile name
-                self.__reset_logfiles(prepend=True)
-
                 if ppr:
                     self.__run_ppr(input_vis, ppr, telescope)
                 else:
                     self.__run_reducer(input_vis)
-            else: 
-                mpihelpers.chdir('working')
 
             # Get new results
             new_results = self.__get_results_of_from_current_context()
@@ -227,9 +226,9 @@ class PipelineRegression(object):
         finally:
             if not self.compare_only:
                 # restore the default logfile state
-                self.__reset_logfiles(casa_logfile=last_casa_logfile)
+                mpihelpers.exec_func(reset_logfiles, casa_logfile=last_casa_logfile)
 
-            mpihelpers.chdir(self.current_path)
+            mpihelpers.exec_func(os.chdir, self.current_path)
             
             # clean up if requested
             if not self.compare_only and self.remove_workdir and os.path.isdir(self.output_dir):
@@ -352,30 +351,7 @@ class PipelineRegression(object):
         LOG.warning("Running without Pipeline Processing Request (PPR).  Using recipereducer instead.")
         pipeline.recipereducer.reduce(vis=input_vis, procedure=self.recipe)
 
-    def __reset_logfiles(self, casacalls_logfile=None, casa_logfile=None, prepend=False):
-        """Put CASA/Pipeline logfiles into the test working directory."""
 
-        # reset casacalls-*.txt
-        if casacalls_logfile is None:
-            casacalls_logfile = 'casacalls-{!s}.txt'.format(platform.node().split('.')[0])
-        _ = logging.get_logger('CASACALLS', stream=None, format='%(message)s', addToCasaLog=False,
-                               filename=casacalls_logfile)
-        # reset casa-*.log
-        if casa_logfile is None:
-            now_str = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-            casa_logfile = os.path.abspath(f'casa-{now_str}.log')
-        else:
-            casa_logfile = os.path.abspath(casa_logfile)
-        last_casa_logfile = casa_tools.casalog.logfile()
-        mpihelpers.setlogfile(casa_logfile)
-
-        # prepend the content of the last CASA logfile in the new logfile.
-        if prepend and os.path.exists(last_casa_logfile) and casa_logfile != last_casa_logfile:
-            with open(last_casa_logfile, 'r') as infile:
-                with open(casa_logfile, 'a') as outfile:
-                    outfile.write(infile.read())
-
-        return
 
 
 # The methods below are test methods called from pytest.
