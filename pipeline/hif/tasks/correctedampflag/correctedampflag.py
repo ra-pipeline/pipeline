@@ -1,14 +1,17 @@
 import collections
 import copy
 import os
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+from numpy.typing import NDArray
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
+from pipeline.domain.measurementset import MeasurementSet
 from pipeline.h.tasks.common import commonhelpermethods
 from pipeline.h.tasks.common.arrayflaggerbase import FlagCmd
 from pipeline.h.tasks.flagging.flagdatasetter import FlagdataSetter
@@ -19,11 +22,10 @@ from .resultobjects import CorrectedampflagResults
 LOG = infrastructure.get_logger(__name__)
 
 
-def _consolidate_flags(flags):
+def _consolidate_flags(flags: List[FlagCmd]) -> List[FlagCmd]:
     """
-    Method to consolidate a list of FlagCmd objects ("flags").
+    Function to consolidate a list of FlagCmd objects ("flags").
     """
-
     # Consolidate by polarisation.
     flags = _consolidate_flags_with_same_pol(flags)
 
@@ -39,15 +41,14 @@ def _consolidate_flags(flags):
     return flags
 
 
-def _consolidate_flags_with_same_pol(flags):
+def _consolidate_flags_with_same_pol(flags: List[FlagCmd]) -> List[FlagCmd]:
     """
-    Method to consolidate a list of FlagCmd objects ("flags") by removing
+    Function to consolidate a list of FlagCmd objects ("flags") by removing
     flags that differ only in polarisation.
 
-    This method belongs to correctedampflag, by making assumptions on which
+    This function belongs to correctedampflag, by making assumptions on which
     properties of the FlagCmd it needs to compare.
     """
-
     # Get flag commands.
     flagcmds = [flag.flagcmd for flag in flags]
 
@@ -61,8 +62,7 @@ def _consolidate_flags_with_same_pol(flags):
     # those where this is true, replace them with a single flag.
     else:
         # Identify the flags that have non-unique flagging commands:
-        uval, uind, ucnt = np.unique(flagcmds, return_inverse=True,
-                                     return_counts=True)
+        uval, uind, ucnt = np.unique(flagcmds, return_inverse=True, return_counts=True)
 
         # Build new list of flags.
         cflags = []
@@ -118,14 +118,14 @@ def _consolidate_flags_with_same_pol(flags):
     return cflags
 
 
-def _consolidate_flags_by_timestamps(flags):
+def _consolidate_flags_by_timestamps(flags: List[FlagCmd]) -> List[FlagCmd]:
     """
-    Method to consolidate a list of FlagCmd objects ("flags") by removing
+    Function to consolidate a list of FlagCmd objects ("flags") by removing
     flags with timestamps if for the same (spw, field, intent), the antenna
     and/or baseline is covered by a flagging command without timestamp
     (covering same baseline, or an antenna from baseline, or all antennas).
 
-    This method belongs to correctedampflag, by making assumptions on which
+    This function belongs to correctedampflag, by making assumptions on which
     properties of the FlagCmd it needs to compare.
     """
 
@@ -191,12 +191,12 @@ def _consolidate_flags_by_timestamps(flags):
     return cflags
 
 
-def _consolidate_flags_by_antennas(flags):
+def _consolidate_flags_by_antennas(flags: List[FlagCmd]) -> List[FlagCmd]:
     """
-    Method to consolidate a list of FlagCmd objects ("flags")
+    Function to consolidate a list of FlagCmd objects ("flags")
     by antennas.
 
-    This method belongs to correctedampflag, by making assumptions on which
+    This function belongs to correctedampflag, by making assumptions on which
     properties of the FlagCmd it needs to compare.
     """
     # Consolidate flags matching a non-antenna specific flag.
@@ -209,14 +209,14 @@ def _consolidate_flags_by_antennas(flags):
     return flags
 
 
-def _consolidate_flags_non_antenna_specific(flags):
+def _consolidate_flags_non_antenna_specific(flags: List[FlagCmd]) -> List[FlagCmd]:
     """
-    Method to consolidate a list of FlagCmd objects ("flags") by removing
+    Function to consolidate a list of FlagCmd objects ("flags") by removing
     flags with antennas/baselines if the same (timestamp, spw, field,
     intent) is covered by a flagging command without antennas (i.e. all
     antennas).
 
-    This method belongs to correctedampflag, by making assumptions on which
+    This function belongs to correctedampflag, by making assumptions on which
     properties of the FlagCmd it needs to compare.
     """
     # Identify list of properties of flag commands without antenna.
@@ -271,12 +271,12 @@ def _consolidate_flags_non_antenna_specific(flags):
     return cflags
 
 
-def _consolidate_flags_for_ant_in_baselines(flags):
-    """Method to consolidate a list of FlagCmd objects ("flags") by removing
+def _consolidate_flags_for_ant_in_baselines(flags: List[FlagCmd]) -> List[FlagCmd]:
+    """Function to consolidate a list of FlagCmd objects ("flags") by removing
     flags with baselines if the same (timestamp, spw, field, intent) is
     covered by a flagging command for one of the antennas in the baseline.
 
-    This method belongs to correctedampflag, by making assumptions on which
+    This function belongs to correctedampflag, by making assumptions on which
     properties of the FlagCmd it needs to compare.
     """
     # Identify list of properties of flag commands with a single antenna.
@@ -325,11 +325,11 @@ def _consolidate_flags_for_ant_in_baselines(flags):
     return cflags
 
 
-def _consolidate_duplicate_flags(flags):
-    """Method to consolidate a list of FlagCmd objects ("flags") by removing
+def _consolidate_duplicate_flags(flags: List[FlagCmd]) -> List[FlagCmd]:
+    """
+    Function to consolidate a list of FlagCmd objects ("flags") by removing
     duplicate flags that result in the same flagging command.
     """
-
     # Build new list of flags, and preserve skipped flag commands to
     # report.
     cflags = []
@@ -350,13 +350,12 @@ def _consolidate_duplicate_flags(flags):
     return cflags
 
 
-def _propagate_phase_flags(flags, ms, antenna_id_to_name):
+def _propagate_phase_flags(flags: List[FlagCmd], ms: MeasurementSet, antenna_id_to_name: Dict) -> List[FlagCmd]:
     """
-    Method to take a list of FlagCmd objects ("flags") and propagate
+    Function to take a list of FlagCmd objects ("flags") and propagate
     flags with reason = 'bad baseline' and intent = PHASE to intents
     TARGET and CHECK.
     """
-
     # Intents to propagate to.
     intents_propto = ["TARGET", "CHECK"]
 
@@ -526,8 +525,10 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         # Get translation dictionary for antenna id to name.
         antenna_id_to_name = self._get_ant_id_to_name_dict(ms)
 
-        # Initialize list of all newly found flags.
+        # Initialize list of all newly found flags, and before/after flagging
+        # summaries.
         allflags = []
+        stats_before, stats_after = {}, {}
 
         # Start iterative flagging.
         counter = 1
@@ -537,6 +538,11 @@ class Correctedampflag(basetask.StandardTaskTemplate):
 
             # Identify new flags.
             newflags = self._run_flagging_iteration(ms, antenna_id_to_name)
+
+            # Run step that will propagate flags under certain conditions.
+            # PIPE-1630: run this within iterative flagging loop to ensure that
+            # propagated flags show up in the "after" flagging summary.
+            newflags = _propagate_phase_flags(newflags, ms, antenna_id_to_name)
 
             # Add flags to overall list.
             allflags.extend(newflags)
@@ -575,9 +581,6 @@ class Correctedampflag(basetask.StandardTaskTemplate):
             # Consolidate final list of all flagging commands.
             allflags = _consolidate_flags(allflags)
 
-            # Propagate PHASE 'bad baseline' flags to TARGET.
-            allflags = _propagate_phase_flags(allflags, ms, antenna_id_to_name)
-
             # Report final number of new flags (CAS-7336: show as info message instead of warning).
             LOG.info("Evaluation of flagging heuristics for {} raised total of {} flagging command(s)"
                      "".format(os.path.basename(inputs.vis), len(allflags)))
@@ -594,7 +597,7 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         return result
 
     @staticmethod
-    def _get_ant_id_to_name_dict(ms):
+    def _get_ant_id_to_name_dict(ms: MeasurementSet) -> Dict:
         """
         Return dictionary with antenna ID mapped to antenna name.
         If no unique antenna name can be assigned to each antenna ID,
@@ -619,7 +622,7 @@ class Correctedampflag(basetask.StandardTaskTemplate):
 
         return antenna_id_to_name
 
-    def _run_flagging_iteration(self, ms, antenna_id_to_name):
+    def _run_flagging_iteration(self, ms: MeasurementSet, antenna_id_to_name: Dict) -> List[FlagCmd]:
         inputs = self.inputs
 
         # Get the spws to use.
@@ -649,7 +652,7 @@ class Correctedampflag(basetask.StandardTaskTemplate):
             # PIPE-281: CHECK intent is optional and does not require a warning.
             # PIPE-607: POLANGLE and POLLEAKAGE are also optional.
             if not valid_fields:
-                if not intent in ['CHECK', 'POLANGLE', 'POLLEAKAGE']:
+                if intent not in ['CHECK', 'POLANGLE', 'POLLEAKAGE']:
                     LOG.warning("Invalid data selection for given intent(s) and field(s): fields {} do not include"
                                 " intent \'{}\'.".format(utils.commafy(utils.safe_split(inputs.field)), intent))
                 continue
@@ -673,8 +676,8 @@ class Correctedampflag(basetask.StandardTaskTemplate):
 
         return newflags
 
-    def _evaluate_heuristic(self, ms, intent, field, spwid, antenna_id_to_name):
-
+    def _evaluate_heuristic(self, ms: MeasurementSet, intent: str, field: str, spwid: int,
+                            antenna_id_to_name: Dict) -> List[FlagCmd]:
         # Initialize flags.
         allflags = []
 
@@ -696,8 +699,7 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         return allflags
 
     @staticmethod
-    def _identify_baseline_sets(ms):
-
+    def _identify_baseline_sets(ms: MeasurementSet) -> List[Tuple[str, str]]:
         # Determine unique antenna diameters.
         uniq_diams = {ant.diameter for ant in ms.antennas}
 
@@ -749,7 +751,7 @@ class Correctedampflag(basetask.StandardTaskTemplate):
 
         return baseline_sets
 
-    def _uvbinFactor(self, uvmin, totalpts):
+    def _uvbinFactor(self, uvmin: float, totalpts: int) -> float:
         # Determine the uvrange bin width for searching for outliers in TARGET data.
         # ACA snapshot mosaics can have small number of visibility points per field that would 
         # not support the option with finer bins at short baselines (18 bins from 7m-36m).  
@@ -779,7 +781,9 @@ class Correctedampflag(basetask.StandardTaskTemplate):
             LOG.info('Using uvbinFactor=%.2f' % (factor))
         return factor
         
-    def _evaluate_heuristic_for_baseline_set(self, ms, intent, field, spwid, antenna_id_to_name, baseline_set=None):
+    def _evaluate_heuristic_for_baseline_set(self, ms: MeasurementSet, intent: str, field: str, spwid: int,
+                                             antenna_id_to_name: Dict,
+                                             baseline_set: Optional[List] = None) -> List[FlagCmd]:
 
         inputs = self.inputs
 
@@ -989,10 +993,11 @@ class Correctedampflag(basetask.StandardTaskTemplate):
             # Based on the "ultra low/high" sigma outlier thresholds, identify
             # both negative and positive outliers.
             if intent == 'TARGET':
+                # Identify UV bins.
                 uvdist = uvdist_all[id_nonac]
                 uvdist_sel = uvdist[id_nonbad]
                 if uvdist_sel.shape == (0,):
-                    continue # go on to the next polarization
+                    continue  # go on to the next polarization
                 uvmin = np.min(uvdist_sel)
                 uvmax = np.max(uvdist_sel)
                 uvbins = []
@@ -1000,8 +1005,10 @@ class Correctedampflag(basetask.StandardTaskTemplate):
                 while uv1 < uvmax:
                     uv0 = uv1
                     uv1 *= self._uvbinFactor(uv0, len(uvdist_sel))
-                    uvbins.append([uv0,uv1])
-                LOG.info('%s: Defined %d uvbins for field %s spw %d: %s' % (ms, len(uvbins),str(field),spwid,str(uvbins)))
+                    uvbins.append([uv0, uv1])
+                LOG.info('%s: Defined %d uvbins for field %s spw %d: %s'
+                         '' % (ms, len(uvbins), str(field), spwid, str(uvbins)))
+
                 # Build another set of uvbins, shifted by 1/2 bin from the original set
                 # Any visibilities in the first half of the original bin will be ignored by
                 # the second set of bins, while the final bin will be half the width of the 
@@ -1012,19 +1019,27 @@ class Correctedampflag(basetask.StandardTaskTemplate):
                     uv0 = uv1
                     i = len(uvbins2)
                     if i < len(uvbins)-1:
-                        uv1 = np.mean([uvbins[i+1][0],uvbins[i+1][1]])
+                        uv1 = np.mean([uvbins[i+1][0], uvbins[i+1][1]])
                     else:
                         uv1 = uvbins[i][1]
-                    uvbins2.append([uv0,uv1])
-                LOG.info('%s: Defined %d offset uvbins for field %s spw %d: %s' % (ms, len(uvbins),str(field),spwid,str(uvbins2)))
+                    uvbins2.append([uv0, uv1])
+                LOG.info('%s: Defined %d offset uvbins for field %s spw %d: %s'
+                         '' % (ms, len(uvbins), str(field), spwid, str(uvbins2)))
                 uvbinsets = [uvbins, uvbins2]
+
                 id_ultrahighsig_dict = {0: [], 1: []}
-                minimumPoints = 22  # for an accurate median/MAD. Note: a single integration of a 7-antenna array would produce only 6 points per field
-                npts = minimumPoints + 1 # establish this count to set the initial uvstart
-                for v,uvbins in enumerate(uvbinsets):
-                    previousLength = 0 # only used for LOG message
+
+                # Define minimum points for an accurate median/MAD. Note: a
+                # single integration of a 7-antenna array would produce only 6
+                # points per field.
+                minimumPoints = 22
+                # Establish count to set the initial uvstart.
+                npts = minimumPoints + 1
+                # Iterate through set of UV bins.
+                for v, uvbins in enumerate(uvbinsets):
+                    previousLength = 0  # only used for LOG message
                     prior_uvstart = uvbins[0][0]
-                    for u,uvbin in enumerate(uvbins):
+                    for u, uvbin in enumerate(uvbins):
                         # Advance uvstart, but only if prior bin contained enough points to be evaluated.
                         # (This avoids leaving a small number of orphaned points unevaluated.)
                         if npts >= minimumPoints: 
@@ -1035,7 +1050,8 @@ class Correctedampflag(basetask.StandardTaskTemplate):
                                 uvdist_sel < uvbin[1]))[0]
                         npts = len(id_uvbin)
                         if npts < minimumPoints and u+1 == len(uvbins) and u > 0:
-                            LOG.info('Final bin (%d) has too few points (%d), including them into prior successful bin with uvstart=%f.' % (u,npts,prior_uvstart))
+                            LOG.info('Final bin (%d) has too few points (%d), including them into prior successful bin'
+                                     ' with uvstart=%f.' % (u, npts, prior_uvstart))
                             id_uvbin = np.where(
                                 np.logical_and(
                                     uvdist_sel >= prior_uvstart,
@@ -1044,8 +1060,9 @@ class Correctedampflag(basetask.StandardTaskTemplate):
                         if npts < minimumPoints: 
                             # If the logic is correct above, we should never arrive here while in the final bin, 
                             # and thus we will never leave any data uninspected.
-                            LOG.info('uvbin%d) has too few points (%d), including them into next bin.' % (u,npts))
+                            LOG.info('uvbin%d) has too few points (%d), including them into next bin.' % (u, npts))
                             continue
+
                         # It is now safe to set prior_uvstart because this is a "successful" bin.
                         prior_uvstart = uvstart
                         maxInThisBin = np.max(cmetric_sel[id_uvbin])
@@ -1057,21 +1074,26 @@ class Correctedampflag(basetask.StandardTaskTemplate):
                                 D9 = np.percentile(cmetric_sel[id_uvbin], 90, interpolation='midpoint')
                                 IQR = 0.5*(Q3-Q1)
                                 IDR = 0.5*(D9-D1)/1.9004
-                                mad = np.max([IQR,np.min([2*IQR,IDR])])
+                                mad = np.max([IQR, np.min([2*IQR, IDR])])
                                 if IQR > IDR:
-                                    LOG.info('uvbin%d) using interquartile range %f>%f (npts=%d, max=%f)' % (u,IQR,IDR,npts,maxInThisBin))
+                                    LOG.info('uvbin%d) using interquartile range %f>%f (npts=%d, max=%f)'
+                                             '' % (u, IQR, IDR, npts, maxInThisBin))
                                 else:
-                                    LOG.info('uvbin%d) using scaled interdecile range %f>%f (npts=%d, max=%f)' % (u,IDR,IQR,npts,maxInThisBin))
+                                    LOG.info('uvbin%d) using scaled interdecile range %f>%f (npts=%d, max=%f)'
+                                             '' % (u, IDR, IQR, npts, maxInThisBin))
                             else:
-                                LOG.info('uvbin%d) using IQR npts=%d<20, max=%f' % (u,npts,maxInThisBin))
-                                mad = 0.5*(Q3-Q1) # use half the interquartile spread instead of MAD
-                            med = np.mean([Q1,Q3]) # use midpoint of interquartile spread (the "midhinge") instead of median
+                                LOG.info('uvbin%d) using IQR npts=%d<20, max=%f' % (u, npts, maxInThisBin))
+                                # use half the interquartile spread instead of MAD
+                                mad = 0.5*(Q3-Q1)
+                            # use midpoint of interquartile spread (the "midhinge") instead of median
+                            med = np.mean([Q1, Q3])
                         else:
-                            LOG.info('uvbin%d) using median & MAD (npts=%d, max=%f)'% (u,npts,maxInThisBin))
+                            LOG.info('uvbin%d) using median & MAD (npts=%d, max=%f)' % (u, npts, maxInThisBin))
                             med = np.median(cmetric_sel[id_uvbin])
                             bufferFactor = 2
                             mad = bufferFactor*np.median(np.abs(cmetric_sel[id_uvbin] - med)) * 1.4826
-                            LOG.info('uv%dbin%d) using median=%f & %.2f*MAD=%f (npts=%d, maxInThisBin=%f)'% (v,u,med,bufferFactor,mad,npts,maxInThisBin))
+                            LOG.info('uv%dbin%d) using median=%f & %.2f*MAD=%f (npts=%d, maxInThisBin=%f)'
+                                     '' % (v, u, med, bufferFactor, mad, npts, maxInThisBin))
                         if tmantint > 0:
                             id_ultrahighsig_dict[v] += list(id_uvbin[np.where(
                                 np.logical_or(
@@ -1081,18 +1103,22 @@ class Correctedampflag(basetask.StandardTaskTemplate):
                             id_ultrahighsig_dict[v] += list(id_uvbin[np.where(
                                 cmetric_sel[id_uvbin] < (med - mad * antultrahighsig))[0]])
                         if len(id_ultrahighsig_dict[v]) > previousLength:
-                            LOG.info('spw %d: Found %d outliers out of %d points in uvbin %d' % (spwid,len(id_ultrahighsig_dict[v])-previousLength,npts,u))
+                            LOG.info('spw %d: Found %d outliers out of %d points in uvbin %d'
+                                     '' % (spwid, len(id_ultrahighsig_dict[v])-previousLength, npts, u))
                         previousLength = len(id_ultrahighsig_dict[v])
                     # end loop over this uvbin set
                 # end loop over uvbinsets
-                LOG.info('spw %d: found %d outliers in uvbinset0 and %d in uvbinset1' % (spwid,len(id_ultrahighsig_dict[0]), len(id_ultrahighsig_dict[1])))
+                LOG.info('spw %d: found %d outliers in uvbinset0 and %d in uvbinset1'
+                         '' % (spwid, len(id_ultrahighsig_dict[0]), len(id_ultrahighsig_dict[1])))
+
                 id_uvbin_firsthalf_firstbin = np.where(
                     np.logical_and(
                         uvdist_sel >= uvbinsets[0][0][0],  # start of first bin of first group
                         uvdist_sel < uvbinsets[1][0][0]))[0]  # start of first bin of second group
                 id_ultrahighsig = np.intersect1d(id_ultrahighsig_dict[0], id_ultrahighsig_dict[1])
                 firsthalf_firstbin_flags = np.intersect1d(id_ultrahighsig_dict[0], id_uvbin_firsthalf_firstbin)
-                LOG.info('spw %d: %d outliers are in common and will be flagged, along with %d outliers from the first half of the first bin' % (spwid,len(id_ultrahighsig),len(firsthalf_firstbin_flags)))
+                LOG.info('spw %d: %d outliers are in common and will be flagged, along with %d outliers from the first'
+                         ' half of the first bin' % (spwid, len(id_ultrahighsig), len(firsthalf_firstbin_flags)))
                 id_ultrahighsig = np.union1d(id_ultrahighsig, firsthalf_firstbin_flags)
                 id_ultrahighsig = np.array(id_ultrahighsig, dtype=int)
             else:
@@ -1157,10 +1183,9 @@ class Correctedampflag(basetask.StandardTaskTemplate):
 
             #
             # The following part considers all timestamps at once, and
-            # identifies "bad baselines" as the baselines that contain
-            # contain outliers in a number of timestamps that exceeds
-            # the maximum threshold (set by scale factor).
-            # For each of these "bad" baselines, it then:
+            # identifies "bad baselines" as the baselines that contain outliers
+            # in a number of timestamps that exceeds the maximum threshold (set
+            # by scale factor). For each of these "bad" baselines, it then:
             #
             #  a.) identifies "bad antennas" as those antennas that are
             #  part of a number of "bad baselines" that exceeds a
@@ -1296,12 +1321,14 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         return newflags
 
     @staticmethod
-    def _read_data_from_ms(ms, intent, field, spwid, baseline_set=None):
+    def _read_data_from_ms(ms: MeasurementSet, intent: str, field: str, spwid: int,
+                           baseline_set: Optional[List] = None) -> Dict:
+        # Identify scans for given data selection.
         scans_with_data = ms.get_scans(scan_intent=intent, field=field, spw=spwid)
         if not scans_with_data:
             LOG.info('No data expected for {} {} intent, field {}, spw {}. Continuing...'
                      ''.format(ms.basename, intent, field, spwid))
-            return None
+            return {}
 
         # Initialize data selection.
         data_selection = {'field': field,
@@ -1332,15 +1359,15 @@ class Correctedampflag(basetask.StandardTaskTemplate):
                 data = openms.getdata(['corrected_data', 'model_data', 'antenna1', 'antenna2', 'flag', 'time', 'uvdist'])
             except:
                 LOG.warning('Unable to compute flagging for intent {}, field {}, spw {}'.format(intent, field, spwid))
-                data = None
+                data = {}
                 openms.close()
 
         return data
 
     @staticmethod
-    def _create_flags_for_ultrahigh_baselines_timestamps(
-            ms, spwid, intent, icorr, field, timestamps, baselines, antenna_id_to_name):
-
+    def _create_flags_for_ultrahigh_baselines_timestamps(ms: MeasurementSet, spwid: int, intent: str, icorr: int,
+                                                         field: str, timestamps: List, baselines: List,
+                                                         antenna_id_to_name: Dict) -> List[FlagCmd]:
         newflags = []
         for idx in range(len(baselines)):
             newflags.append(
@@ -1358,13 +1385,12 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         return newflags
 
     @staticmethod
-    def _evaluate_antbased_heuristics(
-            ms, spwid, intent, icorr, field,
-            ants_in_outlier_baseline_scans_thresh,
-            ants_in_outlier_baseline_scans_partial_thresh,
-            max_frac_outlier_scans,
-            antenna_id_to_name, ant1_sel, ant2_sel, nants,
-            id_highsig, time_sel_highsig, time_sel_highsig_uniq):
+    def _evaluate_antbased_heuristics(ms: MeasurementSet, spwid: int, intent: str, icorr: int, field: str,
+                                      ants_in_outlier_baseline_scans_thresh: float,
+                                      ants_in_outlier_baseline_scans_partial_thresh: float,
+                                      max_frac_outlier_scans: float, antenna_id_to_name: Dict, ant1_sel: NDArray,
+                                      ant2_sel: NDArray, nants: int, id_highsig: NDArray, time_sel_highsig: NDArray,
+                                      time_sel_highsig_uniq: NDArray) -> List[FlagCmd]:
 
         # Initialize flags.
         newflags = []
@@ -1432,9 +1458,9 @@ class Correctedampflag(basetask.StandardTaskTemplate):
                         field=field,
                         reason='bad timestamp'))
             # If there was no significant fraction of affected antennas,
-            # the proceed check if the antenna(s) with the highest number of
-            # outlier scans (within this timestamp) equals-or-exceeds the threshold
-            # and flag the corresponding antenna(s).
+            # then proceed to check if the antenna(s) with the highest number
+            # of outlier scans (within this timestamp) equals-or-exceeds the
+            # threshold and flag the corresponding antenna(s).
             elif (antcnts.max() >= max_frac_outlier_scans * n_outlier_scans_in_timestamp
                     and n_outlier_scans_in_timestamp > 5):
 
@@ -1481,7 +1507,8 @@ class Correctedampflag(basetask.StandardTaskTemplate):
 
         return newflags
 
-    def _apply_flags(self, flags, sum_before=False, sum_after=False):
+    def _apply_flags(self, flags: List[FlagCmd], sum_before: bool = False, sum_after: bool = False) \
+            -> Tuple[Dict, Dict]:
 
         inputs = self.inputs
 

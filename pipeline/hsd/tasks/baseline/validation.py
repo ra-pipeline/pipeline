@@ -2612,8 +2612,7 @@ class SVDSolver2D(object):
         LOG.trace('nx, ny = %s, %s', nx, ny)
         assert nx == ny
         if self.N < nx:
-            self.storage.resize(nx * self.L)
-            #self.G.resize((nx, self.L))
+            self.storage = numpy.resize(self.storage, nx * self.L)
         self.N = nx
         assert self.L <= self.N
 

@@ -40,7 +40,7 @@ class MeasurementSet(object):
         representative_window: A representative spectral window name
         science_goals: A science goal information consists of min/max
             acceptable angular resolution, max allowed beam ratio, sensitivity,
-            dynamic range and SB name.
+            dynamic range, spectral dynamic range bandwidth (Cycle 10+), and SB name.
         data_descriptions: A list of DataDescription objects associated with MS
         spectral_windows: A list of SpectralWindow objects associated with MS
         phasecal_mapping: A dictionary mapping phase calibrator fields to

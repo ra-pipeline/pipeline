@@ -346,9 +346,14 @@ class MeasurementSetReader(object):
                 else:
                     ms.science_goals['dynamicRange'] = sbinfo.dynamicRange
 
+                if sbinfo.spectralDynamicRangeBandWidth is None:
+                    ms.science_goals['spectralDynamicRangeBandWidth'] = '0.0GHz'
+                else:
+                    ms.science_goals['spectralDynamicRangeBandWidth'] = sbinfo.spectralDynamicRangeBandWidth
+
                 ms.science_goals['sbName'] = sbinfo.sbName
             
-                # Populate the the online ALMA Control Software software names 
+                # Populate the online ALMA Control Software names
                 LOG.info('Populating ms.acs_software_version and ms.acs_software_build_version...')
                 ms.acs_software_version, ms.acs_software_build_version  = MeasurementSetReader.get_acs_software_version(ms, msmd)
                     
@@ -789,7 +794,7 @@ class DataDescriptionTable(object):
 
 SBSummaryInfo = collections.namedtuple(
     'SBSummaryInfo', 'repSource repFrequency repBandwidth repWindow minAngResolution maxAngResolution '
-                     'maxAllowedBeamAxialRatio sensitivity dynamicRange sbName')
+                     'maxAllowedBeamAxialRatio sensitivity dynamicRange spectralDynamicRangeBandWidth sbName')
 
 
 class SBSummaryTable(object):
@@ -798,12 +803,12 @@ class SBSummaryTable(object):
         try:
             sbsummary_info = [SBSummaryTable._create_sbsummary_info(*row) for row in SBSummaryTable._read_table(ms)]
             return sbsummary_info[0]
-        except:
+        except Exception as ex:
             if 'ALMA' in obsnames:
-                LOG.warning('Error reading science goals for %s' % ms.basename)
+                LOG.warning('Error reading science goals for %s: %s' % (ms.basename, ex))
             return SBSummaryInfo(repSource=None, repFrequency=None, repBandwidth=None, repWindow=None,
                                  minAngResolution=None, maxAngResolution=None, maxAllowedBeamAxialRatio=None,
-                                 sensitivity=None, dynamicRange=None, sbName=None)
+                                 sensitivity=None, dynamicRange=None, spectralDynamicRangeBandWidth=None, sbName=None)
 
     @staticmethod
     def get_observing_mode(ms):
@@ -825,11 +830,11 @@ class SBSummaryTable(object):
 
     @staticmethod
     def _create_sbsummary_info(repSource, repFrequency, repBandwidth, repWindow, minAngResolution, maxAngResolution,
-                               maxAllowedBeamAxialRatio, sensitivity, dynamicRange, sbName):
+                               maxAllowedBeamAxialRatio, sensitivity, dynamicRange, spectralDynamicRangeBandWidth, sbName):
         return SBSummaryInfo(repSource=repSource, repFrequency=repFrequency, repBandwidth=repBandwidth,
                              repWindow=repWindow, minAngResolution=minAngResolution, maxAngResolution=maxAngResolution,
                              maxAllowedBeamAxialRatio=maxAllowedBeamAxialRatio, sensitivity=sensitivity,
-                             dynamicRange=dynamicRange, sbName=sbName)
+                             dynamicRange=dynamicRange, spectralDynamicRangeBandWidth=spectralDynamicRangeBandWidth, sbName=sbName)
 
     @staticmethod
     def _read_table(ms):
@@ -848,7 +853,11 @@ class SBSummaryTable(object):
                 numScienceGoals = table.getcol('numScienceGoal')
             except:
                 # LOG.warning('Error reading science goals for %s' % (ms.basename))
-                raise 
+                raise
+
+            # shouldn't happen in a well-formed XML
+            if len(scienceGoals) != numScienceGoals:
+                LOG.warning('numScienceGoal=%i but len(scienceGoal)=%i' % (numScienceGoals, len(scienceGoals)))
 
             repSources = []
             repFrequencies = []
@@ -859,6 +868,7 @@ class SBSummaryTable(object):
             maxAllowedBeamAxialRatios = []
             sensitivities = []
             dynamicRanges = []
+            spectralDynamicRangeBandWidths = []
             sbNames = []
 
             for i in range(table.nrows()):
@@ -943,11 +953,21 @@ class SBSummaryTable(object):
                     dynamicRange = qa.quantity(0.0)
                 dynamicRanges.append(dynamicRange)
 
+                # Create spectral dynamic range bandwidth goal
+                spectralDynamicRangeBandWidthGoal = _get_science_goal_value(scienceGoals[0:numScienceGoals[i], i], 'spectralDynamicRangeBandWidth')
+                if spectralDynamicRangeBandWidthGoal is not None:
+                    spectralDynamicRangeBandWidth = qa.quantity(spectralDynamicRangeBandWidthGoal)
+                else:
+                    spectralDynamicRangeBandWidth = qa.quantity(0.0)
+                if spectralDynamicRangeBandWidth['value'] <= 0.0 or spectralDynamicRangeBandWidth['unit'] == '':
+                    spectralDynamicRangeBandWidth = None
+                spectralDynamicRangeBandWidths.append(spectralDynamicRangeBandWidth)
+
                 sbName = _get_science_goal_value(scienceGoals[0:numScienceGoals[i], i], 'SBName')
                 sbNames.append(sbName)
 
         rows = list(zip(repSources, repFrequencies, repBandWidths, repWindows, minAngResolutions, maxAngResolutions,
-                        maxAllowedBeamAxialRatios, sensitivities, dynamicRanges, sbNames))
+                        maxAllowedBeamAxialRatios, sensitivities, dynamicRanges, spectralDynamicRangeBandWidths, sbNames))
         return rows
 
 

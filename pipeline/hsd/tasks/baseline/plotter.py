@@ -686,8 +686,8 @@ class BaselineSubtractionPlotManager(object):
                                                   postfit_qa_figfile)
             if os.path.exists(postfit_qa_figfile):
                 plot_list['post_fit_flatness'][ipol] = postfit_qa_figfile
-                if len(stat) > 0:
-                    self.baseline_quality_stat[postfit_qa_figfile] = stat
+                if stat:
+                    self.baseline_quality_stat[postfit_qa_figfile] = [stat]
 
         del postfit_integrated_data
 
@@ -697,7 +697,7 @@ class BaselineSubtractionPlotManager(object):
                          line_range: Optional[List[Tuple[float, float]]],
                          deviation_mask: Optional[List[Tuple[int, int]]],
                          edge: Tuple[int, int], brightnessunit: str,
-                         figfile: str) -> List[BinnedStat]:
+                         figfile: str) -> Optional[BinnedStat]:
         """
         Calculate baseline flatness of a spectrum and create a plot.
 
@@ -710,19 +710,18 @@ class BaselineSubtractionPlotManager(object):
             deviation_mask: ID ranges of deviation mask. These ranges are also
                 eliminated from inspection of baseline flatness.
             edge: Number of elements in left and right edges that should be
-                eliminates from inspection of baseline flatness.
+                eliminated from inspection of baseline flatness.
             brightnessunit: Brightness unit of spectrum.
             figfile: A file name to save figure.
 
         Returns:
             Statistic information to evaluate baseline flatness.
         """
-        binned_stat = []
         masked_data = numpy.ma.masked_array(spectrum, mask=False)
         if edge is not None:
             (ch1, ch2) = edge
             masked_data.mask[0:ch1] = True
-            masked_data.mask[len(masked_data)-ch2-1:] = True
+            masked_data.mask[len(masked_data)-ch2:] = True
         if line_range is not None:
             for chmin, chmax in line_range:
                 masked_data.mask[int(chmin):int(numpy.ceil(chmax))+1] = True
@@ -731,15 +730,17 @@ class BaselineSubtractionPlotManager(object):
                 masked_data.mask[chmin:chmax+1] = True
         nbin = 20 if len(frequency) >= 512 else 10
         binned_freq, binned_data = binned_mean_ma(frequency, masked_data, nbin)
-        if binned_data.count() <  2: # not enough valid data
-            return binned_stat
         stddev = masked_data.std()
+        if binned_data.count() < 2 \
+           or stddev is numpy.ma.masked \
+           or not numpy.isfinite(stddev):
+            # not enough valid data or stddev is invalid
+            return None
         bin_min = numpy.nanmin(binned_data)
         bin_max = numpy.nanmax(binned_data)
         stat = BinnedStat(bin_min_ratio=bin_min/stddev,
                           bin_max_ratio=bin_max/stddev,
                           bin_diff_ratio=(bin_max-bin_min)/stddev)
-        binned_stat.append(stat)
         # create a plot
         xmin = min(frequency[0], frequency[-1])
         xmax = max(frequency[0], frequency[-1])
@@ -757,7 +758,7 @@ class BaselineSubtractionPlotManager(object):
             (ch1, ch2) = edge
             fedge0 = ch_to_freq(0, frequency)
             fedge1 = ch_to_freq(ch1-1, frequency)
-            fedge2 = ch_to_freq(len(frequency)-ch2-1, frequency)
+            fedge2 = ch_to_freq(len(frequency)-ch2, frequency)
             fedge3 = ch_to_freq(len(frequency)-1, frequency)
             plt.axvspan(fedge0, fedge1, color='lightgray')
             plt.axvspan(fedge2, fedge3, color='lightgray')
@@ -774,7 +775,7 @@ class BaselineSubtractionPlotManager(object):
         plt.hlines([-stddev, 0.0, stddev], xmin, xmax, colors='k', linestyles='dashed')
         plt.plot(binned_freq, binned_data, 'ro')
         plt.savefig(figfile, dpi=DPIDetail)
-        return binned_stat
+        return stat
 
 
 def generate_grid_panel_map(ngrid: int, npanel: int, num_plane: int = 1) -> Generator[List[int], None, None]:
@@ -1371,4 +1372,8 @@ def binned_mean_ma(x: List[float], masked_data: MaskedArray,
         else:
             binned_data[i] = numpy.nanmean(masked_data[min_i:max_i+1])
         min_i = max_i+1
+
+    # mask NaN or Inf value
+    binned_data.mask |= numpy.logical_not(numpy.isfinite(binned_data.data))
+
     return binned_x, binned_data

@@ -225,6 +225,17 @@ class Context(object):
         instance = m[cls]
         setattr(instance, name, value)
 
+    def get_oussid(self):
+        """
+        Get the parent OUS 'ousstatus' name. This is the sanitized OUS
+        status UID.
+        """
+        ps = self.project_structure
+        if ps is None or ps.ousstatus_entity_id == 'unknown':
+            return 'unknown'
+        else:
+            return ps.ousstatus_entity_id.translate(str.maketrans(':/', '__'))
+
 
 class Pipeline(object):
     """
@@ -246,14 +257,19 @@ class Pipeline(object):
             Specifying 'last' loads the last-saved Context, while passing None
             creates a new Context.
         :type context: string
-        :param output_dir: root directory to which all output will be written
-        :type output_dir: string
         :param loglevel: pipeline log level
         :type loglevel: string
         :param casa_version_check: enable (True) or bypass (False) the CASA
             version check. Default is True.
-        :type ignore_casa_version: boolean
-        """        
+        :param name: if not "None", this overrides the name of the Pipeline
+            Context if a new context needs to be created.
+        :type name: string
+        :param plotlevel: Pipeline plots level
+        :type plotlevel: string
+        :param path_overrides: dictionary containing context properties to be
+             redefined when loading existing context (e.g. "name").
+        :type path_overrides: dict
+        """
         # configure logging with the preferred log level
         logging.set_logging_level(level=loglevel)
 
