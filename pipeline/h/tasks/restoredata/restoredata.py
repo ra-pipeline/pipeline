@@ -298,13 +298,27 @@ class RestoreData(basetask.StandardTaskTemplate):
                 # for each non-target asdm/vis in the manifest structure
                 params = pipemanifest.get_renorm(vis)
                 if params:
-                    rn_params = {key:ast.literal_eval(val) if val else val for key,val in params.items()}
+                    # correspondence between param names in the manifest and arguments of 'renormalize()'
+                    paramnames = {
+                        'docorr'        : 'apply',
+                        'docorrThresh'  : 'threshold',
+                        'correctATM'    : 'correctATM',
+                        'spws'          : 'spw',
+                        'excludechan'   : 'excludechan',
+                        'atmAutoExclude': 'atm_auto_exclude',
+                        'bwthreshspw'   : 'bwthreshspw'
+                    }
+                    # rn_params = {key:ast.literal_eval(val) if val else val for key,val in params.items()}
+                    kwargs = {}
+                    for renormalize_key, manifest_key in paramnames.items():
+                        if manifest_key in params:
+                            val = params[manifest_key]
+                            kwargs[renormalize_key] = ast.literal_eval(val) if val else val
                     try:
                         rn = ACreNorm(vis)
                         LOG.info(f'Renormalizing {vis} with hifa_renorm {params}')
-                        rn.renormalize(docorr=rn_params['apply'], docorrThresh=rn_params['threshold'], correctATM=rn_params['correctATM'],
-                                        spws=rn_params['spw'], excludechan=rn_params['excludechan'])
-                        if rn_params['apply'] and rn.checkApply():
+                        rn.renormalize(**kwargs)
+                        if 'docorr' in kwargs and kwargs['docorr'] and rn.checkApply():
                             applied = True
                         else:
                             LOG.error(f'Failed application of renormalization for {vis} {params}')

@@ -110,7 +110,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
                 raise
 
         # Initialize the standard ous is string.
-        oussid = self.get_oussid(inputs.context)
+        oussid = inputs.context.get_oussid()
 
         # Define the results object
         result = ExportvlassdataResults()
@@ -356,23 +356,6 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
 
     def analyse(self, results):
         return results
-
-    def get_oussid(self, context):
-        """
-        Determine the ous prefix
-        """
-
-        # Get the parent ous ousstatus name. This is the sanitized ous
-        # status uid
-        ps = context.project_structure
-        if ps is None:
-            oussid = 'unknown'
-        elif ps.ousstatus_entity_id == 'unknown':
-            oussid = 'unknown'
-        else:
-            oussid = ps.ousstatus_entity_id.translate(str.maketrans(':/', '__'))
-
-        return oussid
 
     def get_recipename(self, context):
         """

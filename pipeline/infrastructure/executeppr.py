@@ -8,6 +8,7 @@ Raises:
     exceptions.PipelineException
 """
 import os
+import shutil
 import sys
 import traceback
 
@@ -16,6 +17,7 @@ from ..extern import XmlObjectifier
 from . import argmapper
 from . import casa_tools
 from . import exceptions
+from . import filenamer
 from . import Pipeline
 from . import project
 from . import task_registry
@@ -198,7 +200,10 @@ def executeppr(pprXmlFile: str, importonly: bool = True, breakpoint: str = 'brea
                      'NRORestoreData')
 
     # Loop over the commands
+    errstr = ''
     foundbp = False
+    tracebacks = []
+    results = None
     for command in commandsList:
 
         # Get task name and arguments lists.
@@ -273,30 +278,51 @@ def executeppr(pprXmlFile: str, importonly: bool = True, breakpoint: str = 'brea
                                    "".format(pipeline_task_name), echo_to_screen=echo_to_screen)
             errstr = traceback.format_exc()
             casa_tools.post_to_log(errstr, echo_to_screen=echo_to_screen)
-            errorfile = utils.write_errorexit_file(workingDir, 'errorexit', 'txt')
-            break
 
-        # Stop execution if result is a failed task result or a list
-        # containing a failed task result.
-        tracebacks = utils.get_tracebacks(results)
+        # Check whether any exceptions were raised either during the task
+        # (shown as traceback in task results) or after the task during results
+        # acceptance.
+        if results:
+            tracebacks.extend(utils.get_tracebacks(results))
+        if errstr:
+            tracebacks.append(errstr)
+        # If we have a traceback from an exception, then create local error
+        # exit file, and export both error file and weblog to the products
+        # directory.
         if len(tracebacks) > 0:
+            errorfile = utils.write_errorexit_file(workingDir, 'errorexit', 'txt')
+            export_on_exception(context, errorfile)
+
             # Save the context
             context.save()
-
+            casa_tools.post_to_log("Terminating procedure execution ...", echo_to_screen=echo_to_screen)
             casa_tools.set_log_origin(fromwhere='')
 
-            errorfile = utils.write_errorexit_file(workingDir, 'errorexit', 'txt')
             previous_tracebacks_as_string = "{}".format("\n".join([tb for tb in tracebacks]))
             raise exceptions.PipelineException(previous_tracebacks_as_string)
 
     # Save the context
     context.save()
-
     casa_tools.post_to_log("Terminating procedure execution ...", echo_to_screen=echo_to_screen)
-
     casa_tools.set_log_origin(fromwhere='')
 
     return
+
+
+def export_on_exception(context, errorfile):
+    # Define path for exporting output products, and ensure path exists.
+    products_dir = utils.get_products_dir(context)
+    utils.ensure_products_dir_exists(products_dir)
+
+    # Copy error file to products.
+    if os.path.exists(errorfile):
+        shutil.copyfile(errorfile, os.path.join(products_dir, os.path.basename(errorfile)))
+
+    # Attempt to export weblog.
+    try:
+         utils.export_weblog_as_tar(context, products_dir, filenamer.PipelineProductNameBuilder)
+    except:
+        casa_tools.post_to_log("Unable to export weblog to products.")
 
 
 # Return the intents list, the ASDM list, and the processing commands

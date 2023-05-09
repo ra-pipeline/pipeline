@@ -160,7 +160,7 @@ def initcli():
         else:
             # Instantiate the pipeline tasks for the given package
             exec('from {} import *'.format(abs_cli_package), my_globals)
-            LOG.info('Loaded CASA tasks from package: {!s}'.format(package))
+            LOG.info('Loaded Pipeline commands from package: {!s}'.format(package))
 
 revision = environment.pipeline_revision
 

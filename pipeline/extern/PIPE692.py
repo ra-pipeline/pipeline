@@ -222,8 +222,8 @@ class SSFanalysis(object):
             antACAid = np.array([antid for antid in range(len(self.allResult['antname'])) if 'PM' not in self.allResult['antname'][antid]])
  
             ## reset allResult to exclude the PM baselines, and PM ants only
-            bl_keys(['blphaserms', 'blphasermscycle', 'bllen', 'blname'])
-            ant_keys(['antphaserms', 'antphasermscycle', 'antname'])
+            bl_keys=['blphaserms', 'blphasermscycle', 'bllen', 'blname'] # PIPE-1633
+            ant_keys=['antphaserms', 'antphasermscycle', 'antname'] # PIPE-1633
             for bl_key in bl_keys:
                 self.allResult[bl_key]=np.array(self.allResult[bl_key])[blACAid]
             for ant_key in ant_keys:
@@ -340,7 +340,8 @@ class SSFanalysis(object):
         '''
 
         antUse = self.antlist
- 
+        antUse = ",".join(antUse) # PIPE-1633
+
         if 'CM' in antUse and 'PM' in antUse and 'DA' not in antUse and 'DV' not in antUse:
             PMincACA = True
         else:

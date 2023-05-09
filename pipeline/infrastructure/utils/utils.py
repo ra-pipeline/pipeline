@@ -2,15 +2,17 @@
 The utils module contains general-purpose uncategorised utility functions and
 classes.
 """
+import ast
 import collections
 import copy
+import errno
 import itertools
 import operator
 import os
+import pickle
 import re
 import string
-import ast
-import pickle
+import tarfile
 from typing import Collection, Dict, List, Tuple, Optional, Sequence, Union
 
 import bisect
@@ -20,15 +22,16 @@ from .conversion import range_to_list, dequote
 from .. import casa_tools
 from .. import logging
 
-import casaplotms.private.plotmstool as plotmstool
+import casaplotms
 
 LOG = logging.get_logger(__name__)
 
 __all__ = ['find_ranges', 'dict_merge', 'are_equal', 'approx_equal', 'get_num_caltable_polarizations',
            'flagged_intervals', 'get_field_identifiers', 'get_receiver_type_for_spws', 'get_spectralspec_to_spwid_map',
-           'imstat_items', 'get_stokes','get_taskhistory_fromimage',
+           'imstat_items', 'get_stokes', 'get_taskhistory_fromimage',
            'get_casa_quantity', 'get_si_prefix', 'absolute_path', 'relative_path', 'get_task_result_count',
-           'place_repr_source_first', 'shutdown_plotms', 'get_casa_session_details', 'get_obj_size']
+           'place_repr_source_first', 'shutdown_plotms', 'get_casa_session_details', 'get_obj_size', 'get_products_dir',
+           'export_weblog_as_tar', 'ensure_products_dir_exists']
 
 
 def find_ranges(data: Union[str, List[int]]) -> str:
@@ -484,9 +487,11 @@ def shutdown_plotms():
 
     Note: This function follows the practice illustrated inside casaplotms.private.plotmstool.__stub_check()
     """
+    plotmstool = casaplotms.plotmstool
+
     if plotmstool.__proc is not None:
         plotmstool.__proc.kill()
-        outs, errs = plotmstool.__proc.communicate()
+        _, _ = plotmstool.__proc.communicate()
         plotmstool.__proc = None
         plotmstool.__stub = None
         plotmstool.__uri = None
@@ -577,3 +582,33 @@ def get_obj_size(obj, serialize=True):
             raise Exception(
                 "Pympler/asizeof is not installed, which is required to run get_obj_size(obj, serialize=False).")
         return asizeof(obj)
+
+
+def ensure_products_dir_exists(products_dir):
+    try:
+        LOG.trace(f"Creating products directory: {products_dir}")
+        os.makedirs(products_dir)
+    except OSError as exc:
+        if exc.errno != errno.EEXIST:
+            raise
+
+
+def export_weblog_as_tar(context, products_dir, name_builder, dry_run=False):
+    # Construct filename for weblog output tar archive.
+    tarfilename = name_builder.weblog(project_structure=context.project_structure,
+                                      ousstatus_entity_id=context.get_oussid())
+    # Save weblog directory to tar archive.
+    LOG.info(f"Saving final weblog in {tarfilename}")
+    if not dry_run:
+        tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
+        tar.add(os.path.join(os.path.basename(os.path.dirname(context.report_dir)), 'html'))
+        tar.close()
+    return tarfilename
+
+
+def get_products_dir(context):
+    if context.products_dir is None:
+        return os.path.abspath('./')
+    else:
+        return context.products_dir
+

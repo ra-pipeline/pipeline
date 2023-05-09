@@ -26,6 +26,9 @@ def pytest_addoption(parser):
                      help="Clean up .pyc to reproduce certain warnings only issued when the bytecode is compiled.")
     parser.addoption("--remove-workdir", action="store_true", default=False,
                      help="Remove individual working directories from regression tests.")
+    parser.addoption("--longtests", action="store_true", default=False, help="Run longer tests.")
+    parser.addoption("--compare-only", action="store_true", default=False, help="Skip running the recipe and do the comparison using the working directories from a previous test run.")
+
 
 
 def pytest_sessionstart(session):
@@ -56,10 +59,22 @@ def pytest_collection_finish(session):
     if session.config.getoption('--collect-tests'):
         with open('collected_tests.txt', 'w') as f:
             for item in session.items:
-                node_id = '{}::{}'.format(item.fspath, item.name)
+                node_id=item.nodeid.split("::")
+                node_id[0]=str(item.fspath)
+                node_id="::".join(node_id)
                 print(node_id)
                 f.write(node_id+'\n')
         pytest.exit('Tests collection completed.')
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--longtests"):
+        # --longtests given in cli: do not skip slow tests
+        return
+    skip_slow = pytest.mark.skip(reason="need --longtests option to run")
+    for item in items:
+        if "slow" in item.keywords:
+            item.add_marker(skip_slow)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -83,3 +98,4 @@ def redirect_casalog():
         except OSError as e:
             pass
         casalog.setlogfile('/dev/null')
+

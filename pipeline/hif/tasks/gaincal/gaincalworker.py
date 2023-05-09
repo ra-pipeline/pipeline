@@ -93,7 +93,9 @@ class GaincalWorker(basetask.StandardTaskTemplate):
             else:
                 inputs.spw = calto.spw
             inputs.field = calto.field
-            # kludge to handle more esoteric 'antenna syntax' 
+            # PIPE-1490: restrict intent to selection set by CalTo.
+            inputs.intent = calto.intent
+            # kludge to handle more esoteric 'antenna syntax'
             LOG.todo('handle & and * in antenna selection')
             if '&' in inputs.antenna or '*' in inputs.antenna:
                 inputs.antenna = orig_antenna

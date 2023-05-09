@@ -143,24 +143,58 @@ class MeasurementSetReader(object):
             return scans
 
     @staticmethod
-    def add_band_to_spws(ms):
+    def add_band_to_spws(ms: domain.MeasurementSet) -> None:
+        """
+        Sets spw.band, which is a string describing a band. 
+        """
+        observatory = ms.antenna_array.name.upper()
+        
+        # This dict is only populated if the spw's band number cannot be determined from its name for ALMA.
+        alma_receiver_band = {}
+
         for spw in ms.spectral_windows:
             if spw.type == 'WVR':
                 spw.band = 'WVR'
+                LOG.debug("For MS {}, SpW {}, setting band to WVR.".format(ms.name, spw.id))
                 continue
 
-            # Expected format is something like ALMA_RB_03#BB_1#SW-01#FULL_RES
-            m = re.search(r'ALMA_RB_(?P<band>\d+)', spw.name)
-            if m:
-                band_str = m.groupdict()['band']
+            # Determining the band number for ALMA data 
+            #
+            # First, try to determine the band number from the spw name
+            # The expected format is something like ALMA_RB_03#BB_1#SW-01#FULL_RES
+            # If this doesn't work and this is ALMA data, try to get the band number from the ASDM_RECEIVER table
+            # If this also fails, then set the band number using a look-up-table. 
+            #
+            # See: PIPE-140 or PIPE-1078
+            #
+            alma_band_regex = r'ALMA_RB_(?P<band>\d+)'
+            match_found = re.search(alma_band_regex, spw.name)
+            if match_found:
+                band_str = match_found.groupdict()['band']
                 band_num = int(band_str)
                 spw.band = 'ALMA Band %s' % band_num
+                LOG.debug("For MS {}, SpW {}, setting band to {}, based on the SPW name.".format(ms.name, spw.id, spw.band))
                 continue
+            elif observatory == 'ALMA': 
+                if not alma_receiver_band:
+                    alma_receiver_band = SpectralWindowTable.get_receiver_info(ms, get_band_info=True)
+                if spw.id in alma_receiver_band:
+                    match_receiver_band = re.search(alma_band_regex, alma_receiver_band[spw.id])
+                    if match_receiver_band:
+                        band_str = match_receiver_band.groupdict()['band']
+                        band_num = int(band_str)
+                        spw.band = 'ALMA Band %s' % band_num 
+                        LOG.debug("For MS {}, SpW {}, setting band to {}, based on ASDM_RECEIVER table.".format(ms.name, spw.id, spw.band))
+                        continue
+                else:
+                    LOG.debug("For MS {}, SpW {}, could not find band number information in ALMA_RECEIVER table.".format(ms.name, spw.id))
 
+            # If both fail for ALMA, set the band number as follows: 
             spw.band = BandDescriber.get_description(spw.ref_frequency, observatory=ms.antenna_array.name)
+            LOG.debug("For MS {}, SpW {}, setting band to {}, based on Pipeline internal look-up table.".format(ms.name, spw.id, spw.band))
 
             # Used EVLA band name from spw instead of frequency range
-            observatory = ms.antenna_array.name.upper()
+
             if observatory in ('VLA', 'EVLA'):
                 spw2band = ms.get_vla_spw2band()
 
@@ -346,9 +380,14 @@ class MeasurementSetReader(object):
                 else:
                     ms.science_goals['dynamicRange'] = sbinfo.dynamicRange
 
+                if sbinfo.spectralDynamicRangeBandWidth is None:
+                    ms.science_goals['spectralDynamicRangeBandWidth'] = '0.0GHz'
+                else:
+                    ms.science_goals['spectralDynamicRangeBandWidth'] = sbinfo.spectralDynamicRangeBandWidth
+
                 ms.science_goals['sbName'] = sbinfo.sbName
             
-                # Populate the the online ALMA Control Software software names 
+                # Populate the online ALMA Control Software names
                 LOG.info('Populating ms.acs_software_version and ms.acs_software_build_version...')
                 ms.acs_software_version, ms.acs_software_build_version  = MeasurementSetReader.get_acs_software_version(ms, msmd)
                     
@@ -551,17 +590,20 @@ class SpectralWindowTable(object):
 
 
     @staticmethod
-    def get_receiver_info(ms):
+    def get_receiver_info(ms, get_band_info=False):
         """
         Extract information about the receiver from the ASDM_RECEIVER table.
-        The following properties are extracted:
+        The following properties are extracted by default:
         * receiver type (e.g.: TSB, DSB, NOSB)
         * local oscillator frequencies
+
+        If get_band_info is set to True, instead, only the frequency 
+        band information is extracted. 
 
         If multiple entries are present for the same ASDM spwid, then keep
 
         :param ms: measurement set to inspect
-        :return: dict of MS spw: (receiver_type, freq_lo)
+        :return: dict of MS spw: (receiver_type, freq_lo) or MS spw: frequency_band
         """
         # Get mapping of ASDM spectral window id to MS spectral window id.
         asdm_to_ms_spw_map = SpectralWindowTable.get_asdm_to_ms_spw_mapping(ms)
@@ -587,16 +629,21 @@ class SpectralWindowTable(object):
                     # Get MS spwid corresponding to the current ASDM spwid.
                     ms_spwid = asdm_to_ms_spw_map[int(asdm_spwid)]
 
-                    # Add the information from the current row if either:
-                    #  a.) no info for the current spwid was stored yet.
-                    #  b.) info was already stored for the current spwid, but
-                    #      this info was not for receiver type of "TSB" or "DSB".
-                    # This will store one entry for each ASDM spwid encountered,
-                    # preferentially the first TSB/DSB row in the table
-                    # corresponding to the spwid, but otherwise the first
-                    # non-TSB/DSB row corresponding to the spwid.
-                    if ms_spwid not in receiver_info or receiver_info[ms_spwid][0] not in ["TSB", "DSB"]:
-                        receiver_info[ms_spwid] = (tb.getcell("receiverSideband", i), tb.getcell("freqLO", i))
+                    if get_band_info: 
+                        # Add and return frequency band information stored in receiver table 
+                        if ms_spwid not in receiver_info:
+                            receiver_info[ms_spwid] = tb.getcell("frequencyBand", i)
+                    else:
+                        # Add the information from the current row if either:
+                        #  a.) no info for the current spwid was stored yet.
+                        #  b.) info was already stored for the current spwid, but
+                        #      this info was not for receiver type of "TSB" or "DSB".
+                        # This will store one entry for each ASDM spwid encountered,
+                        # preferentially the first TSB/DSB row in the table
+                        # corresponding to the spwid, but otherwise the first
+                        # non-TSB/DSB row corresponding to the spwid.
+                        if ms_spwid not in receiver_info or receiver_info[ms_spwid][0] not in ["TSB", "DSB"]:
+                            receiver_info[ms_spwid] = (tb.getcell("receiverSideband", i), tb.getcell("freqLO", i))
         except:
             LOG.info("Unable to read receiver info for MS {}".format(_get_ms_basename(ms)))
             receiver_info = {}
@@ -789,7 +836,7 @@ class DataDescriptionTable(object):
 
 SBSummaryInfo = collections.namedtuple(
     'SBSummaryInfo', 'repSource repFrequency repBandwidth repWindow minAngResolution maxAngResolution '
-                     'maxAllowedBeamAxialRatio sensitivity dynamicRange sbName')
+                     'maxAllowedBeamAxialRatio sensitivity dynamicRange spectralDynamicRangeBandWidth sbName')
 
 
 class SBSummaryTable(object):
@@ -798,12 +845,12 @@ class SBSummaryTable(object):
         try:
             sbsummary_info = [SBSummaryTable._create_sbsummary_info(*row) for row in SBSummaryTable._read_table(ms)]
             return sbsummary_info[0]
-        except:
+        except Exception as ex:
             if 'ALMA' in obsnames:
-                LOG.warning('Error reading science goals for %s' % ms.basename)
+                LOG.warning('Error reading science goals for %s: %s' % (ms.basename, ex))
             return SBSummaryInfo(repSource=None, repFrequency=None, repBandwidth=None, repWindow=None,
                                  minAngResolution=None, maxAngResolution=None, maxAllowedBeamAxialRatio=None,
-                                 sensitivity=None, dynamicRange=None, sbName=None)
+                                 sensitivity=None, dynamicRange=None, spectralDynamicRangeBandWidth=None, sbName=None)
 
     @staticmethod
     def get_observing_mode(ms):
@@ -825,11 +872,11 @@ class SBSummaryTable(object):
 
     @staticmethod
     def _create_sbsummary_info(repSource, repFrequency, repBandwidth, repWindow, minAngResolution, maxAngResolution,
-                               maxAllowedBeamAxialRatio, sensitivity, dynamicRange, sbName):
+                               maxAllowedBeamAxialRatio, sensitivity, dynamicRange, spectralDynamicRangeBandWidth, sbName):
         return SBSummaryInfo(repSource=repSource, repFrequency=repFrequency, repBandwidth=repBandwidth,
                              repWindow=repWindow, minAngResolution=minAngResolution, maxAngResolution=maxAngResolution,
                              maxAllowedBeamAxialRatio=maxAllowedBeamAxialRatio, sensitivity=sensitivity,
-                             dynamicRange=dynamicRange, sbName=sbName)
+                             dynamicRange=dynamicRange, spectralDynamicRangeBandWidth=spectralDynamicRangeBandWidth, sbName=sbName)
 
     @staticmethod
     def _read_table(ms):
@@ -848,7 +895,11 @@ class SBSummaryTable(object):
                 numScienceGoals = table.getcol('numScienceGoal')
             except:
                 # LOG.warning('Error reading science goals for %s' % (ms.basename))
-                raise 
+                raise
+
+            # shouldn't happen in a well-formed XML
+            if len(scienceGoals) != numScienceGoals:
+                LOG.warning('numScienceGoal=%i but len(scienceGoal)=%i' % (numScienceGoals, len(scienceGoals)))
 
             repSources = []
             repFrequencies = []
@@ -859,6 +910,7 @@ class SBSummaryTable(object):
             maxAllowedBeamAxialRatios = []
             sensitivities = []
             dynamicRanges = []
+            spectralDynamicRangeBandWidths = []
             sbNames = []
 
             for i in range(table.nrows()):
@@ -943,11 +995,21 @@ class SBSummaryTable(object):
                     dynamicRange = qa.quantity(0.0)
                 dynamicRanges.append(dynamicRange)
 
+                # Create spectral dynamic range bandwidth goal
+                spectralDynamicRangeBandWidthGoal = _get_science_goal_value(scienceGoals[0:numScienceGoals[i], i], 'spectralDynamicRangeBandWidth')
+                if spectralDynamicRangeBandWidthGoal is not None:
+                    spectralDynamicRangeBandWidth = qa.quantity(spectralDynamicRangeBandWidthGoal)
+                else:
+                    spectralDynamicRangeBandWidth = qa.quantity(0.0)
+                if spectralDynamicRangeBandWidth['value'] <= 0.0 or spectralDynamicRangeBandWidth['unit'] == '':
+                    spectralDynamicRangeBandWidth = None
+                spectralDynamicRangeBandWidths.append(spectralDynamicRangeBandWidth)
+
                 sbName = _get_science_goal_value(scienceGoals[0:numScienceGoals[i], i], 'SBName')
                 sbNames.append(sbName)
 
         rows = list(zip(repSources, repFrequencies, repBandWidths, repWindows, minAngResolutions, maxAngResolutions,
-                        maxAllowedBeamAxialRatios, sensitivities, dynamicRanges, sbNames))
+                        maxAllowedBeamAxialRatios, sensitivities, dynamicRanges, spectralDynamicRangeBandWidths, sbNames))
         return rows
 
 
@@ -1187,7 +1249,7 @@ def _make_range(f_min, f_max):
 
 
 class BandDescriber(object):
-    alma_bands = {'ALMA Band 1': _make_range(31.3, 45),
+    alma_bands = {'ALMA Band 1': _make_range(35, 50),
                   'ALMA Band 2': _make_range(67, 90),
                   'ALMA Band 3': _make_range(84, 116),
                   'ALMA Band 4': _make_range(125, 163),
