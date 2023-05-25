@@ -248,9 +248,7 @@ class TimeGaincal(gtypegaincal.GTypeGaincal):
         np_intents = ','.join(set(inputs.intent.split(',')) - {p_intent})
         np_fields = ','.join([f.name for f in inputs.ms.get_fields(intent=np_intents)])
 
-        # Create separate phase solutions for each PHASE field. These solutions
-        # are intended to be used as a temporary pre-apply when generating the
-        # phase offsets caltable.
+        # Create separate phase solutions for each PHASE field.
         for field in inputs.ms.get_fields(intent=p_intent):
             # Retrieve from MS which TARGET/CHECK fields the gain solutions for
             # the current PHASE field should be applied to.
@@ -781,7 +779,8 @@ class TimeGaincal(gtypegaincal.GTypeGaincal):
         This method will unregister from the callibrary in the local context
         (stored in inputs) any CalApplication that is registered for a PHASE
         calibrator field for which the SpW mapping recommends solving with
-        combine=''.
+        combine='', or for which no SpW mapping exists (assumed the PHASE field
+        will in that case have been solved with default combine='').
         """
         inputs = self.inputs
 
@@ -789,10 +788,16 @@ class TimeGaincal(gtypegaincal.GTypeGaincal):
         vis: str = inputs.ms.basename
 
         # Identify which PHASE calibrator fields to process.
-        fields = set()
+        # First identify all PHASE fields.
+        fields = {f.name for f in inputs.ms.get_fields(intent="PHASE")}
+        # Next, if a SpW mapping was registered for this PHASE field, check if
+        # it already recommended solving with SpW combination, in which case
+        # there is no reason to unregister. If no SpW mapping was registered,
+        # then the PHASE field is expected to have been solved with the default
+        # combine='', and so it's kept for unregistering.
         for (intent, field), spwmapping in inputs.ms.spwmaps.items():
-            if intent == "PHASE" and not spwmapping.combine:
-                fields.add(field)
+            if intent == "PHASE" and spwmapping.combine:
+                fields.remove(field)
 
         # If there were no PHASE calibrator fields with combine='', then there
         # are no CalApplications to unregister.

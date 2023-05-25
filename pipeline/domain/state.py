@@ -52,6 +52,8 @@ class State(object):
             red_intents.update(['AMPLITUDE'])
         if 'FLUX' in raw_intents:
             red_intents.update(['AMPLITUDE'])
+        if 'DIFFGAIN' in raw_intents:
+            red_intents.update(['DIFFGAIN'])
         if 'TARGET' in raw_intents:
             red_intents.update(['TARGET'])
         if ('PHASE' in raw_intents) and \
@@ -117,12 +119,15 @@ class StateALMA(State):
         'CALIBRATE_ATMOSPHERE#OFF_SOURCE'    : 'ATMOSPHERE',
         'CALIBRATE_ATMOSPHERE.OFF_SOURCE'    : 'ATMOSPHERE',
         'CALIBRATE_ATMOSPHERE_OFF_SOURCE'    : 'ATMOSPHERE',
+        'CALIBRATE_ATMOSPHERE#TEST'          : 'ATMOSPHERE',
         'CALIBRATE_SIDEBAND_RATIO#ON_SOURCE' : 'SIDEBAND',
         'CALIBRATE_SIDEBAND_RATIO.ON_SOURCE' : 'SIDEBAND',
         'CALIBRATE_SIDEBAND_RATIO_ON_SOURCE' : 'SIDEBAND',
         'CALIBRATE_SIDEBAND_RATIO#OFF_SOURCE': 'SIDEBAND',
         'CALIBRATE_SIDEBAND_RATIO.OFF_SOURCE': 'SIDEBAND',
         'CALIBRATE_SIDEBAND_RATIO_OFF_SOURCE': 'SIDEBAND',
+        'CALIBRATE_DIFFGAIN#REFERENCE'       : 'DIFFGAIN',
+        'CALIBRATE_DIFFGAIN#ON_SOURCE'       : 'DIFFGAIN',
         'CALIBRATE_DELAY#ON_SOURCE'          : 'CHECK',
         'CALIBRATE_DELAY.ON_SOURCE'          : 'CHECK',
         'CALIBRATE_DELAY_ON_SOURCE'          : 'CHECK',

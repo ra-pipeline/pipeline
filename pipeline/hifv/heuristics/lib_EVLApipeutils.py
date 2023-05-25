@@ -37,12 +37,9 @@
 # 11/19/12 STM add getCalStatistics function
 # 12/17/12 STM add phases to getCalStatistics
 ######################################################################
-import collections
-
 import numpy
 
 import pipeline.infrastructure as infrastructure
-import pipeline.infrastructure.contfilehandler as contfilehandler
 from pipeline.infrastructure import casa_tools
 
 LOG = infrastructure.get_logger(__name__)
@@ -54,71 +51,6 @@ def find_EVLA_band(frequency, bandlimits=[0.0e6, 150.0e6, 700.0e6, 2.0e9, 4.0e9,
     i = bisect_left(bandlimits, frequency)
 
     return BBAND[i]
-
-
-def cont_file_to_CASA(vis, context, contfile='cont.dat'):
-    """
-    Take the dictionary created by _read_cont_file and put it into the format:
-    spw = '0:1.380~1.385GHz;1.390~1.400GHz'
-
-    If the frequencies specified in the contfile are in LSRK, they will be
-    converted to TOPO.
-    """
-
-    contfile_handler = contfilehandler.ContFileHandler(contfile)
-    contdict = contfile_handler.read(warn_nonexist=False)
-
-    #if contdict == {}:
-    #    #LOG.error(contfile + " is empty, does not exist or cannot be read.")
-    #    LOG.info('cont.dat file not present.  Default to VLA Continuum Heuristics.')
-    #    return {}
-
-    m = context.observing_run.get_ms(vis)
-
-    fielddict = {}
-
-    for field in contdict['fields']:
-        spwstring = ''
-        for spw in contdict['fields'][field]:
-            if contdict['fields'][field][spw][0]['refer'] == 'LSRK':
-                LOG.info("Converting from LSRK to TOPO...")
-                # Convert from LSRK to TOPO
-                sname = field
-                spw_id = spw
-                fieldobj = m.get_fields(name=field)
-                fieldobjlist = [fieldobjitem for fieldobjitem in fieldobj]
-                field_id = str(fieldobjlist[0].id)
-
-                cranges_spwsel = collections.OrderedDict()
-
-                cranges_spwsel[sname] = collections.OrderedDict()
-                cranges_spwsel[sname][spw_id], _ = contfile_handler.get_merged_selection(sname, spw_id)
-
-                freq_ranges, chan_ranges, aggregate_lsrk_bw = contfile_handler.to_topo(
-                    cranges_spwsel[sname][spw_id], [vis], [field_id], int(spw_id),
-                    context.observing_run)
-                freq_ranges_list = freq_ranges[0].split(';')
-                spwstring = spwstring + spw + ':'
-                for freqrange in freq_ranges_list:
-                    spwstring = spwstring + freqrange.replace(' TOPO', '') + ';'
-                spwstring = spwstring[:-1]
-                spwstring = spwstring + ','
-
-            if contdict['fields'][field][spw][0]['refer'] == 'TOPO':
-                LOG.info("Using TOPO frequency specified in {!s}".format(contfile))
-                spwstring = spwstring + spw + ':'
-                for freqrange in contdict['fields'][field][spw]:
-                    spwstring = spwstring + str(freqrange['range'][0]) + '~' + str(freqrange['range'][1]) + 'GHz;'
-                spwstring = spwstring[:-1]
-                spwstring = spwstring + ','
-        spwstring = spwstring[:-1]  # Remove appending semicolon
-        fielddict[field] = spwstring
-
-    LOG.info("Using frequencies in TOPO reference frame:")
-    for field, spw in fielddict.items():
-        LOG.info("    Field: {!s}   SPW: {!s}".format(field, spw))
-
-    return fielddict
 
 
 def getCalFlaggedSoln(calTable):

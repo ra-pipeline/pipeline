@@ -11,7 +11,9 @@ LOG = infrastructure.get_logger(__name__)
 
 
 class RenormResults(basetask.Results):
-    def __init__(self, renorm_applied, vis, apply, threshold, correctATM, spw, excludechan, corrApplied, corrColExists, stats, rnstats, alltdm, atmAutoExclude, atmWarning, atmExcludeCmd, exception=None):
+    def __init__(self, renorm_applied, vis, apply, threshold, correctATM, spw,
+                 excludechan, corrApplied, corrColExists, stats, rnstats, alltdm, atmAutoExclude,
+                 atmWarning, atmExcludeCmd, bwthreshspw, exception=None):
         super(RenormResults, self).__init__()
         self.renorm_applied = renorm_applied
         self.vis = vis
@@ -25,10 +27,11 @@ class RenormResults(basetask.Results):
         self.stats = stats
         self.rnstats = rnstats
         self.alltdm = alltdm
-        self.exception = exception
         self.atmAutoExclude = atmAutoExclude
         self.atmWarning = atmWarning
         self.atmExcludeCmd = atmExcludeCmd
+        self.bwthreshspw = bwthreshspw
+        self.exception = exception
 
     def merge_with_context(self, context):
         """
@@ -47,7 +50,8 @@ class RenormResults(basetask.Results):
                 f'\texcludechan={self.excludechan}\n'
                 f'\talltdm={self.alltdm}\n'
                 f'\tstats={self.stats}\n'
-                f'\atmAutoExclude={self.atmAutoExclude}')
+                f'\tatmAutoExclude={self.atmAutoExclude}\n'
+                f'\tbwthreshspw={self.bwthreshspw}\n')
 
 class RenormInputs(vdp.StandardInputs):
     apply = vdp.VisDependentProperty(default=False)
@@ -56,13 +60,15 @@ class RenormInputs(vdp.StandardInputs):
     spw = vdp.VisDependentProperty(default='')
     excludechan = vdp.VisDependentProperty(default={})
     atm_auto_exclude = vdp.VisDependentProperty(default=False)
+    bwthreshspw = vdp.VisDependentProperty(default={})
 
     @spw.convert
     def spw(self, value):
-        # turn comma seperated string into a list of integers
+        # turn comma separated string into a list of integers
         return [int(x) for x in value.split(',')]
 
-    def __init__(self, context, vis=None, apply=None, threshold=None, correctATM=None, spw=None, excludechan=None, atm_auto_exclude=False):
+    def __init__(self, context, vis=None, apply=None, threshold=None, correctATM=None, spw=None,
+                 excludechan=None, atm_auto_exclude=None, bwthreshspw=None):
         super(RenormInputs, self).__init__()
         self.context = context
         self.vis = vis
@@ -72,6 +78,7 @@ class RenormInputs(vdp.StandardInputs):
         self.spw = spw
         self.excludechan = excludechan
         self.atm_auto_exclude = atm_auto_exclude
+        self.bwthreshspw = bwthreshspw
 
 @task_registry.set_equivalent_casa_task('hifa_renorm')
 @task_registry.set_casa_commands_comment('Renormalize data affected by strong line emission.')
@@ -120,7 +127,8 @@ class Renorm(basetask.StandardTaskTemplate):
                 excludechan_copy = deepcopy(inp.excludechan)
 
                 rn.renormalize(docorr=inp.apply, docorrThresh=inp.threshold, correctATM=inp.correctATM,
-                               spws=inp.spw, excludechan=excludechan_copy, atmAutoExclude=inp.atm_auto_exclude)
+                               spws=inp.spw, excludechan=excludechan_copy, atmAutoExclude=inp.atm_auto_exclude,
+                               bwthreshspw=inp.bwthreshspw)
                 rn.plotSpectra(includeSummary=False)
 
                 # if we tried to renormalize, and it was done, store info in the results
@@ -144,10 +152,14 @@ class Renorm(basetask.StandardTaskTemplate):
 
             rn.close()
 
-            result = RenormResults(renorm_applied, inp.vis, inp.apply, inp.threshold, inp.correctATM, inp.spw, inp.excludechan, corrApplied, corrColExists, stats, rnstats, alltdm, inp.atm_auto_exclude, atmWarning, atmExcludeCmd)
+            result = RenormResults(renorm_applied, inp.vis, inp.apply, inp.threshold, inp.correctATM, inp.spw,
+                                   inp.excludechan, corrApplied, corrColExists, stats, rnstats, alltdm,
+                                   inp.atm_auto_exclude, atmWarning, atmExcludeCmd, inp.bwthreshspw)
         except Exception as e:
             LOG.error('Failure in running renormalization heuristic: {}'.format(e))
-            result = RenormResults(renorm_applied, inp.vis, inp.apply, inp.threshold, inp.correctATM, inp.spw, inp.excludechan, False, False, {}, {}, alltdm, inp.atm_auto_exclude, {}, {}, e)
+            result = RenormResults(renorm_applied, inp.vis, inp.apply, inp.threshold, inp.correctATM, inp.spw,
+                                   inp.excludechan, False, False, {}, {}, alltdm,
+                                   inp.atm_auto_exclude, {}, {}, {}, e)
 
         return result
 

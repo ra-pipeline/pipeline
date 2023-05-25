@@ -81,7 +81,7 @@ class SDExportData(exportdata.ExportData):
         """
         results = super(SDExportData, self).prepare()
 
-        oussid = self.get_oussid(self.inputs.context)
+        oussid = self.inputs.context.get_oussid()
 
         # Make the imaging list of names of MeasurementSet and the sessions lists.
         session_list, session_names, session_vislists, vislist = \

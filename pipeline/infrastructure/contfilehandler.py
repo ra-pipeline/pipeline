@@ -7,17 +7,25 @@ The keyword "NONE" can be written in case of non-detection of a continuum
 frequency range.
 """
 
+import collections
 import re
+from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
 
-from . import casa_tools
-from . import utils
-from . import logging
-
-from typing import Union, Tuple, List, Dict, Any, Generator
+from . import casa_tools, logging, utils
 
 LOG = logging.get_logger(__name__)
+
+
+try:
+    # CASA ver<6.5.2
+    from casatasks.private.task_uvcontsub import _quantityRangesToChannels
+except ImportError:
+    # CASA ver>=6.5.2
+    # We might need to copy the private CASA function to the Pipeline codebase or adapted it using MS 
+    # objects in the future. For now, we just import it from the CASA installation.
+    from casatasks.private.task_uvcontsub_old import _quantityRangesToChannels
 
 
 class ContFileHandler(object):
@@ -237,3 +245,88 @@ class ContFileHandler(object):
                                                               (float(item[0]), float(item[1])) for item in topo_freq_selection)))
 
         return topo_freq_selections, topo_chan_selections, aggregate_frame_bw
+
+
+def contfile_to_spwsel(vis, context, contfile='cont.dat', use_realspw=True):
+    """Translate continuum ranges specified in contfile to frequency selection string.
+
+    The return is a dictionary with field names with keys and spwsel as values, e.g.,
+        {'04287+1801': '20:327.464~328.183GHz;328.402~329.136GHz,26:340.207~340.239GHz;340.280~340.313GHz'}
+    By default (use_realspw=True), the frequency selection string is in real SPWs of input vis.
+    If the frequencies specified in the contfile are in LSRK, they will be converted to TOPO.
+    """
+
+    contfile_handler = ContFileHandler(contfile)
+    contdict = contfile_handler.read(warn_nonexist=False)
+    m = context.observing_run.get_ms(vis)
+    fielddict = {}
+
+    for field in contdict['fields']:
+
+        fieldobj = m.get_fields(name=field)
+        fieldobjlist = [fieldobjitem for fieldobjitem in fieldobj]
+
+        # If field is not found, skip it.
+        if not fieldobjlist:
+            continue
+
+        spwstring = ''
+        for spw in contdict['fields'][field]:
+            crange_list = [crange for crange in contdict['fields'][field][spw] if crange != 'ALL']
+            if crange_list[0]['refer'] == 'LSRK':
+                LOG.info("Converting from LSRK to TOPO...")
+                # Convert from LSRK to TOPO
+                sname = field
+                field_id = str(fieldobjlist[0].id)
+
+                cranges_spwsel = collections.OrderedDict()
+                cranges_spwsel[sname] = collections.OrderedDict()
+                cranges_spwsel[sname][spw], _ = contfile_handler.get_merged_selection(sname, spw)
+
+                freq_ranges, chan_ranges, aggregate_lsrk_bw = contfile_handler.to_topo(
+                    cranges_spwsel[sname][spw], [vis], [field_id], int(spw),
+                    context.observing_run)
+                freq_ranges_list = freq_ranges[0].split(';')
+                spwstring = spwstring + spw + ':'
+                for freqrange in freq_ranges_list:
+                    spwstring = spwstring + freqrange.replace(' TOPO', '') + ';'
+                spwstring = spwstring[:-1]
+                spwstring = spwstring + ','
+
+            if crange_list[0]['refer'] == 'TOPO':
+                LOG.info("Using TOPO frequency specified in {!s}".format(contfile))
+                spwstring = spwstring + spw + ':'
+                for freqrange in crange_list:
+                    spwstring = spwstring + str(freqrange['range'][0]) + '~' + str(freqrange['range'][1]) + 'GHz;'
+                spwstring = spwstring[:-1]
+                spwstring = spwstring + ','
+
+        # remove appending semicolon
+        spwstring = spwstring[:-1]
+
+        if use_realspw:
+            spwstring = context.observing_run.get_real_spwsel([spwstring], [vis])
+        fielddict[field] = spwstring[0]
+
+    LOG.info("Using frequencies in TOPO reference frame:")
+    for field, spwsel in fielddict.items():
+        LOG.info("    Field: {!s}   SPW: {!s}".format(field, spwsel))
+
+    return fielddict
+
+
+def contfile_to_chansel(vis, context, contfile='cont.dat', excludechans=False):
+    """Translate continuum ranges specified in contfile to channel selection string.
+
+    The return is a dictionary with field names with keys and chansel as values, e.g.,
+        {'04287+1801': '20:327~328,26:340~341'}
+    The channel selection string is in real SPWs of input vis.
+    If excludechans=True, the returned string will select channels outside the continuum ranges instead.        
+    """
+
+    spwsel_dict = contfile_to_spwsel(vis, context, contfile, use_realspw=True)
+    chansel_dict = collections.OrderedDict()
+    for field, spwsel in spwsel_dict.items():
+        chansel_dict[field] = _quantityRangesToChannels(vis, field, spwsel, excludechans)
+
+    return chansel_dict

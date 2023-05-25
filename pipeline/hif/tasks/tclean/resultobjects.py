@@ -13,7 +13,7 @@ LOG = infrastructure.get_logger(__name__)
 
 class BoxResult(basetask.Results):
     def __init__(self):
-        super(BoxResult, self).__init__()        
+        super(BoxResult, self).__init__()
         self.threshold = None
         self.sensitivity = None
         self.cleanmask = None
@@ -27,10 +27,15 @@ class BoxResult(basetask.Results):
 
 
 class TcleanResult(basetask.Results):
-    def __init__(self, vis=None, sourcename=None, field_ids=None, intent=None, spw=None, orig_specmode=None,
-                 specmode=None, multiterm=None, plotdir=None, imaging_mode=None, is_per_eb=None, is_eph_obj=None):
+    def __init__(self, vis=None, datacolumn=None, datatype=None, datatype_info=None,
+                 sourcename=None, field_ids=None, intent=None, spw=None,
+                 orig_specmode=None, specmode=None, multiterm=None, plotdir=None,
+                 imaging_mode=None, is_per_eb=None, is_eph_obj=None):
         super(TcleanResult, self).__init__()
         self.vis = vis
+        self.datacolumn = datacolumn
+        self.datatype = datatype
+        self.datatype_info = datatype_info
         self.sourcename = sourcename
         self.field_ids = field_ids
         self.intent = intent

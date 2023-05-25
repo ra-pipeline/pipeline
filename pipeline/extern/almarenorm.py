@@ -523,7 +523,7 @@ class ACreNorm(object):
         # useful for ALMA production 
 
         # ALMA Bands        0    1   2    3    4    5    6    7    8    9    10
-        self.bandThresh=[99.0, 1.02,1.02,1.02,1.02,1.02,1.02,1.02,1.02,1.50,1.50] 
+        self.bandThresh=[99.0, 1.02,1.02,1.02,1.02,1.02,1.02,1.02,1.02,1.02,1.02] 
         # B9/B10 set high now to now correct
         # set a B0 as its way easier just to then index this array with Band
 
@@ -4430,10 +4430,14 @@ class ACreNorm(object):
 
 
     def getband(self,freq):
-        ''' Identify the Band for specific frequency (in GHz)
+        ''' 
+        Identify the Band for specific frequency (in GHz)
+
+        Note that the Band 2/3 identification is currently not
+        guaranteed to be correct.
         '''
-        lo=np.array([0,0,84,125,157,211,275,385,602,787])*1e9
-        hi=np.array([0,0,116,163,212,275,373,500,720,950])*1e9
+        lo=np.array([35,67,84,125,157,211,275,385,602,787])*1e9
+        hi=np.array([50,83.999999999,116,163,212,275,373,500,720,950])*1e9
 
         return np.arange(1,len(lo)+1)[(freq>lo)&(freq<hi)][0]
 

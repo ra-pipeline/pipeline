@@ -22,6 +22,7 @@ except ImportError:
 from pipeline.infrastructure import exceptions
 from pipeline.infrastructure import logging
 from pipeline.infrastructure.utils import get_obj_size
+from .jobrequest import JobRequest
 
 # global variable for toggling MPI usage
 USE_MPI = True
@@ -40,6 +41,8 @@ class AsyncTask(object):
 
         :param executable: the TierN executable class to run
         :return: an AsyncTask object
+
+        Note that tier0_executable must be picklable.
         """
         LOG.debug('pushing tier0executable {} from the client: {}'.format(
             executable, file_size.format(get_obj_size(executable))))
@@ -96,7 +99,7 @@ class AsyncTask(object):
         """
 
         LOG.debug(
-            'Received a successful response from MPIserver-{server} for command_request_id={id}'.format(**response))               
+            'Received a successful response from MPIserver-{server} for command_request_id={id}'.format(**response))
         LOG.debug('return request logs: {}'.format(response['parameters']['tier0_executable'].logs))
 
         response_logs = response['parameters']['tier0_executable'].logs
@@ -115,6 +118,7 @@ class AsyncTask(object):
                 os.remove(tier0_cmdfile)
         else:
             LOG.debug('Cannot find Tier0 casa_commands.log for command_request_id={id}; no merge needed'.format(**response))
+
 
 class SyncTask(object):
     def __init__(self, task, executor=None):
@@ -148,7 +152,12 @@ class SyncTask(object):
             if self.__executor:
                 return self.__executor.execute(self.__task)
             else:
-                return self.__task.execute(dry_run=False)
+                if not callable(self.__task):
+                    # for JobRequest or PipelineTask
+                    return self.__task.execute(dry_run=False)
+                else:
+                    # for FunctionCall
+                    return self.__task()
         except Exception as e:
             import traceback
             err_msg = "Failure executing job by an exception {} " \
@@ -240,7 +249,7 @@ class Tier0JobRequest(Executable):
         :param creator_fn: the class of the CASA task to execute
         :param job_args: any arguments to passed to the task Inputs
         """
-        super().__init__()        
+        super().__init__()
         self.__creator_fn = creator_fn
         self.__job_args = job_args
         if executor is None:
@@ -272,15 +281,23 @@ class Tier0JobRequest(Executable):
         return 'Tier0JobRequest({}, {})'.format(self.__creator_fn, self.__job_args)
 
 
-class Tier0FunctionCall(object):
-    def __init__(self, fn, *args, **kwargs):
+class Tier0FunctionCall(Executable):
+    def __init__(self, fn, *args, executor=None, **kwargs):
         """
         Create a new Tier0FunctionCall for a function to be executed on an MPI
         server.
         """
+        super().__init__()
         self.__fn = fn
         self.__args = args
         self.__kwargs = kwargs
+        if executor is None:
+            self.__executor = None
+        else:
+            # Exclude the context reference inside the executor shallow copy before pushing from the client
+            # to reduce the risk of reaching the MPI buffer size limit (150MiB as of CASA ver6.4.1,
+            # see PIPE-13656/PIPE-1337).
+            self.__executor = executor.copy(exclude_context=True)
 
         # the following code is used to get a nice repr format
         arg_names = list(signature(fn).parameters)
@@ -295,7 +312,15 @@ class Tier0FunctionCall(object):
         self.__keyword = list(map(format_arg_value, kwargs.items()))
 
     def get_executable(self):
-        return lambda: self.__fn(*self.__args, **self.__kwargs)
+        if self.__executor is None:
+            return lambda: self.__fn(*self.__args, **self.__kwargs)
+        else:
+            tmpfile = tempfile.NamedTemporaryFile(suffix='.casa_commands.log', dir='', delete=True)
+            tmpfile.close()
+            self.logs['casa_commands_tier0'] = tmpfile.name
+            self.logs['casa_commands'] = self.__executor.cmdfile
+            self.__executor.cmdfile = self.logs['casa_commands_tier0']
+            return lambda: self.__fn(*self.__args, executor=self.__executor, **self.__kwargs)
 
     def __repr__(self):
         args = self.__positional + self.__nameless + self.__keyword
@@ -366,6 +391,11 @@ if MPIEnvironment.is_mpi_enabled:
     try:
         if MPIEnvironment.is_mpi_client:
             __client = MPICommandClient()
+            # PIPE-1757: use the 'redirect' mode to forward tier0 messages to console stdout.
+            #   * checkout different log_mode options in casampi.private.server_run.run()
+            #   * also see the log_mode example here:
+            #       https://casadocs.readthedocs.io/en/latest/notebooks/parallel-processing.html#Advanced:-Interface-Framework
+            __client.set_log_mode('redirect')
             __client.start_services()
 
             mpi_server_list = MPIEnvironment.mpi_server_rank_list()
@@ -389,3 +419,132 @@ else:
     LOG.info('Environment is not MPI enabled. Pipeline operating in single '
              'host mode')
     mpiclient = None
+
+
+class TaskQueue:
+    """A interface class that manages/executes tier0 PipelineTask, JobRquests, or FunctionaCalls in parallel.
+
+    TaskQueue provides an API similar to multiprocessing.Pool, but use the casampi FIFO queue underneath.
+    Note that the AsynTask-based queue (tier0) will only happen when the instance is run from the
+    client node of an MPI cluster. Otherwise, the queue will just be executed in synchronous mode, essentially 
+    a loop over an iterator.
+
+    Example 1: 
+
+        q = TaskQueue()
+        q.add_functioncall(test, 9, 8) # test is a function taking two arguments.
+        for i in range(4):
+            q.add_jobrequest(casa_tasks.plotms, {'vis': 'eb3_targets.04287+1801.spw16_18_20_22_24_26_28_30.selfcal.ms',
+                            'xaxis': 'uvdist', 'yaxis': 'amp', 'coloraxis': 'spw', 'plotfile': 'test'+str(i)+'.png', 
+                            'overwrite': True})
+        results = q.get_results()      
+
+    Example 2:
+
+        with TaskQueue() as tq:
+            tq.map(fn, [(1,2),(2,3),(4,5),(6,7),(8,9)])
+        results = q.get_results()
+    """
+
+    def __init__(self, parallel=True, executor=None):
+
+        self.__queue = []
+        self.__results = []
+        self.__running = True
+        self.__executor = executor
+        self.__mpi_server_list = mpi_server_list
+        self.__is_mpi_ready = is_mpi_ready()
+        self.__async = parallel and self.__is_mpi_ready
+
+        LOG.info('TaskQueue initialized; MPI server list: %s', self.__mpi_server_list)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+
+        if self.__running:
+            _ = self.get_results()
+        else:
+            pass
+        if exc_type:
+            LOG.error('Error in TaskQueue: %s', exc_val)
+        else:
+            LOG.info('TaskQueue completed successfully')
+
+    def __call__(self):
+        return self.get_results()
+
+    def done(self):
+        return self.get_results()
+
+    def is_async(self):
+        """Return True if the TaskQueue is running in parallel mode."""
+        return self.__async
+
+    def get_results(self):
+
+        if not self.__running and self.__results:
+            return self.__results
+        else:
+            results = []
+            for task in self.__queue:
+                results.append(task.get_result())
+            self.__results = results
+            self.__running = False
+
+        return self.__results
+
+    def map(self, fn, iterable):
+
+        if not hasattr(iterable, '__len__'):
+            iterable = list(iterable)
+
+        for args in iterable:
+            self.add_functioncall(fn, *args)
+
+    def add_jobrequest(self, fn, job_args, executor=None):
+        """Add a jobequest into the queue.
+        
+        fn should be a jobrequest generator function, which returns a JobRequest object.
+        e.g.
+            fn = casa_tasks.imdev
+            job_args = {'imagename': 'myimage.fits'}
+        """
+        if executor is None:
+            executor = self.__executor
+        if self.__async:
+            executable = Tier0JobRequest(fn, job_args, executor=executor)
+            task = AsyncTask(executable)
+        else:
+            task = SyncTask(fn(**job_args), executor)
+        self.__queue.append(task)
+
+    def add_functioncall(self, fn, *args, **kwargs):
+
+        if self.__async:
+            executable = Tier0FunctionCall(fn, *args, **kwargs)
+            task = AsyncTask(executable)
+        else:
+            task = SyncTask(lambda: fn(*args, **kwargs))
+        self.__queue.append(task)
+
+    def add_pipelinetask(self, task_cls, task_args, context, executor=None):
+
+        if executor is None:
+            executor = self.__executor
+
+        if self.__async:
+            tmpfile = tempfile.NamedTemporaryFile(suffix='.context',
+                                                  dir=context.output_dir,
+                                                  delete=True)
+            tmpfile.close()
+            context_path = tmpfile.name
+            context.save(context_path)
+            executable = Tier0PipelineTask(task_cls, task_args, context_path)
+            task = AsyncTask(executable)
+        else:
+            inputs = task_cls.Inputs(context, **task_args)
+            task = task_cls(inputs)
+            task = SyncTask(task, executor)
+        self.__queue.append(task)

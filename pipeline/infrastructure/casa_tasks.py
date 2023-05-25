@@ -10,7 +10,9 @@ task attached to this class at runtime. The name and signature of each
 method will match those of the tasks in the CASA environment when this
 module was imported.
 """
+import functools
 import shutil
+import sys
 
 import almatasks
 import casaplotms
@@ -21,203 +23,316 @@ from .jobrequest import JobRequest
 
 LOG = logging.get_logger(__name__)
 
+__all__ = []
 
-def applycal(*v, **k):
-    return _get_job(casatasks.applycal, *v, **k)
 
+def register_task(func):
+    """Register a JobRequest generator function."""
+    __all__.append(func.__name__)
+    return func
 
-def bandpass(*v, **k):
-    return _get_job(casatasks.bandpass, *v, **k)
 
+@register_task
+def applycal(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.applycal, *v, **k)
 
-def calstat(*v, **k):
-    return _get_job(casatasks.calstat, *v, **k)
 
+@register_task
+def bandpass(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.bandpass, *v, **k)
 
-def clearcal(*v, **k):
-    return _get_job(casatasks.clearcal, *v, **k)
 
+@register_task
+def calstat(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.calstat, *v, **k)
 
-def delmod(*v, **k):
-    return _get_job(casatasks.delmod, *v, **k)
 
+@register_task
+def clearcal(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.clearcal, *v, **k)
 
-def exportfits(*v, **k):
-    return _get_job(casatasks.exportfits, *v, **k)
 
+@register_task
+def delmod(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.delmod, *v, **k)
 
-def gaincal(*v, **k):
-    return _get_job(casatasks.gaincal, *v, **k)
 
+@register_task
+def exportfits(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.exportfits, *v, **k)
 
-def flagcmd(*v, **k):
-    return _get_job(casatasks.flagcmd, *v, **k)
 
+@register_task
+def gaincal(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.gaincal, *v, **k)
 
-def flagdata(*v, **k):
-    return _get_job(casatasks.flagdata, *v, **k)
 
+@register_task
+def flagcmd(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.flagcmd, *v, **k)
 
-def flagmanager(*v, **k):
-    return _get_job(casatasks.flagmanager, *v, **k)
 
+@register_task
+def flagdata(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.flagdata, *v, **k)
 
-def fluxscale(*v, **k):
-    return _get_job(casatasks.fluxscale, *v, **k)
 
+@register_task
+def flagmanager(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.flagmanager, *v, **k)
 
-def gencal(*v, **k):
-    return _get_job(casatasks.gencal, *v, **k)
 
+@register_task
+def fluxscale(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.fluxscale, *v, **k)
 
-def hanningsmooth(*v, **k):
-    return _get_job(casatasks.hanningsmooth, *v, **k)
 
+@register_task
+def gencal(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.gencal, *v, **k)
 
-def imdev(*v, **k):
-    return _get_job(casatasks.imdev, *v, **k)
 
+@register_task
+def hanningsmooth(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.hanningsmooth, *v, **k)
 
-def imhead(*v, **k):
-    return _get_job(casatasks.imhead, *v, **k)
 
+@register_task
+def imdev(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.imdev, *v, **k)
 
-def immath(*v, **k):
-    return _get_job(casatasks.immath, *v, **k)
 
+@register_task
+def imhead(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.imhead, *v, **k)
 
-def immoments(*v, **k):
-    return _get_job(casatasks.immoments, *v, **k)
 
+@register_task
+def immath(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.immath, *v, **k)
 
-def imregrid(*v, **k):
-    return _get_job(casatasks.imregrid, *v, **k)
 
-def imsmooth(*v, **k):
-    return _get_job(casatasks.imsmooth, *v, **k)
+@register_task
+def immoments(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.immoments, *v, **k)
 
-def impbcor(*v, **k):
-    return _get_job(casatasks.impbcor, *v, **k)
 
+@register_task
+def imregrid(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.imregrid, *v, **k)
 
-def importasdm(*v, **k):
-    return _get_job(casatasks.importasdm, *v, **k)
 
+@register_task
+def imsmooth(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.imsmooth, *v, **k)
 
-def imstat(*v, **k):
-    return _get_job(casatasks.imstat, *v, **k)
 
+@register_task
+def impbcor(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.impbcor, *v, **k)
 
-def imsubimage(*v, **k):
-    return _get_job(casatasks.imsubimage, *v, **k)
 
+@register_task
+def importasdm(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.importasdm, *v, **k)
 
-def initweights(*v, **k):
-    return _get_job(casatasks.initweights, *v, **k)
 
+@register_task
+def imstat(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.imstat, *v, **k)
 
-def listobs(*v, **k):
-    return _get_job(casatasks.listobs, *v, **k)
 
+@register_task
+def imsubimage(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.imsubimage, *v, **k)
 
-def mstransform(*v, **k):
-    return _get_job(casatasks.mstransform, *v, **k)
 
+@register_task
+def initweights(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.initweights, *v, **k)
 
-def partition(*v, **k):
-    return _get_job(casatasks.partition, *v, **k)
 
+@register_task
+def listobs(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.listobs, *v, **k)
 
-def plotants(*v, **k):
-    return _get_job(casatasks.plotants, *v, **k)
 
+@register_task
+def mstransform(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.mstransform, *v, **k)
 
-def plotbandpass(*v, **k):
-    return _get_job(casatasks.plotbandpass, *v, **k)
 
+@register_task
+def partition(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.partition, *v, **k)
 
-def plotms(*v, **k):
-    return _get_job(casaplotms.plotms, *v, **k)
 
+@register_task
+def plotants(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.plotants, *v, **k)
 
-def plotweather(*v, **k):
-    return _get_job(casatasks.plotweather, *v, **k)
 
+@register_task
+def plotbandpass(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.plotbandpass, *v, **k)
 
-def polcal(*v, **k):
-    return _get_job(casatasks.polcal, *v, **k)
 
+@register_task
+def plotms(*v, **k) -> JobRequest:
+    return JobRequest(casaplotms.plotms, *v, **k)
 
-def setjy(*v, **k):
-    return _get_job(casatasks.setjy, *v, **k)
 
+@register_task
+def plotweather(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.plotweather, *v, **k)
 
-def split(*v, **k):
-    return _get_job(casatasks.split, *v, **k)
 
+@register_task
+def polcal(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.polcal, *v, **k)
 
-def statwt(*v, **k):
-    return _get_job(casatasks.statwt, *v, **k)
 
+@register_task
+def setjy(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.setjy, *v, **k)
 
-def tclean(*v, **k):
-    return _get_job(casatasks.tclean, *v, **k)
 
+@register_task
+def split(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.split, *v, **k)
 
-def wvrgcal(*v, **k):
-    return _get_job(almatasks.wvrgcal, *v, **k)
 
+@register_task
+def statwt(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.statwt, *v, **k)
 
-def visstat(*v, **k):
-    return _get_job(casatasks.visstat, *v, **k)
 
+@register_task
+def tclean(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.tclean, *v, **k)
 
-def uvcontfit(*v, **k):
-    # Note this is pipeline CASA style task not a CASA task
+
+@register_task
+def wvrgcal(*v, **k) -> JobRequest:
+    return JobRequest(almatasks.wvrgcal, *v, **k)
+
+
+@register_task
+def visstat(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.visstat, *v, **k)
+
+
+@register_task
+def uvcontfit(*v, **k) -> JobRequest:
+    """The wrapper function to create jobrequests for task_uvcontfit.uvcontfit.
+
+    Note this is a Pipeline CASA-style task rather than a genuine CASA task
+    The in-function import is necessary to avoid circular imports.
+    """
     import pipeline.hif.cli.uvcontfit as uvcontfit
-    return _get_job(uvcontfit, *v, **k)
+    return JobRequest(uvcontfit, *v, **k)
 
 
+@register_task
 def sdatmcor(*v, **k) -> JobRequest:
     """Wrap casatasks.sdatmcor
 
     Returns:
         JobRequest instance
     """
-    return _get_job(casatasks.sdatmcor, *v, **k)
+    return JobRequest(casatasks.sdatmcor, *v, **k)
 
 
-def sdbaseline(*v, **k):
-    return _get_job(casatasks.sdbaseline, *v, **k)
+@register_task
+def sdbaseline(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.sdbaseline, *v, **k)
 
 
-def sdcal(*v, **k):
-    return _get_job(casatasks.sdcal, *v, **k)
+@register_task
+def sdcal(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.sdcal, *v, **k)
 
 
-def sdimaging(*v, **k):
-    return _get_job(casatasks.sdimaging, *v, **k)
+@register_task
+def sdimaging(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.sdimaging, *v, **k)
 
 
-def tsdimaging(*v, **k):
-    return _get_job(casatasks.tsdimaging, *v, **k)
+@register_task
+def tsdimaging(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.tsdimaging, *v, **k)
 
 
-def copyfile(*v, **k):
-    return _get_job(shutil.copyfile, *v, **k)
+@register_task
+def copyfile(*v, **k) -> JobRequest:
+    return JobRequest(shutil.copyfile, *v, **k)
 
 
-def copytree(*v, **k):
-    return _get_job(shutil.copytree, *v, **k)
+@register_task
+def copytree(*v, **k) -> JobRequest:
+    return JobRequest(shutil.copytree, *v, **k)
 
 
-def rmtree(*v, **k):
-    return _get_job(shutil.rmtree, *v, **k)
+@register_task
+def rmtree(*v, **k) -> JobRequest:
+    return JobRequest(shutil.rmtree, *v, **k)
 
 
-def move(*v, **k):
-    return _get_job(shutil.move, *v, **k)
+@register_task
+def move(*v, **k) -> JobRequest:
+    return JobRequest(shutil.move, *v, **k)
 
 
-def _get_job(task, *v, **k):
-    return JobRequest(task, *v, **k)
+class CasaTasks:
+    """A class to represent a collection of JobRequest-wrapped callables from CASA or Python modules.
+    
+    CasaTasks wraps frequently-used CASA tasks and Python functions into individual class methods that
+    can create and execute JobRequests on-the-fly. Then their calls will be properly
+    logged and recorded by the Pipeline logging framework:
+        * casacalls-*.txt records all JobRequest executions.
+        * casa_commands.log records JobRequest executed by the PipelineTask Executor instances.
+
+    The "immediate-execution" interface offered by this class could help adapt extern Python
+    scripts/module into Pipeline with minimal changes.
+
+    Example 1):
+        
+        from casatasks import tclean
+        
+            can be replaced by:
+        
+        from pipeline.infrastructure.casa_tasks import casa_tasks
+        tclean=casa_tasks.tclean
+
+    Example 2):
+    
+        from pipeline.infrastructure.casa_tasks import CasaTasks
+        ct = CasaTasks()
+        ct.listobs(vis='my.ms')
+        help(ct.listobs) # this behaves like casatasks.listobs
+    """
+
+    def __init__(self, executor=None):
+        self._tasklist = __all__
+        self._executor = executor
+        for _fn in self._tasklist:
+            setattr(self, _fn, self._logged_fn(getattr(sys.modules[__name__], _fn)))
+
+    def _logged_fn(self, fn):
+        """Get the wrapper function that can immediantly create and executate JobRequest of a callable."""
+        if self._executor is None:
+            # Executions will be logged in casacalls-.txt
+            @functools.wraps(fn)
+            def func(*args, **kwargs):
+                return fn(*args, **kwargs).execute(dry_run=False)
+            return func
+        else:
+            # Executions will be logged in both casacalls-.txt and casa-command.txt
+            @functools.wraps(fn)
+            def func(*args, **kwargs):
+                return self._executor.execute(fn(*args, **kwargs))
+            return func
+
+
+# add an instance of executor-free CasaTasks under the module namespace
+casa_tasks = CasaTasks()

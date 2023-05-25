@@ -162,7 +162,6 @@ class GriddingBase(basetask.StandardTaskTemplate):
         result = GriddingResults(task=self.__class__,
                                  success=True,
                                  outcome=compress.CompressedObj(grid_table))
-        result.task = self.__class__
         del grid_table
 
         return result

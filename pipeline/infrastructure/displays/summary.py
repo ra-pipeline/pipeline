@@ -226,6 +226,79 @@ class ElVsTimeChart(object):
                            command=str(task))
 
 
+class ParameterVsTimeChart(object):
+    """
+    Base class for FieldVsTimeChart and IntentVsTimeChart, sharing common logic such as the colour scheme for intents
+    """
+
+    # list of intents that shares a same scan but segregated by subscan
+    # (To distinguish ON and OFF source subscans in ALMA-TP)
+    _subscan_intents = ('TARGET', 'REFERENCE')
+
+    # the order of items here corresponds to the order they are shown in IntentVsTime diagram (from bottom to top).
+    _intent_colours = dict([
+        ('TARGET', 'blue'),
+        ('REFERENCE', 'deepskyblue'),
+        ('PHASE', 'cyan'),
+        ('CHECK', '#700070'),  # slightly darker than 'purple'
+        ('BANDPASS', 'orangered'),
+        ('AMPLITUDE', 'green'),
+        ('ATMOSPHERE', 'magenta'),
+        ('POINTING', 'yellow'),
+        ('SIDEBAND', 'orange'),
+        ('WVR', 'lime'),
+        ('DIFFGAIN', 'maroon'),
+        ('POLARIZATION', 'navy'),
+        ('POLANGLE', 'mediumslateblue'),
+        ('POLLEAKAGE', 'plum'),
+        ('UNKNOWN', 'grey'),
+    ])
+
+    @staticmethod
+    def _set_time_axis(figure, ax, datemin, datemax):
+        border = datetime.timedelta(minutes=5)
+        ax.set_xlim(datemin - border, datemax + border)
+
+        if datemax - datemin < datetime.timedelta(seconds=7200):
+            # scales if observation spans less than 2 hours
+            quarterhours = dates.MinuteLocator(interval=15)
+            minutes = dates.MinuteLocator(interval=5)
+            ax.xaxis.set_major_locator(quarterhours)
+            ax.xaxis.set_major_formatter(dates.DateFormatter('%Hh%Mm'))
+            ax.xaxis.set_minor_locator(minutes)
+        elif datemax - datemin < datetime.timedelta(seconds=21600):
+            # scales if observation spans less than 6 hours
+            halfhours = dates.MinuteLocator(interval=30)
+            minutes = dates.MinuteLocator(interval=10)
+            ax.xaxis.set_major_locator(halfhours)
+            ax.xaxis.set_major_formatter(dates.DateFormatter('%Hh%Mm'))
+            ax.xaxis.set_minor_locator(minutes)
+        elif datemax - datemin < datetime.timedelta(days=1):
+            # scales if observation spans less than a day
+            hours = dates.HourLocator(interval=1)
+            minutes = dates.MinuteLocator(interval=10)
+            ax.xaxis.set_major_locator(hours)
+            ax.xaxis.set_major_formatter(dates.DateFormatter('%Hh%Mm'))
+            ax.xaxis.set_minor_locator(minutes)
+        elif datemax - datemin < datetime.timedelta(days=7):
+            # spans more than a day, less than a week
+            days = dates.DayLocator()
+            hours = dates.HourLocator(np.arange(0, 25, 6))
+            ax.xaxis.set_major_locator(days)
+            ax.xaxis.set_major_formatter(dates.DateFormatter('%Y-%m-%d:%Hh'))
+            ax.xaxis.set_minor_locator(hours)
+        else:
+            # spans more than a week
+            months = dates.MonthLocator(bymonthday=1, interval=3)
+            mondays = dates.WeekdayLocator(dates.MONDAY)
+            ax.xaxis.set_major_locator(months)
+            ax.xaxis.set_major_formatter(dates.DateFormatter('%Y-%m'))
+            ax.xaxis.set_minor_locator(mondays)
+
+        ax.set_xlabel('Time')
+        figure.autofmt_xdate()
+
+
 class FieldVsTimeChartInputs(vdp.StandardInputs):
 
     @vdp.VisDependentProperty
@@ -246,29 +319,8 @@ class FieldVsTimeChartInputs(vdp.StandardInputs):
         self.output = output
 
 
-class FieldVsTimeChart(object):
+class FieldVsTimeChart(ParameterVsTimeChart):
     Inputs = FieldVsTimeChartInputs
-
-    # http://matplotlib.org/examples/color/named_colors.html
-    _intent_colours = {'AMPLITUDE': 'green',
-                       'ATMOSPHERE': 'magenta',
-                       'BANDPASS': 'red',
-                       'CHECK': 'purple',
-                       'PHASE': 'cyan',
-                       'POINTING': 'yellow',
-                       'REFERENCE': 'deepskyblue',
-                       'SIDEBAND': 'orange',
-                       'TARGET': 'blue',
-                       'WVR': 'lime',
-                       'POLARIZATION': 'navy',
-                       'POLANGLE': 'mediumslateblue',
-                       'POLLEAKAGE': 'plum',
-                       'UNKNOWN': 'grey',
-                       }
-
-    # list of intents that shares a same scan but segregated by subscan
-    # (To distinguish ON and OFF source subscans in ALMA-TP)
-    _subscan_intents = ('TARGET', 'REFERENCE')
 
     def __init__(self, inputs):
         self.inputs = inputs
@@ -310,9 +362,8 @@ class FieldVsTimeChart(object):
                 ys = y0
                 ye = y0 + height
                 for intent in intents_to_plot:
-                    colour = FieldVsTimeChart._intent_colours[intent]
-                    if intent in FieldVsTimeChart._subscan_intents and \
-                            len(scan.intents.intersection(FieldVsTimeChart._subscan_intents)) > 1:
+                    colour = self._intent_colours[intent]
+                    if intent in self._subscan_intents and len(scan.intents.intersection(self._subscan_intents)) > 1:
                         time_ranges = [tuple(map(utils.get_epoch_as_datetime, o)) \
                                        for o in get_intent_subscan_time_ranges(ms.name, utils.to_CASA_intent(ms, intent), scan.id) ]
                     else:
@@ -367,12 +418,15 @@ class FieldVsTimeChart(object):
 
         x = 0.00
         size = [0.4, 0.4, 0.6, 0.6]
-        for intent, colour in sorted(self._intent_colours.items(), key=operator.itemgetter(0)):
-            if (intent in self.inputs.ms.intents) or 'UNKNOWN' in intent:
-                plt.gca().fill([x, x+0.05, x+0.05, x], size, facecolor=colour,
-                                 edgecolor=colour)
-                plt.text(x+0.06, 0.4, intent, size=9, va='bottom', rotation=45)
-                x += 0.12
+        # show a sorted list of intents occurring in this plot, but move UNKNOWN to the end of the list
+        intents = sorted(self._intent_colours.keys())
+        del intents[intents.index('UNKNOWN')]
+        intents.append('UNKNOWN')
+        for intent in intents:
+            if (intent in self.inputs.ms.intents) or intent == 'UNKNOWN':
+                plt.gca().fill([x, x+0.035, x+0.035, x], size, facecolor=self._intent_colours[intent], edgecolor=None)
+                plt.text(x+0.04, 0.4, intent, size=9, va='bottom', rotation=45)
+                x += 0.10
 
         plt.axis(lims)
 
@@ -382,50 +436,6 @@ class FieldVsTimeChart(object):
         if not intents:
             intents.append('UNKNOWN')
         return intents
-
-    @staticmethod
-    def _set_time_axis(figure, ax, datemin, datemax):
-        border = datetime.timedelta(minutes=5)
-        ax.set_xlim(datemin-border, datemax+border)
-
-        if datemax - datemin < datetime.timedelta(seconds=7200):
-            # scales if observation spans less than 2 hours
-            quarterhours = dates.MinuteLocator(interval=15)
-            minutes = dates.MinuteLocator(interval=5)
-            ax.xaxis.set_major_locator(quarterhours)
-            ax.xaxis.set_major_formatter(dates.DateFormatter('%Hh%Mm'))
-            ax.xaxis.set_minor_locator(minutes)
-        elif datemax - datemin < datetime.timedelta(seconds=21600):
-            # scales if observation spans less than 6 hours
-            halfhours = dates.MinuteLocator(interval=30)
-            minutes = dates.MinuteLocator(interval=10)
-            ax.xaxis.set_major_locator(halfhours)
-            ax.xaxis.set_major_formatter(dates.DateFormatter('%Hh%Mm'))
-            ax.xaxis.set_minor_locator(minutes)
-        elif datemax - datemin < datetime.timedelta(days=1):
-            # scales if observation spans less than a day
-            hours = dates.HourLocator(interval=1)
-            minutes = dates.MinuteLocator(interval=10)
-            ax.xaxis.set_major_locator(hours)
-            ax.xaxis.set_major_formatter(dates.DateFormatter('%Hh%Mm'))
-            ax.xaxis.set_minor_locator(minutes)
-        elif datemax - datemin < datetime.timedelta(days=7):
-            # spans more than a day, less than a week
-            days = dates.DayLocator()
-            hours = dates.HourLocator(np.arange(0, 25, 6))
-            ax.xaxis.set_major_locator(days)
-            ax.xaxis.set_major_formatter(dates.DateFormatter('%Y-%m-%d:%Hh'))
-            ax.xaxis.set_minor_locator(hours)
-        else:
-            # spans more than a week
-            months = dates.MonthLocator(bymonthday=1, interval=3)
-            mondays = dates.WeekdayLocator(dates.MONDAY)
-            ax.xaxis.set_major_locator(months)
-            ax.xaxis.set_major_formatter(dates.DateFormatter('%Y-%m'))
-            ax.xaxis.set_minor_locator(mondays)
-
-        ax.set_xlabel('Time')
-        figure.autofmt_xdate()
 
 
 class IntentVsTimeChartInputs(vdp.StandardInputs):
@@ -448,24 +458,10 @@ class IntentVsTimeChartInputs(vdp.StandardInputs):
         self.output = output
 
 
-class IntentVsTimeChart(object):
+class IntentVsTimeChart(ParameterVsTimeChart):
     Inputs = IntentVsTimeChartInputs
 
     # http://matplotlib.org/examples/color/named_colors.html
-    _intent_colours = {'AMPLITUDE': ('green', 25),
-                       'ATMOSPHERE': ('magenta', 30),
-                       'BANDPASS': ('red', 20),
-                       'CHECK': ('purple', 15),
-                       'PHASE': ('cyan', 10),
-                       'POINTING': ('yellow', 35),
-                       'REFERENCE': ('deepskyblue', 5),
-                       'SIDEBAND': ('orange', 40),
-                       'TARGET': ('blue', 0),
-                       'WVR': ('lime', 45),
-                       'POLARIZATION': ('navy', 50),
-                       'POLANGLE': ('mediumslateblue', 55),
-                       'POLLEAKAGE': ('plum', 60),
-                       }
 
     # list of intents that shares a same scan but segregated by subscan
     # (To dustinguish ON and OFF source subscans in ALMA-TP)
@@ -488,31 +484,32 @@ class IntentVsTimeChart(object):
         for scan in ms.scans:
             scan_start = utils.get_epoch_as_datetime(scan.start_time)
             scan_end = utils.get_epoch_as_datetime(scan.end_time)
-            for intent in scan.intents:
-                if intent not in IntentVsTimeChart._intent_colours:
+            for scan_y, (intent, colour) in enumerate(self._intent_colours.items()):
+                if intent not in scan.intents:
                     continue
-                (colour, scan_y) = IntentVsTimeChart._intent_colours[intent]
-                if intent in IntentVsTimeChart._subscan_intents and \
-                        len(scan.intents.intersection(FieldVsTimeChart._subscan_intents)) > 1:
-                    time_ranges = [tuple(map(utils.get_epoch_as_datetime, o)) \
+                if intent in self._subscan_intents and \
+                        len(scan.intents.intersection(self._subscan_intents)) > 1:
+                    time_ranges = [tuple(map(utils.get_epoch_as_datetime, o))
                                    for o in get_intent_subscan_time_ranges(ms.name, utils.to_CASA_intent(ms, intent), scan.id) ]
                 else:
                     time_ranges = ((scan_start, scan_end),)
                 for (time_start, time_end) in time_ranges:
                     ax.fill([time_start, time_end, time_end, time_start],
-                            [scan_y, scan_y, scan_y+5, scan_y+5],
+                            [scan_y, scan_y, scan_y+1, scan_y+1],
                             facecolor=colour)
 
-                ax.annotate('%s' % scan.id, (scan_start, scan_y+6))
+                ax.annotate('%s' % scan.id, (scan_start, scan_y+1.2))
 
-        ax.set_ylim(0, 62.5)
-        ax.set_yticks([2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5, 57.5, 62.5])
-        ax.set_yticklabels(['SCIENCE', 'REFERENCE', 'PHASE', 'CHECK', 'BANDPASS',
-                            'AMPLITUDE', 'ATMOSPHERE', 'POINTING', 'SIDEBAND',
-                            'WVR', 'POLARIZATION', 'POLANGLE', 'POLLEAKAGE'])
+        # put intent names on the vertical axis, replacing 'TARGET' with 'SCIENCE', removing 'UNKNOWN', and keeping other names intact
+        intent_colours = self._intent_colours.copy()    # make a copy and then delete one element
+        del intent_colours['UNKNOWN']
+        num_intents = len(intent_colours)
+        ax.set_ylim(0, num_intents+0.5)  # extra space on top for the label
+        ax.set_yticks(np.linspace(0.5, num_intents-0.5, num_intents))
+        ax.set_yticklabels([name.replace('TARGET', 'SCIENCE') for name in intent_colours.keys()])
 
         # set the labelling of the time axis
-        FieldVsTimeChart._set_time_axis(
+        self._set_time_axis(
             figure=fig, ax=ax, datemin=obs_start, datemax=obs_end)
         ax.grid(True)
 

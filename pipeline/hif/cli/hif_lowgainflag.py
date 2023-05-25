@@ -4,7 +4,7 @@ import pipeline.h.cli.utils as utils
 
 
 def hif_lowgainflag(vis=None, intent=None, spw=None, refant=None, flag_nmedian=None, fnm_lo_limit=None,
-                    fnm_hi_limit=None, pipelinemode=None, dryrun=None, acceptresults=None):
+                    fnm_hi_limit=None, tmef1_limit=None, pipelinemode=None, dryrun=None, acceptresults=None):
 
     """
     hif_lowgainflag ---- Flag antennas with low or high gain
@@ -46,10 +46,20 @@ def hif_lowgainflag(vis=None, intent=None, spw=None, refant=None, flag_nmedian=N
                   scheme.
                   
                   Examples: refant='DV01', refant='DV06,DV07'
-    flag_nmedian  True to flag figures of merit greater than
+    flag_nmedian  Whether to flag figures of merit greater than
                   fnm_hi_limit * median or lower than fnm_lo_limit * median.
-    fnm_lo_limit  Flag values lower than fnm_lo_limit * median
-    fnm_hi_limit  Flag values higher than fnm_hi_limit * median
+                  (default: True)
+    fnm_lo_limit  Flag values lower than fnm_lo_limit * median (default: 0.5)
+    fnm_hi_limit  Flag values higher than fnm_hi_limit * median (default: 1.5)
+    niter         The maximum number of iterations to run of the sequence:
+                  solve for amplitude gains, assess statistics, flag spw/antenna
+                  combinations that are outliers (default: 2)
+    tmef1_limit   Threshold for "too many entirely flagged" -
+                  the critical fraction of antennas whose solutions are entirely
+                  flagged in the flagging view of an spw for this stage:
+                  if the fraction is equal or greater than this value, then flag
+                  the visibility data from all antennas in this spw
+                  (default: 0.666)
     pipelinemode  The pipeline operating mode.
                   In 'automatic' mode the pipeline determines the values of all
                   context defined pipeline inputs automatically.

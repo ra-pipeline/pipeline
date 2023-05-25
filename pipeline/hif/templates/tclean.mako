@@ -28,6 +28,27 @@ except:
     long_description = ''
 %>Tclean/MakeImages${long_description}</%block>
 
+%if imaging_mode == 'ALMA':
+    <p>In this stage, images with significant emission are cleaned to a threshold of
+    2 x (predicted rms noise) x (dynamic range correction factor) using automasking.
+    If a clean mask is not found automatically, then this threshold is doubled and
+    the bulk of the whole image is used (PB&gt;0.3). The dynamic range correction factor
+    (abbreviated as "DR correction") accounts for the fact that sources with a high
+    dynamic range will typically exhibit larger imaging artifacts, resulting in a
+    noise level greater than an equivalent blank field. The artifacts are worse for
+    poorer UV coverage, so different dynamic range (DR) correction factors are
+    adopted for different antenna configurations (12m Array vs. 7m Array multi-EB vs.
+    7m Array single-EB), and for different targets (science targets vs. calibrators).
+    See the Pipeline User's Guide for details.<br>
+    The DR correction adopted is a function of the dirty dynamic range (abbreviated
+    as "Dirty DR"), which is defined as the peak intensity divided by the theoretical
+    rms sensitivity delivered by the visibilities.</p>
+%elif imaging_mode == 'VLA':
+    <p>In this stage, images with significant emission are cleaned to a threshold
+    of 4 x (the RMS noise measured by tclean) using automasking.
+    If a clean mask is not found automatically, then no further cleaning is performed.</p>
+%endif
+
 %if len(result[0].targets) != 0:
     %if len(image_info) != 0:
         %if image_info[0].intent == 'CHECK':
@@ -308,6 +329,16 @@ except:
                         <td style="width:250px;">
                             <div style="word-wrap:break-word;width:250px;">
                                 ${image_info[k].image_file}
+                            </div>
+                        </td>
+                    %endfor
+                </tr>
+                <tr>
+                    <th>data type</th>
+                    %for k in range(j, min(j+4, field_block_indices[i+1])):
+                        <td style="width:250px;">
+                            <div style="word-wrap:break-word;width:250px;">
+                                ${image_info[k].datatype_info}
                             </div>
                         </td>
                     %endfor

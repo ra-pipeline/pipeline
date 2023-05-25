@@ -7,7 +7,7 @@ def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, an
                   phaseupsolint=None, phaseupbw=None, phaseupsnr=None, phaseupnsols=None, hm_bandpass=None, solint=None,
                   maxchannels=None, evenbpints=None, bpsnr=None, minbpsnr=None, bpnsols=None, combine=None, refant=None,
                   solnorm=None, minblperant=None, minsnr=None, unregister_existing=None, pipelinemode=None, dryrun=None, 
-                  acceptresults=None):
+                  acceptresults=None, fillgaps=None):
 
     """
     hifa_bandpass ---- Compute bandpass calibration solutions
@@ -126,6 +126,9 @@ def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, an
                         do not execute (False).
     acceptresults       Automatically accept the results of the task into the pipeline context (True)
                         or reject them (False).
+
+    fillgaps            Fill flagged solution channels by interpolation. 
+                        Example: fillgaps = 10
 
     --------- examples -----------------------------------------------------------
 

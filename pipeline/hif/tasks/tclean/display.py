@@ -175,6 +175,7 @@ class CleanSummary(object):
 
                     parameters = {k: miscinfo[k] for k in ['virtspw', 'iter'] if k in miscinfo}
                     parameters['field'] = '%s (%s)' % (miscinfo['field'], miscinfo['intent'])
+                    parameters['datatype'] = r.datatype
                     parameters['type'] = 'spectra'
                     parameters['moment'] = 'N/A'
                     try:

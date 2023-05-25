@@ -79,7 +79,7 @@ class ImageParamsHeuristicsALMA(ImageParamsHeuristics):
         #
         # return uvtaper
 
-    def dr_correction(self, threshold, dirty_dynamic_range, residual_max, intent, tlimit):
+    def dr_correction(self, threshold, dirty_dynamic_range, residual_max, intent, tlimit, drcorrect):
         """Adjustment of cleaning threshold due to dynamic range limitations."""
 
         qaTool = casa_tools.quanta
@@ -88,6 +88,17 @@ class ImageParamsHeuristicsALMA(ImageParamsHeuristics):
 
         diameter = self.observing_run.get_measurement_sets()[0].antennas[0].diameter
         old_threshold = qaTool.convert(threshold, 'Jy')['value']
+
+        if drcorrect not in (None, -999):
+            if isinstance(drcorrect, (float, int)) and drcorrect > 0.0:
+                new_threshold = old_threshold*drcorrect
+                DR_correction_factor = drcorrect
+                LOG.info('DR correction: Modified threshold from {:.3g} Jy to {:.3g} Jy based on the user input correction factor: {}'.format(
+                    old_threshold, new_threshold, DR_correction_factor))
+                return '%.3gJy' % (new_threshold), DR_correction_factor, maxEDR_used
+            else:
+                raise Exception(f'Got an invalid input value for the DR correction factor: {drcorrect}')
+                        
         if intent == 'TARGET' or intent == 'CHECK':
             n_dr_max = 2.5
             if diameter == 12.0:

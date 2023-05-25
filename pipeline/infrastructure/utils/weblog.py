@@ -3,19 +3,20 @@ The sorting module contains utility functions used by the pipeline web log.
 """
 import collections
 import datetime
+import html
 import itertools
 import operator
 import os
 from functools import reduce
 
-import numpy
+import numpy as np
+from astropy.table import QTable
 
-from .conversion import flatten, to_pipeline_intent, spw_arg_to_id
-from .. import casa_tools
-from .. import logging
+from .. import casa_tools, logging
+from .conversion import flatten, spw_arg_to_id, to_pipeline_intent
 
-__all__ = ['OrderedDefaultdict', 'merge_td_columns', 'get_vis_from_plots', 'total_time_on_source',
-           'total_time_on_target_on_source', 'get_logrecords', 'get_intervals']
+__all__ = ['OrderedDefaultdict', 'merge_td_columns', 'merge_td_rows', 'get_vis_from_plots', 'total_time_on_source',
+           'total_time_on_target_on_source', 'get_logrecords', 'get_intervals', 'table_to_html', 'plots_to_html']
 
 LOG = logging.get_logger(__name__)
 
@@ -106,6 +107,41 @@ def merge_td_columns(rows, num_to_merge=None, vertical_align=False):
     return list(zip(*new_cols))
 
 
+def merge_td_rows(table):
+    """
+    Merge HTML TD rows with identical values using colspan.
+
+    Arguments:
+    table -- a list of tuples, one tuple per row, containing n elements for the n columns.
+
+    Output:
+    A list of tuples with adjusted idential values merged with colspan.
+    """
+    new_table = []
+    for row in table:
+        row_list = list(row)
+        start = 0
+        while start < len(row):
+            start_cell = row[start]
+            merge_count = 0
+            end = start+1
+
+            while end < len(row):
+                if start_cell == row[end]:
+                    row_list[end] = ''
+                    merge_count += 1
+                    end += 1
+                else:
+                    break
+            if merge_count > 0:
+                row_list[start] = row_list[start].replace('<td', fr'<td colspan="{merge_count+1}"')
+            start += 1
+
+        new_table.append(tuple(row_list))
+
+    return new_table
+
+
 def get_vis_from_plots(plots):
     """
     Get the name to be used for the MS from the given plots.
@@ -136,7 +172,7 @@ def total_time_on_target_on_source(ms, autocorr_only=False):
     max_time = 0.0
     ant_ids = [a.id for a in ms.antennas]
     dds = [ms.get_data_description(spw=spw) for spw in science_spws]
-    science_dds = numpy.unique([dd.id for dd in dds])
+    science_dds = np.unique([dd.id for dd in dds])
     with casa_tools.TableReader(ms.name) as tb:
         for dd in science_dds:
             for a1 in ant_ids:
@@ -283,3 +319,78 @@ def get_intervals(context, calapp, spw_ids=None):
     #     all_solints.update(set(solints))
     #
     # return all_solints
+
+
+def table_to_html(table, tableclass='table table-bordered table-striped table-condensed', rotate=False):
+    """Convert a astropy.table.Table object to an HTML table snippet."""
+    if rotate:
+        table_rows = [table.colnames]+list(table.as_array())
+        table_rotate = QTable(rows=list(zip(*table_rows)))
+        table_html = table_rotate.pformat(html=True, max_width=-1, tableclass=tableclass, show_name=False)
+    else:
+        table_html = table.pformat(html=True, max_width=-1, tableclass=tableclass, show_name=True)
+
+    table_html = '\n'.join([html.unescape(line) for line in table_html])
+
+    return table_html
+
+
+def plots_to_html(plots, title=None, alt=None, caption=None, group=None,
+                  align='middle', width='auto', height='auto', report_dir='./'):
+    """Convert a list of plots to HTML snippets.
+    
+    examples:
+        plots_to_html(plots, caption=None, width='400px', height='300px')
+
+    notes:
+        the generated snippet requires lazyload.
+    """
+
+    def desc_lookup(plot, key, value=None):
+        """Get a plot description value from the plot object attribute or parameters dictionary.
+        
+        The order of precedence: 
+            non-None input > 
+            matching plot parameters dict key > 
+            attribute with the same name
+        """
+        ret_value = ''
+        if hasattr(plot, key):
+            ret_value = getattr(plot, key)
+        if hasattr(plot, 'parameters') and key in plot.parameters:
+            ret_value = plot.parameters[key]
+        if value is not None:
+            ret_value = value
+        return ret_value
+
+    plots_html = []
+
+    for plot in plots:
+        fullsize_relpath = os.path.relpath(plot.abspath, report_dir)
+        thumbnail_relpath = os.path.relpath(plot.thumbnail, report_dir)
+
+        html_args = {
+            'fullsize': fullsize_relpath,
+            'thumbnail': thumbnail_relpath,
+            'title': desc_lookup(plot, 'title', title),
+            'caption': desc_lookup(plot, 'caption', caption),
+            'alt': desc_lookup(plot, 'alt', alt),
+            'group': desc_lookup(plot, 'group', group),
+            'width': width,
+            'height': height,
+            'align': align,
+        }
+        html = ('<a href="{fullsize}"'
+                '   title="{title}"'
+                '   data-fancybox="{group}"'
+                '   data-caption="{caption}">'
+                '    <img data-src="{thumbnail}"'
+                '         style="width:{width};height:{height}"'
+                '         title="{title}"'
+                '         alt="{alt}"'
+                '         align="{align}"'
+                '         class="lazyload img-responsive">'
+                '</a>'.format(**html_args))
+        plots_html.append(html)
+
+    return plots_html

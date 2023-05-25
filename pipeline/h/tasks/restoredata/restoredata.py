@@ -25,7 +25,6 @@ task = pipeline.tasks.RestoreData(inputs)
 results = task.execute(dry_run=False)
 results.accept(context)
 """
-import glob
 import os
 import re
 import ast
@@ -298,13 +297,27 @@ class RestoreData(basetask.StandardTaskTemplate):
                 # for each non-target asdm/vis in the manifest structure
                 params = pipemanifest.get_renorm(vis)
                 if params:
-                    rn_params = {key:ast.literal_eval(val) if val else val for key,val in params.items()}
+                    # correspondence between param names in the manifest and arguments of 'renormalize()'
+                    paramnames = {
+                        'docorr'        : 'apply',
+                        'docorrThresh'  : 'threshold',
+                        'correctATM'    : 'correctATM',
+                        'spws'          : 'spw',
+                        'excludechan'   : 'excludechan',
+                        'atmAutoExclude': 'atm_auto_exclude',
+                        'bwthreshspw'   : 'bwthreshspw'
+                    }
+                    # rn_params = {key:ast.literal_eval(val) if val else val for key,val in params.items()}
+                    kwargs = {}
+                    for renormalize_key, manifest_key in paramnames.items():
+                        if manifest_key in params:
+                            val = params[manifest_key]
+                            kwargs[renormalize_key] = ast.literal_eval(val) if val else val
                     try:
                         rn = ACreNorm(vis)
                         LOG.info(f'Renormalizing {vis} with hifa_renorm {params}')
-                        rn.renormalize(docorr=rn_params['apply'], docorrThresh=rn_params['threshold'], correctATM=rn_params['correctATM'],
-                                        spws=rn_params['spw'], excludechan=rn_params['excludechan'])
-                        if rn_params['apply'] and rn.checkApply():
+                        rn.renormalize(**kwargs)
+                        if 'docorr' in kwargs and kwargs['docorr'] and rn.checkApply():
                             applied = True
                         else:
                             LOG.error(f'Failed application of renormalization for {vis} {params}')
@@ -323,7 +336,7 @@ class RestoreData(basetask.StandardTaskTemplate):
 
         # Download the pipeline manifest file from the archive or
         #     products_dir to rawdata_dir
-        manifest_files = glob.glob(os.path.join(inputs.products_dir, template))
+        manifest_files = utils.glob_ordered(os.path.join(inputs.products_dir, template))
         for manifestfile in manifest_files:
             LOG.info('Copying %s to %s' % (manifestfile, inputs.rawdata_dir))
             shutil.copy(manifestfile, os.path.join(inputs.rawdata_dir,
@@ -338,9 +351,9 @@ class RestoreData(basetask.StandardTaskTemplate):
         # Get the list of files in the rawdata directory
         #   First find all the manifest files of any kind
         #   If there is more than one file in that list then try the more restrictive template
-        manifestfiles = glob.glob(os.path.join(inputs.rawdata_dir, template1))
+        manifestfiles = utils.glob_ordered(os.path.join(inputs.rawdata_dir, template1))
         if len(manifestfiles) > 1:
-            manifestfiles2 = glob.glob(os.path.join(inputs.rawdata_dir, template2))
+            manifestfiles2 = utils.glob_ordered(os.path.join(inputs.rawdata_dir, template2))
             if len(manifestfiles2) > 0 and len(manifestfiles2) < len(manifestfiles):
                 manifestfiles = manifestfiles2
 
@@ -365,7 +378,7 @@ class RestoreData(basetask.StandardTaskTemplate):
             inflagfiles = [os.path.join(inputs.products_dir, flagfile)
                            for flagfile in pipemanifest.get_final_flagversions(ouss).values()]
         else:
-            inflagfiles = glob.glob(os.path.join(inputs.products_dir, '*.flagversions.tgz'))
+            inflagfiles = utils.glob_ordered(os.path.join(inputs.products_dir, '*.flagversions.tgz'))
 
         for flagfile in inflagfiles:
             LOG.info('Copying %s to %s' % (flagfile, inputs.rawdata_dir))
@@ -377,7 +390,7 @@ class RestoreData(basetask.StandardTaskTemplate):
             incaltables = [os.path.join(inputs.products_dir, caltable)
                            for caltable in pipemanifest.get_caltables(ouss).values()]
         else:
-            incaltables = glob.glob(os.path.join(inputs.products_dir, '*.caltables.tgz'))
+            incaltables = utils.glob_ordered(os.path.join(inputs.products_dir, '*.caltables.tgz'))
 
         for caltable in incaltables:
             LOG.info('Copying %s to %s' % (caltable, inputs.rawdata_dir))
@@ -390,7 +403,7 @@ class RestoreData(basetask.StandardTaskTemplate):
             inapplycals = [os.path.join(inputs.products_dir, applycals)
                            for applycals in pipemanifest.get_applycals(ouss).values()]
         else:
-            inapplycals = glob.glob(os.path.join(inputs.products_dir, '*.calapply.txt'))
+            inapplycals = utils.glob_ordered(os.path.join(inputs.products_dir, '*.calapply.txt'))
 
         for calapply_list in inapplycals:
             LOG.info('Copying %s to %s' % (calapply_list, inputs.rawdata_dir))
@@ -538,8 +551,8 @@ class RestoreData(basetask.StandardTaskTemplate):
                     tarfilename = os.path.join(inputs.rawdata_dir,
                                                pipemanifest.get_caltables(ouss)['default'])
             elif ousid == '':
-                tarfilename = glob.glob(os.path.join(inputs.rawdata_dir,
-                                                     '*' + session + '.caltables.tgz'))[0]
+                tarfilename = utils.glob_ordered(os.path.join(inputs.rawdata_dir,
+                                                              '*' + session + '.caltables.tgz'))[0]
             else:
                 tarfilename = os.path.join(inputs.rawdata_dir,
                                            ousid + session + '.caltables.tgz')

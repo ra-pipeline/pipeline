@@ -39,7 +39,7 @@ class ALMAExportData(exportdata.ExportData):
 
         results = super(ALMAExportData, self).prepare()
 
-        oussid = self.get_oussid(self.inputs.context)
+        oussid = self.inputs.context.get_oussid()
 
         # Make the imaging vislist and the sessions lists.
         #     Force this regardless of the value of imaging_only_products

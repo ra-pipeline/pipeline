@@ -1,7 +1,7 @@
-import glob
 import os
 
 import pipeline.infrastructure as infrastructure
+import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.imagelibrary as imagelibrary
@@ -71,10 +71,10 @@ class Makermsimages(basetask.StandardTaskTemplate):
         imagenames = []
         for imageitem in imlist:
             if imageitem['multiterm']:
-                imagenames.extend(glob.glob(imageitem['imagename'] + '.pbcor.tt0'))
-                imagenames.extend(glob.glob(imageitem['imagename'] + '.pbcor.tt1'))
+                imagenames.extend(utils.glob_ordered(imageitem['imagename'] + '.pbcor.tt0'))
+                imagenames.extend(utils.glob_ordered(imageitem['imagename'] + '.pbcor.tt1'))
             else:
-                imagenames.extend(glob.glob(imageitem['imagename'] + '.pbcor'))
+                imagenames.extend(utils.glob_ordered(imageitem['imagename'] + '.pbcor'))
 
         tier0_imdev_enabled = True
         rmsimagenames = []

@@ -10,6 +10,7 @@ def hif_editimlist(imagename=None,
                    conjbeams=None,
                    cyclefactor=None,
                    cycleniter=None,
+                   datatype=None,
                    datacolumn=None,
                    deconvolver=None,
                    editmode=None,
@@ -71,7 +72,14 @@ def hif_editimlist(imagename=None,
     conjbeams            Use conjugate frequency in tclean for wideband A-terms.
     cyclefactor          Controls the depth of clean in minor cycles based on PSF.
     cycleniter           Controls max number of minor cycle iterations in a single major cycle.
-    datacolumn           Data column to image
+    datatype             Data type(s) to image. The default '' selects the best
+                         available data type (e.g. selfcal over regcal) with
+                         an automatic fallback to the next available data type.
+                         With the datatype parameter of 'regcal' or 'selfcal', one 
+                         can force the use of only given data type(s).
+                         Note that this parameter is only for non-VLASS data when the datacolumn 
+                         is not explictly set by user or imaging heuristics.  
+    datacolumn           Data column to image; this will take precedence over the datatype parameter.
     deconvolver          Minor cycle algorithm (multiscale or mtmfs)
     editmode             The edit mode of the task ('add' or 'replace'). Defaults to 'add'.
     field                Set of data selection field names or ids.

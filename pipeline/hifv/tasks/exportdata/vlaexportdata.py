@@ -93,7 +93,7 @@ class VLAExportData(exportdata.ExportData):
                     target['auxfitsfiles'].append(ee.nonpbcor_fits)
                     target['fitsfiles'].remove(ee.nonpbcor_fits)
 
-        oussid = self.get_oussid(self.inputs.context)  # returns string of 'unknown' for VLA
+        oussid = self.inputs.context.get_oussid()  # returns string of 'unknown' for VLA
 
         # Make the imaging vislist and the sessions lists.
         #     Force this regardless of the value of imaging_only_products

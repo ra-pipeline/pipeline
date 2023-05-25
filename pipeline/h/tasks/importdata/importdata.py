@@ -220,7 +220,7 @@ class ImportData(basetask.StandardTaskTemplate):
         rel_to_import = [os.path.relpath(f, abs_output_dir) for f in to_import]
 
         observing_run = ms_reader.get_observing_run(rel_to_import)
-        available_data_types = [str(v).replace('DataType.', '') for v in DataType]
+        available_data_types = [v.name for v in DataType]
         short_data_types = list(set([v.replace('_ALL', '').replace('_SCIENCE', '') for v in available_data_types if v.endswith('_ALL') or v.endswith('_SCIENCE')]))
         data_type_entry = collections.namedtuple('DataTypeEntry', ('str_data_type enum_data_type'))
         for ms in observing_run.measurement_sets:
@@ -258,11 +258,11 @@ class ImportData(basetask.StandardTaskTemplate):
 
                     if v.upper() in short_data_types:
                         if ms.intents == {'TARGET'}:
-                            data_types[k.upper()] = data_type_entry(f'{v.upper()}_SCIENCE', eval(f'DataType.{v.upper()}_SCIENCE'))
+                            data_types[k.upper()] = data_type_entry(f'{v.upper()}_SCIENCE', DataType[f'{v.upper()}_SCIENCE'])
                         else:
-                            data_types[k.upper()] = data_type_entry(f'{v.upper()}_ALL', eval(f'DataType.{v.upper()}_ALL'))
+                            data_types[k.upper()] = data_type_entry(f'{v.upper()}_ALL', DataType[f'{v.upper()}_ALL'])
                     elif v.upper() in available_data_types:
-                        data_types[k.upper()] = data_type_entry(f'{v.upper()}', eval(f'DataType.{v.upper()}'))
+                        data_types[k.upper()] = data_type_entry(f'{v.upper()}', DataType[f'{v.upper()}'])
                     else:
                         msg = f'No such data type {v.upper()}'
                         LOG.error(msg)
@@ -299,6 +299,16 @@ class ImportData(basetask.StandardTaskTemplate):
             if 'CORRECTED' in data_types:
                 ms.set_data_column(data_types['CORRECTED'].enum_data_type, correcteddatacolumn_name)
                 LOG.info(f'Setting data type for corrected data column of {ms.basename} to {data_types["CORRECTED"].str_data_type}')
+
+            # PIPE-1575: correct invalid coordinate system name in Cycle 2 and earlier datasets
+            for field in ms.fields:
+                if field._mdirection['refer'] in ['J2000', 'j2000']:
+                    LOG.info(f'{ms.basename}: changing coords from J2000 to ICRS for field {field.name}')
+                    field._mdirection['refer'] = 'ICRS'
+            for source in ms.sources:
+                if source._direction['refer'] in ['J2000', 'j2000']:
+                    LOG.info(f'{ms.basename}: changing coords from J2000 to ICRS for source {source.name}')
+                    source._direction['refer'] = 'ICRS'
 
             ms.session = inputs.session
             results.origin[ms.basename] = ms_origin

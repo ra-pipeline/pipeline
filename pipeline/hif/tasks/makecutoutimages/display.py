@@ -297,7 +297,7 @@ class VlassCubeCutoutRmsSummary(object):
             cmap = cm.get_cmap('rainbow_r')
             for idx, stokes in enumerate(stokes_list):
                 color_idx = idx/len(stokes_list)
-                ax.plot(x, y[:, idx], color=cmap(color_idx), label=f'$\it{stokes}$', marker='o')
+                ax.plot(x, y[:, idx], color=cmap(color_idx), label=fr'$\it {stokes}$', marker='o')
                 #ax.scatter(x, y[:, idx], color=cmap(color_idx), alpha=0.75, s=300, edgecolors='black')
                 if stokes == 'I':
                     for idx_spw in range(len(x)):

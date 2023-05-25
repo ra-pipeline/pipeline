@@ -29,9 +29,7 @@ task = pipeline.tasks.exportdata.ExportData(inputs)
 """
 import collections
 import copy
-import errno
 import fnmatch
-import glob
 import io
 import os
 import shutil
@@ -49,125 +47,15 @@ from pipeline import environment
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import task_registry
-from pipeline.infrastructure.filenamer import fitsname
+from pipeline.infrastructure import utils
+from pipeline.infrastructure.filenamer import fitsname, PipelineProductNameBuilder
 from pipeline.domain import DataType
 from ..common import manifest
 
 # the logger for this module
 LOG = infrastructure.get_logger(__name__)
 
-
 StdFileProducts = collections.namedtuple('StdFileProducts', 'ppr_file weblog_file casa_commands_file casa_pipescript casa_restore_script')
-
-
-# product name utility 
-class PipelineProductNameBuilder(object):
-
-    aqua_report_name = 'pipeline_aquareport.xml'
-
-    @classmethod
-    def __build(self, *args, **kwargs):
-        if 'separator' in kwargs:
-            separator = kwargs['separator']
-        else:
-            separator = '.'
-        return separator.join(map(str, args))
-
-    @classmethod
-    def _join_dir(self, name, output_dir=None):
-        if output_dir is not None:
-            name = os.path.join(output_dir, name)
-        return name
-
-    @classmethod
-    def _build_from_oussid(self, basename, ousstatus_entity_id=None, output_dir=None):
-        if ousstatus_entity_id is None:
-            name = basename
-        else:
-            name = self.__build(ousstatus_entity_id, basename)
-        return self._join_dir(name, output_dir)
-
-    @classmethod
-    def _build_from_ps_oussid(self, basename, project_structure=None, ousstatus_entity_id=None, output_dir=None):
-        if project_structure is None:
-            name = basename
-        elif project_structure.ousstatus_entity_id == 'unknown':
-            name = basename
-        else:
-            name = self._build_from_oussid(basename, ousstatus_entity_id=ousstatus_entity_id)
-        return self._join_dir(name, output_dir)
-
-    @classmethod
-    def _build_from_oussid_session(self, basename, ousstatus_entity_id=None, session_name=None, output_dir=None):
-        name = self.__build(ousstatus_entity_id, session_name, basename)
-        return self._join_dir(name, output_dir)
-
-    @classmethod
-    def _build_calproduct_name(self, basename, aux_product=False, output_dir=None):
-        if aux_product:
-            prefix='auxcal'
-        else:
-            prefix='cal'
-        name = self.__build(prefix, basename, separator='')
-        return self._join_dir(name, output_dir)
-
-    @classmethod
-    def _build_from_vis(self, basename, vis, output_dir=None):
-        name = self.__build(os.path.basename(vis), basename)
-        return self._join_dir(name, output_dir)
-
-    @classmethod
-    def weblog(self, project_structure=None, ousstatus_entity_id=None, output_dir=None):
-        return self._build_from_ps_oussid('weblog.tgz', 
-                                          project_structure=project_structure, 
-                                          ousstatus_entity_id=ousstatus_entity_id,
-                                          output_dir=output_dir)
-
-    @classmethod
-    def casa_script(self, basename, project_structure=None, ousstatus_entity_id=None, output_dir=None):
-        return self._build_from_ps_oussid(basename, 
-                                          project_structure=project_structure, 
-                                          ousstatus_entity_id=ousstatus_entity_id,
-                                          output_dir=output_dir)
-
-    @classmethod
-    def manifest(self, basename, ousstatus_entity_id, output_dir=None):
-        return self._build_from_oussid(basename,
-                                       ousstatus_entity_id=ousstatus_entity_id,
-                                       output_dir=output_dir)
-
-    @classmethod
-    def calapply_list(self, vis, aux_product=False, output_dir=None):
-        basename = self._build_calproduct_name('apply.txt', aux_product=aux_product)
-        return self._build_from_vis(basename, vis, output_dir=output_dir)
-
-    @classmethod
-    def caltables(self, ousstatus_entity_id=None, session_name=None, aux_product=False, output_dir=None):
-        basename = self._build_calproduct_name('tables.tgz', aux_product=aux_product)
-        return self._build_from_oussid_session(basename=basename,
-                                               ousstatus_entity_id=ousstatus_entity_id,
-                                               session_name=session_name,
-                                               output_dir=None)
-
-    @classmethod
-    def aqua_report(self, project_structure=None, ousstatus_entity_id=None, output_dir=None):
-        return self._build_from_ps_oussid(PipelineProductNameBuilder.aqua_report_name,
-                                          project_structure=project_structure,
-                                          ousstatus_entity_id=ousstatus_entity_id,
-                                          output_dir=output_dir)
-
-    @classmethod
-    def auxiliary_products(self, basename, ousstatus_entity_id=None, output_dir=None):
-        return self._build_from_oussid(basename,
-                                       ousstatus_entity_id=ousstatus_entity_id,
-                                       output_dir=output_dir)
-
-    @classmethod
-    def aqua_report(self, aqua_report_name, project_structure=None, ousstatus_entity_id=None, output_dir=None):
-        return self._build_from_ps_oussid(aqua_report_name,
-                                          project_structure=project_structure,
-                                          ousstatus_entity_id=ousstatus_entity_id,
-                                          output_dir=output_dir)
 
 
 class ExportDataInputs(vdp.StandardInputs):
@@ -357,15 +245,11 @@ class ExportData(basetask.StandardTaskTemplate):
         # 'self.inputs' everywhere
         inputs = self.inputs
 
-        try:
-            LOG.trace('Creating products directory: %s', inputs.products_dir)
-            os.makedirs(inputs.products_dir)
-        except OSError as exc:
-            if exc.errno != errno.EEXIST:
-                raise
+        # Create products directory if necessary.
+        utils.ensure_products_dir_exists(inputs.products_dir)
 
-        # Initialize the standard ous is string.
-        oussid = self.get_oussid(inputs.context)
+        # Initialize the standard OUS status ID string.
+        oussid = inputs.context.get_oussid()
 
         # Define the results object
         result = ExportDataResults()
@@ -462,21 +346,6 @@ class ExportData(basetask.StandardTaskTemplate):
         """
         return results
 
-    def get_oussid(self, context):
-        """
-        Determine the ous prefix
-        """
-
-        # Get the parent ous ousstatus name. This is the sanitized ous
-        # status uid
-        ps = context.project_structure
-        if ps is None or ps.ousstatus_entity_id == 'unknown':
-            oussid = 'unknown'
-        else:
-            oussid = ps.ousstatus_entity_id.translate(str.maketrans(':/', '__'))
-
-        return oussid
-
     def get_recipename(self, context):
         """
         Get the recipe name
@@ -538,7 +407,7 @@ class ExportData(basetask.StandardTaskTemplate):
             ppr_file = None
 
         # Export a tar file of the web log
-        weblog_file = self._export_weblog(context, products_dir, oussid)
+        weblog_file = self._export_weblog(context, products_dir)
 
         # Export the processing log independently of the web log
         casa_commands_file = self._export_casa_commands_log(context, context.logs['casa_commands'], products_dir,
@@ -673,12 +542,12 @@ class ExportData(basetask.StandardTaskTemplate):
 
         targetflags_filelist = []
         if self.inputs.imaging_products_only:
-            flags_file_list = glob.glob('*.flagtargetstemplate.txt')
+            flags_file_list = utils.glob_ordered('*.flagtargetstemplate.txt')
         elif not vislist:
-            flags_file_list = glob.glob('*.flagtemplate.txt')
-            flags_file_list.extend(glob.glob('*.flagtsystemplate.txt'))
+            flags_file_list = utils.glob_ordered('*.flagtemplate.txt')
+            flags_file_list.extend(utils.glob_ordered('*.flagtsystemplate.txt'))
         else:
-            flags_file_list = glob.glob('*.flag*template.txt')
+            flags_file_list = utils.glob_ordered('*.flag*template.txt')
         for file_name in flags_file_list:
             flags_file = os.path.join(output_dir, file_name)
             if os.path.exists(flags_file):
@@ -1028,24 +897,11 @@ class ExportData(basetask.StandardTaskTemplate):
 
         return tarfilename
 
-    def _export_weblog(self, context, products_dir, oussid):
+    def _export_weblog(self, context, products_dir):
         """
         Save the processing web log to a tarfile
         """
-        # Define the name of the output tarfile
-        ps = context.project_structure
-        tarfilename = self.NameBuilder.weblog(project_structure=ps,
-                                              ousstatus_entity_id=oussid)
-
-        LOG.info('Saving final weblog in %s', tarfilename)
-
-        # Create the tar file
-        if not self._executor._dry_run:
-            tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
-            tar.add(os.path.join(os.path.basename(os.path.dirname(context.report_dir)), 'html'))
-            tar.close()
-
-        return tarfilename
+        return utils.export_weblog_as_tar(context, products_dir, self.NameBuilder, self._executor._dry_run)
 
     def _export_casa_commands_log(self, context, casalog_name, products_dir, oussid):
         """

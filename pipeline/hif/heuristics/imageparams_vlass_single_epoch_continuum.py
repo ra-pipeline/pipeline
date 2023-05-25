@@ -1,6 +1,5 @@
 import os
 import re
-import glob
 import shutil
 import uuid
 from typing import Union, Tuple, Dict
@@ -10,6 +9,7 @@ import numpy
 from casatasks.private.imagerhelpers.imager_parallel_continuum import PyParallelContSynthesisImager
 from casatasks.private.imagerhelpers.input_parameters import ImagerParameters
 
+import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure as infrastructure
 from pipeline.infrastructure import casa_tools
 import pipeline.infrastructure.mpihelpers as mpihelpers
@@ -469,7 +469,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
             csys_record = csys_image.torecord()
             csys_image.done()
 
-            tmp_psf_images = glob.glob('%s.*' % tmp_psf_filename)
+            tmp_psf_images = utils.glob_ordered('%s.*' % tmp_psf_filename)
             for tmp_psf_image in tmp_psf_images:
                 shutil.rmtree(tmp_psf_image)
 

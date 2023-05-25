@@ -46,6 +46,9 @@ class LowgainflagInputs(vdp.StandardInputs):
     min_nants_threshold = vdp.VisDependentProperty(default=5)
     niter = vdp.VisDependentProperty(default=2)
 
+    # PIPE-566, PIPE-808: set threshold for "too many entirely flagged"
+    tmef1_limit = vdp.VisDependentProperty(default=0.666)
+
     @vdp.VisDependentProperty
     def refant(self):
         # we cannot find the context value without the measurement set
@@ -71,7 +74,7 @@ class LowgainflagInputs(vdp.StandardInputs):
         return ','.join([str(spw.id) for spw in science_spws])
 
     def __init__(self, context, output_dir=None, vis=None, intent=None, spw=None, refant=None, flag_nmedian=None,
-                 fnm_lo_limit=None, fnm_hi_limit=None, niter=None, min_nants_threshold=None):
+                 fnm_lo_limit=None, fnm_hi_limit=None, niter=None, min_nants_threshold=None, tmef1_limit=None):
         super(LowgainflagInputs, self).__init__()
 
         # pipeline inputs
@@ -91,6 +94,7 @@ class LowgainflagInputs(vdp.StandardInputs):
         self.fnm_hi_limit = fnm_hi_limit
         self.fnm_lo_limit = fnm_lo_limit
         self.niter = niter
+        self.tmef1_limit = tmef1_limit
 
 
 @task_registry.set_equivalent_casa_task('hif_lowgainflag')
@@ -144,7 +148,7 @@ class Lowgainflag(basetask.StandardTaskTemplate):
         # (unflagged) data at all for a spw (e.g. because gaincal could not
         # compute any solutions). In this case the underlying (bad) data in the
         # MS for this spw should get flagged explicitly.
-        rules.extend(flagger.make_flag_rules(flag_tmef1=True, tmef1_axis='Antenna1', tmef1_limit=1.0))
+        rules.extend(flagger.make_flag_rules(flag_tmef1=True, tmef1_axis='Antenna1', tmef1_limit=inputs.tmef1_limit))
 
         # Construct the flagger task around the data view task and the
         # flagsetter task. 

@@ -1,6 +1,5 @@
 import collections
 import copy
-import glob
 import math
 import operator
 import os.path
@@ -53,7 +52,7 @@ class ImageParamsHeuristics(object):
         :param vislist: the list of MS names
         :type vislist: list of strings
         :param spw: the virtual spw specification (list of virtual spw IDs)
-        :type spw_name: string or list
+        :type spw: string or list
         """
         self.imaging_mode = 'BASE'
 
@@ -536,7 +535,7 @@ class ImageParamsHeuristics(object):
                                                       (field, intent, ','.join(map(str, sorted(spwids))), 'beam'),
                                                       'invalid')
 
-                        tmp_psf_images = glob.glob('%s.*' % tmp_psf_filename)
+                        tmp_psf_images = utils.glob_ordered('%s.*' % tmp_psf_filename)
                         for tmp_psf_image in tmp_psf_images:
                             shutil.rmtree(tmp_psf_image)
         finally:
@@ -1061,7 +1060,7 @@ class ImageParamsHeuristics(object):
 
         return [nxpix, nypix]
 
-    def imagename(self, output_dir=None, intent=None, field=None, spwspec=None, specmode=None, band=None):
+    def imagename(self, output_dir=None, intent=None, field=None, spwspec=None, specmode=None, band=None, datatype: str = None) -> str:
         try:
             nameroot = self.imagename_prefix
             if nameroot == 'unknown':
@@ -1091,6 +1090,8 @@ class ImageParamsHeuristics(object):
             namer.spectral_window(spw)
         if specmode:
             namer.specmode(specmode)
+        if datatype:
+            namer.datatype(datatype)
 
         # filenamer returns a sanitized filename (i.e. one with
         # illegal characters replace by '_'), no need to check
@@ -1255,8 +1256,10 @@ class ImageParamsHeuristics(object):
         return ref_field_ids
 
     def calc_topo_ranges(self, inputs):
-
-        """Calculate TOPO ranges for hif_tclean inputs."""
+        """Calculate TOPO ranges for hif_tclean inputs.
+        
+        Note: we might consider consolidating this with the similar code in contfilehelper.
+        """
 
         spw_topo_freq_param_lists = []
         spw_topo_chan_param_lists = []
@@ -1729,6 +1732,12 @@ class ImageParamsHeuristics(object):
                     if gridder == 'mosaic':
                         # Correct for mosaic overlap factor
                         source_name = [f.source.name for f in ms.fields if (utils.dequote(f.name) == utils.dequote(field) and intent in f.intents)][0]
+                        # PIPE-1708: "Integer" source names consisting of just
+                        # digits cause confusion in the mosaic overlap factor
+                        # calculation. Adopting the "solution" of enquoting
+                        # such names.
+                        if source_name.isdigit():
+                            source_name = '"{}"'.format(source_name)
                         diameter = np.median([a.diameter for a in ms.antennas])
                         overlap_factor = mosaicoverlap.mosaicOverlapFactorMS(ms, source_name, intSpw, diameter)
                         LOG.info('Dividing by mosaic overlap improvement factor of %s corrects sensitivity for EB %s'
@@ -1841,8 +1850,7 @@ class ImageParamsHeuristics(object):
         else:
             return 0.0, effectiveBW_of_1chan, sens_bw
 
-    def dr_correction(self, threshold, dirty_dynamic_range, residual_max, intent, tlimit):
-
+    def dr_correction(self, threshold, dirty_dynamic_range, residual_max, intent, tlimit, drcorrect):
         """Adjustment of cleaning threshold due to dynamic range limitations."""
 
         DR_correction_factor = 1.0

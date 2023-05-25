@@ -1123,12 +1123,25 @@ var UTILS = (function() {
 <p>Your browser cannot display the requested web log page. This error can occur when attempting to view the web log
     while the pipeline is running and web log content is still being generated. If the pipeline is not running yet
     the problem perists, the error is most likely to be caused by your web browser security settings preventing 
-    viewing the web log as flat files. In this case, to view the web log you must serve the web log via HTTP by using 
-    <code>h_weblog</code> from inside a CASA session, or relax your web browser security.</p>
+    viewing the web log as flat files. In this case, to view the web log you must serve the web log via HTTP by 
+    launching a local http server or using <code>h_weblog</code> from inside a CASA session.</p>
 <h2>Solutions</h2>
 <p>First, ensure that pipeline is not currently running. If the problem persists, follow one of the approaches 
     described below.</p>
-<h3>Recommended: use <code>h_weblog()</code></h3>
+<h3>Recommended: launch a local http server</h3>
+<p>In the command line, go to the folder where the weblog is located (e.g.,
+    <samp>&lt;path_to_untarred_weblog&gt;/pipeline-procedure_hifa_calimage/html/</samp>) and simply type:</p>
+<samp>
+<pre>
+python3 -m http.server 8080 --bind localhost
+</pre>
+</samp>
+<p>Then open your browser at the webpage <samp>http://localhost:8080/</samp></p>
+<p>This method uses python3, either already available on your system or bundled with CASA.
+    In the latter case, you may find it at
+    <samp>/Applications/CASA.app/Contents/MacOS/python3</samp> (on MacOS) or at
+    <samp>&lt;casa_install_path&gt;/bin/python3</samp> (on Linux).</p>
+<h3>Alternative: use <code>h_weblog()</code></h3>
 <p>From inside a CASA session, navigate to the root of the untarred weblog directory, <em>e.g.</em>,
     pipeline-procedure_hifa_calimage, and run <code>h_weblog</code>. This command will serve the web log via HTTP and
     launch a browser connecting to the web log. The web log URL is also printed to the CASA logger, should you need to
@@ -1156,24 +1169,12 @@ CASA <5>: h_weblog()
 <pre>
 ssh -L 30000:localhost:30000 remotepc</name>
 </pre>
-</samp>     
-<h3>Alternative: lower browser security</h3>
-<p><strong>These modification lowers your browser security and should be reverted after viewing the weblog!</strong></p>
-<h4>Firefox</h4>
-<p>Navigate to <code>about:config</code> and search for the <code>privacy.file_unique_origin</code> preference. Change
-    the preference value to false.</p>
-<h4>Safari</h4>
-<p>Open Safari preferences, navigate to <em>Advanced</em> tab and check the <em>Show Develop in menu bar</em> option. 
-    From the new <em>Develop</em> menu option now visible at the top of the screen, select <em>Disable Local File 
-    Restriction</em>.</p>
-<h4>Chrome</h4>
-<p>The <code>--disable-web-security</code> and <code>--user-data-dir</code> command line arguments must passed to 
-    Chrome via the command line. For example, on MacOS start Chrome like this:</p>
-<samp>
-<pre>
-/Applications/Chrome.app/Contents/MacOS/Chrome --disable-web-security --user-data-dir=~/tmp
-</pre>
-</samp>`;
+</samp>
+<h3>Troubleshooting</h3>
+<p>Refer to the <a href="https://casaguides.nrao.edu/index.php?title=ALMA_Pipeline_Known_Issues" target="_blank">
+    ALMA Pipeline Known Issues</a> webpage for alternative ways to view the files locally by
+    temporarily disabling some browser security features.</p>
+`;
 
         // display 'loading' spinner
         $(target).html("<div class=\"page-header\"><h1><span class=\"glyphicon glyphicon-refresh spinning\" style=\"vertical-align:top\"></span> Loading...</h1></div>");

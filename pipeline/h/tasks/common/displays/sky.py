@@ -73,9 +73,15 @@ def plotfilename(image, reportdir, collapseFunction=None):
 class SkyDisplay(object):
     """Class to plot sky images."""
 
+    def __init__(self, exclude_desc=False, overwrite=False, figsize=(6.4, 4.8), dpi=None):
+        self.exclude_desc = exclude_desc    # exclude the text descriptions from image metadata.
+        self.overwrite = overwrite          # decide whether to overwrite existing figures or not.
+        self.figsize = figsize
+        self.dpi = dpi
+
     def plot_per_stokes(self, *args, stokes_list: Optional[list] = None, **kwargs):
         """Plot sky images from a image file with multiple Stokes planes (one image per Stokes).
-        
+
         PIPE-1401: a new keyword argument 'stokes' is added into SkyDisplay.plot(), SkyDisplay._plot_panel(), etc.
         By design, the default stokes=None will preserve the behavior before PIPE-1401: it won't add
         additional stokes-related suffix in .png or attach the 'stokes' key in the plot wrapper object.
@@ -88,10 +94,14 @@ class SkyDisplay(object):
 
         return plots
 
-    def plot(self, context, result, reportdir, intent=None, collapseFunction='mean', stokes: Optional[str] = None, vmin=None, vmax=None, mom8_fc_peak_snr=None,
-             dpi=None, **imshow_args):
+    def plot(self, context, result, reportdir, intent=None, collapseFunction='mean',
+             stokes: Optional[str] = None, vmin=None, vmax=None, mom8_fc_peak_snr=None,
+             result_mask=None, dpi=None, **imshow_args):
+        """Plot sky images from a image file."""
 
-        self.dpi = dpi
+        if dpi is not None:
+            self.dpi = dpi
+
         if not result:
             return []
 
@@ -107,8 +117,10 @@ class SkyDisplay(object):
         else:
             ms = None
 
-        plotfile, coord_names, field, band = self._plot_panel(context, reportdir, result, collapseFunction=collapseFunction, stokes=stokes, ms=ms,
-                                                              mom8_fc_peak_snr=mom8_fc_peak_snr, **imshow_args)
+        plotfile, coord_names, field, band = self._plot_panel(context, reportdir, result, collapseFunction=collapseFunction,
+                                                              stokes=stokes, ms=ms,
+                                                              mom8_fc_peak_snr=mom8_fc_peak_snr,
+                                                              result_mask=result_mask, **imshow_args)
 
         # field names may not be unique, which leads to incorrectly merged
         # plots in the weblog output. As a temporary fix, change to field +
@@ -119,7 +131,7 @@ class SkyDisplay(object):
         with casa_tools.ImageReader(result) as image:
             miscinfo = image.miscinfo()
 
-        parameters = {k: miscinfo[k] for k in ['virtspw', 'pol', 'field', 'type', 'iter'] if k in miscinfo}
+        parameters = {k: miscinfo[k] for k in ['virtspw', 'pol', 'field', 'datatype', 'type', 'iter'] if k in miscinfo}
         parameters['ant'] = None
         parameters['band'] = band
         parameters['moment'] = collapseFunction
@@ -138,7 +150,26 @@ class SkyDisplay(object):
 
         return plot
 
-    def _plot_panel(self, context, reportdir, result, collapseFunction='mean', stokes: Optional[str] = None, ms=None, mom8_fc_peak_snr=None, **imshow_args):
+    def _collapse_image(self, imagename, collapseFunction='mean', stokes: Optional[str] = None):
+        """Collapse an image along the spectral axis."""
+
+        stokes_present = get_stokes(imagename)
+        if stokes not in stokes_present:
+            stokes_select = stokes_present[0]
+        else:
+            stokes_select = stokes
+
+        with casa_tools.ImageReader(imagename) as image:
+            collapsed = image.collapse(function=collapseFunction, axes=2, stokes=stokes_select)
+            data = collapsed.getchunk(dropdeg=True)
+            mask = np.invert(collapsed.getchunk(getmask=True, dropdeg=True))
+            mdata = np.ma.array(data, mask=mask)
+            collapsed.done()
+        return mdata
+
+    def _plot_panel(self, context, reportdir, result, collapseFunction='mean',
+                    stokes: Optional[str] = None, ms=None, mom8_fc_peak_snr=None,
+                    result_mask=None, **imshow_args):
         """Method to plot a map."""
 
         if isinstance(stokes, str):
@@ -218,7 +249,7 @@ class SkyDisplay(object):
                 beam = None
 
             # don't replot if a file of the required name already exists
-            if os.path.exists(plotfile):
+            if os.path.exists(plotfile) and not self.overwrite:
                 LOG.info('plotfile already exists: %s', plotfile)
 
                 # We make sure that 'band' is still defined as if the figure is plotted.
@@ -242,7 +273,7 @@ class SkyDisplay(object):
                 # if the band name is not available, use ref_frequencey (in Hz) as the fallback.
                 if band is None:
                     band = cs.referencevalue(format='n')['numeric'][3]
-
+                cs.done()
                 return plotfile, coord_names, miscinfo.get('field'), band
 
             # otherwise do the plot
@@ -262,7 +293,7 @@ class SkyDisplay(object):
 
             # remove any incomplete matplotlib plots, if left these can cause weird errors
             plt.close('all')
-            fig, ax = plt.subplots(figsize=(6.4, 4.8))
+            fig, ax = plt.subplots(figsize=self.figsize)
 
             # plot data
             if 'cmap' not in imshow_args:
@@ -272,6 +303,11 @@ class SkyDisplay(object):
             imshow_args['cmap'].set_bad('k', 1.0)
             im = ax.imshow(mdata.T, interpolation='nearest', origin='lower', aspect='equal',
                            extent=[blc[0], trc[0], blc[1], trc[1]], **imshow_args)
+
+            if result_mask is not None and os.path.exists(result_mask):
+                mdata_mask = self._collapse_image(result_mask)
+                ax.contour(mdata_mask.T, [0.99], origin='lower', colors='white', linewidths=0.7,
+                           extent=[blc[0], trc[0], blc[1], trc[1]])
 
             ax.axis('image')
             lims = ax.axis()
@@ -289,18 +325,19 @@ class SkyDisplay(object):
                 label.set_fontsize(fontsize)
             cb.set_label(brightness_unit, fontsize=fontsize)
 
-            # image reference pixel
-            yoff = 0.10
-            yoff = self.plottext(1.05, yoff, 'Reference position:', 40)
-            for i, k in enumerate(coord_refs['string']):
-                # note: the labels present the reference value at individual axes of the collapsed image
-                # https://casa.nrao.edu/docs/casaref/image.collapse.html
-                yoff = self.plottext(1.05, yoff, '%s: %s' % (coord_names[i], k), 40, mult=0.8)
+            if not self.exclude_desc:
+                # image reference pixel
+                yoff = 0.10
+                yoff = self.plottext(1.05, yoff, 'Reference position:', 40)
+                for i, k in enumerate(coord_refs['string']):
+                    # note: the labels present the reference value at individual axes of the collapsed image
+                    # https://casa.nrao.edu/docs/casaref/image.collapse.html
+                    yoff = self.plottext(1.05, yoff, '%s: %s' % (coord_names[i], k), 40, mult=0.8)
 
-            # if peaksnr is available for the mom8_fc image, include it in the plot
-            if 'mom8_fc' in result and mom8_fc_peak_snr is not None:
-                yoff = 0.90
-                self.plottext(1.05, yoff, 'Peak SNR: {:.5f}'.format(mom8_fc_peak_snr), 40)
+                # if peaksnr is available for the mom8_fc image, include it in the plot
+                if 'mom8_fc' in result and mom8_fc_peak_snr is not None:
+                    yoff = 0.90
+                    self.plottext(1.05, yoff, 'Peak SNR: {:.5f}'.format(mom8_fc_peak_snr), 40)
 
             # plot beam
             if beam is not None:
@@ -416,7 +453,8 @@ class SkyDisplay(object):
                                   xycoords='axes fraction',
                                   frameon=True,
                                   box_alignment=(0.5, 0.5))
-            ax.add_artist(bbox)
+            if not self.exclude_desc:
+                ax.add_artist(bbox)
 
             # save the image
             fig.tight_layout()

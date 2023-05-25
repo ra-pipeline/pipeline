@@ -135,7 +135,7 @@ class Field(object):
 
         for intent in ['BANDPASS', 'PHASE', 'AMPLITUDE', 'TARGET', 'POINTING', 
                        'WVR', 'ATMOSPHERE', 'SIDEBAND', 'POLARIZATION',
-                       'POLANGLE', 'POLLEAKAGE', 'CHECK', 'UNKNOWN',
+                       'POLANGLE', 'POLLEAKAGE', 'CHECK', 'DIFFGAIN', 'UNKNOWN',
                        'SYSTEM_CONFIGURATION']:
             if source_type.find(intent) != -1:
                 self.intents.add(intent)

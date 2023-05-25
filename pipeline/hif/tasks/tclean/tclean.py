@@ -4,11 +4,9 @@ import re
 
 import numpy as np
 from scipy.ndimage import label
-import shutil
 
 import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
-#import pipeline.infrastructure.api as api
 import pipeline.infrastructure.imageheader as imageheader
 import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.pipelineqa as pipelineqa
@@ -16,17 +14,17 @@ import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
 from pipeline.hif.heuristics import imageparams_factory
-from pipeline.infrastructure import casa_tasks
-from pipeline.infrastructure import casa_tools
-from pipeline.infrastructure import task_registry
+from pipeline.infrastructure import casa_tasks, casa_tools, task_registry
+
 from . import cleanbase
 from .automaskthresholdsequence import AutoMaskThresholdSequence
-from .vlaautomaskthresholdsequence import VlaAutoMaskThresholdSequence
+from .autoscalthresholdsequence import AutoScalThresholdSequence
 from .imagecentrethresholdsequence import ImageCentreThresholdSequence
 from .manualmaskthresholdsequence import ManualMaskThresholdSequence
-from .vlassmaskthresholdsequence import VlassMaskThresholdSequence
 from .nomaskthresholdsequence import NoMaskThresholdSequence
 from .resultobjects import TcleanResult
+from .vlaautomaskthresholdsequence import VlaAutoMaskThresholdSequence
+from .vlassmaskthresholdsequence import VlassMaskThresholdSequence
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -43,6 +41,8 @@ class TcleanInputs(cleanbase.CleanBaseInputs):
     calcsb = vdp.VisDependentProperty(default=False)
     cleancontranges = vdp.VisDependentProperty(default=False)
     datacolumn = vdp.VisDependentProperty(default=None)
+    datatype = vdp.VisDependentProperty(default=None)
+    datatype_info = vdp.VisDependentProperty(default=None)
     hm_cleaning = vdp.VisDependentProperty(default='rms')
     masklimit = vdp.VisDependentProperty(default=4.0)
     mosweight = vdp.VisDependentProperty(default=None)
@@ -119,12 +119,12 @@ class TcleanInputs(cleanbase.CleanBaseInputs):
     def __init__(self, context, output_dir=None, vis=None, imagename=None, intent=None, field=None, spw=None,
                  spwsel_lsrk=None, spwsel_topo=None, uvrange=None, specmode=None, gridder=None, deconvolver=None,
                  nterms=None, outframe=None, imsize=None, cell=None, phasecenter=None, stokes=None, nchan=None,
-                 start=None, width=None, nbin=None, datacolumn=None, pblimit=None, cfcache=None,
-                 restoringbeam=None, hm_masking=None, hm_sidelobethreshold=None, hm_noisethreshold=None,
+                 start=None, width=None, nbin=None, datacolumn=None, datatype=None, datatype_info=None, pblimit=None,
+                 cfcache=None, restoringbeam=None, hm_masking=None, hm_sidelobethreshold=None, hm_noisethreshold=None,
                  hm_lownoisethreshold=None, hm_negativethreshold=None, hm_minbeamfrac=None, hm_growiterations=None,
                  hm_dogrowprune=None, hm_minpercentchange=None, hm_fastnoise=None, hm_nsigma=None,
                  hm_perchanweightdensity=None, hm_npixels=None, hm_cleaning=None,
-                 iter=None, mask=None, niter=None, threshold=None, tlimit=None, masklimit=None,
+                 iter=None, mask=None, niter=None, threshold=None, tlimit=None, drcorrect=None, masklimit=None,
                  calcsb=None, cleancontranges=None, parallel=None,
                  # Extra parameters not in the CLI task interface
                  weighting=None, robust=None, uvtaper=None, scales=None, cycleniter=None, cyclefactor=None,
@@ -134,8 +134,8 @@ class TcleanInputs(cleanbase.CleanBaseInputs):
                  bl_ratio=None, cfcache_nowb=None,
                  # End of extra parameters
                  heuristics=None, pbmask=None):
-        super(TcleanInputs, self).__init__(context, output_dir=output_dir, vis=vis,
-                                           imagename=imagename, antenna=antenna, datacolumn=datacolumn,
+        super(TcleanInputs, self).__init__(context, output_dir=output_dir, vis=vis, imagename=imagename, antenna=antenna,
+                                           datacolumn=datacolumn, datatype=datatype, datatype_info=datatype_info,
                                            intent=intent, field=field, spw=spw, uvrange=uvrange, specmode=specmode,
                                            gridder=gridder, deconvolver=deconvolver, uvtaper=uvtaper, nterms=nterms,
                                            cycleniter=cycleniter, cyclefactor=cyclefactor,
@@ -171,6 +171,7 @@ class TcleanInputs(cleanbase.CleanBaseInputs):
         self.num_good_spws = num_good_spws
         self.bl_ratio = bl_ratio
         self.tlimit = tlimit
+        self.drcorrect = drcorrect
 
         # For MOM0/8_FC and cube RMS we need the LSRK frequency ranges in
         # various places
@@ -181,6 +182,8 @@ class TcleanInputs(cleanbase.CleanBaseInputs):
         self.usepointing = usepointing
         self.mosweight = mosweight
         self.datacolumn = datacolumn
+        self.datatype = datatype
+        self.datatype_info = datatype_info
         self.pblimit = pblimit
         self.cfcache = cfcache
         self.cfcache_nowb = cfcache_nowb
@@ -200,7 +203,7 @@ class Tclean(cleanbase.CleanBase):
     is_multi_vis_task = True
 
     def rm_stage_files(self, imagename, stokes=''):
-        filenames = glob.glob('%s*.%s.iter*' % (imagename, stokes))
+        filenames = utils.glob_ordered('%s*.%s.iter*' % (imagename, stokes))
         for filename in filenames:
             try:
                 if os.path.isfile(filename):
@@ -215,7 +218,7 @@ class Tclean(cleanbase.CleanBase):
 
     def rm_iter_files(self, rootname, iteration):
         # Delete any old files with this naming root
-        filenames = glob.glob('%s.iter%s*' % (rootname, iteration))
+        filenames = utils.glob_ordered('%s.iter%s*' % (rootname, iteration))
         for filename in filenames:
             try:
                 rmtree_job = casa_tasks.rmtree(filename)
@@ -224,7 +227,7 @@ class Tclean(cleanbase.CleanBase):
                 LOG.warning('Exception while deleting %s: %s' % (filename, e))
 
     def copy_products(self, old_pname, new_pname, ignore=None):
-        imlist = glob.glob('%s.*' % (old_pname))
+        imlist = utils.glob_ordered('%s.*' % (old_pname))
         imlist = [xx for xx in imlist if ignore is None or ignore not in xx]
         for image_name in imlist:
             newname = image_name.replace(old_pname, new_pname)
@@ -240,7 +243,7 @@ class Tclean(cleanbase.CleanBase):
             remove_list:    remove without 'move' or 'copy', if any string from the list in the image name.
             copy_list:      copy instead move, if any string from the list is in the image name.
         """
-        imlist = glob.glob('%s.*' % (old_pname))
+        imlist = utils.glob_ordered('%s.*' % (old_pname))
         for image_name in imlist:
             newname = image_name.replace(old_pname, new_pname)
             if isinstance(ignore_list, (list, tuple)):
@@ -630,6 +633,11 @@ class Tclean(cleanbase.CleanBase):
             sequence_manager = VlaAutoMaskThresholdSequence(multiterm=multiterm,
                                                             gridder=inputs.gridder, threshold=threshold,
                                                             sensitivity=sensitivity, niter=inputs.niter)
+        # Auto-boxing-selfcal
+        elif inputs.hm_masking == 'auto' and '-SCAL' in self.image_heuristics.imaging_mode:
+            sequence_manager = AutoScalThresholdSequence(multiterm=multiterm,
+                                                         gridder=inputs.gridder, threshold=threshold,
+                                                         sensitivity=sensitivity, niter=inputs.niter)
         # Auto-boxing
         elif inputs.hm_masking == 'auto':
             sequence_manager = AutoMaskThresholdSequence(multiterm=multiterm,
@@ -663,9 +671,12 @@ class Tclean(cleanbase.CleanBase):
         # not optimal. Thus, PSFs need to be created with the tclean parameter
         # wbawp set to False. The awproject mosaic cleaning then continued
         # with this PSF. CASA is expected to handle this with version 6.2.
+
         if self.image_heuristics.imaging_mode in ['VLASS-SE-CONT', 'VLASS-SE-CONT-AWP-P001', 'VLASS-SE-CONT-AWP-P032',
                                                   'VLASS-SE-CONT-MOSAIC', 'VLASS-SE-CUBE']:
             result = self._do_iterative_vlass_se_imaging(sequence_manager=sequence_manager)
+        elif '-SCAL' in self.image_heuristics.imaging_mode:
+            result = self._do_scal_imaging(sequence_manager=sequence_manager)
         else:
             result = self._do_iterative_imaging(sequence_manager=sequence_manager)
 
@@ -772,19 +783,17 @@ class Tclean(cleanbase.CleanBase):
             del result_psf  # Not needed in further steps
 
         if restore_imagename is not None:
-            # only run this block for the selfcal modelcolumn restoration
-            # for now we make a copy of models under the tclean-predict imagename
-            # the use of startmodel introduces a side effect from CAS-13338 when the original model was made with mpicasa, which causes the model images to be regridded.
-            # One will see a model image regridding warning as below:
+            # PIPE-1354: this block will only be executed for the VLASS selfcal modelcolumn restoration (from hifv_restorepims)
             #
+            # As of CASA 6.4.1, if selfcal model images are made with mpicasa and later fed to a predict-only serial tclean call 
+            # using "startmodel", the csys latpoles mismatch from CAS-13338 will cause the input model images to be regridded 
+            # in-flight: a side effect not desired in the VLASS-SE-CUBE case.
+            # for now we make a copy of models under the tclean-predict imagename, and 
+            # you should see a resetting warning instead:
             #           WARN    SIImageStore::Open existing Images (file src/code/synthesis/ImagerObjects/SIImageStore.cc, line 568)     
             #           Mismatch in Csys latpoles between existing image on disk ([350.792, 50.4044, 180, 50.4044]) 
-            #           The DirectionCoordinates have differing latpoles -- Resetting to match image on disk
-            #
-            # if copying models under imagename.model.**, you should see a resetting warning instead            
-            # regridding is not desired in the VLASS-SE-CUBE case.
-            # we assume that restore_imagename and new_pname are different.
-            
+            #           The DirectionCoordinates have differing latpoles -- Resetting to match image on disk           
+            # note: we preassume that restore_imagename and new_pname are different.              
             rootname, _ = os.path.splitext(result.psf)
             rootname, _ = os.path.splitext(rootname)
             LOG.info('Copying model images for the modelcolumn prediction tclean call.')
@@ -986,6 +995,17 @@ class Tclean(cleanbase.CleanBase):
                 LOG.info(f'Copying {origin_psf} to {target_psf}')
                 self._executor.execute(casa_tasks.copytree(origin_psf, target_psf))
 
+    def _do_scal_imaging(self, sequence_manager):
+        """Do self-calibration imaging sequence.
+        
+        This method produces the optimal selfcal solution via the iterative imaging-selfcal loop.
+        It also generate before-scal/after-scal. The input MS is assumed to be calibrated via 
+        standard calibration procedures but they have been splitted from the original *_targets.ms 
+        and rebinned in frequency.
+        """
+
+        raise NotImplementedError("The self-calibration imaging/gaincal loop is not implemented yet!")
+
     def _do_iterative_imaging(self, sequence_manager):
 
         inputs = self.inputs
@@ -1067,7 +1087,7 @@ class Tclean(cleanbase.CleanBase):
         dirty_dynamic_range = None if sequence_manager.sensitivity == 0.0 else residual_max / sequence_manager.sensitivity
         new_threshold, DR_correction_factor, maxEDR_used = \
             self.image_heuristics.dr_correction(sequence_manager.threshold, dirty_dynamic_range, residual_max,
-                                                inputs.intent, inputs.tlimit)
+                                                inputs.intent, inputs.tlimit, inputs.drcorrect)
         sequence_manager.threshold = new_threshold
         sequence_manager.dr_corrected_sensitivity = sequence_manager.sensitivity * DR_correction_factor
 
@@ -1152,7 +1172,10 @@ class Tclean(cleanbase.CleanBase):
                                                   pblimit_cleanmask=self.pblimit_cleanmask,
                                                   cont_freq_ranges=self.cont_freq_ranges)
 
-            self._update_miscinfo(result.image.replace('.image', '.image'+extension), max([len(field_ids.split(',')) for field_ids in self.image_heuristics.field(inputs.intent, inputs.field)]), pbcor_image_min, pbcor_image_max)
+            self._update_miscinfo(result.image.replace('.image', '.image'+extension),
+                                  max([len(field_ids.split(','))
+                                       for field_ids in self.image_heuristics.field(inputs.intent, inputs.field)]),
+                                  pbcor_image_min, pbcor_image_max)
 
             keep_iterating, hm_masking = self.image_heuristics.keep_iterating(iteration, inputs.hm_masking,
                                                                               result.tclean_stopcode,
@@ -1204,10 +1227,8 @@ class Tclean(cleanbase.CleanBase):
         return result
 
     def _do_clean(self, iternum, cleanmask, niter, threshold, sensitivity, result, nsigma=None, savemodel=None, startmodel=None,
-                  calcres=None, calcpsf=None, wbawp=None, parallel=None):
-        """
-        Do basic cleaning.
-        """
+                  calcres=None, calcpsf=None, wbawp=None, parallel=None, clean_imagename=None):
+        """Do basic cleaning."""
         inputs = self.inputs
 
         if parallel is None:
@@ -1220,11 +1241,17 @@ class Tclean(cleanbase.CleanBase):
         if self.width_as_velocity:
             inputs.width = casa_tools.quanta.tos(self.width_as_velocity)
 
+        # optionally override the output image rootname
+        if isinstance(clean_imagename, str):
+            imagename = clean_imagename
+        else:
+            imagename = inputs.imagename
+
         clean_inputs = cleanbase.CleanBase.Inputs(inputs.context,
                                                   output_dir=inputs.output_dir,
                                                   vis=inputs.vis,
                                                   is_per_eb=inputs.is_per_eb,
-                                                  imagename=inputs.imagename,
+                                                  imagename=imagename,
                                                   antenna=inputs.antenna,
                                                   intent=inputs.intent,
                                                   field=inputs.field,
@@ -1239,6 +1266,8 @@ class Tclean(cleanbase.CleanBase):
                                                   specmode=inputs.specmode,
                                                   gridder=inputs.gridder,
                                                   datacolumn=inputs.datacolumn,
+                                                  datatype=inputs.datatype,
+                                                  datatype_info=inputs.datatype_info,
                                                   deconvolver=inputs.deconvolver,
                                                   nterms=inputs.nterms,
                                                   cycleniter=inputs.cycleniter,
@@ -1353,7 +1382,8 @@ class Tclean(cleanbase.CleanBase):
 
         # Update the metadata in the MOM8_FC image.
         imageheader.set_miscinfo(name=outfile, spw=self.inputs.spw, virtspw=virtspw,
-                                 field=self.inputs.field, iter=iter, type=mom_type,
+                                 field=self.inputs.field, iter=iter,
+                                 datatype=self.inputs.datatype, type=mom_type,
                                  intent=self.inputs.intent, specmode=self.inputs.orig_specmode,
                                  context=context)
 

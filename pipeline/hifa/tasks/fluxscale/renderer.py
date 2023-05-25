@@ -22,7 +22,6 @@ from pipeline.domain.measures import FluxDensityUnits, FrequencyUnits
 from pipeline.h.tasks.common import atmutil
 from pipeline.h.tasks.importdata.fluxes import ORIGIN_XML, ORIGIN_ANALYSIS_UTILS
 from pipeline.infrastructure.renderer import logger
-from pipeline.infrastructure.displays.plotutils import CB_color_cycle
 from . import display as gfluxscale
 from ..importdata.dbfluxes import ORIGIN_DB
 
@@ -337,7 +336,11 @@ def create_flux_comparison_plots(context, output_dir, result, showatm=True):
         # Avoid offset values (PIPE-644)
         ax.yaxis.set_major_formatter(plt.ScalarFormatter(useOffset=False))
 
-        symbols_and_colours = itertools.cycle(itertools.product("osDv^<>", CB_color_cycle))
+        # PIPE-1550: cycle through different symbols and colours simultaneously
+        # (diagonally across the 7x10 matrix of unique combinations, rather than row-by-row);
+        # note that this assumes that the numbers of symbols and colours are coprime
+        symbols_and_colours = zip(itertools.cycle('osDv^<>'),
+                                  itertools.cycle(plt.get_cmap('tab10').colors))  # standard Tableau colormap
 
         x_min = 1e99
         x_max = 0

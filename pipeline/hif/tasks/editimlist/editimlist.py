@@ -37,7 +37,6 @@ import copy
 import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.vdp as vdp
-#import pipeline.infrastructure.api as api
 import pipeline.infrastructure.basetask as basetask
 from pipeline.domain import DataType
 from pipeline.infrastructure.utils import utils
@@ -59,6 +58,7 @@ class EditimlistInputs(vdp.StandardInputs):
     cfcache_nowb = vdp.VisDependentProperty(default='')
     cyclefactor = vdp.VisDependentProperty(default=-999.)
     cycleniter = vdp.VisDependentProperty(default=-999)
+    datatype = vdp.VisDependentProperty(default='')
     datacolumn = vdp.VisDependentProperty(default='')
     deconvolver = vdp.VisDependentProperty(default='')
     editmode = vdp.VisDependentProperty(default='')
@@ -137,7 +137,7 @@ class EditimlistInputs(vdp.StandardInputs):
 
     def __init__(self, context, output_dir=None, vis=None,
                  search_radius_arcsec=None, cell=None, cfcache=None, conjbeams=None,
-                 cyclefactor=None, cycleniter=None, datacolumn=None, deconvolver=None,
+                 cyclefactor=None, cycleniter=None, datatype=None, datacolumn=None, deconvolver=None,
                  editmode=None, field=None, imaging_mode=None,
                  imagename=None, imsize=None, intent=None, gridder=None,
                  mask=None, pbmask=None, nbin=None, nchan=None, niter=None, nterms=None,
@@ -158,6 +158,7 @@ class EditimlistInputs(vdp.StandardInputs):
         self.conjbeams = conjbeams
         self.cyclefactor = cyclefactor
         self.cycleniter = cycleniter
+        self.datatype = datatype
         self.datacolumn = datacolumn
         self.deconvolver = deconvolver
         self.editmode = editmode
@@ -193,7 +194,7 @@ class EditimlistInputs(vdp.StandardInputs):
         self.clean_no_mask_selfcal_image = clean_no_mask_selfcal_image
         self.cycleniter_final_image_nomask = cycleniter_final_image_nomask
 
-        keys_to_consider = ('field', 'intent', 'spw', 'cell', 'datacolumn', 'deconvolver', 'imsize',
+        keys_to_consider = ('field', 'intent', 'spw', 'cell', 'datatype', 'datacolumn', 'deconvolver', 'imsize',
                             'phasecenter', 'specmode', 'gridder', 'imagename', 'scales', 'cfcache',
                             'start', 'width', 'nbin', 'nchan', 'uvrange', 'stokes', 'nterms',
                             'robust', 'uvtaper', 'niter', 'cyclefactor', 'cycleniter', 'mask',
@@ -401,6 +402,8 @@ class Editimlist(basetask.StandardTaskTemplate):
         LOG.info("{k} = {v}".format(k='search_radius', v=buffer_arcsec))
         result.capture_buffer_size(buffer_arcsec)
         imlist_entry['intent'] = th.intent() if not inpdict['intent'] else inpdict['intent']
+        
+        # imlist_entry['datacolumn'] is either None or an non-empty string here based on the current heuristics implementation.
         imlist_entry['datacolumn'] = th.datacolumn() if not inpdict['datacolumn'] else inpdict['datacolumn']
         imlist_entry['nterms'] = th.nterms(imlist_entry['spw']) if not inpdict['nterms'] else inpdict['nterms']
         if 'ALMA' not in img_mode:
@@ -446,7 +449,7 @@ class Editimlist(basetask.StandardTaskTemplate):
         if fieldnames:
             imlist_entry['field'] = fieldnames[0]
         else:
-            if not isinstance(imlist_entry['phasecenter'], type(None)):
+            if imlist_entry['phasecenter'] not in ['', None]:
                 # TODO: remove the dependency on cell size being in arcsec
 
                 # remove brackets and begin/end string characters
@@ -461,19 +464,86 @@ class Editimlist(basetask.StandardTaskTemplate):
                 dist = (mosaic_side_arcsec / 2.) + float(buffer_arcsec)
                 dist_arcsec = str(dist) + 'arcsec'
                 LOG.info("{k} = {v}".format(k='dist_arcsec', v=dist_arcsec))
-                found_fields = imlist_entry['heuristics'].find_fields(distance=dist_arcsec,
-                                                                      phase_center=imlist_entry['phasecenter'],
-                                                                      matchregex=['^0', '^1', '^2'])
+                found_fields = th.find_fields(distance=dist_arcsec,
+                                              phase_center=imlist_entry['phasecenter'],
+                                              matchregex=['^0', '^1', '^2'])
                 if found_fields:
                     imlist_entry['field'] = ','.join(str(x) for x in found_fields)  # field ids, not names
+
+        if not imlist_entry['spw']:   # could be None or an empty string
+            LOG.warning('spw is not specified')   # probably should raise an error rather than warning? - will likely fail later anyway
+            imlist_entry['spw'] = None
+
+        if not imlist_entry['field']:
+            LOG.warning('field is not specified')   # again, should probably raise an error, as it will eventually fail anyway
+            imlist_entry['field'] = None
+
+        # validate specmode
+        if imlist_entry['specmode'] not in ('mfs', 'cont', 'cube', 'repBW'):
+            msg = 'specmode must be one of "mfs", "cont", "cube", or "repBW"'
+            LOG.error(msg)
+            result.error = True
+            result.error_msg = msg
+            return result
+
+        if not img_mode.startswith('VLASS'):
+            # this block is only executed for non-VLASS data
+            if imlist_entry['datacolumn'] in (None, ''):
+                # if datacolumn is not specified by the user input or heuristics, we need to determine the datacolumn
+                # from the list of datatypes to consider in the order of preference.
+                specmode_datatypes = DataType.get_specmode_datatypes(imlist_entry['intent'], imlist_entry['specmode'])
+                # PIPE-1798: filter the list to only include the one(s) starting with the user supplied restriction str, i.e., inputs.datatype.
+                if isinstance(inpdict['datatype'], str):
+                    specmode_datatypes = [dt for dt in specmode_datatypes if dt.name.startswith(inpdict['datatype'].upper())]
+                # loop over the datatype candidate list find the first one that appears in the given (source,spw) combinations.
+                for dtype in specmode_datatypes:
+                    datacolumn_name = ms.get_data_column(dtype, imlist_entry['field'], imlist_entry['spw'])
+                    if datacolumn_name in ('DATA', 'CORRECTED_DATA'):
+                        imlist_entry['datatype'] = imlist_entry['datatype_info'] = dtype.name
+                        if datacolumn_name == 'DATA':
+                            imlist_entry['datacolumn'] = 'data'
+                        if datacolumn_name == 'CORRECTED_DATA':
+                            imlist_entry['datacolumn'] = 'corrected'
+                        break
+                    else:
+                        LOG.debug(f'No valid datacolumn is associated with the  data selection: '
+                                  f"datatype={dtype!r}, field={imlist_entry['field']!r}, spw={imlist_entry['spw']!r}")
+                specmode_datatypes_str = ', '.join([dt.name for dt in specmode_datatypes])
+                if imlist_entry['datatype'] is None:
+                    LOG.warning(
+                        f"No data from field={imlist_entry['field']!r} / spw={imlist_entry['spw']!r} is "
+                        f'in the allowed datatype(s): {specmode_datatypes_str}.'
+                        ' No clean target will be added.')
+                    return result
+            else:
+                # if datacolumn is specified, pick it and label cleantarget with the corresponding datatype (when available).
+                ms_datacolumn = imlist_entry['datacolumn'].upper()
+                if ms_datacolumn == 'CORRECTED':
+                    ms_datacolumn = 'CORRECTED_DATA'
+                dtype = ms.get_data_type(ms_datacolumn, imlist_entry['field'], imlist_entry['spw'])
+                LOG.warning(
+                    f'datacolumn={imlist_entry["datacolumn"]!r} is selected based on user or heuristic input, which overrides the datatype-based selection.')
+                if dtype is None:
+                    LOG.warning(f'No valid datatype is associated with the data selection: '
+                                f"datacolumn={imlist_entry['datacolumn']!r}, field={imlist_entry['field']!r}, spw={imlist_entry['spw']!r}")
+                else:
+                    imlist_entry['datatype'] = imlist_entry['datatype_info'] = dtype.name
+
+        # PIPE-1710/PIPE-1474: append a corresponding suffix to the image file name according to the datatype of selected visibilities.
+        datatype_suffix = None
+        if isinstance(imlist_entry['datatype'], str):
+            if imlist_entry['datatype'].lower().startswith('selfcal'):
+                datatype_suffix = 'selfcal'
+            if imlist_entry['datatype'].lower().startswith('regcal'):
+                datatype_suffix = 'regcal'
 
         imlist_entry['gridder'] = th.gridder(imlist_entry['intent'], imlist_entry['field']) if not inpdict['gridder'] else inpdict['gridder']
         imlist_entry['imagename'] = th.imagename(intent=imlist_entry['intent'], field=imlist_entry['field'],
                                                  spwspec=imlist_entry['spw'], specmode=imlist_entry['specmode'],
-                                                 band=None) if not inpdict['imagename'] else inpdict['imagename']
+                                                 band=None, datatype=datatype_suffix) if not inpdict['imagename'] else inpdict['imagename']
 
         # In this case field and spwspec is not needed in the filename, furthermore, imaging is done in multiple stages
-        # prepend the STAGENUMNER string in order to differentiate them. In TcleanInputs class this is replaced by the
+        # prepend the STAGENUMBER string in order to differentiate them. In TcleanInputs class this is replaced by the
         # actual stage number string.
         # Intended to cover VLASS-SE-CONT, VLASS-SE-CONT-AWP-P001, VLASS-SE-CONT-AWP-P032,
         # VLASS-SE-CONT-MOSAIC, and VLASS-SE-CUBE as of 05/03/2022
