@@ -30,7 +30,7 @@ from pipeline.infrastructure import casa_tools
 __all__ = ['score_polintents',                                # ALMA specific
            'score_bands',                                     # ALMA specific
            'score_bwswitching',                               # ALMA specific
-           'score_spwnames',                                  # ALMA specific
+           'score_science_spw_names',                         # ALMA specific
            'score_tsysspwmap',                                # ALMA specific
            'score_number_antenna_offsets',                    # ALMA specific
            'score_missing_derived_fluxes',                    # ALMA specific
@@ -388,11 +388,10 @@ def score_bwswitching(mses):
     bandwidth switching observings. For bandwidth switched
     observations the TARGET and PHASE spws are different.
     """
-    score = 1.0
-    num_mses = len(mses)
-    all_ok = True
+    nophasecals_all = set()   # track any spws that have no phase calibration across all MSes
+    num_b2b = 0    # number of MSes that have bandwidth switching in the B2B mode
+    num_bwsw = 0   # number of MSes that have bandwidth switching not in the B2B mode
     complaints = []
-    nophasecals = []
 
     # analyse each MS
     for ms in mses:
@@ -416,28 +415,41 @@ def score_bwswitching(mses):
         if len(nophasecals) == 0:
             continue
 
-        # Score the difference
-        all_ok = False
-        for _ in nophasecals:
-            score += (-1.0 / num_mses / len(nophasecals))
-        longmsg = ('%s contains no phase calibrations for target spws %s'
-                   '' % (ms.basename, utils.commafy(nophasecals, False)))
-        complaints.append(longmsg)
+        nophasecals_all.update(nophasecals)
 
-    if all_ok:
+        # the following section is invoked for B2B and BWSW modes
+        diffgain_mode = ms.get_diffgain_mode()
+        if diffgain_mode == 'B2B':
+            num_b2b += 1
+            complaints.append('%s uses the B2B mode' % ms.basename)
+        elif diffgain_mode == 'BWSW':
+            num_bwsw += 1
+            complaints.append('%s contains no phase calibrations for target spws %s' %
+                              (ms.basename, utils.commafy(list(nophasecals), quotes=False)))
+
+    if num_bwsw == 0 and num_b2b == 0:
         longmsg = ('Phase calibrations found for all target spws in %s.' % (
-                   utils.commafy([ms.basename for ms in mses], False)))
+            utils.commafy([ms.basename for ms in mses], quotes=False)))
         shortmsg = 'Phase calibrations found for all target spws'
+        score = 1.0
     else:
         longmsg = '%s.' % utils.commafy(complaints, False)
-        shortmsg = 'No phase calibrations found for target spws %s' % list(nophasecals)
+        if num_bwsw > 0:   # at least one MS has no phase calibration and is not in a B2B mode
+            shortmsg = 'No phase calibrations found for target spws %s' % list(nophasecals_all)
+            if num_bwsw > 1:
+                shortmsg += ' in %i MSes' % num_bwsw
+            score = 0.0   # indicates that this mode is currently not supported by the pipeline
+        else:
+            shortmsg = 'B2B mode'
+            if num_b2b > 1:
+                shortmsg += ' in %i MSes' % num_b2b
+            score = 0.9
 
     origin = pqa.QAOrigin(metric_name='score_bwswitching',
-                          metric_score=len(nophasecals),
-                          metric_units='Number of MSes without phase calibrators')
+                          metric_score=score,
+                          metric_units='MS score based on the number of spws without phase calibrators')
 
-    return pqa.QAScore(max(0.0, score), longmsg=longmsg, shortmsg=shortmsg, origin=origin)
-
+    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin)
 
 @log_qa
 def score_bands(mses):
@@ -1354,7 +1366,7 @@ def score_wvrgcal(ms_name, dataresult):
     # same as hard coded in wvrg_qa to make the remcloud 
     # trigger result object boolean
     disc_max = 500 # in um
-    rms_max = 500 # in um 
+    rms_max = 500 # in um
     # subset lists for ants exceeding the limits
     disc_limit=[dval for dval in disc_list if dval > disc_max]
     rms_limit=[rval for rval in rms_list if rval > rms_max]
@@ -1380,7 +1392,7 @@ def score_wvrgcal(ms_name, dataresult):
             score = score - reduceBy
             # Crude check for the message - check if flag or disc/rms
             if len(flagant_list) > 0:
-                qa_messages.append('Flagged antenna(s)') 
+                qa_messages.append('Flagged antenna(s)')
             if len(disc_limit) > 0:
                 qa_messages.append('Elevated disc value(s)')
             if len(rms_limit) > 0:
@@ -1423,7 +1435,7 @@ def score_wvrgcal(ms_name, dataresult):
                 score = score - reduceBy
                 # Crude check for the message - check if flag or disc/rms
                 if len(flagant_list) > 0:
-                    qa_messages.append('Flagged antenna(s)') 
+                    qa_messages.append('Flagged antenna(s)')
                 if len(disc_limit) > 0:
                     qa_messages.append('Elevated disc value(s)')
                 if len(rms_limit) > 0:

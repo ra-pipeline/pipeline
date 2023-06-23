@@ -1,4 +1,3 @@
-import glob
 import os
 import tarfile
 from fnmatch import fnmatch
@@ -9,6 +8,7 @@ import pipeline.infrastructure.exceptions as exceptions
 import pipeline.infrastructure.vdp as vdp
 from pipeline.infrastructure import casa_tasks, casa_tools, task_registry
 from pipeline.hif.tasks.makeimages import MakeImages
+import pipeline.infrastructure.utils as utils
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -159,7 +159,7 @@ class Restorepims(basetask.StandardTaskTemplate):
         # check against the resource requirement list
 
         for pkd in pkd_list:
-            paths = sorted(glob.glob(pkd[0]))
+            paths = utils.glob_ordered(pkd[0])
             if paths:
                 restore_resources[pkd[1]] = (paths, True)  # (file_list, True)
                 LOG.info(f"Found the request {pkd[2]}: {', '.join(paths)}")

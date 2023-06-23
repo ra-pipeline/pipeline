@@ -2,13 +2,13 @@ import os
 import shutil
 
 import numpy as np
-
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
-from pipeline.hifv.heuristics import cont_file_to_CASA, set_add_model_column_parameters
+from pipeline.hifv.heuristics import set_add_model_column_parameters
 from pipeline.infrastructure import casa_tasks, casa_tools, task_registry
+from pipeline.infrastructure.contfilehandler import contfile_to_spwsel
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -75,7 +75,7 @@ class Statwt(basetask.StandardTaskTemplate):
                         'Continuing in \'VLA\' mode.' % self.inputs.statwtmode)
             self.inputs.statwtmode = 'VLA'
 
-        fielddict = cont_file_to_CASA(self.inputs.vis, self.inputs.context)
+        fielddict = contfile_to_spwsel(self.inputs.vis, self.inputs.context)
         fields = ','.join(str(x) for x in fielddict) if fielddict != {} else ''
 
         wtables = {}
@@ -136,7 +136,6 @@ class Statwt(basetask.StandardTaskTemplate):
             return statwt_result
 
     def _do_flagsummary(self, name, field=''):
-        fielddict = cont_file_to_CASA(self.inputs.vis, self.inputs.context)
         job = casa_tasks.flagdata(name=name, vis=self.inputs.vis, field=field, mode='summary')
         return self._executor.execute(job)
 

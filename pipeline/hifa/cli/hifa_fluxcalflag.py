@@ -47,8 +47,14 @@ def hifa_fluxcalflag(vis=None, field=None, intent=None, spw=None, pipelinemode=N
     threshold     If the fraction of an spw occupied by line regions is greater
                   than threshold flag the entire spectral window.
     appendlines   Append user defined line regions to the line dictionary.
-    linesfile     
-    applyflags    
+    linesfile     Read in a file containing lines regions and append it to
+                  the builtin dictionary.
+                  Blank lines and comments beginning with # are skipped
+                  The data is contained in 4 whitespace delimited fields
+                  containing the solar system object field name, e.g. 'Callisto'
+                  the molecular species name, e.g. '13CO' and the starting
+                  and ending frequency in GHz.
+    applyflags    Boolean for whether to apply the generated flag commands. (default True)
     dryrun        Run the commands (True) or generate the commands to be run but
                   do not execute (False).
     acceptresults Add the results of the task to the pipeline context (True) or

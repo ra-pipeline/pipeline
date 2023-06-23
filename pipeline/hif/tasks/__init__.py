@@ -22,6 +22,7 @@ from .transformimagedata import Transformimagedata
 from .makermsimages import Makermsimages
 from .makecutoutimages import Makecutoutimages
 from .analyzealpha import Analyzealpha
+from .selfcal import Selfcal
 
 # set default tasks for tasks with several implementations to our desired
 # specific implementation

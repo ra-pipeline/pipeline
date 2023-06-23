@@ -32,7 +32,8 @@ def h_resume(filename=None):
 
     """
 
-    pipeline = launcher.Pipeline(context=filename)
+    _filename = 'last' if filename is None else filename
+    pipeline = launcher.Pipeline(context=_filename)
 
     cli.stack[cli.PIPELINE_NAME] = pipeline
 

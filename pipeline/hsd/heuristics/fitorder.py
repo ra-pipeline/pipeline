@@ -29,11 +29,14 @@ class FitOrderHeuristics(api.Heuristic):
         for input data array. The heuristics returns one representative
         polynomial order per input data array.
 
-        data: two-dimensional data array with shape (nrow, nchan).
-        mask: list of mask regions. Value should be a list of
-              [[start0,end0],[start1,end1],...] for each spectrum.
-              [[-1,-1]] indicates no mask. Default is None.
-        edge: number of edge channels to be dropped. Default is (0,0).
+        Args:
+            data: two-dimensional data array with shape (nrow, nchan).
+            mask: list of mask regions. Value should be a list of
+                  [[start0,end0],[start1,end1],...] for each spectrum.
+                  [[-1,-1]] indicates no mask. Default is None.
+            edge: number of edge channels to be dropped. Default is (0,0).
+        Returns:
+            Representative polynomial order, None if all data are masked
         """
         (nrow, nchan) = data.shape
         effective_nchan = nchan - sum(edge)
@@ -45,11 +48,16 @@ class FitOrderHeuristics(api.Heuristic):
         for irow in range(nrow):
             spectrum = data[irow]
             flag = mask_maker.get_mask(irow)
-            average = (spectrum * flag).sum() / float(flag.sum())
-            spectrum = (spectrum - average) * flag
+            if numpy.any( flag == 1 ):
+                average = numpy.average( spectrum, weights=flag )
+                spectrum = (spectrum - average) * flag
 
-            # Apply FFT to the spectrum
-            power_spectrum.append(numpy.abs(numpy.fft.rfft(spectrum)))
+                # Apply FFT to the spectrum
+                power_spectrum.append(numpy.abs(numpy.fft.rfft(spectrum)))
+
+        # return None if all rows are completely masked
+        if len(power_spectrum) == 0:
+            return None
 
         # Average seems to be better than median
         #power = numpy.median(power_spectrum, axis=0)
@@ -90,7 +98,7 @@ class FitOrderHeuristics(api.Heuristic):
 
 class MaskMakerNoLine(object):
     def __init__(self, nchan, edge):
-        self.flag = numpy.ones(nchan)
+        self.flag = numpy.ones( nchan, dtype=numpy.int8 )
         self.flag[:edge[0]] = 0
         self.flag[(nchan-edge[1]):] = 0
 

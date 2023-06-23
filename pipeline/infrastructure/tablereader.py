@@ -1,6 +1,5 @@
 import collections
 import datetime
-import glob
 import itertools
 import operator
 import os
@@ -1136,7 +1135,7 @@ class SourceTable(object):
 
     @staticmethod
     def _get_eph_sourcenames(msname):
-        ephemeris_tables = glob.glob(msname+'/FIELD/EPHEM*.tab')
+        ephemeris_tables = utils.glob_ordered(msname+'/FIELD/EPHEM*.tab')
 
         eph_sourcenames = []
         avg_spacings = {}

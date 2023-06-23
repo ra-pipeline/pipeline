@@ -34,7 +34,7 @@ def hif_transformimagedata(vis=None, outputvis=None, field=None, intent=None, sp
                    supported
                    
                    example: 'data', 'model'
-    chanbin        
+    chanbin        Bin width for channel averaging.
     timebin        Bin width for time averaging.
     replace        If a split was performed delete the parent MS and remove it from the context.
                    

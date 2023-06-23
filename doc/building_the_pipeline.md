@@ -2,32 +2,42 @@
 
 ## Prerequisites
 
-The pipeline build procedure depends on Python 3, CASA buildmytasks, and Java,
-which is used by buildmytasks to process the task XML and to minify the
-Pipeline Javascript.
-
 It is recommended to put the CASA `bin` directory first on your path for the
 duration of the installation procedure.
 
 ### Downloading and Installing CASA
-If you don't already have CASA installed, you can find recent builds at  [CASA pre-releases](https://casa.nrao.edu/download/distro/casa/releaseprep/). Sort by "Last Modified" to find the most recent version. 
+
+If you don't already have CASA installed, you can find recent builds at [CASA pre-releases](https://casa.nrao.edu/download/distro/casa/releaseprep/). Sort by "Last Modified" to find the most recent version.
 
 After downloading a CASA build, follow the instructions on the [CASA Installation Guide](https://casadocs.readthedocs.io/en/stable/notebooks/usingcasa.html#Full-Installation-of-CASA-5-and-6) to install CASA.
 
-## Standard build
+### Dependency Requirements
 
-The pipeline can be built and installed like any standard Python module, with
+Following the change from [PIPE-1699](https://open-jira.nrao.edu/browse/PIPE-1699), Pipeline now specifies the required standard Python dependencies in a [requirements.txt](../requirements.txt) file, and recommends using `pip` to install them directly from the Python Package Index ([PyPI](https://pypi.org/)).
+The [`pipeline/extern`](../pipeline/extern) directory now only contains the non-standard Python packages/modules contributed by the developers and heuristics development team.
+
+Note that this file is currently *not* used by [`setup.py`](../setup.py) to auto-install dependencies, and only serves as a reference for development and packaging purposes.
+In addition, the list only includes dependencies that are *not* bundled in the monolith CASA release designated for the next Pipeline release, and their version specifications are continuously examined against potential compatibility issues with other Python packages already shipped in CASA.
+The developer team will maintain the file to reflect the current state of the dependency requirements across the development cycle.
+
+To use this file manually, you can type the following command:
 
 ```console
-python3 setup.py build
+PYTHONNOUSERSITE=1 ${casa_bin}/pip3 install --disable-pip-version-check \
+    --upgrade-strategy=only-if-needed -r requirements.txt
 ```
 
-The build output will be found in the build/lib directory. This directory can
-be put on the PYTHONPATH inside CASA to make the pipeline available, e.g.,
+Note that here `casa_bin` is the path to the CASA `bin` directory.
+On macOS, this is typically `/Applications/CASA.app/Contents/MacOS`; on Linux, it is the `bin/` directory inside the unpacked CASA tarball, e.g. `casa-6.5.3-28-py3.8/bin`. `PYTHONNOUSERSITE=1` is used to prevent the `pip` command from checking dependencies from the user's site-packages directory. This is necessary to isolate the user's site-packages directory from your CASA development environment, which is generally confined to the unpacked CASA tarball directory.
+
+The `pip` command above should install the dependencies in the CASA site-packages directory, which can be verified with this:
 
 ```python
-import sys
-sys.path.insert(0, '/path/to/pipeine/build/lib')
+CASA <1>: import astropy
+CASA <2>: astropy.__version__
+Out[2]: '5.2.1'
+CASA <3>: astropy.__path__
+Out[3]: ['/opt/casa_dist/casa-6.5.3-28-py3.8/lib/py/lib/python3.8/site-packages/astropy']
 ```
 
 ## Standard install
@@ -63,7 +73,7 @@ sys.path.insert(0, '/path/to/workspace/dist/Pipeline.egg')
 Developers often have multiple workspaces, each workspace containing a
 different version of the pipeline. Below is an example prelude.py which
 switches between workspaces based on the launch arguments given to CASA, e.g.,
-`casa --trunk --egg` makes the most recent pipeline egg from the _trunk_
+`casa --trunk --egg` makes the most recent pipeline egg from the *trunk*
 workspace available. Edit the workspaces dictionary definition to match your
 environment.
 
@@ -147,44 +157,6 @@ To uninstall the developer installation, execute
 
 ```console
 python3 setup.py develop -u
-```
-
-### Optional: CASA CLI bindings
-
-The CASA CLI bindings are always generated and included in a standard install.
-To make the CASA CLI bindings available for a developer install, the CLI
-bindings need to be written to the src directory. This can be done using the
-`buildmytasks` command, using the _-i_ option to generate the bindings
-in-place, i.e.,
-
-```console
-python3 setup.py buildmytasks -i
-```
-
-The bindings should be rebuilt whenever you change the interface XML definitions.
-To speed up the build process, one can also add the parallel build option (`-j n`).
-
-**Take care not to commit the code-generated files to SVN!**
-
-### Optional: Install `Astropy` etc.
-
-[`Astropy`](https://www.astropy.org/) and [`PyBDSF`](https://www.astron.nl/citt/pybdsf/) became the pipeline dependencies in [the VLASS single-epoch imaging development](https://open-jira.nrao.edu/browse/PIPE-714). However, they are not currently bundled in the non-pipeline CASA releases.
-
-An easy installation option is to use `pip` packaged in the CASA distribution:
-
-```console
-which pip3
-/opt/nrao/casa-6.2.0-114/bin/pip3
-pip3 install astropy bdsf --disable-pip-version-check
-```
-
-which can be verified,
-
-```python
-CASA <2>: astropy__version__
-Out[2]: '4.1'
-CASA <3>: astropy.__path__
-Out[3]: ['/opt/nrao/casa-6.2.0-114/lib/py/lib/python3.6/site-packages/astropy']
 ```
 
 ### Optional: removing legacy pipeline installation from CASA

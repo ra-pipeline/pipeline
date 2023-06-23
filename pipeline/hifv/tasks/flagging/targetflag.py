@@ -2,7 +2,7 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
-from pipeline.hifv.heuristics import cont_file_to_CASA
+from pipeline.infrastructure.contfilehandler import contfile_to_spwsel
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import task_registry
 
@@ -63,7 +63,7 @@ class Targetflag(basetask.StandardTaskTemplate):
         # corrstring = self.inputs.context.evla['msinfo'][m.name].corrstring
         corrstring = m.get_vla_corrstring()
 
-        fielddict = cont_file_to_CASA(self.inputs.vis, self.inputs.context)
+        fielddict = contfile_to_spwsel(self.inputs.vis, self.inputs.context)
 
         if fielddict != {}:
             LOG.info('cont.dat file present.  Using VLA Spectral Line Heuristics for task targetflag.')

@@ -1,10 +1,5 @@
-import collections
-import copy
-import os
 import datetime
 import shutil
-
-import numpy as np
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -13,7 +8,7 @@ import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
 from pipeline.hifv.heuristics import set_add_model_column_parameters
 from pipeline.hifv.heuristics import RflagDevHeuristic, mssel_valid
-from pipeline.hifv.heuristics import cont_file_to_CASA
+from pipeline.infrastructure.contfilehandler import contfile_to_spwsel
 from pipeline.infrastructure import casa_tasks, casa_tools, task_registry
 
 from .displaycheckflag import checkflagSummaryChart
@@ -162,7 +157,7 @@ class Checkflag(basetask.StandardTaskTemplate):
         # decide on if we use cont.dat for target-vla
         use_contdat = False
         if self.inputs.checkflagmode == 'target-vla':
-            fielddict = cont_file_to_CASA(self.inputs.vis, self.inputs.context)
+            fielddict = contfile_to_spwsel(self.inputs.vis, self.inputs.context)
             if fielddict != {}:
                 LOG.info('cont.dat file present.  Using VLA Spectral Line Heuristics for checkflagmode=target-vla.')
                 use_contdat = True

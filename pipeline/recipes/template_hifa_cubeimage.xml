@@ -7,9 +7,11 @@
         <Command xmlns="">hifa_importdata</Command>
         <ParameterSet/>
     </ProcessingCommand>
+    <!-- end of import MS-->
     {{/importonly}}
+    
     {{^importonly}}
-     <!-- Restore MS: if importonly!=True, restore ASDM -->
+    <!-- Restore MS: if importonly!=True, restore ASDM -->
     <ProcessingCommand>
         <Command xmlns="">hifa_restoredata</Command>
         <ParameterSet>
@@ -19,6 +21,7 @@
           </Parameter>
         </ParameterSet>
     </ProcessingCommand>
+    <!-- End of Restore MS-->
     {{/importonly}}
 
     <ProcessingCommand>
@@ -45,10 +48,6 @@
                 <Value xmlns="">mfs</Value>
             </Parameter>
             <Parameter>
-                <Keyword xmlns="">pipelinemode</Keyword>
-                <Value xmlns="">interactive</Value>
-            </Parameter>
-            <Parameter>
                 <Keyword xmlns="">field</Keyword>
                 <Value xmlns="">{{{field_list}}}</Value>
             </Parameter>
@@ -60,7 +59,10 @@
         <ParameterSet>
         </ParameterSet>
     </ProcessingCommand>
-
+    
+    {{#cube_image}}
+    <!-- create continumm-free data if cube_image=true -->
+    
     <ProcessingCommand>
         <Command xmlns="">hif_uvcontfit</Command>
         <ParameterSet>
@@ -72,7 +74,9 @@
         <ParameterSet>
         </ParameterSet>
     </ProcessingCommand>
-
+    
+    <!-- end of the continuum subtraction section -->
+    {{/cube_image}}
 
     <ProcessingCommand>
         <Command xmlns="">hif_makeimages</Command>
@@ -80,18 +84,15 @@
         </ParameterSet>
     </ProcessingCommand>
 
-<!-- create aggregate continuum image if cont_image=true -->
-{{#cont_image}}
+    {{#cont_image}}
+    <!-- create aggregate continuum image if cont_image=true -->
+
     <ProcessingCommand>
         <Command xmlns="">hif_makeimlist</Command>
         <ParameterSet>
             <Parameter>
                 <Keyword xmlns="">specmode</Keyword>
                 <Value xmlns="">cont</Value>
-            </Parameter>
-            <Parameter>
-                <Keyword xmlns="">pipelinemode</Keyword>
-                <Value xmlns="">interactive</Value>
             </Parameter>
             <Parameter>
                 <Keyword xmlns="">field</Keyword>
@@ -105,12 +106,14 @@
         <ParameterSet>
         </ParameterSet>
     </ProcessingCommand>
-{{/cont_image}}
-<!-- end of the continuum imaging section -->
+    
+    <!-- end of the continuum imaging section -->
+    {{/cont_image}}
 
-<!-- loop over list of cubes and create images -->
-{{#cube_list}}
-
+    {{#cube_image}}
+    <!-- loop over list of cubes and create images -->
+    {{#cube_list}}
+    
     <ProcessingCommand>
         <Command xmlns="">hif_editimlist</Command>
         <ParameterSet>
@@ -158,9 +161,116 @@
           </Parameter>
         </ParameterSet>
     </ProcessingCommand>
+    
+    {{/cube_list}}
+    <!-- end loop -->
+    {{/cube_image}}
 
-{{/cube_list}}
-<!-- end loop -->
+    {{#selfcal}}
+    <!-- run selfcal and save selfcal'ed data in 'corrected' if selfcal=true -->
+    
+    <ProcessingCommand>
+        <Command xmlns="">hif_selfcal</Command>
+        <ParameterSet>
+            <Parameter>
+                <Keyword xmlns="">field</Keyword>
+                <Value xmlns="">{{{field_list}}}</Value>
+            </Parameter>            
+        </ParameterSet>
+    </ProcessingCommand>
+
+    {{#cont_image}}
+    <!-- create aggregate continuum image if cont_image=true -->
+
+    <ProcessingCommand>
+        <Command xmlns="">hif_makeimlist</Command>
+        <ParameterSet>
+            <Parameter>
+                <Keyword xmlns="">specmode</Keyword>
+                <Value xmlns="">cont</Value>
+            </Parameter>
+            <Parameter>
+                <Keyword xmlns="">field</Keyword>
+                <Value xmlns="">{{{field_list}}}</Value>
+            </Parameter>
+            <Parameter>
+                <Keyword xmlns="">datatype</Keyword>
+                <Value xmlns="">selfcal</Value>
+            </Parameter>              
+        </ParameterSet>
+    </ProcessingCommand>
+
+    <ProcessingCommand>
+        <Command xmlns="">hif_makeimages</Command>
+        <ParameterSet>
+        </ParameterSet>
+    </ProcessingCommand>
+    
+    <!-- end of the continuum imaging section -->
+    {{/cont_image}}
+
+    {{#cube_image}}
+    <!-- loop over list of cubes and create images -->
+    {{#cube_list}}
+    
+    <ProcessingCommand>
+        <Command xmlns="">hif_editimlist</Command>
+        <ParameterSet>
+            <Parameter>
+                <Keyword xmlns="">imaging_mode</Keyword>
+                <Value xmlns="">ALMA</Value>
+            </Parameter>
+            <Parameter>
+                <Keyword xmlns="">datatype</Keyword>
+                <Value xmlns="">selfcal</Value>
+            </Parameter>            
+            <Parameter>
+                <Keyword xmlns="">specmode</Keyword>
+                <Value xmlns="">cube</Value>
+            </Parameter>
+            <Parameter>
+                <Keyword xmlns="">field</Keyword>
+                <Value xmlns="">{{{field}}}</Value>
+            </Parameter>
+            <Parameter>
+                <Keyword xmlns="">spw</Keyword>
+                <Value xmlns="">{{spw}}</Value>
+            </Parameter>
+            <Parameter>
+                <Keyword xmlns="">restfreq</Keyword>
+                <Value xmlns="">{{restfreq}}</Value>
+            </Parameter>
+            <Parameter>
+                <Keyword xmlns="">start</Keyword>
+                <Value xmlns="">{{start}}</Value>
+            </Parameter>
+            <Parameter>
+                <Keyword xmlns="">width</Keyword>
+                <Value xmlns="">{{width}}</Value>
+            </Parameter>
+            <Parameter>
+                <Keyword xmlns="">nchan</Keyword>
+                <Value xmlns="">{{nchan}}</Value>
+            </Parameter>              
+        </ParameterSet>
+    </ProcessingCommand>
+
+    <ProcessingCommand>
+        <Command xmlns="">hif_makeimages</Command>
+        <ParameterSet>
+          <Parameter>
+            <Keyword xmlns="">overwrite_on_export</Keyword>
+            <Value xmlns="">False</Value>
+          </Parameter>
+        </ParameterSet>
+    </ProcessingCommand>
+    
+    {{/cube_list}}
+    <!-- end loop -->
+    {{/cube_image}}      
+
+    <!-- end of the selfcal section -->
+    {{/selfcal}}    
 
     <ProcessingCommand>
         <Command xmlns="">hifa_exportdata</Command>

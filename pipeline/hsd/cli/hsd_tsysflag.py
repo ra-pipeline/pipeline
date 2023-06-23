@@ -91,7 +91,7 @@ def hsd_tsysflag(vis=None, caltable=None,
                     in a spw, if proportion of antennas that are already entirely flagged
                     in all timestamps exceeds tmef1_limit.
     metric_order    Order in which to evaluate the flagging metrics that are
-                    enables. Disabled metrics are skipped.
+                    enabled. Disabled metrics are skipped.
     normalize_tsys  True to create a normalized Tsys table that is used to
                     evaluate the Tsys flagging metrics. All newly found flags are also applied
                     to the original Tsys caltable that continues to be used for subsequent

@@ -1,9 +1,7 @@
-import glob
-
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.vdp as vdp
-from pipeline.infrastructure import casa_tools, task_registry
+from pipeline.infrastructure import casa_tools, task_registry, utils
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -58,15 +56,15 @@ class Analyzealpha(basetask.StandardTaskTemplate):
 
             if not subimagefile:
                 if imageitem['multiterm']:
-                    subimagefile = glob.glob(imageitem['imagename'].replace('.subim', '.pbcor.tt0.subim'))[0]
+                    subimagefile = utils.glob_ordered(imageitem['imagename'].replace('.subim', '.pbcor.tt0.subim'))[0]
                 else:
-                    subimagefile = glob.glob(imageitem['imagename'].replace('.subim', '.pbcor.subim'))[0]
+                    subimagefile = utils.glob_ordered(imageitem['imagename'].replace('.subim', '.pbcor.subim'))[0]
 
             if not alphafile:
-                alphafile = glob.glob(imlist[0]['imagename'].replace('.image.subim', '.alpha'))[0]
+                alphafile = utils.glob_ordered(imlist[0]['imagename'].replace('.image.subim', '.alpha'))[0]
 
             if not alphaerrorfile:
-                alphaerrorfile = glob.glob(imlist[0]['imagename'].replace('.image.subim', '.alpha.error'))[0]
+                alphaerrorfile = utils.glob_ordered(imlist[0]['imagename'].replace('.image.subim', '.alpha.error'))[0]
 
             # Extract the value from the .alpha and .alpha.error images (for wideband continuum MTMFS with nterms>1)
             # 

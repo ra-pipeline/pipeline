@@ -360,7 +360,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         return super().imsize(fields, cell, primary_beam, sfpblimit=sfpblimit, max_pixels=max_pixels,
                               centreonly=centreonly, vislist=vislist)
 
-    def imagename(self, output_dir=None, intent=None, field=None, spwspec=None, specmode=None, band=None) -> str:
+    def imagename(self, output_dir=None, intent=None, field=None, spwspec=None, specmode=None, band=None, datatype: str = None) -> str:
         try:
             nameroot = self.imagename_prefix
             if nameroot == 'unknown':
@@ -393,6 +393,8 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
             namer.band('{}_band'.format(band))
         if specmode:
             namer.specmode(specmode)
+        if datatype:
+            namer.datatype(datatype)
 
         # filenamer returns a sanitized filename (i.e. one with
         # illegal characters replace by '_'), no need to check

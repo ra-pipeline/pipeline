@@ -74,7 +74,7 @@ def hifa_gfluxscaleflag(
                    antennas within individual timestamps.
     tmantint       Threshold for maximum fraction of timestamps that are allowed to
                    contain outliers.
-    tmint          eshold for maximum fraction of "outlier timestamps" over
+    tmint          Threshold for maximum fraction of "outlier timestamps" over
                    "total timestamps" that a baseline may be a part of.
     tmbl           Initial threshold for maximum fraction of "bad baselines" over "all
                    baselines" that an antenna may be a part of.
@@ -89,7 +89,7 @@ def hifa_gfluxscaleflag(
     niter          Maximum number of times to iterate on evaluation of flagging
                    heuristics. If an iteration results in no new flags, then subsequent
                    iterations are skipped.
-    pipelinemode   e operating mode. In 'automatic' mode the pipeline
+    pipelinemode   Pipeline operating mode. In 'automatic' mode the pipeline
                    determines the values of all context defined pipeline inputs automatically.
                    In interactive mode the user can set the pipeline context defined
                    parameters manually. In 'getinputs' mode the user can check the settings of

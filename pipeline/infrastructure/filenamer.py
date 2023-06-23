@@ -70,6 +70,7 @@ class FileNameComponentBuilder(object):
         self._intent = None
         self._iteration = None
         self._line_region = None
+        self._datatype = None
         self._output_dir = None
         self._polarization = None
         self._antenna = None
@@ -100,6 +101,7 @@ class FileNameComponentBuilder(object):
                       self._band,
                       self._specmode,
                       self._line_region,
+                      self._datatype,
                       self._polarization,
                       self._antenna,
                       self._type,
@@ -163,6 +165,10 @@ class FileNameComponentBuilder(object):
             self._method = v
         else:
             self._method = None
+        return self
+
+    def datatype(self, datatype):
+        self._datatype = datatype
         return self
 
     def polarization(self, polarization):
@@ -663,6 +669,10 @@ class Image(NamingTemplate):
 
     def line_region(self, start_channel, end_channel):
         self._associations.line_region(start_channel, end_channel)
+        return self
+
+    def datatype(self, datatype):
+        self._associations.datatype(datatype)
         return self
 
     def polarization(self, polarization):

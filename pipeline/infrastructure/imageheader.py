@@ -50,8 +50,8 @@ def clean_extendable_keys(data, key, num_keys=None):
 
 
 # Add information to image header
-def set_miscinfo(name, spw=None, virtspw=True, field=None, nfield=None, type=None, iter=None, intent=None, specmode=None,
-                 robust=None, weighting=None, is_per_eb=None, context=None):
+def set_miscinfo(name, spw=None, virtspw=True, field=None, nfield=None, datatype=None, type=None, iter=None,
+                 intent=None, specmode=None, robust=None, weighting=None, is_per_eb=None, context=None):
     """Define miscellaneous image information."""
     if name == '':
         return
@@ -111,6 +111,9 @@ def set_miscinfo(name, spw=None, virtspw=True, field=None, nfield=None, type=Non
                 info['npol'] = len(context.observing_run.measurement_sets[0].get_vla_corrstring().split(','))
             else:
                 info['npol'] = -999
+
+        if datatype is not None:
+            info['datatype'] = datatype
 
         if type is not None:
             info['type'] = type

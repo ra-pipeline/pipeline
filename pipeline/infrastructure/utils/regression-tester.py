@@ -787,7 +787,7 @@ class TestSlowerRegression:
         ref_directory =  'pl-regressiontest/2019.1.01056.S/'
 
         pr = PipelineRegression(input_dir = test_directory,
-                                visname=['uid___A002_Xe1f219_X6d0b', ' uid___A002_Xe1f219_X7ee8'], 
+                                visname=['uid___A002_Xe1f219_X6d0b', 'uid___A002_Xe1f219_X7ee8'], 
                                 project_id="2019_1_01056_S",
                                 expectedoutput_file=(f'{ref_directory}' + 
                                                 'uid___A002_Xe1f219_X6d0b.casa-6.5.4-2-pipeline-2023.0.0.17.results.txt'))

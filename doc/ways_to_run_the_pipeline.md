@@ -163,7 +163,29 @@ context.save()
 and then run this with:
 
 ```console
-$ casa -c ../debug.script
+casa -c ../debug.script
+```
+
+### Create custom Pipeline processing recipes from SRDP Mustache templates
+
+The SDRP templates are [mustache](http://mustache.github.io/) templates that can be used to generate custom SDRP processing recipe XML files.
+All templates are located in the [pipeline/recipes](pipeline/recipes) directory (template_*.xml).
+A mustache template contains both the XML and the mustache tags, the latter of which allows the insertion of values from the JSON file into the XML during rendering.
+
+To generate a custom SDRP recipe, you will need to create a JSON file that contains the custom mustache tag values. Once the JSON file is prepared, we can render the SDRP recipes for testing.
+Two [recommended](https://open-jira.nrao.edu/browse/PIPE-72?focusedCommentId=140995&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-140995) rendering options are below:
+
+* Use the demo page on the [mustache](http://mustache.github.io/) site.  You can copy and paste the text from the JSON file and template into the boxes and click the "Render Template" button.
+
+* Use a Python Library, e.g. [pystache](https://github.com/PennyDreadfulMTG/pystache) or [chevron](https://github.com/noahmorrison/chevron), you could do something like this:
+
+```python
+import json, pystache
+with open('srdp_examples/example4_hifa_cubeimage_selfcal.json') as f_json, open('template_hifa_cubeimage.xml') as f_template:
+    d = json.load(f_json)
+    t = f_template.read()
+    with open('recipe.xml', 'w') as out:
+        out.write(pystache.render(t,d))
 ```
 
 ## Workflow Break/Resume
@@ -171,7 +193,7 @@ $ casa -c ../debug.script
 ### Context-by-Stage
 
 The context content at individual stages can be pickled after the completion of each PL task.
-The [implementation](https://open-bitbucket.nrao.edu/projects/PIPE/repos/pipeline/commits/bf904d167c09c2f7a9e648ce3e30122185887586) is in `infrastructure.basetask` and will only be switched on if the pipeline is in the `DEBUG` (or lower) logging level. This feature works for both PPR and receipereducer runs.
+The [implementation](https://open-bitbucket.nrao.edu/projects/PIPE/repos/pipeline/commits/bf904d167c09c2f7a9e648ce3e30122185887586) is in `infrastructure.basetask` and will only be switched on if the pipeline is in the `DEBUG` (or lower) logging level. This feature works for both PPR and recipereducer runs.
 
 The path of pickled context files is: `output_dir`/`context_name`/`saved_state`/`context-stage*.pickle`, saved along with `result-stage*.pickle` which is always present in the same directory.
 
@@ -206,7 +228,7 @@ The path of pickled context files is: `output_dir`/`context_name`/`saved_state`/
 
   For development/test purposes, one workaround to avoid copying the entire working directory is to create a fresh copy of the context pickled from the "breakpoint" stage (where your loglevel='debug' setting is crucial) in the existing working directory:
 
-  First, you back up the context pickle files from differnet stages:
+  First, you back up the context pickle files from different stages:
 
   ```console
   $ cp -rf pipeline-20210421T172403/saved_state pipeline-20210421T172403/saved_state_backup

@@ -460,11 +460,15 @@ class GcorFluxscale(basetask.StandardTaskTemplate):
         ampcal_result = None
         check_ok = False
         try:
+            # Create amplitude gain solutions and merge into the local context,
+            # so that these amplitude solutions will be used in a temporary
+            # applycal when deriving calibrated visibility fluxes.
             ampcal_result = self._do_gaincal(
                 field=f'{inputs.transfer},{inputs.reference}', intent=f'{inputs.transintent},{inputs.refintent}',
                 gaintype='T', calmode='a', combine='', solint=inputs.solint, antenna=antenna, uvrange='',
                 minsnr=inputs.minsnr, refant=refant, minblperant=minblperant, spwmap=None, interp=None,
-                append=False, merge=True)
+                append=False)
+            ampcal_result.accept(inputs.context)
 
             # Get the gaincal caltable from the results
             try:
@@ -489,7 +493,7 @@ class GcorFluxscale(basetask.StandardTaskTemplate):
 
     def _do_gaincal(self, caltable=None, field=None, intent=None, gaintype='G', calmode=None, combine=None, solint=None,
                     antenna=None, uvrange='', minsnr=None, refant=None, minblperant=None, spwmap=None, interp=None,
-                    append=False, merge=False):
+                    append=False):
         inputs = self.inputs
 
         # Use only valid science spws
@@ -559,10 +563,6 @@ class GcorFluxscale(basetask.StandardTaskTemplate):
             result.pool[0] = modified_calapp
             result.final[0] = modified_calapp
 
-        # If requested, immediately merge into local context.
-        if merge:
-            result.accept(inputs.context)
-
         return result
 
     def _do_phasecals(self, all_ants: str, restr_ants: str, refant: str, minblperant: int,
@@ -585,7 +585,8 @@ class GcorFluxscale(basetask.StandardTaskTemplate):
 
         # Compute phase caltable for the flux calibrator, using restricted set
         # of antennas.
-        phase_results.append(self._do_phasecal_for_amp_calibrator(restr_ants, refant, minblperant, uvrange))
+        phase_results.append(self._do_phasecal_for_amp_calibrator(restr_ants, refant, minblperant, uvrange,
+                                                                  non_pc_intents))
 
         # PIPE-1154: compute phase caltable(s) with optimal parameters for
         # PHASE and/or CHECK fields that do not cover any of the other
@@ -651,7 +652,7 @@ class GcorFluxscale(basetask.StandardTaskTemplate):
         return sorted(intent_field)
 
     def _do_phasecal_for_amp_calibrator(self, antenna: str, refant: str, minblperant: int,
-                                        uvrange: str) -> GaincalResults:
+                                        uvrange: str, non_pc_intents: Set) -> GaincalResults:
         inputs = self.inputs
 
         # Compute phase caltable for the amplitude calibrator (set by
@@ -663,6 +664,20 @@ class GcorFluxscale(basetask.StandardTaskTemplate):
                                         combine='', solint=inputs.phaseupsolint, antenna=antenna, uvrange=uvrange,
                                         minsnr=inputs.minsnr, refant=refant, minblperant=minblperant, spwmap=None,
                                         interp=None)
+        # PIPE-1831: update the CalApplication to add the other non-phase/check
+        # calibrator intents as valid intents that this phase caltable can be
+        # applied to. This is necessary for datasets where a field that covers
+        # both the amplitude calibrator and other (non-phase/check)
+        # calibrators. Without this, any subsequent gaincal on this field would
+        # split the call for this field into separate ones for AMP and other
+        # intents, leading to undesired duplicate solutions.
+        if phase_result.pool:
+            original_calapp = phase_result.pool[0]
+            intents_str = ",".join({original_calapp.intent} | non_pc_intents)
+            modified_calapp = callibrary.copy_calapplication(original_calapp, intent=intents_str)
+            phase_result.pool[0] = modified_calapp
+            phase_result.final[0] = modified_calapp
+
         return phase_result
 
     def _do_phase_for_phase_check_no_overlap(self, pc_intents: Set, exclude_intents: Set, antenna: str,

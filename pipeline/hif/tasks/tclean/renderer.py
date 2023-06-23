@@ -30,7 +30,7 @@ ImageRow = collections.namedtuple('ImageInfo', (
     'final_nsigma_mad_label final_nsigma_mad residual_ratio non_pbcor_label non_pbcor '
     'pbcor score fractional_bw_label fractional_bw aggregate_bw_label aggregate_bw aggregate_bw_num '
     'nsigma_label nsigma vis_amp_ratio_label vis_amp_ratio  '
-    'image_file datatype_info nchan plot qa_url iterdone stopcode stopreason '
+    'image_file datatype datatype_info nchan plot qa_url iterdone stopcode stopreason '
     'chk_pos_offset chk_frac_beam_offset chk_fitflux chk_fitpeak_fitflux_ratio img_snr '
     'chk_gfluxscale chk_gfluxscale_snr chk_fitflux_gfluxscale_ratio cube_all_cont tclean_command result '
     'model_pos_flux model_neg_flux model_flux_inner_deg nmajordone_total nmajordone_per_iter majorcycle_stat_plot '
@@ -38,8 +38,8 @@ ImageRow = collections.namedtuple('ImageInfo', (
 
 
 class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
-    def __init__(self, uri='tclean.mako', 
-                 description='Produce a cleaned image', 
+    def __init__(self, uri='tclean.mako',
+                 description='Produce a cleaned image',
                  always_rerender=False):
         super(T2_4MDetailsTcleanRenderer, self).__init__(uri=uri,
                 description=description, always_rerender=always_rerender)
@@ -76,6 +76,7 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             maxiter = max(r.iterations.keys())
 
             vis = ','.join([os.path.basename(v).strip('.ms') for v in r.vis])
+            datatype = r.datatype
             datatype_info = r.datatype_info
 
             field = None
@@ -538,6 +539,7 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             # cache. We will later set plot to the correct value.
             row = ImageRow(
                 vis=vis,
+                datatype=datatype,
                 datatype_info=datatype_info,
                 field=field,
                 fieldname=fieldname,
@@ -608,7 +610,7 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
         # construct the renderers so we know what the back/forward links will be
         temp_urls = (None, None, None)
-        qa_renderers = [TCleanPlotsRenderer(context, results, row.result, plots_dict, row.image_file.split('.')[0], row.field, str(row.spw), row.pol, temp_urls, row.cube_all_cont)
+        qa_renderers = [TCleanPlotsRenderer(context, results, row.result, plots_dict, row.image_file.split('.')[0], row.field, str(row.spw), row.pol, row.datatype, temp_urls, row.cube_all_cont)
                         for row in image_rows]
         qa_links = triadwise([renderer.path for renderer in qa_renderers])
 
@@ -622,16 +624,16 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         for row, renderer, qa_urls, tab_url in zip(image_rows, qa_renderers, qa_links, tab_links):
             prefix = row.image_file.split('.')[0]
             try:
-                final_iter = sorted(plots_dict[prefix][row.field][str(row.spw)].keys())[-1]
+                final_iter = sorted(plots_dict[prefix][row.datatype][row.field][str(row.spw)].keys())[-1]
                 # cube and repBW mode use mom8
-                plot = get_plot(plots_dict, prefix, row.field, str(row.spw), final_iter, 'image', 'mom8')
+                plot = get_plot(plots_dict, prefix, row.datatype, row.field, str(row.spw), final_iter, 'image', 'mom8')
                 if plot is None:
                     # mfs and cont mode use mean
-                    plot = get_plot(plots_dict, prefix, row.field, str(row.spw), final_iter, 'image', 'mean')
+                    plot = get_plot(plots_dict, prefix, row.datatype, row.field, str(row.spw), final_iter, 'image', 'mean')
 
                 renderer = TCleanPlotsRenderer(context, results, row.result,
                                                plots_dict, prefix, row.field, str(row.spw), row.pol,
-                                               qa_urls, row.cube_all_cont)
+                                               row.datatype, qa_urls, row.cube_all_cont)
                 with renderer.get_file() as fileobj:
                     fileobj.write(renderer.render())
 
@@ -661,7 +663,7 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         # stay in the same weblog table row. Note that this additional VLA-only sorting might introduce
         # a difference between the target sequences of hif_makeimages and hif_makeimlist (see PIPE-1302).
         if final_rows and 'VLA' in final_rows[0].result.imaging_mode:
-            final_rows.sort(key=lambda row: (row.vis, row.field, utils.natural_sort_key(row.spw), row.pol))
+            final_rows.sort(key=lambda row: (row.vis, row.datatype, row.field, utils.natural_sort_key(row.spw), row.pol))
 
         chk_fit_rows = []
         for row in final_rows:
@@ -683,7 +685,7 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
 
 class TCleanPlotsRenderer(basetemplates.CommonRenderer):
-    def __init__(self, context, makeimages_results, result, plots_dict, prefix, field, spw, pol, urls, cube_all_cont):
+    def __init__(self, context, makeimages_results, result, plots_dict, prefix, field, spw, pol, datatype, urls, cube_all_cont):
         super(TCleanPlotsRenderer, self).__init__('tcleanplots.mako', context, makeimages_results)
 
         # Set HTML page name
@@ -706,14 +708,14 @@ class TCleanPlotsRenderer(basetemplates.CommonRenderer):
                 #       While working on PIPE-129 it happened that this code
                 #       was run 4 times for 2 targets. Better make sure the
                 #       name is well defined (see new setup for per EB images below).
-                outfile = '%s-field%s-pol%s-cleanplots-%d.html' % (prefix, field, pol, randint(1, 1e12))
+                outfile = '%s-field%s-pol%s-datatype%s-cleanplots-%d.html' % (prefix, field, pol, datatype, randint(1, 1e12))
             else:
                 # The name needs to be unique also for the per EB imaging. Thus prepend the image name
                 # which contains the OUS or EB ID.
-                outfile = '%s-field%s-spw%s-pol%s-cleanplots.html' % (prefix, field, spw, pol)
+                outfile = '%s-field%s-spw%s-pol%s-datatype%s-cleanplots.html' % (prefix, field, spw, pol, datatype)
         # TODO: Check if this is useful since the result is empty.
         else:
-            outfile = '%s-field%s-spw%s-pol%s-cleanplots.html' % (prefix, field, spw, pol)
+            outfile = '%s-field%s-spw%s-pol%s-datatype%s-cleanplots.html' % (prefix, field, spw, pol, datatype)
 
         # HTML encoded filenames, so can't have plus sign
         valid_chars = "_.-%s%s" % (string.ascii_letters, string.digits)
@@ -736,6 +738,7 @@ class TCleanPlotsRenderer(basetemplates.CommonRenderer):
         self.extra_data = {
             'plots_dict': plots_dict,
             'prefix': prefix.split('.')[0],
+            'datatype': datatype,
             'field': field,
             'spw': spw,
             'qa_previous': urls[0],
@@ -775,9 +778,9 @@ class TCleanTablesRenderer(basetemplates.CommonRenderer):
         mako_context.update(self.extra_data)
 
 
-def get_plot(plots, prefix, field, spw, i, colname, moment):
+def get_plot(plots, prefix, datatype, field, spw, i, colname, moment):
     try:
-        return plots[prefix][field][spw][i][colname][moment]
+        return plots[prefix][datatype][field][spw][i][colname][moment]
     except KeyError:
         return None
 
@@ -785,6 +788,7 @@ def get_plot(plots, prefix, field, spw, i, colname, moment):
 def make_plot_dict(plots):
     # Make the plots
     prefixes = sorted({p.parameters['prefix'] for p in plots})
+    datatypes = sorted({p.parameters['datatype'] for p in plots})
     fields = sorted({p.parameters['field'] for p in plots})
     spws = sorted({p.parameters['virtspw'] for p in plots})
     iterations = sorted({p.parameters['iter'] for p in plots})
@@ -795,22 +799,25 @@ def make_plot_dict(plots):
     iteration_dim = lambda: collections.defaultdict(type_dim)
     spw_dim = lambda: collections.defaultdict(iteration_dim)
     field_dim = lambda: collections.defaultdict(spw_dim)
-    plots_dict = collections.defaultdict(field_dim)
+    datatype_dim = lambda: collections.defaultdict(field_dim)
+    plots_dict = collections.defaultdict(datatype_dim)
     for prefix in prefixes:
-        for field in fields:
-            for spw in spws:
-                for iteration in iterations:
-                    for t in types:
-                        for moment in moments:
-                            matching = [p for p in plots
-                                        if p.parameters['prefix'] == prefix
-                                        and p.parameters['field'] == field
-                                        and p.parameters['virtspw'] == spw
-                                        and p.parameters['iter'] == iteration
-                                        and p.parameters['type'] == t
-                                        and p.parameters['moment'] == moment]
-                            if matching:
-                                plots_dict[prefix][field][spw][iteration][t][moment] = matching[0]
+        for datatype in datatypes:
+            for field in fields:
+                for spw in spws:
+                    for iteration in iterations:
+                        for t in types:
+                            for moment in moments:
+                                matching = [p for p in plots
+                                            if p.parameters['prefix'] == prefix
+                                            and p.parameters['datatype'] == datatype
+                                            and p.parameters['field'] == field
+                                            and p.parameters['virtspw'] == spw
+                                            and p.parameters['iter'] == iteration
+                                            and p.parameters['type'] == t
+                                            and p.parameters['moment'] == moment]
+                                if matching:
+                                    plots_dict[prefix][datatype][field][spw][iteration][t][moment] = matching[0]
 
     return plots_dict
 
@@ -861,6 +868,7 @@ class T2_4MDetailsTcleanVlassCubeRenderer(basetemplates.T2_4MDetailsDefaultRende
             field = fieldname = intent = None
 
             vis = ','.join([os.path.basename(v).strip('.ms') for v in r.vis])
+            datatype = r.datatype
             datatype_info = r.datatype_info
             image_path = r.iterations[maxiter]['image'].replace('.image', f'.image{extension}')
 
@@ -1371,6 +1379,7 @@ class T2_4MDetailsTcleanVlassCubeRenderer(basetemplates.T2_4MDetailsDefaultRende
 
                 row = ImageRow(
                     vis=vis,
+                    datatype=datatype,
                     datatype_info=datatype_info,
                     field=field,
                     fieldname=fieldname,
@@ -1442,9 +1451,9 @@ class T2_4MDetailsTcleanVlassCubeRenderer(basetemplates.T2_4MDetailsDefaultRende
         # construct the renderers so we know what the back/forward links will be
         # sort the rows so the links will be in the same order as the rows
         image_rows.sort(key=lambda row: (row.image_file.split(
-            '.')[0], utils.natural_sort_key(row.field+': '+str(row.spw)), row.pol))
+            '.')[0], utils.natural_sort_key(row.datatype, row.field+': '+str(row.spw)), row.pol))
         temp_urls = (None, None, None)
-        qa_renderers = [TCleanPlotsRenderer(context, results, row.result, plots_dict, row.image_file.split('.')[0], row.field+': '+str(row.spw), str(row.pol), row.pol, temp_urls, row.cube_all_cont)
+        qa_renderers = [TCleanPlotsRenderer(context, results, row.result, plots_dict, row.image_file.split('.')[0], row.field+': '+str(row.spw), str(row.pol), row.pol, row.datatype, temp_urls, row.cube_all_cont)
                         for row in image_rows]
         qa_links = triadwise([renderer.path for renderer in qa_renderers])
 
@@ -1458,16 +1467,16 @@ class T2_4MDetailsTcleanVlassCubeRenderer(basetemplates.T2_4MDetailsDefaultRende
         for row, renderer, qa_urls, tab_url in zip(image_rows, qa_renderers, qa_links, tab_links):
             prefix = row.image_file.split('.')[0]
             try:
-                final_iter = sorted(plots_dict[prefix][row.field+': '+str(row.spw)][str(row.pol)].keys())[-1]
+                final_iter = sorted(plots_dict[prefix][row.datatype][row.field+': '+str(row.spw)][str(row.pol)].keys())[-1]
                 # cube and repBW mode use mom8
-                plot = get_plot(plots_dict, prefix, row.field+': '+str(row.spw), str(row.pol), final_iter, 'image', 'mom8')
+                plot = get_plot(plots_dict, prefix, row.datatype, row.field+': '+str(row.spw), str(row.pol), final_iter, 'image', 'mom8')
                 if plot is None:
                     # mfs and cont mode use mean
-                    plot = get_plot(plots_dict, prefix, row.field+': '+str(row.spw), str(row.pol), final_iter, 'image', 'mean')
+                    plot = get_plot(plots_dict, prefix, row.datatype, row.field+': '+str(row.spw), str(row.pol), final_iter, 'image', 'mean')
 
                 renderer = TCleanPlotsRenderer(context, results, row.result,
                                                plots_dict, prefix, row.field+': '+str(row.spw), str(row.pol), row.pol,
-                                               qa_urls, row.cube_all_cont)
+                                               row.datatype, qa_urls, row.cube_all_cont)
                 with renderer.get_file() as fileobj:
                     fileobj.write(renderer.render())
 
@@ -1493,8 +1502,8 @@ class T2_4MDetailsTcleanVlassCubeRenderer(basetemplates.T2_4MDetailsDefaultRende
                 LOG.error(e)
                 final_rows.append(row)
 
-        # primary sort images by vis, field, secondary sort on spw, then by pol
-        final_rows.sort(key=lambda row: (row.vis, utils.natural_sort_key(row.field+': '+str(row.spw)), row.pol))
+        # primary sort images by vis, datatype, field, secondary sort on spw, then by pol
+        final_rows.sort(key=lambda row: (row.vis, utils.natural_sort_key(row.datatype, row.field+': '+str(row.spw)), row.pol))
 
         chk_fit_rows = []
         for row in final_rows:
@@ -1570,6 +1579,7 @@ def get_cycle_stats_vlass(context, makeimages_result, r):
 def make_plot_dict_stokes(plots):
     # Make the plots
     prefixes = sorted({p.parameters['prefix'] for p in plots})
+    datatypes = sorted({p.parameters['datatype'] for p in plots})
     fields = sorted({p.parameters['field']+': '+p.parameters['virtspw'] for p in plots})
     spws = sorted({p.parameters['stokes'] for p in plots})
     iterations = sorted({p.parameters['iter'] for p in plots})
@@ -1580,22 +1590,25 @@ def make_plot_dict_stokes(plots):
     def iteration_dim(): return collections.defaultdict(type_dim)
     def spw_dim(): return collections.defaultdict(iteration_dim)
     def field_dim(): return collections.defaultdict(spw_dim)
-    plots_dict = collections.defaultdict(field_dim)
+    def datatype_dim(): return collections.defaultdict(field_dim)
+    plots_dict = collections.defaultdict(datatype_dim)
 
     for prefix in prefixes:
-        for field in fields:
-            for spw in spws:
-                for iteration in iterations:
-                    for t in types:
-                        for moment in moments:
-                            matching = [p for p in plots
-                                        if p.parameters['prefix'] == prefix
-                                        and p.parameters['field']+': '+p.parameters['virtspw'] == field
-                                        and p.parameters['stokes'] == spw
-                                        and p.parameters['iter'] == iteration
-                                        and p.parameters['type'] == t
-                                        and p.parameters['moment'] == moment]
-                            if matching:
-                                plots_dict[prefix][field][spw][iteration][t][moment] = matching[0]
+        for datatype in datatypes:
+            for field in fields:
+                for spw in spws:
+                    for iteration in iterations:
+                        for t in types:
+                            for moment in moments:
+                                matching = [p for p in plots
+                                            if p.parameters['prefix'] == prefix
+                                            and p.parameters['datatype'] == datatype
+                                            and p.parameters['field']+': '+p.parameters['virtspw'] == field
+                                            and p.parameters['stokes'] == spw
+                                            and p.parameters['iter'] == iteration
+                                            and p.parameters['type'] == t
+                                            and p.parameters['moment'] == moment]
+                                if matching:
+                                    plots_dict[prefix][datatype][field][spw][iteration][t][moment] = matching[0]
 
     return plots_dict

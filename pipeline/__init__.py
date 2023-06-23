@@ -6,10 +6,6 @@ import pkg_resources
 import threading
 import webbrowser
 
-# required to get extern eggs on sys.path. This has to come first, before any
-# modules that depend on them.
-from . import extern
-
 from . import domain
 from . import environment
 from . import infrastructure

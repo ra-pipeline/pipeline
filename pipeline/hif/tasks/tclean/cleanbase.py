@@ -1,16 +1,12 @@
 import os
 import traceback
 
-import numpy as np
-
-import pipeline as pipeline
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 import pipeline.infrastructure.imageheader as imageheader
-from pipeline import environment
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import logging
@@ -28,6 +24,7 @@ class CleanBaseInputs(vdp.StandardInputs):
 
     antenna = vdp.VisDependentProperty(default='')
     datacolumn = vdp.VisDependentProperty(default='')
+    datatype = vdp.VisDependentProperty(default='')
     datatype_info = vdp.VisDependentProperty(default='')
     deconvolver = vdp.VisDependentProperty(default='')
     cycleniter = vdp.VisDependentProperty(default=-999)
@@ -121,7 +118,7 @@ class CleanBaseInputs(vdp.StandardInputs):
     def spwsel(self):
         return []
 
-    def __init__(self, context, output_dir=None, vis=None, imagename=None, datacolumn=None, datatype_info=None, intent=None, field=None,
+    def __init__(self, context, output_dir=None, vis=None, imagename=None, datacolumn=None, datatype=None, datatype_info=None, intent=None, field=None,
                  spw=None, spwsel=None, spwsel_all_cont=None, uvrange=None, orig_specmode=None, specmode=None, gridder=None, deconvolver=None,
                  uvtaper=None, nterms=None, cycleniter=None, cyclefactor=None, hm_minpsffraction=None,
                  hm_maxpsffraction=None, scales=None, outframe=None, imsize=None,
@@ -140,6 +137,7 @@ class CleanBaseInputs(vdp.StandardInputs):
 
         self.imagename = imagename
         self.datacolumn = datacolumn
+        self.datatype = datatype
         self.datatype_info = datatype_info
         self.intent = intent
         self.field = field
@@ -208,7 +206,7 @@ class CleanBaseInputs(vdp.StandardInputs):
         self.rotatepastep = rotatepastep
         self.heuristics = heuristics
         self.calcpsf = calcpsf
-        self.calcres = calcres        
+        self.calcres = calcres
 
 
 class CleanBase(basetask.StandardTaskTemplate):
@@ -237,6 +235,7 @@ class CleanBase(basetask.StandardTaskTemplate):
             field_ids = inputs.heuristics.field(inputs.intent, inputs.field)
             result = TcleanResult(vis=inputs.vis,
                                   datacolumn=inputs.datacolumn,
+                                  datatype=inputs.datatype,
                                   datatype_info=inputs.datatype_info,
                                   sourcename=inputs.field,
                                   field_ids=field_ids,
@@ -670,7 +669,7 @@ class CleanBase(basetask.StandardTaskTemplate):
             for name in name_list:
                 if os.path.exists(name):
                     imageheader.set_miscinfo(name=name, spw=inputs.spw, virtspw=virtspw, field=inputs.field,
-                                             type=im_type, iter=iter,
+                                             datatype=inputs.datatype, type=im_type, iter=iter,
                                              intent=inputs.intent, specmode=inputs.orig_specmode,
                                              robust=inputs.robust, weighting=inputs.weighting,
                                              is_per_eb=inputs.is_per_eb,
@@ -705,7 +704,7 @@ class CleanBase(basetask.StandardTaskTemplate):
 
     def _copy_restoringbeam_from_psf(self, imagename):
         """Copy the per-plane beam set from .psf image to .image/.residual.
-        
+
         Note: this is a short-term workaround for CAS-13401, in which CASA/tclean(stokes='IQUV') doesn't save
               the per-plane restoring beam information into the residual and restored images.
         """

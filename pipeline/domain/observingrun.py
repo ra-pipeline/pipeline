@@ -13,7 +13,7 @@ LOG = infrastructure.get_logger(__name__)
 
 
 class ObservingRun(object):
-    def __init__(self):        
+    def __init__(self):
         self.measurement_sets = []
         self.virtual_science_spw_ids = {}
         self.virtual_science_spw_names = {}
@@ -25,7 +25,7 @@ class ObservingRun(object):
             LOG.error(msg)
             raise Exception(msg)
 
-        # Initialise virtual science spw IDs from first MS 
+        # Initialise virtual science spw IDs from first MS
         if self.measurement_sets == []:
             self.virtual_science_spw_ids = \
                 dict((int(s.id), s.name) for s in ms.get_spectral_windows(science_windows_only=True))
@@ -52,7 +52,7 @@ class ObservingRun(object):
         self.measurement_sets.append(ms)
 
     def get_ms(self, name=None, intent=None):
-        """Returns the first measurement set matching the given identifier. 
+        """Returns the first measurement set matching the given identifier.
         Identifier precedence is name then intent.
         """
         if name:
@@ -110,9 +110,11 @@ class ObservingRun(object):
         return candidates
 
     def get_measurement_sets_of_type(self, dtypes: List[DataType],
-                                     msonly: bool=True, source: Optional[str]=None,
-                                     spw: Optional[str]=None) -> Union[List[MeasurementSet],
-                                                               Tuple[collections.OrderedDict, DataType]]:
+                                     msonly: bool=True,
+                                     source: Optional[str]=None,
+                                     spw: Optional[str]=None,
+                                     vis: Optional[List[str]]=None) -> Union[List[MeasurementSet],
+                                                                             Tuple[collections.OrderedDict, DataType]]:
         """
         Return a list of MeasurementSet domain object with matching DataType.
 
@@ -130,7 +132,8 @@ class ObservingRun(object):
             source: Filter for particular source name selection (comma
                 separated list of names).
             spw: Filter for particular virtual spw specification (comma
-                separated list of real virtual IDs).
+                separated list of virtual IDs).
+            vis: Filter for list of MS names (list of strings)
 
         Returns:
             When msonly is True, a list of MeasurementSet domain objects of
@@ -145,6 +148,10 @@ class ObservingRun(object):
         column = []
         for dtype in dtypes:
             for ms in self.measurement_sets:
+                # Filter for vis list
+                if isinstance(vis, list):
+                    if ms.name not in vis:
+                        continue
                 if spw is not None:
                     real_spw_ids = ','.join(str(self.virtual2real_spw_id(spw_id, ms)) for spw_id in spw.split(','))
                 else:
@@ -171,7 +178,7 @@ class ObservingRun(object):
     def get_fields(self, names=None):
         """
         Returns fields matching the given arguments from all measurement sets.
-        """        
+        """
         match = [ms.fields for ms in self.measurement_sets]
         # flatten the fields lists to one sequence
         match = itertools.chain(*match)
@@ -180,7 +187,7 @@ class ObservingRun(object):
             if isinstance(names, str):
                 names = utils.safe_split(names)
             names = set(names)
-            match = [f for f in match if f.name in names] 
+            match = [f for f in match if f.name in names]
 
         return match
 
@@ -214,7 +221,7 @@ class ObservingRun(object):
         Translate a virtual (science) spw ID to the real one for a given MS.
 
         :param spw_id: the spw id to convert
-        :type spw_id: integer
+        :type spw_id: integer or str
         :param target_ms: the MS to map spw_id to
         :type target_ms: domain.MeasurementSet
         """
@@ -225,7 +232,7 @@ class ObservingRun(object):
         Translate a real (science) spw ID of a given MS to the virtual one for this pipeline run.
 
         :param spw_id: the spw id to convert
-        :type spw_id: integer
+        :type spw_id: integer or str
         :param target_ms: the MS to map spw_id to
         :type target_ms: domain.MeasurementSet
         """
