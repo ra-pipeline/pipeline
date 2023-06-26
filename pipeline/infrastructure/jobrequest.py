@@ -246,9 +246,11 @@ class JobRequest(object):
         try:
             return self.fn(*self.args, **self.kw)
         except grpc.RpcError as rpc_error:
-            LOG.warning('RPC error from JobRequest: {!s}'.format(rpc_error))
-            tb = traceback.format_exc()
-            LOG.trace(tb)          
+            # PIPE-1255: CASA/plotms can raise grpc.RpcError exceptions, which are captured here.
+            # We avoid lazy logging format so buffered log messages are pickable and correctly 
+            # aggreated back to the weblog renderer.
+            LOG.warning('RPC error from JobRequest: {!s}, with the error message: {!s}'.format(msg, rpc_error))
+            LOG.debug(traceback.format_exc())
         finally:
             for hook in POSTHOOKS:
                 hook(self)
