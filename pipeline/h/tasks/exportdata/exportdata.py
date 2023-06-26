@@ -35,9 +35,13 @@ import os
 import shutil
 import sys
 import tarfile
+import tempfile
 
 import astropy.io.fits as apfits
 
+from pipeline.infrastructure.launcher import Context
+from pipeline.h.tasks.exportdata.aqua import AquaXmlGenerator
+from pipeline.h.tasks.exportdata.aqua import export_to_disk as export_aqua_to_disk
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.callibrary as callibrary
@@ -1210,3 +1214,82 @@ finally:
 
         pipemanifest.write(manifest_file)
 
+    def _export_aqua_report(self, context: Context, oussid: str, products_dir: str, report_generator: AquaXmlGenerator,
+                            weblog_filename: str):
+        """Save the AQUA report.
+
+        Note the method is mostly a duplicate of the conterpart
+             in hifa/tasks/exportdata/almaexportdata
+
+        Args:
+            context : pipeline context
+            oussid : OUS status ID
+            products_dir (str): path of product directory
+            report_generator: AQUA XML Generator
+            weblog_filename (str): weblog tarball filename
+
+        Returns:
+            AQUA report file path
+        """
+
+        aqua_file = os.path.join(context.output_dir, context.logs['aqua_report'])
+
+        LOG.info('Generating pipeline AQUA report')
+        try:
+            report_xml = report_generator.get_report_xml(context)
+            export_aqua_to_disk(report_xml, aqua_file)
+        except Exception as e:
+            LOG.exception('Error generating the pipeline AQUA report', exc_info=e)
+            return 'Undefined'
+
+        ps = context.project_structure
+        out_aqua_file = self.NameBuilder.aqua_report(context.logs['aqua_report'],
+                                                     project_structure=ps,
+                                                     ousstatus_entity_id=oussid,
+                                                     output_dir=products_dir)
+
+        LOG.info(f'Copying AQUA report {aqua_file} to {out_aqua_file}')
+        shutil.copy(aqua_file, out_aqua_file)
+
+        # put aqua report into html directory, so it can be linked to the weblog
+        aqua_html_path = f'{context.report_dir}/{aqua_file}'
+        LOG.info(f'Copying AQUA report {aqua_file} to {aqua_html_path}')
+        shutil.copy(aqua_file, context.report_dir)
+
+        products_weblog_tarball = os.path.join(context.products_dir, weblog_filename)
+
+        with tarfile.open(products_weblog_tarball, "r:gz") as tar:
+
+            # Extract all the files from the old tarball except the file to be replaced
+            files_to_keep = []
+            aqua_html_path_in_tarball = None
+            for member in tar.getmembers():
+                if aqua_file in member.name:
+                    aqua_html_path_in_tarball = member
+                else:
+                    files_to_keep.append(member)
+
+            with tempfile.NamedTemporaryFile(prefix='updated_weblog_', delete=False) as temp_weblog_tarball:
+                LOG.debug(f'Created {temp_weblog_tarball.name}')
+
+                # Create a new tarball with the updated aqua file, keeping all others the same
+                with tarfile.open(temp_weblog_tarball.name, "w:gz") as new_tar:
+                    for member in files_to_keep:
+                        # Add all the existing files from the old tarball to the new tarball
+                        new_tar.addfile(member, tar.extractfile(member))
+
+                    # If an aqua file was already in the weblog tarball, then update it.
+                    # Else, add it into the weblog tarball.
+                    if aqua_html_path_in_tarball:
+                        LOG.info(f'Replacing {products_weblog_tarball} with contents of {temp_weblog_tarball.name}')
+                        new_tar.add(aqua_file, arcname=aqua_html_path_in_tarball.name)
+                    else:
+                        LOG.info(f'Adding {aqua_html_path} to contents of weblog tarball')
+                        LOG.debug(f'Adding {aqua_html_path} to contents of {temp_weblog_tarball.name}')
+                        new_tar.add(f'{aqua_html_path}')
+
+            LOG.info(f'Adding/updating aqua report in {products_weblog_tarball}')
+            LOG.debug(f'Moving {temp_weblog_tarball.name} to {products_weblog_tarball}')
+            shutil.move(temp_weblog_tarball.name, products_weblog_tarball)
+
+        return os.path.basename(out_aqua_file)

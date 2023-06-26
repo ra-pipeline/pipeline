@@ -32,7 +32,6 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 from pipeline.infrastructure.launcher import Context
 from pipeline.infrastructure.utils import absolute_path
-from pipeline.h.tasks.exportdata.aqua import export_to_disk as aqua_export_to_disk
 import pipeline.infrastructure.project as project
 from pipeline.infrastructure import task_registry
 from pipeline.hsd.tasks.importdata.importdata import SDImportDataResults
@@ -124,7 +123,11 @@ class SDExportData(exportdata.ExportData):
                                         self.inputs.products_dir)
 
         # Export the AQUA report
-        pipe_aqua_reportfile = self._export_aqua_report(self.inputs.context, prefix, self.inputs.products_dir)
+        pipe_aqua_reportfile = self._export_aqua_report(context=self.inputs.context,
+                                                        oussid=prefix,
+                                                        products_dir=self.inputs.products_dir,
+                                                        report_generator=almasdaqua.AlmaAquaXmlGenerator(),
+                                                        weblog_filename=results.weblog)
 
         # Update the manifest
         if auxfproducts is not None or pipe_aqua_reportfile is not None:
@@ -638,44 +641,3 @@ finally:
             shutil.copy(script_file, out_script_file)
 
         return os.path.basename(out_script_file)
-
-    def _export_aqua_report(self, context: Context, oussid: str, products_dir: str) -> str:
-        """Save the AQUA report.
-
-        Note the method is mostly a duplicate of the conterpart
-             in hifa/tasks/exportdata/almaexportdata
-
-        Args:
-            context : pipeline context
-            oussid : OUS status ID
-            products_dir (str): path of product directory
-
-        Returns:
-            AQUA report file path
-        """
-        aqua_file = os.path.join(context.output_dir, context.logs['aqua_report'])
-
-        report_generator = almasdaqua.AlmaAquaXmlGenerator()
-        LOG.info('Generating pipeline AQUA report')
-        try:
-            report_xml = report_generator.get_report_xml(context)
-            aqua_export_to_disk(report_xml, aqua_file)
-        except Exception as e:
-            LOG.exception('Error generating the pipeline AQUA report',
-                          exc_info=e)
-            return 'Undefined'
-
-        ps = context.project_structure
-        out_aqua_file = self.NameBuilder.aqua_report(context.logs['aqua_report'],
-                                                     project_structure=ps,
-                                                     ousstatus_entity_id=oussid,
-                                                     output_dir=products_dir)
-
-        LOG.info('Copying AQUA report %s to %s' % (aqua_file, out_aqua_file))
-        shutil.copy(aqua_file, out_aqua_file)
-
-        # put aqua report into html directory, so it can be linked to the weblog
-        LOG.info('Copying AQUA report %s to %s', aqua_file, context.report_dir)
-        shutil.copy(aqua_file, context.report_dir)
-
-        return os.path.basename(out_aqua_file)

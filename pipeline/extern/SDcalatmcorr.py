@@ -1,7 +1,7 @@
 #
 # [SCRIPT INFORMATION]
-# GIT REPO: https://bitbucket.sco.alma.cl/scm/~harold.francke/sd-atm-line-correction-prototype.git
-# COMMIT: 7841010
+# GIT REPO: https://bitbucket.alma.cl/scm/~harold.francke/sd-atm-line-correction-prototype.git
+# COMMIT: 6ceb2fd3edf
 #
 #SDcalatmcorr: Casapipescript with wrapper for TS script "atmcorr.py" for the removal
 #of atmospheric line residuals.
@@ -1023,7 +1023,7 @@ def getAntennaFlagFrac(ms, fieldid, spwid, spwsetup):
     '''
     af = createCasaTool(aftool)
     af.open(ms)
-    af.selectdata(field = fieldid, spw = spwid)
+    af.selectdata(field = str(fieldid), spw = str(spwid))
     af.parsesummaryparameters()
     af.init()
     flag_stats_dict = af.run()

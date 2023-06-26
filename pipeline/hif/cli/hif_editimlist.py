@@ -108,7 +108,7 @@ def hif_editimlist(imagename=None,
                          Starts at first input channel of the spw.
                          example: '22.3GHz'
     stokes               Stokes Planes to make
-    sensitivity          
+    sensitivity          Theoretical sensitivity (override internal calculation)
     threshold            Stopping threshold (number in units of Jy, or string)
     nsigma               Multiplicative factor for rms-based threshold stopping
     uvtaper              Used to set a uv-taper during clean.

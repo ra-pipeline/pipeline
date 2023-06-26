@@ -1,0 +1,37 @@
+#####################################################################################################
+# CASA ver-6.5.4-py3.8 (monolithic)
+# 
+# usage:
+#
+#   PYTHONNOUSERSITE=1 ${casa_bin}/pip3 install --disable-pip-version-check \
+#        --upgrade-strategy=only-if-needed -r requirements.txt
+#   
+#   on macOS: $casa_bin is /Applications/CASA.app/Contents/MacOS/
+#   on Linux: $casa_bin is the bin/ dictionary inside the package, e.g. casa-6.5.3-28-py3.8/bin 
+#
+#   some recommended aliases to restrict your environment:
+#       $ export casa_bin='/Applications/CASA.app/Contents/MacOS' # or the Linux-version equivalent.
+#       $ alias casa='${casa_bin}/casa --nologger --log2term --agg'
+#       $ alias casa_python='PYTHONNOUSERSITE=1 ${casa_bin}/python3'
+#       $ alias casa_pip='PYTHONNOUSERSITE=1 ${casa_bin}/pip3 --disable-pip-version-check'
+#
+#####################################################################################################
+
+### PL production dependencies 
+
+wheel                       # required for installing older packages
+csscompressor == 0.9.5      # for minifying CSS files
+cachetools == 5.2.0         # https://pypi.org/project/cachetools
+                            # replaced: pipeline/external/cachetools-3.1.1-py3.6.egg
+mako == 1.2.4               # https://github.com/sqlalchemy/mako
+                            # replaced: pipeline/external/Mako-1.1.0-py3.6.egg
+pypubsub == 4.0.3           # https://pypi.org/project/PyPubSub
+intervaltree == 3.1.0       # https://pypi.org/project/intervaltree
+logutils == 0.3.5           # https://pypi.org/project/logutils
+                            # replaced: pipeline/external/logutils (ver0.3.2)
+ps_mem == 3.14              # https://pypi.org/project/ps-mem
+                            # replaced: pipeline/external/ps_mem.py (ver3.1)
+astropy == 5.2.1            # https://docs.astropy.org/en/stable/changelog.html
+bdsf == 1.10.2              ; sys_platform != "darwin"
+                            # https://github.com/lofar-astron/PyBDSF (.whl not available for macOS)
+                            # only required for the VLASS pipeline.

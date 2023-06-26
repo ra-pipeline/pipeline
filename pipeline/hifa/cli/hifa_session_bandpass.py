@@ -66,7 +66,7 @@ def hifa_session_bandpass(vis=None, caltable=None, field=None, intent=None, spw=
                   computed. Defaults to all science spectral windows.
                   
                   example: spw='11,13,15,17'
-    antenna       
+    antenna       The selection of antennas for which bandpasses are computed. Defaults to all.
     hm_phaseup    The pre-bandpass solution phaseup gain heuristics. The options
                   are 'snr' (compute solution required to achieve the specified SNR),
                   'manual' (use manual solution parameters), and '' (none).

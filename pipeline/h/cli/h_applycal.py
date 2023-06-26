@@ -20,16 +20,7 @@ def h_applycal(vis=None, field=None, intent=None, spw=None, antenna=None, applym
     
     Users can interact with the pipeline calibration state using the tasks
     h_export_calstate and h_import_calstate.
-    
-    Issues
-    
-    There is some discussion about the appropriate values of calwt. Given
-    properly scaled data, the correct value should be the CASA default of True.
-    However at the current time ALMA is suggesting that calwt be set to True for
-    applying observatory calibrations, e.g. antenna positions, WVR, and system
-    temperature corrections, and to False for applying instrument calibrations,
-    e.g. bandpass, gain, and flux.
-    
+
     Output:
     
     results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
@@ -52,19 +43,19 @@ def h_applycal(vis=None, field=None, intent=None, spw=None, antenna=None, applym
                     will be applied. Defaults to all science windows in the pipeline
                     context. Parameter is not available when pipelinemode='automatic'.
                     example: '17', '11, 15'
-    antenna         The list of antennas to which the calibration will be applied.
+    antenna         The selection of antennas to which the calibration will be applied.
                     Defaults to all antennas. Not currently supported.
                     Parameter is not available when pipelinemode='automatic'.
     applymode       Calibration apply mode
-                    ''='calflagstrict': calibrate data and apply flags from solutions using
-                        the strict flagging convention
-                    'trial': report on flags from solutions, dataset entirely unchanged
-                    'flagonly': apply flags from solutions only, data not calibrated
-                    'calonly': calibrate data only, flags from solutions NOT applied
-                    'calflagstrict':
-                    'flagonlystrict': same as above except flag spws for which calibration is
+                    'calflag': calibrate data and apply flags from solutions
+                    'calflagstrict': (default) same as above except flag spws for which calibration is
                         unavailable in one or more tables (instead of allowing them to pass
                         uncalibrated and unflagged)
+                    'trial': report on flags from solutions, dataset entirely unchanged
+                    'flagonly': apply flags from solutions only, data not calibrated
+                    'flagonlystrict': same as above except flag spws for which calibration is
+                        unavailable in one or more tables
+                    'calonly': calibrate data only, flags from solutions NOT applied
     flagbackup      Backup the flags before the apply
     flagsum         Compute before and after flagging summary statistics
     flagdetailedsum Compute detailed before and after flagging statistics summaries.

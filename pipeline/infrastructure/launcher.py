@@ -346,7 +346,10 @@ class Pipeline(object):
         # list all the files in the directory..
         files = [f for f in os.listdir(directory) if f.endswith('.context')]
 
-        # .. and from these matches, create a dict mapping files to their 
+        if len(files) == 0:
+            raise FileNotFoundError(f'No pipeline context exists in {os.path.abspath(directory)}')
+
+        # .. and from these matches, create a dict mapping files to their
         # modification timestamps, ..
         name_n_timestamp = dict([(f, os.stat(directory+f).st_mtime) 
                                  for f in files])

@@ -193,7 +193,7 @@ with open('srdp_examples/example4_hifa_cubeimage_selfcal.json') as f_json, open(
 ### Context-by-Stage
 
 The context content at individual stages can be pickled after the completion of each PL task.
-The [implementation](https://open-bitbucket.nrao.edu/projects/PIPE/repos/pipeline/commits/bf904d167c09c2f7a9e648ce3e30122185887586) is in `infrastructure.basetask` and will only be switched on if the pipeline is in the `DEBUG` (or lower) logging level. This feature works for both PPR and receipereducer runs.
+The [implementation](https://open-bitbucket.nrao.edu/projects/PIPE/repos/pipeline/commits/bf904d167c09c2f7a9e648ce3e30122185887586) is in `infrastructure.basetask` and will only be switched on if the pipeline is in the `DEBUG` (or lower) logging level. This feature works for both PPR and recipereducer runs.
 
 The path of pickled context files is: `output_dir`/`context_name`/`saved_state`/`context-stage*.pickle`, saved along with `result-stage*.pickle` which is always present in the same directory.
 
@@ -228,7 +228,7 @@ The path of pickled context files is: `output_dir`/`context_name`/`saved_state`/
 
   For development/test purposes, one workaround to avoid copying the entire working directory is to create a fresh copy of the context pickled from the "breakpoint" stage (where your loglevel='debug' setting is crucial) in the existing working directory:
 
-  First, you back up the context pickle files from differnet stages:
+  First, you back up the context pickle files from different stages:
 
   ```console
   $ cp -rf pipeline-20210421T172403/saved_state pipeline-20210421T172403/saved_state_backup

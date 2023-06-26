@@ -2,7 +2,7 @@ import os
 import numpy
 import collections
 import abc
-from typing import List, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import pipeline.infrastructure.api as api
 import pipeline.infrastructure as infrastructure
@@ -76,11 +76,14 @@ class BaselineFitParamConfig(api.Heuristic, metaclass=abc.ABCMeta):
     MaxPolynomialOrder = 'none'  # 'none', 0, 1, 2,...
     PolynomialOrder = 'automatic'  # 'automatic', 0, 1, 2, ...
 
-    def __init__(self, switchpoly=True):
+    def __init__(self, switchpoly: bool = True):
+        """
+        Construct BaselineFitParamConfig instance
+        """
         super(BaselineFitParamConfig, self).__init__()
         self.paramdict = {}
         self.heuristics_engine = fitorder.SwitchPolynomialWhenLargeMaskAtEdgeHeuristic()
-        if switchpoly == True:
+        if switchpoly is True:
             self.switching_heuristic = do_switching
         else:
             self.switching_heuristic = no_switching
@@ -208,9 +211,9 @@ class BaselineFitParamConfig(api.Heuristic, metaclass=abc.ABCMeta):
         with open(blparam, 'a') as blparamfileobj:
 
             with casa_tools.TableReader(vis) as tb:
-                for y in range(len(member_list)):
-                    origin_rows = member_list[y][0] # origin_ms row ID
-                    idxs = member_list[y][1] # datatable row ID
+                for y, member in enumerate( member_list ):
+                    origin_rows = member[0] # origin_ms row ID
+                    idxs = member[1] # datatable row ID
                     rows = [rowmap[i] for i in origin_rows] # vis row ID
 
                     spectra = numpy.zeros((len(rows), npol, nchan,), dtype=numpy.float32)
@@ -236,17 +239,29 @@ class BaselineFitParamConfig(api.Heuristic, metaclass=abc.ABCMeta):
 
                     npol = spectra.shape[1]
                     for pol in range(npol):
+                        # MS rows contain npol spectra
+                        if pol == 0:
+                            index_list_total.extend(idxs)
+
                         # fit order determination
-                        polyorder = self.fitorder_heuristic(
+                        averaged_polyorder = self.fitorder_heuristic(
                             spectra[:, pol, :], [list(masklist[i]) + flaglist[i][pol] for i in range(len(idxs))], edge)
                         #del spectra
+
+                        # write dummy baseline parameters and skip the subsequent calculations for fully flagged rows
+                        if averaged_polyorder is None:
+                            for irow in rows:
+                                write_blparam( blparamfileobj, self._dummy_baseline_param( irow, pol ) )
+                            continue
+
+                        # fit order determination (cnt'd)
                         if fit_order == 'automatic' and self.MaxPolynomialOrder != 'none':
-                            polyorder = min(polyorder, self.MaxPolynomialOrder)
+                            averaged_polyorder = min(averaged_polyorder, self.MaxPolynomialOrder)
                         #LOG.debug('time group {} pol {}: fitting order={}'.format(
-                        #            y, pol, polyorder))
+                        #            y, pol, averaged_polyorder))
 
                         # calculate fragmentation
-                        (fragment, nwindow, win_polyorder) = fragmentation_heuristic(polyorder, nchan, edge)
+                        (fragment, nwindow, win_polyorder) = fragmentation_heuristic(averaged_polyorder, nchan, edge)
 
                         nrow = len(rows)
                         if DEBUG() or TRACE():
@@ -280,10 +295,10 @@ class BaselineFitParamConfig(api.Heuristic, metaclass=abc.ABCMeta):
                                 LOG.trace('Masked Region from previous processes = {}'.format(
                                     _masklist))
                                 LOG.trace('edge parameters= {}'.format(edge))
-                                LOG.trace('Polynomial order = {}  Max Polynomial order = {}'.format(polyorder, max_polyorder))
+                                LOG.trace('Polynomial order = {}  Max Polynomial order = {}'.format(averaged_polyorder, max_polyorder))
 
                             # fitting
-                            polyorder = min(polyorder, max_polyorder)
+                            polyorder = min(averaged_polyorder, max_polyorder)
                             mask_array[:] = base_mask_array
                             #LOG.info('mask_array = {}'.format(''.join(map(str, mask_array))))
                             #irow = len(row_list_total)+len(row_list)
@@ -297,10 +312,6 @@ class BaselineFitParamConfig(api.Heuristic, metaclass=abc.ABCMeta):
                             if TRACE():
                                 LOG.trace('Row {}: param={}'.format(row, param))
                             write_blparam(blparamfileobj, param)
-
-                        # MS rows contain npol spectra
-                        if pol == 0:
-                            index_list_total.extend(idxs)
 
         return blparam
 
@@ -337,6 +348,21 @@ class BaselineFitParamConfig(api.Heuristic, metaclass=abc.ABCMeta):
             LOG.trace('outdata={}'.format(outdata))
 
         return outdata
+
+    def _dummy_baseline_param( self, row: int, pol: int ) -> Dict[str, Union[int, float, str]]:
+        """
+        Create a dummy parameter dict for baseline parameters
+
+        This replaces _calc_baseline_param() for fully flagged rows
+
+        Args:
+           row : row number
+           pol : polarization index
+        Returns:
+           dummy parameter dict for baseline parameters
+        """
+        return {'clipniter': 1, 'clipthresh': 5.0,
+                'row': row, 'pol': pol, 'mask': '', 'npiece': 1, 'blfunc': 'poly', 'order': 1}
 
     def __convert_flags_to_masklist(self, flags: 'numpy.ndarray[numpy.ndarray[numpy.int64]]') -> List[List[List[int]]]:
         """

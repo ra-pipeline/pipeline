@@ -50,17 +50,17 @@ def hifv_fixpointing(vis=None, pipelinemode=None, dryrun=None, acceptresults=Non
     --- pipeline task execution modes
     
     dryrun -- Run the commands (True) or generate the commands to be run but
-    do not execute (False).
-    default: True
+                do not execute (False).
+                default: True
     
     acceptresults -- Add the results of the task to the pipeline context (True) or
-    reject them (False).
-    default: True
+                reject them (False).
+                default: True
     
     Output:
     
     results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+                the results object for the pipeline task is returned.
     
     
     Examples

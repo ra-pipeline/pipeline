@@ -609,7 +609,7 @@ class SerialSDATMCorrection(basetask.StandardTaskTemplate):
         # perform atmtype heuristics if atmtype is 'auto'
         # run Harold's script here
         LOG.info('Performing atmtype heuristics')
-        atm_heuristics = 'Default'
+        atm_heuristics = 'Fallback'
         default_model = ATMModelParam(atmtype=1, maxalt=120, dtem_dh=-5.6, h0=2.0)
         # best_model will fall back to default_model if heuristics is failed
         best_model = default_model
@@ -657,6 +657,9 @@ class SerialSDATMCorrection(basetask.StandardTaskTemplate):
             LOG.info(f'ATM heuristics failed. Falling back to default model {default_model}.')
             LOG.info('Original error:')
             LOG.info(str(e))
+            if LOG.isEnabledFor(logging.DEBUG):
+                import traceback
+                LOG.debug(traceback.format_exc())
 
         # construct argument list for sdatmcor
         inputs_local = utils.pickle_copy(self.inputs)

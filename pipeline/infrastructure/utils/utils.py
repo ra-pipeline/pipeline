@@ -768,7 +768,7 @@ def export_weblog_as_tar(context, products_dir, name_builder, dry_run=False):
     tarfilename = name_builder.weblog(project_structure=context.project_structure,
                                       ousstatus_entity_id=context.get_oussid())
     # Save weblog directory to tar archive.
-    LOG.info(f"Saving final weblog in {tarfilename}")
+    LOG.info(f"Saving weblog in {tarfilename}")
     if not dry_run:
         tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
         tar.add(os.path.join(os.path.basename(os.path.dirname(context.report_dir)), 'html'))

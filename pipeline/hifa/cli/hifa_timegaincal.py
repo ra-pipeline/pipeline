@@ -77,7 +77,7 @@ def hifa_timegaincal(vis=None, calamptable=None, calphasetable=None, offsetstabl
                      computed. Defaults to all science spectral windows.
                      
                      example: spw='3C279', spw='3C279, M82'
-    antenna          
+    antenna          The selection of antennas for which gains are computed. Defaults to all.
     calsolint        Time solution interval in CASA syntax for calibrator source
                      solutions.
                      

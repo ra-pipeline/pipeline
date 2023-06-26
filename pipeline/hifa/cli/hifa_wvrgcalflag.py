@@ -112,7 +112,7 @@ def hifa_wvrgcalflag(
     smooth               Smooth WVR data on this timescale before calculating the correction.
                          Ignored unless hm_smooth='manual'.
     scale                Scale the entire phase correction by this factor.
-    maxdistm             tance in meters of an antenna used for interpolation
+    maxdistm             Distance in meters of an antenna used for interpolation
                          from a flagged antenna.
                          
                          default: -1  (automatically set to 100m if >50% of antennas are 7m
