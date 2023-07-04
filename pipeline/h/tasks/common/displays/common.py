@@ -763,13 +763,11 @@ class CaltableWrapperFactory(object):
             flag_col = tb.getvarcol('FLAG')
             row_flag = [flag_col['r%s' % (k + 1)].swapaxes(0, 1).squeeze(2)
                         for k in range(len(flag_col))]
-
-            # there's a bug in numpy.ma which prevents us from creating a
-            # MaskedArray directly. Instead, we need to create a standard array
-            # and subsequently convert to a MaskedArray.
-            std_array = numpy.asarray([numpy.ma.MaskedArray(d, mask=f)
-                                       for (d, f) in zip(row_data, row_flag)])
-            data = numpy.ma.asarray(std_array)
+            
+            # PIPE-1706: explicitly pass dtype=object to create "object" array and allow 
+            # individual elements to have different shapes.
+            data = numpy.asarray([numpy.ma.MaskedArray(d, mask=f)
+                                  for (d, f) in zip(row_data, row_flag)], dtype=object)
 
             return CaltableWrapper(path, data, time_matplotlib, antenna1, spw,
                                    scan)
