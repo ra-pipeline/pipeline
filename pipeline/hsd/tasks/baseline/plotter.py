@@ -20,7 +20,6 @@ from ..common import compress
 from ..common import display
 from ..common.display import DPIDetail, ch_to_freq, sd_polmap
 from ..common import direction_utils as dirutil
-from numpy import int
 
 if TYPE_CHECKING:
     from numbers import Integral
