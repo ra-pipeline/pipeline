@@ -5,7 +5,7 @@ import pipeline.h.cli.utils as utils
 
 def hif_gaincal(vis=None, caltable=None, field=None, intent=None, spw=None, antenna=None, hm_gaintype=None,
                 calmode=None, solint=None, combine=None, refant=None, refantmode=None, solnorm=None, minblperant=None,
-                minsnr=None, smodel=None, splinetime=None, npointaver=None, phasewrap=None, pipelinemode=None,
+                minsnr=None, smodel=None, splinetime=None, npointaver=None, phasewrap=None,
                 dryrun=None, acceptresults=None):
 
     """
@@ -25,8 +25,7 @@ def hif_gaincal(vis=None, caltable=None, field=None, intent=None, spw=None, ante
     
     Output
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -95,13 +94,6 @@ def hif_gaincal(vis=None, caltable=None, field=None, intent=None, spw=None, ante
                   hm_gaintype='gspline'. Keep at default value.
     phasewrap     Wrap the phase for changes larger than this amount (degrees).
                   Used for hm_gaintype='gspline'. Keep at default value.
-    pipelinemode  The pipeline operating mode.
-                  In 'automatic' mode the pipeline determines the values of all
-                  context defined pipeline inputs automatically.
-                  In 'interactive' mode the user can set the pipeline context
-                  defined parameters manually.
-                  In 'getinputs' mode the user can check the settings of all
-                  pipeline parameters without running the task.
     dryrun        Run the task (False) or just display the command (True)
     acceptresults Add the results of the task to the pipeline context (True) or
                   reject them (False).

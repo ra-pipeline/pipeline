@@ -5,7 +5,7 @@ from casatasks import casalog
 import pipeline.h.cli.utils as utils
 
 
-def hifv_importdata(vis=None, session=None, pipelinemode=None, asis=None, overwrite=None, nocopy=None, createmms=None,
+def hifv_importdata(vis=None, session=None, asis=None, overwrite=None, nocopy=None, createmms=None,
                     ocorr_mode=None, datacolumns=None, dryrun=None, acceptresults=None):
 
     """
@@ -24,19 +24,13 @@ def hifv_importdata(vis=None, session=None, pipelinemode=None, asis=None, overwr
                   to a single session containing all the visibility files, otherwise
                   a session must be assigned to each vis file.
                   example: session=['Session_1', 'Sessions_2']
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the pipeline
-                  determines the values of all context defined pipeline inputs
-                  automatically.  In 'interactive' mode the user can set the pipeline
-                  context defined parameters manually.  In 'getinputs' mode the user
-                  can check the settings of all pipeline parameters without running
-                  the task.
-    asis          ASDM to convert as is 
-                  Only can be set in pipelinemode='interactive'
+    asis          Creates verbatim copies of the ASDM tables in the output MS.
+                  The value given to this option must be a list of table names
+                  separated by space characters.
                   examples: 'Receiver CalAtmosphere'
                   'Receiver', ''
-    overwrite     Only can be set in pipelinemode='interactive'
+    overwrite     Overwrite existing files on import.
     nocopy        When importing an MS, disable copying of the MS to the working directory.
-                  Only can be set in pipelinemode='interactive'
     createmms     Create a multi-MeasurementSet ('true') ready for parallel
                   processing, or a standard MeasurementSet ('false'). The default setting
                   ('automatic') creates an MMS if running in a cluster environment.
@@ -82,8 +76,7 @@ def hifv_importdata(vis=None, session=None, pipelinemode=None, asis=None, overwr
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
     
     
     Examples
@@ -104,13 +97,12 @@ def hifv_importdata(vis=None, session=None, pipelinemode=None, asis=None, overwr
     4. Check the hifv_importdata inputs, then import the data
     
     myvislist = ['uid___A002_X30a93d_X43e.ms', 'uid_A002_x30a93d_X44e.ms']
-    hifv_importdata(vis=myvislist, pipelinemode='getinputs')
     hifv_importdata(vis=myvislist)
     
     5. Load an ASDM but check the results before accepting them into the context.
     
     results = hifv_importdata (vis=['uid___A002_X30a93d_X43e.ms'],
-    acceptresults=False)
+                               acceptresults=False)
     results.accept()
     
     6. Run in  dryrun mode before running for real

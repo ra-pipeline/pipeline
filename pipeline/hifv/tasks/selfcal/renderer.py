@@ -1,22 +1,14 @@
-import collections
 import contextlib
-import itertools
-import operator
 import os
 
-import pipeline.domain.measures as measures
-import pipeline.infrastructure
 import pipeline.infrastructure.filenamer as filenamer
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.renderer.weblog as weblog
-import pipeline.infrastructure.utils as utils
 
 from . import display as selfcaldisplay
 
 LOG = logging.get_logger(__name__)
-
-FlagTotal = collections.namedtuple('FlagSummary', 'flagged total')
 
 
 class VLASubPlotRenderer(object):

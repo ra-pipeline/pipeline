@@ -9,8 +9,8 @@ def hif_makeimlist(vis=None, imagename=None, intent=None, field=None,
                    calmaxpix=None, phasecenter=None,
                    nchan=None, start=None, width=None, nbins=None,
                    robust=None, uvtaper=None, clearlist=None, per_eb=None,
-                   calcsb=None, datatype=None, datacolumn=None, parallel=None,
-                   pipelinemode=None, dryrun=None, acceptresults=None):
+                   per_session=None, calcsb=None, datatype=None, datacolumn=None,
+                   parallel=None, dryrun=None, acceptresults=None):
 
     """
     hif_makeimlist ---- Compute list of clean images to be produced
@@ -33,8 +33,7 @@ def hif_makeimlist(vis=None, imagename=None, intent=None, field=None,
 
     Output
 
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise,
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -146,13 +145,6 @@ def hif_makeimlist(vis=None, imagename=None, intent=None, field=None,
     datacolumn    Data column to image. Only to be used for manual overriding
                   when the automatic choice by data type is not appropriate.
     parallel      Use MPI cluster where possible
-    pipelinemode  The pipeline operating mode.
-                  In 'automatic' mode the pipeline determines the values of all
-                  context defined pipeline inputs automatically.
-                  In 'interactive' mode the user can set the pipeline context
-                  defined parameters manually.
-                  In 'getinputs' mode the user can check the settings of all
-                  pipeline parameters without running the task.
     dryrun        Run the task (False) or just display the command (True)
     acceptresults Add the results of the task to the pipeline context (True) or
                   reject them (False).

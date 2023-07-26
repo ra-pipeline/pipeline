@@ -198,15 +198,15 @@ class JsonPlotRenderer(CommonRenderer):
             json_dict_for_plot = {'thumbnail' : thumbnail_relpath}
             # push the most commonly used filter parameters directly into the
             # JSON dictionary to save the extending classes from doing it in
-            # update_json_dict 
+            # update_json_dict
             for param in ('vis', 'session', 'spw', 'scan', 'ant', 'baseband',
                           'field', 'pol'):
                 if param in plot.parameters:
-                    json_dict_for_plot[param] = str(plot.parameters[param])                    
+                    json_dict_for_plot[param] = str(plot.parameters[param])
             self.update_json_dict(json_dict_for_plot, plot)
 
-            # Javascript JSON parser doesn't like Javascript floating point 
-            # constants (NaN, Infinity etc.), so convert them to null. We  
+            # Javascript JSON parser doesn't like Javascript floating point
+            # constants (NaN, Infinity etc.), so convert them to null. We
             # do not omit the dictionary entry so that the plot is hidden
             # by the filters.
             for k, v in json_dict_for_plot.items():

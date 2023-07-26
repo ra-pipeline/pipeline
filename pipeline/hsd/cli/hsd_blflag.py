@@ -14,8 +14,7 @@ def hsd_blflag(iteration=None, edge=None, flag_tsys=None, tsys_thresh=None,
                  flag_pofr=None, pofr_thresh=None,
                  flag_prfrm=None, prfrm_thresh=None, prfrm_nmean=None,
                  flag_pofrm=None, pofrm_thresh=None, pofrm_nmean=None,
-                 plotflag=None,
-                 pipelinemode=None, infiles=None, antenna=None, 
+                 plotflag=None, infiles=None, antenna=None,
                  field=None, spw=None, pol=None,
                  dryrun=None, acceptresults=None, parallel=None):
 
@@ -32,8 +31,7 @@ def hsd_blflag(iteration=None, edge=None, flag_tsys=None, tsys_thresh=None,
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -72,13 +70,6 @@ def hsd_blflag(iteration=None, edge=None, flag_tsys=None, tsys_thresh=None,
                   spectra.
     pofrm_nmean   Number of channels for running mean of post-fit spectra.
     plotflag      True to plot result of data flagging.
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the 
-                  pipeline determines the values of all context defined 
-                  pipeline inputs automatically.  In interactive mode 
-                  the user can set the pipeline context defined parameters 
-                  manually. In 'getinputs' mode  the user can check the 
-                  settings of all pipeline parameters without running 
-                  the task.
     infiles       ASDM or MS files to be processed. This parameter behaves
                   as data selection parameter. The name specified by 
                   infiles must be registered to context before you run

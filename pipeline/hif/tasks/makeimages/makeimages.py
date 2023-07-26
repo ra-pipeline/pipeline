@@ -30,7 +30,7 @@ class MakeImagesInputs(vdp.StandardInputs):
     hm_dogrowprune = vdp.VisDependentProperty(default=None)
     hm_growiterations = vdp.VisDependentProperty(default=-999)
     hm_lownoisethreshold = vdp.VisDependentProperty(default=-999.0)
-    hm_masking = vdp.VisDependentProperty(default='auto')
+    hm_masking = vdp.VisDependentProperty(default=None)
     hm_minbeamfrac = vdp.VisDependentProperty(default=-999.0)
     hm_minpercentchange = vdp.VisDependentProperty(default=-999.0)
     hm_minpsffraction = vdp.VisDependentProperty(default=-999.0)
@@ -258,7 +258,8 @@ class MakeImages(basetask.StandardTaskTemplate):
                            uvtaper=target['uvtaper'],
                            sensitivity=cqa.quantity(result.image_rms, 'Jy/beam'),
                            pbcor_image_min=cqa.quantity(result.image_min, 'Jy/beam'),
-                           pbcor_image_max=cqa.quantity(result.image_max, 'Jy/beam'))
+                           pbcor_image_max=cqa.quantity(result.image_max, 'Jy/beam'),
+                           imagename=result.image.replace('.pbcor', ''))
 
 
 class CleanTaskFactory(object):
@@ -379,12 +380,11 @@ class CleanTaskFactory(object):
             task_args['gridder'] = image_heuristics.gridder(
                     task_args['intent'], task_args['field'])
 
-        if inputs.hm_masking == '':
+        if inputs.hm_masking in (None, ''):
             if 'TARGET' in task_args['intent']:
-                # For the time being the target imaging uses the
-                # inner quarter. Other methods will be made available
-                # later.
                 task_args['hm_masking'] = 'auto'
+            elif 'POLARIZATION' in task_args['intent']:
+                task_args['hm_masking'] = 'centralregion'
             else:
                 task_args['hm_masking'] = 'auto'
         else:

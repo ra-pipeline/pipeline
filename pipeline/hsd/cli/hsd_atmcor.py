@@ -3,7 +3,7 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
-def hsd_atmcor(atmtype=None, dtem_dh=None, h0=None, pipelinemode=None,
+def hsd_atmcor(atmtype=None, dtem_dh=None, h0=None,
                infiles=None, antenna=None, field=None, spw=None, pol=None,
                dryrun=None, acceptresults=None, parallel=None):
 
@@ -47,13 +47,6 @@ def hsd_atmcor(atmtype=None, dtem_dh=None, h0=None, pipelinemode=None,
                   choose best model from the provided value.
                   
                   Default: '' (tool default, 2.0km, is used)
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the
-                  pipeline determines the values of all context defined
-                  pipeline inputs automatically.  In interactive mode
-                  the user can set the pipeline context defined parameters
-                  manually. In 'getinputs' mode  the user can check the
-                  settings of all pipeline parameters without running
-                  the task.
     infiles       ASDM or MS files to be processed. This parameter behaves
                   as data selection parameter. The name specified by
                   infiles must be registered to context before you run

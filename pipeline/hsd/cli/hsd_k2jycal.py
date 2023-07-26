@@ -3,7 +3,7 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
-def hsd_k2jycal(dbservice=None, endpoint=None, reffile=None, pipelinemode=None,
+def hsd_k2jycal(dbservice=None, endpoint=None, reffile=None,
                 infiles=None, caltable=None, dryrun=None, acceptresults=None):
 
     """
@@ -12,8 +12,7 @@ def hsd_k2jycal(dbservice=None, endpoint=None, reffile=None, pipelinemode=None,
     
     Derive the Kelvin to Jy calibration for list of MeasurementSets.
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -54,7 +53,7 @@ def hsd_k2jycal(dbservice=None, endpoint=None, reffile=None, pipelinemode=None,
                       2,2011-11-13 01:45:00,2011-11-13 02:15:00,ANONYMOUS,86243.0,500.0,I,90.0
                       2,2011-11-13 01:45:00,2011-11-13 02:15:00,ANONYMOUS,86243.0,1000.0,I,110.0
                   
-                  The line starting with '#' indicates a meta data section and header.
+                  Lines starting with '#' are meta data and header.
                   The header must exist. The factor to apply is identified by matching the
                   session ID, antenna name, frequency and polarization of data in each line of
                   the file. Note the observation date is supplementary information and not used
@@ -67,11 +66,6 @@ def hsd_k2jycal(dbservice=None, endpoint=None, reffile=None, pipelinemode=None,
                   are set to 1.0.
                   
                   example: reffile='', reffile='working/jyperk.csv'
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the pipeline
-                  determines the values of all context defined pipeline inputs automatically.
-                  In interactive mode the user can set the pipeline context defined
-                  parameters manually. In 'getinputs' mode the user can check the settings of
-                  all pipeline parameters without running the task.
     infiles       List of input MeasurementSets.
                   
                   example: vis='ngc5921.ms'

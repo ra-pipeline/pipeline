@@ -7,6 +7,7 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
+import pipeline.infrastructure.sessionutils as sessionutils
 from pipeline.domain import DataType
 from pipeline.hif.heuristics import imageparams_factory
 from pipeline.infrastructure import casa_tools
@@ -34,6 +35,7 @@ class MakeImListInputs(vdp.StandardInputs):
     width = vdp.VisDependentProperty(default='')
     clearlist = vdp.VisDependentProperty(default=True)
     per_eb = vdp.VisDependentProperty(default=False)
+    per_session = vdp.VisDependentProperty(default=False)
     calcsb = vdp.VisDependentProperty(default=False)
     datatype = vdp.VisDependentProperty(default='')
     datacolumn = vdp.VisDependentProperty(default='')
@@ -54,6 +56,15 @@ class MakeImListInputs(vdp.StandardInputs):
         if 'TARGET' in self.intent and 'field' in self.context.size_mitigation_parameters:
             return self.context.size_mitigation_parameters['field']
         return ''
+
+    @field.convert
+    def field(self, val):
+        if not isinstance(val, (str, type(None))):
+            # PIPE-1881: allow field names that mistakenly get casted into non-string datatype by
+            # recipereducer (recipereducer.string_to_val) and executeppr (XmlObjectifier.castType)
+            LOG.warning('The field selection input %r is not a string and will be converted.', val)
+            val = str(val)
+        return val
 
     @vdp.VisDependentProperty
     def hm_cell(self):
@@ -170,7 +181,7 @@ class MakeImListInputs(vdp.StandardInputs):
     def __init__(self, context, output_dir=None, vis=None, imagename=None, intent=None, field=None, spw=None,
                  contfile=None, linesfile=None, uvrange=None, specmode=None, outframe=None, hm_imsize=None,
                  hm_cell=None, calmaxpix=None, phasecenter=None, nchan=None, start=None, width=None, nbins=None,
-                 robust=None, uvtaper=None, clearlist=None, per_eb=None, calcsb=None, datatype=None,
+                 robust=None, uvtaper=None, clearlist=None, per_eb=None, per_session=None, calcsb=None, datatype=None,
                  datacolumn=None, parallel=None, known_synthesized_beams=None, scal=False):
         self.context = context
         self.output_dir = output_dir
@@ -197,6 +208,7 @@ class MakeImListInputs(vdp.StandardInputs):
         self.uvtaper = uvtaper
         self.clearlist = clearlist
         self.per_eb = per_eb
+        self.per_session = per_session
         self.calcsb = calcsb
         self.datatype = datatype
         self.datacolumn = datacolumn
@@ -608,8 +620,17 @@ class MakeImList(basetask.StandardTaskTemplate):
             spw = '[]'
             spwlist = []
 
+        if inputs.per_eb and inputs.per_session:
+            msg = '"per_eb" and "per_session" are mutually exclusive'
+            LOG.error(msg)
+            result.error = True
+            result.error_msg = msg
+            return result
+
         if inputs.per_eb:
             vislists = [[vis] for vis in inputs.vis]
+        elif inputs.per_session:
+            vislists = list(sessionutils.group_vislist_into_sessions(inputs.context, inputs.vis).values())
         else:
             vislists = [inputs.vis]
 
@@ -637,6 +658,8 @@ class MakeImList(basetask.StandardTaskTemplate):
                 for vislist in vislists:
                     if inputs.per_eb:
                         imagename_prefix = os.path.basename(vislist[0]).strip('.ms')
+                    elif inputs.per_session:
+                        imagename_prefix = inputs.context.observing_run.get_ms(vislist[0]).session
                     else:
                         imagename_prefix = inputs.context.project_structure.ousstatus_entity_id
 
@@ -898,7 +921,6 @@ class MakeImList(basetask.StandardTaskTemplate):
                     if phasecenter == '':
                         for field_intent in field_intent_list:
                             try:
-                                gridder = self.heuristics.gridder(field_intent[1], field_intent[0])
                                 field_ids = self.heuristics.field(field_intent[1], field_intent[0], vislist=vislist_field_spw_combinations[field_intent[0]]['vislist'])
                                 phasecenters[field_intent[0]] = self.heuristics.phasecenter(field_ids, vislist=vislist_field_spw_combinations[field_intent[0]]['vislist'])
                             except Exception as e:
@@ -933,7 +955,6 @@ class MakeImList(basetask.StandardTaskTemplate):
                             for spwspec in min_freq_spwlist:
 
                                 try:
-                                    gridder = self.heuristics.gridder(field_intent[1], field_intent[0])
                                     field_ids = self.heuristics.field(field_intent[1], field_intent[0], vislist=vislist_field_spw_combinations[field_intent[0]]['vislist'])
                                     # Image size (FOV) may be determined depending on the fractional bandwidth of the
                                     # selected spectral windows. In continuum spectral mode pass the spw list string
@@ -942,7 +963,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                                     himsize = self.heuristics.imsize(
                                         fields=field_ids, cell=cells[spwspec], primary_beam=largest_primary_beams[spwspec],
                                         sfpblimit=sfpblimit, centreonly=False, vislist=vislist_field_spw_combinations[field_intent[0]]['vislist'],
-                                        spwspec=imsize_spwlist)
+                                        spwspec=imsize_spwlist, intent=field_intent[1])
                                     if field_intent[1] in [
                                             'PHASE',
                                             'BANDPASS',
@@ -1202,6 +1223,9 @@ class MakeImList(basetask.StandardTaskTemplate):
                             else:
                                 nbin = -1
 
+                            # Get stokes value
+                            stokes = self.heuristics.stokes(field_intent[1])
+
                             if spwspec_ok and (field_intent[0], spwspec) in imsizes and ('invalid' not in cells[spwspec]):
                                 LOG.debug(
                                   'field:%s intent:%s spw:%s cell:%s imsize:%s phasecenter:%s' %
@@ -1245,7 +1269,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                                     imsize=imsizes[(field_intent[0], spwspec)],
                                     phasecenter=phasecenters[field_intent[0]],
                                     specmode=inputs.specmode,
-                                    gridder=target_heuristics.gridder(field_intent[1], field_intent[0]),
+                                    gridder=target_heuristics.gridder(field_intent[1], field_intent[0], spwspec=spwspec),
                                     imagename=imagename,
                                     start=inputs.start,
                                     width=widths[(field_intent[0], spwspec)],
@@ -1255,7 +1279,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                                     uvrange=uvrange[(field_intent[0], spwspec)],
                                     bl_ratio=bl_ratio[(field_intent[0], spwspec)],
                                     uvtaper=uvtaper,
-                                    stokes='I',
+                                    stokes=stokes,
                                     heuristics=target_heuristics,
                                     vis=filtered_vislist,
                                     datacolumn=datacolumn,

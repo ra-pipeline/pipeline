@@ -24,13 +24,6 @@ You are expected to have the _targets.ms and cont.data as input.
     </ProcessingCommand>
     <!-- end of import MS-->
 
-
-    <ProcessingCommand>
-        <Command xmlns="">hif_uvcontfit</Command>
-        <ParameterSet>
-        </ParameterSet>
-    </ProcessingCommand>
-
     <ProcessingCommand>
         <Command xmlns="">hif_uvcontsub</Command>
         <ParameterSet>

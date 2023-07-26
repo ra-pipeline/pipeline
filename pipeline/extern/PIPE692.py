@@ -109,9 +109,7 @@ class SSFanalysis(object):
         # run my function to check if the data are ACA or not (maybe in Context? but this is an easy check)
         self.PMinACA = self.pmInACA()
  
-        # run my converted function from Todd's aU.cycletime
-        self.cycletime = self.getcycletime()
-
+            
         # for BP scan only values from function for given scan/field/spw only
         # this is keyed by blname, e.g.  self.baselines['DA42-DA42'] 
         self.baselines=self.getbaselinesproj()
@@ -123,6 +121,13 @@ class SSFanalysis(object):
         self.totaltime = alltime[-1]
         self.difftime = np.median(np.diff(alltime))        
 
+        # PIPE-1848 related - reorder to here - getcycletime will use a lookup if there is 1 or less phase cal scans
+        # run my converted function from Todd's aU.cycletime
+        self.cycletime = self.getcycletime() 
+
+        
+
+        
         # set holder for outlier antennas related to plotting and scores later
         self.antout = []
 
@@ -680,7 +685,8 @@ class SSFanalysis(object):
         i.e. ignoring the duration of the phasecal scan, the ATM cal scans, the 
         checksource, and all the slewing and overhead.
         -Todd Hunter ORIG in analysis Utils (cycleTime)
-        - LM edited for this code
+        - LM edited for this code -
+        - PIPE-1848 diverts to a lookup table if cycle time is not found
 
         input used:
                 self.visUse
@@ -690,17 +696,127 @@ class SSFanalysis(object):
 
         mymsmd.open(self.visUse)
         scans = mymsmd.scansforintent('*PHASE*')
+
+        # PIPE-1848 related - if there is no phase calibrator we cannot get cycle time either
+        if len(scans) == 0:
+            # No phase calibrator in the data
+            LOG.warning("Using lookup Cycle Time as there is no PHASE intent in "+str(self.visUse))
+            usecycle = self.lookupcycle()
+            return usecycle
+
+        # PIPE-1848
+        # changed as before tired to get times even for one scan, but it is pointless
+        # already use the lookup 
+        if len(scans) == 1:
+            # OLD
+            #print("There was only 1 scan with this intent.")
+            #LOG.warning("There was only 1 scan with this intent.")
+            #return # possible error return ? or default as none
+            LOG.warning("Using lookup Cycle Time as there is only 1 PHASE calibrator scan for "+str(self.visUse))
+            usecycle = self.lookupcycle()
+            return usecycle
+
+        # all correectly formed data should go here
+        # now get the times for the scans and work out the cycle time 
         times = []
         for scan in scans:
             times.append(np.min(mymsmd.timesforscan(scan)))
         mymsmd.close()
-        if len(times) == 1:
-            #print("There was only 1 scan with this intent.")
-            LOG.warning("There was only 1 scan with this intent.")
-            return # possible error return ? or default as none
+
+            
         diffs = np.diff(times)
         return np.median(diffs)
 
+    
+    def lookupcycle(self):
+        """ Code to lookup the nearest default cycle time 
+        as using best practices for Baseline length and 
+        the frequency band - this is ONLY needed when the 
+        returned cycle time is None - which would only happen
+        for malformed data with only one PHASE cal scan,
+        that ultimately should not be coming to PIPELINE at all
+        PIPE-1848
+
+        """
+        if self.PMinACA:
+            config=0
+        else:
+            config = self.getconfig()  # as configs run 1 to 10, 0 is ACA 
+
+        bandu = self.getband()  # this gets freq then band - run 1 to 10
+
+        # just a big list of lists for cycle times these are for Cycle 10
+        # BAND 1 is missing, I do not know these
+        # [config][band]
+        # band index 0 doesnt exist padded with 999
+        cycletimes = [[999,999,999,660,660,480,540,480,480,360,360],  
+                      [999,999,999,630,630,450,510,390,390,270,270],  
+                      [999,999,999,630,630,450,510,390,390,270,270],  
+                      [999,999,999,630,630,450,510,270,270,210,210],  
+                      [999,999,999,630,630,450,510,270,270,210,210],  
+                      [999,999,999,390,390,270,210,130,130,130,130],  
+                      [999,999,999,390,390,270,210,130,130,130,130],  
+                      [999,999,999,80,80,80,80,80,80,80,80],  
+                      [999,999,999,80,80,80,80,80,65,58,45],   
+                      [999,999,999,80,80,80,80,80,65,58,45],  
+                      [999,999,999,80,80,80,80,80,65,58,45]]  
+
+        cycletime = float(cycletimes[config][bandu])
+ 
+        return cycletime
+    
+
+    def getfreq(self):
+        """ wrap in a function here as we open msmd
+        return is in Hz used for getting the band
+
+        PIPE-1848
+        """
+
+        # note to Dev. probably can get this from context?
+        mymsmd.open(self.visUse)
+        freqval = np.median(mymsmd.chanfreqs(self.spwUse)) # otherwise all channels 
+        mymsmd.close()
+
+        return freqval
+    
+    def getband(self):
+        ''' Identify the Band for specific frequency (in GHz)
+        PIPE-1848
+
+        '''
+
+        freq = self.getfreq()
+        # Note to Dev. maybe already in the context 
+        
+        lo=np.array([35,67,84,125,157,211,275,385,602,787])*1e9
+        hi=np.array([51,85,116,163,212,275,373,500,720,950])*1e9
+        # Set Band 2 to stop at current B3
+
+        bandsel = np.arange(1,len(lo)+1)[(freq>lo)&(freq<hi)][0]
+
+        return bandsel
+
+
+    def getconfig(self):
+        ''' Identify the configuration based on 
+        baseline length - returns as an int to 
+        allow a table search for cycle time
+        PIPE-1848
+        '''
+
+        # self.baselines is a dict, rule is max on a dict returns a
+        # key for the max so this is max baseline to use 
+        maxbl = self.baselines[max(self.baselines)]
+        shortbl=np.array([0,44,160,313,499,783,1399,2499,3599,8499,13899])
+        longbl=np.array([45,161,314,500,784,1400,2500,3600,8500,13900,20000]) # upper limit greater than baseline len 
+     
+        
+        config = np.arange(0,len(longbl))[(maxbl>shortbl)&(maxbl<longbl)][0]
+
+        return config
+    
+    
 
     def getbaselinesproj(self, fieldin=None):
         ''' Code to get the projected baseline from the openend 

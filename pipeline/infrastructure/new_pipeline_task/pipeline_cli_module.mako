@@ -5,7 +5,7 @@ from casatasks import casalog
 import pipeline.h.cli.utils as utils
 
 
-def ${package}_${taskname.lower()}(vis=None, pipelinemode=None, dryrun=None, acceptresults=None):
+def ${package}_${taskname.lower()}(vis=None, dryrun=None, acceptresults=None):
 
     ##########################################################################
     #                                                                        #

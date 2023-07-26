@@ -8,7 +8,7 @@ import pipeline.h.cli.utils as utils
 def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, hm_spwmapmode=None, maxnarrowbw=None,
                     minfracmaxbw=None, samebb=None, phasesnr=None, bwedgefrac=None, hm_nantennas=None,
                     maxfracflagged=None, combine=None, refant=None, minblperant=None, minsnr=None,
-                    unregister_existing=None, pipelinemode=None, dryrun=None, acceptresults=None):
+                    unregister_existing=None, dryrun=None, acceptresults=None):
 
     """
     hifa_spwphaseup ---- Compute phase calibration spw map and per spw phase offsets
@@ -81,8 +81,7 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
     
     Output
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -160,11 +159,6 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
     minsnr              Solutions below this SNR are rejected.
     unregister_existing Unregister previous spwphaseup calibrations from the pipeline context
                         before registering the new calibrations from this task.
-    pipelinemode        The pipeline operating mode. In 'automatic' mode the pipeline
-                        determines the values of all context defined pipeline inputs automatically.
-                        In interactive mode the user can set the pipeline context defined
-                        parameters manually.  In 'getinputs' mode the user can check the settings
-                        of all pipeline parameters without running the task.
     dryrun              Run the commands (True) or generate the commands to be run but
                         do not execute (False).
     acceptresults       Add the results of the task to the pipeline context (True) or

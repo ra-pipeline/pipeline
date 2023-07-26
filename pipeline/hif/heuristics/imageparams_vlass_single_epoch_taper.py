@@ -28,7 +28,7 @@ class ImageParamsHeuristicsVlassSeTaper(ImageParamsHeuristics):
         """Tclean niter parameter heuristics."""
         return self.niter_correction(None, None, None, None, None, None)
 
-    def deconvolver(self, specmode, spwspec) -> str:
+    def deconvolver(self, specmode, spwspec, intent: str = '') -> str:
         """Tclean deconvolver parameter heuristics."""
         return 'mtmfs'
 
@@ -45,7 +45,7 @@ class ImageParamsHeuristicsVlassSeTaper(ImageParamsHeuristics):
         return ['1.8arcsec']
 
     def imsize(self, fields=None, cell=None, primary_beam=None, sfpblimit=None, max_pixels=None, centreonly=None,
-               vislist=None, spwspec=None) -> Union[list, int]:
+               vislist=None, spwspec=None, intent: str = '') -> Union[list, int]:
         """Tclean imsize parameter heuristics."""
         return [4050, 4050]
 
@@ -92,7 +92,7 @@ class ImageParamsHeuristicsVlassSeTaper(ImageParamsHeuristics):
         """Tclean nterms parameter heuristics."""
         return 2
 
-    def stokes(self) -> str:
+    def stokes(self, intent: str = '') -> str:
         """Tclean stokes parameter heuristics."""
         return 'I'
 

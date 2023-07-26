@@ -6,7 +6,7 @@ import pipeline.h.cli.utils as utils
 def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, antenna=None, hm_phaseup=None,
                   phaseupsolint=None, phaseupbw=None, phaseupsnr=None, phaseupnsols=None, hm_bandpass=None, solint=None,
                   maxchannels=None, evenbpints=None, bpsnr=None, minbpsnr=None, bpnsols=None, combine=None, refant=None,
-                  solnorm=None, minblperant=None, minsnr=None, unregister_existing=None, pipelinemode=None, dryrun=None, 
+                  solnorm=None, minblperant=None, minsnr=None, unregister_existing=None, dryrun=None,
                   acceptresults=None, fillgaps=None):
 
     """
@@ -20,8 +20,7 @@ def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, an
     The hif_refant task may be used to pre-compute a prioritized list of
     reference antennas.
     
-    If pipeline mode is 'getinputs' then None is returned. Otherwise,
-    the results object for the pipeline task is returned.
+    The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -74,19 +73,19 @@ def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, an
                         Example: phaseupnsols=4
     hm_bandpass         The bandpass solution heuristics. The options are:
                         'snr': compute the solution required to achieve the specified SNR
-                        'smoothed': simple smoothing heuristics
+                        'smoothed': simple 'smoothing' i.e. spectral solint>1chan
                         'fixed': use the user defined parameters for all spws
     solint              Time and channel solution intervals in CASA syntax.
                         
                         Default is solint='inf', which is used when hm_bandpass='fixed'.
                         If hm_bandpass is set to 'snr', then the task will attempt to compute and use
                         an optimal SNR-based solint (and warn if this solint is not good enough).
-                        If hm_bandpass is set to 'smoothed', the task will use a smoothed solint.
-    maxchannels         The bandpass solution smoothing factor in channels. The
-                        solution interval is bandwidth / 240. Set to 0 for no smoothing.
+                        If hm_bandpass is set to 'smoothed', the task will override the spectral
+                        solint with bandwidth/maxchannels.
+    maxchannels         The bandpass solution 'smoothing' factor in channels, i.e. spectral
+                        solint will be set to bandwidth/maxchannels
+                        Set to 0 for no smoothing.
                         Used if hm_bandpass='smoothed'.
-                        
-                        Example: maxchannels=0
     evenbpints          Force the per spw frequency solint to be evenly divisible
                         into the spw bandpass if hm_bandpass='snr'.
                         
@@ -117,17 +116,12 @@ def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, an
     minsnr              Solutions below this SNR are rejected in the phaseup and bandpass solves
     unregister_existing Unregister all bandpass calibrations from the pipeline context
                         before registering the new bandpass calibrations from this task.
-    pipelinemode        The pipeline operating mode. In 'automatic' mode the pipeline
-                        determines the values of all context defined pipeline inputs automatically.
-                        In interactive mode the user can set the pipeline context defined parameters
-                        manually. In 'getinputs' mode the user can check the settings of
-                        all pipeline parameters without running the task.
     dryrun              Run the commands (True) or generate the commands to be run but
                         do not execute (False).
     acceptresults       Automatically accept the results of the task into the pipeline context (True)
                         or reject them (False).
 
-    fillgaps            Fill flagged solution channels by interpolation. 
+    fillgaps            Fill flagged solution channels by interpolation.
                         Example: fillgaps = 10
 
     --------- examples -----------------------------------------------------------

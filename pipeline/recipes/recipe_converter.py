@@ -41,7 +41,7 @@ IMPORT_ONLY = 'Import only'
 
 
 # Run the procedure
-def ${func_name}(vislist, importonly=False, pipelinemode='automatic', interactive=True):
+def ${func_name}(vislist, importonly=False, interactive=True):
     echo_to_screen = interactive
     casa_tools.post_to_log("Beginning pipeline run ...")
 
@@ -372,7 +372,6 @@ def get_execution_command(task_name: str, config: dict) -> str:
     # param_types = get_parameter_types(task_name)
     param_types = config['parameter_types']
 
-    args = 'pipelinemode=pipelinemode'
     if parameter:
         def construct_arg(key, value):
             # default value type is string
@@ -386,8 +385,7 @@ def get_execution_command(task_name: str, config: dict) -> str:
                 arg = f'{key}={value}'
             return arg
 
-        custom_args = ', '.join([construct_arg(k, v) for k, v in parameter.items()])
-        args = f'{custom_args}, {args}'
+        args = ', '.join([construct_arg(k, v) for k, v in parameter.items()])
 
     # special handling for importdata task
     is_importdata = 'importdata' in task_name
@@ -420,12 +418,12 @@ def c2p(command: dict) -> str:
         The string will look like the following:
 
             # task shortdescription taken from the task xml file
-            taskname(pipelinemode=pipelinemode)
+            taskname()
 
         or, if parameters are customized in the procedure xml file,
 
             # task shortdescription taken from the task xml file
-            taskname(custom_param=custom_value, pipelinemode=pipelinemode)
+            taskname(custom_param=custom_value)
 
         Note that there will be some additional code for importdata stage.
     """

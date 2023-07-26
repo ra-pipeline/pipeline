@@ -7,7 +7,7 @@ import pipeline.h.cli.utils as utils
 
 def hifa_renorm(vis=None, apply=None, threshold=None, correctATM=None, spw=None,
                 excludechan=None, atm_auto_exclude=None, bwthreshspw=None,
-                pipelinemode=None, dryrun=None, acceptresults=None):
+                dryrun=None, acceptresults=None):
 
     """
     hifa_renorm ---- Base renorm task
@@ -22,6 +22,7 @@ def hifa_renorm(vis=None, apply=None, threshold=None, correctATM=None, spw=None,
                      for any ATM residual features that get into the scaling spectra
     spw              The list of spectral windows to evaluate. Set to spw='' by default,
                      which means the task will select all relevant (science FDM) spectral windows.
+                     
                      Example: spw="11,13,15,17"
     excludechan      Channels to exclude in either channel or frequency space (TOPO, GHz)
                      Examples: excludechan={'22':'100~150;800~850', '24':'100~200'}
@@ -33,7 +34,6 @@ def hifa_renorm(vis=None, apply=None, threshold=None, correctATM=None, spw=None,
                      to override it for specific SPWs, due to needing potentially various
                      'nsegments' when EBs have very different SPW bandwidths.
                      Example:  bwthreshspw={'16: 64e6, '22: 64e6}
-    pipelinemode     The pipeline operating mode
     dryrun           Run the task (False) or display task command (True)
     acceptresults    Add the results into the pipeline context
     [1;42mRETURNS[1;m             void

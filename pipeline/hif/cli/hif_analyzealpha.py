@@ -4,15 +4,14 @@ import pipeline.h.cli.utils as utils
 
 
 def hif_analyzealpha(vis=None, image=None, alphafile=None, alphaerrorfile=None,
-                     pipelinemode=None, dryrun=None, acceptresults=None):
+                     dryrun=None, acceptresults=None):
 
     """
     hif_analyzealpha ---- Extract spectral index from intensity peak in VLA/VLASS images
 
     Extract spectral index from intensity peak in VLA/VLASS images
     
-    If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -23,12 +22,6 @@ def hif_analyzealpha(vis=None, image=None, alphafile=None, alphaerrorfile=None,
     image          Restored subimage
     alphafile      Input spectral index map
     alphaerrorfile Input spectral index error map
-    pipelinemode   The pipeline operating mode. In 'automatic' mode the pipeline
-                   determines the values of all context defined pipeline inputs
-                   automatically.  In 'interactive' mode the user can set the pipeline
-                   context defined parameters manually.  In 'getinputs' mode the user
-                   can check the settings of all pipeline parameters without running
-                   the task.
     dryrun         Run the task (False) or display task command (True)
     acceptresults  Add the results into the pipeline context
 

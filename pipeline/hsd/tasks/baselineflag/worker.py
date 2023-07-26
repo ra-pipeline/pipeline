@@ -518,7 +518,7 @@ class SDBLFlagWorker(basetask.StandardTaskTemplate):
                             RmaskNew = numpy.zeros(NCHAN, int)
                             RdataNew0 = numpy.zeros(NCHAN, numpy.float64)
                             NR = 0
-                            for _x in range(1, min(Nmean + 1, valid_nrow)):
+                            for _x in range(1, valid_nrow):
                                 x = valid_indices[_x]
                                 NR += 1
                                 RdataOld0 += SpIn[ip, x]
@@ -530,6 +530,11 @@ class SDBLFlagWorker(basetask.StandardTaskTemplate):
                                 mask0 = self._get_mask_array(masklist, (edgeL, edgeR), FlOut[ip, x],
                                                              deviation_mask=deviation_mask) if is_baselined else numpy.zeros(NCHAN, dtype=numpy.int64)
                                 RmaskNew += mask0
+
+                                if NR >= Nmean:
+                                    # accumulated enough number of spectra
+                                    break
+
                         elif START > (valid_nrow - Nmean):
                             NR -= 1
                             RdataOld0 -= SpIn[ip, index]
@@ -586,19 +591,28 @@ class SDBLFlagWorker(basetask.StandardTaskTemplate):
                                                          deviation_mask=deviation_mask) if is_baselined else numpy.zeros(NCHAN, dtype=numpy.int64)
                             LmaskNew -= mask0
 
-                        diffOld0 = (LdataOld0 + RdataOld0) / float(NL + NR) - SpIn[ip, index]
-                        diffNew0 = (LdataNew0 + RdataNew0) / float(NL + NR) - SpOut[ip, index]
+                        if NL == 0 and NR == 0:
+                            # current spectrum is valid but no other valid specrtra in this group
+                            # which typically represents single raster row
+                            OldRMSdiff = INVALID_STAT
+                            NewRMSdiff = INVALID_STAT
+                            stats[3] = NewRMSdiff
+                            stats[4] = OldRMSdiff
+                            Nmask = NCHAN
+                        else:
+                            diffOld0 = (LdataOld0 + RdataOld0) / float(NL + NR) - SpIn[ip, index]
+                            diffNew0 = (LdataNew0 + RdataNew0) / float(NL + NR) - SpOut[ip, index]
 
-                        # Calculate Standard Deviation (NOT RMS)
-                        mask0 = (RmaskOld + LmaskOld + mask_in) // (NL + NR + 1)
-                        OldRMSdiff, Nmask = self._calculate_masked_stddev(diffOld0, mask0)
-                        stats[4] = OldRMSdiff
+                            # Calculate Standard Deviation (NOT RMS)
+                            mask0 = (RmaskOld + LmaskOld + mask_in) // (NL + NR + 1)
+                            OldRMSdiff, Nmask = self._calculate_masked_stddev(diffOld0, mask0)
+                            stats[4] = OldRMSdiff
 
-                        NewRMSdiff = -1
-                        if is_baselined:
-                            mask0 = (RmaskNew + LmaskNew + mask_out) // (NL + NR + 1)
-                            NewRMSdiff, Nmask = self._calculate_masked_stddev(diffNew0, mask0)
-                        stats[3] = NewRMSdiff
+                            NewRMSdiff = -1
+                            if is_baselined:
+                                mask0 = (RmaskNew + LmaskNew + mask_out) // (NL + NR + 1)
+                                NewRMSdiff, Nmask = self._calculate_masked_stddev(diffNew0, mask0)
+                            stats[3] = NewRMSdiff
                     else:
                         # invalid data
                         OldRMSdiff = INVALID_STAT

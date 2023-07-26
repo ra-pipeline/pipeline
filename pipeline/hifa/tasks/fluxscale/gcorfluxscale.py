@@ -5,7 +5,6 @@ import uuid
 from functools import reduce
 from typing import List, Set, Tuple, Union
 
-import numpy as np
 import scipy.stats as stats
 
 import pipeline.domain as domain
@@ -14,12 +13,10 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.sessionutils as sessionutils
-import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import FluxMeasurement
 from pipeline.domain import MeasurementSet
-from pipeline.h.tasks.common import commonfluxresults
-from pipeline.h.tasks.common import commonhelpermethods
+from pipeline.h.tasks.common import commonfluxresults, mstools
 from pipeline.hif.tasks import applycal
 from pipeline.hif.tasks import gaincal
 from pipeline.hif.tasks.fluxscale import fluxscale
@@ -229,91 +226,6 @@ class GcorFluxscale(basetask.StandardTaskTemplate):
         if not fieldids.issuperset(transfer_fieldids):
             LOG.warning('%s does not contain results for all transfer calibrators' % os.path.basename(caltable))
 
-    def _compute_calvis_flux(self, fieldid, spwid):
-
-        # Read in data from the MS, for specified field, spw, and all transfer
-        # intents.
-        data = self._read_data_from_ms(self.inputs.ms, fieldid, spwid, self.inputs.transintent)
-
-        # Return if no valid data were read.
-        if not data:
-            return
-
-        # Get number of correlations for this spw.
-        corr_type = commonhelpermethods.get_corr_products(self.inputs.ms, int(spwid))
-        ncorrs = len(corr_type)
-
-        # Select which correlations to consider for computing the mean
-        # visibility flux:
-        #  - for single and dual pol, consider all correlations.
-        #  - for ncorr == 4 with linear correlation products (XX, XY, etc)
-        #    select the XX and YY columns.
-        #  - for other values of ncorrs, or e.g. circular correlation (LL, RL)
-        #    raise a warning that these are not handled.
-        if ncorrs in [1, 2]:
-            columns_to_select = range(ncorrs)
-        elif ncorrs == 4 and set(corr_type) == {'XX', 'XY', 'YX', 'YY'}:
-            columns_to_select = [corr_type.index('XX'), corr_type.index('YY')]
-        else:
-            LOG.warning("Unexpected polarisations found for MS {}, unable to compute mean visibility fluxes."
-                        "".format(self.inputs.ms.basename))
-            columns_to_select = []
-
-        # Derive mean flux and variance for each polarisation.
-        mean_fluxes = []
-        variances = []
-        for col in columns_to_select:
-            # Select data for current polarisation.
-            ampdata = np.squeeze(data['corrected_data'], axis=1)[col]
-            flagdata = np.squeeze(data['flag'], axis=1)[col]
-            weightdata = data['weight'][col]
-
-            # Select for non-flagged data and non-NaN data.
-            id_nonbad = np.where(np.logical_and(np.logical_not(flagdata), np.isfinite(ampdata)))
-            amplitudes = ampdata[id_nonbad]
-            weights = weightdata[id_nonbad]
-
-            # If no valid data are available, skip to the next polarisation.
-            if len(amplitudes) == 0:
-                continue
-
-            # Determine number of non-flagged antennas, baselines, and
-            # integrations.
-            ant1 = data['antenna1'][id_nonbad]
-            ant2 = data['antenna2'][id_nonbad]
-            n_ants = len(set(ant1) | set(ant2))
-            n_baselines = n_ants * (n_ants - 1) // 2
-            n_ints = len(amplitudes) // n_baselines
-
-            # PIPE-644: Determine scale factor for variance.
-            var_scale = np.mean([len(amplitudes), n_ints * n_ants])
-
-            # Compute mean flux and stdev for current polarisation.
-            mean_flux = np.abs(np.average(amplitudes, weights=weights))
-            variance = np.average((np.abs(amplitudes) - mean_flux)**2, weights=weights) / var_scale
-
-            # Store for this polarisation.
-            mean_fluxes.append(mean_flux)
-            variances.append(variance)
-
-        # Compute mean flux and mean stdev for all polarisations.
-        if mean_fluxes:
-            mean_flux = np.mean(mean_fluxes)
-            mean_std = np.sqrt(np.mean(variances))
-        # If no valid data was found for any polarisation, then set flux and
-        # uncertainty to zero.
-        else:
-            mean_flux = 0
-            mean_std = 0
-            LOG.debug("No valid data found for MS {}, field {}, spw {}, unable to compute mean visibility flux; flux"
-                      " and uncertainty will be set to zero.".format(self.inputs.ms.basename, fieldid, spwid))
-
-        # Combine into single flux measurement object.
-        flux = domain.FluxMeasurement(spwid, mean_flux, origin=ORIGIN)
-        flux.uncertainty = domain.FluxMeasurement(spwid, mean_std, origin=ORIGIN)
-
-        return flux
-
     def _derive_ants_to_use(self, refant):
         inputs = self.inputs
 
@@ -407,9 +319,11 @@ class GcorFluxscale(basetask.StandardTaskTemplate):
             # spw and add as flux measurement to the final result.
             for fieldid in transfer_fieldids:
                 for spwid in spw_ids:
-                    fluxes_for_field_and_spw = self._compute_calvis_flux(fieldid, spwid)
-                    if fluxes_for_field_and_spw:
-                        result.measurements[fieldid].append(fluxes_for_field_and_spw)
+                    mean_flux, std_flux = mstools.compute_mean_flux(self.inputs.ms, fieldid, spwid, self.inputs.transintent)
+                    if mean_flux:
+                        flux = domain.FluxMeasurement(spwid, mean_flux, origin=ORIGIN)
+                        flux.uncertainty = domain.FluxMeasurement(spwid, std_flux, origin=ORIGIN)
+                        result.measurements[fieldid].append(flux)
         finally:
             # Restore the MS flagging state.
             LOG.info('Restoring back-up of flagging state.')
@@ -870,36 +784,6 @@ class GcorFluxscale(basetask.StandardTaskTemplate):
         task = setjy.Setjy(task_inputs)
 
         return self._executor.execute(task, merge=True)
-
-    @staticmethod
-    def _read_data_from_ms(ms, fieldid, spwid, intent):
-
-        # Initialize data selection.
-        data_selection = {'field': fieldid,
-                          'scanintent': '*%s*' % utils.to_CASA_intent(ms, intent),
-                          'spw': spwid}
-
-        # Get number of channels for this spw.
-        nchans = ms.get_spectral_windows(spwid)[0].num_channels
-
-        # Read in data from MS.
-        with casa_tools.MSReader(ms.name) as openms:
-            try:
-                # Apply data selection.
-                openms.msselect(data_selection)
-
-                # Set channel selection to take the average of all channels.
-                openms.selectchannel(1, 0, nchans, 1)
-
-                # Extract data from MS.
-                data = openms.getdata(['corrected_data', 'flag', 'antenna1', 'antenna2', 'weight'])
-            except:
-                # Log a warning and return without data.
-                LOG.warning('Unable to compute mean vis for intent(s) {}, field {}, spw {}'
-                            ''.format(intent, fieldid, spwid))
-                return
-
-        return data
 
     def _replace_amplitude_caltable(self, ampresult, fsresult):
         inputs = self.inputs

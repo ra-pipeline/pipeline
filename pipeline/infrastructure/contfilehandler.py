@@ -273,9 +273,8 @@ def contfile_to_spwsel(vis, context, contfile='cont.dat', use_realspw=True):
         spwstring = ''
         for spw in contdict['fields'][field]:
             crange_list = [crange for crange in contdict['fields'][field][spw] if crange != 'ALL']
-            if crange_list[0]['refer'] == 'LSRK':
-                LOG.info("Converting from LSRK to TOPO...")
-                # Convert from LSRK to TOPO
+            if crange_list[0]['refer'] in ('LSRK', 'SOURCE'):
+                LOG.info("Converting from %s to TOPO...", crange_list[0]['refer'])
                 sname = field
                 field_id = str(fieldobjlist[0].id)
 
@@ -283,7 +282,7 @@ def contfile_to_spwsel(vis, context, contfile='cont.dat', use_realspw=True):
                 cranges_spwsel[sname] = collections.OrderedDict()
                 cranges_spwsel[sname][spw], _ = contfile_handler.get_merged_selection(sname, spw)
 
-                freq_ranges, chan_ranges, aggregate_lsrk_bw = contfile_handler.to_topo(
+                freq_ranges, _, _ = contfile_handler.to_topo(
                     cranges_spwsel[sname][spw], [vis], [field_id], int(spw),
                     context.observing_run)
                 freq_ranges_list = freq_ranges[0].split(';')

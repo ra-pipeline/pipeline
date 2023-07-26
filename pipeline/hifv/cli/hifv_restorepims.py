@@ -5,7 +5,7 @@ from casatasks import casalog
 import pipeline.h.cli.utils as utils
 
 
-def hifv_restorepims(vis=None, reimaging_resources=None, pipelinemode=None, dryrun=None, acceptresults=None):
+def hifv_restorepims(vis=None, reimaging_resources=None, dryrun=None, acceptresults=None):
 
     """
     hifv_restorepims ---- Restore VLASS SE per-image measurement set data, resetting flagging, weights, and applying self-calibration.
@@ -16,7 +16,6 @@ def hifv_restorepims(vis=None, reimaging_resources=None, pipelinemode=None, dryr
 
     vis                 List of input visibility data
     reimaging_resources file path of reimaging_resources.tgz from the SE imaging product
-    pipelinemode        The pipeline operating mode
     dryrun              Run the task (False) or display task command (True)
     acceptresults       Add the results into the pipeline context
     [1;42mRETURNS[1;m                void
@@ -28,30 +27,12 @@ def hifv_restorepims(vis=None, reimaging_resources=None, pipelinemode=None, dryr
     
     Keyword arguments:
     
-    ---- pipeline parameter arguments which can be set in any pipeline mode
-    
     vis -- List of visisbility  data files. These may be ASDMs, tar files of ASDMs,
     MSs, or tar files of MSs, If ASDM files are specified, they will be
     converted  to MS format.
     default: []
     example: vis=['X227.ms', 'asdms.tar.gz']
-    
-    
-    
-    pipelinemode -- The pipeline operating mode. In 'automatic' mode the pipeline
-    determines the values of all context defined pipeline inputs
-    automatically.  In 'interactive' mode the user can set the pipeline
-    context defined parameters manually.  In 'getinputs' mode the user
-    can check the settings of all pipeline parameters without running
-    the task.
-    default: 'automatic'.
-    
-    ---- pipeline context defined parameter argument which can be set only in
-    'interactive mode'
-    
-    
-    --- pipeline task execution modes
-    
+
     dryrun -- Run the commands (True) or generate the commands to be run but
     do not execute (False).
     default: True
@@ -62,8 +43,7 @@ def hifv_restorepims(vis=None, reimaging_resources=None, pipelinemode=None, dryr
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
     
     
     Examples

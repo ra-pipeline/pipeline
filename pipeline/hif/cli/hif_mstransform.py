@@ -6,7 +6,7 @@ import pipeline.h.cli.utils as utils
 
 
 def hif_mstransform(vis=None, outputvis=None, field=None, intent=None, spw=None, chanbin=None, timebin=None,
-                    pipelinemode=None, dryrun=None, acceptresults=None):
+                    dryrun=None, acceptresults=None):
 
     """
     hif_mstransform ---- Create new MeasurementSets for science target imaging
@@ -20,8 +20,7 @@ def hif_mstransform(vis=None, outputvis=None, field=None, intent=None, spw=None,
     
     Output
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -53,13 +52,6 @@ def hif_mstransform(vis=None, outputvis=None, field=None, intent=None, spw=None,
                   switched to True.
     timebin       Bin width for time averaging. If timebin > 0s then
                   timeaverage is automatically switched to True.
-    pipelinemode  The pipeline operating modeThe pipeline operating mode.
-                  In 'automatic' mode the pipeline determines the values of all
-                  context defined pipeline inputs automatically.
-                  In 'interactive' mode the user can set the pipeline context
-                  defined parameters manually.
-                  In 'getinputs' mode the user can check the settings of all
-                  pipeline parameters without running the task.
     dryrun        Run the task (False) or just display the command (True)
     acceptresults Add the results of the task to the pipeline context (True) or
                   reject them (False).

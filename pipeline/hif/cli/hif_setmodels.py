@@ -6,7 +6,7 @@ import pipeline.h.cli.utils as utils
 
 
 def hif_setmodels(vis=None, reference=None, refintent=None, transfer=None, transintent=None, reffile=None,
-                  normfluxes=None, scalebychan=None, pipelinemode=None, dryrun=None, acceptresults=None):
+                  normfluxes=None, scalebychan=None, dryrun=None, acceptresults=None):
 
     """
     hif_setmodels ---- Set calibrator source models
@@ -31,8 +31,7 @@ def hif_setmodels(vis=None, reference=None, refintent=None, transfer=None, trans
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned
+    results -- The results object for the pipeline task is returned
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -65,11 +64,6 @@ def hif_setmodels(vis=None, reference=None, refintent=None, transfer=None, trans
                   example: 'myfluxes.csv'
     normfluxes    Normalize the transfer source flux densities.
     scalebychan   Scale the flux density on a per channel basis or else on a per spw basis
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the pipeline
-                  determines the values of all context defined pipeline inputs automatically.
-                  In interactive mode the user can set the pipeline context defined
-                  parameters manually.  In 'getinputs' mode the users can check the settings
-                  of all pipeline parameters without running the task.
     dryrun        Run the commands (True) or generate the commands to be run but
                   do not execute (False).
     acceptresults Add the results of the task to the pipeline context (True) or

@@ -540,10 +540,6 @@ class InputsContainer(object):
                      if k not in ['self', 'context']
                      and v is not None]
 
-        # work around CASA problem with globals when no arguments are specified
-        if not task_args:
-            task_args = ['pipelinemode="automatic"']
-
         casa_call = '%s(%s)' % (casa_tasks[0], ', '.join(task_args))
 
         return casa_call

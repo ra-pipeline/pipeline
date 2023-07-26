@@ -16,7 +16,7 @@ class CheckProductSizeQAHandler(pqa.QAPlugin):
         if result.status == 'OK':
             score = 1.0
         elif result.status == 'MITIGATED':
-            score = 0.5
+            score = 0.85
         elif result.status == 'ERROR':
             score = 0.0
         longmsg = result.reason['longmsg']

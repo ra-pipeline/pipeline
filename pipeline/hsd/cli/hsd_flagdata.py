@@ -7,8 +7,7 @@ def hsd_flagdata(vis=None, autocorr=None, shadow=None, scan=None,
                  fracspwfps=None, online=None, fileonline=None, template=None,
                  filetemplate=None, pointing=None, filepointing=None, incompleteraster=None,
                  hm_tbuff=None, tbuff=None, qa0=None, qa2=None,
-                 pipelinemode=None, flagbackup=None, dryrun=None,
-                 acceptresults=None):
+                 flagbackup=None, dryrun=None, acceptresults=None):
 
     """
     hsd_flagdata ---- Do basic flagging of a list of MeasurementSets
@@ -25,8 +24,7 @@ def hsd_flagdata(vis=None, autocorr=None, shadow=None, scan=None,
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -67,11 +65,6 @@ def hsd_flagdata(vis=None, autocorr=None, shadow=None, scan=None,
                      hm_tbuff='manual'.
     qa0              QA0 flags
     qa2              QA2 flags
-    pipelinemode     The pipeline operating mode. In 'automatic' mode the pipeline
-                     determines the values of all context defined pipeline inputs automatically.
-                     In interactive mode the user can set the pipeline context defined parameters
-                     manually.  In 'getinputs' mode the user can check the settings of all
-                     pipeline parameters without running the task.
     flagbackup       Back up any pre-existing flags before applying new ones.
     dryrun           Run the commands (True) or generate the commands to be run but
                      do not execute (False).

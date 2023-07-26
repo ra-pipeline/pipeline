@@ -13,18 +13,23 @@ import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.renderer.rendererutils as rendererutils
 import pipeline.infrastructure.utils as utils
+from pipeline.infrastructure.launcher import Context
+from pipeline.infrastructure.basetask import ResultsList
 from pipeline.h.tasks.common import calibrationtableaccess as caltableaccess
+from pipeline.h.tasks.common import flagging_renderer_utils as flagutils
 from pipeline.h.tasks.common.displays import image as image
 from pipeline.h.tasks.common.displays import slice as slice_display
 from pipeline.h.tasks.common.displays import tsys as tsys
 from pipeline.h.tasks.tsyscal import renderer as tsyscalrenderer
+from pipeline.h.tasks.common.flagging_renderer_utils import FlagTotal
 
 LOG = logging.get_logger(__name__)
 
-FlagTotal = collections.namedtuple('FlagSummary', 'flagged total')
-
 
 class T2_4MDetailsTsysflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
+    # list of intents to consider for the summary table (only the ones that actually exist will be shown)
+    task_intents = ('AMPLITUDE', 'BANDPASS', 'DIFFGAIN', 'PHASE', 'TARGET')
+
     """
     Renders detailed HTML output for the Tsysflag task.
     """
@@ -34,8 +39,11 @@ class T2_4MDetailsTsysflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         super(T2_4MDetailsTsysflagRenderer, self).__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
-    def update_mako_context(self, ctx, context, results):
-        weblog_dir = os.path.join(context.report_dir,
+    def update_mako_context(self,
+                            mako_context: dict,
+                            pipeline_context: Context,
+                            results: ResultsList):
+        weblog_dir = os.path.join(pipeline_context.report_dir,
                                   'stage%s' % results.stage_number)
 
         # Initialize items that are to be exported to the
@@ -49,8 +57,8 @@ class T2_4MDetailsTsysflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         updated_refants = {}
         flagcmd_files = {}
 
-        standard_plots = create_plot_detail_page(std_renderer_mapping, context, results)
-        extra_plots = create_plot_detail_page(extra_renderer_mapping, context, results)
+        standard_plots = create_plot_detail_page(std_renderer_mapping, pipeline_context, results)
+        extra_plots = create_plot_detail_page(extra_renderer_mapping, pipeline_context, results)
 
         # For each result in the results list...
         for result in results:
@@ -67,17 +75,17 @@ class T2_4MDetailsTsysflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             table = os.path.basename(result.inputs['caltable'])
 
             # summarise flag state on entry
-            flag_totals[table]['before'] = self._flags_for_result(result, context, summary='first')
+            flag_totals[table]['before'] = self._flags_for_result(result, pipeline_context, summary='first')
 
             # summarise flagging by each step
             for component, r in result.components.items():
                 if r is not None:
-                    flag_totals[table][component] = self._flags_for_result(r, context)
+                    flag_totals[table][component] = self._flags_for_result(r, pipeline_context)
                 else:
                     flag_totals[table][component] = None
 
             # summarise flag state on exit
-            flag_totals[table]['after'] = self._flags_for_result(result, context, summary='last')
+            flag_totals[table]['after'] = self._flags_for_result(result, pipeline_context, summary='last')
 
             # If a manual flagging template file was applied, copy the file to
             # the weblog directory, and store information.
@@ -97,16 +105,16 @@ class T2_4MDetailsTsysflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             lastresult = result.components[lastflag]
 
             calapp = lastresult.final[0]
-            plotter = tsys.TsysSummaryChart(context, lastresult, calapp)
+            plotter = tsys.TsysSummaryChart(pipeline_context, lastresult, calapp)
             plots = plotter.plot()
             vis = os.path.basename(lastresult.inputs['vis'])
             summary_plots[vis] = plots
 
             # generate per-antenna plots
-            plotter = tsys.TsysPerAntennaChart(context, lastresult)
+            plotter = tsys.TsysPerAntennaChart(pipeline_context, lastresult)
             per_antenna_plots = plotter.plot()
 
-            renderer = tsyscalrenderer.TsyscalPlotRenderer(context,
+            renderer = tsyscalrenderer.TsyscalPlotRenderer(pipeline_context,
                                                            lastresult,
                                                            per_antenna_plots)
             with renderer.get_file() as fileobj:
@@ -121,18 +129,24 @@ class T2_4MDetailsTsysflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             # If the reference antenna list was updated, retrieve new refant
             # list.
             if result.refants_to_remove or result.refants_to_demote:
-                ms = context.observing_run.get_ms(name=vis)
+                ms = pipeline_context.observing_run.get_ms(name=vis)
                 updated_refants[vis] = ms.reference_antenna
 
         # If there were any valid results, then additionally render plots
         # for all EBs in one page
         if last_results:
-            renderer = tsyscalrenderer.TsyscalPlotRenderer(context, last_results, eb_plots)
+            renderer = tsyscalrenderer.TsyscalPlotRenderer(pipeline_context, last_results, eb_plots)
             with renderer.get_file() as fileobj:
                 fileobj.write(renderer.render())
                 # .. and we want the subpage links to go to this master page
                 for vis in subpages:
                     subpages[vis] = renderer.path
+
+        # PIPE-1806: add DIFFGAIN intent to the results table
+        # and use a common infrastructure to retrieve the existing intents
+        flag_table_intents = ['TOTAL']
+        flag_table_intents.extend(
+            flagutils.intents_to_summarise(pipeline_context, T2_4MDetailsTsysflagRenderer.task_intents))
 
         # Retrieve the metric_order from the result.
         # NOTE: metric_order is assumed to be the same
@@ -140,10 +154,10 @@ class T2_4MDetailsTsysflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         components = results[0].metric_order
 
         # Generate the HTML reports
-        htmlreports = self._get_htmlreports(context, results, components)
+        htmlreports = self._get_htmlreports(pipeline_context, results, components)
 
         # Update the mako context.
-        ctx.update({
+        mako_context.update({
             'components': components,
             'dirname': weblog_dir,
             'extraplots': extra_plots,
@@ -154,7 +168,8 @@ class T2_4MDetailsTsysflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             'summary_plots': summary_plots,
             'summary_subpage': subpages,
             'task_incomplete_msg': task_incomplete_msg,
-            'updated_refants': updated_refants
+            'updated_refants': updated_refants,
+            'flag_table_intents': flag_table_intents,
         })
 
     def _get_htmlreports(self, context, results, components):
@@ -233,7 +248,7 @@ class T2_4MDetailsTsysflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def _flags_by_intent(ms, summaries):
         # create a dictionary of fields per observing intent, eg. 'PHASE':['3C273']
         intent_fields = {}
-        for intent in ('BANDPASS', 'PHASE', 'AMPLITUDE', 'TARGET'):
+        for intent in T2_4MDetailsTsysflagRenderer.task_intents:
             # use _name from field as we do want the raw name here as used
             # in the summaries dict (not sometimes enclosed in "..."). Better
             # perhaps to fix the summaries dict.

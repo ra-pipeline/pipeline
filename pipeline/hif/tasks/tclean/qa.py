@@ -1,6 +1,6 @@
 import collections
 
-import numpy
+import numpy as np
 
 import pipeline.h.tasks.exportdata.aqua as aqua
 import pipeline.domain.measures as measures
@@ -9,16 +9,21 @@ import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as scorecalc
 import pipeline.qa.utility.scorers as scorers
+from pipeline.infrastructure import casa_tasks
+from pipeline.infrastructure import casa_tools
 from . import resultobjects
 
 LOG = logging.get_logger(__name__)
 
 
-class TcleanQAHandler(pqa.QAPlugin):    
+class TcleanQAHandler(pqa.QAPlugin):
     result_cls = resultobjects.TcleanResult
     child_cls = None
 
     def handle(self, context, result):
+
+        qaTool = casa_tools.quanta
+
         # calculate QA score comparing RMS against clean threshold
 
         # Add offset of 0.34 to avoid any red scores
@@ -47,9 +52,9 @@ class TcleanQAHandler(pqa.QAPlugin):
                 # sensitivity as an estimate of the expected RMS.
                 rms_score = imageScorer(result.image_rms / result.dr_corrected_sensitivity)
 
-                if (numpy.isnan(rms_score)):
+                if (np.isnan(rms_score)):
                     rms_score = 0.0
-                    longmsg='Cleaning diverged, RMS is NaN. Field: %s Intent: %s SPW: %s' % (result.inputs['field'], result.intent, resultspw)
+                    longmsg='Cleaning diverged, RMS is NaN. Field: %s Intent: %s SPW: %s' % (result.inputs['field'], result.intent, result.spw)
                     shortmsg='RMS is NaN'
                 else:
                     if rms_score > 0.66:
@@ -67,12 +72,12 @@ class TcleanQAHandler(pqa.QAPlugin):
                             rms_score -= 0.11
                             rms_score = max(0.0, rms_score)
                             longmsg = '%s. Between 1-10 channels show significantly deviant synthesized beam(s), this is usually indicative of bad data, if at cube edge can likely be ignored.' % (longmsg)
-                            shortmsg = '%s. 1-10 channels masked.' % (shortmsg) 
+                            shortmsg = '%s. 1-10 channels masked.' % (shortmsg)
                         else:
                             rms_score -= 0.34
                             rms_score = max(0.0, rms_score)
                             longmsg = '%s. More than 10 channels show significantly deviant synthesized beams, this is usually indicative of bad data, and should be investigated.' % (longmsg)
-                            shortmsg = '%s. > 10 channels masked.' % (shortmsg) 
+                            shortmsg = '%s. > 10 channels masked.' % (shortmsg)
 
                 origin = pqa.QAOrigin(metric_name='image rms / sensitivity',
                                       metric_score=(result.image_rms, result.dr_corrected_sensitivity),
@@ -135,6 +140,93 @@ class TcleanQAHandler(pqa.QAPlugin):
                     LOG.warning('Exception scoring check source fit: %s. Setting score to -0.1.' % (e))
                     result.qa.pool.append(-0.1, longmsg='Exception scoring check source fit: %s' % (e), shortmsg='Exception scoring check source fit')
 
+            # Polarization calibrators
+            if result.intent == 'POLARIZATION' and result.inputs['specmode'] in ('mfs', 'cont') and result.imaging_mode == 'ALMA':
+                try:
+                    # Fit I, Q and U image planes
+                    imagename = result.image.replace('.pbcor', '')
+
+                    # Calculate POLI/POLA images
+                    imstat_arg = {'imagename': result.residual, 'axes': [0, 1]}
+                    job = casa_tasks.imstat(**imstat_arg)
+                    calstat = job.execute(dry_run=False)
+                    rms = calstat['rms']
+                    prms = np.sqrt(rms[1]**2. + rms[2]**2.)
+
+                    poli_imagename = imagename.replace('IQUV', 'POLI')
+                    immath_arg = {'imagename': imagename, 'outfile': poli_imagename, 'mode': 'poli', 'sigma': '0.0Jy/beam'}
+                    job = casa_tasks.immath(**immath_arg)
+                    res = job.execute(dry_run=False)
+                    pola_imagename = imagename.replace('IQUV', 'POLA')
+                    immath_arg = {'imagename': imagename, 'outfile': pola_imagename, 'mode': 'pola', 'polithresh': '%.8fJy/beam' % (5.0*prms)}
+                    job = casa_tasks.immath(**immath_arg)
+                    res = job.execute(dry_run=False)
+
+                    # Fit I, Q and U images
+                    imfit_arg = {'imagename': imagename, 'stokes': 'I', 'box': '110,110,145,145'}
+                    job = casa_tasks.imfit(**imfit_arg)
+                    res_I = job.execute(dry_run=False)
+                    if res_I is None or not res_I['converged']:
+                        msg = f'Fitting Stokes I for {imagename} failed'
+                        raise Exception(msg)
+
+                    imfit_arg = {'imagename': imagename, 'stokes': 'Q', 'box': '115,115,130,130'}
+                    job = casa_tasks.imfit(**imfit_arg)
+                    res_Q = job.execute(dry_run=False)
+                    if res_Q is None or not res_Q['converged']:
+                        msg = f'Fitting Stokes Q for {imagename} failed'
+                        raise Exception(msg)
+
+                    imfit_arg = {'imagename': imagename, 'stokes': 'U', 'box': '110,110,145,145'}
+                    job = casa_tasks.imfit(**imfit_arg)
+                    res_U = job.execute(dry_run=False)
+                    if res_U is None or not res_U['converged']:
+                        msg = f'Fitting Stokes U for {imagename} failed'
+                        raise Exception(msg)
+
+                    # Extract the flux and error values for each Stokes
+                    flux_I = res_I['results']['component0']['flux']['value'][0]
+                    unit_I = res_I['results']['component0']['flux']['unit']
+                    error_I = res_I['results']['component0']['flux']['error'][0]
+
+                    flux_Q = res_Q['results']['component0']['flux']['value'][1]
+                    unit_Q = res_Q['results']['component0']['flux']['unit']
+                    error_Q = res_Q['results']['component0']['flux']['error'][1]
+
+                    flux_U = res_U['results']['component0']['flux']['value'][2]
+                    unit_U = res_U['results']['component0']['flux']['unit']
+                    error_U = res_U['results']['component0']['flux']['error'][2]
+
+                    # Now use these values to compute polarization intensity, angle and ratio, and their errors:
+                    flux_pol_intens  = np.sqrt(flux_Q**2 + flux_U**2)
+                    err_pol_intens = np.sqrt((flux_Q*error_U)**2 + (flux_U*error_Q)**2) / flux_pol_intens
+
+                    pol_ratio     = flux_pol_intens / flux_I
+                    err_pol_ratio = pol_ratio * np.sqrt((err_pol_intens/flux_pol_intens)**2 + (error_I/flux_I)**2)
+
+                    pol_angle     = 0.5 * np.degrees(np.arctan2(flux_U, flux_Q))
+                    err_pol_angle = 0.5 * np.degrees(err_pol_intens / flux_pol_intens)
+
+                    result.polcal_fit = {'session': context.observing_run.get_ms(result.vis[0]).session,
+                                         'converged': True,
+                                         'flux_pol_intens': qaTool.quantity(flux_pol_intens, unit_I),
+                                         'err_pol_intens': qaTool.quantity(err_pol_intens, unit_I),
+                                         'pol_ratio': qaTool.convert(qaTool.quantity(pol_ratio, ''), '%'),
+                                         'err_pol_ratio': qaTool.convert(qaTool.quantity(err_pol_ratio, ''), '%'),
+                                         'pol_angle': qaTool.quantity(pol_angle, 'deg'),
+                                         'err_pol_angle': qaTool.quantity(err_pol_angle, 'deg'),
+                                         'err_msg': ''}
+                except Exception as e:
+                    LOG.error(str(e))
+                    result.polcal_fit = {'session': context.observing_run.get_ms(result.vis[0]).session,
+                                         'converged': False,
+                                         'flux_pol_intens': 'N/A',
+                                         'err_pol_intens': 'N/A',
+                                         'pol_ratio': 'N/A',
+                                         'err_pol_ratio': 'N/A',
+                                         'pol_angle': 'N/A',
+                                         'err_pol_angle': 'N/A',
+                                         'err_msg': str(e)}
 
 class TcleanListQAHandler(pqa.QAPlugin):
     result_cls = collections.Iterable
@@ -143,7 +235,7 @@ class TcleanListQAHandler(pqa.QAPlugin):
     def handle(self, context, result):
         # collate the QAScores from each child result, pulling them into our
         # own QAscore list
-        collated = utils.flatten([r.qa.pool for r in result]) 
+        collated = utils.flatten([r.qa.pool for r in result])
         result.qa.pool[:] = collated
 
 

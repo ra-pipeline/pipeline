@@ -5,7 +5,7 @@ from casatasks import casalog
 import pipeline.h.cli.utils as utils
 
 
-def hifa_fluxcalflag(vis=None, field=None, intent=None, spw=None, pipelinemode=None, threshold=None, appendlines=None,
+def hifa_fluxcalflag(vis=None, field=None, intent=None, spw=None, threshold=None, appendlines=None,
                      linesfiles=None, applyflags=None, dryrun=None, acceptresults=None):
 
     """
@@ -19,8 +19,7 @@ def hifa_fluxcalflag(vis=None, field=None, intent=None, spw=None, pipelinemode=N
     
     Output
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -39,11 +38,6 @@ def hifa_fluxcalflag(vis=None, field=None, intent=None, spw=None, pipelinemode=N
                   computed. Defaults to all science spectral windows.
                   
                   example: spw='11,13,15,17'
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the pipeline
-                  determines the values of all context defined pipeline inputs automatically.
-                  In interactive mode the user can set the pipeline context defined
-                  parameters manually. In 'getinputs' mode the user can check the settings of
-                  all pipeline parameters without running the task.
     threshold     If the fraction of an spw occupied by line regions is greater
                   than threshold flag the entire spectral window.
     appendlines   Append user defined line regions to the line dictionary.

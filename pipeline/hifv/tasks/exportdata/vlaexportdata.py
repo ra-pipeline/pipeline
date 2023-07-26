@@ -188,9 +188,9 @@ class VLAExportData(exportdata.ExportData):
                 continue
 
         if vlassmode:
-            task_string += "\n    hifv_fixpointing(pipelinemode='automatic')"
+            task_string += "\n    hifv_fixpointing()"
 
-        task_string += "\n    hifv_statwt(pipelinemode='automatic')"
+        task_string += "\n    hifv_statwt()"
 
         template = '''h_init()
 try:

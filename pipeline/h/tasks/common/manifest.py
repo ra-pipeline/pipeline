@@ -9,17 +9,17 @@ from xml.dom import minidom
 from pipeline import environment
 
 # # Set the command used to calculate MD5 (see infrastructure.renderer.logger)
-# CHECKSUM_CMD = None 
-# 
+# CHECKSUM_CMD = None
+#
 # if platform.system() == 'Darwin':
 #     # Look for md5 on OS X.
 #     md5_path = spawn.find_executable('md5')
 #     if md5_path:
-#         LOG.trace('Using md5 executable at \'%s\' to generate MD5' 
+#         LOG.trace('Using md5 executable at \'%s\' to generate MD5'
 #                   % md5_path)
 #         CHECKSUM_CMD = lambda name : (md5_path, name)
 # else:
-#     # .. otherwise try to find md5sum command.    
+#     # .. otherwise try to find md5sum command.
 #     md5sum_path = spawn.find_executable('md5sum')
 #     if md5sum_path:
 #         LOG.trace('Using convert executable at \'%s\' to generate MD5' % \
@@ -31,7 +31,7 @@ from pipeline import environment
 
 class PipelineManifest(object):
     """
-    Class for creating the pipeline data product manifest 
+    Class for creating the pipeline data product manifest
     """
     def __init__(self, ouss_id):
         self.ouss_id = ouss_id
@@ -47,7 +47,7 @@ class PipelineManifest(object):
 
     def set_ous(self, ous_name):
         """
-        Set an OUS element and return it 
+        Set an OUS element and return it
         """
         return eltree.SubElement(self.piperesults, "ous", name=ous_name)
 
@@ -124,7 +124,7 @@ class PipelineManifest(object):
     @staticmethod
     def set_session(ous, session_name):
         """
-        Set a SESSION element in an OUS element and return it 
+        Set a SESSION element in an OUS element and return it
         """
         return eltree.SubElement(ous, "session", name=session_name)
 
@@ -141,7 +141,7 @@ class PipelineManifest(object):
     @staticmethod
     def get_asdm(session, asdm_name):
         """
-        Get an ASDM element in a SESSION element and return it 
+        Get an ASDM element in a SESSION element and return it
         """
         for asdm in session.iter('asdm'):
             if asdm.attrib['name'] == asdm_name:
@@ -204,7 +204,7 @@ class PipelineManifest(object):
         finalflags_dict = collections.OrderedDict()
         for session in ous.iter('session'):
             for asdm in session.iter('asdm'):
-                for finalflags in asdm.iter('finalflags'): 
+                for finalflags in asdm.iter('finalflags'):
                     finalflags_dict[asdm.attrib['name']] = finalflags.attrib['name']
         return finalflags_dict
 
@@ -216,7 +216,7 @@ class PipelineManifest(object):
         applycmds_dict = collections.OrderedDict()
         for session in ous.iter('session'):
             for asdm in session.iter('asdm'):
-                for applycmds in asdm.iter('applycmds'): 
+                for applycmds in asdm.iter('applycmds'):
                     applycmds_dict[asdm.attrib['name']] = applycmds.attrib['name']
         return applycmds_dict
 

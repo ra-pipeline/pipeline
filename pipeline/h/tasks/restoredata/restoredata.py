@@ -126,8 +126,8 @@ class RestoreDataInputs(vdp.StandardInputs):
         :type bdfflags: boolean True or False
         :param lazy: use the lazy filler to restore data
         :type lazy: boolean True or False
-        :param asis: list of ASDM tables to import as is
-        :type asis: comma delimated list of tables
+        :param asis: Creates verbatim copies of the ASDM tables in the output MS.
+        :type asis: space delimated list of tables
         """
         super(RestoreDataInputs, self).__init__()
 

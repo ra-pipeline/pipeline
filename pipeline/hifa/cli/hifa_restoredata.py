@@ -6,7 +6,7 @@ import pipeline.h.cli.utils as utils
 
 
 def hifa_restoredata(vis=None, session=None, products_dir=None, copytoraw=None, rawdata_dir=None, lazy=None,
-                     bdfflags=None, ocorr_mode=None, asis=None, pipelinemode=None, dryrun=None, acceptresults=None):
+                     bdfflags=None, ocorr_mode=None, asis=None, dryrun=None, acceptresults=None):
 
     """
     hifa_restoredata ---- Restore flagged and calibration interferometry data from a pipeline run
@@ -49,55 +49,42 @@ def hifa_restoredata(vis=None, session=None, products_dir=None, copytoraw=None, 
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
     vis           List of raw visibility data files to be restored. 
                   Assumed to be in the directory specified by rawdata_dir.
-                  (can be set only in 'interactive mode')
                   example: vis=['uid___A002_X30a93d_X43e']
-    session       List of sessions one per visibility file. 
-                  (can be set only in 'interactive mode')
+    session       List of sessions one per visibility file.
                   
                   example: session=['session_3']
     products_dir  Name of the data products directory to copy calibration
                   products from. The parameter is effective only when 
                   copytoraw = True.  When copytoraw = False, calibration
                   products in rawdata_dir will be used.
-                  (can be set only in 'interactive mode')
                   
                   example: products_dir='myproductspath'
     copytoraw     Copy calibration and flagging tables from products_dir to
                   rawdata_dir directory.
-                  (can be set only in 'interactive mode')
                   
                   example: copytoraw=False
-    rawdata_dir   Name of the rawdata subdirectory. 
-                  (can be set only in 'interactive mode')
+    rawdata_dir   Name of the rawdata subdirectory.
                   
                   example: rawdata_dir='myrawdatapath'
     lazy          Use the lazy filler option.
-                  (can be set only in 'interactive mode')
                   
                   example: lazy=True
     bdfflags      Set the BDF flags.
-                  (can be set only in 'interactive mode')
                   
                   example: bdfflags=False
     ocorr_mode    Set ocorr_mode.
-                  (can be set only in 'interactive mode')
                   
                   example: ocorr_mode='ca'
-    asis          Set list of tables to import as is.
-                  (can be set only in 'interactive mode')
+    asis          Creates verbatim copies of the ASDM tables in the output MS.
+                  The value given to this option must be a list of table names separated by space characters.
                   
                   example: asis='Source Receiver'
-    pipelinemode  The pipeline operating mode. In 'automatic' mode 
-                  the pipeline determines the values of all context 
-                  defined pipeline inputs automatically.
-                  (can be set in any pipeline mode)
     dryrun        Run the commands (False) or generate the commands to be
                   run but do not execute (True).
     acceptresults Add the results of the task to the pipeline context (True)

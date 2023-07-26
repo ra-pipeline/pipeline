@@ -6,7 +6,7 @@ from . import utils
 
 
 def h_applycal(vis=None, field=None, intent=None, spw=None, antenna=None, applymode=None, flagbackup=None, flagsum=None,
-               flagdetailedsum=None, pipelinemode=None, dryrun=None, acceptresults=None):
+               flagdetailedsum=None, dryrun=None, acceptresults=None):
 
     """
     h_applycal ---- Apply the calibration(s) to the data
@@ -23,29 +23,27 @@ def h_applycal(vis=None, field=None, intent=None, spw=None, antenna=None, applym
 
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned
+    results -- The results object for the pipeline task is returned
 
     --------- parameter descriptions ---------------------------------------------
 
     vis             The list of input MeasurementSets. Defaults to the list of MeasurementSets
-                    in the pipeline context. Parameter is not available when pipelinemode='automatic'.
+                    in the pipeline context.
                     example: ['X227.ms']
     field           A string containing the list of field names or field ids to which
                     the calibration will be applied. Defaults to all fields in the pipeline
-                    context. Parameter is not available when pipelinemode='automatic'.
+                    context.
                     example: '3C279', '3C279, M82'
     intent          A string containing the list of intents against which the
                     selected fields will be matched. Defaults to all supported intents
-                    in the pipeline context. Parameter is not available when pipelinemode='automatic'.
+                    in the pipeline context.
                     example: '*TARGET*'
     spw             The list of spectral windows and channels to which the calibration
                     will be applied. Defaults to all science windows in the pipeline
-                    context. Parameter is not available when pipelinemode='automatic'.
+                    context.
                     example: '17', '11, 15'
     antenna         The selection of antennas to which the calibration will be applied.
                     Defaults to all antennas. Not currently supported.
-                    Parameter is not available when pipelinemode='automatic'.
     applymode       Calibration apply mode
                     'calflag': calibrate data and apply flags from solutions
                     'calflagstrict': (default) same as above except flag spws for which calibration is
@@ -60,15 +58,9 @@ def h_applycal(vis=None, field=None, intent=None, spw=None, antenna=None, applym
     flagsum         Compute before and after flagging summary statistics
     flagdetailedsum Compute detailed before and after flagging statistics summaries.
                     Parameter available only when if flagsum is True.
-    pipelinemode    The pipeline operating mode. In 'automatic' mode the pipeline
-                    determines the values of all context defined pipeline inputs automatically.
-                    In interactive mode the user can set the pipeline context defined parameters
-                    manually.  In 'getinputs' mode the user can check the settings of all
-                    pipeline parameters without running the task.
     dryrun          Run task (False) or display the command(True).
-                    Parameter is available only when pipelinemode='interactive'.
     acceptresults   Add the results of the task to the pipeline context (True) or
-                    reject them (False). Parameter is available only when pipelinemode='interactive'.
+                    reject them (False).
 
     --------- examples -----------------------------------------------------------
 

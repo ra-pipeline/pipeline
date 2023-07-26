@@ -110,14 +110,14 @@ def flagcmd_file_data(caltable, flagcmd_file):
 		</tr>
 	</thead>
 	<tbody>
-%for vis in updated_refants:
+        % for vis in updated_refants:
 		<tr>
 			<td>${os.path.basename(vis)}</td>
 			## insert spaces in refant list to allow browser to break string
 			## if it wants
 			<td>${updated_refants[vis].replace(',', ', ')}</td>
 		</tr>
-%endfor
+        % endfor
 	</tbody>
 </table>
 % endif
@@ -168,11 +168,11 @@ def flagcmd_file_data(caltable, flagcmd_file):
 		<tr>
 			<td>${ms}</td>
 			% for step in components:
-			% if flags[ms].get(step) is None:
-			<td><span class="glyphicon glyphicon-remove"></span></td>
-      		% else:
-      		<td><span class="glyphicon glyphicon-ok"></span></td>
-      		% endif
+			  % if flags[ms].get(step) is None:
+			    <td><span class="glyphicon glyphicon-remove"></span></td>
+      		  % else:
+      		    <td><span class="glyphicon glyphicon-ok"></span></td>
+      		  % endif
   			% endfor
 		</tr>
 	% endfor
@@ -208,15 +208,15 @@ def flagcmd_file_data(caltable, flagcmd_file):
 		</tr>
 	</thead>
 	<tbody>
-		% for k in ['TOTAL', 'BANDPASS', 'AMPLITUDE', 'PHASE', 'TARGET']:
+		% for intent in flag_table_intents:
 		<tr>
-			<th>${k}</th>               
+			<th>${intent}</th>
 			% for step in ['before'] + components + ['after']:
-			% if flags[ms].get(step) is not None:
-				${get_td_for_percent_flagged(flags[ms][step]['Summary'][k], step)}
-			% else:
+			  % if flags[ms].get(step):
+				${get_td_for_percent_flagged(flags[ms][step]['Summary'][intent], step)}
+			  % else:
 				<td>N/A</td>
-			% endif
+			  % endif
 			% endfor
 		</tr>
 		% endfor

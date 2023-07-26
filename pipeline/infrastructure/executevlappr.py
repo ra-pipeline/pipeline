@@ -157,7 +157,7 @@ def executeppr(pprXmlFile: str, importonly: bool = True, dry_run: bool = False, 
 
             # List parameters
             for keyword, value in task_args.items():
-                casa_tools.post_to_log("    Parameter: " + keyword + " = " + str(value), echo_to_screen=echo_to_screen)
+                casa_tools.post_to_log("    Parameter: " + keyword + " = " + repr(value), echo_to_screen=echo_to_screen)
 
             # For import/restore tasks, set vis and session explicitly (not inferred from context).
             if pipeline_task_name in import_tasks or pipeline_task_name in restore_tasks:

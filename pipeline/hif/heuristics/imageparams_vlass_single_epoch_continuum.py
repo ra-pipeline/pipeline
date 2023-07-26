@@ -44,7 +44,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         """Tclean niter parameter heuristics."""
         return self.niter_correction(None, None, None, None, None, None)
 
-    def deconvolver(self, specmode, spwspec) -> str:
+    def deconvolver(self, specmode, spwspec, intent: str = '') -> str:
         """Tclean deconvolver parameter heuristics."""
         return 'mtmfs'
 
@@ -64,7 +64,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         return ['0.6arcsec']
 
     def imsize(self, fields=None, cell=None, primary_beam=None, sfpblimit=None, max_pixels=None, centreonly=None,
-               vislist=None, spwspec=None) -> Union[list, int]:
+               vislist=None, spwspec=None, intent: str = '') -> Union[list, int]:
         """Tclean imsize parameter heuristics."""
         return [16384, 16384]
 
@@ -163,7 +163,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         """Tclean nterms parameter heuristics."""
         return 2
 
-    def stokes(self) -> str:
+    def stokes(self, intent: str = '') -> str:
         """Tclean stokes parameter heuristics."""
         return 'I'
 
@@ -350,7 +350,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         else:
             return 'corrected'
 
-    def wprojplanes(self) -> int:
+    def wprojplanes(self, gridder=None, spwspec=None) -> int:
         """Tclean wprojplanes parameter heuristics."""
         return 32
 
@@ -563,7 +563,7 @@ class ImageParamsHeuristicsVlassSeContAWPP001(ImageParamsHeuristicsVlassSeCont):
         # Update it explicitly when populating context.clean_list_pending (i.e. in hif_editimlist)
         self.vlass_stage = 0
 
-    def wprojplanes(self) -> int:
+    def wprojplanes(self, gridder=None, spwspec=None) -> int:
         """Tclean wprojplanes parameter heuristics."""
         return 1
 
@@ -588,7 +588,7 @@ class ImageParamsHeuristicsVlassSeContMosaic(ImageParamsHeuristicsVlassSeCont):
         self.user_cycleniter_final_image_nomask = None
 
     def imsize(self, fields=None, cell=None, primary_beam=None, sfpblimit=None, max_pixels=None, centreonly=None,
-               vislist=None, spwspec=None) -> Union[list, int]:
+               vislist=None, spwspec=None, intent: str = '') -> Union[list, int]:
         """Tclean imsize parameter heuristics."""
         return [12500, 12500]
 
@@ -600,7 +600,7 @@ class ImageParamsHeuristicsVlassSeContMosaic(ImageParamsHeuristicsVlassSeCont):
         # the default is set to False here.
         return False
 
-    def wprojplanes(self) -> int:
+    def wprojplanes(self, gridder=None, spwspec=None) -> int:
         """Tclean wprojplanes parameter heuristics."""
         return 1
 

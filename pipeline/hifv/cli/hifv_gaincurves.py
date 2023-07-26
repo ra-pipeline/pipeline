@@ -5,7 +5,7 @@ from casatasks import casalog
 import pipeline.h.cli.utils as utils
 
 
-def hifv_gaincurves(vis=None, caltable=None, pipelinemode=None, dryrun=None, acceptresults=None):
+def hifv_gaincurves(vis=None, caltable=None, dryrun=None, acceptresults=None):
 
     """
     hifv_gaincurves ---- Runs gencal in gc mode
@@ -17,12 +17,6 @@ def hifv_gaincurves(vis=None, caltable=None, pipelinemode=None, dryrun=None, acc
 
     vis           List of input visibility data
     caltable      String name of caltable
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the pipeline
-                  determines the values of all context defined pipeline inputs
-                  automatically.  In 'interactive' mode the user can set the pipeline
-                  context defined parameters manually.  In 'getinputs' mode the user
-                  can check the settings of all pipeline parameters without running
-                  the task.
     dryrun        Run the commands (True) or generate the commands to be run but
                   do not execute (False).  This is a pipeline task execution mode.
     acceptresults Add the results of the task to the pipeline context (True) or
@@ -33,8 +27,7 @@ def hifv_gaincurves(vis=None, caltable=None, pipelinemode=None, dryrun=None, acc
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
     
     
     Examples

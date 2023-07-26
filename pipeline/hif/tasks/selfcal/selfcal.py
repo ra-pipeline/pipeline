@@ -77,8 +77,17 @@ class SelfcalInputs(vdp.StandardInputs):
 
     processing_data_type = [DataType.REGCAL_CONTLINE_SCIENCE]
 
-    # simple properties with no logic
     field = vdp.VisDependentProperty(default='')
+
+    @field.convert
+    def field(self, val):
+        if not isinstance(val, (str, type(None))):
+            # PIPE-1881: allow field names that mistakenly get casted into non-string datatype by
+            # recipereducer (recipereducer.string_to_val) and executeppr (XmlObjectifier.castType)
+            LOG.warning('The field selection input %r is not a string and will be converted.', val)
+            val = str(val)
+        return val
+        
     spw = vdp.VisDependentProperty(default='')
     contfile = vdp.VisDependentProperty(default='cont.dat')
     apply = vdp.VisDependentProperty(default=True)
@@ -239,7 +248,7 @@ class Selfcal(basetask.StandardTaskTemplate):
             # note scal_library is keyed by field name without quotes at this moment.
             # see. https://casadocs.readthedocs.io/en/stable/notebooks/visibility_data_selection.html#The-field-Parameter
             #       utils.fieldname_for_casa() and
-            #       utils.dequote_fieldname_for_casa()
+            #       utils.dequote()
             field_name = utils.dequote(target['field'])
             target['sc_lib'] = scal_library[field_name][target['sc_band']]
             target['field_name'] = field_name

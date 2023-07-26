@@ -12,7 +12,6 @@ LOG = logging.get_logger(__name__)
 
 JyperKTRV = collections.namedtuple('JyperKTRV', 'virtualspw msname realspw antenna pol factor')
 JyperKTR  = collections.namedtuple('JyperKTR', 'spw msname antenna pol factor')
-FlagTotal = collections.namedtuple('FlagSummary', 'flagged total')
 
 
 class T2_4MDetailsNRORestoreDataRenderer(sdapplycal.T2_4MDetailsSDApplycalRenderer):

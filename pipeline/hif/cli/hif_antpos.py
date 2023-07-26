@@ -5,7 +5,7 @@ from casatasks import casalog
 import pipeline.h.cli.utils as utils
 
 
-def hif_antpos(vis=None, caltable=None, hm_antpos=None, antenna=None, offsets=None, antposfile=None, pipelinemode=None,
+def hif_antpos(vis=None, caltable=None, hm_antpos=None, antenna=None, offsets=None, antposfile=None,
                dryrun=None, acceptresults=None):
 
     """
@@ -43,16 +43,13 @@ def hif_antpos(vis=None, caltable=None, hm_antpos=None, antenna=None, offsets=No
     
     Output
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
     vis           List of input visibility files.
-                  Not available when pipelinemode='automatic'.
                   example: ['ngc5921.ms']
     caltable      Name of output gain calibration tables.
-                  Not available when pipelinemode='automatic'.
                   example: ['ngc5921.gcal']
     hm_antpos     Heuristics method for retrieving the antenna position
                   corrections. The options are 'online' (not yet implemented), 'manual',
@@ -67,15 +64,9 @@ def hif_antpos(vis=None, caltable=None, hm_antpos=None, antenna=None, offsets=No
     antposfile    The file(s) containing the antenna offsets. Used if hm_antpos
                   is 'file'.
                   example: 'antennapos.csv'
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the pipeline
-                  determines the values of all context defined pipeline inputs automatically.
-                  In interactive mode the user can set the pipeline context defined
-                  parameters manually. In 'getinputs' mode the user can check the settings of
-                  all pipeline parameters without running the task.
     dryrun        Run the task (False) or list commands (True).
-                  Available when pipelinemode='interactive'.
     acceptresults Add the results of the task to the pipeline context (True) or
-                  reject them (False). Available when pipelinemode='interactive'.
+                  reject them (False).
 
     --------- examples -----------------------------------------------------------
 

@@ -5,7 +5,7 @@ from casatasks import casalog
 import pipeline.h.cli.utils as utils
 
 
-def hifa_imageprecheck(vis=None, calcsb=None, parallel=None, pipelinemode=None, dryrun=None, acceptresults=None):
+def hifa_imageprecheck(vis=None, calcsb=None, parallel=None, dryrun=None, acceptresults=None):
 
     """
     hifa_imageprecheck ---- Calculates the best Briggs robust parameter to achieve sensitivity and angular resolution goals.
@@ -21,8 +21,7 @@ def hifa_imageprecheck(vis=None, calcsb=None, parallel=None, pipelinemode=None, 
     robust parameter to achieve the PI's desired angular resolution is chosen
     automatically. See the User's guide for further details.
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -33,13 +32,6 @@ def hifa_imageprecheck(vis=None, calcsb=None, parallel=None, pipelinemode=None, 
                   Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
     calcsb        Force (re-)calculation of sensitivities and beams
     parallel      Use MPI cluster where possible
-    pipelinemode  The pipeline operating mode.
-                  In 'automatic' mode the pipeline determines the values of all
-                  context defined pipeline inputs automatically.
-                  In 'interactive' mode the user can set the pipeline context
-                  defined parameters manually.
-                  In 'getinputs' mode the user can check the settings of all
-                  pipeline parameters without running the task.
     dryrun        Run the task (False) or just display the command (True)
     acceptresults Add the results of the task to the pipeline context (True) or
                   reject them (False).

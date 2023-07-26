@@ -6,7 +6,7 @@ import pipeline.h.cli.utils as utils
 
 
 def hifv_applycals(vis=None, field=None, intent=None, spw=None, antenna=None, applymode=None, flagbackup=None,
-                   flagsum=None, flagdetailedsum=None, gainmap=None, pipelinemode=None, dryrun=None,
+                   flagsum=None, flagdetailedsum=None, gainmap=None, dryrun=None,
                    acceptresults=None):
 
     """
@@ -27,19 +27,17 @@ def hifv_applycals(vis=None, field=None, intent=None, spw=None, antenna=None, ap
                     example: vis=['X227.ms', 'asdms.tar.gz']
     field           A string containing the list of field names or field ids to which
                     the calibration will be applied. Defaults to all fields in the pipeline
-                    context.  Only can be set in pipelinemode='interactive'.
+                    context.
                     example: '3C279', '3C279, M82'
     intent          A string containing the list of intents against which the
                     selected fields will be matched. Defaults to all supported intents
-                    in the pipeline context.  Only can be set in pipelinemode='interactive'.
+                    in the pipeline context.
                     example: '*TARGET*'
     spw             The list of spectral windows and channels to which the calibration
                     will be applied. Defaults to all science windows in the pipeline.
-                    Only can be set in pipelinemode='interactive'.
                     example: '17', '11, 15'
     antenna         The selection of antennas to which the calibration will be applied.
                     Defaults to all antennas. Not currently supported.
-                    Only can be set in pipelinemode='interactive'.
     applymode       Calibration apply mode
                     'calflag': calibrate data and apply flags from solutions
                     'calflagstrict': same as above except flag spws for which calibration is
@@ -50,16 +48,10 @@ def hifv_applycals(vis=None, field=None, intent=None, spw=None, antenna=None, ap
                     'flagonlystrict': same as above except flag spws for which calibration is
                         unavailable in one or more tables
                     'calonly': calibrate data only, flags from solutions NOT applied
-    flagbackup      Backup the flags before the apply.  Only can be set in pipelinemode='interactive'.
+    flagbackup      Backup the flags before the apply.
     flagsum         Compute before and after flagging summary statistics
     flagdetailedsum Compute detailed flagging statistics
     gainmap         Mode to map gainfields to scans.
-    pipelinemode    The pipeline operating mode. In 'automatic' mode the pipeline
-                    determines the values of all context defined pipeline inputs
-                    automatically.  In 'interactive' mode the user can set the pipeline
-                    context defined parameters manually.  In 'getinputs' mode the user
-                    can check the settings of all pipeline parameters without running
-                    the task.
     dryrun          Run the commands (True) or generate the commands to be run but
                     do not execute (False).  This is a pipeline task execution mode.
     acceptresults   Add the results of the task to the pipeline context (True) or
@@ -72,8 +64,7 @@ def hifv_applycals(vis=None, field=None, intent=None, spw=None, antenna=None, ap
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned
+    results -- The results object for the pipeline task is returned
     
     Issues
     

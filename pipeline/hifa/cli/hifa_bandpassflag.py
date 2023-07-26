@@ -8,7 +8,7 @@ def hifa_bandpassflag(vis=None, caltable=None, intent=None, field=None, spw=None
                       solint=None, maxchannels=None, evenbpints=None, bpsnr=None, minbpsnr=None, bpnsols=None,
                       combine=None, refant=None, minblperant=None, minsnr=None, solnorm=None, antnegsig=None,
                       antpossig=None, tmantint=None, tmint=None, tmbl=None, antblnegsig=None, antblpossig=None,
-                      relaxed_factor=None, niter=None, pipelinemode=None, dryrun=None, acceptresults=None):
+                      relaxed_factor=None, niter=None, dryrun=None, acceptresults=None):
 
     """
     hifa_bandpassflag ---- Bandpass calibration flagging
@@ -27,8 +27,7 @@ def hifa_bandpassflag(vis=None, caltable=None, intent=None, field=None, spw=None
     run and applied. If no points were flagged, the 'after' plots are not generated
     or displayed.
     
-    If pipeline mode is 'getinputs' then None is returned. Otherwise the
-    results object for the pipeline task is returned.
+    The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -81,19 +80,19 @@ def hifa_bandpassflag(vis=None, caltable=None, intent=None, field=None, spw=None
                    Example: phaseupnsols=4
     hm_bandpass    The bandpass solution heuristics. The options are:
                    'snr': compute the solution required to achieve the specified SNR
-                   'smoothed': simple smoothing heuristics
+                   'smoothed': simple 'smoothing' i.e. spectral solint>1chan
                    'fixed': use the user defined parameters for all spws
     solint         Time and channel solution intervals in CASA syntax.
                    
                    Default is solint='inf', which is used when hm_bandpass='fixed'.
                    If hm_bandpass is set to 'snr', then the task will attempt to compute and use
                    an optimal SNR-based solint (and warn if this solint is not good enough).
-                   If hm_bandpass is set to 'smoothed', the task will use a smoothed solint.
-    maxchannels    The bandpass solution smoothing factor in channels. The
-                   solution interval is bandwidth / 240. Set to 0 for no smoothing.
+                   If hm_bandpass is set to 'smoothed', the task will override the spectral
+                   solint with bandwidth/maxchannels.
+    maxchannels    The bandpass solution 'smoothing' factor in channels, i.e. spectral
+                   solint will be set to bandwidth/maxchannels
+                   Set to 0 for no smoothing.
                    Used if hm_bandpass='smoothed'.
-                   
-                   Example: maxchannels=0
     evenbpints     Force the per spw frequency solint to be evenly divisible
                    into the spw bandpass if hm_bandpass='snr'.
                    
@@ -143,11 +142,6 @@ def hifa_bandpassflag(vis=None, caltable=None, intent=None, field=None, spw=None
     niter          Maximum number of times to iterate on evaluation of flagging
                    heuristics. If an iteration results in no new flags, then subsequent
                    iterations are skipped.
-    pipelinemode   The pipeline operating mode. In 'automatic' mode the pipeline
-                   determines the values of all context defined pipeline inputs automatically.
-                   In interactive mode the user can set the pipeline context defined parameters
-                   manually. In 'getinputs' mode the user can check the settings of
-                   all pipeline parameters without running the task.
     dryrun         Run the commands (True) or generate the commands to be run but
                    do not execute (False).
     acceptresults  Automatically accept the results of the task into the pipeline context (True)

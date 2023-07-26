@@ -65,12 +65,6 @@
     </ProcessingCommand>
 
     <ProcessingCommand>
-        <Command xmlns="">hif_uvcontfit</Command>
-        <ParameterSet>
-        </ParameterSet>
-    </ProcessingCommand>
-
-    <ProcessingCommand>
         <Command xmlns="">hif_uvcontsub</Command>
         <ParameterSet>
         </ParameterSet>

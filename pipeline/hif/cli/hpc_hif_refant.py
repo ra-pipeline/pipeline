@@ -6,7 +6,7 @@ import pipeline.h.cli.utils as utils
 
 
 def hpc_hif_refant(vis=None, field=None, spw=None, intent=None, hm_refant=None, refant=None, geometry=None,
-                   flagging=None, pipelinemode=None, dryrun=None, acceptresults=None, parallel=None, refantignore=None):
+                   flagging=None, dryrun=None, acceptresults=None, parallel=None, refantignore=None):
 
     """
     hpc_hif_refant ---- Select the best reference antennas
@@ -22,8 +22,7 @@ def hpc_hif_refant(vis=None, field=None, spw=None, intent=None, hm_refant=None, 
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
     
     Issues
     
@@ -33,19 +32,16 @@ def hpc_hif_refant(vis=None, field=None, spw=None, intent=None, hm_refant=None, 
 
     vis           The list of input MeasurementSets. Defaults to the list of
                   MeasurementSets in the pipeline context.
-                  Not available when pipelinemode='automatic'.
                   example: ['M31.ms']
     field         The comma delimited list of field names or field ids for which flagging
                   scores are computed if hm_refant='automatic' and flagging = True.
-                  Not available when pipelinemode='automatic'.
                   example: '' (Default to fields with the specified intents), '3C279', '3C279,M82'
     intent        A string containing a comma delimited list of intents against
                   which the selected fields are matched. Defaults to all supported
-                  intents. Not available when pipelinemode='automatic'.
+                  intents.
                   example: 'BANDPASS', 'AMPLI,BANDPASS,PHASE'
     spw           A string containing the comma delimited list of spectral window ids for
                   which flagging scores are computed if hm_refant='automatic' and flagging = True.
-                  Not available when pipelinemode='automatic'.
                   example: '' (all spws observed with the specified intents), '11,13,15,17'
     hm_refant     The heuristics method or mode for selection the reference
                   antenna. The options are 'manual' and 'automatic. In manual
@@ -62,15 +58,9 @@ def hpc_hif_refant(vis=None, field=None, spw=None, intent=None, hm_refant=None, 
     flagging      Score antennas by percentage of unflagged data. This option
                   requires computing flagging statistics.
                   Parameter is available when hm_refant='automatic'.
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the pipeline
-                  determines the values of all context defined pipeline inputs automatically.
-                  In interactive mode the user can set the pipeline context defined parameters
-                  manually. In 'getinputs' mode the user can check the settings of all
-                  pipeline parameters without running the task.
     dryrun        Run the task (False) or display the command (True).
-                  Available when pipelinemode='interactive'.
     acceptresults Add the results of the task to the pipeline context (True) or
-                  reject them (False). Available when pipelinemode='interactive'.
+                  reject them (False).
     parallel      Execute using CASA HPC functionality, if available.
 
     --------- examples -----------------------------------------------------------

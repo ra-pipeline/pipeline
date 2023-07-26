@@ -1,4 +1,3 @@
-import glob
 import os
 import re
 
@@ -237,7 +236,7 @@ class Tclean(cleanbase.CleanBase):
 
     def move_products(self, old_pname, new_pname, ignore_list=None, remove_list=None, copy_list=None):
         """Move imaging products of one iteration to another.
-        
+
         Certain image types can be excluded from the default "move" operation using the following keywords (in the precedence order):
             ignore_list:    do nothing (no 'remove', 'copy', or 'move'), if any string from the list is in the image name.
             remove_list:    remove without 'move' or 'copy', if any string from the list in the image name.
@@ -324,7 +323,7 @@ class Tclean(cleanbase.CleanBase):
 
         # Determine deconvolver
         if inputs.deconvolver in (None, ''):
-            inputs.deconvolver = self.image_heuristics.deconvolver(inputs.specmode, inputs.spw)
+            inputs.deconvolver = self.image_heuristics.deconvolver(inputs.specmode, inputs.spw, inputs.intent)
 
         # Determine weighting
         if inputs.weighting in (None, ''):
@@ -785,15 +784,15 @@ class Tclean(cleanbase.CleanBase):
         if restore_imagename is not None:
             # PIPE-1354: this block will only be executed for the VLASS selfcal modelcolumn restoration (from hifv_restorepims)
             #
-            # As of CASA 6.4.1, if selfcal model images are made with mpicasa and later fed to a predict-only serial tclean call 
-            # using "startmodel", the csys latpoles mismatch from CAS-13338 will cause the input model images to be regridded 
+            # As of CASA 6.4.1, if selfcal model images are made with mpicasa and later fed to a predict-only serial tclean call
+            # using "startmodel", the csys latpoles mismatch from CAS-13338 will cause the input model images to be regridded
             # in-flight: a side effect not desired in the VLASS-SE-CUBE case.
-            # for now we make a copy of models under the tclean-predict imagename, and 
+            # for now we make a copy of models under the tclean-predict imagename, and
             # you should see a resetting warning instead:
-            #           WARN    SIImageStore::Open existing Images (file src/code/synthesis/ImagerObjects/SIImageStore.cc, line 568)     
-            #           Mismatch in Csys latpoles between existing image on disk ([350.792, 50.4044, 180, 50.4044]) 
-            #           The DirectionCoordinates have differing latpoles -- Resetting to match image on disk           
-            # note: we preassume that restore_imagename and new_pname are different.              
+            #           WARN    SIImageStore::Open existing Images (file src/code/synthesis/ImagerObjects/SIImageStore.cc, line 568)
+            #           Mismatch in Csys latpoles between existing image on disk ([350.792, 50.4044, 180, 50.4044])
+            #           The DirectionCoordinates have differing latpoles -- Resetting to match image on disk
+            # note: we preassume that restore_imagename and new_pname are different.
             rootname, _ = os.path.splitext(result.psf)
             rootname, _ = os.path.splitext(rootname)
             LOG.info('Copying model images for the modelcolumn prediction tclean call.')
@@ -824,7 +823,10 @@ class Tclean(cleanbase.CleanBase):
              pbcor_image_max,  # added to result, later used in Weblog under name 'image_max'
              # USED
              residual_robust_rms,
-             nonpbcor_image_robust_rms_and_spectra) = \
+             nonpbcor_image_robust_rms_and_spectra,
+             pbcor_image_min_iquv,
+             pbcor_image_max_iquv,
+             nonpbcor_image_non_cleanmask_rms_iquv) = \
                 sequence_manager.iteration_result(model=result.model,
                                                   restored=result.image, residual=result.residual,
                                                   flux=result.flux, cleanmask=None,
@@ -925,7 +927,10 @@ class Tclean(cleanbase.CleanBase):
              pbcor_image_min,
              pbcor_image_max,
              residual_robust_rms,
-             nonpbcor_image_robust_rms_and_spectra) = \
+             nonpbcor_image_robust_rms_and_spectra,
+             pbcor_image_min_iquv,
+             pbcor_image_max_iquv,
+             nonpbcor_image_non_cleanmask_rms_iquv) = \
                 sequence_manager.iteration_result(model=result.model,
                                                   restored=result.image, residual=result.residual,
                                                   flux=result.flux, cleanmask=new_cleanmask,
@@ -939,8 +944,11 @@ class Tclean(cleanbase.CleanBase):
 
             # Keep image cleanmask area min and max and non-cleanmask area RMS for weblog and QA
             result.set_image_min(pbcor_image_min)
+            result.set_image_min_iquv(pbcor_image_min_iquv)
             result.set_image_max(pbcor_image_max)
+            result.set_image_max_iquv(pbcor_image_max_iquv)
             result.set_image_rms(nonpbcor_image_non_cleanmask_rms)
+            result.set_image_rms_iquv(nonpbcor_image_non_cleanmask_rms_iquv)
             result.set_image_rms_min(nonpbcor_image_non_cleanmask_rms_min)
             result.set_image_rms_max(nonpbcor_image_non_cleanmask_rms_max)
             result.set_image_robust_rms_and_spectra(nonpbcor_image_robust_rms_and_spectra)
@@ -970,7 +978,7 @@ class Tclean(cleanbase.CleanBase):
                      (iteration-1))
             _ = self._do_clean(iternum=iteration-1, cleanmask='', niter=0, threshold='0.0mJy',
                                sensitivity=sequence_manager.sensitivity, savemodel=savemodel, startmodel=restore_startmodel,
-                               result=None, calcpsf=False, calcres=False, parallel=False)                               
+                               result=None, calcpsf=False, calcres=False, parallel=False)
 
         return result
 
@@ -997,10 +1005,10 @@ class Tclean(cleanbase.CleanBase):
 
     def _do_scal_imaging(self, sequence_manager):
         """Do self-calibration imaging sequence.
-        
+
         This method produces the optimal selfcal solution via the iterative imaging-selfcal loop.
-        It also generate before-scal/after-scal. The input MS is assumed to be calibrated via 
-        standard calibration procedures but they have been splitted from the original *_targets.ms 
+        It also generate before-scal/after-scal. The input MS is assumed to be calibrated via
+        standard calibration procedures but they have been splitted from the original *_targets.ms
         and rebinned in frequency.
         """
 
@@ -1054,7 +1062,10 @@ class Tclean(cleanbase.CleanBase):
          pbcor_image_max,  # added to result, later used in Weblog under name 'image_max'
          # USED
          residual_robust_rms,
-         nonpbcor_image_robust_rms_and_spectra) = \
+         nonpbcor_image_robust_rms_and_spectra,
+         pbcor_image_min_iquv,
+         pbcor_image_max_iquv,
+         nonpbcor_image_non_cleanmask_rms_iquv) = \
             sequence_manager.iteration_result(model=result.model,
                                               restored=result.image, residual=result.residual,
                                               flux=result.flux, cleanmask=None,
@@ -1073,8 +1084,11 @@ class Tclean(cleanbase.CleanBase):
             self._update_miscinfo(result.image.replace('.image', '.image'+extension), max([len(field_ids.split(',')) for field_ids in self.image_heuristics.field(inputs.intent, inputs.field)]), pbcor_image_min, pbcor_image_max)
 
             result.set_image_min(pbcor_image_min)
+            result.set_image_min_iquv(pbcor_image_min_iquv)
             result.set_image_max(pbcor_image_max)
+            result.set_image_max_iquv(pbcor_image_max_iquv)
             result.set_image_rms(nonpbcor_image_non_cleanmask_rms)
+            result.set_image_rms_iquv(nonpbcor_image_non_cleanmask_rms_iquv)
             result.set_image_rms_min(nonpbcor_image_non_cleanmask_rms_min)
             result.set_image_rms_max(nonpbcor_image_non_cleanmask_rms_max)
             result.set_image_robust_rms_and_spectra(nonpbcor_image_robust_rms_and_spectra)
@@ -1138,7 +1152,7 @@ class Tclean(cleanbase.CleanBase):
             new_pname = '%s.iter%s' % (rootname, iteration)
             self.copy_products(os.path.basename(old_pname), os.path.basename(new_pname),
                                ignore='mask' if do_not_copy_mask else None)
-            
+
             threshold = self.image_heuristics.threshold(iteration, sequence_manager.threshold, inputs.hm_masking)
             nsigma = self.image_heuristics.nsigma(iteration, inputs.hm_nsigma, inputs.hm_masking)
             savemodel = self.image_heuristics.savemodel(iteration)
@@ -1164,7 +1178,10 @@ class Tclean(cleanbase.CleanBase):
              pbcor_image_min,
              pbcor_image_max,
              residual_robust_rms,
-             nonpbcor_image_robust_rms_and_spectra) = \
+             nonpbcor_image_robust_rms_and_spectra,
+             pbcor_image_min_iquv,
+             pbcor_image_max_iquv,
+             nonpbcor_image_non_cleanmask_rms_iquv) = \
                 sequence_manager.iteration_result(model=result.model,
                                                   restored=result.image, residual=result.residual,
                                                   flux=result.flux, cleanmask=new_cleanmask,
@@ -1188,8 +1205,11 @@ class Tclean(cleanbase.CleanBase):
 
             # Keep image cleanmask area min and max and non-cleanmask area RMS for weblog and QA
             result.set_image_min(pbcor_image_min)
+            result.set_image_min_iquv(pbcor_image_min_iquv)
             result.set_image_max(pbcor_image_max)
+            result.set_image_max_iquv(pbcor_image_max_iquv)
             result.set_image_rms(nonpbcor_image_non_cleanmask_rms)
+            result.set_image_rms_iquv(nonpbcor_image_non_cleanmask_rms_iquv)
             result.set_image_rms_min(nonpbcor_image_non_cleanmask_rms_min)
             result.set_image_rms_max(nonpbcor_image_non_cleanmask_rms_max)
             result.set_image_robust_rms_and_spectra(nonpbcor_image_robust_rms_and_spectra)

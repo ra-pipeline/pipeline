@@ -10,7 +10,7 @@ import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.hifv.heuristics import getCalFlaggedSoln
-from pipeline.hifv.heuristics import find_EVLA_band
+from pipeline.infrastructure.tablereader import find_EVLA_band
 from pipeline.hifv.heuristics import standard as standard
 from pipeline.hifv.heuristics import weakbp, do_bandpass, uvrange
 from pipeline.hifv.tasks.setmodel.vlasetjy import standard_sources

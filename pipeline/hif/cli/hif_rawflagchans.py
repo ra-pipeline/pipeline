@@ -7,7 +7,7 @@ def hif_rawflagchans(vis=None, spw=None, intent=None,
   flag_hilo=None, fhl_limit=None, fhl_minsample=None,
   flag_bad_quadrant=None, fbq_hilo_limit=None,
   fbq_antenna_frac_limit=None, fbq_baseline_frac_limit=None,
-  pipelinemode=None, dryrun=None, acceptresults=None):
+  dryrun=None, acceptresults=None):
 
     """
     hif_rawflagchans ---- Flag deviant baseline/channels in raw data
@@ -51,8 +51,7 @@ def hif_rawflagchans(vis=None, spw=None, intent=None,
     
     Output
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -92,11 +91,6 @@ def hif_rawflagchans(vis=None, spw=None, intent=None,
                             suspect channel/baselines in a particular baseline/quadrant exceeds
                             fbq_baseline_frac_limit then all data for that baseline/quadrant will
                             be flagged.
-    pipelinemode            e operating mode. In 'automatic' mode the pipeline
-                            determines the values of all context defined pipeline inputs automatically.
-                            In interactive mode the user can set the pipeline context defined
-                            parameters manually. In 'getinputs' mode the user can check the settings of
-                            all pipeline parameters without running the task.
     dryrun                  Run the commands (True) or generate the commands to be run but
                             do not execute (False).
     acceptresults           This parameter has no effect. The Tsyscal file is already

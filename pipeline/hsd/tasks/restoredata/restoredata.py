@@ -50,7 +50,8 @@ class SDRestoreDataInputs(restoredata.RestoreDataInputs):
             vis: the ASDMs(s) for which data is to be restored
             bdfflags: set the BDF flags
             lazy: use the lazy filler to restore data
-            asis: list of ASDM tables to import as is
+            asis: Creates verbatim copies of the ASDM tables in the output MS.
+                  The value given to this option must be a list of table names separated by space characters.
             hm_rasterscan: Heuristics method for raster scan analysis
         """
         super(SDRestoreDataInputs, self).__init__(context, copytoraw=copytoraw, products_dir=products_dir,

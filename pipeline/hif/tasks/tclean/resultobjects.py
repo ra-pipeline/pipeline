@@ -59,8 +59,11 @@ class TcleanResult(basetask.Results):
         self._DR_correction_factor = 1.0
         self._maxEDR_used = False
         self._image_min = 0.0
+        self._image_min_iquv = [0.0, 0.0, 0.0, 0.0]
         self._image_max = 0.0
+        self._image_max_iquv = [0.0, 0.0, 0.0, 0.0]
         self._image_rms = 0.0
+        self._image_rms_iquv = [0.0, 0.0, 0.0, 0.0]
         self._image_rms_min = 0.0
         self._image_rms_max = 0.0
         self._image_robust_rms_and_spectra = None
@@ -90,6 +93,8 @@ class TcleanResult(basetask.Results):
         self.synthesized_beams = None
         # Store visibility amplitude ratio for VLA
         self.bl_ratio = None
+        # Polarization calibrator fit result
+        self.polcal_fit = None
 
     def merge_with_context(self, context):
         # Calculated beams for later stages
@@ -542,6 +547,13 @@ class TcleanResult(basetask.Results):
         self._image_min = image_min
 
     @property
+    def image_min_iquv(self):
+        return self._image_min_iquv
+
+    def set_image_min_iquv(self, image_min_iquv):
+        self._image_min_iquv = image_min_iquv
+
+    @property
     def image_max(self):
         return self._image_max
 
@@ -549,11 +561,25 @@ class TcleanResult(basetask.Results):
         self._image_max = image_max
 
     @property
+    def image_max_iquv(self):
+        return self._image_max_iquv
+
+    def set_image_max_iquv(self, image_max_iquv):
+        self._image_max_iquv = image_max_iquv
+
+    @property
     def image_rms(self):
         return self._image_rms
 
     def set_image_rms(self, image_rms):
         self._image_rms = image_rms
+
+    @property
+    def image_rms_iquv(self):
+        return self._image_rms_iquv
+
+    def set_image_rms_iquv(self, image_rms_iquv):
+        self._image_rms_iquv = image_rms_iquv
 
     @property
     def image_rms_min(self):

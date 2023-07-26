@@ -6,7 +6,7 @@ import pipeline.h.cli.utils as utils
 
 
 def hif_checkproductsize(vis=None, maxcubesize=None, maxcubelimit=None, maxproductsize=None, maximsize=None,
-                         calcsb=None, parallel=None, pipelinemode=None, dryrun=None, acceptresults=None):
+                         calcsb=None, parallel=None, dryrun=None, acceptresults=None):
 
     """
     hif_checkproductsize ---- Check imaging product size
@@ -30,8 +30,7 @@ def hif_checkproductsize(vis=None, maxcubesize=None, maxcubelimit=None, maxprodu
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -56,13 +55,6 @@ def hif_checkproductsize(vis=None, maxcubesize=None, maxcubelimit=None, maxprodu
                    -1: disables mitigation for this parameter
     calcsb         Force (re-)calculation of sensitivities and beams
     parallel       Use MPI cluster where possible
-    pipelinemode   The pipeline operating mode.
-                   In 'automatic' mode the pipeline determines the values of all
-                   context defined pipeline inputs automatically.
-                   In 'interactive' mode the user can set the pipeline context
-                   defined parameters manually.
-                   In 'getinputs' mode the user can check the settings of all
-                   pipeline parameters without running the task.
     dryrun         Run the task (False) or just display the command (True)
     acceptresults  Add the results of the task to the pipeline context (True) or
                    reject them (False).

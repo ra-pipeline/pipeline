@@ -11,7 +11,7 @@ def hifa_wvrgcalflag(
         refant=None, flag_intent=None, qa_intent=None,
         qa_bandpass_intent=None, accept_threshold=None, flag_hi=None,
         fhi_limit=None, fhi_minsample=None, ants_with_wvr_thresh=None,
-        pipelinemode=None, dryrun=None, acceptresults=None):
+        dryrun=None, acceptresults=None):
 
     """
     hifa_wvrgcalflag ---- 
@@ -177,7 +177,6 @@ def hifa_wvrgcalflag(
                          applied.
                          
                          example: ants_with_wvr_thresh=0.5
-    pipelinemode         The pipeline operating mode
     dryrun               Run the task (False) or display the command(True)
     acceptresults        Add the results to the pipeline context
 

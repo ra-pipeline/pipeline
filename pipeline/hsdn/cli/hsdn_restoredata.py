@@ -6,7 +6,7 @@ import pipeline.h.cli.utils as utils
 
 def hsdn_restoredata(vis=None, caltable=None, reffile=None,
                      products_dir=None, copytoraw=None, rawdata_dir=None, hm_rasterscan=None,
-                     pipelinemode='automatic', dryrun=False, acceptresults=None):
+                     dryrun=False, acceptresults=None):
 
     """
     hsdn_restoredata ---- Restore flagged and calibration single dish data from a pipeline run
@@ -14,10 +14,7 @@ def hsdn_restoredata(vis=None, caltable=None, reffile=None,
     
     The hsdn_restoredata task restores flagged and calibrated MeasurementSets
     from archived ASDMs and pipeline flagging and calibration date products.
-    
-    pipeline context defined parameter argument which can be set only in
-    'interactive mode'
-    
+
     The hsdn_restoredata task restores flagged and calibrated data from archived
     ASDMs and pipeline flagging and calibration data products. Pending archive
     retrieval support hsdn_restoredata assumes that the required products
@@ -52,8 +49,7 @@ def hsdn_restoredata(vis=None, caltable=None, reffile=None,
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -105,11 +101,6 @@ def hsdn_restoredata(vis=None, caltable=None, reffile=None,
     hm_rasterscan Heuristics method for raster scan analysis. Two analysis modes,
                   time-domain analysis ('time') and direction analysis ('direction'), are available.
                   Default is 'time'.
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the pipeline
-                  determines the values of all context defined pipeline inputs automatically.
-                  In 'interactive' mode the user can set the pipeline context defined
-                  parameters manually.  In 'getinputs' mode the user can check the settings
-                  of all pipeline parameters without running the task.
     dryrun        Run the commands (True) or generate the commands to be run but
                   do not execute (False).
     acceptresults Add the results of the task to the pipeline context (True) or

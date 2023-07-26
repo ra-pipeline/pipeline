@@ -2,7 +2,6 @@
 import os
 import collections
 import shutil
-import numpy
 
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
@@ -21,6 +20,7 @@ LOG = logging.get_logger(__name__)
 
 JyperKTRV = collections.namedtuple('JyperKTRV', 'virtualspw msname realspw antenna pol factor')
 JyperKTR  = collections.namedtuple('JyperKTR',  'spw msname antenna pol factor')
+
 
 class T2_4MDetailsSingleDishK2JyCalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     """Weblog renderer class for k2jycal task."""
@@ -47,7 +47,6 @@ class T2_4MDetailsSingleDishK2JyCalRenderer(basetemplates.T2_4MDetailsDefaultRen
             context: Pipeline context
             results: ResultsList instance. Should hold a list of SDK2JyCalResults instance.
         """
-        reffile = None
         spw_factors = collections.defaultdict(lambda: [])
         valid_spw_factors = collections.defaultdict(lambda: collections.defaultdict(lambda: []))
 
@@ -55,6 +54,7 @@ class T2_4MDetailsSingleDishK2JyCalRenderer(basetemplates.T2_4MDetailsDefaultRen
         trfunc_r = lambda _vspwid, _vis, _rspwid, _antenna, _pol, _factor: JyperKTR(_rspwid, _vis, _antenna, _pol, _factor)
         trfunc_v = lambda _vspwid, _vis, _rspwid, _antenna, _pol, _factor: JyperKTRV(_vspwid, _vis, _rspwid, _antenna, _pol, _factor)
         trfunc = trfunc_v if dovirtual else trfunc_r
+        reffile_list = []
         for r in results:
             # rearrange jyperk factors
             ms = context.observing_run.get_ms(name=r.vis)
@@ -84,7 +84,7 @@ class T2_4MDetailsSingleDishK2JyCalRenderer(basetemplates.T2_4MDetailsDefaultRen
                         spw_factors[vspwid].append(tr)
                         if factor is not None:
                             valid_spw_factors[vspwid][corr].append(factor)
-            reffile = r.reffile
+            reffile_list.append(r.reffile)
         stage_dir = os.path.join(context.report_dir, 'stage%s' % results.stage_number)
         # histogram plots of Jy/K factors
         hist_plots = []
@@ -93,17 +93,20 @@ class T2_4MDetailsSingleDishK2JyCalRenderer(basetemplates.T2_4MDetailsDefaultRen
                 task = display.K2JyHistDisplay(stage_dir, vspwid, valid_factors, spw_band[vspwid])
                 hist_plots += task.plot()
         # input Jy/K files
-        reffile_copied = None
-        if reffile is not None and os.path.exists(reffile):
-            LOG.debug('copying %s to %s' % (reffile, stage_dir))
-            shutil.copy2(reffile, stage_dir)
-            reffile_copied = os.path.join(stage_dir, os.path.basename(reffile))
+        reffile_list = list(dict.fromkeys(reffile_list))   # remove duplicated filenames
+        reffile_copied_list = []
+        for reffile in reffile_list:
+            if reffile is not None and os.path.exists(reffile):
+                LOG.debug('copying %s to %s' % (reffile, stage_dir))
+                shutil.copy2(reffile, stage_dir)
+                reffile_copied_list.append( os.path.join(stage_dir, os.path.basename(reffile)) )
+        reffile_copied = None if len(reffile_copied_list) == 0 else reffile_copied_list
         # order table rows so that spw comes first
         row_values = []
         for factor_list in spw_factors.values():
             row_values += list(factor_list)
         ctx.update({'jyperk_rows': utils.merge_td_columns(row_values),
-                    'reffile': reffile_copied,
+                    'reffile_list': reffile_copied,
                     'jyperk_hist': hist_plots,
                     'dovirtual': dovirtual})
 

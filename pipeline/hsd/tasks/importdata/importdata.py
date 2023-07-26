@@ -62,7 +62,8 @@ class SDImportDataInputs(importdata.ImportDataInputs):
             context: pipeline context
             vis: List of input visibility data
             output_dir: path of output directory
-            asis: Extra ASDM tables to convert as is
+            asis: Creates verbatim copies of the ASDM tables in the output MS.
+                  The value given to this option must be a list of table names separated by space characters.
             process_caldevice: Import the CalDevice table from the ASDM
             session: List of sessions of input visibility data. Each element in the list indicates the session of a corresponding element in vis.
             overwrite: Overwrite existing files on import
@@ -196,6 +197,11 @@ class SerialSDImportData(importdata.ImportData):
         myresults.origin = results.origin
         return myresults
 
+    def _get_fluxes(self, context, observing_run):
+        # override _get_fluxes not to create flux.csv (PIPE-1846)
+        # do nothing, return empty results
+        return None, [], None
+
 
 # Tier-0 parallelization
 class HpcSDImportDataInputs(SDImportDataInputs):
@@ -228,7 +234,8 @@ class HpcSDImportDataInputs(SDImportDataInputs):
             context: pipeline context
             vis: List of input visibility data
             output_dir: path of output directory
-            asis: Extra ASDM tables to convert as is
+            asis: Creates verbatim copies of the ASDM tables in the output MS.
+                  The value given to this option must be a list of table names separated by space characters.
             process_caldevice: Import the caldevice table from the ASDM
             session: List of visibility data sessions
             overwrite: Overwrite existing files on import

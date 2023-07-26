@@ -5,7 +5,7 @@ from casatasks import casalog
 import pipeline.h.cli.utils as utils
 
 
-def hifv_checkflag(vis=None, checkflagmode=None, growflags=None, pipelinemode=None, overwrite_modelcol=None,
+def hifv_checkflag(vis=None, checkflagmode=None, growflags=None, overwrite_modelcol=None,
                    dryrun=None, acceptresults=None):
 
     """
@@ -47,12 +47,6 @@ def hifv_checkflag(vis=None, checkflagmode=None, growflags=None, pipelinemode=No
     growflags          Grow flags in time at the end of the following checkflagmodes:
                        default=True, for 'bpd-vla', 'allcals-vla', 'bpd', and 'allcals'  
                        default=False, for '' and 'semi'
-    pipelinemode       The pipeline operating mode. In 'automatic' mode the pipeline
-                       determines the values of all context defined pipeline inputs
-                       automatically.  In 'interactive' mode the user can set the pipeline
-                       context defined parameters manually.  In 'getinputs' mode the user
-                       can check the settings of all pipeline parameters without running
-                       the task.
     overwrite_modelcol Always write the model column, even if it already exists
     dryrun             Run the commands (True) or generate the commands to be run but
                        do not execute (False).  This is a pipeline task execution mode.
@@ -65,8 +59,7 @@ def hifv_checkflag(vis=None, checkflagmode=None, growflags=None, pipelinemode=No
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
     
     
     Examples

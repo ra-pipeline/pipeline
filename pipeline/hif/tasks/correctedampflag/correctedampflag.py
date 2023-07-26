@@ -12,10 +12,9 @@ import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
 from pipeline.domain.measurementset import MeasurementSet
-from pipeline.h.tasks.common import commonhelpermethods
+from pipeline.h.tasks.common import commonhelpermethods, mstools
 from pipeline.h.tasks.common.arrayflaggerbase import FlagCmd
 from pipeline.h.tasks.flagging.flagdatasetter import FlagdataSetter
-from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import task_registry
 from .resultobjects import CorrectedampflagResults
 
@@ -838,7 +837,8 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         newflags = []
 
         # Read in data from MS. If no valid data could be read, return early with no flags.
-        data = self._read_data_from_ms(ms, intent, field, spwid, baseline_set=baseline_set)
+        data = mstools.read_channel_averaged_data_from_ms(ms, field, spwid, intent,
+            ['corrected_data', 'model_data', 'antenna1', 'antenna2', 'flag', 'time', 'uvdist'], baseline_set)
         if not data:
             return newflags
 
@@ -1319,50 +1319,6 @@ class Correctedampflag(basetask.StandardTaskTemplate):
                                     antenna_id_to_name=antenna_id_to_name))
 
         return newflags
-
-    @staticmethod
-    def _read_data_from_ms(ms: MeasurementSet, intent: str, field: str, spwid: int,
-                           baseline_set: Optional[List] = None) -> Dict:
-        # Identify scans for given data selection.
-        scans_with_data = ms.get_scans(scan_intent=intent, field=field, spw=spwid)
-        if not scans_with_data:
-            LOG.info('No data expected for {} {} intent, field {}, spw {}. Continuing...'
-                     ''.format(ms.basename, intent, field, spwid))
-            return {}
-
-        # Initialize data selection.
-        data_selection = {'field': field,
-                          'scanintent': '*%s*' % utils.to_CASA_intent(ms, intent),
-                          'spw': str(spwid)}
-
-        # Add baseline set to data selection if provided; log selection.
-        if baseline_set:
-            LOG.info('Reading data for {}, intent {}, field {}, spw {}, and {} baselines ({})'.format(
-                os.path.basename(ms.name), intent, field, spwid, baseline_set[0], baseline_set[1]))
-            data_selection['baseline'] = baseline_set[1]
-        else:
-            LOG.info('Reading data for {}, intent {}, field {}, spw {}, and all baselines'.format(
-                os.path.basename(ms.name), intent, field, spwid))
-
-        # Get number of channels for this spw.
-        nchans = ms.get_spectral_windows(str(spwid))[0].num_channels
-
-        # Read in data from MS.
-        with casa_tools.MSReader(ms.name) as openms:
-            try:
-                # Apply data selection, and set channel selection to take the
-                # average of all channels.
-                openms.msselect(data_selection)
-                openms.selectchannel(1, 0, nchans, 1)
-
-                # Extract data from MS.
-                data = openms.getdata(['corrected_data', 'model_data', 'antenna1', 'antenna2', 'flag', 'time', 'uvdist'])
-            except:
-                LOG.warning('Unable to compute flagging for intent {}, field {}, spw {}'.format(intent, field, spwid))
-                data = {}
-                openms.close()
-
-        return data
 
     @staticmethod
     def _create_flags_for_ultrahigh_baselines_timestamps(ms: MeasurementSet, spwid: int, intent: str, icorr: int,

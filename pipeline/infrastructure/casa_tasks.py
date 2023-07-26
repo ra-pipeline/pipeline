@@ -103,6 +103,11 @@ def imdev(*v, **k) -> JobRequest:
 
 
 @register_task
+def imfit(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.imfit, *v, **k)
+
+
+@register_task
 def imhead(*v, **k) -> JobRequest:
     return JobRequest(casatasks.imhead, *v, **k)
 
@@ -213,6 +218,11 @@ def tclean(*v, **k) -> JobRequest:
 
 
 @register_task
+def uvcontsub(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.uvcontsub, *v, **k)
+
+
+@register_task
 def wvrgcal(*v, **k) -> JobRequest:
     return JobRequest(almatasks.wvrgcal, *v, **k)
 
@@ -220,17 +230,6 @@ def wvrgcal(*v, **k) -> JobRequest:
 @register_task
 def visstat(*v, **k) -> JobRequest:
     return JobRequest(casatasks.visstat, *v, **k)
-
-
-@register_task
-def uvcontfit(*v, **k) -> JobRequest:
-    """The wrapper function to create jobrequests for task_uvcontfit.uvcontfit.
-
-    Note this is a Pipeline CASA-style task rather than a genuine CASA task
-    The in-function import is necessary to avoid circular imports.
-    """
-    import pipeline.hif.cli.uvcontfit as uvcontfit
-    return JobRequest(uvcontfit, *v, **k)
 
 
 @register_task
@@ -285,7 +284,7 @@ def move(*v, **k) -> JobRequest:
 
 class CasaTasks:
     """A class to represent a collection of JobRequest-wrapped callables from CASA or Python modules.
-    
+
     CasaTasks wraps frequently-used CASA tasks and Python functions into individual class methods that
     can create and execute JobRequests on-the-fly. Then their calls will be properly
     logged and recorded by the Pipeline logging framework:
@@ -296,16 +295,16 @@ class CasaTasks:
     scripts/module into Pipeline with minimal changes.
 
     Example 1):
-        
+
         from casatasks import tclean
-        
+
             can be replaced by:
-        
+
         from pipeline.infrastructure.casa_tasks import casa_tasks
         tclean=casa_tasks.tclean
 
     Example 2):
-    
+
         from pipeline.infrastructure.casa_tasks import CasaTasks
         ct = CasaTasks()
         ct.listobs(vis='my.ms')

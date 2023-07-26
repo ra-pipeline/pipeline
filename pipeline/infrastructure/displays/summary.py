@@ -389,7 +389,8 @@ class FieldVsTimeChart(ParameterVsTimeChart):
             minor_locator = ticker.MultipleLocator(1)
             ax.yaxis.set_minor_locator(minor_locator)
         else:
-            major_locator = ticker.FixedLocator(np.arange(0, nfield+1, 400))
+            step = np.ceil(nfield / 10.)  # show at most 10 tick labels
+            major_locator = ticker.IndexLocator(step, 0)
         ax.yaxis.set_major_locator(major_locator)
         ax.grid(True)
 
@@ -581,8 +582,8 @@ class MosaicChart(object):
 
         try:
             plotmosaic.plot_mosaic(self.ms, self.source, self.figfile)
-        except:
-            LOG.debug('Could not create mosaic plot')
+        except Exception as e:
+            LOG.warn('Could not create mosaic plot: {}'.format(e))
             return None
 
         return self._get_plot_object()

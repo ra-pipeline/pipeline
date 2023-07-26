@@ -5,7 +5,7 @@ import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.vdp as vdp
 from pipeline.h.heuristics import caltable as caltable_heuristic
-from pipeline.hifv.heuristics import find_EVLA_band
+from pipeline.infrastructure.tablereader import find_EVLA_band
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 from . import resultobjects

@@ -7,7 +7,7 @@ import pipeline.h.cli.utils as utils
 
 def hif_setjy(vis=None, field=None, intent=None, spw=None, model=None,
               reffile=None, normfluxes=None, reffreq=None, fluxdensity=None,
-              spix=None, scalebychan=None, standard=None, pipelinemode=None,
+              spix=None, scalebychan=None, standard=None,
               dryrun=None, acceptresults=None):
 
     """
@@ -24,8 +24,7 @@ def hif_setjy(vis=None, field=None, intent=None, spw=None, model=None,
     
     Output
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -84,13 +83,6 @@ def hif_setjy(vis=None, field=None, intent=None, spw=None, model=None,
                   
                   default: 'Butler-JPL-Horizons 2012' for solar system object
                                            'Perley-Butler 2010' otherwise
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the pipeline
-                  determines the values of all context defined pipeline inputs automatically.
-                  In interactive mode the user can set the pipeline context defined
-                  parameters manually. In 'getinputs' mode the user can check the settings of
-                  all pipeline parameters without running the task.
-                  
-                  default: 'automatic'.
     dryrun        Run the commands (True) or generate the commands to be run but
                   do not execute (False).
     acceptresults Add the results of the task to the pipeline context (True) or

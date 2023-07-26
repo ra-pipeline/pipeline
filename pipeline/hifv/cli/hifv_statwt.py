@@ -5,7 +5,7 @@ from casatasks import casalog
 import pipeline.h.cli.utils as utils
 
 
-def hifv_statwt(vis=None, datacolumn=None, pipelinemode=None, overwrite_modelcol=None,
+def hifv_statwt(vis=None, datacolumn=None, overwrite_modelcol=None,
                 statwtmode=None, dryrun=None, acceptresults=None):
 
     """
@@ -22,12 +22,6 @@ def hifv_statwt(vis=None, datacolumn=None, pipelinemode=None, overwrite_modelcol
     datacolumn         Data column used to compute weights. Supported values are
                        "data", "corrected", "residual", and "residual_data"
                        (case insensitive, minimum match supported).
-    pipelinemode       The pipeline operating mode. In 'automatic' mode the pipeline
-                       determines the values of all context defined pipeline inputs
-                       automatically.  In 'interactive' mode the user can set the pipeline
-                       context defined parameters manually.  In 'getinputs' mode the user
-                       can check the settings of all pipeline parameters without running
-                       the task.
     overwrite_modelcol Always write the model column, even if it already exists
     statwtmode         Sets the weighting parameters for general VLA ('VLA') or VLASS
                        Single Epoch ('VLASS-SE') use case. Note that the 'VLASS-SE'
@@ -43,8 +37,7 @@ def hifv_statwt(vis=None, datacolumn=None, pipelinemode=None, overwrite_modelcol
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
     
     
     Examples

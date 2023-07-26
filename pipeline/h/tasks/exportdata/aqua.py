@@ -786,6 +786,14 @@ def xml_for_sensitivity(d):
     except:
         pbcor_image_max_jy_per_beam = 'N/A'
 
+    try:
+        if d['imagename'] is None:
+            imagename = 'N/A'
+        else:
+            imagename = d['imagename']
+    except:
+        imagename = 'N/A'
+
     xml = ElementTree.Element('Sensitivity',
         Array=d['array'],
         BandwidthHz=bandwidth_hz,
@@ -804,7 +812,8 @@ def xml_for_sensitivity(d):
         MsSpwId=d['spw'],
         IsRepresentative=is_representative,
         PbcorImageMinJyPerBeam=pbcor_image_min_jy_per_beam,
-        PbcorImageMaxJyPerBeam=pbcor_image_max_jy_per_beam
+        PbcorImageMaxJyPerBeam=pbcor_image_max_jy_per_beam,
+        ImageName=imagename
       )
 
     return xml

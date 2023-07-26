@@ -3,7 +3,6 @@ import itertools
 import math
 import operator
 import os
-
 import numpy as np
 
 import pipeline.infrastructure as infrastructure
@@ -15,6 +14,7 @@ from pipeline.h.tasks.common import arrayflaggerbase
 from pipeline.h.tasks.common import flaggableviewresults
 from pipeline.h.tasks.common import ozone
 from pipeline.infrastructure import casa_tools
+from pipeline.infrastructure.utils.utils import find_ranges
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -45,15 +45,15 @@ def _get_ant_id_to_name_dict(ms):
     return antenna_id_to_name
 
 
-def _log_outlier(msg):
+def _log_outlier(msg, level=logging.DEBUG):
     """
     Pipeline DEBUG messages are only logged to the terminal unless the
     CASA logging priority level is also lowered. This method will log
     the outlier message as well as record it in the CASA log, so it can
     be referenced afterwards.
     """
-    if LOG.isEnabledFor(logging.DEBUG):
-        LOG.debug(msg)
+    if LOG.isEnabledFor(level):
+        LOG.log(level, msg)
         # Log outliers directly to CASA log (CAS-11313)
         casa_tools.post_to_log(msg)
 
@@ -543,12 +543,31 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
                 if not np.any(ind2flag):
                     continue
 
-                # If the view is for a specific set of antennas, then
-                # include these in the warning
+                # PIPE-344: If the flagged channels fall within ozone lines, then ignore these outliers
+                # (but still display a warning message that no action was taken)
+                ozone_channels = ozone.get_ozone_channels_for_spw(self.inputs.ms, spw)
+                rejected_flagging = []
+                for chan in np.where(ozone_channels)[0]:
+                    if np.any(ind2flag[chan]):
+                        rejected_flagging.append(chan)
+                    ind2flag[chan] = False
+
+                # If the view is for a specific set of antennas, then include these in the warning
                 if antenna:
                     ants_as_str = ", ant {}".format(antenna)
                 else:
                     ants_as_str = ""
+
+                if rejected_flagging:
+                    msg = ("Outliers provisionally found with flagging rule '{}' for {}, spw {}, pol {}{}, "
+                           "channel {}, were not flagged because they overlap with known atmospheric ozone lines".
+                           format(rulename, os.path.basename(table), spw, pol, ants_as_str, find_ranges(rejected_flagging)))
+                    # add a message at the "attention" level, creating a notification banner in the weblog
+                    _log_outlier(msg, logging.ATTENTION)
+
+                # check again if any outliers remained after excluding those within ozone lines
+                if not np.any(ind2flag):
+                    continue
 
                 # Log a debug message with outliers.
                 outliers_as_str = ", ".join(sorted([str(ol) for ol in data_masked[ind2flag].data], reverse=True))
@@ -562,8 +581,7 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
                 i2flag = i[ind2flag]
                 j2flag = j[ind2flag]
 
-                # Add new flag command to flag data underlying the
-                # view.
+                # Add new flag command to flag data underlying the view.
                 for flagcoord in zip(xdata[i2flag], ydata[j2flag]):
                     newflags.append(arrayflaggerbase.FlagCmd(
                         reason='outlier', filename=table, rulename=rulename, spw=spw, antenna=antenna,
@@ -1177,12 +1195,30 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
                 if not np.any(ind2flag):
                     continue
 
+                # PIPE-344: If the flagged channels fall within ozone lines, then ignore these outliers
+                ozone_channels = ozone.get_ozone_channels_for_spw(self.inputs.ms, spw)
+                rejected_flagging = []
+                for chan in np.where(ozone_channels)[0]:
+                    if np.any(ind2flag[chan]):
+                        rejected_flagging.append(chan)
+                    ind2flag[chan] = False
+
+                if rejected_flagging:
+                    msg = ("Outliers that could have been flagged with '{}' for {}, spw {}, pol {}, channel {}, were "
+                           "removed from the flagging list because they overlap with known atmospheric ozone lines".
+                           format(rulename, os.path.basename(table), spw, pol, find_ranges(rejected_flagging)))
+                    _log_outlier(msg, logging.ATTENTION)
+
+                # check again if any outliers remained after excluding those within ozone lines
+                if not np.any(ind2flag):
+                    continue
+
                 i2flag = i[ind2flag]
                 j2flag = j[ind2flag]
 
                 # have to be careful here not to corrupt the data view
                 # as we go through it testing for bad quadrant/antenna.
-                # Make a copy of the view flags and go though these
+                # Make a copy of the view flags and go through these
                 # one antenna at a time testing for bad quadrant.
                 # If bad, copy 'outlier' and 'bad quadrant' flags to
                 # original view. 'unflagged_flag_copy' is a copy

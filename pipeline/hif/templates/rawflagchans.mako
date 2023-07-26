@@ -13,25 +13,13 @@ total_keys = {
 	'BANDPASS'     : 'Bandpass',
 	'AMPLITUDE'    : 'Flux',
 	'PHASE'        : 'Phase',
-	'TARGET'       : 'Target',
+	'TARGET'       : 'Target (science spws)',
     'POLARIZATION' : 'Polarization',
     'POLANGLE'     : 'Polarization angle',
     'POLLEAKAGE'   : 'Polarization leakage',
 	'CHECK'		   : 'Check',
+	'DIFFGAIN'     : 'Diffgain',
 }
-
-def template_agent_header1(agent):
-	span = 'col' if agent in ('online','template') else 'row'
-	return '<th %sspan=2>%s</th>' % (span, agent_description[agent])
-
-def template_agent_header2(agent):
-	if agent in ('online', 'template'):
-		return '<th>File</th><th>Number of Statements</th>'
-	else:
-		return ''		
-
-def get_template_agents(agents):
-	return [a for a in agents if a in ('online', 'template')]
 %>
 
 
@@ -145,36 +133,36 @@ def agent_data(agent, ms):
 			<th colspan="${len(flags)}">Measurement Set</th>
 		</tr>
         <tr>
-%for ms in flags.keys():
+        % for ms in flags.keys():
 			<th class="rotate"><div><span>${ms}</span></div></th>
-%endfor
+        % endfor
         </tr>
 	</thead>
 	<tbody>
-%for k in flag_table_intents:
+        % for k in flag_table_intents:
 		<tr>
 			<th>${total_keys[k]}</th>		
-	% for agent in agents:
-			<td>${total_for_agent(agent, k)}</td>
-	% endfor
+	        % for agent in agents:
+			    <td>${total_for_agent(agent, k)}</td>
+	        % endfor
 			<td>${total_for_mses(flags.keys(), k)}</td>
-	% for ms in flags.keys():
-			<td>${total_for_mses([ms], k)}</td>
-	% endfor		
+	        % for ms in flags.keys():
+    			<td>${total_for_mses([ms], k)}</td>
+	        % endfor
 		</tr>
-%endfor
-%for ms in flags.keys():
+        % endfor
+        % for ms in flags.keys():
 		<tr>
 			<th>${ms}</th>
-	% for agent in agents:
-			<td>${total_for_agent(agent, 'TOTAL', [ms])}</td>
-	% endfor
+	        % for agent in agents:
+    			<td>${total_for_agent(agent, 'TOTAL', [ms])}</td>
+	        % endfor
 			<td>${total_for_mses([ms], 'TOTAL')}</td>
-	% for ms in flags.keys():
-			<td></td>
-	% endfor
+	        % for ms in flags.keys():
+    			<td></td>
+	        % endfor
 		</tr>
-%endfor
+        % endfor
 	</tbody>
 </table>
 

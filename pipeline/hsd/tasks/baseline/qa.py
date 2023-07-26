@@ -61,14 +61,9 @@ class SDBaselineQAHandler(pqa.QAPlugin):
                                                             field_id_list,
                                                             spw_id_list,
                                                             lines_list))
-        for figfile, stat in result.outcome['baseline_quality_stat'].items():
-            plot = _get_plot(result.outcome['plots'], figfile)
-            if plot is None:
-                LOG.warning(f'Unable to find plot instance for {figfile}')
-                continue
-            p = plot.parameters
-            scores.append(qacalc.score_sd_baseline_quality(p['vis'], plot.field, p['ant'], p['spw'], p['pol'], stat))
-            del plot
+        for qstat in result.outcome['baseline_quality_stat']:
+            scores.append(qacalc.score_sd_baseline_quality(qstat.vis, qstat.field, qstat.ant, 
+                                                           qstat.spw, qstat.pol, qstat.stat))
         result.qa.pool.extend(scores)
 
 def _get_plot(plots: List[logger.Plot], figfile: str) -> Optional[Union[compress.CompressedObj, logger.Plot]]:

@@ -2,8 +2,7 @@ import sys
 
 import pipeline.h.cli.utils as utils
 
-def hsd_imaging(mode=None, restfreq=None, pipelinemode=None, 
-                  infiles=None, field=None, spw=None, 
+def hsd_imaging(mode=None, restfreq=None, infiles=None, field=None, spw=None,
                   dryrun=None, acceptresults=None):
 
     """
@@ -18,9 +17,7 @@ def hsd_imaging(mode=None, restfreq=None, pipelinemode=None,
     Note that generated images are always in LSRK frame.
     
     Output:
-    results -- If pipeline mode is 'getinputs' then None is returned.
-    Otherwise the results object for the pipeline task is
-    returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -28,14 +25,7 @@ def hsd_imaging(mode=None, restfreq=None, pipelinemode=None,
                   Accepts either "line" (spectral line imaging) or "ampcal"
                   (image settings for amplitude calibrator)
     restfreq      Rest frequency
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the 
-                  pipeline determines the values of all context defined
-                  pipeline inputs automatically.  In 'interactive' mode
-                  the user can set the pipeline context defined parameters
-                  manually.  In 'getinputs' mode the user can check the 
-                  settings of all pipeline parameters without running
-                  the task.
-    infiles       List of data files. These must be a name of 
+    infiles       List of data files. These must be a name of
                   MeasurementSets that are registered to context via 
                   hsd_importdata task.
                   example: vis=['uid___A002_X85c183_X36f.ms', 

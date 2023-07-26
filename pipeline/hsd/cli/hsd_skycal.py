@@ -4,7 +4,7 @@ import pipeline.h.cli.utils as utils
 
 def hsd_skycal(calmode=None, fraction=None, noff=None,
                  width=None, elongated=None,
-                 pipelinemode=None, infiles=None, field=None,
+                 infiles=None, field=None,
                  spw=None, scan=None, 
                  dryrun=None, acceptresults=None):
 
@@ -17,8 +17,7 @@ def hsd_skycal(calmode=None, fraction=None, noff=None,
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -54,12 +53,6 @@ def hsd_skycal(calmode=None, fraction=None, noff=None,
     elongated     Sub-parameter for calmode. Edge marking parameter for
                   'otf' mode. Please set True only if observed area is elongated
                   in one direction.
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the
-                  pipeline determines the values of all context defined pipeline inputs
-                  automatically. In 'interactive' mode the user can set the pipeline
-                  context defined parameters manually. In 'getinputs' mode the user
-                  can check the settings of all pipeline parameters without running
-                  the task.
     infiles       List of data files. These must be a name of MeasurementSets that
                   are registered to context via hsd_importdata task.
                   

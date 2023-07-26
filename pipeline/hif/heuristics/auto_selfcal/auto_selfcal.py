@@ -3,28 +3,29 @@
 see: https://github.com/jjtobin/auto_selfcal
 """
 
-import os
 import glob
+import os
 
 import numpy as np
 import pipeline.infrastructure as infrastructure
 from pipeline.domain.observingrun import ObservingRun
+from pipeline.infrastructure import casa_tools, utils
 from pipeline.infrastructure.casa_tasks import CasaTasks
 from pipeline.infrastructure.casa_tools import msmd
 from pipeline.infrastructure.casa_tools import table as tb
 from pipeline.infrastructure.tablereader import MeasurementSetReader
-from pipeline.infrastructure import casa_tools
-# from pipeline.infrastructure.utils import request_omp_threading
 
 from .selfcal_helpers import (analyze_inf_EB_flagging, checkmask,
                               compare_beams, estimate_near_field_SNR,
                               estimate_SNR, fetch_spws, fetch_targets,
-                              get_dr_correction, get_nterms,
-                              get_intflux, get_n_ants, get_sensitivity,
-                              get_SNR_self, get_SNR_self_update,
-                              get_solints_simple, get_spw_bandwidth,
-                              get_uv_range, importdata, rank_refants,
-                              sanitize_string)
+                              get_dr_correction, get_intflux, get_n_ants,
+                              get_nterms, get_sensitivity, get_SNR_self,
+                              get_SNR_self_update, get_solints_simple,
+                              get_spw_bandwidth, get_uv_range, importdata,
+                              rank_refants, sanitize_string)
+
+# from pipeline.infrastructure.utils import request_omp_threading
+
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -60,6 +61,7 @@ class SelfcalHeuristics(object):
         self.uvtaper = scal_target['uvtaper']
         self.robust = scal_target['robust']
         self.field = scal_target['field']
+        self.target = utils.dequote(scal_target['field'])
         self.uvrange = scal_target['uvrange']
 
         self.do_amp_selfcal = do_amp_selfcal
@@ -100,7 +102,7 @@ class SelfcalHeuristics(object):
         See the CASA 6.1.1 documentation for tclean to get the definitions of all the parameters
         """
         msmd.open(vis[0])
-        fieldid = msmd.fieldsforname(field)
+        fieldid = msmd.fieldsforname(self.target)
         msmd.done()
         tb.open(vis[0]+'/FIELD')
         ephem_column = tb.getcol('EPHEMERIS_ID')
@@ -302,7 +304,7 @@ class SelfcalHeuristics(object):
                     threshold='0.0Jy', niter=0, savemodel='none', parallel=parallel, cellsize=cellsize,
                     imsize=imsize,
                     nterms=selfcal_library[target][band]['nterms'],
-                    field=target, spw=selfcal_library[target][band]['spws_per_vis'],
+                    field=self.field, spw=selfcal_library[target][band]['spws_per_vis'],
                     uvrange=selfcal_library[target][band]['uvrange'],
                     obstype=selfcal_library[target][band]['obstype'])
 
@@ -333,7 +335,7 @@ class SelfcalHeuristics(object):
                     threshold=str(sensitivity * 4.0) + 'Jy', savemodel='none', parallel=parallel, cellsize=cellsize,
                     imsize=imsize,
                     nterms=selfcal_library[target][band]['nterms'],
-                    field=target, spw=selfcal_library[target][band]['spws_per_vis'],
+                    field=self.field, spw=selfcal_library[target][band]['spws_per_vis'],
                     uvrange=selfcal_library[target][band]['uvrange'],
                     obstype=selfcal_library[target][band]['obstype'])
                 initial_SNR, initial_RMS = estimate_SNR(sani_target+'_'+band+'_initial.image.tt0')
@@ -424,7 +426,7 @@ class SelfcalHeuristics(object):
                                 telescope=self.telescope, nsigma=4.0, scales=[0],
                                 threshold='0.0Jy', niter=0, savemodel='none', parallel=parallel, cellsize=cellsize,
                                 imsize=imsize,
-                                nterms=1, field=target, spw=spws_per_vis, uvrange=selfcal_library[target][band]
+                                nterms=1, field=self.field, spw=spws_per_vis, uvrange=selfcal_library[target][band]
                                 ['uvrange'],
                                 obstype=selfcal_library[target][band]['obstype'])
                         dirty_SNR, dirty_RMS = estimate_SNR(sani_target+'_'+band+'_'+spw+'_dirty.image.tt0')
@@ -450,7 +452,7 @@ class SelfcalHeuristics(object):
                                 telescope=self.telescope, nsigma=4.0, threshold=str(sensitivity * 4.0) + 'Jy', scales=[0],
                                 savemodel='none', parallel=parallel, cellsize=cellsize,
                                 imsize=imsize,
-                                nterms=1, field=target, datacolumn='corrected', spw=spws_per_vis,
+                                nterms=1, field=self.field, datacolumn='corrected', spw=spws_per_vis,
                                 uvrange=selfcal_library[target][band]['uvrange'],
                                 obstype=selfcal_library[target][band]['obstype'])
 
@@ -636,7 +638,7 @@ class SelfcalHeuristics(object):
                             parallel=parallel, cellsize=cellsize,
                             imsize=imsize,
                             nterms=selfcal_library[target][band]['nterms'],
-                            field=target, spw=selfcal_library[target][band]['spws_per_vis'],
+                            field=self.field, spw=selfcal_library[target][band]['spws_per_vis'],
                             uvrange=selfcal_library[target][band]['uvrange'],
                             obstype=selfcal_library[target][band]['obstype'], resume=resume)
 
@@ -675,7 +677,7 @@ class SelfcalHeuristics(object):
                             parallel=parallel, cellsize=cellsize,
                             imsize=imsize,
                             nterms=selfcal_library[target][band]['nterms'],
-                            field=target, spw=selfcal_library[target][band]['spws_per_vis'],
+                            field=self.field, spw=selfcal_library[target][band]['spws_per_vis'],
                             uvrange=selfcal_library[target][band]['uvrange'],
                             obstype=selfcal_library[target][band]['obstype'],
                             savemodel_only=True)
@@ -773,7 +775,7 @@ class SelfcalHeuristics(object):
                                 calmode=solmode[band][iteration],
                                 solnorm=solnorm, solint=solint.replace('_EB', '').replace('_ap', ''),
                                 minsnr=self.gaincal_minsnr, minblperant=4, combine=gaincal_combine[band][iteration],
-                                field=target, gaintable=gaincal_preapply_gaintable[vis],
+                                field=self.field, gaintable=gaincal_preapply_gaintable[vis],
                                 spwmap=gaincal_spwmap[vis],
                                 uvrange=selfcal_library[target][band]['uvrange'],
                                 interp=gaincal_interpolate[vis])
@@ -791,7 +793,7 @@ class SelfcalHeuristics(object):
                                     spw=selfcal_library[target][band][vis]['spws'],
                                     refant=selfcal_library[target][band][vis]['refant'],
                                     calmode='p', solint=solint.replace('_EB', '').replace('_ap', ''),
-                                    minsnr=self.gaincal_minsnr, minblperant=4, combine=test_gaincal_combine, field=target,
+                                    minsnr=self.gaincal_minsnr, minblperant=4, combine=test_gaincal_combine, field=self.field,
                                     gaintable='', spwmap=[],
                                     uvrange=selfcal_library[target][band]['uvrange'])
                                 spwlist = selfcal_library[target][band][vislist[0]]['spws'].split(',')
@@ -828,7 +830,7 @@ class SelfcalHeuristics(object):
                                 interp=applycal_interpolate[vis],
                                 calwt=True, spwmap=applycal_spwmap[vis],
                                 applymode=applycal_mode[band][iteration],
-                                field=target, spw=selfcal_library[target][band][vis]['spws'])
+                                field=self.field, spw=selfcal_library[target][band][vis]['spws'])
 
                         # Create post self-cal image using the model as a startmodel to evaluate how much selfcal helped
                         ##
@@ -841,7 +843,7 @@ class SelfcalHeuristics(object):
                                 selfcal_library[target][band]['nsigma'][iteration] * selfcal_library[target][band]['RMS_curr']) +
                             'Jy', savemodel='none', parallel=parallel, cellsize=cellsize, imsize=imsize,
                             nterms=selfcal_library[target][band]['nterms'],
-                            field=target, spw=selfcal_library[target][band]['spws_per_vis'],
+                            field=self.field, spw=selfcal_library[target][band]['spws_per_vis'],
                             uvrange=selfcal_library[target][band]['uvrange'],
                             obstype=selfcal_library[target][band]['obstype'])
 
@@ -995,12 +997,12 @@ class SelfcalHeuristics(object):
                                                       interp=selfcal_library[target][band][vis]['applycal_interpolate_final'],
                                                       calwt=True, spwmap=selfcal_library[target][band][vis]['spwmap_final'],
                                                       applymode=selfcal_library[target][band][vis]['applycal_mode_final'],
-                                                      field=target, spw=selfcal_library[target][band][vis]['spws'])
+                                                      field=self.field, spw=selfcal_library[target][band][vis]['spws'])
                             else:
                                 LOG.info('****************Removing all calibrations for '+target+' '+band+'**************')
                                 for vis in vislist:
                                     self.cts.flagmanager(vis=vis, mode='restore', versionname='selfcal_starting_flags_'+sani_target)
-                                    self.cts.clearcal(vis=vis, field=target, spw=selfcal_library[target][band][vis]['spws'])
+                                    self.cts.clearcal(vis=vis, field=self.field, spw=selfcal_library[target][band][vis]['spws'])
                                     selfcal_library[target][band]['SNR_post'] = selfcal_library[target][band][
                                         'SNR_orig'].copy()
                                     selfcal_library[target][band]['RMS_post'] = selfcal_library[target][band][
@@ -1056,7 +1058,7 @@ class SelfcalHeuristics(object):
                     savemodel='none', parallel=parallel, cellsize=cellsize,
                     imsize=imsize,
                     nterms=selfcal_library[target][band]['nterms'],
-                    field=target, datacolumn='corrected', spw=selfcal_library[target][band]['spws_per_vis'],
+                    field=self.field, datacolumn='corrected', spw=selfcal_library[target][band]['spws_per_vis'],
                     uvrange=selfcal_library[target][band]['uvrange'],
                     obstype=selfcal_library[target][band]['obstype'])
                 final_SNR, final_RMS = estimate_SNR(sani_target+'_'+band+'_final.image.tt0')
@@ -1135,7 +1137,7 @@ class SelfcalHeuristics(object):
                             telescope=self.telescope, nsigma=4.0, threshold=str(sensitivity * 4.0) + 'Jy', scales=[0],
                             savemodel='none', parallel=parallel, cellsize=cellsize,
                             imsize=imsize,
-                            nterms=1, field=target, datacolumn='corrected', spw=spws_per_vis,
+                            nterms=1, field=self.field, datacolumn='corrected', spw=spws_per_vis,
                             uvrange=selfcal_library[target][band]['uvrange'],
                             obstype=selfcal_library[target][band]['obstype'])
                         final_per_spw_SNR, final_per_spw_RMS = estimate_SNR(sani_target+'_'+band+'_'+spw+'_final.image.tt0')

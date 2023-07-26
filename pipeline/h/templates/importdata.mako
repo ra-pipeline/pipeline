@@ -1,6 +1,14 @@
 <%!
 import os
 from functools import reduce
+
+def singledish_result(results_list):
+    result_repr = ''
+    if len(results_list) > 0:
+        importdata_result = results_list[0]
+        result_repr = str(importdata_result)
+
+    return result_repr.find('SDImportDataResults') != -1
 %>
 <%inherit file="t2-4m_details-base.mako"/>
 
@@ -18,7 +26,7 @@ from functools import reduce
 -->
 
 <p>Data from ${num_mses} measurement set${'s were' if num_mses != 1 else ' was'}
- registered with the pipeline. The imported data 
+ registered with the pipeline. The imported data
 ${'is' if num_mses == 1 else 'are'} summarised below.</p>
 
 <table class="table table-bordered table-striped table-condensed"
@@ -32,7 +40,9 @@ ${'is' if num_mses == 1 else 'are'} summarised below.</p>
 			<th scope="col" rowspan="2">Dst Type</th>
 			<th scope="col" colspan="3">Number Imported</th>
 			<th scope="col" rowspan="2">Size</th>
+			% if not singledish_result(result):
 			<th scope="col" rowspan="2">flux.csv</th>
+			% endif
 		</tr>
 		<tr>
 			<th>Scans</th>
@@ -54,13 +64,16 @@ ${'is' if num_mses == 1 else 'are'} summarised below.</p>
 			<td>${len(ms.fields)}</td>
 			<td>${len({source.name for source in ms.sources if 'TARGET' in source.intents})}</td>
 			<td>${str(ms.filesize)}</td>
+			% if not singledish_result(result):
 			<td><a href="${fluxcsv_files[ms.basename]}" class="replace-pre" data-title="flux.csv">View</a> or <a href="${fluxcsv_files[ms.basename]}" download="${fluxcsv_files[ms.basename]}">download</a></td>
+			% endif
 		</tr>
 	% endfor
 % endfor
 	</tbody>
 </table>
 
+% if not singledish_result(result):
 % if flux_imported:
 <h3>Imported Flux Densities</h3>
 <p>The following flux densities were imported into the pipeline context:</p>
@@ -96,6 +109,7 @@ ${'is' if num_mses == 1 else 'are'} summarised below.</p>
 </table>
 % else:
 <p>No flux densities were imported.</p>
+% endif
 % endif
 
 <h3>Representative Target Information</h3>

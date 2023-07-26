@@ -996,7 +996,8 @@ class SDImaging(basetask.StandardTaskTemplate):
                                     is_representative=_pp.is_representative_source_spw,
                                     bandwidth=__cqa.quantity(_pp.chan_width, 'Hz'),
                                     bwmode='repBW', beam=_pp.beam, cell=_pp.qcell,
-                                    sensitivity=__cqa.quantity(_pp.image_rms, _pp.brightnessunit))
+                                    sensitivity=__cqa.quantity(_pp.image_rms, _pp.brightnessunit),
+                                    imagename=_rgp.imagename)
         __theoretical_noise = Sensitivity(array='TP', intent='TARGET', field=_rgp.source_name,
                                           spw=str(_rgp.combined.v_spws[REF_MS_ID]),
                                           is_representative=_pp.is_representative_source_spw,
@@ -1139,8 +1140,9 @@ class SDImaging(basetask.StandardTaskTemplate):
         Args:
             _rgp : Reduction group parameter object of prepare()
         """
-        # PIPE-251: detect contamination
-        detectcontamination.detect_contamination(self.inputs.context, _rgp.imager_result.outcome['image'])
+        if not basetask.DISABLE_WEBLOG:
+            # PIPE-251: detect contamination
+            detectcontamination.detect_contamination(self.inputs.context, _rgp.imager_result.outcome['image'])
 
     def __append_result(self, _cp: imaging_params.CommonParameters, _rgp: imaging_params.ReductionGroupParameters):
         """Append result to RGP.

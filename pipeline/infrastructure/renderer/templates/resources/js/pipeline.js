@@ -1151,7 +1151,7 @@ python3 -m http.server 8080 --bind localhost
 CASA <5>: h_weblog()
 2020-07-30 12:57:20     INFO    h_weblog::::casa        ##########################################
 2020-07-30 12:57:20     INFO    h_weblog::::casa        ##### Begin Task: h_weblog           #####
-2020-07-30 12:57:20     INFO    h_weblog::::casa        h_weblog( pipelinemode='automatic', relpath='' )
+2020-07-30 12:57:20     INFO    h_weblog::::casa        h_weblog( relpath='' )
 2020-07-30 12:57:20     INFO    h_weblog::pipeline::casa        Found weblogs at:
 2020-07-30 12:57:20     INFO    h_weblog::pipeline::casa+               main/pipeline-procedure_hifa_calimage/html/t1-1.html
 2020-07-30 12:57:20     INFO    h_weblog::pipeline::casa        Using existing HTTP server at 127.0.0.1 port 30000 ...

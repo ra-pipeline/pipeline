@@ -5,7 +5,7 @@ from casatasks import casalog
 import pipeline.h.cli.utils as utils
 
 
-def hif_makermsimages(vis=None, pipelinemode=None, dryrun=None, acceptresults=None):
+def hif_makermsimages(vis=None, dryrun=None, acceptresults=None):
 
     """
     hif_makermsimages ---- Create RMS images for VLASS data.
@@ -14,8 +14,7 @@ def hif_makermsimages(vis=None, pipelinemode=None, dryrun=None, acceptresults=No
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -24,12 +23,6 @@ def hif_makermsimages(vis=None, pipelinemode=None, dryrun=None, acceptresults=No
                   converted  to MS format.
                   
                   example: vis=['X227.ms', 'asdms.tar.gz']
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the pipeline
-                  determines the values of all context defined pipeline inputs
-                  automatically.  In 'interactive' mode the user can set the pipeline
-                  context defined parameters manually.  In 'getinputs' mode the user
-                  can check the settings of all pipeline parameters without running
-                  the task.
     dryrun        Run the commands (True) or generate the commands to be run but
                   do not execute (False).
     acceptresults Add the results of the task to the pipeline context (True) or

@@ -1,5 +1,6 @@
 import ast
 from copy import deepcopy
+import traceback
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -157,6 +158,7 @@ class Renorm(basetask.StandardTaskTemplate):
                                    inp.atm_auto_exclude, atmWarning, atmExcludeCmd, inp.bwthreshspw)
         except Exception as e:
             LOG.error('Failure in running renormalization heuristic: {}'.format(e))
+            LOG.error(traceback.format_exc())
             result = RenormResults(renorm_applied, inp.vis, inp.apply, inp.threshold, inp.correctATM, inp.spw,
                                    inp.excludechan, False, False, {}, {}, alltdm,
                                    inp.atm_auto_exclude, {}, {}, {}, e)

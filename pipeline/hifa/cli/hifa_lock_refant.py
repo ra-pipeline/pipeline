@@ -3,7 +3,7 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
-def hifa_lock_refant(vis=None, pipelinemode=None, dryrun=None, acceptresults=None):
+def hifa_lock_refant(vis=None, dryrun=None, acceptresults=None):
 
     """
     hifa_lock_refant ---- Lock reference antenna list
@@ -19,12 +19,6 @@ def hifa_lock_refant(vis=None, pipelinemode=None, dryrun=None, acceptresults=Non
                   MeasurementSets specified in the pipeline context.
                   
                   Example: vis=['ngc5921.ms']
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the pipeline
-                  determines the values of all context defined pipeline inputs
-                  automatically. In 'interactive' mode the user can set the
-                  pipeline context defined parameters manually. In 'getinputs'
-                  mode the user can check the settings of all pipeline
-                  parameters without running the task.
     dryrun        Run the task (False) or display task command (True)
     acceptresults Add the results into the pipeline context
 
