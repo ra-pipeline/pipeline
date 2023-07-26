@@ -876,3 +876,26 @@ def reset_logfiles(casacalls_logfile=None, casa_logfile=None, prepend=False):
                     outfile.write(infile.read())
 
     return
+
+
+class pl_defaultdict(collections.defaultdict):
+    def __repr__(self):
+        return str(dict(self))
+
+    def as_plain_dict(self):
+        return to_plain_dict(self)
+
+
+def nested_dict():
+    return pl_defaultdict(nested_dict)
+
+
+def to_plain_dict(default_dict):
+    plain_dict = dict()
+    for k, v in default_dict.items():
+        if isinstance(v, collections.defaultdict):
+            plain_dict[k] = to_plain_dict(v)
+        else:
+            plain_dict[k] = v
+
+    return plain_dict
