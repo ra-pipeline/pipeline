@@ -1136,9 +1136,9 @@ class SpwIdVsFreqChart(object):
         request_spws = ms.get_spectral_windows()
         targeted_scans = ms.get_scans(scan_intent='TARGET')
         scan_spws = {spw for scan in targeted_scans for spw in scan.spws if spw in request_spws}
-        list_bw = [float(spw.bandwidth.value)/1.0e9 for spw in request_spws]  # GHz
-        list_fmin = [float(spw.min_frequency.value)/1.0e9 for spw in request_spws]  # GHz
-        list_fmax = [float(spw.max_frequency.value)/1.0e9 for spw in request_spws]  # GHz
+        list_bw = [float(spw.bandwidth.value)/1.0e9 for spw in scan_spws]  # GHz
+        list_fmin = [float(spw.min_frequency.value)/1.0e9 for spw in scan_spws]  # GHz
+        list_fmax = [float(spw.max_frequency.value)/1.0e9 for spw in scan_spws]  # GHz
         list_all_spwids = []
         list_indices = []
         list_all_indices = []
