@@ -1136,13 +1136,13 @@ class SpwIdVsFreqChart(object):
         request_spws = ms.get_spectral_windows()
         targeted_scans = ms.get_scans(scan_intent='TARGET')
         scan_spws = {spw for scan in targeted_scans for spw in scan.spws if spw in request_spws}
-        list_bw = [float(spw.bandwidth.value)/1.0e9 for spw in scan_spws]  # GHz
-        list_fmin = [float(spw.min_frequency.value)/1.0e9 for spw in scan_spws]  # GHz
-        list_fmax = [float(spw.max_frequency.value)/1.0e9 for spw in scan_spws]  # GHz
         list_all_spwids = []
         list_indices = []
         list_all_indices = []
         if self.context.project_summary.telescope in ('VLA', 'EVLA'):  # For VLA
+            list_bw = [float(spw.bandwidth.value)/1.0e9 for spw in request_spws]  # GHz
+            list_fmin = [float(spw.min_frequency.value)/1.0e9 for spw in request_spws]  # GHz
+            list_fmax = [float(spw.max_frequency.value)/1.0e9 for spw in request_spws]  # GHz
             banddict = ms.get_vla_baseband_spws(science_windows_only=True, return_select_list=False, warning=False)
             list_spwids_baseband = []
             for band in banddict:
@@ -1158,6 +1158,9 @@ class SpwIdVsFreqChart(object):
             list_all_indices = list(range(len(list_all_spwids)))
             ax_spw.barh(list_all_indices, list_bw, height=0.4, left=list_fmin)
         else:  # For ALMA and NRO
+            list_bw = [float(spw.bandwidth.value)/1.0e9 for spw in scan_spws]  # GHz
+            list_fmin = [float(spw.min_frequency.value)/1.0e9 for spw in scan_spws]  # GHz
+            list_fmax = [float(spw.max_frequency.value)/1.0e9 for spw in scan_spws]  # GHz
             for list_spwids in utils.get_spectralspec_to_spwid_map(scan_spws).values():
                 shift = len(list_all_spwids)
                 list_indices = [list_spwids.index(spwid)+shift for spwid in list_spwids]
