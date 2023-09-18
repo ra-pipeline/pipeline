@@ -10,7 +10,7 @@ import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.h.tasks.common import commonfluxresults
-from pipeline.hifv.heuristics import find_EVLA_band
+from pipeline.infrastructure.tablereader import find_EVLA_band
 from pipeline.hifv.heuristics import standard as standard
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools

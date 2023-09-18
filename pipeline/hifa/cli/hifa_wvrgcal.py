@@ -3,6 +3,7 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
+@utils.cli_wrapper
 def hifa_wvrgcal(
         vis=None, caltable=None, offsetstable=None, hm_toffset=None,
         toffset=None, segsource=None, sourceflag=None, hm_tie=None, tie=None,
@@ -10,7 +11,7 @@ def hifa_wvrgcal(
         smooth=None, scale=None, maxdistm=None, minnumants=None,
         mingoodfrac=None, refant=None, qa_intent=None,
         qa_bandpass_intent=None, qa_spw=None, accept_threshold=None,
-        pipelinemode=None, dryrun=None, acceptresults=None):
+        dryrun=None, acceptresults=None):
 
     """
     hifa_wvrgcal ---- 
@@ -130,9 +131,8 @@ def hifa_wvrgcal(
     accept_threshold   The phase-rms improvement ratio
                        (rms without wvr / rms with wvr) above which the wrvg file will be
                        accepted into the context for subsequent application.
-    pipelinemode       
-    dryrun             
-    acceptresults      
+    dryrun             Run the task (False) or display the command(True)
+    acceptresults      Add the results to the pipeline context
 
     --------- examples -----------------------------------------------------------
 

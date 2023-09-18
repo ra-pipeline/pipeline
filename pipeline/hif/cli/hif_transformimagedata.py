@@ -1,13 +1,12 @@
 import sys
 
-from casatasks import casalog
-
 import pipeline.h.cli.utils as utils
 
 
+@utils.cli_wrapper
 def hif_transformimagedata(vis=None, outputvis=None, field=None, intent=None, spw=None, datacolumn=None, chanbin=None,
                            timebin=None, replace=None, clear_pointing=None, modify_weights=None, wtmode=None,
-                           pipelinemode=None, dryrun=None, acceptresults=None):
+                           dryrun=None, acceptresults=None):
 
     """
     hif_transformimagedata ---- Extract fields for the desired VLASS image to a new MS and reset weights if desired
@@ -16,8 +15,7 @@ def hif_transformimagedata(vis=None, outputvis=None, field=None, intent=None, sp
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -42,12 +40,6 @@ def hif_transformimagedata(vis=None, outputvis=None, field=None, intent=None, sp
     clear_pointing Clear the pointing table.
     modify_weights Re-initialize the weights.
     wtmode         optional weight initialization mode when modify_weights=True
-    pipelinemode   The pipeline operating mode. In 'automatic' mode the pipeline
-                   determines the values of all context defined pipeline inputs
-                   automatically.  In 'interactive' mode the user can set the pipeline
-                   context defined parameters manually.  In 'getinputs' mode the user
-                   can check the settings of all pipeline parameters without running
-                   the task.
     dryrun         Run the commands (True) or generate the commands to be run but
                    do not execute (False).
     acceptresults  Add the results of the task to the pipeline context (True) or

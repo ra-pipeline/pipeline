@@ -3,9 +3,10 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
+@utils.cli_wrapper
 def hifv_exportdata(vis=None, session=None, imaging_products_only=None, exportmses=None, tarms=None, exportcalprods=None,
     pprfile=None, calintents=None, calimages=None, targetimages=None, products_dir=None,
-    gainmap=None, pipelinemode=None, dryrun=None, acceptresults=None):
+    gainmap=None, dryrun=None, acceptresults=None):
 
     """
     hifv_exportdata ---- Prepare and export interferometry and imaging data
@@ -43,19 +44,18 @@ def hifv_exportdata(vis=None, session=None, imaging_products_only=None, exportms
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
     vis                   List of visibility data files for which flagging and calibration
                           information will be exported. Defaults to the list maintained in the
-                          pipeline context. Not available in pipelinemode='automatic'.
+                          pipeline context.
                           example: vis=['X227.ms', 'X228.ms']
     session               List of sessions one per visibility file. Currently defaults
                           to a single virtual session containing all the visibility files in vis.
                           In the future, this will default to the set of observing sessions defined
-                          in the context. Not available in pipelinemode='automatic'.
+                          in the context.
                           example: session=['session1', 'session2']
     imaging_products_only Export science target imaging products only
     exportmses            Export the final MeasurementSets instead of the final flags,
@@ -64,34 +64,24 @@ def hifv_exportdata(vis=None, session=None, imaging_products_only=None, exportms
     exportcalprods        Export flags and caltables in addition to MeasurementSets.
                           this parameter is only valid when exportmses = True.
     pprfile               Name of the pipeline processing request to be exported. Defaults
-                          to a file matching the template 'PPR_*.xml'. Not available in pipelinemode='automatic'.
+                          to a file matching the template 'PPR_*.xml'.
                           example: pprfile=['PPR_GRB021004.xml']
     calintents            List of calibrator image types to be exported. Defaults to
                           all standard calibrator intents, 'BANDPASS', 'PHASE', 'FLUX'.
-                          Not available in pipelinemode='automatic'.
                           example: 'PHASE'
     calimages             List of calibrator images to be exported. Defaults to all
                           calibrator images recorded in the pipeline context.
-                          Not available in pipelinemode='automatic'.
                           example: calimages=['3C454.3.bandpass', '3C279.phase']
     targetimages          List of science target images to be exported. Defaults to all
                           science target images recorded in the pipeline context.
-                          Not available in pipelinemode='automatic'.
                           example: targetimages=['NGC3256.band3', 'NGC3256.band6']
     products_dir          Name of the data products subdirectory. Defaults to './'
-                          Not available in pipelinemode='automatic'.
                           example: '../products'
     gainmap               The value of gainmap parameter in hifv_restoredata task put in
                           casa_piperestorescript.py
-    pipelinemode          The pipeline operating mode. In 'automatic' mode the pipeline
-                          determines the values of all context defined pipeline inputs automatically.
-                          In 'interactive' mode the user can set the pipeline context defined
-                          parameters manually.  In 'getinputs' mode the user can check the settings
-                          of all pipeline parameters without running the task.
     dryrun                Run the task (False) or display task command (True).
-                          Only available in pipelinemode='interactive'.
     acceptresults         Add the results of the task to the pipeline context (True) or
-                          reject them (False). Only available in pipelinemode='interactive'.
+                          reject them (False).
 
     --------- examples -----------------------------------------------------------
 

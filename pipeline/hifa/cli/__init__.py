@@ -12,6 +12,7 @@ from .hifa_gfluxscaleflag import hifa_gfluxscaleflag
 from .hifa_imageprecheck import hifa_imageprecheck
 from .hifa_importdata import hifa_importdata
 from .hifa_lock_refant import hifa_lock_refant
+from .hifa_polcal import hifa_polcal
 from .hifa_polcalflag import hifa_polcalflag
 from .hifa_renorm import hifa_renorm
 from .hifa_restoredata import hifa_restoredata

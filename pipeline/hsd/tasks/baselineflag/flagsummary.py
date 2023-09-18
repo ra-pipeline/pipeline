@@ -217,8 +217,8 @@ class SDBLFlagSummary(object):
         NPprows = {}
         NPptime = {}
         for key in [ 'TsysFlag', 'BaselineFlag' ]:
-            NPprows[key] = np.zeros( NROW, dtype=np.int )
-            NPptime[key] = np.zeros( NROW, dtype=np.float )
+            NPprows[key] = np.zeros( NROW, dtype=int )
+            NPptime[key] = np.zeros( NROW, dtype=float )
 
         NPpdata = {}
         NPpflag = {}
@@ -226,8 +226,8 @@ class SDBLFlagSummary(object):
                      'RmsPostFitFlag', 'RmsPreFitFlag',
                      'RunMeanPostFitFlag', 'RunMeanPreFitFlag',
                      'RmsExpectedPostFitFlag', 'RmsExpectedPreFitFlag' ]:
-            NPpdata[key] = np.zeros( NROW, dtype=np.float )
-            NPpflag[key] = np.zeros( NROW, dtype=np.int )
+            NPpdata[key] = np.zeros( NROW, dtype=float )
+            NPpflag[key] = np.zeros( NROW, dtype=int )
 
         FlaggedRowsCategory = collections.OrderedDict((
             ('TsysFlag', []),              ('OnlineFlag', []),

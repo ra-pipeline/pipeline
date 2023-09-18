@@ -29,6 +29,7 @@ total_keys = {
     'POLANGLE'     : 'Polarization angle',
     'POLLEAKAGE'   : 'Polarization leakage',
 	'CHECK'		   : 'Check',
+	'DIFFGAIN'     : 'Diffgain',
 }
 
 def template_agent_header1(agent):

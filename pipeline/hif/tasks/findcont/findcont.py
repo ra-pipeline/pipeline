@@ -362,6 +362,10 @@ class FindCont(basetask.StandardTaskTemplate):
 
                     spw_transitions = ref_ms.get_spectral_window(real_spwid).transitions
                     single_continuum = any(['Single_Continuum' in t for t in spw_transitions])
+                    # PIPE-1855: use spectralDynamicRangeBandWidth from SBSummary if available
+                    dynrange_bw = ref_ms.science_goals['spectralDynamicRangeBandWidth']
+                    if dynrange_bw is not None:  # None means that a value was not provided, and it should remain None
+                        dynrange_bw = qaTool.tos(dynrange_bw)
                     (cont_range, png, single_range_channel_fraction, warning_strings, joint_mask_name) = \
                         findcont_heuristics.find_continuum(dirty_cube='%s.residual' % findcont_basename,
                                                            pb_cube='%s.pb' % findcont_basename,
@@ -369,7 +373,8 @@ class FindCont(basetask.StandardTaskTemplate):
                                                            single_continuum=single_continuum,
                                                            is_eph_obj=image_heuristics.is_eph_obj(target['field']),
                                                            ref_ms_name=ref_ms.name,
-                                                           nbin=reprBW_nbin)
+                                                           nbin=reprBW_nbin,
+                                                           dynrange_bw=dynrange_bw)
                     joint_mask_names[(source_name, spwid)] = joint_mask_name
                     # PIPE-74
                     if single_range_channel_fraction < 0.05:

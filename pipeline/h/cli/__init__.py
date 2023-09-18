@@ -11,4 +11,3 @@ from .h_save import h_save
 from .h_show_calstate import h_show_calstate
 from .h_tsyscal import h_tsyscal
 from .h_weblog import h_weblog
-from .hpc_h_applycal import hpc_h_applycal

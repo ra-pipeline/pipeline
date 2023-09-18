@@ -1,4 +1,5 @@
 """Set of plotting classes for hsd_imaging task."""
+import copy
 import itertools
 import math
 import os
@@ -19,14 +20,14 @@ import pipeline.infrastructure.renderer.logger as logger
 from pipeline.domain import DataType
 from pipeline.h.tasks.common import atmutil
 from pipeline.hsd.tasks.common.display import DPIDetail, SDImageDisplay, SDImageDisplayInputs
-from pipeline.hsd.tasks.common.display import sd_polmap as polmap
+from pipeline.hsd.tasks.common.display import sd_polmap as polmap, SpectralImage, ChannelSelection
 from pipeline.hsd.tasks.common.display import SDSparseMapPlotter
 from pipeline.hsd.tasks.common.display import NoData
+from pipeline.hsd.tasks.imaging.resultobjects import SDImagingResultItem
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.displays.pointing import MapAxesManagerBase
 from pipeline.infrastructure.displays.plotstyle import casa5style_plot
-from pipeline.infrastructure.utils import absolute_path
 
 RArotation = pointing.RArotation
 DECrotation = pointing.DECrotation
@@ -259,8 +260,6 @@ class SDChannelAveragedImageDisplay(SDImageDisplay):
 class SDMomentMapDisplay(SDImageDisplay):
     """Plotter to create a moment map."""
 
-    MAP_TITLE = "Max Intensity Map"
-
     def __init__(self, inputs: SDImageDisplayInputs) -> None:
         """Create SDMomentMapDisplay instance.
 
@@ -268,10 +267,7 @@ class SDMomentMapDisplay(SDImageDisplay):
             Inputs instance.
         """
         super(self.__class__, self).__init__(inputs)
-    #         if hasattr(self.inputs, 'momentmap_name'):
-    #             self.imagename = self.inputs.momentmap_name
-    #         else:
-        # self.imagename = self.inputs.result.outcome['image'].imagename.rstrip('/') + ('.mom%d' % self.MAP_MOMENT)
+        self.moment_images = []
 
     def init(self) -> None:
         """Do some initialization for moment map.
@@ -279,11 +275,24 @@ class SDMomentMapDisplay(SDImageDisplay):
         Execute immoments task to generate moment image as well as
         performing generic initialization defined in the super class.
         """
-        if os.path.exists(self.inputs.moment_imagename):
-            status = casa_tools.image.removefile(self.inputs.moment_imagename) 
-        job = casa_tasks.immoments(imagename=self.inputs.imagename, moments=[self.inputs.MAP_MOMENT], outfile=self.inputs.moment_imagename)
-        job.execute(dry_run=False)
-        assert os.path.exists(self.inputs.moment_imagename)
+        self.moment_images = []
+        for spec in self.inputs.MomentMapList:
+            chans = self.inputs.create_channel_mask(spec.chans)
+            LOG.debug('chans = "%s"', chans)
+            moment_imagename_list = [self.inputs.moment_imagename(moment, spec.chans) for moment in spec.moments]
+            for imagename in moment_imagename_list:
+                if os.path.exists(imagename):
+                    status = casa_tools.image.removefile(imagename)
+            outfile = self.inputs.moment_imagename(spec.moments, spec.chans)
+            moments = [moment.value for moment in spec.moments]
+            LOG.debug(f'moment_imagename_list={moment_imagename_list}')
+            LOG.debug(f'moments={moments}')
+            LOG.debug(f'outfile={outfile}')
+            job = casa_tasks.immoments(imagename=self.inputs.imagename, moments=moments, chans=chans, outfile=outfile)
+            job.execute(dry_run=False)
+            for imagename in moment_imagename_list:
+                assert os.path.exists(imagename)
+            self.moment_images.extend(moment_imagename_list)
         super(self.__class__, self).init()
 
     def plot(self) -> List[logger.Plot]:
@@ -318,64 +327,97 @@ class SDMomentMapDisplay(SDImageDisplay):
 
         plot_list = []
 
-        image = self.inputs.get_moment_image_instance()
-        assert image is not None
-        data = image.data
-        mask = image.mask
-        for pol in range(self.npol):
-            masked_data = (data.take([pol], axis=self.id_stokes) * mask.take([pol], axis=self.id_stokes)).squeeze()
-            Total = numpy.flipud(masked_data.transpose())
-            del masked_data
+        for imagename in self.moment_images:
 
-            # 2008/9/20 DEC Effect
-            im = axes_tpmap.imshow(Total, interpolation='nearest', aspect=self.aspect, extent=Extent)
-            tmin = Total.min()
-            tmax = Total.max()
-            del Total
+            if not os.path.exists(imagename):
+                continue
 
-            xlim = axes_tpmap.get_xlim()
-            ylim = axes_tpmap.get_ylim()
+            split_imagename = imagename.split('.')
+            moment_type = split_imagename[-1]
+            chans = split_imagename[-2]
 
-            # colorbar
-            #print "min=%s, max of Total=%s" % (tmin,tmax)
-            if not (tmin == tmax):
-                #if not ((Ymax == Ymin) and (Xmax == Xmin)):
-                #if not all(image_shape[id_direction] <= 1):
-                if self.nx > 1 or self.ny > 1:
-                    axes_manager.set_colorbar_for(axes_tpmap, tmin, tmax, self.brightnessunit, shrink=0.8)
+            if moment_type == 'maximum':
+                map_title = 'Max Intensity Map'
+            else:  # 'integrated'
+                map_title = 'Integrated Intensity Map'
 
-            # draw beam pattern
-            if beam_circle is None:
-                beam_circle = pointing.draw_beam(axes_tpmap, 0.5 * self.beam_size, self.aspect, self.ra_min,
-                                                 self.dec_min)
+            image = SpectralImage(imagename)
+            data = image.data
+            mask = image.mask
 
-            axes_tpmap.set_title(self.MAP_TITLE, size=TickSize)
-            axes_tpmap.set_xlim(xlim)
-            axes_tpmap.set_ylim(ylim)
+            for pol in range(self.npol):
 
-            FigFileRoot = self.inputs.imagename+'.pol%s' % pol
-            plotfile = os.path.join(self.stage_dir, FigFileRoot+'_TP.png')
-            fig.savefig(plotfile, dpi=DPIDetail)
+                masked_data = (data.take([pol], axis=self.id_stokes) * mask.take([pol], axis=self.id_stokes)).squeeze()
+                Total = numpy.flipud(masked_data.transpose())
+                del masked_data
 
-            im.remove()
+                if moment_type == 'maximum' and chans == 'line_free':
+                    # adjust color scale according to the logic described in PIPE-373/PIPE-197
+                    with casa_tools.ImageReader(imagename) as ia:
+                        # cf. hif/tasks/tclean/tclean.py mom8_stats
+                        stats = ia.statistics(robust=True, stretch=True)
+                    tmin = stats['median'] - stats['medabsdevmed']
 
-            parameters = {}
-            parameters['intent'] = 'TARGET'
-            parameters['spw'] = self.inputs.spw
-            parameters['pol'] = self.image.stokes[pol] #polmap[pol]
-            parameters['ant'] = self.inputs.antenna
-            parameters['type'] = 'sd_moment_map'
-            parameters['file'] = self.inputs.imagename
-            parameters['field'] = self.inputs.source
-            parameters['vis'] = 'ALL'
+                    per_channel_stats = self.inputs.compute_per_channel_stats()
+                    line_free_channels = self.inputs.get_line_free_channels()
+                    sigma = numpy.median(per_channel_stats['sigma'][line_free_channels])
+                    tmax = 10 * sigma
+                else:
+                    tmin = Total.min()
+                    tmax = Total.max()
 
-            plot = logger.Plot(plotfile,
-                               x_axis='R.A.',
-                               y_axis='Dec.',
-                               field=self.inputs.source,
-                               parameters=parameters)
+                # 2008/9/20 DEC Effect
+                im = axes_tpmap.imshow(
+                    Total, interpolation='nearest', aspect=self.aspect, extent=Extent,
+                    vmin=tmin, vmax=tmax
+                )
+                del Total
 
-            plot_list.append(plot)
+                xlim = axes_tpmap.get_xlim()
+                ylim = axes_tpmap.get_ylim()
+
+                # colorbar
+                #print "min=%s, max of Total=%s" % (tmin,tmax)
+                if not (tmin == tmax):
+                    #if not ((Ymax == Ymin) and (Xmax == Xmin)):
+                    #if not all(image_shape[id_direction] <= 1):
+                    if self.nx > 1 or self.ny > 1:
+                        axes_manager.set_colorbar_for(axes_tpmap, tmin, tmax, self.brightnessunit, shrink=0.8)
+
+                # draw beam pattern
+                if beam_circle is None:
+                    beam_circle = pointing.draw_beam(axes_tpmap, 0.5 * self.beam_size, self.aspect, self.ra_min,
+                                                     self.dec_min)
+
+                axes_tpmap.set_title(map_title, size=TickSize)
+                axes_tpmap.set_xlim(xlim)
+                axes_tpmap.set_ylim(ylim)
+
+                figfile = imagename + f'.pol{pol}.png'
+                plotfile = os.path.join(self.stage_dir, figfile)
+                fig.savefig(plotfile, dpi=DPIDetail)
+
+                im.remove()
+
+                parameters = {}
+                parameters['intent'] = 'TARGET'
+                parameters['spw'] = self.inputs.spw
+                parameters['pol'] = self.image.stokes[pol] #polmap[pol]
+                parameters['ant'] = self.inputs.antenna
+                parameters['type'] = 'sd_moment_map'
+                parameters['moment'] = moment_type
+                parameters['chans'] = chans
+                parameters['file'] = self.inputs.imagename
+                parameters['field'] = self.inputs.source
+                parameters['vis'] = 'ALL'
+
+                plot = logger.Plot(plotfile,
+                                   x_axis='R.A.',
+                                   y_axis='Dec.',
+                                   field=self.inputs.source,
+                                   parameters=parameters)
+
+                plot_list.append(plot)
 
         fig.clf()
         del fig
@@ -767,32 +809,6 @@ class SDChannelMapDisplay(SDImageDisplay):
 
         return self.__plot_channel_map()
 
-    def __valid_lines(self) -> List[List[int]]:
-        """Return list of chnnel ranges of valid spectral lines."""
-        group_desc = self.inputs.reduction_group
-        ant_index = self.inputs.antennaid_list
-        spwid_list = self.inputs.spwid_list
-        msid_list = self.inputs.msid_list
-        fieldid_list = self.inputs.fieldid_list
-
-        line_list = []
-
-        msobj_list = self.inputs.context.observing_run.measurement_sets
-        msname_list = [absolute_path(msobj.name) for msobj in msobj_list]
-        for g in group_desc:
-            found = False
-            for (msid, ant, fid, spw) in zip(msid_list, ant_index, fieldid_list, spwid_list):
-                group_msid = msname_list.index(absolute_path(g.ms.name))
-                if group_msid == msid and g.antenna_id == ant and \
-                   g.field_id == fid and g.spw_id == spw:
-                    found = True
-                    break
-            if found:
-                for ll in g.channelmap_range:
-                    if ll not in line_list and ll[2] is True:
-                        line_list.append(ll)
-        return line_list
-
     def __get_integrated_spectra(self) -> numpy.ma.masked_array:
         """Compute integrated spectrum from the image.
 
@@ -809,10 +825,10 @@ class SDChannelMapDisplay(SDImageDisplay):
 
         # if all pixels are masked, return fully masked array
         unweight_mask = unweight_ia.getchunk(getmask=True)
-        if numpy.all(unweight_mask == False):
+        if numpy.all(numpy.logical_not(unweight_mask)):
             unweight_ia.close()
             sp_ave = numpy.ma.masked_array(numpy.zeros((self.npol, self.nchan), dtype=numpy.float32),
-                                           mask=numpy.ones((self.npol, self.nchan), dtype=numpy.bool))
+                                           mask=numpy.ones((self.npol, self.nchan), dtype=bool))
             return sp_ave
 
         # average image spectra over map area taking mask into account
@@ -829,7 +845,7 @@ class SDChannelMapDisplay(SDImageDisplay):
         with casa_tools.ImageReader(imagename) as ia:
             maskname = ia.maskhandler('get')[0]
         with casa_tools.ImageReader(weightname) as ia:
-            if maskname != 'T': #'T' is no mask (usually an image from completely flagged MSes)
+            if maskname != 'T':  # 'T' is no mask (usually an image from completely flagged MSes)
                 ia.maskhandler('delete', [maskname])
                 ia.maskhandler('copy', ['%s:%s' % (imagename, maskname), maskname])
                 ia.maskhandler('set', maskname)
@@ -865,38 +881,41 @@ class SDChannelMapDisplay(SDImageDisplay):
 
         plot_list = []
 
-        # nrow is number of grid points for image
-#         nrow = self.nx * self.ny
+        is_freq_chan_reversed_image = False
+        if isinstance(self.inputs.result, SDImagingResultItem):
+            is_freq_chan_reversed_image = self.inputs.result.frequency_channel_reversed
 
         # retrieve line list from reduction group
         # key is antenna and spw id
-        line_list = self.__valid_lines()
+        line_list = self.inputs.valid_lines(is_freq_chan_reversed_image)
 
         # 2010/6/9 in the case of non-detection of the lines
         if len(line_list) == 0:
             return plot_list
 
         # Set data
-        Map = numpy.zeros((self.NumChannelMap, (self.y_max - self.y_min + 1), (self.x_max - self.x_min + 1)),
+        Map = numpy.zeros((self.NumChannelMap,
+                           (self.y_max - self.y_min + 1),
+                           (self.x_max - self.x_min + 1)),
                           dtype=numpy.float32)
-#         RMSMap = numpy.zeros(((self.y_max - self.y_min + 1), (self.x_max - self.x_min + 1)), dtype=numpy.float32)
 
         # Swap (x,y) to match the clustering result
         grid_size_arcsec = self.grid_size * 3600.0
-        ExtentCM = ((self.x_max+0.5)*grid_size_arcsec, (self.x_min-0.5)*grid_size_arcsec, (self.y_min-0.5)*grid_size_arcsec, (self.y_max+0.5)*grid_size_arcsec)
-        Extent = (self.ra_max+self.grid_size/2.0, self.ra_min-self.grid_size/2.0, self.dec_min-self.grid_size/2.0, self.dec_max+self.grid_size/2.0)
-        span = max(self.ra_max - self.ra_min + self.grid_size, self.dec_max - self.dec_min + self.grid_size)
-        (RAlocator, DEClocator, RAformatter, DECformatter) = pointing.XYlabel(span,
-                                                                              self.direction_reference)
+        ExtentCM = ((self.x_max + 0.5) * grid_size_arcsec,
+                    (self.x_min - 0.5) * grid_size_arcsec,
+                    (self.y_min - 0.5) * grid_size_arcsec,
+                    (self.y_max + 0.5) * grid_size_arcsec)
+        Extent = (self.ra_max + self.grid_size / 2.0,
+                  self.ra_min - self.grid_size / 2.0,
+                  self.dec_min - self.grid_size / 2.0,
+                  self.dec_max + self.grid_size / 2.0)
+        span = max(self.ra_max - self.ra_min + self.grid_size,
+                   self.dec_max - self.dec_min + self.grid_size)
+        (RAlocator, DEClocator, RAformatter, DECformatter) = \
+            pointing.XYlabel(span, self.direction_reference)
 
         # How to coordinate the map
         TickSize = 6
-
-        # 2008/9/20 Dec Effect has been taken into account
-        #Aspect = 1.0 / math.cos(0.5 * (self.dec_min + self.dec_max) / 180.0 * 3.141592653)
-
-        # Check the direction of the Velocity axis
-        Reverse = (self.velocity[0] < self.velocity[1])
 
         # Initialize axes
         fig = self.figure
@@ -918,47 +937,83 @@ class SDChannelMapDisplay(SDImageDisplay):
         ValidCluster = 0
         data = self.data
         mask = self.mask
-        for line_window in line_list:
-            # shift channel according to the edge parameter
-            ChanC = int(line_window[0] + 0.5 - self.edge[0])
-            if float(ChanC) == line_window[0] - self.edge[0]:
-                VelC = self.velocity[ChanC]
-            else:
-                VelC = 0.5 * ( self.velocity[ChanC] + self.velocity[ChanC-1] )
-            if ChanC > 0:
-                ChanVelWidth = abs(self.velocity[ChanC] - self.velocity[ChanC - 1])
-            else:
-                ChanVelWidth = abs(self.velocity[ChanC] - self.velocity[ChanC + 1])
 
+        # If the frequency channel of the image cube has been reversed to ascending,
+        # indices of frequency and velocity must have an offset to get a center value of them.
+        if is_freq_chan_reversed_image:
+            _offset = 0.5
+            _left_edge = self.edge[1]
+        else:
+            _offset = 0
+            _left_edge = self.edge[0]
+
+        # NOTE: Variable names MUST be easy to understand.
+        # The variables with the prefixes, 'idx_' and 'indices_', indicate they are an index or
+        # sequence (list, set, array, etc.) of indices in the loop below.
+
+        for line_window in line_list:
+            _line_center = line_window[0]
+            _line_width = line_window[1]
+            _line_center_shifted = _line_center - _left_edge
+
+            # Offset calculation of index(int) from line(float) when the line has a decimal point of 0.5
+            # and frequency channel of the image is reversed;
+            # ex) n=107.5, nchan=128, reversed_n = nchan-1-n = 19.5
+            # when the real numeric cut-edge is 0.5 then the calculation of index 1-0.5 is to be neary 0.5 and not 0.5.
+            # So, the cut-edge which has 0.5 + offset 0.5 like int(19.5 + 0.5) must be 19, not 20.
+            _cut_edge_offset = 0
+            if is_freq_chan_reversed_image and _line_center_shifted - int(_line_center_shifted) == 0.5:
+                _cut_edge_offset = 1
+
+            # shift channel according to the edge parameter
+            idx_line_center = int(_line_center_shifted + 0.5) - _cut_edge_offset
+            if float(idx_line_center) == _line_center_shifted:
+                velocity_line_center = self.velocity[idx_line_center]
+            else:
+                if is_freq_chan_reversed_image:
+                    velocity_line_center = 0.5 * (self.velocity[idx_line_center + 1] +
+                                                  self.velocity[idx_line_center])
+                else:
+                    velocity_line_center = 0.5 * (self.velocity[idx_line_center] +
+                                                  self.velocity[idx_line_center - 1])
+            LOG.debug(f'center velocity[{idx_line_center}]: {velocity_line_center}')
+            if idx_line_center > 0:
+                ChanVelWidth = abs(self.velocity[idx_line_center] - self.velocity[idx_line_center - 1])
+            else:
+                ChanVelWidth = abs(self.velocity[idx_line_center] - self.velocity[idx_line_center + 1])
+
+            LOG.debug(f"center frequency[{idx_line_center}]: {self.frequency[idx_line_center]}")
             # 2007/9/13 Change the magnification factor 1.2 to your preference (to Dirk)
             # be sure the width of one channel map is integer
             # 2014/1/12 factor 1.4 -> 1.0 since velocity structure was taken into account for the range in validation.py
-            #ChanW = max(int(line_window[1] * 1.4 / self.NumChannelMap + 0.5), 1)
-            ChanW = max(int(line_window[1] / self.NumChannelMap + 0.5), 1)
-            #ChanB = int(ChanC - self.NumChannelMap / 2.0 * ChanW)
-            ChanB = int(ChanC - self.NumChannelMap / 2.0 * ChanW + 0.5)
+            indices_width_of_line = max(int(_line_width / self.NumChannelMap + 0.5), 1)
+            idx_left_end = int(idx_line_center - self.NumChannelMap / 2.0 * indices_width_of_line + 0.5 + _offset)
             # 2007/9/10 remedy for 'out of index' error
-            #print '\nDEBUG0: Nc, ChanB, ChanW, NchanMap', Nc, ChanB, ChanW, self.NumChannelMap
-            if ChanB < 0:
-                ChanW = int(ChanC * 2.0 / self.NumChannelMap)
-                if ChanW == 0: continue
-                ChanB = int(ChanC - self.NumChannelMap / 2.0 * ChanW)
-            elif ChanB + ChanW * self.NumChannelMap > self.nchan:
-                ChanW = int((self.nchan - 1 - ChanC) * 2.0 / self.NumChannelMap)
-                if ChanW == 0: continue
-                ChanB = int(ChanC - self.NumChannelMap / 2.0 * ChanW)
-            #print 'DEBUG1: Nc, ChanB, ChanW, NchanMap', Nc, ChanB, ChanW, self.NumChannelMap, '\n'
+            LOG.debug('idx_left_end, indices_width_of_line, NchanMap : '
+                      f'{idx_left_end}, {indices_width_of_line}, {self.NumChannelMap}')
+            if idx_left_end < 0:
+                indices_width_of_line = int(idx_line_center * 2.0 / self.NumChannelMap)
+                if indices_width_of_line == 0:
+                    continue
+                idx_left_end = int(idx_line_center - self.NumChannelMap / 2.0 * indices_width_of_line)
+            elif idx_left_end + indices_width_of_line * self.NumChannelMap > self.nchan:
+                indices_width_of_line = int((self.nchan - 1 - idx_line_center) * 2.0 / self.NumChannelMap)
+                if indices_width_of_line == 0:
+                    continue
+                idx_left_end = int(idx_line_center - self.NumChannelMap / 2.0 * indices_width_of_line)
 
-            chan0 = max(ChanB-1, 0)
-            chan1 = min(ChanB + self.NumChannelMap*ChanW, self.nchan-1)
-            V0 = min(self.velocity[chan0], self.velocity[chan1]) - VelC
-            V1 = max(self.velocity[chan0], self.velocity[chan1]) - VelC
-            #print 'chan0, chan1, V0, V1, VelC =', chan0, chan1, V0, V1, VelC
+            chan0 = max(idx_left_end - 1, 0)
+            chan1 = min(idx_left_end + self.NumChannelMap * indices_width_of_line, self.nchan - 1)
+            V0 = min(self.velocity[chan0], self.velocity[chan1]) - velocity_line_center
+            V1 = max(self.velocity[chan0], self.velocity[chan1]) - velocity_line_center
+            LOG.debug('chan0, chan1, V0, V1, velocity_line_center : '
+                      f'{chan0}, {chan1}, {V0}, {V1}, {velocity_line_center}')
 
             vertical_lines = []
+
             # vertical lines for integrated spectrum #1
             vertical_lines.append(
-                axes_integsp1.axvline(x=self.frequency[max(ChanB, 0)], linewidth=0.3, color='r')
+                axes_integsp1.axvline(x=self.frequency[chan0], linewidth=0.3, color='r')
             )
             vertical_lines.append(
                 axes_integsp1.axvline(x=self.frequency[chan1], linewidth=0.3, color='r')
@@ -966,81 +1021,90 @@ class SDChannelMapDisplay(SDImageDisplay):
 
             # vertical lines for integrated spectrum #2
             for i in range(self.NumChannelMap + 1):
-                ChanL = int(ChanB + i*ChanW)
-                #if 0 <= ChanL and ChanL < nchan:
-                if 0 < ChanL and ChanL < self.nchan:
-                    vertical_lines.append(
-                        axes_integsp2.axvline(x = 0.5 * (self.velocity[ChanL] + self.velocity[ChanL - 1]) - VelC, linewidth=0.3, color='r')
-                    )
-                elif ChanL == 0:
-                    vertical_lines.append(
-                        axes_integsp2.axvline(x = 0.5 * (self.velocity[ChanL] - self.velocity[ChanL + 1]) - VelC, linewidth=0.3, color='r')
-                    )
-                #print 'DEBUG: Vel[ChanL]', i, (self.velocity[ChanL]+self.velocity[ChanL-1])/2.0 - VelC
+                idx_chan_left_end = int(idx_left_end + i * indices_width_of_line)
+                vel_chan_left_end = None
+                if idx_chan_left_end == 0:
+                    vel_chan_left_end = 0.5 * (self.velocity[idx_chan_left_end] -
+                                               self.velocity[idx_chan_left_end - 1]) - velocity_line_center
+                else:
+                    vel_chan_left_end = 0.5 * (self.velocity[idx_chan_left_end] +
+                                               self.velocity[idx_chan_left_end - 1]) - velocity_line_center
+                vertical_lines.append(
+                    axes_integsp2.axvline(x=vel_chan_left_end, linewidth=0.3, color='r')
+                )
+                LOG.debug(f'i, Vel[idx_chan_left_end] : {i}, {vel_chan_left_end}')
 
             # loop over polarizations
             for pol in range(self.npol):
                 plotted_objects = []
 
-                masked_data = (data.take([pol], axis=self.id_stokes) * mask.take([pol], axis=self.id_stokes)).squeeze()
+                masked_data = (data.take([pol], axis=self.id_stokes) *
+                               mask.take([pol], axis=self.id_stokes)).squeeze()
 
                 # Integrated Spectrum
                 t0 = time.time()
 
                 # Draw Total Intensity Map
-                Total = masked_data.sum(axis=2) * ChanVelWidth
-                Total = numpy.flipud(Total.transpose())
+                total = masked_data.sum(axis=2) * ChanVelWidth
+                total = numpy.flipud(total.transpose())
 
                 # 2008/9/20 DEC Effect
                 plotted_objects.append(
-                    axes_integmap.imshow(Total, interpolation='nearest', aspect=self.aspect, extent=Extent)
+                    axes_integmap.imshow(total, interpolation='nearest',
+                                         aspect=self.aspect, extent=Extent)
                 )
 
                 xlim = axes_integmap.get_xlim()
                 ylim = axes_integmap.get_ylim()
 
                 # colorbar
-                #print "min=%s, max of Total=%s" % (Total.min(),Total.max())
-                if not (Total.min() == Total.max()):
+                LOG.debug(f'total min:{total.min()}, total max:{total.max()}')
+                if not (total.min() == total.max()):
                     if not ((self.y_max == self.y_min) and (self.x_max == self.x_min)):
-                        axes_manager.set_colorbar_for(axes_integmap, Total.min(), Total.max(), f'{self.brightnessunit} km/s', shrink=0.8)
+                        axes_manager.set_colorbar_for(axes_integmap, total.min(), total.max(),
+                                                      f'{self.brightnessunit} km/s', shrink=0.8)
 
                 # draw beam pattern
                 if beam_circle is None:
-                    beam_circle = pointing.draw_beam(axes_integmap, self.beam_radius, self.aspect, self.ra_min, self.dec_min)
+                    beam_circle = pointing.draw_beam(axes_integmap, self.beam_radius, self.aspect,
+                                                     self.ra_min, self.dec_min)
 
-                axes_integmap.set_title('Total Intensity: CenterFreq.= %.3f GHz' % self.frequency[ChanC], size=TickSize)
+                axes_integmap.set_title('Total Intensity: CenterFreq.= %.3f GHz' %
+                                        self.frequency[idx_line_center], size=TickSize)
                 axes_integmap.set_xlim(xlim)
                 axes_integmap.set_ylim(ylim)
 
                 t1 = time.time()
 
                 # Plot Integrated Spectrum #1
-#                 Sp = numpy.sum(numpy.transpose((valid * numpy.transpose(flattened_data))),axis=0)/numpy.sum(valid,axis=0)
-                #Sp = numpy.sum(flattened_data * valid.reshape((nrow,1)), axis=0)/valid.sum()
                 Sp = Sp_integ[pol, :]
-                (F0, F1) = (min(self.frequency[0], self.frequency[-1]), max(self.frequency[0], self.frequency[-1]))
+                (F0, F1) = (min(self.frequency[0], self.frequency[-1]),
+                            max(self.frequency[0], self.frequency[-1]))
                 spmin = Sp.min()
                 spmax = Sp.max()
                 dsp = spmax - spmin
                 spmin -= dsp * 0.1
                 spmax += dsp * 0.1
+                LOG.debug(f'Freq0, Freq1: {F0}, {F1}')
 
-                axes_integsp1.plot(self.frequency, Sp, '-b', markersize=2, markeredgecolor='b', markerfacecolor='b')
-                #print 'DEBUG: Freq0, Freq1', self.frequency[ChanB], self.frequency[ChanB + self.NumChannelMap * ChanW]
+                axes_integsp1.plot(self.frequency, Sp, '-b', markersize=2,
+                                   markeredgecolor='b', markerfacecolor='b')
                 axes_integsp1.axis([F0, F1, spmin, spmax])
 
                 t2 = time.time()
 
                 # Plot Integrated Spectrum #2
-                axes_integsp2.plot(self.velocity[chan0:chan1] - VelC, Sp[chan0:chan1], '-b', markersize=2, markeredgecolor='b', markerfacecolor='b')
+                axes_integsp2.plot(self.velocity[chan0:chan1 + 1] - velocity_line_center,
+                                   Sp[chan0:chan1 + 1], '-b', markersize=2, markeredgecolor='b',
+                                   markerfacecolor='b')
                 # adjust Y-axis range to the current line
-                spmin_zoom = Sp[chan0:chan1].min()
-                spmax_zoom = Sp[chan0:chan1].max()
+                spmin_zoom = Sp[chan0:chan1 + 1].min()
+                spmax_zoom = Sp[chan0:chan1 + 1].max()
                 dsp = spmax_zoom - spmin_zoom
                 spmin_zoom -= dsp * 0.1
                 spmax_zoom += dsp * 0.1
                 axes_integsp2.axis([V0, V1, spmin_zoom, spmax_zoom])
+                LOG.debug(f'Velo0, Velo1: {V0}, {V1}')
 
                 t3 = time.time()
 
@@ -1049,20 +1113,17 @@ class SDChannelMapDisplay(SDImageDisplay):
                 Vmax0 = Vmin0 = 0
                 Title = []
                 for i in range(self.NumChannelMap):
-                    if Reverse:
-                        ii = i
-                    else:
-                        ii = self.NumChannelMap - i - 1
-                    C0 = ChanB + ChanW*ii
-                    C1 = C0 + ChanW
+                    ii = self.NumChannelMap - i - 1
+                    C0 = idx_left_end + indices_width_of_line * ii
+                    C1 = C0 + indices_width_of_line
                     if C0 < 0 or C1 >= self.nchan - 1:
                         continue
-                    velo = (self.velocity[C0] + self.velocity[C1-1]) / 2.0 - VelC
+                    velo = (self.velocity[C0] + self.velocity[C1 - 1]) / 2.0 - velocity_line_center
                     width = abs(self.velocity[C0] - self.velocity[C1])
                     Title.append('(Vel,Wid) = (%.1f, %.1f) (km/s)' % (velo, width))
                     NMap += 1
-                    tmp = masked_data[:, :, C0:C1].sum(axis=2) * ChanVelWidth
-                    Map[i] = numpy.flipud(tmp.transpose())
+                    _mask = masked_data[:, :, C0:C1].sum(axis=2) * ChanVelWidth
+                    Map[i] = numpy.flipud(_mask.transpose())
                 del masked_data
                 Vmax0 = Map.max()
                 Vmin0 = Map.min()
@@ -1081,7 +1142,8 @@ class SDChannelMapDisplay(SDImageDisplay):
 
                 for i in range(NMap):
                     if Vmax != Vmin:
-                        axes_chmap[i].imshow(Map[i], vmin=Vmin, vmax=Vmax, interpolation='nearest', aspect='equal', extent=ExtentCM)
+                        axes_chmap[i].imshow(Map[i], vmin=Vmin, vmax=Vmax, interpolation='nearest',
+                                             aspect='equal', extent=ExtentCM)
                         x = i % self.NhPanel
                         if x == (self.NhPanel - 1):
                             axes_manager.set_colorbar_for(axes_chmap[i], Vmin, Vmax, f'{self.brightnessunit} km/s')
@@ -1089,13 +1151,13 @@ class SDChannelMapDisplay(SDImageDisplay):
                         axes_chmap[i].set_title(Title[i], size=TickSize)
 
                 t4 = time.time()
-                LOG.debug('PROFILE: integrated intensity map: %s sec' % (t1-t0))
-                LOG.debug('PROFILE: integrated spectrum #1: %s sec' % (t2-t1))
-                LOG.debug('PROFILE: integrated spectrum #2: %s sec' % (t3-t2))
-                LOG.debug('PROFILE: channel map: %s sec'%(t4-t3))
+                LOG.debug('PROFILE: integrated intensity map: %s sec' % (t1 - t0))
+                LOG.debug('PROFILE: integrated spectrum #1: %s sec' % (t2 - t1))
+                LOG.debug('PROFILE: integrated spectrum #2: %s sec' % (t3 - t2))
+                LOG.debug('PROFILE: channel map: %s sec' % (t4 - t3))
 
-                FigFileRoot = self.inputs.imagename + '.pol%s'%(pol)
-                plotfile = os.path.join(self.stage_dir, FigFileRoot+'_ChannelMap_%s.png'%(ValidCluster))
+                FigFileRoot = self.inputs.imagename + '.pol%s' % (pol)
+                plotfile = os.path.join(self.stage_dir, FigFileRoot + '_ChannelMap_%s.png' % (ValidCluster))
                 fig.savefig(plotfile, dpi=DPIDetail)
 
                 for _a in itertools.chain([axes_integmap, axes_integsp1, axes_integsp2], axes_chmap):
@@ -1106,13 +1168,13 @@ class SDChannelMapDisplay(SDImageDisplay):
                 parameters = {}
                 parameters['intent'] = 'TARGET'
                 parameters['spw'] = self.spw
-                parameters['pol'] = self.image.stokes[pol] #polmap[pol]
+                parameters['pol'] = self.image.stokes[pol]  # polmap[pol]
                 parameters['ant'] = self.antenna
                 parameters['type'] = 'channel_map'
                 parameters['file'] = self.inputs.imagename
                 parameters['field'] = self.inputs.source
                 parameters['vis'] = 'ALL'
-                parameters['line'] = [self.frequency[chan0] * 1e9, self.frequency[chan1] * 1e9] # GHz -> Hz
+                parameters['line'] = [self.frequency[chan0] * 1e9, self.frequency[chan1] * 1e9]  # GHz -> Hz
 
                 plot = logger.Plot(plotfile,
                                    x_axis='R.A.',
@@ -1432,7 +1494,7 @@ class SDSpectralMapDisplay(SDImageDisplay):
             NH = int((self.x_max - self.x_min) // STEPX // NhPanel + 1)
             NV = int((self.y_max - self.y_min) // STEPY // NvPanel + 1)
             # an array with length of total number of spectra to be plotted (initialized by -1)
-            ROWS = numpy.zeros(NH * NV * NhPanel * NvPanel, dtype=numpy.int) - 1
+            ROWS = numpy.zeros(NH * NV * NhPanel * NvPanel, dtype=int) - 1
             # 2010/6/15 GK Change the plotting direction: UpperLeft->UpperRight->OneLineDown repeat...
             for x in range(0, self.nx, STEPX):
                 posx = (self.x_max - x)//STEPX // NhPanel

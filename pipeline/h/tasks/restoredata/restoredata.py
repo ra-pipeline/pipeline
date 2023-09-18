@@ -43,7 +43,7 @@ from .. import applycal
 from .. import importdata
 from ..common import manifest
 
-from pipeline.extern.almarenorm import ACreNorm
+from pipeline.extern.almarenorm import alma_renorm
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -126,8 +126,8 @@ class RestoreDataInputs(vdp.StandardInputs):
         :type bdfflags: boolean True or False
         :param lazy: use the lazy filler to restore data
         :type lazy: boolean True or False
-        :param asis: list of ASDM tables to import as is
-        :type asis: comma delimated list of tables
+        :param asis: Creates verbatim copies of the ASDM tables in the output MS.
+        :type asis: space delimated list of tables
         """
         super(RestoreDataInputs, self).__init__()
 
@@ -228,7 +228,7 @@ class RestoreData(basetask.StandardTaskTemplate):
 
         # Copy the required calibration products from "someplace" on disk
         #   (default ../products) to ../rawdata. The pipeline manifest file
-        #   if present is used to determine which files to copy. Otherwise   
+        #   if present is used to determine which files to copy. Otherwise
         #   a file naming scheme is used. The latter is deprecated as it
         #   requires the exportdata / restoredata tasks to be synchronized
         #   but it is maintained for testing purposes.
@@ -270,8 +270,10 @@ class RestoreData(basetask.StandardTaskTemplate):
         # pipeline manifest.
         casa_version, pipeline_version, num_mpi = self._extract_casa_pipeline_version(pipemanifest)
 
-        # If necessary, renormalize ALMA IF data
-        renorm_applied = self._do_renormalize(pipemanifest, session_names=session_names, session_vislists=session_vislists)
+        # If necessary, renormalize ALMA IF data; returns bool declaring
+        # whether the renormalization was run.
+        renorm_applied = self._do_renormalize(pipemanifest, session_names=session_names,
+                                              session_vislists=session_vislists)
 
         # Return the results object, which will be used for the weblog
         return RestoreDataResults(import_results, apply_results, flagging_summaries, casa_version, pipeline_version,
@@ -297,27 +299,26 @@ class RestoreData(basetask.StandardTaskTemplate):
                 # for each non-target asdm/vis in the manifest structure
                 params = pipemanifest.get_renorm(vis)
                 if params:
-                    # correspondence between param names in the manifest and arguments of 'renormalize()'
-                    paramnames = {
-                        'docorr'        : 'apply',
-                        'docorrThresh'  : 'threshold',
-                        'correctATM'    : 'correctATM',
-                        'spws'          : 'spw',
-                        'excludechan'   : 'excludechan',
-                        'atmAutoExclude': 'atm_auto_exclude',
-                        'bwthreshspw'   : 'bwthreshspw'
+                    # Convert input parameters with ast (string to bool, dict, etc).
+                    kwargs = {key: ast.literal_eval(val) if val else val for key, val in params.items()}
+
+                    # PIPE-1687: restrict input arguments to those needed by
+                    # renorm interface function.
+                    kwargs = {
+                        'vis': vis,
+                        'spw': [int(x) for x in kwargs['spw'].split(',') if x],
+                        'apply': kwargs['apply'],
+                        'threshold': kwargs['threshold'],
+                        'excludechan': kwargs['excludechan'],
+                        'correct_atm': kwargs['correctATM'],
+                        'atm_auto_exclude': kwargs['atm_auto_exclude'],
+                        'bwthreshspw': kwargs['bwthreshspw'],
                     }
-                    # rn_params = {key:ast.literal_eval(val) if val else val for key,val in params.items()}
-                    kwargs = {}
-                    for renormalize_key, manifest_key in paramnames.items():
-                        if manifest_key in params:
-                            val = params[manifest_key]
-                            kwargs[renormalize_key] = ast.literal_eval(val) if val else val
+
                     try:
-                        rn = ACreNorm(vis)
                         LOG.info(f'Renormalizing {vis} with hifa_renorm {params}')
-                        rn.renormalize(**kwargs)
-                        if 'docorr' in kwargs and kwargs['docorr'] and rn.checkApply():
+                        _, _, _, _, _, renorm_applied, _, _ = alma_renorm(**kwargs)
+                        if 'apply' in kwargs and kwargs['apply'] and renorm_applied:
                             applied = True
                         else:
                             LOG.error(f'Failed application of renormalization for {vis} {params}')
@@ -560,8 +561,9 @@ class RestoreData(basetask.StandardTaskTemplate):
             with tarfile.open(tarfilename, 'r:gz') as tar:
                 tarmembers = tar.getmembers()
 
-                # Loop over the visibilities associated with that session
-                for vis in vislist:
+                # Retrieve any caltable associated with either session name or
+                # the measurement sets associated with this session.
+                for vis in vislist + [session]:
                     LOG.info('Restoring caltables for %s from %s'
                              '' % (os.path.basename(vis), tarfilename))
                     extractlist = []
@@ -579,8 +581,8 @@ class RestoreData(basetask.StandardTaskTemplate):
                             tar.extractall(path=inputs.output_dir, members=extractlist)
 
     def _do_applycal(self):
-        container = vdp.InputsContainer(applycal.Applycal, self.inputs.context)
-        applycal_task = applycal.Applycal(container)
+        container = vdp.InputsContainer(applycal.SerialApplycal, self.inputs.context)
+        applycal_task = applycal.SerialApplycal(container)
         return self._executor.execute(applycal_task, merge=True)
 
     def _get_sessions(self, sessions=None, vis=None):

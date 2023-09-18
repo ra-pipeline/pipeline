@@ -404,7 +404,7 @@ class SelfcalSummary(object):
                 mask = mask[:, :, 0, 0]
                 unmasked = (mask == True).nonzero()
                 pix_unmasked = pix[unmasked]
-        elif telescope == 'VLA':
+        elif 'VLA' in telescope:
             with casa_tools.ImageReader(imagename.replace('image', 'residual')) as image:
                 rms = image.statistics(algorithm='chauvenet')['rms'][0]
             with casa_tools.ImageReader(residualImage) as image:

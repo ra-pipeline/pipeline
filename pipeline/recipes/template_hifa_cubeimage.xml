@@ -9,7 +9,7 @@
     </ProcessingCommand>
     <!-- end of import MS-->
     {{/importonly}}
-    
+
     {{^importonly}}
     <!-- Restore MS: if importonly!=True, restore ASDM -->
     <ProcessingCommand>
@@ -41,6 +41,24 @@
     </ProcessingCommand>
 
     <ProcessingCommand>
+        <Command xmlns="">hif_checkproductsize</Command>
+        <ParameterSet>
+            <Parameter>
+                <Keyword xmlns="">maxcubesize</Keyword>
+                <Value xmlns="">100.0</Value>
+            </Parameter>
+            <Parameter>
+                <Keyword xmlns="">maxcubelimit</Keyword>
+                <Value xmlns="">120.0</Value>
+            </Parameter>
+            <Parameter>
+                <Keyword xmlns="">maxproductsize</Keyword>
+                <Value xmlns="">10000.0</Value>
+            </Parameter>
+        </ParameterSet>
+    </ProcessingCommand>    
+
+    <ProcessingCommand>
         <Command xmlns="">hif_makeimlist</Command>
         <ParameterSet>
             <Parameter>
@@ -59,22 +77,16 @@
         <ParameterSet>
         </ParameterSet>
     </ProcessingCommand>
-    
+
     {{#cube_image}}
     <!-- create continumm-free data if cube_image=true -->
-    
-    <ProcessingCommand>
-        <Command xmlns="">hif_uvcontfit</Command>
-        <ParameterSet>
-        </ParameterSet>
-    </ProcessingCommand>
 
     <ProcessingCommand>
         <Command xmlns="">hif_uvcontsub</Command>
         <ParameterSet>
         </ParameterSet>
     </ProcessingCommand>
-    
+
     <!-- end of the continuum subtraction section -->
     {{/cube_image}}
 
@@ -106,14 +118,14 @@
         <ParameterSet>
         </ParameterSet>
     </ProcessingCommand>
-    
+
     <!-- end of the continuum imaging section -->
     {{/cont_image}}
 
     {{#cube_image}}
     <!-- loop over list of cubes and create images -->
     {{#cube_list}}
-    
+
     <ProcessingCommand>
         <Command xmlns="">hif_editimlist</Command>
         <ParameterSet>
@@ -161,21 +173,21 @@
           </Parameter>
         </ParameterSet>
     </ProcessingCommand>
-    
+
     {{/cube_list}}
     <!-- end loop -->
     {{/cube_image}}
 
     {{#selfcal}}
     <!-- run selfcal and save selfcal'ed data in 'corrected' if selfcal=true -->
-    
+
     <ProcessingCommand>
         <Command xmlns="">hif_selfcal</Command>
         <ParameterSet>
             <Parameter>
                 <Keyword xmlns="">field</Keyword>
                 <Value xmlns="">{{{field_list}}}</Value>
-            </Parameter>            
+            </Parameter>
         </ParameterSet>
     </ProcessingCommand>
 
@@ -196,7 +208,7 @@
             <Parameter>
                 <Keyword xmlns="">datatype</Keyword>
                 <Value xmlns="">selfcal</Value>
-            </Parameter>              
+            </Parameter>
         </ParameterSet>
     </ProcessingCommand>
 
@@ -205,14 +217,14 @@
         <ParameterSet>
         </ParameterSet>
     </ProcessingCommand>
-    
+
     <!-- end of the continuum imaging section -->
     {{/cont_image}}
 
     {{#cube_image}}
     <!-- loop over list of cubes and create images -->
     {{#cube_list}}
-    
+
     <ProcessingCommand>
         <Command xmlns="">hif_editimlist</Command>
         <ParameterSet>
@@ -223,7 +235,7 @@
             <Parameter>
                 <Keyword xmlns="">datatype</Keyword>
                 <Value xmlns="">selfcal</Value>
-            </Parameter>            
+            </Parameter>
             <Parameter>
                 <Keyword xmlns="">specmode</Keyword>
                 <Value xmlns="">cube</Value>
@@ -251,7 +263,7 @@
             <Parameter>
                 <Keyword xmlns="">nchan</Keyword>
                 <Value xmlns="">{{nchan}}</Value>
-            </Parameter>              
+            </Parameter>
         </ParameterSet>
     </ProcessingCommand>
 
@@ -264,13 +276,13 @@
           </Parameter>
         </ParameterSet>
     </ProcessingCommand>
-    
+
     {{/cube_list}}
     <!-- end loop -->
-    {{/cube_image}}      
+    {{/cube_image}}
 
     <!-- end of the selfcal section -->
-    {{/selfcal}}    
+    {{/selfcal}}
 
     <ProcessingCommand>
         <Command xmlns="">hifa_exportdata</Command>

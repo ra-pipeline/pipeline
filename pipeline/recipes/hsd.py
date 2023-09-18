@@ -6,7 +6,11 @@ import traceback
 import inspect
 
 # Pipeline imports
+import pipeline
 from pipeline.infrastructure import casa_tools
+
+# Make pipeline tasks available in local name space
+pipeline.initcli(locals())
 
 IMPORT_ONLY = 'Import only'
 
@@ -14,8 +18,7 @@ ITERATION = 2
 
 
 # Run the procedure
-def hsdms(vislist, importonly=False, pipelinemode='automatic',
-          interactive=True):
+def hsdms(vislist, importonly=False, interactive=True):
 
     echo_to_screen = interactive
     casa_tools.post_to_log("Beginning pipeline run ...")
@@ -25,46 +28,46 @@ def hsdms(vislist, importonly=False, pipelinemode='automatic',
         h_init()
 
         # Load the data
-        hsd_importdata(vis=vislist, pipelinemode=pipelinemode)
+        hsd_importdata(vis=vislist)
         if importonly:
             raise Exception(IMPORT_ONLY)
 
         # Deterministic flagging
-        hsd_flagdata(pipelinemode=pipelinemode)
+        hsd_flagdata()
 
         # Tsys calibration
-        h_tsyscal(pipelinemode=pipelinemode)
+        h_tsyscal()
 
         # Flag system temperature calibration
-        hsd_tsysflag(pipelinemode=pipelinemode)
+        hsd_tsysflag()
 
         # Compute the sky calibration
-        hsd_skycal(pipelinemode=pipelinemode)
+        hsd_skycal()
 
         # Compute the Kelvin to Jansky calibration
-        hsd_k2jycal(pipelinemode=pipelinemode)
+        hsd_k2jycal()
 
         # Apply the calibrations
-        hsd_applycal(pipelinemode=pipelinemode)
+        hsd_applycal()
 
         # Calibration of residual atmospheric transmission
-        hsd_atmcor(pipelinemode=pipelinemode)
+        hsd_atmcor()
 
         # # Improve line mask for baseline subtraction by executing 
         # # hsd_baseline and hsd_blflag iteratively
         for i in range(ITERATION):
 
             # Baseline subtraction with automatic line detection
-            hsd_baseline(pipelinemode=pipelinemode)
+            hsd_baseline()
 
             # Flag data based on baseline quality
-            hsd_blflag(pipelinemode=pipelinemode)
+            hsd_blflag()
 
         # Imaging
-        hsd_imaging(pipelinemode=pipelinemode)
+        hsd_imaging()
 
         # Export the data
-        hsd_exportdata(pipelinemode=pipelinemode)
+        hsd_exportdata()
 
     except Exception as e:
         if str(e) == IMPORT_ONLY:

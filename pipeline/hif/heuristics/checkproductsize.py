@@ -372,9 +372,6 @@ class CheckProductSizeHeuristics(object):
                 cubesizes, maxcubesize, productsizes, total_productsize = self.calculate_sizes(imlist)
                 LOG.info('spw mitigation leads to product size of %s GB' % (total_productsize))
 
-        # Save cube mitigated product size for logs
-        cube_mitigated_productsize = total_productsize
-
         if (self.inputs.maxproductsize != -1.0) and (total_productsize > self.inputs.maxproductsize):
             LOG.error('Product size cannot be mitigated. Remaining factor: %.4f.' % (total_productsize / self.inputs.maxproductsize / nfields))
             return size_mitigation_parameters, \

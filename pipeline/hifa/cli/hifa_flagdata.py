@@ -3,12 +3,13 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
+@utils.cli_wrapper
 def hifa_flagdata(vis=None, autocorr=None, shadow=None, tolerance=None,
                   scan=None, scannumber=None, intents=None, edgespw=None,
                   fracspw=None, fracspwfps=None, online=None, partialpol=None,
                   lowtrans=None, mintransrepspw=None, mintransnonrepspws=None,
                   fileonline=None, template=None, filetemplate=None, hm_tbuff=None,
-                  tbuff=None, qa0=None, qa2=None, pipelinemode=None,
+                  tbuff=None, qa0=None, qa2=None,
                   flagbackup=None, dryrun=None, acceptresults=None):
 
     """
@@ -48,8 +49,7 @@ def hifa_flagdata(vis=None, autocorr=None, shadow=None, tolerance=None,
     
     Output
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -105,11 +105,6 @@ def hifa_flagdata(vis=None, autocorr=None, shadow=None, tolerance=None,
                        hm_tbuff='manual'. The default in manual mode is no flagging.
     qa0                QA0 flags.
     qa2                QA2 flags.
-    pipelinemode       The pipeline operating mode. In 'automatic' mode the pipeline
-                       determines the values of all context defined pipeline inputs automatically.
-                       In interactive mode the user can set the pipeline context defined parameters
-                       manually. In 'getinputs' mode the user can check the settings of all
-                       pipeline parameters without running the task.
     flagbackup         Back up any pre-existing flags.
     dryrun             Run the commands (True) or generate the commands to be run but do not
                        execute (False).

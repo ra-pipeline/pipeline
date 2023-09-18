@@ -1,6 +1,7 @@
 import collections
 import copy
 import os
+from statistics import mode
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -12,10 +13,9 @@ import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
 from pipeline.domain.measurementset import MeasurementSet
-from pipeline.h.tasks.common import commonhelpermethods
+from pipeline.h.tasks.common import commonhelpermethods, mstools
 from pipeline.h.tasks.common.arrayflaggerbase import FlagCmd
 from pipeline.h.tasks.flagging.flagdatasetter import FlagdataSetter
-from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import task_registry
 from .resultobjects import CorrectedampflagResults
 
@@ -838,7 +838,8 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         newflags = []
 
         # Read in data from MS. If no valid data could be read, return early with no flags.
-        data = self._read_data_from_ms(ms, intent, field, spwid, baseline_set=baseline_set)
+        data = mstools.read_channel_averaged_data_from_ms(ms, field, spwid, intent,
+            ['corrected_data', 'model_data', 'antenna1', 'antenna2', 'flag', 'time', 'uvdist'], baseline_set)
         if not data:
             return newflags
 
@@ -941,14 +942,63 @@ class Correctedampflag(basetask.StandardTaskTemplate):
                 if tmantint <= 0:
                     thresh_scale_factor = inputs.relaxed_factor
                 else:
+                    # First check if a few antennas (up to 10%) explain most of
+                    # the outlier timestamps (>90%), before determining the
+                    # maximum threshold of outlier timestamps.
+                    n_time_max_scale_factor = 1
+
+                    # Track which antennas appear most frequently among outlier
+                    # timestamps.
+                    frequent_ants = []
+
+                    # Select antennas for outlier timestamps.
+                    ant1_remaining = ant1_sel[id_relaxsig]
+                    ant2_remaining = ant2_sel[id_relaxsig]
+
+                    # Iterate for up to 10% of the nr. of antennas.
+                    for i in range(np.max([1, nants // 10])):
+                        # Add antenna that appears most frequently.
+                        frequent_ant = mode(np.concatenate([ant1_remaining, ant2_remaining]))
+                        frequent_ants.append(antenna_id_to_name[frequent_ant])
+
+                        # Identify which antennas remain excluding the newly
+                        # found most frequent antenna.
+                        ant1_to_keep = np.where(ant1_remaining != frequent_ant)
+                        ant2_to_keep = np.where(ant2_remaining != frequent_ant)
+                        ants_to_keep = np.intersect1d(ant1_to_keep, ant2_to_keep)
+
+                        # Compute what fraction of outliers the most frequent
+                        # antennas account for.
+                        percentage = 100 * (1 - float(len(ants_to_keep)) / len(id_relaxsig))
+                        LOG.info(f"{ms.basename}, corr {icorr}: {i + 1} antenna(s)"
+                                 f" ({utils.commafy(frequent_ants, quotes=False)}) account for {percentage:.1f} percent"
+                                 f" of relaxsig outliers (PIPE-1000).")
+
+                        # If the remaining outliers are less than 10%, then
+                        # set a new scaling factor based on nr. of antennas
+                        # that cause the most outliers, and break out of this
+                        # for loop.
+                        if len(ants_to_keep) < len(id_relaxsig) * 0.1:
+                            n_time_max_scale_factor = 4 - i
+                            LOG.info(f"{ms.basename}, corr {icorr}: setting scaling factor for maximum threshold for"
+                                     f" outlier timestamps to: {n_time_max_scale_factor} (PIPE-1000).")
+                            break
+
+                        # If still iterating, re-select the remaining antennas
+                        # for outlier timestamps.
+                        ant1_remaining = ant1_remaining[ants_to_keep]
+                        ant2_remaining = ant2_remaining[ants_to_keep]
+
                     # Identify number of unique outlier timestamps.
                     time_sel_relaxsig = time_sel[id_relaxsig]
                     time_sel_relaxsig_uniq = np.unique(time_sel_relaxsig)
 
                     # Set maximum threshold for outlier timestamps.
                     # Currently set equal to the threshold for high sigma
-                    # outlier timestamps used in flagging heuristic.
-                    n_time_with_relaxsig_max = n_time_with_highsig_max
+                    # outlier timestamps used in flagging heuristic, scaled by
+                    # the scaling factor based on whether a small fraction of
+                    # antennas are responsible for most outliers.
+                    n_time_with_relaxsig_max = n_time_with_highsig_max * n_time_max_scale_factor
 
                     # If the number of unique outlier timestamps exceeds the
                     # threshold, then relax the threshold scale factor.
@@ -1319,50 +1369,6 @@ class Correctedampflag(basetask.StandardTaskTemplate):
                                     antenna_id_to_name=antenna_id_to_name))
 
         return newflags
-
-    @staticmethod
-    def _read_data_from_ms(ms: MeasurementSet, intent: str, field: str, spwid: int,
-                           baseline_set: Optional[List] = None) -> Dict:
-        # Identify scans for given data selection.
-        scans_with_data = ms.get_scans(scan_intent=intent, field=field, spw=spwid)
-        if not scans_with_data:
-            LOG.info('No data expected for {} {} intent, field {}, spw {}. Continuing...'
-                     ''.format(ms.basename, intent, field, spwid))
-            return {}
-
-        # Initialize data selection.
-        data_selection = {'field': field,
-                          'scanintent': '*%s*' % utils.to_CASA_intent(ms, intent),
-                          'spw': str(spwid)}
-
-        # Add baseline set to data selection if provided; log selection.
-        if baseline_set:
-            LOG.info('Reading data for {}, intent {}, field {}, spw {}, and {} baselines ({})'.format(
-                os.path.basename(ms.name), intent, field, spwid, baseline_set[0], baseline_set[1]))
-            data_selection['baseline'] = baseline_set[1]
-        else:
-            LOG.info('Reading data for {}, intent {}, field {}, spw {}, and all baselines'.format(
-                os.path.basename(ms.name), intent, field, spwid))
-
-        # Get number of channels for this spw.
-        nchans = ms.get_spectral_windows(str(spwid))[0].num_channels
-
-        # Read in data from MS.
-        with casa_tools.MSReader(ms.name) as openms:
-            try:
-                # Apply data selection, and set channel selection to take the
-                # average of all channels.
-                openms.msselect(data_selection)
-                openms.selectchannel(1, 0, nchans, 1)
-
-                # Extract data from MS.
-                data = openms.getdata(['corrected_data', 'model_data', 'antenna1', 'antenna2', 'flag', 'time', 'uvdist'])
-            except:
-                LOG.warning('Unable to compute flagging for intent {}, field {}, spw {}'.format(intent, field, spwid))
-                data = {}
-                openms.close()
-
-        return data
 
     @staticmethod
     def _create_flags_for_ultrahigh_baselines_timestamps(ms: MeasurementSet, spwid: int, intent: str, icorr: int,

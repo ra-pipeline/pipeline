@@ -9,7 +9,7 @@ agent_description = {
 }
 
 total_keys = {
-        'TOTAL'        : 'All Data',
+    'TOTAL'        : 'All Data',
 	'TARGET'       : 'Target'
 }
 

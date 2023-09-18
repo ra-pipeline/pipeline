@@ -36,9 +36,9 @@ from pipeline.h.tasks.common.commonfluxresults import FluxCalibrationResults
 from pipeline.hif.tasks.applycal.ifapplycal import IFApplycal
 from pipeline.hifa.tasks.fluxscale.gcorfluxscale import GcorFluxscale
 from pipeline.hifa.tasks.gfluxscaleflag.resultobjects import GfluxscaleflagResults
-from pipeline.hsd.tasks.applycal.applycal import HpcSDApplycal
+from pipeline.hsd.tasks.applycal.applycal import SDApplycal
 from pipeline.hsd.tasks.baselineflag.baselineflag import SDBLFlagResults
-from pipeline.hsd.tasks.baselineflag.baselineflag import HpcSDBLFlag
+from pipeline.hsd.tasks.baselineflag.baselineflag import SDBLFlag
 from pipeline.hsd.tasks.imaging.imaging import SDImaging
 from pipeline.hsd.tasks.imaging.resultobjects import SDImagingResults
 from pipeline.infrastructure.basetask import Results, ResultsList, StandardTaskTemplate
@@ -370,7 +370,7 @@ class SDApplycalRegressionExtractor(ApplycalRegressionExtractor):
 
     result_cls = ApplycalResults
     child_cls = None
-    generating_task = HpcSDApplycal
+    generating_task = SDApplycal
 
 
 class VLAApplycalRegressionExtractor(ApplycalRegressionExtractor):
@@ -834,7 +834,7 @@ class SDBLFlagRegressionExtractor(RegressionExtractor):
 
     result_cls = SDBLFlagResults
     child_cls = None
-    generating_task = HpcSDBLFlag
+    generating_task = SDBLFlag
 
     def handle(self, result:SDBLFlagResults) -> OrderedDict:
         """

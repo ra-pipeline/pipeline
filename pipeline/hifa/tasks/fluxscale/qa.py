@@ -3,20 +3,17 @@ import collections
 import functools
 import operator
 import re
-from datetime import timedelta
 from decimal import Decimal
 from math import sqrt
 
 import numpy
 
-import pipeline.domain.spectralwindow as spectralwindow
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as qacalc
 from pipeline.domain.measures import FluxDensity, FluxDensityUnits, Frequency, FrequencyUnits
 from pipeline.h.tasks.common import commonfluxresults
-from pipeline.h.tasks.common.displays.common import CaltableWrapperFactory
 from pipeline.h.tasks.importdata.fluxes import ORIGIN_ANALYSIS_UTILS, ORIGIN_XML
 from pipeline.hifa.heuristics.snr import ALMA_BANDS, ALMA_SENSITIVITIES, ALMA_TSYS
 from pipeline.hifa.tasks.importdata.dbfluxes import ORIGIN_DB
@@ -304,7 +301,7 @@ def gaincalSNR(context, ms, tsysTable, flux, field, spws, intent='PHASE', requir
     # compute the median length of a "solint='inf', combine=''" scan. In
     # principle, this should be the time weighted by percentage of unflagged
     # data. Also, the method below will include sub-scan latency.
-    time_on_source = {spw: median([scan.exposure_time(spw.id) for scan in scans[spw]], start=timedelta())
+    time_on_source = {spw: numpy.median([scan.exposure_time(spw.id) for scan in scans[spw]])
                       for spw in all_gaincal_spws}
 
     spw_to_flux_density = {spw_id: FluxDensity(flux_jy, FluxDensityUnits.JANSKY) for spw_id, _, flux_jy in flux}
@@ -518,38 +515,6 @@ def frequency_min_max_after_aliasing(spw):
         return spw.min_frequency, spw.max_frequency
 
 
-def median(data, start):
-    num_elements = len(data)
-    even = True if num_elements % 2 == 0 else False
-
-    if even:
-        slice_start = (num_elements // 2) - 1
-        slice_end = (num_elements // 2) + 1
-        med = sum(data[slice_start:slice_end], start) / 2
-    else:
-        med = data[num_elements // 2]
-
-    return med
-
-
-def median_channel_width(spw):
-    channel_widths = spw.channels.chan_widths
-
-    if isinstance(channel_widths, spectralwindow.ArithmeticProgression):
-        median_width = abs(channel_widths.start)
-    else:
-        # FIXME: function call is missing parameter
-        median_width = median(channel_widths)
-
-    return Frequency(median_width, FrequencyUnits.HERTZ)
-
-
-def median_scan_duration(scans):
-    durations = [scan.time_on_source for scan in scans]
-    # FIXME: function call is missing parameter
-    return median(durations)
-
-
 class CaltableWrapperFactory(object):
     @staticmethod
     def from_caltable(filename):
@@ -619,7 +584,7 @@ class CaltableWrapperFactory(object):
 # get_dtype function below.
 CASA_DATA_TYPES = {
     'int': numpy.int32,
-    'boolean': numpy.bool,
+    'boolean': bool,
     'float': numpy.float64,
     'double': numpy.float64,
     'complex': numpy.complex128

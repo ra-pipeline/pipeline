@@ -3,12 +3,13 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
+@utils.cli_wrapper
 def hifa_gfluxscaleflag(
         vis=None, intent=None,
         phaseupsolint=None, solint=None, minsnr=None, refant=None,
         antnegsig=None, antpossig=None, tmantint=None, tmint=None, tmbl=None,
         antblnegsig=None, antblpossig=None, relaxed_factor=None, niter=None,
-        pipelinemode=None, dryrun=None, acceptresults=None):
+        dryrun=None, acceptresults=None):
 
     """
     hifa_gfluxscaleflag ---- Flag the phase, pol, flux calibrators
@@ -39,8 +40,7 @@ def hifa_gfluxscaleflag(
     
     Output
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -74,7 +74,7 @@ def hifa_gfluxscaleflag(
                    antennas within individual timestamps.
     tmantint       Threshold for maximum fraction of timestamps that are allowed to
                    contain outliers.
-    tmint          Threshold for maximum fraction of "outlier timestamps" over
+    tmint          eshold for maximum fraction of "outlier timestamps" over
                    "total timestamps" that a baseline may be a part of.
     tmbl           Initial threshold for maximum fraction of "bad baselines" over "all
                    baselines" that an antenna may be a part of.
@@ -89,13 +89,6 @@ def hifa_gfluxscaleflag(
     niter          Maximum number of times to iterate on evaluation of flagging
                    heuristics. If an iteration results in no new flags, then subsequent
                    iterations are skipped.
-    pipelinemode   Pipeline operating mode. In 'automatic' mode the pipeline
-                   determines the values of all context defined pipeline inputs automatically.
-                   In interactive mode the user can set the pipeline context defined
-                   parameters manually. In 'getinputs' mode the user can check the settings of
-                   all pipeline parameters without running the task.
-                   
-                   default: 'automatic'.
     dryrun         Run the commands (True) or generate the commands to be run but
                    do not execute (False).
     acceptresults  Add the results of the task to the pipeline context (True) or

@@ -108,7 +108,7 @@ class ALMAApplycalQAHandler(pqa.QAPlugin):
     # returned by IFApplycal only
     result_cls = h_applycal.ApplycalResults
     child_cls = None
-    generating_task = hif_applycal.IFApplycal
+    generating_task = hif_applycal.SerialIFApplycal
 
     def handle(self, context, result: h_applycal.ApplycalResults):
         vis = result.inputs['vis']

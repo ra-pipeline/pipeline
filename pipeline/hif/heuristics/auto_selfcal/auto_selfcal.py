@@ -3,28 +3,27 @@
 see: https://github.com/jjtobin/auto_selfcal
 """
 
-import os
 import glob
+import os
 
 import numpy as np
 import pipeline.infrastructure as infrastructure
 from pipeline.domain.observingrun import ObservingRun
+from pipeline.infrastructure import casa_tools, utils
 from pipeline.infrastructure.casa_tasks import CasaTasks
-from pipeline.infrastructure.casa_tools import msmd
-from pipeline.infrastructure.casa_tools import table as tb
 from pipeline.infrastructure.tablereader import MeasurementSetReader
-from pipeline.infrastructure import casa_tools
-# from pipeline.infrastructure.utils import request_omp_threading
+from pipeline.infrastructure import logging
 
 from .selfcal_helpers import (analyze_inf_EB_flagging, checkmask,
                               compare_beams, estimate_near_field_SNR,
-                              estimate_SNR, fetch_spws, fetch_targets,
-                              get_dr_correction, get_nterms,
-                              get_intflux, get_n_ants, get_sensitivity,
-                              get_SNR_self, get_SNR_self_update,
-                              get_solints_simple, get_spw_bandwidth,
-                              get_uv_range, importdata, rank_refants,
-                              sanitize_string)
+                              estimate_SNR, fetch_targets,
+                              get_dr_correction, get_intflux, get_n_ants,
+                              get_nterms, get_sensitivity, get_SNR_self,
+                              get_SNR_self_update, get_solints_simple,
+                              get_spw_bandwidth, get_uv_range, importdata,
+                              rank_refants, sanitize_string)
+
+# from pipeline.infrastructure.utils import request_omp_threading
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -40,8 +39,10 @@ class SelfcalHeuristics(object):
                  rel_thresh_scaling='log10',
                  dividing_factor=None,
                  check_all_spws=False,
+                 n_solints=4.0,
                  do_amp_selfcal=False,
                  inf_EB_gaincal_combine='scan',
+                 refantignore='',
                  executor=None):
         """Initialize the class."""
         self.executor = executor
@@ -60,8 +61,10 @@ class SelfcalHeuristics(object):
         self.uvtaper = scal_target['uvtaper']
         self.robust = scal_target['robust']
         self.field = scal_target['field']
+        self.target = utils.dequote(scal_target['field'])
         self.uvrange = scal_target['uvrange']
 
+        self.n_solints = n_solints
         self.do_amp_selfcal = do_amp_selfcal
         self.gaincal_minsnr = gaincal_minsnr
         self.minsnr_to_proceed = minsnr_to_proceed
@@ -70,10 +73,11 @@ class SelfcalHeuristics(object):
         self.rel_thresh_scaling = rel_thresh_scaling
         self.dividing_factor = dividing_factor
         self.check_all_spws = check_all_spws
+        self.refantignore = refantignore
         self.inf_EB_gaincal_combine = inf_EB_gaincal_combine    # Options: 'spw,scan' or 'scan' or 'spw' or 'none'
-        self.inf_EB_gaintype = 'G'              # Options: 'G' or 'T' or 'G,T'
+        self.inf_EB_gaintype = 'G'                              # Options: 'G' or 'T' or 'G,T'
 
-        LOG.info('recreating observing run from per-selfcal-target MS(es)')
+        LOG.info('recreating observing run from per-selfcal-target MS(es): %r', self.vislist)
         self.image_heuristics.observing_run = self.get_observing_run(self.vislist)
 
     @staticmethod
@@ -83,7 +87,9 @@ class SelfcalHeuristics(object):
 
         observing_run = ObservingRun()
         for ms_file in ms_files:
-            ms = MeasurementSetReader.get_measurement_set(ms_file)
+            with logging.log_level('pipeline.infrastructure.tablereader', logging.WARNING+1):
+                # avoid trigger warnings from MeasurementSetReader
+                ms = MeasurementSetReader.get_measurement_set(ms_file)
             ms.exclude_num_chans = ()
             observing_run.add_measurement_set(ms)
         return observing_run
@@ -92,23 +98,20 @@ class SelfcalHeuristics(object):
             self, vis, imagename, band_properties, band, telescope='undefined', scales=[0],
             smallscalebias=0.6, mask='', nsigma=5.0, imsize=None, cellsize=None, interactive=False, robust=0.5, gain=0.1, niter=50000,
             cycleniter=300, uvtaper=[],
-            savemodel='none', gridder='standard', sidelobethreshold=3.0, smoothfactor=1.0, noisethreshold=5.0, lownoisethreshold=1.5,
+            savemodel='none', gridder='standard', sidelobethreshold=3.0, smoothfactor=1.0,  noisethreshold=5.0, lownoisethreshold=1.5,
             parallel=False, nterms=1, cyclefactor=3, uvrange='', threshold='0.0Jy', startmodel='', pblimit=0.1, pbmask=0.1, field='',
-            datacolumn='', spw='', obstype='single-point', savemodel_only=False, resume=False):
+            datacolumn='', spw='', obstype='single-point', nfrms_multiplier=1.0,
+            savemodel_only=False, resume=False):
         """
         Wrapper for tclean with keywords set to values desired for the Large Program imaging
         See the CASA 6.1.1 documentation for tclean to get the definitions of all the parameters
         """
-        msmd.open(vis[0])
-        fieldid = msmd.fieldsforname(field)
-        msmd.done()
-        tb.open(vis[0]+'/FIELD')
-        ephem_column = tb.getcol('EPHEMERIS_ID')
-        tb.close()
-        if ephem_column[fieldid[0]] != -1:
-            phasecenter = 'TRACKFIELD'
-        else:
-            phasecenter = self.phasecenter
+
+        phasecenter = self.phasecenter
+
+        LOG.info('NF RMS Multiplier: %r', nfrms_multiplier)
+        # Minimize out the nfrms_multiplier at 1.
+        nfrms_multiplier = max(nfrms_multiplier, 1.0)
 
         if mask == '':
             usemask = 'auto-multithresh'
@@ -117,10 +120,10 @@ class SelfcalHeuristics(object):
         if threshold != '0.0Jy':
             nsigma = 0.0
         if telescope == 'ALMA':
-            sidelobethreshold = 3.0
+            sidelobethreshold = 2.5
             smoothfactor = 1.0
-            noisethreshold = 5.0
-            lownoisethreshold = 1.5
+            noisethreshold = 5.0*nfrms_multiplier
+            lownoisethreshold = 1.5*nfrms_multiplier
             cycleniter = -1
             cyclefactor = 1.0
             LOG.info(band_properties)
@@ -130,16 +133,16 @@ class SelfcalHeuristics(object):
         if telescope == 'ACA':
             sidelobethreshold = 1.25
             smoothfactor = 1.0
-            noisethreshold = 5.0
-            lownoisethreshold = 2.0
+            noisethreshold = 5.0*nfrms_multiplier
+            lownoisethreshold = 2.0*nfrms_multiplier
             cycleniter = -1
             cyclefactor = 1.0
 
         elif 'VLA' in telescope:
             sidelobethreshold = 2.0
             smoothfactor = 1.0
-            noisethreshold = 5.0
-            lownoisethreshold = 1.5
+            noisethreshold = 5.0*nfrms_multiplier
+            lownoisethreshold = 1.5*nfrms_multiplier
             pblimit = -0.1
             cycleniter = -1
             cyclefactor = 3.0
@@ -147,7 +150,12 @@ class SelfcalHeuristics(object):
         wprojplanes = 1
         if band == 'EVLA_L' or band == 'EVLA_S':
             gridder = 'wproject'
-            wprojplanes = -1
+            wplanes = 384  # normalized to S-band A-config
+            # scale by 75th percentile uv distance divided by A-config value
+            wplanes = wplanes * band_properties[vis[0]][band]['75thpct_uv']/20000.0
+            if band == 'EVLA_L':
+                wplanes = wplanes*2.0  # compensate for 1.5 GHz being 2x longer than 3 GHz
+            wprojplanes = int(wplanes)
         if (band == 'EVLA_L' or band == 'EVLA_S') and obstype == 'mosaic':
             LOG.info('WARNING DETECTED VLA L- OR S-BAND MOSAIC; WILL USE gridder="mosaic" IGNORING W-TERM')
         if obstype == 'mosaic':
@@ -182,6 +190,8 @@ class SelfcalHeuristics(object):
                        'usemask': usemask,
                        'savemodel': 'none',
                        'sidelobethreshold': sidelobethreshold,
+                       'noisethreshold': noisethreshold,
+                       'lownoisethreshold': lownoisethreshold,
                        'smoothfactor': smoothfactor,
                        'pbmask': pbmask,
                        'pblimit': pblimit,
@@ -194,7 +204,8 @@ class SelfcalHeuristics(object):
                        'datacolumn': datacolumn,
                        'spw': spw,
                        'wprojplanes': wprojplanes,
-                       'fullsummary': False}
+                       'fullsummary': False,
+                       'verbose': True}
 
         if not savemodel_only:
             if not resume:
@@ -235,31 +246,34 @@ class SelfcalHeuristics(object):
     def move_dir(self, old_dirname, new_dirname):
         """Move a directory to a new location."""
         if os.path.isdir(new_dirname):
-            LOG.warning(f"WARNING: {new_dirname} already exists. Will remove it first.")
+            LOG.info("%s already exists. Will remove it first.", new_dirname)
             self.cts.rmtree(new_dirname)
         if os.path.isdir(old_dirname):
             self.cts.move(old_dirname, new_dirname)
         else:
-            LOG.warning(f"WARNING: {old_dirname} does not exist")
+            LOG.info("%s does not exist", old_dirname)
 
     def copy_dir(self, old_dirname, new_dirname):
         """Copy a directory to a new location."""
         if os.path.isdir(new_dirname):
-            LOG.warning(f"WARNING: {new_dirname} already exists. Will remove it first.")
+            LOG.info("%s already exists. Will remove it first.", new_dirname)
             self.cts.rmtree(new_dirname)
         if os.path.isdir(old_dirname):
             self.cts.copytree(old_dirname, new_dirname)
         else:
-            LOG.warning(f"WARNING: {old_dirname} does not exist")
+            LOG.info("%s does not exist", old_dirname)
 
-    def get_sensitivity(self):
+    def get_sensitivity(self, spw=None):
+        if spw is None:
+            spw = self.spw_virtual
 
         gridder = self.image_heuristics.gridder('TARGET', self.field)
-
-        sensitivity, eff_ch_bw, sens_bw, known_per_spw_cont_sensitivities_all_chan = self.image_heuristics.calc_sensitivities(
-            self.vislist, self.field, 'TARGET', self.spw_virtual, -1, {},
-            'cont', gridder, self.cellsize, self.imsize, 'briggs', self.robust, self.uvtaper, True, {},
-            False)
+        # PIPE-1827: filter out the "channel bandwidths ratio" warning messages during sensitivity calculations.
+        with logging.log_level('pipeline.hif.heuristics.imageparams_base', logging.WARNING+1):
+            sensitivity, eff_ch_bw, sens_bw, known_per_spw_cont_sensitivities_all_chan = self.image_heuristics.calc_sensitivities(
+                self.vislist, self.field, 'TARGET', spw, -1, {},
+                'cont', gridder, self.cellsize, self.imsize, 'briggs', self.robust, self.uvtaper, True, {},
+                False)
         return sensitivity[0], sens_bw[0]
 
     def get_dr_correction(self):
@@ -271,7 +285,8 @@ class SelfcalHeuristics(object):
         cleantarget: a list of CleanTarget objects.
         """
 
-        all_targets, n_ants, bands, band_properties, applycal_interp, selfcal_library, solints, gaincal_combine, solmode, applycal_mode, integration_time = self._prep_selfcal()
+        all_targets, n_ants, bands, band_properties, applycal_interp, selfcal_library, \
+            solints, gaincal_combine, solmode, applycal_mode, integration_time, spectral_scan, spws_set = self._prep_selfcal()
 
         # Currently, we are still using a modified version of the prototype selfcal preparation scheme to prepare "selfcal_library".
         # Then we override a subset of selfcal input parameters using PL-heuristics-based values.
@@ -296,21 +311,30 @@ class SelfcalHeuristics(object):
                 # make images using the appropriate tclean heuristics for each telescope
                 if os.path.exists(sani_target+'_'+band+'_dirty.image.tt0'):
                     self.cts.rmtree(sani_target+'_'+band+'_dirty.image.tt0')
+                # Because tclean doesn't deal in NF masks, the automask from the initial image is likely to contain a lot of noise unless
+                # we can get an estimate of the NF modifier for the auto-masking thresholds. To do this, we need to create a very basic mask
+                # with the dirty image. So we just use one iteration with a tiny gain so that nothing is really subtracted off.
                 self.tclean_wrapper(
                     vislist, sani_target + '_' + band + '_dirty', band_properties, band, telescope=self.telescope, nsigma=4.0,
                     scales=[0],
-                    threshold='0.0Jy', niter=0, savemodel='none', parallel=parallel, cellsize=cellsize,
+                    threshold='0.0Jy', niter=1, gain=0.00001,
+                    savemodel='none', parallel=parallel, cellsize=cellsize,
                     imsize=imsize,
                     nterms=selfcal_library[target][band]['nterms'],
-                    field=target, spw=selfcal_library[target][band]['spws_per_vis'],
+                    field=self.field, spw=selfcal_library[target][band]['spws_per_vis'],
                     uvrange=selfcal_library[target][band]['uvrange'],
                     obstype=selfcal_library[target][band]['obstype'])
 
                 dirty_SNR, dirty_RMS = estimate_SNR(sani_target+'_'+band+'_dirty.image.tt0')
+                if self.telescope != 'ACA':
+                    dirty_NF_SNR, dirty_NF_RMS = estimate_near_field_SNR(
+                        sani_target+'_'+band+'_dirty.image.tt0', las=selfcal_library[target][band]['LAS'])
+                else:
+                    dirty_NF_SNR, dirty_NF_RMS = dirty_SNR, dirty_RMS
                 dr_mod = 1.0
                 if self.telescope == 'ALMA' or self.telescope == 'ACA':
                     sensitivity = get_sensitivity(
-                        vislist, selfcal_library[target][band],
+                        vislist, selfcal_library[target][band], target,
                         selfcal_library[target][band][vis]['spws'],
                         spw=selfcal_library[target][band][vis]['spwsarray'],
                         imsize=imsize[0],
@@ -333,12 +357,14 @@ class SelfcalHeuristics(object):
                     threshold=str(sensitivity * 4.0) + 'Jy', savemodel='none', parallel=parallel, cellsize=cellsize,
                     imsize=imsize,
                     nterms=selfcal_library[target][band]['nterms'],
-                    field=target, spw=selfcal_library[target][band]['spws_per_vis'],
+                    field=self.field, spw=selfcal_library[target][band]['spws_per_vis'],
                     uvrange=selfcal_library[target][band]['uvrange'],
-                    obstype=selfcal_library[target][band]['obstype'])
+                    obstype=selfcal_library[target][band]['obstype'],
+                    nfrms_multiplier=dirty_NF_RMS/dirty_RMS)
                 initial_SNR, initial_RMS = estimate_SNR(sani_target+'_'+band+'_initial.image.tt0')
                 if self.telescope != 'ACA':
-                    initial_NF_SNR, initial_NF_RMS = estimate_near_field_SNR(sani_target+'_'+band+'_initial.image.tt0')
+                    initial_NF_SNR, initial_NF_RMS = estimate_near_field_SNR(
+                        sani_target+'_'+band+'_initial.image.tt0', las=selfcal_library[target][band]['LAS'])
                 else:
                     initial_NF_SNR, initial_NF_RMS = initial_SNR, initial_RMS
                 with casa_tools.ImageReader(sani_target+'_'+band+'_initial.image.tt0') as image:
@@ -349,11 +375,15 @@ class SelfcalHeuristics(object):
                     selfcal_library[target][band]['theoretical_sensitivity'] = -99.0
                 selfcal_library[target][band]['SNR_orig'] = initial_SNR
                 if selfcal_library[target][band]['nterms'] < 2:
-                    selfcal_library[target][band]['nterms'] = get_nterms(band_properties[vislist[0]][band]['fracbw'], initial_SNR)
+                    # updated nterms if needed based on S/N and fracbw
+                    selfcal_library[target][band]['nterms'] = get_nterms(
+                        selfcal_library[target][band]['fracbw'],
+                        selfcal_library[target][band]['SNR_orig'])
                 selfcal_library[target][band]['RMS_orig'] = initial_RMS
                 selfcal_library[target][band]['SNR_NF_orig'] = initial_NF_SNR
                 selfcal_library[target][band]['RMS_NF_orig'] = initial_NF_RMS
                 selfcal_library[target][band]['RMS_curr'] = initial_RMS
+                selfcal_library[target][band]['RMS_NF_curr'] = initial_NF_RMS
                 selfcal_library[target][band]['SNR_dirty'] = dirty_SNR
                 selfcal_library[target][band]['RMS_dirty'] = dirty_RMS
                 selfcal_library[target][band]['Beam_major_orig'] = bm['major']['value']
@@ -381,14 +411,14 @@ class SelfcalHeuristics(object):
                 maxspws = 0
                 maxspwvis = ''
                 for vis in vislist:
-                    if selfcal_library[target][band][vis]['n_spws'] >= maxspws:
+                    if selfcal_library[target][band][vis]['n_spws'] > maxspws:
                         maxspws = selfcal_library[target][band][vis]['n_spws']
                         maxspwvis = vis+''
                     selfcal_library[target][band][vis]['spwlist'] = selfcal_library[target][band][vis]['spws'].split(',')
                 spwlist = selfcal_library[target][band][maxspwvis]['spwlist']
 
                 spw_bandwidths, spw_effective_bandwidths = get_spw_bandwidth(
-                    vis, selfcal_library[target][band][maxspwvis]['spwsarray'], target)
+                    maxspwvis, selfcal_library[target][band][maxspwvis]['spwsarray'], target)
 
                 selfcal_library[target][band]['total_bandwidth'] = 0.0
                 selfcal_library[target][band]['total_effective_bandwidth'] = 0.0
@@ -412,52 +442,58 @@ class SelfcalHeuristics(object):
                 for band in selfcal_library[target].keys():
                     vislist = selfcal_library[target][band]['vislist'].copy()
                     # potential place where diff spws for different VLA EBs could cause problems
-                    spwlist = selfcal_library[target][band][vis]['spws'].split(',')
+                    spwlist = self.spw_virtual.split(',')
                     for spw in spwlist:
                         keylist = selfcal_library[target][band]['per_spw_stats'].keys()
                         if spw not in keylist:
                             selfcal_library[target][band]['per_spw_stats'][spw] = {}
                         if not os.path.exists(sani_target+'_'+band+'_'+spw+'_dirty.image.tt0'):
-                            spws_per_vis = [spw]*len(vislist)
+                            spws_per_vis = self.image_heuristics.observing_run.get_real_spwsel([spw]*len(vislist), vislist)
                             self.tclean_wrapper(
                                 vislist, sani_target + '_' + band + '_' + spw + '_dirty', band_properties, band,
                                 telescope=self.telescope, nsigma=4.0, scales=[0],
                                 threshold='0.0Jy', niter=0, savemodel='none', parallel=parallel, cellsize=cellsize,
                                 imsize=imsize,
-                                nterms=1, field=target, spw=spws_per_vis, uvrange=selfcal_library[target][band]
+                                nterms=1, field=self.field, spw=spws_per_vis, uvrange=selfcal_library[target][band]
                                 ['uvrange'],
                                 obstype=selfcal_library[target][band]['obstype'])
-                        dirty_SNR, dirty_RMS = estimate_SNR(sani_target+'_'+band+'_'+spw+'_dirty.image.tt0')
+                        dirty_per_spw_SNR, dirty_per_spw_RMS = estimate_SNR(sani_target+'_'+band+'_'+spw+'_dirty.image.tt0')
+                        if self.telescope != 'ACA':
+                            dirty_per_spw_NF_SNR, dirty_per_spw_NF_RMS = estimate_near_field_SNR(
+                                sani_target+'_'+band+'_'+spw+'_dirty.image.tt0', las=selfcal_library[target][band]['LAS'])
+                        else:
+                            dirty_per_spw_NF_SNR, dirty_per_spw_NF_RMS = dirty_per_spw_SNR, dirty_per_spw_RMS
                         if not os.path.exists(sani_target+'_'+band+'_'+spw+'_initial.image.tt0'):
                             if self.telescope == 'ALMA' or self.telescope == 'ACA':
                                 sensitivity = get_sensitivity(
-                                    vislist, selfcal_library[target][band],
+                                    vislist, selfcal_library[target][band], target,
                                     spw, spw=np.array([int(spw)]),
                                     imsize=imsize[0],
                                     cellsize=cellsize[0])
-                                sensitivity, sens_bw = self.get_sensitivity()
-                                dr_mod = get_dr_correction(self.telescope, dirty_SNR*dirty_RMS, sensitivity, vislist)
+                                sensitivity, sens_bw = self.get_sensitivity(spw=spw)
+                                dr_mod = get_dr_correction(self.telescope, dirty_per_spw_SNR*dirty_per_spw_RMS, sensitivity, vislist)
                                 LOG.info(f'DR modifier: {dr_mod}  SPW: {spw}')
                                 sensitivity = sensitivity*dr_mod
                                 if ((band == 'Band_9') or (band == 'Band_10')) and dr_mod != 1.0:   # adjust for DSB noise increase
                                     sensitivity = sensitivity*4.0
                             else:
                                 sensitivity = 0.0
-                            spws_per_vis = [spw]*len(vislist)  # assumes all spw ids are identical in each MS file
+                            spws_per_vis = self.image_heuristics.observing_run.get_real_spwsel([spw]*len(vislist), vislist)
 
                             self.tclean_wrapper(
                                 vislist, sani_target + '_' + band + '_' + spw + '_initial', band_properties, band,
                                 telescope=self.telescope, nsigma=4.0, threshold=str(sensitivity * 4.0) + 'Jy', scales=[0],
                                 savemodel='none', parallel=parallel, cellsize=cellsize,
                                 imsize=imsize,
-                                nterms=1, field=target, datacolumn='corrected', spw=spws_per_vis,
+                                nterms=1, field=self.field, datacolumn='corrected', spw=spws_per_vis,
                                 uvrange=selfcal_library[target][band]['uvrange'],
-                                obstype=selfcal_library[target][band]['obstype'])
+                                obstype=selfcal_library[target][band]['obstype'],
+                                nfrms_multiplier=dirty_per_spw_NF_RMS/dirty_RMS)
 
                         per_spw_SNR, per_spw_RMS = estimate_SNR(sani_target+'_'+band+'_'+spw+'_initial.image.tt0')
                         if self.telescope != 'ACA':
                             initial_per_spw_NF_SNR, initial_per_spw_NF_RMS = estimate_near_field_SNR(
-                                sani_target + '_' + band + '_' + spw + '_initial.image.tt0')
+                                sani_target + '_' + band + '_' + spw + '_initial.image.tt0', las=selfcal_library[target][band]['LAS'])
                         else:
                             initial_per_spw_NF_SNR, initial_per_spw_NF_RMS = per_spw_SNR, per_spw_RMS
                         selfcal_library[target][band]['per_spw_stats'][spw]['SNR_orig'] = per_spw_SNR
@@ -548,7 +584,7 @@ class SelfcalHeuristics(object):
                         np.array([10 ** (np.log10(3.0))] * n_ap_solints))
                 if self.telescope == 'ALMA' or self.telescope == 'ACA':  # or ('VLA' in telescope)
                     sensitivity = get_sensitivity(
-                        vislist, selfcal_library[target][band],
+                        vislist, selfcal_library[target][band], target,
                         selfcal_library[target][band][vis]['spws'],
                         spw=selfcal_library[target][band][vis]['spwsarray'],
                         imsize=imsize[0],
@@ -577,6 +613,15 @@ class SelfcalHeuristics(object):
             for band in selfcal_library[target].keys():
                 vislist = selfcal_library[target][band]['vislist'].copy()
                 LOG.info('Starting selfcal procedure on: '+target+' '+band)
+
+                gaincal_preapply_gaintable = {}
+                gaincal_spwmap = {}
+                gaincal_interpolate = {}
+                applycal_gaintable = {}
+                applycal_spwmap = {}
+                fallback = {}
+                applycal_interpolate = {}
+
                 for iteration in range(len(solints[band])):
                     if (iterjump != -1) and (iteration < iterjump):  # allow jumping to amplitude selfcal and not need to use a while loop
                         continue
@@ -621,10 +666,13 @@ class SelfcalHeuristics(object):
                                 resume = True
                                 files = glob.glob(sani_target+'_'+band+'_'+prev_solint+'_'+str(prev_iteration)+"_post.*")
                                 for f in files:
+                                    if 'nearfield' in f:
+                                        continue
                                     self.copy_dir(f, f.replace(prev_solint+"_"+str(prev_iteration)+"_post", solint+'_'+str(iteration)))
                         else:
                             resume = False
 
+                        nfsnr_modifier = selfcal_library[target][band]['RMS_NF_curr'] / selfcal_library[target][band]['RMS_curr']
                         self.tclean_wrapper(
                             vislist, sani_target + '_' + band + '_' + solint + '_' + str(iteration),
                             band_properties, band, telescope=self.telescope,
@@ -636,21 +684,19 @@ class SelfcalHeuristics(object):
                             parallel=parallel, cellsize=cellsize,
                             imsize=imsize,
                             nterms=selfcal_library[target][band]['nterms'],
-                            field=target, spw=selfcal_library[target][band]['spws_per_vis'],
+                            field=self.field, spw=selfcal_library[target][band]['spws_per_vis'],
                             uvrange=selfcal_library[target][band]['uvrange'],
-                            obstype=selfcal_library[target][band]['obstype'], resume=resume)
+                            obstype=selfcal_library[target][band]['obstype'],
+                            nfrms_multiplier=nfsnr_modifier,
+                            resume=resume)
+
+                        # Check if a mask was actually created: if not, the model will be empty and gaincal will fail.
+                        if not checkmask(sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'.image.tt0'):
+                            selfcal_library[target][band]['Stop_Reason'] = 'Empty model for solint '+solint
+                            break  # breakout of loop because the model is empty and gaincal will therefore fail
 
                         with casa_tools.ImageReader(sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'.image.tt0') as image:
                             bm = image.restoringbeam(polarization=0)
-
-                        if iteration == 0:
-                            gaincal_preapply_gaintable = {}
-                            gaincal_spwmap = {}
-                            gaincal_interpolate = {}
-                            applycal_gaintable = {}
-                            applycal_spwmap = {}
-                            fallback = {}
-                            applycal_interpolate = {}
 
                         for vis in vislist:
                             ##
@@ -675,7 +721,7 @@ class SelfcalHeuristics(object):
                             parallel=parallel, cellsize=cellsize,
                             imsize=imsize,
                             nterms=selfcal_library[target][band]['nterms'],
-                            field=target, spw=selfcal_library[target][band]['spws_per_vis'],
+                            field=self.field, spw=selfcal_library[target][band]['spws_per_vis'],
                             uvrange=selfcal_library[target][band]['uvrange'],
                             obstype=selfcal_library[target][band]['obstype'],
                             savemodel_only=True)
@@ -765,18 +811,39 @@ class SelfcalHeuristics(object):
                                 solnorm = True
                             else:
                                 solnorm = False
-                            self.cts.gaincal(
-                                vis=vis, caltable=sani_target + '_' + vis + '_' + band + '_' + solint + '_' + str(iteration) + '_' +
-                                solmode[band][iteration] + '.g', gaintype=gaincal_gaintype,
-                                spw=selfcal_library[target][band][vis]['spws'],
-                                refant=selfcal_library[target][band][vis]['refant'],
-                                calmode=solmode[band][iteration],
-                                solnorm=solnorm, solint=solint.replace('_EB', '').replace('_ap', ''),
-                                minsnr=self.gaincal_minsnr, minblperant=4, combine=gaincal_combine[band][iteration],
-                                field=target, gaintable=gaincal_preapply_gaintable[vis],
-                                spwmap=gaincal_spwmap[vis],
-                                uvrange=selfcal_library[target][band]['uvrange'],
-                                interp=gaincal_interpolate[vis])
+                            if solint == 'inf_EB':
+                                if spws_set.ndim == 1:
+                                    nspw_sets = 1
+                                else:
+                                    nspw_sets = spws_set.shape[0]
+                            else:
+                                # only necessary to loop over gain cal when in inf_EB to avoid inf_EB solving for all spws
+                                nspw_sets = 1
+                            for i in range(nspw_sets):  # run gaincal on each spw set to handle spectral scans (one run one time if not inf_EB)
+                                if solint == 'inf_EB':
+                                    if nspw_sets == 1 and spws_set.ndim == 1:
+                                        spwselect = ','.join(str(spw) for spw in spws_set.tolist())
+                                    else:
+                                        spwselect = ','.join(str(spw) for spw in spws_set[i].tolist())
+                                else:
+                                    spwselect = selfcal_library[target][band][vis]['spws']
+                                LOG.info(
+                                    'Running gaincal on '+spwselect+' for '+sani_target+'_'+vis + '_'+band+'_'+solint+'_' +
+                                    str(iteration) + '_' + solmode[band][iteration] + '.g')
+                                self.cts.gaincal(vis=vis,
+                                                 caltable=sani_target+'_'+vis+'_'+band+'_'+solint+'_' +
+                                                 str(iteration)+'_'+solmode[band][iteration]+'.g',
+                                                 gaintype=gaincal_gaintype, spw=spwselect,
+                                                 refant=selfcal_library[target][band][vis]['refant'],
+                                                 calmode=solmode[band][iteration], solnorm=solnorm,
+                                                 solint=solint.replace('_EB', '').replace('_ap', ''),
+                                                 minsnr=self.gaincal_minsnr, minblperant=4, combine=gaincal_combine[band][iteration],
+                                                 field=self.field, gaintable=gaincal_preapply_gaintable[vis],
+                                                 spwmap=gaincal_spwmap[vis], uvrange=selfcal_library[target][band]['uvrange'],
+                                                 interp=gaincal_interpolate[vis],
+                                                 append=os.path.exists(
+                                                     sani_target + '_' + vis + '_' + band + '_' + solint + '_' + str(iteration) + '_' +
+                                                     solmode[band][iteration] + '.g'))
                             ##
                             # default is to run without combine=spw for inf_EB, here we explicitly run a test inf_EB with combine='scan,spw' to determine
                             # the number of flagged antennas when combine='spw' then determine if it needs spwmapping or to use the gaintable with spwcombine.
@@ -786,18 +853,26 @@ class SelfcalHeuristics(object):
                                 test_gaincal_combine = 'scan,spw'
                                 if selfcal_library[target][band]['obstype'] == 'mosaic':
                                     test_gaincal_combine += ',field'
-                                self.cts.gaincal(
-                                    vis=vis, caltable='test_inf_EB.g', gaintype=gaincal_gaintype,
-                                    spw=selfcal_library[target][band][vis]['spws'],
-                                    refant=selfcal_library[target][band][vis]['refant'],
-                                    calmode='p', solint=solint.replace('_EB', '').replace('_ap', ''),
-                                    minsnr=self.gaincal_minsnr, minblperant=4, combine=test_gaincal_combine, field=target,
-                                    gaintable='', spwmap=[],
-                                    uvrange=selfcal_library[target][band]['uvrange'])
+                                for i in range(spws_set.shape[0]):
+                                    # run gaincal on each spw set to handle spectral scans
+                                    if nspw_sets == 1 and spws_set.ndim == 1:
+                                        spwselect = ','.join(str(spw) for spw in spws_set.tolist())
+                                    else:
+                                        spwselect = ','.join(str(spw) for spw in spws_set[i].tolist())
+                                    LOG.info('Running gaincal on '+spwselect+' for test_inf_EB.g')
+                                    self.cts.gaincal(
+                                        vis=vis, caltable='test_inf_EB.g', gaintype=gaincal_gaintype, spw=spwselect,
+                                        refant=selfcal_library[target][band][vis]['refant'],
+                                        calmode='p', solint=solint.replace('_EB', '').replace('_ap', ''),
+                                        minsnr=self.gaincal_minsnr, minblperant=4, combine=test_gaincal_combine, field=self.field,
+                                        gaintable='', spwmap=[],
+                                        uvrange=selfcal_library[target][band]['uvrange'],
+                                        append=os.path.exists('test_inf_EB.g'))
+
                                 spwlist = selfcal_library[target][band][vislist[0]]['spws'].split(',')
                                 fallback[vis], map_index, spwmap, applycal_spwmap_inf_EB = analyze_inf_EB_flagging(
                                     selfcal_library, band, spwlist, sani_target + '_' + vis + '_' + band + '_' + solint + '_' +
-                                    str(iteration) + '_' + solmode[band][iteration] + '.g', vis, target, 'test_inf_EB.g')
+                                    str(iteration) + '_' + solmode[band][iteration] + '.g', vis, target, 'test_inf_EB.g', spectral_scan)
 
                                 inf_EB_fallback_mode_dict[target][band][vis] = fallback[vis]+''
                                 LOG.info(f'inf_EB {fallback[vis]}  {applycal_spwmap_inf_EB}')
@@ -826,9 +901,9 @@ class SelfcalHeuristics(object):
                             self.cts.applycal(
                                 vis=vis, gaintable=applycal_gaintable[vis],
                                 interp=applycal_interpolate[vis],
-                                calwt=True, spwmap=applycal_spwmap[vis],
+                                calwt=False, spwmap=applycal_spwmap[vis],
                                 applymode=applycal_mode[band][iteration],
-                                field=target, spw=selfcal_library[target][band][vis]['spws'])
+                                field=self.field, spw=selfcal_library[target][band][vis]['spws'])
 
                         # Create post self-cal image using the model as a startmodel to evaluate how much selfcal helped
                         ##
@@ -841,9 +916,10 @@ class SelfcalHeuristics(object):
                                 selfcal_library[target][band]['nsigma'][iteration] * selfcal_library[target][band]['RMS_curr']) +
                             'Jy', savemodel='none', parallel=parallel, cellsize=cellsize, imsize=imsize,
                             nterms=selfcal_library[target][band]['nterms'],
-                            field=target, spw=selfcal_library[target][band]['spws_per_vis'],
+                            field=self.field, spw=selfcal_library[target][band]['spws_per_vis'],
                             uvrange=selfcal_library[target][band]['uvrange'],
-                            obstype=selfcal_library[target][band]['obstype'])
+                            obstype=selfcal_library[target][band]['obstype'],
+                            nfrms_multiplier=nfsnr_modifier)
 
                         ##
                         ## Do the assessment of the post- (and pre-) selfcal images.
@@ -855,7 +931,7 @@ class SelfcalHeuristics(object):
                         if self.telescope != 'ACA':
                             SNR_NF, RMS_NF = estimate_near_field_SNR(
                                 sani_target + '_' + band + '_' + solint + '_' + str(iteration) + '.image.tt0', maskname=sani_target + '_' + band +
-                                '_' + solint + '_' + str(iteration) + '_post.mask')
+                                '_' + solint + '_' + str(iteration) + '_post.mask',  las=selfcal_library[target][band]['LAS'])
                         else:
                             SNR_NF, RMS_NF = SNR, RMS
 
@@ -867,11 +943,13 @@ class SelfcalHeuristics(object):
 
                         if self.telescope != 'ACA':
                             post_SNR_NF, post_RMS_NF = estimate_near_field_SNR(
-                                sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'_post.image.tt0')
+                                sani_target + '_' + band + '_' + solint + '_' + str(iteration) + '_post.image.tt0',
+                                las=selfcal_library[target][band]['LAS'])
                         else:
                             post_SNR_NF, post_RMS_NF = post_SNR, post_RMS
                         if selfcal_library[target][band]['nterms'] < 2:
-                            selfcal_library[target][band]['nterms'] = get_nterms(band_properties[vislist[0]][band]['fracbw'], post_SNR)
+                            # Change nterms to 2 if needed based on fracbw and SNR
+                            selfcal_library[target][band]['nterms'] = get_nterms(selfcal_library[target][band]['fracbw'], post_SNR)
 
                         for vis in vislist:
 
@@ -907,6 +985,9 @@ class SelfcalHeuristics(object):
                                     'RMS_curr']:
                                 selfcal_library[target][band]['RMS_curr'] = selfcal_library[target][band][vis][solint][
                                     'RMS_post'].copy()
+                            if selfcal_library[target][band][vis][solint]['RMS_NF_post'] < selfcal_library[target][band]['RMS_NF_curr']:
+                                selfcal_library[target][band]['RMS_NF_curr'] = selfcal_library[target][band][vis][solint][
+                                    'RMS_NF_post'].copy()
                             with casa_tools.ImageReader(sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'_post.image.tt0') as image:
                                 bm = image.restoringbeam(polarization=0)
 
@@ -993,14 +1074,14 @@ class SelfcalHeuristics(object):
                                     self.cts.applycal(vis=vis,
                                                       gaintable=selfcal_library[target][band][vis]['gaintable_final'],
                                                       interp=selfcal_library[target][band][vis]['applycal_interpolate_final'],
-                                                      calwt=True, spwmap=selfcal_library[target][band][vis]['spwmap_final'],
+                                                      calwt=False, spwmap=selfcal_library[target][band][vis]['spwmap_final'],
                                                       applymode=selfcal_library[target][band][vis]['applycal_mode_final'],
-                                                      field=target, spw=selfcal_library[target][band][vis]['spws'])
+                                                      field=self.field, spw=selfcal_library[target][band][vis]['spws'])
                             else:
                                 LOG.info('****************Removing all calibrations for '+target+' '+band+'**************')
                                 for vis in vislist:
                                     self.cts.flagmanager(vis=vis, mode='restore', versionname='selfcal_starting_flags_'+sani_target)
-                                    self.cts.clearcal(vis=vis, field=target, spw=selfcal_library[target][band][vis]['spws'])
+                                    self.cts.clearcal(vis=vis, field=self.field, spw=selfcal_library[target][band][vis]['spws'])
                                     selfcal_library[target][band]['SNR_post'] = selfcal_library[target][band][
                                         'SNR_orig'].copy()
                                     selfcal_library[target][band]['RMS_post'] = selfcal_library[target][band][
@@ -1029,39 +1110,21 @@ class SelfcalHeuristics(object):
             sani_target = sanitize_string(target)
             for band in selfcal_library[target].keys():
                 vislist = selfcal_library[target][band]['vislist'].copy()
-                # omit DR modifiers here since we should have increased DR significantly
-                if self.telescope == 'ALMA' or self.telescope == 'ACA':
-                    sensitivity = get_sensitivity(
-                        vislist, selfcal_library[target][band],
-                        selfcal_library[target][band][vis]['spws'],
-                        spw=selfcal_library[target][band][vis]['spwsarray'],
-                        imsize=imsize[0],
-                        cellsize=cellsize[0])
-                    sensitivity, sens_bw = self.get_sensitivity()
-                    dr_mod = 1.0
-                    if not selfcal_library[target][band]['SC_success']:  # fetch the DR modifier if selfcal failed on source
-                        dr_mod = get_dr_correction(
-                            self.telescope, selfcal_library[target][band]['SNR_dirty'] *
-                            selfcal_library[target][band]['RMS_dirty'],
-                            sensitivity, vislist)
-                        LOG.info(f'DR modifier: {dr_mod}')
-                        sensitivity = sensitivity*dr_mod
-                    if ((band == 'Band_9') or (band == 'Band_10')) and dr_mod != 1.0:   # adjust for DSB noise increase
-                        sensitivity = sensitivity*4.0
-                else:
-                    sensitivity = 0.0
+                nfsnr_modifier = selfcal_library[target][band]['RMS_NF_curr'] / selfcal_library[target][band]['RMS_curr']
                 self.tclean_wrapper(
                     vislist, sani_target + '_' + band + '_final', band_properties, band, telescope=self.telescope, nsigma=3.0,
-                    threshold=str(sensitivity * 4.0) + 'Jy', scales=[0],
+                    threshold=str(selfcal_library[target][band]['RMS_curr']*3.0) + 'Jy', scales=[0],
                     savemodel='none', parallel=parallel, cellsize=cellsize,
                     imsize=imsize,
                     nterms=selfcal_library[target][band]['nterms'],
-                    field=target, datacolumn='corrected', spw=selfcal_library[target][band]['spws_per_vis'],
+                    field=self.field, datacolumn='corrected', spw=selfcal_library[target][band]['spws_per_vis'],
                     uvrange=selfcal_library[target][band]['uvrange'],
-                    obstype=selfcal_library[target][band]['obstype'])
+                    obstype=selfcal_library[target][band]['obstype'],
+                    nfrms_multiplier=nfsnr_modifier)
                 final_SNR, final_RMS = estimate_SNR(sani_target+'_'+band+'_final.image.tt0')
                 if self.telescope != 'ACA':
-                    final_NF_SNR, final_NF_RMS = estimate_near_field_SNR(sani_target+'_'+band+'_final.image.tt0')
+                    final_NF_SNR, final_NF_RMS = estimate_near_field_SNR(
+                        sani_target+'_'+band+'_final.image.tt0', las=selfcal_library[target][band]['LAS'])
                 else:
                     final_NF_SNR, final_NF_RMS = final_SNR, final_RMS
                 selfcal_library[target][band]['SNR_final'] = final_SNR
@@ -1078,7 +1141,8 @@ class SelfcalHeuristics(object):
                                                     maskname=sani_target+'_'+band+'_final.mask')
                 if self.telescope != 'ACA':
                     final_NF_SNR, final_NF_RMS = estimate_near_field_SNR(
-                        sani_target+'_'+band+'_initial.image.tt0', maskname=sani_target+'_'+band+'_final.mask')
+                        sani_target + '_' + band + '_initial.image.tt0', maskname=sani_target + '_' + band + '_final.mask',
+                        las=selfcal_library[target][band]['LAS'])
                 else:
                     final_NF_SNR, final_NF_RMS = final_SNR, final_RMS
                 selfcal_library[target][band]['SNR_orig'] = final_SNR
@@ -1102,20 +1166,19 @@ class SelfcalHeuristics(object):
                 sani_target = sanitize_string(target)
                 for band in selfcal_library[target].keys():
                     vislist = selfcal_library[target][band]['vislist'].copy()
-
-                    spwlist = selfcal_library[target][band][vis]['spws'].split(',')
+                    spwlist = self.spw_virtual.split(',')
                     LOG.info('Generating final per-SPW images for '+target+' in '+band)
                     for spw in spwlist:
                         # omit DR modifiers here since we should have increased DR significantly
-                        if os.path.exists(sani_target+'_'+band+'_final.image.tt0'):
-                            self.cts.rmtree(sani_target+'_'+band+'_final.image.tt0')
+                        if os.path.exists(sani_target + '_' + band + '_' + spw + '_final.image.tt0'):
+                            self.cts.rmtree(sani_target + '_' + band + '_' + spw + '_final.image.tt0')
                         if self.telescope == 'ALMA' or self.telescope == 'ACA':
                             sensitivity = get_sensitivity(
-                                vislist, selfcal_library[target][band],
+                                vislist, selfcal_library[target][band], target,
                                 spw, spw=np.array([int(spw)]),
                                 imsize=imsize[0],
                                 cellsize=cellsize[0])
-                            sensitivity, sens_bw = self.get_sensitivity()
+                            sensitivity, sens_bw = self.get_sensitivity(spw=spw)
                             dr_mod = 1.0
                             # fetch the DR modifier if selfcal failed on source
                             if not selfcal_library[target][band]['SC_success']:
@@ -1129,19 +1192,22 @@ class SelfcalHeuristics(object):
                                 sensitivity = sensitivity*4.0
                         else:
                             sensitivity = 0.0
-                        spws_per_vis = [spw]*len(vislist)  # assumes all spw ids are identical in each MS file
-                        self.tclean_wrapper(
-                            vislist, sani_target + '_' + band + '_' + spw + '_final', band_properties, band,
-                            telescope=self.telescope, nsigma=4.0, threshold=str(sensitivity * 4.0) + 'Jy', scales=[0],
-                            savemodel='none', parallel=parallel, cellsize=cellsize,
-                            imsize=imsize,
-                            nterms=1, field=target, datacolumn='corrected', spw=spws_per_vis,
-                            uvrange=selfcal_library[target][band]['uvrange'],
-                            obstype=selfcal_library[target][band]['obstype'])
+                        spws_per_vis = self.image_heuristics.observing_run.get_real_spwsel([spw]*len(vislist), vislist)
+                        nfsnr_modifier = selfcal_library[target][band]['RMS_NF_curr'] / selfcal_library[target][band]['RMS_curr']
+                        sensitivity_agg, sens_bw = self.get_sensitivity()
+                        sensitivity_scale_factor = selfcal_library[target][band]['RMS_curr']/sensitivity_agg
+                        self.tclean_wrapper(vislist, sani_target + '_' + band + '_' + spw + '_final', band_properties, band,
+                                            telescope=self.telescope, nsigma=4.0,
+                                            threshold=str(sensitivity * sensitivity_scale_factor * 4.0) + 'Jy', scales=[0],
+                                            savemodel='none', parallel=parallel, cellsize=cellsize, imsize=imsize, nterms=1,
+                                            field=self.field, datacolumn='corrected', spw=spws_per_vis,
+                                            uvrange=selfcal_library[target][band]['uvrange'],
+                                            obstype=selfcal_library[target][band]['obstype'],
+                                            nfrms_multiplier=nfsnr_modifier)
                         final_per_spw_SNR, final_per_spw_RMS = estimate_SNR(sani_target+'_'+band+'_'+spw+'_final.image.tt0')
                         if self.telescope != 'ACA':
                             final_per_spw_NF_SNR, final_per_spw_NF_RMS = estimate_near_field_SNR(
-                                sani_target + '_' + band + '_' + spw + '_final.image.tt0')
+                                sani_target + '_' + band + '_' + spw + '_final.image.tt0', las=selfcal_library[target][band]['LAS'])
                         else:
                             final_per_spw_NF_SNR, final_per_spw_NF_RMS = final_per_spw_SNR, final_per_spw_RMS
 
@@ -1154,7 +1220,8 @@ class SelfcalHeuristics(object):
                             sani_target+'_'+band+'_'+spw+'_initial.image.tt0', maskname=sani_target+'_'+band+'_'+spw+'_final.mask')
                         if self.telescope != 'ACA':
                             final_per_spw_NF_SNR, final_per_spw_NF_RMS = estimate_near_field_SNR(
-                                sani_target+'_'+band+'_'+spw+'_initial.image.tt0', maskname=sani_target+'_'+band+'_'+spw+'_final.mask')
+                                sani_target + '_' + band + '_' + spw + '_initial.image.tt0', maskname=sani_target + '_' + band + '_' + spw +
+                                '_final.mask', las=selfcal_library[target][band]['LAS'])
                         else:
                             final_per_spw_NF_SNR, final_per_spw_NF_RMS = final_per_spw_SNR, final_per_spw_RMS
                         selfcal_library[target][band]['per_spw_stats'][spw]['SNR_orig'] = final_per_spw_SNR
@@ -1241,7 +1308,7 @@ class SelfcalHeuristics(object):
         n_ants = get_n_ants(vislist)
 
         bands, band_properties, scantimesdict, scanstartsdict, scanendsdict, \
-            integrationtimesdict, spwslist, spwsarray, mosaic_field = importdata(vislist, all_targets, telescope)
+            integrationtimesdict, spwslist, spwsarray, mosaic_field, spectral_scan, spws_set = importdata(vislist, all_targets, telescope)
 
         ##
         # Save/restore starting flags
@@ -1297,7 +1364,9 @@ class SelfcalHeuristics(object):
                 scanstartsdict[band],
                 scanendsdict[band],
                 integrationtimesdict[band],
-                self.inf_EB_gaincal_combine, do_amp_selfcal=self.do_amp_selfcal)
+                self.inf_EB_gaincal_combine,
+                n_solints=self.n_solints,
+                do_amp_selfcal=self.do_amp_selfcal)
             LOG.info(f'{band} {solints[band]}')
             applycal_mode[band] = [self.apply_cal_mode_default]*len(solints[band])
 
@@ -1326,15 +1395,25 @@ class SelfcalHeuristics(object):
                     selfcal_library[target][band][vis]['TOS'] = np.sum(scantimesdict[band][vis][target])
                     selfcal_library[target][band][vis]['Median_scan_time'] = np.median(scantimesdict[band][vis][target])
                     allscantimes = np.append(allscantimes, scantimesdict[band][vis][target])
-                    selfcal_library[target][band][vis]['refant'] = rank_refants(vis)
+                    selfcal_library[target][band][vis]['refant'] = rank_refants(vis, refantignore=self.refantignore)
                     selfcal_library[target][band][vis]['spws'] = band_properties[vis][band]['spwstring']
                     selfcal_library[target][band][vis]['spwsarray'] = band_properties[vis][band]['spwarray']
                     selfcal_library[target][band][vis]['spwlist'] = band_properties[vis][band]['spwarray'].tolist()
                     selfcal_library[target][band][vis]['n_spws'] = len(selfcal_library[target][band][vis]['spwsarray'])
                     selfcal_library[target][band][vis]['minspw'] = int(
                         np.min(selfcal_library[target][band][vis]['spwsarray']))
-                    selfcal_library[target][band][vis]['spwmap'] = [selfcal_library[target][band][
-                        vis]['minspw']]*(np.max(selfcal_library[target][band][vis]['spwsarray'])+1)
+
+                    if spectral_scan:
+                        spwmap = np.zeros(np.max(spws_set)+1, dtype='int')
+                        spwmap.fill(np.min(spws_set))
+                        for i in range(spws_set.shape[0]):
+                            indices = np.arange(np.min(spws_set[i]), np.max(spws_set[i])+1)
+                            spwmap[indices] = np.min(spws_set[i])
+                        selfcal_library[target][band][vis]['spwmap'] = spwmap.tolist()
+                    else:
+                        selfcal_library[target][band][vis]['spwmap'] = [selfcal_library[target][band][
+                            vis]['minspw']]*(np.max(selfcal_library[target][band][vis]['spwsarray'])+1)
+
                     selfcal_library[target][band]['Total_TOS'] = selfcal_library[target][band][vis]['TOS'] + \
                         selfcal_library[target][band]['Total_TOS']
                     selfcal_library[target][band]['spws_per_vis'].append(band_properties[vis][band]['spwstring'])
@@ -1344,9 +1423,11 @@ class SelfcalHeuristics(object):
                 LOG.info(
                     f'using the Pipeline standard heuristics uvrange: {self.uvrange}, instead of the prototype uvrange: {prototype_uvrange}')
                 selfcal_library[target][band]['75thpct_uv'] = band_properties[vislist[0]][band]['75thpct_uv']
+                selfcal_library[target][band]['LAS'] = band_properties[vislist[0]][band]['LAS']
+                selfcal_library[target][band]['fracbw'] = band_properties[vislist[0]][band]['fracbw']
 
         for target in all_targets:
             for band in selfcal_library[target].keys():
                 if selfcal_library[target][band]['Total_TOS'] == 0.0:
                     selfcal_library[target].pop(band)
-        return all_targets, n_ants, bands, band_properties, applycal_interp, selfcal_library, solints, gaincal_combine, solmode, applycal_mode, integration_time
+        return all_targets, n_ants, bands, band_properties, applycal_interp, selfcal_library, solints, gaincal_combine, solmode, applycal_mode, integration_time, spectral_scan, spws_set

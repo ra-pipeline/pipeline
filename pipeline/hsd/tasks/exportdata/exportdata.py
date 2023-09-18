@@ -134,7 +134,7 @@ class SDExportData(exportdata.ExportData):
             manifest_file = os.path.join(self.inputs.context.products_dir,
                                          results.manifest)
             self._add_to_manifest(manifest_file, auxfproducts, auxcaltables,
-                                  auxcalapplys, pipe_aqua_reportfile)
+                                  auxcalapplys, pipe_aqua_reportfile, oussid)
 
         return results
 

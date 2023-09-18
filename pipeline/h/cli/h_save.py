@@ -1,7 +1,5 @@
 import datetime
 
-from casatasks import casalog
-
 from . import utils
 
 

@@ -41,7 +41,10 @@ class BaseCleanSequence:
          nonpbcor_image_non_cleanmask_rms,
          pbcor_image_min, pbcor_image_max,
          residual_robust_rms,
-         nonpbcor_image_robust_rms_and_spectra) = \
+         nonpbcor_image_robust_rms_and_spectra,
+         pbcor_image_min_iquv,
+         pbcor_image_max_iquv,
+         nonpbcor_image_non_cleanmask_rms_iquv) = \
             cbheuristic.analyse_clean_result(self.multiterm, model, restored,
                                              residual, flux, cleanmask,
                                              pblimit_image, pblimit_cleanmask,
@@ -64,7 +67,10 @@ class BaseCleanSequence:
                nonpbcor_image_non_cleanmask_rms, \
                pbcor_image_min, pbcor_image_max, \
                residual_robust_rms, \
-               nonpbcor_image_robust_rms_and_spectra
+               nonpbcor_image_robust_rms_and_spectra, \
+               pbcor_image_min_iquv, \
+               pbcor_image_max_iquv, \
+               nonpbcor_image_non_cleanmask_rms_iquv
 
     def iteration(self):
         """The base boxworker allows only one iteration."""
@@ -73,8 +79,8 @@ class BaseCleanSequence:
 
     def get_rootname(self):
         """Return the rootname of imaging products.
-        
-        e.g. oussid.s2_2.04287+1801_sci.spw16_18_20_22_24_26_28_30.cont.I        
+
+        e.g. oussid.s2_2.04287+1801_sci.spw16_18_20_22_24_26_28_30.cont.I
         """
         rootname = None
         if self.residuals:

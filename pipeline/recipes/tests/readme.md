@@ -1,19 +1,14 @@
 
-## Testing Prrocedures
+## Testing Procedures
 
-* Examples of SRDP Json files for creating custom recipes
+* Examples of SRDP JSON files for creating custom recipes
   * `test_hifa_cubeimage.json` # uid___A001_X1467_X256
   * `test_hifv_contimage.json`
 
-* SRDP-like procedures:
-    no data restorations; cube imaging created from `hif_makeimlist` rather than `hif_editimlist`
-  * `test_procedure_hifa_cubeimage_selfcal.xml`
-  * `test_procedure_hifv_contimage_selfcal.xml`
+* SRDP-like procedures: no restoration / target-split / findcont for speeded-up testing; needs to be used with *_targets.ms, along with cont.dat
+  * `test_procedure_hifa_image.xml` (with selfcal)
+  * `test_procedure_hifv_contimage.xml` (with selfcal)
 
 * Testing procedures for only testing the `hif_selfcal` task
-  * `test_procedure_hifv_selfcal_only.xml`
-  * `test_procedure_hifa_selfcal_only.xml`
-
-* A standard "calimage" workflow with `hif_selfcal` stage
-
-  * `test_procedure_hifa_calimage_selfcal.xml`
+  * `test_procedure_hifv_selfcal.xml`
+  * `test_procedure_hifa_selfcal.xml`

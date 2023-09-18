@@ -139,7 +139,7 @@ class T2_4MDetailsSelfcalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             row = []
             valid_chars = "%s%s" % (string.ascii_letters, string.digits)
             id_name = filenamer.sanitize(target['field_name']+'_'+target['sc_band'], valid_chars)
-            row.append(f' <a href="#{id_name}">{target["field"]}</a> ')
+            row.append(f' <a href="#{id_name}">{fm_target(target)}</a> ')
             row.append(target['sc_band'].replace('_', ' '))
             row.append(target['spw'])
             row.append(target['phasecenter'])
@@ -157,7 +157,8 @@ class T2_4MDetailsSelfcalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
         stage_dir = os.path.join(context.report_dir, 'stage%s' % results.stage_number)
         r = results[0]
-        cleantargets = results[0].targets
+        cleantargets = [cleantarget for cleantarget in r.targets if not cleantarget['sc_exception']]
+        is_restore = r.is_restore
 
         if cleantargets:
             targets_summary_table = self.make_targets_summary_table(r, cleantargets)
@@ -171,14 +172,16 @@ class T2_4MDetailsSelfcalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
         for target in cleantargets:
 
-            key = (target['field_name'], target['sc_band'])
-            slib = target['sc_lib']
-
-            summary_tabs[key] = self.make_summary_table(context, r, target)
-            solint_tabs[key] = self.make_solint_summary_table(target, context, results)
-            spw_tabs[key], spw_tabs_msg[key] = self.make_spw_summary_table(slib)
+            if not is_restore:
+                # only do this when not restoring from a previous run (selfcal_resourcs avaibility is not warranted)
+                key = (target['field_name'], target['sc_band'])
+                slib = target['sc_lib']
+                summary_tabs[key] = self.make_summary_table(context, r, target)
+                solint_tabs[key] = self.make_solint_summary_table(target, context, results)
+                spw_tabs[key], spw_tabs_msg[key] = self.make_spw_summary_table(slib)
 
         ctx.update({'targets_summary_table': targets_summary_table,
+                    'is_restore': is_restore,
                     'solint_tabs': solint_tabs,
                     'summary_tabs': summary_tabs,
                     'spw_tabs': spw_tabs,
@@ -489,3 +492,10 @@ class T2_4MDetailsSelfcalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
 def text_with_tooltip(text, tooltip):
     return f'<div data-toggle="tooltip" data-placement="bottom" title="{tooltip}">{text}</div>'
+
+
+def fm_target(target):
+    target_str = target['field']
+    if target['is_repr_target']:
+        target_str += '<br> (rep.source)'
+    return target_str

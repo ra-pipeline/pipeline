@@ -1,11 +1,10 @@
 import sys
 
-from casatasks import casalog
-
 import pipeline.h.cli.utils as utils
 
 
-def hifa_antpos(vis=None, caltable=None, hm_antpos=None, antenna=None, offsets=None, antposfile=None, pipelinemode=None,
+@utils.cli_wrapper
+def hifa_antpos(vis=None, caltable=None, hm_antpos=None, antenna=None, offsets=None, antposfile=None,
                 dryrun=None, acceptresults=None, threshold=None):
 
     """
@@ -36,8 +35,7 @@ def hifa_antpos(vis=None, caltable=None, hm_antpos=None, antenna=None, offsets=N
     generate other calibration tables, or permanently to generate calibrated
     visibilities for imaging.
     
-    If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    The results object for the pipeline task is returned.
     
     Note: the hm_antpos 'online' option will be implemented when the observing system
     provides an antenna position determination service.
@@ -68,11 +66,6 @@ def hifa_antpos(vis=None, caltable=None, hm_antpos=None, antenna=None, offsets=N
                   Example: offsets=[0.01, 0.02, 0.03, 0.03, 0.02, 0.01]
     antposfile    The file(s) containing the antenna offsets. Used if hm_antpos
                   is 'file'.
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the pipeline
-                  determines the values of all context defined pipeline inputs automatically.
-                  In interactive mode the user can set the pipeline context defined parameters
-                  manually. In 'getinputs' mode the user can check the settings of
-                  all pipeline parameters without running the task.
     dryrun        Run the commands (True) or generate the commands to be run but
                   do not execute (False).
     acceptresults Automatically accept the results of the task into the pipeline context (True)

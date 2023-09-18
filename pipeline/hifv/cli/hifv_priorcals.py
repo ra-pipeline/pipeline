@@ -1,12 +1,11 @@
 import sys
 
-from casatasks import casalog
-
 import pipeline.h.cli.utils as utils
 
 
+@utils.cli_wrapper
 def hifv_priorcals(vis=None, show_tec_maps=None, apply_tec_correction=None, swpow_spw=None,
-                   pipelinemode=None, dryrun=None, acceptresults=None):
+                   dryrun=None, acceptresults=None):
 
     """
     hifv_priorcals ---- Runs gaincurves, opacities, requantizer gains, antenna position corrections, tec_maps, switched power.
@@ -20,12 +19,6 @@ def hifv_priorcals(vis=None, show_tec_maps=None, apply_tec_correction=None, swpo
     show_tec_maps        Plot tec maps
     apply_tec_correction Apply tec correction
     swpow_spw            Spectral-window(s) for plotting: "" ==>all, spw="6,14"
-    pipelinemode         The pipeline operating mode. In 'automatic' mode the pipeline
-                         determines the values of all context defined pipeline inputs
-                         automatically.  In 'interactive' mode the user can set the pipeline
-                         context defined parameters manually.  In 'getinputs' mode the user
-                         can check the settings of all pipeline parameters without running
-                         the task.
     dryrun               Run the commands (True) or generate the commands to be run but
                          do not execute (False).  This is a pipeline task execution mode.
     acceptresults        Add the results of the task to the pipeline context (True) or
@@ -37,8 +30,7 @@ def hifv_priorcals(vis=None, show_tec_maps=None, apply_tec_correction=None, swpo
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
     
     
     Examples

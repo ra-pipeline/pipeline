@@ -1,7 +1,5 @@
 import sys
 
-from casatasks import casalog
-
 from . import utils
 
 

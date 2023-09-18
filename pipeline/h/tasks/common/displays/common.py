@@ -148,12 +148,13 @@ class PlotmsCalLeaf(object):
     """
 
     def __init__(self, context, result, calapp : Union[List[callibrary.CalApplication], callibrary.CalApplication], 
-                xaxis, yaxis, spw='', ant='', pol='', plotrange=[], coloraxis=''):
+                 xaxis, yaxis, spw='', ant='', pol='', correlation='', plotrange=[], coloraxis=''):
         self._context = context
         self._result = result
         self._xaxis = xaxis
         self._yaxis = yaxis
         self._spw = spw
+        self._correlation = correlation
         self._plotrange = plotrange
         self._coloraxis = coloraxis
 
@@ -187,15 +188,17 @@ class PlotmsCalLeaf(object):
 
         # These task_args are the same whether one caltable is plotted 
         # on its own, or multiple caltables are overplotted. 
-        self.task_args = {'xaxis': self._xaxis,
-                     'yaxis': self._yaxis,
-                     'showgui': False,
-                     'spw': str(self._spw),
-                     'antenna': self._ant,
-                     'plotrange': self._plotrange,
-                     'coloraxis': self._coloraxis,
-                     'title': self._title, 
-                     'clearplots': True}
+        self.task_args = {
+            'xaxis': self._xaxis,
+            'yaxis': self._yaxis,
+            'showgui': False,
+            'spw': str(self._spw),
+            'antenna': self._ant,
+            'correlation': self._correlation,
+            'plotrange': self._plotrange,
+            'coloraxis': self._coloraxis,
+            'title': self._title,
+            'clearplots': True}
 
     def plot(self):
         plots = [self._get_plot_wrapper()]
@@ -210,9 +213,10 @@ class PlotmsCalLeaf(object):
             'y': self._yaxis,
             'spw': '' if self._spw == '' else 'spw%0.2d-' % int(self._spw),
             'ant': '' if self._ant == '' else 'ant%s-' % self._ant.replace(',', '_'),
-            'intent': '' if self._intent == '' else '%s-' % self._intent.replace(',', '_')
+            'intent': '' if self._intent == '' else '%s-' % self._intent.replace(',', '_'),
+            'correlation': '' if self._correlation == '' else '%s-' % self._correlation.replace('/', 'ratio')
         }
-        png = '{caltable}-{spw}{ant}{intent}{y}_vs_{x}.png'.format(**fileparts)
+        png = '{caltable}-{spw}{ant}{intent}{correlation}{y}_vs_{x}.png'.format(**fileparts)
         
         # Maximum filename size for Lustre filesystems is 255 bytes. These
         # plots can exceed this limit due to including the names of all
@@ -763,13 +767,11 @@ class CaltableWrapperFactory(object):
             flag_col = tb.getvarcol('FLAG')
             row_flag = [flag_col['r%s' % (k + 1)].swapaxes(0, 1).squeeze(2)
                         for k in range(len(flag_col))]
-
-            # there's a bug in numpy.ma which prevents us from creating a
-            # MaskedArray directly. Instead, we need to create a standard array
-            # and subsequently convert to a MaskedArray.
-            std_array = numpy.asarray([numpy.ma.MaskedArray(d, mask=f)
-                                       for (d, f) in zip(row_data, row_flag)])
-            data = numpy.ma.asarray(std_array)
+            
+            # PIPE-1706: explicitly pass dtype=object to create "object" array and allow 
+            # individual elements to have different shapes.
+            data = numpy.asarray([numpy.ma.MaskedArray(d, mask=f)
+                                  for (d, f) in zip(row_data, row_flag)], dtype=object)
 
             return CaltableWrapper(path, data, time_matplotlib, antenna1, spw,
                                    scan)

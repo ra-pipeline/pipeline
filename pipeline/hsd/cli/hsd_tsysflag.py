@@ -3,6 +3,7 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
+@utils.cli_wrapper
 def hsd_tsysflag(vis=None, caltable=None,
                  flag_nmedian=None, fnm_limit=None, fnm_byfield=None,
                  flag_derivative=None, fd_max_limit=None,
@@ -11,7 +12,7 @@ def hsd_tsysflag(vis=None, caltable=None,
                  flag_birdies=None, fb_sharps_limit=None,
                  flag_toomany=None, tmf1_limit=None, tmef1_limit=None,
                  metric_order=None, normalize_tsys=None, filetemplate=None,
-                 pipelinemode=None, dryrun=None, acceptresults=None):
+                 dryrun=None, acceptresults=None):
 
     """
     hsd_tsysflag ---- Flag deviant system temperature measurements
@@ -53,8 +54,7 @@ def hsd_tsysflag(vis=None, caltable=None,
     
     Output
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -99,11 +99,6 @@ def hsd_tsysflag(vis=None, caltable=None,
     filetemplate    The name of a text file that contains the manual Tsys flagging
                     template. If the template flags file is undefined, a name of the form
                     'msname.flagtsystemplate.txt' is assumed.
-    pipelinemode    The pipeline operating mode. In 'automatic' mode the pipeline
-                    determines the values of all context defined pipeline inputs automatically.
-                    In interactive mode the user can set the pipeline context defined
-                    parameters manually.  In 'getinputs' mode the user can check the settings
-                    of all pipeline parameters without running the task.
     dryrun          Run the commands (True) or generate the commands to be run but
                     do not execute (False).
     acceptresults   Add the results of the task to the pipeline context (True) or

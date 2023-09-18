@@ -499,12 +499,6 @@ class CalibrationTable(NamingTemplate):
         """
         return self.extension('dcal')
 
-    def instrumentpol_cal(self):
-        """Set the filename extension as appropriate for a instrument
-        pol calibration.
-        """
-        return self.extension('pcal')
-
     def flux_cal(self):
         """Set the filename extension as appropriate for a flux
         calibration.
@@ -817,10 +811,10 @@ class DelayCalibrationTable(CalibrationTable):
         self.delay_cal()
 
 
-class InstrumentPolCalibrationTable(CalibrationTable):
+class PolCalibrationTable(CalibrationTable):
     def __init__(self, other=None):
-        super(InstrumentPolCalibrationTable, self).__init__(other)
-        self.instrumentpol_cal()
+        super().__init__(other)
+        self.polarization_cal()
 
 
 class FluxCalibrationTable(CalibrationTable):

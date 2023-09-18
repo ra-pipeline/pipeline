@@ -9,10 +9,9 @@ import os
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.utils as utils
+from pipeline.h.tasks.common.flagging_renderer_utils import FlagTotal
 
 LOG = logging.get_logger(__name__)
-
-FlagTotal = collections.namedtuple('FlagSummary', 'flagged total')
 
 
 class T2_4MDetailsCorrectedampflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):

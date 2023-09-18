@@ -190,7 +190,7 @@ class Bandpassflag(basetask.StandardTaskTemplate):
             LOG.info('Applying pre-existing caltables and preliminary phase-up, bandpass, and amplitude caltables.')
             acinputs = applycal.IFApplycalInputs(context=inputs.context, vis=inputs.vis, field=inputs.field,
                                                  intent=inputs.intent, flagsum=False, flagbackup=False)
-            actask = applycal.IFApplycal(acinputs)
+            actask = applycal.SerialIFApplycal(acinputs)
             acresult = self._executor.execute(actask)
             # copy across the vis:callibrary dict to our result. This dict 
             # will be inspected by the renderer to know if/which callibrary

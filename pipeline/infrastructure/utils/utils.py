@@ -35,7 +35,8 @@ __all__ = ['find_ranges', 'dict_merge', 'are_equal', 'approx_equal', 'get_num_ca
            'imstat_items', 'get_stokes', 'get_taskhistory_fromimage', 'glob_ordered', 'deduplicate',
            'get_casa_quantity', 'get_si_prefix', 'absolute_path', 'relative_path', 'get_task_result_count',
            'place_repr_source_first', 'shutdown_plotms', 'get_casa_session_details', 'get_obj_size', 'get_products_dir',
-           'export_weblog_as_tar', 'ensure_products_dir_exists', 'ignore_pointing', 'request_omp_threading']
+           'export_weblog_as_tar', 'ensure_products_dir_exists', 'ignore_pointing', 'request_omp_threading',
+           'nested_dict']
 
 
 def find_ranges(data: Union[str, List[int]]) -> str:
@@ -82,10 +83,6 @@ def dict_merge(a: Dict, b: Union[Dict, any]) -> Dict:
     (b) is a dictionary, then a copy of first argument (dictionary a) is created
     and the elements of b are merged into the new dictionary. Otherwise return
     argument b.
-
-    This utility function check the equivalence of array like objects. Two arrays
-    are equal if they have the same number of elements and elements of the same
-    index are equal.
 
     Examples:
     >>> dict_merge({'a': {'b': 1}}, {'c': 2})
@@ -483,10 +480,10 @@ def shutdown_plotms():
     This utility function shuts down the persist plotms process in the current CASA session, so the next plotms call
     can start from a new proc. It's implemented as a short-term workaround for two plotms behaviors due to the persistent
     state of plotms once it's called in a CASA session.
-        1. a plotms process always uses the initial working directory to construct the output plot path when the 
-           figure name is specified as a relative path (see CAS-13626), even after the working directory has changed 
+        1. a plotms process always uses the initial working directory to construct the output plot path when the
+           figure name is specified as a relative path (see CAS-13626), even after the working directory has changed
            in the Python perspective.
-        2. a plotms process always uses the same casa logfile when it was started for its logging, even after 
+        2. a plotms process always uses the same casa logfile when it was started for its logging, even after
            the casa log file location has been altered.
 
     Note: This function follows the practice illustrated inside casaplotms.private.plotmstool.__stub_check()
@@ -510,9 +507,9 @@ def get_casa_session_details():
         data_path: CASA data paths in-use.
         numa_mem: memory properties from the NUMA software perspective.
         numa_cpu: cpu properties from the NUMA software perspective.
-            The above CPU/mem properties might be different from the hardware specs obtained from 
+            The above CPU/mem properties might be different from the hardware specs obtained from
             standard Python functions (e.g. os.cpu_count()) or pipeline.environment.
-            On the difference between the "software" and hardware nodes, see 
+            On the difference between the "software" and hardware nodes, see
                 https://www.kernel.org/doc/html/latest/vm/numa.html
     """
     casa_session_details = casa_tools.utils.hostinfo()
@@ -563,7 +560,7 @@ def get_taskhistory_fromimage(imagename: str):
 def get_obj_size(obj, serialize=True):
     """Estimate the size of a Python object.
 
-    If serialize=True, the size of a serialized object is returned. Note that this is NOT the 
+    If serialize=True, the size of a serialized object is returned. Note that this is NOT the
     same as the object size in memory.
 
     When serialize=False, the memory consumption of the object is returned via
@@ -608,9 +605,9 @@ def glob_ordered(pattern: str, *args, order: Optional[str] = None, **kwargs) -> 
 
 def deduplicate(items):
     """Remove duplicate entries from a list, but preserve the order.
-    
+
     Note that the use of list(set(x)) can cause random order in the output.
-    The return of this function is guaranteed to be in the order that unique items show up in the input, unlike 
+    The return of this function is guaranteed to be in the order that unique items show up in the input, unlike
     a deduplicate-resorting solution like sorted(set(x).
     Ref: https://stackoverflow.com/questions/480214/how-do-i-remove-duplicates-from-a-list-while-preserving-order
     This solution only works for Python 3.7+.
@@ -624,23 +621,23 @@ def deduplicate(items):
 def ignore_pointing(vis):
     """A context manager to ignore pointing tables of MSes during I/O operations.
 
-    The original pointing table will be temperarily renamed to POINTING_ORIGIN, and a new empty pointing table 
+    The original pointing table will be temperarily renamed to POINTING_ORIGIN, and a new empty pointing table
     is created. When the context manager exits, the original table is restored.
 
     For example, to ignore the pointing table of a MS during mstransform() calls, use:
-    
+
         with ignore_pointing('test.ms'):
             casatasks.mstransform(vis='test.ms',outputvis='test_output.ms',scan='16',datacolumn='data')
 
-    The pointing table of the output MS should be empty.    
-    
+    The pointing table of the output MS should be empty.
+
     On the other hand, if the pointing table is needed in the output vis, e.g. for imaging with tclean(usepointing=True),
     we can manually create hardlinks of pointing table afterwards while minimizing the disk space usage:
-    
+
         import shutil, os
         shutil.rmtree('test_small.ms/POINTING')
         shutil.copytree('test.ms/POINTING', 'test_output.ms/POINTING', copy_function=os.link)
-    
+
     One can verify the inodes of the pointing table files, which should be the same:
 
         ls -lih test.ms/POINTING
@@ -684,22 +681,22 @@ def ignore_pointing(vis):
 @contextlib.contextmanager
 def request_omp_threading(num_threads=None):
     """A context manager to override the session-wise OMP threading setting on CASA MPI client.
-    
-    This function is intended to improve certain CASAtask/tool call performance on the MPI client by 
+
+    This function is intended to improve certain CASAtask/tool call performance on the MPI client by
     temporarily turning on OpenMP threading while the MPI servers are idle. This feature will only
     take effect under restricted circumstances to avoid competing with the MPI server processes from
     the tier0 or tier1 parallelization.
 
     This function can be used as both a decorator and context manager. For example:
-        
+
         @request_omp_threading(4)
         def do_something():
             ...
         or,
         with request_omp_threading(4):
             immoments(..)
-            
-    Note: please use it with caution and examine the computing resource allocation circumstance 
+
+    Note: please use it with caution and examine the computing resource allocation circumstance
     carefully at the execution point.
     """
 
@@ -764,9 +761,16 @@ def ensure_products_dir_exists(products_dir):
 
 
 def export_weblog_as_tar(context, products_dir, name_builder, dry_run=False):
+    # Construct filename prefix from oussid and recipe name if available.
+    prefix = context.get_oussid()
+    recipe_name = context.get_recipe_name()
+    if recipe_name:
+        prefix = prefix + '.' + recipe_name
+
     # Construct filename for weblog output tar archive.
     tarfilename = name_builder.weblog(project_structure=context.project_structure,
-                                      ousstatus_entity_id=context.get_oussid())
+                                      ousstatus_entity_id=prefix)
+
     # Save weblog directory to tar archive.
     LOG.info(f"Saving weblog in {tarfilename}")
     if not dry_run:
@@ -782,3 +786,25 @@ def get_products_dir(context):
     else:
         return context.products_dir
 
+
+class pl_defaultdict(collections.defaultdict):
+    def __repr__(self):
+        return str(dict(self))
+
+    def as_plain_dict(self):
+        return to_plain_dict(self)
+
+
+def nested_dict():
+    return pl_defaultdict(nested_dict)
+
+
+def to_plain_dict(default_dict):
+    plain_dict = dict()
+    for k, v in default_dict.items():
+        if isinstance(v, collections.defaultdict):
+            plain_dict[k] = to_plain_dict(v)
+        else:
+            plain_dict[k] = v
+
+    return plain_dict

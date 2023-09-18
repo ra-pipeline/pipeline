@@ -18,10 +18,10 @@ class ImageParamsHeuristicsVlassSeCube(ImageParamsHeuristicsVlassSeContMosaic):
 
     def reffreq(self) -> Optional[str]:
         """Tclean reffreq parameter heuristics.
-        
+
         tclean(reffreq=None) will automatically calculate the referenece frequency using the mean frequency of the selected spws.
         For VLASS-SE-CONT, this is hardcoded to '3.0GHz'.
-        For VLASS-SE-CUBE, PIPE-1401 requests this to be explicitly set as the central freq derived from individual SPW groups. 
+        For VLASS-SE-CUBE, PIPE-1401 requests this to be explicitly set as the central freq derived from individual SPW groups.
         None is returned here as a fallback and hif_editimlist() will set actual values.
         """
         return None
@@ -44,7 +44,7 @@ class ImageParamsHeuristicsVlassSeCube(ImageParamsHeuristicsVlassSeContMosaic):
 
     def flagpct_spwgroup(self, results_list: Union[list, None] = None, spw_selection=None):
         """Get the flag percentage of a spw group (specified by a selection string, e.g. '2,3,4').
-        
+
         Note: this is a quick check using existing results from hifv_flagtargetsdata().
         More comprehensive (and expensive) check could be done using ImageParamsHeuristics.has_data() (also see PIPE-557)
         """
@@ -106,13 +106,13 @@ class ImageParamsHeuristicsVlassSeCube(ImageParamsHeuristicsVlassSeContMosaic):
         """Tclean nterms parameter heuristics."""
         return 1
 
-    def stokes(self) -> str:
+    def stokes(self, intent: str = '', joint_intents: str = '') -> str:
         """Tclean stokes parameter heuristics."""
         return 'IQUV'
 
     def psfcutoff(self) -> float:
         """Tclean psfcutoff parameter heuristics.
-        
+
         PIPE-1466: use psfcutoff=0.5 to properly fit the PSF for all spws in the VLASS Coarse Cube pipeline,
         rather than the default value of 0.35 from CASA/tclean ver6.4.1.
         """

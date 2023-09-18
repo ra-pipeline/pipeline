@@ -1250,7 +1250,7 @@ class ValidateLineRaster(basetask.StandardTaskTemplate):
         else: # Ward's linkage method: default
             H_Clustering = HIERARCHY.ward
         # temporaly add artificial detection points to normalize the cluster distance
-        tmp = numpy.zeros((Data.shape[0]+Repeat*2, Data.shape[1]), numpy.float)
+        tmp = numpy.zeros((Data.shape[0]+Repeat*2, Data.shape[1]), float)
         tmp[Repeat*2:] = Data.copy()
         for i in range(Repeat):
             tmp[i] = [self.nchan//2, 0]
@@ -1340,7 +1340,7 @@ class ValidateLineRaster(basetask.StandardTaskTemplate):
         Observation: numpy.array([[val1, val2, val3,..,valN],
                                   [val1, val2, val3,..,valN],
                                    ........................
-                                  [val1, val2, val3,..,valN]], numpy.float)
+                                  [val1, val2, val3,..,valN]], float)
         where N is a max dimensions of parameter space
             ordering: 'none' or list of ordering of columns
               e.g., ordering=[2,3,1,0] => [col3,col2,col0,col1]
@@ -1366,15 +1366,15 @@ class ValidateLineRaster(basetask.StandardTaskTemplate):
             NumParam = len(Observation[0])
             OrderList = list(range(NumParam))
         if isinstance(Observation, list):
-            Obs = numpy.array(Observation, numpy.float)
+            Obs = numpy.array(Observation, float)
         else:
             Obs = Observation.copy()
         if len(Obs.shape) == 2:
-            Data = numpy.zeros((Obs.shape[0], NumParam), numpy.float)
+            Data = numpy.zeros((Obs.shape[0], NumParam), float)
             for i in range(Obs.shape[0]):
                 for j in range(NumParam):
                     Data[i][j] = Obs[i][OrderList[j]]
-            Factor = numpy.ones(NumParam, numpy.float)
+            Factor = numpy.ones(NumParam, float)
             Ndata = len(Data)
         else:
             LOG.error("Data should be 2-dimensional. {}-dimensional data was given".format(len(Obs.shape)))
@@ -1418,8 +1418,8 @@ class ValidateLineRaster(basetask.StandardTaskTemplate):
         ValidRange = []
         ValidStdev = []
         ReNumber = {}
-        Range = numpy.zeros((C, 5), numpy.float)
-        Stdev = numpy.zeros((C, 5), numpy.float)
+        Range = numpy.zeros((C, 5), float)
+        Stdev = numpy.zeros((C, 5), float)
         for k in range(Ncluster):
             NewData = Data[Category == k+1].T
             NewIDX = IDX[Category == k+1]

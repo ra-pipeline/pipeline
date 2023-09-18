@@ -99,7 +99,7 @@ class CalApplication(object):
 
             else:
                 LOG.warning('Could not access {}. Using heuristics to determine caltable type'
-                            ''.format(os.path.gaintable))
+                            ''.format(os.path.basename(gaintable)))
                 if 'tsys' in gaintable:
                     viscal = 'B TSYS'
                 elif 'bcal' in gaintable:

@@ -26,16 +26,16 @@ class MakeImListQAHandler(pqa.QAPlugin):
         elif result.error:
             score = 0.0
             longmsg = shortmsg = result.error_msg
-        elif result.max_num_targets == 0:
+        elif result.expected_num_targets == 0:
             score = None
             longmsg = 'No clean targets expected.'
             shortmsg = 'No clean targets expected'
         else:
-            score = float(result.num_targets)/float(result.max_num_targets)
+            score = float(result.num_targets)/float(result.expected_num_targets)
             longmsg, shortmsg = ('All clean targets defined', '') if score == 1.0 else \
                 ('Expected %d clean targets but got only %d.' % \
-                 (result.max_num_targets, result.num_targets), \
-                 'Expected %d clean targets' % (result.max_num_targets))
+                 (result.expected_num_targets, result.num_targets), \
+                 'Expected %d clean targets' % (result.expected_num_targets))
         result.qa.pool[:] = [pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg)]
 
         # Score 2
@@ -72,5 +72,5 @@ class MakeImListListQAHandler(pqa.QAPlugin):
     def handle(self, context, result):
         # collate the QAScores from each child result, pulling them into our
         # own QAscore list
-        collated = utils.flatten([r.qa.pool for r in result]) 
+        collated = utils.flatten([r.qa.pool for r in result])
         result.qa.pool[:] = collated

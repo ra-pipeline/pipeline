@@ -606,7 +606,7 @@ def format_spwmap(spwmap, scispws):
 		Science target: calibrated amplitude vs frequency
 	</%def>
 
-	<%def name="preamble()">
+	<%def name="ms_preamble(ms)">
 	% if uv_max[ms].value > 0.0:
         <p>Calibrated amplitude vs frequency plots for the each measurement
             set's representative source. For mosaics, the representative field is

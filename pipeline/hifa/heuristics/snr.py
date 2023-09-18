@@ -24,6 +24,9 @@ ALMA_BANDS = ['ALMA Band 1', 'ALMA Band 2', 'ALMA Band 3', 'ALMA Band 4', 'ALMA 
 ALMA_TSYS = [56.0, 65.0, 75.0, 86.0, 120.0, 90.0, 150.0, 387.0, 1200.0, 1515.0]
 # Sensitivities in mJy (for 16*12 m antennas, 1 minute, 8 GHz, 2pol)
 ALMA_SENSITIVITIES = [0.16, 0.19, 0.20, 0.24, 0.37, 0.27, 0.50, 1.29, 5.32, 8.85]
+ALMA_FIDUCIAL_NUM_ANTENNAS = 16
+ALMA_FIDUCIAL_EXP_TIME = 1.0  # minutes
+ALMA_FIDUCIAL_BANDWIDTH = 8.0e9  # Hz
 
 # origins with smaller numbers are preferred over those with larger numbers
 # this is a dict rather than a list so that a default preference order can be
@@ -353,9 +356,9 @@ def get_tsysinfo(ms, fieldnamelist, intent, spwidlist):
 
             # Get tsys spws and spw ids
             scanspwlist = [scanspw for scanspw in list(atmscan.spws)
-                           if scanspw.num_channels not in (1, 4)]
+                           if scanspw.num_channels not in ms.exclude_num_chans]
             scanspwidlist = [scanspw.id for scanspw in list(atmscan.spws)
-                             if scanspw.num_channels not in (1, 4)]
+                             if scanspw.num_channels not in ms.exclude_num_chans]
 
             # Match the Tsys spw to the science spw
             #   Match first by id then by frequency
@@ -718,7 +721,8 @@ def get_obsinfo(ms, fieldnamelist, intent, spwidlist, compute_nantennas='all', m
         # one spw to the next
         spwscans = []
         for obscan in obscans:
-            scanspwset = {scanspw.id for scanspw in list(obscan.spws) if scanspw.num_channels not in (1, 4)}
+            scanspwset = {scanspw.id for scanspw in list(obscan.spws)
+                          if scanspw.num_channels not in ms.exclude_num_chans}
             if len({spwid}.intersection(scanspwset)) == 0:
                 continue
             spwscans.append(obscan)
@@ -916,7 +920,7 @@ def _transfer_obsinfo(spwlist, spw_dict, obs_dict):
 
 
 def compute_gaincalsnr(ms, spwlist, spw_dict, edge_fraction):
-    """Compute the gain to signal to noise given the spw list and the spw
+    """Compute the gain to signal-to-noise given the spw list and the spw
     dictionary.
 
     This code assumes that the science spws are observed in both the
@@ -932,7 +936,7 @@ def compute_gaincalsnr(ms, spwlist, spw_dict, edge_fraction):
     The SNR dictionary keys and values
         key: the spw id     value: The science spw id as an integer
 
-    The preaveraging parameter dictionary keys abd values
+    The preaveraging parameter dictionary keys and values
         key: 'band'                       value: The ALMA receiver band
         key: 'frequency_Hz'               value: The frequency of the spw
         key: 'nchan_total'                value: The total number of channels
@@ -953,6 +957,11 @@ def compute_gaincalsnr(ms, spwlist, spw_dict, edge_fraction):
 
     maxEffectiveBW = 2.0e9 * (1.0 - 2.0 * edge_fraction)
 
+    # PIPE-788: retrieve the fraction of flagged data
+    scans = set(np.hstack([spw_dict[spwid]['snr_scans'] for spwid in spwlist]))
+    flag_task = casa_tasks.flagdata(vis=ms.name, scan=','.join(map(str, list(scans))), mode='summary')
+    flag_result = flag_task.execute()
+
     LOG.info('Signal to noise summary')
     for spwid in spwlist:
 
@@ -966,26 +975,27 @@ def compute_gaincalsnr(ms, spwlist, spw_dict, edge_fraction):
         else:
             relativeTsys = spw_dict[spwid]['median_tsys'] / ALMA_TSYS[bandidx]
         nbaselines = spw_dict[spwid]['num_7mantenna'] + spw_dict[spwid]['num_12mantenna'] - 1
-        arraySizeFactor = np.sqrt(16 * 15 / 2.0) / np.sqrt(nbaselines)
+        arraySizeFactor = np.sqrt(ALMA_FIDUCIAL_NUM_ANTENNAS * (ALMA_FIDUCIAL_NUM_ANTENNAS-1) / 2.0 / nbaselines)
         if spw_dict[spwid]['num_7mantenna'] == 0:
             areaFactor = 1.0
         elif spw_dict[spwid]['num_12mantenna'] == 0:
             areaFactor = (12.0 / 7.0) ** 2
         else:
-            # Not sure this is correct
-            ntotant = spw_dict[spwid]['num_7mantenna'] + spw_dict[spwid]['num_12mantenna']
-            areaFactor = (spw_dict[spwid]['num_12mantenna'] + (12.0 / 7.0)**2 * spw_dict[spwid]['num_7mantenna']) / \
-                ntotant
+            # general case:  eq. 6 in arXiv:2306.07420
+            areaFactor = (spw_dict[spwid]['num_12mantenna'] + spw_dict[spwid]['num_7mantenna'] * (12./7)**2) / \
+                         (spw_dict[spwid]['num_12mantenna'] + spw_dict[spwid]['num_7mantenna'])
         polarizationFactor = np.sqrt(2.0)
 
         # SNR computation
-        timeFactor = 1.0 / np.sqrt(spw_dict[spwid]['exptime'] / len(spw_dict[spwid]['snr_scans']))
-        bandwidthFactor = np.sqrt(8.0e9 / min(spw_dict[spwid]['bandwidth'], maxEffectiveBW))
+        timeFactor = ALMA_FIDUCIAL_EXP_TIME / np.sqrt(spw_dict[spwid]['exptime'] / len(spw_dict[spwid]['snr_scans']))
+        bandwidthFactor = np.sqrt(ALMA_FIDUCIAL_BANDWIDTH / min(spw_dict[spwid]['bandwidth'], maxEffectiveBW))
+        # PIPE-788: multiply the exposure time by the fraction of unflagged data
+        flagFactor = 1.0 / np.sqrt(1 - flag_result['spw'][str(spwid)]['flagged'] / flag_result['spw'][str(spwid)]['total'])
         factor = relativeTsys * timeFactor * arraySizeFactor * \
-            areaFactor * bandwidthFactor * polarizationFactor
+            areaFactor * bandwidthFactor * polarizationFactor * flagFactor
         sensitivity = ALMA_SENSITIVITIES[bandidx] * factor
         if 'flux' in spw_dict[spwid]:
-            snrPerScan = spw_dict[spwid]['flux'] * 1000.0 / sensitivity
+            snrPerScan = spw_dict[spwid]['flux'] * 1000.0 / sensitivity  # factor of 1000 converting from Jy to mJy
         else:
             snrPerScan = None
 

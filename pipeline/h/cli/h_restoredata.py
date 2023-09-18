@@ -1,12 +1,11 @@
 import sys
 
-from casatasks import casalog
-
 from . import utils
 
 
+@utils.cli_wrapper
 def h_restoredata(vis=None, session=None, products_dir=None, copytoraw=None, rawdata_dir=None, lazy=None, bdfflags=None,
-                  ocorr_mode=None, pipelinemode=None, asis=None, dryrun=None, acceptresults=None):
+                  ocorr_mode=None, asis=None, dryrun=None, acceptresults=None):
 
     """
     h_restoredata ---- Restore flags and calibration state from a pipeline run
@@ -48,8 +47,7 @@ def h_restoredata(vis=None, session=None, products_dir=None, copytoraw=None, raw
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -57,63 +55,48 @@ def h_restoredata(vis=None, session=None, products_dir=None, copytoraw=None, raw
                   be in the directory specified by rawdata_dir.
                   
                   example: vis=['uid___A002_X30a93d_X43e']
-                  
-                  Can only set when pipelinemode='interactive'
+
     session       List of sessions, one per visibility file.
                   
                   example: session=['session_3']
-                  
-                  Can only set when pipelinemode='interactive'
+
     products_dir  Path to the data products directory, used to copy calibration
                   products from. The parameter is effective only when
                   copytoraw=True. When copytoraw=False, calibration products in
                   rawdata_dir will be used.
                   
                   example: products_dir='/path/to/my/products'
-                  
-                  Can only set when pipelinemode='interactive'
+
     copytoraw     Copy calibration and flagging tables from products_dir to
                   rawdata_dir directory.
                   
                   example: copytoraw=False
-                  
-                  Can only set when pipelinemode='interactive'
+
     rawdata_dir   Path to the rawdata subdirectory.
                   
                   example: rawdata_dir='/path/to/my/rawdata'
-                  
-                  Can only set when pipelinemode='interactive'
+
     lazy          Use the lazy filler option
                   
                   example: lazy=True
-                  
-                  Can only set when pipelinemode='interactive'
+
     bdfflags      Set the BDF flags
                   
                   example: bdfflags=False
-                  
-                  Can only set when pipelinemode='interactive'
+
     ocorr_mode    Set correlation import mode
                   
                   example: ocorr_mode='ca'
-                  
-                  Can only set when pipelinemode='interactive'
-    asis          Set list of tables to import as-is into the Measurement Set
+
+    asis          Creates verbatim copies of the ASDM tables in the output MS.
+                  The value given to this option must be a list of table names separated by space characters.
                   
                   example: ocorr_mode='Source Receiver'
                   
-                  Can only set when pipelinemode='interactive'
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the pipeline
-                  determines the values of all context defined pipeline inputs
-                  automatically. In 'interactive' mode the user can set the
-                  pipeline context defined parameters manually. In 'getinputs'
-                  mode the user can check the settings of all pipeline
-                  parameters without running the task.
     dryrun        Run the commands (True) or generate the commands to be run
                   but do not execute (False).
-                  
-                  Can only set when pipelinemode='interactive'
-    acceptresults Add the results into the pipeline contextAdd the results of the task to the pipeline context (True) or
+
+    acceptresults Add the results of the task to the pipeline context (True) or
                   reject them (False).
 
     --------- examples -----------------------------------------------------------

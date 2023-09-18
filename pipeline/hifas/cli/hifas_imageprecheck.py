@@ -1,11 +1,10 @@
 import sys
 
-from casatasks import casalog
-
 import pipeline.h.cli.utils as utils
 
 
-def hifas_imageprecheck(vis=None, desired_angular_resolution=None, calcsb=None, parallel=None, pipelinemode=None,
+@utils.cli_wrapper
+def hifas_imageprecheck(vis=None, desired_angular_resolution=None, calcsb=None, parallel=None,
                         dryrun=None, acceptresults=None):
 
     """
@@ -23,8 +22,7 @@ def hifas_imageprecheck(vis=None, desired_angular_resolution=None, calcsb=None, 
     the PI's desired angular resolution is chosen automatically.
     See the User's guide for further details.
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -39,13 +37,6 @@ def hifas_imageprecheck(vis=None, desired_angular_resolution=None, calcsb=None, 
                                Example: '1.0arcsec'
     calcsb                     Force (re-)calculation of sensitivities and beams
     parallel                   Use MPI cluster where possible
-    pipelinemode               The pipeline operating mode.
-                               In 'automatic' mode the pipeline determines the values of all
-                               context defined pipeline inputs automatically.
-                               In 'interactive' mode the user can set the pipeline context
-                               defined parameters manually.
-                               In 'getinputs' mode the user can check the settings of all
-                               pipeline parameters without running the task.
     dryrun                     Run the task (False) or just display the command (True)
     acceptresults              Add the results of the task to the pipeline context (True) or
                                reject them (False).

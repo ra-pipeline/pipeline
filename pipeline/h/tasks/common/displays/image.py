@@ -299,7 +299,7 @@ class ImageDisplay(object):
         sentinel_set = set(np.ravel(flag_reason_plane))
         sentinel_set.discard(0)
 
-        sentinelvalues = np.array(list(sentinel_set), np.float) + 10.0
+        sentinelvalues = np.array(list(sentinel_set), float) + 10.0
 
         for sentinelvalue in sentinelvalues:
             sentinels[sentinelvalue] = cc.to_rgb(
@@ -313,7 +313,7 @@ class ImageDisplay(object):
         # calculate vmin, vmax without the sentinels. Leaving norm to do
         # this is not sufficient; the standard Normalize gets called
         # by something in matplotlib and initialises vmin and vmax incorrectly.
-        sentinel_mask = np.zeros(np.shape(data), np.bool)
+        sentinel_mask = np.zeros(np.shape(data), bool)
         for sentinel in sentinels:
             sentinel_mask += (data == sentinel)
         actual_data = data[np.logical_not(sentinel_mask)]
@@ -635,7 +635,7 @@ class _SentinelNorm(Normalize):
         # values may not re-appear with the exact same value as those
         # registered in self.sentinels. Therefore, look for values that are
         # close to the sentinel within a very small tolerance.
-        sentinel_mask = np.zeros(np.shape(value), np.bool)
+        sentinel_mask = np.zeros(np.shape(value), bool)
         for sentinel in self.sentinels:
             sentinel_mask += np.isclose(value, sentinel, rtol=1.e-12, atol=1.e-12)
         sentinel_values = value[sentinel_mask]

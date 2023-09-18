@@ -38,6 +38,8 @@ class SDATMCorrectionInputs(vdp.StandardInputs):
     # Search order of input vis
     processing_data_type = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
+    parallel = sessionutils.parallel_inputs_impl()
+
     atmtype = vdp.VisDependentProperty(default='auto')
     dtem_dh = vdp.VisDependentProperty(default=-5.6)
     h0 = vdp.VisDependentProperty(default=2.0)
@@ -262,15 +264,16 @@ class SDATMCorrectionInputs(vdp.StandardInputs):
 
     def __init__(self,
                  context: Context,
-                 atmtype: Optional[Union[int, str, List[int], List[str]]] =None,
-                 dtem_dh: Optional[Union[float, str, dict, List[float], List[str], List[dict]]] =None,
-                 h0: Optional[Union[float, str, dict, List[float], List[str], List[dict]]] =None,
-                 maxalt: Optional[Union[float, str, dict, List[float], List[str], List[dict]]] =None,
-                 infiles: Optional[Union[str, List[str]]] =None,
-                 antenna: Optional[Union[str, List[str]]] =None,
-                 field: Optional[Union[str, List[str]]] =None,
-                 spw: Optional[Union[str, List[str]]] =None,
-                 pol: Optional[Union[str, List[str]]] =None):
+                 atmtype: Optional[Union[int, str, List[int], List[str]]] = None,
+                 dtem_dh: Optional[Union[float, str, dict, List[float], List[str], List[dict]]] = None,
+                 h0: Optional[Union[float, str, dict, List[float], List[str], List[dict]]] = None,
+                 maxalt: Optional[Union[float, str, dict, List[float], List[str], List[dict]]] = None,
+                 infiles: Optional[Union[str, List[str]]] = None,
+                 antenna: Optional[Union[str, List[str]]] = None,
+                 field: Optional[Union[str, List[str]]] = None,
+                 spw: Optional[Union[str, List[str]]] = None,
+                 pol: Optional[Union[str, List[str]]] = None,
+                 parallel: Optional[Union[bool, str]] = None):
         """Initialize Inputs instance for hsd_atmcor.
 
         Args:
@@ -284,6 +287,9 @@ class SDATMCorrectionInputs(vdp.StandardInputs):
             field: field selection. Defaults to None.
             spw: spw selection. Defaults to None.
             pol: polarization selection. Defaults to None.
+            parallel: Execute using CASA HPC functionality, if available.
+                      Default is None, which intends to turn on parallel
+                      processing if possible.
         """
         super().__init__()
 
@@ -297,6 +303,7 @@ class SDATMCorrectionInputs(vdp.StandardInputs):
         self.field = field
         self.spw = spw
         self.pol = pol
+        self.parallel = parallel
 
     def _identify_datacolumn(self, vis: str) -> str:
         """Identify data column.
@@ -408,9 +415,11 @@ class SDATMCorrectionInputs(vdp.StandardInputs):
         # to avoid strange error in VI/VB2 framework
         args['correlation'] = ''
 
-        # intent should include OFF_SOURCE data (for validation purpose)
-        # TODO: remove it after PIPE-1062 is implemented
+        # process ON_SOURCE data only
         args['intent'] = 'OBSERVE_TARGET#ON_SOURCE'
+
+        # remove parallel
+        del args['parallel']
 
         return args
 
@@ -574,7 +583,7 @@ class SerialSDATMCorrection(basetask.StandardTaskTemplate):
     def analyse(self, result: SDATMCorrectionResults) -> SDATMCorrectionResults:
         """Analyse results produced by prepare method.
 
-        Do nothing at this moment.
+        Generate domain object of MS with offline ATM correction.
 
         Args:
             result: results instance
@@ -582,7 +591,6 @@ class SerialSDATMCorrection(basetask.StandardTaskTemplate):
         Returns:
             input results instance
         """
-        # Generate domain object of baselined MS
         in_ms = self.inputs.ms
         new_ms = generate_ms(result.atmcor_ms_name, in_ms)
         new_ms.set_data_column(DataType.ATMCORR, 'DATA')
@@ -672,78 +680,8 @@ class SerialSDATMCorrection(basetask.StandardTaskTemplate):
         return atm_heuristics, args, best_model_index, model_list
 
 
-### Tier-0 parallelization
-class HpcSDATMCorrectionInputs(SDATMCorrectionInputs):
-    """Inputs for parallel implementation of offline ATM correction."""
-
-    # use common implementation for parallel inputs argument
-    parallel = sessionutils.parallel_inputs_impl()
-
-    def __init__(self,
-                 context: Context,
-                 atmtype: Optional[Union[int, str, List[int], List[str]]] =None,
-                 dtem_dh: Optional[Union[float, str, dict, List[float], List[str], List[dict]]] =None,
-                 h0: Optional[Union[float, str, dict, List[float], List[str], List[dict]]] =None,
-                 maxalt: Optional[Union[float, str, dict, List[float], List[str], List[dict]]] =None,
-                 infiles: Optional[Union[str, List[str]]] =None,
-                 antenna: Optional[Union[str, List[str]]] =None,
-                 field: Optional[Union[str, List[str]]] =None,
-                 spw: Optional[Union[str, List[str]]] =None,
-                 pol: Optional[Union[str, List[str]]] =None,
-                 parallel: Optional[bool] =None):
-        """Initialize Inputs instance for hsd_atmcor.
-
-        Args:
-            context: pipeline context
-            atmtype: enumeration for atmospheric transmission model
-            dtem_dh: temperature gradient [K/km]
-            h0: scale height for water [km]. Defaults to None.
-            maxalt: maximum altitude of the model [km]. Defaults to None.
-            infiles: MS selection. Defaults to None.
-            antenna: antenna selection. Defaults to None.
-            field: field selection. Defaults to None.
-            spw: spw selection. Defaults to None.
-            pol: polarization selection. Defaults to None.
-            parallel: enable Tier-0 parallelization or not. Defaults to None.
-        """
-        super().__init__(context, atmtype=atmtype, dtem_dh=dtem_dh, h0=h0, maxalt=maxalt,
-                         infiles=infiles, antenna=antenna, field=field, spw=spw, pol=pol)
-        self.parallel = parallel
-
-
-# @task_registry.set_equivalent_casa_task('hsd_atmcor')
-# @task_registry.set_casa_commands_comment(
-#     'Apply offline correction of atmospheric transmission model.'
-# )
 class HpcSDATMCorrection(sessionutils.ParallelTemplate):
     """Parallel implementation of offline ATM correction task."""
 
-    Inputs = HpcSDATMCorrectionInputs
+    Inputs = SDATMCorrectionInputs
     Task = SerialSDATMCorrection
-
-    def __init__(self, inputs: HpcSDATMCorrectionInputs):
-        """Initialize parallel ATM correction task.
-
-        Args:
-            inputs instance for parallel ATM correction task
-        """
-        super().__init__(inputs)
-
-    @basetask.result_finaliser
-    def get_result_for_exception(self, vis: str, exception: Exception) -> basetask.FailedTaskResults:
-        """Produce failed task results.
-
-        Args:
-            vis: name of the MS
-            exception: original exception
-
-        Returns:
-            FailedTaskResults instance
-        """
-        LOG.error('Error operating target flag for {!s}'.format(os.path.basename(vis)))
-        LOG.error('{0}({1})'.format(exception.__class__.__name__, str(exception)))
-        import traceback
-        tb = traceback.format_exc()
-        if tb.startswith('None'):
-            tb = '{0}({1})'.format(exception.__class__.__name__, str(exception))
-        return basetask.FailedTaskResults(self.__class__, exception, tb)

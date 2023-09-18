@@ -153,7 +153,9 @@ class ObservingRun(object):
                     if ms.name not in vis:
                         continue
                 if spw is not None:
-                    real_spw_ids = ','.join(str(self.virtual2real_spw_id(spw_id, ms)) for spw_id in spw.split(','))
+                    real_spw_ids = ','.join(str(self.virtual2real_spw_id(spw_id, ms)) for spw_id in spw.split(',') if self.virtual2real_spw_id(spw_id, ms) is not None)
+                    if not real_spw_ids:
+                        real_spw_ids = None
                 else:
                     real_spw_ids = None
                 dcol = ms.get_data_column(dtype, source, real_spw_ids)

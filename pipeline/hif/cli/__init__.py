@@ -20,8 +20,4 @@ from .hif_selfcal import hif_selfcal
 from .hif_setjy import hif_setjy
 from .hif_setmodels import hif_setmodels
 from .hif_transformimagedata import hif_transformimagedata
-from .hif_uvcontfit import hif_uvcontfit
 from .hif_uvcontsub import hif_uvcontsub
-from .hpc_hif_applycal import hpc_hif_applycal
-from .hpc_hif_refant import hpc_hif_refant
-from .uvcontfit import uvcontfit

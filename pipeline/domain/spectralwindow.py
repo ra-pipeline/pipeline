@@ -7,7 +7,7 @@ windows, channel frequency information, and channel selection.
 import decimal
 import itertools
 import operator
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import numpy
 
@@ -205,25 +205,28 @@ class SpectralWindow(object):
         transitions: Spectral transitions recorded associated with spectral window
         type: Spectral window type, e.g., 'TDM'
         sdm_num_bin: Number of bins for online spectral averaging
+        correlation_bits: Number of bits used for correlation
+        median_receptor_angle: Median feed receptor angle.
     """
 
     __slots__ = ('id', 'band', 'bandwidth', 'type', 'intents', 'ref_frequency', 'name', 'baseband', 'sideband',
                  'receiver', 'freq_lo', 'mean_frequency', '_min_frequency', '_max_frequency', '_centre_frequency',
-                 'channels', '_ref_frequency_frame', 'spectralspec', 'transitions', 'sdm_num_bin')
+                 'channels', '_ref_frequency_frame', 'spectralspec', 'transitions', 'sdm_num_bin', 'correlation_bits',
+                 'median_receptor_angle')
 
     def __getstate__(self):
         """Define what to pickle as a class intance."""
         return (self.id, self.band, self.bandwidth, self.type, self.intents, self.ref_frequency, self.name,
                 self.baseband, self.sideband, self.receiver, self.freq_lo, self.mean_frequency, self._min_frequency,
                 self._max_frequency, self._centre_frequency, self.channels, self._ref_frequency_frame,
-                self.spectralspec, self.transitions, self.sdm_num_bin)
+                self.spectralspec, self.transitions, self.sdm_num_bin, self.correlation_bits, self.median_receptor_angle)
 
     def __setstate__(self, state):
         """Define how to unpickle a class instance."""
         (self.id, self.band, self.bandwidth, self.type, self.intents, self.ref_frequency, self.name, self.baseband,
          self.sideband, self.receiver, self.freq_lo, self.mean_frequency, self._min_frequency, self._max_frequency,
          self._centre_frequency, self.channels, self._ref_frequency_frame, self.spectralspec, self.transitions,
-         self.sdm_num_bin) = state
+         self.sdm_num_bin, self.correlation_bits, self.median_receptor_angle) = state
 
     def __repr__(self):
         chan_freqs = self.channels.chan_freqs
@@ -239,7 +242,7 @@ class SpectralWindow(object):
             chan_effective_bws = numpy.array(list(chan_effective_bws))
 
         return ('SpectralWindow({0!r}, {1!r}, {2!r}, {3!r}, {4!r}, {5!r}, {6}, {7}, {8}, {9!r}, {10!r}, {11!r}, '
-                '{12!r})').format(
+                '{12!r}, {13}, {14}, {15!r})').format(
             self.id,
             self.name,
             self.type,
@@ -256,17 +259,22 @@ class SpectralWindow(object):
             self.baseband,
             self.band,
             self.transitions,
-            self.sdm_num_bin
+            self.sdm_num_bin,
+            self.correlation_bits,
+            self.median_receptor_angle
         )
 
     def __init__(self, spw_id: int, name: str, spw_type: str, bandwidth: float,
                  ref_freq: dict, mean_freq: float, chan_freqs: numpy.ndarray,
                  chan_widths: numpy.ndarray, chan_effective_bws: numpy.ndarray,
-                 sideband: int, baseband: int, receiver: str,
-                 freq_lo: Optional[List[float]], band: str='Unknown',
-                 spectralspec: str=None,
-                 transitions: Optional[numpy.ndarray]=None,
-                 sdm_num_bin: Optional[int]=None):
+                 sideband: int, baseband: int,
+                 receiver: Optional[str], freq_lo: Optional[Union[List[float], numpy.ndarray]],
+                 band: str = 'Unknown',
+                 spectralspec: Optional[str] = None,
+                 transitions: Optional[List[str]] = None,
+                 sdm_num_bin: Optional[int] = None,
+                 correlation_bits: Optional[str]=None,
+                 median_receptor_angle: Optional[numpy.ndarray] = None):
         """
         Initialize SpectralWindow class.
 
@@ -279,17 +287,17 @@ class SpectralWindow(object):
             mean_freq: Mean frequency of spectral window in Hz
             chan_freqs: A list of frequency of each channel in spw in Hz
             chan_widths: A list of channel width of each channel in spw in Hz
-            chan_effective_bws: A list of effective band width of each channel
-                in spw in Hz
+            chan_effective_bws: A list of effective bandwidth of each channel in spw in Hz
             sideband: Side band
             baseband: The baseband
             receiver: Receiver type, e.g., 'TSB'
             freq_lo: A list of LO frequencies in Hz
             band: Frequency band
             spectralspec: SpectralSpec name
-            transition: Spectral transitions recorded associated with spectral
-                window
+            transitions: Spectral transitions recorded associated with spectral window
             sdm_num_bin: Number of bins for online spectral averaging
+            correlation_bits: Number of bits used for correlation
+            median_receptor_angle: Median feed receptor angle.
         """
         if transitions is None:
             transitions = ['Unknown']
@@ -329,7 +337,9 @@ class SpectralWindow(object):
         self._centre_frequency = (self._min_frequency + self._max_frequency) / 2.0
 
         self.transitions = transitions
-        self.sdm_num_bin = sdm_num_bin 
+        self.sdm_num_bin = sdm_num_bin
+        self.correlation_bits = correlation_bits
+        self.median_receptor_angle = median_receptor_angle
 
     @property
     def centre_frequency(self):

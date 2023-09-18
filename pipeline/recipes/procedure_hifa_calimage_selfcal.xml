@@ -1,6 +1,6 @@
 <ProcessingProcedure>
 
-    <ProcedureTitle>hifa_calimage</ProcedureTitle>
+    <ProcedureTitle>hifa_calimage_selfcal</ProcedureTitle>
 
     <ProcessingCommand>
         <Command xmlns="">hifa_importdata</Command>
@@ -235,12 +235,6 @@
     </ProcessingCommand>
 
     <ProcessingCommand>
-        <Command xmlns="">hif_uvcontfit</Command>
-        <ParameterSet>
-        </ParameterSet>
-    </ProcessingCommand>
-
-    <ProcessingCommand>
         <Command xmlns="">hif_uvcontsub</Command>
         <ParameterSet>
         </ParameterSet>
@@ -258,7 +252,7 @@
             <Parameter>
                 <Keyword xmlns="">specmode</Keyword>
                 <Value xmlns="">cont</Value>
-            </Parameter>             
+            </Parameter>
         </ParameterSet>
     </ProcessingCommand>
 
@@ -266,7 +260,7 @@
         <Command xmlns="">hif_makeimages</Command>
         <ParameterSet>
         </ParameterSet>
-    </ProcessingCommand>    
+    </ProcessingCommand>
 
     <ProcessingCommand>
         <Command xmlns="">hif_makeimlist</Command>
@@ -274,7 +268,7 @@
             <Parameter>
                 <Keyword xmlns="">specmode</Keyword>
                 <Value xmlns="">cube</Value>
-            </Parameter>             
+            </Parameter>
         </ParameterSet>
     </ProcessingCommand>
 
@@ -282,11 +276,47 @@
         <Command xmlns="">hif_makeimages</Command>
         <ParameterSet>
         </ParameterSet>
-    </ProcessingCommand>          
+    </ProcessingCommand>
+
+    <ProcessingCommand>
+        <Command xmlns="">hif_makeimlist</Command>
+        <ParameterSet>
+            <Parameter>
+                <Keyword xmlns="">specmode</Keyword>
+                <Value xmlns="">repBW</Value>
+            </Parameter>
+        </ParameterSet>
+    </ProcessingCommand>
+
+    <ProcessingCommand>
+        <Command xmlns="">hif_makeimages</Command>
+        <ParameterSet>
+        </ParameterSet>
+    </ProcessingCommand>
 
     <ProcessingCommand>
         <Command xmlns="">hif_selfcal</Command>
-        <ParameterSet>             
+        <ParameterSet>
+        </ParameterSet>
+    </ProcessingCommand>
+
+    <ProcessingCommand>
+        <Command xmlns="">hif_makeimlist</Command>
+        <ParameterSet>
+            <Parameter>
+                <Keyword xmlns="">specmode</Keyword>
+                <Value xmlns="">mfs</Value>
+            </Parameter>
+            <Parameter>
+                <Keyword xmlns="">datatype</Keyword>
+                <Value xmlns="">selfcal</Value>
+            </Parameter>
+        </ParameterSet>
+    </ProcessingCommand>
+
+    <ProcessingCommand>
+        <Command xmlns="">hif_makeimages</Command>
+        <ParameterSet>
         </ParameterSet>
     </ProcessingCommand>
 
@@ -300,16 +330,16 @@
             <Parameter>
                 <Keyword xmlns="">datatype</Keyword>
                 <Value xmlns="">selfcal</Value>
-            </Parameter>               
+            </Parameter>
         </ParameterSet>
-    </ProcessingCommand>    
+    </ProcessingCommand>
 
     <ProcessingCommand>
         <Command xmlns="">hif_makeimages</Command>
         <ParameterSet>
         </ParameterSet>
-    </ProcessingCommand>          
-    
+    </ProcessingCommand>
+
     <ProcessingCommand>
         <Command xmlns="">hif_makeimlist</Command>
         <ParameterSet>
@@ -320,15 +350,35 @@
             <Parameter>
                 <Keyword xmlns="">datatype</Keyword>
                 <Value xmlns="">selfcal</Value>
-            </Parameter>               
+            </Parameter>
         </ParameterSet>
-    </ProcessingCommand>      
-    
+    </ProcessingCommand>
+
     <ProcessingCommand>
         <Command xmlns="">hif_makeimages</Command>
         <ParameterSet>
         </ParameterSet>
-    </ProcessingCommand>          
+    </ProcessingCommand>
+
+    <ProcessingCommand>
+        <Command xmlns="">hif_makeimlist</Command>
+        <ParameterSet>
+            <Parameter>
+                <Keyword xmlns="">specmode</Keyword>
+                <Value xmlns="">repBW</Value>
+            </Parameter>
+            <Parameter>
+                <Keyword xmlns="">datatype</Keyword>
+                <Value xmlns="">selfcal</Value>
+            </Parameter>
+        </ParameterSet>
+    </ProcessingCommand>
+
+    <ProcessingCommand>
+        <Command xmlns="">hif_makeimages</Command>
+        <ParameterSet>
+        </ParameterSet>
+    </ProcessingCommand>
 
     <ProcessingCommand>
         <Command xmlns="">hifa_exportdata</Command>

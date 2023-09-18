@@ -142,9 +142,13 @@ def stop_weblog():
             LOG.info(serve_message.format(host=sa[0], port=sa[1]))
             HTTP_SERVER = None
 
-def initcli():
+def initcli(user_globals=None):
     LOG.info('Initializing cli...')
-    my_globals = find_frame()
+    if user_globals is None:
+        my_globals = find_frame()
+    else:
+        my_globals = user_globals
+
     for package in ['h', 'hif', 'hifa', 'hifas', 'hifv', 'hsd', 'hsdn']:
         abs_cli_package = 'pipeline.{package}.cli'.format(package=package)
         try:

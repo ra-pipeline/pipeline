@@ -243,6 +243,7 @@ class CleanBase(basetask.StandardTaskTemplate):
                                   spw=inputs.spw,
                                   orig_specmode=inputs.orig_specmode,
                                   specmode=inputs.specmode,
+                                  stokes=inputs.stokes,
                                   multiterm=inputs.nterms if inputs.deconvolver == 'mtmfs' else None,
                                   plotdir=plotdir, imaging_mode=inputs.heuristics.imaging_mode,
                                   is_per_eb=inputs.is_per_eb,
@@ -539,7 +540,7 @@ class CleanBase(basetask.StandardTaskTemplate):
                 tclean_job_parameters['mosweight'] = mosweight
 
         tclean_job_parameters['nsigma'] = inputs.heuristics.nsigma(iter, inputs.hm_nsigma, inputs.hm_masking)
-        tclean_job_parameters['wprojplanes'] = inputs.heuristics.wprojplanes()
+        tclean_job_parameters['wprojplanes'] = inputs.heuristics.wprojplanes(gridder=inputs.gridder, spwspec=inputs.spw)
         tclean_job_parameters['rotatepastep'] = inputs.heuristics.rotatepastep()
         tclean_job_parameters['smallscalebias'] = inputs.heuristics.smallscalebias()
         tclean_job_parameters['usepointing'] = inputs.heuristics.usepointing()
@@ -697,7 +698,7 @@ class CleanBase(basetask.StandardTaskTemplate):
         result.set_imaging_params(iter, tclean_job_parameters)
 
         # This operation is used as a workaround for CAS-13401 and can be removed after the CAS ticket is resolved.
-        if tclean_job_parameters['stokes'] != 'I':
+        if tclean_job_parameters['stokes'] != 'I' and inputs.heuristics.imaging_mode != 'ALMA':
             self._copy_restoringbeam_from_psf(tclean_job_parameters['imagename'])
 
         return result

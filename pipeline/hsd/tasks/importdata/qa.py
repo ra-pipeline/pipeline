@@ -43,7 +43,8 @@ class SDImportDataQAHandler(importdataqa.ImportDataQAHandler, QAPlugin):
 
 class HpcSDImportDataQAHandler(SDImportDataQAHandler):
     """QA handler for HpcImportData task."""
-    generating_task = importdata.HpcSDImportData
+
+    generating_task = importdata.SDImportData
 
 
 class SDImportDataListQAHandler(importdataqa.ImportDataListQAHandler, QAPlugin):

@@ -1,4 +1,5 @@
-import pprint
+from functools import wraps
+from typing import Callable
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.api as api
@@ -9,6 +10,22 @@ from . import cli
 from .. import heuristics
 
 LOG = infrastructure.get_logger(__name__)
+
+
+def cli_wrapper(func: Callable):
+    """Wrap pipeline task CLI functions to handle the extra 'pipelinemode' argument.
+
+    PIPE-1884: this decorator function removes the "pipelinemode" argument from pipeline CLI task 
+    calls, which commonly exists in archival casa_pipescript.py/casa_pipestorescript.py scripts generated 
+    by old pipeline versions before PIPE-1686.
+    """
+    @wraps(func)
+    def wrapped_func(*args, **kwargs):
+        if 'pipelinemode' in kwargs:
+            LOG.attention('The pipeline task argument "pipelinemode" does not affect results and will be removed in the future.')
+            kwargs.pop('pipelinemode')
+        return func(*args, **kwargs)
+    return wrapped_func
 
 
 def get_context():
@@ -56,9 +73,6 @@ def get_heuristic(arg):
 
 
 def execute_task(context, casa_task, casa_args):
-    pipelinemode = casa_args.get('pipelinemode', None)
-    if pipelinemode is None:
-        pipelinemode = 'automatic'
     dry_run = casa_args.get('dryrun', None)
     if dry_run is None:
         dry_run = False
@@ -68,11 +82,6 @@ def execute_task(context, casa_task, casa_args):
 
     # get the pipeline task inputs
     task_inputs = _get_task_inputs(casa_task, context, casa_args)
-
-    # print them if necessary
-    if pipelinemode == 'getinputs':
-        _print_inputs(casa_task, casa_args, task_inputs)
-        return None
 
     # Execute the class, collecting the results
     results = _execute_task(casa_task, task_inputs, dry_run)
@@ -124,18 +133,3 @@ def _merge_results(context, results):
     except Exception:
         LOG.critical('Warning: Check merge to context for {}'.format(results.__class__.__name__))
         raise
-
-
-def _print_inputs(casa_task, casa_args, task_inputs):
-    pipeline_class = task_registry.get_pipeline_class_for_task(casa_task)
-    task_args = argmapper.convert_args(pipeline_class, casa_args)
-
-    pipeline_perspective = {}
-    for arg in task_args:
-        if hasattr(task_inputs, arg):
-            pipeline_perspective[arg] = getattr(task_inputs, arg)
-
-    casa_args = argmapper.task_to_casa(casa_task, pipeline_perspective)
-
-    print('Pipeline-derived inputs for {!s}:'.format(casa_task))
-    pprint.pprint(casa_args)

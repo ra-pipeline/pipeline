@@ -29,7 +29,7 @@ class BoxResult(basetask.Results):
 class TcleanResult(basetask.Results):
     def __init__(self, vis=None, datacolumn=None, datatype=None, datatype_info=None,
                  sourcename=None, field_ids=None, intent=None, spw=None,
-                 orig_specmode=None, specmode=None, multiterm=None, plotdir=None,
+                 orig_specmode=None, specmode=None, stokes=None, multiterm=None, plotdir=None,
                  imaging_mode=None, is_per_eb=None, is_eph_obj=None):
         super(TcleanResult, self).__init__()
         self.vis = vis
@@ -42,6 +42,7 @@ class TcleanResult(basetask.Results):
         self.spw = spw
         self.orig_specmode = orig_specmode
         self.specmode = specmode
+        self.stokes = stokes
         self.multiterm = multiterm
         self.plotdir = plotdir
         self._psf = None
@@ -59,8 +60,11 @@ class TcleanResult(basetask.Results):
         self._DR_correction_factor = 1.0
         self._maxEDR_used = False
         self._image_min = 0.0
+        self._image_min_iquv = [0.0, 0.0, 0.0, 0.0]
         self._image_max = 0.0
+        self._image_max_iquv = [0.0, 0.0, 0.0, 0.0]
         self._image_rms = 0.0
+        self._image_rms_iquv = [0.0, 0.0, 0.0, 0.0]
         self._image_rms_min = 0.0
         self._image_rms_max = 0.0
         self._image_robust_rms_and_spectra = None
@@ -90,6 +94,8 @@ class TcleanResult(basetask.Results):
         self.synthesized_beams = None
         # Store visibility amplitude ratio for VLA
         self.bl_ratio = None
+        # Polarization calibrator fit result
+        self.polcal_fit = None
 
     def merge_with_context(self, context):
         # Calculated beams for later stages
@@ -542,6 +548,13 @@ class TcleanResult(basetask.Results):
         self._image_min = image_min
 
     @property
+    def image_min_iquv(self):
+        return self._image_min_iquv
+
+    def set_image_min_iquv(self, image_min_iquv):
+        self._image_min_iquv = image_min_iquv
+
+    @property
     def image_max(self):
         return self._image_max
 
@@ -549,11 +562,25 @@ class TcleanResult(basetask.Results):
         self._image_max = image_max
 
     @property
+    def image_max_iquv(self):
+        return self._image_max_iquv
+
+    def set_image_max_iquv(self, image_max_iquv):
+        self._image_max_iquv = image_max_iquv
+
+    @property
     def image_rms(self):
         return self._image_rms
 
     def set_image_rms(self, image_rms):
         self._image_rms = image_rms
+
+    @property
+    def image_rms_iquv(self):
+        return self._image_rms_iquv
+
+    def set_image_rms_iquv(self, image_rms_iquv):
+        self._image_rms_iquv = image_rms_iquv
 
     @property
     def image_rms_min(self):

@@ -481,23 +481,23 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         pipemanifest.add_procedure_name(ouss, context.project_structure.recipe_name)
 
         if stdfproducts.ppr_file:
-            pipemanifest.add_pprfile(ouss, os.path.basename(stdfproducts.ppr_file))
+            pipemanifest.add_pprfile(ouss, os.path.basename(stdfproducts.ppr_file), oussid)
 
         # Add the flagging and calibration products
         for session_name in sessiondict:
             session = pipemanifest.set_session(ouss, session_name)
-            pipemanifest.add_caltables(session, sessiondict[session_name][1])
+            pipemanifest.add_caltables(session, sessiondict[session_name][1], session_name)
             for vis_name in sessiondict[session_name][0]:
-                pipemanifest.add_asdm(session, vis_name, visdict[vis_name][0], visdict[vis_name][1])
+                pipemanifest.add_asdm(session, vis_name, visdict[vis_name][0], visdict[vis_name][1], oussid)
 
         # Add a tar file of the web log
-        pipemanifest.add_weblog(ouss, os.path.basename(stdfproducts.weblog_file))
+        pipemanifest.add_weblog(ouss, os.path.basename(stdfproducts.weblog_file), oussid)
 
         # Add the processing log independently of the web log
-        pipemanifest.add_casa_cmdlog(ouss, os.path.basename(stdfproducts.casa_commands_file))
+        pipemanifest.add_casa_cmdlog(ouss, os.path.basename(stdfproducts.casa_commands_file), oussid)
 
         # Add the processing script independently of the web log
-        pipemanifest.add_pipescript(ouss, os.path.basename(stdfproducts.casa_pipescript))
+        pipemanifest.add_pipescript(ouss, os.path.basename(stdfproducts.casa_pipescript), oussid)
 
         # Add the calibrator images
         pipemanifest.add_images(ouss, calimages, 'calibrator')

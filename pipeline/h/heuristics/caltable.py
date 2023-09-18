@@ -113,9 +113,17 @@ class DelayCaltable(CaltableNamer):
         return filenamer.DelayCalibrationTable()
 
 
-class PolCaltable(CaltableNamer):
+class PolcalCaltable(CaltableNamer):
     def get_namer(self):
-        return filenamer.InstrumentPolCalibrationTable()
+        return filenamer.PolCalibrationTable()
+
+    def customise(self, namer, task_args):
+        namer.spectral_window_nochan(task_args.get('spw', None))
+
+        if 'solint' in task_args:
+            # convert integer solints to str for truncation
+            solint = str(task_args['solint'])
+            namer.solint(_truncate_floats(solint, 3))
 
 
 class FluxCaltable(CaltableNamer):

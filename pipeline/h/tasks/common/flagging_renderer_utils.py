@@ -5,11 +5,12 @@ Created on 25 Nov 2014
 """
 import collections
 import functools
-from typing import Optional, List
+from typing import Optional, List, Sequence, Dict
 
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.utils as utils
 from pipeline.infrastructure.launcher import Context
+from pipeline.domain.measurementset import MeasurementSet
 
 LOG = logging.get_logger(__name__)
 
@@ -38,7 +39,18 @@ def flags_for_result(result,
     return {ms.basename: adjusted}
 
 
-def flags_by_intent(ms, summaries, intents=None):
+def flags_by_intent(ms: MeasurementSet,
+                    summaries: List[dict],
+                    intents: Sequence[str] = None) -> Dict[str, Dict[str, FlagTotal]]:
+    """
+    Arguments:
+        ms: an instance of MeasurementSet.
+        summaries: a list of summaries created by flagging tasks.
+        intents: list of intents for which the total flagging percentage should be reported.
+    Returns:
+        a dictionary indexed by summary name (e.g. 'before', '...'),
+        where each element is itself a dictionary containing FlagTotal tuples for each intent.
+    """
     # create a dictionary of scans per observing intent, eg. 'PHASE':['1','2','7']
     intent_scans = {
         # convert IDs to strings as they're used as summary dictionary keys
@@ -59,6 +71,8 @@ def flags_by_intent(ms, summaries, intents=None):
             totalcount = 0
 
             for i in scan_ids:
+                # workaround for KeyError exception when summary
+                # dictionary doesn't contain the scan
                 if i not in summary['scan']:
                     continue
 
@@ -73,10 +87,15 @@ def flags_by_intent(ms, summaries, intents=None):
 
         previous_summary = summary
 
-    return total 
+    return total
 
 
-def flags_by_science_spws(ms, summaries):
+def flags_by_science_spws(ms: MeasurementSet, summaries: List[dict]) -> Dict[str, Dict[str, FlagTotal]]:
+    """
+    Returns:
+        a dictionary indexed by summary name, where each element is a dict
+        with a single key 'SCIENCE_SPWS' and a FlagTotal value
+    """
     science_spws = ms.get_spectral_windows(science_windows_only=True)
 
     total = collections.defaultdict(dict)
@@ -126,14 +145,14 @@ def adjust_non_science_totals(flagtotals, non_science_agents=None):
 
     # copy agents that use the total number of visibilities across to new 
     # results
-    adjusted_results = dict((agent, flagtotals[agent]) 
+    adjusted_results = dict((agent, flagtotals[agent])
                             for agent in agents_to_copy
                             if agent in flagtotals)
 
     # tot up how much data was flagged by each agent per data selection
     flagged_non_science = {}
     for data_selection in data_selections:
-        flagged_non_science[data_selection] = sum([v[data_selection].flagged 
+        flagged_non_science[data_selection] = sum([v[data_selection].flagged
                                                    for v in adjusted_results.values()])
 
     # subtract this 'number of rows flagged per data selection' from the total
@@ -141,7 +160,7 @@ def adjust_non_science_totals(flagtotals, non_science_agents=None):
     for agent in agents_to_adjust:
         for data_selection in flagtotals[agent]:
             unadjusted = flagtotals[agent][data_selection]
-            adjusted = FlagTotal(unadjusted.flagged, 
+            adjusted = FlagTotal(unadjusted.flagged,
                                  unadjusted.total - flagged_non_science[data_selection])
             if agent not in adjusted_results:
                 adjusted_results[agent] = {}
@@ -150,17 +169,27 @@ def adjust_non_science_totals(flagtotals, non_science_agents=None):
     return adjusted_results
 
 
-def intents_to_summarise(context: Context) -> List[str]:
-    # Find out which intents to list in the flagging table
+def intents_to_summarise(context: Context, all_flag_summary_intents: Optional[Sequence[str]] = None) -> List[str]:
+    """
+    Find out which intents to list in the flagging table.
+    Arguments:
+        context: Pipeline context.
+        all_flag_summary_intents: a list of intents to summarise;
+        if None, the default list of all relevant intents (calibration and target) is used.
+    Returns:
+        the subset of intents from the input list all_flag_summary_intents that are actually present in at least one MS
+        (a list of strings in the same order as input, but omitting missing ones).
+    """
+
     # First get all intents across all MSes in context
     context_intents = functools.reduce(lambda x, m: x.union(m.intents),
                                        context.observing_run.measurement_sets,
                                        set())
-    # then match intents against those we want in the table, removing those not
-    # present. List order is preserved in the table.
-    all_flag_summary_intents = [
-        'AMPLITUDE', 'BANDPASS', 'CHECK', 'PHASE', 'POLANGLE', 'POLARIZATION', 'POLLEAKAGE', 'TARGET'
-    ]
+    # then match intents against those we want in the table, removing those not present.
+    # List order is preserved in the table.
+    if all_flag_summary_intents is None:
+        all_flag_summary_intents = [
+            'AMPLITUDE', 'BANDPASS', 'CHECK', 'DIFFGAIN', 'PHASE', 'POLANGLE', 'POLARIZATION', 'POLLEAKAGE', 'TARGET']
     intents_to_summarise = [i for i in all_flag_summary_intents
                             if i in context_intents.intersection(set(all_flag_summary_intents))]
     return intents_to_summarise

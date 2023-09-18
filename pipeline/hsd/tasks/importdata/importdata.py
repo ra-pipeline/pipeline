@@ -39,30 +39,34 @@ class SDImportDataInputs(importdata.ImportDataInputs):
     createmms = vdp.VisDependentProperty(default='false')
     hm_rasterscan = vdp.VisDependentProperty(default='time')
 
+    parallel = sessionutils.parallel_inputs_impl()
+
     def __init__(self,
                  context: Context,
-                 vis: Optional[List[str]]=None,
-                 output_dir: Optional[str]=None,
-                 asis: Optional[str]=None,
-                 process_caldevice: Optional[bool]=None,
-                 session: Optional[List[str]]=None,
-                 overwrite: Optional[bool]=None,
-                 nocopy: Optional[bool]=None,
-                 bdfflags: Optional[bool]=None,
-                 datacolumns: Optional[Dict]=None,
-                 save_flagonline: Optional[bool]=None,
-                 lazy: Optional[bool]=None,
-                 with_pointing_correction: Optional[bool]=None,
-                 createmms: Optional[str]=None,
-                 ocorr_mode: Optional[str]=None,
-                 hm_rasterscan: Optional[str]=None):
+                 vis: Optional[List[str]] = None,
+                 output_dir: Optional[str] = None,
+                 asis: Optional[str] = None,
+                 process_caldevice: Optional[bool] = None,
+                 session: Optional[List[str]] = None,
+                 overwrite: Optional[bool] = None,
+                 nocopy: Optional[bool] = None,
+                 bdfflags: Optional[bool] = None,
+                 datacolumns: Optional[Dict] = None,
+                 save_flagonline: Optional[bool] = None,
+                 lazy: Optional[bool] = None,
+                 with_pointing_correction: Optional[bool] = None,
+                 createmms: Optional[str] = None,
+                 ocorr_mode: Optional[str] = None,
+                 hm_rasterscan: Optional[str] = None,
+                 parallel: Optional[Union[str, bool]] = None):
         """Initialise SDImportDataInputs class.
 
         Args:
             context: pipeline context
             vis: List of input visibility data
             output_dir: path of output directory
-            asis: Extra ASDM tables to convert as is
+            asis: Creates verbatim copies of the ASDM tables in the output MS.
+                  The value given to this option must be a list of table names separated by space characters.
             process_caldevice: Import the CalDevice table from the ASDM
             session: List of sessions of input visibility data. Each element in the list indicates the session of a corresponding element in vis.
             overwrite: Overwrite existing files on import
@@ -75,14 +79,18 @@ class SDImportDataInputs(importdata.ImportDataInputs):
             ocorr_mode: Selection of baseline correlation to import.
                         Valid only if input visibility is ASDM. See a document of CASA, casatasks::importasdm, for available options.
             hm_rasterscan: heuristics method for raster scan analysis
+            parallel: Execute using CASA HPC functionality, if available.
+                      Default is None, which intends to turn on parallel
+                      processing if possible.
         """
-        super(SDImportDataInputs, self).__init__(context, vis=vis, output_dir=output_dir, asis=asis,
-                                                 process_caldevice=process_caldevice, session=session,
-                                                 overwrite=overwrite, nocopy=nocopy, bdfflags=bdfflags, lazy=lazy,
-                                                 save_flagonline=save_flagonline, createmms=createmms,
-                                                 ocorr_mode=ocorr_mode, datacolumns=datacolumns)
+        super().__init__(context, vis=vis, output_dir=output_dir, asis=asis,
+                         process_caldevice=process_caldevice, session=session,
+                         overwrite=overwrite, nocopy=nocopy, bdfflags=bdfflags, lazy=lazy,
+                         save_flagonline=save_flagonline, createmms=createmms,
+                         ocorr_mode=ocorr_mode, datacolumns=datacolumns)
         self.with_pointing_correction = with_pointing_correction
         self.hm_rasterscan = hm_rasterscan
+        self.parallel = parallel
 
 
 class SDImportDataResults(basetask.Results):
@@ -98,11 +106,11 @@ class SDImportDataResults(basetask.Results):
     """
 
     def __init__(self,
-                 mses: Optional[List[MeasurementSet]]=None,
-                 reduction_group_list: Optional[List[Dict[int, MSReductionGroupDesc]]]=None,
-                 datatable_prefix: Optional[str]=None,
-                 setjy_results: Optional[List[FluxCalibrationResults]]=None,
-                 org_directions: Optional[Dict[str, Union[str, Dict[str, Union[str, float]]]]]=None):
+                 mses: Optional[List[MeasurementSet]] = None,
+                 reduction_group_list: Optional[List[Dict[int, MSReductionGroupDesc]]] = None,
+                 datatable_prefix: Optional[str] = None,
+                 setjy_results: Optional[List[FluxCalibrationResults]] = None,
+                 org_directions: Optional[Dict[str, Union[str, Dict[str, Union[str, float]]]]] = None):
         """Initialise SDImportDataResults class.
 
         Args:
@@ -179,7 +187,7 @@ class SerialSDImportData(importdata.ImportData):
             LOG.debug('Start inspection for %s' % ms.basename)
             table_name = os.path.join(table_prefix, ms.basename)
             inspector = inspection.SDInspection(self.inputs.context, table_name, ms=ms, hm_rasterscan=self.inputs.hm_rasterscan)
-            reduction_group, org_directions = self._executor.execute(inspector, merge=False)
+            reduction_group, org_directions, msglist = self._executor.execute(inspector, merge=False)
             reduction_group_list.append(reduction_group)
 
             # update org_directions_dict for only new keys in org_directions
@@ -194,94 +202,20 @@ class SerialSDImportData(importdata.ImportData):
                                         org_directions=org_directions_dict)
 
         myresults.origin = results.origin
+        myresults.msglist = msglist
         return myresults
+
+    def _get_fluxes(self, context, observing_run):
+        # override _get_fluxes not to create flux.csv (PIPE-1846)
+        # do nothing, return empty results
+        return None, [], None
 
 
 # Tier-0 parallelization
-class HpcSDImportDataInputs(SDImportDataInputs):
-    """SDImportDataInputs class for parallelization."""
-
-    # use common implementation for parallel inputs argument
-    parallel = sessionutils.parallel_inputs_impl()
-
-    def __init__(self,
-                 context: Context,
-                 vis: Optional[List[str]]=None,
-                 output_dir: Optional[str]=None,
-                 asis: Optional[str]=None,
-                 process_caldevice: Optional[bool]=None,
-                 session: Optional[List[str]]=None,
-                 overwrite: Optional[bool]=None,
-                 nocopy: Optional[bool]=None,
-                 bdfflags: Optional[bool]=None,
-                 save_flagonline: Optional[bool]=None,
-                 lazy: Optional[bool]=None,
-                 with_pointing_correction: Optional[bool]=None,
-                 createmms: Optional[str]=None,
-                 ocorr_mode: Optional[str]=None,
-                 hm_rasterscan: Optional[str]=None,
-                 parallel: Optional[property]=None):
-        """
-        Initialise HpcSDImportDataInputs class. Arguments are same with SDImportDataInputs.
-
-        Args:
-            context: pipeline context
-            vis: List of input visibility data
-            output_dir: path of output directory
-            asis: Extra ASDM tables to convert as is
-            process_caldevice: Import the caldevice table from the ASDM
-            session: List of visibility data sessions
-            overwrite: Overwrite existing files on import
-            nocopy: Disable copying of MS to working directory
-            bdfflags: Apply BDF flags on import
-            save_flagonline: Save flag commands, flagging template, imaging targets, to text files
-            lazy: use the lazy filler to import data
-            with_pointing_correction: Apply pointing correction to DIRECTION
-            createmms: Create an MMS
-            ocorr_mode: Correlation data mode
-            hm_rasterscan: Heuristics method for raster scan analysis
-            parallel: Parallel execution or not
-        """
-        super(HpcSDImportDataInputs, self).__init__(context, vis=vis, output_dir=output_dir, asis=asis,
-                                                    process_caldevice=process_caldevice, session=session,
-                                                    overwrite=overwrite, nocopy=nocopy, bdfflags=bdfflags, lazy=lazy,
-                                                    save_flagonline=save_flagonline,
-                                                    with_pointing_correction=with_pointing_correction,
-                                                    createmms=createmms, ocorr_mode=ocorr_mode,
-                                                    hm_rasterscan=hm_rasterscan)
-        self.parallel = parallel
-
-
 @task_registry.set_equivalent_casa_task('hsd_importdata')
 @task_registry.set_casa_commands_comment('If required, ASDMs are converted to MeasurementSets.')
-class HpcSDImportData(sessionutils.ParallelTemplate):
+class SDImportData(sessionutils.ParallelTemplate):
     """SDImportData class for parallelization."""
 
-    Inputs = HpcSDImportDataInputs
+    Inputs = SDImportDataInputs
     Task = SerialSDImportData
-
-    def __init__(self, inputs: HpcSDImportDataInputs):
-        """Initialize HpcSDImportData class.
-
-        Args:
-            inputs: HpcSDImportDataInputs
-        """
-        super(HpcSDImportData, self).__init__(inputs)
-
-    @basetask.result_finaliser
-    def get_result_for_exception(self, vis, exception) -> basetask.FailedTaskResults:
-        """Return result when exception occured on pararellization.
-
-        Args:
-            vis: List of input visibility data
-            exception: Exception occured
-        Return:
-            basetask.FailedTaskResults: a results object with exception rised.
-        """
-        LOG.error('Error importing {!s}'.format(os.path.basename(vis)))
-        LOG.error('{0}({1})'.format(exception.__class__.__name__, str(exception)))
-        import traceback
-        tb = traceback.format_exc()
-        if tb.startswith('None'):
-            tb = '{0}({1})'.format(exception.__class__.__name__, str(exception))
-        return basetask.FailedTaskResults(self.__class__, exception, tb)

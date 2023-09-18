@@ -470,7 +470,7 @@ class LowgainflagView(object):
 
                     # Initialize arrays for flagging view.
                     data = np.zeros([nants, len(scans)])
-                    flag = np.ones([nants, len(scans)], np.bool)
+                    flag = np.ones([nants, len(scans)], bool)
 
                     for row in gtable.rows:
                         ant = row.get('ANTENNA1')

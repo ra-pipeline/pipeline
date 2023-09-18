@@ -215,7 +215,7 @@ class AtmHeuristics(object):
         spw_ids = np.array([spw.id for spw in self.science_spws])
 
         for ispw, spw in enumerate(self.science_spws):
-            metric[ispw] = np.float(np.sqrt(spw.bandwidth.to_units(measures.FrequencyUnits.GIGAHERTZ))) * \
+            metric[ispw] = float(np.sqrt(spw.bandwidth.to_units(measures.FrequencyUnits.GIGAHERTZ))) * \
                            np.exp(-1.0 * np.median(self.opacities[spw.id].data))
 
         result = spw_ids[np.argsort(metric)[::-1]]
@@ -267,7 +267,7 @@ class AtmHeuristics(object):
         # a valid median Tsys is available.
         for ispw, spw in enumerate(self.science_spws):
             if np.isfinite(median_tsys[spw.id]):
-                metric[ispw] = np.float(np.sqrt(spw.bandwidth.to_units(measures.FrequencyUnits.MEGAHERTZ))) / \
+                metric[ispw] = float(np.sqrt(spw.bandwidth.to_units(measures.FrequencyUnits.MEGAHERTZ))) / \
                                median_tsys[spw.id]
 
         # Sort spws by highest to lowest metric; convert to list of strings.

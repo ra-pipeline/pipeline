@@ -30,7 +30,7 @@ class MakeImagesInputs(vdp.StandardInputs):
     hm_dogrowprune = vdp.VisDependentProperty(default=None)
     hm_growiterations = vdp.VisDependentProperty(default=-999)
     hm_lownoisethreshold = vdp.VisDependentProperty(default=-999.0)
-    hm_masking = vdp.VisDependentProperty(default='auto')
+    hm_masking = vdp.VisDependentProperty(default=None)
     hm_minbeamfrac = vdp.VisDependentProperty(default=-999.0)
     hm_minpercentchange = vdp.VisDependentProperty(default=-999.0)
     hm_minpsffraction = vdp.VisDependentProperty(default=-999.0)
@@ -209,10 +209,13 @@ class MakeImages(basetask.StandardTaskTemplate):
         return False
 
     def _get_image_rms_as_sensitivity(self, result, target, heuristics):
+        if not result.image:
+            return None
+
         extension = 'tt0.' if result.multiterm else '' # Needed when nterms=2, see PIPE-1361
         # the tt0 needs to be inserted before the ending ".pbcor" in the image name
         index = result.image.find('pbcor')
-        imname = result.image[:index] + extension + result.image[index:] 
+        imname = result.image[:index] + extension + result.image[index:]
 
         if not os.path.exists(imname):
             return None
@@ -258,7 +261,9 @@ class MakeImages(basetask.StandardTaskTemplate):
                            uvtaper=target['uvtaper'],
                            sensitivity=cqa.quantity(result.image_rms, 'Jy/beam'),
                            pbcor_image_min=cqa.quantity(result.image_min, 'Jy/beam'),
-                           pbcor_image_max=cqa.quantity(result.image_max, 'Jy/beam'))
+                           pbcor_image_max=cqa.quantity(result.image_max, 'Jy/beam'),
+                           imagename=result.image.replace('.pbcor', ''),
+                           datatype=result.datatype)
 
 
 class CleanTaskFactory(object):
@@ -306,6 +311,15 @@ class CleanTaskFactory(object):
         is_cal_image = 'TARGET' not in target['intent']
 
         is_tier0_job = is_mpi_ready and is_cal_image
+        # PIPE-1923 asks to temporarily turn off Tier-0 mode for
+        # POLARIZATION intent when imaging IQUV because of a
+        # potential CASA bug. This should be undone when this
+        # bug is fixed.
+        if target['intent'] == 'POLARIZATION' and target['stokes'] == 'IQUV':
+            is_tier0_job = False
+            if is_mpi_ready:
+                LOG.info('Temporarily turning off Tier-0 parallelization for Stokes IQUV polarization calibrator imaging (PIPE-1923).')
+
         parallel_wanted = mpihelpers.parse_mpi_input_parameter(self.__inputs.parallel)
 
         # PIPE-1401: turn on the tier0 parallelization for individuals planes in the VLASS coarse cube imaging
@@ -379,12 +393,11 @@ class CleanTaskFactory(object):
             task_args['gridder'] = image_heuristics.gridder(
                     task_args['intent'], task_args['field'])
 
-        if inputs.hm_masking == '':
+        if inputs.hm_masking in (None, ''):
             if 'TARGET' in task_args['intent']:
-                # For the time being the target imaging uses the
-                # inner quarter. Other methods will be made available
-                # later.
                 task_args['hm_masking'] = 'auto'
+            elif task_args['intent'] == 'POLARIZATION' and task_args['stokes'] == 'IQUV':
+                task_args['hm_masking'] = 'centralregion'
             else:
                 task_args['hm_masking'] = 'auto'
         else:
@@ -437,10 +450,15 @@ class CleanTaskFactory(object):
 
 
 def _get_description_map(intent):
-    if intent in ('PHASE', 'BANDPASS', 'AMPLITUDE', 'POLARIZATION', 'POLANGLE', 'POLLEAKAGE'):
+    if intent in ('PHASE', 'BANDPASS', 'AMPLITUDE'):
         return {
             'mfs': 'Make calibrator images',
             'cont': 'Make calibrator images'
+        }
+    elif intent in ('POLARIZATION', 'POLANGLE', 'POLLEAKAGE'):
+        return {
+            'mfs': 'Make polarization calibrator images',
+            'cont': 'Make polarization calibrator images'
         }
     elif intent == 'CHECK':
         return {
@@ -459,10 +477,15 @@ def _get_description_map(intent):
         return {}
 
 def _get_sidebar_map(intent):
-    if intent in ('PHASE', 'BANDPASS', 'AMPLITUDE', 'AMPLITUDE', 'POLARIZATION', 'POLANGLE', 'POLLEAKAGE'):
+    if intent in ('PHASE', 'BANDPASS', 'AMPLITUDE'):
         return {
             'mfs': 'cals',
             'cont': 'cals'
+        }
+    elif intent in ('POLARIZATION', 'POLANGLE', 'POLLEAKAGE'):
+        return {
+            'mfs': 'pol',
+            'cont': 'pol'
         }
     elif intent == 'CHECK':
         return {

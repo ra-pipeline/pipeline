@@ -41,7 +41,7 @@ class ImageParamsHeuristicsALMAScal(ImageParamsHeuristicsALMA):
 
     def is_selfcal_iteration(self, iteration):
         """"Determine if we need to start the selfcal-solint inner-iteration sequence.
-        
+
         In the selfcal imaging sequence.
         iter1: initial image: unselfcal imageing
         iter2: i.e. the selfcal lopp

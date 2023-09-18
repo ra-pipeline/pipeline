@@ -274,11 +274,11 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
         # Calculate Grid index for each position
         igrid_ra_corr = 1.0 / grid_ra_corr
         igrid_dec = 1.0 / grid_dec
-        index_ra = numpy.array((ras - min_ra) * igrid_ra_corr, dtype=numpy.int)
-        index_dec = numpy.array((decs - min_dec) * igrid_dec, dtype=numpy.int)
+        index_ra = numpy.array((ras - min_ra) * igrid_ra_corr, dtype=int)
+        index_dec = numpy.array((decs - min_dec) * igrid_dec, dtype=int)
 
         # Counter for distributing spectrum into several planes (nplane)
-        counter = numpy.zeros((ngrid_ra, ngrid_dec), dtype=numpy.int)
+        counter = numpy.zeros((ngrid_ra, ngrid_dec), dtype=int)
 
         # Make lists to store indexes for combine spectrum
         nplane = self.inputs.nplane
@@ -425,10 +425,10 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
         LOG.debug('sorted bind_to_grid=%s', bind_to_grid)
 
         # create storage for output
-        StorageOut = numpy.zeros((nrow, nchan), dtype=numpy.complex)
+        StorageOut = numpy.zeros((nrow, nchan), dtype=complex)
         StorageWeight = numpy.zeros((nrow, nchan), dtype=numpy.float32)
-        StorageNumSp = numpy.zeros((nrow), dtype=numpy.int)
-        StorageNumFlag = numpy.zeros((nrow), dtype=numpy.int)
+        StorageNumSp = numpy.zeros((nrow), dtype=int)
+        StorageNumFlag = numpy.zeros((nrow), dtype=int)
         OutputTable = []
 
         # Return empty result if all the spectra are flagged out

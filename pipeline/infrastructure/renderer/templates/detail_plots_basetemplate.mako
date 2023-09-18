@@ -47,7 +47,9 @@ SELECT2_LABEL = {'vis': 'Measurement Set',
                  'intent' : 'Observing intent filter',
                  'type' : 'Type filter',
                  'status': 'Status filter',
-                 'model': 'Model filter'}
+                 'model': 'Model filter',
+                 'moment': 'Moment filter',
+                 'chans': 'Channel selection filter'}
 
 SELECT2_PLACEHOLDER = {'vis': 'Show all measurement sets',
                        'spw' : 'Show all spectral windows',
@@ -60,7 +62,9 @@ SELECT2_PLACEHOLDER = {'vis': 'Show all measurement sets',
                        'intent' : 'Show all observing intents',
                        'type' : 'Show all types',
                        'status': 'Show all status',
-                       'model': 'Show all models'}
+                       'model': 'Show all models',
+                       'moment': 'Show all moments',
+                       'chans': 'Show all channel selections'}
 
 def get_options(selector, plots):
     try:

@@ -67,11 +67,21 @@ combination whose conversion factor is in each bin.
 <div class="clearfix"></div><!--  flush plots, break to next row -->
 
 <h3>Jy/K Conversion Factors</h3>
-The following table lists the Jy/K factor.
-% if reffile is not None and len(reffile) > 0 and os.path.exists(os.path.join(stage_dir, os.path.basename(reffile))):
-Input file is <a class="replace-pre" href="${os.path.relpath(reffile, pcontext.report_dir)}">${os.path.basename(reffile)}</a>.
+The following table lists the Jy/K factors.
+% if reffile_list is not None:
+    Parameters can be found in:
+    % for idx, reffile in enumerate(reffile_list):
+        % if reffile is not None and len(reffile) > 0 and os.path.exists(os.path.join(stage_dir, os.path.basename(reffile))):
+            <a class="replace-pre" href="${os.path.relpath(reffile, pcontext.report_dir)}">${os.path.basename(reffile)}</a>
+            % if idx < len(reffile_list)-1:
+                ,
+            % else:
+                .
+            % endif
+        % endif
+    % endfor
 % else:
-No Jy/K factors file is specified. 
+    No Jy/K factors file is specified. 
 % endif
 <table class="table table-bordered table-striped" summary="Jy/K factors">
     <thead>

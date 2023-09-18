@@ -1,9 +1,3 @@
-# Version 1.0 - LM - 04 June 2021 - Official delivered script to JAO
-
-# if changing version remember to set self.RNversion
-# pre-release version history written below
-
-
 ########################################################################
 # almarenorm.py
 #
@@ -19,8 +13,7 @@
 #  
 #  sys.path.append(os.getcwd())  
 #  from almarenorm import *    # import 
-#  RN=ACreNorm(<msname>)       # create ACreNorm tool (NB this is
-#                                 _not_ an ordinary CASA tool)
+#  RN=ACreNorm(<msname>)       # create ACreNorm tool 
 #
 ### To examine Tsys spectra for spurious lines - BY EYE:
 #
@@ -55,339 +48,14 @@
 #
 #  RN.renormalize(docorr=True)
 #  
-#
-### Options for the renormalize code
-#  spws=[]  - to manually set only certain SPW to be analysed and/or corrected
-#  targscans=[]  - to manually set only certain scans to be analysed and/or corrected
-#  nfit=5  - polynomial fit to the AC to flatten the 'baseline' of the scaling 'spectrum'
-#  bwthresh=120e6  - bandwidth at which to segment a SPW into chunks to fit separately
-#                   Luke's default for ALMA-IMF 120e6 - and works well in disctibuted checker version
-#                   George's default 64e6 - to fit out problem ATM lines in earlier versions
-#                   by having smaller SPW chunks and when used on FAUST data 
-#                   (Luke has since coded in a ATM fix)
-#  bwdiv= 'odd'  -  options are: (i) bwdiv=None (George's default), i.e. power of 2, can split lines and
-#                   sometimes make a discontinuity if poor fits occur
-#                   (ii) bwdiv ='odd' (Luke's default) chooses an odd value of nseg 
-#                    to divide the SPW (if SPW_BW > bwthresh) - as lines are usually SPW central
-#                    checks if the remainded channels of the SPW are masked within the edges
-#                    else defaults to (i)
-#                    (iii) bwdiv = int, forces nseg=bwdiv, provided dNchan = nchan/nseg is int, or if 
-#                   not the remainder channel number is within the masked edge channels - else defaults to (i) 
-#  bwthreshspw ={} - added a dict option to allow the specific input of bwthresh 
-#                    for specific SPWs, due to needing potentially different 'nsegments' when 
-#                    EBs have very different SPW bandwidths - may not be required since May 2021
-#                    version - this was work around as ATM windows needed small bwthresh 
-#                    to provide a better correction - but Luke now coded ATMs 
-#                    to be handled better 
-#                    input as e.g. {'22':200e6}
-#  docorr=False   - apply or not the correction (False/True)
-#                    True will check the MS file to see if there was HISTORY noting the 
-#                    renormalization was already applied - blocks a double application
-#  excludespws=[]  - manually exclude SPWs from the automatic SPW list
-#  excludeants=[]  - Antennas to excluded - i.e. sets their scaling to 1.0 (no application)
-#                    intended use if these antennas are not in the interferometric data
-#                    or are miss-behaved in their AutoCorr and might need to be considered
-#                    for flagging in the interferometric data
-#  excludechan={}  - Dictionary input set these channels to unity - pre May 2021
-#                    this was required for excluding the strong
-#                    ATM features that do not fit out well over peak transition 
-#                    and these channels were incorrectly ascribed a scaling value
-#                    - input as strings, e.g. excludechan={'22':'100~150'}
-#  fthresh=0.01  - thereshold to show alarm trigger '***' in the verbose output and log
-#                   Luke's default 0.01 conforms to 1% scaling, George's was 0.001 (0.1%) 
-#  datacolumn='CORRECTED_DATA'  - data column which will have the application applied
-#                    - if the code is run post calibration CORRECTED_DATA should be used
-#                       and the renormalize process will also take advantaged ignoring
-#                      autocorrelations assosicated with flagged interferometric data
-#                   - if the code is run pre-calibration DATA could be used
-#                     but the code may show some strange plots for 'bad' antennas
-#                     if they have problemetic AutoCorrelation spectra - for which 
-#                    the flags are NOT assessed
-#  fixOutliers=True    - use heurisitcs to check antennas in case of outlier scaling values and make
-#                  a channel by channel assessment and correct the antenna in question - 
-#                  will replace probelm channels or for very bad antennas it will
-#                  replace the antennas spectrum with a median spectrum that is representative 
-#  mededge=0.01  - option to set 1.0% of edge channels to 1.0 scaling - i.e. stop edge effects
-#                   typcially FDM edges are usually very well behaved
-#  excflagged=True  - exclude flagged antennas, reads Cross-Corr (XC) flag tables 
-#                     per SPW, per Scan, per Field and excludes antennas (set them to scaling 
-#                     1.0) if it is fully flagged in the interferometric data. 
-#                      Useful as usually the PL calibration flagged bad
-#                     antennas and these should not be included in the scaling process
-#  diagspectra=True  - plot extra diagnostic spectra, made a scaling spectra plot 
-#                      for each SPW, scan, field. Both XX and YY and all ants on same plot
-#                      and the respective median representative spectra
-# usePhaseAC = False   - use phase cal AC instead of bandpass - usually Phase cal can be
-#                     contaminated too, so BP default is best
-# plotATM = True     - if diagnostic spectra plots are made, plot also the ATM
-#                     transmission profile
-# correctATM = False - use the ATM model transmission profiles to try correct for
-#                      any ATM residual features that get into the scaling spectra
-# limATM = 0.85      - only action on correctATM if the ATM transmission at any point
-#                      drops below this value, otherwise the are no 'deep' ATM features 
-#                      to try to correct
-# docorrThresh = None - left a None by default will use the ALMA set 1.02 (2%) threshold
-#                     for application. I.e. if docorr=True only fields in SPW where 
-#                      peak scaling >1.02 will be corrected. Input a float to overwrite 
-#                     the default values B9 and B10 are set to 1.5 
-# verbose = False    - write to terminal all output blurb, this is anyway in a log file
-#
 ## Close the ACreNorm tool (detaches from MS, etc.)
 #
 #  RN.close()
 #
-######## VERSION REVISIONS ################
-#
-# Note a number of esits by Luke were interactive testing
-# and have been superseeded in later versions. Effort 
-# has been made to indicate this in the revision list
-# for information purposes
-#
-# gmoellen (2020Sep24,2020Aug19,2020Sep16)
-# gmoellen (2020Nov16: in plotRelTsysSpectra(): return line channel lists in dict,
-#                      segment wide FDM Tsys spws, and use nfit=5)
-# LM added (2020Dec17: a loop over fields, within the scan loop, all fuctions added with field
-#                   read now, if field is None, defaults to data query without specifiying the 
-#                   field - e.g. getting the Bandpass does not provide a field
-# LM added (2021Jan13: SUPERSEEDED check for outlier antennas (peak scaling >5x the median pk scaing - from 
-#                   all ants - as the casalog.post out show. casalog.post info about outliers and set
-#                   the 'bad' channels to the median of that antenna - if 'dofix=True' 
-#                    (CHANGED NAME 31 May 2021) in renormalize
-# LM added (2021Jan14:{i}  edge channels in AC can trigger outlier ant code, set 1% edge of bandwidth
-#                    to the median scaling value for that antenna - if 'mededge=True' in renormalize
-#                    new funtion -- calcSetEdge -- (SUPERSEEDED, mededge is now a value 2021May21)
-#                    {ii} check in function -- getACdata -- to see if 'd' (DATA) is filled - otherwise returns 'None'
-#                    some ALMA-IMF data are aborted so some fields are empty, these are now ignored 
-# LM added (2021Jan19:- exclude antenna manual input option - input a list of strings e.g. ['DA59, DA60']
-#                     or IDs [0,1] in the new parameter 'excludeants=[]' to permanantly set that 
-#                      scaling to 1.0 for all SPW, scans, fields.
-# LM added (2021Jan21:- {i} within the spw, scan, field loop get the cross-corr (XC) flags and find
-#                      antennas that are _fully_ flagged and exclude them by setting scaling to 1.0 
-#                      new function -- getXCflags -- returns antenna ID list 
-#                      {ii} SUPERSEEDED Edited outlier check, finds now per spw, per scan, per field the ants >5x
-#                      mean of all ant peaks, and any where -ve are < 10*MAD from 1.0. The MAD is the 
-#                      median value of the MADs of all antennas. 
-#                      {iii} SUPERSEEDED checking and clipping of the outlier antennas occurs with 'dofix=True'.
-#                      If outliers (Ant/Median Scaing spectrum) are >7.5 MAD they are (a) set to the Median
-#                      scaling of the antenna in question, (b) if >5% of Bandwidth is flagged, and
-#                      only one corellation is effected, we set the problematic corr. to the good corr.
-#                      (c) if both corr. are effected and flags >5% we set both to the median correction 
-#                      spectrum generated from all antennas - function is calcFixReNorm - and will make plots
-# LM added (2021Feb01:- SUPESEEDED 
-#                       {i} further refinement to outlier triggering code 2x max peak, 2x min peak (from 1.0)
-#                       only occurs if dofix is True now otherwise follows origional code, no antenna checking
-#                       {ii} refinement of clipping code. Min threshold is max of(1.0025,10*MAD) 
-#                           assessment thereafter .....
-#                       {iii} made odd/even check for nseg=2 fits as lines in middle of SPW can cause an issue
-#                       {iv} in comparing XX and YY median spectra difference has to be >10% to find 
-#                        if there is a birdie in one (i.e. all ants of a given correcation) or not 
-#                        - otherwise was triggering when strong lines (CO) differered by more than previous
-#                       limit of 10*MAD. (NB this is not the ant clipping just quality check of median spectra)
-# LM added (2021Feb02:- For outlier ant plots create a known list, refer to it for low amp (1-2% scalings) and
-#                       /or low number changed channels and don't remake a plot if not needed.
-#                       - added clause if >10 consequitive channels do replacment of correlation
-#
-# LM RUNNING VERSION 03 FEB 2021 # - ALMA-IMF delviered 7 B3, and 2 B6 - retracted Band 6 due to discontinuity 
-#                                 # issue noted as above odd/even check, changes as below to correct
-#                                 # In running ALMA-IMF use bwthresh=120e6 and new option bwdiv= 3 for Band 6 data 
-#                                 ### THIS HAS NOW BEEN FURTHER SUPERSEEDED -  18th FEB
-#
-# LM added (2021Feb09: - SUPERSEEDED input option for calcChanRanges to be any multiple. Previous fixed as power of 2
-#                       to break the SPWs into segments, this caused issues for lines in the middle of SPW
-#                       with complex structures (inc abs features). Now use option of a multiple, ie. 3
-#                      - slight logic changes for replacing channels, for 'almost' continous regions
-#                        treat as continous due to piece-meal channel replacements occuring
-#                      - added median plots for all scans/fields for checking
-# LM added (2021Feb16: -  SUPERSEEDED Changed the outlier ant check to be inside a function, cleaner main code
-#                        and changed to do a simple median ant check - this is required as 2x peak
-#                        can totally miss any outlier ant that have a large peak scaling of many %
-#                        but where 'non-scaled' region could miss-behave and have spikes/jumps/noise
-#                      - simply, per ant, divide by median spectrum to see if any are "different"
-#                      - set baseline threshold for testing outlier channels to 1.025 (0.25%) 
-#                        which is usually notably more than 10*MAD for the antenna spec / median spec
-#                        and only for 'line' free segments of the bandwidth
-#                      - SUPERSEEDED  added plotMedian - to plot the per spw, per scan, per field scaling
-#                         spectra for assessment as defualt - forward look to Pipeline integration/style plots
-# LM added (2021Feb18: - adjustments to calcChanRange again, options are: (i) George's default, i.e. power of 2;
-#                        (ii) bwdiv ='odd' chooses an odd value of nseg (if SPW_BW > bwthresh) that given dNchan
-#                        per nseg as an integer value, or if not edge channel remainder is low and classed as 
-#                        edges and set to zero, else default to (i); (iii) bwdiv = int, forces nseg=bwdiv, provided
-#                        dNchan = nchan/nseg is int, of if with remainder chans that fall to the edge set 
-#                        to ~1.0, else defaults to (i) 
-# LM added (2021Feb23: - simple check of the comparions median spectrum to check for birdies, i.e if the 
-#                        difference of a channel to med(nch-3:nch+2) is more than max(0.5*pk_val,0.0025) different,
-#                        this behaves better than previous comparions of XX and YY 
-#                       - ATM lines excluded by means of 'excludechan={}' option
-# LM added (2021Feb26:  - nch-2:nch+3, this is correct for middle value analysis
-# LM added (2021Mar04:  - Script tidying and running version for most of ALMA-IMF data
-#                        plotMedian plots now called plotdiagSpectra, need to set 
-#                        diagspectra=True in renormalize call
-# LM added (2021Mar26:   - fix of XX-YY replacement logic - no XX was getting the median as YY wrong assesment 
-#                         spotted only in case where YY was actually bad too
-#                        - fixed that median assessment will not use the flagged antennas
-#                         (i.e. those set to 1.0),as if more than half ants are flagged (ACA data)
-#                          the median spectrum could have been incorrectly set to 1.0 - use only unflagged ants now
-# LM added (2021Mar30    - fix the plotSpectra to use nanmean to account for flagged ants set to scaling 1.0
-#                        - added logic before fitting rnstats['N'] to not include flagged ants
-#                          which are set to one, into otherwise good scans. If all scans for an 
-#                          antenna are set to 1.0 (i.e. a flagged ant) then that antenna
-#                          will have rnstats['N'] of 1.0, otherwise only uses values !=1.0 
-# LM added (2021Apr8    -  log file introduced which will fill a log per run and per EB
-#                       - verbose option to provide a 'minimal' terminal output if False
-#                         or more details when True
-#                       - added bwthreshspw as a dict to all specification of bwthresh for
-#                         a particular SPW, in case width to break for nseg needs to be changed
-#                         and separate SPW with and without ATM that need more segs to fit 'better'
-#
-# LM note - running remaining ALMA-IMF QA3 with this code, and ALMA-IMF pilot projects (new QA3)
-#           ATM line still needs manually setting to 1.0 to not incorrectly flag
-#           new development will fix this
-#
-# LM added (2021Apr21)  - added usePhaseAC option to instead use the AutoCorr of the phasecal preceeding the target scan
-#                         rather than the Bandpass source - closers in Eleveation/airmass, making ATM less of a problem
-#                         PROBLEM - if the Phase cal has any emission (usually CO) then it's AutoCorr
-#                         is contaminated and so the phase cal cannot be used for doing renormalization - 
-#                         *** deemed not good to use by default (discussion with Bill, Baltasar, Antonio, Myself)
-#                             use the bandpass always as default as it is 99.9% a clean AutoCorr
-#                       - titlein option in plotSpectra will pre-pend this text as a title name if needed
-#                         and so the summary spectra plot can easily be identified for large archive data checks
-#
-# CHECKVERION of code was spun off here - with most of extra plots 'off' and this was used for checking all 
-#             ALMA archive data - no majot fails/crashes were noted/reported on possibly problatic data
-#             e.g. spectral scans, full-pol, multi-spectra and multi field
-#             - note most of Luke's plots/heuristics deal only with dual pol data
-#
-#
-# LM added (2021May21) - edited mededge option to read the actual value of the edge to flag, no longer
-#                        true/false, now 0.01 represents flagging of 1% of edge channels of the SPW
-#                        and is the default
-#                      - Misc code function and plot name changes. Plots and log all have 'ReNorm' in the name
-#                      - added function "unityAC" which is triggered if 'editAC' option in renormalization code
-#                        is set to true. If this is run, after application of the ReNorm with docorr=True the
-#                        AutoCorr of all fields are overwritten with a value of 1.0. This means any
-#                        subsequent run of the ReNorm code, will not find any scaling 
-#
-#                       *** PLWG wanted a second run to possibly return no scaling plots _IF_ the 
-#                         renorm correction was already made previously- however later discussion with PLWG
-#                         indicated that it is not good practice however to change the AutoCorr like 
-#                         this to achieve the aim of a 'non-scaling' plot -  so by default editAC=False,
-#                         and new code (below) will simply add a history comment that can be dealt with to just
-#                         not re-run any correction again - but plots can still be made if docorr=False ***  
-#
-# LM added (2021May23   - ATM function ATMtrans to get ATM transmission profile using the attool - credits
-#                        also to T.Hunter as I borrowed code extracted from analysisUtils and plotbandpass3 when
-#                        needed - this function make the almarenorm.py dependent on the analysisUtils
-# LM added (2021May25)  - ATM transmission line included as plot option for the Tsys spectra (getRelTsysSpectra),
-#                        diagnostic spectra (plotdiagSpectra), and summary spectra (plotSpectra) - these are
-#                        True by default - code will get ATM profiles where required from ATMtrans
-# LM added (2021May26)  - History write (recordApply) and read functionality (checkApply), so that
-#                        once the ReNorm was applied with docorr=True
-#                        a history notification is written, which is always read upon any run of the code with
-#                        docorr=True and which will stop and present a warning as it will NOT re-apply the correction 
-# LM added (2021May27) - function ATMcorrection which corrects the divided AutoCorr spectra by the 
-#                        ratio of the Target and Bandpass (or phasecal) ATM model profiles.
-#                       - added options to renormalize function "correctATM" and "limATM"
-#                       - correctATM = False (Luke's default as DRs should set to True) -
-#                         Luke has tested True on ALMA-IMF data and it makes a reasonable correction.
-#                          this makes the ATMcorrection
-#                         by:
-#                         (i) first setting the divided AutoCorr spectra (Tar_AC/BP_AC) to its median value
-#                         which makes the first overall average baseline fit and sets baseline to ~1.0 
-#                         (this is actually similar to the initial process George uses in the fitting
-#                         of the scaling spectrum)
-#                         (ii) doing a ratio of the ATM profiles for the target and BP, and also setting the
-#                         baseline to a median value, i.e. ~1.0.
-#                         WHY: the action of this baselining to ~1.0 means that when the divided scaling
-#                         spectrum is corrected (i.e. multiplied) by the ATM ratio spectrum, then 
-#                         most of the values are actually ~1.0 away from strong ATM lines - i.e no effect, only 
-#                         regions where deeper ATM profiles (lower transmission) sometimes differ 
-#                         noticably between the target(s) and the Bandpass source - due to airmass differnces 
-#                         (i.e. elevation) - which is what we want to correct as otherwise the renorm process
-#                         cannot fit-out residual ATM lines differnces, and so incorrectly attributes a scaling
-#                         value to them - which must NOT be applied
-#                        -limATM = 0.85 (Luke's default based on XYZ), after getting the ATM transmission profiles
-#                         and if correctATM=True, then the code will only actually attempt the correction if
-#                         ATM transmission in the SPW drops below 0.8 (i.e. 80% transmission) at which point
-#                         the correction is made by the multiplication of the ratio of ATM profiles described
-#                         above
-#                        - added start and end CASA log message to track run-time as well as edit to ReNorm log
-#
-# LMadded (2021May28)  - functionality where band is obtained for the data RN.Band
-#                      - RN.bandThresh are set as the hard coded determined thresholds above which 
-#                        data are to be corrected - per Band
-#                      - docorrThresh=None in renormalize finds the threshold from the above, or
-#                        can be a user defined float, as a fraction, e.g. 1.05 which the peak scaling
-#                        has to be for a correction to be applied, even if docorr=True, i.e.
-#                        we only correct fields that need correction per SPW
-#                      - added functionaility at end of renormalize function that checks the 
-#                        dictionary RN.docorrApply (if docorr=True) to see (per spw) if
-#                        the field will be correced or not. If the dict is empty the 
-#                        peak scaling of that field is checked against the threhsold to 
-#                        initiate the dictionary
-# LMadded (2021May31)  - edited inside the ATMtrans function to ...
-#                      - changed 'dofix' option for outlier antennas to 'fixOutliers'
-# LMadded (2021June02) - edited to make the entire code (mainly ATMtrans profile function)
-#                        totally independent to the analysis utilities
-#                        otherwise this cannot run in PL, and users would also have to 
-#                        download and install aU for a 'simple' restore.
-#                        This uses a bunch of copied/modified code from Todd Hunter's aU.
-# LMadded (2021June03) - Final scaling per spw, scan, field is stored in class variable 
-#                        self.scalingValues
-#                      - Made ATM plot axis label, number work in CASA6
-# LMadded (2021June08)  - nan output warning when all data in interferometric are flagged
-#                        and we set to 1.0 and then a nan mask to get a true
-#                        median creates warnings if all scaling values are 1.0
-#                      - stopped overall mean, and medians returning nan in these cases
-#                       from nanmean, nanmedian in renormalize code 
-#
-# ALadded (2021June18) - Edits for PIPE-1168 for plotting in frequency, turning off antenna
-#                       diagnostic plots, plotting into a subdirectory, plotting by spectral
-#                       window instead of subplots for plotSpectra(), creation of a dictionary
-#                       for PL purposes (self.rnpipestats).
-#
-# ALadded (2021July20) - Considerable changes from last update. Please see PIPE-1179 for the epic
-#                        which is tracking all the tickets/changes related to this. To summarize
-#                        the changes: high frequency (B9/10) data now properly shows image sideband
-#                        (PIPE-1188), single and full polarization properly handled (PIPE-1180),
-#                        PDF creation of all plots (PIPE-1168), misc fixes including plot improvements
-#                        (PIPE-1175), consistent application across all fields of sources (PIPE-1176),
-#                        changes to number of divisions to improve fitting. Additionally, random
-#                        fixes mostly due to new implementation.
-# 
-########################################################################
-# LM final version provided to JAO - 04 JUNE 2021
 ########################################################################
 #
-# LM notes for future development - from some discussion with PLWG 
+#  Notes for future development - from some discussion with PLWG 
 #
-# - log messages now are going to a standalone log - these could be changed
-#   to casa log messages (and write optional separate log if requested?)
-#   * currently have a start and end casa log message only
-#
-# - ATM correction could add more 'intelligence' to flag or rather exclude
-#   (set to 1.0) the scaling where the line is 'deepest' as it is
-#   unavoidable that there will be residual 'incorrect' scaling
-#   in some data where ATM are present in the same SPW as the 
-#   astronomical line we are trying to correct
-#  *** needs discussion & testing *** 
-#
-# - ATM recognition of the SPW and then will automatically increase
-#   nseg, for the SPW segmenting for the fitting, as this is a good
-#   way to counteract (fit-out) the ATM line, even after it was accounted
-#   for by ATMcorrection (correctATM=True). A caveat is that if astronomical
-#   lines are broad tend to also get fitted-out which is not the intention
-#   usually nseg is small enough so one segment fully covers the 
-#   astronomical line and only fits its baseline
-#  *** needs discussion & testing ***
-#
-# - Make work on full Polarization data - i.e. plots/heuristics
-#   are assuming dual corr [xx,yy] now 
-#
-# - Multi-spectra specs are not tested explicitly - in theory should `work'
-#   
-# - might names to change in plots for PL harvesting
-#
-# - useful CASA log messages or returns for PL harvesting
 #
 # - PLWG might want some information to store in MS keywords
 #
@@ -400,29 +68,6 @@
 #   cumulative average and takes all fields - even this could be 
 #   split out into a per field basis
 #
-# - Active changing of how to divide up SPWs for the fitting process
-#   more dependent on the bandwidth 
-#   - LM note - 
-#   typcially this is relatively insensitive except:
-#          -- George used a small value in bwthresh 64e6 as this better
-#            fits-out residual ATM profiles in scaling spectra - 
-#             especially for FAUST data
-#          -- Luke coded an option to set specific 'bothersome'
-#             SPWs to different divides as to possibly better
-#            fit those with ATM profiles (divide into more nseg chunks
-#            so the profile is traced and fitted), or those with respectively
-#            broad astronomical lines (i.e. less nseg chunks where CO
-#            was so broad the line was broken-up in fitting and 
-#            divergence or breaks could be seen - a wider bwthresh
-#            allows baseline values at either side of the wide line)
-#  however, since May an ATM correction is applied before the fitting which 
-#  uses model ATM profiles to remove any residual differences in 
-#  the scaling spectra before fitting cause by ATM transmission difference
-#  between the Target and Bandpass. Thus fitting now using a default of 
-#  120e6 (Luke's value) basically works most data without issue (CONFIRM)
-#
-# - Checking of current heuristic method, i.e. how 'outlier' ants are 
-#   currently replaced - maybe more efficent/effective method ? 
 #
 #########################################################################
 
@@ -431,6 +76,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 import os
 from math import *
+from typing import List, Union, Dict
 from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
@@ -447,10 +93,112 @@ except:
     from casatools import ms as mstool
     from casatasks import casalog 
     from casatools import measures as metool
-    # casa log import ? 
 
 mytb=tbtool()
 myms=mstool()
+
+
+# Interface function for use by ALMA Pipeline renormalization task (PIPE-1687).
+def alma_renorm(vis: str, spw: List[int], apply: bool, threshold: Union[None, float], excludechan: Dict,
+                correct_atm: bool, atm_auto_exclude: bool, bwthreshspw: Dict) -> tuple:   ## PIPE-1469 for bwthreshspw
+    """
+    Interface function for ALMA Pipeline: this runs the ALMA renormalization
+    heuristic for input vis, and returns statistics and metadata required by
+    the Pipeline renormalization task.
+
+    Args:
+        vis: path to the measurement set to renormalize.
+        spw: Spectral Window IDs to process.
+        apply: apply the correction or not.
+        threshold: the threshold above which the scaling must exceed for the
+            renormalization correction to be applied. If set to None, then use
+            a pre-defined threshold appropriate for the ALMA Band.
+        excludechan: dictionary with keys set to SpW IDs (as string), and
+            values set to channels to exclude for that SpW.
+        correct_atm: this will get the transmission profiles for the SPW
+            bandpass (or phase) and target(s) because the BP (or phase) and
+            target(s) autocorr are compared in establishing the scaling in
+            cases spectra, there can be issues where transmission is low and
+            the source elevations are tens of degrees different. Often the ATM
+            is not divided out well and leads to incorrect scaling in ATM
+            regions. This option acts to fix this discrepancy so ATM are
+            handled correctly.
+        atm_auto_exclude: if True, then spectral regions found during the
+            "check for false positives" algorithm will be excluded from the
+             spectrum.
+        bwthreshspw: disctionary with keys set to SpW IDs (as string), 
+            and values set to a bandwidth (in Hz) to use for dividing 
+            up the SpWs, e.g. 120e6 
+
+    Returns: 8-tuple containing:
+        - boolean declaring whether data are all TDM
+        - ATM exclusion command
+        - ATM warning
+        - boolean declaring whether the renormalization correction was found
+          to have already been applied.
+        - boolean declaring whether a corrected data column was found.
+        - boolean declaring whether the renormalization correction was applied.
+        - dictionary containing factors for Pipeline QA.
+        - dictionary containing renormalization statistics indexed by source
+          and SpW.
+    """
+    # Initialize the renormalization object for input vis.
+    print(' Doing the initialize in ALMARENORM itself\n')
+    rn = ACreNorm(vis)
+
+    # Initialize return variables.
+    stats = {}
+    rnstats = {}
+    atmWarning = {}
+    atmExcludeCmd = {}
+    renorm_applied = False
+
+    # Store "all TDM" information before trying the renormalization so
+    # that the weblog is rendered properly.
+    alltdm = rn.tdm_only
+
+    # Check if the correction has already been applied.
+    corrApplied = rn.checkApply()
+
+    # Check whether the dataset has a corrected data column.
+    corrColExists = rn.correxists
+
+    # Only attempt the correction if the data are not all TDM.
+    if not alltdm:
+        # Run the renormalisation.
+        rn.renormalize(docorr=apply, docorrThresh=threshold, correctATM=correct_atm, spws=spw, excludechan=excludechan,
+                       atmAutoExclude=atm_auto_exclude, bwthreshspw=bwthreshspw) # add bwthreshspw
+
+        # Create spectra plots.
+        rn.plotSpectra(includeSummary=False)
+
+        # Check if the renormalisation has been applied. This flag will be
+        # passed back to caller, for future export to the manifest and use
+        # during restore.
+        if apply and rn.checkApply():
+            renorm_applied = True
+
+        # Only populate the following variables used for QA and to populate the
+        # weblog if this was run in a 'valid' way: on data which has not
+        # already been corrected (not corrApplied) and on data which has a
+        # corrected column. If apply=False, it doesn't matter if the corrected
+        # column exists or if the data has already been corrected, because the
+        # correction isn't actually done.
+        if (corrColExists or not apply) and (not corrApplied or not apply):
+            # Get stats (dictionary) indexed by source, spw
+            stats = rn.rnpipestats
+            # Get all factors for QA
+            rnstats = rn.stats()
+            # get information related to detecting false positives caused by
+            # atmospheric features, also needed for QA.
+            atmWarning = rn.atmWarning
+            atmExcludeCmd = rn.atmExcludeCmd
+
+    # Clean up.
+    rn.close()
+
+    return alltdm, atmExcludeCmd, atmWarning, corrApplied, corrColExists, renorm_applied, rnstats, stats  
+
 
 
 class ACreNorm(object):
@@ -460,7 +208,7 @@ class ACreNorm(object):
 
         # Version
 
-        self.RNversion='v1.4-2022/08/12-alipnick'
+        self.RNversion='v1.6.1-2023/08/09-PLWG'
 
         self.msname=msname
         casalog.post('Opening ms: '+str(self.msname))
@@ -525,10 +273,6 @@ class ACreNorm(object):
  
         self.states=[]
 
-        ## not used anywhere
-        ##self.nx=ceil(sqrt(self.nAnt))
-        ###self.ny=floor(sqrt(self.nAnt)+0.5)+1
-
         self.nfit=5
         self.fthresh=0.001
         
@@ -567,7 +311,6 @@ class ACreNorm(object):
         
         self.Band = int(self.getband(bandFreq))
 
-
         # warnings that give nan slice back or empty mean
         warnings.filterwarnings(action='ignore', message='All-NaN slice encountered')
         warnings.filterwarnings(action='ignore', message='Mean of empty slice')
@@ -601,8 +344,7 @@ class ACreNorm(object):
 
         return Bspw
 
-    # LM added function - get Phasecal scan
-    # - could have just added options to BP scan function but this is explicit
+
     def getPhscan(self,spw,verbose=False):
         PHscan=[]
         Phscans=self.msmeta.scansforintent('*PHASE*')
@@ -625,7 +367,7 @@ class ACreNorm(object):
         return list(np.array(range(len(self.states)))[np.transpose([intent in y for y in self.states])])
 
 
-    def getBtsysscan(self,spw, verbose=True):   # LM added verbose option
+    def getBtsysscan(self,spw, verbose=True): 
         
         Bflds=list(self.msmeta.fieldsforintent('*BANDPASS*'))  # Bandpass field(s)
         Bscans=[]
@@ -639,7 +381,7 @@ class ACreNorm(object):
 
         if len(BTsysScans)<1:
             casalog.post('Could not find Tsys scan on B calibrator in spw='+str(spw))
-            return None  ## LM added was  []
+            return None  
         
         if verbose:
             casalog.post('Tsys scan(s) for bandpass calibrator(s) {0} in spw={1} are: {2}'.format(Bflds, spw, BTsysScans))
@@ -647,23 +389,6 @@ class ACreNorm(object):
         # already a list
         return BTsysScans
 
-    ## LM ADDED function (actually not even used -> just called msmeta in the renormalise function)
-    def getfieldforscan(self,scan):
-        TFields=list(self.msmeta.fieldsforscan(scan))
-
-        # make a list
-        Tarflds=[itar for itar in TFields]
-
-        if len(Tarflds) < 1:
-            casalog.post('Could not find a Target field in scan='+str(scan))
-            return []
-
-        casalog.post('Target field(s) for scan {0} are: {1}'.format(scan,Tarflds))
-
-        # already a list
-        return Tarflds
-
-    ## LM added - edited to add field input and query if data is filled
     def getACdata(self,scan,spw,field,rowave=False,stateid=[]):
         sortlist=''
         if rowave:
@@ -698,10 +423,9 @@ class ACreNorm(object):
 
             dsh=d.shape
             if rowave and dsh[2]%self.nAnt==0:
-                dsh2=(dsh[0],dsh[1],self.nAnt,int(dsh[2]/self.nAnt))  ## for CASA6/Py3  LM added int - as it was otherwise py2 is a float by default
+                dsh2=(dsh[0],dsh[1],self.nAnt,int(dsh[2]/self.nAnt)) 
                 d=np.mean(d.reshape(dsh2),3)
                 a1=np.sum(a1.reshape(dsh2[2:]),1)//dsh2[3]
-                #casalog.post(a1) # for checking in early code
 
                 ## Some details for how to incorporate flagging if that was wanted in the future:
                 # if (f == True).any(): #if there are no flags then just do as above
@@ -717,7 +441,6 @@ class ACreNorm(object):
             mytb.close()
         return d
 
-    # LM added field 
     def getXCdata(self,scan,spw,field,datacolumn='CORRECTED_DATA'):
         casalog.post('  Extracting CROSS-correlation data from spw='+str(spw)+' and scan='+str(scan)+' and field='+str(field))
 
@@ -738,7 +461,7 @@ class ACreNorm(object):
 
         return (a1,a2,cd)
 
-    # LM added this function -  mimics part of getXCdata, but gets the FLAG column
+    # Mimics part of getXCdata, but gets the FLAG column
     def getXCflags(self,scan,spw,field,datacolumn='FLAG', verbose=False):
         if verbose:
             casalog.post('  Extracting CROSS-correlation flags from spw='+str(spw)+' and scan='+str(scan)+' and field='+str(field))
@@ -805,7 +528,6 @@ class ACreNorm(object):
         return Tatm
 
 
-
     def normChanAxis(self,A):
         # this is for the Tsys checking part/plotting 
         (n0,n1,n2)=A.shape
@@ -816,7 +538,6 @@ class ACreNorm(object):
                 A[i0,:,i2]/=np.median(A[i0,:,i2])
                 
         return A
-
 
 
     def xyplots(self,N):
@@ -869,7 +590,6 @@ class ACreNorm(object):
         plt.xlabel('Frequency (GHz)')
         plt.ylabel('Spw Id')
         plt.title(self.msname,{'horizontalalignment': 'left', 'fontsize': 'medium','verticalalignment': 'bottom'})
-        # CASA 6 units change unless specificed
         plt.ticklabel_format(style='plain', useOffset=False)
         if hardcopy:
             if not os.path.exists('RN_plots'):
@@ -978,7 +698,6 @@ class ACreNorm(object):
             chhi=nCha-1-chlo
             chans=range(chlo,nCha-chlo)
 
-            # LM added
             if plotATM:
                 if type(Bscan) is list:
                     Bscanatm=Bscan[0]
@@ -990,7 +709,6 @@ class ACreNorm(object):
 
             plt.subplot(nYspw,nXspw,k)
             plt.ioff()
-            # CASA 6 units change unless specificed
             plt.ticklabel_format(style='plain', useOffset=False)
             if (k-1)%nXspw==0:
                 plt.ylabel('Relative Tsys')
@@ -1023,7 +741,7 @@ class ACreNorm(object):
                 # mask edges
                 Tsys=Tsys[chlo:(nCha-chlo)]
 
-                # remove broad non-linearity (usually atm) -- this does not trigger for TDM at present (LM - May 25)
+                # remove broad non-linearity (usually atm) -- this does not trigger for TDM at present  
                 if self.nfit>0:
                     
                     for iseg in range(nseg):
@@ -1054,14 +772,13 @@ class ACreNorm(object):
                         #if not flch.has_key(spwkey):  ## HAS_KEY IS NOT IN CASA6 - PYTHON3
                         #    flch[spwkey]={}
 
-                        #LM added for CASA6 functionality (fine for CASA 5 too)
                         if not spwkey in flch.keys():
                             flch[spwkey]={}
 
                         scankey='scan='+str(iscan)
                         flch[spwkey][scankey]=flchans
                         if verbose:
-                            flchanstr=' Found '+str(nflchan)+' channels in SPW '+str(ispw)+' execeeding fractional threshold ('+str(usefthresh)+')' # LM edited to add SPW
+                            flchanstr=' Found '+str(nflchan)+' channels in SPW '+str(ispw)+' execeeding fractional threshold ('+str(usefthresh)+')' 
                         plt.plot(flchans,[0.999]*nflchan,'ks',markersize=4)
                     alarm=' ***'
                     plt.plot([3*nCha/8,5*nCha/8],[TsysMax]*2,cols[c%ncol]+'-')
@@ -1089,7 +806,7 @@ class ACreNorm(object):
             dy=lims[2]*0.1+lims[3]*0.9
             plt.text(nCha/2,dy,'Spw='+str(ispw),ha='center')
 
-            # LM added - want second axis for ATM line 
+            # want second axis for ATM line 
             # this is to aid DR in understading there is not a problem here
             # similar to pipeline Tsys plots with transmission shown
             # but keep simple with 0 to 100% shown only
@@ -1118,7 +835,7 @@ class ACreNorm(object):
         else:
             plt.show()
 
-        # LM added - keep the channels in a dictionary 
+        # keep the channels in a dictionary 
         self.TsysReturn = flch
 
         if retflchan:
@@ -1156,18 +873,18 @@ class ACreNorm(object):
             Data Selection
             --------------
 
-            spws : list of integers
-                If not empty, only perform renormalization on the spws that
-                are specified. Note that these must be science spws or they
-                will be ignored.
-                Example: spws = [21,23]
-                Default: spws = []
-
             excludespws : list of integers
                 If not empty, any spw specified will be removed from analysis
                 if that spw is one of the science spws. 
                 Example: excludespws = [21]
                 Default: excludespws = []
+
+             spws : list of integers
+                If not empty, only perform renormalization on the spws that
+                are specified. Note that these must be science spws or they
+                will be ignored.
+                Example: spws = [21,23]
+                Default: spws = []
 
             targscans : list of integers
                 If not empty, only perform renormalization on the target scans
@@ -1175,7 +892,7 @@ class ACreNorm(object):
                 data or they will be ignored. 
                 Example: targscans = [18,21,24,27]
                 Default: targscans = []
-            
+
             --------------
             Data Reduction
             --------------
@@ -1408,7 +1125,7 @@ class ACreNorm(object):
 
             fthresh : float
                 This is the threshold above which to show an alarm trigger in
-                casalog.post statements and logs as "***". Stands for "fractional
+                print statements and logs as "***". Stands for "fractional
                 alarm" threshold.
                 Default: 0.01   (i.e. 1%)
 
@@ -1417,7 +1134,7 @@ class ACreNorm(object):
             -----
 
             verbose : boolean
-                casalog.post additional messages to the terminal that normally only go
+                Print additional messages to the terminal that normally only go
                 into the log file along with some "debug" type statements.
                 Default: False
         
@@ -1425,7 +1142,7 @@ class ACreNorm(object):
             Varies by the options selected above but at minimum the scaling 
             spectra are calculated and optionally applied directly to the data.
         """
-        # LM added - starting CASA logger message
+        # Starting CASA logger message
         casalog.post('*** ALMA almarenorm.py ***', 'INFO', 'ReNormalize')   
         casalog.post('*** '+str(self.RNversion)+' ***', 'INFO', 'ReNormalize')   
         casalog.post('*** Beginning renormalization run ***', 'INFO', 'ReNormalize')   
@@ -1440,7 +1157,6 @@ class ACreNorm(object):
         casalog.post('')
         casalog.post('Using fractional alarm indication threshold for ReNorm = '+str(usefthresh*100)+'%')
 
-        # LM added 
         if correctATM:
             self.corrATM = True
             casalog.post('Will account for any ATM lines within the SPWs')
@@ -1454,7 +1170,7 @@ class ACreNorm(object):
 
             casalog.post('The '+str(datacolumn)+' column will be corrected!')
 
-            # LM added - check of the history - as the renorm code now writes in that application was made
+            # Check of the MS history as the renorm code now writes in that application was made
             alreadyApp = self.checkApply()
             if alreadyApp:
                 casalog.post('')
@@ -1511,10 +1227,9 @@ class ACreNorm(object):
                 for i in range(len(spws)):
                     spws[i] = int(spws[i])
             casalog.post('User supplied spws = '+str(spws))
-            # LM added
             if not any(uspw in spws for uspw in list(self.fdmspws)):
                 casalog.post('User supplied spw(s) are not in the list of FDM spws => '+str(self.fdmspws))
-                raise
+                raise SyntaxError('User supplied spw(s) are not in the list of FDM spws => '+str(self.fdmspws))
 
         if len(excludespws)>0:
             casalog.post('Will exclude spws='+str(excludespws))
@@ -1638,10 +1353,27 @@ class ACreNorm(object):
                 casalog.post(' bwthreshspw specified but useDynamicSegments was also specified.')
                 casalog.post(' I will use the user input and turn off dynamic segmentation for specified spws.')
 
+        # Send all input options to the log file so it's clear what has been entered
+        casalog.post('Equivalent manual input:')
+        casalog.post('\nself.renormalize(excludespws='+str(excludespws)+', spws='+str(spws) \
+                + ', targscans='+str(targscans))
+        casalog.post('    excludeants='+str(excludeants)+', excludechan='+str(excludechan)\
+                +', excflagged='+str(excflagged)+', fixOutliers='+str(fixOutliers)+', mededge='+str(mededge))
+        casalog.post('    atmAutoExclude='+str(atmAutoExclude)+', checkFalsePositives='+str(checkFalsePositives) \
+                +', correctATM='+str(correctATM)+', limATM='+str(limATM)+', plotATM='+str(plotATM)+',')
+        casalog.post('    bwdiv='+str(bwdiv)+', bwthresh='+str(bwthresh)+', bwthreshspw='+str(bwthreshspw) \
+                +', checkLineForest='+str(checkLineForest)+', nfit='+str(nfit)+', useDynamicSegments=' \
+                +str(useDynamicSegments))
+        casalog.post('    datacolumn='+str(datacolumn)+', docorr='+str(docorr)+', docorrThresh='+str(docorrThresh) \
+                +', usePhaseAC='+str(usePhaseAC))
+        casalog.post('    antHeuristicsSpectra='+str(antHeuristicsSpectra)+', diagSpectra='+str(diagSpectra) \
+                +', fthresh='+str(fthresh))
+        casalog.post('    verbose='+str(verbose)+')')
+
         # Want to loop over sources so we can disentangle fields and sources and better plot what is happening
         # for mosaics and multi-target observations. 
         target_list = np.unique(self.msmeta.namesforfields(self.msmeta.fieldsforintent('*TARGET*')))
-        casalog.post('Found targets: '+str(target_list))
+        casalog.post('\nFound targets: '+str(target_list))
         for target in target_list:
             self.rnstats['N'][target] = {}
             self.rnstats['N_atm'][target] = {}
@@ -1679,13 +1411,13 @@ class ACreNorm(object):
                 if usePhaseAC:
                     # just pick up the full list of phase cal scans
                     # later work out which one we get the AC from within the loop over the target scans
-                    casalog.post('Will use PHASE calibrator AutoCorr for comparions')
+                    casalog.post('Will use PHASE calibrator AutoCorr for comparisons')
                     Phscan=self.getPhscan(ispw,verbose)
                     # still need Bandpass scan for any ATM plots - these are only for illustration
                     Bscan=self.getBscan(ispw,verbose)
                 else:
                     # discern the B scan(s) which will be used - otherwise for using the phase AC we get it later
-                    casalog.post('Will use BANDPASS source AutoCorr for comparions') 
+                    casalog.post('Will use BANDPASS source AutoCorr for comparisons') 
                     Bscan=self.getBscan(ispw,verbose)
                     # and get corr- and ant-dep B, time-averaged 
                     B=self.getACdata(Bscan,ispw,None,True)
@@ -1710,7 +1442,6 @@ class ACreNorm(object):
                 # global list of scans with the current spw
                 spwscans=list(self.msmeta.scansforspw(ispw))
 
-                # LM added - bwthreshspw 
                 if bwthreshspw:
                     # check if the spw is ispw and use different bwthreshold
                     if str(ispw) in bwthreshspw.keys():
@@ -1724,8 +1455,8 @@ class ACreNorm(object):
                     (nseg,dNchan) = self.calcChanRanges(ispw,bwthresh,bwdiv,edge=mededge,verbose=verbose)
                 
                 self.rnstats['inputs'][target][str(ispw)] = {}
-                self.rnstats['inputs'][target][str(ispw)]['num_segments'] = nseg
-                self.rnstats['inputs'][target][str(ispw)]['dNchan'] = dNchan
+                self.rnstats['inputs'][target][str(ispw)]['num_segments'] = []
+                self.rnstats['inputs'][target][str(ispw)]['dNchan'] = []
 
                 # init Norm spectra for this spw
                 self.rnstats['N'][target][str(ispw)]= np.zeros((self.num_corrs,self.msmeta.nchan(ispw),self.nAnt))
@@ -1735,7 +1466,6 @@ class ACreNorm(object):
                 ngoodscan=0
                 ngoodscan_thresh=0
 
-                # LM added
                 if fixOutliers:
                     self.AntOut[str(ispw)]={}
                     self.replacedCorr[str(ispw)]=[]
@@ -1791,11 +1521,11 @@ class ACreNorm(object):
                         # get the fields to process in this scan - i.e. mosaics have many fields per scan
                         Tarfld = list(self.msmeta.fieldsforscan(iscan))
                         casalog.post(' Will process science target field(s) '+str(Tarfld)+' within this scan')
-                        # LM added
-                        # holder for a max value per scan to casalog.post out 
+
+                        # holder for a max value per scan to print out 
                         scanNmax=[]
 
-                        # LM added - so now we are looping over the target field
+                        # Now loop over the target fields
                         for ifld in Tarfld:
                             if verbose:
                                 casalog.post(' Processing field='+str(ifld)+'-----------------------------')
@@ -1904,11 +1634,13 @@ class ACreNorm(object):
                                             N_atm = N.copy()
                                             # now we pass to a function to do the correction
                                             if usePhaseAC:
-                                                self.ATMcorrection(N,iscan,ispw,ifld,str(Phscan[scanIdx]),'PhaseCal', verbose=verbose) # just edits the N in place - i.e. should flattens out the ATM region 
+                                                self.ATMcorrection(N,iscan,ispw,ifld,str(Phscan[scanIdx]),'PhaseCal', verbose=verbose) 
+                                                # just edits the N in place - i.e. should flattens out the ATM region 
                                                 # - could pass fldname also but re-gets this in ATM correction function
                                             else:
                                                 # bscanatm already specified above 
-                                                self.ATMcorrection(N,iscan,ispw,ifld,str(Bscanatm),'BandPass',verbose=True) # just edits the N in place - i.e. should flattens out the ATM region 
+                                                self.ATMcorrection(N,iscan,ispw,ifld,str(Bscanatm),'BandPass',verbose=True) 
+                                                # just edits the N in place - i.e. should flattens out the ATM region 
                                     else:
                                         casalog.post('No ATM features found below set limATM limit of '+str(limATM)+'. Skipping computation of ATM correction.')
                                         skipAtmCorr = True
@@ -1968,11 +1700,12 @@ class ACreNorm(object):
                                                 for icor in range(nCor):
                                                     # Edits N in place! just does the fit to get zero baseline. 
                                                     # This is calcuating the ReNorm scaling per ant !!!
-                                                    if checkLineForest:
+                                                    if checkLineForest and nseg_tmp>1:
                                                         redo = self.calcReNorm1(
                                                                 N_tmp[icor,lochan:hichan,iant],
                                                                 checkFit=True,
                                                                 doplot=False,
+                                                                iden='Ant'+str(iant)+'Seg'+str(iseg)+'Corr'+str(icor),
                                                                 verbose=True
                                                                 )
                                                     else:
@@ -1980,6 +1713,7 @@ class ACreNorm(object):
                                                                 N_tmp[icor,lochan:hichan,iant],
                                                                 checkFit=False,
                                                                 doplot=False,
+                                                                iden='Ant'+str(iant)+'Seg'+str(iseg)+'Corr'+str(icor),
                                                                 verbose=True
                                                                 )
 
@@ -1993,8 +1727,7 @@ class ACreNorm(object):
                                                                 verbose=False
                                                                 )
                                                     if redo:
-                                                        casalog.post('More than 50% of segment masked in fit, likely due to ' \
-                                                                + 'wide line or line forest. Widening segment and retrying fit.')
+                                                        casalog.post('    Widening segment and retrying fit.')
                                                         break
                                                 if redo:
                                                     break
@@ -2055,8 +1788,8 @@ class ACreNorm(object):
                                     # the very last nseg and dNchan that was used so if the final scan
                                     # was different, it will not reflect the aggreagate choice, only
                                     # the very last choice.
-                                    self.rnstats['inputs'][target][str(ispw)]['num_segments'] = nseg_tmp
-                                    self.rnstats['inputs'][target][str(ispw)]['dNchan'] = dNchan_tmp
+                                    self.rnstats['inputs'][target][str(ispw)]['num_segments'].append(nseg_tmp)
+                                    self.rnstats['inputs'][target][str(ispw)]['dNchan'].append(dNchan_tmp)
                                     N = N_tmp.copy()
                                     if (self.corrATM and not skipAtmCorr) or (str(ispw) in excludechan.keys()):
                                         N_atm = N_atm_tmp.copy()
@@ -2064,6 +1797,9 @@ class ACreNorm(object):
                                 # If we don't want to dynamically change the segment sizes or have specified one to 
                                 # use, just do it once and move on.
                                 else:
+                                    self.rnstats['inputs'][target][str(ispw)]['num_segments'].append(nseg)
+                                    self.rnstats['inputs'][target][str(ispw)]['dNchan'].append(dNchan)
+
                                     #If we are not using dynamic segments, then calculate what we have.
                                     for iant in range(nAnt):
                                         for iseg in range(nseg):
@@ -2071,13 +1807,17 @@ class ACreNorm(object):
                                             hichan=(iseg+1)*dNchan
                                             for icor in range(nCor):
                                                 # edits N in place! just does the fit to get zero baseline - this is calcuating the ReNorm scaling per ant !!!
-                                                self.calcReNorm1(N[icor,lochan:hichan,iant],doplot=False)
+                                                self.calcReNorm1(
+                                                        N[icor,lochan:hichan,iant],
+                                                        doplot=False,
+                                                        iden='Ant'+str(iant)+'Seg'+str(iseg)+'Corr'+str(icor)
+                                                        )
                                                 #N[icor,lochan:hichan,iant] = self.calcRenormLegendre(N[icor,lochan:hichan,iant])
 
                                                 # If we applied an ATM correction to the data, want to
                                                 # also see the non-ATM corrected data.
                                                 if (self.corrATM and not skipAtmCorr) or (str(ispw) in excludechan.keys()):
-                                                     self.calcReNorm1(N_atm[icor,lochan:hichan,iant],False)                                    
+                                                     self.calcReNorm1(N_atm[icor,lochan:hichan,iant],doplot=False)                                    
 
                                 ## LM added 
                                 if mededge:
@@ -2122,10 +1862,8 @@ class ACreNorm(object):
                                             N_atm[:,:,excant].fill(1.0)
 
 
-                                # LM added - the checking and fixing of outlier antennas compared to a representative median spectrumd
+                                # Check and fix outlier antennas compared to a representative median spectrum
                                 if fixOutliers: 
-                                  
-                                    ## LM added Feb 09 - outlier checker in a function (updated End Feb)
                                     AntChk = self.checkOutlierAnt(N)
 
                                     if len(AntChk) > 0:
@@ -2185,7 +1923,7 @@ class ACreNorm(object):
                                                 if (Nmax_atm > hardLim).any():
                                                     if atmAutoExclude:
                                                         if verbose:
-                                                            casalog.post('   Significant atmospheric signal was removed by atmAutoExclude!')
+                                                            casalog.post('   Significant atmospheric signal was removed by atmAutoExclude.')
                                                     else:
                                                         casalog.post('   WARNING! There may be significant artifical signal from an' \
                                                                     ' atmospheric feature that will trigger renorm application!!!')
@@ -2197,12 +1935,11 @@ class ACreNorm(object):
                                         else:
                                             self.atmWarning[str(fldname)][str(ispw)] = False 
 
-                                    if np.isnan(np.sum(Nmax)):# is nan:
+                                    if np.isnan(np.sum(Nmax)):
                                         Nmax = np.array([1.0,1.0])
                                     Nmads = np.nanmedian(np.where(N!=1.0,np.absolute(N-1.0),np.nan),[1,2]) 
-                                    if np.isnan(np.sum(Nmads)):# is nan:
+                                    if np.isnan(np.sum(Nmads)):
                                         Nmads = np.array([0.0,0.0])
-                                    # pre-April was np.median(np.absolute(N-1.0),[1,2]) in below casalog.post out
                                     scanNmax.append(np.mean(Nmax))
                                     alarm='   '
                                     if np.any(np.greater(Nmax,1.0+usefthresh)):
@@ -2211,7 +1948,7 @@ class ACreNorm(object):
                                         casalog.post('  Mean peak renormalization factor (power) per polarization = '+str(alarm)+str(Nmax))
                                         casalog.post('  Median renormalization deviation (power) per polarization = '+'   '+str(Nmads)) 
 
-                                    # LM added - diagnoastic plots one level more detail vs. summary plots
+                                    # Diagnoastic plots - one level more detail vs. summary plots
                                     # this is really the ant level what will be applied as a scaling
                                     #
                                     # skip these if second pass...
@@ -2221,8 +1958,7 @@ class ACreNorm(object):
                                         else:
                                             self.plotdiagSpectra(N, iscan, ispw, ifld, plotATM=plotATM)
 
-                                    # LM Added/modified rnstats recording
-                                    # in the spectra antennas that have some scans as 1.0 due to being 
+                                    # In the spectra, antennas that have some scans as 1.0 due to being 
                                     # interferometrically flagged (or we excluded) we don't want them
                                     # to skew the summary cumulative average plots using the rnstats
                                     # if some scans are flagged and some are unflagged
@@ -2279,13 +2015,13 @@ class ACreNorm(object):
                                             ngoodscan+=1
                                     ## Non flagged antenna cases
                                     else:
-                                        # incrementall accumulate scan-mean spectra - keeps adding even as we do per field
+                                        # incrementally accumulate scan-mean spectra - keeps adding even as we do per field
                                         self.rnstats['N'][target][str(ispw)]=self.rnstats['N'][target][str(ispw)]*ngoodscan/(ngoodscan+1)  + N/(ngoodscan+1)
                                         if (self.corrATM and not skipAtmCorr) or (str(ispw) in excludechan.keys()):
                                             self.rnstats['N_atm'][target][str(ispw)]=self.rnstats['N_atm'][target][str(ispw)]*ngoodscan/(ngoodscan+1)  + N_atm/(ngoodscan+1)     
                                         ngoodscan+=1
 
-                                    # AL added - PIPE 1168 (1)
+                                    # PIPE 1168 (1)
                                     # Repeat the same process but now we'll only be keeping normalized spectra that is above the threshold.
                                     # This helps us plot mosaic sources and multi-target MSs as the mixture of empty/problem fields can wash the peaks.
                                     if np.mean(Nmax) > hardLim:
@@ -2317,7 +2053,7 @@ class ACreNorm(object):
 
                                         ## Non flagged antenna cases
                                         else:
-                                            # incrementall accumulate scan-mean spectra - keeps adding even as we do per field
+                                            # incrementally accumulate scan-mean spectra - keeps adding even as we do per field
                                             self.rnstats['N_thresh'][target][str(ispw)]=self.rnstats['N_thresh'][target][str(ispw)]*ngoodscan_thresh/(ngoodscan_thresh+1)  + N/(ngoodscan_thresh+1)
                                             ngoodscan_thresh+=1
 
@@ -2354,27 +2090,28 @@ class ACreNorm(object):
                                     # apply the correction
                                     # Antenna-based Correction factors are in voltage units (pair products are power)
                                     Nv=np.sqrt(N)
-                                    self.applyReNorm(iscan,ispw,ifld,Nv,datacolumn) # LM pass field too
+                                    self.applyReNorm(iscan,ispw,ifld,Nv,datacolumn) 
                             
                                     # do self.recordApply here and pass scan, spw, field too
                                     self.recordApply(iscan,ispw,ifld)
 
                                     # ****
-                                    # In combination with the docorrApply dictionary, and the casalog.posted messaged
+                                    # In combination with the docorrApply dictionary, and the printed message
                                     # PLWG might want to include also Keyword dictionaries into the MS
                                     # here might be a good place for this
                                     # ****
 
                                     casalog.post('Application of the ReNormalization was written to the MS history for spw'+str(ispw)+' scan'+str(iscan)+' field'+str(ifld))
 
-                            # LM added closes the data check whereto see if the AC data is confirmed to be filled - only gets here if None was returned
+                            # closes the data check to see if the AC data is confirmed to be filled 
+                            #    - only gets here if None was returned
                             else:
                                 if verbose:
                                     casalog.post(' **** No data found - skipping field '+str(ifld)+' in scan '+str(iscan)+' ****')
                                 continue
 
                             if not second_pass:
-                            # LM added casalog.post of per scan max val
+                            # print per scan max val
                                 if ifld == max(Tarfld):
                                     casalog.post('  Max peak renormalization factor (power) over scan '+str(iscan)+' = '+str(max(scanNmax)))
 
@@ -2383,16 +2120,20 @@ class ACreNorm(object):
                         if docorr and not second_pass and self.docorrApply[target][str(ispw)]:
                             second_pass_required = True
 
+
                     if checkFalsePositives:
+                        exclude_cmd = self.suggestAtmExclude(target, str(ispw), return_command=True)
                         if self.atmWarning[str(fldname)][str(ispw)]:
-                            exclude_cmd = self.suggestAtmExclude(target, str(ispw), return_command=True)
                             if atmAutoExclude:
                                 casalog.post('Atmospheric features above the threshold have been mitigated by atmAutoExclude.')
                                 casalog.post('Equivalent manual call: '+exclude_cmd)
                             else:
                                 casalog.post('ATM features may be falsely triggering renorm!')
                                 casalog.post('Suggested channel exclusion: '+exclude_cmd)
-                
+                        elif exclude_cmd:
+                            casalog.post('Atmospheric features mitigated.')
+                            casalog.post('Equivalent manual call: '+exclude_cmd)
+
         # PIPE 1168 (3)
         # Loops through the scalingValue dict and populates the pipeline needed dictionary
         self.rnpipestats = {}
@@ -2415,23 +2156,17 @@ class ACreNorm(object):
                 self.rnpipestats[trg][spw]['max_rn'] = max(pipe_target_sv)
                 self.rnpipestats[trg][spw]['max_rn_field'] = pipe_target_fld[np.where(np.array(pipe_target_sv) == self.rnpipestats[trg][spw]['max_rn'])[0][0]]
                 self.rnpipestats[trg][spw]['threshold'] = hardLim
+                if len(np.unique(self.rnstats['inputs'][trg][spw]['dNchan'])) > 1:
+                    self.rnpipestats[trg][spw]['seg_change'] = True
+                else:
+                    self.rnpipestats[trg][spw]['seg_change'] = False
 
         
         # final log end of the renormalize function
-        # LM added - starting CASA logger message
         casalog.post('*** ALMA almarenorm.py ***', 'INFO', 'ReNormalize')   
         casalog.post('*** '+str(self.RNversion)+' ***', 'INFO', 'ReNormalize')   
         casalog.post('*** End of renormalization run ***', 'INFO', 'ReNormalize')   
 
-    # LM added / edited 
-    # added option Feb 18/23 - odd, code will instead find the best odd value for nseg where
-    # such that dNchan remains an integer number or remainng 'non-fitted' chans are in the edge
-    # also added forced divide - with same rule. Else defaults to power 2 
-    # bwthresh Luke's default is 120e6
-    #
-    # AL - added a check for minimum number of channels so that divisions don't get so small that 
-    #      that overfitting occurs.
-    #    - changed so that ~2GHz spws will get split into only 7 sections rather than 17
     def calcChanRanges(self,spw,bwthresh=120e6,bwdiv='odd',onlyfdm=True, edge=0.01,verbose=False):
         
         Tbw=self.msmeta.bandwidths(spw)
@@ -2440,13 +2175,12 @@ class ACreNorm(object):
         nseg=1
         dNchan=nchan
 
-        # Only do non-trivial segments if bwthresh exceeded AND spw is FDM (lots of channels)
-        #   (This prevents TDM spws, which are wide and low-res, from being segmented. Not really
-        #   necessary since we specifically exclude TDM windows but will protect against future changes.)
-        
-        # First check the number of channels explicitly. If we have a small number of channels, we don't want
-        # to accidentally divide up the spectrum into a ridiculous number of divisions and overfit. 
-        # Less than 128, no need to divide the window up at all, from there scale up to a max of 7.
+        # Only do non-trivial segments if bwthresh exceeded AND spw is FDM 
+        # (lots of channels). First check the number of channels explicitly. 
+        # If we have a small number of channels, we don't want to divide up 
+        # the spectrum into a ridiculous number of divisions and overfit. Less
+        # than 128, no need to divide the window up at all, from there scale 
+        # up to a max of 7.
         if nchan <= 128:
             casalog.post(' **Small number of channels found, will not divide up the spw.')
             if type(bwdiv) is int:
@@ -2463,8 +2197,8 @@ class ACreNorm(object):
             # make float so we can check dNchan
             nseg=float(bwdiv)
             dNchan=nchan/nseg
-            # check if nseg gives an integer nchans or if the remaining chans when dNchan is not an int
-            # will be covered by the edge boundaries 
+            # check if nseg gives an integer nchans or if the remaining chans 
+            # when dNchan is not an int will be covered by the edge boundaries
             if dNchan.is_integer() or nchan%nseg < edge*nchan:
                 dNchan = int(dNchan)
                 nseg=int(nseg)
@@ -2474,47 +2208,48 @@ class ACreNorm(object):
                 casalog.post(" Will default to power of 2 division based on bwthresh ")
                 nseg=max(0,2**int(ceil(log(Tbw/bwthresh)/log(2))))
                 dNchan=int(nchan/nseg)
+        # This is overkill given the above restrictions, limiting to 3, 5, or 7
+        # segments ensures that there are no answers for which the remainder 
+        # does not fall into the edge channel rejection...
         elif Tbw>bwthresh and spw in self.fdmspws:
             if bwdiv=='odd':
-                # work out best odd divisibile when dNchan is an int
-                # need to avoid splitting up wide spws into too many slices which can cause major issues
-                if Tbw > 1.8e9:
-                    nseg=min(max_divs,Tbw/bwthresh) # need as a float here, but also don't go above max divisions
-                else:
-                    nseg=Tbw/bwthresh
-                if nseg > max_divs:
-                    nseg = max_divs
+                # work out best odd divisibile when dNchan is an int need to
+                # avoid splitting up wide spws into too many slices which can
+                # cause major issues
+                nseg = min(max_divs, Tbw/bwthresh)
                 dNchan=nchan/nseg
+                
+                # while condition is met when float value is equivalent to an 
+                # int value (i.e. 7.0.is_integer() = True)
                 while not dNchan.is_integer():
-                    # if not integer right away
-                    # recalc making sure nseg is an int
                     nseg=int(ceil(nseg))
                     dNchan=nchan/nseg
                     # check if the new nseg is actually odd, otherwise make it odd
                     if nseg%2 != 1:
                         nseg=int(ceil(nseg))+1.0
                         dNchan=nchan/nseg
-                    # check if the remainder for this odd nseg falls into the median set edges
-                    # i.e don't need to worry if nchan/nseg is a true integer division
-                    # e.g. 2048 into 5, dNchan is 409.6, so 5x409 segs and remaining is 3 chans,
-                    #      but edge chans are 20, so they are anyway set to to the median value (~1)
+                    # check if the remainder for this odd nseg falls into the 
+                    # median set edges i.e don't need to worry if nchan/nseg 
+                    # is a true integer division 
+                    # e.g. 2048 into 5, dNchan is 409.6, so 5x409 segs and 
+                    #      remaining is 3 chans, but edge chans are 20, so 
+                    #      they are anyway set to to the median value (~1)
                     #      and we can use nseg = 5 without worry 
                     if nchan%nseg < edge*nchan:
+                        # round down to nearest int and exit the while statment                        
                         dNchan=float(int(dNchan)) 
-                        # not ceil, need to round down to nearest int and will exit the while statment
                     else:
-                        # if remainder not in edges, add another to nseg and continue 
+                        # if remainder not in edges, add to nseg and continue 
                         nseg=int(ceil(nseg))+1.0
                             
-                    # case where odd numbers just will not go into the channel number inc remainder accounting
+                    # case where odd numbers just will not go into the channel 
+                    # number inc remainder accounting
                     if nseg > 50:
                         nseg=max(0,2**int(ceil(log(Tbw/bwthresh)/log(2))))
                         break
-                # breaks when nseg is odd and dNchan is an integer
-                # but pass back the correct ints
-                nseg=int(ceil(nseg))
-                dNchan=int(nchan/nseg) # CASA 6 passing as a float even though two ints are input - explicit for int
 
+                nseg=int(ceil(nseg))
+                dNchan=int(nchan/nseg) 
 
             else:
                 # George's base function
@@ -2631,7 +2366,7 @@ class ACreNorm(object):
                 An atmospheric profile as returned by ATMtrans()
 
             verbose : boolean : OPTIONAL
-                If True, then information about the fit will be casalog.posted to the terminal.
+                If True, then information about the fit will be printed to the terminal.
 
         Outputs:
             centers : list of floats
@@ -2754,7 +2489,7 @@ class ACreNorm(object):
                 casalog.post('\toffset = '+str(popt[3]))
                 casalog.post('')
                 casalog.post('\tcovariance matrix:')
-                casalog.post(cov)
+                casalog.post(str(cov))
                 casalog.post('')
                 casalog.post('\t std_devs = '+str(np.sqrt(np.diag(cov))))
         return centers, scales 
@@ -3070,12 +2805,31 @@ class ACreNorm(object):
                 # If True, draw thin, dotted lines at the locations where the 
                 # renormalization spectrum was broken up during the fitting 
                 # process.
+                #
+                # Since the number of divisions can change through renormalization
+                # the mode is chosen and an indicator is placed in the upper right
+                # if the number of segments changed.
                 if plotDivisions:
-                    dNchan = self.rnstats['inputs'][target][str(spw)]['dNchan']
-                    nseg = self.rnstats['inputs'][target][str(spw)]['num_segments']
+                    if self.rnpipestats[target][str(spw)]['seg_change']:
+                        ax_rn.text(0.6, 0.93, "Segment sizes changed!", color='red', fontsize='18', transform=ax_rn.transAxes)
+                        dNchan = max(
+                                    set(
+                                        self.rnstats['inputs'][target][str(spw)]['dNchan']
+                                        ), 
+                                    key=self.rnstats['inputs'][target][str(spw)]['dNchan'].count
+                                    )
+                        nseg = max(
+                                    set(
+                                        self.rnstats['inputs'][target][str(spw)]['num_segments']
+                                        ),
+                                    key = self.rnstats['inputs'][target][str(spw)]['num_segments'].count
+                                    )
+                    else:
+                        dNchan = self.rnstats['inputs'][target][str(spw)]['dNchan'][0]
+                        nseg = self.rnstats['inputs'][target][str(spw)]['num_segments'][0]
                     if nseg > 1: 
                         xlocs = [iseg*dNchan for iseg in range(1,nseg)]
-                        ax_rn.vlines(freqs[xlocs], 0.5, 2.5, linestyles='dotted', 
+                        ax_rn.vlines(freqs[xlocs], 0.5, 5, linestyles='dotted', 
                                 colors='grey', alpha=0.5, zorder=10)
                 
                 # Set the channels labels in the correct direction since the
@@ -3188,7 +2942,7 @@ class ACreNorm(object):
                         atm_gammas += atm_gammas_SB
 
                     # Report found lines, if any.
-                    # PL requested that statistics of ATM lines be casalog.posted out 
+                    # PL requested that statistics of ATM lines be printed out 
                     # with this function.
                     #
                     # Output is:
@@ -3493,7 +3247,7 @@ class ACreNorm(object):
                     
         self.putXCdata(scan,spw,field,X,datacolumn)
 
-    def calcReNorm1(self,R,checkFit=False,doplot=False, verbose=True):   
+    def calcReNorm1(self, R, checkFit=False, doplot=False, iden='', verbose=True):   
         """
         Purpose:
             Perform a simple polynomial fit to the renormalization scaling 
@@ -3511,6 +3265,10 @@ class ACreNorm(object):
                 If set to True, produce a plot showing the polynomial fits 
                 that have been applied to the data. 
 
+            iden : str : OPTIONAL
+                An optional identifier to append to image names to make them
+                unique, otherwise they will get written over. 
+
         Outputs:
             None directly, but note that the input scaling spectrum will be 
             adjusted directly.
@@ -3521,17 +3279,28 @@ class ACreNorm(object):
 
         x=np.array(range(nCha))*1.0/nCha - 0.5
 
-        # initial "fit"
-        f=np.array([np.median(R)])
-
         mask=np.ones(len(R),bool)
         ylim=0.0
 
         if doplot:
+            plt.ioff()
             plt.clf()
+            fig = plt.figure(figsize=(20,10))
         
         # Find where ATM was masked
         atm_masked = np.where(R==1.0)[0]
+        
+        atm_mask = mask
+        atm_mask[atm_masked] = False
+
+        # initial "fit" - Ignoring atm regions
+        if len(R[atm_mask]) == 0:
+            casalog.post('    WARN: No data left in segment after removing atm features.')
+            refit=True
+            return refit
+        else:
+            f=np.array([np.median(R[atm_mask])])
+
 
         for ifit in range(1,self.nfit):
 
@@ -3545,52 +3314,74 @@ class ACreNorm(object):
             #thresh=abs(R0.min()/2.0)
 
             # thresh is 2x median deviation (~1.33 sigma) 
-            thresh=np.median(np.absolute(R0))*2.0
+            # need to ignore regions of the spectrum with atm features
+            thresh=np.median(np.absolute(R0[atm_mask]))*2.0
             
-            # mask within thresh
+            # mask outside thresh
             mask[:]=True
             mask[R0<-thresh]=False
             mask[R0>thresh]=False
+            
+            # This was meant to check for line forest like data but ultimately
+            # just fails when there is an atm feature and noisy data
+            #if checkFit:
+            #    if sum(mask)/len(mask) > 0.5:
+            #        refit=False
+            #    else:
+            #        if verbose:
+            #            casalog.post('    WARN: More than 50% of the selected data is masked in the fit.')
+            #        refit=True
+            #        # Exit here since we need to refit anyway, no sense in
+            #        # wasting compute time. There's also a small chance that
+            #        # the entire segment is masked from an atm feature.
+            #        return refit
 
             # ignore ATM masked regions
-            mask[R0==1.0]=False
-            
+            mask[atm_masked]=False
+
             if checkFit:
-                if sum(mask)/len(mask) > 0.5:
+                if sum(mask)/len(mask) > 0.1:
                     refit=False
                 else:
                     if verbose:
-                        casalog.post('\tWARN: More than 50% of the selected data is masked in the fit.')
-                    refit=True
+                        casalog.post('    WARN: Less than 10% of the selected data is available ' \
+                                +'to fit likely due to atm and/or science line features.')
+                        refit=True
+                        # Exit here since we need to refit because there's 
+                        # almost no data left.
+                        return refit
 
             if doplot:
                 med=np.median(R)
                 plt.subplot(2,self.nfit,ifit)
-                plt.plot(range(nCha),R,'b,')
+                plt.plot(range(nCha),R,'b,', label='Data')
                 plt.plot(
                         np.array(range(nCha))[np.logical_not(mask)],
                         R[np.logical_not(mask)],
-                        'r.'
+                        'r.',
+                        label='Masked'
                         )
-                plt.plot(range(nCha),np.polyval(f,x),'r-')
-                plt.axis([-1,nCha,med-0.003,med+0.003])
+                plt.plot(range(nCha),np.polyval(f,x),'r-', label='Initial/Last Fit')
+                #plt.axis([-1,nCha,med-0.003,med+0.003])
                             
                 if ylim==0.0:
                     ylim=5*thresh
                 plt.subplot(2,self.nfit,ifit+self.nfit)
-                plt.plot(range(nCha),R0,'b,')
-                plt.plot([-1,nCha],[-thresh,-thresh],'r:')
+                plt.plot(range(nCha),R0,'b,', label='Data after last fit')
+                plt.plot([-1,nCha],[-thresh,-thresh],'r:', label='Threshold')
                 plt.plot([-1,nCha],[thresh,thresh],'r:')
-                plt.axis([-1,nCha,-ylim,ylim])
-                casalog.post(ifit-1, thresh, abs(R0.min()/2.0), np.sum(mask), f)
+                #plt.axis([-1,nCha,-ylim,ylim])
+                #casalog.post(ifit-1, thresh, abs(R0.min()/2.0), np.sum(mask), f)
+                plt.legend()
 
             # fit to _R_ in masked spectra
             f=np.polyfit(x[mask],R[mask],ifit)
             
             if doplot:
                 plt.subplot(2,self.nfit,ifit)
-                plt.plot(range(nCha),np.polyval(f,x),'g-')
-                casalog.post(ifit, f)
+                plt.plot(range(nCha),np.polyval(f,x),'g-', label='N='+str(ifit)+' Fit')
+                #casalog.post(ifit, f)
+                plt.legend()
 
         R/=np.polyval(f,x)
 
@@ -3600,6 +3391,13 @@ class ACreNorm(object):
         if doplot:
             plt.subplot(2,self.nfit,ifit+1)
             plt.plot(range(nCha),R,'g-')
+            plt.title('Final Data After Fitting')
+            plt.savefig(
+                    './RN_plots/seg_fitting_results_'+iden+'.png', 
+                    format='png', 
+                    bbox_inches='tight'
+                    )
+            plt.close()
         
         if checkFit:        
             return refit
@@ -3745,8 +3543,8 @@ class ACreNorm(object):
             set of heuristics to check for outliers caused by issues with the
             autocorrelations (e.g. birdies). Outlier channels are replaced with
             the median spectrum. If many channels are found to be outliers 
-            (greater than 10 consecutive channels) and the other correlation 
-            appears to be fine, then the other correlation is used for the 
+            (greater than 10 consecutive channels or >10% of total spectrum), 
+            then the whole median spectrum of that correlation is used for the 
             replacement instead. 
 
             Note that this operates on the input renormalization spectrum 
@@ -3787,7 +3585,7 @@ class ACreNorm(object):
                 Default: True
 
             verbose : boolean : OPTIONAL
-                If set to True, produce additional casalog.post statement output.
+                If set to True, produce additional output.
                 Default: False
 
         Outputs:
@@ -3795,18 +3593,9 @@ class ACreNorm(object):
             No additional output is generated.
 
         Notes for Improvement: 
-            Due to the replacement of XX with YY, this may have a bad impact
-            on full polarization data! This should be replaced to only use the
-            median spectrum and only that of the correct correlation!
-
             If AntUse is not defined, could default to running checkOutlierAnt
             method by default.
         """
-        # this changes actively the renorm value, R,
-        # creates a channel based threshold
-        # uses the divided spectrum (ant/median-spec) for checks
-        
-
         # Median spectra for each pol - in principle all ants should be the 
         # same per field. However, there can be a problem if there are too 
         # many 1.0's from flagged data because median ends up being 1.0. For
@@ -3897,7 +3686,7 @@ class ACreNorm(object):
                         if Rcomp[spl]>thresharr[jcor][spl]
                         ]
 
-                # store a casalog.post statement for plot - can be later overwritten
+                # store a print statement for plot - can be later overwritten
                 plttxt[jcor]=' **** Replace flagged channels with that from median spectrum **** ' 
                 if len(lineOut[jcor])>0:
                     if verbose:
@@ -3910,13 +3699,9 @@ class ACreNorm(object):
                     
                     # also want to know the maximum consecutive channels 
                     maxConseq = self.calcMaxConseq(lineOut[jcor])
-                    #casalog.post(' ######## consecuitve is '+str(maxConseq)) # for testing
 
-                    # if there are more than 10 consecutive lines follow the replacement with 
-                    # other correlation route, XX -> YY, or YY-> XX
+                    # if there are more than 10 consecutive lines replace with median spectrum
                     if maxConseq > 10: 
-                        # the below code will do logic to check if the swap to the 
-                        # opposite correlation is ok or not
                         replaceCorr[jcor]=True
                 else:
                     # There were no triggered lines, maybe only one pol was 
@@ -4017,8 +3802,8 @@ class ACreNorm(object):
                     # during fitting
                     if plotDivisions:
                         target = self.msmeta.namesforfields(fldin)[0]
-                        dNchan = self.rnstats['inputs'][target][str(spwin)]['dNchan']
-                        nseg = self.rnstats['inputs'][target][str(spwin)]['num_segments']
+                        dNchan = self.rnstats['inputs'][target][str(spwin)]['dNchan'][-1]
+                        nseg = self.rnstats['inputs'][target][str(spwin)]['num_segments'][-1]
                         # if there is only 1 segment, then no lines to draw
                         if nseg==1:
                             plotDivisions=False
@@ -4027,7 +3812,7 @@ class ACreNorm(object):
                             ax.vlines(
                                     xlocs, 
                                     0.5, 
-                                    1.5, 
+                                    5, 
                                     linestyles='dotted', 
                                     colors='grey', 
                                     alpha=0.5, 
@@ -4178,7 +3963,7 @@ class ACreNorm(object):
         try:
             plMax = [plM for plM in maxVal if plM >= R.max()][0]
         except IndexError:
-            plMax = 2.0
+            plMax = 3.0
             casalog.post('\n\tWARNING!!!!')
             casalog.post('\tUNREALISTICALLY HIGH RENORM VALUE FOUND!! THERE ARE LIKELY CORRELATOR \
                     ISSUES WITH SCAN '+str(scanin)+' OR THE FITTING HAS DIVERGED.\n')
@@ -4280,8 +4065,8 @@ class ACreNorm(object):
 
         # If selected, plot the locations where the spectrum was divided during the fitting process
         if plotDivisions:
-            dNchan = self.rnstats['inputs'][target][str(spwin)]['dNchan']
-            nseg = self.rnstats['inputs'][target][str(spwin)]['num_segments']
+            dNchan = self.rnstats['inputs'][target][str(spwin)]['dNchan'][-1]
+            nseg = self.rnstats['inputs'][target][str(spwin)]['num_segments'][-1]
             if nseg == 1:
                 plotDivisions=False
             else:
@@ -4289,7 +4074,7 @@ class ACreNorm(object):
                 ax_rn.vlines(
                         freqs[xlocs], 
                         0.5, 
-                        2.5, 
+                        5, 
                         linestyles='dotted', 
                         colors='grey', 
                         alpha=0.5, 
@@ -4426,7 +4211,6 @@ class ACreNorm(object):
         return maxConsec
 
 
-    # LM added - ATM transmission profile code - aU code dependancy 
     def ATMtrans(self, iscan, ispw, ifld=None, verbose=False):
         """
         Purpose:
@@ -4523,7 +4307,7 @@ class ACreNorm(object):
         scanTimes = self.msmeta.timesforscan(iscan)
         myscantime = np.median(scanTimes) 
         scanLength = scanTimes[-1] - scanTimes[0]        
-        casalog.filterMsg('Position:') # message filter as this casalog.posts ALMA's position each call
+        casalog.filterMsg('Position:') # message filter as this prints ALMA's position each call
         azel=self.renormcomputeAzElFromRADecMJD(mydirection,myscantime/86400.)
         casalog.clearFilterMsgList()
         airmass = 1.0/np.cos((90.-azel[1])*np.pi/180.)
@@ -4628,7 +4412,6 @@ class ACreNorm(object):
         if sense == 1:
             if verbose:
                 casalog.post('********* REVERSING THE ATM FOUND FOR LSB ***********')
-            # need to super check this !!
             transmission = transmission[::-1] # reverse the order
             if self.Band in [9, 10]:
                 transmission_SB = transmission_SB[::-1]
@@ -4867,7 +4650,7 @@ class ACreNorm(object):
 
                     >>> iterable = [1, 10, 11, 12, 20, 30, 31, 32, 33, 40]
                     >>> for group in consecutive_groups(iterable):
-                    ...     casalog.post(list(group))
+                    ...     print(list(group))
                     [1]
                     [10, 11, 12]
                     [20]
@@ -4881,7 +4664,7 @@ class ACreNorm(object):
                     >>> iterable = 'abcdfgilmnop'
                     >>> ordering = ascii_lowercase.index
                     >>> for group in consecutive_groups(iterable, ordering):
-                    ...     casalog.post(list(group))
+                    ...     print(list(group))
                     ['a', 'b', 'c', 'd']
                     ['f', 'g']
                     ['i']
@@ -4956,14 +4739,20 @@ class ACreNorm(object):
         else:
             return ranges
 
-    # LM added - write to the history of the dataset upon application
-    # of the renorm - thus a check will be made on subsequent runs that 
-    # - if the renorlamization was made and history is present it will not apply again
-
     def recordApply(self, scanout=None, spwout=None, fldout=None):
+        """
+        Purpose:
+            This will write to the history of the dataset upon application of
+            renorm (i.e. self.renormalize(docorr=True)). Within the 
+            renormalize() method, a check of the MS HISTORY table is performed
+            to ensure that double application is avoided. 
 
-        # crude check if we also add more to the message - not that 
-        # the extended string is checked anyway
+        Inputs:
+            scanout, spwout, fldout : int : OPTIONAL
+                The scan, spw, and field numbers where renormalization was 
+                applied. If set to None then a generic message is filled.
+            Default: None
+        """
         if (scanout is not None) and (spwout is not None) and (fldout is not None):
             messageIn = 'ReNormalization correction applied to spw'+str(spwout) \
                     +' scan'+str(scanout)+' field'+str(fldout)+' '+self.RNversion
@@ -4973,7 +4762,6 @@ class ACreNorm(object):
         myms.writehistory(messageIn)
         myms.close()
 
-    # LM added - check the history
     def checkApply(self):
         # just need to get the history column
         # appears that list history is useless and only writes to the logger ?
@@ -4989,12 +4777,12 @@ class ACreNorm(object):
         return applyStatus
 
     def getband(self,freq):
-        ''' 
+        """ 
         Identify the Band for specific frequency (in GHz)
 
         Note that the Band 2/3 identification is currently not
         guaranteed to be correct.
-        '''
+        """
         lo=np.array([35,67,84,125,157,211,275,385,602,787])*1e9
         hi=np.array([50,83.999999999,116,163,212,275,373,500,720,950])*1e9
 
@@ -5045,7 +4833,7 @@ class ACreNorm(object):
                         )
         else:
             dictIn = self.TsysReturn
-                        
+            
         listToKeep=[]
         TDM=True
         for keyuse in dictIn.keys():
@@ -5086,9 +4874,8 @@ class ACreNorm(object):
             addChan = 1
             gapChan = 3
         else:
-            # ACA data are much finer resolution, to combat piece wise flags 
-            # due to channels triggering just around the threshold, set extra
-            # buffers.
+            # To combat piece wise flags due to channels triggering just around
+            # the threshold, set extra buffers.
             addChan = 5
             gapChan = 10 
 
@@ -5305,7 +5092,7 @@ class ACreNorm(object):
                 The scan number.
 
             verbose : boolean : OPTIONAL
-                If set to true, some additional output is casalog.posted to screen.
+                If set to true, some additional output is printed to screen.
 
         Returns:
             [conditions, myTimes]
@@ -5772,6 +5559,3 @@ class ACreNorm(object):
         fWidthSB = chansepSB*len(fSB)
 
         return fSB, chansepSB, fCenterSB, fWidthSB
-
-
-        

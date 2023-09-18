@@ -1,5 +1,4 @@
 """QA score calculation for baseline subtraction task."""
-import numpy
 import os
 from typing import TYPE_CHECKING, List, Optional, Union
 
@@ -28,9 +27,8 @@ class SDBaselineQAHandler(pqa.QAPlugin):
     def handle(self, context: 'Context', result: result_cls) -> None:
         """Compute QA score for baseline subtraction task.
 
-        QA scorering is performed based on the following metric:
+        QA scoring is performed based on the following metric:
 
-            - Line detection: Whether or not any astronomical lines are detected
             - Flatness of spectral baseline
 
         Scores and associated metrics are attached to the results instance.
@@ -40,36 +38,11 @@ class SDBaselineQAHandler(pqa.QAPlugin):
             result: Result instance of baseline subtraction task
         """
         scores = []
-        lines_list = []
-        group_id_list = []
-        spw_id_list = []
-        field_id_list = []
-        reduction_group = context.observing_run.ms_reduction_group
-        baselined = result.outcome['baselined']
-        for b in baselined:
-            reduction_group_id = b['group_id']
-            members = b['members']
-            group_desc = reduction_group[reduction_group_id]
-            spw_id = numpy.fromiter((group_desc[m].spw_id for m in members), dtype=numpy.int32)  # b['spw']
-            field_id = numpy.fromiter((group_desc[m].field_id for m in members), dtype=numpy.int32)  # b['field']
-            lines = b['lines']
-            lines_list.append(lines)
-            group_id_list.append(reduction_group_id)
-            spw_id_list.append(spw_id)
-            field_id_list.append(field_id)
-        scores.append(qacalc.score_sd_line_detection_for_ms(group_id_list,
-                                                            field_id_list,
-                                                            spw_id_list,
-                                                            lines_list))
-        for figfile, stat in result.outcome['baseline_quality_stat'].items():
-            plot = _get_plot(result.outcome['plots'], figfile)
-            if plot is None:
-                LOG.warning(f'Unable to find plot instance for {figfile}')
-                continue
-            p = plot.parameters
-            scores.append(qacalc.score_sd_baseline_quality(p['vis'], plot.field, p['ant'], p['spw'], p['pol'], stat))
-            del plot
+        for qstat in result.outcome['baseline_quality_stat']:
+            scores.append(qacalc.score_sd_baseline_quality(qstat.vis, qstat.field, qstat.ant,
+                                                           qstat.spw, qstat.pol, qstat.stat))
         result.qa.pool.extend(scores)
+
 
 def _get_plot(plots: List[logger.Plot], figfile: str) -> Optional[Union[compress.CompressedObj, logger.Plot]]:
     """

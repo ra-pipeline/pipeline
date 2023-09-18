@@ -69,16 +69,16 @@ class ImageResult(ResultBase):
         self.data = data.copy()
         self.axes = axes
 
-        self.flag_reason_plane = np.zeros(np.shape(data), np.int)
+        self.flag_reason_plane = np.zeros(np.shape(data), int)
         self.flag_reason_key = {}
 
         if flag is None:
-            self.flag = np.zeros(np.shape(self.data), np.bool)
+            self.flag = np.zeros(np.shape(self.data), bool)
         else:
             self.flag = flag.copy()
 
         if nodata is None:
-            self.nodata = np.zeros(np.shape(self.data), np.bool)
+            self.nodata = np.zeros(np.shape(self.data), bool)
         else:
             self.nodata = nodata.copy()
 
@@ -111,7 +111,7 @@ class SpectrumResult(ResultBase):
         self.filename = filename
 
         if flag is None:
-            self.flag = np.zeros(np.shape(data), np.bool)
+            self.flag = np.zeros(np.shape(data), bool)
         else:
             self.flag = flag.copy()
 
@@ -141,12 +141,12 @@ class SpectrumResult(ResultBase):
             self.axis = axis
 
         if nodata is None:
-            self.nodata = np.zeros(np.shape(self.data), np.bool)
+            self.nodata = np.zeros(np.shape(self.data), bool)
         else:
             self.nodata = nodata.copy()
 
         if noisychannels is None:
-            self.noisychannels = np.zeros(np.shape(self.data), np.bool)
+            self.noisychannels = np.zeros(np.shape(self.data), bool)
         else:
             self.noisychannels = np.array(noisychannels)
 

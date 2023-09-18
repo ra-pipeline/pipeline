@@ -10,8 +10,7 @@ def hif_gaincal(vis=None, caltable=None, field=None, intent=None, spw=None,
                 antenna=None, hm_gaintype=None, calmode=None, solint=None,
                 combine=None, refant=None, solnorm=None, minblperant=None,
                 minsnr=None, smodel=None, splinetime=None, npointaver=None,
-                phasewrap=None,pipelinemode=None, dryrun=None,
-                acceptresults=None):
+                phasewrap=None, dryrun=None, acceptresults=None):
     pass
 
 

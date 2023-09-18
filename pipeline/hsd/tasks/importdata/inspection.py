@@ -70,6 +70,7 @@ class SDInspection(object):
         LOG.debug('register meta data to DataTable')
         table_name = self.table_name
         worker = reader.MetaDataReader(context=self.context, ms=self.ms, table_name=table_name)
+        invalid_pointing_data, msglist = worker.generate_flagdict_for_invalid_pointing_data()
         LOG.debug('table_name=%s' % table_name)
 
         dry_run = not os.path.exists(self.ms.name)
@@ -152,7 +153,7 @@ class SDInspection(object):
         if is_alma and is_raster:
             worker.generate_flagcmd()
 
-        return reduction_group, org_directions
+        return reduction_group, org_directions, msglist
 
 #     def _inspect_reduction_group(self):
 #         reduction_group = {}
@@ -426,8 +427,7 @@ class SDInspection(object):
                             merge_table, merge_gap = raster_heuristic(sra_sel, sdec_sel)
                             raster_heuristic_ok = True
                         except RasterScanHeuristicsFailure as e:
-                            LOG.warn('RasterScanHeuristics failed with the following error. ' +
-                                     'Falling back to time domain grouping.\nOriginal Exception:\n{}'.format(e))
+                            LOG.warn('{} This often happens when pointing pattern deviates from regular raster. You may want to check the pointings in observation.'.format(e))
                             raster_heuristic_ok = False
 
                     if pattern != 'RASTER' or self.hm_rasterscan == 'time' or raster_heuristic_ok is False:

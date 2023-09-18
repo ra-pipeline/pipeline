@@ -639,8 +639,9 @@ class T1_3MRenderer(RendererBase):
                         for field in resultitem.flagsummary:
                             # Get the field intents, but only for those that
                             # the pipeline processes. This can be an empty
-                            # list (PIPE-394: POINTING, WVR intents).
-                            intents_list = [f.intents for f in ms.get_fields(intent='BANDPASS,PHASE,AMPLITUDE,POLARIZATION,POLANGLE,POLLEAKAGE,CHECK,TARGET')
+                            # list (PIPE-394: POINTING, WVR intents; PIPE-1806: DIFFGAIN).
+                            intents_list = [f.intents for f in ms.get_fields(
+                                intent='BANDPASS,PHASE,AMPLITUDE,POLARIZATION,POLANGLE,POLLEAKAGE,CHECK,TARGET,DIFFGAIN')
                                             if field in f.name]
                             if len(intents_list) == 0:
                                 continue
@@ -776,6 +777,10 @@ class T2_1DetailsRenderer(object):
         task = summary.FieldVsTimeChart(inputs)
         field_vs_time = task.plot()
 
+        inputs = summary.SpwIdVsFreqChart.Inputs(context, vis=ms.basename)
+        task = summary.SpwIdVsFreqChart(inputs, context)
+        spwid_vs_freq = task.plot()
+
         science_spws = ms.get_spectral_windows(science_windows_only=True)
         all_bands = sorted({spw.band for spw in ms.get_all_spectral_windows()})
         science_bands = sorted({spw.band for spw in science_spws})
@@ -803,10 +808,6 @@ class T2_1DetailsRenderer(object):
             time_on_science = utils.total_time_on_target_on_source(ms, is_single_dish_data)
         else:
             time_on_science = utils.total_time_on_source(science_scans)
-
-#         dirname = os.path.join(context.report_dir, 
-#                                'session%s' % ms.session,
-#                                ms.basename)
 
         task = summary.WeatherChart(context, ms)
         weather_plot = task.plot()
@@ -887,6 +888,7 @@ class T2_1DetailsRenderer(object):
             'time_on_science' : utils.format_timedelta(time_on_science),
             'intent_vs_time'  : intent_vs_time,
             'field_vs_time'   : field_vs_time,
+            'spwid_vs_freq'   : spwid_vs_freq,
             'dirname'         : dirname,
             'weather_plot'    : weather_plot,
             'pwv_plot'        : pwv_plot,

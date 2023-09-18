@@ -1,11 +1,10 @@
 import sys
 
-from casatasks import casalog
-
 import pipeline.h.cli.utils as utils
 
 
-def hifv_hanning(vis=None, pipelinemode=None, dryrun=None, acceptresults=None):
+@utils.cli_wrapper
+def hifv_hanning(vis=None, dryrun=None, acceptresults=None):
 
     """
     hifv_hanning ---- Hanning smoothing on a dataset
@@ -18,12 +17,6 @@ def hifv_hanning(vis=None, pipelinemode=None, dryrun=None, acceptresults=None):
                   MSs, or tar files of MSs, If ASDM files are specified, they will be
                   converted  to MS format.
                   example: vis=['X227.ms', 'asdms.tar.gz']
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the pipeline
-                  determines the values of all context defined pipeline inputs
-                  automatically.  In 'interactive' mode the user can set the pipeline
-                  context defined parameters manually.  In 'getinputs' mode the user
-                  can check the settings of all pipeline parameters without running
-                  the task.
     dryrun        Run the commands (True) or generate the commands to be run but
                   do not execute (False).  This is a pipeline task execution mode.
     acceptresults Add the results of the task to the pipeline context (True) or
@@ -35,8 +28,7 @@ def hifv_hanning(vis=None, pipelinemode=None, dryrun=None, acceptresults=None):
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
     
     
     Examples

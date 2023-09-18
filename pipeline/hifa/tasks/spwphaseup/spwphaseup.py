@@ -1,8 +1,10 @@
 import collections
+import copy
 import os
 from typing import Dict, List, Optional, Tuple
 
 import numpy
+import traceback
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -19,7 +21,7 @@ from pipeline.hifa.heuristics.phasespwmap import snr_n2wspwmap
 from pipeline.hifa.tasks.gaincalsnr import gaincalsnr
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import task_registry
-from pipeline.extern.PIPE692 import SSFanalysis
+from pipeline.hifa.heuristics.phasemetrics import PhaseStabilityHeuristics
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -151,15 +153,14 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         snr_info = self._compute_median_snr(diag_phase_results)
 
         # Do the decoherence assessment
-        phaserms_qa, phaserms_results, phaserms_cycletime, phaserms_totaltime, phaserms_antout \
+        phaserms_results, phaserms_cycletime, phaserms_totaltime, phaserms_antout \
             = self._do_decoherence_assessment()
 
         # Create the results object.
         result = SpwPhaseupResults(vis=inputs.vis, phasecal_mapping=phasecal_mapping, phaseup_result=phaseupresult,
                                    snr_info=snr_info, spwmaps=spwmaps, unregister_existing=inputs.unregister_existing,
-                                   phaserms_totaltime=phaserms_totaltime, phaserms_cycletime=phaserms_cycletime, 
-                                   phaserms_results=phaserms_results, phaserms_antout=phaserms_antout, 
-                                   phaserms_qa=phaserms_qa)
+                                   phaserms_totaltime=phaserms_totaltime, phaserms_cycletime=phaserms_cycletime,
+                                   phaserms_results=phaserms_results, phaserms_antout=phaserms_antout)
 
         return result
 
@@ -512,10 +513,13 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                 if spwmap[spwid] == mappedspwid:
                     snr = perspwsnr[i]
                     if snr is None:
-                        LOG.error('SNR not calculated for spw={}. Cannot calculate combined SNR'.format(spwid))
-                        return [], {}
-                    snrlist.append(perspwsnr[i])
+                        continue
+                    snrlist.append(snr)
                     combined_idx.append(i)
+
+            if not snrlist:
+                LOG.error('No SpW with valid SNR values; cannot calculate the combined SNR')
+                return [], {}
 
             # calculate combined SNR from per spw SNR
             combined_snr = numpy.linalg.norm(snrlist)
@@ -740,41 +744,25 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
 
         return snr_info
 
-    def _do_decoherence_assessment(self) -> Tuple[Dict, Dict, str, str, List]:
+    def _do_decoherence_assessment(self) -> Tuple[Dict, str, str, List]:
         try:
-            LOG.info("Starting decoherence assessment.")
+            LOG.info("Starting phase RMS structure function decoherence assessment.")
 
-            # Initialize the Decoherence Phase RMS Structure function assessment
-            pipe692 = SSFanalysis(self.inputs, outlierlimit=180., ftoll=0.3, maxpoorant=11)
+            # Initialize the phase RMS structure function assessment
+            inputs = copy.deepcopy(self.inputs)
+            phase_rms = PhaseStabilityHeuristics(inputs, outlier_limit=180.0, flag_tolerance=0.3, max_poor_ant=11)
 
-            # Launch the analysis
-            pipe692.analysis()
+            # Do the analysis
+            phaserms_results, phaserms_cycletime, phaserms_totaltime, phaserms_antout = phase_rms.analysis()
 
-            # Get the QA dictionary: 
-            # keys are: 'basescore', 'basecolor', 'shortmsg', 'longmsg'
-            phaserms_qa = pipe692.score()
-
-            LOG.info('The Phase RMS assessment score is: '+str(phaserms_qa['basescore']))
-
-            # Create the SSF plot(s) to include in the weblog
-            pipe692.plotSSF()
-
-            # Store the values which need to be reported on the weblog
-            phaserms_results = pipe692.allResult
-            phaserms_cycletime = pipe692.cycletime 
-            phaserms_totaltime = pipe692.totaltime
-            phaserms_antout = pipe692.antout
-
-            pipe692.close()
-        except Exception as e:
-            phaserms_qa = None
-            phaserms_results = None
-            phaserms_cycletime = None
-            phaserms_totaltime = None
+        except Exception:
+            phaserms_results, phaserms_cycletime, phaserms_totaltime = None, None, None
             phaserms_antout = []
+            LOG.error("For {}, phase RMS structure function analysis failed".format(self.inputs.ms.basename))
+            LOG.error(traceback.format_exc())
 
-        return phaserms_qa, phaserms_results, phaserms_cycletime, phaserms_totaltime, phaserms_antout
-
+        return phaserms_results, phaserms_cycletime, phaserms_totaltime, phaserms_antout
+    
     @staticmethod
     def _get_intent_field(ms: MeasurementSet, intents: str, exclude_intents: str = None) -> List[Tuple[str, str]]:
         # If provided, convert "intents to exclude" into set of strings.
@@ -869,9 +857,9 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
 
 class SpwPhaseupResults(basetask.Results):
     def __init__(self, vis: str = None, phasecal_mapping: Dict = None, phaseup_result: GaincalResults = None,
-                 snr_info: Dict = None, spwmaps: Dict = None, unregister_existing: Optional[bool] = False, 
-                 phaserms_totaltime: str = None, phaserms_cycletime: str = None, phaserms_results = None, 
-                 phaserms_antout: List = [], phaserms_qa: Dict = {}): 
+                 snr_info: Dict = None, spwmaps: Dict = None, unregister_existing: Optional[bool] = False,
+                 phaserms_totaltime: str = None, phaserms_cycletime: str = None, phaserms_results = None,
+                 phaserms_antout: List = []):
         """
         Initialise the phaseup spw mapping results object.
         """
@@ -889,9 +877,7 @@ class SpwPhaseupResults(basetask.Results):
         self.phaserms_totaltime = phaserms_totaltime
         self.phaserms_cycletime = phaserms_cycletime
         self.phaserms_results = phaserms_results
-        self.phaserms_qa = phaserms_qa
         self.phaserms_antout = ",".join(phaserms_antout)
-
 
     def merge_with_context(self, context):
         if self.vis is None:

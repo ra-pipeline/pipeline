@@ -306,7 +306,7 @@ class FlagCmd(object):
     def flagchannels(self):
         """Return list of channels flagged.
         """
-        result = np.array([], np.int)
+        result = np.array([], int)
         # decode axisnames/flagcoords
         if self.axisnames is not None:
             for k, name in enumerate(self.axisnames):

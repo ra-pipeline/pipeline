@@ -17,3 +17,4 @@ NoData = -32767.0
 
 from . import inspection_util
 from . import rasterutil
+from . import sdtyping

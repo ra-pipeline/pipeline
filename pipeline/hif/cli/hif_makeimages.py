@@ -1,10 +1,9 @@
 import sys
 
-from casatasks import casalog
-
 import pipeline.h.cli.utils as utils
 
 
+@utils.cli_wrapper
 def hif_makeimages(vis=None, target_list=None, hm_masking=None,
                    hm_sidelobethreshold=None, hm_noisethreshold=None, hm_lownoisethreshold=None,
                    hm_negativethreshold=None, hm_minbeamfrac=None, hm_growiterations=None,
@@ -12,7 +11,7 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
                    hm_perchanweightdensity=None, hm_npixels=None, hm_cyclefactor=None, hm_minpsffraction=None,
                    hm_maxpsffraction=None, hm_weighting=None, hm_cleaning=None, tlimit=None, drcorrect=None, masklimit=None,
                    cleancontranges=None, calcsb=None, hm_mosweight=None, overwrite_on_export=None, parallel=None,
-                   pipelinemode=None, dryrun=None, acceptresults=None):
+                   dryrun=None, acceptresults=None):
 
     """
     hif_makeimages ---- Compute clean map
@@ -22,8 +21,7 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -81,13 +79,6 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
                             product retains the same name.  Additional products start
                             counting with 'v2', 'v3', etc.
     parallel                Clean images using MPI cluster
-    pipelinemode            The pipeline operating mode.
-                            In 'automatic' mode the pipeline determines the values of all
-                            context defined pipeline inputs automatically.
-                            In 'interactive' mode the user can set the pipeline context
-                            defined parameters manually.
-                            In 'getinputs' mode the user can check the settings of all
-                            pipeline parameters without running the task.
     dryrun                  Run the task (False) or just display the command (True)
     acceptresults           Add the results to the pipeline context
 

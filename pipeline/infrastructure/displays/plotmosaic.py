@@ -1,6 +1,3 @@
-import math
-from decimal import Decimal
-
 import matplotlib.pyplot as plt
 import numpy
 import scipy.interpolate
@@ -32,56 +29,62 @@ def plot_mosaic(ms, source, figfile):
 
     median_ref_wavelength = Distance(C_MKS / median_ref_freq, DistanceUnits.METRE)
 
+    # dish diameter(s) in meters, primary beam diameter(s) in arcsec
     dish_diameters = [Distance(d, DistanceUnits.METRE) for d in {a.diameter for a in ms.antennas}]
+    taper = antenna_taper_factor(ms.antenna_array.name)
+    beam_diameters = [float(primary_beam_fwhm(median_ref_wavelength, dish_diameter, taper).to_units(ArcUnits.ARC_SECOND))
+                      for dish_diameter in dish_diameters]
 
-    # convert radians to degrees, constrained within [0,360]
-    ra_deg = numpy.array([quanta.convert(f.mdirection['m0']['value'], 'deg')['value'] % 360 for f in fields])
-    dec_deg = numpy.array([quanta.convert(f.mdirection['m1']['value'], 'deg')['value'] for f in fields])
+    # longitude and latitude in radians
+    ra  = numpy.array([quanta.convert(f.mdirection['m0']['value'], 'rad')['value'] for f in fields])
+    dec = numpy.array([quanta.convert(f.mdirection['m1']['value'], 'rad')['value'] for f in fields])
 
-    all_ras = [EquatorialArc(o, ArcUnits.DEGREE) for o in ra_deg]
-    all_decs = [EquatorialArc(o, ArcUnits.DEGREE) for o in dec_deg]
-    mean_ra = sum(all_ras, EquatorialArc(0)) / len(all_ras)
-    mean_dec = sum(all_decs, EquatorialArc(0)) / len(all_decs)
+    # compute the mean longitude, taking into account possible wrap-around cases
+    mean_ra  = numpy.arctan2(numpy.mean(numpy.sin(ra)), numpy.mean(numpy.cos(ra)))
+    mean_dec = numpy.mean(dec)  # no special measures needed for mean latitude
 
-    # scale by cos(dec) to make the pointing pattern in angle on sky
-    relative_ra = [(a - mean_ra) * Decimal(math.cos(mean_dec.to_units(ArcUnits.RADIAN))) for a in all_ras]
-    relative_dec = [(a - mean_dec) for a in all_decs]
+    # compute offsets in longitude (taking into account the cos(lat) factor) and latitude, still in radians
+    delta_ra  = numpy.cos(dec) * numpy.sin(ra - mean_ra)
+    delta_dec = numpy.sin(dec) * numpy.cos(mean_dec) - numpy.cos(dec) * numpy.sin(mean_dec) * numpy.cos(ra - mean_ra)
 
-    ra_range = max(relative_ra) - min(relative_ra)
-    dec_range = max(relative_dec) - min(relative_dec)
-    x_label_offset = 0.02 * float(ra_range.to_units(ArcUnits.ARC_SECOND))
-    y_label_offset = 0.02 * float(dec_range.to_units(ArcUnits.ARC_SECOND))
+    # some heuristics to determine the appropriate x- and y-range for plotting, adjusting the figure size as needed
+    radians_to_arcsec = 180 / numpy.pi * 60 * 60
+    ra_range_arcsec  = (max(delta_ra)  - min(delta_ra))  * radians_to_arcsec
+    dec_range_arcsec = (max(delta_dec) - min(delta_dec)) * radians_to_arcsec
+    smallest_beam = min(beam_diameters)  # arcsec
+    pixels_per_beam = 60.
+    min_size_in_pixels = 400.
+    max_size_in_pixels = 2000.
+    margin_x = 100.0  # margins outside the axes in pixels, approximate (the axes object is automatically resized anyway)
+    margin_y = 80.0
+    pixels_x = max(min_size_in_pixels, min(max_size_in_pixels, pixels_per_beam * ra_range_arcsec / smallest_beam))
+    pixels_y = max(min_size_in_pixels, min(max_size_in_pixels, pixels_per_beam * dec_range_arcsec / smallest_beam))
+    pixels_per_smallest_beam = smallest_beam / max(ra_range_arcsec / pixels_x, dec_range_arcsec / pixels_y)
+    fontsize = max(6, min(12, 0.1 * pixels_per_smallest_beam))   # font size for labelling the antennae
 
-    fig = plt.figure()
+    dpi = 100  # pixels per inch
+    fig = plt.figure(figsize=((pixels_x + margin_x) / dpi, (pixels_y + margin_y) / dpi))
     ax = fig.add_subplot(1, 1, 1)
 
-    taper = antenna_taper_factor(ms.antenna_array.name)
-    # field labels overlap and become unintelligible if there are too many of
-    # them
-    draw_field_labels = True if len(fields) <= 500 else False
+    # field labels overlap and become unintelligible if there are too many of them
+    draw_field_labels = len(fields) <= 500
 
     legend_labels = {}
     legend_colours = {}
-    for diameter in dish_diameters:
-        primary_beam = primary_beam_fwhm(median_ref_wavelength, diameter, taper)
-        radius_arcsecs = 0.5 * float(primary_beam.to_units(ArcUnits.ARC_SECOND))
-
-        for field, rel_ra, rel_dec in zip(fields, relative_ra, relative_dec):
-            x = float(rel_ra.to_units(ArcUnits.ARC_SECOND))
-            y = float(rel_dec.to_units(ArcUnits.ARC_SECOND))
-            colour = get_dish_colour(diameter, field)
-
-            cir = Circle((x, y), radius=radius_arcsecs, facecolor='none', edgecolor=colour, linestyle='dotted',
-                         alpha=0.6)
+    for dish_diameter, beam_diameter in zip(dish_diameters, beam_diameters):
+        for field, rel_ra, rel_dec in zip(fields, delta_ra, delta_dec):
+            x = rel_ra  * radians_to_arcsec
+            y = rel_dec * radians_to_arcsec
+            colour = get_dish_colour(dish_diameter, field)
+            cir = Circle((x, y), radius=0.5 * beam_diameter, facecolor='none', edgecolor=colour,
+                         linestyle='dotted', alpha=0.6)
             ax.add_patch(cir)
-
             if draw_field_labels:
-                label = '{}'.format(field.id)
-                ax.text(x + x_label_offset, y + y_label_offset, label, fontsize=12, color=colour, weight='normal')
+                ax.text(x, y, '{}'.format(field.id), ha='center', va='center', fontsize=fontsize, color=colour)
+            else:
+                ax.plot(x, y, '{}+'.format(colour), markersize=4)  # show just the field centre, but no label
 
-            ax.plot(x, y, '{}+'.format(colour), markersize=4)
-
-            label = 'T$_{{sys}}$-only field' if is_tsys_only(field) else str(diameter)
+            label = 'T$_{{sys}}$-only field' if is_tsys_only(field) else str(dish_diameter)
             if label not in legend_labels:
                 legend_labels[label] = Line2D(list(range(1)), list(range(1)), color=colour, linewidth=2,
                                               linestyle='dotted')
@@ -89,42 +92,38 @@ def plot_mosaic(ms, source, figfile):
 
     title_string = '{}, {}, average freq.={}'.format(ms.basename, source.name,
                                                      unitformat.frequency.format(median_ref_freq))
-    ax.set_title(title_string, size=12)
-    ra_string = r'{:02d}$^{{\rm h}}${:02d}$^{{\rm m}}${:02.3f}$^{{\rm s}}\!\!.$'.format(*mean_ra.toHms())
+    title_font_size = 12
+    title_text = ax.set_title(title_string, size=title_font_size)
+    ra_string = r'{:02d}$^{{\rm h}}${:02d}$^{{\rm m}}${:02.3f}$^{{\rm s}}$'.format(
+        *EquatorialArc(mean_ra % (2*numpy.pi), ArcUnits.RADIAN).toHms())
     ax.set_xlabel('Right ascension offset from {}'.format(ra_string))
-    dec_string = r'{:02d}$\degree${:02d}$^\prime${:02.1f}$^{{\prime\prime}}$'.format(*mean_dec.toDms())
+    dec_string = r'{:02d}$\degree${:02d}$^\prime${:02.1f}$^{{\prime\prime}}$'.format(
+        *EquatorialArc(mean_dec, ArcUnits.RADIAN).toDms())
     ax.set_ylabel('Declination offset from {}'.format(dec_string))
 
     leg_lines = [legend_labels[i] for i in sorted(legend_labels)]
     leg_labels = sorted(legend_labels)
-    leg = ax.legend(leg_lines, leg_labels, prop={'size': 10}, loc='upper right')
+    leg = ax.legend(leg_lines, leg_labels, prop={'size': 10}, loc='best')
     leg.get_frame().set_alpha(0.8)
     for text in leg.get_texts():
         text.set_color(legend_colours[text.get_text()])
 
-    y = 0.02
-    pb_formatter = get_arc_formatter(1)
-    for d in dish_diameters:
-        colour = get_dish_colour(d)
-        pb = primary_beam_fwhm(median_ref_wavelength, d, taper)
-        pb_arcsecs = float(pb.to_units(ArcUnits.ARC_SECOND))
-        msg = '{} primary beam = {}'.format(d, pb_formatter.format(pb_arcsecs))
-        t = ax.text(0.02, y, msg, color=colour, transform=ax.transAxes, size=10)
-        t.set_bbox(dict(facecolor='white', edgecolor='none', alpha=0.75))
-        y += 0.05
-
     ax.axis('equal')
-    ax.margins(0.05)
-
     arcsec_formatter = FuncFormatter(label_format)
     ax.xaxis.set_major_formatter(arcsec_formatter)
     ax.yaxis.set_major_formatter(arcsec_formatter)
     ax.xaxis.grid(True, which='major')
     ax.yaxis.grid(True, which='major')
-
     ax.invert_xaxis()
+    plt.tight_layout()
 
-    fig.savefig(figfile)
+    # make sure title text fits into the picture, if not, then reduce the font size
+    xmax = title_text.get_window_extent(fig.canvas.get_renderer()).xmax
+    figwidth = fig.canvas.get_width_height()[0]
+    if xmax > figwidth:
+        title_text.set_fontsize(title_font_size * figwidth / (2*xmax-figwidth))
+
+    fig.savefig(figfile, dpi=dpi)
     plt.close(fig)
 
 
@@ -182,9 +181,9 @@ def primary_beam_fwhm(wavelength, diameter, taper):
       obscuration: diameter of the central obstruction in meters
     """
     b = baars_taper_factor(taper) * central_obstruction_factor(diameter)
-    lambda_m = wavelength.to_units(DistanceUnits.METRE)
-    diameter_m = diameter.to_units(DistanceUnits.METRE)
-    return EquatorialArc(Decimal(b) * lambda_m / diameter_m, ArcUnits.RADIAN)
+    lambda_m = float(wavelength.to_units(DistanceUnits.METRE))
+    diameter_m = float(diameter.to_units(DistanceUnits.METRE))
+    return EquatorialArc(b * lambda_m / diameter_m, ArcUnits.RADIAN)
 
 
 def central_obstruction_factor(diameter, obscuration=0.75):

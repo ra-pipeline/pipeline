@@ -3,7 +3,8 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
-def hsdn_importdata(vis=None, session=None, hm_rasterscan=None, pipelinemode=None, datacolumns=None,
+@utils.cli_wrapper
+def hsdn_importdata(vis=None, session=None, hm_rasterscan=None, datacolumns=None,
                     overwrite=None, nocopy=None, createmms=None, dryrun=None,
                     acceptresults=None):
 
@@ -22,8 +23,7 @@ def hsdn_importdata(vis=None, session=None, hm_rasterscan=None, pipelinemode=Non
     
     Output
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -38,12 +38,6 @@ def hsdn_importdata(vis=None, session=None, hm_rasterscan=None, pipelinemode=Non
     hm_rasterscan Heuristics method for raster scan analysis. Two analysis modes,
                   time-domain analysis ('time') and direction analysis ('direction'), are available.
                   Default is 'time'.
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the pipeline
-                  determines the values of all context defined pipeline inputs
-                  automatically.  In 'interactive' mode the user can set the pipeline
-                  context defined parameters manually.  In 'getinputs' mode the user
-                  can check the settings of all pipeline parameters without running
-                  the task.
     datacolumns   Dictionary defining the data types of
                   existing columns. The format is:
                   
@@ -73,17 +67,13 @@ def hsdn_importdata(vis=None, session=None, hm_rasterscan=None, pipelinemode=Non
                   If no type is specified, {'data':'raw'} will
                   be assumed.
     overwrite     Overwrite existing files on import.
-                  Can only be set in pipelinemode='interactive'.
                   When converting ASDM to MS, if overwrite=False and the MS already
                   exists in output directory, then this existing MS dataset will be used
                   instead.
     nocopy        Disable copying of MS to working directory.
-                  Parameter is not available when pipelinemode='automatic'.
     createmms     Create an MMS
     dryrun        Run the task (False) or display task command (True).
-                  Parameter is available only when pipelinemode='interactive'.
     acceptresults results of the task to the pipeline context (True) or reject them (False).
-                  Parameter is available only when pipelinemode='interactive'.
 
     --------- examples -----------------------------------------------------------
 
@@ -101,16 +91,15 @@ def hsdn_importdata(vis=None, session=None, hm_rasterscan=None, pipelinemode=Non
     
     hsdn_importdata (vis=['../rawdata/uid___A002_X30a93d_X43e.tar.gz'])
     
-    4. Check the hsdn_importdata inputs, then import the data:
+    4. Import a list of MeasurementSets:
     
     myvislist = ['uid___A002_X30a93d_X43e.ms', 'uid_A002_x30a93d_X44e.ms']
-    hsdn_importdata(vis=myvislist, pipelinemode='getinputs')
     hsdn_importdata(vis=myvislist)
     
     5. Load an ASDM but check the results before accepting them into the context:
     
     results = hsdn_importdata(vis=['uid___A002_X30a93d_X43e.ms'],
-    acceptresults=False)
+                              acceptresults=False)
     results.accept()
     
     6. Run in dryrun mode before running for real:

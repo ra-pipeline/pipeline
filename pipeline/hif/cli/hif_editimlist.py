@@ -3,6 +3,7 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
+@utils.cli_wrapper
 def hif_editimlist(imagename=None,
                    search_radius_arcsec=None,
                    cell=None,
@@ -42,7 +43,6 @@ def hif_editimlist(imagename=None,
                    uvtaper=None,
                    uvrange=None,
                    width=None,
-                   pipelinemode=None,
                    dryrun=None,
                    acceptresults=None):
 
@@ -53,8 +53,7 @@ def hif_editimlist(imagename=None,
     Add to a list of images to be produced with hif_makeimages(), which uses hif_tclean() to invoke CASA tclean.
     Many of the hif_editimlist() inputs map directly to tclean parameters.
     
-    If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    The results object for the pipeline task is returned.
     
 
     --------- parameter descriptions ---------------------------------------------
@@ -114,11 +113,6 @@ def hif_editimlist(imagename=None,
     uvtaper              Used to set a uv-taper during clean.
     uvrange              Set of data selection uv ranges, \'\' for all.
     width                Channel width
-    pipelinemode         The pipeline operating mode. In 'automatic' mode the pipeline
-                         determines the values of all context defined pipeline inputs automatically.
-                         In 'interactive' mode the user can set the pipeline context defined
-                         parameters manually. In 'getinputs' mode the user can check the settings
-                         of all pipeline parameters without running the task.
     dryrun               Run the task (False) or display the command(True)
     acceptresults        Add the results to the pipeline context
 

@@ -1,5 +1,5 @@
 <ProcessingProcedure>
-	<ProcedureTitle>test_hifa_selfcal_only</ProcedureTitle>
+	<ProcedureTitle>test_hifa_selfcal</ProcedureTitle>
 
     <!-- import MS: if importonly=True, no calibration shall be performed -->
     <ProcessingCommand>

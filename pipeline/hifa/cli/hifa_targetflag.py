@@ -3,7 +3,8 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
-def hifa_targetflag(vis=None, pipelinemode=None, dryrun=None, acceptresults=None):
+@utils.cli_wrapper
+def hifa_targetflag(vis=None, dryrun=None, acceptresults=None):
 
     """
     hifa_targetflag ---- Flag target source outliers
@@ -34,13 +35,6 @@ def hifa_targetflag(vis=None, pipelinemode=None, dryrun=None, acceptresults=None
                   '': use all MeasurementSets in the context
                   
                   Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
-    pipelinemode  The pipeline operating mode.
-                  In 'automatic' mode the pipeline determines the values of all
-                  context defined pipeline inputs automatically.
-                  In 'interactive' mode the user can set the pipeline context
-                  defined parameters manually.
-                  In 'getinputs' mode the user can check the settings of all
-                  pipeline parameters without running the task.
     dryrun        Run the task (False) or display task command (True)
     acceptresults Add the results of the task to the pipeline context (True) or
                   reject them (False).

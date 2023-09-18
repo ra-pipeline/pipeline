@@ -1,15 +1,14 @@
 import sys
 
-from casatasks import casalog
-
 import pipeline.h.cli.utils as utils
 
 
+@utils.cli_wrapper
 def hifa_session_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, antenna=None, hm_phaseup=None,
                           phaseupsolint=None, phaseupbw=None, phaseupsnr=None, phaseupnsols=None, hm_bandpass=None,
                           solint=None, maxchannels=None, evenbpints=None, bpsnr=None, minbpsnr=None, bpnsols=None,
                           hm_bandtype=None, combine=None, refant=None, solnorm=None, minblperant=None, minsnr=None,
-                          degamp=None, degphase=None, pipelinemode=None, dryrun=None, acceptresults=None,
+                          degamp=None, degphase=None, dryrun=None, acceptresults=None,
                           parallel=None):
 
     """
@@ -33,8 +32,7 @@ def hifa_session_bandpass(vis=None, caltable=None, field=None, intent=None, spw=
     
     Output
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
     
     
     Issues
@@ -139,11 +137,6 @@ def hifa_session_bandpass(vis=None, caltable=None, field=None, intent=None, spw=
                   'channel' only.
     degamp        
     degphase      
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the pipeline
-                  determines the values of all context defined pipeline inputs automatically.
-                  In interactive mode the user can set the pipeline context defined
-                  parameters manually. In 'getinputs' mode the user can check the settings of
-                  all pipeline parameters without running the task.
     dryrun        Run the commands (True) or generate the commands to be run but
                   do not execute (False).
     acceptresults Add the results of the task to the pipeline context (True) or

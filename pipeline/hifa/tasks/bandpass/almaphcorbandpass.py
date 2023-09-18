@@ -154,6 +154,12 @@ class ALMAPhcorBandpass(bandpassworker.BandpassWorker):
         if inputs.hm_phaseup != '':
             result.preceding.append(phaseup_result.final)
 
+            # PIPE-1624: Store bandpass phaseup caltable table name so it
+            # can be saved into the context. Do not use the version in
+            # preceding.append (above), as it is labeled "deprecated"
+            for cal in phaseup_result.final:
+                result.phaseup_caltable_for_phase_rms.append(cal.gaintable)
+
         # PIPE-628: set whether we should unregister old bandpass calibrators
         # on results acceptance
         result.unregister_existing = inputs.unregister_existing

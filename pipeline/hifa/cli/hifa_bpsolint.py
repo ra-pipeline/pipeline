@@ -1,14 +1,13 @@
 import sys
 
-from casatasks import casalog
-
 import pipeline.h.cli.utils as utils
 
 
+@utils.cli_wrapper
 def hifa_bpsolint(vis=None, field=None, intent=None, spw=None, phaseupsnr=None,
                   minphaseupints=None, evenbpints=None, bpsnr=None, minbpsnr=None,
                   minbpnchan=None, hm_nantennas=None, maxfracflagged=None,
-                  pipelinemode=None, dryrun=None, acceptresults=None):
+                  dryrun=None, acceptresults=None):
 
     """
     hifa_bpsolint ---- Compute optimal bandpass calibration solution intervals
@@ -76,8 +75,7 @@ def hifa_bpsolint(vis=None, field=None, intent=None, spw=None, phaseupsnr=None,
     
     Output
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -127,11 +125,6 @@ def hifa_bpsolint(vis=None, field=None, intent=None, spw=None, phaseupsnr=None,
                    before it is excluded from the signal to noise estimate.
                    
                    example: maxfracflagged=0.80
-    pipelinemode   The pipeline operating mode. In 'automatic' mode the pipeline
-                   determines the values of all context defined pipeline inputs automatically.
-                   In interactive mode the user can set the pipeline context defined
-                   parameters manually. In 'getinputs' mode the user can check the settings of
-                   all pipeline parameters without running the task.
     dryrun         Run the commands (True) or generate the commands to be run but
                    do not execute (False).
     acceptresults  ults of the task to the pipeline context (True) or

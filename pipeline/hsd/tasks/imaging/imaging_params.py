@@ -7,7 +7,6 @@ import numpy
 
 from casatools import coordsys
 from pipeline.hsd.tasks.common import utils as sdutils
-from pipeline.hsd.tasks.imaging.resultobjects import SDImagingResultItem
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.utils.debugwrapper import debugwrapper
 
@@ -15,11 +14,9 @@ if TYPE_CHECKING:
     from collections import namedtuple
     from pipeline.hsd.tasks.imaging.resultobjects import SDImagingResults
     from pipeline.infrastructure import Context
-    from pipeline.infrastructure.callibrary import IntervalCalState
     from pipeline.domain.datatable import DataTableImpl
     from pipeline.domain import MeasurementSet
     from pipeline.domain.singledish import MSReductionGroupDesc
-    Direction = NewType('Direction', Dict[str, Union[str, float]])
     RasterInfo = NewType('RasterInfo', namedtuple('RasterInfo', 'center_ra center_dec width'
                                                                 'height scan_angle row_separation row_duration'))
     ImageGroup = Dict[str, List[Union['MeasurementSet', int,
@@ -28,7 +25,7 @@ if TYPE_CHECKING:
 
 class ObservedList(list):
     """Class inherit list to observe its behavior.
-    
+
     This class intends to observe/output list stuff for debugging more easier.
     If you want to search a needle in a haystack, please uncomment out @debugwrapper()."""
 
@@ -73,7 +70,7 @@ class ObservedList(list):
 
 class Parameters:
     """Abstract class of Parameter object.
-    
+
     Note: _immutable_parameters is the list which is set some parameter names of a class inherit Parameter.
     All parameters in _immutable_parameters are set immutable by freeze().
     """
@@ -293,10 +290,11 @@ class PostProcessParameters(Parameters):
         self.cs = None                             # coordsys: Coordsys object
         self.faxis = None                          # int: Spectral axis which is found
         self.imagename = None                      # str: Image name
-        self.image_rms = None                      # float: Image statistics
+        self.image_rms = None                      # float: Image statistics (rms)
+        self.image_max = None                      # float: Image statistics (maximum value)
+        self.image_min = None                      # float: Image statistics (minimum value)
         self.include_channel_range = None          # List[int]: List of channel ranges to calculate image statistics
-        self.is_representative_source_spw = None   # bool: Flag of representative source spw
-        self.is_representative_spw = None          # bool: Flag of representative spw
+        self.is_representative_source_and_spw = None  # bool: Flag of representative source spw and representative spw
         self.nx = None                             # numpy.int64: X of image shape
         self.ny = None                             # numpy.int64: Y of image shape
         self.org_direction = None                  # Direction: a direction of origin for ephemeris object

@@ -183,12 +183,10 @@ except:
             casaVersion = mycasa.casa['build']['version'].split()[0]
     else:
         casaVersion = casadef.casa_version
-print("casaVersion = ", casaVersion)
 
 if (casaVersion >= '5.9.9'):
     try:
         import astropy.io.fits as pyfits
-        print("Using astropy.io.fits instead of pyfits")
     except:
         with warnings.catch_warnings():
             # ignore pyfits deprecation message, maybe casa will include astropy.io.fits soon

@@ -124,7 +124,7 @@ class VLAExportData(exportdata.ExportData):
         # Update the manifest
         if auxfproducts is not None or pipe_aqua_reportfile is not None:
             manifest_file = os.path.join(self.inputs.products_dir, results.manifest)
-            self._add_to_manifest(manifest_file, auxfproducts, False, [], pipe_aqua_reportfile)
+            self._add_to_manifest(manifest_file, auxfproducts, False, [], pipe_aqua_reportfile, oussid)
 
         return results
 
@@ -188,9 +188,9 @@ class VLAExportData(exportdata.ExportData):
                 continue
 
         if vlassmode:
-            task_string += "\n    hifv_fixpointing(pipelinemode='automatic')"
+            task_string += "\n    hifv_fixpointing()"
 
-        task_string += "\n    hifv_statwt(pipelinemode='automatic')"
+        task_string += "\n    hifv_statwt()"
 
         template = '''h_init()
 try:

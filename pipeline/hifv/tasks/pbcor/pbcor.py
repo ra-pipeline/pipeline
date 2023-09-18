@@ -33,6 +33,8 @@ class PbcorInputs(vdp.StandardInputs):
 class Pbcor(basetask.StandardTaskTemplate):
     Inputs = PbcorInputs
 
+    is_multi_vis_task = True
+
     def prepare(self):
 
         sci_imlist = self.inputs.context.sciimlist.get_imlist()

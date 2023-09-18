@@ -347,7 +347,7 @@ class MetaDataReader(object):
         # key: antenna id
         # value: list of rows to be flagged
         try:
-            flagdict1 = self.generate_flagdict_for_invalid_pointing_data()
+            flagdict1, _ = self.generate_flagdict_for_invalid_pointing_data()
         except Exception:
             flagdict1 = {}
 
@@ -382,19 +382,18 @@ class MetaDataReader(object):
         self._generate_flagcmd(self.flagtemplate, flagdict1, reason='missing pointing data')
         self._generate_flagcmd(self.flagtemplate, flagdict2, reason='uniform image rms')
 
-    def generate_flagdict_for_invalid_pointing_data(self) -> collections.defaultdict:
-        """Return row IDs of DataTable with invalid pointing information.
+    def generate_flagdict_for_invalid_pointing_data(self) -> Tuple[collections.defaultdict, List[str]]:
+        """Return row IDs of DataTable with invalid pointing information and a list of message.
 
         Returns:
-            collections.defaultdict: dictionary of invalid pointing data
+            Tuple: contains dictionary of invalid pointing data and a list of message 
         """
-        if len(self.invalid_pointing_data) > 0:
-            LOG.warning('There are rows without corresponding POINTING data. Affected rows are identified and will be flagged in hsd_flagdata stage.')
-            LOG.warning('Affected antennas are: {} in {}'.format(
-                ' '.join([self.ms.antennas[k].name for k in self.invalid_pointing_data]),
-                self.ms.basename))
 
-        return self.invalid_pointing_data
+        msglist = []
+        if len(self.invalid_pointing_data) > 0:
+            msg = 'There are rows without corresponding POINTING data. Affected rows are identified and will be flagged in hsd_flagdata stage. Affected antennas are: {} in {}'.format(' '.join([self.ms.antennas[k].name for k in self.invalid_pointing_data]), self.ms.basename)
+            msglist.append(msg)
+        return self.invalid_pointing_data, msglist
 
     def generate_flagdict_for_uniform_rms(self) -> Dict[Tuple[int, int], numpy.ndarray]:
         """Return row IDs of DataTable to flag.
@@ -647,7 +646,7 @@ class MetaDataReader(object):
             field_ids = tb.getcol('FIELD_ID')
             getsourcename = numpy.vectorize(lambda x: ms.get_fields(x)[0].source.name, otypes=['str'])
             Tsrc = getsourcename(field_ids)
-            NchanArray = numpy.fromiter((nchan_map[n] for n in Tif), dtype=numpy.int)
+            NchanArray = numpy.fromiter((nchan_map[n] for n in Tif), dtype=int)
 
         ID = len(self.datatable)
         LOG.info('ID=%s' % ID)

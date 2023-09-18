@@ -9,7 +9,6 @@ import os
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 from pipeline.h.tasks.importdata.renderer import make_repsource_table
-from pipeline.infrastructure.utils import merge_td_columns
 
 LOG = logging.get_logger(__name__)
 
@@ -72,6 +71,7 @@ def _get_flags(pipeline_context, results):
                         flags[source][vis] = {}
 
                         for spw in sci_spw_ids:
-                            flags[source][vis][spw] = src_summary['spw'][str(spw)]
+                            if str(spw) in src_summary['spw']:
+                                flags[source][vis][spw] = src_summary['spw'][str(spw)]
 
     return flags

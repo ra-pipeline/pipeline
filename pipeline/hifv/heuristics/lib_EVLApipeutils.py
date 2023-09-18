@@ -45,14 +45,6 @@ from pipeline.infrastructure import casa_tools
 LOG = infrastructure.get_logger(__name__)
 
 
-def find_EVLA_band(frequency, bandlimits=[0.0e6, 150.0e6, 700.0e6, 2.0e9, 4.0e9, 8.0e9, 12.0e9, 18.0e9, 26.5e9, 40.0e9, 56.0e9], BBAND='?4PLSCXUKAQ?'):
-    from bisect import bisect_left
-    """identify VLA band"""
-    i = bisect_left(bandlimits, frequency)
-
-    return BBAND[i]
-
-
 def getCalFlaggedSoln(calTable):
     """
     Version 2012-05-03 v1.0 STM to 3.4 from original 3.3 version, new dictionary

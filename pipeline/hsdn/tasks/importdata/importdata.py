@@ -124,6 +124,7 @@ class NROImportData(sd_importdata.SerialSDImportData):
         myresults = NROImportDataResults(mses=results.mses, reduction_group_list=results.reduction_group_list,
                                          datatable_prefix=results.datatable_prefix, setjy_results=results.setjy_results)
         myresults.origin = results.origin
+        myresults.msglist = results.msglist
         return myresults
 
     def analyse(self, result: NROImportDataResults) -> NROImportDataResults:

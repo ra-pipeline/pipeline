@@ -362,7 +362,7 @@ class DetectLine(basetask.StandardTaskTemplate):
         if Bin == 1:
             return data
         else:
-            return numpy.array([data[i:i+Bin].min() for i in range(offset, len(data)-Bin+1, Bin)], dtype=numpy.bool)
+            return numpy.array([data[i:i+Bin].min() for i in range(offset, len(data)-Bin+1, Bin)], dtype=bool)
 
     def SpBinning(self,
                   data: numpy.ndarray,
@@ -381,7 +381,7 @@ class DetectLine(basetask.StandardTaskTemplate):
         if Bin == 1:
             return data
         else:
-            return numpy.array([data[i:i+Bin].mean() for i in range(offset, len(data)-Bin+1, Bin)], dtype=numpy.float)
+            return numpy.array([data[i:i+Bin].mean() for i in range(offset, len(data)-Bin+1, Bin)], dtype=float)
 
     def analyse(self, result: DetectLineResults) -> DetectLineResults:
         """Analyse result.

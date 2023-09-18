@@ -1213,7 +1213,7 @@ class TsysflagView(object):
                         # Initialize median spectrum and corresponding flag list
                         # and populate with valid data
                         stackmedian = np.zeros(np.shape(spectrumstack)[1])
-                        stackmedianflag = np.ones(np.shape(spectrumstack)[1], np.bool)
+                        stackmedianflag = np.ones(np.shape(spectrumstack)[1], bool)
                         for j in range(np.shape(spectrumstack)[1]):
                             valid_data = spectrumstack[:, j][np.logical_not(flagstack[:, j])]
                             if len(valid_data):
@@ -1232,7 +1232,7 @@ class TsysflagView(object):
                         # view, and get values for the 'times' axis.
                         times = np.sort(list(times))
                         data = np.zeros([antenna_ids[-1]+1, len(times)])
-                        flag = np.ones([antenna_ids[-1]+1, len(times)], np.bool)
+                        flag = np.ones([antenna_ids[-1]+1, len(times)], bool)
 
                         # Populate the flagging view based on the flagging metric
                         for description in tsysspectra[pol].descriptions():
@@ -1311,7 +1311,7 @@ class TsysflagView(object):
                     # Initialize median spectrum and corresponding flag list
                     # and populate with valid data
                     stackmedian = np.zeros(np.shape(spectrumstack)[1])
-                    stackmedianflag = np.ones(np.shape(spectrumstack)[1], np.bool)
+                    stackmedianflag = np.ones(np.shape(spectrumstack)[1], bool)
                     for j in range(np.shape(spectrumstack)[1]):
                         valid_data = spectrumstack[:, j][np.logical_not(flagstack[:, j])]
                         if len(valid_data):
@@ -1330,7 +1330,7 @@ class TsysflagView(object):
                     # and get values for the 'times' axis.
                     times = np.sort(list(times))
                     data = np.zeros([antenna_ids[-1]+1, len(times)])
-                    flag = np.ones([antenna_ids[-1]+1, len(times)], np.bool)
+                    flag = np.ones([antenna_ids[-1]+1, len(times)], bool)
 
                     # Populate the flagging view based on the flagging metric
                     for description in tsysspectra[pol].descriptions():
@@ -1435,7 +1435,7 @@ class TsysflagView(object):
                 # Initialize median spectrum and corresponding flag list
                 # and populate with valid data
                 stackmedian = np.zeros(np.shape(spectrumstack)[1])
-                stackmedianflag = np.ones(np.shape(spectrumstack)[1], np.bool)
+                stackmedianflag = np.ones(np.shape(spectrumstack)[1], bool)
                 for j in range(np.shape(spectrumstack)[1]):
                     valid_data = spectrumstack[:, j][np.logical_not(flagstack[:, j])]
                     if len(valid_data):
@@ -1452,7 +1452,7 @@ class TsysflagView(object):
             # and get values for the 'times' axis.
             times = np.sort(list(times))
             data = np.zeros([antenna_ids[-1]+1, len(times)])
-            flag = np.ones([antenna_ids[-1]+1, len(times)], np.bool)
+            flag = np.ones([antenna_ids[-1]+1, len(times)], bool)
 
             # Populate the flagging view based on the flagging metric:
             # Get MAD of channel by channel derivative of Tsys
@@ -1593,7 +1593,7 @@ class TsysflagView(object):
 
                     # Initialize median spectrum and corresponding flag list
                     stackmedian = np.zeros(np.shape(spectrumstack)[1])
-                    stackmedianflag = np.ones(np.shape(spectrumstack)[1], np.bool)
+                    stackmedianflag = np.ones(np.shape(spectrumstack)[1], bool)
 
                     # Calculate median Tsys spectrum from spectrum stack
                     for j in range(np.shape(spectrumstack)[1]):
@@ -1616,7 +1616,7 @@ class TsysflagView(object):
                     # and not flagged, and create a new list of flags 
                     # that include these channels
                     newflag = (diff > 0.05) & np.logical_not(diff_flag)
-                    flag_chan = np.zeros([len(newflag)+1], np.bool)
+                    flag_chan = np.zeros([len(newflag)+1], bool)
                     flag_chan[:-1] = newflag
                     flag_chan[1:] = np.logical_or(flag_chan[1:], newflag)
                     channels_flagged = np.arange(len(newflag)+1)[flag_chan]
@@ -1642,7 +1642,7 @@ class TsysflagView(object):
             # and get values for the 'times' axis.
             times = np.sort(list(times))
             data = np.zeros([antenna_ids[-1]+1, len(times)])
-            flag = np.ones([antenna_ids[-1]+1, len(times)], np.bool)
+            flag = np.ones([antenna_ids[-1]+1, len(times)], bool)
 
             # Populate the flagging view based on the flagging metric
             for description in tsysspectra[pol].descriptions():
@@ -1750,7 +1750,7 @@ class TsysflagView(object):
 
             # Initialize median spectrum and corresponding flag list
             stackmedian = np.zeros(np.shape(spectrumstack)[1])
-            stackmedianflag = np.ones(np.shape(spectrumstack)[1], np.bool)
+            stackmedianflag = np.ones(np.shape(spectrumstack)[1], bool)
 
             # Calculate median Tsys spectrum from spectrum stack
             for j in range(np.shape(spectrumstack)[1]):
@@ -1843,7 +1843,7 @@ class TsysflagView(object):
             # Initialize median spectrum and corresponding flag list
             # and populate with valid data
             spw_median = np.zeros(np.shape(spw_spectrumstack)[1])
-            spw_medianflag = np.ones(np.shape(spw_spectrumstack)[1], np.bool)
+            spw_medianflag = np.ones(np.shape(spw_spectrumstack)[1], bool)
             for j in range(np.shape(spw_spectrumstack)[1]):
                 valid_data = spw_spectrumstack[:, j][np.logical_not(spw_flagstack[:, j])]
                 if len(valid_data):
@@ -1857,7 +1857,7 @@ class TsysflagView(object):
 
                 # Initialize the data and flagging state for the flagging view
                 ant_median = np.zeros(np.shape(ant_spectrumstack[antenna_id])[1])
-                ant_medianflag = np.ones(np.shape(ant_spectrumstack[antenna_id])[1], np.bool)
+                ant_medianflag = np.ones(np.shape(ant_spectrumstack[antenna_id])[1], bool)
 
                 # Populate the flagging view based on the flagging metric:
                 # Calculate diff between median for spw/antenna and median for spw

@@ -33,32 +33,29 @@ SDFlagRule = {\
     'RmsPreFitFlag':\
         {'isActive': True, \
          'Reversible': True, \
-         'Threshold': 4.5}, \
-         #'Threshold': 2.5}, \
+         'Threshold': 9.0}, \
     'RmsPostFitFlag':\
         {'isActive': True, \
          'Reversible': True, \
-         'Threshold': 4.0}, \
+         'Threshold': 8.0}, \
     'RunMeanPreFitFlag':\
         {'isActive': True, \
          'Reversible': True, \
-         'Threshold': 5.5, \
+         'Threshold': 11.0, \
          'Nmean': 5}, \
     'RunMeanPostFitFlag':\
         {'isActive': True, \
          'Reversible': True, \
-         'Threshold': 5.0, \
+         'Threshold': 10.0, \
          'Nmean': 5}, \
     'RmsExpectedPreFitFlag':\
         {'isActive': True, \
          'Reversible': True, \
-         #'Threshold': 2.66666}, \
-         'Threshold': 3.0}, \
+         'Threshold': 6.0}, \
     'RmsExpectedPostFitFlag':\
         {'isActive': True, \
          'Reversible': True, \
-         #'Threshold': 1.5}, \
-         'Threshold': 1.33333}, \
+         'Threshold':  2.6666}, \
     'Flagging':\
         {'ApplicableDuration': 'raster'}, \
         #{'ApplicableDuration': 'subscan'}, \

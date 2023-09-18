@@ -4,7 +4,6 @@
 import pipeline.infrastructure.renderer.weblog as weblog
 
 from .pbcor import Pbcor
-from . import pbcor
 from . import renderer
 # from . import qa
 

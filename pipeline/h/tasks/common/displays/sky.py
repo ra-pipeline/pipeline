@@ -189,7 +189,7 @@ class SkyDisplay(object):
                 # PIPE-1401: plot mask sky images for different stokes plane even when the mask file has a single Stokes plane.
                 # note: the fallback is required for vlass-se-cube because the user input mask is from vlass-se-cont with only Stokes=I.
                 if isinstance(stokes, str):
-                    LOG.warning(f'Stokes {stokes_select} is requested, but only Stokes={stokes_present} is present.')
+                    LOG.warning(f'Stokes {stokes} is requested, but only Stokes={stokes_present} is present.')
                     LOG.warning(f'We will try to create a plot with a fallback of Stokes={stokes_select}.')
                 else:
                     LOG.info(

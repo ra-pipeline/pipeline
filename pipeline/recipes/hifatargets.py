@@ -6,13 +6,17 @@ import traceback
 import inspect
 
 # Pipeline imports
+import pipeline
 from pipeline.infrastructure import casa_tools
+
+# Make pipeline tasks available in local name space
+pipeline.initcli(locals())
 
 IMPORT_ONLY = 'Import only'
 
 
 # Run the procedure
-def hifatargets (vislist, importonly=False, pipelinemode='automatic', interactive=True):
+def hifatargets(vislist, importonly=False, interactive=True):
 
     echo_to_screen = interactive
     casa_tools.post_to_log("Beginning pipeline target imaging run ...")
@@ -22,57 +26,54 @@ def hifatargets (vislist, importonly=False, pipelinemode='automatic', interactiv
         h_init()
 
         # Load the data
-        hifa_importdata (vis=vislist, dbservice=True, pipelinemode=pipelinemode)
+        hifa_importdata(vis=vislist, dbservice=True)
         if importonly:
             raise Exception(IMPORT_ONLY)
 
         # Split out the target data
-        hif_mstransform (pipelinemode=pipelinemode)
+        hif_mstransform()
 
         # Flag the target data
-        hifa_flagtargets (pipelinemode=pipelinemode)
+        hifa_flagtargets()
 
         # Check imaging parameters against PI specified values
-        hifa_imageprecheck(pipelinemode=pipelinemode)
+        hifa_imageprecheck()
 
         # Check product size limits and mitigate imaging parameters
         hif_checkproductsize(maxcubesize=40.0, maxcubelimit=60.0, maxproductsize=500.0)
 
         # Make a list of expected targets to be cleaned in mfs mode (used for continuum subtraction)
-        hif_makeimlist (specmode='mfs', pipelinemode=pipelinemode)
+        hif_makeimlist(specmode='mfs')
 
         # Find continuum frequency ranges
-        hif_findcont(pipelinemode=pipelinemode)
+        hif_findcont()
 
-        # Fit the continuum using frequency ranges from hif_findcont
-        hif_uvcontfit(pipelinemode=pipelinemode)
-
-        # Subtract the continuum fit
-        hif_uvcontsub(pipelinemode=pipelinemode)
+        # Fit and subtract the continuum using frequency ranges from hif_findcont
+        hif_uvcontsub()
 
         # Make clean mfs images for the selected targets
-        hif_makeimages (pipelinemode=pipelinemode)
+        hif_makeimages()
 
         # Make a list of expected targets to be cleaned in cont (aggregate over all spws) mode
-        hif_makeimlist (specmode='cont', pipelinemode=pipelinemode)
+        hif_makeimlist(specmode='cont')
 
         # Make clean cont images for the selected targets
-        hif_makeimages (pipelinemode=pipelinemode)
+        hif_makeimages()
 
         # Make a list of expected targets to be cleaned in continuum subtracted cube mode
-        hif_makeimlist (specmode='cube', pipelinemode=pipelinemode)
+        hif_makeimlist(specmode='cube')
 
         # Make clean continuum subtracted cube images for the selected targets
-        hif_makeimages (pipelinemode=pipelinemode)
+        hif_makeimages()
 
         # Make a list of expected targets to be cleaned in continuum subtracted PI cube mode
-        hif_makeimlist (specmode='repBW', pipelinemode=pipelinemode)
+        hif_makeimlist(specmode='repBW')
 
         # Make clean continuum subtracted PI cube
-        hif_makeimages (pipelinemode=pipelinemode)
+        hif_makeimages()
 
         # Export the data
-        hifa_exportdata(pipelinemode=pipelinemode)
+        hifa_exportdata()
 
     except Exception as e:
         if str(e) == IMPORT_ONLY:

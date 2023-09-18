@@ -90,6 +90,66 @@ except:
                 </h4>
                 <br>
         %endif
+        %if have_polcal_fit:
+            <h2>Polarization Calibrator Fit Results</h2>
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Session</th>
+                            <th>EBs</th>
+                            <th>Field</th>
+                            <th>Virtual SPW</th>
+                            <th>Polarization Fraction</th>
+                            <th>Polarization Angle</th>
+                            <th>Polarization Intensity Plot</th>
+                            <th>Polarization Angle Plot</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        %for row, plots in zip(pol_fit_info, pol_fit_plots):
+                            <tr>
+                            %for td in row:
+                                ${td}
+                            %endfor
+                                <td>
+                                    <%
+                                    fullsize_relpath = os.path.relpath(plots.poli_abspath, pcontext.report_dir)
+                                    thumbnail_relpath = os.path.relpath(plots.poli_thumbnail, pcontext.report_dir)
+                                    %>
+                                    <a href="${fullsize_relpath}"
+                                       data-fancybox="clean-summary-images"
+                                       data-tcleanCommandTarget="N/A"
+                                       data-caption="POLI image"
+                                       title='<div class="pull-left">POLI image'>
+                                      <img class="lazyload"
+                                           data-src="${thumbnail_relpath}"
+                                           title="POLI image"
+                                           alt="POLI image"
+                                           class="img-thumbnail img-responsive">
+                                    </a>
+                                </td>
+                                <td>
+                                    <%
+                                    fullsize_relpath = os.path.relpath(plots.pola_abspath, pcontext.report_dir)
+                                    thumbnail_relpath = os.path.relpath(plots.pola_thumbnail, pcontext.report_dir)
+                                    %>
+                                    <a href="${fullsize_relpath}"
+                                       data-fancybox="clean-summary-images"
+                                       data-tcleanCommandTarget="N/A"
+                                       data-caption="POLA image"
+                                       title='<div class="pull-left">POLA image'>
+                                      <img class="lazyload"
+                                           data-src="${thumbnail_relpath}"
+                                           title="POLA image"
+                                           alt="POLA image"
+                                           class="img-thumbnail img-responsive">
+                                    </a>
+                                </td>
+                            </tr>
+                        %endfor
+                    </tbody>
+                </table>
+        %endif
     %endif
 %endif
 
@@ -213,6 +273,12 @@ except:
                                 No image available
                             %endif
                         </td>
+                    %endfor
+                </tr>
+                <tr>
+                    <th>${image_info[j].stokes_label}</th>
+                    %for k in range(j, min(j+4, field_block_indices[i+1])):
+                        <td style="width:250px;">${image_info[k].pol}</td>
                     %endfor
                 </tr>
                 <tr>

@@ -30,7 +30,7 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
         """Tclean niter parameter heuristics."""
         return self.niter_correction(None, None, None, None, None, None)
 
-    def deconvolver(self, specmode, spwspec) -> str:
+    def deconvolver(self, specmode, spwspec, intent: str = '', stokes: str = '') -> str:
         """Tclean deconvolver parameter heuristics."""
         return 'mtmfs'
 
@@ -47,7 +47,7 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
         return ['1.0arcsec']
 
     def imsize(self, fields=None, cell=None, primary_beam=None, sfpblimit=None, max_pixels=None, centreonly=None,
-               vislist=None, spwspec=None) -> Union[list, int]:
+               vislist=None, spwspec=None, intent: str = '', joint_intents: str = '') -> Union[list, int]:
         """Tclean imsize parameter heuristics."""
         return [7290, 7290]
 
@@ -100,7 +100,7 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
         """Tclean nterms parameter heuristics."""
         return 2
 
-    def stokes(self) -> str:
+    def stokes(self, intent: str = '', joint_intents: str = '') -> str:
         """Tclean stokes parameter heuristics."""
         return 'I'
 
@@ -444,7 +444,7 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
         """Column parameter to be used as tclean argument"""
         return 'data'
 
-    def wprojplanes(self) -> int:
+    def wprojplanes(self, gridder=None, spwspec=None) -> int:
         """Tclean wprojplanes parameter heuristics."""
         return 1
 

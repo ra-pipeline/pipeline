@@ -214,6 +214,9 @@ class PlotmsLeaf(object):
         if self._baseband != '':
             parameters['baseband'] = self._baseband
 
+        if self._correlation != '':
+            parameters['correlation'] = self._correlation
+
         for attr in ['spw', 'ant', 'intent', 'scan']:
             val = getattr(self, '_%s' % attr)
             if val != '':

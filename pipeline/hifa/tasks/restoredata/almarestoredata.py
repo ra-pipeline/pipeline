@@ -37,7 +37,7 @@ class ALMARestoreData(restoredata.RestoreData):
 
     # PIPE-1165: override applycal method to include polarisation intents.
     def _do_applycal(self):
-        container = vdp.InputsContainer(applycal.Applycal, self.inputs.context,
+        container = vdp.InputsContainer(applycal.SerialApplycal, self.inputs.context,
                                         intent='TARGET,PHASE,BANDPASS,AMPLITUDE,CHECK,POLARIZATION,POLANGLE,POLLEAKAGE')
-        applycal_task = applycal.Applycal(container)
+        applycal_task = applycal.SerialApplycal(container)
         return self._executor.execute(applycal_task, merge=True)

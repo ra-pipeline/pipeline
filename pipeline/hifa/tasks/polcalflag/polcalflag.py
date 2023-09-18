@@ -207,7 +207,7 @@ class Polcalflag(basetask.StandardTaskTemplate):
         for intent in ac_intents:
             task_inputs = applycal.IFApplycalInputs(inputs.context, vis=inputs.vis, intent=intent, flagsum=False,
                                                     flagbackup=False)
-            task = applycal.IFApplycal(task_inputs)
+            task = applycal.SerialIFApplycal(task_inputs)
             applycal_tasks.append(task)
 
         # as there's just one job

@@ -80,7 +80,9 @@ def calculate_view(context, nowvrtable, withwvrtable, result, qa_intent):
     # Initial flag settings
     PHnoisy = False
     BPnoisy = False
-
+    BPgood = False
+    PHgood = False
+    
     for k, v in wvr_results.items():
         result.vis = v.filename
 
@@ -120,11 +122,22 @@ def calculate_view(context, nowvrtable, withwvrtable, result, qa_intent):
         # wider data required - after tarball??
 
         perhi = np.percentile(wvr_data[data_flag==False], 80)
+        perhi_nowvr = np.percentile(nowvr_data[data_flag==False], 80)
         bpmax = np.max(wvr_data[data_flag==False])
         if v.intent == 'PHASE' and perhi > PHlim:
              PHnoisy = True
         elif v.intent == 'BANDPASS' and perhi > (BPlim-5.) and bpmax > BPlim:
              BPnoisy = True
+
+        # PIPE-1837
+        # simply add a bool again for 'good' phase rms
+        # define this as <1 radian over all the data averaged
+        # here just return the values for both, do logic for score elsewhere
+        LOG.info('phase rms is : '+str(perhi))
+        if v.intent == 'PHASE' and perhi_nowvr < 57.1:
+            PHgood = True
+        elif v.intent == 'BANDPASS' and perhi_nowvr < 57.1:
+            BPgood = True
 
         ############################
 
@@ -136,7 +149,7 @@ def calculate_view(context, nowvrtable, withwvrtable, result, qa_intent):
 
         result.addview(improvement_result.description, improvement_result)
 
-    return PHnoisy, BPnoisy
+    return PHnoisy, BPnoisy, PHgood, BPgood
 
 
 def calculate_phase_rms(context, gaintable, qa_intent):
@@ -229,8 +242,7 @@ def calculate_phase_rms(context, gaintable, qa_intent):
                                     gain.real * refant_gain.imag \
                                     - gain.imag * refant_gain.real
 
-                                complex_rel_phase = np.zeros([len(dot_product)],
-                                                             np.complex)
+                                complex_rel_phase = np.zeros([len(dot_product)], complex)
                                 complex_rel_phase.imag = np.arctan2(
                                     cross_product, dot_product)
 
@@ -242,8 +254,7 @@ def calculate_phase_rms(context, gaintable, qa_intent):
                 # now calculate the phase rms views
                 for spwid in spwids:
                     data = np.zeros([max(antennas)+1, len(time_chunks)])
-                    data_flag = np.ones([max(antennas)+1, len(time_chunks)],
-                                        np.bool)
+                    data_flag = np.ones([max(antennas)+1, len(time_chunks)], bool)
                     chunk_base_times = np.zeros([len(time_chunks)])
 
                     for antenna in antennas:
@@ -265,7 +276,7 @@ def calculate_phase_rms(context, gaintable, qa_intent):
                             chunk_base_times[i] = gain_times_chunk[0]
 
                             rms_refant = np.zeros([8])
-                            rms_refant_flag = np.ones([8], np.bool)
+                            rms_refant_flag = np.ones([8], bool)
 
                             for refant in refants:
                                 gain = cparam_refant[refant][0, 0, selected_rows]

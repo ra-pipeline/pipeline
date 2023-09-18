@@ -4,6 +4,7 @@ import sys
 import time
 import types
 import functools
+from contextlib import contextmanager
 
 from casatasks import casalog
 
@@ -387,6 +388,22 @@ class Traceback(object):
             self.tb_next = None
         else:
             self.tb_next = Traceback(tb.tb_next)
+
+
+@contextmanager
+def log_level(name, level=logging.WARNING):
+    """Context manager to temporarily adjust the logging level of a logger.
+    
+    The default level is WARNING, which means that all messages with level<=30 is filtered.
+    """
+
+    logger = logging.getLogger(name)
+    current_level = logger.getEffectiveLevel()
+    logger.setLevel(level)
+    try:
+        yield
+    finally:
+        logger.setLevel(current_level)
 
 
 LOG = get_logger(__name__)

@@ -3,8 +3,9 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
+@utils.cli_wrapper
 def hif_lowgainflag(vis=None, intent=None, spw=None, refant=None, flag_nmedian=None, fnm_lo_limit=None,
-                    fnm_hi_limit=None, tmef1_limit=None, pipelinemode=None, dryrun=None, acceptresults=None):
+                    fnm_hi_limit=None, tmef1_limit=None, dryrun=None, acceptresults=None):
 
     """
     hif_lowgainflag ---- Flag antennas with low or high gain
@@ -21,8 +22,7 @@ def hif_lowgainflag(vis=None, intent=None, spw=None, refant=None, flag_nmedian=N
     
     Output
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -60,13 +60,6 @@ def hif_lowgainflag(vis=None, intent=None, spw=None, refant=None, flag_nmedian=N
                   if the fraction is equal or greater than this value, then flag
                   the visibility data from all antennas in this spw
                   (default: 0.666)
-    pipelinemode  The pipeline operating mode.
-                  In 'automatic' mode the pipeline determines the values of all
-                  context defined pipeline inputs automatically.
-                  In 'interactive' mode the user can set the pipeline context
-                  defined parameters manually.
-                  In 'getinputs' mode the user can check the settings of all
-                  pipeline parameters without running the task.
     dryrun        Run the task (False) or just display the command (True)
     acceptresults Add the results of the task to the pipeline context (True) or
                   reject them (False).

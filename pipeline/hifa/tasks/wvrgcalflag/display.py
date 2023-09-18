@@ -401,7 +401,7 @@ class WVRPhaseVsBaselineChart(object):
         # won't have values yet.
         fig.canvas.draw()
         # omit the last y axis tick label from the lower plot
-        ax2.set_yticklabels([t.get_text() for t in ax2.get_yticklabels()[0:-1]])
+        ax2.get_yticklabels()[-1].set_visible(False)   # PIPE-1673
 
         figfile = self.get_figfile(spw, scans, helper.antenna_filename_component)
         plt.savefig(figfile)

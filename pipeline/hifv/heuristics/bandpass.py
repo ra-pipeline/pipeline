@@ -12,22 +12,22 @@ LOG = infrastructure.get_logger(__name__)
 
 
 def removeRows(caltable, spwids):
-    tb = casa_tools.table()
-    tb.open(caltable, nomodify=False)
-    for spwid in spwids:
-        subtb = tb.query('SPECTRAL_WINDOW_ID == '+str(spwid))
-        flaggedrows = subtb.rownumbers()
-        if len(flaggedrows) > 0: tb.removerows(flaggedrows)
-        subtb.close()
-    tb.flush()
-    tb.close()
+    """Remove rows from specified spwid from a CASA caltable."""
 
-    tb.open(caltable + '/SPECTRAL_WINDOW', nomodify=False)
-    for spwid in spwids:
-        temparray = tb.getcol('FLAG_ROW')
-        temparray[spwid] = True
-        tb.putcol('FLAG_ROW', temparray)
-    tb.close()
+    with casa_tools.TableReader(caltable, nomodify=False) as tb:
+        for spwid in spwids:
+            subtb = tb.query('SPECTRAL_WINDOW_ID == '+str(spwid))
+            flaggedrows = subtb.rownumbers()
+            if len(flaggedrows) > 0:
+                LOG.debug('removing rows from table '+caltable+' for spw='+str(spwid))
+                tb.removerows(flaggedrows)
+            subtb.close()
+
+    with casa_tools.TableReader(caltable+'/SPECTRAL_WINDOW', nomodify=False) as tb:
+        for spwid in spwids:
+            temparray = tb.getcol('FLAG_ROW')
+            temparray[spwid] = True
+            tb.putcol('FLAG_ROW', temparray)
 
 
 def computeChanFlag(vis, caltable, context):

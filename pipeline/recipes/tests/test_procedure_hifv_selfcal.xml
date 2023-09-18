@@ -1,6 +1,6 @@
 <ProcessingProcedure>
 
-    <ProcedureTitle>test_hifv_selfcal_only</ProcedureTitle>
+    <ProcedureTitle>test_hifv_selfcal</ProcedureTitle>
 
     <ProcessingCommand>
         <Command xmlns="">hifv_importdata</Command>

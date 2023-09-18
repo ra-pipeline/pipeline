@@ -2,12 +2,14 @@ import sys
 
 import pipeline.h.cli.utils as utils
 
+
+@utils.cli_wrapper
 def hifv_flagdata(vis=None, autocorr=None, shadow=None, scan=None,
                   scannumber=None, quack=None, clip=None, baseband=None,
                   intents=None, edgespw=None, fracspw=None,
                   online=None, fileonline=None, template=None,
                   filetemplate=None, hm_tbuff=None, tbuff=None,
-                  pipelinemode=None, flagbackup=None, dryrun=None,
+                  flagbackup=None, dryrun=None,
                   acceptresults=None):
 
     """
@@ -57,13 +59,7 @@ def hifv_flagdata(vis=None, autocorr=None, shadow=None, scan=None,
                   is undefined a name of the form 'msname.flagtemplate.txt' is assumed.
     hm_tbuff      The time buffer computation heuristic
     tbuff         List of time buffers (sec) to pad timerange in flag commands
-    pipelinemode  The pipeline operating mode. In 'automatic' mode the pipeline
-                  determines the values of all context defined pipeline inputs automatically.
-                  In interactive mode the user can set the pipeline context defined parameters
-                  manually.  In 'getinputs' mode the user can check the settings of all
-                  pipeline parameters without running the task.
-    flagbackup    Backup pre-existing flags before applying new ones. Only can be set in 
-                  pipelinemode='interactive'.
+    flagbackup    Backup pre-existing flags before applying new ones.
     dryrun        Run the commands (True) or generate the commands to be run but
                   do not execute (False).  This is a pipeline task execution mode.
     acceptresults Add the results of the task to the pipeline context (True) or
@@ -74,8 +70,7 @@ def hifv_flagdata(vis=None, autocorr=None, shadow=None, scan=None,
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
     
     Examples
     

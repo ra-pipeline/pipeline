@@ -194,9 +194,9 @@ def executeppr(pprXmlFile: str, importonly: bool = True, breakpoint: str = 'brea
     casa_tools.post_to_log("Procedure name: " + procedureName + "\n", echo_to_screen=echo_to_screen)
 
     # Names of import tasks that need special treatment:
-    import_tasks = ('ImportData', 'ALMAImportData', 'VLAImportData', 'SerialSDImportData', 'HpcSDImportData',
+    import_tasks = ('ImportData', 'ALMAImportData', 'VLAImportData', 'SDImportData',
                     'NROImportData')
-    restore_tasks = ('RestoreData', 'ALMARestoreData', 'VLARestoreData', 'SDRestoreData', 'HpcSDImportData',
+    restore_tasks = ('RestoreData', 'ALMARestoreData', 'VLARestoreData', 'SDRestoreData',
                      'NRORestoreData')
 
     # Loop over the commands
@@ -246,7 +246,7 @@ def executeppr(pprXmlFile: str, importonly: bool = True, breakpoint: str = 'brea
 
             # List parameters
             for keyword, value in task_args.items():
-                casa_tools.post_to_log("    Parameter: " + keyword + " = " + str(value), echo_to_screen=echo_to_screen)
+                casa_tools.post_to_log("    Parameter: " + keyword + " = " + repr(value), echo_to_screen=echo_to_screen)
 
             # For import/restore tasks, set vis and session explicitly (not inferred from context).
             if pipeline_task_name in import_tasks or pipeline_task_name in restore_tasks:

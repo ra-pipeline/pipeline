@@ -94,7 +94,8 @@ def fm_band(band):
     return band.replace('_',' ')
 
 def fm_target(target):
-    return target.replace('_',' ') 
+    target_str=target['field'].replace('_',' ')
+    return target_str
 
 def fm_sc_success(success):
     if success:
@@ -117,7 +118,7 @@ def fm_reason(slib):
 <h3>List of Self-cal Targets</h3>
 
 % if not cleantargets:
-    <p>No valid selfcal source found.</p>
+    <p>No valid self-calibration result was returned.</p>
     <% return STOP_RENDERING %>
 % endif
 
@@ -151,6 +152,14 @@ def fm_reason(slib):
 </table> 
 </div>
 
+% if is_restore:
+    <p>
+    The task has skipped the self-calibration solver and is executed in the applycal-only mode based on the existing selfcal/restore resources.
+    Please visit the original weblog for details on the self-calibration process.
+    </p>
+    <% return STOP_RENDERING %>
+% endif
+
 <h3>Self-cal Target Details</h3>
 
 % for target in cleantargets:
@@ -166,7 +175,7 @@ def fm_reason(slib):
 
     <a class="anchor" id="${id_name}"></a>
     <h4>
-      ${fm_target(target['field'])}&nbsp;${fm_band(target['sc_band'])}&nbsp;
+      ${fm_target(target)}&nbsp;${fm_band(target['sc_band'])}&nbsp;
       <a href="#targetlist"><sup>back to top</sup></a>&nbsp;&nbsp;
       <a class="btn btn-sm btn-light" data-toggle="collapse" 
           href="#${id_name}_summary" 

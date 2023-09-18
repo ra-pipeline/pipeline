@@ -76,45 +76,53 @@ class GaincalWorker(basetask.StandardTaskTemplate):
         # table
         inputs.caltable = inputs.caltable
 
-        # create a job for each CalTo data selection
-        calto = callibrary.get_calto_from_inputs(inputs)
-        calstate = inputs.context.callibrary.get_calstate(calto)
-
         # make a memo of the original spw input. These are the spws we will
         # apply the resultant caltable to
         orig_spw = inputs.spw
         orig_antenna = inputs.antenna
 
+        # Retrieve the on-the-fly calibration state for the data selection.
+        calto = callibrary.get_calto_from_inputs(inputs)
+        calstate = inputs.context.callibrary.get_calstate(calto)
+
         jobs = []
-        for calto, calfroms in calstate.merged().items():
-            # arrange a gaincal job for the data selection
-            if ':' in inputs.spw or '~' in inputs.spw:
-                inputs.spw = orig_spw
-            else:
-                inputs.spw = calto.spw
-            inputs.field = calto.field
-            # PIPE-1490: restrict intent to selection set by CalTo.
-            inputs.intent = calto.intent
-            # kludge to handle more esoteric 'antenna syntax'
-            LOG.todo('handle & and * in antenna selection')
-            if '&' in inputs.antenna or '*' in inputs.antenna:
-                inputs.antenna = orig_antenna
-            else:
-                inputs.antenna = calto.antenna
-
+        # If no on-the-fly calibration is applicable for the data selection
+        # then generate a single gaincal job based on inputs.
+        if not calstate.merged():
             args = inputs.to_casa_args()
-
-            # set the on-the-fly calibration state for the data selection 
-            calapp = callibrary.CalApplication(calto, calfroms)
-            args['gaintable'] = calapp.gaintable
-            args['gainfield'] = calapp.gainfield
-            args['spwmap']    = calapp.spwmap
-            args['interp']    = calapp.interp
-
             jobs.append(casa_tasks.gaincal(**args))
+        # Otherwise, generate a separate gaincal job for each data selection
+        # for which the CalLibrary has a separate entry of CalFrom/CalTo.
+        else:
+            for calto, calfroms in calstate.merged().items():
+                # arrange a gaincal job for the data selection
+                if ':' in inputs.spw or '~' in inputs.spw:
+                    inputs.spw = orig_spw
+                else:
+                    inputs.spw = calto.spw
+                inputs.field = calto.field
+                # PIPE-1490: restrict intent to selection set by CalTo.
+                inputs.intent = calto.intent
+                # kludge to handle more esoteric 'antenna syntax'
+                LOG.todo('handle & and * in antenna selection')
+                if '&' in inputs.antenna or '*' in inputs.antenna:
+                    inputs.antenna = orig_antenna
+                else:
+                    inputs.antenna = calto.antenna
 
-            # append subsequent output to the same caltable 
-            inputs.append = True
+                args = inputs.to_casa_args()
+
+                # set the on-the-fly calibration state for the data selection
+                calapp = callibrary.CalApplication(calto, calfroms)
+                args['gaintable'] = calapp.gaintable
+                args['gainfield'] = calapp.gainfield
+                args['spwmap']    = calapp.spwmap
+                args['interp']    = calapp.interp
+
+                jobs.append(casa_tasks.gaincal(**args))
+
+                # append subsequent output to the same caltable
+                inputs.append = True
 
         # execute the jobs
         for job in jobs:

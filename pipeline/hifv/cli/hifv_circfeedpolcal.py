@@ -1,12 +1,11 @@
 import sys
 
-from casatasks import casalog
-
 import pipeline.h.cli.utils as utils
 
 
+@utils.cli_wrapper
 def hifv_circfeedpolcal(vis=None, Dterm_solint=None, refantignore=None, leakage_poltype=None, mbdkcross=None,
-                        clipminmax=None, pipelinemode=None, dryrun=None, acceptresults=None):
+                        clipminmax=None, dryrun=None, acceptresults=None):
 
     """
     hifv_circfeedpolcal ---- Perform polarization calibration for VLA circular feeds.
@@ -25,12 +24,6 @@ def hifv_circfeedpolcal(vis=None, Dterm_solint=None, refantignore=None, leakage_
     leakage_poltype poltype to use in first polcal execution - blank string means use default heuristics
     mbdkcross       Run gaincal KCROSS grouped by baseband
     clipminmax      Acceptable range for leakage amplitudes, values outside will be flagged.
-    pipelinemode    The pipeline operating mode. In 'automatic' mode the pipeline
-                    determines the values of all context defined pipeline inputs
-                    automatically.  In 'interactive' mode the user can set the pipeline
-                    context defined parameters manually.  In 'getinputs' mode the user
-                    can check the settings of all pipeline parameters without running
-                    the task.
     dryrun          Run the commands (True) or generate the commands to be run but
                     do not execute (False).  This is a pipeline task execution mode.
     acceptresults   Add the results of the task to the pipeline context (True) or
@@ -42,8 +35,7 @@ def hifv_circfeedpolcal(vis=None, Dterm_solint=None, refantignore=None, leakage_
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
     
     
     Examples

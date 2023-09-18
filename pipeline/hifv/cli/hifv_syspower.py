@@ -1,12 +1,11 @@
 import sys
 
-from casatasks import casalog
-
 import pipeline.h.cli.utils as utils
 
 
-def hifv_syspower(vis=None, clip_sp_template=None, antexclude=None, usemedian=None, apply=None,
-                  pipelinemode=None, dryrun=None, acceptresults=None):
+@utils.cli_wrapper
+def hifv_syspower(vis=None, clip_sp_template=None, antexclude=None, apply=None, do_not_apply=None,
+                  dryrun=None, acceptresults=None):
 
     """
     hifv_syspower ---- Determine amount of gain compression affecting VLA data below Ku-band
@@ -15,16 +14,14 @@ def hifv_syspower(vis=None, clip_sp_template=None, antexclude=None, usemedian=No
 
     vis              List of input visibility data
     clip_sp_template Acceptable range for Pdiff data; data are clipped outside this range and flagged
-    antexclude       csv string list of antennas to exclude
-    usemedian        If antexclude is specified with usemedian=False, the template values are replaced with 1.0.
-                     If usemedian = True, the template values are replaced with the median of the good antennas.
+    antexclude       dictionary in the format of:
+                     {'L': {'ea02': {'usemedian': True}, 'ea03': {'usemedian': False}},
+                      'X': {'ea02': {'usemedian': True}, 'ea03': {'usemedian': False}},
+                      'S': {'ea12': {'usemedian': False}, 'ea22': {'usemedian': False}}}
+                     If antexclude is specified with 'usemedian': False, the template values are replaced with 1.0.
+                     If 'usemedian': True, the template values are replaced with the median of the good antennas.
     apply            Apply task results to RQ table
-    pipelinemode     The pipeline operating mode. In 'automatic' mode the pipeline
-                     determines the values of all context defined pipeline inputs
-                     automatically.  In 'interactive' mode the user can set the pipeline
-                     context defined parameters manually.  In 'getinputs' mode the user
-                     can check the settings of all pipeline parameters without running
-                     the task.
+    do_not_apply     csv string of band names to not apply. Example: 'L,X,S'
     dryrun           Run the commands (True) or generate the commands to be run but
                      do not execute (False).  This is a pipeline task execution mode.
     acceptresults    Add the results of the task to the pipeline context (True) or
@@ -35,8 +32,7 @@ def hifv_syspower(vis=None, clip_sp_template=None, antexclude=None, usemedian=No
     
     Output:
     
-    results -- If pipeline mode is 'getinputs' then None is returned. Otherwise
-    the results object for the pipeline task is returned.
+    results -- The results object for the pipeline task is returned.
     
     
     Examples

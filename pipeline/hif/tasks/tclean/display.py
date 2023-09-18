@@ -49,14 +49,10 @@ class CleanSummary(object):
 
             extension = '.tt0' if r.multiterm else ''
 
-            # psf map
-            # TODO: Check if r.imaging_mode should be used
-            if self.context.imaging_mode == 'VLASS-SE-CUBE':
-                # PIPE-1401: use the same selecting list constructed from the Stokes plane present in the PSF image.
-                stokes_list = get_stokes(r.psf + extension)
-            else:
-                stokes_list = None
+            # PIPE-1401: use the same selecting list constructed from the Stokes plane present in the PSF image.
+            stokes_list = get_stokes(r.psf + extension)
 
+            # psf map
             plot_wrappers.extend(sky.SkyDisplay().plot_per_stokes(self.context, r.psf + extension,
                                                                   reportdir=stage_dir, intent=r.intent, stokes_list=stokes_list,
                                                                   collapseFunction='mean'))
@@ -177,6 +173,7 @@ class CleanSummary(object):
                     parameters['field'] = '%s (%s)' % (miscinfo['field'], miscinfo['intent'])
                     parameters['datatype'] = r.datatype
                     parameters['type'] = 'spectra'
+                    parameters['stokes'] = stokes_list[0]
                     parameters['moment'] = 'N/A'
                     try:
                         parameters['prefix'] = miscinfo['filnam01']
@@ -204,7 +201,19 @@ class CleanSummary(object):
                     plot_beams(r.psf, psf_per_channel_plotfile)
                     psf_per_channel_parameters = copy.deepcopy(parameters)
                     psf_per_channel_parameters['type'] = 'psf_per_channel'
+                    psf_per_channel_parameters['stokes'] = stokes_list[0]
                     plot_wrappers.append(logger.Plot(psf_per_channel_plotfile, parameters=psf_per_channel_parameters))
+
+            # polarization intensity and angle
+            if r.intent == 'POLARIZATION' and set(stokes_list) == {'I', 'Q', 'U', 'V'} and r.imaging_mode == 'ALMA':
+                plot_wrappers.extend(sky.SkyDisplay().plot_per_stokes(self.context,
+                                                                      r.image.replace('.pbcor', '').replace('IQUV', 'POLI'),
+                                                                      reportdir=stage_dir, intent=r.intent,
+                                                                      collapseFunction='mean'))
+                plot_wrappers.extend(sky.SkyDisplay().plot_per_stokes(self.context,
+                                                                      r.image.replace('.pbcor', '').replace('IQUV', 'POLA'),
+                                                                      reportdir=stage_dir, intent=r.intent,
+                                                                      collapseFunction='mean'))
 
         return [p for p in plot_wrappers if p is not None]
 
