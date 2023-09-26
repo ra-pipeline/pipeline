@@ -85,6 +85,11 @@ class MeasurementSetReader(object):
 
         # For each Observation ID, retrieve info on scans.
         scans = []
+
+        data_desc_mask_dict = {}
+        for dd in ms.data_descriptions:
+            data_desc_mask_dict[dd.id] = (data_desc_id_col == dd.id)
+
         for obs_id in range(msmd.nobservations()):
             statesforscans = msmd.statesforscans(obsid=obs_id)
             fieldsforscans = msmd.fieldsforscans(obsid=obs_id, arrayid=0, asmap=True)
@@ -126,11 +131,11 @@ class MeasurementSetReader(object):
                 scan_times = {}  
                 LOG.trace('Processing scan times for scan %s', scan_id)
                 for dd in data_descriptions:
-                    dd_mask = (scan_number_col == scan_id) & (data_desc_id_col == dd.id)
+                    dd_mask = scan_mask & data_desc_mask_dict[dd.id]
 
                     raw_midpoints = list(time_col[dd_mask])
-                    unique_midpoints = set(raw_midpoints)
-                    epoch_midpoints = [mt.epoch(time_ref, qt.quantity(o, time_unit)) for o in unique_midpoints]
+                    epoch_midpoints = [mt.epoch(time_ref, qt.quantity(o, time_unit))
+                                       for o in (numpy.min(raw_midpoints), numpy.max(raw_midpoints))]
 
                     scan_times[dd.spw.id] = list(zip(epoch_midpoints, itertools.repeat(exposures[dd.spw.id])))
 
