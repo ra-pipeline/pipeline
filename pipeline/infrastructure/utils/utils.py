@@ -3,30 +3,28 @@ The utils module contains general-purpose uncategorised utility functions and
 classes.
 """
 import ast
+import bisect
 import collections
+import contextlib
 import copy
 import errno
+import fcntl
 import glob
 import itertools
 import operator
 import os
 import pickle
 import re
+import shutil
 import string
 import tarfile
-import contextlib
-import shutil
-from typing import Collection, Dict, List, Tuple, Optional, Sequence, Union
-
-import bisect
-import numpy as np
-
-from .conversion import range_to_list, dequote
-from .. import casa_tools
-from .. import logging
-from .. import mpihelpers
+from typing import Collection, Dict, List, Optional, Sequence, Tuple, Union
 
 import casaplotms
+import numpy as np
+
+from .. import casa_tools, logging, mpihelpers
+from .conversion import dequote, range_to_list
 
 LOG = logging.get_logger(__name__)
 
@@ -36,7 +34,7 @@ __all__ = ['find_ranges', 'dict_merge', 'are_equal', 'approx_equal', 'get_num_ca
            'get_casa_quantity', 'get_si_prefix', 'absolute_path', 'relative_path', 'get_task_result_count',
            'place_repr_source_first', 'shutdown_plotms', 'get_casa_session_details', 'get_obj_size', 'get_products_dir',
            'export_weblog_as_tar', 'ensure_products_dir_exists', 'ignore_pointing', 'request_omp_threading',
-           'nested_dict']
+           'open_with_lock', 'nested_dict']
 
 
 def find_ranges(data: Union[str, List[int]]) -> str:
@@ -749,6 +747,52 @@ def request_omp_threading(num_threads=None):
         if context_num_threads is not None:
             casa_tools.casalog.ompSetNumThreads(session_num_threads)
             LOG.info('restore openmp threads to {}'.format(session_num_threads))
+
+
+@contextlib.contextmanager
+def open_with_lock(filename, mode='r'):
+    """Open file with a lock.
+
+    The file open context manager function will try to lock the file upon opening 
+    so other processes using the same "opener" will wait for the file to unlock. 
+    The applied lock will be released when leaving the context.
+
+    Notes: 
+    
+    all file open calls with `open_with_lock` will block other `open_with_lock` usages 
+    (even from different processes/lustre-clients) from read/write until the lock is released.
+    However, this locking/blocking mechanism will not prevent the file access (potentially 
+    causing IO error) from other file openers (e.g. the default open() function).
+
+    Because the Python/fcntl API depends on the underlying OS/storage implementation: 
+        https://docs.python.org/3/library/fcntl.html
+    Not all OS/fsys is fully supported. For Lustre, it seems to depend on fsys mount `-o flock` 
+    options, which is indeed used for cv/naasc/aoc lustre systems:
+        $ mount -l | grep lustre
+            192.168.1.30@o2ib:/aoclst03 on /.lustre/aoc type lustre (rw,flock,user_xattr,lazystatfs)
+
+    For a practical test, try the code snippet below from different clients/processes to see 
+    if the fnctl blocking mechanism can prevent non-exclusive access to a file.
+        import fcntl
+        fd=open(filename,'w')
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    Args:
+        filename (str): the file name
+        mode (str, optional): open mode. Defaults to 'r'.
+
+    """
+
+    with open(filename, mode) as fd:
+
+        LOG.info('acquiring lock on %s', filename)
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        LOG.info('acquired lock on %s', filename)
+
+        yield fd
+
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        LOG.info('released lock on %s', filename)
 
 
 def ensure_products_dir_exists(products_dir):

@@ -6,7 +6,7 @@ import pipeline.h.cli.utils as utils
 @utils.cli_wrapper
 def hifa_importdata(vis=None, session=None, asis=None, process_caldevice=None, overwrite=None,
                     nocopy=None, bdfflags=None, datacolumns=None, lazy=None, dbservice=None, ocorr_mode=None,
-                    createmms=None, minparang=None, dryrun=None, acceptresults=None):
+                    createmms=None, minparang=None, dryrun=None, acceptresults=None, parallel=None):
 
     """
     hifa_importdata ---- Imports data into the interferometry pipeline
@@ -80,6 +80,7 @@ def hifa_importdata(vis=None, session=None, asis=None, process_caldevice=None, o
                       in degrees. The default of 0.0 is used for non-polarisation processing.
     dryrun            Run the task (False) or display task command (True)
     acceptresults     Add the results into the pipeline context
+    parallel          Execute using CASA HPC functionality, if available.    
 
     --------- examples -----------------------------------------------------------
 
