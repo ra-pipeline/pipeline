@@ -25,6 +25,8 @@ from . import utils
 from . import vdp
 from .eventbus import TaskStartedEvent, TaskCompleteEvent, TaskAbnormalExitEvent
 from .eventbus import ResultAcceptingEvent, ResultAcceptedEvent, ResultAcceptErrorEvent
+from .eventbus import WebLogStageRenderingStartedEvent
+
 from .casa_tasks import CasaTasks
 
 LOG = logging.get_logger(__name__)
@@ -326,6 +328,14 @@ class Results(api.Results):
 
             # generate weblog if accepting a result from outside a task execution
             if task_completed and not DISABLE_WEBLOG:
+
+                # PIPE-2014: to derive the bulk of the weblog rendering cost, we register 
+                # the "rendering-started" event here so the timing can include the total time spent 
+                # on most renderers up to T2_4MDetailsRenderer, where WebLogStageRenderingCompleteEvent or
+                # WebLogStageRenderingAbnormalExitEvent is registered.
+                event = WebLogStageRenderingStartedEvent(context_name=context.name, stage_number=self.stage_number)
+                eventbus.send_message(event)
+
                 # cannot import at initial import time due to cyclic dependency
                 import pipeline.infrastructure.renderer.htmlrenderer as htmlrenderer
                 htmlrenderer.WebLogGenerator.render(context)
