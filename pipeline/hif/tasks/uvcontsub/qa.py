@@ -12,7 +12,7 @@ LOG = logging.get_logger(__name__)
 class UVcontSubQAHandler(pqa.QAPlugin):
     result_cls = uvcontsub.UVcontSubResults
     child_cls = None
-    generating_task = uvcontsub.UVcontSub
+    generating_task = uvcontsub.SerialUVcontSub
 
     def handle(self, context, result):
 

@@ -4,7 +4,8 @@ import pipeline.h.cli.utils as utils
 
 
 @utils.cli_wrapper
-def hif_uvcontsub(vis=None, field=None, intent=None, spw=None, fitorder=None, dryrun=None, acceptresults=None):
+def hif_uvcontsub(vis=None, field=None, intent=None, spw=None, fitorder=None, dryrun=None, acceptresults=None,
+                  parallel=None):
     """
     hif_uvcontsub ---- Subtract the fitted continuum from the data
 
@@ -45,6 +46,7 @@ def hif_uvcontsub(vis=None, field=None, intent=None, spw=None, fitorder=None, dr
     dryrun        Run the task (False) or just display the command (True)
     acceptresults Add the results of the task to the pipeline context (True) or
                   reject them (False).
+    parallel      Execute using CASA HPC functionality, if available.
 
     --------- examples -----------------------------------------------------------
 

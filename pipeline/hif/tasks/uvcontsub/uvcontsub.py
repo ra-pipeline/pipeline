@@ -10,9 +10,9 @@ import pipeline.infrastructure.vdp as vdp
 import pipeline.infrastructure.utils as utils
 from pipeline.infrastructure.utils import nested_dict
 from pipeline.infrastructure import casa_tasks
-from pipeline.infrastructure import casa_tools
 from pipeline.domain import DataType
 from pipeline.infrastructure import task_registry
+import pipeline.infrastructure.sessionutils as sessionutils
 
 from pipeline.hif.tasks.makeimlist import makeimlist
 
@@ -27,8 +27,10 @@ class UVcontSubInputs(vdp.StandardInputs):
     fitorder = vdp.VisDependentProperty(default={})
     intent = vdp.VisDependentProperty(default='TARGET')
 
+    parallel = sessionutils.parallel_inputs_impl()
+
     def __init__(self, context, output_dir=None, vis=None, field=None,
-                 spw=None, intent=None, fitorder=None):
+                 spw=None, intent=None, fitorder=None, parallel=None):
         self.context = context
         self.output_dir = output_dir
         self.vis = vis
@@ -37,10 +39,10 @@ class UVcontSubInputs(vdp.StandardInputs):
         self.spw = spw
         self.intent = intent
         self.fitorder = fitorder
+        self.parallel = parallel
 
 
-@task_registry.set_equivalent_casa_task('hif_uvcontsub')
-class UVcontSub(basetask.StandardTaskTemplate):
+class SerialUVcontSub(basetask.StandardTaskTemplate):
     Inputs = UVcontSubInputs
 
     def prepare(self):
@@ -241,13 +243,20 @@ class UVcontSub(basetask.StandardTaskTemplate):
                 shutil.copyfile(vis_source, outputvis_target_line)
 
 
+@task_registry.set_equivalent_casa_task('hif_uvcontsub')
+class UVcontSub(sessionutils.ParallelTemplate):
+    """UVcontSub class for parallelization."""
+
+    Inputs = UVcontSubInputs
+    Task = SerialUVcontSub
+
 class UVcontSubResults(basetask.Results):
     """
     UVcontSubResults is the results class for the pipeline UVcontSub task.
     """
 
     def __init__(self):
-        super(UVcontSubResults, self).__init__()
+        super().__init__()
         self.mitigation_error = False
         self.vis = None
         self.outputvis = None
