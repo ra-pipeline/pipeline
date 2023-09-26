@@ -3,9 +3,10 @@ import traceback
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
+import pipeline.infrastructure.sessionutils as sessionutils
 import pipeline.infrastructure.vdp as vdp
-from pipeline.infrastructure import task_registry
 from pipeline.extern.almarenorm import alma_renorm
+from pipeline.infrastructure import task_registry
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -13,7 +14,7 @@ LOG = infrastructure.get_logger(__name__)
 class RenormResults(basetask.Results):
     def __init__(self, renorm_applied, vis, apply, threshold, correctATM, spw, excludechan, corrApplied, corrColExists,
                  stats, rnstats, alltdm, atmAutoExclude, atmWarning, atmExcludeCmd, bwthreshspw, exception=None):
-        super(RenormResults, self).__init__()
+        super().__init__()
         self.renorm_applied = renorm_applied
         self.vis = vis
         self.apply = apply
@@ -62,9 +63,11 @@ class RenormInputs(vdp.StandardInputs):
     atm_auto_exclude = vdp.VisDependentProperty(default=False)
     bwthreshspw = vdp.VisDependentProperty(default={})
 
+    parallel = sessionutils.parallel_inputs_impl()
+
     def __init__(self, context, vis=None, apply=None, threshold=None, correctATM=None, spw=None,
-                 excludechan=None, atm_auto_exclude=None, bwthreshspw=None):
-        super(RenormInputs, self).__init__()
+                 excludechan=None, atm_auto_exclude=None, bwthreshspw=None, parallel=None):
+        super().__init__()
         self.context = context
         self.vis = vis
         self.apply = apply
@@ -74,11 +77,10 @@ class RenormInputs(vdp.StandardInputs):
         self.excludechan = excludechan
         self.atm_auto_exclude = atm_auto_exclude
         self.bwthreshspw = bwthreshspw
+        self.parallel = parallel
 
 
-@task_registry.set_equivalent_casa_task('hifa_renorm')
-@task_registry.set_casa_commands_comment('Renormalize data affected by strong line emission.')
-class Renorm(basetask.StandardTaskTemplate):
+class SerialRenorm(basetask.StandardTaskTemplate):
     Inputs = RenormInputs
 
     def prepare(self):
@@ -134,3 +136,10 @@ class Renorm(basetask.StandardTaskTemplate):
 
     def analyse(self, results):
         return results
+
+
+@task_registry.set_equivalent_casa_task('hifa_renorm')
+@task_registry.set_casa_commands_comment('Renormalize data affected by strong line emission.')
+class Renorm(sessionutils.ParallelTemplate):
+    Inputs = RenormInputs
+    Task = SerialRenorm
