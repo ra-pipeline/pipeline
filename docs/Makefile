@@ -55,4 +55,4 @@ pdf_taskdocs:
 	@make taskdocs
 	@rm -rf ${BUILDDIR}/latex ${BUILDDIR}/doctrees
 	@make latexpdf
-	@rm -rf casa-*.log ${SOURCEDIR}/casa-*log
+	@rm -rf casa-*.log ${glob}/casa-*log

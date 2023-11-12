@@ -4,7 +4,7 @@ import pipeline.h.cli.utils as utils
 
 
 @utils.cli_wrapper
-def hifa_importdata(vis=None, session=None, asis : bool=None, process_caldevice=None, overwrite=None, nocopy=None,
+def hifa_importdata(vis=None, session=None, asis=None, process_caldevice=None, overwrite=None, nocopy=None,
                     bdfflags=None, datacolumns=None, lazy=None, dbservice=None, ocorr_mode=None, createmms=None,
                     minparang=None, dryrun=None, acceptresults=None):
     """Imports data into the interferometry pipeline.
@@ -18,20 +18,17 @@ def hifa_importdata(vis=None, session=None, asis : bool=None, process_caldevice=
       exists in the output directory, the importasdm conversion step is skipped,
       and the existing MS will be imported instead.
 
-    .. warning:: 
-      If you import bad data, you will get bad results!
-
     Args:
-        vis (int):
+        vis:
           List of visibility data files. These may be ASDMs, tar
           files of ASDMs, MSes, or tar files of MSes. If ASDM files
           are specified, they will be converted to MS format.
           
-          Example:
-            vis=['X227.ms', 'asdms.tar.gz']
+          Example: vis=['X227.ms', 'asdms.tar.gz']
         session:
           List of session names, one for each visibility dataset,
           used to group the MSes into sessions.
+
           Example: session=['session_1', 'session_2']
         asis:
           Creates verbatim copies of the ASDM tables in the output MS.
@@ -44,10 +41,12 @@ def hifa_importdata(vis=None, session=None, asis : bool=None, process_caldevice=
           When converting ASDM to MS, if overwrite=False and the MS
           already exists in the output directory, then this existing
           MS dataset will be used instead.
+
           Example: overwrite=True
         nocopy:
           Disable copying of MS to working directory; defaults to
           False.
+          
           Example: nocopy=True
         bdfflags: Apply BDF flags on import.
         datacolumns: Dictionary defining the data types of existing columns.
@@ -93,8 +92,9 @@ def hifa_importdata(vis=None, session=None, asis : bool=None, process_caldevice=
     Examples:
       1. Load an ASDM list in the ../rawdata subdirectory into the context:
       
-      >>> hifa_importdata(vis=['../rawdata/uid___A002_X30a93d_X43e', '../rawdata/uid_A002_x30a93d_X44e'])
-      (results)
+      ::
+
+        hifa_importdata(vis=['../rawdata/uid___A002_X30a93d_X43e', '../rawdata/uid_A002_x30a93d_X44e'])
       
       2. Load an MS in the current directory into the context:
       
@@ -103,18 +103,24 @@ def hifa_importdata(vis=None, session=None, asis : bool=None, process_caldevice=
         hifa_importdata(vis=['uid___A002_X30a93d_X43e.ms'])
       
       3. Load a tarred ASDM in ../rawdata into the context:
-      
-      >>> hifa_importdata(vis=['../rawdata/uid___A002_X30a93d_X43e.tar.gz'])
+
+      ::  
+
+        hifa_importdata(vis=['../rawdata/uid___A002_X30a93d_X43e.tar.gz'])
       
       4. Import a list of MeasurementSets:
       
-      >>> myvislist = ['uid___A002_X30a93d_X43e.ms', 'uid_A002_x30a93d_X44e.ms']
-      >>> hifa_importdata(vis=myvislist)
+      ::
+
+        myvislist = ['uid___A002_X30a93d_X43e.ms', 'uid_A002_x30a93d_X44e.ms']
+        hifa_importdata(vis=myvislist)
   
       5. Run with explicit setting of data column types:
       
-      >>> hifa_importdata(vis=['uid___A002_X30a93d_X43e_targets.ms'], datacolumns={'data': 'regcal_contline'})
-      >>> hifa_importdata(vis=['uid___A002_X30a93d_X43e_targets_line.ms'], datacolumns={'data': 'regcal_line', 'corrected': 'selfcal_line'})
+      ::
+
+        hifa_importdata(vis=['uid___A002_X30a93d_X43e_targets.ms'], datacolumns={'data': 'regcal_contline'})
+        hifa_importdata(vis=['uid___A002_X30a93d_X43e_targets_line.ms'], datacolumns={'data': 'regcal_line', 'corrected': 'selfcal_line'})
     """
     ##########################################################################
     #                                                                        #
