@@ -18,43 +18,36 @@ def hifa_importdata(vis=None, session=None, asis=None, process_caldevice=None, o
       exists in the output directory, the importasdm conversion step is skipped,
       and the existing MS will be imported instead.
 
-    Parameters
-    ----------
-    vis : {str, list}
-      List of visibility data files. These may be ASDMs, tar
+    :param vis: List of visibility data files. These may be ASDMs, tar
       files of ASDMs, MSes, or tar files of MSes. If ASDM files
       are specified, they will be converted to MS format.
-        
       Example: vis=['X227.ms', 'asdms.tar.gz']
-    session : list
-      List of session names, one for each visibility dataset,
+    :type vis: {str, list}
+    :param session: List of session names, one for each visibility dataset,
       used to group the MSes into sessions.
-
       Example: session=['session_1', 'session_2']
-    asis : bool
-      Creates verbatim copies of the ASDM tables in the output MS.
+    :type session: list
+    :param asis: Creates verbatim copies of the ASDM tables in the output MS.
       The value given to this option must be a list of table names
       separated by space characters.
-    process_caldevice: bool
-      Import the caldevice table from the ASDM.
-    overwrite: bool
-      Overwrite existing files on import; defaults to False.
+    :type asis: bool
+    :param process_caldevice: Import the caldevice table from the ASDM.
+    :type process_caldevice: bool
+    :param overwrite: Overwrite existing files on import; defaults to False.
       When converting ASDM to MS, if overwrite=False and the MS
       already exists in the output directory, then this existing
       MS dataset will be used instead.
-
       Example: overwrite=True
-    nocopy : bool
-      Disable copying of MS to working directory; defaults to
+    :type overwrite: bool 
+    :param nocopy: Disable copying of MS to working directory; defaults to
       False.
-        
       Example: nocopy=True
-    bdfflags: bool
-      Apply BDF flags on import.
-
-    datacolumns: dict
-      Dictionary defining the data types of existing columns.
+    :type nocopy: bool
         
+    :param bdfflags: Apply BDF flags on import.
+    :type bdffflags: bool
+
+    :param datacolumns: Dictionary defining the data types of existing columns.
       The format is:
       ``{'data': 'data type 1'}``
       or
@@ -83,22 +76,9 @@ def hifa_importdata(vis=None, session=None, asis=None, process_caldevice=None, o
       ``{'data':'raw','corrected':'regcal_contline'}``
       or ``{'data':'raw'}`` will be assumed, depending on
       whether the corrected column exists or not.
-      lazy: bool
-        Use the lazy filler import.
-      dbservice: bool 
-        Use the online flux catalog.
-      ocorr_mode: str
-        ALMA default set to ca.
-      createmms: bool
-        Create an MMS.
-      minparang: float
-        Minimum required parallactic angle range for polarisation
-        calibrator, in degrees. The default of 0.0 is used for
-        non-polarisation processing.
-      dryrun: bool
-        Run the task (False) or display task command (True).
-      acceptresults: bool
-        Add the results into the pipeline context.
+      :type datacolumns: dict
+      :param acceptresults: Add the results into the pipeline context.
+      :type acceptresults: bool
 
     Examples
     --------
