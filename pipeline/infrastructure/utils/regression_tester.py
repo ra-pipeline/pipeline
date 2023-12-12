@@ -59,7 +59,8 @@ class PipelineRegression(object):
             shutil.rmtree(self.output_dir)
         os.mkdir(self.output_dir)
 
-    def __sanitize_regression_string(self, instring: str) -> Tuple:
+    @staticmethod
+    def __sanitize_regression_string(instring: str) -> Tuple:
         """Sanitize to get numeric values, remove newline chars and change to float.
 
         Args:
@@ -170,7 +171,8 @@ class PipelineRegression(object):
         if omp_num_threads is not None:
             casa_tools.casalog.ompSetNumThreads(default_nthreads)
 
-    def __compare_results(self, new_file: str, relative_tolerance: float):
+    @staticmethod
+    def compare_results(expected_results_file: str, new_file: str, relative_tolerance: float):
         """
         Compare results between new one loaded from file and old one.
 
@@ -178,14 +180,13 @@ class PipelineRegression(object):
             new_file : file path of new results
             relative_tolerance : relative tolerance of output value
         """
-        expected = casa_tools.utils.resolve(self.expectedoutput)
-        with open(expected) as expected_fd, open(new_file) as new_fd:
+        with open(expected_results_file) as expected_fd, open(new_file) as new_fd:
             expected_results = expected_fd.readlines()
             new_results = new_fd.readlines()
             errors = []
             for old, new in zip(expected_results, new_results):
-                oldkey, oldval, tol = self.__sanitize_regression_string(old)
-                newkey, newval, _ = self.__sanitize_regression_string(new)
+                oldkey, oldval, tol = PipelineRegression.__sanitize_regression_string(old)
+                newkey, newval, _ = PipelineRegression.__sanitize_regression_string(new)
                 assert oldkey == newkey
                 tolerance = tol if tol else relative_tolerance
                 LOG.info(f'Comparing {oldval} to {newval} with a rel. tolerance of {tolerance}')
@@ -198,7 +199,20 @@ class PipelineRegression(object):
                 pytest.fail("Failed to match {0} result value{1} within tolerance{1} :\n{2}".format(
                     n_errors, '' if n_errors == 1 else 's', '\n'.join(errors)), pytrace=True)
 
-    def __save_new_results_to(self, new_file: str, new_results: List[str]):
+    def __compare_results(self,  new_file: str, relative_tolerance: float):
+        """
+        Compare results between new one loaded from file and old one.
+
+        Args:
+            expected_results : file path to the file with the expected results
+            new_file : file path of new results
+            relative_tolerance : relative tolerance of output value
+        """
+        expected = casa_tools.utils.resolve(self.expectedoutput)
+        self.compare_results(expected, new_file, relative_tolerance)
+
+    @staticmethod
+    def __save_new_results_to(new_file: str, new_results: List[str]):
         """
         Compare results between new one and old one, both results are loaded from specified files.
 
@@ -209,7 +223,8 @@ class PipelineRegression(object):
         with open(new_file, 'w') as fd:
             fd.writelines([str(x) + '\n' for x in new_results])
 
-    def __get_results_of_from_current_context(self) -> List[str]:
+    @staticmethod
+    def __get_results_of_from_current_context() -> List[str]:
         """
         Get results of current execution from context.
 
