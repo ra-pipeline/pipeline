@@ -325,7 +325,14 @@ def gaincalSNR(context, ms, tsysTable, flux, field, spws, intent='PHASE', requir
         # If there are multiple scans for an spw, then simply use the Tsys of the first scan
         first_tsys_scan = min(tsys_scans, key=operator.attrgetter('id'))
         tsys_spw = phase_spw_to_tsys_spw[phase_spw]
-        scan_data = wrapper.filter(spw=tsys_spw.id, scan=first_tsys_scan.id)
+        #scan_data = wrapper.filter(spw=tsys_spw.id, scan=first_tsys_scan.id)
+        # in old data there was a tsys scan that didn't end up in SYSCAL
+        # would be best to remove that scan from tsys_scans above, but for now:
+        try:
+            scan_data = wrapper.filter(spw=tsys_spw.id, scan=first_tsys_scan.id)
+        except:
+            scan_data = wrapper.filter(spw=tsys_spw.id, scan=tsys_scans[1].id)
+            
         if numpy.all(scan_data['FPARAM'].mask):  # Assign NaN if everything is masked
             median_tsys[phase_spw.id] = numpy.NaN
             get_snr_info = True
