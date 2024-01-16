@@ -80,6 +80,11 @@ def set_miscinfo(name, spw=None, virtspw=True, field=None, nfield=None, datatype
             # Write spw IDs. For some observatories these are virtual IDs because of
             # changing real IDs for the same frequency setup between MSes. In that case
             # we also write the "virtspw" and "spwisvrt" keywords.
+            #PIPE-1615, limiting SPW and VIRTSPW keyword length to 68 characters 
+            #(limit specified by FITS conventions)
+            if len(unique_spws) >= 68:
+                spw_sorted = sorted([int(x) for x in unique_spws.split(',')])
+                unique_spws = '{},...,{}'.format(spw_sorted[0], spw_sorted[-1])
             info['spw'] = unique_spws
             if virtspw:
                 info['virtspw'] = unique_spws
