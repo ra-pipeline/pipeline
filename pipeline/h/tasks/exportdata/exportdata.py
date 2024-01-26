@@ -1351,8 +1351,6 @@ finally:
         """
         PIPE-2054, validating FITS header to ensure that
         the FITS header is following the FITS standard.
-        In case, any of the header keyword is violating
-        the FITS standard, it will be fixed.
         Reference: https://docs.astropy.org/en/stable/io/fits/usage/verification.html#
         """
 
