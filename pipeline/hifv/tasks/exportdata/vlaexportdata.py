@@ -2,7 +2,6 @@ import os
 import shutil
 import collections
 import tarfile
-from astropy.io import fits
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.vdp as vdp
@@ -133,19 +132,6 @@ class VLAExportData(exportdata.ExportData):
             self._add_to_manifest(manifest_file, auxfproducts, False, [], pipe_aqua_reportfile, oussid)
 
         return results
-
-    def _validate_fits_header(self, filename):
-        """
-        PIPE-2054, validating FITS header to ensure that
-        the FITS header is following the FITS standard.
-        In case, any of the header keyword is violating
-        the FITS standard, it will be fixed.
-        Reference: https://docs.astropy.org/en/stable/io/fits/usage/verification.html#
-        """
-        if os.path.exists(filename):
-            hdulist = fits.open(filename)
-            hdulist.verify()
-            hdulist.close()
 
     def _shorten_spwlist(self, image):
         # PIPE-325: abbreviate 'spw' and/or 'virtspw' for FITS header when spw string is "too long"

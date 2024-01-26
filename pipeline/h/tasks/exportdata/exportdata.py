@@ -1346,3 +1346,17 @@ finally:
             shutil.move(temp_weblog_tarball, products_weblog_tarball)
 
         return os.path.basename(out_aqua_file)
+
+    def _validate_fits_header(self, filename):
+        """
+        PIPE-2054, validating FITS header to ensure that
+        the FITS header is following the FITS standard.
+        In case, any of the header keyword is violating
+        the FITS standard, it will be fixed.
+        Reference: https://docs.astropy.org/en/stable/io/fits/usage/verification.html#
+        """
+
+        if os.path.exists(filename):
+            hdulist = apfits.open(filename)
+            hdulist.verify()
+            hdulist.close()
