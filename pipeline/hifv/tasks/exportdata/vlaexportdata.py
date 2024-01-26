@@ -2,6 +2,7 @@ import os
 import shutil
 import collections
 import tarfile
+from astropy.io import fits
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.vdp as vdp
@@ -52,7 +53,6 @@ class VLAExportData(exportdata.ExportData):
 
     def prepare(self):
         results = super().prepare()
-
         # PIPE-1205
         PbcorFits = collections.namedtuple('PbcorFits', 'pbcorimage pbcorfits nonpbcor_fits')
         # results.targetimages[0] is the same as self.inputs.context.sciimlist.get_imlist()
@@ -92,6 +92,12 @@ class VLAExportData(exportdata.ExportData):
                 if ee.nonpbcor_fits in target['fitsfiles']:
                     target['auxfitsfiles'].append(ee.nonpbcor_fits)
                     target['fitsfiles'].remove(ee.nonpbcor_fits)
+        # validate FITS header
+        for fitsfile in results.targetimages[1]:
+            self._validate_fits_header(fitsfile)
+
+        for fitsfile in results.calimages[1]:
+            self._validate_fits_header(fitsfile)
 
         oussid = self.inputs.context.get_oussid()  # returns string of 'unknown' for VLA
 
@@ -127,6 +133,19 @@ class VLAExportData(exportdata.ExportData):
             self._add_to_manifest(manifest_file, auxfproducts, False, [], pipe_aqua_reportfile, oussid)
 
         return results
+
+    def _validate_fits_header(self, filename):
+        """
+        PIPE-2054, validating FITS header to ensure that
+        the FITS header is following the FITS standard.
+        In case, any of the header keyword is violating
+        the FITS standard, it will be fixed.
+        Reference: https://docs.astropy.org/en/stable/io/fits/usage/verification.html#
+        """
+        if os.path.exists(filename):
+            hdulist = fits.open(filename)
+            hdulist.verify()
+            hdulist.close()
 
     def _shorten_spwlist(self, image):
         # PIPE-325: abbreviate 'spw' and/or 'virtspw' for FITS header when spw string is "too long"
