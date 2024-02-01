@@ -38,6 +38,7 @@ import tarfile
 import uuid
 
 import astropy.io.fits as apfits
+from astropy import log as aplog
 
 from pipeline.infrastructure.launcher import Context
 from pipeline.h.tasks.exportdata.aqua import AquaXmlGenerator
@@ -1353,8 +1354,12 @@ finally:
         the FITS header is following the FITS standard.
         Reference: https://docs.astropy.org/en/stable/io/fits/usage/verification.html#
         """
-
-        if os.path.exists(filename):
-            hdulist = apfits.open(filename)
-            hdulist.verify()
-            hdulist.close()
+        with aplog.log_to_list() as aplog_list:
+            if os.path.exists(filename):
+                hdulist = apfits.open(filename)
+                hdulist.verify()
+                hdulist.close()
+            if len(aplog_list) != 0:
+                LOG.warning("%s FITS header keyword is invalid", filename)
+                for log_record in aplog_list:
+                    LOG.warning(log_record.message)
