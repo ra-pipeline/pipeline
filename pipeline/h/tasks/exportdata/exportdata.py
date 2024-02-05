@@ -36,9 +36,11 @@ import shutil
 import sys
 import tarfile
 import uuid
+import warnings
 
 import astropy.io.fits as apfits
 from astropy import log as aplog
+from astropy.io.fits.verify import VerifyWarning
 
 from pipeline.infrastructure.launcher import Context
 from pipeline.h.tasks.exportdata.aqua import AquaXmlGenerator
@@ -1352,14 +1354,15 @@ finally:
         """
         PIPE-2054, validating FITS header to ensure that
         the FITS header is following the FITS standard.
-        Reference: https://docs.astropy.org/en/stable/io/fits/usage/verification.html#
+        References: https://docs.astropy.org/en/stable/io/fits/usage/verification.html#
+                    https://docs.astropy.org/en/stable/logging.html#context-managers
         """
-        with aplog.log_to_list() as aplog_list:
-            if os.path.exists(filename):
-                hdulist = apfits.open(filename)
-                hdulist.verify()
-                hdulist.close()
-            if len(aplog_list) != 0:
-                LOG.warning("%s FITS header keyword is invalid", filename)
-                for log_record in aplog_list:
-                    LOG.warning(log_record.message)
+        with warnings.catch_warnings():
+            warnings.simplefilter('default', VerifyWarning)
+            with aplog.log_to_list() as aplog_list:
+                if os.path.exists(filename):
+                    hdulist = apfits.open(filename)
+                    hdulist.verify()
+                    hdulist.close()
+                if len(aplog_list) != 0:
+                    LOG.warning("%s %s", filename, aplog_list[3].message)

@@ -146,7 +146,7 @@ def set_miscinfo(name, spw=None, virtspw=True, field=None, nfield=None, datatype
 
         # Project information
         if context is not None:
-            info['propcode'] = context.project_summary.proposal_code
+            info['propcode'] = str(context.project_summary.proposal_code).strip()
             info['group'] = 'N/A'
             info['member'] = context.project_structure.ousstatus_entity_id
             info['sgoal'] = 'N/A'
