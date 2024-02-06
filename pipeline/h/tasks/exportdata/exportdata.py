@@ -1365,4 +1365,6 @@ finally:
                     hdulist.verify()
                     hdulist.close()
                 if len(aplog_list) != 0:
-                    LOG.warning("%s %s", filename, aplog_list[3].message)
+                    log_msg = [log_entry.msg.replace('VerifyWarning:', '').replace('Note: astropy.io.fits uses zero-based indexing.', '').strip() for log_entry in aplog_list]
+                    log_msg = ' '.join(log_msg)
+                    LOG.warning("%s %s", filename, log_msg)
