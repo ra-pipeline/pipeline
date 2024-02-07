@@ -315,15 +315,6 @@ class CleanTaskFactory(object):
         is_cal_image = 'TARGET' not in target['intent']
 
         is_tier0_job = is_mpi_ready and is_cal_image
-        # PIPE-1923 asks to temporarily turn off Tier-0 mode for
-        # POLARIZATION intent when imaging IQUV because of a
-        # potential CASA bug. This should be undone when this
-        # bug is fixed.
-        if target['intent'] == 'POLARIZATION' and target['stokes'] == 'IQUV':
-            is_tier0_job = False
-            if is_mpi_ready:
-                LOG.info('Temporarily turning off Tier-0 parallelization for Stokes IQUV polarization calibrator imaging (PIPE-1923).')
-
         parallel_wanted = mpihelpers.parse_mpi_input_parameter(self.__inputs.parallel)
 
         # PIPE-1401: turn on the tier0 parallelization for individuals planes in the VLASS coarse cube imaging
