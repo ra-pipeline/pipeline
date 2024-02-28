@@ -36,6 +36,14 @@ class FlagDeterALMAQAHandler(pqa.QAPlugin):
         # self.result_cls or its parent class(es).
         result.qa.pool.append(score)
 
+        # PIPE-1759: aggregate former warning messages into a new QA score
+        if result.missing_baseband_spws:
+            result.qa.pool.append(pqa.QAScore(score=0.8,
+                longmsg='Unable to determine baseband range for {}, spw{}, skipping ACA FDM edge flagging'.format(
+                    ms.basename, utils.commafy(result.missing_baseband_spws, quotes=False, multi_prefix='s')),
+                shortmsg='Unable to determine baseband range'))
+
+
 
 class FlagDeterALMAListQAHandler(pqa.QAPlugin):
     result_cls = collections.Iterable

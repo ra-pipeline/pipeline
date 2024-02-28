@@ -68,7 +68,7 @@ class OpcalInputs(vdp.StandardInputs):
 
 
 class Opcal(basetask.StandardTaskTemplate):
-    Inputs = OpcalInputs    
+    Inputs = OpcalInputs
 
     def prepare(self):
         inputs = self.inputs
@@ -96,7 +96,7 @@ class Opcal(basetask.StandardTaskTemplate):
         '''
         if (((startdate >= 55918.80) and (startdate <= 55938.98)) or ((startdate >= 56253.6) and (startdate <= 56271.6))):
             LOG.warning("Weather station broken during this period, using 100% seasonal model for calculating the zenith opacity")
-            seasonal_weight=1.0            
+            seasonal_weight=1.0
         else:
             LOG.info("Using seasonal_weight of 0.5")
             seasonal_weight=0.5
@@ -128,12 +128,10 @@ class Opcal(basetask.StandardTaskTemplate):
         # caltable as the best result
 
         # double-check that the caltable was actually generated
-        on_disk = [ca for ca in result.pool
-                   if ca.exists() or self._executor._dry_run]
+        on_disk = [ca for ca in result.pool if ca.exists()]
         result.final[:] = on_disk
 
-        missing = [ca for ca in result.pool
-                   if ca not in on_disk and not self._executor._dry_run]
+        missing = [ca for ca in result.pool if ca not in on_disk]
         result.error.clear()
         result.error.update(missing)
 

@@ -64,8 +64,8 @@ def plot_type(plot):
 
 <p>For the measurement set(s) listed below, the reference antenna
     list was updated due to significant flagging (antennas moved to
-    end and/or removed). See warnings in task notifications
-    for details. Shown below are the updated reference antenna lists,
+    end and/or removed). See QA messages for details.
+    Shown below are the updated reference antenna lists,
     only for those measurement sets where it was modified.</p>
 
 <table class="table table-bordered table-striped"

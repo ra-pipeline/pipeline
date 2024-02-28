@@ -4,11 +4,11 @@ import pipeline.h.cli.utils as utils
 
 
 @utils.cli_wrapper
-def hifa_polcalflag(vis=None, dryrun=None, acceptresults=None):
+def hifa_polcalflag(vis=None):
     """
     hifa_polcalflag ---- Flag polarization calibrators
 
-    
+
     This task flags corrected visibility outliers in the polarization calibrator
     data using the hif_correctedampflag heuristics.
 
@@ -22,13 +22,8 @@ def hifa_polcalflag(vis=None, dryrun=None, acceptresults=None):
                   The list of input MeasurementSets. Defaults to the list of
                   MeasurementSets specified in the h_init or hif_importdata task.
                   '': use all MeasurementSets in the context
-                  
+
                   Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
-    dryrun
-                  Run the task (False) or display task command (True)
-    acceptresults
-                  Add the results of the task to the pipeline context (True) or
-                  reject them (False).
 
     --------- examples -----------------------------------------------------------
 

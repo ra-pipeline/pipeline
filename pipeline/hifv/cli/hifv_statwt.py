@@ -4,19 +4,18 @@ import pipeline.h.cli.utils as utils
 
 
 @utils.cli_wrapper
-def hifv_statwt(vis=None, datacolumn=None, overwrite_modelcol=None,
-                statwtmode=None, dryrun=None, acceptresults=None):
+def hifv_statwt(vis=None, datacolumn=None, overwrite_modelcol=None, statwtmode=None):
 
     """
     hifv_statwt ---- Compute statistical weights and write them to measurement set
 
     Compute statistical weights and write them to measurement set
 
-    
+
     Output:
-    
+
     results -- The results object for the pipeline task is returned.
-    
+
     --------- parameter descriptions ---------------------------------------------
 
     vis                The list of input MeasurementSets. Defaults to the list of MeasurementSets
@@ -29,20 +28,16 @@ def hifv_statwt(vis=None, datacolumn=None, overwrite_modelcol=None,
                        Single Epoch ('VLASS-SE') use case. Note that the 'VLASS-SE'
                        mode is meant to be used with datacolumn='residual_data'.
                        Default is 'VLA'.
-    dryrun             Run the commands (True) or generate the commands to be run but
-                       do not execute (False).  This is a pipeline task execution mode.
-    acceptresults      Add the results of the task to the pipeline context (True) or
-                       reject them (False).  This is a pipeline task execution mode.
 
     --------- examples -----------------------------------------------------------
-    
-    
+
+
     1. Statistical weighting of the visibilities:
-    
+
     >>> hifv_statwt()
-    
+
     2. Statistical weighting of the visibilities in the Very Large Array Sky Survey Single Epoch use case:
-    
+
     >>> hifv_statwt(mode='vlass-se', datacolumn='residual_data')
 
 

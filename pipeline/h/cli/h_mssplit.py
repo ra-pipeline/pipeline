@@ -5,18 +5,18 @@ from . import utils
 
 @utils.cli_wrapper
 def h_mssplit(vis=None, outputvis=None, field=None, intent=None, spw=None, datacolumn=None, chanbin=None, timebin=None,
-              replace=None, dryrun=None, acceptresults=None):
+              replace=None):
 
     """
     h_mssplit ---- Select data from calibrated MS(s) to form new MS(s) for imaging
 
     Select data from calibrated MS(s) to form new MS(s) for imaging
-    
+
     Create new MeasurementSets for imaging from the corrected column of the input
     MeasurementSet. By default all science target data is copied to the new MS. The new
     MeasurementSet is not re-indexed to the selected data in the new MS will have the
     same source, field, and spw names and ids as it does in the parent MS.
-    
+
     The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
@@ -44,15 +44,13 @@ def h_mssplit(vis=None, outputvis=None, field=None, intent=None, spw=None, datac
     timebin       The time binning factor. '0s' for no binning
                   example: '10s' for 10 second binning
     replace       If a split was performed delete the parent MS and remove it from the context.
-    dryrun        Run the task (False) or display the command(True)
-    acceptresults Add the results to the pipeline context
 
     --------- examples -----------------------------------------------------------
 
-    
-    
+
+
     1. Create a 4X channel smoothed output MS from the input MS
-    
+
     >>> h_mssplit(chanbin=4)
 
 

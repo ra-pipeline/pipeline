@@ -5,7 +5,7 @@ import pipeline.h.cli.utils as utils
 
 @utils.cli_wrapper
 def hsd_applycal(vis=None, field=None, intent=None, spw=None, antenna=None,
-    applymode=None, calwt=None, flagbackup=None, parallel=None, dryrun=None, acceptresults=None):
+    applymode=None, calwt=None, flagbackup=None, parallel=None):
 
     """
     hsd_applycal ---- Apply the calibration(s) to the data
@@ -56,9 +56,6 @@ def hsd_applycal(vis=None, field=None, intent=None, spw=None, antenna=None,
     parallel      Execute using CASA HPC functionality, if available.
                   options: 'automatic', 'true', 'false', True, False
                   default: None (equivalent to 'automatic')
-    dryrun        Run task (False) or display the command(True).
-    acceptresults Add the results of the task to the pipeline context (True) or
-                  reject them (False).
 
     --------- examples -----------------------------------------------------------
 

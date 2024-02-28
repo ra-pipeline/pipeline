@@ -8,8 +8,7 @@ def hsd_baseline(fitfunc=None, fitorder=None, switchpoly=None,
                  linewindow=None, linewindowmode=None, edge=None, broadline=None,
                  hm_linefinder=None,
                  clusteringalgorithm=None, deviationmask=None, parallel=None,
-                 infiles=None, field=None, antenna=None, spw=None, pol=None,
-                 dryrun=None, acceptresults=None):
+                 infiles=None, field=None, antenna=None, spw=None, pol=None):
 
     """
     hsd_baseline ---- Detect and validate spectral lines, subtract baseline by masking detected lines
@@ -201,12 +200,6 @@ def hsd_baseline(fitfunc=None, fitorder=None, switchpoly=None,
                         example: '0' (generate caltable for pol 0)
                                  ['0~1','0'] (pol 0 and 1 for first data, only 0 for second)
                                  '' (all polarizations)
-
-    dryrun              Run the commands (True) or generate the commands to be
-                        run but do not execute (False).
-
-    acceptresults       Add the results of the task to the pipeline context (True)
-                        or reject them (False).
 
     --------- examples -----------------------------------------------------------
 

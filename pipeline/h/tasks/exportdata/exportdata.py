@@ -12,7 +12,7 @@ vis = [ '<MS name>' ]
 context = pipeline.Pipeline().context
 inputs = pipeline.tasks.ImportData.Inputs(context, vis=vis)
 task = pipeline.tasks.ImportData(inputs)
-results = task.execute(dry_run=False)
+results = task.execute()
 results.accept(context)
 
 # Run some other pipeline tasks, e.g flagging, calibration,
@@ -25,7 +25,7 @@ results.accept(context)
 inputs = pipeline.tasks.exportdata.Exportdata.Inputs(context,
       vis, output_dir, sessions, pprfile, products_dir)
 task = pipeline.tasks.exportdata.ExportData(inputs)
-  results = task.execute(dry_run = True)
+  results = task.execute()
 """
 import collections
 import copy
@@ -739,8 +739,7 @@ class ExportData(basetask.StandardTaskTemplate):
                 outfile = file
             pprmatchesout.append(outfile)
             LOG.info('Copying pipeline processing file %s to %s', os.path.basename(file), os.path.basename(outfile))
-            if not self._executor._dry_run:
-                shutil.copy(file, outfile)
+            shutil.copy(file, outfile)
 
         return pprmatchesout
 
@@ -754,9 +753,6 @@ class ExportData(basetask.StandardTaskTemplate):
         LOG.info('Storing final ms %s in %s', visname, tarfilename)
 
         # Create the tar file
-        if self._executor._dry_run:
-            return tarfilename
-
         tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
         tar.add(visname)
         tar.close()
@@ -769,9 +765,8 @@ class ExportData(basetask.StandardTaskTemplate):
         """
 
         LOG.info('Saving final flags for %s in flag version %s', os.path.basename(vis), flag_version_name)
-        if not self._executor._dry_run:
-            task = casa_tasks.flagmanager(vis=vis, mode='save', versionname=flag_version_name)
-            self._executor.execute(task)
+        task = casa_tasks.flagmanager(vis=vis, mode='save', versionname=flag_version_name)
+        self._executor.execute(task)
 
     def _export_final_flagversion(self, vis, flag_version_name, products_dir):
         """
@@ -795,11 +790,10 @@ class ExportData(basetask.StandardTaskTemplate):
         LOG.info('Saving flag version list')
 
         # Create the tar file
-        if not self._executor._dry_run:
-            tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
-            tar.add(flagsname, arcname=flagsarcname)
-            tar.addfile(ti, io.BytesIO(line))
-            tar.close()
+        tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
+        tar.add(flagsname, arcname=flagsarcname)
+        tar.addfile(ti, io.BytesIO(line))
+        tar.close()
 
         return tarfilename
 
@@ -810,9 +804,6 @@ class ExportData(basetask.StandardTaskTemplate):
         """
         applyfile_name = self.NameBuilder.calapply_list(vis=vis, aux_product=imaging)
         LOG.info('Storing calibration apply list for %s in  %s', os.path.basename(vis), applyfile_name)
-
-        if self._executor._dry_run:
-            return applyfile_name
 
         try:
             calto = callibrary.CalTo(vis=vis)
@@ -906,9 +897,6 @@ class ExportData(basetask.StandardTaskTemplate):
         LOG.info('Saving final caltables for %s in %s', session, tarfilename)
 
         # Create the tar file
-        if self._executor._dry_run:
-            return tarfilename
-
         caltables = set()
 
         for visfile in vislist:
@@ -936,7 +924,7 @@ class ExportData(basetask.StandardTaskTemplate):
         """
         Save the processing web log to a tarfile
         """
-        return utils.export_weblog_as_tar(context, products_dir, self.NameBuilder, self._executor._dry_run)
+        return utils.export_weblog_as_tar(context, products_dir, self.NameBuilder)
 
     def _export_casa_commands_log(self, context, casalog_name, products_dir, oussid):
         """
@@ -951,8 +939,7 @@ class ExportData(basetask.StandardTaskTemplate):
                                                         output_dir=products_dir)
 
         LOG.info('Copying casa commands log %s to %s', casalog_file, out_casalog_file)
-        if not self._executor._dry_run:
-            shutil.copy(casalog_file, out_casalog_file)
+        shutil.copy(casalog_file, out_casalog_file)
 
         return os.path.basename(out_casalog_file)
 
@@ -995,8 +982,7 @@ finally:
             casa_restore_file.write(template)
 
         LOG.info('Copying casa restore script %s to %s', script_file, out_script_file)
-        if not self._executor._dry_run:
-            shutil.copy(script_file, out_script_file)
+        shutil.copy(script_file, out_script_file)
 
         return os.path.basename(out_script_file)
 
@@ -1013,8 +999,7 @@ finally:
                                                            output_dir=products_dir)
 
         LOG.info('Copying casa script file %s to %s', casascript_file, out_casascript_file)
-        if not self._executor._dry_run:
-            shutil.copy(casascript_file, out_casascript_file)
+        shutil.copy(casascript_file, out_casascript_file)
 
         return os.path.basename(out_casascript_file)
 
@@ -1026,8 +1011,7 @@ finally:
                                                       ousstatus_entity_id=oussid,
                                                       output_dir=products_dir)
         LOG.info('Creating manifest file %s', out_manifest_file)
-        if not self._executor._dry_run:
-            pipemanifest.write(out_manifest_file)
+        pipemanifest.write(out_manifest_file)
 
         return out_manifest_file
 
@@ -1191,61 +1175,60 @@ finally:
                         info['virtspw'] = '{},...,{}'.format(spw_sorted[0], spw_sorted[-1])
                         img.setmiscinfo(info)
 
-            if not self._executor._dry_run:
-                task = casa_tasks.exportfits(imagename=image, fitsimage=fitsfile, velocity=False, optical=False,
-                                             bitpix=-32, minpix=0, maxpix=-1, overwrite=True, dropstokes=False,
-                                             stokeslast=True)
-                self._executor.execute(task)
-                fits_list.append(fitsfile)
-                # Fetch header keywords for manifest
-                try:
-                    ff = apfits.open(fitsfile)
-                    fits_keywords = dict()
-                    # Loop through FITS keywords.
-                    for key in ['object', 'obsra', 'obsdec', 'intent', 'specmode',
-                                'spw', 'virtspw', 'spwisvrt',
-                                'naxis1', 'ctype1', 'cunit1', 'crpix1', 'crval1', 'cdelt1',
-                                'naxis2', 'ctype2', 'cunit2', 'crpix2', 'crval2', 'cdelt2',
-                                'naxis3', 'ctype3', 'cunit3', 'crpix3', 'crval3', 'cdelt3',
-                                'naxis4', 'ctype4', 'cunit4', 'crpix4', 'crval4', 'cdelt4',
-                                'bmaj', 'bmin', 'bpa', 'robust', 'weight',
-                                'effbw', 'level', 'ctrfrq', 'obspatt', 'arrays', 'modifier']:
+            task = casa_tasks.exportfits(imagename=image, fitsimage=fitsfile, velocity=False, optical=False,
+                                         bitpix=-32, minpix=0, maxpix=-1, overwrite=True, dropstokes=False,
+                                         stokeslast=True)
+            self._executor.execute(task)
+            fits_list.append(fitsfile)
+            # Fetch header keywords for manifest
+            try:
+                ff = apfits.open(fitsfile)
+                fits_keywords = dict()
+                # Loop through FITS keywords.
+                for key in ['object', 'obsra', 'obsdec', 'intent', 'specmode',
+                            'spw', 'virtspw', 'spwisvrt',
+                            'naxis1', 'ctype1', 'cunit1', 'crpix1', 'crval1', 'cdelt1',
+                            'naxis2', 'ctype2', 'cunit2', 'crpix2', 'crval2', 'cdelt2',
+                            'naxis3', 'ctype3', 'cunit3', 'crpix3', 'crval3', 'cdelt3',
+                            'naxis4', 'ctype4', 'cunit4', 'crpix4', 'crval4', 'cdelt4',
+                            'bmaj', 'bmin', 'bpa', 'robust', 'weight',
+                            'effbw', 'level', 'ctrfrq', 'obspatt', 'arrays', 'modifier', 'session']:
+                    fits_keywords[key] = str(ff[0].header.get(key, 'N/A'))
+
+                if 'nspwnam' in ff[0].header:
+                    nspwnam = ff[0].header['nspwnam']
+                    fits_keywords['nspwnam'] = str(nspwnam)
+                    for i in range(1, nspwnam+1):
+                        key = 'spwnam{:02d}'.format(i)
                         fits_keywords[key] = str(ff[0].header.get(key, 'N/A'))
 
-                    if 'nspwnam' in ff[0].header:
-                        nspwnam = ff[0].header['nspwnam']
-                        fits_keywords['nspwnam'] = str(nspwnam)
-                        for i in range(1, nspwnam+1):
-                            key = 'spwnam{:02d}'.format(i)
-                            fits_keywords[key] = str(ff[0].header.get(key, 'N/A'))
+                # Some names and/or values need to be mapped
+                fits_keywords['imagemin'] = str(ff[0].header.get('datamin', 'N/A'))
+                fits_keywords['imagemax'] = str(ff[0].header.get('datamax', 'N/A'))
+                fits_keywords['rms'] = str(ff[0].header.get('datarms', 'N/A'))
+                fits_keywords['producttype'] = str(ff[0].header.get('specmode', 'N/A'))
+                fits_keywords['pl_datatype'] = str(ff[0].header.get('datatype', 'N/A'))
+                fits_keywords['pol'] = str(ff[0].header.get('stokes', 'N/A'))
+                imagetype = str(ff[0].header['type'])
+                if imagetype == 'flux':
+                    fits_keywords['datatype'] = 'pb'
+                elif imagetype == 'pbcorimage':
+                    fits_keywords['datatype'] = 'pbcor'
+                elif imagetype == 'cleanmask':
+                    fits_keywords['datatype'] = 'mask'
+                elif imagetype == 'singledish':
+                    fits_keywords['datatype'] = 'sd'
+                else:
+                    fits_keywords['datatype'] = 'N/A'
 
-                    # Some names and/or values need to be mapped
-                    fits_keywords['imagemin'] = str(ff[0].header.get('datamin', 'N/A'))
-                    fits_keywords['imagemax'] = str(ff[0].header.get('datamax', 'N/A'))
-                    fits_keywords['rms'] = str(ff[0].header.get('datarms', 'N/A'))
-                    fits_keywords['producttype'] = str(ff[0].header.get('specmode', 'N/A'))
-                    fits_keywords['pl_datatype'] = str(ff[0].header.get('datatype', 'N/A'))
-                    fits_keywords['pol'] = str(ff[0].header.get('stokes', 'N/A'))
-                    imagetype = str(ff[0].header['type'])
-                    if imagetype == 'flux':
-                        fits_keywords['datatype'] = 'pb'
-                    elif imagetype == 'pbcorimage':
-                        fits_keywords['datatype'] = 'pbcor'
-                    elif imagetype == 'cleanmask':
-                        fits_keywords['datatype'] = 'mask'
-                    elif imagetype == 'singledish':
-                        fits_keywords['datatype'] = 'sd'
-                    else:
-                        fits_keywords['datatype'] = 'N/A'
+                fits_keywords['format'] = 'fits'
+                fits_keywords['ous'] = ous_name
 
-                    fits_keywords['format'] = 'fits'
-                    fits_keywords['ous'] = ous_name
-
-                    ff.close()
-                except Exception as e:
-                    LOG.info('Fetching FITS keywords for {} failed: {}'.format(fitsfile, e))
-                    fits_keywords = dict()
-                fits_keywords_list.append(fits_keywords)
+                ff.close()
+            except Exception as e:
+                LOG.info('Fetching FITS keywords for {} failed: {}'.format(fitsfile, e))
+                fits_keywords = dict()
+            fits_keywords_list.append(fits_keywords)
 
         new_cleanlist = copy.deepcopy(cleanlist)
 

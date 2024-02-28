@@ -91,15 +91,14 @@ class Hanning(basetask.StandardTaskTemplate):
         """
 
         if self._checkpreaveraged():
-            if not self._executor._dry_run:
-                try:
-                    self._do_hanningsmooth()
-                    LOG.info("Removing original VIS " + self.inputs.vis)
-                    shutil.rmtree(self.inputs.vis)
-                    LOG.info("Renaming temphanning.ms to " + self.inputs.vis)
-                    os.rename('temphanning.ms', self.inputs.vis)
-                except Exception as ex:
-                    LOG.warning('Problem encountered with hanning smoothing. ' + str(ex))
+            try:
+                self._do_hanningsmooth()
+                LOG.info("Removing original VIS " + self.inputs.vis)
+                shutil.rmtree(self.inputs.vis)
+                LOG.info("Renaming temphanning.ms to " + self.inputs.vis)
+                os.rename('temphanning.ms', self.inputs.vis)
+            except Exception as ex:
+                LOG.warning('Problem encountered with hanning smoothing. ' + str(ex))
         else:
             LOG.warning("Data in this MS are pre-averaged.  CASA task hanningsmooth() was not executed.")
 

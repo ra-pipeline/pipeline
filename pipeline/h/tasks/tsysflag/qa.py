@@ -5,6 +5,7 @@ import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as qacalc
+from pipeline.infrastructure.refantflag import format_fully_flagged_antenna_notification
 from . import resultobjects
 from ..exportdata import aqua
 
@@ -43,6 +44,16 @@ class TsysflagQAHandler(pqa.QAPlugin):
                                           metric_units='Percentage Tsys caltable newly flagged')
                 score.origin = new_origin
                 scores = [score]
+            try:
+                for notification in result.fully_flagged_antenna_notifications:
+                    score = pqa.QAScore(
+                        0.8,
+                        longmsg=format_fully_flagged_antenna_notification(vis, notification),
+                        shortmsg='Fully flagged antennas',
+                        vis=vis)
+                    scores.append(score)
+            except AttributeError:
+                LOG.error('Unable to find the list of fully flagged antennas')
 
         result.qa.pool[:] = scores
 

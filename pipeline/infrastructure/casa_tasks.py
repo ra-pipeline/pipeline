@@ -14,9 +14,17 @@ import functools
 import shutil
 import sys
 
-import almatasks
-import casaplotms
 import casatasks
+import casaplotms
+
+# PIPE-2099: add the compatibility with the 'wvrgcal' task change from CAS-14218
+if hasattr(casatasks, 'wvrgcal'):
+    # wvrgcal was migrated into the casatasks package via CAS-14218
+    almatasks = casatasks
+else:
+    # before CAS-14218, the task wvrgcal was under the almatasks package
+    import almatasks
+
 
 from . import logging
 from .jobrequest import JobRequest
@@ -338,7 +346,7 @@ class CasaTasks:
             # Executions will be logged in casacalls-.txt
             @functools.wraps(fn)
             def func(*args, **kwargs):
-                return fn(*args, **kwargs).execute(dry_run=False)
+                return fn(*args, **kwargs).execute()
             return func
         else:
             # Executions will be logged in both casacalls-.txt and casa-command.txt

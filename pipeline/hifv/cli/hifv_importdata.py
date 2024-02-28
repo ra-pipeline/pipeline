@@ -5,16 +5,16 @@ import pipeline.h.cli.utils as utils
 
 @utils.cli_wrapper
 def hifv_importdata(vis=None, session=None, asis=None, overwrite=None, nocopy=None, createmms=None,
-                    ocorr_mode=None, datacolumns=None, dryrun=None, acceptresults=None):
+                    ocorr_mode=None, datacolumns=None):
 
     """
     hifv_importdata ---- Imports data into the VLA pipeline
 
     The hifv_importdata task loads the specified visibility data into the pipeline
     context unpacking and / or converting it as necessary.
-        
+
     Output:
-    
+
     results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
@@ -41,14 +41,14 @@ def hifv_importdata(vis=None, session=None, asis=None, overwrite=None, nocopy=No
                   correlation data only (co), or autocorrelation data only (ao).
     datacolumns   Dictionary defining the data types of
                   existing columns. The format is:
-                  
+
                   {'data': 'data type 1'}
                   or
                   {'data': 'data type 1', 'corrected': 'data type 2'}
-                  
+
                   For ASDMs the data type can only be RAW and one
                   can only specify it for the data column.
-                  
+
                   For MSes one can define two different data types
                   for the DATA and CORRECTED_DATA columns and they
                   can be any of the known data types (RAW,
@@ -59,43 +59,39 @@ def hifv_importdata(vis=None, session=None, asis=None, overwrite=None, nocopy=No
                   skipped. In that case the task determines this
                   automatically by inspecting the existing intents
                   in the dataset.
-                  
+
                   Usually, a single datacolumns dictionary is used
-                  for all datasets. If necessary, one can define a 
+                  for all datasets. If necessary, one can define a
                   list of dictionaries, one for each EB, with
                   different setups per EB.
-                  
+
                   If no types are specified,
                   {'data':'raw','corrected':'regcal_contline'}
                   or {'data':'raw'} will be assumed, depending on
                   whether the corrected column exists or not.
-    dryrun        Run the commands (True) or generate the commands to be run but
-                  do not execute (False).  This is a pipeline task execution mode.
-    acceptresults Add the results of the task to the pipeline context (True) or
-                  reject them (False).  This is a pipeline task execution mode.
 
     --------- examples -----------------------------------------------------------
-    
-    
+
+
     1. Load an ASDM list in the ../rawdata subdirectory into the context.
-    
+
     >>> hifv_importdata (vis=['../rawdata/uid___A002_X30a93d_X43e', '../rawdata/uid_A002_x30a93d_X44e'])
-    
+
     2. Load an MS in the current directory into the context.
-    
+
     >>> hifv_importdata (vis=[uid___A002_X30a93d_X43e.ms])
-    
+
     3. Load a tarred ASDM in ../rawdata into the context.
-    
+
     >>> hifv_importdata (vis=['../rawdata/uid___A002_X30a93d_X43e.tar.gz'])
-    
+
     4. Check the hifv_importdata inputs, then import the data
-    
+
     >>> myvislist = ['uid___A002_X30a93d_X43e.ms', 'uid_A002_x30a93d_X44e.ms']
     >>> hifv_importdata(vis=myvislist)
-    
+
     5. Run with explicit setting of data column types:
-    
+
     >>> hifv_importdata(vis=['uid___A002_X30a93d_X43e_targets.ms'], datacolumns={'data': 'regcal_contline'})
     >>> hifv_importdata(vis=['uid___A002_X30a93d_X43e_targets_line.ms'], datacolumns={'data': 'regcal_line', 'corrected': 'selfcal_line'})
 

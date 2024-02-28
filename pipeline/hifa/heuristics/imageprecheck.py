@@ -106,7 +106,6 @@ class ImagePreCheckHeuristics(object):
             hm_robust_score_value = 0.25
             hm_robust_score_longmsg = 'The beam is too small, the predicted non-default robust=2.0 beam cannot achieve PI beam area'
             hm_robust_score_shortmsg = 'Beam is too small'
-            LOG.warning(hm_robust_score_longmsg)
         # robust=0.0 beam area out of range
         elif beamArea_0p0 is not None and \
              cqa.gt(beamArea_0p0, maxARbeamArea):
@@ -114,12 +113,10 @@ class ImagePreCheckHeuristics(object):
             hm_robust_score_value = 0.25
             hm_robust_score_longmsg = 'The beam is too large, the predicted non-default robust=0.0 beam cannot achieve PI beam area'
             hm_robust_score_shortmsg = 'Beam is too large'
-            LOG.warning(hm_robust_score_longmsg)
         else:
             hm_robust = 0.5
             hm_robust_score_value = 0.25
             hm_robust_score_longmsg = 'Requested beam area range falls in robust gap'
             hm_robust_score_shortmsg = 'Requested beam falls in robust gap'
-            LOG.warning(hm_robust_score_longmsg)
 
         return hm_robust, (hm_robust_score_value, hm_robust_score_longmsg, hm_robust_score_shortmsg), beamRatio_0p0, beamRatio_0p5, beamRatio_1p0, beamRatio_2p0

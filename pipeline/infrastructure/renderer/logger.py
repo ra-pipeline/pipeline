@@ -262,16 +262,21 @@ class Selector(object):
 
 class Plot(object):
     def __init__(self, filename, x_axis='Unknown', y_axis='Unknown', 
-                 field=None, parameters=None, qa_score=None, command=None):
+                 field=None, parameters=None, qa_score=None, command=None, captionmessage=''):
         """
         Plot(filename, x_axis, y_axis, field, parameters)
 
-        filename - the filename of the plot
-        x_axis - what the X axis of this plot measures
-        y_axis - what the Y axis of this plot measures
-        field - the name of the source or field which this data corresponds to
-        parameters - a dictionary of parameters, eg. { 'ant' : 1, 'spw' : 2 }. These
-            parameters should be known to the logging.Parameters class.
+        Args:
+            filename: the filename of the plot.
+            x_axis: what the X axis of this plot measures.
+            y_axis: what the Y axis of this plot measures.
+            field: the name of the source or field which this data corresponds to.
+            parameters: a dictionary of parameters, eg. { 'ant' : 1, 'spw' : 2 }.
+                These parameters should be known to the logging.Parameters class.
+            qa_score: additional property of the plot.
+            command: plotting command.
+            captionmessage: additional text in caption (its appearance is
+                determined by the mako template in which this plot appears).
         """
         if parameters is None:
             parameters = {}
@@ -286,6 +291,7 @@ class Plot(object):
             self.parameters['field'] = field
         self.qa_score = qa_score
         self.command = command
+        self.captionmessage = captionmessage
 
     @property
     def css_class(self):

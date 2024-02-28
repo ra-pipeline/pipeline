@@ -60,7 +60,7 @@ class BandpassDetailChart(common.PlotbandpassDetailBase):
         ant_ids = ','.join({str(ant_id) for _, ant_id in missing})
         try:
             task = self.create_task(spw_ids, ant_ids, showimage=showimage)
-            task.execute(dry_run=False)
+            task.execute()
         except Exception as ex:
             LOG.error('Could not create plotbandpass details plots')
             LOG.exception(ex)
@@ -94,7 +94,7 @@ class BandpassSummaryChart(common.PlotbandpassDetailBase):
             ant_ids = ','.join([str(ant_id) for ant_id in missing])
             try:
                 task = self.create_task('', ant_ids, showimage=self._showimage)
-                task.execute(dry_run=False)
+                task.execute()
             except Exception as ex:
                 LOG.error('Could not create plotbandpass summary plots')
                 LOG.exception(ex)

@@ -156,7 +156,7 @@ class SingleDishSkyCalAmpVsFreqSummaryChart(common.PlotbandpassDetailBase, Singl
                 try:
                     task = self.create_task(spw_id, '', showimage=showimage)
                     commands[spw_id] = str(task)
-                    task.execute(dry_run=False)
+                    task.execute()
                 except Exception as ex:
                     LOG.error('Could not create plotbandpass summary plots')
                     LOG.exception(ex)
@@ -174,7 +174,7 @@ class SingleDishSkyCalAmpVsFreqSummaryChart(common.PlotbandpassDetailBase, Singl
                 try:
                     task = self.create_task_for_tp_spectral_scan(spw_id, '', showimage=showimage)
                     commands[spw_id] = str(task)
-                    task.execute(dry_run=False)
+                    task.execute()
                     self.rename_and_clear_figure(spw_id)
                 except Exception as ex:
                     LOG.error('Could not create plotbandpass summary plots')
@@ -910,7 +910,7 @@ def plot_elevation_difference(
                 xoff = sd_display.mjd_to_plotval(eld.timecal)
                 for a in [a0, a2]:
                     a.plot(xon, eld.elon, '.', color='black', mew=0)
-                    a.plot(xoff, eld.elcal, '.-', color='blue', mew=0)
+                    a.plot(xoff, eld.elcal, '.', color='blue', mew=0)
 
                 # Elevation Difference vs. Time
                 time0 = eld.time0

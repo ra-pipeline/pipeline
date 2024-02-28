@@ -177,6 +177,13 @@ def log_host_environment():
             environment.host_distribution)
 
         LOG.info('Host environment: {!s}'.format(host_summary))
+        LOG.debug('Dependency details:')
+        for dep_name, dep_detail in environment.dependency_details.items():
+            if dep_detail is None:
+                LOG.debug('  {!s} : {!s}'.format(dep_name, 'not found'))
+            else:
+                LOG.debug('  {!s} = {!s} : {!s}'.format(
+                    dep_name, dep_detail['version'], dep_detail['path']))
     except NotImplemented:
         pass
 

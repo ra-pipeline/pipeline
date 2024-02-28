@@ -4,17 +4,17 @@ import pipeline.h.cli.utils as utils
 
 
 @utils.cli_wrapper
-def hifa_targetflag(vis=None, dryrun=None, acceptresults=None):
+def hifa_targetflag(vis=None):
     """
     hifa_targetflag ---- Flag target source outliers
 
-    
+
     This task flags very obvious target source outliers. The calibration tables and
     flags accumulated in the cal library up to this point are pre-applied, then
     hif_correctedampflag is called for just the TARGET intent. Any resulting
     flags are applied and the calibration library is restored to the state before
     calling this task.
-    
+
     Because science targets are generally not point sources, the flagging algorithm
     needs to be more clever than for point source calibrators. The algorithm identifies
     outliers by examining statistics within successive overlapping radial uv bins,
@@ -37,13 +37,8 @@ def hifa_targetflag(vis=None, dryrun=None, acceptresults=None):
                   The list of input MeasurementSets. Defaults to the list of
                   MeasurementSets specified in the h_init or hif_importdata task.
                   '': use all MeasurementSets in the context
-                  
+
                   Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
-    dryrun
-                  Run the task (False) or display task command (True)
-    acceptresults
-                  Add the results of the task to the pipeline context (True) or
-                  reject them (False).
 
     --------- examples -----------------------------------------------------------
 

@@ -202,7 +202,7 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                     centre_ghz = qaTool.convert('%s %s' % (center_frequency, summary['axisunits'][frequency_axis]), 'GHz')
                     if nchan > 1:
                         job = casa_tasks.imhead(image_path, mode='get', hdkey='restfreq')
-                        restfreq = job.execute(dry_run=False)
+                        restfreq = job.execute()
                         rest_ghz = qaTool.convert(restfreq, 'GHz')
                         row_frequency = '%s / %s (LSRK)' % (casa_tools.quanta.tos(centre_ghz, 4),
                                                             casa_tools.quanta.tos(rest_ghz, 4))
@@ -303,7 +303,7 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                     row_model_neg_flux = None
                     row_model_flux_inner_deg = None
 
-                row_nmajordone_per_iter, row_nmajordone_total, majorcycle_stat_plot, tab_dict = get_cycle_stats_vlass(
+                row_nmajordone_per_iter, row_nmajordone_total, majorcycle_stat_plot, tab_dict = get_cycle_stats(
                     context, makeimages_result, r)
 
                 #
@@ -1096,7 +1096,7 @@ class T2_4MDetailsTcleanVlassCubeRenderer(basetemplates.T2_4MDetailsDefaultRende
                         center_frequency, summary['axisunits'][frequency_axis]), 'GHz')
                     if nchan > 1:
                         job = casa_tasks.imhead(image_path, mode='get', hdkey='restfreq')
-                        restfreq = job.execute(dry_run=False)
+                        restfreq = job.execute()
                         rest_ghz = qaTool.convert(restfreq, 'GHz')
                         row_frequency = '%s / %s (LSRK)' % (casa_tools.quanta.tos(centre_ghz, 4),
                                                             casa_tools.quanta.tos(rest_ghz, 4))
@@ -1209,7 +1209,7 @@ class T2_4MDetailsTcleanVlassCubeRenderer(basetemplates.T2_4MDetailsDefaultRende
                     row_model_neg_flux = None
                     row_model_flux_inner_deg = None
 
-                row_nmajordone_per_iter, row_nmajordone_total, majorcycle_stat_plot, tab_dict = get_cycle_stats_vlass(
+                row_nmajordone_per_iter, row_nmajordone_total, majorcycle_stat_plot, tab_dict = get_cycle_stats(
                     context, makeimages_result, r)
 
                 #
@@ -1705,8 +1705,8 @@ class T2_4MDetailsTcleanVlassCubeRenderer(basetemplates.T2_4MDetailsDefaultRende
         })
 
 
-def get_cycle_stats_vlass(context, makeimages_result, r):
-    """Get the major cycle statistics for VLASS."""
+def get_cycle_stats(context, makeimages_result, r):
+    """Get the major cycle statistics."""
 
     row_nmajordone_per_iter, row_nmajordone_total, majorcycle_stat_plot, tab_dict = None, None, None, None
 
@@ -1756,5 +1756,14 @@ def get_cycle_stats_vlass(context, makeimages_result, r):
                         'iteration': [k for k in row_nmajordone_per_iter],
                         'cleanmask': [item['cleanmask'] for iter, item in row_nmajordone_per_iter.items()],
                         'nmajordone': [item['nmajordone'] for iter, item in row_nmajordone_per_iter.items()]}}
+    else:
+        # Just nmajor for other modes
+        row_nmajordone_per_iter = {}
+        for iteration, iterdata in r.iterations.items():
+            iter_dict = {'nmajordone': iterdata['nmajordone'] if 'nmajordone' in iterdata else 0}
+            row_nmajordone_per_iter[iteration] = iter_dict
+
+        # sum the major cycle done over all 'iter's of Tclean
+        row_nmajordone_total = np.sum([item['nmajordone'] for key, item in row_nmajordone_per_iter.items()])
 
     return row_nmajordone_per_iter, row_nmajordone_total, majorcycle_stat_plot, tab_dict

@@ -7,8 +7,8 @@ import pipeline.h.cli.utils as utils
 def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, antenna=None, hm_phaseup=None,
                   phaseupsolint=None, phaseupbw=None, phaseupsnr=None, phaseupnsols=None, hm_bandpass=None, solint=None,
                   maxchannels=None, evenbpints=None, bpsnr=None, minbpsnr=None, bpnsols=None, combine=None, refant=None,
-                  solnorm=None, minblperant=None, minsnr=None, unregister_existing=None, dryrun=None,
-                  acceptresults=None, fillgaps=None):
+                  solnorm=None, minblperant=None, minsnr=None, unregister_existing=None,
+                  fillgaps=None):
     """
     hifa_bandpass ---- Compute bandpass calibration solutions
 
@@ -17,10 +17,10 @@ def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, an
     science spectral window. By default, a 'phaseup' pre-calibration is
     performed and applied on the fly to the data, before the bandpass is
     computed.
-    
+
     The hif_refant task may be used to pre-compute a prioritized list of
     reference antennas.
-    
+
     Output:
 
         results -- The results object for the pipeline task is returned.
@@ -30,31 +30,31 @@ def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, an
     vis
                         List of input MeasurementSets. Defaults to the list of
                         MeasurementSets specified in the pipeline context.
-                        
+
                         Example: vis=['ngc5921.ms']
     caltable
                         List of names for the output calibration tables. Defaults
                         to the standard pipeline naming convention.
-                        
+
                         Example: caltable=['ngc5921.gcal']
     field
                         The list of field names or field ids for which
                         bandpasses are computed. Set to field='' by default,
                         which means the task will select all fields.
-                        
+
                         Example: field='3C279', field='3C279,M82'
     intent
                         A string containing a comma delimited list of intents
                         against which the selected fields are matched. Set to
                         intent='' by default, which means the task will select
                         all data with the BANDPASS intent.
-                        
+
                         Example: intent='`*PHASE*`'
     spw
                         The list of spectral windows and channels for which
                         bandpasses are computed. Set to spw='' by default, which
                         means the task will select all science spectral windows.
-                        
+
                         Example: spw='11,13,15,17'
     antenna
                         Set of data selection antenna IDs
@@ -67,18 +67,18 @@ def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, an
                         'manual': use manual solution parameters
 
                         '': skip phaseup
-                        
+
                         Example: hm_phaseup='manual'
     phaseupsolint
                         The phase correction solution interval in CASA syntax.
                         Used when ``hm_phaseup`` = 'manual' or as a default if
                         the ``hm_phaseup`` = 'snr' heuristic computation fails.
-                        
+
                         Example: phaseupsolint='300s'
     phaseupbw
                         Bandwidth to be used for phaseup. Used when
                         ``hm_phaseup`` = 'manual'.
-                        
+
                         Example:
 
                         phaseupbw='' to use entire bandpass
@@ -88,7 +88,7 @@ def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, an
                         The required SNR for the phaseup solution. Used to calculate
                         the phaseup time solint, and only if
                         ``hm_phaseup`` = 'snr'.
-                        
+
                         Example: phaseupsnr=10.0
     phaseupnsols
                         The minimum number of phaseup gain solutions. Used only
@@ -179,12 +179,6 @@ def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, an
                         from this task. Defaults to False.
 
                         Example: unregister_existing=True
-    dryrun
-                        Run the commands (True) or generate the commands to be
-                        run but do not execute (False).
-    acceptresults
-                        Automatically accept the results of the task into the
-                        pipeline context (True) or reject them (False).
     fillgaps
                         Fill flagged solution channels by interpolation.
 
@@ -194,11 +188,11 @@ def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, an
 
     1. Compute a channel bandpass for all visibility files in the pipeline
     context using the CASA reference antenna determination scheme:
-    
+
     >>> hifa_bandpass()
-    
+
     2. Same as the above but precompute a prioritized reference antenna list:
-    
+
     >>> hif_refant()
     >>> hifa_bandpass()
 

@@ -242,7 +242,7 @@ class MeasurementSet(object):
                     spw = spw.split(',')
             spw = {int(i) for i in spw}
             pool = {scan for scan in pool for scan_spw in scan.spws if scan_spw.id in spw}
-            pool = list(pool)
+            pool = sorted(pool, key=lambda s: s.id)
 
         return pool
 
@@ -1291,10 +1291,12 @@ class MeasurementSet(object):
 
         # Return early if no refants are registered (None, or empty string).
         if not (self.reference_antenna and self.reference_antenna.strip()):
-            LOG.warning("No reference antennas registered set for MS {}, "
-                        "cannot update its reference antenna list."
-                        "".format(self.name))
+            LOG.warning('No reference antennas registered set for MS {} ({}), '
+                        'cannot update its reference antenna list.'.
+                        format(self.basename, hex(id(self))))
             return
+
+        previous_reference_antenna = self.reference_antenna
 
         # Create updated refant list.
         refants_to_keep = []
@@ -1309,6 +1311,12 @@ class MeasurementSet(object):
 
         # Update refant list.
         self.reference_antenna = ','.join(refants_to_keep)
+
+        LOG.info('ms.update_reference_antennas for MS {} ({}): previous list={}, removed={}, demoted={}, new list={}'.
+                 format(self.basename, hex(id(self)), previous_reference_antenna,
+                        ','.join(sorted(ants_to_remove)) if ants_to_remove else 'none',
+                        ','.join(sorted(ants_to_demote)) if ants_to_remove else 'none',
+                        self.reference_antenna))
 
     @property
     def session(self):

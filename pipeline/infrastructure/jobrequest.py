@@ -9,9 +9,16 @@ import sys
 import types
 from inspect import signature
 
-import almatasks
-import casaplotms
 import casatasks
+import casaplotms
+
+# PIPE-2099: add the compatibility with the 'wvrgcal' task change from CAS-14218
+if hasattr(casatasks, 'wvrgcal'):
+    # wvrgcal was migrated into the casatasks package via CAS-14218
+    almatasks = casatasks
+else:
+    # before CAS-14218, the task wvrgcal was under the almatasks package
+    import almatasks
 
 from . import logging, utils
 
@@ -214,22 +221,16 @@ class JobRequest(object):
         self._keyword = [FunctionArg(name, kw[name]) for name in argnames if name in kw]
         self._nameless = [NamelessArg(a) for a in args[argcount:]]
 
-    def execute(self, dry_run=False, verbose=False):
+    def execute(self, verbose=False):
         """
         Execute this job, returning any result to the caller.
 
-        :param dry_run: True if the job should be logged rather than executed\
-            (default: False)
-        :type dry_run: boolean
         :param verbose: True if the complete invocation, including all default\
             variables and arguments, should be logged instead of just those\
             explicitly given (default: False)
         :type verbose: boolean
         """
         msg = self._get_fn_msg(verbose, sort_args=False)
-        if dry_run:
-            sys.stdout.write('Dry run: %s\n' % msg)
-            return
 
         for hook in PREHOOKS:
             hook(self)
@@ -314,7 +315,7 @@ def get_fn_name(fn):
     Note: as of CASA ver6.5, all genuine CASA tasks are callable class instances, rather than Python functions.
     """
 
-    for m in (almatasks, casatasks, casaplotms):
+    for m in (casatasks, casaplotms, almatasks):
         for k in m.__all__:
             v = getattr(m, k)
             if v == fn and not isinstance(fn, types.FunctionType):

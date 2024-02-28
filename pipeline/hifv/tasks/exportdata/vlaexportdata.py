@@ -203,8 +203,7 @@ finally:
             casa_restore_file.write(template)
 
         LOG.info('Copying casa restore script %s to %s', script_file, out_script_file)
-        if not self._executor._dry_run:
-            shutil.copy(script_file, out_script_file)
+        shutil.copy(script_file, out_script_file)
 
         return os.path.basename(out_script_file)
 
@@ -223,9 +222,6 @@ finally:
             LOG.info('Storing final ms %s in %s', visname, tarfilename)
 
             # Create the tar file
-            if self._executor._dry_run:
-                return tarfilename
-
             tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
             tar.add(visname)
             tar.close()

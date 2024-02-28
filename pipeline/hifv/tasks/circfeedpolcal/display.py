@@ -36,7 +36,7 @@ class CircFeedPolCalChart(object):
                          title='{!s}  Antenna: {!s}'.format(self.caltable, self.antenna),
                          titlefont=7, xaxisfont=7, yaxisfont=7, showgui=False, plotfile=figfile)
 
-        job.execute(dry_run=False)
+        job.execute()
 
     def get_figfile(self, prefix):
         return os.path.join(self.context.report_dir,
@@ -124,7 +124,7 @@ class ampfreqPerAntennaChart(object):
                                      titlefont=8, xaxisfont=7, yaxisfont=7, showgui=False, plotfile=figfile,
                                      xconnector='step')
 
-                    job.execute(dry_run=False)
+                    job.execute()
 
                 except Exception as ex:
                     LOG.warning("Unable to plot " + filename + str(ex))

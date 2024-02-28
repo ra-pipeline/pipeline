@@ -161,8 +161,7 @@ finally:
             casa_restore_file.write(template)
 
         LOG.info('Copying casa restore script %s to %s' % (script_file, out_script_file))
-        if not self._executor._dry_run:
-            shutil.copy(script_file, out_script_file)
+        shutil.copy(script_file, out_script_file)
 
         return os.path.basename(out_script_file)
 

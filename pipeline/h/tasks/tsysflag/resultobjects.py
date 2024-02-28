@@ -1,9 +1,11 @@
 import collections
+from typing import List, Set
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 from pipeline.h.tasks.common import flaggableviewresults
 from pipeline.h.tasks.tsyscal import resultobjects
+from pipeline.infrastructure.refantflag import FullyFlaggedAntennasNotification
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -20,14 +22,17 @@ class TsysflagResults(resultobjects.TsyscalResults):
         self.components = collections.OrderedDict()
 
         # task completion status / reason for incompleteness
-        self.task_incomplete_reason = ''
+        self.task_incomplete_reason: str = ''
 
         # list of antennas that should be moved to the end
         # of the refant list
-        self.refants_to_demote = set()
+        self.refants_to_demote: Set[str] = set()
 
         # list of entirely flagged antennas that should be removed from refants
-        self.refants_to_remove = set()
+        self.refants_to_remove: Set[str] = set()
+
+        # further information about entirely flagged antennas used in QA scoring
+        self.fully_flagged_antenna_notifications: List[FullyFlaggedAntennasNotification] = []
 
     def merge_with_context(self, context):
         # Update reference antennas for MS.

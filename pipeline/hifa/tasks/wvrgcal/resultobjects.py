@@ -3,7 +3,6 @@ import os
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
-import pipeline.infrastructure.utils as utils
 from pipeline.h.tasks.common import commonresultobjects
 
 LOG = infrastructure.get_logger(__name__)
@@ -70,13 +69,7 @@ class WvrgcalResult(basetask.Results):
                 refant = ms.reference_antenna.split(',')
                 bad_antennas = set(self.wvrflag).intersection(refant)
                 if bad_antennas:
-                    ant_msg = utils.commafy(bad_antennas, quotes=False,
-                                            multi_prefix='s')
-                    LOG.warning('Antenna%s with bad WVR removed from refant list for '
-                                '%s' % (ant_msg, os.path.basename(self.vis)))
-                    for antenna in list(bad_antennas):
-                        refant.remove(antenna)
-                    ms.reference_antenna = ','.join(refant)
+                    ms.update_reference_antennas(ants_to_remove=bad_antennas)
 
     def __repr__(self):
 

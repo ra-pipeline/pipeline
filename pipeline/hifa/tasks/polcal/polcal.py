@@ -156,10 +156,10 @@ class Polcal(basetask.StandardTaskTemplate):
         """
         # For each session, check that the caltables were all generated.
         for session_name, sresults in result.session.items():
-            on_disk = [ca for ca in sresults.pool if ca.exists() or self._executor._dry_run]
+            on_disk = [ca for ca in sresults.pool if ca.exists()]
             sresults.final[:] = on_disk
 
-            missing = [ca for ca in sresults.pool if ca not in on_disk and not self._executor._dry_run]
+            missing = [ca for ca in sresults.pool if ca not in on_disk]
             sresults.error.clear()
             sresults.error.update(missing)
         return result

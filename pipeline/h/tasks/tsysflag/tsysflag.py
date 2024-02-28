@@ -2,8 +2,8 @@ import collections
 import os
 import re
 import string
-
 import numpy as np
+from typing import Dict
 
 from casatasks.private import flaghelper
 
@@ -13,12 +13,12 @@ import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.h.heuristics.tsysnormalize import tsysNormalize
-from pipeline.h.tasks.common import calibrationtableaccess as caltableaccess
-from pipeline.h.tasks.common import commonhelpermethods
-from pipeline.h.tasks.common import commonresultobjects
-from pipeline.h.tasks.common import viewflaggers
+from pipeline.h.tasks.common import calibrationtableaccess as caltableaccess, \
+    commonhelpermethods, commonresultobjects, viewflaggers
 from pipeline.h.tasks.flagging.flagdatasetter import FlagdataSetter
 from pipeline.infrastructure import task_registry
+from pipeline.infrastructure.refantflag import identify_fully_flagged_antennas_from_flagview, \
+    mark_antennas_for_refant_update, aggregate_fully_flagged_antenna_notifications
 from .resultobjects import TsysflagResults, TsysflagspectraResults, TsysflagDataResults, TsysflagViewResults
 
 __all__ = [
@@ -40,129 +40,6 @@ def _create_normalized_caltable(vis, caltable):
     tsysNormalize(vis, tsysTable=caltable, newTsysTable=norm_caltable)
 
     return norm_caltable
-
-
-def _identify_ants_to_demote(flagging_state, ms, antenna_id_to_name):
-
-    # Initialize summary
-    ants_fully_flagged = collections.defaultdict(set)
-
-    # Create translation of field ID to field name
-    field_name_for_id = dict((field.id, field.name) for field in ms.fields)
-
-    # Based on flagging state summarized from all flagging views, identify
-    # antennas that are fully flagged for all available timestamps for one
-    # or more fields belonging to one or more of the intents of interest
-    # in one or more of the spws.
-    intents_found = {key[0] for key in flagging_state}
-    for intent in intents_found:
-        fields_found = {key[1] for key in flagging_state if key[0] == intent}
-        for field in fields_found:
-            spws_found = {key[2] for key in flagging_state if key[0:2] == (intent, field)}
-            for spwid in spws_found:
-                flags_per_ant = np.array(flagging_state[(intent, field, spwid)]).T
-                for iant, flag_for_ant in enumerate(flags_per_ant):
-                    if flag_for_ant.all():
-                        ants_fully_flagged[(intent, field, spwid)].update([iant])
-
-    # For each combination of intent, field, and spw that were found
-    # to have antennas fully flagged in all timestamps, raise a
-    # warning.
-    sorted_keys = sorted(
-        sorted(ants_fully_flagged.keys(), key=lambda keys: keys[2]),
-        key=lambda keys: keys[0])
-    for (intent, field, spwid) in sorted_keys:
-        ants_flagged = ants_fully_flagged[(intent, field, spwid)]
-
-        # Convert antenna IDs to names and create a string.
-        ants_str = ", ".join(map(str, [antenna_id_to_name[iant]
-                                       for iant in ants_flagged]))
-        LOG.attention(
-            "{msname} - for intent {intent} (field {fieldid}: "
-            "{fieldname}) and spw {spw}, the following antennas "
-            "are fully flagged: {ants}".format(
-                msname=ms.basename, intent=intent, fieldid=field,
-                fieldname=field_name_for_id[field], spw=spwid,
-                ants=ants_str))
-
-    # Store the set of antennas that were fully flagged in at least
-    # one Tsys spw, for any of the fields for any of the intents.
-    ants_to_demote_as_refant = {antenna_id_to_name[iant]
-                                for iants in ants_fully_flagged.values()
-                                for iant in iants}
-
-    return ants_to_demote_as_refant, ants_fully_flagged
-
-
-def _identify_ants_to_remove(result, ms, metric_to_test, ants_fully_flagged, antenna_id_to_name):
-    # Initialize set of antennas that are fully flagged for all spws, for any intent
-    ants_fully_flagged_in_all_spws_any_intent = set()
-
-    # Get the science spw ids from the MS.
-    science_spw_ids = [spw.id for spw in ms.get_spectral_windows(science_windows_only=True)]
-
-    # Using the CalTo object in the TsysflagspectraResults from the
-    # last-ran testable metric, identify which are the Tsys spectral
-    # windows.
-    calto = result.components[metric_to_test].final[0]
-    tsys_spw_ids = [tsys for (spw, tsys) in enumerate(calto.spwmap)
-                    if spw in science_spw_ids and spw not in result.unmappedspws]
-
-    # Check if any antennas were found to be fully flagged in all
-    # scans (timestamps) and all spws, for any intent.
-    #
-    # NOTE: The following test checks for antennas fully flagged
-    # in all spws declared by CalTo (and assumes that flagging views were
-    # available for each of those spw to be able to test it).
-    # Conversely, this test does not check for antennas fully flagged in
-    # all spws within the subset of spws for which flagging views were available.
-    # If a flagging view was not available for some spw and a given intent,
-    # then no antenna will be found to be fully flagged in all spws for that intent.
-
-    # Identify the field and intent combinations for which fully flagged
-    # antennas were found.
-    intent_field_found = {key[0:2] for key in ants_fully_flagged}
-    for (intent, field) in intent_field_found:
-
-        # Identify the spws for which fully flagged antennas were found (for current
-        # intent and field).
-        spws_found = {key[2] for key in ants_fully_flagged if key[0:2] == (intent, field)}
-
-        # Only proceed if the set of spws for which flagged antennas were found is
-        # the same as the set of spws declared by CalTo, i.e. flagged antennas
-        # were found in all spws.
-        if spws_found == set(tsys_spw_ids):
-            # Select the fully flagged antennas for current intent and field.
-            ants_fully_flagged_for_intent_field = [ants_fully_flagged[key] for key in ants_fully_flagged
-                                                   if key[0:2] == (intent, field)]
-
-            # Identify which antennas are fully flagged in all spws, for
-            # current intent and field, and store these for later warning
-            # and/or updating of refant.
-            ants_fully_flagged_in_all_spws_any_intent.update(
-                set.intersection(*ants_fully_flagged_for_intent_field))
-
-    # For the antennas that were found to be fully flagged in all
-    # spws for all timestamps for one or more fields belonging to
-    # one or more of the intents, raise a warning.
-    if ants_fully_flagged_in_all_spws_any_intent:
-        # Convert antenna IDs to names and create a string.
-        ants_str = ", ".join(
-            map(str, [antenna_id_to_name[iant]
-                      for iant in ants_fully_flagged_in_all_spws_any_intent]))
-        LOG.attention(
-            '{0} - the following antennas are fully flagged in all Tsys '
-            'spws for one or more fields with the intent "BANDPASS", '
-            '"PHASE", and/or "AMPLITUDE": {1}'.format(ms.basename, ants_str))
-
-    # Store the set of antennas that are fully flagged for all Tsys
-    # spws in any of the intents in the result as a list of antenna
-    # names.
-    ants_to_remove_as_refant = {
-        antenna_id_to_name[iant]
-        for iant in ants_fully_flagged_in_all_spws_any_intent}
-
-    return ants_to_remove_as_refant
 
 
 def _identify_testable_metrics(result, testable_metrics):
@@ -390,11 +267,42 @@ class Tsysflag(basetask.StandardTaskTemplate):
 
         # If any of the testable metrics were completed...
         if testable_metrics_completed:
-            # Identify bad antennas to demote/remove from refant list.
-            ants_to_demote, ants_to_remove = self._identify_bad_refants(result, testable_metrics_completed)
+            # Get the MS object
+            ms = self.inputs.context.observing_run.get_ms(name=self.inputs.vis)
+
+            # Pick the testable metric that ran last.
+            metric_to_test = testable_metrics_completed[-1]
+            LOG.trace("Using metric '{0}' to evaluate if any antennas were"
+                      " entirely flagged.".format(metric_to_test))
+
+            # Get the science spw ids from the MS.
+            science_spw_ids = [spw.id for spw in ms.get_spectral_windows(science_windows_only=True)]
+
+            # Using the CalTo object in the TsysflagspectraResults from the
+            # last-ran testable metric, identify which are the Tsys spectral windows.
+            calto = result.components[metric_to_test].final[0]
+            tsys_spw_ids = set(tsys for (spw, tsys) in enumerate(calto.spwmap)
+                               if spw in science_spw_ids and spw not in result.unmappedspws)
+
+            # Create field ID to name translation.
+            field_id_to_name: Dict[int, str] = {field.id: field.name for field in ms.fields}
+
+            # Create the translation between scan times (which enumerate scans) and field names.
+            tsystable = caltableaccess.CalibrationTableDataFiller.getcal(self.inputs.caltable)
+            scan_time_to_field_names: Dict[float, str] = {row.get('TIME'): field_id_to_name[row.get('FIELD_ID')]
+                                                          for row in tsystable.rows}
+
+            # Identify antennas that are fully flagged in all scans in any combination of field/intent/spw.
+            fully_flagged_antennas = identify_fully_flagged_antennas_from_flagview(
+                ms, result.components[metric_to_test], scan_time_to_field_names,
+                intents_of_interest=('AMPLITUDE', 'BANDPASS', 'PHASE'))
 
             # Update result to mark antennas for demotion/removal as refant.
-            result = self._mark_antennas_for_refant_update(result, ants_to_demote, ants_to_remove)
+            result = mark_antennas_for_refant_update(ms, result, fully_flagged_antennas, tsys_spw_ids)
+
+            # Aggregate the list of fully flagged antennas by intent, field and spw for subsequent QA scoring
+            result.fully_flagged_antenna_notifications = aggregate_fully_flagged_antenna_notifications(
+                fully_flagged_antennas, tsys_spw_ids)
 
         # If no testable metrics were completed, then log a trace warning that
         # no evaluation of fully flagged antennas was performed.
@@ -402,178 +310,6 @@ class Tsysflag(basetask.StandardTaskTemplate):
             LOG.trace("Cannot test if any antennas were entirely flagged"
                       " since none of the following flagging metrics were"
                       " evaluated: {}".format(', '.join(testable_metrics)))
-
-        return result
-
-    def _identify_bad_refants(self, result, testable_metrics_completed):
-        # Get the MS object
-        ms = self.inputs.context.observing_run.get_ms(name=self.inputs.vis)
-
-        # Pick the testable metric that ran last.
-        metric_to_test = testable_metrics_completed[-1]
-        LOG.trace("Using metric '{0}' to evaluate if any antennas were"
-                  " entirely flagged.".format(metric_to_test))
-
-        # Create antenna ID to name translation dictionary, reject empty
-        # antenna name strings.
-        antenna_id_to_name = {ant.id: ant.name for ant in ms.antennas if ant.name.strip()}
-
-        # Summarize flagging state from all flagging views in result.
-        flagging_state = self._summarize_flagging_state(result, ms, metric_to_test)
-
-        # Identify antennas to demote as refant.
-        ants_to_demote, ants_fully_flagged = _identify_ants_to_demote(flagging_state, ms, antenna_id_to_name)
-
-        # Identify antennas to remove as refant.
-        ants_to_remove = _identify_ants_to_remove(result, ms, metric_to_test, ants_fully_flagged, antenna_id_to_name)
-
-        return ants_to_demote, ants_to_remove
-
-    def _summarize_flagging_state(self, result, ms, metric_to_test):
-        # Perform test separately for each of these intents.
-        intents_of_interest = ['BANDPASS', 'AMPLITUDE', 'PHASE']
-
-        # Create translation of field to intent for intents of interest.
-        intents_for_field = dict((field.id, field.intents) for field in ms.fields)
-
-        # Identify fields present in Tsys table:
-        # Read in the Tsys table, and extract the field ids.
-        tsystable = caltableaccess.CalibrationTableDataFiller.getcal(self.inputs.caltable)
-        fields = {}
-        for row in tsystable.rows:
-            time = row.get('TIME')
-            if time not in fields:
-                fields[time] = row.get('FIELD_ID')
-
-        # Initialize flagging state
-        flagging_state = collections.defaultdict(list)
-
-        # Create a summary of the flagging state by going through
-        # each view product for the specified metric.
-        for description in result.components[metric_to_test].descriptions():
-
-            # Get final view.
-            view = result.components[metric_to_test].last(description)
-
-            # Get spw
-            spwid = view.spw
-
-            # Go through each scan within view.
-            for iscan, time in enumerate(view.axes[1].data):
-
-                # Get flags per antenna for current scan
-                flag_per_scan = view.flag[:, iscan]
-
-                # Get field ID and intent(s) for current scan
-                field_scan = fields[time]
-                intents_scan = intents_for_field[field_scan]
-
-                # For each intent that this scan belongs to:
-                for intent in intents_scan:
-                    # If this scan is for an intent of interest, then store scan
-                    # accordingly.
-                    if intent in intents_of_interest:
-                        flagging_state[(intent, field_scan, spwid)].append(list(flag_per_scan))
-
-        return flagging_state
-
-    def _mark_antennas_for_refant_update(self, result, ants_to_demote, ants_to_remove):
-        """
-        Modify result to set antennas to be demoted/removed if/when result
-        gets accepted into the pipeline context. If list of antennas to demote
-        and/or remove comprises all antennas, then skip demotion/removal and
-        raise a warning.
-
-        :param result: TsysflagResults object
-        :param ants_to_demote: list of ints, representing IDs of antennas to
-        demote.
-        :param ants_to_remove: list of ints, representing IDs of antennas to
-        remove.
-        :return: TsysflagResults object
-        """
-        # Get the MS object
-        ms = self.inputs.context.observing_run.get_ms(name=self.inputs.vis)
-
-        # If any reference antennas were found to be candidates for
-        # removal or demotion (move to end of list), then proceed...
-        if ants_to_remove or ants_to_demote:
-
-            # If a list of reference antennas was registered with the MS..
-            if (hasattr(ms, 'reference_antenna') and
-                    isinstance(ms.reference_antenna, str)):
-
-                # Create list of current refants
-                refant = ms.reference_antenna.split(',')
-
-                # Identify intersection between refants and fully flagged
-                # and store in result.
-                result.refants_to_remove = {
-                    ant for ant in refant
-                    if ant in ants_to_remove}
-
-                # If any refants were found to be removed...
-                if result.refants_to_remove:
-
-                    # Create string for log message.
-                    ant_msg = utils.commafy(result.refants_to_remove, quotes=False)
-
-                    # Check if removal of refants would result in an empty refant list,
-                    # in which case the refant update is skipped.
-                    if result.refants_to_remove == set(refant):
-
-                        # Log warning that refant list should have been updated, but
-                        # will not be updated so as to avoid an empty refant list.
-                        LOG.warning(
-                            '{0} - the following reference antennas are fully flagged '
-                            'in all Tsys spws in the "BANDPASS", "PHASE", and/or '
-                            '"AMPLITUDE" intents, but are *NOT* removed from the '
-                            'refant list because doing so would result in an '
-                            'empty refant list: {1}'.format(ms.basename, ant_msg))
-
-                        # Reset the refant removal list in the result to be empty.
-                        result.refants_to_remove = set()
-
-                # Identify intersection between refants and candidate
-                # antennas to demote, skipping those that are to be
-                # removed entirely, and store this list in the result.
-                # These antennas should be moved to the end of the refant
-                # list (demoted) upon merging the result into the context.
-                result.refants_to_demote = {
-                    ant for ant in refant
-                    if ant in ants_to_demote
-                       and ant not in result.refants_to_remove}
-
-                # If any refants were found to be demoted...
-                if result.refants_to_demote:
-
-                    # Create string for log message.
-                    ant_msg = utils.commafy(result.refants_to_demote, quotes=False)
-
-                    # Check if the list of refants-to-demote comprises all
-                    # refants, in which case the re-ordering of refants is
-                    # skipped.
-                    if result.refants_to_demote == set(refant):
-
-                        # Log warning that refant list should have been updated, but
-                        # will not be updated due to  as to avoid an empty refant list.
-                        LOG.warning(
-                            '{0} - the following antennas are fully flagged '
-                            'for one or more Tsys spws, in one or more fields '
-                            'with intent "BANDPASS", "PHASE", and/or '
-                            '"AMPLITUDE", but since these comprise all '
-                            'refants, the refant list is *NOT* updated to '
-                            're-order these to the end of the refant list: '
-                            '{1}'.format(ms.basename, ant_msg))
-
-                        # Reset the refant demotion list in the result to be empty.
-                        result.refants_to_demote = set()
-
-            # If no list of reference antennas was registered with the MS,
-            # raise a warning.
-            else:
-                LOG.warning(
-                    '{0} - no reference antennas found in MS, cannot update '
-                    'the reference antenna list.'.format(ms.basename))
 
         return result
 
@@ -788,6 +524,8 @@ class Tsysflag(basetask.StandardTaskTemplate):
             flagger = viewflaggers.MatrixFlagger
         elif metric in ['birdies', 'edgechans']:
             flagger = viewflaggers.VectorFlagger
+        else:
+            raise RuntimeError('Unknown metric in TsysFlagger')
 
         # Depending on the flagging metric, translate the appropriate input
         # flagging parameters to a more compact list of flagging rules.
@@ -813,6 +551,8 @@ class Tsysflag(basetask.StandardTaskTemplate):
                 tmf1_limit=inputs.tmf1_limit,
                 flag_tmef1=True, tmef1_axis='Antenna1',
                 tmef1_limit=inputs.tmef1_limit)
+        else:
+            raise RuntimeError('Unknown metric in TsysFlagger')
 
         # Construct the flagger task around the data view task and the
         # flagsetter task.
@@ -1188,7 +928,7 @@ class TsysflagView(object):
                     # Initialize the median Tsys spectra results and spectrum
                     # stack
                     tsysmedians = TsysflagspectraResults()
-                    spectrumstack = None
+                    spectrumstack = flagstack = None
 
                     # Create a stack of all Tsys spectra for specified spw,
                     # pol, and field id.
@@ -1287,7 +1027,7 @@ class TsysflagView(object):
 
                 # Initialize the median Tsys spectra results, and spectrum stack
                 tsysmedians = TsysflagspectraResults()
-                spectrumstack = None
+                spectrumstack = flagstack = None
 
                 # Create a stack of all Tsys spectra for specified spw and pol;
                 # this will stack together spectra from all "fieldids".
@@ -1410,7 +1150,7 @@ class TsysflagView(object):
 
             # Initialize the median Tsys spectra results, and spectrum stack
             tsysmedians = TsysflagspectraResults()
-            spectrumstack = None
+            spectrumstack = flagstack = None
 
             # Create a stack of all Tsys spectra for specified spw and pol;
             # this will stack together spectra from all "fieldids".
@@ -1564,7 +1304,7 @@ class TsysflagView(object):
 
                 # Create a single stack of spectra, and corresponding flags, 
                 # for all fields that are listed as reference field.
-                spectrumstack = None
+                spectrumstack = flagstack = None
                 for description in tsysspectra[pol].descriptions():
                     tsysspectrum = tsysspectra[pol].last(description)
                     if (tsysspectrum.pol == corr_type[pol][0]
@@ -1726,7 +1466,7 @@ class TsysflagView(object):
             normalise=True)
 
         # Initialize a stack of all Tsys spectra
-        spectrumstack = None
+        spectrumstack = flagstack = None
 
         # Create a stack of all Tsys spectra for the specified spwid; this will
         # stack together spectra from all "fieldids" and both polarisations.
@@ -1801,7 +1541,7 @@ class TsysflagView(object):
             normalise=True)
 
         # Initialize spectrum stacks for antennas and for spw
-        spw_spectrumstack = None
+        spw_spectrumstack = spw_flagstack = None
         ant_spectrumstack = {}
         ant_flagstack = {}
 
@@ -1849,6 +1589,9 @@ class TsysflagView(object):
                 if len(valid_data):
                     spw_median[j] = np.median(valid_data)
                     spw_medianflag[j] = False
+        else:
+            spw_median = 0.0
+            spw_medianflag = True
 
         # Create separate flagging views for each antenna
         for antenna_id in antenna_ids:

@@ -3,11 +3,9 @@ Created on 10 Sep 2014
 
 @author: sjw
 """
-
 import collections
 import os
 
-#import pipeline.infrastructure.displays.image as image
 import pipeline.h.tasks.common.displays.image as image
 import pipeline.infrastructure.filenamer as filenamer
 import pipeline.infrastructure.logging as logging
@@ -15,11 +13,9 @@ import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.utils as utils
 from pipeline.hifa.tasks.wvrgcalflag import display as display
 
-
 LOG = logging.get_logger(__name__)
 
-WvrApplication = collections.namedtuple('WvrApplication', 
-                                        'ms gaintable interpolated applied') 
+WvrApplication = collections.namedtuple('WvrApplication', 'ms gaintable interpolated applied')
 
 
 class T2_4MDetailsWvrgcalflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
@@ -27,26 +23,20 @@ class T2_4MDetailsWvrgcalflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
     T2_4MDetailsWvrgcalflagRenderer generates the detailed T2_4M-level plots
     and output specific to the wvrgcalflag task.
     """
-    def __init__(self, uri='wvrgcalflag.mako',
-                 description='Calculate and flag WVR calibration',
-                 always_rerender=False):
-        super(T2_4MDetailsWvrgcalflagRenderer, self).__init__(
-            uri=uri, description=description, always_rerender=always_rerender)
+    def __init__(self, uri='wvrgcalflag.mako', description='Calculate and flag WVR calibration', always_rerender=False):
+        super().__init__(uri=uri, description=description, always_rerender=always_rerender)
 
-    """
-    Update the Mako context appropriate to the results created by a Wvrgcalflag
-    task.
-    
-    :param context: the pipeline Context
-    :type context: :class:`~pipeline.infrastructure.launcher.Context`
-    :param results: the bandpass results to describe
-    :type results: 
-        :class:`~pipeline.infrastructure.tasks.wvrgcalflag.resultobjects.WvrgcalflagResults`
-    :rtype a dictionary that can be passed to the matching Mako template
-    """
     def update_mako_context(self, ctx, context, results):
-        plots_dir = os.path.join(context.report_dir, 
-                                 'stage%d' % results.stage_number)
+        """
+        Updates the Mako context appropriate to the results created by a
+        Wvrgcalflag task.
+
+        Args:
+            ctx: the mako context for weblog page
+            context: the pipeline Context
+            results: the Wvrgcalflag results object
+        """
+        plots_dir = os.path.join(context.report_dir, 'stage%d' % results.stage_number)
         if not os.path.exists(plots_dir):
             os.mkdir(plots_dir)
 
@@ -106,12 +96,19 @@ class T2_4MDetailsWvrgcalflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
                 baseline_plotter = display.WVRPhaseVsBaselineChart(context, result.flaggerresult)
                 baseline_detail_plots[vis] = baseline_plotter.plot()
 
-                # get the first scan for the QA intent(s)
+                # PIPE-851: get the first scan for the QA intent(s) with SpW
+                # matching the gaintable SpW.
                 qa_intent = set(result.flaggerresult.dataresult.inputs['qa_intent'].split(','))
-                qa_scan = sorted([scan.id for scan in ms.scans 
-                                  if not qa_intent.isdisjoint(scan.intents)])[0]
-                # scan parameter on plot is comma-separated string 
-                qa_scan = str(qa_scan)            
+                if not result.flaggerresult.dataresult.qa_wvr.qa_spw:
+                    # If no valid QA SpW was set for this data result, then no
+                    # valid matching scans can be found.
+                    qa_scan = ''
+                else:
+                    qa_spw = int(result.flaggerresult.dataresult.qa_wvr.qa_spw)
+                    qa_scan = sorted(scan.id for scan in ms.scans if not qa_intent.isdisjoint(scan.intents)
+                                     for scan_spw in scan.spws if scan_spw.id == qa_spw)[0]
+                    # scan parameter on plot is comma-separated string
+                    qa_scan = str(qa_scan)
                 LOG.trace('Using scan %s for phase vs baseline summary plots', qa_scan)
                 baseline_summary_plots[vis] = [p for p in baseline_detail_plots[vis]
                                                if qa_scan in set(p.parameters['scan'].split(','))]

@@ -28,7 +28,7 @@ class PlotAntsChart(object):
         }
         task = casa_tasks.flagcmd(**args)
         try:
-            result = task.execute(dry_run=False)
+            result = task.execute()
         except:
             # no problem, probably 'no flags commands in input' exception
             return None

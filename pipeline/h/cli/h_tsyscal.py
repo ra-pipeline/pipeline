@@ -4,7 +4,7 @@ from . import utils
 
 
 @utils.cli_wrapper
-def h_tsyscal(vis=None, caltable=None, chantol=None, dryrun=None, acceptresults=None):
+def h_tsyscal(vis=None, caltable=None, chantol=None):
 
     """
     h_tsyscal ---- Derive a Tsys calibration table
@@ -25,9 +25,6 @@ def h_tsyscal(vis=None, caltable=None, chantol=None, dryrun=None, acceptresults=
     chantol       The tolerance in channels for mapping atmospheric calibration
                   windows (TDM) to science windows (FDM or TDM).
                   example: chantol=5
-    dryrun        Run the task (False) or list commands (True).
-    acceptresults Add the results of the task to the pipeline context (True) or
-                  reject them (False).
 
     --------- examples -----------------------------------------------------------
 

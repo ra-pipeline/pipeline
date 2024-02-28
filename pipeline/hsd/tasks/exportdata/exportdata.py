@@ -15,8 +15,7 @@ products_dir = "./products"
 inputs = pipeline.tasks.singledish.SDExportData.Inputs(context, output_dir,
                                                        products_dir)
 task = pipeline.tasks.singledish.SDExportData (inputs)
-results = task.execute (dry_run = True)
-results = task.execute (dry_run = False)
+results = task.execute ()
 """
 
 import collections
@@ -261,8 +260,6 @@ class SDExportData(exportdata.ExportData):
         LOG.info('Saving final caltables for %s in %s', session, tarfilename)
 
         # Create the tar file
-        if self._executor._dry_run:
-            return tarfilename
 
 #             caltables = set()
 
@@ -343,9 +340,6 @@ class SDExportData(exportdata.ExportData):
         # applyfile_name = os.path.basename(vis) + '.auxcalapply.txt'
         LOG.info('Storing calibration apply list for %s in  %s',
                  os.path.basename(vis), applyfile_name)
-
-        if self._executor._dry_run:
-            return applyfile_name
 
         try:
             # Log the list in human readable form. Better way to do this ?
@@ -637,7 +631,6 @@ finally:
 
         LOG.info('Copying casa restore script '
                  '%s to %s' % (script_file, out_script_file))
-        if not self._executor._dry_run:
-            shutil.copy(script_file, out_script_file)
+        shutil.copy(script_file, out_script_file)
 
         return os.path.basename(out_script_file)

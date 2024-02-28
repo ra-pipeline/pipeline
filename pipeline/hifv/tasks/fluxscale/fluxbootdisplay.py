@@ -36,7 +36,7 @@ class fluxbootSummaryChart(object):
                          coloraxis='field', plotrange=[], title='', xlabel='', ylabel='',  showmajorgrid=False,
                          showminorgrid=False, plotfile=figfile, overwrite=True, clearplots=True, showgui=False)
 
-        job.execute(dry_run=False)
+        job.execute()
 
     def get_figfile(self):
         return os.path.join(self.context.report_dir,
@@ -85,7 +85,7 @@ class fluxgaincalSummaryChart(object):
                          coloraxis='field', plotrange=[], title='', xlabel='', ylabel='', showmajorgrid=False,
                          showminorgrid=False, plotfile=figfile, overwrite=True, clearplots=True, showgui=False)
 
-        job.execute(dry_run=False)
+        job.execute()
 
     def get_figfile(self):
         return os.path.join(self.context.report_dir,

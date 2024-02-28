@@ -110,16 +110,24 @@ class FlagDeterALMA(flagdeterbase.FlagDeterBase):
     _max_frac_low_trans = 0.6
 
     def prepare(self):
+        # PIPE-1759: this list collects the spws with missing basebands subsequently used to create a QA score
+        self.missing_baseband_spws = []
+
         # Wrap results from parent in hifa_flagdata specific result to enable
         # separate QA scoring.
         results = super().prepare()
-        return FlagDeterALMAResults(results.summaries, results.flagcmds())
+        results = FlagDeterALMAResults(results.summaries, results.flagcmds())
+
+        # PIPE-1759: store the list of spws with missing basebands for a subsequent QA score
+        results.missing_baseband_spws = self.missing_baseband_spws
+        return results
 
     def get_fracspw(self, spw):
         # From T. Hunter on PIPE-425: in early ALMA Cycles, the ACA
         # correlator's frequency profile synthesis (fps) algorithm produced TDM
         # spws that had 64 channels in full-polarisation, 124 channels in dual
         # pol, and 248 channels in single-pol.
+        # TODO: find out whether it should be 62 (as in code) or 64 (as per above comment)
         #
         # By comparison, the baseline correlator (BLC) standard values are 128
         # channels for dual pol, and 256 channels for single pol, and in more
@@ -212,7 +220,8 @@ class FlagDeterALMA(flagdeterbase.FlagDeterBase):
                 # TODO: in CASA 6.1, the correlator type should start to be
                 # propagated from ASDM to MS. Once available, this test could
                 # be future-proofed (w.r.t. possible new correlators) by
-                # explicitly checking whether the spw is an ACA spw.
+                # explicitly checking whether the spw is an ACA spw
+                # (e.g., self.inputs.ms.correlator_name == 'ALMA_ACA')
                 spw_bw_in_mhz = spw.bandwidth.to_units(otherUnits=measures.FrequencyUnits.MEGAHERTZ)
                 if spw_bw_in_mhz in self._aca_edge_flag_thresholds.keys():
                     to_flag.extend(self._get_aca_edgespw_cmds(spw, self._aca_edge_flag_thresholds[spw_bw_in_mhz]))
@@ -281,11 +290,10 @@ class FlagDeterALMA(flagdeterbase.FlagDeterBase):
         bb_spw = [s for s in self.inputs.ms.get_spectral_windows(science_windows_only=False)
                   if s.baseband == spw.baseband and s.type == 'SQLD' and 'TARGET' in s.intents]
 
-        # If no baseband spw could be identified, log warning and return
-        # with no new flagging commands.
+        # If no baseband spw could be identified, add the spw to the list of missing basebands
+        # and return with no new flagging commands.
         if not bb_spw:
-            LOG.warning("{} - Unable to determine baseband range for spw {}, skipping ACA FDM edge flagging."
-                        "".format(self.inputs.ms.basename, spw.id))
+            self.missing_baseband_spws.append(spw.id)
             return []
 
         # Compute frequency ranges for which any channel that falls within the

@@ -5,24 +5,23 @@ import pipeline.h.cli.utils as utils
 
 @utils.cli_wrapper
 def hsdn_importdata(vis=None, session=None, hm_rasterscan=None, datacolumns=None,
-                    overwrite=None, nocopy=None, createmms=None, dryrun=None,
-                    acceptresults=None):
+                    overwrite=None, nocopy=None, createmms=None):
 
     """
     hsdn_importdata ---- Imports Nobeyama data into the single dish pipeline
 
-    
+
     Imports Nobeyama data into the single dish pipeline.
     The hsdn_importdata task loads the specified visibility data into the pipeline
     context unpacking and / or converting it as necessary.
-    
+
     If the ``overwrite`` input parameter is set to False and the task is asked to
     convert an input ASDM input to an MS, then when the output MS already exists in
     the output directory, the importasdm conversion step is skipped, and the
     existing MS will be imported instead.
-    
+
     Output
-    
+
     results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
@@ -40,14 +39,14 @@ def hsdn_importdata(vis=None, session=None, hm_rasterscan=None, datacolumns=None
                   Default is 'time'.
     datacolumns   Dictionary defining the data types of
                   existing columns. The format is:
-                  
+
                   {'data': 'data type 1'}
                   or
                   {'data': 'data type 1', 'corrected': 'data type 2'}
-                  
+
                   For ASDMs the data type can only be RAW and one
                   can only specify it for the data column.
-                  
+
                   For MSes one can define two different data types
                   for the DATA and CORRECTED_DATA columns and they
                   can be any of the known data types (RAW,
@@ -58,12 +57,12 @@ def hsdn_importdata(vis=None, session=None, hm_rasterscan=None, datacolumns=None
                   skipped. In that case the task determines this
                   automatically by inspecting the existing intents
                   in the dataset.
-                  
+
                   Usually, a single datacolumns dictionary is used
                   for all datasets. If necessary, one can define a
                   list of dictionaries, one for each EB, with
                   different setups per EB.
-                  
+
                   If no type is specified, {'data':'raw'} will
                   be assumed.
     overwrite     Overwrite existing files on import.
@@ -72,29 +71,27 @@ def hsdn_importdata(vis=None, session=None, hm_rasterscan=None, datacolumns=None
                   instead.
     nocopy        Disable copying of MS to working directory.
     createmms     Create an MMS
-    dryrun        Run the task (False) or display task command (True).
-    acceptresults results of the task to the pipeline context (True) or reject them (False).
 
     --------- examples -----------------------------------------------------------
 
-    
+
     1. Load an ASDM list in the ../rawdata subdirectory into the context:
-    
+
     >>> hsdn_importdata (vis=['../rawdata/uid___A002_X30a93d_X43e', '../rawdata/uid_A002_x30a93d_X44e'])
-    
+
     2. Load an MS in the current directory into the context:
-    
+
     >>> hsdn_importdata (vis=[uid___A002_X30a93d_X43e.ms])
-    
+
     3. Load a tarred ASDM in ../rawdata into the context:
-    
+
     >>> hsdn_importdata (vis=['../rawdata/uid___A002_X30a93d_X43e.tar.gz'])
-    
+
     4. Import a list of MeasurementSets:
-    
+
     >>> myvislist = ['uid___A002_X30a93d_X43e.ms', 'uid_A002_x30a93d_X44e.ms']
     >>> hsdn_importdata(vis=myvislist)
-    
+
     """
 
 

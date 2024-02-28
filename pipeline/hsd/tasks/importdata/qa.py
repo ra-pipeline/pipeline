@@ -41,12 +41,6 @@ class SDImportDataQAHandler(importdataqa.ImportDataQAHandler, QAPlugin):
         return qacalc.score_missing_intents(mses, array_type='ALMA_TP')
 
 
-class HpcSDImportDataQAHandler(SDImportDataQAHandler):
-    """QA handler for HpcImportData task."""
-
-    generating_task = importdata.SDImportData
-
-
 class SDImportDataListQAHandler(importdataqa.ImportDataListQAHandler, QAPlugin):
     """QA handling class to combine QA scores of a list of SDImportDataResults."""
 

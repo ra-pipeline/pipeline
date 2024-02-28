@@ -625,7 +625,7 @@ def _get_unflagged_antennas(vis, scanidlist, ants12m, ants7m, max_fracflagged=0.
     #     Execute task
     scanidstr = ','.join([str(scanid) for scanid in scanidlist])
     flagdata_task = casa_tasks.flagdata(vis=vis, scan=scanidstr, mode='summary')
-    flagdata_result = flagdata_task.execute(dry_run=False)
+    flagdata_result = flagdata_task.execute()
 
     # Initialize the statistics per scan
     unflagged_12mantennas = []

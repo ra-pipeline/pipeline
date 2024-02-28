@@ -71,7 +71,7 @@ def _parse_description(description_section: str) -> Tuple[str, str]:
     index = 0
     lines = description_section.split("\n")
     if len(lines) > 1:
-        short_description = lines[1].split(" ---- ")
+        short_description = lines[1].split("----")
         if len(short_description) > 1:
             if short_description[1] != '':
                 short_description = short_description[1]
@@ -191,12 +191,6 @@ def docstring_parse(docstring: str) -> Tuple[str, str, str, dict]:
 
         parameters_dict = _parse_parameters(parameters_section)
 
-        # Remove "dryrun" and "acceptresults" from parameters dict as they are
-        # not wanted in the Reference Manual
-        exclude_parameters = ["dryrun", "acceptresults"]
-        for parm_to_exclude in exclude_parameters:
-            if parm_to_exclude in parameters_dict:
-                del parameters_dict[parm_to_exclude]
         # The "issues" section is excluded from the output docs and is not
         # always present. If present, it will always be the last
         # section.
@@ -319,7 +313,7 @@ def cli_command():
     parser.add_argument('--srcdir', '-s', type=str, default=None, help='Path of the Pipeline source code')
 
     args = parser.parse_args()
-    srcdir = args.scrdir
+    srcdir = args.srcdir
 
     # the primary fallback default of the pipeline source directory.
     env_pipeline_src = os.getenv('pipeline_src')

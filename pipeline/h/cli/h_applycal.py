@@ -5,7 +5,7 @@ from . import utils
 
 @utils.cli_wrapper
 def h_applycal(vis=None, field=None, intent=None, spw=None, antenna=None, parang=None, applymode=None, flagbackup=None,
-               flagsum=None, flagdetailedsum=None, parallel=None, dryrun=None, acceptresults=None):
+               flagsum=None, flagdetailedsum=None, parallel=None):
 
     """
     h_applycal ---- Apply the calibration(s) to the data
@@ -61,9 +61,6 @@ def h_applycal(vis=None, field=None, intent=None, spw=None, antenna=None, parang
     parallel        Execute using CASA HPC functionality, if available.
                     options: 'automatic', 'true', 'false', True, False
                     default: None (equivalent to False)
-    dryrun          Run task (False) or display the command(True).
-    acceptresults   Add the results of the task to the pipeline context (True) or
-                    reject them (False).
 
     --------- examples -----------------------------------------------------------
 

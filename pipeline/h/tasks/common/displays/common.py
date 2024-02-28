@@ -56,7 +56,7 @@ class PlotbandpassDetailBase(object):
         self._antmap = dict((a.id, a.name) for a in antennas)
 
         # the number of polarisations for a spw may not be equal to the number
-        # of shape of the column. For example, X403 has XX,YY for some spws 
+        # of shape of the column. For example, X403 has XX,YY for some spws
         # but XX for the science data.
         self._pols = {}
         for spw in spw_ids:
@@ -141,13 +141,13 @@ class PlotmsCalLeaf(object):
     """
     Class to execute plotms and return a plot wrapper. It passes the spw and
     ant arguments through to plotms without further manipulation, creating
-    exactly one plot. 
+    exactly one plot.
 
-    If a list of calapps is provided as input, the caltables from each calapp 
+    If a list of calapps is provided as input, the caltables from each calapp
     will be overplotted on the same plot.
     """
 
-    def __init__(self, context, result, calapp : Union[List[callibrary.CalApplication], callibrary.CalApplication], 
+    def __init__(self, context, result, calapp : Union[List[callibrary.CalApplication], callibrary.CalApplication],
                  xaxis, yaxis, spw='', ant='', pol='', correlation='', plotrange=[], coloraxis=''):
         self._context = context
         self._result = result
@@ -159,7 +159,7 @@ class PlotmsCalLeaf(object):
         self._coloraxis = coloraxis
 
         # Make calapp a list if it isn't already, as the rest of the code assumes this is a list
-        if not isinstance(calapp, list): 
+        if not isinstance(calapp, list):
             calapp = [calapp]
 
         self._calapp = calapp
@@ -170,7 +170,7 @@ class PlotmsCalLeaf(object):
         self._intent = ",".join([cal.intent for cal in self._calapp])
 
         # Use antenna name rather than ID if possible
-        self._ant_ids = ant 
+        self._ant_ids = ant
         if ant != '':
             ms = self._context.observing_run.get_ms(self._vis)
             domain_antennas = ms.get_antenna(ant)
@@ -186,8 +186,8 @@ class PlotmsCalLeaf(object):
         if ant:
             self._title += ' ant {}'.format(', '.join(ant.split(',')))
 
-        # These task_args are the same whether one caltable is plotted 
-        # on its own, or multiple caltables are overplotted. 
+        # These task_args are the same whether one caltable is plotted
+        # on its own, or multiple caltables are overplotted.
         self.task_args = {
             'xaxis': self._xaxis,
             'yaxis': self._yaxis,
@@ -217,7 +217,7 @@ class PlotmsCalLeaf(object):
             'correlation': '' if self._correlation == '' else '%s-' % self._correlation.replace('/', 'ratio')
         }
         png = '{caltable}-{spw}{ant}{intent}{correlation}{y}_vs_{x}.png'.format(**fileparts)
-        
+
         # Maximum filename size for Lustre filesystems is 255 bytes. These
         # plots can exceed this limit due to including the names of all
         # antennas. Truncate over-long filename while keeping it unique by
@@ -231,13 +231,13 @@ class PlotmsCalLeaf(object):
         return os.path.join(self._context.report_dir, 'stage%s' % self._result.stage_number, png)
 
     def _get_plot_wrapper(self):
-        tasks = self._create_tasks() 
+        tasks = self._create_tasks()
         if not os.path.exists(self._figfile):
             LOG.trace('Creating new plot: %s' % self._figfile)
             try:
                 for task in tasks:
-                    task.execute(dry_run=False)
-            except Exception as ex: 
+                    task.execute()
+            except Exception as ex:
                 LOG.error('Could not create plot %s' % self._figfile)
                 LOG.exception(ex)
                 return None
@@ -258,18 +258,18 @@ class PlotmsCalLeaf(object):
         return wrapper
 
     def _create_tasks(self):
-        symbol_array = ['autoscaling', 'diamond', 'square'] # Note: autoscaling can be 'pixel (cross)' or 'circle' depending on number of points. 
+        symbol_array = ['autoscaling', 'diamond', 'square'] # Note: autoscaling can be 'pixel (cross)' or 'circle' depending on number of points.
         task_list = []
 
-        # Create a plotms task for each caltable. See PIPE-1377 and PIPE-1409. 
-        for n, caltable in enumerate(self._caltable): 
+        # Create a plotms task for each caltable. See PIPE-1377 and PIPE-1409.
+        for n, caltable in enumerate(self._caltable):
             # plotms uses the 'vis' input parameter to specify caltables to plot
             self.task_args['vis'] = caltable
             self.task_args['plotindex'] = n
 
             # If there are multiple caltables to overplot, clearplots must be False for all
             # but the first plot.
-            if n != 0: 
+            if n != 0:
                 self.task_args['clearplots'] = False
 
             # Alter plot symbols by cycling through the list of available symbols for each subsequent over-plot.
@@ -278,7 +278,7 @@ class PlotmsCalLeaf(object):
 
             # The plotfile must be specified for only the last plotms command
             if n == (len(self._caltable) - 1):
-                self.task_args['plotfile'] = self._figfile 
+                self.task_args['plotfile'] = self._figfile
 
             task_list.append(casa_tasks.plotms(**self.task_args))
 
@@ -289,8 +289,8 @@ class PlotbandpassLeaf(object):
     """
     Class to execute plotbandpass and return a plot wrapper. It passes the spw
     and ant arguments through to plotbandpass without further manipulation. More
-    than one plot may be created though not necessarily returned, as 
-    plotbandpass may create many plots depending on the input arguments. 
+    than one plot may be created though not necessarily returned, as
+    plotbandpass may create many plots depending on the input arguments.
     """
 
     def __init__(self, context, result, calapp, xaxis, yaxis, spw='', ant='', pol='',
@@ -326,7 +326,7 @@ class PlotbandpassLeaf(object):
 
         # plotbandpass injects antenna name, spw ID and t0 into every plot filename
         root, ext = os.path.splitext(self._figfile)
-        # if spw is '', the spw component will be set to the first spw 
+        # if spw is '', the spw component will be set to the first spw
         if spw == '':
             with casa_tools.TableReader(calapp.gaintable) as tb:
                 caltable_spws = set(tb.getcol('SPECTRAL_WINDOW_ID'))
@@ -367,7 +367,7 @@ class PlotbandpassLeaf(object):
         if not os.path.exists(self._pb_figfile):
             LOG.trace('Creating new plot: %s' % self._pb_figfile)
             try:
-                task.execute(dry_run=False)
+                task.execute()
             except Exception as ex:
                 LOG.error('Could not create plot %s' % self._pb_figfile)
                 LOG.exception(ex)
@@ -423,13 +423,13 @@ class LeafComposite(object):
 
     def _create_calapp_contents_dict(self, calapps : List[callibrary.CalApplication], column_name: str) -> Dict[int, List[callibrary.CalApplication]]:
         """
-        Creates and returns a dictionary mapping some element (e.g. spw, ant) specified by the input 
+        Creates and returns a dictionary mapping some element (e.g. spw, ant) specified by the input
         column_name to lists of the input calapps that have that element present in their caltables.
 
-        e.g if the column_name is 'ANTENNA1', this funtion will return a dict where the keys are 
-        all antenna numbers present in any of the input calapps' caltables. For each antenna number key, 
-        the value is a list of all the input calapps with caltables with that antenna. 
-        """        
+        e.g if the column_name is 'ANTENNA1', this funtion will return a dict where the keys are
+        all antenna numbers present in any of the input calapps' caltables. For each antenna number key,
+        the value is a list of all the input calapps with caltables with that antenna.
+        """
         dict_calapp = collections.defaultdict(list)
         for cal in calapps:
             with casa_tools.TableReader(cal.gaintable) as tb:
@@ -449,7 +449,7 @@ class PolComposite(LeafComposite):
     def __init__(self, context, result, calapp, xaxis, yaxis, ant='', spw='',
                  **kwargs):
         # the number of polarisations for a spw may not be equal to the number
-        # of shape of the column. For example, X403 has XX,YY for some spws 
+        # of shape of the column. For example, X403 has XX,YY for some spws
         # but XX for the science data. If we're given a spw argument we can
         # bypass the calls for the missing polarisation.
         if spw != '':
@@ -475,19 +475,19 @@ class SpwComposite(LeafComposite):
     # reference to the PlotLeaf class to call
     leaf_class = None
 
-    def __init__(self, context, result, calapp: Union[List[callibrary.CalApplication], callibrary.CalApplication], 
+    def __init__(self, context, result, calapp: Union[List[callibrary.CalApplication], callibrary.CalApplication],
                 xaxis, yaxis, ant='', pol='', **kwargs):
 
         if isinstance(calapp, list):
             # Create a dictionary to keep track of which caltables have which spws.
             dict_calapp_spws = self._create_calapp_contents_dict(calapp, 'SPECTRAL_WINDOW_ID')
             table_spws = sorted(dict_calapp_spws.keys())
-            
-            # In the following call, dict_calapp_spw[spw] is a list of calapps with that spw present 
+
+            # In the following call, dict_calapp_spw[spw] is a list of calapps with that spw present
             children = [self.leaf_class(context, result, dict_calapp_spws[spw], xaxis, yaxis,
                         spw=int(spw), ant=ant, pol=pol, **kwargs)
-                        for spw in table_spws]    
-        else: 
+                        for spw in table_spws]
+        else:
             # Identify spws in caltable
             with casa_tools.TableReader(calapp.gaintable) as tb:
                 table_spws = sorted(set(tb.getcol('SPECTRAL_WINDOW_ID')))
@@ -506,10 +506,10 @@ class SpwAntComposite(LeafComposite):
     # reference to the PlotLeaf class to call
     leaf_class = None
 
-    def __init__(self, context, result, calapp : Union[List[callibrary.CalApplication], callibrary.CalApplication], 
+    def __init__(self, context, result, calapp : Union[List[callibrary.CalApplication], callibrary.CalApplication],
                 xaxis, yaxis, pol='', ysamescale=False, **kwargs):
         # Support for lists of calapps was added for PIPE-1409 and PIPE-1377.
-        if isinstance(calapp, list): 
+        if isinstance(calapp, list):
             # Create a dictionary to keep track of which caltables have which spws.
             dict_calapp_spws = self._create_calapp_contents_dict(calapp, 'SPECTRAL_WINDOW_ID')
             table_spws = sorted(dict_calapp_spws.keys())
@@ -525,11 +525,11 @@ class SpwAntComposite(LeafComposite):
             children = []
             for spw in table_spws:
                 if update_yscale:
-                # If a list of calapps is input, get the ymin and ymax for all the caltables with this spw. 
+                # If a list of calapps is input, get the ymin and ymax for all the caltables with this spw.
                     ymins = []
                     ymaxes = []
                     for cal in dict_calapp_spws[spw]:
-                        caltable_wrapper = CaltableWrapperFactory.from_caltable(cal.gaintable, gaincalamp=True) 
+                        caltable_wrapper = CaltableWrapperFactory.from_caltable(cal.gaintable, gaincalamp=True)
                         filtered = caltable_wrapper.filter(spw=[int(spw)])
                         # Save the ymin and ymax values rather than the full filtered.data as that could get large
                         ymins.append(numpy.ma.min(numpy.abs(filtered.data)))
@@ -547,7 +547,7 @@ class SpwAntComposite(LeafComposite):
                 # In the following call, dict_calapp_spw[spw] is the list of calapps with that spw
                 children.append(
                     self.leaf_class(context, result, dict_calapp_spws[spw], xaxis, yaxis, spw=int(spw), pol=pol, **kwargs))
-        else: 
+        else:
             # Identify spws in caltable
             with casa_tools.TableReader(calapp.gaintable) as tb:
                 table_spws = set(tb.getcol('SPECTRAL_WINDOW_ID'))
@@ -591,16 +591,16 @@ class AntComposite(LeafComposite):
 
     def __init__(self, context, result, calapp : Union[List[callibrary.CalApplication], callibrary.CalApplication],
                 xaxis, yaxis, spw='', pol='', **kwargs):
-        if isinstance(calapp, list): 
+        if isinstance(calapp, list):
             # Create a dictionary to keep track of which caltables have which ants.
             dict_calapp_ants = self._create_calapp_contents_dict(calapp, 'ANTENNA1')
             table_ants = sorted(dict_calapp_ants.keys())
 
-            # In the following call dict_calapp_ants[ant] is the list of calapps with antenna=ant present 
+            # In the following call dict_calapp_ants[ant] is the list of calapps with antenna=ant present
             children = [self.leaf_class(context, result, dict_calapp_ants[ant], xaxis, yaxis,
                         ant=int(ant), spw=spw, pol=pol, **kwargs)
                         for ant in table_ants]
-        else: 
+        else:
             # Identify ants in caltable
             with casa_tools.TableReader(calapp.gaintable) as tb:
                 table_ants = sorted(set(tb.getcol('ANTENNA1')))
@@ -767,8 +767,8 @@ class CaltableWrapperFactory(object):
             flag_col = tb.getvarcol('FLAG')
             row_flag = [flag_col['r%s' % (k + 1)].swapaxes(0, 1).squeeze(2)
                         for k in range(len(flag_col))]
-            
-            # PIPE-1706: explicitly pass dtype=object to create "object" array and allow 
+
+            # PIPE-1706: explicitly pass dtype=object to create "object" array and allow
             # individual elements to have different shapes.
             data = numpy.asarray([numpy.ma.MaskedArray(d, mask=f)
                                   for (d, f) in zip(row_data, row_flag)], dtype=object)
@@ -783,7 +783,7 @@ class CaltableWrapper(object):
         return CaltableWrapperFactory.from_caltable(filename)
 
     def __init__(self, filename, data, time, antenna, spw, scan):
-        # tag the extra metadata columns onto our data array 
+        # tag the extra metadata columns onto our data array
         self.filename = filename
         self.data = data
         self.time = time
@@ -821,7 +821,7 @@ class CaltableWrapper(object):
         # combine masks to create final data selection mask
         mask = (antenna_mask == 1) & (spw_mask == 1) & (scan_mask == 1)
 
-        # find data for the selection mask 
+        # find data for the selection mask
         data = self.data[mask]
         time = self.time[mask]
         antenna = self.antenna[mask]
@@ -898,7 +898,7 @@ class PhaseVsBaselineData(object):
                              key=functools.partial(cachetools.keys.hashkey, 'distance_to_refant'))
     def distance_to_refant(self):
         """
-        Return the distance between this antenna and the reference antenna in 
+        Return the distance between this antenna and the reference antenna in
         metres.
         """
         antenna_id = int(self.data.antenna[0])

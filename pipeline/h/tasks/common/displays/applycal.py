@@ -19,7 +19,7 @@ class PlotmsLeaf(object):
     """
     Class to execute plotms and return a plot wrapper. It passes the spw and
     ant arguments through to plotms without further manipulation, creating
-    exactly one plot. 
+    exactly one plot.
     """
 
     def __init__(self, context, output_dir, calto, xaxis, yaxis, spw='', ant='', field='', scan='', intent='',
@@ -38,7 +38,7 @@ class PlotmsLeaf(object):
         self._spw = spw
         self._intent = intent
         self._uvrange = uvrange
-        
+
         # TODO
         # This should be revisited when the confusion between correlation and
         # polarisation is ironed out. I'm not convinced that
@@ -78,7 +78,7 @@ class PlotmsLeaf(object):
                 # contain a duplicate name
                 matching_by_name = self._ms.get_fields(field_name)
                 if len(matching_by_name) == 1:
-                    # if the argument was the field ID but the field name is 
+                    # if the argument was the field ID but the field name is
                     # unique. Therefore, we can use the field name.
                     field = field_name
                     field_label = field_name
@@ -86,7 +86,7 @@ class PlotmsLeaf(object):
                               'appears unique. Using %r as field identifier',
                               field, field_label)
                 else:
-                    # if the argument was the field ID but the field name is 
+                    # if the argument was the field ID but the field name is
                     # not unique, prepend the ID with the field name
                     field_label = '%s (field #%s)' % (field_name, field_id)
                     LOG.trace('One field found for search term %r but name '
@@ -138,7 +138,7 @@ class PlotmsLeaf(object):
     def _is_null_select(self):
         """Attempt to identify a null data selection to prevent CASA/plotms grpc-related exceptions.
 
-        Note: this doesn't guarantee to detect all null-selection conditions, but can rule out several known 
+        Note: this doesn't guarantee to detect all null-selection conditions, but can rule out several known
         scenarios. See PIPE-1596/PIPE-1259/PIPE-1255.
         """
         is_null_select = False
@@ -193,7 +193,7 @@ class PlotmsLeaf(object):
         # Maximum filename size for Lustre filesystems is 255 bytes. Mosaics
         # can exceed this limit due to including the names of all the field.
         # Truncate over-long field components while keeping them unique by
-        # replacing them with the hash of the component          
+        # replacing them with the hash of the component
         if len(png) > 251:  # 255 - '.png'
             new_png = '{!s}.png'.format(hash(png))
             LOG.info('Renaming plot to avoid exceeding filesystem limit on filename length.\n'
@@ -298,7 +298,7 @@ class BasebandComposite(common.LeafComposite):
 
     def __init__(self, context, output_dir, calto, xaxis, yaxis, ant='', field='', intent='', overplot_receivers=False,
                  **kwargs):
-        
+
         ms = context.observing_run.get_ms(calto.vis)
 
         receivers = collections.defaultdict(lambda: utils.OrderedDefaultdict(list))
@@ -404,7 +404,7 @@ class FieldSpwComposite(common.LeafComposite):
         wanted = set(intent.split(','))
         children = []
         # Add override for kwargs
-        if 'field' in kwargs and kwargs['field'] != '': 
+        if 'field' in kwargs and kwargs['field'] != '':
             fields = kwargs['field']
             LOG.debug('Override for %s vs %s plot: fields=%s' % (yaxis, xaxis, fields))
             del kwargs['field']
@@ -926,7 +926,7 @@ class SpwAntDetailChart(PlotmsSpwAntComposite):
             LOG.debug('Override for %s vs %s plot: field=%s' % (yaxis, xaxis, field))
         else:
             field = calto.field
-        
+
         # request plots per spw, overlaying all antennas
         # if field is specified in kwargs, it will override the calto.field
         # selection
@@ -949,7 +949,7 @@ class FieldSpwAntDetailChart(PlotmsFieldSpwAntComposite):
 
 class AmpVsFrequencyDetailChart(FieldSpwAntDetailChart):
     """
-    Create an amplitude vs frequency plot for each spw and antenna, 
+    Create an amplitude vs frequency plot for each spw and antenna,
     overplotting by field.
     """
 
@@ -1041,7 +1041,7 @@ class PhaseVsUVDetailChart(SpwAntDetailChart):
 
 class AmpVsTimeDetailChart(FieldSpwAntDetailChart):
     """
-    Create an amplitude vs time plot for each field, spw and antenna, 
+    Create an amplitude vs time plot for each field, spw and antenna,
     overplotting by correlation.
     """
 
@@ -1089,7 +1089,7 @@ class CAS9154AmpVsTimeDetailChart(SpwAntDetailChart):
 
 class PhaseVsTimeDetailChart(FieldSpwAntDetailChart):
     """
-    Create an phase vs time plot for each field, spw and antenna, 
+    Create an phase vs time plot for each field, spw and antenna,
     overplotting by correlation.
     """
 
@@ -1172,12 +1172,12 @@ class RealVsFrequencyDetailChart(SpwAntDetailChart):
     """
     Create a real vs time plot for each spw and antenna
     """
-    def __init__(self, 
-                 context: Context, 
-                 output_dir: str, 
-                 calto: CalTo, 
-                 intent: str='', 
-                 ydatacolumn: Optional[str]='corrected', 
+    def __init__(self,
+                 context: Context,
+                 output_dir: str,
+                 calto: CalTo,
+                 intent: str='',
+                 ydatacolumn: Optional[str]='corrected',
                  **kwargs: Optional[Dict]
     ) -> None:
         """

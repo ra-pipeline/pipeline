@@ -15,8 +15,8 @@ LOG = infrastructure.get_logger(__name__)
 def cli_wrapper(func: Callable):
     """Wrap pipeline task CLI functions to handle the extra 'pipelinemode' argument.
 
-    PIPE-1884: this decorator function removes the "pipelinemode" argument from pipeline CLI task 
-    calls, which commonly exists in archival casa_pipescript.py/casa_pipestorescript.py scripts generated 
+    PIPE-1884: this decorator function removes the "pipelinemode" argument from pipeline CLI task
+    calls, which commonly exists in archival casa_pipescript.py/casa_pipestorescript.py scripts generated
     by old pipeline versions before PIPE-1686.
     """
     @wraps(func)
@@ -73,18 +73,11 @@ def get_heuristic(arg):
 
 
 def execute_task(context, casa_task, casa_args):
-    dry_run = casa_args.get('dryrun', None)
-    if dry_run is None:
-        dry_run = False
-    accept_results = casa_args.get('acceptresults', True)
-    if accept_results is None:
-        accept_results = True
-
     # get the pipeline task inputs
     task_inputs = _get_task_inputs(casa_task, context, casa_args)
 
     # Execute the class, collecting the results
-    results = _execute_task(casa_task, task_inputs, dry_run)
+    results = _execute_task(casa_task, task_inputs)
 
     # write the command invoked (eg. hif_setjy) to the result so that the
     # weblog can print help from the XML task definition rather than the
@@ -92,8 +85,7 @@ def execute_task(context, casa_task, casa_args):
     results.taskname = casa_task
 
     # accept the results if desired
-    if accept_results and not dry_run:
-        _merge_results(context, results)
+    _merge_results(context, results)
 
     tracebacks = utils.get_tracebacks(results)
     if len(tracebacks) > 0:
@@ -113,7 +105,7 @@ def _get_task_inputs(casa_task, context, casa_args):
     return inputs
 
 
-def _execute_task(casa_task, task_inputs, dry_run):
+def _execute_task(casa_task, task_inputs):
     # Given the class and CASA name of the stage and the list
     # of stage arguments, compute and return the results.
 
@@ -124,7 +116,7 @@ def _execute_task(casa_task, task_inputs, dry_run):
     # Reporting stuff goes here
 
     # Error checking ?
-    return task.execute(dry_run=dry_run)
+    return task.execute()
 
 
 def _merge_results(context, results):

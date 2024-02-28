@@ -81,7 +81,7 @@ class Statwt(basetask.StandardTaskTemplate):
         wtables = {}
 
         if self.inputs.statwtmode == 'VLASS-SE':
-            wtables['before'] = self._make_weight_table(suffix='before', dryrun=False)
+            wtables['before'] = self._make_weight_table(suffix='before')
 
         flag_summaries = []
         # flag statistics before task
@@ -91,7 +91,7 @@ class Statwt(basetask.StandardTaskTemplate):
         # flag statistics after task
         flag_summaries.append(self._do_flagsummary('statwt', field=fields))
 
-        wtables['after'] = self._make_weight_table(suffix='after', dryrun=False)
+        wtables['after'] = self._make_weight_table(suffix='after')
 
         return StatwtResults(jobs=[statwt_result], flag_summaries=flag_summaries, wtables=wtables)
 
@@ -150,28 +150,25 @@ class Statwt(basetask.StandardTaskTemplate):
             else:
                 LOG.info('Using existing MODEL_DATA column found in {}'.format(ms.basename))
 
-    def _make_weight_table(self, suffix='', dryrun=False):
+    def _make_weight_table(self, suffix=''):
 
         stage_number = self.inputs.context.task_counter
         names = [os.path.basename(self.inputs.vis), 'hifv_statwt', 's'+str(stage_number), suffix, 'wts']
         outputvis = '.'.join(list(filter(None, names)))
         wtable = outputvis+'.tbl'
 
-        if dryrun == True:
-            return wtable
-
         isdir = os.path.isdir(outputvis)
         if isdir:
             shutil.rmtree(outputvis)
 
-        if self.inputs.statwtmode == 'VLASS-SE': 
+        if self.inputs.statwtmode == 'VLASS-SE':
             datacolumn = 'DATA'
-        else: 
+        else:
             datacolumn = 'CORRECTED'
 
         task_args = {'vis': self.inputs.vis,
                      'outputvis': outputvis,
-                     'spw': '*:0', # Channel 0 for all spwids 
+                     'spw': '*:0', # Channel 0 for all spwids
                      'datacolumn': datacolumn,
                      'keepflags': False}
         job = casa_tasks.split(**task_args)

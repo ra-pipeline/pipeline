@@ -51,7 +51,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
                         'useflags': True, 'field': field, 'spw': spw,
                         'correlation': 'LL,RR'}
             job = casa_tasks.visstat(**stat_arg)
-            stats = job.execute(dry_run=False)  # returns stat in meter
+            stats = job.execute()  # returns stat in meter
 
             # Get means of spectral windows with data in the selected uvrange
             spws_means = [v['mean'] for (k, v) in stats.items() if np.isfinite(v['mean'])]
@@ -102,7 +102,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         # Get max baseline
         mean_wave_m = light_speed / max_mean_freq_Hz  # in meter
         job = casa_tasks.visstat(vis=vis, field=field, spw=str(max_freq_spw), axis='uvrange', useflags=False)
-        uv_stat = job.execute(dry_run=False) # returns stat in meter
+        uv_stat = job.execute() # returns stat in meter
         max_bl = uv_stat['DATA_DESC_ID=%s' % max_freq_spw]['max'] / mean_wave_m
 
         # Define bin for lowest 5% of baselines (in wavelength units)

@@ -5,15 +5,15 @@ import pipeline.h.cli.utils as utils
 
 @utils.cli_wrapper
 def hifa_fluxcalflag(vis=None, field=None, intent=None, spw=None, threshold=None, appendlines=None, linesfiles=None,
-                     applyflags=None, dryrun=None, acceptresults=None):
+                     applyflags=None):
     """
     hifa_fluxcalflag ---- Locate and flag line regions in solar system flux calibrators
 
-    
+
     Search the built-in solar system flux calibrator line catalog for overlaps with
     the science spectral windows. Generate a list of line overlap regions and
     flagging commands.
-    
+
     Output:
 
         results -- The results object for the pipeline task is returned.
@@ -26,18 +26,18 @@ def hifa_fluxcalflag(vis=None, field=None, intent=None, spw=None, threshold=None
     field
                   The list of field names or field ids for which the models are
                   to be set. Defaults to all fields with intent 'AMPLITUDE'.
-                  
+
                   Example: field='3C279', field='3C279, M82'
     intent
                   A string containing a comma delimited list of intents against
                   which the selected fields are matched. Defaults to all data
                   with amplitude intent.
-                  
+
                   Example: intent='AMPLITUDE'
     spw
                   Spectral windows and channels for which bandpasses are
                   computed. Defaults to all science spectral windows.
-                  
+
                   Example: spw='11,13,15,17'
     threshold
                   If the fraction of a spectral window occupied by line regions
@@ -54,17 +54,11 @@ def hifa_fluxcalflag(vis=None, field=None, intent=None, spw=None, threshold=None
                   starting and ending frequency in GHz.
     applyflags
                   Boolean for whether to apply the generated flag commands. (default True)
-    dryrun
-                  Run the commands (True) or generate the commands to be run but
-                  do not execute (False).
-    acceptresults
-                  Add the results of the task to the pipeline context (True) or
-                  reject them (False).
 
     --------- examples -----------------------------------------------------------
 
     1. Locate known lines in any solar system object flux calibrators:
-    
+
     >>> hifa_fluxcalflag()
 
     """

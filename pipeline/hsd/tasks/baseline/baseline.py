@@ -614,19 +614,13 @@ class HeuristicsTask(object):
         self.kwargs = kwargs
         # print(self.args, self.kwargs)
 
-    def execute(self, dry_run: bool = False) -> Any:
+    def execute(self) -> Any:
         """Perform Heuristics and return its result.
-
-        Args:
-            dry_run: Set True to enable dry-run mode. Defaults to False.
 
         Returns:
             Heuristics result. Actual contents of return value
             depends on the Heuristics class.
         """
-        if dry_run:
-            return []
-
         return self.heuristics.calculate(*self.args, **self.kwargs)
 
     def get_executable(self) -> Callable[[], Any]:
@@ -635,7 +629,7 @@ class HeuristicsTask(object):
         Returns:
             Function to run execute method
         """
-        return lambda: self.execute(dry_run=False)
+        return lambda: self.execute()
 
 
 class DeviationMaskHeuristicsTask(HeuristicsTask):
@@ -669,22 +663,17 @@ class DeviationMaskHeuristicsTask(HeuristicsTask):
         self.antenna_list = antenna_list
         self.spw_list = spw_list
 
-    def execute(self, dry_run: bool = False) -> dict:
+    def execute(self) -> dict:
         """Execute heuristics.
-
-        Args:
-            dry_run: Set True to enable dry-run mode. Defaults to False.
 
         Returns:
             Deviation mask for each set of field id, antenna id, and spw id.
         """
-        if dry_run:
-            return {}
 
         result = []
         for field_id, antenna_id, spw_id in zip(self.field_list, self.antenna_list, self.spw_list):
             self.kwargs.update({'field_id': field_id, 'antenna_id': antenna_id, 'spw_id': spw_id})
-            mask_list = super(DeviationMaskHeuristicsTask, self).execute(dry_run)
+            mask_list = super(DeviationMaskHeuristicsTask, self).execute()
             result.append(mask_list)
         return result
 

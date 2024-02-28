@@ -32,7 +32,7 @@ LOG = logging.get_logger(__name__)
 
 
 class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
-    def __init__(self, uri='applycal.mako', 
+    def __init__(self, uri='applycal.mako',
                  description='Apply calibrations from context',
                  always_rerender=False):
         super(T2_4MDetailsApplycalRenderer, self).__init__(
@@ -315,7 +315,7 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
     def create_science_plots(self, context, results):
         """
-        Create plots for the science targets, returning two dictionaries of 
+        Create plots for the science targets, returning two dictionaries of
         vis:[Plots], vis:[subpage paths], and vis:[max UV distances].
 
         Args:
@@ -420,20 +420,20 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
     @staticmethod
     def science_plots_for_result(
-            context: Context, 
+            context: Context,
             result: ApplycalResults,
-            plotter_cls: Type[Union[applycal.PlotmsAntComposite, applycal.PlotmsSpwComposite, 
-                                    applycal.PlotmsBasebandComposite, applycal.PlotmsFieldComposite, 
-                                    applycal.PlotmsFieldSpwComposite, applycal.PlotmsSpwAntComposite, 
-                                    applycal.PlotmsFieldSpwAntComposite]], 
-            fields: Iterable[int], 
-            uvrange: Optional[str]=None, 
-            renderer_cls: Optional[Type[JsonPlotRenderer]]=None, 
+            plotter_cls: Type[Union[applycal.PlotmsAntComposite, applycal.PlotmsSpwComposite,
+                                    applycal.PlotmsBasebandComposite, applycal.PlotmsFieldComposite,
+                                    applycal.PlotmsFieldSpwComposite, applycal.PlotmsSpwAntComposite,
+                                    applycal.PlotmsFieldSpwAntComposite]],
+            fields: Iterable[int],
+            uvrange: Optional[str]=None,
+            renderer_cls: Optional[Type[JsonPlotRenderer]]=None,
             preserve_coloraxis: bool=False
     ) -> List[Plot]:
         """
         Create science plots for result
-        
+
         Create science plots for result.
         Args:
             context:            Pipeline Context
@@ -463,7 +463,7 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
         for field in fields:
             # override field when plotting amp/phase vs frequency, as otherwise
-            # the field is resolved to a list of all field IDs  
+            # the field is resolved to a list of all field IDs
             overrides['field'] = field
 
             plotter = plotter_cls(context, plot_output_dir, calto, 'TARGET', **overrides)
@@ -475,7 +475,7 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         if renderer_cls is not None:
             renderer = renderer_cls(context, result, plots)
             with renderer.get_file() as fileobj:
-                fileobj.write(renderer.render())        
+                fileobj.write(renderer.render())
 
         return plots
 
@@ -538,8 +538,8 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 caltype = type_map.get(calfrom.caltype, calfrom.caltype)
 
                 if calfrom.caltype == 'gaincal':
-                    # try heuristics to detect phase-only and amp-only 
-                    # solutions 
+                    # try heuristics to detect phase-only and amp-only
+                    # solutions
                     caltype += self.get_gain_solution_type(calfrom.gaintable)
 
                 d[calfrom.gaintable] = caltype
@@ -565,10 +565,10 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         # solve circular import problem by importing at run-time
         from pipeline.infrastructure import casa_tasks
 
-        # get stats on amp solution of gaintable 
-        calstat_job = casa_tasks.calstat(caltable=gaintable, axis='amp', 
+        # get stats on amp solution of gaintable
+        calstat_job = casa_tasks.calstat(caltable=gaintable, axis='amp',
                                          datacolumn='CPARAM', useflags=True)
-        calstat_result = calstat_job.execute(dry_run=False)        
+        calstat_result = calstat_job.execute()
         stats = calstat_result['CPARAM']
 
         # amp solutions of unity imply phase-only was requested
@@ -578,9 +578,9 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                            utils.approx_equal(stats['max'], 1, tol)])
 
         # same again for phase solution
-        calstat_job = casa_tasks.calstat(caltable=gaintable, axis='phase', 
+        calstat_job = casa_tasks.calstat(caltable=gaintable, axis='phase',
                                          datacolumn='CPARAM', useflags=True)
-        calstat_result = calstat_job.execute(dry_run=False)        
+        calstat_result = calstat_job.execute()
         stats = calstat_result['CPARAM']
 
         # phase solutions ~ 0 implies amp-only solution
@@ -604,7 +604,7 @@ class ApplycalAmpVsFreqPlotRenderer(basetemplates.JsonPlotRenderer):
         outfile = filenamer.sanitize('amp_vs_freq-%s.html' % vis)
 
         super(ApplycalAmpVsFreqPlotRenderer, self).__init__(
-                'generic_x_vs_y_field_spw_ant_detail_plots.mako', context, 
+                'generic_x_vs_y_field_spw_ant_detail_plots.mako', context,
                 result, plots, title, outfile)
 
 
@@ -616,7 +616,7 @@ class ApplycalPhaseVsFreqPlotRenderer(basetemplates.JsonPlotRenderer):
         outfile = filenamer.sanitize('phase_vs_freq-%s.html' % vis)
 
         super(ApplycalPhaseVsFreqPlotRenderer, self).__init__(
-                'generic_x_vs_y_field_spw_ant_detail_plots.mako', context, 
+                'generic_x_vs_y_field_spw_ant_detail_plots.mako', context,
                 result, plots, title, outfile)
 
 
@@ -636,9 +636,9 @@ class ApplycalAmpVsFreqPerAntSciencePlotRenderer(basetemplates.JsonPlotRenderer)
     """
     Class to render 'per antenna' Amp vs Freq plots for applycal
     """
-    def __init__(self, 
-                 context: Context, 
-                 result: ApplycalResults, 
+    def __init__(self,
+                 context: Context,
+                 result: ApplycalResults,
                  plots: List[Plot]
     ) -> None:
         """
@@ -691,7 +691,7 @@ class ApplycalPhaseVsUVPlotRenderer(basetemplates.JsonPlotRenderer):
         outfile = filenamer.sanitize('phase_vs_uv-%s.html' % vis)
 
         super(ApplycalPhaseVsUVPlotRenderer, self).__init__(
-                'generic_x_vs_y_spw_ant_plots.mako', context, 
+                'generic_x_vs_y_spw_ant_plots.mako', context,
                 result, plots, title, outfile)
 
 
@@ -715,7 +715,7 @@ class ApplycalPhaseVsTimePlotRenderer(basetemplates.JsonPlotRenderer):
         outfile = filenamer.sanitize('phase_vs_time-%s.html' % vis)
 
         super(ApplycalPhaseVsTimePlotRenderer, self).__init__(
-                'generic_x_vs_y_field_spw_ant_detail_plots.mako', context, 
+                'generic_x_vs_y_field_spw_ant_detail_plots.mako', context,
                 result, plots, title, outfile)
 
 
@@ -727,13 +727,13 @@ def _get_data_selection_for_plot(context, result, intent):
     Background: we don't want to create plots for an entire MS, only the data
     selection of interest. Rather than calculate and explicitly pass in the
     data selection of interest, this function calculates the data selection of
-    interest by inspecting the results and extracting the data selection that 
+    interest by inspecting the results and extracting the data selection that
     the calibration is applied to.
 
     :param context: pipeline Context
     :param result: a Result with an .applied property containing CalApplications
     :param intent: pipeline intent
-    :return: 
+    :return:
     """
     spw = _get_calapp_arg(result, 'spw')
     field = _get_calapp_arg(result, 'field')
@@ -863,11 +863,11 @@ def _deduplicate_plots(ms: MeasurementSet, plots: List[Plot]) -> List[Plot]:
     # holds the final deduplicated list of plots
     deduplicated: List[Plot] = []
 
-    # General algorithm is 'what scan does this spw and intent correspond to? 
+    # General algorithm is 'what scan does this spw and intent correspond to?
     # Has this scan already been plotted? If so, discard the plot.'
     #
     # Plots are made per spw, per intent. Duplicate plots should be removed by
-    # navigating down to the spw and filtering per spw. Just because spw 16 
+    # navigating down to the spw and filtering per spw. Just because spw 16
     # BANDPASS cal is also spw 16 AMPLITUDE cal doesn't mean the same holds
     # for other spectral windows.
 
@@ -891,7 +891,7 @@ def _deduplicate_plots(ms: MeasurementSet, plots: List[Plot]) -> List[Plot]:
         spw_plots_by_intent = sorted(spw_plots, key=intent_fn)
         for intent, spw_intent_plots in itertools.groupby(spw_plots_by_intent, intent_fn):
             # Store group iterator as a list
-            spw_intent_plots = list(spw_intent_plots)  
+            spw_intent_plots = list(spw_intent_plots)
 
             # Try something new... does this fail if no fields? (i.e. need to move back in 'if')?
             spw_intent_plots_by_field = sorted(spw_intent_plots, key=field_fn)
@@ -904,7 +904,7 @@ def _deduplicate_plots(ms: MeasurementSet, plots: List[Plot]) -> List[Plot]:
                 if len(spw_intent_field_plots) != 1:
                     LOG.warning('Plot deduplication cancelled. '
                            'Could not process ambiguous plot for spw %s intent %s field', spw, intent, field)
-                else: 
+                else:
                     plot = spw_intent_field_plots[0]
                     scan_ids = sorted({(scan.id) for scan in ms.get_scans(scan_intent=intent, spw=spw, field=field)})
                     scan_ids = ','.join(str(s) for s in scan_ids)
@@ -917,6 +917,6 @@ def _deduplicate_plots(ms: MeasurementSet, plots: List[Plot]) -> List[Plot]:
                         old_intent = intent_fn(plots_for_scan[scan_ids])
                         new_intent = [','.join(sorted(set(old_intent).union(set(intent))))]
                         LOG.info('Deduplicating plot: spw %s %s -> %s', spw, old_intent, new_intent)
-                        plots_for_scan[scan_ids].parameters['intent'] = new_intent 
+                        plots_for_scan[scan_ids].parameters['intent'] = new_intent
         deduplicated.extend(plots_for_scan.values())
     return deduplicated

@@ -165,7 +165,7 @@ class TcleanQAHandler(pqa.QAPlugin):
                     # Calculate POLI/POLA images
                     imstat_arg = {'imagename': result.residual, 'axes': [0, 1]}
                     job = casa_tasks.imstat(**imstat_arg)
-                    calstat = job.execute(dry_run=False)
+                    calstat = job.execute()
                     rms = calstat['rms']
                     prms = np.sqrt(rms[1]**2. + rms[2]**2.)
 
@@ -173,31 +173,31 @@ class TcleanQAHandler(pqa.QAPlugin):
                     poli_imagename = imagename.replace('IQUV', 'POLI')
                     immath_arg = {'imagename': imagename, 'outfile': poli_imagename, 'mode': 'poli', 'sigma': '0.0Jy/beam'}
                     job = casa_tasks.immath(**immath_arg)
-                    res = job.execute(dry_run=False)
+                    res = job.execute()
                     pola_imagename = imagename.replace('IQUV', 'POLA')
                     immath_arg = {'imagename': imagename, 'outfile': pola_imagename, 'mode': 'pola', 'polithresh': '%.8fJy/beam' % (5.0*prms)}
                     job = casa_tasks.immath(**immath_arg)
-                    res = job.execute(dry_run=False)
+                    res = job.execute()
 
                     # Try fitting I, Q and U images planes
                     error_msgs = []
                     imfit_arg = {'imagename': imagename, 'stokes': 'I', 'box': '110,110,145,145'}
                     job = casa_tasks.imfit(**imfit_arg)
-                    res_I = job.execute(dry_run=False)
+                    res_I = job.execute()
                     if res_I is None or not res_I['converged']:
                         msg = f"Fitting Stokes I for {imagename} (field {result.inputs['field']} spw {result.inputs['spw']}) failed"
                         error_msgs.append(msg)
 
                     imfit_arg = {'imagename': imagename, 'stokes': 'Q', 'box': '115,115,130,130'}
                     job = casa_tasks.imfit(**imfit_arg)
-                    res_Q = job.execute(dry_run=False)
+                    res_Q = job.execute()
                     if res_Q is None or not res_Q['converged']:
                         msg = f"Fitting Stokes Q for {imagename} (field {result.inputs['field']} spw {result.inputs['spw']}) failed"
                         error_msgs.append(msg)
 
                     imfit_arg = {'imagename': imagename, 'stokes': 'U', 'box': '110,110,145,145'}
                     job = casa_tasks.imfit(**imfit_arg)
-                    res_U = job.execute(dry_run=False)
+                    res_U = job.execute()
                     if res_U is None or not res_U['converged']:
                         msg = f"Fitting Stokes U for {imagename} (field {result.inputs['field']} spw {result.inputs['spw']}) failed"
                         error_msgs.append(msg)

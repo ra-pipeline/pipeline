@@ -15,7 +15,7 @@ import string
 import typing
 from datetime import datetime, timedelta
 from numbers import Number
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, Union, Iterable
 
 import cachetools
 import pyparsing
@@ -68,7 +68,7 @@ class LoggingLRUCache(cachetools.LRUCache):
 MSTOOL_SELECTEDINDICES_CACHE: typing.Dict[str, LoggingLRUCache] = {}
 
 
-def commafy(l: Sequence[str], quotes: bool = True, multi_prefix: str = '', separator: str = ', ',
+def commafy(l: Iterable, quotes: bool = True, multi_prefix: str = '', separator: str = ', ',
             conjunction: str = 'and') -> str:
     """Convert the string list into the textual description.
 

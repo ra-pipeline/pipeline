@@ -28,7 +28,7 @@ class ImportDataQAHandler(pqa.QAPlugin):
         score3 = self._check_model_data_column(result.mses)
         score4 = self._check_history_column(result.mses, result.inputs)
 
-        LOG.todo('How long can MSes be separated and still be considered ' 
+        LOG.todo('How long can MSes be separated and still be considered '
                  'contiguous?')
         score5 = self._check_contiguous(result.mses)
 
@@ -36,7 +36,7 @@ class ImportDataQAHandler(pqa.QAPlugin):
 
         score7 = self._check_science_spw_names(result.mses, context.observing_run.virtual_science_spw_names)
 
-        LOG.todo('ImportData QA: missing source.xml and calibrator unknown to ' 
+        LOG.todo('ImportData QA: missing source.xml and calibrator unknown to '
                  'CASA')
         LOG.todo('ImportData QA: missing BDFs')
 
@@ -46,7 +46,7 @@ class ImportDataQAHandler(pqa.QAPlugin):
     @staticmethod
     def _check_contiguous(mses):
         """
-        Check whether observations are contiguous. 
+        Check whether observations are contiguous.
         """
         tolerance = datetime.timedelta(hours=1)
         return qacalc.score_contiguous_session(mses, tolerance=tolerance)
@@ -102,7 +102,7 @@ class ImportDataQAHandler(pqa.QAPlugin):
     def _check_flagged_calibrator_data(mses):
         """
         Check how much calibrator data has been flagged in the given measurement
-        sets, complaining if the fraction of flagged data exceeds a threshold. 
+        sets, complaining if the fraction of flagged data exceeds a threshold.
         """
         LOG.todo('What fraction of flagged calibrator data should result in a warning?')
         threshold = 0.10
@@ -116,10 +116,10 @@ class ImportDataQAHandler(pqa.QAPlugin):
         for ms in mses:
             bad_scans = collections.defaultdict(list)
 
-            # inspect each MS with flagdata, capturing the dictionary 
-            # describing the number of flagged rows 
+            # inspect each MS with flagdata, capturing the dictionary
+            # describing the number of flagged rows
             flagdata_task = casa_tasks.flagdata(vis=ms.name, mode='summary')
-            flagdata_result = flagdata_task.execute(dry_run=False)
+            flagdata_result = flagdata_task.execute()
 
             for intent in calibrator_intents:
                 # collect scans with the calibrator intent
@@ -137,7 +137,7 @@ class ImportDataQAHandler(pqa.QAPlugin):
             for intent in bad_scans:
                 scan_ids = [scan.id for scan in bad_scans[intent]]
                 multi = False if len(scan_ids) == 1 else True
-                # log something like 'More than 12% of PHASE scans 1, 2, and 7 
+                # log something like 'More than 12% of PHASE scans 1, 2, and 7
                 # in vla.ms are flagged'
                 LOG.warning('More than %s%% of %s scan%s %s in %s %s flagged'
                             '' % (threshold * 100.0,
@@ -157,7 +157,7 @@ class ImportDataQAHandler(pqa.QAPlugin):
         """
         Check each measurement set in the list for a set of required intents.
 
-        TODO Should we terminate execution on missing intents?        
+        TODO Should we terminate execution on missing intents?
         """
         return qacalc.score_missing_intents(mses)
 
@@ -181,7 +181,7 @@ class ImportDataListQAHandler(pqa.QAPlugin):
     def handle(self, context, result):
         # collate the QAScores from each child result, pulling them into our
         # own QAscore list
-        collated = utils.flatten([r.qa.pool[:] for r in result]) 
+        collated = utils.flatten([r.qa.pool[:] for r in result])
         result.qa.pool.extend(collated)
 
 

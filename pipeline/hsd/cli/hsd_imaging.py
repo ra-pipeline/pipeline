@@ -4,8 +4,7 @@ import pipeline.h.cli.utils as utils
 
 
 @utils.cli_wrapper
-def hsd_imaging(mode=None, restfreq=None, infiles=None, field=None, spw=None,
-                  dryrun=None, acceptresults=None):
+def hsd_imaging(mode=None, restfreq=None, infiles=None, field=None, spw=None):
 
     """
     hsd_imaging ---- Generate single dish images
@@ -15,9 +14,9 @@ def hsd_imaging(mode=None, restfreq=None, infiles=None, field=None, spw=None,
     spectral window. Image configuration (grid size, number of pixels,
     etc.) is automatically determined based on meta data such as
     antenna diameter, map extent, etc.
-    
+
     Note that generated images are always in LSRK frame.
-    
+
     Output:
     results -- The results object for the pipeline task is returned.
 
@@ -28,27 +27,23 @@ def hsd_imaging(mode=None, restfreq=None, infiles=None, field=None, spw=None,
                   (image settings for amplitude calibrator)
     restfreq      Rest frequency
     infiles       List of data files. These must be a name of
-                  MeasurementSets that are registered to context via 
+                  MeasurementSets that are registered to context via
                   hsd_importdata task.
-                  example: vis=['uid___A002_X85c183_X36f.ms', 
+                  example: vis=['uid___A002_X85c183_X36f.ms',
                                 'uid___A002_X85c183_X60b.ms']
     field         Data selection by field names or ids.
                   example: "`*Sgr*,M100`"
     spw           Data selection by spw ids.
                   example: "3,4" (generate images for spw 3 and 4)
-    dryrun        Run the commands (True) or generate the commands to be 
-                  run but do not execute (False).
-    acceptresults Add the results of the task to the pipeline context (True)
-                  or reject them (False).
 
     --------- examples -----------------------------------------------------------
 
     1. Generate images with default settings and context
-    
+
     >>> hsd_imaging()
 
     2. Generate images with amplitude calibrator and specific parameters
-    
+
     >>> hsd_imaging(mode='ampcal', field='*Sgr*,M100', spw='17,19')
 
     """

@@ -521,7 +521,7 @@ class Selfcal(basetask.StandardTaskTemplate):
 
     def _check_scaltargets(self, scal_targets):
         """Filter out the sources that the selfcal heuristics should not process.
-        
+
         PIPE-1447/PIPE-1915: we do not execute selfcal heuristics for mosaic or ephemeris sources.
         """
 
@@ -545,7 +545,7 @@ class Selfcal(basetask.StandardTaskTemplate):
 
     def _get_scaltargets(self, scal=True):
         """Get the cleantarget list from the context.
-        
+
         This essenially runs MakeImList and go through all nesscary steps to get the target list.
         However, it will pick up the selfcal heuristics from imageparams_factory,ImageParamsHeuristicsFactory
         """
@@ -568,7 +568,7 @@ class Selfcal(basetask.StandardTaskTemplate):
                                               field=self.inputs.field,
                                               spw=self.inputs.spw)
         makeimlist_task = MakeImList(makeimlist_inputs)
-        makeimlist_results = makeimlist_task.execute(dry_run=False)
+        makeimlist_results = makeimlist_task.execute()
 
         scal_targets = makeimlist_results.targets
         for scal_target in scal_targets:
@@ -699,7 +699,7 @@ class Selfcal(basetask.StandardTaskTemplate):
     @staticmethod
     def get_spw_chanbin(bwarray, chanarray, chanwidth=15.625e6):
         """Calculate the number of channels to average over for each spw.
-        
+
         note: mstransform only accept chanbin as integer.
         """
         avgarray = [1]*len(bwarray)

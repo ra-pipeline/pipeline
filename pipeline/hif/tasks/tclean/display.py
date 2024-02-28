@@ -176,7 +176,7 @@ class CleanSummary(object):
                     parameters['stokes'] = stokes_list[0]
                     parameters['moment'] = 'N/A'
                     try:
-                        parameters['prefix'] = miscinfo['filnam01']
+                        parameters['prefix'] = os.path.basename(imagename).split('.')[0]
                     except:
                         parameters['prefix'] = None
 

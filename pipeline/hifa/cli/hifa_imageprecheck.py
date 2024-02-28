@@ -4,7 +4,7 @@ import pipeline.h.cli.utils as utils
 
 
 @utils.cli_wrapper
-def hifa_imageprecheck(vis=None, calcsb=None, parallel=None, dryrun=None, acceptresults=None):
+def hifa_imageprecheck(vis=None, calcsb=None, parallel=None):
     """
     hifa_imageprecheck ---- Calculates the best Briggs robust parameter to achieve sensitivity and angular resolution goals.
 
@@ -36,11 +36,6 @@ def hifa_imageprecheck(vis=None, calcsb=None, parallel=None, dryrun=None, accept
                   False.
     parallel
                   Use MPI cluster where possible
-    dryrun
-                  Run the task (False) or just display the command (True)
-    acceptresults
-                  Add the results of the task to the pipeline context (True) or
-                  reject them (False).
 
     --------- examples -----------------------------------------------------------
 

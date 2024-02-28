@@ -9,14 +9,13 @@ def hifv_flagdata(vis=None, autocorr=None, shadow=None, scan=None,
                   intents=None, edgespw=None, fracspw=None,
                   online=None, fileonline=None, template=None,
                   filetemplate=None, hm_tbuff=None, tbuff=None,
-                  flagbackup=None, dryrun=None,
-                  acceptresults=None):
+                  flagbackup=None):
 
     """
     hifv_flagdata ---- Do basic deterministic flagging of a list of MeasurementSets
 
     The hifv_flagdata task performs basic flagging operations on a list of MeasurementSets including:
-    
+
     - autocorrelation data flagging
     - shadowed antenna data flagging
     - scan based flagging
@@ -26,11 +25,11 @@ def hifv_flagdata(vis=None, autocorr=None, shadow=None, scan=None,
     - applying a flagging template
     - quack, shadow, and basebands
     - Antenna not-on-source (ANOS)
-    
+
     Output:
-    
+
     results -- The results object for the pipeline task is returned.
-    
+
     --------- parameter descriptions ---------------------------------------------
 
     vis           The list of input MeasurementSets. Defaults to the list of MeasurementSets
@@ -59,21 +58,17 @@ def hifv_flagdata(vis=None, autocorr=None, shadow=None, scan=None,
     hm_tbuff      The time buffer computation heuristic
     tbuff         List of time buffers (sec) to pad timerange in flag commands
     flagbackup    Backup pre-existing flags before applying new ones.
-    dryrun        Run the commands (True) or generate the commands to be run but
-                  do not execute (False).  This is a pipeline task execution mode.
-    acceptresults Add the results of the task to the pipeline context (True) or
-                  reject them (False).  This is a pipeline task execution mode.
 
     --------- examples -----------------------------------------------------------
-    
-    
+
+
     1. Do basic flagging on a MeasurementSet
-    
+
     >>> hifv_flagdata()
-    
+
     2. Do basic flagging on a MeasurementSet as well as flag pointing and
     atmosphere data
-    
+
     >>> hifv_flagdata(scan=True intent='*BANDPASS*')
 
 

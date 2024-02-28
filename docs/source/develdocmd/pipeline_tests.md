@@ -1,3 +1,5 @@
+# Pipeline testing
+
 ## Unit tests
 
 The instruction of writing/running pipeline unit tests is described in [PIPE-862](https://open-jira.nrao.edu/browse/PIPE-862). Some tips for running local tests are below:
@@ -115,6 +117,15 @@ xvfb-run casa --nogui --nologger --log2term --agg -c \
 ```
 
 The `--longtests` option enables the longer tests to be run. When this option is not specified, only the quicker set of tests will be run. 
+
+The `--data-directory` option allows the specification of the directory where the larger input data files are stored. If not specified, this defaults to 
+`/lustre/cv/projects/pipeline-test-data/regression-test-data/` which requires the tests to be run somewhere with access to lustre.
+
+```console
+xvfb-run casa --nogui --nologger --log2term --agg -c \
+    "import pytest; pytest.main(['-vv', '-m alma and slow', '--data-directory=/users/kberry/big_data_directory/', '<pipeline_dir>/pipeline/infrastructure/utils/regression-tester.py'])"
+```
+
 
 ## Custom markers
 

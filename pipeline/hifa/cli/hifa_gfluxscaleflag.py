@@ -6,11 +6,11 @@ import pipeline.h.cli.utils as utils
 @utils.cli_wrapper
 def hifa_gfluxscaleflag(vis=None, intent=None, phaseupsolint=None, solint=None, minsnr=None, refant=None,
                         antnegsig=None, antpossig=None, tmantint=None, tmint=None, tmbl=None, antblnegsig=None,
-                        antblpossig=None, relaxed_factor=None, niter=None, dryrun=None, acceptresults=None):
+                        antblpossig=None, relaxed_factor=None, niter=None):
     """
     hifa_gfluxscaleflag ---- Flag the phase, pol, flux calibrators
 
-    
+
     This task computes the flagging heuristics on the phase calibrator and flux
     calibrator by calling hif_correctedampflag which looks for outlier
     visibility points by statistically examining the scalar difference of
@@ -20,7 +20,7 @@ def hifa_gfluxscaleflag(vis=None, intent=None, phaseupsolint=None, solint=None, 
     resolved calibrators and point sources because it is not performing a
     vector difference, and thus is not sensitive to nulls in the flux density
     vs. uvdistance domain. Note that the phase of the data is not assessed.
-    
+
     In further detail, the workflow is as follows: a snapshot of the flagging
     state is preserved at the start, a preliminary phase and amplitude gaincal
     solution is solved and applied, the flagging heuristics are run and
@@ -32,7 +32,7 @@ def hifa_gfluxscaleflag(vis=None, intent=None, phaseupsolint=None, solint=None, 
     the 'after' plots are not generated or displayed. The score for this stage
     is the standard data flagging score, which depends on the fraction of data
     flagged.
-    
+
     Output:
 
         results -- The results object for the pipeline task is returned.
@@ -42,7 +42,7 @@ def hifa_gfluxscaleflag(vis=None, intent=None, phaseupsolint=None, solint=None, 
     vis
                    The list of input MeasurementSets. Defaults to the list of
                    MeasurementSets specified in the pipeline context.
-                   
+
                    Example: vis=['M51.ms']
     intent
                    A string containing a comma delimited list of intents against
@@ -51,15 +51,15 @@ def hifa_gfluxscaleflag(vis=None, intent=None, phaseupsolint=None, solint=None, 
                    except for one case: if one of the AMPLITUDE intent fields was also
                    used for BANDPASS, then this task will select only data with PHASE
                    and CHECK intents.
-                   
+
                    Example: intent='`*PHASE*`'
     phaseupsolint
                    The phase correction solution interval in CASA syntax.
-                   
+
                    Example: phaseupsolint='300s'
     solint
                    Time and channel solution intervals in CASA syntax.
-                   
+
                    Example: solint='inf,10ch', solint='inf'
     minsnr
                    Solutions below this SNR are rejected.
@@ -67,7 +67,7 @@ def hifa_gfluxscaleflag(vis=None, intent=None, phaseupsolint=None, solint=None, 
                    Reference antenna names. Defaults to the value(s) stored in the
                    pipeline context. If undefined in the pipeline context defaults to
                    the CASA reference antenna naming scheme.
-                   
+
                    Example: refant='DV01', refant='DV06,DV07'
     antnegsig
                    Lower sigma threshold for identifying outliers as a result of
@@ -117,18 +117,12 @@ def hifa_gfluxscaleflag(vis=None, intent=None, phaseupsolint=None, solint=None, 
                    iterations are skipped.
 
                    Example: niter=2
-    dryrun
-                   Run the commands (True) or generate the commands to be run but
-                   do not execute (False).
-    acceptresults
-                   Add the results of the task to the pipeline context (True) or
-                   reject them (False).
 
     --------- examples -----------------------------------------------------------
 
     1. run with recommended settings to create flux scale calibration with flagging
     using recommended thresholds:
-    
+
     >>> hifa_gfluxscaleflag()
 
     """

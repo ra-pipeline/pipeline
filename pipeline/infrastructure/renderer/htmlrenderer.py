@@ -763,7 +763,7 @@ class T2_1DetailsRenderer(object):
             LOG.debug('Writing listobs output to %s' % listfile)
             task = infrastructure.casa_tasks.listobs(vis=ms.name,
                                                      listfile=listfile)
-            task.execute(dry_run=False)
+            task.execute()
 
     @staticmethod
     def get_display_context(context, ms):

@@ -4,11 +4,11 @@ import pipeline.h.cli.utils as utils
 
 
 @utils.cli_wrapper
-def hifa_flagtargets(vis=None, template=None, filetemplate=None, flagbackup=None, dryrun=None, acceptresults=None):
+def hifa_flagtargets(vis=None, template=None, filetemplate=None, flagbackup=None):
     """
     hifa_flagtargets ---- Do science target flagging
 
-    
+
     The hifa_flagtargets task performs basic flagging operations on a list of
     science target MeasurementSets, including:
 
@@ -27,22 +27,16 @@ def hifa_flagtargets(vis=None, template=None, filetemplate=None, flagbackup=None
                   Apply flagging templates; defaults to True.
     filetemplate
                   The name of a text file that contains the flagging
-                  template for issues with the science target data etc. 
-                  If the template flags files is undefined a name of the 
+                  template for issues with the science target data etc.
+                  If the template flags files is undefined a name of the
                   form 'msname_flagtargetstemplate.txt' is assumed.
     flagbackup
                   Back up any pre-existing flags; defaults to False.
-    dryrun
-                  Run the commands (False) or generate the commands to be
-                  run but do not execute (True).
-    acceptresults
-                  Add the results of the task to the pipeline context (True)
-                  or reject them (False).
 
     --------- examples -----------------------------------------------------------
 
     1. Do basic flagging on a science target MeasurementSet:
-    
+
     >>> hifa_flagtargets()
 
     """

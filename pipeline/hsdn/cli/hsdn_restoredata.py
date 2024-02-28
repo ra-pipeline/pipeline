@@ -5,8 +5,7 @@ import pipeline.h.cli.utils as utils
 
 @utils.cli_wrapper
 def hsdn_restoredata(vis=None, caltable=None, reffile=None,
-                     products_dir=None, copytoraw=None, rawdata_dir=None, hm_rasterscan=None,
-                     dryrun=False, acceptresults=None):
+                     products_dir=None, copytoraw=None, rawdata_dir=None, hm_rasterscan=None):
 
     """
     hsdn_restoredata ---- Restore flagged and calibration single dish data from a pipeline run
@@ -16,25 +15,25 @@ def hsdn_restoredata(vis=None, caltable=None, reffile=None,
     retrieval support hsdn_restoredata assumes that the required products
     are available in the rawdata_dir in the format produced by the
     hifa_exportdata task.
-    
+
     hsdn_restoredata assumes that the following entities are available in the raw
     data directory:
-    
+
     - the ASDMs to be restored
     - for each ASDM in the input list:
 
         - a compressed tar file of the final flagversions file, e.g.
           uid___A002_X30a93d_X43e.ms.flagversions.tar.gz
-          
+
         - a text file containing the applycal instructions, e.g.
           uid___A002_X30a93d_X43e.ms.calapply.txt
-          
+
         - a compressed tar file containing the caltables for the parent session,
           e.g. uid___A001_X74_X29.session_3.caltables.tar.gz
-          
+
 
     hsdn_restoredata performs the following operations:
-    
+
     - imports the ASDM(s)
     - removes the default MS.flagversions directory created by the filler
     - restores the final MS.flagversions directory stored by the pipeline
@@ -42,30 +41,30 @@ def hsdn_restoredata(vis=None, caltable=None, reffile=None,
     - restores the final calibration state of the MS
     - restores the final calibration tables for each MS
     - applies the calibration tables to each MS
-    
+
     When importing the ASDM and converting it to a Measurement Set (MS), if the
     output MS already exists in the output directory, then the importasdm
     conversion step is skipped, and the existing MS will be imported instead.
-    
+
     Output:
-    
+
     results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
     vis           List of raw visibility data files to be restored. Assumed to be
                   in the directory specified by rawdata_dir.
-                  
+
                   example: vis=['uid___A002_X30a93d_X43e']
     caltable      Name of output gain calibration tables.
-                  
+
                   example: caltable='ngc5921.gcal'
     reffile       Path to a file containing scaling factors between beams.
                   The format is equals to jyperk.csv with five fields:
                   MS name, beam name (instead of antenna name), spectral window id,
                   polarization string, and the scaling factor.
                   Example for the file is as follows:
-                  
+
                   #MS,Beam,Spwid,Polarization,Factor
                   mg2-20181016165248-181017.ms,NRO-BEAM0,0,I,1.000000000
                   mg2-20181016165248-181017.ms,NRO-BEAM0,1,I,1.000000000
@@ -83,34 +82,30 @@ def hsdn_restoredata(vis=None, caltable=None, reffile=None,
                   mg2-20181016165248-181017.ms,NRO-BEAM3,1,I,2.000000000
                   mg2-20181016165248-181017.ms,NRO-BEAM3,2,I,2.000000000
                   mg2-20181016165248-181017.ms,NRO-BEAM3,3,I,2.000000000
-                  
+
                   If no file name is specified or specified file doesn't exist,
                   all the factors are set to 1.0.
-                  
+
                   example: reffile='', reffile='nroscalefactor.csv'
     products_dir  Name of the data products directory. Currently not
                   used.
-                  
+
                   example: products_dir='myproductspath'
     copytoraw     Copy calibration and flagging tables to raw data directory.
-                  
+
                   example: copytoraw=False
     rawdata_dir   Name of the raw data directory.
-                  
+
                   example: rawdata_dir='myrawdatapath'
     hm_rasterscan Heuristics method for raster scan analysis. Two analysis modes,
                   time-domain analysis ('time') and direction analysis ('direction'), are available.
                   Default is 'time'.
-    dryrun        Run the commands (True) or generate the commands to be run but
-                  do not execute (False).
-    acceptresults Add the results of the task to the pipeline context (True) or
-                  reject them (False).
 
     --------- examples -----------------------------------------------------------
 
-    
+
     1. Restore the pipeline results for a single ASDM in a single session
-    
+
     >>> hsdn_restoredata (vis=['mg2-20181016165248-190320.ms'], reffile='nroscalefactor.csv')
 
 

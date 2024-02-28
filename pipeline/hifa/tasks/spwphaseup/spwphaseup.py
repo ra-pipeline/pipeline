@@ -170,10 +170,10 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         # to set the one caltable as the best result.
 
         # double-check that the caltable was actually generated
-        on_disk = [ca for ca in result.phaseup_result.pool if ca.exists() or self._executor._dry_run]
+        on_disk = [ca for ca in result.phaseup_result.pool if ca.exists()]
         result.phaseup_result.final[:] = on_disk
 
-        missing = [ca for ca in result.phaseup_result.pool if ca not in on_disk and not self._executor._dry_run]
+        missing = [ca for ca in result.phaseup_result.pool if ca not in on_disk]
         result.phaseup_result.error.clear()
         result.phaseup_result.error.update(missing)
 

@@ -20,17 +20,17 @@ def h_save(filename=None):
 
     --------- examples -----------------------------------------------------------
 
-    
+
     1. Save the current state in the default file
-    
+
     >>> h_save()
-    
+
     2. Save the current state to a file called 'savestate_1'
-    
+
     >>> h_save(filename='savestate_1')
 
 
     """
 
-    context = utils.get_context()    
+    context = utils.get_context()
     context.save(filename)

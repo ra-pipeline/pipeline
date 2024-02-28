@@ -196,7 +196,7 @@ class FlagCmd(object):
                         ant_list = antenna.split(',')
 
                         # If the view is specific to one antenna, and that is
-                        # not the the same antenna as in the flag coordinate,
+                        # not the same antenna as in the flag coordinate,
                         # then turn this into a baseline flagging command.
                         if len(ant_list) == 1 and ant_list[0] and int(ant_list[0]) != flagcoords[k]:
                             ax_antenna = '%s&%s' % (ant_list[0], flagcoords[k])

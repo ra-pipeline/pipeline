@@ -1,6 +1,4 @@
-
-
-# VLASS Selfcal & Restore
+# VLASS Selfcal & Restore workflows
 
 * VLASS selfcal workflow
 
@@ -20,7 +18,7 @@
         ...
     ```
 
-# auto_selfcal prototype
+## auto_selfcal prototype
 
 ```console
 per target per band
@@ -53,7 +51,7 @@ per target
             applycal(to originMS): write to a script / or apply on-the-fly
 ```
 
-# PipelineTask: `hif_selfcal`
+## PipelineTask: `hif_selfcal`
 
 ```console
 MakeImList:cont: derive clean_target_list

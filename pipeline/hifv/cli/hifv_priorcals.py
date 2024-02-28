@@ -4,16 +4,15 @@ import pipeline.h.cli.utils as utils
 
 
 @utils.cli_wrapper
-def hifv_priorcals(vis=None, show_tec_maps=None, apply_tec_correction=None, swpow_spw=None,
-                   dryrun=None, acceptresults=None):
+def hifv_priorcals(vis=None, show_tec_maps=None, apply_tec_correction=None, swpow_spw=None, ant_pos_time_limit=None):
 
     """
     hifv_priorcals ---- Runs gaincurves, opacities, requantizer gains, antenna position corrections, tec_maps, switched power.
-    
+
     Runs gaincurves, opacities, requantizer gains, antenna position corrections, tec_maps, switched power.
 
     Output:
-    
+
     results -- The results object for the pipeline task is returned.
     --------- parameter descriptions ---------------------------------------------
 
@@ -24,21 +23,16 @@ def hifv_priorcals(vis=None, show_tec_maps=None, apply_tec_correction=None, swpo
     show_tec_maps        Plot tec maps
     apply_tec_correction Apply tec correction
     swpow_spw            Spectral-window(s) for plotting: "" ==>all, spw="6,14"
-    dryrun               Run the commands (True) or generate the commands to be run but
-                         do not execute (False).  This is a pipeline task execution mode.
-    acceptresults        Add the results of the task to the pipeline context (True) or
-                         reject them (False).  This is a pipeline task execution mode.
-
+    ant_pos_time_limit   Antenna position time limit in days, default to 150 days
     --------- examples -----------------------------------------------------------
-    
-    
+
+
     1. Run gaincurves, opacities, requantizer gains and antenna position corrections.
-    
+
     >>> hifv_priorcals()
 
 
     """
-
 
     ##########################################################################
     #                                                                        #

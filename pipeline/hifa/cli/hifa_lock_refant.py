@@ -4,7 +4,7 @@ import pipeline.h.cli.utils as utils
 
 
 @utils.cli_wrapper
-def hifa_lock_refant(vis=None, dryrun=None, acceptresults=None):
+def hifa_lock_refant(vis=None):
     """
     hifa_lock_refant ---- Lock reference antenna list
 
@@ -26,12 +26,8 @@ def hifa_lock_refant(vis=None, dryrun=None, acceptresults=None):
     vis
                   List of input MeasurementSets. Defaults to the list of
                   MeasurementSets specified in the pipeline context.
-                  
+
                   Example: vis=['ngc5921.ms']
-    dryrun
-                  Run the task (False) or display task command (True).
-    acceptresults
-                  Add the results into the pipeline context.
 
     --------- examples -----------------------------------------------------------
 

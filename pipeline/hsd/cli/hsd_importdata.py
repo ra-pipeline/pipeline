@@ -5,8 +5,7 @@ import pipeline.h.cli.utils as utils
 
 @utils.cli_wrapper
 def hsd_importdata(vis=None, session=None, hm_rasterscan=None, parallel=None, asis=None, process_caldevice=None, overwrite=None,
-                   nocopy=None, bdfflags=None, datacolumns=None, lazy=None, with_pointing_correction=None, createmms=None, dryrun=None,
-                   acceptresults=None):
+                   nocopy=None, bdfflags=None, datacolumns=None, lazy=None, with_pointing_correction=None, createmms=None):
 
     """
     hsd_importdata ---- Imports data into the single dish pipeline
@@ -84,8 +83,6 @@ def hsd_importdata(vis=None, session=None, hm_rasterscan=None, parallel=None, as
     with_pointing_correction add (ASDM::Pointing::encoder - ASDM::Pointing::pointingDirection)
                              to the value to be written in MS::Pointing::direction
     createmms                Create an MMS
-    dryrun                   Run the task (False) or display task command (True).
-    acceptresults            results of the task to the pipeline context (True) or reject them (False).
 
     --------- examples -----------------------------------------------------------
 

@@ -77,7 +77,7 @@ class VLASubPlotRenderer(object):
         return os.path.join(self.context.report_dir, stage)
 
     @property
-    def filename(self):        
+    def filename(self):
         filename = filenamer.sanitize(self.filename_prefix + '-%s.html' % self.ms)
         return filename
 
@@ -244,7 +244,7 @@ class T2_4MDetailsfinalcalsRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
 
 class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
-    def __init__(self, uri='applycals.mako', 
+    def __init__(self, uri='applycals.mako',
                  description='Apply calibrations from context',
                  always_rerender=False):
         super(T2_4MDetailsVLAApplycalRenderer, self).__init__(
@@ -290,7 +290,7 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
 
     def create_science_plots(self, context, results, correlation):
         """
-        Create plots for the science targets, returning two dictionaries of 
+        Create plots for the science targets, returning two dictionaries of
         vis:[Plots].
         """
         amp_vs_freq_summary_plots = collections.defaultdict(dict)
@@ -299,7 +299,7 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
         max_uvs = collections.defaultdict(dict)
 
         for result in results:
-            # Plot for 1 science field (either 1 science target or for a mosaic 1 
+            # Plot for 1 science field (either 1 science target or for a mosaic 1
             # pointing). The science field that should be chosen is the one with
             # the brightest average amplitude over all spws
             vis = os.path.basename(result.inputs['vis'])
@@ -362,22 +362,22 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
             '''
             for source_id, brightest_field in brightest_fields.items()[0:len(brightest_fields.items()):Nplots]:
                 plots = self.science_plots_for_result(context,
-                                                      result, 
+                                                      result,
                                                       applycal.AmpVsFrequencyPerBasebandSummaryChart,
                                                       [brightest_field.id],
                                                       uv_range, correlation=correlation)
                 amp_vs_freq_summary_plots[vis][source_id] = plots
 
             for source_id, brightest_field in brightest_fields.items()[0:len(brightest_fields.items()):Nplots]:
-                plots = self.science_plots_for_result(context, 
-                                                      result, 
+                plots = self.science_plots_for_result(context,
+                                                      result,
                                                       applycal.PhaseVsFrequencySummaryChart,
                                                       [brightest_field.id],
                                                       uv_range, correlation=correlation)
                 phase_vs_freq_summary_plots[vis][source_id] = plots
-    
-                plots = self.science_plots_for_result(context, 
-                                                      result, 
+
+                plots = self.science_plots_for_result(context,
+                                                      result,
                                                       applycal.AmpVsUVBasebandSummaryChart,
                                                       [brightest_field.id], correlation=correlation)
                 amp_vs_uv_summary_plots[vis][source_id] = plots
@@ -398,15 +398,15 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
                                               uv_range,
                                               ApplycalAmpVsFreqSciencePlotRenderer, correlation=correlation)
 
-                self.science_plots_for_result(context, 
-                                              result, 
+                self.science_plots_for_result(context,
+                                              result,
                                               applycal.PhaseVsFrequencySummaryChart,
                                               fields,
                                               uv_range,
                                               ApplycalPhaseVsFreqSciencePlotRenderer, correlation=correlation)
 
-                self.science_plots_for_result(context, 
-                                              result, 
+                self.science_plots_for_result(context,
+                                              result,
                                               applycal.AmpVsUVBasebandSummaryChart,
                                               fields,
                                               renderer_cls=ApplycalAmpVsUVSciencePlotRenderer, correlation=correlation)
@@ -423,10 +423,10 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
 
         return (amp_vs_freq_summary_plots,  max_uvs)
 
-    def science_plots_for_result(self, context, result, plotter_cls, fields, 
+    def science_plots_for_result(self, context, result, plotter_cls, fields,
                                  uvrange=None, renderer_cls=None, correlation=''):
         # override field when plotting amp/phase vs frequency, as otherwise
-        # the field is resolved to a list of all field IDs  
+        # the field is resolved to a list of all field IDs
         overrides = {'coloraxis': 'spw',
                      'correlation': correlation}
         if uvrange is not None:
@@ -437,7 +437,7 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
         plots = []
         for field in fields:
             # override field when plotting amp/phase vs frequency, as otherwise
-            # the field is resolved to a list of all field IDs  
+            # the field is resolved to a list of all field IDs
             overrides['field'] = field
 
             plotter = plotter_cls(context, result, ['TARGET'], **overrides)
@@ -449,7 +449,7 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
         if renderer_cls is not None:
             renderer = renderer_cls(context, result, plots, **overrides)
             with renderer.get_file() as fileobj:
-                fileobj.write(renderer.render())        
+                fileobj.write(renderer.render())
 
         return plots
 
@@ -471,7 +471,7 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
         result = collections.OrderedDict()
 
         by_source_id = lambda field: field.source.id
-        fields_by_source_id = sorted(ms.get_fields(intent=intent), 
+        fields_by_source_id = sorted(ms.get_fields(intent=intent),
                                      key=by_source_id)
         for source_id, source_fields in itertools.groupby(fields_by_source_id,
                                                           by_source_id):
@@ -516,7 +516,7 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
                 job_params['field'] = str(field_id)
                 job = casa_tasks.visstat(**job_params)
                 LOG.debug('Calculating statistics for %r (#%s)', field_name, field_id)
-                result = job.execute(dry_run=False)
+                result = job.execute()
 
                 average_flux[(field_id, field_name)] = float(result['CORRECTED']['mean'])
 
@@ -563,7 +563,7 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
         if renderer_cls is not None:
             renderer = renderer_cls(context, result, plots, **kwargs)
             with renderer.get_file() as fileobj:
-                fileobj.write(renderer.render())        
+                fileobj.write(renderer.render())
 
         return d
 
@@ -588,8 +588,8 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
                 caltype = type_map.get(calfrom.caltype, calfrom.caltype)
 
                 if calfrom.caltype == 'gaincal':
-                    # try heuristics to detect phase-only and amp-only 
-                    # solutions 
+                    # try heuristics to detect phase-only and amp-only
+                    # solutions
                     caltype += self.get_gain_solution_type(calfrom.gaintable)
 
                 d[calfrom.gaintable] = caltype
@@ -600,10 +600,10 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
         # solve circular import problem by importing at run-time
         from pipeline.infrastructure import casa_tasks
 
-        # get stats on amp solution of gaintable 
-        calstat_job = casa_tasks.calstat(caltable=gaintable, axis='amp', 
+        # get stats on amp solution of gaintable
+        calstat_job = casa_tasks.calstat(caltable=gaintable, axis='amp',
                                          datacolumn='CPARAM', useflags=True)
-        calstat_result = calstat_job.execute(dry_run=False)        
+        calstat_result = calstat_job.execute()
         stats = calstat_result['CPARAM']
 
         # amp solutions of unity imply phase-only was requested
@@ -613,9 +613,9 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
                            utils.approx_equal(stats['max'], 1, tol)])
 
         # same again for phase solution
-        calstat_job = casa_tasks.calstat(caltable=gaintable, axis='phase', 
+        calstat_job = casa_tasks.calstat(caltable=gaintable, axis='phase',
                                          datacolumn='CPARAM', useflags=True)
-        calstat_result = calstat_job.execute(dry_run=False)        
+        calstat_result = calstat_job.execute()
         stats = calstat_result['CPARAM']
 
         # phase solutions ~ 0 implies amp-only solution
@@ -638,7 +638,7 @@ class ApplycalAmpVsFreqPlotRenderer(basetemplates.JsonPlotRenderer):
         outfile = filenamer.sanitize('amp_vs_freq-%s.html' % vis)
 
         super(ApplycalAmpVsFreqPlotRenderer, self).__init__(
-                'generic_x_vs_y_field_spw_ant_detail_plots.mako', context, 
+                'generic_x_vs_y_field_spw_ant_detail_plots.mako', context,
                 result, plots, title, outfile, **overrides)
 
 
@@ -649,7 +649,7 @@ class ApplycalPhaseVsFreqPlotRenderer(basetemplates.JsonPlotRenderer):
         outfile = filenamer.sanitize('phase_vs_freq-%s.html' % vis)
 
         super(ApplycalPhaseVsFreqPlotRenderer, self).__init__(
-                'generic_x_vs_y_field_spw_ant_detail_plots.mako', context, 
+                'generic_x_vs_y_field_spw_ant_detail_plots.mako', context,
                 result, plots, title, outfile, **overrides)
 
 
@@ -660,7 +660,7 @@ class ApplycalAmpVsFreqSciencePlotRenderer(basetemplates.JsonPlotRenderer):
         outfile = filenamer.sanitize('science_amp_vs_freq-%s.html' % vis)
 
         super(ApplycalAmpVsFreqSciencePlotRenderer, self).__init__(
-                'generic_x_vs_y_field_baseband_detail_plots.mako', context, 
+                'generic_x_vs_y_field_baseband_detail_plots.mako', context,
                 result, plots, title, outfile, **overrides)
 
 
@@ -671,7 +671,7 @@ class ApplycalPhaseVsFreqSciencePlotRenderer(basetemplates.JsonPlotRenderer):
         outfile = filenamer.sanitize('science_phase_vs_freq-%s.mako' % vis)
 
         super(ApplycalPhaseVsFreqSciencePlotRenderer, self).__init__(
-                'generic_x_vs_y_field_baseband_detail_plots.html', context, 
+                'generic_x_vs_y_field_baseband_detail_plots.html', context,
                 result, plots, title, outfile, **overrides)
 
 
@@ -682,7 +682,7 @@ class ApplycalAmpVsUVSciencePlotRenderer(basetemplates.JsonPlotRenderer):
         outfile = filenamer.sanitize('science_amp_vs_uv-%s.html' % vis)
 
         super(ApplycalAmpVsUVSciencePlotRenderer, self).__init__(
-                'generic_x_vs_y_field_baseband_detail_plots.mako', context, 
+                'generic_x_vs_y_field_baseband_detail_plots.mako', context,
                 result, plots, title, outfile, **overrides)
 
 
@@ -693,7 +693,7 @@ class ApplycalAmpVsUVPlotRenderer(basetemplates.JsonPlotRenderer):
         outfile = filenamer.sanitize('amp_vs_uv-%s.html' % vis)
 
         super(ApplycalAmpVsUVPlotRenderer, self).__init__(
-                'generic_x_vs_y_spw_ant_plots.mako', context, 
+                'generic_x_vs_y_spw_ant_plots.mako', context,
                 result, plots, title, outfile, **overrides)
 
 
@@ -704,7 +704,7 @@ class ApplycalPhaseVsUVPlotRenderer(basetemplates.JsonPlotRenderer):
         outfile = filenamer.sanitize('phase_vs_uv-%s.html' % vis)
 
         super(ApplycalPhaseVsUVPlotRenderer, self).__init__(
-                'generic_x_vs_y_spw_ant_plots.mako', context, 
+                'generic_x_vs_y_spw_ant_plots.mako', context,
                 result, plots, title, outfile, **overrides)
 
 
@@ -715,7 +715,7 @@ class ApplycalAmpVsTimePlotRenderer(basetemplates.JsonPlotRenderer):
         outfile = filenamer.sanitize('amp_vs_time-%s.html' % vis)
 
         super(ApplycalAmpVsTimePlotRenderer, self).__init__(
-                'generic_x_vs_y_field_spw_ant_detail_plots.mako', context, 
+                'generic_x_vs_y_field_spw_ant_detail_plots.mako', context,
                 result, plots, title, outfile, **overrides)
 
 
@@ -726,5 +726,5 @@ class ApplycalPhaseVsTimePlotRenderer(basetemplates.JsonPlotRenderer):
         outfile = filenamer.sanitize('phase_vs_time-%s.html' % vis)
 
         super(ApplycalPhaseVsTimePlotRenderer, self).__init__(
-                'generic_x_vs_y_field_spw_ant_detail_plots.mako', context, 
+                'generic_x_vs_y_field_spw_ant_detail_plots.mako', context,
                 result, plots, title, outfile, **overrides)

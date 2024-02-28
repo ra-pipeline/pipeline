@@ -34,7 +34,7 @@ class GainCurvesInputs(vdp.StandardInputs):
 
 
 class GainCurves(basetask.StandardTaskTemplate):
-    Inputs = GainCurvesInputs    
+    Inputs = GainCurvesInputs
 
     def prepare(self):
         inputs = self.inputs
@@ -54,12 +54,10 @@ class GainCurves(basetask.StandardTaskTemplate):
     def analyse(self, result):
 
         # double-check that the caltable was actually generated
-        on_disk = [ca for ca in result.pool
-                   if ca.exists() or self._executor._dry_run]
+        on_disk = [ca for ca in result.pool if ca.exists()]
         result.final[:] = on_disk
 
-        missing = [ca for ca in result.pool
-                   if ca not in on_disk and not self._executor._dry_run]
+        missing = [ca for ca in result.pool if ca not in on_disk]
         result.error.clear()
         result.error.update(missing)
 

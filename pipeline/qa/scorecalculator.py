@@ -6,6 +6,7 @@ Created on 9 Jan 2014
 # Do not evaluate type annotations at definition time.
 from __future__ import annotations
 
+import shutil
 import collections
 import datetime
 import functools
@@ -332,6 +333,10 @@ def score_ms_model_data_column_present(all_mses, mses_with_column):
     """
     num_with = len(mses_with_column)
     num_all = len(all_mses)
+
+    if num_all == 0:
+        return pqa.QAScore(0.0, 'No MSes were imported', 'No MSes imported')
+
     f = float(num_with) / num_all
 
     if mses_with_column:
@@ -365,6 +370,9 @@ def score_ms_history_entries_present(all_mses, mses_with_history):
     """
     num_with = len(mses_with_history)
     num_all = len(all_mses)
+
+    if num_all == 0:
+        return pqa.QAScore(0.0, 'No MSes were imported', 'No MSes imported')
 
     if mses_with_history:
         # log a message like 'Entries were found in the HISTORY table for
@@ -1101,10 +1109,11 @@ def countbaddelays(m, delaytable, delaymax):
     with casa_tools.TableReader(delaytable) as tb:
         spws = np.unique(tb.getcol('SPECTRAL_WINDOW_ID'))
         for ispw in spws:
+            # byspw table must be written to disk in outer layer to avoid 'Table does not exist' error
             tbspw = tb.query(query='SPECTRAL_WINDOW_ID==' + str(ispw), name='byspw')
             ants = np.unique(tbspw.getcol('ANTENNA1'))
             for iant in ants:
-                tbant = tbspw.query(query='ANTENNA1==' + str(iant), name='byant')
+                tbant = tbspw.query(query='ANTENNA1==' + str(iant))
                 absdel = np.absolute(tbant.getcol('FPARAM'))
                 if np.max(absdel) > delaymax:
                     antname = m.get_antenna(iant)[0].name
@@ -1114,6 +1123,10 @@ def countbaddelays(m, delaytable, delaymax):
                              + str((absdel > delaymax).sum()))
                 tbant.close()
             tbspw.close()
+            # clean up byspw table after each iteration
+            byspw = os.getcwd() + '/byspw'
+            if os.path.exists(byspw):
+                shutil.rmtree(byspw)
 
     return delaydict
 

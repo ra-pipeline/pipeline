@@ -48,7 +48,7 @@ class targetflagSummaryChart(object):
                                         xlabel='',  ylabel='', showmajorgrid=False, showminorgrid=False,
                                         plotfile=figfile, overwrite=True, clearplots=True, showgui=False)
 
-                job.execute(dry_run=False)
+                job.execute()
 
             except Exception as ex:
                 LOG.error('Could not create fluxboot plot.')
@@ -80,7 +80,7 @@ class targetflagSummaryChart(object):
                                             xlabel='', ylabel='', showmajorgrid=False, showminorgrid=False,
                                             plotfile=figfile, overwrite=True, clearplots=True, showgui=False)
 
-                    job.execute(dry_run=False)
+                    job.execute()
 
                 except Exception as ex:
                     LOG.error('Could not create plot for field '+str(field_ids[ii]))
@@ -92,6 +92,6 @@ class targetflagSummaryChart(object):
         return [p for p in plots if p is not None]
 
     def get_figfile(self, prefix):
-        return os.path.join(self.context.report_dir, 
-                            'stage%s' % self.result.stage_number, 
+        return os.path.join(self.context.report_dir,
+                            'stage%s' % self.result.stage_number,
                             prefix+'-%s-summary.png' % self.ms.basename)

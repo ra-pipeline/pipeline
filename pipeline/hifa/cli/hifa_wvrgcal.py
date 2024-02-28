@@ -7,13 +7,13 @@ import pipeline.h.cli.utils as utils
 def hifa_wvrgcal(vis=None, caltable=None, offsetstable=None, hm_toffset=None, toffset=None, segsource=None,
                  sourceflag=None, hm_tie=None, tie=None, nsol=None, disperse=None, wvrflag=None, hm_smooth=None,
                  smooth=None, scale=None, maxdistm=None, minnumants=None, mingoodfrac=None, refant=None, qa_intent=None,
-                 qa_bandpass_intent=None, qa_spw=None, accept_threshold=None, dryrun=None, acceptresults=None):
+                 qa_bandpass_intent=None, qa_spw=None, accept_threshold=None):
     """
-    hifa_wvrgcal ---- 
+    hifa_wvrgcal ----
     Generate a gain table based on Water Vapor Radiometer data, and calculate
     a QA score based on its effect on the interferometric data.
 
-    
+
     Generate a gain table based on the Water Vapor Radiometer data in each vis
     file. By applying the wvr calibration to the data specified by ``qa_intent``
     and ``qa_spw``, calculate a QA score to indicate its effect on
@@ -37,7 +37,7 @@ def hifa_wvrgcal(vis=None, caltable=None, offsetstable=None, hm_toffset=None, to
                        Example: vis=['ngc5921.ms']
     caltable
                        List of output gain calibration tables.
-                       
+
                        Default: none, in which case the names of the caltables
                        will be generated automatically.
 
@@ -45,7 +45,7 @@ def hifa_wvrgcal(vis=None, caltable=None, offsetstable=None, hm_toffset=None, to
     offsetstable
                        List of input temperature offsets table files to subtract
                        from WVR measurements before calculating phase corrections.
-                       
+
                        Default: none, in which case no offsets are applied.
 
                        Example: offsetstable=['ngc5921.cloud_offsets']
@@ -64,7 +64,7 @@ def hifa_wvrgcal(vis=None, caltable=None, offsetstable=None, hm_toffset=None, to
     sourceflag
                        Flag the WVR data for these source(s) as bad and do not
                        produce corrections for it. Requires ``segsource`` = True.
-                       
+
                        Example: ['3C273']
     hm_tie
                        If 'manual', set the ``tie`` parameter to the
@@ -91,7 +91,7 @@ def hifa_wvrgcal(vis=None, caltable=None, offsetstable=None, hm_toffset=None, to
                        Flag the WVR data for the listed antennas as bad and replace
                        their data with values interpolated from the 3 nearest antennas with
                        unflagged data.
-                       
+
                        Example: ['DV03','DA05','PM02']
     hm_smooth
                        If 'manual' set the ``smooth`` parameter to the user-specified value.
@@ -106,7 +106,7 @@ def hifa_wvrgcal(vis=None, caltable=None, offsetstable=None, hm_toffset=None, to
     maxdistm
                        Maximum distance in meters of an antenna used for interpolation
                        from a flagged antenna.
-                       
+
                        Default: -1  (automatically set to 100m if >50% of
                        antennas are 7m antennas without WVR and otherwise set to
                        500m).
@@ -115,37 +115,37 @@ def hifa_wvrgcal(vis=None, caltable=None, offsetstable=None, hm_toffset=None, to
     minnumants
                        Minimum number of nearby antennas (up to 3) used for
                        interpolation from a flagged antenna.
-                       
+
                        Example: minnumants=3
     mingoodfrac
                        Minimum fraction of good data per antenna.
     refant
                        Ranked comma delimited list of reference antennas.
-                       
+
                        Example: refant='DV01,DV02'
     qa_intent
                        The list of data intents on which the wvr correction is to be
                        tried as a means of estimating its effectiveness.
-                       
+
                        A QA 'view' will be calculated for each specified intent, in each spectral
                        window in each vis file.
-                       
+
                        Each QA 'view' will consist of a pair of 2-d images with dimensions
-                       ['ANTENNA', 'TIME'], one showing the data phase-noise before the 
+                       ['ANTENNA', 'TIME'], one showing the data phase-noise before the
                        wvr application, the second showing the phase noise after (both 'before'
                        and 'after' images have a bandpass calibration applied as well).
-                       
+
                        An overall QA score is calculated for each vis file, by dividing the
                        'before' images by the 'after' and taking the median of the result. An
                        overall score of 1 would correspond to no change in the phase noise,
                        a score > 1 implies an improvement.
-                       
-                       If the overall score for a vis file is less than the value in          
-                       'accept_threshold' then the wvr calibration file is not made available 
+
+                       If the overall score for a vis file is less than the value in
+                       'accept_threshold' then the wvr calibration file is not made available
                        for merging into the context for use in the subsequent reduction.
-                       
+
                        If you do not want any QA calculations then set qa_intent=''.
-                       
+
                        example: qa_intent='PHASE'
     qa_bandpass_intent
                        The data intent to use for the bandpass calibration in
@@ -160,15 +160,11 @@ def hifa_wvrgcal(vis=None, caltable=None, offsetstable=None, hm_toffset=None, to
                        The phase-rms improvement ratio
                        (rms without wvr / rms with wvr) above which the wrvg file will be
                        accepted into the context for subsequent application.
-    dryrun
-                       Run the task (False) or display the command(True)
-    acceptresults
-                       Add the results to the pipeline context
 
     --------- examples -----------------------------------------------------------
 
     1. Compute the WVR calibration for all the MeasurementSets:
-    
+
     >>> hifa_wvrgcal(hm_tie='automatic')
 
     """

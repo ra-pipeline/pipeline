@@ -92,10 +92,10 @@ class AsyncTask(object):
                 response['id']: the command request id (same as self.__pid)
                 response['command_start_time']: command start time
                 response['command_stop_time']: command stop time
-            
+
             The rest keys include:
                 response['ret']: return from the server-side constructed PipelineTask/JobRequest executable
-                response['command']: the input command request string 
+                response['command']: the input command request string
         """
 
         LOG.debug(
@@ -154,7 +154,7 @@ class SyncTask(object):
             else:
                 if not callable(self.__task):
                     # for JobRequest or PipelineTask
-                    return self.__task.execute(dry_run=False)
+                    return self.__task.execute()
                 else:
                     # for FunctionCall
                     return self.__task()
@@ -206,8 +206,8 @@ class Tier0PipelineTask(Executable):
 
     def get_executable(self):
         """Create and return a Pipeline task executable, intended to run on the MPI server.
-        
-        The construction is based on the content of Tier0PipelineTask instance pushed from the client.        
+
+        The construction is based on the content of Tier0PipelineTask instance pushed from the client.
         """
         try:
             with open(self.__context_path, 'rb') as context_file:
@@ -228,7 +228,7 @@ class Tier0PipelineTask(Executable):
             inputs = self.__task_cls.Inputs(context, **task_args)
             task = self.__task_cls(inputs)
 
-            return lambda: task.execute(dry_run=False)
+            return lambda: task.execute()
 
         finally:
             if self.__task_args_path and os.path.exists(self.__task_args_path):
@@ -263,11 +263,11 @@ class Tier0JobRequest(Executable):
     def get_executable(self):
         """Create and return a JobRequest executable, intended to run on the MPI server.
 
-        The construction is based on the content of Tier0JobRequest instance pushed from the client.        
+        The construction is based on the content of Tier0JobRequest instance pushed from the client.
         """
         job_request = self.__creator_fn(**self.__job_args)
         if self.__executor is None:
-            return lambda: job_request.execute(dry_run=False)
+            return lambda: job_request.execute()
         else:
             # modify the executor copy used on the MPI server
             tmpfile = tempfile.NamedTemporaryFile(suffix='.casa_commands.log', dir='', delete=True)
@@ -426,18 +426,18 @@ class TaskQueue:
 
     TaskQueue provides an API similar to multiprocessing.Pool, but use the casampi FIFO queue underneath.
     Note that the AsynTask-based queue (tier0) will only happen when the instance is run from the
-    client node of an MPI cluster. Otherwise, the queue will just be executed in synchronous mode, essentially 
+    client node of an MPI cluster. Otherwise, the queue will just be executed in synchronous mode, essentially
     a loop over an iterator.
 
-    Example 1: 
+    Example 1:
 
         q = TaskQueue()
         q.add_functioncall(test, 9, 8) # test is a function taking two arguments.
         for i in range(4):
             q.add_jobrequest(casa_tasks.plotms, {'vis': 'eb3_targets.04287+1801.spw16_18_20_22_24_26_28_30.selfcal.ms',
-                            'xaxis': 'uvdist', 'yaxis': 'amp', 'coloraxis': 'spw', 'plotfile': 'test'+str(i)+'.png', 
+                            'xaxis': 'uvdist', 'yaxis': 'amp', 'coloraxis': 'spw', 'plotfile': 'test'+str(i)+'.png',
                             'overwrite': True})
-        results = q.get_results()      
+        results = q.get_results()
 
     Example 2:
 
@@ -505,7 +505,7 @@ class TaskQueue:
 
     def add_jobrequest(self, fn, job_args, executor=None):
         """Add a jobequest into the queue.
-        
+
         fn should be a jobrequest generator function, which returns a JobRequest object.
         e.g.
             fn = casa_tasks.imdev

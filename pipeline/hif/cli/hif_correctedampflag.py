@@ -8,15 +8,14 @@ def hif_correctedampflag(
         vis=None, intent=None, field=None, spw=None, antnegsig=None,
         antpossig=None, tmantint=None,
         tmint=None, tmbl=None, antblnegsig=None,
-        antblpossig=None, relaxed_factor=None, niter=None,
-        dryrun=None, acceptresults=None):
+        antblpossig=None, relaxed_factor=None, niter=None):
 
     """
     hif_correctedampflag ---- Flag corrected - model amplitudes based on calibrators.
 
-    
+
     Flag corrected - model amplitudes based on calibrators.
-    
+
     This task computes the flagging heuristics on a calibrator by calling hif_correctedampflag
     which looks for outlier visibility points by statistically examining the scalar
     difference of corrected amplitudes minus model amplitudes, and flags those outliers.
@@ -25,9 +24,9 @@ def hif_correctedampflag(
     and point sources because it is not performing a vector difference, and thus is not
     sensitive to nulls in the flux density vs. uvdistance domain. Note that the phase of
     the data is not assessed.
-    
+
     Output
-    
+
     results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
@@ -35,21 +34,21 @@ def hif_correctedampflag(
     vis            The list of input MeasurementSets. Defaults to the list of
                    MeasurementSets specified in the h_init or hif_importdata task.
                    '': use all MeasurementSets in the context
-                   
+
                    Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
     intent         A string containing a comma delimited list of intents against
                    which the selected fields are matched. If undefined (default),
                    it will select all data with the BANDPASS intent.
-                   
+
                    Example: intent='`*PHASE*`'
     field          The list of field names or field ids for which bandpasses are
                    computed. If undefined (default), it will select all fields.
-                   
+
                    Examples: field='3C279', '3C279, M82'
     spw            The list of spectral windows and channels for which bandpasses
                    are computed. If undefined (default), it will select all
                    science spectral windows.
-                   
+
                    Example: spw='11,13,15,17'
     antnegsig      Lower sigma threshold for identifying outliers as a result of bad antennas within individual timestamps
     antpossig      Upper sigma threshold for identifying outliers as a result of bad antennas within individual timestamps
@@ -62,15 +61,12 @@ def hif_correctedampflag(
     niter          Maximum number of times to iterate on evaluation of flagging
                    heuristics. If an iteration results in no new flags, then
                    subsequent iterations are skipped.
-    dryrun         Run the task (False) or just display the command (True)
-    acceptresults  Add the results of the task to the pipeline context (True) or
-                   reject them (False).
 
     --------- examples -----------------------------------------------------------
 
-    
+
     Run default flagging on bandpass calibrator with recommended settings:
-    
+
     >>> hif_correctedampflag()
 
 

@@ -265,6 +265,7 @@ def get_ant_str_for_caption_title(parameters):
 	<%def name="caption_text(plot, intent)"> 
 		Phase offset vs time for spectral window <strong>${plot.parameters['spw']}</strong>,
         all antennas and correlations.
+		${plot.captionmessage}
 	</%def>
 
 </%self:plot_group>

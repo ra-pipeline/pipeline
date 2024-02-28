@@ -4,18 +4,17 @@ import pipeline.h.cli.utils as utils
 
 
 @utils.cli_wrapper
-def hifv_syspower(vis=None, clip_sp_template=None, antexclude=None, apply=None, do_not_apply=None,
-                  dryrun=None, acceptresults=None):
+def hifv_syspower(vis=None, clip_sp_template=None, antexclude=None, apply=None, do_not_apply=None):
 
     """
     hifv_syspower ---- Determine amount of gain compression affecting VLA data below Ku-band
 
     Determine amount of gain compression affecting VLA data below Ku-band
-    
+
     Output:
-    
+
     results -- The results object for the pipeline task is returned.
-    
+
     --------- parameter descriptions ---------------------------------------------
 
     vis              List of input visibility data
@@ -28,16 +27,12 @@ def hifv_syspower(vis=None, clip_sp_template=None, antexclude=None, apply=None, 
                      If 'usemedian': True, the template values are replaced with the median of the good antennas.
     apply            Apply task results to RQ table
     do_not_apply     csv string of band names to not apply. Example: 'L,X,S'
-    dryrun           Run the commands (True) or generate the commands to be run but
-                     do not execute (False).  This is a pipeline task execution mode.
-    acceptresults    Add the results of the task to the pipeline context (True) or
-                     reject them (False).  This is a pipeline task execution mode.
 
     --------- examples -----------------------------------------------------------
-    
-    
+
+
     1. Basic syspower task
-    
+
     >>> hifv_syspower()
 
 

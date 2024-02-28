@@ -4,22 +4,21 @@ import pipeline.h.cli.utils as utils
 
 
 @utils.cli_wrapper
-def hifv_checkflag(vis=None, checkflagmode=None, growflags=None, overwrite_modelcol=None,
-                   dryrun=None, acceptresults=None):
+def hifv_checkflag(vis=None, checkflagmode=None, growflags=None, overwrite_modelcol=None):
 
     """
     hifv_checkflag ---- Run RFI flagging using flagdata in various modes
 
     Run RFI flagging using flagdata in various modes
-    
+
     Output:
-    
+
     results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
 
     vis                The list of input MeasurementSets. Defaults to the list of MeasurementSets
-                       specified in the h_init or hifv_importdata task.     
+                       specified in the h_init or hifv_importdata task.
     checkflagmode      -- Standard VLA modes with improved RFI flagging heuristics: 'bpd-vla', 'allcals-vla', 'target-vla'
                        -- blank string default use of rflag on bandpass and delay calibrators
                        -- use string 'semi' after hifv_semiFinalBPdcals() for executing rflag on calibrators
@@ -44,23 +43,19 @@ def hifv_checkflag(vis=None, checkflagmode=None, growflags=None, overwrite_model
                              per baseband/field/scan, replace all spw thresholds above the median with the median,
                              before re-running rflag with the new thresholds.  This has the effect of
                              lowering the thresholds for spws with RFI to be closer to the RFI-free
-                             thresholds, and catches more of the RFI.                      
+                             thresholds, and catches more of the RFI.
                        -- Mode 'vlass-imaging' is similar to 'target-vlass', except that it executes on the split off target
                              data, intent='*TARGET', datacolumn='data' and uses a timedevscale of 4.0.
     growflags          Grow flags in time at the end of the following checkflagmodes:
-                       default=True, for 'bpd-vla', 'allcals-vla', 'bpd', and 'allcals'  
+                       default=True, for 'bpd-vla', 'allcals-vla', 'bpd', and 'allcals'
                        default=False, for '' and 'semi'
     overwrite_modelcol Always write the model column, even if it already exists
-    dryrun             Run the commands (True) or generate the commands to be run but
-                       do not execute (False).  This is a pipeline task execution mode.
-    acceptresults      Add the results of the task to the pipeline context (True) or
-                       reject them (False).  This is a pipeline task execution mode.
 
     --------- examples -----------------------------------------------------------
-    
-    
+
+
     1. Run RFLAG with associated heuristics in the VLA CASA pipeline.
-    
+
     >>> hifv_checkflag()
 
 

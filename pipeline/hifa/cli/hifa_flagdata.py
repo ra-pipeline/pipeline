@@ -7,14 +7,14 @@ import pipeline.h.cli.utils as utils
 def hifa_flagdata(vis=None, autocorr=None, shadow=None, tolerance=None, scan=None, scannumber=None, intents=None,
                   edgespw=None, fracspw=None, fracspwfps=None, online=None, partialpol=None, lowtrans=None,
                   mintransrepspw=None, mintransnonrepspws=None, fileonline=None, template=None, filetemplate=None,
-                  hm_tbuff=None, tbuff=None, qa0=None, qa2=None, flagbackup=None, dryrun=None, acceptresults=None):
+                  hm_tbuff=None, tbuff=None, qa0=None, qa2=None, flagbackup=None):
     """
     hifa_flagdata ---- Do metadata based flagging of a list of MeasurementSets.
 
-    
+
     The hifa_flagdata data performs basic flagging operations on a list of
     measurements including:
-    
+
     - applying online flags
     - applying a flagging template
     - partial polarization flagging
@@ -23,15 +23,15 @@ def hifa_flagdata(vis=None, autocorr=None, shadow=None, tolerance=None, scan=Non
     - scan-based flagging by intent or scan number
     - edge channel flagging, as needed
     - low atmospheric transmission flagging
-    
+
     About the spectral window edge channel flagging:
-    
+
     - For TDM spectral windows, a number of edge channels are always flagged,
       according to the ``fracspw`` and ``fracspwfps`` parameters (the latter
       operates only on spectral windows with 62, 124, or 248 channels). With the
       default setting of ``fracspw``, the number of channels flagged on each edge
       is 2, 4, or 8 for 64, 128, or 256-channel spectral windows, respectively.
-    
+
     - For most FDM spectral windows, no edge flagging is done. The only exceptions
       are ACA spectral windows that encroach too close to the baseband edge.
       Channels that lie closer to the baseband edge than the following values are
@@ -42,7 +42,7 @@ def hifa_flagdata(vis=None, autocorr=None, shadow=None, tolerance=None, scan=Non
       both sides of the spectral window, and thus are always flagged on both sides
       in order to achieve 1875 MHz bandwidth (in effect, they are flagged by
       62.5 MHz on each side), and thus no warning is generated.
-    
+
     Output:
 
         results -- The results object for the pipeline task is returned.
@@ -66,12 +66,12 @@ def hifa_flagdata(vis=None, autocorr=None, shadow=None, tolerance=None, scan=Non
     scannumber
                        A string containing a comma delimited list of scans to be
                        flagged.
-                       
+
                        Example: scannumber='3,5,6'
     intents
                        A string containing a comma delimited list of intents against
                        which the scans to be flagged are matched.
-                       
+
                        Example: intents='`*BANDPASS*`'
     edgespw
                        Flag the edge spectral window channels.
@@ -126,22 +126,16 @@ def hifa_flagdata(vis=None, autocorr=None, shadow=None, tolerance=None, scan=Non
                        QA2 flags.
     flagbackup
                        Back up any pre-existing flags.
-    dryrun
-                       Run the commands (True) or generate the commands to be run but do not
-                       execute (False).
-    acceptresults
-                       Add the results of the task to the pipeline context (True) or
-                       reject them (False).
 
     --------- examples -----------------------------------------------------------
 
     1. Do basic flagging on a MeasurementSet:
-    
+
     >>> hifa_flagdata()
-    
+
     2. Do basic flagging on a MeasurementSet flagging additional scans selected
     by number as well:
-    
+
     >>> hifa_flagdata(scannumber='13,18')
 
     """

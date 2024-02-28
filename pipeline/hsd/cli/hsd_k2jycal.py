@@ -5,14 +5,14 @@ import pipeline.h.cli.utils as utils
 
 @utils.cli_wrapper
 def hsd_k2jycal(dbservice=None, endpoint=None, reffile=None,
-                infiles=None, caltable=None, dryrun=None, acceptresults=None):
+                infiles=None, caltable=None):
 
     """
     hsd_k2jycal ---- Derive Kelvin to Jy calibration tables
 
-    
+
     Derive the Kelvin to Jy calibration for list of MeasurementSets.
-    
+
     results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
@@ -28,16 +28,16 @@ def hsd_k2jycal(dbservice=None, endpoint=None, reffile=None,
                   be in an CSV format with five fields: MS name, antenna name, spectral
                   window id, polarization string, and Jy/K conversion factor. Example for
                   the file is as follows:
-                  
+
                       MS,Antenna,Spwid,Polarization,Factor
                       uid___A002_X316307_X6f.ms,CM03,5,XX,10.0
                       uid___A002_X316307_X6f.ms,CM03,5,YY,12.0
                       uid___A002_X316307_X6f.ms,PM04,5,XX,2.0
                       uid___A002_X316307_X6f.ms,PM04,5,YY,5.0
-                  
+
                   The first line in the above example is a header which may or may not
                   exist. Example for the session-based format is as follows:
-                  
+
                       #OUSID=XXXXXX
                       #OBJECT=Uranus
                       #FLUXJY=yy,zz,aa
@@ -54,7 +54,7 @@ def hsd_k2jycal(dbservice=None, endpoint=None, reffile=None,
                       2,2011-11-13 01:45:00,2011-11-13 02:15:00,PM04,86243.0,1000.0,I,110.0
                       2,2011-11-13 01:45:00,2011-11-13 02:15:00,ANONYMOUS,86243.0,500.0,I,90.0
                       2,2011-11-13 01:45:00,2011-11-13 02:15:00,ANONYMOUS,86243.0,1000.0,I,110.0
-                  
+
                   Lines starting with '#' are meta data and header.
                   The header must exist. The factor to apply is identified by matching the
                   session ID, antenna name, frequency and polarization of data in each line of
@@ -66,24 +66,20 @@ def hsd_k2jycal(dbservice=None, endpoint=None, reffile=None,
                   PM04 in session 1.
                   If no file name is specified or specified file doesn't exist, all Jy/K factors
                   are set to 1.0.
-                  
+
                   example: reffile='', reffile='working/jyperk.csv'
     infiles       List of input MeasurementSets.
-                  
+
                   example: vis='ngc5921.ms'
     caltable      Name of output gain calibration tables.
-                  
+
                   example: caltable='ngc5921.gcal'
-    dryrun        Run the commands (True) or generate the commands to be run but
-                  do not execute (False).
-    acceptresults Add the results of the task to the pipeline context (True) or
-                  reject them (False).
 
     --------- examples -----------------------------------------------------------
 
-    
+
     1. Compute the Kevin to Jy calibration tables for a list of MeasurementSets:
-    
+
     >>> hsd_k2jycal()
 
 

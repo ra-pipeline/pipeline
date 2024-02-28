@@ -19,9 +19,9 @@ def h_import_calstate(filename):
     --------- examples -----------------------------------------------------------
 
     1. Import a calibration state from disk.
-    
+
     >>> h_import_calstate(filename='aftergaincal.calstate')
 
     """
-    context = utils.get_context()  
+    context = utils.get_context()
     context.callibrary.import_state(filename)

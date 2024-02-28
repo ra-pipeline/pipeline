@@ -84,7 +84,7 @@ class ALMAApplycalListQAHandler(pqa.QAPlugin):
     """
     result_cls = collections.Iterable
     child_cls = h_applycal.ApplycalResults
-    generating_task = hif_applycal.IFApplycal
+    generating_task = hif_applycal.SerialIFApplycal
 
     def handle(self, context, result):
         super().handle(context, result)

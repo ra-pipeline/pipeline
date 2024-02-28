@@ -19,7 +19,7 @@ def h_show_calstate():
     >>> h_show_calstate()
 
     """
-    context = utils.get_context()  
+    context = utils.get_context()
     sys.stdout.write('Current on-the-fly calibration state:\n\n')
     sys.stdout.write(str(context.callibrary.active))
     sys.stdout.write('\n')

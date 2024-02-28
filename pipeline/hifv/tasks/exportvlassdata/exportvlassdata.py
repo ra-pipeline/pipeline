@@ -555,8 +555,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
                 outfile = file
             pprmatchesout.append(outfile)
             LOG.info('Copying pipeline processing file %s to %s' % (os.path.basename(file), os.path.basename(outfile)))
-            if not self._executor._dry_run:
-                shutil.copy(file, outfile)
+            shutil.copy(file, outfile)
 
         return pprmatchesout
 
@@ -633,10 +632,9 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         LOG.info('Saving final weblog in %s' % tarfilename)
 
         # Create the tar file
-        if not self._executor._dry_run:
-            tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
-            tar.add(os.path.join(os.path.basename(os.path.dirname(context.report_dir)), 'html'))
-            tar.close()
+        tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
+        tar.add(os.path.join(os.path.basename(os.path.dirname(context.report_dir)), 'html'))
+        tar.close()
 
         # Restore the original current working directory
         os.chdir(cwd)
@@ -660,27 +658,26 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
 
         # Create the tar file
 
-        if not self._executor._dry_run:
-            tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
+        tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
 
-            for mask in self.masks:
-                tar.add(mask, mask)
-                LOG.info('....Adding {!s}'.format(mask))
+        for mask in self.masks:
+            tar.add(mask, mask)
+            LOG.info('....Adding {!s}'.format(mask))
 
-            for initial_model in self.initial_models:
-                tar.add(initial_model, initial_model)
-                LOG.info('....Adding {!s}'.format(initial_model))
+        for initial_model in self.initial_models:
+            tar.add(initial_model, initial_model)
+            LOG.info('....Adding {!s}'.format(initial_model))
 
-            for final_model in self.final_models:
-                tar.add(final_model, final_model)
-                LOG.info('....Adding {!s}'.format(final_model))
+        for final_model in self.final_models:
+            tar.add(final_model, final_model)
+            LOG.info('....Adding {!s}'.format(final_model))
 
-            tar.add(self.selfcaltable, self.selfcaltable)
-            LOG.info('....Adding {!s}'.format(self.selfcaltable))
+        tar.add(self.selfcaltable, self.selfcaltable)
+        LOG.info('....Adding {!s}'.format(self.selfcaltable))
 
-            tar.add(self.flagversion, self.flagversion)
-            LOG.info('....Adding {!s}'.format(self.flagversion))
-            tar.close()
+        tar.add(self.flagversion, self.flagversion)
+        LOG.info('....Adding {!s}'.format(self.flagversion))
+        tar.close()
 
         # Restore the original current working directory
         os.chdir(cwd)
@@ -693,8 +690,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         out_parameterlist_file = os.path.join(products_dir, os.path.basename(parameterlist_name))
 
         LOG.info('Copying parameter list file %s to %s' % (parameterlist_name, out_parameterlist_file))
-        if not self._executor._dry_run:
-            shutil.copy(parameterlist_name, out_parameterlist_file)
+        shutil.copy(parameterlist_name, out_parameterlist_file)
 
         return os.path.basename(out_parameterlist_file)
 
@@ -708,8 +704,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         out_table_file = os.path.join(products_dir, table_file)
 
         LOG.info('Copying product from %s to %s' % (table_file, out_table_file))
-        if not self._executor._dry_run:
-            shutil.copytree(table_file, out_table_file)
+        shutil.copytree(table_file, out_table_file)
 
         return os.path.basename(out_table_file)
 
@@ -735,8 +730,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         #     out_casalog_file = os.path.join(products_dir, oussid + '.' + casalog_name)
 
         LOG.info('Copying casa commands log %s to %s' % (casalog_file, out_casalog_file))
-        if not self._executor._dry_run:
-            shutil.copy(casalog_file, out_casalog_file)
+        shutil.copy(casalog_file, out_casalog_file)
 
         return os.path.basename(out_casalog_file)
 
@@ -763,8 +757,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         #     out_casascript_file = os.path.join(products_dir, oussid + '.' + casascript_name)
 
         LOG.info('Copying casa script file %s to %s' % (casascript_file, out_casascript_file))
-        if not self._executor._dry_run:
-            shutil.copy(casascript_file, out_casascript_file)
+        shutil.copy(casascript_file, out_casascript_file)
 
         return os.path.basename(out_casascript_file)
 
@@ -775,8 +768,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
 
         out_manifest_file = os.path.join(products_dir, manifest_name)
         LOG.info('Creating manifest file %s' % out_manifest_file)
-        if not self._executor._dry_run:
-            pipemanifest.write(out_manifest_file)
+        pipemanifest.write(out_manifest_file)
 
         return out_manifest_file
 
@@ -872,8 +864,8 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         beam_target['positionangle'] = beam_target.pop('pa')
         myia.close()
 
-        # PIPE-1434: increase the target beam from ia.commonbeam() by a small margin to avoid potential 
-        # failures of ia.convolve2d() when the convolution kernel is too small on the minor axis near the 
+        # PIPE-1434: increase the target beam from ia.commonbeam() by a small margin to avoid potential
+        # failures of ia.convolve2d() when the convolution kernel is too small on the minor axis near the
         # numerical precision limit.
         beam_target['major']['value'] *= 1.00001
         beam_target['minor']['value'] *= 1.00001

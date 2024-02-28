@@ -6,7 +6,7 @@ import pipeline.h.cli.utils as utils
 @utils.cli_wrapper
 def hif_refant(vis=None, field=None, spw=None, intent=None, hm_refant=None,
                refant=None, geometry=None, flagging=None, parallel=None,
-               dryrun=None, acceptresults=None, refantignore=None):
+               refantignore=None):
 
     """
     hif_refant ---- Select the best reference antennas
@@ -54,9 +54,6 @@ def hif_refant(vis=None, field=None, spw=None, intent=None, hm_refant=None,
     parallel      Execute using CASA HPC functionality, if available.
                   options: 'automatic', 'true', 'false', True, False
                   default: None (equivalent to False)
-    dryrun        Run the task (False) or display the command (True)
-    acceptresults Add the results of the task to the pipeline context (True) or
-                  reject them (False).
     refantignore  string list to be ignored as reference antennas.
                   example:  refantignore='ea02,ea03'
 

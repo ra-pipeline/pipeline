@@ -7,8 +7,7 @@ import pipeline.h.cli.utils as utils
 def hsd_skycal(calmode=None, fraction=None, noff=None,
                  width=None, elongated=None, parallel=None,
                  infiles=None, field=None,
-                 spw=None, scan=None,
-                 dryrun=None, acceptresults=None):
+                 spw=None, scan=None):
 
     """
     hsd_skycal ---- Calibrate data
@@ -73,16 +72,12 @@ def hsd_skycal(calmode=None, fraction=None, noff=None,
 
                   example: '22,23' (use scan 22 and 23 for calibration)
                           ['22','24'] (scan 22 for first data, 24 for second)
-    dryrun        Run the commands (True) or generate the commands to be run but
-                  do not execute (False).
-    acceptresults Add the results of the task to the pipeline context (True) or
-                  reject them (False).
 
     --------- examples -----------------------------------------------------------
 
 
     1. Generate caltables for all data managed by context.
-    
+
     >>> default(hsd_skycal)
     >>> hsd_skycal()
 

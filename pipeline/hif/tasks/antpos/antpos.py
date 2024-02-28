@@ -100,7 +100,7 @@ class AntposInputs(vdp.StandardInputs):
             antenna = self.antenna
             offsets = self.offsets
         elif self.hm_antpos == 'file':
-            filename = os.path.join(self.output_dir, self.antposfile)           
+            filename = os.path.join(self.output_dir, self.antposfile)
             antenna, offsets = self._read_antpos_csvfile(
                 filename, os.path.basename(self.vis))
         else:
@@ -141,7 +141,7 @@ class AntposInputs(vdp.StandardInputs):
 
             # Loop over the rows
             for row in reader:
-                if len(row) == 6: 
+                if len(row) == 6:
                     (ms_name, ant_name, xoffset, yoffset, zoffset, _) = row
                 else:
                     msg = "Cannot read antenna position file: %s. Row %s is not correctly formatted." % (filename, reader.line_num)
@@ -159,7 +159,7 @@ class AntposInputs(vdp.StandardInputs):
 
 @task_registry.set_equivalent_casa_task('hif_antpos')
 class Antpos(basetask.StandardTaskTemplate):
-    Inputs = AntposInputs    
+    Inputs = AntposInputs
 
     def prepare(self):
         inputs = self.inputs
@@ -190,15 +190,13 @@ class Antpos(basetask.StandardTaskTemplate):
 
     def analyse(self, result):
         # With no best caltable to find, our task is simply to set the one
-        # caltable as the best result 
+        # caltable as the best result
 
         # double-check that the caltable was actually generated
-        on_disk = [ca for ca in result.pool
-                   if ca.exists() or self._executor._dry_run]
+        on_disk = [ca for ca in result.pool if ca.exists()]
         result.final[:] = on_disk
 
-        missing = [ca for ca in result.pool
-                   if ca not in on_disk and not self._executor._dry_run]        
+        missing = [ca for ca in result.pool if ca not in on_disk]
         result.error.clear()
         result.error.update(missing)
 

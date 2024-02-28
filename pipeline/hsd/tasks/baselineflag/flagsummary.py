@@ -58,13 +58,11 @@ class SDBLFlagSummary(object):
         self.flagRule = flagRule
         self.bunit = sdutils.get_brightness_unit(self.ms.name, defaultunit='Jy/beam')
 
-    def execute(self, dry_run:bool=True) -> Tuple[List[Dict],List]:
+    def execute(self) -> Tuple[List[Dict],List]:
         """
         Summarizes flagging results.
 
         Iterates over antenna and polarization for a certain spw ID
-        Args:
-           dry_run: True if dry_run
         Returns:
            flagSummary : flagsummary
            plot_list   : list of plot objects

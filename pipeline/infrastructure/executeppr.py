@@ -75,8 +75,16 @@ def executeppr(pprXmlFile: str, importonly: bool = True, breakpoint: str = 'brea
             _getFirstRequest(pprXmlFile)
 
         # Set the directories
-        workingDir = os.path.join(os.path.expandvars("$SCIPIPE_ROOTDIR"), relativePath, "working")
-        rawDir = os.path.join(os.path.expandvars("$SCIPIPE_ROOTDIR"), relativePath, "rawdata")
+        if 'SCIPIPE_ROOTDIR' in os.environ:
+            workingDir = os.path.join(os.path.expandvars('$SCIPIPE_ROOTDIR'), relativePath, 'working')
+            rawDir = os.path.join(os.path.expandvars('$SCIPIPE_ROOTDIR'), relativePath, 'rawdata')
+        else:
+            # PIPE-2093: if $SCIPIPE_ROOTDIR doesn't exist, we likely run in a local dev/test environment.
+            # Then we will override the typical production workingDir/rawDIR values that are traditionally
+            # constructed from $SCIPIPE_ROOTDIR and the PPR <RelativePath> field. Note that we assume that
+            # any executeppr call here happens inside the "working/" directory.
+            workingDir = os.path.abspath(os.path.join('..', 'working'))
+            rawDir = os.path.abspath(os.path.join('..', 'rawdata'))
 
         # Check for the breakpoint
         bpset = False
@@ -256,7 +264,7 @@ def executeppr(pprXmlFile: str, importonly: bool = True, breakpoint: str = 'brea
             remapped_args = argmapper.convert_args(pipeline_task_class, task_args, convert_nulls=False)
             inputs = vdp.InputsContainer(pipeline_task_class, context, **remapped_args)
             task = pipeline_task_class(inputs)
-            results = task.execute(dry_run=False)
+            results = task.execute()
             casa_tools.post_to_log('Results ' + str(results), echo_to_screen=echo_to_screen)
 
             try:

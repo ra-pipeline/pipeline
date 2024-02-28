@@ -58,13 +58,13 @@ CASA <3>: pipeline.infrastructure.utils.enable_memstats()
 We can also turn weblog and plotting off:
 
 ```python
-CASA <1>: h_init(loglevel="info",plotlevel="summary",output_dir="./",weblog=False,overwrite=True,dryrun=False,acceptresults=True)
+CASA <1>: h_init(loglevel="info",plotlevel="summary",output_dir="./",weblog=False,overwrite=True)
 ```
 
 Or we can turn debug mode on, weblog off:
 
 ```python
-CASA <1>: h_init(loglevel="debug",plotlevel="summary",output_dir="./",weblog=True,overwrite=True,dryrun=False,acceptresults=True)
+CASA <1>: h_init(loglevel="debug",plotlevel="summary",output_dir="./",weblog=True,overwrite=True)
 ```
 
 Full example of running Pipeline importdata task on CASA prompt:
@@ -99,7 +99,7 @@ CASA <3>: spws=m.get_spectral_windows()
 
 CASA <4>: inputs = pipeline.infrastructure.vdp.InputsContainer(pipeline.hifv.tasks.hanning.Hanning, context)
 CASA <5>: task = pipeline.hifv.tasks.hanning.Hanning(inputs)
-CASA <6>: result = task.execute(dry_run=False)
+CASA <6>: result = task.execute()
 CASA <7>: result.accept(context)
 CASA <8>: context.save()
 ```
@@ -155,7 +155,7 @@ inputs = pipeline.infrastructure.vdp.InputsContainer(taskclass, context)
 # Optionally override input parameter(s) for debugging, e.g.:
 # inputs.normalize_tsys = True
 task = taskclass(inputs)
-result = task.execute(dry_run=False)
+result = task.execute()
 result.accept(context)
 context.save()
 ```
@@ -270,7 +270,7 @@ The path of pickled context files is: `output_dir`/`context_name`/`saved_state`/
   taskclass = task_registry.get_pipeline_class_for_task(task_to_run)
   inputs = pipeline.infrastructure.vdp.InputsContainer(taskclass, context, **task_keywords)
   task = taskclass(inputs)
-  result = task.execute(dry_run=False)
+  result = task.execute()
   result.accept(context)
   context.save('test-context-stage25.pickle')
   ```

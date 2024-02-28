@@ -2,6 +2,7 @@ import collections
 import distutils.cmd
 import distutils.log
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -197,7 +198,7 @@ class VersionCommand(distutils.cmd.Command):
             f.write('\n')
 
 
-def _get_git_version():
+def _get_git_version() -> str:
     # Retrieve info about current branch.
     git_branch = None
     try:
@@ -208,14 +209,28 @@ def _get_git_version():
         # subprocess.CalledProcessError: if git command returns error; for example, current checkout
         #   may have a detached HEAD pointing at a specific tag (not pointing to a branch).
         pass
-    if git_branch is not None and (git_branch == 'main' or git_branch.startswith('release/')):
-        ver = subprocess.check_output([sys.executable, 'pipeline/infrastructure/version.py'],
-                                      stderr=subprocess.DEVNULL).decode().rstrip().split(' ')
+
+    # Try to get version information
+    ver_from_script = []
+    try:
         # Output of the version.py script is a string with two or three space-separated elements:
         # last branch tag (possibly empty), last release tag, and possibly a "dirty" suffix.
+        # For example:
+        # 2024.0.0.3 2024.0.0.3
+        # or
+        # '' 2024.0.0.3 dirty
+        ver_from_script = subprocess.check_output([sys.executable, 'pipeline/infrastructure/version.py'],
+                                             stderr=subprocess.DEVNULL).decode().rstrip().split(' ')
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        # FileNotFoundError: if git is not on PATH.
+        # subprocess.CalledProcessError: if git command returns error; for example, current checkout
+        #   may have a detached HEAD pointing at a specific tag (not pointing to a branch).
+        pass
+
+    if git_branch is not None and (git_branch == 'main' or git_branch.startswith('release/')):
         # Version string returned by this routine contains the latest release tag and optionally
         # a local version identifier ("dirty") as described in PEP440, separated by "+".
-        return '+'.join(ver[1:])
+        return '+'.join(ver_from_script[1:])
     else:
         # Retrieve info about current commit.
         try:
@@ -226,13 +241,28 @@ def _get_git_version():
             # FileNotFoundError: if git is not on PATH.
             # subprocess.CalledProcessError: if git command returns error.
             commit_hash = None
-        # Consolidate into single version string.
+
+        # Populate the hash, branch, and version from the script if any are unset:
         if commit_hash is None:
-            version = "unknown"
-        elif git_branch is None:
-            version = commit_hash
+            commit_hash = "unknown_hash"
         else:
-            version = "{}-{}".format(commit_hash, git_branch)
+            # Only ASCII numbers, letters, '.', '-', and '_' are allowed in the local version label
+            commit_hash = re.sub(r'[^\w_\-\.]+', '.', commit_hash)
+
+        if git_branch is None:
+            git_branch = "unknown_branch"
+        else:
+            # Only ASCII numbers, letters, '.', '-', and '_' are allowed in the local version label
+            git_branch = re.sub(r'[^\w_\-\.]+', '.', git_branch)
+
+        if len(ver_from_script) < 2:
+            # Invalid version number:
+            version_number = '0.0.dev0'
+        else:
+            version_number = ver_from_script[1]
+
+        # Consolidate into single version string.
+        version = "{}+{}-{}".format(version_number, commit_hash, git_branch)
 
         return version
 

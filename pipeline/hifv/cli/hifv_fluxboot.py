@@ -4,8 +4,7 @@ import pipeline.h.cli.utils as utils
 
 
 @utils.cli_wrapper
-def hifv_fluxboot(vis=None, caltable=None, fitorder=None, dryrun=None, acceptresults=None,
-                   refantignore=None):
+def hifv_fluxboot(vis=None, caltable=None, fitorder=None, refantignore=None):
 
     """
     hifv_fluxboot ---- Fluxboot
@@ -13,7 +12,7 @@ def hifv_fluxboot(vis=None, caltable=None, fitorder=None, dryrun=None, acceptres
     Determine flux density bootstrapping for gain calibrators relative to flux calibrator.
 
     Output:
-    
+
     results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
@@ -27,18 +26,14 @@ def hifv_fluxboot(vis=None, caltable=None, fitorder=None, dryrun=None, acceptres
                   An override value of 1,2,3 or 4 may be specified by the user.
                   Spectral index (1) and, if applicable, curvature (2) are reported in the weblog.
                   If no determination can be made by the heuristics, a fitorder of 1 will be used.
-    dryrun        Run the commands (True) or generate the commands to be run but
-                  do not execute (False).  This is a pipeline task execution mode.
-    acceptresults Add the results of the task to the pipeline context (True) or
-                  reject them (False).  This is a pipeline task execution mode.
     refantignore  String list of antennas to ignore
                   Example:  refantignore='ea02,ea03'
 
     --------- examples -----------------------------------------------------------
-    
-    
+
+
     1. VLA CASA pipeline flux density bootstrapping.
-    
+
     >>> hifv_fluxboot()
 
 

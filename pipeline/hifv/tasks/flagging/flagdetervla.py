@@ -31,7 +31,7 @@
 # task = pipeline.hifv.tasks.flagging.FlagDeterVLA( inputs )
 # jobs = task.analyse()
 #
-# status = task.execute(dry_run=False)
+# status = task.execute()
 #
 # In other words, create a context, create the inputs (which sets the public
 # variables to the correct values and creates the temporary flag command file),

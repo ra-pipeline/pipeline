@@ -320,6 +320,14 @@ except:
                     %endfor
                 </tr>
                 %endif
+                % if row.nmajordone_total is not None:
+                <tr>
+                    <th>total number of major cycles done</th>
+                    %for k in range(j, min(j+4, field_block_indices[i+1])):
+                        <td>${image_info[k].nmajordone_total}</td>
+                    %endfor
+                </tr>
+                % endif
                 <tr>
                     <th>clean residual peak / scaled MAD</th>
                     %for k in range(j, min(j+4, field_block_indices[i+1])):

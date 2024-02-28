@@ -121,7 +121,7 @@ class TimeGaincal(gtypegaincal.GTypeGaincal):
                 result.pool.append(cp_calapp)
 
             # Add all results to this list to be plotted in the phase vs. time diagnostic plots in the renderer (See: PIPE-1377)
-            result.phasecal_for_phase_plot.append(cp_calapp) 
+            result.phasecal_for_phase_plot.append(cp_calapp)
 
         # Compute the amplitude calibration.
         LOG.info('Computing the final amplitude gain table.')
@@ -181,10 +181,10 @@ class TimeGaincal(gtypegaincal.GTypeGaincal):
 
     def analyse(self, result):
         # Double-check that the caltables were actually generated.
-        on_disk = [table for table in result.pool if table.exists() or self._executor._dry_run]
+        on_disk = [table for table in result.pool if table.exists()]
         result.final[:] = on_disk
 
-        missing = [table for table in result.pool if table not in on_disk and not self._executor._dry_run]
+        missing = [table for table in result.pool if table not in on_disk]
         result.error.clear()
         result.error.update(missing)
 

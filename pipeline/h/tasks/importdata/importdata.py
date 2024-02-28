@@ -159,9 +159,8 @@ class ImportData(basetask.StandardTaskTemplate):
                 to_convert = [os.path.join(abs_output_dir, asdm) for asdm in to_convert]
                 to_import = [os.path.join(abs_output_dir, ms) for ms in to_import]
 
-                if not self._executor._dry_run:
-                    LOG.info('Extracting %s to %s', vis, abs_output_dir)
-                    tar.extractall(path=abs_output_dir)
+                LOG.info('Extracting %s to %s', vis, abs_output_dir)
+                tar.extractall(path=abs_output_dir)
 
         # Assume that if vis is not a tar, it's a directory ready to be
         # imported, or in the case of an ASDM, converted then imported.
@@ -191,9 +190,8 @@ class ImportData(basetask.StandardTaskTemplate):
                     LOG.warning('{} already in {}. Will import existing data.'.format(os.path.basename(src), abs_output_dir))
                     continue
 
-                if not self._executor._dry_run:
-                    LOG.info('Copying %s to %s', src, inputs.output_dir)
-                    shutil.copytree(src, dst)
+                LOG.info('Copying %s to %s', src, inputs.output_dir)
+                shutil.copytree(src, dst)
 
         # launch an import job for each ASDM we need to convert
         for asdm in to_convert:
@@ -217,8 +215,6 @@ class ImportData(basetask.StandardTaskTemplate):
 
         LOG.info('Creating pipeline objects for measurement set(s) {0}'
                  ''.format(', '.join(to_import)))
-        if self._executor._dry_run:
-            return ImportDataResults()
 
         ms_reader = tablereader.ObservingRunReader
 

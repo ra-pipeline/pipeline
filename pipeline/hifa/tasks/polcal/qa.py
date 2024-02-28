@@ -43,7 +43,7 @@ class PolcalQAHandler(pqa.QAPlugin):
         result.qa.pool.extend(scores)
 
 
-class PolcalflagListQAHandler(pqa.QAPlugin):
+class PolcalListQAHandler(pqa.QAPlugin):
     """
     QA handler for a list containing PolcalResults.
     """

@@ -14,7 +14,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import pipeline.extern.adopted as adopted
-from pipeline.infrastructure import casa_tools
+from pipeline.infrastructure import casa_tools, get_logger
+
+
+LOG = get_logger(__name__)
 
 
 class AtmType(object):
@@ -122,7 +125,7 @@ def calc_airmass(elevation: float = 45.0) -> float:
     Returns:
         The relative airmass to the one at zenith.
     """
-    return 1.0 / math.cos((90.0 - elevation) * math.pi / 180.)
+    return 1.0 / math.cos(math.radians(90.0 - elevation))
 
 
 def calc_transmission(airmass: float, dry_opacity: Union[float, np.ndarray],
@@ -293,7 +296,8 @@ def get_median_elevation(vis: str, antenna_id: int) -> float:
 
     Returns:
         The median of elevation of selected antenna (unit: degree).
-        Rerun 45.0 if DIRECTION is not in AZELGEO.
+        Returns 45.0 if DIRECTION is not in AZELGEO or the value is invalid
+        i.e. not within (0.0, 90.0].
 
     Raises:
         RuntimeError: An error when DIRECTION column has unsupported coodinate
@@ -310,11 +314,103 @@ def get_median_elevation(vis: str, antenna_id: int) -> float:
                     if not (colkeywords['QuantumUnits'] == 'rad').all():
                         raise RuntimeError('The unit must be radian. Got {}'.format(str(colkeywords['QuantumUnits'])))
                     elevation_list = tsel.getcol('DIRECTION')[1][0]
-                    elevation = np.median(elevation_list) * 180.0 / math.pi
+                    median_elevation = math.degrees(np.median(elevation_list))
+
+                    # check if the value is in reasonable range
+                    if 0.0 < median_elevation and median_elevation <= 90.0:
+                        elevation = median_elevation
+                    else:
+                        LOG.attention(
+                            f'Encountered invalid median elevation value, {median_elevation:.4g}deg. '
+                            f'Use {elevation:.2g}deg instead.'
+                        )
         finally:
             tsel.close()
 
     return elevation
+
+
+def get_representative_elevation(vis, antenna_id: int) -> float:
+    """Return representative elevation value computed from phasecenter.
+
+    Representative elevation value is defined as the median elevation
+    of the first science field during the observation.
+    If there are multiple observations (OBSERVATION rows) in the MS,
+    start/end times of the observation are determined by the min/max
+    of time ranges of all observations.
+
+    Args:
+        vis: Path to MeasurementSet.
+        antenna_id: The antenna ID to select.
+
+    Returns:
+        Elevation value in degree.
+    """
+    myqa = casa_tools.quanta
+    myme = casa_tools.measures
+
+    # correct necessary information using msmd tool
+    with casa_tools.MSMDReader(vis) as mymsmd:
+        mposition = mymsmd.antennaposition(antenna_id)
+        target_field = mymsmd.fieldsforintent('OBSERVE_TARGET*')[0]
+        time_range = mymsmd.timerangeforobs(0)
+        for i in range(1, mymsmd.nobservations()):
+            another_time_range = mymsmd.timerangeforobs(i)
+            if myqa.lt(another_time_range['begin']['m0'], time_range['begin']['m0']):
+                time_range['begin'] = another_time_range['begin']
+            if myqa.gt(another_time_range['end']['m0'], time_range['end']['m0']):
+                time_range['end'] = another_time_range['end']
+        start_time = myqa.convert(time_range['begin']['m0'], 's')['value']
+        end_time = myqa.convert(time_range['end']['m0'], 's')['value']
+        mdirection = mymsmd.phasecenter(target_field)
+
+    # convert phasecenter to AZEL and return elevation in degree
+    def _elevation_at(time_in_sec: float) -> float:
+        myme.done()
+        mepoch = myme.epoch('UTC', myqa.quantity(time_in_sec, 's'))
+        myme.doframe(mepoch)
+        myme.doframe(mposition)
+        azel = myme.measure(mdirection, 'AZELGEO')
+        myme.done()
+        elevation = myqa.convert(azel['m1'], 'deg')['value']
+        return elevation
+
+    # compute elevation value at 1 min (=60sec) interval
+    # and take median of computed list of elevations
+    elevation_list = [_elevation_at(t) for t in np.arange(start_time, end_time, 60)]
+    median_elevation = np.median(elevation_list)
+
+    return median_elevation
+
+
+def get_altitude(vis: str) -> float:
+    """Return observatory-dependent altitude in meter.
+
+    This method gets observatory name from MS, and return
+    appropriate altitude value depending on the observatory
+    name.
+
+    Args:
+        vis: Path to MeasurementSet.
+
+    Returns:
+        Altitude value in meter. It only supports ALMA, VLA, and NRO.
+        Otherwise, the method returns default value, 5000m.
+    """
+    with casa_tools.MSMDReader(vis) as mymsmd:
+        observatory = mymsmd.observatorynames()[0]
+
+    if observatory.find('ALMA') != -1 or observatory.find('ACA') != -1:
+        altitude = 5059
+    elif observatory.find('VLA') != -1:
+        altitude = 2124
+    elif observatory.find('NRO') != -1 or observatory.find('Nobeyama') != -1:
+        altitude = 1300
+    else:
+        # default value is 5000m
+        altitude = 5000
+
+    return altitude
 
 
 def get_transmission(vis: str, antenna_id: int = 0, spw_id: int = 0,
@@ -342,16 +438,24 @@ def get_transmission(vis: str, antenna_id: int = 0, spw_id: int = 0,
         frequency.
     """
     center_freq, nchan, resolution = get_spw_spec(vis, spw_id)
-    elevation = get_median_elevation(vis, antenna_id)
+    # first try computing elevation value from phasecenter
+    # if it fails, inspect POINTING table
+    try:
+        elevation = get_representative_elevation(vis, antenna_id)
+    except Exception:
+        elevation = get_median_elevation(vis, antenna_id)
 
     # set pwv to 1.0
     #pwv = 1.0
     # get median PWV using Todd's script
     (pwv, pwvmad) = adopted.getMedianPWV(vis=vis)
 
+    altitude = get_altitude(vis)
+
     myat = casa_tools.atmosphere
     myqa = casa_tools.quanta
-    init_at(myat, fcenter=center_freq, nchan=nchan, resolution=resolution)
+    init_at(myat, fcenter=center_freq, nchan=nchan, resolution=resolution,
+            altitude=altitude)
     myat.setUserWH2O(myqa.quantity(pwv, 'mm'))
 
     airmass = calc_airmass(elevation)

@@ -2,7 +2,7 @@
 Pipeline Regression framework.
 
 PipelineRegression class runs on pytest framework, so it needs to implement
-test_* methods for testing. 
+test_* methods for testing.
 """
 
 import shutil
@@ -12,10 +12,10 @@ import os
 import platform
 import pytest
 import re
-from packaging import version 
+from packaging import version
 from typing import Tuple, Optional, List
 
-import casatasks.private.tec_maps as tec_maps 
+import casatasks.private.tec_maps as tec_maps
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.casa_tools as casa_tools
@@ -33,7 +33,7 @@ class PipelineRegression(object):
 
     def __init__(self, recipe: Optional[str] = None, input_dir: Optional[str] = None, visname: Optional[List[str]] = None,
                  expectedoutput_file: Optional[str] = None, output_dir: Optional[str] = None, project_id: Optional[str] = None,
-                 expectedoutput_dir: Optional[str] = None) :
+                 expectedoutput_dir: Optional[str] = None):
         """Constructor of PilelineRegression.
         
         Args:
@@ -41,7 +41,7 @@ class PipelineRegression(object):
             input_dir: path to directory contains input files
             visname: list of names of MeadurementSets
             expectedoutput_file: path to a file that defines expected output of a test. Will override expectedoutput_dir if that is 
-                                 also specified. 
+                                 also specified.
             expectedoutput_dir: path to a directory which contains 1 or more expected output files. Not used if expectedoutput_file
                                 is specified.
             output_dir: path to directory to output. If None, it sets visname
@@ -53,8 +53,8 @@ class PipelineRegression(object):
         if expectedoutput_file: 
             self.expectedoutput_file = casa_tools.utils.resolve(expectedoutput_file)
         else:
-            # Find the newest reference file in expectedoutput_dir and use that. 
-            if expectedoutput_dir: 
+            # Find the newest reference file in expectedoutput_dir and use that.
+            if expectedoutput_dir:
                 reference_data_files = glob.glob(casa_tools.utils.resolve(expectedoutput_dir)+'/*.results.txt')
                 if reference_data_files:
                     # Pick the reference result file with the highest PL version number
@@ -81,9 +81,9 @@ class PipelineRegression(object):
         if output_dir:
             self.output_dir = output_dir
         elif self.project_id: 
-            self.output_dir = f'{self.project_id}__{self.visname[0]}_test_output' 
+            self.output_dir = f'{self.project_id}__{self.visname[0]}_test_output'
         else: 
-            self.output_dir = f'{self.visname[0]}_test_output' 
+            self.output_dir = f'{self.visname[0]}_test_output'
 
         if hasattr(pytest, 'pytestconfig'):
             self.remove_workdir = pytest.pytestconfig.getoption('--remove-workdir')
@@ -92,7 +92,7 @@ class PipelineRegression(object):
             self.remove_workdir = False
             self.compare_only = False
         
-        if not(self.compare_only):
+        if not self.compare_only:
             self.__initialize_working_folder()
 
 
@@ -167,7 +167,7 @@ class PipelineRegression(object):
         # set datapath in ~/.casa/config.py, e.g. datapath = ['/users/jmasters/pl-testdata.git']
         input_vis = [casa_tools.utils.resolve(testinput) for testinput in self.testinput]
 
-        if not(self.compare_only):
+        if not self.compare_only:
             # optionally set OpenMP nthreads to a specified value.
             if omp_num_threads is not None:
                 # casa_tools.casalog.ompGetNumThreads() and get_casa_session_details()['omp_num_threads'] are equivalent.
@@ -223,20 +223,19 @@ class PipelineRegression(object):
             self.__compare_results(new_file, default_relative_tolerance)
 
         finally:
-            if not(self.compare_only):
+            if not self.compare_only:
                 # restore the default logfile state
                 self.__reset_logfiles(casa_logfile=last_casa_logfile)
 
             os.chdir(self.current_path)
             
             # clean up if requested
-            if not(self.compare_only) and self.remove_workdir and os.path.isdir(self.output_dir):
+            if not self.compare_only and self.remove_workdir and os.path.isdir(self.output_dir):
                 shutil.rmtree(self.output_dir)
         
         # restore the OpenMP nthreads to the value saved before the Pipeline ppr/reducer call.
-        if not(self.compare_only) and omp_num_threads is not None:
+        if not self.compare_only and omp_num_threads is not None:
             casa_tools.casalog.ompSetNumThreads(default_nthreads)
-
 
     def __compare_results(self, new_file: str, relative_tolerance: float): 
         """
@@ -290,7 +289,6 @@ class PipelineRegression(object):
                 pytest.fail("Failed to match {0} result value{1} within tolerance{1} :\n{2}".format(
                     n_errors, '' if n_errors == 1 else 's', '\n'.join(errors)), pytrace=True)
 
-
     def __save_new_results_to(self, new_file: str, new_results: List[str]):
         """
         Compare results between new one and old one, both results are loaded from specified files.
@@ -302,7 +300,6 @@ class PipelineRegression(object):
         with open(new_file, 'w') as fd:
             fd.writelines([str(x) + '\n' for x in new_results])
 
-
     def __get_results_of_from_current_context(self) -> List[str]:
         """
         Get results of current execution from context.
@@ -312,7 +309,6 @@ class PipelineRegression(object):
         context = pipeline.Pipeline(context='last').context
         new_results = sorted(regression.extract_regression_results(context))
         return new_results
-
 
     def __run_ppr(self, input_vis: List[str], ppr: str, telescope: str):
         """
@@ -334,9 +330,6 @@ class PipelineRegression(object):
         ppr_path = casa_tools.utils.resolve(ppr)
         ppr_local = f'../{os.path.basename(ppr_path)}'
         shutil.copyfile(ppr_path, ppr_local)
-
-        # executeppr expects this environment avariable pointing to "working/".
-        os.environ['SCIPIPE_ROOTDIR'] = os.getcwd()
 
         if telescope == 'alma':
             almappr.executeppr(ppr_local, importonly=False)
@@ -607,255 +600,296 @@ def test_vlass_quicklook():
     shutil.copyfile(parameter_list_file, casa_tools.utils.resolve(f'{pr.output_dir}/working/QLIP_parameter.list'))
     pr.run(telescope='vla')
 
+# Section for longer-running tests
 
-# Section of longer-running tests
+@pytest.fixture(autouse=True)
+def data_directory(scope="module") -> str:
+    if hasattr(pytest, 'pytestconfig'):
+        big_data_dir = pytest.pytestconfig.getoption('--data-directory')
+    else:
+        big_data_dir = "/lustre/cv/projects/pipeline-test-data/regression-test-data/"
+
+    if not os.path.exists(big_data_dir):
+        print("Warning! The large dataset directory {} does not exist, so any long-running tests will fail.".format(big_data_dir))
+    else:
+        print("Using: {} for data directory".format(big_data_dir))
+    return big_data_dir
+
+
+def setup_flux_antennapos(test_directory, output_dir):
+    # Copy flux.csv and antennapos.csv into the working directory
+    flux_file = casa_tools.utils.resolve(f'{test_directory}/flux.csv')
+    anteannapos_file = casa_tools.utils.resolve(f'{test_directory}/antennapos.csv')
+
+    try:
+        os.mkdir(f'{output_dir}/working/')
+    except FileExistsError:
+        pass
+
+    shutil.copyfile(flux_file, casa_tools.utils.resolve(f'{output_dir}/working/flux.csv'))
+    shutil.copyfile(anteannapos_file, casa_tools.utils.resolve(f'{output_dir}/working/antennapos.csv'))
+
+
 @pytest.mark.slow
 class TestSlowerRegression:
-    regression_directory =  '/lustre/cv/projects/pipeline-test-data/regression-test-data'
 
     # ALMA-section
     @pytest.mark.alma
     @pytest.mark.twelve
-    def test_2019_1_01094_S__uid___A002_Xecbc07_X6b0e_PPR__regression(self):
-        """Run longer regression test on this ALMA if dataset 
+    def test_2019_1_01094_S__uid___A002_Xecbc07_X6b0e_PPR__regression(self, data_directory):
+        """Run longer regression test on this ALMA if dataset
         
         Dataset: 2019.1.01094.S: uid___A002_Xecbc07_X6b0e, uid___A002_Xecf7c7_X1d83
         """
-        test_directory = f'{self.regression_directory}/alma_if/2019.1.01094.S/'
-        ref_directory =  'pl-regressiontest/2019.1.01094.S/'
+        test_directory = f'{data_directory}/alma_if/2019.1.01094.S/'
+        ref_directory = 'pl-regressiontest/2019.1.01094.S/'
 
-        pr = PipelineRegression(input_dir = test_directory,
-                                visname=['uid___A002_Xecbc07_X6b0e', 'uid___A002_Xecf7c7_X1d83'], 
+        pr = PipelineRegression(input_dir=test_directory,
+                                visname=['uid___A002_Xecbc07_X6b0e', 'uid___A002_Xecf7c7_X1d83'],
                                 project_id="2019_1_01094_S",
                                 expectedoutput_dir=ref_directory)
-        pr.run(ppr=(test_directory + 'PPR.xml'))
 
+        setup_flux_antennapos(test_directory, pr.output_dir)
+
+        pr.run(ppr=(test_directory + 'PPR.xml'))
 
     @pytest.mark.alma
     @pytest.mark.twelve
-    def test_E2E9_1_00061_S__uid___A002_Xfd764e_X5843_regression(self):
-        """Run longer regression test on this ALMA if dataset 
+    def test_E2E9_1_00061_S__uid___A002_Xfd764e_X5843_regression(self, data_directory):
+        """Run longer regression test on this ALMA if dataset
         
         Dataset: E2E9.1.00061.S: uid___A002_Xfd764e_X5843, uid___A002_Xfd764e_X60e2
         """
-        test_directory = f'{self.regression_directory}/alma_if/E2E9.1.00061.S/'
-        ref_directory =  'pl-regressiontest/E2E9.1.00061.S/'
+        test_directory = f'{data_directory}/alma_if/E2E9.1.00061.S/'
+        ref_directory = 'pl-regressiontest/E2E9.1.00061.S/'
 
-        pr = PipelineRegression(input_dir = test_directory,
-                                visname=['uid___A002_Xfd764e_X5843', 'uid___A002_Xfd764e_X60e2'], 
+        pr = PipelineRegression(input_dir=test_directory,
+                                visname=['uid___A002_Xfd764e_X5843', 'uid___A002_Xfd764e_X60e2'],
                                 project_id="E2E9_1_00061_S",
                                 expectedoutput_dir=ref_directory)
 
-        pr.run(ppr=(test_directory + 'PPR.xml'))
+        setup_flux_antennapos(test_directory, pr.output_dir)
 
+        pr.run(ppr=(test_directory + 'PPR.xml'))
 
     @pytest.mark.alma
     @pytest.mark.twelve
-    def test_2018_1_01255_S__uid___A002_Xe0e4ca_Xb18_regression(self):
+    def test_2018_1_01255_S__uid___A002_Xe0e4ca_Xb18_regression(self, data_directory):
         """Run longer regression test on this ALMA if dataset 
         
         Dataset: 2018.1.01255.S: uid___A002_Xe0e4ca_Xb18, uid___A002_Xeb9695_X2fe5
         """
-        test_directory = f'{self.regression_directory}/alma_if/2018.1.01255.S/'
-        ref_directory =  'pl-regressiontest/2018.1.01255.S/'
+        test_directory = f'{data_directory}/alma_if/2018.1.01255.S/'
+        ref_directory = 'pl-regressiontest/2018.1.01255.S/'
         
         pr = PipelineRegression(input_dir = test_directory,
                                 visname=['uid___A002_Xe0e4ca_Xb18', 'uid___A002_Xeb9695_X2fe5'],
                                 project_id="2018_1_01255_S",
-                                expectedoutput_dir=ref_directory) 
+                                expectedoutput_dir=ref_directory)
+        
+        setup_flux_antennapos(test_directory, pr.output_dir)
         
         pr.run(ppr=(test_directory + 'PPR.xml'))
 
-
     @pytest.mark.alma
     @pytest.mark.twelve
-    def test_2017_1_00912_S__uid___A002_Xc74b5b_X316a_regression(self):
-        """Run longer regression test on this ALMA if dataset 
+    def test_2017_1_00912_S__uid___A002_Xc74b5b_X316a_regression(self, data_directory):
+        """Run longer regression test on this ALMA if dataset
         
         Dataset: 2017.1.00912.S: uid___A002_Xe6a684_X7c41
         """
-        test_directory = f'{self.regression_directory}/alma_if/2017.1.00912.S/'
-        ref_directory =  'pl-regressiontest/2017.1.00912.S/'
+        test_directory = f'{data_directory}/alma_if/2017.1.00912.S/'
+        ref_directory = 'pl-regressiontest/2017.1.00912.S/'
 
-        pr = PipelineRegression(input_dir = test_directory,
-                                visname=['uid___A002_Xc74b5b_X316a'], 
+        pr = PipelineRegression(input_dir=test_directory,
+                                visname=['uid___A002_Xc74b5b_X316a'],
                                 project_id="2017_1_00912_S",
-                                expectedoutput_dir=ref_directory) 
-        
-        pr.run(ppr=(test_directory + 'PPR.xml'))
+                                expectedoutput_dir=ref_directory)
 
+        setup_flux_antennapos(test_directory, pr.output_dir)
+
+        pr.run(ppr=(test_directory + 'PPR.xml'))
 
     @pytest.mark.alma
     @pytest.mark.twelve
-    def test_2019_1_01184_S__uid___A002_Xe1d2cb_X12782_regression(self):
+    def test_2019_1_01184_S__uid___A002_Xe1d2cb_X12782_regression(self, data_directory):
         """Run longer regression test on this ALMA if dataset 
         
         Dataset: 2019_1_01184_S: uid___A002_Xe1d2cb_X12782, uid___A002_Xe850fb_X4efc
         """
-        test_directory = f'{self.regression_directory}/alma_if/2019.1.01184.S/'
-        ref_directory =  'pl-regressiontest/2019.1.01184.S/'
+        test_directory = f'{data_directory}/alma_if/2019.1.01184.S/'
+        ref_directory = 'pl-regressiontest/2019.1.01184.S/'
 
-        pr = PipelineRegression(input_dir = test_directory,
-                                visname=['uid___A002_Xe1d2cb_X12782', 'uid___A002_Xe850fb_X4efc'], 
+        pr = PipelineRegression(input_dir=test_directory,
+                                visname=['uid___A002_Xe1d2cb_X12782', 'uid___A002_Xe850fb_X4efc'],
                                 project_id="2019_1_01184_S",
                                 expectedoutput_dir=ref_directory)
-        pr.run(ppr=(test_directory + 'PPR.xml'))
+        
+        setup_flux_antennapos(test_directory, pr.output_dir)
 
+        pr.run(ppr=(test_directory + 'PPR.xml'))
 
     @pytest.mark.alma
     @pytest.mark.twelve
-    def test_2019_1_00678_S__uid___A002_Xe6a684_X7c41__PPR__regression(self):
+    def test_2019_1_00678_S__uid___A002_Xe6a684_X7c41__PPR__regression(self, data_directory):
         """Run longer regression test on this ALMA if dataset 
         
         Dataset: 2019.1.00678.S: uid___A002_Xe6a684_X7c41
         """
-        test_directory = f'{self.regression_directory}/alma_if/2019.1.00678.S/'
+        test_directory = f'{data_directory}/alma_if/2019.1.00678.S/'
         ref_directory =  'pl-regressiontest/2019.1.00678.S/'
 
-        pr = PipelineRegression(input_dir = test_directory,
-                                project_id = "2019_1_00678_S",
+        pr = PipelineRegression(input_dir=test_directory,
+                                project_id="2019_1_00678_S",
                                 visname=['uid___A002_Xe6a684_X7c41'],
                                 expectedoutput_dir=ref_directory)
-        pr.run(ppr=(test_directory + 'PPR.xml'))
 
+        setup_flux_antennapos(test_directory, pr.output_dir)
+
+        pr.run(ppr=(test_directory + 'PPR.xml'))
 
     @pytest.mark.alma
     @pytest.mark.twelve
-    def test_2017_1_00670_S__uid___A002_Xca8fbf_X5733__PPR__regression(self):
+    def test_2017_1_00670_S__uid___A002_Xca8fbf_X5733__PPR__regression(self, data_directory):
         """Run longer regression test on this ALMA if dataset 
         
         Dataset: 2017.1.00670.S: uid___A002_Xca8fbf_X5733
         """
-        test_directory = f'{self.regression_directory}/alma_if/2017.1.00670.S/'
+        test_directory = f'{data_directory}/alma_if/2017.1.00670.S/'
         ref_directory =  'pl-regressiontest/2017.1.00670.S/'
 
         pr = PipelineRegression(input_dir = test_directory,
                                 project_id='2017_1_00670_S',
                                 visname=['uid___A002_Xca8fbf_X5733'],
                                 expectedoutput_dir=ref_directory)
+
+        setup_flux_antennapos(test_directory, pr.output_dir)
         
         pr.run(ppr=(test_directory + 'PPR.xml'))
 
-
     @pytest.mark.alma
     @pytest.mark.seven
-    def test_2019_1_00847_S__uid___A002_Xe1f219_X1457_regression(self):
-        """Run longer regression test on this ALMA if dataset 
+    def test_2019_1_00847_S__uid___A002_Xe1f219_X1457_regression(self, data_directory):
+        """Run longer regression test on this ALMA if dataset
         ALMA 7m
 
         Dataset: 2019.1.00847.S: uid___A002_Xe1f219_X1457, uid___A002_Xe1f219_X9dbf, uid___A002_Xe27761_X74f8
         """
-        test_directory = f'{self.regression_directory}/alma_if/2019.1.00847.S/'
-        ref_directory =  'pl-regressiontest/2019.1.00847.S/'
+        test_directory = f'{data_directory}/alma_if/2019.1.00847.S/'
+        ref_directory = 'pl-regressiontest/2019.1.00847.S/'
 
-        pr = PipelineRegression(input_dir = test_directory,
-                                project_id= "2019_1_00847_S",
+        pr = PipelineRegression(input_dir=test_directory,
+                                project_id="2019_1_00847_S",
                                 visname=['uid___A002_Xe1f219_X1457', 'uid___A002_Xe1f219_X9dbf', 'uid___A002_Xe27761_X74f8'],
                                 expectedoutput_dir=ref_directory)
-        pr.run(ppr=(test_directory + 'PPR.xml'))
+        
+        setup_flux_antennapos(test_directory, pr.output_dir)
 
+        pr.run(ppr=(test_directory + 'PPR.xml'))
 
     @pytest.mark.alma
     @pytest.mark.seven
-    def test_2019_1_00994_S__uid___A002_Xe44309_X7d94__PPR__regression(self):
+    def test_2019_1_00994_S__uid___A002_Xe44309_X7d94__PPR__regression(self, data_directory):
         """Run longer regression test on this ALMA IF dataset
         
-        ALMA 7m 
+        ALMA 7m
 
         Dataset: 2019.1.00994.S: uid___A002_Xe44309_X7d94, uid___A002_Xe45e29_X59ee, uid___A002_Xe45e29_X6666, uid___A002_Xe48598_X8697
         """
-        test_directory = f'{self.regression_directory}/alma_if/2019.1.00994.S/'
-        ref_directory =  'pl-regressiontest/2019.1.00994.S/'
+        test_directory = f'{data_directory}/alma_if/2019.1.00994.S/'
+        ref_directory = 'pl-regressiontest/2019.1.00994.S/'
 
-        pr = PipelineRegression(input_dir = test_directory,
+        pr = PipelineRegression(input_dir=test_directory,
                                 project_id="2019_1_00994_S",
                                 visname=['uid___A002_Xe44309_X7d94', 'uid___A002_Xe45e29_X59ee', 'uid___A002_Xe45e29_X6666', 'uid___A002_Xe48598_X8697'],
                                 expectedoutput_dir=ref_directory)
-        pr.run(ppr=(test_directory + 'PPR.xml'))
+        
+        setup_flux_antennapos(test_directory, pr.output_dir)
 
+        pr.run(ppr=(test_directory + 'PPR.xml'))
 
     @pytest.mark.alma
     @pytest.mark.seven
-    def test_2019_1_01056_S__uid___A002_Xe1f219_X6d0b__PPR__regression(self):
+    def test_2019_1_01056_S__uid___A002_Xe1f219_X6d0b__PPR__regression(self, data_directory):
         """Run longer regression test on this ALMA IF dataset
         
         ALMA 7m 
 
         Dataset: 2019.1.01056.S: uid___A002_Xe1f219_X6d0bm, uid___A002_Xe1f219_X7ee8
         """
-        test_directory = f'{self.regression_directory}/alma_if/2019.1.01056.S/'
-        ref_directory =  'pl-regressiontest/2019.1.01056.S/'
+        test_directory = f'{data_directory}/alma_if/2019.1.01056.S/'
+        ref_directory = 'pl-regressiontest/2019.1.01056.S/'
 
-        pr = PipelineRegression(input_dir = test_directory,
-                                visname=['uid___A002_Xe1f219_X6d0b', 'uid___A002_Xe1f219_X7ee8'], 
+        pr = PipelineRegression(input_dir=test_directory,
+                                visname=['uid___A002_Xe1f219_X6d0b', 'uid___A002_Xe1f219_X7ee8'],
                                 project_id="2019_1_01056_S",
-                                expectedoutput_file=(f'{ref_directory}' + 
+                                expectedoutput_file=(f'{ref_directory}' +
                                                 'uid___A002_Xe1f219_X6d0b.casa-6.5.4-2-pipeline-2023.0.0.17.results.txt'))
         
+        setup_flux_antennapos(test_directory, pr.output_dir)
+        
         pr.run(ppr=(test_directory + 'PPR.xml'))
-
 
     # SD Section
     @pytest.mark.alma
     @pytest.mark.sd
-    def test_2019_2_00093_S__uid___A002_Xe850fb_X2df8_regression(self):
+    def test_2019_2_00093_S__uid___A002_Xe850fb_X2df8_regression(self, data_directory):
         """Run longer regression test on this ALMA SD dataset
         
         Recipe name: procedure_hsd_calimage
         Dataset: 2019.2.00093.S: uid___A002_Xe850fb_X2df8, uid___A002_Xe850fb_X36e4, uid___A002_Xe850fb_X11e13
         """
-        test_directory = f'{self.regression_directory}/alma_sd/2019.2.00093.S/'
-        ref_directory =  'pl-regressiontest/2019.2.00093.S/'
+        test_directory = f'{data_directory}/alma_sd/2019.2.00093.S/'
+        ref_directory = 'pl-regressiontest/2019.2.00093.S/'
 
         pr = PipelineRegression(recipe='procedure_hsd_calimage.xml',
-                                input_dir = test_directory,
+                                input_dir=test_directory,
                                 visname=['uid___A002_Xe850fb_X2df8', 'uid___A002_Xe850fb_X36e4', 'uid___A002_Xe850fb_X11e13'], 
                                 project_id="2019_2_00093_S",
                                 expectedoutput_dir=ref_directory)
         pr.run()
 
-
     @pytest.mark.alma
     @pytest.mark.sd
-    def test_2019_1_01056_S__uid___A002_Xe1d2cb_X110f1_regression(self):
+    def test_2019_1_01056_S__uid___A002_Xe1d2cb_X110f1_regression(self, data_directory):
         """Run weekly regression test on this ALMA SD dataset
         
         Recipe name: procedure_hsd_calimage
         Dataset: 2019.1.01056.S: uid___A002_Xe1d2cb_X110f1, uid___A002_Xe1d2cb_X11d0a, uid___A002_Xe1f219_X6eeb
         """
-        test_directory = f'{self.regression_directory}/alma_sd/2019.1.01056.S/'
-        ref_directory =  'pl-regressiontest/2019.1.01056.S/'
+        test_directory = f'{data_directory}/alma_sd/2019.1.01056.S/'
+        ref_directory = 'pl-regressiontest/2019.1.01056.S/'
 
         pr = PipelineRegression(recipe='procedure_hsd_calimage.xml',
-                                input_dir = test_directory,
+                                input_dir=test_directory,
                                 visname=['uid___A002_Xe1d2cb_X110f1', 'uid___A002_Xe1d2cb_X11d0a', 'uid___A002_Xe1f219_X6eeb'], 
                                 project_id="2019_1_01056_S",
                                 expectedoutput_file=f'{ref_directory}uid___A002_Xe1d2cb_X110f1.casa-6.5.4-2-pipeline-2023.0.0.17.results.txt')
-        pr.run()
 
+        setup_flux_antennapos(test_directory, pr.output_dir)
+        pr.run()
 
     @pytest.mark.alma
     @pytest.mark.sd
-    def test_2016_1_01489_T__uid___A002_Xbadc30_X43ee_regression(self):
+    def test_2016_1_01489_T__uid___A002_Xbadc30_X43ee_regression(self, data_directory):
         """Run weekly regression test on this ALMA SD dataset
         
         Recipe name: procedure_hsd_calimage
         Dataset: 2016.1.01489.T: uid___A002_Xbadc30_X43ee, uid___A002_Xbaedce_X7694
         """
-        test_directory = f'{self.regression_directory}/alma_sd/2016.1.01489.T/'
-        ref_directory =  'pl-regressiontest/2016.1.01489.T/'
+        test_directory = f'{data_directory}/alma_sd/2016.1.01489.T/'
+        ref_directory = 'pl-regressiontest/2016.1.01489.T/'
 
         pr = PipelineRegression(recipe='procedure_hsd_calimage.xml',
-                                input_dir = test_directory,
+                                input_dir=test_directory,
                                 visname=['uid___A002_Xbadc30_X43ee', 'uid___A002_Xbaedce_X7694'], 
                                 project_id="2016_1_01489_T",
                                 expectedoutput_dir=ref_directory)
         pr.run()
 
-
     # VLA Section
     @pytest.mark.vla
-    def test_13A_537__procedure_hifv_calimage__regression(self):
+    def test_13A_537__procedure_hifv_calimage__regression(self, data_directory):
         """Run VLA calibration regression for standard procedure_hifv_calimage_cont recipe.
 
         Recipe name:                procedure_hifv_calimage_cont
@@ -864,7 +898,7 @@ class TestSlowerRegression:
 
         dataset_name = '13A-537.sb24066356.eb24324502.56514.05971091435'
         input_dir = 'pl-regressiontest/13A-537/'
-        ref_directory =  'pl-regressiontest/13A-537/'
+        ref_directory = 'pl-regressiontest/13A-537/'
 
         pr = PipelineRegression(recipe='procedure_hifv_calimage_cont.xml',
                                 input_dir=input_dir,
@@ -873,9 +907,8 @@ class TestSlowerRegression:
 
         pr.run(telescope='vla', omp_num_threads=1)
 
-
     @pytest.mark.vla
-    def test_15B_342__procedure_hifv__regression(self):
+    def test_15B_342__procedure_hifv__regression(self, data_directory):
         """Run VLA calibration regression for standard recipe.
 
         Recipe name:                procedure_hifv_calimage_cont
@@ -883,8 +916,8 @@ class TestSlowerRegression:
         """
 
         dataset_name = '15B-342.sb31041443.eb31041910.57246.076202627315'
-        input_dir = f'{self.regression_directory}/vla/15B-342/'
-        ref_directory =  'pl-regressiontest/15B-342/'
+        input_dir = f'{data_directory}/vla/15B-342/'
+        ref_directory = 'pl-regressiontest/15B-342/'
 
         pr = PipelineRegression(recipe='procedure_hifv_calimage_cont.xml',
                                 input_dir=input_dir,
@@ -892,9 +925,8 @@ class TestSlowerRegression:
                                 expectedoutput_dir=ref_directory)
         pr.run(telescope='vla', omp_num_threads=1)
 
-
     @pytest.mark.vla
-    def test_17B_188__procedure_hifv__regression(self):
+    def test_17B_188__procedure_hifv__regression(self, data_directory):
         """Run VLA calibration regression for standard recipe.
 
         Recipe name:                procedure_hifv_calimage_cont
@@ -902,8 +934,8 @@ class TestSlowerRegression:
         """
 
         dataset_name = '17B-188.sb35564398.eb35590549.58363.10481791667'
-        input_dir = f'{self.regression_directory}/vla/17B-188/'
-        ref_directory =  'pl-regressiontest/17B-188/'
+        input_dir = f'{data_directory}/vla/17B-188/'
+        ref_directory = 'pl-regressiontest/17B-188/'
 
         pr = PipelineRegression(recipe='procedure_hifv_calimage_cont.xml',
                                 input_dir=input_dir,
@@ -912,16 +944,15 @@ class TestSlowerRegression:
 
         pr.run(telescope='vla', omp_num_threads=1)
 
-
     @pytest.mark.vla
-    def test_18A_228__procedure_hifv__regression(self):
+    def test_18A_228__procedure_hifv__regression(self, data_directory):
         """Run VLA calibration regression for standard procedure_hifv_calimage_cont.xml recipe.
 
         Recipe name:                procedure_hifv_calimage_cont
         Dataset:                    18A-228.sb35538192.eb35676319.58412.135923414358
         """
-        input_dir = f'{self.regression_directory}/vla/18A-228/'
-        ref_directory =  'pl-regressiontest/18A-228/'
+        input_dir = f'{data_directory}/vla/18A-228/'
+        ref_directory = 'pl-regressiontest/18A-228/'
 
         pr = PipelineRegression(recipe='procedure_hifv_calimage_cont.xml',
                                 input_dir=input_dir,
@@ -930,16 +961,15 @@ class TestSlowerRegression:
 
         pr.run(telescope='vla', omp_num_threads=1)
 
-
     @pytest.mark.vla
-    def test_18A_426__procedure_hifv__regression(self):
+    def test_18A_426__procedure_hifv__regression(self, data_directory):
         """Run VLA calibration regression for standard procedure_hifv_calimage_cont.xml recipe.
 
         Recipe name:                procedure_hifv_calimage_cont
         Dataset:                    18A-426.sb35644955.eb35676220.58411.96917952546
         """
-        input_dir = f'{self.regression_directory}/vla/18A-426/'
-        ref_directory =  'pl-regressiontest/18A-426/'
+        input_dir = f'{data_directory}/vla/18A-426/'
+        ref_directory = 'pl-regressiontest/18A-426/'
 
         pr = PipelineRegression(recipe='procedure_hifv_calimage_cont.xml',
                                 input_dir=input_dir,
@@ -947,9 +977,8 @@ class TestSlowerRegression:
                                 expectedoutput_dir=ref_directory)
         pr.run(telescope='vla', omp_num_threads=1)
 
-
     @pytest.mark.vla
-    def test_21A_423__procedure_hifv__regression(self):
+    def test_21A_423__procedure_hifv__regression(self, data_directory):
         """Run VLA calibration regression for standard recipe.
 
         Recipe name:                procedure_hifv_calimage_cont
@@ -957,8 +986,8 @@ class TestSlowerRegression:
         """
 
         dataset_name = '21A-423.sb39709588.eb40006153.59420.64362002315'
-        input_dir = f'{self.regression_directory}/vla/21A-423/'
-        ref_directory =  'pl-regressiontest/21A-423/'
+        input_dir = f'{data_directory}/vla/21A-423/'
+        ref_directory = 'pl-regressiontest/21A-423/'
 
         pr = PipelineRegression(recipe='procedure_hifv_calimage_cont.xml',
                                 input_dir=input_dir,
@@ -967,10 +996,9 @@ class TestSlowerRegression:
 
         pr.run(telescope='vla', omp_num_threads=1)
 
-
     ### VLASS section
     @pytest.mark.vlass
-    def test_vlass_se_cont_mosaic(self):
+    def test_vlass_se_cont_mosaic(self, data_directory):
         """Run VLASS regression
 
         Recipe name: procedure_vlassSEIP_cv.xml
@@ -978,8 +1006,8 @@ class TestSlowerRegression:
         """
 
         dataset_name = 'VLASS2.2.sb40889925.eb40967634.59536.14716583333_J232327.4+5024320_split.ms'
-        input_dir = f'{self.regression_directory}/vlass/se_cont_mosaic/'
-        ref_directory =  'pl-regressiontest/vlass_se_cont_mosaic/'
+        input_dir = f'{data_directory}/vlass/se_cont_mosaic/'
+        ref_directory = 'pl-regressiontest/vlass_se_cont_mosaic/'
 
         pr = PipelineRegression(recipe=f'{input_dir}/procedure_vlassSEIP_cv.xml',
                                 input_dir=input_dir,
@@ -996,9 +1024,8 @@ class TestSlowerRegression:
 
         pr.run(telescope='vla')
 
-
     @pytest.mark.vlass
-    def test_vlass_se_cont_awp32(self):    
+    def test_vlass_se_cont_awp32(self, data_directory):    
         """Run VLASS regression
 
         Recipe name: procedure_vlassSEIP_cv.xml
@@ -1006,8 +1033,8 @@ class TestSlowerRegression:
         """
 
         dataset_name = 'VLASS2.2.sb40889925.eb40967634.59536.14716583333_J232327.4+5024320_split.ms'
-        input_dir = f'{self.regression_directory}/vlass/se_cont_awp32/'
-        ref_directory =  'pl-regressiontest/vlass_se_cont_awp32/'
+        input_dir = f'{data_directory}/vlass/se_cont_awp32/'
+        ref_directory = 'pl-regressiontest/vlass_se_cont_awp32/'
 
         pr = PipelineRegression(recipe=f'{input_dir}/procedure_vlassSEIP_cv.xml',
                                 input_dir=input_dir,
@@ -1024,17 +1051,16 @@ class TestSlowerRegression:
 
         pr.run(telescope='vla')
 
-
     @pytest.mark.vlass
-    def test_vlass_se_cube(self):
+    def test_vlass_se_cube(self, data_directory):
         """Run VLASS regression
 
         Recipe name: procedure_vlassCCIP.xml
         Dataset: VLASS2.2.sb40889925.eb40967634.59536.14716583333_J232327.4+5024320_split.ms
         """
         dataset_name = 'VLASS2.2.sb40889925.eb40967634.59536.14716583333_J232327.4+5024320_split.ms'
-        input_dir = f'{self.regression_directory}/vlass/se_cube/'
-        ref_directory =  'pl-regressiontest/vlass_se_cube/'
+        input_dir = f'{data_directory}/vlass/se_cube/'
+        ref_directory = 'pl-regressiontest/vlass_se_cube/'
 
         pr = PipelineRegression(recipe='procedure_vlassCCIP.xml',
                                 input_dir=input_dir,
@@ -1058,17 +1084,16 @@ class TestSlowerRegression:
 
         pr.run(telescope='vla')
 
-
     @pytest.mark.vlass
-    def test_vlass_cal(self):
+    def test_vlass_cal(self, data_directory):
         """Run VLASS regression
 
         Recipe name: procedure_hifvcalvlass.xml
         Dataset: VLASS2.1.sb39020033.eb39038648.59173.7629213426
         """
         dataset_name = 'VLASS2.1.sb39020033.eb39038648.59173.7629213426'
-        input_dir = f'{self.regression_directory}/vlass/cal/'
-        ref_directory =  'pl-regressiontest/vlass_cal'
+        input_dir = f'{data_directory}/vlass/cal/'
+        ref_directory = 'pl-regressiontest/vlass_cal'
 
         pr = PipelineRegression(recipe='procedure_hifvcalvlass.xml',
                                 input_dir=input_dir,

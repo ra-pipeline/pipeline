@@ -5,8 +5,7 @@ import pipeline.h.cli.utils as utils
 
 @utils.cli_wrapper
 def hifv_applycals(vis=None, field=None, intent=None, spw=None, antenna=None, applymode=None, flagbackup=None,
-                   flagsum=None, flagdetailedsum=None, gainmap=None, dryrun=None,
-                   acceptresults=None):
+                   flagsum=None, flagdetailedsum=None, gainmap=None):
 
     """
     hifv_applycals ---- Apply calibration tables to measurement set
@@ -14,18 +13,18 @@ def hifv_applycals(vis=None, field=None, intent=None, spw=None, antenna=None, ap
     hifv_applycals applies the precomputed calibration tables stored in the pipeline
     context to the set of visibility files using predetermined field and
     spectral window maps and default values for the interpolation schemes.
-    
+
     Users can interact with the pipeline calibration state using the tasks
     h_export_calstate and h_import_calstate.
 
     Output:
-    
+
     results -- The results object for the pipeline task is returne
-    
+
     --------- parameter descriptions ---------------------------------------------
 
     vis             The list of input MeasurementSets. Defaults to the list of MeasurementSets
-                    specified in the h_init or hifv_importdata task.     
+                    specified in the h_init or hifv_importdata task.
     field           A string containing the list of field names or field ids to which
                     the calibration will be applied. Defaults to all fields in the pipeline
                     context.
@@ -53,16 +52,12 @@ def hifv_applycals(vis=None, field=None, intent=None, spw=None, antenna=None, ap
     flagsum         Compute before and after flagging summary statistics
     flagdetailedsum Compute detailed flagging statistics
     gainmap         Mode to map gainfields to scans.
-    dryrun          Run the commands (True) or generate the commands to be run but
-                    do not execute (False).  This is a pipeline task execution mode.
-    acceptresults   Add the results of the task to the pipeline context (True) or
-                    reject them (False).  This is a pipeline task execution mode.
 
     --------- examples -----------------------------------------------------------
-    
-    
+
+
     1. Run the final applycals stage of the VLA CASA pipeline.
-    
+
     >>> hifv_applycals()
 
     --------- issues -----------------------------------------------------------

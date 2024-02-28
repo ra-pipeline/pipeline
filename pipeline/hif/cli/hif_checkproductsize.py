@@ -5,7 +5,7 @@ import pipeline.h.cli.utils as utils
 
 @utils.cli_wrapper
 def hif_checkproductsize(vis=None, maxcubesize=None, maxcubelimit=None, maxproductsize=None, maximsize=None,
-                         calcsb=None, parallel=None, dryrun=None, acceptresults=None):
+                         calcsb=None, parallel=None):
 
     """
     hif_checkproductsize ---- Check imaging product size
@@ -54,9 +54,6 @@ def hif_checkproductsize(vis=None, maxcubesize=None, maxcubelimit=None, maxprodu
                    -1: disables mitigation for this parameter
     calcsb         Force (re-)calculation of sensitivities and beams
     parallel       Use MPI cluster where possible
-    dryrun         Run the task (False) or just display the command (True)
-    acceptresults  Add the results of the task to the pipeline context (True) or
-                   reject them (False).
 
     --------- examples -----------------------------------------------------------
 

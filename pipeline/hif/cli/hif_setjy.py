@@ -6,18 +6,17 @@ import pipeline.h.cli.utils as utils
 @utils.cli_wrapper
 def hif_setjy(vis=None, field=None, intent=None, spw=None, model=None,
               reffile=None, normfluxes=None, reffreq=None, fluxdensity=None,
-              spix=None, scalebychan=None, standard=None,
-              dryrun=None, acceptresults=None):
+              spix=None, scalebychan=None, standard=None):
 
     """
     hif_setjy ---- Fill the model column with calibrated visibilities
 
-    
+
     Fills the model column with the model visibilities.
-    
-    
+
+
     Output
-    
+
     results -- The results object for the pipeline task is returned.
 
     --------- parameter descriptions ---------------------------------------------
@@ -26,27 +25,27 @@ def hif_setjy(vis=None, field=None, intent=None, spw=None, model=None,
                   MeasurementSets defined in the pipeline context.
     field         The list of field names or field ids for which the models are
                   to be set. Defaults to all fields with intent '`*AMPLITUDE*`'.
-                  
+
                   example: field='3C279', field='3C279, M82'
     intent        A string containing a comma delimited list of intents against
                   which the selected fields are matched. Defaults to all data
                   with amplitude intent.
-                  
+
                   example: intent='`*AMPLITUDE*`'
     spw           The list of spectral windows and channels for which bandpasses are
                   computed. Defaults to all science spectral windows.
-                  
+
                   example: spw='11,13,15,17'
     model         Model image for setting model visibilities. Not fully
                   supported.
-                  
+
                   example: see details in help for CASA setjy task
     reffile       Path to a file containing flux densities for calibrators unknown to
                   CASA. Values given in this file take precedence over the CASA-derived
                   values for all calibrators except solar system calibrators. By default the
                   path is set to the CSV file created by h_importdata, consisting of
                   catalogue fluxes extracted from the ASDM.
-                  
+
                   example: reffile='', reffile='working/flux.csv'
     normfluxes    Normalize lookup fluxes.
     reffreq       The reference frequency for spix, given with units. Provided to
@@ -55,13 +54,13 @@ def hif_setjy(vis=None, field=None, intent=None, spw=None, model=None,
                   for the given fluxdensity and spix. It cannot be determined from vis. On
                   the other hand, if spix is 0, then any positive frequency can be used and
                   will be ignored.
-                  
+
                   example: reffreq='86.0GHz', reffreq='4.65e9Hz'
     fluxdensity   Specified flux density [I,Q,U,V] in Jy. Uses [1,0,0,0]
                   flux density for unrecognized sources, and standard flux densities for
                   ones recognized by 'standard', including 3C286, 3C48, 3C147, and several
                   planets, moons, and asteroids.
-                  
+
                   example: [3.06,0.0,0.0,0.0]
     spix          Spectral index for fluxdensity S = fluxdensity * (freq/reffreq)**spix
                   Only used if fluxdensity is being used. If fluxdensity is positive, and
@@ -74,23 +73,19 @@ def hif_setjy(vis=None, field=None, intent=None, spw=None, model=None,
     standard      Flux density standard, used if fluxdensity[0] less than 0.0. The
                   options are: 'Baars','Perley 90','Perley-Taylor 95', 'Perley-Taylor 99',
                   'Perley-Butler 2010' and 'Butler-JPL-Horizons 2010'.
-                  
+
                   default: 'Butler-JPL-Horizons 2012' for solar system object
                                            'Perley-Butler 2010' otherwise
-    dryrun        Run the commands (True) or generate the commands to be run but
-                  do not execute (False).
-    acceptresults Add the results of the task to the pipeline context (True) or
-                  reject them (False).
 
     --------- examples -----------------------------------------------------------
 
-    
+
     1. Set the model flux densities for all the amplitude calibrators:
-    
+
     >>> hif_setjy()
 
     --------- issues -----------------------------------------------------------
-    
+
     Support for the setjy spix parameter needs to be added.
 
     """

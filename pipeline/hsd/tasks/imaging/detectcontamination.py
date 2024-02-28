@@ -218,9 +218,9 @@ def warn_deep_absorption_feature(masked_average_spectrum: 'sdtyping.NpArray1D', 
         if imageitem is not None:
             field = imageitem.sourcename
             spw = ','.join(map(str, np.unique(imageitem.spwlist)))
-            warning_sentence = f'Field {field} Spw {spw}: '
-            'Absorption feature is detected in the lower S/N area. '
-            'Please check calibration result in detail.'
+            warning_sentence = (f'Field {field} Spw {spw}: '
+                                'Absorption feature is detected in the lower S/N area. '
+                                'Please check calibration result in detail.')
         LOG.warning(warning_sentence)
 
 

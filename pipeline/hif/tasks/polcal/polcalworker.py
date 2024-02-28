@@ -1,5 +1,6 @@
 import copy
 import os
+import shutil
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -134,6 +135,13 @@ class PolcalWorker(basetask.StandardTaskTemplate):
         # Set caltable to itself to generate a permanent caltable name.
         inputs.caltable = inputs.caltable
 
+        # Delete a pre-existing table if append it not set. This is to
+        # replicate the somewhat convoluted old filenamer "dry_run" logic
+        # (see PIPE-1688).
+        if os.path.exists(inputs.caltable) and not inputs.append:
+            LOG.debug(f'Deleting existing calibration table {inputs.caltable}')
+            shutil.rmtree(inputs.caltable, ignore_errors=True)
+
         # Retrieve original Spw input, to attach to final CalApplication.
         origin = [callibrary.CalAppOrigin(task=PolcalWorker, inputs=inputs.to_casa_args())]
         orig_spw = inputs.spw
@@ -178,8 +186,8 @@ class PolcalWorker(basetask.StandardTaskTemplate):
         for job in jobs:
             polcal_returns.append(self._executor.execute(job))
 
-        # create the data selection target defining which data this caltable 
-        # should calibrate 
+        # create the data selection target defining which data this caltable
+        # should calibrate
         calto = callibrary.CalTo(vis=inputs.vis, spw=orig_spw)
 
         # create the calfrom object describing which data should be selected
@@ -195,9 +203,9 @@ class PolcalWorker(basetask.StandardTaskTemplate):
 
     def analyse(self, result):
         # Check that the caltable was actually generated
-        on_disk = [table for table in result.pool if table.exists() or self._executor._dry_run]
+        on_disk = [table for table in result.pool if table.exists()]
         result.final[:] = on_disk
-        missing = [table for table in result.pool if table not in on_disk and not self._executor._dry_run]
+        missing = [table for table in result.pool if table not in on_disk]
         result.error.clear()
         result.error.update(missing)
         return result

@@ -42,19 +42,15 @@ class SDInspection(object):
         if self.hm_rasterscan not in ['time', 'direction']:
             raise ValueError("hm_rasterscan must be either 'time' or 'direction'")
 
-    def execute(self, dry_run: bool = True) -> Tuple[Dict[int, MSReductionGroupDesc], Dict[str, Union[str, Dict]]]:
+    def execute(self) -> Tuple[Dict[int, MSReductionGroupDesc], Dict[str, Union[str, Dict]]]:
         """Execute inspection process.
 
         This method calls execute method of reader.py.
 
-        Args:
-            dry_run: dry run flag
         Return:
             reduction_group: dict of reduction group IDs (key) and MSReductionGroupDesc (value)
             org_directions: dict of org_direction
         """
-        if dry_run:
-            return None
 
         # per ms inspection: beam size and calibration strategy
         LOG.debug('inspect_beam_size')
@@ -73,9 +69,8 @@ class SDInspection(object):
         invalid_pointing_data, msglist = worker.generate_flagdict_for_invalid_pointing_data()
         LOG.debug('table_name=%s' % table_name)
 
-        dry_run = not os.path.exists(self.ms.name)
         # worker.set_name(ms.name)
-        org_directions = worker.execute(dry_run=dry_run)
+        org_directions = worker.execute() if os.path.exists(self.ms.name) else None
 
         datatable = worker.get_datatable()
         datatable.exportdata(minimal=False)

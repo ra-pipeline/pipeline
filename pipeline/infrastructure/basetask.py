@@ -143,9 +143,9 @@ class ModeTask(api.Task):
         self.inputs = inputs
         self._delegate = inputs.get_task()
 
-    def execute(self, dry_run=True, **parameters):
+    def execute(self, **parameters):
         self._check_delegate()
-        return self._delegate.execute(dry_run, **parameters)
+        return self._delegate.execute(**parameters)
 
     def __getattr__(self, name):
         self._check_delegate()
@@ -603,13 +603,7 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
     @matplotlibrc_handler
     @capture_log
     @result_finaliser
-    def execute(self, dry_run=True, **parameters):
-        # The filenamer deletes any identically named file when constructing
-        # the filename, which is desired when really executing a task but not
-        # when performing a dry run. This line disables the
-        # 'delete-on-generate' behaviour.
-        filenamer.NamingTemplate.dry_run = dry_run
-
+    def execute(self, **parameters):
         if utils.is_top_level_task():
             # Set the task name, but only if this is a top-level task. This
             # name will be prepended to every data product name as a sign of
@@ -633,7 +627,7 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
 
             # log the invoked pipeline task and its comment to
             # casa_commands.log
-            _log_task(self, dry_run)
+            _log_task(self)
 
         else:
             self.inputs.context.subtask_counter += 1
@@ -645,7 +639,7 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
         self.inputs = utils.pickle_copy(original_inputs)
 
         # create a job executor that tasks can use to execute subtasks
-        self._executor = Executor(self.inputs.context, dry_run)
+        self._executor = Executor(self.inputs.context)
         self._executable = CasaTasks(executor=self._executor)
 
         # create a new log handler that will capture all messages above
@@ -658,7 +652,7 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
             # function to invoke the task once per ms.
             if not self.is_multi_vis_task:
                 if isinstance(self.inputs, vdp.InputsContainer) or isinstance(self.inputs.vis, list):
-                    return self._handle_multiple_vis(dry_run, **parameters)
+                    return self._handle_multiple_vis(**parameters)
 
             if isinstance(self.inputs, vdp.InputsContainer):
                 container = self.inputs
@@ -735,9 +729,6 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
             # restore the context to the original context
             self.inputs = original_inputs
 
-            # now the task has completed, we tell the namer not to delete again
-            filenamer.NamingTemplate.dry_run = True
-
             # delete the task name once the top-level task is complete
             if utils.is_top_level_task():
                 filenamer.NamingTemplate.task = None
@@ -751,7 +742,7 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
             self._executor = None
             self._executable = None
 
-    def _handle_multiple_vis(self, dry_run, **parameters):
+    def _handle_multiple_vis(self, **parameters):
         """
         Handle a single task invoked for multiple measurement sets.
 
@@ -781,7 +772,7 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
         try:
             for inputs in container:
                 self.inputs = inputs
-                single_result = self.execute(dry_run=dry_run, **parameters)
+                single_result = self.execute(**parameters)
 
                 if isinstance(single_result, ResultsList):
                     results.extend(single_result)
@@ -819,8 +810,7 @@ class FailedTask(StandardTaskTemplate):
 
 
 class Executor(object):
-    def __init__(self, context, dry_run=True):
-        self._dry_run = dry_run
+    def __init__(self, context):
         self._context = context
         self._output_dir = self._context.output_dir
         self.cmdfile = os.path.join(context.report_dir,
@@ -849,17 +839,14 @@ class Executor(object):
         :rtype: :class:`~pipeline.api.Result`
         """
         # execute the job, capturing its results object
-        result = job.execute(dry_run=self._dry_run, **kwargs)
-
-        if self._dry_run:
-            return result
+        result = job.execute(**kwargs)
 
         # if the job was a JobRequest, log it to our command log
         if isinstance(job, jobrequest.JobRequest):
             self._log_jobrequest(job)
 
         # if requested, merge the result with the context.
-        if merge and not self._dry_run:
+        if merge:
             if self._context is None:
                 # PIPE-1522: A "context-free" copy of the Executor instance can be created from the 'copy'
                 # method (exclude_context=True), and sent to MPI servers for Tier0JobRequest executions.
@@ -913,10 +900,7 @@ class Executor(object):
         return executor_copy
 
 
-def _log_task(task, dry_run):
-    if dry_run:
-        return
-
+def _log_task(task):
     context = task.inputs.context
     filename = os.path.join(context.report_dir,
                             context.logs['casa_commands'])

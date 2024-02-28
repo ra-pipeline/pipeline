@@ -34,7 +34,7 @@ class RqcalInputs(vdp.StandardInputs):
 
 
 class Rqcal(basetask.StandardTaskTemplate):
-    Inputs = RqcalInputs    
+    Inputs = RqcalInputs
 
     def prepare(self):
         inputs = self.inputs
@@ -65,12 +65,10 @@ class Rqcal(basetask.StandardTaskTemplate):
         # caltable as the best result
 
         # double-check that the caltable was actually generated
-        on_disk = [ca for ca in result.pool
-                   if ca.exists() or self._executor._dry_run]
+        on_disk = [ca for ca in result.pool if ca.exists()]
         result.final[:] = on_disk
 
-        missing = [ca for ca in result.pool
-                   if ca not in on_disk and not self._executor._dry_run]
+        missing = [ca for ca in result.pool if ca not in on_disk]
         result.error.clear()
         result.error.update(missing)
 

@@ -7,11 +7,11 @@ def h_export_calstate(filename=None, state=None):
 
     h_export_calstate saves the current pipeline calibration state to disk
     in the form of a set of equivalent applycal calls.
-    
+
     If ``filename`` is not given, h_export_calstate saves the calibration state to
     disk with a filename based on the pipeline context creation time, using the
     extension '.calstate'
-    
+
     One of two calibration states can be exported: either the active calibration
     state (those calibrations currently applied on-the-fly but scheduled for
     permanent application to the MeasurementSet in a subsequent hif_applycal
@@ -31,19 +31,19 @@ def h_export_calstate(filename=None, state=None):
     --------- examples -----------------------------------------------------------
 
     1. Save the calibration state:
-    
+
     >>> h_export_calstate()
-    
+
     2. Save the active calibration state with a custom filename:
-    
+
     >>> h_export_calstate(filename='afterbandpass.calstate')
-    
+
     3. Save the applied calibration state with a custom filename:
-    
+
     >>> h_export_calstate(filename='applied.calstate', state='applied')
 
     --------- issues -----------------------------------------------------------
-        
+
     If run several times in one pipeline session does the automatic export
     file naming scheme, overwrite previous versions?
     """

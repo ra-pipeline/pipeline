@@ -236,7 +236,7 @@ class MakeImages(basetask.StandardTaskTemplate):
         if result.specmode == 'cube': # use nbin for cube and repBW
             msobj = self.inputs.context.observing_run.get_ms(name=result.vis[0])
             nbin = target['nbin'] if target['nbin'] > 0 else 1
-            SCF, physicalBW_of_1chan, effectiveBW_of_1chan = heuristics.get_bw_corr_factor(msobj, result.spw, nbin)
+            SCF, physicalBW_of_1chan, effectiveBW_of_1chan, _ = heuristics.get_bw_corr_factor(msobj, result.spw, nbin)
             effectiveBW_of_image = cqa.quantity(nbin / SCF**2 * effectiveBW_of_1chan, 'Hz')
         else: #continuum mode
             effectiveBW_of_image = result.aggregate_bw

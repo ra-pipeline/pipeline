@@ -199,12 +199,11 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
 
     Inputs = SDK2JyCalInputs
 
-    def execute( self, dry_run: bool = True, **parameters) -> SDK2JyCalResults:
+    def execute( self, **parameters) -> SDK2JyCalResults:
         """
         remove existing QUERIED_FACTOR_FILE before the first run
 
         Args:
-            dry_run: True if dry_run
             parameters: parameters
         Returns
             SDK2JyCalResults
@@ -217,7 +216,7 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
                     LOG.info( "Existing {}_orig will be overwritten".format(filename) )
                 os.rename( filename, "{}_orig".format(filename) )
 
-        results = super().execute( dry_run=dry_run, **parameters )
+        results = super().execute( **parameters )
         return results
 
     def prepare(self) -> SDK2JyCalResults:
@@ -452,12 +451,10 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
                         LOG.warning("No Jy/K factor is given for Spw={}, Ant={}, Pol={} of {}".format(spwid, ant_name, pol, vis))
 
         # double-check that the caltable was actually generated and prepare 'final'.
-        on_disk = [ca for ca in result.pool
-                   if ca.exists() or self._executor._dry_run]
+        on_disk = [ca for ca in result.pool if ca.exists()]
         result.final[:] = on_disk
 
-        missing = [ca for ca in result.pool
-                   if ca not in on_disk and not self._executor._dry_run]
+        missing = [ca for ca in result.pool if ca not in on_disk]
         result.error.clear()
         result.error.update(missing)
 

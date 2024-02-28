@@ -9,7 +9,7 @@ def hsd_flagdata(vis=None, autocorr=None, shadow=None, scan=None,
                  fracspwfps=None, online=None, fileonline=None, template=None,
                  filetemplate=None, pointing=None, filepointing=None, incompleteraster=None,
                  hm_tbuff=None, tbuff=None, qa0=None, qa2=None, parallel=None,
-                 flagbackup=None, dryrun=None, acceptresults=None):
+                 flagbackup=None):
 
     """
     hsd_flagdata ---- Do basic flagging of a list of MeasurementSets
@@ -71,10 +71,6 @@ def hsd_flagdata(vis=None, autocorr=None, shadow=None, scan=None,
                      options: 'automatic', 'true', 'false', True, False
                      default: None (equivalent to 'automatic')
     flagbackup       Back up any pre-existing flags before applying new ones.
-    dryrun           Run the commands (True) or generate the commands to be run but
-                     do not execute (False).
-    acceptresults    Add the results of the task to the pipeline context (True) or
-                     reject them (False).
 
     --------- examples -----------------------------------------------------------
 

@@ -11,8 +11,7 @@ def hifa_tsysflag(vis=None, caltable=None,
                   flag_fieldshape=None, ff_refintent=None, ff_max_limit=None,
                   flag_birdies=None, fb_sharps_limit=None,
                   flag_toomany=None, tmf1_limit=None, tmef1_limit=None,
-                  metric_order=None, normalize_tsys=None, filetemplate=None,
-                  dryrun=None, acceptresults=None):
+                  metric_order=None, normalize_tsys=None, filetemplate=None):
     """
     hifa_tsysflag ---- Flag deviant system temperatures for ALMA interferometry measurements.
 
@@ -20,31 +19,31 @@ def hifa_tsysflag(vis=None, caltable=None,
     This task flags all deviant system temperature measurements in the system
     temperature calibration table by running a sequence of flagging tests, each
     designed to look for a different type of possible error.
-    
+
     If a file with manual Tsys flags is provided with the ``filetemplate``
     parameter, then these flags are applied prior to the evaluation of the
     flagging heuristics listed below.
-    
+
     The tests are:
-    
+
     1. Flag Tsys spectra with high median values
-    
+
     2. Flag Tsys spectra with high median derivatives. This is meant to spot
        spectra that are 'ringing'.
-    
+
     3. Flag the edge channels of the Tsys spectra in each SpW.
-    
+
     4. Flag Tsys spectra whose shape is different from that associated with
        the BANDPASS intent.
-    
+
     5. Flag 'birdies'.
-    
+
     6. Flag the Tsys spectra of all antennas in a timestamp and spw if
        proportion of antennas already flagged in this timestamp and spw exceeds
        a threshold, and flag Tsys spectra for all antennas and all timestamps
        in a spw, if proportion of antennas that are already entirely flagged
        in all timestamps exceeds a threshold.
-    
+
     Output:
 
         results -- The results object for the pipeline task is returned.
@@ -55,7 +54,7 @@ def hifa_tsysflag(vis=None, caltable=None,
                     List of input MeasurementSets (Not used).
     caltable
                     List of input Tsys calibration tables.
-                    
+
                     Default: [] - Use the table currently stored in the pipeline context.
 
                     Example: caltable=['X132.ms.tsys.s2.tbl']
@@ -114,22 +113,16 @@ def hifa_tsysflag(vis=None, caltable=None,
                     The name of a text file that contains the manual Tsys flagging
                     template. If the template flags file is undefined, a name of the form
                     'msname.flagtsystemplate.txt' is assumed.
-    dryrun
-                    Run the commands (True) or generate the commands to be run but
-                    do not execute (False).
-    acceptresults
-                    Add the results of the task to the pipeline context (True) or
-                    reject them (False).
 
     --------- examples -----------------------------------------------------------
 
     1. Flag Tsys measurements using currently recommended tests:
-    
+
     >>> hifa_tsysflag()
-    
+
     2. Flag Tsys measurements using all recommended tests apart from that
     using the 'fieldshape' metric:
-    
+
     >>> hifa_tsysflag(flag_fieldshape=False)
 
     """

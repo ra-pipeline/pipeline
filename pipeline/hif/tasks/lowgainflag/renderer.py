@@ -49,7 +49,7 @@ class T2_4MDetailsLowgainFlagRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
             vis = result.vis
             # If the reference antenna list was updated, retrieve new refant
             # list.
-            if result.refants_to_demote:
+            if result.refants_to_demote or result.refants_to_remove:
                 ms = pipeline_context.observing_run.get_ms(name=vis)
                 updated_refants[vis] = ms.reference_antenna
 

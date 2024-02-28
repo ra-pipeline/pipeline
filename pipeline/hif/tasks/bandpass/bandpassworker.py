@@ -1,3 +1,6 @@
+import os
+import shutil
+
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure as infrastructure
@@ -69,14 +72,21 @@ class BandpassWorker(basetask.StandardTaskTemplate):
 
         # make a note of the current inputs state before we start fiddling
         # with it. This origin will be attached to the final CalApplication.
-        origin = callibrary.CalAppOrigin(task=BandpassWorker, 
+        origin = callibrary.CalAppOrigin(task=BandpassWorker,
                                          inputs=inputs.to_casa_args())
 
-        # make fast the caltable name by manually setting it to its current 
-        # value. This makes the caltable name permanent, so we can 
+        # make fast the caltable name by manually setting it to its current
+        # value. This makes the caltable name permanent, so we can
         # subsequently append calibrations for each spectral window to the one
         # table
         inputs.caltable = inputs.caltable
+
+        # Delete a pre-existing table if append it not set. This is to
+        # replicate the somewhat convoluted old filenamer "dry_run" logic
+        # (see PIPE-1688).
+        if os.path.exists(inputs.caltable) and not inputs.append:
+            LOG.debug(f'Deleting existing calibration table {inputs.caltable}')
+            shutil.rmtree(inputs.caltable, ignore_errors=True)
 
         # create a job for each CalTo data selection
         calto = callibrary.get_calto_from_inputs(inputs)
@@ -97,7 +107,7 @@ class BandpassWorker(basetask.StandardTaskTemplate):
 
             args = inputs.to_casa_args()
 
-            # set the on-the-fly calibration state for the data selection 
+            # set the on-the-fly calibration state for the data selection
             calapp = callibrary.CalApplication(calto, calfroms)
             args['gaintable'] = calapp.gaintable
             args['gainfield'] = calapp.gainfield
@@ -106,15 +116,15 @@ class BandpassWorker(basetask.StandardTaskTemplate):
 
             jobs.append(casa_tasks.bandpass(**args))
 
-            # append subsequent bandpass output to the same caltable 
+            # append subsequent bandpass output to the same caltable
             inputs.append = True
 
         # execute the jobs
         for job in jobs:
             self._executor.execute(job)
 
-        # create the data selection target defining which data this caltable 
-        # should calibrate 
+        # create the data selection target defining which data this caltable
+        # should calibrate
         calto = callibrary.CalTo(vis=inputs.vis,
                                  spw=orig_spw)
                                  #antenna=orig_antenna)
@@ -135,15 +145,13 @@ class BandpassWorker(basetask.StandardTaskTemplate):
 
     def analyse(self, result):
         # With no best caltable to find, our task is simply to set the one
-        # caltable as the best result 
+        # caltable as the best result
 
         # double-check that the caltable was actually generated
-        on_disk = [ca for ca in result.pool
-                   if ca.exists() or self._executor._dry_run]
+        on_disk = [ca for ca in result.pool if ca.exists()]
         result.final[:] = on_disk
 
-        missing = [ca for ca in result.pool
-                   if ca not in on_disk and not self._executor._dry_run]        
+        missing = [ca for ca in result.pool if ca not in on_disk]
         result.error.clear()
         result.error.update(missing)
 

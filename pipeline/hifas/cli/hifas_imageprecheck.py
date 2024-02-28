@@ -4,8 +4,7 @@ import pipeline.h.cli.utils as utils
 
 
 @utils.cli_wrapper
-def hifas_imageprecheck(vis=None, desired_angular_resolution=None, calcsb=None, parallel=None,
-                        dryrun=None, acceptresults=None):
+def hifas_imageprecheck(vis=None, desired_angular_resolution=None, calcsb=None, parallel=None):
 
     """
     hifas_imageprecheck ---- Calculates the best robust value and Briggs weighting parameter to achieve sensitivity and angular resolution goals.
@@ -37,9 +36,6 @@ def hifas_imageprecheck(vis=None, desired_angular_resolution=None, calcsb=None, 
                                Example: '1.0arcsec'
     calcsb                     Force (re-)calculation of sensitivities and beams
     parallel                   Use MPI cluster where possible
-    dryrun                     Run the task (False) or just display the command (True)
-    acceptresults              Add the results of the task to the pipeline context (True) or
-                               reject them (False).
 
     --------- examples -----------------------------------------------------------
 

@@ -5,7 +5,6 @@ import numpy as np
 import pipeline.domain as domain
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
-import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.h.tasks.common import calibrationtableaccess as caltableaccess
 from pipeline.h.tasks.common import commonresultobjects
@@ -14,6 +13,8 @@ from pipeline.h.tasks.flagging.flagdatasetter import FlagdataSetter
 from pipeline.hif.tasks import bandpass
 from pipeline.hif.tasks import gaincal
 from pipeline.infrastructure import task_registry
+from pipeline.infrastructure.refantflag import identify_fully_flagged_antennas_from_flagview, \
+    mark_antennas_for_refant_update, aggregate_fully_flagged_antenna_notifications
 from .resultobjects import LowgainflagDataResults
 from .resultobjects import LowgainflagResults
 from .resultobjects import LowgainflagViewResults
@@ -178,129 +179,42 @@ class Lowgainflag(basetask.StandardTaskTemplate):
         :param result: LowgainflagResults object
         :return: LowgainflagResults object
         """
-        result = self._update_reference_antennas(result)
+        result = self._identify_refants_to_update(result)
 
         return result
 
-    def _update_reference_antennas(self, result):
+    def _identify_refants_to_update(self, result):
         """
-        Updates the Lowgainflag result to mark any antennas that were found to
-        be fully flagged in any of the flagging views to be demoted when
-        result gets accepted.
+        Updates the Lowgainflag result to mark any antennas that were found
+        to be fully flagged by the newly introduced flagging commands
+        to be demoted and/or removed when result gets accepted.
 
         :param result: LowgainflagResults object
         :return: LowgainflagResults object
         """
+
         # First summarize which antennas are fully flagged in any flagging view.
-        ants_flagged_in_any_spw = self._summarize_fully_flagged_antennas(result)
+        ms = self.inputs.ms
+
+        # The flagging view shows antennas with flagging commands introduced in this stage,
+        # as well as those which have been flagged by earlier stages.
+        # OTOH the flagging commands only show the effect of this stage alone.
+        # The two uncommented lines below implement the former approach (currently used),
+        # and the commented-out line - the latter.
+
+        scan_to_field_names = {str(scan.id): tuple(field.name for field in scan.fields) for scan in ms.scans}
+        fully_flagged_antennas = identify_fully_flagged_antennas_from_flagview(ms, result, scan_to_field_names)
+
+        # fully_flagged_antennas = identify_fully_flagged_antennas_from_flagcmds(ms, result.flagcmds())
 
         # If any fully flagged antennas were found, then update result to mark
-        # these antennas for demotion.
-        if ants_flagged_in_any_spw:
-            result = self._mark_antennas_for_demotion(result, ants_flagged_in_any_spw)
+        # these antennas for demotion and/or removal.
+        all_spw_ids = {int(spw) for spw in self.inputs.spw.split(',')}
+        result = mark_antennas_for_refant_update(ms, result, fully_flagged_antennas, all_spw_ids)
 
-        return result
-
-    @staticmethod
-    def _summarize_fully_flagged_antennas(result):
-        """
-        Create a summary of fully flagged antennas based on all flagging views
-        in the result.
-
-        :param result: LowgainflagResults object
-        :return: list of int, representing IDs of antennas that are fully
-        flagged.
-        """
-        ants_flagged_in_any_view = set()
-
-        for description in result.descriptions():
-            # Get final view.
-            view = result.last(description)
-
-            # Identify antennas fully flagged for all scans, mapping the
-            # array indices to the original antenna IDs using the flagging view
-            # x-axis data.
-            antids_fully_flagged = view.axes[0].data[
-                np.where(np.all(view.flag, axis=1))[0]]
-
-            # Update set of fully flagged antennas based on current view.
-            ants_flagged_in_any_view.update(antids_fully_flagged)
-
-        return ants_flagged_in_any_view
-
-    def _mark_antennas_for_demotion(self, result, ants_to_demote):
-        """
-        Modify result to set antennas to be demoted if/when result gets
-        accepted into the pipeline context. If list of antennas to demote
-        comprises all antennas, then skip demotion but raise a warning.
-
-        :param result: LowgainflagResults object
-        :param ants_to_demote: list of ints, representing IDs of antennas to
-        demote.
-        :return: LowgainflagResults object
-        """
-        # Get the MS object
-        ms = self.inputs.context.observing_run.get_ms(name=self.inputs.vis)
-
-        # Proceed only if a list of reference antennas was registered with the MS.
-        if (hasattr(ms, 'reference_antenna') and
-                isinstance(ms.reference_antenna, str)):
-
-            # Create list of current refants
-            refant = ms.reference_antenna.split(',')
-
-            # Create translation dictionary, reject empty antenna name strings.
-            antenna_id_to_name = {ant.id: ant.name for ant in ms.antennas if ant.name.strip()}
-
-            # Translate IDs of antennas-to-demote to antenna names.
-            ants_to_demote_as_refant = {
-                antenna_id_to_name[ant_id]
-                for ant_id in ants_to_demote
-            }
-
-            # Compute intersection between refants and ants to demote as
-            # refant.
-            refants_to_demote = {
-                ant for ant in refant
-                if ant in ants_to_demote_as_refant
-            }
-
-            # If the intersection is not empty, then there are existing
-            # refants that need to be demoted.
-            if refants_to_demote:
-                # Create string for log message.
-                ant_msg = utils.commafy(refants_to_demote, quotes=False)
-
-                # Check if the list of refants-to-demote comprises all
-                # refants, in which case the re-ordering of refants is
-                # skipped.
-                if refants_to_demote == set(refant):
-
-                    # Log warning that refant list should have been updated, but
-                    # will not be updated so as to avoid an empty refant list.
-                    LOG.warning(
-                        '{} - the following antennas are fully flagged '
-                        'for one or more spws, but since these comprise all '
-                        'refants, the refant list is *NOT* updated to '
-                        're-order these to the end of the refant list: '
-                        '{}'.format(ms.basename, ant_msg))
-                else:
-                    # Log a warning if any antennas are to be demoted from
-                    # the refant list.
-                    LOG.warning(
-                        '{} - the following antennas have been fully flagged '
-                        'in one or more spws, and moved to the end '
-                        'of the refant list: {}'.format(ms.basename, ant_msg))
-
-                    # Update result to set the refants to demote:
-                    result.refants_to_demote = refants_to_demote
-
-        # If no list of reference antennas was registered with the MS,
-        # raise a warning.
-        else:
-            LOG.warning(
-                '{} - no reference antennas found in MS, cannot update '
-                'the reference antenna list.'.format(ms.basename))
+        # Aggregate the list of fully flagged antennas by intent, field and spw for subsequent QA scoring
+        result.fully_flagged_antenna_notifications = aggregate_fully_flagged_antenna_notifications(
+            fully_flagged_antennas, all_spw_ids)
 
         return result
 

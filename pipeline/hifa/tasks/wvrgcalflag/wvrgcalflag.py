@@ -162,19 +162,6 @@ class Wvrgcalflag(basetask.StandardTaskTemplate):
             # the result so that it cannot be accepted into the context. 
             elif result.flaggerresult.dataresult.qa_wvr.overall_score is not None \
                     and result.flaggerresult.dataresult.qa_wvr.overall_score < inputs.accept_threshold:
-                # Modified for PIPE-1837 to have a variable warning according to the
-                # phase rms return from dataresult.BPgood (see wvrgcal/wvrg_qa.py)
-                if result.flaggerresult.dataresult.BPgood:
-                    LOG.attention('wvrgcal file has qa score ({0}) below'
-                            ' accept_threshold ({1}) and will not be'
-                            ' applied, however the atmospheric stability still'
-                            ' appears to be good'.format(result.flaggerresult.dataresult.qa_wvr.overall_score,
-                                              inputs.accept_threshold))         
-                else:
-                    LOG.warning('wvrgcal file has qa score ({0}) below'
-                            ' accept_threshold ({1}) and will not be'
-                            ' applied'.format(result.flaggerresult.dataresult.qa_wvr.overall_score,
-                                              inputs.accept_threshold))
                 result.flaggerresult.dataresult.final = []
 
         return result

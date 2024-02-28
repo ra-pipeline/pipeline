@@ -42,19 +42,17 @@ def hif_editimlist(imagename=None,
                    nsigma=None,
                    uvtaper=None,
                    uvrange=None,
-                   width=None,
-                   dryrun=None,
-                   acceptresults=None):
+                   width=None):
 
     """
     hif_editimlist ---- Add to a list of images to be produced with hif_makeimages()
 
-    
+
     Add to a list of images to be produced with hif_makeimages(), which uses hif_tclean() to invoke CASA tclean.
     Many of the hif_editimlist() inputs map directly to tclean parameters.
-    
+
     The results object for the pipeline task is returned.
-    
+
 
     --------- parameter descriptions ---------------------------------------------
 
@@ -74,10 +72,10 @@ def hif_editimlist(imagename=None,
     datatype             Data type(s) to image. The default '' selects the best
                          available data type (e.g. selfcal over regcal) with
                          an automatic fallback to the next available data type.
-                         With the ``datatype`` parameter of 'regcal' or 'selfcal', one 
+                         With the ``datatype`` parameter of 'regcal' or 'selfcal', one
                          can force the use of only given data type(s).
-                         Note that this parameter is only for non-VLASS data when the datacolumn 
-                         is not explictly set by user or imaging heuristics.  
+                         Note that this parameter is only for non-VLASS data when the datacolumn
+                         is not explictly set by user or imaging heuristics.
     datacolumn           Data column to image; this will take precedence over the datatype parameter.
     deconvolver          Minor cycle algorithm (multiscale or mtmfs)
     editmode             The edit mode of the task ('add' or 'replace'). Defaults to 'add'.
@@ -113,13 +111,11 @@ def hif_editimlist(imagename=None,
     uvtaper              Used to set a uv-taper during clean.
     uvrange              Set of data selection uv ranges, \'\' for all.
     width                Channel width
-    dryrun               Run the task (False) or display the command(True)
-    acceptresults        Add the results to the pipeline context
 
     --------- examples -----------------------------------------------------------
 
-    
-    
+
+
 
 
     """

@@ -44,7 +44,7 @@ class CaltableNamer(api.Heuristic):
 
         self.customise(namer, task_args)
 
-        return namer.get_filename(True)
+        return namer.get_filename()
 
     @abc.abstractmethod
     def get_namer(self):

@@ -45,7 +45,7 @@ class plotsummarySummaryChart(object):
                                         xlabel='',  ylabel='', showmajorgrid=False, showminorgrid=False,
                                         plotfile=figfile, overwrite=True, clearplots=True, showgui=False)
 
-                job.execute(dry_run=False)
+                job.execute()
 
             except Exception as ex:
                 LOG.error('Could not create plotsummary plot.')
@@ -124,7 +124,7 @@ class plotsummarySummaryChart(object):
                                                     xlabel='', ylabel='',  showmajorgrid=False, showminorgrid=False,
                                                     plotfile=figfile, overwrite=True, clearplots=True, showgui=False)
 
-                            job.execute(dry_run=False)
+                            job.execute()
 
                         except Exception as ex:
                             LOG.error('Could not create plot for field {!s}  band {!s}'.format(str(field.id), bandname))

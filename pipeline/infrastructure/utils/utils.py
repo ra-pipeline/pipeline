@@ -770,6 +770,7 @@ def open_with_lock(filename, mode='r'):
     options, which is indeed used for cv/naasc/aoc lustre systems:
         $ mount -l | grep lustre
             192.168.1.30@o2ib:/aoclst03 on /.lustre/aoc type lustre (rw,flock,user_xattr,lazystatfs)
+    For NFS, please see additional notes in PIPE-2051.
 
     For a practical test, try the code snippet below from different clients/processes to see 
     if the fnctl blocking mechanism can prevent non-exclusive access to a file.
@@ -785,15 +786,23 @@ def open_with_lock(filename, mode='r'):
 
     with open(filename, mode) as fd:
 
-        LOG.info('acquiring lock on %s', filename)
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        LOG.info('acquired lock on %s', filename)
+        LOG.debug('acquiring lock on %s', filename)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            LOG.debug('acquired lock on %s', filename)
+        except OSError as e:
+            LOG.warning('failed to acquire file lock due to the filesystem limitation,'
+                        'which might cause racing conditions if multiple processes access %s simultaneously.',
+                        filename)
 
         yield fd
-
-        fcntl.flock(fd, fcntl.LOCK_UN)
-        LOG.info('released lock on %s', filename)
-
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            LOG.debug('released lock on %s', filename)
+        except OSError as e:
+            LOG.warning('failed to acquire file lock due to the filesystem limitation,'
+                        'which might cause racing conditions if multiple processes access %s simultaneously.',
+                        filename)
 
 def ensure_products_dir_exists(products_dir):
     try:
@@ -804,7 +813,7 @@ def ensure_products_dir_exists(products_dir):
             raise
 
 
-def export_weblog_as_tar(context, products_dir, name_builder, dry_run=False):
+def export_weblog_as_tar(context, products_dir, name_builder):
     # Construct filename prefix from oussid and recipe name if available.
     prefix = context.get_oussid()
     recipe_name = context.get_recipe_name()
@@ -817,10 +826,9 @@ def export_weblog_as_tar(context, products_dir, name_builder, dry_run=False):
 
     # Save weblog directory to tar archive.
     LOG.info(f"Saving weblog in {tarfilename}")
-    if not dry_run:
-        tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
-        tar.add(os.path.join(os.path.basename(os.path.dirname(context.report_dir)), 'html'))
-        tar.close()
+    tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
+    tar.add(os.path.join(os.path.basename(os.path.dirname(context.report_dir)), 'html'))
+    tar.close()
     return tarfilename
 
 

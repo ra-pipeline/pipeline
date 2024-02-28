@@ -5,7 +5,7 @@ import pipeline.h.cli.utils as utils
 
 @utils.cli_wrapper
 def hif_findcont(vis=None, target_list=None, hm_mosweight=None, hm_perchanweightdensity=None, hm_weighting=None,
-                 datacolumn=None, parallel=None, dryrun=None, acceptresults=None):
+                 datacolumn=None, parallel=None):
 
     """
     hif_findcont ---- Find continuum frequency ranges
@@ -53,9 +53,6 @@ def hif_findcont(vis=None, target_list=None, hm_mosweight=None, hm_perchanweight
     datacolumn              Data column to image. Only to be used for manual overriding
                             when the automatic choice by data type is not appropriate.
     parallel                Use MPI cluster where possible
-    dryrun                  Run the task (False) or just display the command (True)
-    acceptresults           Add the results of the task to the pipeline context (True) or
-                            reject them (False).
 
     --------- examples -----------------------------------------------------------
 
