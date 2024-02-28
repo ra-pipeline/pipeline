@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-In_pipeline : bool = False    # Set this boolean parameter to True 'In_pipeline'.
+In_pipeline : bool = True    # Set this boolean parameter to True 'In_pipeline'.
 
 
 # Find indices of lines from spectrum data.
@@ -80,7 +80,7 @@ from math import pi, sqrt, exp, log, isnan
 import copy
 from typing import List, Optional
 if In_pipeline:
-    from . import lf_gmn_open as lfr   # bitbucket (pipeline)   lf_gmn_open
+    from . import lf_gmn as lfr   # bitbucket (pipeline)   lf_gmn_open
     Draw_graph = False
 else:
     import lf_gmn as lfr          # jupyternote (version-4.3 uses lf_gmn module)
