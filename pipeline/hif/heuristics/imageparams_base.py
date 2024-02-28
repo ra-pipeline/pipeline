@@ -6,7 +6,7 @@ import os.path
 import re
 import shutil
 import uuid
-from typing import Union
+from typing import List, Union, Optional
 
 import numpy as np
 
@@ -1687,9 +1687,10 @@ class ImageParamsHeuristics(object):
             approximateEffectiveBW = (nchan + 1.12 * (spwchan - nchan) / spwchan / N_smooth) * float(physicalBW_of_1chan)
             SCF = (optimisticBW / approximateEffectiveBW) ** 0.5
         else:
+            approximateEffectiveBW = nchan * float(physicalBW_of_1chan)
             SCF = 1.0
 
-        return SCF, physicalBW_of_1chan, effectiveBW_of_1chan
+        return SCF, physicalBW_of_1chan, effectiveBW_of_1chan, approximateEffectiveBW
 
     def calc_sensitivities(self, vis, field, intent, spw, nbin, spw_topo_chan_param_dict, specmode, gridder, cell, imsize, weighting, robust, uvtaper, center_only=False, known_sensitivities={}, force_calc=False):
         """Compute sensitivity estimate using CASA."""
@@ -1814,7 +1815,7 @@ class ImageParamsHeuristics(object):
                         chansel_corrected_center_field_sensitivity = center_field_full_spw_sensitivity
 
                     # Correct for effective bandwidth effects
-                    bw_corr_factor, physicalBW_of_1chan, effectiveBW_of_1chan = self.get_bw_corr_factor(ms, intSpw, nchan_sel)
+                    bw_corr_factor, physicalBW_of_1chan, effectiveBW_of_1chan, _ = self.get_bw_corr_factor(ms, intSpw, nchan_sel)
                     center_field_sensitivity = chansel_corrected_center_field_sensitivity * bw_corr_factor
                     if bw_corr_factor != 1.0:
                         LOG.info('Effective BW heuristic: Correcting sensitivity for EB %s Field %s SPW %s by %.3g from %.3g Jy/beam to %.3g Jy/beam' % (os.path.basename(msname).replace('.ms', ''), field, str(intSpw), bw_corr_factor, chansel_corrected_center_field_sensitivity, center_field_sensitivity))
@@ -1925,7 +1926,7 @@ class ImageParamsHeuristics(object):
                 cstart, cstop = list(map(int, chanrange.split('~')))
                 nchan = cstop - cstart + 1
 
-                SCF, physicalBW_of_1chan, effectiveBW_of_1chan = self.get_bw_corr_factor(ms_do, spw, nchan)
+                SCF, physicalBW_of_1chan, effectiveBW_of_1chan, _ = self.get_bw_corr_factor(ms_do, spw, nchan)
                 sens_bw += nchan * physicalBW_of_1chan
 
                 chansel_sensitivities.append(apparentsens_value)
@@ -2111,6 +2112,12 @@ class ImageParamsHeuristics(object):
                                                            if antenna.diameter == majority_diameter]
 
         return majority_antenna_ids
+
+    def arrays(self, vislist: Optional[List[str]] = None) -> str:
+
+        """Return the array descriptions."""
+
+        return None
 
     def antenna_ids(self, intent, vislist=None):
 

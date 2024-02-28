@@ -14,9 +14,17 @@ import functools
 import shutil
 import sys
 
-import almatasks
-import casaplotms
 import casatasks
+import casaplotms
+
+# PIPE-2099: add the compatibility with the 'wvrgcal' task change from CAS-14218
+if hasattr(casatasks, 'wvrgcal'):
+    # wvrgcal was migrated into the casatasks package via CAS-14218
+    almatasks = casatasks
+else:
+    # before CAS-14218, the task wvrgcal was under the almatasks package
+    import almatasks
+
 
 from . import logging
 from .jobrequest import JobRequest

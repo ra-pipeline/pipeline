@@ -1192,7 +1192,7 @@ finally:
                             'naxis3', 'ctype3', 'cunit3', 'crpix3', 'crval3', 'cdelt3',
                             'naxis4', 'ctype4', 'cunit4', 'crpix4', 'crval4', 'cdelt4',
                             'bmaj', 'bmin', 'bpa', 'robust', 'weight',
-                            'effbw', 'level', 'ctrfrq', 'obspatt', 'arrays', 'modifier']:
+                            'effbw', 'level', 'ctrfrq', 'obspatt', 'arrays', 'modifier', 'session']:
                     fits_keywords[key] = str(ff[0].header.get(key, 'N/A'))
 
                 if 'nspwnam' in ff[0].header:

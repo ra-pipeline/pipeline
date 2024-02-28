@@ -13,10 +13,13 @@ from importlib.metadata import version, PackageNotFoundError
 from importlib.util import find_spec
 import pkg_resources
 
+import casatasks
+
 from .infrastructure import mpihelpers
 from .infrastructure.mpihelpers import MPIEnvironment
 from .infrastructure import utils
 from .infrastructure import casa_tools
+from .infrastructure.version import get_version
 
 __all__ = ['casa_version', 'casa_version_string', 'compare_casa_version', 'cpu_type', 'hostname', 'host_distribution',
            'logical_cpu_cores', 'memory_size', 'pipeline_revision', 'role', 'cluster_details', 'dependency_details']
@@ -115,7 +118,7 @@ def _memory_size():
 
 
 # Determine pipeline version from Git or package.
-def _pipeline_revision():
+def _pipeline_revision() -> str:
     """
     Get a string describing the pipeline revision and branch of the executing
     pipeline distribution if executing from a Git repo; as a fall-back,
@@ -142,12 +145,18 @@ def _pipeline_revision():
     try:
         git_branch = subprocess.check_output(['git', 'symbolic-ref', '--short', 'HEAD'], cwd=pl_path,
                                              stderr=subprocess.DEVNULL).decode().strip()
+
     except (FileNotFoundError, subprocess.CalledProcessError):
         pass
 
-    if git_branch is not None and (git_branch == "main" or git_branch.startswith("release/")):
-        from pipeline.infrastructure.version import get_version
+    # Try to get the version
+    ver = None
+    try:
         ver = get_version(pl_path)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        pass
+
+    if git_branch is not None and ver is not None and (git_branch == "main" or git_branch.startswith("release/")):
         # Output of the version.py script is a string with two or three space-separated elements:
         # last branch tag (possibly empty), last release tag, and possibly a "dirty" suffix.
         releasetag = ver[1]
@@ -159,23 +168,34 @@ def _pipeline_revision():
     else:
         # Consolidate into single version string.
         if commit_hash is None:
+            commit_hash = "unknown_hash"
             # If no Git commit info could be found, then attempt to load version
             # from the _version module that is created when pipeline package is
             # built.
             try:
                 from pipeline._version import version
+                ver = version
             except ModuleNotFoundError:
-                version = "unknown"
-        elif git_branch is None:
-            # If info on Git commit is available, but no info on Git branch, then
-            # this checkout may have a detached HEAD pointing at a specific tag, so
-            # just report the Git commit/tag info.
-            version = commit_hash
-        else:
-            # If both Git commit and branch info are available, then use both.
-            version = "{}-{}".format(commit_hash, git_branch)
+                ver = "0.0.dev0"
 
-        return version
+        if git_branch is None:
+            git_branch = "unknown_branch"
+
+        # this isn't available here
+        if ver is None or len(ver) < 2:
+            # Invalid version number:
+            ver = "0.0.dev0"
+        else:
+            ver = ver[1]
+
+        # Only ASCII numbers, letters, '.', '-', and '_' are allowed in the local version label (anything after the +)
+        commit_hash = re.sub(r'[^\w_\-\.]+', '.', commit_hash)
+        git_branch = re.sub(r'[^\w_\-\.]+', '.', git_branch)
+
+        # Consolidate into single version string.
+        version_str = "{}+{}-{}".format(ver, commit_hash, git_branch)
+
+        return version_str
 
 
 def _ulimit():
@@ -217,8 +237,8 @@ def _cluster_details():
     return env_details
 
 
-casa_version = casa_tools.utils.version()
-casa_version_string = casa_tools.utils.version_string()
+casa_version = casatasks.version()
+casa_version_string = casatasks.version_string()
 compare_casa_version = casa_tools.utils.compare_version
 
 
