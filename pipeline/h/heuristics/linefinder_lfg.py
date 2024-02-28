@@ -24,7 +24,7 @@ import numpy as np
 import pipeline.infrastructure.api as api
 from typing import List, Optional
 
-from .lfg.lf_g_gm import line_finder
+from .lfgmn.lf_g_gmngs import line_finder
 
 class ZeroCrossLineFinder(api.Heuristic):
     """
