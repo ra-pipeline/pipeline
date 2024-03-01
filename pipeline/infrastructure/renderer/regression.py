@@ -177,11 +177,7 @@ class RegressionExtractorRegistry(object):
         if isinstance(result, collections.Iterable):
             for r in result:
                 d = self.handle(r)
-                print(d)
                 extracted = union(extracted, d)
-
-        print("in handler")
-        print(extracted)
 
         # process the group-level results.
         for handler in self.__handlers:
@@ -189,9 +185,7 @@ class RegressionExtractorRegistry(object):
                 LOG.debug('{} extracting regression results for {}'.format(handler.__class__.__name__,
                                                                            result.__class__.__name__))
                 d = handler.handle(result)
-                print(d)
                 extracted = union(extracted, d)
-        print(extracted)
         return extracted
 
 
@@ -1062,7 +1056,6 @@ def extract_qa_score_regression_json(prefix:str, result:Results) -> OrderedDict:
         d['value'] = value
         d['score'] = score
 
-        print(d)
     return d
 
 
@@ -1093,10 +1086,7 @@ def write_stats_information(context: Context) -> dict:
         if handled_result:
             stats_dict[str(results.uuid)] = handled_result
 
-    print(stats_dict)
-
     with open('stats.json', 'w', encoding='utf-8') as f:
-        print("writing to file")
         json.dump(stats_dict, f, ensure_ascii=False, indent=4)
     return stats_dict
 
