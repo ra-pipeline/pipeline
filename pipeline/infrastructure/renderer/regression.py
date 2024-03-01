@@ -25,6 +25,7 @@ QAPlugin.
 """
 import abc
 import collections
+import json
 import os.path
 import re
 from collections import OrderedDict
@@ -176,7 +177,11 @@ class RegressionExtractorRegistry(object):
         if isinstance(result, collections.Iterable):
             for r in result:
                 d = self.handle(r)
+                print(d)
                 extracted = union(extracted, d)
+
+        print("in handler")
+        print(extracted)
 
         # process the group-level results.
         for handler in self.__handlers:
@@ -184,8 +189,9 @@ class RegressionExtractorRegistry(object):
                 LOG.debug('{} extracting regression results for {}'.format(handler.__class__.__name__,
                                                                            result.__class__.__name__))
                 d = handler.handle(result)
+                print(d)
                 extracted = union(extracted, d)
-
+        print(extracted)
         return extracted
 
 
@@ -263,10 +269,10 @@ class FluxcalflagRegressionExtractor(RegressionExtractor):
             num_flags_after = num_flags_before
 
         d = OrderedDict()
-        d['{}.num_rows_flagged.before'.format(prefix)] = int(num_flags_before)
-        d['{}.num_rows_flagged.after'.format(prefix)] = int(num_flags_after)
+#        d['{}.num_rows_flagged.before'.format(prefix)] = int(num_flags_before)
+#        d['{}.num_rows_flagged.after'.format(prefix)] = int(num_flags_after)
 
-        qa_entries = extract_qa_score_regression(prefix, result)
+        qa_entries = extract_qa_score_regression_json(prefix, result)
         d.update(qa_entries)
 
         return d
@@ -297,12 +303,12 @@ class GcorFluxscaleRegressionExtractor(RegressionExtractor):
         prefix = get_prefix(result, self.generating_task)
 
         d = OrderedDict()
-        for field_id, measurements in result.measurements.items():
-            for m in measurements:
-                key = '{}.field_{}.spw_{}.I'.format(prefix, field_id, m.spw_id)
-                d[key] = str(m.I.to_units(FluxDensityUnits.JANSKY))
+        # for field_id, measurements in result.measurements.items():
+        #     for m in measurements:
+        #         key = '{}.field_{}.spw_{}.I'.format(prefix, field_id, m.spw_id)
+        #         d[key] = str(m.I.to_units(FluxDensityUnits.JANSKY))
 
-        qa_entries = extract_qa_score_regression(prefix, result)
+        qa_entries = extract_qa_score_regression_json(prefix, result)
         d.update(qa_entries)
 
         return d
@@ -336,22 +342,22 @@ class ApplycalRegressionExtractor(RegressionExtractor):
         d = OrderedDict()
 
         try:
-            summaries_by_name = {s['name']: s for s in result.summaries}
-            num_flags_before = summaries_by_name['before']['flagged']
-            num_flags_after = summaries_by_name['applycal']['flagged']
+            # summaries_by_name = {s['name']: s for s in result.summaries}
+            # num_flags_before = summaries_by_name['before']['flagged']
+            # num_flags_after = summaries_by_name['applycal']['flagged']
             
-            d['{}.num_rows_flagged.before'.format(prefix)] = int(num_flags_before)
-            d['{}.num_rows_flagged.after'.format(prefix)] = int(num_flags_after)
+            # d['{}.num_rows_flagged.before'.format(prefix)] = int(num_flags_before)
+            # d['{}.num_rows_flagged.after'.format(prefix)] = int(num_flags_after)
 
-            flag_summary_before = summaries_by_name['before']
-            for scan_id, v in flag_summary_before['scan'].items():
-                d['{}.scan_{}.num_rows_flagged.before'.format(prefix, scan_id)] = int(v['flagged'])
+            # flag_summary_before = summaries_by_name['before']
+            # for scan_id, v in flag_summary_before['scan'].items():
+            #     d['{}.scan_{}.num_rows_flagged.before'.format(prefix, scan_id)] = int(v['flagged'])
 
-            flag_summary_after = summaries_by_name['applycal']
-            for scan_id, v in flag_summary_after['scan'].items():
-                d['{}.scan_{}.num_rows_flagged.after'.format(prefix, scan_id)] = int(v['flagged'])
+            # flag_summary_after = summaries_by_name['applycal']
+            # for scan_id, v in flag_summary_after['scan'].items():
+            #     d['{}.scan_{}.num_rows_flagged.after'.format(prefix, scan_id)] = int(v['flagged'])
 
-            qa_entries = extract_qa_score_regression(prefix, result)
+            qa_entries = extract_qa_score_regression_json(prefix, result)
             d.update(qa_entries)
 
         except: 
@@ -1024,6 +1030,42 @@ def extract_qa_score_regression(prefix:str, result:Results) -> OrderedDict:
     return d
 
 
+def extract_qa_score_regression_json(prefix:str, result:Results) -> OrderedDict:
+    """
+    Create QA strings are properties of result, and insert them to OrderedDict.
+
+    Args:
+        prefix: Prefix string
+        result: Result object
+
+    Returns:
+        OrderedDict
+    """
+    d = OrderedDict()
+    for qa_score in result.qa.pool:
+        metric_name = qa_score.origin.metric_name
+        # Remove all non-word characters (everything except numbers and letters)
+        metric_name = re.sub(r"[^\w\s]", '', metric_name)
+        # Replace all runs of whitespace with a single dash
+        metric_name = re.sub(r"\s+", '-', metric_name)
+
+        origin = prefix
+        longdescription = metric_name + "'s long description."
+        units = qa_score.origin.metric_units
+        value = str(qa_score.origin.metric_score)
+        score = qa_score.score
+
+        d['name'] = metric_name
+        d['origin'] = origin
+        d['longdescription'] = longdescription
+        d['units'] = units
+        d['value'] = value
+        d['score'] = score
+
+        print(d)
+    return d
+
+
 def extract_regression_results(context: Context) -> List[str]:
     """
     Extract regression result and return logs.
@@ -1041,6 +1083,22 @@ def extract_regression_results(context: Context) -> List[str]:
 
     # return unified
     return ['{}={}'.format(k, v)for k, v in unified.items()]
+
+
+def write_stats_information(context: Context) -> dict:
+    stats_dict = {}
+    for results_proxy in context.results:
+        results = results_proxy.read()
+        handled_result = registry.handle(results)
+        if handled_result:
+            stats_dict[str(results.uuid)] = handled_result
+
+    print(stats_dict)
+
+    with open('stats.json', 'w', encoding='utf-8') as f:
+        print("writing to file")
+        json.dump(stats_dict, f, ensure_ascii=False, indent=4)
+    return stats_dict
 
 
 def get_all_subclasses(cls: RegressionExtractor) -> List[RegressionExtractor]:

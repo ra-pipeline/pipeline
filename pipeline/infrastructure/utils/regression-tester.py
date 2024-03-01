@@ -76,13 +76,13 @@ class PipelineRegression(object):
                 else: 
                     LOG.warning("No reference file found in {}. Test will fail.".format(expectedoutput_dir))
 
-        self.testinput = [f'{input_dir}/{vis}' for vis in self.visname] 
+        self.testinput = [f'{input_dir}/{vis}' for vis in self.visname]
         self.current_path = os.getcwd()
         if output_dir:
             self.output_dir = output_dir
-        elif self.project_id: 
+        elif self.project_id:
             self.output_dir = f'{self.project_id}__{self.visname[0]}_test_output'
-        else: 
+        else:
             self.output_dir = f'{self.visname[0]}_test_output'
 
         if hasattr(pytest, 'pytestconfig'):
@@ -207,12 +207,18 @@ class PipelineRegression(object):
                     self.__run_ppr(input_vis, ppr, telescope)
                 else:
                     self.__run_reducer(input_vis)
-            else: 
+            else:
                 os.chdir('working')
 
             # Get new results
-            new_results = self.__get_results_of_from_current_context()
+#            new_results = self.__get_results_of_from_current_context()
+            json_results = self.__write_stats_file()
 
+            print("writing json stats file...")
+            print(json_results)
+
+            return
+        
             # new results file path
             new_file = f'{self.visname[0]}.NEW.results.txt'
 
@@ -299,6 +305,11 @@ class PipelineRegression(object):
         """
         with open(new_file, 'w') as fd:
             fd.writelines([str(x) + '\n' for x in new_results])
+
+    def __write_stats_file(self):
+        context = pipeline.Pipeline(context='last').context
+        new_results = sorted(regression.write_stats_information(context))
+        return new_results 
 
     def __get_results_of_from_current_context(self) -> List[str]:
         """

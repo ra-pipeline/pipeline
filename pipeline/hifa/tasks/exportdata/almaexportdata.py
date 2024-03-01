@@ -81,6 +81,8 @@ class ALMAExportData(exportdata.ExportData):
                                                         report_generator=almaifaqua.AlmaAquaXmlGenerator(),
                                                         weblog_filename=results.weblog)
 
+        # Export the stats file PLACEHOLDER?
+
         # Update the manifest
         if auxfproducts is not None or pipe_aqua_reportfile is not None:
             manifest_file = os.path.join(self.inputs.products_dir, results.manifest)
