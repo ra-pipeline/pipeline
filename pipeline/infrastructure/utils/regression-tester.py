@@ -332,6 +332,12 @@ class PipelineRegression(object):
         ppr_local = f'../{os.path.basename(ppr_path)}'
         shutil.copyfile(ppr_path, ppr_local)
 
+        # executeppr expects this environment variable pointing to "working/", or take
+        # the CWD as fallback, if $SCIPIPE_ROOTDIR is not set (PIPE-2093). Here, an explicit
+        # unset of $SCIPIPE_ROOTDIR ensures the path is always constructed correctly even
+        # $SCIPIPE_ROOTDIR is already specified from the shell before the test session.
+        os.environ.pop('SCIPIPE_ROOTDIR', None)
+
         if telescope == 'alma':
             almappr.executeppr(ppr_local, importonly=False)
         elif telescope == 'vla':
