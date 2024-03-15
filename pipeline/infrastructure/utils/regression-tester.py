@@ -25,6 +25,7 @@ import pipeline.infrastructure.executeppr as almappr
 import pipeline.infrastructure.executevlappr as vlappr
 from pipeline.infrastructure.utils import shutdown_plotms, get_casa_session_details, reset_logfiles
 from pipeline.infrastructure import mpihelpers
+from pipeline.hifa.tasks.importdata import dbfluxes
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -91,7 +92,7 @@ class PipelineRegression(object):
         else:
             self.remove_workdir = False
             self.compare_only = False
-        
+
         if not self.compare_only:
             self.__initialize_working_folder()
 
@@ -331,12 +332,6 @@ class PipelineRegression(object):
         ppr_path = casa_tools.utils.resolve(ppr)
         ppr_local = f'../{os.path.basename(ppr_path)}'
         shutil.copyfile(ppr_path, ppr_local)
-
-        # executeppr expects this environment variable pointing to "working/", or take
-        # the CWD as fallback, if $SCIPIPE_ROOTDIR is not set (PIPE-2093). Here, an explicit
-        # unset of $SCIPIPE_ROOTDIR ensures the path is always constructed correctly even
-        # $SCIPIPE_ROOTDIR is already specified from the shell before the test session.
-        os.environ.pop('SCIPIPE_ROOTDIR', None)
 
         if telescope == 'alma':
             almappr.executeppr(ppr_local, importonly=False)
@@ -670,6 +665,49 @@ def data_directory(scope="module") -> str:
     else:
         print("Using: {} for data directory".format(big_data_dir))
     return big_data_dir
+
+
+def dbservice_urls(urls=None):
+    last_urls = (dbfluxes.FLUX_SERVICE_URL, dbfluxes.FLUX_SERVICE_URL_BACKUP)
+    if isinstance(urls, list) and len(urls) == 2:
+        dbfluxes.FLUX_SERVICE_URL = urls[0]
+        dbfluxes.FLUX_SERVICE_URL_BACKUP = urls[1]
+    return last_urls
+
+
+@pytest.fixture(autouse=True)
+def test_config(scope="module"):
+    """Standardize regression tests setup."""
+
+    # executeppr expects $SCIPIPE_ROOTDIR pointing to the path of "working/"; after PIPE-2093, if 
+    # $SCIPIPE_ROOTDIR is not set, executeppr will also take the CWD as a fallback. However, because 
+    # specifying $SCIPIPE_ROOTDIR from the shell will cause the regression tester to fail in detecting
+    # "rawdata/", due to the CWD change behavior between individual tests, here we must explictly disable 
+    # $SCIPIE_ROOTDIR during a Pytest session.
+    env_scipipe_rootdir = os.environ.pop('SCIPIPE_ROOTDIR', None)
+
+    # The online regression test plan doesn't use dbservice; so by default, we disable dbservice
+    # URL during a Pytest session.
+
+    if hasattr(pytest, 'pytestconfig'):
+        dbservice = pytest.pytestconfig.getoption('--dbservice')
+    else:
+        dbservice = False
+
+    # disable dbservice URLs during a Pytest session.
+    if not dbservice:
+        last_urls = dbservice_urls()
+        mpihelpers.exec_func(dbservice_urls, ['', ''])
+
+    yield
+
+    # recover the before-pytest $SCIPIPE_ROOTDIR setting
+    if env_scipipe_rootdir is not None:
+        os.environ['SCIPIPE_ROOTDIR'] = env_scipipe_rootdir
+
+    # enable dbservice URLs after a Pytest session.
+    if not dbservice:
+        mpihelpers.exec_func(dbservice_urls, last_urls)
 
 
 def setup_flux_antennapos(test_directory, output_dir):

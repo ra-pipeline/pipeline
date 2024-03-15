@@ -151,8 +151,10 @@ class SerialALMAImportData(importdata.ImportData):
         if self.inputs.dbservice:
             testquery = '?DATE=27-March-2013&FREQUENCY=86837309056.169219970703125&WEIGHTED=true&RESULT=1&NAME=J1427-4206&VERBOSE=1'
             # Test for service response
-            flux_url, backup_flux_url = dbfluxes.get_flux_urls()
-            url = flux_url + testquery
+            baseurl = dbfluxes.FLUX_SERVICE_URL
+            url = baseurl + testquery
+            if baseurl == '':
+                url = ''
 
             try:
                 ssl_context = ssl.create_default_context(cafile=certifi.where())
@@ -164,9 +166,12 @@ class SerialALMAImportData(importdata.ImportData):
                 try:
                     LOG.warning('Unable to execute initial test query with primary flux service.')
                     ssl_context = ssl.create_default_context(cafile=certifi.where())
-                    url = backup_flux_url + testquery
-                    LOG.info('Attempting test query at backup: %s', url)
-                    urllib.request.urlopen(url, context=ssl_context, timeout=60.0)
+                    baseurl = dbfluxes.FLUX_SERVICE_URL_BACKUP
+                    url = baseurl + testquery
+                    if baseurl == '':
+                        url = ''
+                    LOG.info('Attempting test query at backup: {!s}'.format(url))
+                    response = urllib.request.urlopen(url, context=ssl_context, timeout=60.0)
                     xml_results, qastatus = dbfluxes.get_setjy_results(observing_run.measurement_sets)
                     fluxservice='BACKUPURL'
                 except Exception as e2:
