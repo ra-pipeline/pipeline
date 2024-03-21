@@ -18,6 +18,7 @@ if IN_PIPELINE:
     Draw_graph = False
 else:
     import lf_gmn as lfr          # jupyternote (version-4.3 uses lf_gmn module)
+    Draw_graph = True
 
 
 # <br>
@@ -125,7 +126,6 @@ SGZXMAX=2            # 2:
 
 # Parameters for Graphic Option
 
-Draw_graph = True
 Savefig_only_detected_lines = False    # True: Save figures if lines are detected   # False: Save all figures
 Show_details = False             # False: only Fig-0,  # True: All Figs   # True : only Fig-i
 Show_each = 0 # 0 1 2           # 0                   # 0                # i(1..5)
