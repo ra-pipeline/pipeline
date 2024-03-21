@@ -1,95 +1,136 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-In_pipeline : bool = True    # Set this boolean parameter to True 'In_pipeline'.
+IN_PIPELINE : bool = True    # Set this boolean parameter to True 'IN_PIPELINE'.
+BOTH_SIDES_EXCLUSIONS :bool = False    # If True, main exclusion side is fixed, and weak excusion is invoked in the reverse side.
+GAUSSIAN_ENABLE:bool = False        # Gaussian_subtraction is used when linear baseline is inappropiate.
+WL_ANALYSIS : bool = True  # Narrow line analysis is activated in wide line ranges
 
 
 # Find indices of lines from spectrum data.
-#
-# <br>
-#     lf_g_gmngs.py (v.4.3)<br>
-#     This module provides a line finder based on Gaussian filter along with baseline estimator using Geman-McClure function.<br>
-#     <br>
-#     line_finder() is a main function of this module, which serves as a line finder for a given spectrum data.<br>
-#     <br>
-#     Abstract of line_finder() is as folows:<br>
-#     0)Rough estimation of mean and std of Baseline by Iterative 2-sigma exclusions: (iterative_2s_exclusions())<br>
-#     1)Baseline estimation by Geman-McClure function: (lf_gmn.py)<br>
-#     2)Integrated line detection by zero-crossings of first derivative of Gaussian average of SIGNAL_BL: (integrated_line_detection())<br>
-#       2.1)Narrow line detection by zero-crossings of the first derivative of Gaussian average on SIGNAL_BL: (narrow_line_detection())<br>
-#       2.2)Indices of the detected lines are made: (in line_finder())
-#
-
-sigma_sp :float          #STD, most important parameter estimated in this module
-local_std :float         #local_std
-ga5_std:float            #ga5_std
-gs_param:float = 1.2     #2.0
-optimum_sigma:float = 10.0   #10.0
-
-e_std_max = 12          #Maximum iterations of iterative 2-sigma exclusions for estimation of STD and BL
-e_std :int
-thr_rmg = 2.25          #Main requirement for the estimation termination is relative_mean_gap < thr_rmg.
-forced_level_down = 0.1 #When cut_level[est] is not effective in the iterative exclusions, cut_level is reduced forced_level_down
-
-Baseline_estimation :bool = True    # If True, baseline estimation is effective.
-Baseline_inclination :bool = True   # If False, horizontal baseline is assumed.
-thr_ss = 128                        # Inclination is effective for dmax > thr_ss
-thr_rpg = 0.5                       # Inclination is effective when abs(relative_pos_gap) > thr_rpg
-Gaussian_enable:bool = True        # Gaussian_subtraction is used when linear baseline is inappropiate.
-Gaussian_subtraction:bool           # Boolen parameter for baseline type selection
-
-# Baseline estimation by Geman-McClure function
-gm_param = 4                         # In Geman-McClure function, parameter c is defined by STD/gm_param.
-
-# Line/WideLine detection
-sgzxmax=3             # 3: See details in line_finder()
-wl_mask_index = 1     # 1: 0 through 3 are effective, wl_mask_index indicates a number of effective sigma's
-thr_c = 0.01          # 0.01, fixed empirically, used in narrow_line_detection()
-thr_h = 40            # 40, fixed empirically, used in integrated_line_detection()
-thr_fgh = 100         # 100, fixed empirically, used in integrated_line_detection()
-
-# Line Width estimation
-Gaussian_sp_bl :bool   # When True, zero-crosings of Median of Gaussian (with sigma=1) of signal_bl is used for edge estimation
-                       # Otherwise, zero-crossings of signal_bl is used.
-median_iw :int         # global parameter controled by Gaussian_sp_bl
-thr_Gsb = 20.0         # Threshold for determining Gaussian_sp_bl:      Gaussian_sp_bl = (max_height/sigma_sp < thr_Gsb)
-
-# Other global parameters
-dmax : int           # length of input spectrum
-min_X : int          # effective range of spectrum is [min_x:max_x]
-max_X : int          # effective range of spectrum is [min_x:max_x]
-max_height : int     # maximum height of signal_bl
-min_height : int     # minimum height of signal_bl
-sign_dist : int      # automatically set to max_height/abs(min_height) in line_finder()
-
-thr_d : float         # automatically tuned by Gaussian_sp_bl in narrow_line_detection()
-thr_f1 : float        # automatically tuned by sign_dist in integrated_line_detection()
-thr_f2 : float        # automatically tuned by sign_dist in integrated_line_detection()
-thr_g1 : float         # automatically tuned to thr_d in integrated_line_detection()
-
-# Parameters for Graphic Option
-Draw_graph = True
-Savefig_only_detected_lines = False    # True: Save figures if lines are detected   # False: Save all figures
-Show_details = False             # False: only Fig-0,  # True: All Figs   # True : only Fig-i
-Show_each = 0 # 0 1 2 3 4 5      # 0                   # 0                # i(1..5)
-Show_label = True                #effective only when Show_details = False
-Zoom_in = 0 # if Zoom_in=1,narrow band arround the highest peak is shown in the graph, if Zoom_in==2, given band.
 
 import numpy as np
 from math import pi, sqrt, exp, log, isnan
 import copy
 from typing import List, Optional
-if In_pipeline:
-    from . import lf_gmn as lfr   # bitbucket (pipeline)   lf_gmn_open
+if IN_PIPELINE:
+    from . import lf_gmn as lfr   # bitbucket (pipeline) lf_gmn
     Draw_graph = False
 else:
     import lf_gmn as lfr          # jupyternote (version-4.3 uses lf_gmn module)
+
+
+# <br>
+# <br><br>
+#     lf_g_gmngs.py (v.4.3)<br><br>
+#     This module provides a line finder based on Gaussian filter along with baseline estimator using Geman-McClure function.<br><br>
+#     <br><br>
+#     line_finder() is a main function of this module, which serves as a line finder for a given spectrum data.<br><br>
+#     <br><br>
+#     Abstract of line_finder() is as follows:<br><br>
+#     0)Rough estimation of mean and std of Baseline by Iterative 2-sigma exclusions: (iterative_2s_exclusions())<br><br>
+#     1)Baseline estimation by Geman-McClure function: (lf_gmn.py)<br><br>
+#     2)Integrated line detection by zero-crossings of first derivative of Gaussian average of SIGNAL_BL: (integrated_line_detection())<br><br>
+#       2.1)Narrow line detection by zero-crossings of the first derivative of Gaussian average on SIGNAL_BL: (narrow_line_detection())<br><br>
+#       2.2)Indices of the detected lines are made: (in line_finder())<br>
+#
 
 np_signal = 'np.ndarray[float]'
 line_list = List[List[int]]
 ranges = List[int]
 kernel = List[float]
 odd = int
+
+
+# Important parameters
+
+sigma_sp :float          #STD, most important parameter estimated in this module
+local_std :float         #local_std
+ga5_std:float            #ga5_std
+GS_PARAM:float = 1.2     #2.0
+optimum_sigma:float       #10.0
+
+
+# Iterative 2-sigma exclusions
+
+E_STD_MAX = 12          #Maximum iterations of iterative 2-sigma exclusions for estimation of STD and BL
+e_std :int
+THR_RMG = 2.25          #Main requirement for the estimation termination is relative_mean_gap < THR_RMG.
+FORCED_LEVEL_DOWN = 0.1 #When cut_level[est] is not effective in the iterative exclusions, cut_level is reduced FORCED_LEVEL_DOWN
+
+
+# Baseline estimation by Geman-McClure function
+
+BASELINE_ESTIMATION :bool = True    # If True, baseline estimation is effective.
+BASELINE_INCLINATION :bool = True   # If False, horizontal baseline is assumed.
+THR_SS = 128                        # Inclination is effective for dmax > THR_SS
+THR_RPG = 0.5                       # Inclination is effective when abs(relative_pos_gap) > THR_RPG
+GM_PARAM = 4                         # In Geman-McClure function, parameter c is defined by STD/GM_PARAM.
+
+#
+
+Gaussian_subtraction:bool           # Boolen parameter for baseline type selection
+
+# WideLine detection
+
+#
+# <br>
+#     Requirements for lines used in integrated_line_detection():<br>
+#       (mean_line > thr_f*sigma_sp) or (max_line > thr_g*sigma_sp) or (area_line > THR_H*sigma_sp) or (prod3_line > THR_FGH)   #emissional<br>
+#       (mean_line < -thr_f*sigma_sp) or (min_line < -thr_g*sigma_sp) or (area_line > THR_H*sigma_sp) or (prod3_line > THR_FGH) #absorption<br>
+#     where mean_line = np.mean(sp_bl[ib:ie]) if ie > ib+2 else 0<br>
+#           max_line = np.max(sp_bl[ib:ie])<br>
+#           area_line = mean_line *min(ie-ib,100)<br>
+#           prod3_line = (mean_line * max_line * area_line)/sigma_sp**3<br>
+#     when [ib:ie] indicates a range of line candidate.<br>
+#
+
+# Threshold parameters and how they are tuned in integrated_line_detection()
+
+THR_E = 0.01          # 0.01, fixed empirically, used in integrated_line_detection()
+#
+#thr_f : float        # used in (mean_line > thr_f*sigma_sp) for emissional line
+                      # this parameter is selected from thr_f1 and thr_f2 and tuned by ie-ib between 1.3 and 3.0
+thr_f1 : float        # automatically tuned by sign_dist between 1.5 and 3.0
+thr_f2 : float        # automatically tuned by sign_dist between 1.5 and 3.0
+#
+thr_g : float         # used in (max_line > thr_g*sigma_sp) for emissional line
+                      # tuned by sign_dist and ie-ib between 3.5 and 4.5
+THR_G0 : float = 4.5  # 4.5, base value of thr_g, fixed empirically
+#
+THR_H = 40            # used in (area_line > THR_H*sigma_sp) for emissional line
+                      # 40, fixed empirically
+#
+THR_FGH = 100         # used in (prod3_line > THR_FGH) for emissional line
+                      # 100, fixed empirically
+                      # NOTE: THR_FGH < thr_f * thr_g * thr_h
+
+# Line Width estimation
+
+THR_SPBL = 20.0        # Threshold for determining Gaussian_sp_bl:      Gaussian_sp_bl = (max_height/sigma_sp < THR_SPBL)
+Gaussian_sp_bl :bool   # When True, zero-crosings of Median of Gaussian (with sigma=1) of signal_bl is used for edge estimation
+                       # Otherwise, zero-crossings of signal_bl is used.
+median_iw :int         # global parameter controled by Gaussian_sp_bl
+sp_bl_a: np_signal     # signal used for edge detection
+
+# Other global parameters
+
+dmax : int           # length of input spectrum
+min_X : int          # effective range of spectrum is [min_x:max_x]
+max_X : int          # effective range of spectrum is [min_x:max_x]
+max_height : int     # maximum height of signal_bl
+min_height : int     # minimum height of signal_bl
+sign_dist : int      # automatically set to max_height/abs(min_height), used for tune thr_f1 and thr_f2, in line_finder()
+SGZXMAX=2            # 2:
+
+# Parameters for Graphic Option
+
+Draw_graph = True
+Savefig_only_detected_lines = False    # True: Save figures if lines are detected   # False: Save all figures
+Show_details = False             # False: only Fig-0,  # True: All Figs   # True : only Fig-i
+Show_each = 0 # 0 1 2           # 0                   # 0                # i(1..5)
+Show_label = True                #effective only when Show_details = False
+Zoom_in = 0 # if Zoom_in=1,narrow band arround the highest peak is shown in the graph, if Zoom_in==2, given band.
 
 def gaussian(n: odd, sigma: float) -> kernel:
     """
@@ -158,12 +199,12 @@ def med_bl_a(sig :np_signal, ib:int, ibmin:int, ibmax:int) -> float:    # median
         real number: median of sig[ib+ib0:ib+ib1]
     """
     global median_iw
-    median_iw = 0      # SOS
+    #median_iw = 0      # SOS
     ib0 = max(ibmin,ib-median_iw)
     ib1 = min(ibmax,ib+median_iw+1)
     return np.ma.median(sig[ib0:ib1])
 
-def narrow_line_detection(sp_bl:np_signal, sigma:float, signal:np_signal, coeff:np_signal, wl_flag:'np.ndarray[int]', wl_analysis:bool) ->line_list:
+def narrow_line_detection(sp_bl:np_signal, sigma:float, signal:np_signal, coeff:np_signal, wl_flag:'np.ndarray[int]', WL_ANALYSIS:bool) ->line_list:
     """
     Detect narrow lines from a baseline-subtracted signal using zero-crossings of the first derivative of Gaussian average.
     Qualification check is made by using the second derivative and baseline-subtracted signal.
@@ -173,17 +214,17 @@ def narrow_line_detection(sp_bl:np_signal, sigma:float, signal:np_signal, coeff:
         signal: np.ndarray representing the first floor derivative of Gaussian average of sp_bl
         coeff: np.ndarray representing the second floor derivative of Gaussian average of sp_bl
         wl_flag: np.ndarray[int] reprisenting whether each channel is included in wide-lines
-        wl_analysis: bool representing effectiveness of the narrow-line detection in the wide-line ranges
-    Requirements for narrow lines (effective when (not wl_flag[i] or wl_analysis) == True)
-        1) -coeff[i] > thr_c (emission line)       coeff[i] > thr_c (absorption line)
-        2) sp_bl[i] > thr_d1 * sigma_sp            sp_bl[i] < -sigma_sp *thrt_d2
+        WL_ANALYSIS: bool representing effectiveness of the narrow-line detection in the wide-line ranges
+    Requirements for narrow lines (effective when (not wl_flag[i] or WL_ANALYSIS) == True)
+        1) -coeff[i] > THR_E (emission line)       coeff[i] > THR_E (absorption line)
+        2) sp_bl[i] > thr_g * sigma_sp            sp_bl[i] < -thr_g * sigma_sp
     Returns:
         line_list: A list of list representing peak, start and end indices of spectral lines. The indices of
                     lines are in the order of, e.g., [[peak1, start1, end1], ..., [peakN, startN, endN]].
     """
-    global sigma_sp, Gaussian_sp_bl, thr_c, thr_d
+    global sigma_sp, THR_E, thr_g, sp_bl_a
     global min_X,max_X,max_height,min_height
-    global median_iw
+
     detected_lines = []
     k_edge = int(sigma * 3)
     ksize= 2 * k_edge + 1
@@ -198,21 +239,6 @@ def narrow_line_detection(sp_bl:np_signal, sigma:float, signal:np_signal, coeff:
     std_coeff = np.std(coeff[min_X:max_X])
     coeff[min_X:max_X] /= std_coeff
 
-    # Preparation for edge-detection.
-    if Gaussian_sp_bl:        # When sp_bl is noisy, Gaussian average is used for adjusting edges.
-        k_edge2 = 1
-        g_ave2 = np.ma.arange(sp_bl.shape[0], dtype=np.float64)
-        g_ave2[min_X:max_X] = gaussian_average(sp_bl[min_X:max_X],k_edge2)
-        sp_bl_a = g_ave2
-        median_iw = 1
-        thr_d = 4.5
-    else:                     # When sp_bl is not noisy, original signal is used for djusting edges.
-        sp_bl_a = sp_bl
-        median_iw = 0
-        thr_d = 4.0
-    thrt_d1 = thr_d
-    thrt_d2 = thr_d * 1.5
-
     # Make a List of zero-crossings.
     zero_crossings = np.where(np.diff(np.sign(signal[min_X:max_X])))[0]     # Simple implementation of crossing-range detection.
     zero_crossings += min_X
@@ -224,17 +250,21 @@ def narrow_line_detection(sp_bl:np_signal, sigma:float, signal:np_signal, coeff:
         i = zero_crossings[j]
         ib_lim = min_X if j == 0 else zero_crossings[j-1]          # lower/upper limits of the line
         ie_lim = max_X if j == (len(zero_crossings)-1) else zero_crossings[j+1]
-        dl_on = not wl_flag[i] or wl_analysis    # dl_on is controled by combination of wl_flag and wl_analysis
+        dl_on = not wl_flag[i] or WL_ANALYSIS    # dl_on is controled by combination of wl_flag and WL_ANALYSIS
         emissional = (signal[i] > signal[i+1])
         if dl_on and emissional:
-            if (-coeff[i] > thr_c and (sp_bl[i] > sigma_sp*thrt_d1)):          # Qualification by coeff and sp_bl
+            if (-coeff[i] > THR_E and (sp_bl[i] > sigma_sp * thr_g)):          # Qualification by coeff and sp_bl
                 if max_height > -min_height:
-                    ib, ie = find_edges_e(i, sp_bl_a, ib_lim, ie_lim)
+                    #ib, ie = find_edges_e(i, sp_bl_a, ib_lim, ie_lim)
+                    ib = i
+                    ie = i+1
                     detected_lines.append([i,ib,ie])
         elif dl_on:  # absorption
-            if coeff[i] > thr_c and sp_bl[i] < -sigma_sp *thrt_d2 :                   # Qualification by coeff and sp_bl
+            if coeff[i] > THR_E and sp_bl[i] < -sigma_sp * thr_g :                   # Qualification by coeff and sp_bl
                 if min_height < -max_height:
-                    ib, ie = find_edges_a(i, sp_bl_a, ib_lim, ie_lim)
+                    #ib, ie = find_edges_a(i, sp_bl_a, ib_lim, ie_lim)
+                    ib = i
+                    ie = i+1
                     detected_lines.append([i,ib,ie])
     return(detected_lines)
 
@@ -290,7 +320,7 @@ def parameter_set2(sign_dist :float) -> 'float, float':
         thr_f2: threshold for absortion lines
     """
     if sign_dist > 10.0:
-        thr_f1 = 1.5   # very sensitive for mean_height in positive side
+        thr_f1 = 1.5   # very sensitive for mean_line in positive side
         thr_f2 = 3
     elif sign_dist > 2.0:
         thr_f1 = 2.5   # a little sensitive in positive side
@@ -303,7 +333,7 @@ def parameter_set2(sign_dist :float) -> 'float, float':
         thr_f2 = 2.5   # a little sensitive in negative side
     else:
         thr_f1 = 3
-        thr_f2 = 1.5   # very sensitive for mean_height in negative side
+        thr_f2 = 1.5   # very sensitive for mean_line in negative side
     return(thr_f1,thr_f2)
 
 def integrated_line_detection(sp_bl:np_signal,sigma:float,signal:np_signal,coeff:np_signal) ->line_list:
@@ -316,19 +346,19 @@ def integrated_line_detection(sp_bl:np_signal,sigma:float,signal:np_signal,coeff
         signal: np.ndarray representing the first floor derivative of Gaussian average of sp_bl
         coeff: np.ndarray representing the second floor derivative of Gaussian average of sp_bl
     Requirements for wide lines:
-      (mean_g > thr_f*sigma_sp) or (max_g > thr_g*sigma_sp) or (area_g > thr_h*sigma_sp) or (prod_coeff > thr_fgh)   #emissional
-      (mean_g < -thr_f*sigma_sp) or (min_g < -thr_g*sigma_sp) or (area_g > thr_h*sigma_sp) or (prod_coeff > thr_fgh) #absorption
-    where mean_g = np.mean(sp_bl[ib:ie]) if ie > ib+2 else 0
-          max_g = np.max(sp_bl[ib:ie])
-          area_g = mean_g *min(ie-ib,100) #if mean_g > 1.0 else 0
-          prod_coeff = (mean_g * max_g * area_g)/sigma_sp**3
+      (mean_line > thr_f*sigma_sp) or (max_line > thr_g*sigma_sp) or (area_line > THR_H*sigma_sp) or (prod3_line > THR_FGH)   #emissional
+      (mean_line < -thr_f*sigma_sp) or (min_line < -thr_g*sigma_sp) or (area_line > THR_H*sigma_sp) or (prod3_line > THR_FGH) #absorption
+    where mean_line = np.mean(sp_bl[ib:ie]) if ie > ib+2 else 0
+          max_line = np.max(sp_bl[ib:ie])
+          area_line = mean_line *min(ie-ib,100) #if mean_line > 1.0 else 0
+          prod3_line = (mean_line * max_line * area_line)/sigma_sp**3
     Returns:
         line_list: A list of list representing peak, start and end indices of spectral lines. The indices of
                     lines are in the order of, e.g., [[peak1, start1, end1], ..., [peakN, startN, endN]].
     """
-    global sigma_sp, Gaussian_sp_bl,thr_c,thr_f1,thr_f2,thr_g1,thr_h,thr_fgh,sign_dist
+    global sigma_sp, Gaussian_sp_bl,THR_E,thr_f1,thr_f2,thr_g,THR_G0,THR_H,THR_FGH,sign_dist
     global min_X,max_X
-    global median_iw
+    global median_iw, sp_bl_a
     k_edge = int(sigma * 3)
     ksize= 2 * k_edge + 1
     _dg1 = np.array(derivative_of_gaussian(ksize,sigma))
@@ -351,14 +381,12 @@ def integrated_line_detection(sp_bl:np_signal,sigma:float,signal:np_signal,coeff
         g_ave2[min_X:max_X] = gaussian_average(sp_bl[min_X:max_X],k_edge2)
         sp_bl_a = g_ave2                       # Gausian average is used
         median_iw = 1
-        thr_g1 = 4.5
     else:
         sp_bl_a = sp_bl                        # original signal is used
         median_iw = 0
-        thr_g1 = 4.0
     thr_f1,thr_f2 = parameter_set2(sign_dist)
     print('sign_dist,thr_f1,thr_f2',sign_dist,thr_f1,thr_f2)
-    print('thr_c,f1,f2,g1,h,fgh',thr_c,thr_f1,thr_f2,thr_g1,thr_h,thr_fgh)
+    print('THR_E,f1,f2,G0,H,FGH',THR_E,thr_f1,thr_f2,THR_G0,THR_H,THR_FGH)
     first_spbl = sp_bl[min_X]
     detected_lines = []
     ib_lim = min_X
@@ -370,41 +398,41 @@ def integrated_line_detection(sp_bl:np_signal,sigma:float,signal:np_signal,coeff
             #print ('last_registered',i)
             continue
         emissional = (signal[i] > signal[i+1])
-        if emissional and (-coeff[i] > thr_c):
+        if emissional and (-coeff[i] > THR_E):
             ib, ie = find_edges_e(i, sp_bl_a, ib_lim, ie_lim)
             if ib != ie:                            # Select a wide line by mean, max and area of sp_bl[ib:ie]
-                mean_g = np.mean(sp_bl[ib:ie]) if ie > ib+2 else 0    # mean_g is effective when ie > 1b + 2
+                mean_line = np.ma.mean(sp_bl[ib:ie]) if ie > ib+2 else 0    # mean_line is effective when ie > 1b + 2
                 thr_f = thr_f1
-                thr_g = thr_g1
+                thr_g = THR_G0
                 if sign_dist > 2:        # thr_f and thr_g are tuned by sign_dist and ie-ib
                     if ie > ib + 10:
                         thr_f -= 0.2
                         thr_g -= 1.0
                     elif ie > ib + 5:
                         thr_f -= 0.1
-                max_g = np.max(sp_bl[ib:ie])
-                area_g = mean_g *min(ie-ib,100) #if mean_g > 1.0 else 0
-                prod_coeff = (mean_g * max_g * area_g)/sigma_sp**3
-                if (mean_g > thr_f*sigma_sp) or (max_g > thr_g*sigma_sp) or (area_g > thr_h*sigma_sp) or (prod_coeff > thr_fgh):
+                max_line = np.max(sp_bl[ib:ie])
+                area_line = mean_line *min(ie-ib,100) #if mean_line > 1.0 else 0
+                prod3_line = (mean_line * max_line * area_line)/sigma_sp**3
+                if (mean_line > thr_f*sigma_sp) or (max_line > thr_g*sigma_sp) or (area_line > THR_H*sigma_sp) or (prod3_line > THR_FGH):
                     ic = ib + np.argmax(sp_bl[ib:ie])  #(ib+ie)//2
                     detected_lines.append([ic,ib,ie])
                     last_registered = [ic,ib,ie]
-        elif (not emissional) and (coeff[i] > thr_c):
+        elif (not emissional) and (coeff[i] > THR_E):
             ib, ie = find_edges_a(i, sp_bl_a, ib_lim, ie_lim)
             if ib != ie:                          # Select a wide line by mean, max and area of sp_bl[ib:ie]
-                mean_g = np.mean(sp_bl[ib:ie]) if ie > ib+2 else 0
+                mean_line = np.ma.mean(sp_bl[ib:ie]) if ie > ib+2 else 0
                 thr_f = thr_f2
-                thr_g = thr_g1
+                thr_g = THR_G0
                 if sign_dist < 0.5:        # thr_f and thr_g are tuned by sign_dist and ie-ib
                     if ie > ib + 10:
                         thr_f -= 0.2
                         thr_g -= 1.0
                     elif ie > ib + 5:
                         thr_f -= 0.1
-                min_g = np.min(sp_bl[ib:ie])
-                area_g = -mean_g * min(ie-ib,100) if -mean_g > 1.0 else 0
-                prod_coeff = (mean_g * min_g * area_g)/sigma_sp**3
-                if (mean_g < -thr_f*sigma_sp) or (min_g < -thr_g*sigma_sp) or (area_g > thr_h*sigma_sp) or (prod_coeff > thr_fgh):
+                min_line = np.min(sp_bl[ib:ie])
+                area_line = -mean_line * min(ie-ib,100) if -mean_line > 1.0 else 0
+                prod3_line = (mean_line * min_line * area_line)/sigma_sp**3
+                if (mean_line < -thr_f*sigma_sp) or (min_line < -thr_g*sigma_sp) or (area_line > THR_H*sigma_sp) or (prod3_line > THR_FGH):
                     ic = ib + np.argmin(sp_bl[ib:ie])  #(ib+ie)//2
                     detected_lines.append([ic,ib,ie])
                     last_registered = [ic,ib,ie]
@@ -535,24 +563,26 @@ def draw_graph_gmr(_spectrum:np_signal,baseline,_spectrum_bl:np_signal,signal:np
     This is not used in the pipeline.
     """
     import matplotlib.pyplot as plt
-    global thr_c,thr_d,thr_f1,thr_f2,thr_rmg,gm_param,sigma_sp
+    #global THR_E,thr_d,thr_f1,thr_f2,THR_RMG,GM_PARAM,sigma_sp
+    global THR_E,THR_G0,thr_f1,thr_f2,THR_RMG,GM_PARAM,sigma_sp
     global dmax,min_X,max_X
     global Zoom_in, Show_details, Show_each, Show_label,Savefig_only_detected_lines
     X = np.ma.arange(dmax)
-    sgzxmax = len(sgzx_list)
-    if 1:
-        sgzxmax += 1
-    str1 = format(Baseline_estimation,'01d')
-    str1a = format(Baseline_inclination,'01d')
-    str2c = format(thr_c,'3.2f')
-    str2d = format(thr_d,'3.2f')
+    SGZXMAX = len(sgzx_list)
+    #if 1:
+    #    SGZXMAX += 1
+    str1 = format(BASELINE_ESTIMATION,'01d')
+    str1a = format(BASELINE_INCLINATION,'01d')
+    str2c = format(THR_E,'3.2f')
+    #str2d = format(thr_d,'3.2f')
+    str2d = format(THR_G0,'3.2f')
     str2f1 = format(thr_f1,'3.2f')
     str2f2 = format(thr_f2,'3.2f')
-    str3a = format(thr_rmg,'3.2f')
-    str3b = format(gm_param,'3.1f')
+    str3a = format(THR_RMG,'3.2f')
+    str3b = format(GM_PARAM,'3.1f')
     str4 = format(Show_each,'01d')
     opt_sigma = '('
-    for sgzx in range(sgzxmax-1):
+    for sgzx in range(SGZXMAX-1):
         if sgzx > 0 :
             opt_sigma += ','
         opt_sigma += format(sgzx_list[sgzx],'3.2f')
@@ -565,19 +595,19 @@ def draw_graph_gmr(_spectrum:np_signal,baseline,_spectrum_bl:np_signal,signal:np
         plt.rcParams["figure.figsize"] = [20, 6]#[20, 6] [20,200]#ax.set_box_aspect(0.5)  # 0.2     1
     parameters = {'axes.labelsize': 25,'axes.titlesize': 35,'xtick.labelsize':20,'ytick.labelsize':20}
     if Show_details and Show_each == 0:
-        fig, ax = plt.subplots(sgzxmax+2, 1)
+        fig, ax = plt.subplots(SGZXMAX+2, 1)
     else:
         fig, ax = plt.subplots(1, 1)
 
     #print(str(fig), str(ax[0]))
     if Zoom_in == 1:
         peak_i = int((min_X+max_X)/2)
-        max_line_height = 0
-        for sgzx in range(sgzxmax):
+        line_height = 0
+        for sgzx in range(SGZXMAX):
             for j in range(len(lines_detected[sgzx])):
                 i = lines_detected[sgzx][j][0]
-                if _spectrum_bl[i] > max_line_height:
-                    max_line_height = _spectrum_bl[i]
+                if _spectrum_bl[i] > line_height:
+                    line_height = _spectrum_bl[i]
                     peak_i = i
         min_Xd=max(min_X,peak_i-250)
         max_Xd=min(max_X,peak_i+250)
@@ -592,20 +622,20 @@ def draw_graph_gmr(_spectrum:np_signal,baseline,_spectrum_bl:np_signal,signal:np
     if Show_details and Show_each == 0:
         ax[0].plot(X[min_Xd:max_Xd], _spectrum[min_Xd:max_Xd],c="darkgray")
         ax[0].plot(X[min_Xd:max_Xd], baseline[min_Xd:max_Xd], c="black")
-        ax[0].plot(X[min_Xd:max_Xd], baseline[min_Xd:max_Xd]+sigma_sp, c="lightgreen")    # t_param/gm_param
+        ax[0].plot(X[min_Xd:max_Xd], baseline[min_Xd:max_Xd]+sigma_sp, c="lightgreen")    # t_param/GM_PARAM
         ax[0].plot(X[min_Xd:max_Xd], baseline[min_Xd:max_Xd]-sigma_sp, c="lightgreen")
     elif not Show_details :
         if Show_label:
             plt.xlabel(resultfile)
         plt.plot(X[min_Xd:max_Xd], baseline[min_Xd:max_Xd], c="black")  #"black"  "red"
-        plt.plot(X[min_Xd:max_Xd], baseline[min_Xd:max_Xd]+sigma_sp, c="lightgreen")    # t_param/gm_param
+        plt.plot(X[min_Xd:max_Xd], baseline[min_Xd:max_Xd]+sigma_sp, c="lightgreen")    # t_param/GM_PARAM
         plt.plot(X[min_Xd:max_Xd], baseline[min_Xd:max_Xd]-sigma_sp, c="lightgreen")
         plt.plot(X[min_Xd:max_Xd], _spectrum[min_Xd:max_Xd],c="darkgray")
     if Show_details:
         print('Show_each',Show_each)
         if Show_each == 0:
-            ax[sgzxmax+1].plot(X[min_Xd:max_Xd], _spectrum[min_Xd:max_Xd],c="gray")
-            for sgzx in range(sgzxmax):
+            ax[SGZXMAX+1].plot(X[min_Xd:max_Xd], _spectrum[min_Xd:max_Xd],c="gray")
+            for sgzx in range(SGZXMAX):
                 if 1:
                     std_sig = np.std(signal[sgzx,min_X:max_X])
                     signal[sgzx,min_X:max_X] /= std_sig
@@ -625,8 +655,8 @@ def draw_graph_gmr(_spectrum:np_signal,baseline,_spectrum_bl:np_signal,signal:np
                         #print('green line1')
                         #ax[0].plot([i, i],[baseline[i],_spectrum[i]] , c="black")
                         ax[sgzx+1].plot([i, i],[0,_spectrum_bl[i]] , c="blue")
-                        if sgzx < sgzxmax-1:
-                            #print('graph',sgzx,sgzxmax-1)
+                        if sgzx < SGZXMAX-1:
+                            #print('graph',sgzx,SGZXMAX-1)
                             ax[sgzx+1].plot([i, i],[0,signal[sgzx,i]] , c="blue")
                         if ib>=min_Xd:
                             ax[sgzx+1].plot([ib, ib],[0,_spectrum_bl[ib]] , c="green")
@@ -639,10 +669,10 @@ def draw_graph_gmr(_spectrum:np_signal,baseline,_spectrum_bl:np_signal,signal:np
             print ('mean_level',mean_level,len(mean_level))
             print ('cut_level',cut_level,len(cut_level))
             for icut in range(len(cut_level)):
-                ax[sgzxmax+1].plot(X[min_Xd:max_Xd], X[min_Xd:max_Xd]*0+cut_level[icut],c="blue", linewidth=0.5)
+                ax[SGZXMAX+1].plot(X[min_Xd:max_Xd], X[min_Xd:max_Xd]*0+cut_level[icut],c="blue", linewidth=0.5)
             for imean in range(len(mean_level)):
-                ax[sgzxmax+1].plot(X[min_Xd:max_Xd], X[min_Xd:max_Xd]*0+mean_level[imean],c="red", linewidth=0.5)
-        elif Show_each < 5:
+                ax[SGZXMAX+1].plot(X[min_Xd:max_Xd], X[min_Xd:max_Xd]*0+mean_level[imean],c="red", linewidth=0.5)
+        elif Show_each < 3:
             sgzx = Show_each -1
             if 1:
                 std_sig = np.std(signal[sgzx,min_X:max_X])
@@ -664,8 +694,8 @@ def draw_graph_gmr(_spectrum:np_signal,baseline,_spectrum_bl:np_signal,signal:np
                     #print('green line1')
                     #ax[0].plot([i, i],[baseline[i],_spectrum[i]] , c="black")
                     plt.plot([i, i],[0,_spectrum_bl[i]] , c="blue")
-                    if sgzx < sgzxmax-1:
-                        #print('graph',sgzx,sgzxmax-1)
+                    if sgzx < SGZXMAX-1:
+                        #print('graph',sgzx,SGZXMAX-1)
                         plt.plot([i, i],[0,signal[sgzx,i]] , c="blue")
                     if ib>=min_Xd:
                         plt.plot([ib, ib],[0,_spectrum_bl[ib]] , c="green")
@@ -676,8 +706,8 @@ def draw_graph_gmr(_spectrum:np_signal,baseline,_spectrum_bl:np_signal,signal:np
                     plt.plot([max(ib,min_Xd), min(ie,max_Xd-1)],[0,0] , c="red", linewidth=4)
                     #ax[0].plot([max(ib,min_Xd), min(ie,max_Xd-1)],[baseline[max(ib,min_Xd)],baseline[min(ie,max_Xd-1)]] , c="yellow")
         else:
-            print ('Show_each5:mean_level',mean_level,len(mean_level))
-            print ('Show_each5:cut_level',cut_level,len(cut_level))
+            print ('Show_each3:mean_level',mean_level,len(mean_level))
+            print ('Show_each3:cut_level',cut_level,len(cut_level))
             plt.plot(X[min_Xd:max_Xd], _spectrum[min_Xd:max_Xd],c="gray")
             for imean in range(len(mean_level)):
                 plt.plot(X[min_Xd:max_Xd], X[min_Xd:max_Xd]*0+mean_level[imean],c="red", linewidth=0.5)
@@ -696,7 +726,7 @@ def draw_graph_gmr(_spectrum:np_signal,baseline,_spectrum_bl:np_signal,signal:np
             elif not Show_details:
                 plt.plot([i, i],[baseline[i],_spectrum[i]] , c="blue")
                 plt.plot([max(ib,min_Xd), min(ie,max_Xd-1)],[baseline[max(ib,min_Xd)],baseline[min(ie,max_Xd-1)]] , c="red", linewidth=4)  ##temp
-    print(resultfile)
+    #print(resultfile)
     if not Savefig_only_detected_lines or len(lines_merged) > 0:
         plt.savefig(resultfile)
     else:
@@ -740,19 +770,25 @@ def iterative_2s_exclusions(_spectrum:np_signal,mean_level:np_signal,cut_level:n
     Note:
         The std_lower is used as STD (No correction is made in the current version.)
     """
-    global e_std_max, e_std, local_std
+    global E_STD_MAX, e_std, local_std, BOTH_SIDES_EXCLUSIONS
     # Preparations
-    #mean_sp = np.ma.mean(_spectrum)                # both-sides-exclusions
-    #height_sp = np.ma.max(_spectrum)-mean_sp       # both-sides-exclusions
-    #depth_sp = mean_sp - np.ma.min(_spectrum)      # both-sides-exclusions
+    mean_sp = np.ma.mean(_spectrum)                # both-sides-exclusions
+    if len(_spectrum) == 0:
+        print('np.ma.mean 0')
+    #if not BOTH_SIDES_EXCLUSIONS:
+    if 1:
+        height_sp = np.ma.max(_spectrum)-mean_sp       # constant for e_std
+        depth_sp = mean_sp - np.ma.min(_spectrum)      # constant for e_std
     sigma_sp = np.ma.std(_spectrum)
 
     # Main cycle of Iterative 2-sigma exclusions
     _spectrum1 = _spectrum
-    for e_std in range(e_std_max-1):
-        mean_sp = np.ma.mean(_spectrum1)                # both-sides-exclusions
-        height_sp = np.ma.max(_spectrum1)-mean_sp       # both-sides-exclusions
-        depth_sp = mean_sp - np.ma.min(_spectrum1)      # both-sides-exclusions
+    for e_std in range(E_STD_MAX-1):
+        #if BOTH_SIDES_EXCLUSIONS:
+        #    height_sp = np.ma.max(_spectrum1)-mean_sp       # variable for e_std
+        #    depth_sp = mean_sp - np.ma.min(_spectrum1)      # variable for e_std
+        #    print ('Both_sides',height_sp,depth_sp,height_sp/depth_sp)
+
         # update mean_level[e_std] and cut_level[e_std]
         mean_level[e_std]=mean_sp
         if height_sp > depth_sp:                  # Exclude from upper_part
@@ -760,31 +796,43 @@ def iterative_2s_exclusions(_spectrum:np_signal,mean_level:np_signal,cut_level:n
             upper_part = np.where(_spectrum1>cut_level[e_std])  # upper_part is selected
             thr_level = 2.0
             while upper_part[0].shape[0] == 0:     # thr_level is tuned, if neccessary
-                thr_level -= forced_level_down
+                thr_level -= FORCED_LEVEL_DOWN
                 print ('*forced thr_level down1',thr_level)
                 cut_level[e_std]=mean_sp+sigma_sp*thr_level
                 upper_part = np.where(_spectrum1>cut_level[e_std])
-            lower_part = np.where(_spectrum1<=cut_level[e_std])   # lower_part is selected
+            if BOTH_SIDES_EXCLUSIONS:
+                cut_level2 = mean_sp -sigma_sp*3
+                lower_part = np.where((_spectrum1<=cut_level[e_std]) & (_spectrum1>cut_level2))   # lower_part is selected
+            else:
+                lower_part = np.where(_spectrum1<=cut_level[e_std])   # lower_part is selected
 
         else:                                      # Exclude from lower part
             cut_level[e_std]=mean_sp-sigma_sp*2
             lower_part = np.where(_spectrum1<cut_level[e_std])    # lower_part is selected
             thr_level = 2.0
             while lower_part[0].shape[0] == 0:      # thr_level is tuned, if neccessary
-                thr_level -= forced_level_down
+                thr_level -= FORCED_LEVEL_DOWN
                 print ('*forced thr_level down2',thr_level)
                 cut_level[e_std]=mean_sp-sigma_sp*thr_level
                 lower_part = np.where(_spectrum1<cut_level[e_std])
-            upper_part = np.where(_spectrum1>=cut_level[e_std])    # upper_part is selected
+            if BOTH_SIDES_EXCLUSIONS:
+                cut_level2 = mean_sp +sigma_sp*3
+                upper_part = np.where((_spectrum1>=cut_level[e_std]) & (_spectrum1<cut_level2))   # lower_part is selected
+            else:
+                upper_part = np.where(_spectrum1>=cut_level[e_std])   # lower_part is selected
 
         # Calculate upper_mean and lower_mean
         upper_mean = np.ma.mean(_spectrum1[upper_part])
         lower_mean = np.ma.mean(_spectrum1[lower_part])
+        if upper_part[0].shape[0] == 0:
+             print('np.ma.mean 1: upper_part[0]')
+        if lower_part[0].shape[0] == 0:
+             print('np.ma.mean 2: lower_part[0]')
 
         # Calculate relative_mean_gap
         mean_gap = upper_mean - lower_mean
         relative_mean_gap = mean_gap/sigma_sp
-        print('statistics0:',e_std,mean_gap,sigma_sp,relative_mean_gap,mean_level[e_std],cut_level[e_std])
+        print('statistics0:',e_std,(height_sp > depth_sp), mean_gap,sigma_sp,relative_mean_gap,mean_level[e_std],cut_level[e_std])
 
         # Update mean_sp and sigma_sp
         if height_sp > depth_sp:
@@ -796,10 +844,10 @@ def iterative_2s_exclusions(_spectrum:np_signal,mean_level:np_signal,cut_level:n
 
         # validation by local_std_check
         local_std_check_invalid = (sigma_sp > 2 * local_std)
-        if relative_mean_gap <= thr_rmg and not local_std_check_invalid:      # thr_tmg = 2.25  # relative_mean_gap converges to 2.25
+        if relative_mean_gap <= THR_RMG and not local_std_check_invalid:      # thr_tmg = 2.25  # relative_mean_gap converges to 2.25
             mean_level[e_std+1]=mean_sp
             break
-        if local_std_check_invalid and (e_std == e_std_max-2):                   # at final iteration
+        if local_std_check_invalid and (e_std == E_STD_MAX-2):                   # at final iteration
             print ('**final_local_std_check_invalid')
 
         # _spectrum1 is updated for the next iteration (important)
@@ -813,13 +861,12 @@ def iterative_2s_exclusions(_spectrum:np_signal,mean_level:np_signal,cut_level:n
 def optimize_sigma(sp:np_signal) -> float:
     global dmax, min_X, max_X
     sigma_gap = 2 ** 0.1 # 2**0.2   2**0.5
-    sigma_num = 80  # 60
+    sigma_num = 60  # 60
     sigma_first = 2.0  #
     sigma_list = []
     for i in range(sigma_num):
         sigma_list.append(sigma_first*sigma_gap**i)
     kmax=len(sigma_list)
-
     dmax0 = max_X - min_X
     _gaussian = np.ma.arange(kmax*dmax0,dtype=float).reshape(kmax,dmax0)
     mse = np.ma.arange(kmax,dtype=float)
@@ -834,7 +881,6 @@ def optimize_sigma(sp:np_signal) -> float:
 
         #_gaussian[kk,:] = np.ma.convolve(sp, _g, propagate_mask=False)[k_edge:-k_edge]  # propagate_mask = False version
         _gaussian[kk,:] = np.ma.convolve(sp, _g)[k_edge:-k_edge]
-
         k_edge_left = k_edge
         k_edge_right = - k_edge - 1
         #print(k_edge_left,k_edge_right,sigma)
@@ -860,7 +906,7 @@ def line_finder(sp:np_signal, sp_mask:'np.ndarray[bool]' = False) -> ranges:
     """Line finder based on Gaussian filter along with baseline estimator using Geman-McClure function.
     This function consists of five subtasks as follows:
         0)Rough estimation of mean and std of Baseline by Iterative 2-sigma exclusions (iterative_2s_exclusions())
-        1)Baseline estimation by Geman-McClure function: (lf_gmb.py)
+        1)Baseline estimation by Geman-McClure function: (lf_gmn.py)
         2)Integrated line detection by zero-crossings of first derivative of Gaussian average of SIGNAL_BL: (integrated_line_detection())
         3)Narrow line detection by zero-crossings of the first derivative of Gaussian average on SIGNAL_BL: (narrow_line_detection())
 
@@ -868,9 +914,9 @@ def line_finder(sp:np_signal, sp_mask:'np.ndarray[bool]' = False) -> ranges:
         ranges: A list of start and end indices of spectral lines. The indices of
                     lines are in the order of, e.g., [start1, end1, ..., startN, endN].
     """
-    global sigma_sp, local_std, ga5_std, gs_param, optimum_sigma, Gaussian_sp_bl, thr_rmg, sign_dist
-    global dmax, min_X, max_X, max_height, min_height
-    global Draw_graph, Baseline_estimation, Baseline_inclination, Gaussian_subtraction, Gaussian_enable
+    global sigma_sp, local_std, ga5_std, GS_PARAM, optimum_sigma, Gaussian_sp_bl, THR_RMG, sign_dist
+    global dmax, min_X, max_X, max_height, min_height, SGZXMAX
+    global Draw_graph, BASELINE_ESTIMATION, BASELINE_INCLINATION, Gaussian_subtraction, GAUSSIAN_ENABLE, WL_ANALYSIS
     dmax = len(sp)
     _spectrum = np.ma.array(sp,mask=sp_mask)
 
@@ -897,8 +943,8 @@ def line_finder(sp:np_signal, sp_mask:'np.ndarray[bool]' = False) -> ranges:
     print ('**local_std,ga5_std',local_std,ga5_std)
 
     ## Iterative 2-sigma exclusions
-    mean_level = np.arange(e_std_max,dtype=float)
-    cut_level = np.arange(e_std_max,dtype=float)
+    mean_level = np.arange(E_STD_MAX,dtype=float)
+    cut_level = np.arange(E_STD_MAX,dtype=float)
     sigma_sp,mean_sp,k_std,_spectrum1 = iterative_2s_exclusions(_spectrum,mean_level,cut_level)
     print('sigma_sp,mean_sp',sigma_sp,mean_sp)
 
@@ -906,21 +952,23 @@ def line_finder(sp:np_signal, sp_mask:'np.ndarray[bool]' = False) -> ranges:
     baseline = np.ma.arange(dmax,dtype=float)
     X_ = np.ma.arange(dmax).reshape(-1,1)
 
-    # Selection of Baseline_estimation or Gaussian_subtraction
-    Baseline_estimation = True
-    #if (ga5_std < 2.5 * local_std and sigma_sp > gs_param *local_std):
-    if Gaussian_enable:
-        if (dmax > 256 and sigma_sp > gs_param *local_std):  # gs_param = 1.25
-            if ((k_std < 4 and ga5_std > 1.8 * local_std) or (k_std < 10 and ga5_std > 2.0 * local_std)):   # Baseline_estimation works in these cases
+    # Selection of BASELINE_ESTIMATION or Gaussian_subtraction
+    BASELINE_ESTIMATION = True
+    #if (ga5_std < 2.5 * local_std and sigma_sp > GS_PARAM *local_std):
+    print('GAUSSIAN_ENABLE',GAUSSIAN_ENABLE)
+    if GAUSSIAN_ENABLE:
+        print ('BASELINE_ESTIMATION0', local_std, k_std, sigma_sp/local_std, ga5_std/local_std, BASELINE_ESTIMATION)
+        if (dmax > 256 and sigma_sp > GS_PARAM *local_std):  # GS_PARAM = 1.2
+            if ((k_std < 4 and ga5_std > 1.8 * local_std) or (k_std < 10 and ga5_std > 2.0 * local_std)):     # BASELINE_ESTIMATION works in these cases
                 print ('**k_std check')
             else:
-                Baseline_estimation = False
-        print ('Baseline_estimation', local_std, k_std, sigma_sp/local_std, ga5_std/local_std, Baseline_estimation)
-    Gaussian_subtraction = not Baseline_estimation
+                BASELINE_ESTIMATION = False
+        print ('BASELINE_ESTIMATION', local_std, k_std, sigma_sp/local_std, ga5_std/local_std, BASELINE_ESTIMATION)
+    Gaussian_subtraction = not BASELINE_ESTIMATION
 
     # Preparation for lfr.GM()
-    if Baseline_estimation:               # Baseline_estimation is used for the future alternative, e.g. Gaussian-subtraction
-        if Baseline_inclination and (dmax > thr_ss):         # Baseline_inclination is not effective for short spectrum
+    if BASELINE_ESTIMATION:               # BASELINE_ESTIMATION is used for the future alternative, e.g. Gaussian-subtraction
+        if BASELINE_INCLINATION and (dmax > THR_SS):         # BASELINE_INCLINATION is not effective for short spectrum
 
             # SLOPE is estimated from mean_left and mean_right
             half_pos = len(_spectrum)//2
@@ -930,7 +978,7 @@ def line_finder(sp:np_signal, sp_mask:'np.ndarray[bool]' = False) -> ranges:
             print ('relative_pos_gap',half_pos,mean_sp,mean_left,mean_right,relative_pos_gap)
 
             # SLOPE is effective when abs(relative_pos_gap) is not too small
-            displacement_effective = (abs(relative_pos_gap) > thr_rpg)
+            displacement_effective = (abs(relative_pos_gap) > THR_RPG)
             if displacement_effective:   # in case of inclined baseline
                 # Make displacement for inclination compensation
                 displacement = np.ma.arange(dmax,dtype=float)
@@ -957,10 +1005,10 @@ def line_finder(sp:np_signal, sp_mask:'np.ndarray[bool]' = False) -> ranges:
         yc_list[0] = mean_sp        # mean_sp is used  for initial value.
 
         # Instanciation of lfr.GM() along with instanciation of lfr.LinearModel()
-        regressor = lfr.GM(t=t_param,g=gm_param, y_list=yc_list, model=lfr.LinearModel(),
+        regressor = lfr.GM(t=t_param,g=GM_PARAM, y_list=yc_list, model=lfr.LinearModel(),
                            metric=lfr.mean_gm_error, fdt=lfr.gm_fd_total, sdt=lfr.gm_sd_total)
-        #regressor =lfr.GM(t=t_param, g=gm_param, y_list=yc_list,model=lfr.LinearModel(), loss=lfr.gm_error_loss, metric=lfr.mean_gm_error)
-        print ('t,g:',t_param,gm_param)
+        #regressor =lfr.GM(t=t_param, g=GM_PARAM, y_list=yc_list,model=lfr.LinearModel(), loss=lfr.gm_error_loss, metric=lfr.mean_gm_error)
+        print ('t,g:',t_param,GM_PARAM)
         #print (X_.shape,_spectrum_.shape)
 
         # Horizintal baseline estimation
@@ -974,16 +1022,16 @@ def line_finder(sp:np_signal, sp_mask:'np.ndarray[bool]' = False) -> ranges:
             baseline += displacement
         #print ('baseline=',baseline)
     if Gaussian_subtraction:                # SOSGS
-        print('Gaussian_subtraction', optimum_sigma)
         sigma_sp = local_std
         optimum_sigma = optimize_sigma(_spectrum[min_X:max_X])
+        print('Gaussian_subtraction', optimum_sigma)
         gs_edge_width = int(optimum_sigma*3.0)
         baseline[min_X:max_X] = gaussian_average(_spectrum[min_X:max_X], optimum_sigma)
         baseline[min_X:min_X+gs_edge_width] = _spectrum[min_X:min_X+gs_edge_width]
         baseline[max_X-gs_edge_width:max_X] = _spectrum[max_X-gs_edge_width:max_X]
     # Baseline-subtracted spectrum is generated
     _spectrum_bl = np.ma.arange(_spectrum.shape[0], dtype=np.float64)
-    if Gaussian_subtraction or Baseline_estimation:
+    if Gaussian_subtraction or BASELINE_ESTIMATION:
         _spectrum_bl[min_X:max_X] = _spectrum[min_X:max_X] -baseline[min_X:max_X]
     else:
         _spectrum_bl[min_X:max_X] = _spectrum[min_X:max_X]
@@ -993,16 +1041,20 @@ def line_finder(sp:np_signal, sp_mask:'np.ndarray[bool]' = False) -> ranges:
     ## Preparation for parallel processings
     # sgzx_list is generated
     sgzx_list = []
-    if sgzxmax >= 1:
-        for ii in range(sgzxmax):
-            sgzx_list += [2 ** (ii+1)]
+    if SGZXMAX >= 1:
+        for ii in range(SGZXMAX):
+            sgzx_list += [2 ** (ii+ii+1)]       # 2, 8
+            #sgzx_list += [2 ** (ii+1)]          # 2, 4
     #print ('sgzx_list',sgzx_list)
 
     # arangement of g_ave, signal and coeff
-    sgzxmaxp1= sgzxmax + 1
-    g_ave = np.ma.arange(sgzxmaxp1*dmax,dtype=float).reshape(sgzxmaxp1,dmax)   # for Graphic use
-    signal = np.ma.arange(sgzxmaxp1*dmax,dtype=float).reshape(sgzxmaxp1,dmax)
-    coeff = np.ma.arange(sgzxmaxp1*dmax,dtype=float).reshape(sgzxmaxp1,dmax)
+    #SGZXMAXp1= SGZXMAX + 1
+    #g_ave = np.ma.arange(SGZXMAXp1*dmax,dtype=float).reshape(SGZXMAXp1,dmax)   # for Graphic use
+    #signal = np.ma.arange(SGZXMAXp1*dmax,dtype=float).reshape(SGZXMAXp1,dmax)
+    #coeff = np.ma.arange(SGZXMAXp1*dmax,dtype=float).reshape(SGZXMAXp1,dmax)
+    g_ave = np.ma.arange(SGZXMAX*dmax,dtype=float).reshape(SGZXMAX,dmax)   # for Graphic use
+    signal = np.ma.arange(SGZXMAX*dmax,dtype=float).reshape(SGZXMAX,dmax)
+    coeff = np.ma.arange(SGZXMAX*dmax,dtype=float).reshape(SGZXMAX,dmax)
 
     ## Wide line detection
     # setting parameters
@@ -1010,14 +1062,15 @@ def line_finder(sp:np_signal, sp_mask:'np.ndarray[bool]' = False) -> ranges:
     min_height = np.ma.min(_spectrum_bl[min_X:max_X])
     sign_dist = max_height/abs(min_height)
     #print ('sign_dist', np.ma.max(_spectrum_bl[min_X:max_X]),np.ma.min(_spectrum_bl[min_X:max_X]), sign_dist)
-    Gaussian_sp_bl = (max_height/sigma_sp < thr_Gsb)
+    Gaussian_sp_bl = (max_height/sigma_sp < THR_SPBL)
     print ('Gaussian_sp_bl',Gaussian_sp_bl,max_height/sigma_sp)
 
     ## select sigma_p
-    sigma_p = sgzx_list[0]
+    sigma_p = sgzx_list[0]     # 2
 
     ## call integrated_line_detection)
-    wide_line_list = integrated_line_detection(_spectrum_bl,sigma_p,signal[sgzxmax,:],coeff[sgzxmax,:])
+    #wide_line_list = integrated_line_detection(_spectrum_bl,sigma_p,signal[SGZXMAX,:],coeff[SGZXMAX,:])
+    wide_line_list = integrated_line_detection(_spectrum_bl,sigma_p,signal[0,:],coeff[0,:])
 
     ## Make wl_flag from wide_line_list
     wl_flag= np.arange(dmax,dtype='int')
@@ -1030,22 +1083,28 @@ def line_finder(sp:np_signal, sp_mask:'np.ndarray[bool]' = False) -> ranges:
     ## Narrow line detection by narrow_line_detection()
     lines_detected = []
 
-    # Parallel narrow line detection with changing sigma
-    for sgzx in range(sgzxmax):
+    # Narrow line detection for sigma = 8
+
+    #for sgzx in range(SGZXMAX):
+    if 1:
+        sgzx = 1
         #setting parameters
         sigma = sgzx_list[sgzx]
-        wl_analysis = (sgzx >= sgzxmax - wl_mask_index)       # wl_analysis is controled by wl_mask_index.
+        #WL_ANALYSIS = (sgzx >= SGZXMAX - WL_MASK_INDEX)
 
         # call narrow_line_detection()
-        new_lines = narrow_line_detection(_spectrum_bl,sigma,signal[sgzx,:],coeff[sgzx,:],wl_flag,wl_analysis)
+        new_lines = narrow_line_detection(_spectrum_bl,sigma,signal[sgzx,:],coeff[sgzx,:],wl_flag,WL_ANALYSIS)
 
         # detected line_list is appended to lines_detected
         lines_detected.append(new_lines)
-        print ('lines_detected',sgzx,len(lines_detected[sgzx]),lines_detected[sgzx])
+        print ('lines_detected',sgzx,len(lines_detected[0]),lines_detected[0])
+        #print ('lines_detected',sgzx,len(lines_detected[sgzx]),lines_detected[sgzx])
 
     # wide_line_list is appended to lines_detected
     lines_detected.append(wide_line_list)
-    print ('lines_detected2',sgzxmax,len(lines_detected[sgzxmax]),lines_detected[sgzxmax])
+    nlist=len(lines_detected)-1
+    print ('lines_detected *',1,len(lines_detected[nlist]),lines_detected[nlist])
+    #print ('lines_detected2',SGZXMAX,len(lines_detected[SGZXMAX]),lines_detected[SGZXMAX])
 
     # lines_detected(list of line_lists) is merged to a list of lines named lines_merged
     lines_merged = merge_detected_lines(lines_detected)
@@ -1055,16 +1114,17 @@ def line_finder(sp:np_signal, sp_mask:'np.ndarray[bool]' = False) -> ranges:
     lines_final = pipeline_format_lines(lines_merged)
     #print ('lines_final',len(lines_final)/2,lines_final)
     if Draw_graph:
-        for sgzx in range(sgzxmax):
+        for sgzx in range(SGZXMAX):
             sigma = sgzx_list[sgzx]
             make_g_ave(_spectrum_bl,sigma,g_ave[sgzx,:])
-        make_g_ave(_spectrum_bl,sigma_p,g_ave[sgzxmax,:])
+        #make_g_ave(_spectrum_bl,sigma_p,g_ave[SGZXMAX,:])
+        make_g_ave(_spectrum_bl,sigma_p,g_ave[1,:])
         draw_graph_gmr(_spectrum,baseline,_spectrum_bl,signal,coeff,g_ave,lines_detected,lines_merged,
                        sgzx_list, mean_level[0:e_std+2], cut_level[0:e_std+1])
     return(lines_final,baseline[0],baseline[0]/sigma_sp)
 
 if __name__ == "__main__":
-    Database_selector = 6
+    Database_selector = 0
     _bl_selector = False
     all_files =True            # if False, hand-made list is used for debugging
     loc_all = 1
@@ -1164,9 +1224,9 @@ if __name__ == "__main__":
 
             ## setting for line_finder()
             if _bl_selector:             # spectrum data before baseline subtraction
-                Baseline_estimation = False
+                BASELINE_ESTIMATION = False
             else:
-                Baseline_estimation = True         # lf_gm is called for baseline estimation
+                BASELINE_ESTIMATION = True         # lf_gm is called for baseline estimation
             if 1:   # line_finder works for spetrum with mask
                 #print (_spectrum.shape,_spectrum.mask.shape)
                 lines_final,base_l[loc-loc_b],base_lr[loc-loc_b] = line_finder(_spectrum,_spectrum.mask)
