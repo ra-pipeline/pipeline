@@ -64,7 +64,7 @@ FORCED_LEVEL_DOWN = 0.1 #When cut_level[est] is not effective in the iterative e
 
 BASELINE_ESTIMATION :bool = True    # If True, baseline estimation is effective.
 BASELINE_INCLINATION :bool = True   # If False, horizontal baseline is assumed.
-THR_SS = 128                        # Inclination is effective for dmax > THR_SS
+THR_SS = 120                        # Inclination is effective for dmax > THR_SS
 THR_RPG = 0.5                       # Inclination is effective when abs(relative_pos_gap) > THR_RPG
 GM_PARAM = 4                         # In Geman-McClure function, parameter c is defined by STD/GM_PARAM.
 
