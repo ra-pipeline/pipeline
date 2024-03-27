@@ -94,13 +94,15 @@ class K2JyHistDisplay(object):
         data = numpy.array(factors1d)
         medval = numpy.median(data)
         bin_width = medval*0.05
-        maxval = max(data.max(), medval*1.3)
-        minval = min(data.min(), medval*0.7)
-        num_bin = int(numpy.ceil(max((maxval-minval)/bin_width, 1)))
+        nbin_min = 6   # minimum number of bins on each side of the center bin
+        nbin_neg = max( nbin_min, numpy.ceil( ( medval - data.min() ) / bin_width - 0.5 ) )
+        nbin_pos = max( nbin_min, numpy.ceil( ( data.max() - medval ) / bin_width - 0.5 ) )
+        minval = medval - bin_width * ( nbin_neg + 0.5 )
+        maxval = medval + bin_width * ( nbin_pos + 0.5 )
+        num_bin = int(nbin_pos + nbin_neg + 1)
 
         plt.hist(factors, range=[minval, maxval], bins=num_bin,
-                histtype='barstacked', align='mid', label=labels)
-        #plt.hist(factors, bins='auto', histtype='barstacked', align='mid', label=labels)
+                 histtype='barstacked', align='mid', label=labels, ec='black')
         plt.xlabel('Jy/K factor', fontsize=11)
         plt.ylabel('Numbers', fontsize=11)
         plt.title('Jy/K factors (SPW %d)' % self.spw, fontsize=11)

@@ -63,12 +63,13 @@ class ALMAPhcorBandpassInputs(bandpassmode.BandpassModeInputs):
     solint = vdp.VisDependentProperty(default='inf')
     # PIPE-628: new parameter to unregister existing bcals before appending to callibrary 
     unregister_existing = vdp.VisDependentProperty(default=False)
-
+    # PIPE-712: Expose fillgaps parameter 
+    fillgaps = vdp.VisDependentProperty(default=0)
 
     def __init__(self, context, output_dir=None, vis=None, mode='channel', hm_phaseup=None, phaseupbw=None,
                  phaseupsolint=None, phaseupsnr=None, phaseupnsols=None, hm_bandpass=None, solint=None,
                  maxchannels=None, evenbpints=None, bpsnr=None, minbpsnr=None, bpnsols=None, unregister_existing=None, 
-                 **parameters):
+                 fillgaps=None, **parameters):
         super(ALMAPhcorBandpassInputs, self).__init__(context, output_dir=output_dir, vis=vis, mode=mode, **parameters)
         self.bpnsols = bpnsols
         self.bpsnr = bpsnr
@@ -83,6 +84,7 @@ class ALMAPhcorBandpassInputs(bandpassmode.BandpassModeInputs):
         self.phaseupsolint = phaseupsolint
         self.solint = solint
         self.unregister_existing = unregister_existing
+        self.fillgaps = fillgaps
 
 
 @task_registry.set_equivalent_casa_task('hifa_bandpass')
@@ -151,6 +153,12 @@ class ALMAPhcorBandpass(bandpassworker.BandpassWorker):
         # complete log of all the executed tasks.
         if inputs.hm_phaseup != '':
             result.preceding.append(phaseup_result.final)
+
+            # PIPE-1624: Store bandpass phaseup caltable table name so it
+            # can be saved into the context. Do not use the version in
+            # preceding.append (above), as it is labeled "deprecated"
+            for cal in phaseup_result.final:
+                result.phaseup_caltable_for_phase_rms.append(cal.gaintable)
 
         # PIPE-628: set whether we should unregister old bandpass calibrators
         # on results acceptance

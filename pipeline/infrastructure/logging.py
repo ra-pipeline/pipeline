@@ -3,11 +3,13 @@ import logging
 import sys
 import time
 import types
+import functools
+from contextlib import contextmanager
 
 from casatasks import casalog
 
-import pipeline.extern.logutils as logutils
-import pipeline.extern.logutils.colorize as colorize
+import logutils
+import logutils.colorize as colorize
 
 from logging import CRITICAL, WARNING, ERROR, INFO, DEBUG
 
@@ -23,6 +25,10 @@ colorize.ColorizingStreamHandler.level_map[TODO] = ('black', 'yellow', True)
 ATTENTION = 25
 logging.addLevelName(ATTENTION, 'ATTENTION')
 colorize.ColorizingStreamHandler.level_map[ATTENTION] = ('white', 'blue', False)
+
+# PIPE-1699: this is to replicate the modification from d86115b to the logutils 
+# source code originally saved in pipeline/extern/logutils.
+colorize.ColorizingStreamHandler.level_map[INFO] = (None, None, False)
 
 LOGGING_LEVELS = {'critical'  : CRITICAL,
                   'error'     : ERROR,
@@ -42,6 +48,17 @@ logging_level = logging.NOTSET
 # time
 logging.getLogger().setLevel(INFO)
 _loggers = []
+
+
+def pipeline_origin(method):
+    """Use 'pipeline' as the CASAlog Origin by default."""
+    @functools.wraps(method)
+    def pipeline_as_origin(self, *args, **kwargs):
+        if casalog.getOrigin() != 'pipeline':
+            casalog.origin('pipeline')
+        retval = method(self, *args, **kwargs)
+        return retval
+    return pipeline_as_origin
 
 
 class CASALogHandler(logging.Handler):
@@ -68,6 +85,7 @@ class CASALogHandler(logging.Handler):
         """
         pass
 
+    @pipeline_origin
     def emit(self, record):
         """
         Emit a record.
@@ -370,6 +388,22 @@ class Traceback(object):
             self.tb_next = None
         else:
             self.tb_next = Traceback(tb.tb_next)
+
+
+@contextmanager
+def log_level(name, level=logging.WARNING):
+    """Context manager to temporarily adjust the logging level of a logger.
+    
+    The default level is WARNING, which means that all messages with level<=30 is filtered.
+    """
+
+    logger = logging.getLogger(name)
+    current_level = logger.getEffectiveLevel()
+    logger.setLevel(level)
+    try:
+        yield
+    finally:
+        logger.setLevel(current_level)
 
 
 LOG = get_logger(__name__)

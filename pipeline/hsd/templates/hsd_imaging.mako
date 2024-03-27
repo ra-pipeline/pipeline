@@ -32,7 +32,7 @@ $(document).ready(function() {
     };
 
     // return a function that sets the Field text field to the given spw
-    var createAntennaSetter = function(field) {
+    var createFieldSetter = function(field) {
         return function() {
         	if (typeof field !== "undefined") {
 	            // trigger a change event, otherwise the filters are not changed
@@ -119,7 +119,7 @@ plots_list = [{'title': 'Channel Map',
               {'title': 'Baseline Rms Map',
                'subpage': rmsmap_subpage,
                'plot': rmsmap_plots},
-              {'title': 'Max Intensity Map',
+              {'title': 'Moment Map',
                'subpage': momentmap_subpage,
                'plot': momentmap_plots},
               {'title': 'Integrated Intensity Map',
@@ -181,7 +181,7 @@ It generates an image combined spectral data from whole antenna as well as image
 		<caption>RMS of line-free channels</caption>
     	<thead>
 	    	<tr>
-	        	<th>Name</th><th>Representative (Estimate)</th><th>Frequency Ranges</th><th>Channel width [kHz]</th><th>Theoretical RMS</th><th>Observed RMS</th>
+	        	<th>Name</th><th>Frequency Ranges</th><th>Channel width</th><th>Theoretical RMS</th><th>Observed RMS</th>
 	    	</tr>
 
   		</thead>
@@ -273,7 +273,8 @@ It generates an image combined spectral data from whole antenna as well as image
     % for field, subpage in plots['subpage'].items():
         <h4><a class="replace"
                href="${os.path.join(dirname, subpage)}"
-               data-field="${field}">
+               data-field="${field}"
+               data-ant="COMBINED">
                ${field}
             </a>
         </h4>
@@ -294,7 +295,8 @@ It generates an image combined spectral data from whole antenna as well as image
 	                            <a href="${os.path.join(dirname, subpage)}"
 	                               class="replace"
 	                               data-spw="${plot.parameters['spw']}"
-	                               data-field="${field}">
+	                               data-field="${field}"
+                                   data-ant="COMBINED">
 	                               ${get_spw_exp(plot.parameters['spw'])}
 	                            </a>
 	                        </h4>

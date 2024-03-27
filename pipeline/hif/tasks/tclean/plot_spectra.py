@@ -539,7 +539,7 @@ def imheadlist(vis, omitBeam=False):
             'object', 'observer', 'projection', 'reffreqtype',
             'restfreq', 'shape', 'telescope']
     if not omitBeam:
-        singleBeam = imhead(vis, mode='get', hdkey='beammajor')
+        singleBeam = imhead(vis=vis, mode='get', hdkey='beammajor')
         if (singleBeam == False):
             header = imhead(vis, mode='list')
             if (header is None):

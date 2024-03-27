@@ -3,7 +3,7 @@ import os
 import shutil
 import tarfile
 import collections
-from typing import List, Optional
+from typing import List, Optional, Set
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -159,9 +159,8 @@ class ImportData(basetask.StandardTaskTemplate):
                 to_convert = [os.path.join(abs_output_dir, asdm) for asdm in to_convert]
                 to_import = [os.path.join(abs_output_dir, ms) for ms in to_import]
 
-                if not self._executor._dry_run:
-                    LOG.info('Extracting %s to %s', vis, abs_output_dir)
-                    tar.extractall(path=abs_output_dir)
+                LOG.info('Extracting %s to %s', vis, abs_output_dir)
+                tar.extractall(path=abs_output_dir)
 
         # Assume that if vis is not a tar, it's a directory ready to be
         # imported, or in the case of an ASDM, converted then imported.
@@ -191,9 +190,8 @@ class ImportData(basetask.StandardTaskTemplate):
                     LOG.warning('{} already in {}. Will import existing data.'.format(os.path.basename(src), abs_output_dir))
                     continue
 
-                if not self._executor._dry_run:
-                    LOG.info('Copying %s to %s', src, inputs.output_dir)
-                    shutil.copytree(src, dst)
+                LOG.info('Copying %s to %s', src, inputs.output_dir)
+                shutil.copytree(src, dst)
 
         # launch an import job for each ASDM we need to convert
         for asdm in to_convert:
@@ -210,18 +208,23 @@ class ImportData(basetask.StandardTaskTemplate):
         # compare to ms.name in order to calculate the origin of each MS
         converted_asdm_abspaths = [os.path.abspath(f) for f in converted_asdms]
 
+        # PIPE-2006: for ALMA data in cycles 0-2, replace the [incorrect] coordinate
+        # system name 'J2000' by 'ICRS' (supersedes PIPE-1575)
+        for ms_path in to_import:
+            self._rename_J2000_to_ICRS(ms_path)
+
         LOG.info('Creating pipeline objects for measurement set(s) {0}'
                  ''.format(', '.join(to_import)))
-        if self._executor._dry_run:
-            return ImportDataResults()
 
         ms_reader = tablereader.ObservingRunReader
 
         rel_to_import = [os.path.relpath(f, abs_output_dir) for f in to_import]
 
         observing_run = ms_reader.get_observing_run(rel_to_import)
-        available_data_types = [str(v).replace('DataType.', '') for v in DataType]
-        short_data_types = list(set([v.replace('_ALL', '').replace('_SCIENCE', '') for v in available_data_types if v.endswith('_ALL') or v.endswith('_SCIENCE')]))
+        available_data_types = [v.name for v in DataType]
+        short_data_types = list(set([v.replace('_ALL', '').replace('_SCIENCE', '')
+                                     for v in available_data_types
+                                     if v.endswith('_ALL') or v.endswith('_SCIENCE')]))
         data_type_entry = collections.namedtuple('DataTypeEntry', ('str_data_type enum_data_type'))
         for ms in observing_run.measurement_sets:
             LOG.debug(f'Setting session to {inputs.session} for {ms.basename}')
@@ -258,11 +261,11 @@ class ImportData(basetask.StandardTaskTemplate):
 
                     if v.upper() in short_data_types:
                         if ms.intents == {'TARGET'}:
-                            data_types[k.upper()] = data_type_entry(f'{v.upper()}_SCIENCE', eval(f'DataType.{v.upper()}_SCIENCE'))
+                            data_types[k.upper()] = data_type_entry(f'{v.upper()}_SCIENCE', DataType[f'{v.upper()}_SCIENCE'])
                         else:
-                            data_types[k.upper()] = data_type_entry(f'{v.upper()}_ALL', eval(f'DataType.{v.upper()}_ALL'))
+                            data_types[k.upper()] = data_type_entry(f'{v.upper()}_ALL', DataType[f'{v.upper()}_ALL'])
                     elif v.upper() in available_data_types:
-                        data_types[k.upper()] = data_type_entry(f'{v.upper()}', eval(f'DataType.{v.upper()}'))
+                        data_types[k.upper()] = data_type_entry(f'{v.upper()}', DataType[f'{v.upper()}'])
                     else:
                         msg = f'No such data type {v.upper()}'
                         LOG.error(msg)
@@ -341,7 +344,7 @@ class ImportData(basetask.StandardTaskTemplate):
         # QA flux service messaging, return None by default
         return None, combined_results, None
 
-    def _analyse_filenames(self, filenames, vis):
+    def _analyse_filenames(self, filenames, vis) -> (Set[str], Set[str]):
         to_import = set()
         to_convert = set()
 
@@ -443,6 +446,36 @@ class ImportData(basetask.StandardTaskTemplate):
             with open(outfile, 'w') as f:
                 f.writelines(template_text)
 
+    @staticmethod
+    def _rename_J2000_to_ICRS(ms_path):
+        # PIPE-2006: rename J2000 FIELD and SOURCE table directions to ICRS (only for ALMA cycles 0-2);
+        # adapted from a script by D.Petry (ESO), 2016-03-04
+        with casa_tools.MSMDReader(ms_path) as msmd:
+            if 'ALMA' not in msmd.observatorynames():
+                return
+
+        basename = os.path.basename(ms_path)
+        changed_columns = set()
+        with casa_tools.TableReader(ms_path + '/FIELD', nomodify=False) as tb:
+            for colname in ['PhaseDir_Ref', 'DelayDir_Ref', 'RefDir_Ref']:
+                a = tb.getcol(colname)
+                for i in range(len(a)):
+                    if a[i] == 0:  # J2000
+                        a[i] = 21  # ICRS
+                        changed_columns.add(colname)
+                tb.putcol(colname, a)
+        if changed_columns:
+            LOG.info(basename + ': changing coords from J2000 to ICRS in the FIELD table, columns ' +
+                     ', '.join(changed_columns))
+
+        with casa_tools.TableReader(ms_path + '/SOURCE', nomodify=False) as tb:
+            x = tb.getcolkeywords('DIRECTION')
+            if x['MEASINFO']['Ref'] == 'J2000':
+                x['MEASINFO']['Ref'] = 'ICRS'
+                tb.putcolkeywords('DIRECTION', x)
+                LOG.info(basename + ': changing coords from J2000 to ICRS in the SOURCE table')
+
+
 def get_datacolumn_name(msname: str) -> Optional[str]:
     """
     Return a name of data column in MeasurementSet (MS).
@@ -455,6 +488,7 @@ def get_datacolumn_name(msname: str) -> Optional[str]:
         matching column in MS. Returns None if no match is found.
     """
     return search_columns(msname, ['DATA', 'FLOAT_DATA'])
+
 
 def get_correcteddatacolumn_name(msname: str) -> Optional[str]:
     """
@@ -469,9 +503,11 @@ def get_correcteddatacolumn_name(msname: str) -> Optional[str]:
     """
     return search_columns(msname, ['CORRECTED_DATA'])
 
+
 def search_columns(msname: str, search_cols: List[str]) -> Optional[str]:
     """
     Args:
+        msname: MS directory name
         search_cols: List of column names to search for
 
     Returns:
@@ -484,7 +520,6 @@ def search_columns(msname: str, search_cols: List[str]) -> Optional[str]:
             if col in tb_cols:
                 return col
     return None
-
 
 
 FLAGGING_TEMPLATE_HEADER = '''#

@@ -14,14 +14,14 @@ columns = {'cleanmask' : ('Clean Mask', 'Clean Mask'),
            'spectra': ('Spectra / Mask', 'Spectra from flattened clean mask'),
            'psf_per_channel': ('Beam per channel', 'Beam per channel')}
 
-def get_plot(plots, prefix, field, spw, i, colname, moment=None):
+def get_plot(plots, prefix, datatype, field, spw, stokes, i, colname, moment=None):
     try:
         if moment is not None:
-            return plots[prefix][field][spw][i][colname][moment]
+            return plots[prefix][datatype][field][spw][stokes][i][colname][moment]
         else:
             for m in ('mean', 'mom8', 'mom0', 'N/A'):
-                if m in plots[prefix][field][spw][i][colname]:
-                    return plots[prefix][field][spw][i][colname][m]
+                if m in plots[prefix][datatype][field][spw][stokes][i][colname]:
+                    return plots[prefix][datatype][field][spw][stokes][i][colname][m]
             return None
     except KeyError:
         return None
@@ -67,7 +67,7 @@ def get_plot(plots, prefix, field, spw, i, colname, moment=None):
     </thead>
     <tbody>
 
-        % for i in sorted(plots_dict[prefix][field][spw].keys())[::-1]:
+        % for i in sorted(plots_dict[prefix][datatype][field][spw][pol].keys())[::-1]:
             % for colorder in colorders:
                 <tr>
                     <!-- iteration row heading -->
@@ -79,7 +79,7 @@ def get_plot(plots, prefix, field, spw, i, colname, moment=None):
                     <!-- plots for this iteration, in column order -->
                 % for colname, moment in colorder:
                 <td>
-                    <% plot = get_plot(plots_dict, prefix, field, spw, i, colname, moment) %>
+                    <% plot = get_plot(plots_dict, prefix, datatype, field, spw, pol, i, colname, moment) %>
                     <!-- use bootstrap markup for thumbnails -->
                     % if plot is not None:
                     <div class="thumbnail">
@@ -119,8 +119,8 @@ def get_plot(plots, prefix, field, spw, i, colname, moment=None):
                 <td>
                     <!-- model/psf/flux plots are associated with the final iteration -->
                     <% 
-                    lastiter = sorted(plots_dict[prefix][field][spw].keys())[-1]
-                    plot = get_plot(plots_dict, prefix, field, spw, lastiter, colname)
+                    lastiter = sorted(plots_dict[prefix][datatype][field][spw][pol].keys())[-1]
+                    plot = get_plot(plots_dict, prefix, datatype, field, spw, pol, lastiter, colname)
                     %>
                     % if plot is not None:
                         <div class="thumbnail">

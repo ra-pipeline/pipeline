@@ -18,14 +18,10 @@ from pipeline.infrastructure.launcher import Context
 
 from .. import common
 from ..common import direction_utils as dirutil
-from ..common import observatory_policy, utils
+from ..common import observatory_policy, sdtyping, utils
 from . import resultobjects
 
 LOG = infrastructure.get_logger(__name__)
-
-if TYPE_CHECKING:
-    Angle = NewType('Angle', Dict[str, Union[str, float]])
-    Direction = NewType('Direction', Dict[str, Union[str, float]])
 
 
 def ImageCoordinateUtil(
@@ -34,7 +30,7 @@ def ImageCoordinateUtil(
     ant_list: List[Optional[int]],
     spw_list: List[int],
     fieldid_list: List[int]
-) -> Union[Tuple[str, 'Angle', 'Angle', int, int, 'Direction'], bool]:
+) -> Union[Tuple[str, 'sdtyping.Angle', 'sdtyping.Angle', int, int, 'sdtyping.Direction'], bool]:
     """
     Calculate spatial coordinate of image.
 
@@ -272,10 +268,10 @@ class SDImagingWorkerInputs(vdp.StandardInputs):
     def __init__(self, context: Context, infiles: List[str], outfile: str, mode: str,
                  antids: List[int], spwids: List[int], fieldids: List[int], restfreq: str,
                  stokes: str, edge: Optional[List[int]]=None, phasecenter: Optional[str]=None,
-                 cellx: Optional['Angle']=None,
-                 celly: Optional['Angle']=None,
+                 cellx: Optional['sdtyping.Angle']=None,
+                 celly: Optional['sdtyping.Angle']=None,
                  nx: Optional[int]=None, ny: Optional[int]=None,
-                 org_direction: Optional['Direction']=None):
+                 org_direction: Optional['sdtyping.Direction']=None):
         """Initialise an instance of SDImagingWorkerInputs.
 
         Args:
@@ -318,6 +314,11 @@ class SDImagingWorkerInputs(vdp.StandardInputs):
         self.ny = ny
         self.org_direction = org_direction
 
+    @property
+    def is_freq_axis_ascending(self) -> bool:
+        _ref_spwobj = self.context.observing_run.get_ms(self.infiles[0]).spectral_windows[self.spwids[0]]
+        return _ref_spwobj.channels.chan_freqs.delta > 0
+
 
 class SDImagingWorker(basetask.StandardTaskTemplate):
     """Worker class of imaging task."""
@@ -351,10 +352,8 @@ class SDImagingWorker(basetask.StandardTaskTemplate):
             self._get_map_coord(inputs, context, infiles, antid_list, spwid_list, fieldid_list)
         is_eph_obj = rep_ms.get_fields(field_id=rep_fieldid)[0].source.is_eph_obj
 
-        status = self._do_imaging(infiles, antid_list, spwid_list, fieldid_list, outfile, imagemode,
-                                  edge, phasecenter, cellx, celly, nx, ny)
-
-        if status is True:
+        if self._do_imaging(infiles, antid_list, spwid_list, fieldid_list, outfile, imagemode,
+                            edge, phasecenter, cellx, celly, nx, ny):
             specmode = 'cubesource' if is_eph_obj else 'cube'
             # missing attributes in result instance will be filled in by the
             # parent class
@@ -367,9 +366,11 @@ class SDImagingWorker(basetask.StandardTaskTemplate):
             image_item.antenna = ant_name  # name #(group name)
             outcome = {}
             outcome['image'] = image_item
+            is_frequency_channel_reversed = not self.inputs.is_freq_axis_ascending
             result = resultobjects.SDImagingResultItem(task=None,
                                                        success=True,
-                                                       outcome=outcome)
+                                                       outcome=outcome,
+                                                       frequency_channel_reversed=is_frequency_channel_reversed)
         else:
             # Imaging failed due to missing valid data
             result = resultobjects.SDImagingResultItem(task=None,
@@ -384,7 +385,7 @@ class SDImagingWorker(basetask.StandardTaskTemplate):
 
     def _get_map_coord(self, inputs: SDImagingWorkerInputs, context: Context, infiles: List[str],
                        ant_list: List[int], spw_list: List[int], field_list: List[int]) \
-            -> Tuple[str, 'Angle', 'Angle', int, int, 'Direction']:
+            -> Tuple[str, 'sdtyping.Angle', 'sdtyping.Angle', int, int, 'sdtyping.Direction']:
         """Gather or generate the input image parameters.
 
         Args:
@@ -413,7 +414,7 @@ class SDImagingWorker(basetask.StandardTaskTemplate):
 
     def _do_imaging(self, infiles: List[str], antid_list: List[int], spwid_list: List[int],
                     fieldid_list: List[int], imagename: str, imagemode: str, edge: List[int],
-                    phasecenter: str, cellx: 'Angle', celly: 'Angle', nx: int, ny: int) -> bool:
+                    phasecenter: str, cellx: 'sdtyping.Angle', celly: 'sdtyping.Angle', nx: int, ny: int) -> bool:
         """Process imaging.
 
         Args:
@@ -478,9 +479,14 @@ class SDImagingWorker(basetask.StandardTaskTemplate):
             step = 1
             nchan = 1
         else:
-            start = edge[0]
-            step = 1
             nchan = total_nchan - sum(edge)
+            # set start and step values to make the frequency axis of all FITS in ascending order.
+            if numpy.logical_not(self.inputs.is_freq_axis_ascending):
+                step = -1
+                start = nchan - edge[1] - 1
+            else:
+                step = 1
+                start = edge[0]
         # ampcal
         if imagemode == 'AMPCAL':
             step = nchan
@@ -610,6 +616,7 @@ class SDImagingWorker(basetask.StandardTaskTemplate):
         if not os.path.exists(imagename) or not os.path.exists(weightname):
             LOG.error("Generation of %s failed" % imagename)
             return False
+
         # check for valid pixels (non-zero weight)
         # Task sdimaging does not fail even if no data is gridded to image.
         # In that case, image is not masked, no restoring beam is set to
@@ -619,5 +626,11 @@ class SDImagingWorker(basetask.StandardTaskTemplate):
         if sumsq == 0.0:
             LOG.warning("No valid pixel found in image, %s. Discarding the image from futher processing." % imagename)
             return False
+
+        virtual_spw_id = context.observing_run.real2virtual_spw_id(ref_spwid, reference_data)
+
+        if numpy.logical_not(self.inputs.is_freq_axis_ascending):
+            LOG.info(f"Channel frequencies in spw {virtual_spw_id} is in decending order in observation data. "
+                     f"They will be reversed to have the frequency axis of output image cube {imagename} in ascending order.")
 
         return True

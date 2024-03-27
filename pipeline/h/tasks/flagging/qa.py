@@ -30,7 +30,7 @@ class FlagDeterBaseQAHandler(pqa.QAPlugin):
 
 
 class FlagDeterBaseListQAHandler(pqa.QAPlugin):
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = flagdeterbase.FlagDeterBaseResults
 
     def handle(self, context, result):

@@ -14,8 +14,8 @@ LOG = infrastructure.get_logger(__name__)
 
 class WeightMSInputs(vdp.StandardInputs):
     """
-    Inputs for exporting data to MS 
-    NOTE: infile should be a complete list of MSes 
+    Inputs for exporting data to MS
+    NOTE: infile should be a complete list of MSes
     """
     # Search order of input vis
     processing_data_type = [DataType.BASELINED, DataType.ATMCORR,
@@ -39,7 +39,7 @@ class WeightMSInputs(vdp.StandardInputs):
     def vis(self):
         return self.infiles
 
-    def __init__(self, context, infiles=None, outfiles=None, 
+    def __init__(self, context, infiles=None, outfiles=None,
                  antenna=None, spwid=None, fieldid=None):
         super(WeightMSInputs, self).__init__()
 
@@ -101,7 +101,6 @@ class WeightMS(basetask.StandardTaskTemplate):
         result = WeightMSResults(task=self.__class__,
                                  success=True,
                                  outcome=outfile)
-        result.task = self.__class__
 
         return result
 
@@ -131,7 +130,7 @@ class WeightMS(basetask.StandardTaskTemplate):
             tsel = tb.query('DATA_DESC_ID==%s && FIELD_ID==%d && ANTENNA1==%d && ANTENNA2==%d' %
                             (data_desc_id, fieldid, antid, antid),
                             sortlist='TIME')
-            out_rows = tsel.rownumbers() 
+            out_rows = tsel.rownumbers()
             stateids = numpy.unique(tsel.getcol('STATE_ID'))
             tsel.close()
 
@@ -145,7 +144,7 @@ class WeightMS(basetask.StandardTaskTemplate):
                             (data_desc_id, fieldid, antid, antid, list(stateids)),
                             sortlist='TIME', style='python')
             if tsel.nrows() > 0:
-                in_rows = tsel.rownumbers() 
+                in_rows = tsel.rownumbers()
             tsel.close()
 
         assert len(in_rows) == len(out_rows)
@@ -179,7 +178,7 @@ class WeightMS(basetask.StandardTaskTemplate):
         index_list = common.get_index_list_for_ms(datatable, [infile], [antid], [fieldid], [spwid])
 
         in_rows = datatable.getcol('ROW').take(index_list)
-#         # row map filtered by target scans (key: target input 
+#         # row map filtered by target scans (key: target input
 #         target_row_map = {}
 #         for idx in in_rows:
 #             target_row_map[idx] = row_map.get(idx, -1)
@@ -215,7 +214,7 @@ class WeightMS(basetask.StandardTaskTemplate):
                             weight[row][ipol] = 0.0
                     else:
                         # treat flagged data
-                        pass
+                        weight[row][ipol] = 0.0
 
         if weight_tintsys:
             exposures = datatable.getcol('EXPOSURE').take(index_list)

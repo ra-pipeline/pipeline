@@ -71,7 +71,15 @@ instance/
 .scrapy
 
 # Sphinx documentation
-docs/_build/
+docs/_build/**
+docs/source/_apidoc/**
+docs/source/_autosummary/**
+docs/source/_taskdocs/**
+
+# CASA log files
+casa-*.log
+docs/casa-*.log
+docs/source/casa-*.log
 
 # PyBuilder
 target/
@@ -153,13 +161,6 @@ tags
 
 # VSCode
 .vscode/
-
-# ignore auto-generated files and directories
-pipeline/*/cli/*.py
-pipeline/*/cli/gotasks/
-# but do not ignore cli.py or utils.py, which are required by all tasks
-!**/cli/cli.py
-!**/cli/utils.py
 
 # ignore _version.py, created by setup.py
 _version.py

@@ -1,10 +1,5 @@
-import collections
-import copy
-import os
 import datetime
 import shutil
-
-import numpy as np
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -13,7 +8,7 @@ import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
 from pipeline.hifv.heuristics import set_add_model_column_parameters
 from pipeline.hifv.heuristics import RflagDevHeuristic, mssel_valid
-from pipeline.hifv.heuristics import cont_file_to_CASA
+from pipeline.infrastructure.contfilehandler import contfile_to_spwsel
 from pipeline.infrastructure import casa_tasks, casa_tools, task_registry
 
 from .displaycheckflag import checkflagSummaryChart
@@ -162,7 +157,7 @@ class Checkflag(basetask.StandardTaskTemplate):
         # decide on if we use cont.dat for target-vla
         use_contdat = False
         if self.inputs.checkflagmode == 'target-vla':
-            fielddict = cont_file_to_CASA(self.inputs.vis, self.inputs.context)
+            fielddict = contfile_to_spwsel(self.inputs.vis, self.inputs.context)
             if fielddict != {}:
                 LOG.info('cont.dat file present.  Using VLA Spectral Line Heuristics for checkflagmode=target-vla.')
                 use_contdat = True
@@ -386,7 +381,7 @@ class Checkflag(basetask.StandardTaskTemplate):
                     #   The usage of 'RESIDUAL' is only valid if the model of bpd source(s) is properly filled *AND*
                     #   the first-order gain/passband calibration has been applied in 'CORRECTED'.
                     #   Here we check each field from the data selection and see if they all meet the above requirements.
-                    #   We only examine the parallel hand amplitude: 
+                    #   We only examine the parallel hand amplitude:
                     #       - setjy() has only I models for 3C48/3C138/3C286/3C147.
                     #       - setjy(fluxdensity=-1) will fill the cross-hand with zero values.
                     LOG.info("Determining if we can use the RESIDUAL column for rflag:")
@@ -452,7 +447,7 @@ class Checkflag(basetask.StandardTaskTemplate):
 
     def do_vla_targetflag(self, fieldselect='', scanselect='', intentselect='', spwselect=''):
         """"Perform a simple second 'rflag' pass.
-        
+
         This method is equivalent to hifv_targetflag(intents='*TARGET*'), which is phasing out.
         See PIPE-1342.
         """
@@ -484,7 +479,7 @@ class Checkflag(basetask.StandardTaskTemplate):
         """Select data according to the specified checkflagmode.
 
         Returns:
-            tuple: (field_select_string, scan_select_string, intent_select_string) 
+            tuple: (field_select_string, scan_select_string, intent_select_string)
         """
         fieldselect = scanselect = intentselect = ''
         columnselect = 'corrected'
@@ -533,7 +528,7 @@ class Checkflag(basetask.StandardTaskTemplate):
         Set up threshold multiplier values for calibrators and targets separately.
         Xpol are used for cross-hands, Ppol are used for parallel hands. As
         noted above, I'm still refining these values; I suppose they could be
-        input parameters for the task, if needed.  
+        input parameters for the task, if needed.
 
         rflag_standard: list of tuple, with each tuple (a, b, c, d) describing the specifications of one self._do_rflag call:
 
@@ -541,7 +536,7 @@ class Checkflag(basetask.StandardTaskTemplate):
                             b) correlation selection
                             c) ftdev threshold multiplier
                             d) extendflag setting
-                                Boolean (True/False): 
+                                Boolean (True/False):
                                     use the default basic extendflagging scheme; see the 'extendflags' subprameter of flagdata(mode='rflag'.
                                 A dictionary (e.g. {'growtime':100,'growfreq':100,'')
                                     do extendflag using seperate flagdata(mode='extend',..) call following flagdata(model='rflag',extendflags=False,..)
@@ -552,7 +547,7 @@ class Checkflag(basetask.StandardTaskTemplate):
                             b) correlation selection
                             c) tfcrop threshold multiplier
                             d) extendflag setting
-                                Boolean (True/False): 
+                                Boolean (True/False):
                                     use the default basic extendflagging scheme; see the 'extendflags' subprameter of flagdata(mode='rflag'.
                                 A dictionary (e.g. {'growtime':100,'growfreq':100,'')
                                     do extendflag using seperate flagdata(mode='extend',..) call following flagdata(model='rflag',extendflags=False,..
@@ -593,7 +588,7 @@ class Checkflag(basetask.StandardTaskTemplate):
                                  'growfreq': 100,
                                  'growaround': True,
                                  'flagneartime': True,
-                                 'flagnearfreq': True}                                 
+                                 'flagnearfreq': True}
 
         if self.inputs.checkflagmode == 'allcals-vla':
             # PIPE-987: follow the VLASS flagging scheme described in CAS-11598.
@@ -627,7 +622,7 @@ class Checkflag(basetask.StandardTaskTemplate):
                                  'growfreq': 100,
                                  'growaround': True,
                                  'flagneartime': True,
-                                 'flagnearfreq': True}                                 
+                                 'flagnearfreq': True}
 
         if self.inputs.checkflagmode == 'target-vla':
             # PIPE-685: follow the VLASS flagging scheme described in CAS-11598
@@ -760,7 +755,7 @@ class Checkflag(basetask.StandardTaskTemplate):
                                      correlation=self.corrstring,
                                      timeaverage=True, timebin='1e8', timespan=timespan,
                                      keepflags=False, reindex=False)
-        job.execute(dry_run=False)
+        job.execute()
 
         with casa_tools.MSReader(vis_averaged_name) as msfile:
             vis_ampstats = msfile.statistics(column='data', complex_value='amp', useweights=False, useflags=True,

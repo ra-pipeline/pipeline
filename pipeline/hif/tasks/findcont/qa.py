@@ -59,7 +59,7 @@ class FindContQAHandler(pqa.QAPlugin):
 
 
 class FindContListQAHandler(pqa.QAPlugin):
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = resultobjects.FindContResult
 
     def handle(self, context, result):

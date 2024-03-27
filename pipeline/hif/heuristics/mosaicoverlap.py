@@ -4,6 +4,7 @@ import numpy as np
 import scipy as sp
 
 from pipeline.infrastructure import casa_tools
+import pipeline.infrastructure.utils as utils
 
 # Physical constants
 #
@@ -13,7 +14,7 @@ c_mks = 2.99792458e8
 
 def mosaicOverlapFactorMS(ms, source, spw, diameter, intent='TARGET', fwhmfactor=1.13, taper=10.0, obscuration=0.75):
     """
-    This routine computes the maximum sensitivity increase factor for a 
+    This routine computes the maximum sensitivity increase factor for a
     mosaic. It handles an arbitrary mosaic pattern. It does not account for
     flagging or different observing depths at different pointings. Defaulted
     parameters take values appropriate for ALMA. The use2007formula parameter
@@ -24,7 +25,7 @@ def mosaicOverlapFactorMS(ms, source, spw, diameter, intent='TARGET', fwhmfactor
     Inputs:
 
              ms: The ms object from the pipeline context
-         source: The target source id or name 
+         source: The target source id or name
             spw: Determine the frequency based on this spw or list of spws.
        diameter: The effective antenna diameter in meters
          intent: The target source intent
@@ -44,9 +45,9 @@ def mosaicOverlapFactorMS(ms, source, spw, diameter, intent='TARGET', fwhmfactor
     # Find the fields associated with the selected mosaic source
     msource = []
     if source.isdigit():
-        msource = [s for s in ms.sources if s.id == source] 
+        msource = [s for s in ms.sources if s.id == source]
     else:
-        msource = [s for s in ms.sources if s.name == source] 
+        msource = [s for s in ms.sources if utils.dequote(s.name) == utils.dequote(source)]
     if not msource:
         return None
     fields = [f.id for f in msource[0].fields]
@@ -72,7 +73,7 @@ def mosaicOverlapFactorMS(ms, source, spw, diameter, intent='TARGET', fwhmfactor
 
     # Find all the spw ids associated with the
     # specified intent
-    science_spws = [s.id for s in ms.get_spectral_windows() if intent in s.intents] 
+    science_spws = [s.id for s in ms.get_spectral_windows() if intent in s.intents]
 
     # Compute the intersection of the two
     #    Replace the specified spws with the intersection if
@@ -83,7 +84,7 @@ def mosaicOverlapFactorMS(ms, source, spw, diameter, intent='TARGET', fwhmfactor
 
     # Compute the mean frequency for the spws in Hz
     frequencies = []
-    for spwid in spws: 
+    for spwid in spws:
         frequency = float(ms.get_spectral_window(spwid).centre_frequency.value)
         frequencies.append(frequency)
     frequency = np.mean(frequencies)
@@ -147,7 +148,7 @@ def mosaicOverlapFactorVIS(vis, source, spw, diameter, fwhmfactor=1.13, taper=10
     Inputs:
 
            vis: The name of the measurement set
-        source: The source id or name 
+        source: The source id or name
            spw: determine the frequency based on this spw or list of spws.
                 Defaults to all with the specified intent.
       diameter: The effective outer antenna diameter in meters
@@ -203,12 +204,12 @@ def mosaicOverlapFactorVIS(vis, source, spw, diameter, fwhmfactor=1.13, taper=10
 
         # Compute the mean frequency in Hz
         frequencies = []
-        for spwid in spws: 
+        for spwid in spws:
             frequencies.append(msmd.meanfreq(spwid))
         frequency = np.mean(frequencies)
 
     # Compute the primary beam and radius at first null
-    #    Note that in this call fwhmfactor is set 
+    #    Note that in this call fwhmfactor is set
     primaryBeam = primaryBeamArcsec(frequency, diameter, taper=taper, obscuration=obscuration, fwhmfactor=fwhmfactor)
 
     # Approximately correct for Bessel function
@@ -283,13 +284,13 @@ def primaryBeamArcsec (frequency, diameter, taper=10.0, obscuration=0.75, fwhmfa
         mytaper = taper
     else:
         mytaper = effectiveTaper (fwhmfactor, diameter,
-            obscuration=obscuration, use2007formula=use2007formula) 
+            obscuration=obscuration, use2007formula=use2007formula)
         if not mytaper:
             return None
     if mytaper < 0.0:
         mytaper = abs (mytaper)
 
-    # Compute the primary beam factor. 
+    # Compute the primary beam factor.
     lambdaMeters = c_mks / frequency
     bfactor = baarsTaperFactor(mytaper, use2007formula=use2007formula) * \
         centralObstructionFactor(diameter, obscuration=obscuration)
@@ -308,7 +309,7 @@ def gaussianBeamResponse (radius, frequency, diameter, taper=10.0, obscuration=0
             radius: The radius in arcseconds
          frequency: The frequency in Hz
           diameter: The outer diameter of the dish in m
-             taper: The taper in DB 
+             taper: The taper in DB
        obscuration: Diameter of the central obscuration in meters
         fwhmfactor: The fwhm factor, if given ignore the taper
     use2007formula: If True use Baars formula
@@ -331,7 +332,7 @@ def baarsTaperFactor(taper_dB, use2007formula=True):
                      True --> use Equation 4.13 from Baars 2007 book
 
     Inputs
-             taper: The taper in DB 
+             taper: The taper in DB
     use2007formula: If True use Baars formula
 
     """

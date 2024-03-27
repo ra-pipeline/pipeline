@@ -58,13 +58,11 @@ class SDBLFlagSummary(object):
         self.flagRule = flagRule
         self.bunit = sdutils.get_brightness_unit(self.ms.name, defaultunit='Jy/beam')
 
-    def execute(self, dry_run:bool=True) -> Tuple[List[Dict],List]:
+    def execute(self) -> Tuple[List[Dict],List]:
         """
         Summarizes flagging results.
 
         Iterates over antenna and polarization for a certain spw ID
-        Args:
-           dry_run: True if dry_run
         Returns:
            flagSummary : flagsummary
            plot_list   : list of plot objects
@@ -217,8 +215,8 @@ class SDBLFlagSummary(object):
         NPprows = {}
         NPptime = {}
         for key in [ 'TsysFlag', 'BaselineFlag' ]:
-            NPprows[key] = np.zeros( NROW, dtype=np.int )
-            NPptime[key] = np.zeros( NROW, dtype=np.float )
+            NPprows[key] = np.zeros( NROW, dtype=int )
+            NPptime[key] = np.zeros( NROW, dtype=float )
 
         NPpdata = {}
         NPpflag = {}
@@ -226,8 +224,8 @@ class SDBLFlagSummary(object):
                      'RmsPostFitFlag', 'RmsPreFitFlag',
                      'RunMeanPostFitFlag', 'RunMeanPreFitFlag',
                      'RmsExpectedPostFitFlag', 'RmsExpectedPreFitFlag' ]:
-            NPpdata[key] = np.zeros( NROW, dtype=np.float )
-            NPpflag[key] = np.zeros( NROW, dtype=np.int )
+            NPpdata[key] = np.zeros( NROW, dtype=float )
+            NPpflag[key] = np.zeros( NROW, dtype=int )
 
         FlaggedRowsCategory = collections.OrderedDict((
             ('TsysFlag', []),              ('OnlineFlag', []),

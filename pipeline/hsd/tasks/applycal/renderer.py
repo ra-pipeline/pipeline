@@ -28,8 +28,6 @@ if TYPE_CHECKING:
 
 LOG = logging.get_logger(__name__)
 
-FlagTotal = collections.namedtuple('FlagSummary', 'flagged total')
-
 
 class T2_4MDetailsSDApplycalRenderer(super_renderer.T2_4MDetailsApplycalRenderer):
     """SDApplyCal Renderer class for t2_4m."""

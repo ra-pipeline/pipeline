@@ -1,5 +1,8 @@
+import os
+
 import pipeline.infrastructure as infrastructure
 from pipeline.hif.heuristics import cleanbox as cbheuristic
+
 from .resultobjects import BoxResult
 
 LOG = infrastructure.get_logger(__name__)
@@ -25,9 +28,7 @@ class BaseCleanSequence:
     def iteration_result(self, model, restored, residual,
                          flux, cleanmask, pblimit_image=0.2, pblimit_cleanmask=0.3,
                          cont_freq_ranges=None):
-        """This method sets the iteration counter and returns statistics for
-        that iteration.
-        """
+        """This method sets the iteration counter and returns statistics for that iteration."""
 
         self.flux = flux
 
@@ -40,7 +41,10 @@ class BaseCleanSequence:
          nonpbcor_image_non_cleanmask_rms,
          pbcor_image_min, pbcor_image_max,
          residual_robust_rms,
-         nonpbcor_image_robust_rms_and_spectra) = \
+         nonpbcor_image_robust_rms_and_spectra,
+         pbcor_image_min_iquv,
+         pbcor_image_max_iquv,
+         nonpbcor_image_non_cleanmask_rms_iquv) = \
             cbheuristic.analyse_clean_result(self.multiterm, model, restored,
                                              residual, flux, cleanmask,
                                              pblimit_image, pblimit_cleanmask,
@@ -63,10 +67,23 @@ class BaseCleanSequence:
                nonpbcor_image_non_cleanmask_rms, \
                pbcor_image_min, pbcor_image_max, \
                residual_robust_rms, \
-               nonpbcor_image_robust_rms_and_spectra
+               nonpbcor_image_robust_rms_and_spectra, \
+               pbcor_image_min_iquv, \
+               pbcor_image_max_iquv, \
+               nonpbcor_image_non_cleanmask_rms_iquv
 
     def iteration(self):
-        """The base boxworker allows only one iteration.
-        """
+        """The base boxworker allows only one iteration."""
 
         return self.result
+
+    def get_rootname(self):
+        """Return the rootname of imaging products.
+
+        e.g. oussid.s2_2.04287+1801_sci.spw16_18_20_22_24_26_28_30.cont.I
+        """
+        rootname = None
+        if self.residuals:
+            rootname, _ = os.path.splitext(self.residuals[0])
+            rootname, _ = os.path.splitext(rootname)
+        return rootname

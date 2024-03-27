@@ -36,7 +36,7 @@ class testgainsSummaryChart(object):
                          title='testgains Temp table', titlefont=8, xaxisfont=7, yaxisfont=7,
                          showgui=False, plotfile=figfile)
 
-        job.execute(dry_run=False)
+        job.execute()
 
     def get_figfile(self, prefix):
         return os.path.join(self.context.report_dir, 'stage%s' % self.result.stage_number,
@@ -137,7 +137,7 @@ class testgainsPerAntennaChart(object):
                                          titlefont=8, xaxisfont=7, yaxisfont=7, showgui=False, plotfile=figfile,
                                          xconnector=xconnector)
 
-                        job.execute(dry_run=False)
+                        job.execute()
 
                     except Exception as ex:
                         LOG.warning("Unable to plot " + filename + str(ex))

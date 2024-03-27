@@ -107,7 +107,10 @@ def make_flux_table(context, results):
                 # get one spw/field intent
                 scan_intents_list = [scan.intents for scan in ms_for_result.get_scans(field=field.name, spw=measurement.spw_id)]
                 scan_intents = set().union(*scan_intents_list)
-                field_spw_intents = ", ".join(sorted(scan_intents.intersection({'PHASE', 'BANDPASS', 'FLUX', 'CHECK', 'POLARIZATION', 'AMPLITUDE'}))) # Set of intents to include from PIPE-1006
+
+                # Set of intents to include from PIPE-1006 + PIPE-1724
+                field_spw_intents = ", ".join(sorted(scan_intents.intersection(
+                    {'PHASE', 'BANDPASS', 'FLUX', 'CHECK', 'POLARIZATION', 'AMPLITUDE', 'DIFFGAIN'})))
 
                 tr = FluxTR(vis_cell, field_cell, field_spw_intents, measurement.spw_id, 
                             fluxes['I'], fluxes['Q'], fluxes['U'], fluxes['V'],
@@ -117,7 +120,7 @@ def make_flux_table(context, results):
     return utils.merge_td_columns(rows)
 
 
-RepsourceTR = collections.namedtuple('RepsourceTR', 'vis source rfreq rbwidth spwid bwidth')
+RepsourceTR = collections.namedtuple('RepsourceTR', 'vis source rfreq rbwidth spwid bwidth dynrange')
 
 
 def make_repsource_table(context, results):
@@ -140,12 +143,15 @@ def make_repsource_table(context, results):
             vis = ms.basename
 
             # If either the representative frequency or bandwidth is undefined then
-            # the representatve target is undefined
-            representative_target = ms.representative_target
-            rep_target_defined = not(None in representative_target or 'None' in representative_target or 'none' in representative_target)
-            repsource_name_is_none = representative_target[0] == 'none'
-            if not rep_target_defined:
-                rows.append(RepsourceTR(vis, 'N/A', 'N/A', 'N/A', 'N/A', 'N/A'))
+            # the representative target is undefined
+            reptarget_name, reptarget_freq, reptarget_bw = ms.representative_target
+            reptarget_defined = (reptarget_name not in (None, 'None', 'none') and
+                                 reptarget_freq is not None and
+                                 reptarget_bw is not None)
+            # when no rep.target is defined, its name is None, but a string 'none' means an incomplete definition
+            repsource_name_is_none = reptarget_name == 'none'
+            if not reptarget_defined:
+                rows.append(RepsourceTR(vis, 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A'))
                 continue
 
             # Is the representative source in the context or not
@@ -160,6 +166,12 @@ def make_repsource_table(context, results):
             else:
                 source_spwid = context.project_performance_parameters.representative_spwid
 
+            dynrange_bw = ms.science_goals['spectralDynamicRangeBandWidth']
+            if dynrange_bw is not None:
+                dynrange_bw = qa.tos(dynrange_bw, 5)
+            else:
+                dynrange_bw = 'Not available'  # cannot use N/A because this will hide the entire row
+
             # Determine the representative source name and spwid for the ms
             repsource_name, repsource_spwid = ms.get_representative_source_spw(source_name=source_name,
                                                                                source_spwid=source_spwid)
@@ -167,17 +179,17 @@ def make_repsource_table(context, results):
             # Populate the table rows
             # No source
             if repsource_name is None: 
-                if not ms.representative_target[0]:
-                    tr = RepsourceTR(vis, 'Unknown', 'Unknown', 'Unknown', 'Unknown', 'Unknown')
+                if not reptarget_name:
+                    tr = RepsourceTR(vis, 'Unknown', 'Unknown', 'Unknown', 'Unknown', 'Unknown', 'Unknown')
                 else:
-                    tr = RepsourceTR(vis, ms.representative_target[0], 'Unknown', 'Unknown', 'Unknown', 'Unknown')
+                    tr = RepsourceTR(vis, reptarget_name, 'Unknown', 'Unknown', 'Unknown', 'Unknown', dynrange_bw)
                 rows.append(tr)
                 continue
 
             # No spwid
             if repsource_spwid is None:
-                tr = RepsourceTR(vis, repsource_name, qa.tos(ms.representative_target[1], 5),
-                                 qa.tos(ms.representative_target[2], 5), 'Unknown', 'Unknown')
+                tr = RepsourceTR(vis, repsource_name, qa.tos(reptarget_freq, 5),
+                                 qa.tos(reptarget_bw, 5), 'Unknown', 'Unknown', dynrange_bw)
                 rows.append(tr)
                 continue
 
@@ -186,9 +198,9 @@ def make_repsource_table(context, results):
             repsource_chanwidth = qa.quantity(
                 float(repsource_spw.channels[0].getWidth().to_units(FrequencyUnits.MEGAHERTZ)), 'MHz')
 
-            tr = RepsourceTR(vis, repsource_name, qa.tos(ms.representative_target[1], 5),
-                             qa.tos(ms.representative_target[2], 5), str(repsource_spwid),
-                             qa.tos(repsource_chanwidth, 5))
+            tr = RepsourceTR(vis, repsource_name, qa.tos(reptarget_freq, 5),
+                             qa.tos(reptarget_bw, 5), str(repsource_spwid),
+                             qa.tos(repsource_chanwidth, 5), dynrange_bw)
             rows.append(tr)
 
     return utils.merge_td_columns(rows), repsource_name_is_none

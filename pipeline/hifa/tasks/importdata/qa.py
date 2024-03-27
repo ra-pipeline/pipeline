@@ -19,7 +19,7 @@ aqua.register_aqua_metric(aqua_exporter)
 
 
 class ALMAImportDataListQAHandler(pqa.QAPlugin):
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = ALMAImportDataResults
 
     def handle(self, context, result):
@@ -43,7 +43,7 @@ class ALMAImportDataQAHandler(pqa.QAPlugin):
     child_cls = None
 
     def handle(self, context, result):
-        # Check for the presense of polarization intents
+        # Check for the presence of polarization intents
         recipe_name = context.project_structure.recipe_name
         polcal_scores = _check_polintents(recipe_name, result.mses)
 

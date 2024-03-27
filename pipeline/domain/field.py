@@ -69,7 +69,7 @@ class Field(object):
         Get the field name with illegal characters replaced with underscores.
 
         This property is used to determine whether the field name, when given
-        as a CASA argument, should be enclosed in quotes. 
+        as a CASA argument, should be enclosed in quotes.
         """
         return utils.fieldname_clean(self._name)
 
@@ -85,7 +85,7 @@ class Field(object):
     def identifier(self):
         """
         A human-readable identifier for this Field.
-        """ 
+        """
         return self.name if self.name else '#{0}'.format(self.id)
 
     @property
@@ -112,7 +112,7 @@ class Field(object):
         self._name = value
 
     @property
-    def ra(self):        
+    def ra(self):
         return casa_tools.quanta.formxxx(self.longitude, format='hms', prec=3)
 
     # Galactic Longitude: it is usually expressed in DMS format
@@ -133,14 +133,14 @@ class Field(object):
         source_type = source_type.replace('GAIN', 'PHASE')
         source_type = source_type.replace('FLUX', 'AMPLITUDE')
 
-        for intent in ['BANDPASS', 'PHASE', 'AMPLITUDE', 'TARGET', 'POINTING', 
+        for intent in ['BANDPASS', 'PHASE', 'AMPLITUDE', 'TARGET', 'POINTING',
                        'WVR', 'ATMOSPHERE', 'SIDEBAND', 'POLARIZATION',
-                       'POLANGLE', 'POLLEAKAGE', 'CHECK', 'UNKNOWN',
+                       'POLANGLE', 'POLLEAKAGE', 'CHECK', 'DIFFGAIN', 'UNKNOWN',
                        'SYSTEM_CONFIGURATION']:
             if source_type.find(intent) != -1:
                 self.intents.add(intent)
 
     def __str__(self):
         return '<Field {id}: name=\'{name}\' intents=\'{intents}\'>'.format(
-            id=self.identifier, name=self.name, 
+            id=self.identifier, name=self.name,
             intents=','.join(self.intents))

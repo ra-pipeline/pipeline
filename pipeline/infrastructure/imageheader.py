@@ -7,6 +7,7 @@ import pipeline as pipeline
 import pipeline.infrastructure as infrastructure
 from pipeline import environment
 from pipeline.infrastructure import casa_tools
+from textwrap import wrap
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -50,8 +51,8 @@ def clean_extendable_keys(data, key, num_keys=None):
 
 
 # Add information to image header
-def set_miscinfo(name, spw=None, virtspw=True, field=None, nfield=None, type=None, iter=None, intent=None, specmode=None,
-                 robust=None, weighting=None, is_per_eb=None, context=None):
+def set_miscinfo(name, spw=None, virtspw=True, field=None, nfield=None, datatype=None, type=None, iter=None,
+                 intent=None, specmode=None, robust=None, weighting=None, is_per_eb=None, context=None):
     """Define miscellaneous image information."""
     if name == '':
         return
@@ -59,7 +60,9 @@ def set_miscinfo(name, spw=None, virtspw=True, field=None, nfield=None, type=Non
     with casa_tools.ImageReader(name) as image:
         info = image.miscinfo()
         if name is not None:
-            filename_components = os.path.basename(name).split('.')
+            # PIPE-533, limiting 'filnamXX' keyword length to 68 characters
+            # due to FITS header keyword string length limit.
+            filename_components = wrap(os.path.basename(name), 68)
             info['nfilnam'] = len(filename_components)
             for i, filename_component in enumerate(filename_components):
                 info['filnam{:02d}'.format(i+1)] = filename_component
@@ -111,6 +114,9 @@ def set_miscinfo(name, spw=None, virtspw=True, field=None, nfield=None, type=Non
                 info['npol'] = len(context.observing_run.measurement_sets[0].get_vla_corrstring().split(','))
             else:
                 info['npol'] = -999
+
+        if datatype is not None:
+            info['datatype'] = datatype
 
         if type is not None:
             info['type'] = type

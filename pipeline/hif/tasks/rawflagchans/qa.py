@@ -46,7 +46,7 @@ class RawflagchansListQAHandler(pqa.QAPlugin):
     """
     QA handler for a list containing RawflagchansResults.
     """
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = resultobjects.RawflagchansResults
 
     def handle(self, context, result):

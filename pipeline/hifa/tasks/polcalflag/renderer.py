@@ -14,8 +14,6 @@ from pipeline.infrastructure import basetask
 
 LOG = logging.get_logger(__name__)
 
-FlagTotal = collections.namedtuple('FlagSummary', 'flagged total')
-
 
 class T2_4MDetailsPolcalflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     """

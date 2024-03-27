@@ -45,7 +45,7 @@ class ApplycalsInputs(applycal.IFApplycalInputs):
 
 
 @task_registry.set_equivalent_casa_task('hifv_applycals')
-class Applycals(applycal.IFApplycal):
+class Applycals(applycal.SerialIFApplycal):
     Inputs = ApplycalsInputs
 
     # Note this is a temporary workaround

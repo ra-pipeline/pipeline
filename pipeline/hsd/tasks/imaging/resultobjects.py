@@ -11,10 +11,12 @@ class SDImagingResultItem(common.SingleDishResults):
     """
     The class to store result of each image.
     """
-    def __init__(self, task=None, success=None, outcome=None, sensitivity_info=None, theoretical_rms=None):
+    def __init__(self, task=None, success=None, outcome=None, sensitivity_info=None,
+                 theoretical_rms=None, frequency_channel_reversed=False):
         super(SDImagingResultItem, self).__init__(task, success, outcome)
         self.sensitivity_info = sensitivity_info
         self.theoretical_rms = theoretical_rms
+        self.frequency_channel_reversed = frequency_channel_reversed
         # logrecords attribute is mandatory but not created unless Result is returned by execute.
         self.logrecords = []
 

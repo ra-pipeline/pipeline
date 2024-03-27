@@ -62,9 +62,9 @@ class HeuristicsLineFinder(api.Heuristic):
         """
         _spectrum = np.array(spectrum)
         if len(mask) == 0:
-            mask = np.ones(len(_spectrum), dtype=np.int)
+            mask = np.ones(len(_spectrum), dtype=int)
         else:
-            mask = np.array(mask, np.int)
+            mask = np.array(mask, int)
         if edge is not None:
             if len(edge) == 1:
                 if edge[0] != 0:
@@ -82,7 +82,7 @@ class HeuristicsLineFinder(api.Heuristic):
             _edge = (0, len(_spectrum))
         indeces = np.arange(len(_spectrum))
 
-        previous_line_indeces = np.array([], np.int)
+        previous_line_indeces = np.array([], int)
         previous_mad = 1e6
         iteration = 0
         max_iteration = 10

@@ -1,7 +1,7 @@
 #
 # [SCRIPT INFORMATION]
-# GIT REPO: https://bitbucket.sco.alma.cl/scm/~harold.francke/sd-atm-line-correction-prototype.git
-# COMMIT: 7841010
+# GIT REPO: https://bitbucket.alma.cl/scm/~harold.francke/sd-atm-line-correction-prototype.git
+# COMMIT:  b7bc39c4741
 #
 #SDcalatmcorr: Casapipescript with wrapper for TS script "atmcorr.py" for the removal
 #of atmospheric line residuals.
@@ -1023,7 +1023,7 @@ def getAntennaFlagFrac(ms, fieldid, spwid, spwsetup):
     '''
     af = createCasaTool(aftool)
     af.open(ms)
-    af.selectdata(field = fieldid, spw = spwid)
+    af.selectdata(field = str(fieldid), spw = str(spwid))
     af.parsesummaryparameters()
     af.init()
     flag_stats_dict = af.run()
@@ -1974,7 +1974,7 @@ def redPipeSDatmcorr(iant = 'auto', atmtype = [1, 2, 3, 4],
     context.set_state('ProjectStructure', 'ousstatus_entity_id', mousstatusuid)
 
     #Import ASDM and start pipeline
-    hsd_importdata(vis=asdmlist, pipelinemode="automatic")
+    hsd_importdata(vis=asdmlist)
     #Obtain the Jy/K factors
     #mslist = glob.glob('uid___*.ms')
     mslist = [x.name for x in context.observing_run.measurement_sets]
@@ -1983,12 +1983,12 @@ def redPipeSDatmcorr(iant = 'auto', atmtype = [1, 2, 3, 4],
     #print('Obtaining Jy/K factors for MSs: '+str(mslist))
     #es.getJyPerK(mslist)
     #Continue pipeline
-    hsd_flagdata(pipelinemode="automatic")
-    h_tsyscal(pipelinemode="automatic")
-    hsd_tsysflag(pipelinemode="automatic")
-    hsd_skycal(pipelinemode="automatic")
-    hsd_k2jycal(pipelinemode="automatic")
-    hsd_applycal(pipelinemode="automatic")
+    hsd_flagdata()
+    h_tsyscal()
+    hsd_tsysflag()
+    hsd_skycal()
+    hsd_k2jycal()
+    hsd_applycal()
 
     ###Correct atmospheric ozone lines###
     ### following recipe in CSV-3320  ###
@@ -2007,17 +2007,17 @@ def redPipeSDatmcorr(iant = 'auto', atmtype = [1, 2, 3, 4],
     atmtypelist = [int(bestmodels[ms][0]) for ms in mslist]
     dtem_dhlist = [str(bestmodels[ms][2])+'K/km' for ms in mslist]
     h0list = [str(bestmodels[ms][3])+'km' for ms in mslist]
-    hsd_atmcor(infiles=mslist,atmtype=atmtypelist,dtem_dh=dtem_dhlist,h0=h0list,pipelinemode="interactive")
+    hsd_atmcor(infiles=mslist,atmtype=atmtypelist,dtem_dh=dtem_dhlist,h0=h0list)
 
     ### Finish ATM correction ###
 
     #Continue pipeline execution from sdbaseline stage
-    hsd_baseline(pipelinemode="automatic")
-    hsd_blflag(pipelinemode="automatic")
-    hsd_baseline(pipelinemode="automatic")
-    hsd_blflag(pipelinemode="automatic")
-    hsd_imaging(pipelinemode="automatic")
-    hsd_exportdata(pipelinemode="automatic")
+    hsd_baseline()
+    hsd_blflag()
+    hsd_baseline()
+    hsd_blflag()
+    hsd_imaging()
+    hsd_exportdata()
     h_save()
     os.chdir('..')
 

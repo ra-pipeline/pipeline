@@ -22,7 +22,7 @@ LOG = logging.get_logger(__name__)
 
 
 # minimum allowed CASA revision. Set to 0 or None to disable
-MIN_CASA_REVISION = [6, 2, 0,  115]
+MIN_CASA_REVISION = [6, 5, 4, 7]
 # maximum allowed CASA revision. Set to 0 or None to disable
 MAX_CASA_REVISION = None
 
@@ -103,6 +103,14 @@ class Context(object):
         imaging mode string; may be used to switch between imaging parameter
         heuristics; currently only used for deciding what products to export
 
+    .. py:attribute:: selfcal_targets
+
+        list of targets for which self-calibration is performed
+
+    .. py:attribute:: selfcal_resources
+
+        list of files/tables required for the self-calibration restoration
+
     """
     def __init__(self, name: Optional[str] = None):
         if name is None:
@@ -144,6 +152,8 @@ class Context(object):
         self.per_spw_cont_sensitivities_all_chan = {'robust': None, 'uvtaper': None}
         self.synthesized_beams = {'robust': None, 'uvtaper': None}
         self.imaging_mode = None
+        self.selfcal_targets = []
+        self.selfcal_resources = []
 
         LOG.trace('Creating report directory: %s', self.report_dir)
         utils.mkdir_p(self.report_dir)
@@ -225,6 +235,27 @@ class Context(object):
         instance = m[cls]
         setattr(instance, name, value)
 
+    def get_oussid(self):
+        """
+        Get the parent OUS 'ousstatus' name. This is the sanitized OUS
+        status UID.
+        """
+        ps = self.project_structure
+        if ps is None or ps.ousstatus_entity_id == 'unknown':
+            return 'unknown'
+        else:
+            return ps.ousstatus_entity_id.translate(str.maketrans(':/', '__'))
+
+    def get_recipe_name(self):
+        """
+        Get the recipe name from project structure.
+        """
+        ps = self.project_structure
+        if ps is None or ps.recipe_name == 'Undefined':
+            return ''
+        else:
+            return ps.recipe_name
+
 
 class Pipeline(object):
     """
@@ -246,14 +277,19 @@ class Pipeline(object):
             Specifying 'last' loads the last-saved Context, while passing None
             creates a new Context.
         :type context: string
-        :param output_dir: root directory to which all output will be written
-        :type output_dir: string
         :param loglevel: pipeline log level
         :type loglevel: string
         :param casa_version_check: enable (True) or bypass (False) the CASA
             version check. Default is True.
-        :type ignore_casa_version: boolean
-        """        
+        :param name: if not "None", this overrides the name of the Pipeline
+            Context if a new context needs to be created.
+        :type name: string
+        :param plotlevel: Pipeline plots level
+        :type plotlevel: string
+        :param path_overrides: dictionary containing context properties to be
+             redefined when loading existing context (e.g. "name").
+        :type path_overrides: dict
+        """
         # configure logging with the preferred log level
         logging.set_logging_level(level=loglevel)
 
@@ -330,7 +366,10 @@ class Pipeline(object):
         # list all the files in the directory..
         files = [f for f in os.listdir(directory) if f.endswith('.context')]
 
-        # .. and from these matches, create a dict mapping files to their 
+        if len(files) == 0:
+            raise FileNotFoundError(f'No pipeline context exists in {os.path.abspath(directory)}')
+
+        # .. and from these matches, create a dict mapping files to their
         # modification timestamps, ..
         name_n_timestamp = dict([(f, os.stat(directory+f).st_mtime) 
                                  for f in files])

@@ -1,11 +1,15 @@
 import abc
 import collections
+import datetime
 import itertools
 import os
 import tempfile
+import traceback
+from inspect import signature
 
 from pipeline.infrastructure import basetask
 from pipeline.infrastructure import exceptions
+from pipeline.infrastructure import logging
 from . import mpihelpers
 from . import utils
 from . import vdp
@@ -21,12 +25,14 @@ __all__ = [
     'VisResultTuple'
 ]
 
+LOG = logging.get_logger(__file__)
+
 # VisResultTuple is a data structure used by VDPTaskFactor to group
 # inputs and results.
 VisResultTuple = collections.namedtuple('VisResultTuple', 'vis inputs result')
 
 
-def parallel_inputs_impl():
+def parallel_inputs_impl(default='automatic'):
     """
     Get a vis-independent property implementation for a parallel
     Inputs argument.
@@ -40,7 +46,7 @@ def parallel_inputs_impl():
 
     def fset(self, value):
         if value is None:
-            value = 'automatic'
+            value = default
         else:
             allowed = ('true', 'false', 'automatic', True, False)
             if value not in allowed:
@@ -84,7 +90,7 @@ def group_into_sessions(context, all_results, measurement_sets=None):
 
     def get_start_time(r):
         basename = os.path.basename(r[0])
-        return ms_start_times.get(basename, None)
+        return ms_start_times.get(basename, datetime.datetime.utcfromtimestamp(0))
 
     results_by_session = sorted(all_results, key=get_session)
     return {session_id: sorted(results_for_session, key=get_start_time)
@@ -233,9 +239,7 @@ class VDPTaskFactory(object):
 
 def remove_unexpected_args(fn, fn_args):
     # get the argument names for the function
-    code = fn.__code__
-    arg_count = code.co_argcount
-    arg_names = code.co_varnames[:arg_count]
+    arg_names = list(signature(fn).parameters)
 
     # identify arguments that are not expected by the function
     unexpected = [k for k in fn_args if k not in arg_names]
@@ -275,7 +279,7 @@ def get_spwmap(source_ms, target_ms):
     # non-science windows and vice versa. Not what we want! This set
     # will be used to filter for the spectral windows we want to
     # consider.
-    science_intents = {'AMPLITUDE', 'BANDPASS', 'PHASE', 'TARGET', 'CHECK'}
+    science_intents = {'AMPLITUDE', 'BANDPASS', 'PHASE', 'TARGET', 'CHECK', 'POLARIZATION'}
 
     # map spw id to spw name for source MS - just for science intents
     id_to_name = {spw.id: spw.name
@@ -344,8 +348,25 @@ class ParallelTemplate(basetask.StandardTaskTemplate):
     def __init__(self, inputs):
         super(ParallelTemplate, self).__init__(inputs)
 
-    def get_result_for_exception(self, vis, result):
-        raise NotImplementedError
+    @basetask.result_finaliser
+    def get_result_for_exception(self, vis: str, exception: Exception) -> basetask.FailedTaskResults:
+        """Generate FailedTaskResults with exception raised.
+
+        This provides default implementation of exception handling.
+
+        Args:
+            vis: List of input visibility data
+            exception: Exception occurred
+
+        Return:
+            a results object with exception raised
+        """
+        LOG.error('Error processing {!s}'.format(os.path.basename(vis)))
+        LOG.error('{0}({1})'.format(exception.__class__.__name__, str(exception)))
+        tb = traceback.format_exc()
+        if tb.startswith('None'):
+            tb = '{0}({1})'.format(exception.__class__.__name__, str(exception))
+        return basetask.FailedTaskResults(self.__class__, exception, tb)
 
     def prepare(self):
         inputs = self.inputs
@@ -366,7 +387,7 @@ class ParallelTemplate(basetask.StandardTaskTemplate):
                     # for importdata/restoredata tasks, input and output vis
                     # can be different. sessionutils seems to require vis to
                     # be output vis
-                    if isinstance(worker_result, collections.Iterable):
+                    if isinstance(worker_result, collections.abc.Iterable):
                         result = worker_result[0]
                     else:
                         result = worker_result
@@ -389,7 +410,7 @@ class ParallelTemplate(basetask.StandardTaskTemplate):
         # retrieve measurementset domain objects from the results
         mses = []
         for _, _, vis_result in assessed:
-            if isinstance(vis_result, collections.Iterable):
+            if isinstance(vis_result, collections.abc.Iterable):
                 for r in vis_result:
                     mses.extend(getattr(r, 'mses', []))
             else:
@@ -404,7 +425,7 @@ class ParallelTemplate(basetask.StandardTaskTemplate):
                     final_result.append(fake_result)
 
                 else:
-                    if isinstance(vis_result, collections.Iterable):
+                    if isinstance(vis_result, collections.abc.Iterable):
                         final_result.extend(vis_result)
                     else:
                         final_result.append(vis_result)

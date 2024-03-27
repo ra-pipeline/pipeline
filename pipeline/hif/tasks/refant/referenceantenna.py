@@ -9,17 +9,20 @@ from pipeline.infrastructure import task_registry
 from ...heuristics import findrefant
 
 __all__ = [
-    'RefAnt',
     'RefAntInputs',
     'RefAntResults',
-    'HpcRefAnt',
-    'HpcRefAntInputs',
+    'RefAnt',
+    'SerialRefAnt',
 ]
 
 LOG = infrastructure.get_logger(__name__)
 
 
 class RefAntInputs(vdp.StandardInputs):
+    # PIPE-1691: hif_refant is now implicitly a parallel task, but by default
+    # running with parallel=False.
+    parallel = sessionutils.parallel_inputs_impl(default=False)
+
     @vdp.VisDependentProperty
     def field(self):
         # return each field in the current ms that has been observed
@@ -60,7 +63,7 @@ class RefAntInputs(vdp.StandardInputs):
         raise NotImplementedError
 
     def __init__(self, context, vis=None, output_dir=None, field=None, spw=None, intent=None, hm_refant=None,
-                 refant=None, geometry=None, flagging=None, refantignore=None):
+                 refant=None, geometry=None, flagging=None, refantignore=None, parallel=None):
         self.context = context
         self.vis = vis
         self.output_dir = output_dir
@@ -74,6 +77,8 @@ class RefAntInputs(vdp.StandardInputs):
         self.geometry = geometry
         self.flagging = flagging
         self.refantignore = refantignore
+
+        self.parallel = parallel
 
 
 class RefAntResults(basetask.Results):
@@ -107,17 +112,11 @@ class RefAntResults(basetask.Results):
         return 'RefAntResults({!r}, {!r})'.format(self._vis, self._refant)
 
 
-@task_registry.set_equivalent_casa_task('hif_refant')
-@task_registry.set_casa_commands_comment(
-    'Antennas are prioritized and enumerated based on fraction flagged and position in the array. The best antenna is '
-    'used as a reference antenna unless it gets flagged, in which case the next-best antenna is used.\n'
-    'This stage performs a pipeline calculation without running any CASA commands to be put in this file.'
-)
-class RefAnt(basetask.StandardTaskTemplate):
+class SerialRefAnt(basetask.StandardTaskTemplate):
     Inputs = RefAntInputs
 
     def __init__(self, inputs):
-        super(RefAnt, self).__init__(inputs)
+        super().__init__(inputs)
 
     def prepare(self, **parameters):
         inputs = self.inputs
@@ -143,30 +142,12 @@ class RefAnt(basetask.StandardTaskTemplate):
         return results
 
 
-class HpcRefAntInputs(RefAntInputs):
-    parallel = sessionutils.parallel_inputs_impl()
-
-    def to_casa_args(self):
-        # Session tasks don't implement to_casa_args; it's the individual tasks
-        # that do so
-        raise NotImplementedError
-
-    def __init__(self, context, vis=None, output_dir=None, field=None, spw=None, intent=None, hm_refant=None,
-                 refant=None, geometry=None, flagging=None, refantignore=None, parallel=None):
-        super(HpcRefAntInputs, self).__init__(context, vis=vis, output_dir=output_dir, field=field, spw=spw,
-                                              intent=intent, hm_refant=hm_refant, refant=refant, geometry=geometry,
-                                              flagging=flagging, refantignore=refantignore)
-        self.parallel = parallel
-
-
-@task_registry.set_equivalent_casa_task('hpc_hif_refant')
-class HpcRefAnt(sessionutils.ParallelTemplate):
-    Inputs = HpcRefAntInputs
-    Task = RefAnt
-
-    def __init__(self, inputs):
-        super(HpcRefAnt, self).__init__(inputs)
-
-    def get_result_for_exception(self, vis, result):
-        failed_result = basetask.FailedTaskResults(self.__class__, result, result.message)
-        return failed_result
+@task_registry.set_equivalent_casa_task('hif_refant')
+@task_registry.set_casa_commands_comment(
+    'Antennas are prioritized and enumerated based on fraction flagged and position in the array. The best antenna is '
+    'used as a reference antenna unless it gets flagged, in which case the next-best antenna is used.\n'
+    'This stage performs a pipeline calculation without running any CASA commands to be put in this file.'
+)
+class RefAnt(sessionutils.ParallelTemplate):
+    Inputs = RefAntInputs
+    Task = SerialRefAnt

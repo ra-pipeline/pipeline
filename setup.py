@@ -2,11 +2,10 @@ import collections
 import distutils.cmd
 import distutils.log
 import os
+import re
 import shutil
 import subprocess
 import sys
-import textwrap
-
 import setuptools
 from setuptools.command.build_py import build_py
 
@@ -17,23 +16,12 @@ PIPELINE_PACKAGES = ['h', 'hif', 'hifa', 'hifas', 'hifv', 'hsd', 'hsdn']
 def flatten(items):
     """Yield items from any nested iterable"""
     for x in items:
-        if isinstance(x, collections.Iterable) and not isinstance(x, (str, bytes)):
+        if isinstance(x, collections.abc.Iterable) and not isinstance(x, (str, bytes)):
             for sub_x in flatten(x):
                 yield sub_x
         else:
             yield x
 
-def str_encode(s):
-    return bytes(s,sys.getdefaultencoding())
-def str_decode(bs):
-    return bs.decode(sys.getdefaultencoding(),"strict")
-def pipe_decode(output):
-    if isinstance(output,bytes) or isinstance(output,bytearray):
-        return str_decode(output)
-    elif isinstance(output,tuple):
-        return (str_decode(output[0]),str_decode(output[1]))
-    else:
-        return ("","")
 
 class MinifyJSCommand(distutils.cmd.Command):
     description = 'Minify the pipeline javascript'
@@ -177,151 +165,6 @@ class MinifyCSSCommand(distutils.cmd.Command):
             f.write('\n')
 
 
-class SubprocessScheduler:
-    def __init__(self, concurrency=1):
-        self._maxlen = concurrency
-        self.procs = []
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.__join()
-
-    def add(self, process):
-        assert isinstance(process, subprocess.Popen)
-        self.__update(process)
-
-    def __join(self):
-        if len(self.procs) > 0:
-            list(map(lambda p: p.communicate(), self.procs))
-            ret = list(map(lambda p: p.returncode, self.procs))
-            self.procs.clear()
-            if any([r != 0 for r in ret]):
-                raise RuntimeError('Failed to execute process')
-
-    def __update(self, process):
-        self.procs.append(process)
-
-        while len(self.procs) >= self._maxlen:
-            p = self.procs.pop(0)
-            p.communicate()
-            r = p.returncode
-            if r != 0:
-                self.__join()
-                raise RuntimeError('Failed to execute process')
-
-
-class BuildMyTasksCommand(distutils.cmd.Command):
-    description = 'Generate the CASA CLI bindings'
-    user_options = [
-        ('inplace', 'i', 'Generate CLI bindings in src directory'),
-        ('parallel=', 'j', 'number of parallel build jobs')
-    ]
-    boolean_options = ['inplace']
-
-    def __init__(self, dist):
-        distutils.cmd.Command.__init__(self, dist)
-
-    def initialize_options(self):
-        """Set default values for options."""
-        self.inplace = None
-        self.parallel = None
-
-    def finalize_options(self):
-        # get the path to this file
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-
-        if self.inplace:
-            self.build_path = dir_path
-        else:
-            # get the path to the build directory
-            build_py_cmd = self.get_finalized_command('build_py')
-            self.build_path = os.path.join(dir_path, build_py_cmd.build_lib)
-
-        if isinstance(self.parallel, str):
-            try:
-                self.parallel = int(self.parallel)
-            except ValueError:
-                raise Exception('prallel (-j) should be an integer')
-
-        if not self.parallel:
-            obj = self.distribution.get_command_obj('build')
-            self.parallel = obj.parallel if obj.parallel else 1
-
-        self.parallel = max(1, self.parallel)
-
-    def _buildmytasks_exe(self):
-        """Get the CASA/buildmytasks executeable path."""
-        for py_exe in [os.environ['_'], sys.executable]:
-            buildmytasks_exe = os.path.join(os.path.dirname(py_exe), 'buildmytasks')
-            if os.path.exists(buildmytasks_exe):
-                return buildmytasks_exe
-        msg_buildmytasks_not_found = f"""
-            Cannot find the buildmytasks helper program associated with the current Python interpreter.
-            Please check if you are using the Python executable from a monolithic CASA distribution.
-
-            We will attempt to proceed with any 'buildmytasks' executable inherited from your shell environment, 
-            which is not guaranteed to work.
-            """
-        self.announce(textwrap.dedent(msg_buildmytasks_not_found),
-                      level=distutils.log.INFO)
-        buildmytasks_exe = 'buildmytasks'
-        return buildmytasks_exe
-
-    def run(self):
-        buildmytasks_exe = self._buildmytasks_exe()
-        if self.parallel > 1:
-            self.announce(f'Number of parallel processes: {self.parallel}', level=distutils.log.INFO)
-        else:
-            self.announce('Serial build', level=distutils.log.INFO)
-        with SubprocessScheduler(concurrency=self.parallel) as sched:
-            for d in PIPELINE_PACKAGES:
-                cli_dir = os.path.join('pipeline', d, 'cli')
-                cli_module = '.'.join(['pipeline', d, 'cli'])
-                src_dir = os.path.join(self.build_path, cli_dir)
-                if not os.path.exists(src_dir):
-                    continue
-
-                cli_init_py = os.path.join(src_dir, '__init__.py')
-                # Remove old init module to avoid incompatible code and duplication
-                if os.path.exists(cli_init_py):
-                    os.remove(cli_init_py)
-
-                gotasks_dir = os.path.join(src_dir, 'gotasks')
-                if not os.path.exists(gotasks_dir):
-                    os.mkdir(gotasks_dir)
-
-                gotasks_init_py = os.path.join(gotasks_dir, '__init__.py')
-                # Remove old init module to avoid incompatible code and duplication
-                if os.path.exists(gotasks_init_py):
-                    os.remove(gotasks_init_py)
-
-                for xml_file in [f for f in os.listdir(src_dir) if f.endswith('.xml')]:
-                    self.announce('Building task from XML: {}'.format(xml_file), level=distutils.log.INFO)
-                    p = subprocess.Popen([
-                        buildmytasks_exe,
-                        '--module',
-                        cli_module,
-                        xml_file
-                    ], cwd=src_dir, stdout=subprocess.PIPE)
-                    sched.add(p)
-
-                    root, _ = os.path.splitext(xml_file)
-                    import_statement = 'from .{} import {}'.format(root, root)
-                    with open(cli_init_py, 'a+', encoding=ENCODING) as init_file:
-                        import_exists = any(import_statement in line for line in init_file)
-                        if not import_exists:
-                            init_file.seek(0, os.SEEK_END)
-                            init_file.write('{}\n'.format(import_statement))
-
-                    with open(gotasks_init_py, 'a+', encoding=ENCODING) as init_file:
-                        import_exists = any(import_statement in line for line in init_file)
-                        if not import_exists:
-                            init_file.seek(0, os.SEEK_END)
-                            init_file.write('{}\n'.format(import_statement))
-
-
 class VersionCommand(distutils.cmd.Command):
     description = 'Generate the version file'
     user_options = [('inplace', 'i', 'Generate the version file in src directory')]
@@ -355,48 +198,71 @@ class VersionCommand(distutils.cmd.Command):
             f.write('\n')
 
 
-def _get_git_version():
+def _get_git_version() -> str:
     # Retrieve info about current branch.
     git_branch = None
     try:
         git_branch = subprocess.check_output(['git', 'symbolic-ref', '--short', 'HEAD'],
-                                            stderr=subprocess.DEVNULL).decode().strip()
+                                             stderr=subprocess.DEVNULL).decode().strip()
     except (FileNotFoundError, subprocess.CalledProcessError):
         # FileNotFoundError: if git is not on PATH.
         # subprocess.CalledProcessError: if git command returns error; for example, current checkout
         #   may have a detached HEAD pointing at a specific tag (not pointing to a branch).
         pass
-    if git_branch !=None and (git_branch == "main" or git_branch.startswith("release/")):
-        proc = subprocess.Popen( [ "pipeline/infrastructure/version" ], stdout=subprocess.PIPE, stderr=subprocess.PIPE )
-        out,err = pipe_decode(proc.communicate( ))
-        #print(out)
-        releasetag = out.split(" ")[1].strip()
-        dirty=""
-        version = releasetag
-        if (len(out.split(" ")) == 3):
-            #print("Latest commit doesn't have a tag. Adding -dirty flag to version string.")
-            dirty="+" + out.split(" ")[2].strip() # "+" denotes local version identifier as described in PEP440
-            version = version + dirty
-        return version
+
+    # Try to get version information
+    ver_from_script = []
+    try:
+        # Output of the version.py script is a string with two or three space-separated elements:
+        # last branch tag (possibly empty), last release tag, and possibly a "dirty" suffix.
+        # For example:
+        # 2024.0.0.3 2024.0.0.3
+        # or
+        # '' 2024.0.0.3 dirty
+        ver_from_script = subprocess.check_output([sys.executable, 'pipeline/infrastructure/version.py'],
+                                             stderr=subprocess.DEVNULL).decode().rstrip().split(' ')
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        # FileNotFoundError: if git is not on PATH.
+        # subprocess.CalledProcessError: if git command returns error; for example, current checkout
+        #   may have a detached HEAD pointing at a specific tag (not pointing to a branch).
+        pass
+
+    if git_branch is not None and (git_branch == 'main' or git_branch.startswith('release/')):
+        # Version string returned by this routine contains the latest release tag and optionally
+        # a local version identifier ("dirty") as described in PEP440, separated by "+".
+        return '+'.join(ver_from_script[1:])
     else:
         # Retrieve info about current commit.
         try:
-            # Set version to latest tag, number of commits since tag, and latest
-            # commit hash.
+            # Set version to latest tag, number of commits since tag, and latest commit hash.
             commit_hash = subprocess.check_output(['git', 'describe', '--always', '--tags', '--long', '--dirty'],
-                                                stderr=subprocess.DEVNULL).decode().strip()
-            print(commit_hash)
+                                                  stderr=subprocess.DEVNULL).decode().strip()
         except (FileNotFoundError, subprocess.CalledProcessError):
             # FileNotFoundError: if git is not on PATH.
             # subprocess.CalledProcessError: if git command returns error.
             commit_hash = None
-        # Consolidate into single version string.
+
+        # Populate the hash, branch, and version from the script if any are unset:
         if commit_hash is None:
-            version = "unknown"
-        elif git_branch is None:
-            version = commit_hash
+            commit_hash = "unknown_hash"
         else:
-            version = "{}-{}".format(commit_hash, git_branch)
+            # Only ASCII numbers, letters, '.', '-', and '_' are allowed in the local version label
+            commit_hash = re.sub(r'[^\w_\-\.]+', '.', commit_hash)
+
+        if git_branch is None:
+            git_branch = "unknown_branch"
+        else:
+            # Only ASCII numbers, letters, '.', '-', and '_' are allowed in the local version label
+            git_branch = re.sub(r'[^\w_\-\.]+', '.', git_branch)
+
+        if len(ver_from_script) < 2:
+            # Invalid version number:
+            version_number = '0.0.dev0'
+        else:
+            version_number = ver_from_script[1]
+
+        # Consolidate into single version string.
+        version = "{}+{}-{}".format(version_number, commit_hash, git_branch)
 
         return version
 
@@ -406,7 +272,6 @@ class PipelineBuildPyCommand(build_py):
         build_py.run(self)
         self.run_command('minify_css')
         self.run_command('minify_js')
-        self.run_command('buildmytasks')
         self.run_command('version')
 
 
@@ -428,7 +293,6 @@ setuptools.setup(
     version=_get_git_version(),
     description='CASA pipeline',
     cmdclass={
-        'buildmytasks': BuildMyTasksCommand,
         'build_py': PipelineBuildPyCommand,
         'minify_js': MinifyJSCommand,
         'minify_css': MinifyCSSCommand,
@@ -443,7 +307,6 @@ setuptools.setup(
     setup_requires=[
         'csscompressor'  # minify CSS
     ],
-    #options=dict(egg_info=dict(tag_build='_{}'.format(_get_git_version()))),
     packages=packages,
     package_data={'': ['*.css',
                        '*.egg',

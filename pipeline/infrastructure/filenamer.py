@@ -70,6 +70,7 @@ class FileNameComponentBuilder(object):
         self._intent = None
         self._iteration = None
         self._line_region = None
+        self._datatype = None
         self._output_dir = None
         self._polarization = None
         self._antenna = None
@@ -89,7 +90,7 @@ class FileNameComponentBuilder(object):
         self._stage = None
 
     def build(self):
-        # The file names will be assembled using the order of the attributes 
+        # The file names will be assembled using the order of the attributes
         # given here
         attributes = (os.path.basename(self._asdm),
                       self._task,
@@ -100,6 +101,7 @@ class FileNameComponentBuilder(object):
                       self._band,
                       self._specmode,
                       self._line_region,
+                      self._datatype,
                       self._polarization,
                       self._antenna,
                       self._type,
@@ -163,6 +165,10 @@ class FileNameComponentBuilder(object):
             self._method = v
         else:
             self._method = None
+        return self
+
+    def datatype(self, datatype):
+        self._datatype = datatype
         return self
 
     def polarization(self, polarization):
@@ -253,21 +259,15 @@ def sort_spws(unsorted):
 
 class NamingTemplate(object):
     """Base class used for all naming templates."""
-    dry_run = True
     task = None
 
     def __init__(self):
         self._associations = FileNameComponentBuilder()
 
-    def get_filename(self, delete=False):
+    def get_filename(self):
         """Assembles and returns the final filename."""
         filename_components = self._associations.build()
         filename = '.'.join([filename_components])
-
-        if delete and not NamingTemplate.dry_run:
-            # .. and remove any old table with this name
-            shutil.rmtree(filename, ignore_errors=True)
-
         return filename
 
     def output_dir(self, output_dir):
@@ -362,7 +362,7 @@ class CalibrationTable(NamingTemplate):
     Defines the calibration table naming scheme.
 
     File names have the syntax:
-    <ASDM UID>.<spgrp>.<pol>.<fit>.<type>.<format>, 
+    <ASDM UID>.<spgrp>.<pol>.<fit>.<type>.<format>,
     eg. uid___X02_X3d737_X1.spwgrp1.X.channel.bcal.tbl.
     """
     _extensions = ['bcal', 'dcal', 'fcal', 'gcal', 'gacal', 'gpcal', 'pcal']
@@ -493,12 +493,6 @@ class CalibrationTable(NamingTemplate):
         """
         return self.extension('dcal')
 
-    def instrumentpol_cal(self):
-        """Set the filename extension as appropriate for a instrument
-        pol calibration.
-        """
-        return self.extension('pcal')
-
     def flux_cal(self):
         """Set the filename extension as appropriate for a flux
         calibration.
@@ -599,7 +593,6 @@ class CalibrationTable(NamingTemplate):
         dish baseline subtraction."""
         return self.extension('bl')
 
-
     # Fit type convenience methods --------------------------------------------
 
     def channel_fit(self):
@@ -664,6 +657,10 @@ class Image(NamingTemplate):
 
     def line_region(self, start_channel, end_channel):
         self._associations.line_region(start_channel, end_channel)
+        return self
+
+    def datatype(self, datatype):
+        self._associations.datatype(datatype)
         return self
 
     def polarization(self, polarization):
@@ -808,10 +805,10 @@ class DelayCalibrationTable(CalibrationTable):
         self.delay_cal()
 
 
-class InstrumentPolCalibrationTable(CalibrationTable):
+class PolCalibrationTable(CalibrationTable):
     def __init__(self, other=None):
-        super(InstrumentPolCalibrationTable, self).__init__(other)
-        self.instrumentpol_cal()
+        super().__init__(other)
+        self.polarization_cal()
 
 
 class FluxCalibrationTable(CalibrationTable):
@@ -873,15 +870,118 @@ class WvrgCalibrationTable(CalibrationTable):
         super(WvrgCalibrationTable, self).__init__(other)
         self.wvrg_cal()
 
+
 class SDSkyCalibrationTable(CalibrationTable):
     def __init__(self, other=None):
         super(SDSkyCalibrationTable, self).__init__(other)
         self.sdsky_cal()
 
+
 class SDBaselineTable(CalibrationTable):
     def __init__(self, other=None):
         super(SDBaselineTable, self).__init__(other)
         self.sdbaseline()
+
+
+# product name utility
+class PipelineProductNameBuilder(object):
+
+    @classmethod
+    def __build(cls, *args, **kwargs):
+        if 'separator' in kwargs:
+            separator = kwargs['separator']
+        else:
+            separator = '.'
+        return separator.join(map(str, args))
+
+    @classmethod
+    def _join_dir(cls, name, output_dir=None):
+        if output_dir is not None:
+            name = os.path.join(output_dir, name)
+        return name
+
+    @classmethod
+    def _build_from_oussid(cls, basename, ousstatus_entity_id=None, output_dir=None):
+        if ousstatus_entity_id is None:
+            name = basename
+        else:
+            name = cls.__build(ousstatus_entity_id, basename)
+        return cls._join_dir(name, output_dir)
+
+    @classmethod
+    def _build_from_ps_oussid(cls, basename, project_structure=None, ousstatus_entity_id=None, output_dir=None):
+        if project_structure is None:
+            name = basename
+        elif project_structure.ousstatus_entity_id == 'unknown':
+            name = basename
+        else:
+            name = cls._build_from_oussid(basename, ousstatus_entity_id=ousstatus_entity_id)
+        return cls._join_dir(name, output_dir)
+
+    @classmethod
+    def _build_from_oussid_session(cls, basename, ousstatus_entity_id=None, session_name=None, output_dir=None):
+        name = cls.__build(ousstatus_entity_id, session_name, basename)
+        return cls._join_dir(name, output_dir)
+
+    @classmethod
+    def _build_calproduct_name(cls, basename, aux_product=False, output_dir=None):
+        if aux_product:
+            prefix = 'auxcal'
+        else:
+            prefix = 'cal'
+        name = cls.__build(prefix, basename, separator='')
+        return cls._join_dir(name, output_dir)
+
+    @classmethod
+    def _build_from_vis(cls, basename, vis, output_dir=None):
+        name = cls.__build(os.path.basename(vis), basename)
+        return cls._join_dir(name, output_dir)
+
+    @classmethod
+    def weblog(cls, project_structure=None, ousstatus_entity_id=None, output_dir=None):
+        return cls._build_from_ps_oussid('weblog.tgz',
+                                         project_structure=project_structure,
+                                         ousstatus_entity_id=ousstatus_entity_id,
+                                         output_dir=output_dir)
+
+    @classmethod
+    def casa_script(cls, basename, project_structure=None, ousstatus_entity_id=None, output_dir=None):
+        return cls._build_from_ps_oussid(basename,
+                                         project_structure=project_structure,
+                                         ousstatus_entity_id=ousstatus_entity_id,
+                                         output_dir=output_dir)
+
+    @classmethod
+    def manifest(cls, basename, ousstatus_entity_id, output_dir=None):
+        return cls._build_from_oussid(basename,
+                                      ousstatus_entity_id=ousstatus_entity_id,
+                                      output_dir=output_dir)
+
+    @classmethod
+    def calapply_list(cls, vis, aux_product=False, output_dir=None):
+        basename = cls._build_calproduct_name('apply.txt', aux_product=aux_product)
+        return cls._build_from_vis(basename, vis, output_dir=output_dir)
+
+    @classmethod
+    def caltables(cls, ousstatus_entity_id=None, session_name=None, aux_product=False, output_dir=None):
+        basename = cls._build_calproduct_name('tables.tgz', aux_product=aux_product)
+        return cls._build_from_oussid_session(basename=basename,
+                                              ousstatus_entity_id=ousstatus_entity_id,
+                                              session_name=session_name,
+                                              output_dir=None)
+
+    @classmethod
+    def auxiliary_products(cls, basename, ousstatus_entity_id=None, output_dir=None):
+        return cls._build_from_oussid(basename,
+                                      ousstatus_entity_id=ousstatus_entity_id,
+                                      output_dir=output_dir)
+
+    @classmethod
+    def aqua_report(cls, aqua_report_name, project_structure=None, ousstatus_entity_id=None, output_dir=None):
+        return cls._build_from_ps_oussid(aqua_report_name,
+                                         project_structure=project_structure,
+                                         ousstatus_entity_id=ousstatus_entity_id,
+                                         output_dir=output_dir)
 
 
 if __name__ == '__main__':
@@ -893,16 +993,3 @@ if __name__ == '__main__':
 
     x.polarization('X').spectral_window(3)
     print(x.get_filename())
-
-    # log = Image().source('NGC312')
-    # print(log.get_filename())
-    # log = Image().source('NGC312').intent('gain').spectral_image()
-    # print(log.get_filename())
-    # log = Image().project(
-    #    'pcode').obs_unit_set('uid').source('3C454').gain().polarization('I').clean().spectral_image()
-    # print(log.get_filename())
-    # log = CalibrationTable().project_code(
-    #    'pcode').asdm('uid://X02/X3D737/X1').spectral_window(1).polarization('X').channel_fit().bandpass_cal()
-    # print(log.get_filename())
-    # a = ASDM(log)
-    # print(a.get_filename())

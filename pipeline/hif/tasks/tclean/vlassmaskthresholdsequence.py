@@ -66,14 +66,14 @@ class VlassMaskThresholdSequence(BaseCleanSequence):
             imregrid_job = casa_tasks.imregrid(imagename=usermask, template=self.flux+extension,
                                                output=new_cleanmask, overwrite=True, axes=[0, 1], replicate=False, interpolation='nearest')
             if self.__executor is None:
-                imregrid_job.execute(dry_run=False)
+                imregrid_job.execute()
             else:
                 self.__executor.execute(imregrid_job)
         else:
             LOG.info('Copying {} to {}'.format(usermask, new_cleanmask))
             copytree_job = casa_tasks.copytree(usermask, new_cleanmask)
             if self.__executor is None:
-                copytree_job.execute(dry_run=False)
+                copytree_job.execute()
             else:
                 self.__executor.execute(copytree_job)
 

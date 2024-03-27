@@ -71,7 +71,7 @@ class TaskTimeTracker(object):
                 db[db_key] = {}
 
             if isinstance(event, start_event):
-                tes = ExecutionState(stage=stage_number, start=now, end=None, state=event.state)
+                tes = ExecutionState(stage=stage_number, start=now, end=now, state=event.state)
             elif isinstance(event, stop_events):
                 old_tes = db[db_key][stage_number]
                 tes = ExecutionState(stage=stage_number, start=old_tes.start, end=now, state=event.state)

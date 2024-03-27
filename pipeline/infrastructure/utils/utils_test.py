@@ -266,7 +266,7 @@ def test_get_taskhistory_fromimage(tmpdir):
         tclean_job_parameters['vis'] = vis
         tclean_job_parameters['imagename'] = os.path.join(str(tmpdir), tclean_job_parameters['imagename'])
         job = casa_tasks.tclean(**tclean_job_parameters)
-        job.execute(dry_run=False)
+        job.execute()
 
     task_history_list = get_taskhistory_fromimage(tclean_job_parameters['imagename']+'.model')
 

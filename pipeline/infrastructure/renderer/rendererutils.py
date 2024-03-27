@@ -9,7 +9,7 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.utils as utils
 from pipeline.infrastructure import casa_tools
-from pipeline.infrastructure.pipelineqa import QAScore, WebLogLocation
+from pipeline.infrastructure.pipelineqa import QAScore, WebLogLocation, scores_with_location
 
 from typing import Any
 
@@ -205,10 +205,12 @@ def get_suboptimal_badge(result):
 def get_command_markup(ctx, command):
     if not command:
         return ''
-    stripped = command.replace('%s/' % ctx.report_dir, '')
-    stripped = stripped.replace('%s/' % ctx.output_dir, '')
-    escaped = html.escape(stripped, True).replace('\'', '&#39;')
-    return escaped
+    # PIPE-1839: avoid removing '/' symbols if not part of a non-empty directory path
+    if ctx.report_dir:
+        command = command.replace('%s/' % ctx.report_dir, '')
+    if ctx.output_dir:
+        command = command.replace('%s/' % ctx.output_dir, '')
+    return html.escape(command, True).replace('\'', '&#39;')
 
 
 def format_shortmsg(pqascore):
@@ -295,17 +297,6 @@ def scores_in_range(pool: List[QAScore], lo: float, hi: float) -> List[QAScore]:
     return [score for score in pool
             if score.score not in ('', 'N/A', None)
             and lo < score.score <= hi]
-
-
-def scores_with_location(pool: List[QAScore],
-                         locations: Optional[List[WebLogLocation]] = None) -> List[QAScore]:
-    """
-    Filter QA scores by web log location.
-    """
-    if not locations:
-        locations = list(WebLogLocation)
-
-    return [score for score in pool if score.weblog_location in locations]
 
 
 def get_notification_trs(result, alerts_info, alerts_success):

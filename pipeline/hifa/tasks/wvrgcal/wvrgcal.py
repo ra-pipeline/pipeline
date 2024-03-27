@@ -318,10 +318,8 @@ class Wvrgcal(basetask.StandardTaskTemplate):
         inputs = self.inputs
 
         # check that the caltable was actually generated
-        on_disk = [ca for ca in result.pool
-                   if ca.exists() or self._executor._dry_run]
-        missing = [ca for ca in result.pool
-                   if ca not in on_disk and not self._executor._dry_run]
+        on_disk = [ca for ca in result.pool if ca.exists()]
+        missing = [ca for ca in result.pool if ca not in on_disk]
         result.error.clear()
         result.error.update(missing)
 
@@ -402,11 +400,14 @@ class Wvrgcal(basetask.StandardTaskTemplate):
         wvr_caltable = wvr_result.inputs['caltable']
         result.qa_wvr.gaintable_wvr = wvr_caltable
 
+        # Edited for PIPE-1837 adding BPgood and PHgood
         LOG.info('qa: calculate ratio with-WVR phase RMS / without-WVR phase rms')
-        PHnoisy, BPnoisy = wvrg_qa.calculate_view(inputs.context, nowvr_caltable,
+        PHnoisy, BPnoisy, PHgood, BPgood = wvrg_qa.calculate_view(inputs.context, nowvr_caltable,
                                                   wvr_caltable, result.qa_wvr, qa_intent)
         result.PHnoisy = PHnoisy
         result.BPnoisy = BPnoisy
+        result.PHgood = PHgood
+        result.BPgood = BPgood
 
         suggest_remcloud = wvrg_qa.calculate_qa_numbers(result.qa_wvr, result.wvr_infos, PHnoisy, BPnoisy)
         result.suggest_remcloud = suggest_remcloud

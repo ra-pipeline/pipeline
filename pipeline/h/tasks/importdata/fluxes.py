@@ -12,8 +12,9 @@ from functools import reduce
 import pipeline.domain as domain
 import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
-import pipeline.infrastructure.utils as utils
 from pipeline.infrastructure.tablereader import SpectralWindowTable
+from pipeline.infrastructure.utils import dequote, open_with_lock
+
 from ..common import commonfluxresults
 
 LOG = infrastructure.get_logger(__name__)
@@ -251,12 +252,12 @@ def CYCLE7_export_flux_from_result(results, context, filename='flux.csv'):
 
     # if the file exists, read it in
     if os.path.exists(abspath):
-        with open(abspath, 'r') as f:
+        with open_with_lock(abspath, 'r') as f:
             # slurp in all but the header rows
             existing.extend([l for l in f.readlines() if not l.startswith(','.join(columns))])
 
     # so we can write it back out again, with our measurements appended
-    with open(abspath, 'wt') as f:
+    with open_with_lock(abspath, 'wt') as f:
         writer = csv.writer(f)
         writer.writerow(columns)
         f.writelines(existing)
@@ -282,7 +283,7 @@ def CYCLE7_export_flux_from_result(results, context, filename='flux.csv'):
 
                         ms = context.observing_run.get_ms(ms_basename)
                         field = ms.get_fields(field_id)[0]
-                        comment = "\'" + utils.dequote(field.name) + "\'" + ' ' + 'intent=' + ','.join(
+                        comment = "\'" + dequote(field.name) + "\'" + ' ' + 'intent=' + ','.join(
                             sorted(field.intents))
 
                         writer.writerow((ms_basename, field_id, m.spw_id, I, Q, U, V, float(m.spix), m.origin,
@@ -307,7 +308,7 @@ def export_flux_from_result(results, context, filename='flux.csv'):
 
     # if the file exists, read it in
     if os.path.exists(abspath):
-        with open(abspath, 'r') as f:
+        with open_with_lock(abspath, 'r') as f:
 
             first = f.readline()
             if not first.startswith(','.join(columns)):
@@ -323,7 +324,7 @@ def export_flux_from_result(results, context, filename='flux.csv'):
 
     # so we can write it back out again, with our measurements appended
     comment_template = '# field={field} intents={intents} origin={origin} age={age} queried_at={queried_at}'
-    with open(abspath, 'wt') as f:
+    with open_with_lock(abspath, 'wt') as f:
         writer = csv.writer(f)
         writer.writerow(columns)
         f.writelines(existing)
@@ -382,7 +383,7 @@ def import_flux(output_dir, observing_run, filename=None):
     if not filename:
         filename = os.path.join(output_dir, 'flux.csv')
 
-    with open(filename, 'rt') as f:
+    with open_with_lock(filename, 'rt') as f:
         reader = csv.DictReader(f, restkey='others', restval=None)
 
         counter = 0

@@ -2,9 +2,9 @@ import os
 import tempfile
 
 import pipeline.infrastructure as infrastructure
-#import pipeline.infrastructure.api as api
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.mpihelpers as mpihelpers
+import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
@@ -30,7 +30,7 @@ class MakeImagesInputs(vdp.StandardInputs):
     hm_dogrowprune = vdp.VisDependentProperty(default=None)
     hm_growiterations = vdp.VisDependentProperty(default=-999)
     hm_lownoisethreshold = vdp.VisDependentProperty(default=-999.0)
-    hm_masking = vdp.VisDependentProperty(default='auto')
+    hm_masking = vdp.VisDependentProperty(default=None)
     hm_minbeamfrac = vdp.VisDependentProperty(default=-999.0)
     hm_minpercentchange = vdp.VisDependentProperty(default=-999.0)
     hm_minpsffraction = vdp.VisDependentProperty(default=-999.0)
@@ -46,6 +46,7 @@ class MakeImagesInputs(vdp.StandardInputs):
     masklimit = vdp.VisDependentProperty(default=2.0)
     parallel = vdp.VisDependentProperty(default='automatic')
     tlimit = vdp.VisDependentProperty(default=2.0)
+    drcorrect = vdp.VisDependentProperty(default=-999.0)
     overwrite_on_export = vdp.VisDependentProperty(default=True)
 
     @vdp.VisDependentProperty(null_input=['', None, {}])
@@ -64,7 +65,7 @@ class MakeImagesInputs(vdp.StandardInputs):
                  hm_lownoisethreshold=None, hm_negativethreshold=None, hm_minbeamfrac=None, hm_growiterations=None,
                  hm_dogrowprune=None, hm_minpercentchange=None, hm_fastnoise=None, hm_nsigma=None,
                  hm_perchanweightdensity=None, hm_npixels=None, hm_cyclefactor=None, hm_minpsffraction=None,
-                 hm_maxpsffraction=None, hm_weighting=None, hm_cleaning=None, tlimit=None, masklimit=None,
+                 hm_maxpsffraction=None, hm_weighting=None, hm_cleaning=None, tlimit=None, drcorrect=None, masklimit=None,
                  cleancontranges=None, calcsb=None, hm_mosweight=None, overwrite_on_export=None,
                  parallel=None,
                  # Extra parameters
@@ -93,6 +94,7 @@ class MakeImagesInputs(vdp.StandardInputs):
         self.hm_maxpsffraction = hm_maxpsffraction
         self.hm_weighting = hm_weighting
         self.tlimit = tlimit
+        self.drcorrect = drcorrect
         self.masklimit = masklimit
         self.cleancontranges = cleancontranges
         self.calcsb = calcsb
@@ -141,14 +143,18 @@ class MakeImages(basetask.StandardTaskTemplate):
                 try:
                     worker_result = task.get_result()
                 except exceptions.PipelineException as ex:
-                    result.add_result(TcleanResult(), target, outcome='failure')
-                    LOG.error('Cleaning failure for field {!s} spw {!s} specmode {!s}.\nException from hif_tclean: {!s}'.format(
-                        target['field'], target['spw'], target['specmode'], ex))
+                    error_msg = ('Cleaning failure for field {!s}, intent {!s}, specmode {!s}, spw {!s}. '
+                                 'Exception from hif_tclean: {!s}'.format(
+                                 target['field'], target['intent'], target['specmode'], target['spw'], ex))
+                    worker_result = TcleanResult()
+                    worker_result.qa.pool.append(pqa.QAScore(0.34, longmsg=error_msg, shortmsg='Cleaning failure'))
+                    result.add_result(worker_result, target, outcome='failure')
+                    LOG.error(error_msg)
                 else:
                     # Note add_result() removes 'heuristics' from worker_result
                     heuristics = target['heuristics']
                     result.add_result(worker_result, target, outcome='success')
-                    # Export RMS of  sources              
+                    # Export RMS of  sources
                     if self._is_target_for_sensitivity(worker_result, heuristics):
                         s = self._get_image_rms_as_sensitivity(worker_result, target, heuristics)
                         if s is not None:
@@ -207,10 +213,13 @@ class MakeImages(basetask.StandardTaskTemplate):
         return False
 
     def _get_image_rms_as_sensitivity(self, result, target, heuristics):
+        if not result.image:
+            return None
+
         extension = 'tt0.' if result.multiterm else '' # Needed when nterms=2, see PIPE-1361
         # the tt0 needs to be inserted before the ending ".pbcor" in the image name
         index = result.image.find('pbcor')
-        imname = result.image[:index] + extension + result.image[index:] 
+        imname = result.image[:index] + extension + result.image[index:]
 
         if not os.path.exists(imname):
             return None
@@ -227,7 +236,7 @@ class MakeImages(basetask.StandardTaskTemplate):
         if result.specmode == 'cube': # use nbin for cube and repBW
             msobj = self.inputs.context.observing_run.get_ms(name=result.vis[0])
             nbin = target['nbin'] if target['nbin'] > 0 else 1
-            SCF, physicalBW_of_1chan, effectiveBW_of_1chan = heuristics.get_bw_corr_factor(msobj, result.spw, nbin)
+            SCF, physicalBW_of_1chan, effectiveBW_of_1chan, _ = heuristics.get_bw_corr_factor(msobj, result.spw, nbin)
             effectiveBW_of_image = cqa.quantity(nbin / SCF**2 * effectiveBW_of_1chan, 'Hz')
         else: #continuum mode
             effectiveBW_of_image = result.aggregate_bw
@@ -256,7 +265,9 @@ class MakeImages(basetask.StandardTaskTemplate):
                            uvtaper=target['uvtaper'],
                            sensitivity=cqa.quantity(result.image_rms, 'Jy/beam'),
                            pbcor_image_min=cqa.quantity(result.image_min, 'Jy/beam'),
-                           pbcor_image_max=cqa.quantity(result.image_max, 'Jy/beam'))
+                           pbcor_image_max=cqa.quantity(result.image_max, 'Jy/beam'),
+                           imagename=result.image.replace('.pbcor', ''),
+                           datatype=result.datatype)
 
 
 class CleanTaskFactory(object):
@@ -304,6 +315,15 @@ class CleanTaskFactory(object):
         is_cal_image = 'TARGET' not in target['intent']
 
         is_tier0_job = is_mpi_ready and is_cal_image
+        # PIPE-1923 asks to temporarily turn off Tier-0 mode for
+        # POLARIZATION intent when imaging IQUV because of a
+        # potential CASA bug. This should be undone when this
+        # bug is fixed.
+        if target['intent'] == 'POLARIZATION' and target['stokes'] == 'IQUV':
+            is_tier0_job = False
+            if is_mpi_ready:
+                LOG.info('Temporarily turning off Tier-0 parallelization for Stokes IQUV polarization calibrator imaging (PIPE-1923).')
+
         parallel_wanted = mpihelpers.parse_mpi_input_parameter(self.__inputs.parallel)
 
         # PIPE-1401: turn on the tier0 parallelization for individuals planes in the VLASS coarse cube imaging
@@ -357,6 +377,9 @@ class CleanTaskFactory(object):
         if 'hm_nsigma' not in task_args:
             task_args['hm_nsigma'] = inputs.hm_nsigma
 
+        if inputs.drcorrect not in (None, -999.0):
+            task_args['drcorrect'] = inputs.drcorrect
+
         if target['robust'] not in (None, -999.0):
             task_args['robust'] = target['robust']
         else:
@@ -374,12 +397,11 @@ class CleanTaskFactory(object):
             task_args['gridder'] = image_heuristics.gridder(
                     task_args['intent'], task_args['field'])
 
-        if inputs.hm_masking == '':
+        if inputs.hm_masking in (None, ''):
             if 'TARGET' in task_args['intent']:
-                # For the time being the target imaging uses the
-                # inner quarter. Other methods will be made available
-                # later.
                 task_args['hm_masking'] = 'auto'
+            elif task_args['intent'] == 'POLARIZATION' and task_args['stokes'] == 'IQUV':
+                task_args['hm_masking'] = 'centralregion'
             else:
                 task_args['hm_masking'] = 'auto'
         else:
@@ -432,10 +454,20 @@ class CleanTaskFactory(object):
 
 
 def _get_description_map(intent):
-    if intent in ('PHASE', 'BANDPASS', 'AMPLITUDE', 'POLARIZATION', 'POLANGLE', 'POLLEAKAGE'):
+    if intent in ('PHASE', 'BANDPASS', 'AMPLITUDE'):
         return {
             'mfs': 'Make calibrator images',
             'cont': 'Make calibrator images'
+        }
+    elif intent in ('POLARIZATION', 'POLANGLE', 'POLLEAKAGE'):
+        return {
+            'mfs': 'Make polarization calibrator images',
+            'cont': 'Make polarization calibrator images'
+        }
+    elif intent == 'DIFFGAIN':
+        return {
+            'mfs': 'Make diffgain calibrator images',
+            'cont': 'Make diffgain calibrator images'
         }
     elif intent == 'CHECK':
         return {
@@ -454,10 +486,15 @@ def _get_description_map(intent):
         return {}
 
 def _get_sidebar_map(intent):
-    if intent in ('PHASE', 'BANDPASS', 'AMPLITUDE', 'AMPLITUDE', 'POLARIZATION', 'POLANGLE', 'POLLEAKAGE'):
+    if intent in ('PHASE', 'BANDPASS', 'AMPLITUDE', 'DIFFGAIN'):
         return {
             'mfs': 'cals',
             'cont': 'cals'
+        }
+    elif intent in ('POLARIZATION', 'POLANGLE', 'POLLEAKAGE'):
+        return {
+            'mfs': 'pol',
+            'cont': 'pol'
         }
     elif intent == 'CHECK':
         return {

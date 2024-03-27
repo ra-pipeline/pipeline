@@ -44,8 +44,9 @@ def get_scan_exptimes (ms, fieldnamelist, intent, spwidlist):
         # one spw to the next
         spwscans = []
         for obscan in obscans:
-            scanspwset = {scanspw.id for scanspw in list(obscan.spws) if scanspw.num_channels not in (1, 4)}
-            if len(set([spwid]).intersection(scanspwset)) == 0:
+            scanspwset = {scanspw.id for scanspw in list(obscan.spws)
+                          if scanspw.num_channels not in ms.exclude_num_chans}
+            if len({spwid}.intersection(scanspwset)) == 0:
                 continue
             spwscans.append(obscan)
         if not spwscans:

@@ -75,6 +75,32 @@ class ObservatoryImagingPolicy(abc.ABC):
         """
         raise NotImplementedError('should be implemented in subclass')
 
+    @staticmethod
+    @abc.abstractmethod
+    def get_conv1d() -> float:
+        """Get the constant of conv1d. This is to obtain convolution factors in sdimaging task.
+
+        Raises:
+            NotImplementedError
+
+        Returns:
+            (Supposed to be) the constant of conv1d.
+        """
+        raise NotImplementedError('should be implemented in subclass')
+
+    @staticmethod
+    @abc.abstractmethod
+    def get_conv2d() -> float:
+        """Get the constant of conv2d. This is to obtain convolution factors in sdimaging task.
+
+        Raises:
+            NotImplementedError
+
+        Returns:
+            (Supposed to be) the constant of conv2d.
+        """
+        raise NotImplementedError('should be implemented in subclass')
+
 
 class ALMAImagingPolicy(ObservatoryImagingPolicy):
     """Implementation of imaging policy for ALMA."""
@@ -138,6 +164,23 @@ class ALMAImagingPolicy(ObservatoryImagingPolicy):
         margin += margin % 2
         return margin
 
+    @staticmethod
+    def get_conv1d() -> float:
+        """Get the constant of conv1d. This is to obtain convolution factors in sdimaging task.
+
+        Returns:
+            the constant of conv1d.
+        """
+        return 0.3954
+
+    @staticmethod
+    def get_conv2d() -> float:
+        """Get the constant of conv2d. This is to obtain convolution factors in sdimaging task.
+
+        Returns:
+            the constant of conv2d.
+        """
+        return 0.1597
 
 class NROImagingPolicy(ObservatoryImagingPolicy):
     """Implementation of imaging policy for NRO 45m telescope."""
@@ -188,6 +231,24 @@ class NROImagingPolicy(ObservatoryImagingPolicy):
             number of pixels of imaging margin
         """
         return 0
+
+    @staticmethod
+    def get_conv1d() -> float:
+        """Get the constant of conv1d. This is to obtain convolution factors in sdimaging task.
+
+        Returns:
+            the constant of conv1d.
+        """
+        return 0.5592
+
+    @staticmethod
+    def get_conv2d() -> float:
+        """Get the constant of conv2d. This is to obtain convolution factors in sdimaging task.
+
+        Returns:
+            the constant of conv2d.
+        """
+        return 0.3193
 
 
 def get_imaging_policy(context: Context) -> Type[ObservatoryImagingPolicy]:

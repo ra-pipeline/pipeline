@@ -302,12 +302,17 @@ class FindCont(basetask.StandardTaskTemplate):
                     # used in heuristics methods upstream.
                     if image_heuristics.is_eph_obj(target['field']):
                         phasecenter = 'TRACKFIELD'
+                        psf_phasecenter = None
                         # 'REST' does not yet work (see CAS-8965, CAS-9997)
                         #outframe = 'REST'
                         outframe = ''
                         specmode = 'cubesource'
                     else:
                         phasecenter = target['phasecenter']
+                        if gridder == 'mosaic' and target['psf_phasecenter'] != target['phasecenter']:
+                            psf_phasecenter = target['psf_phasecenter']
+                        else:
+                            psf_phasecenter = None
                         outframe = 'LSRK'
                         specmode = 'cube'
 
@@ -337,10 +342,11 @@ class FindCont(basetask.StandardTaskTemplate):
                                             mosweight=mosweight, perchanweightdensity=perchanweightdensity,
                                             pblimit=0.2, niter=0, threshold='0mJy', deconvolver='hogbom',
                                             interactive=False, imsize=target['imsize'], cell=target['cell'],
-                                            phasecenter=phasecenter, stokes='I', weighting=weighting,
-                                            robust=robust, uvtaper=uvtaper, npixels=0, restoration=False,
-                                            restoringbeam=[], pbcor=False, usepointing=usepointing,
-                                            savemodel='none', parallel=parallel)
+                                            phasecenter=phasecenter, psfphasecenter=psf_phasecenter,
+                                            stokes='I', weighting=weighting, robust=robust, uvtaper=uvtaper,
+                                            npixels=0, restoration=False, restoringbeam=[], pbcor=False,
+                                            usepointing=usepointing, savemodel='none', parallel=parallel,
+                                            fullsummary=False)
                     self._executor.execute(job)
 
                     # Try detecting continuum frequency ranges
@@ -362,6 +368,10 @@ class FindCont(basetask.StandardTaskTemplate):
 
                     spw_transitions = ref_ms.get_spectral_window(real_spwid).transitions
                     single_continuum = any(['Single_Continuum' in t for t in spw_transitions])
+                    # PIPE-1855: use spectralDynamicRangeBandWidth from SBSummary if available
+                    dynrange_bw = ref_ms.science_goals['spectralDynamicRangeBandWidth']
+                    if dynrange_bw is not None:  # None means that a value was not provided, and it should remain None
+                        dynrange_bw = qaTool.tos(dynrange_bw)
                     (cont_range, png, single_range_channel_fraction, warning_strings, joint_mask_name) = \
                         findcont_heuristics.find_continuum(dirty_cube='%s.residual' % findcont_basename,
                                                            pb_cube='%s.pb' % findcont_basename,
@@ -369,7 +379,8 @@ class FindCont(basetask.StandardTaskTemplate):
                                                            single_continuum=single_continuum,
                                                            is_eph_obj=image_heuristics.is_eph_obj(target['field']),
                                                            ref_ms_name=ref_ms.name,
-                                                           nbin=reprBW_nbin)
+                                                           nbin=reprBW_nbin,
+                                                           dynrange_bw=dynrange_bw)
                     joint_mask_names[(source_name, spwid)] = joint_mask_name
                     # PIPE-74
                     if single_range_channel_fraction < 0.05:

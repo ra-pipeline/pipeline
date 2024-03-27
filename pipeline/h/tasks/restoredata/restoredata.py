@@ -22,10 +22,9 @@ vis = [ '<ASDM name>' ]
 context = pipeline.Pipeline().context
 inputs = pipeline.tasks.RestoreData.Inputs(context, vis=vis)
 task = pipeline.tasks.RestoreData(inputs)
-results = task.execute(dry_run=False)
+results = task.execute()
 results.accept(context)
 """
-import glob
 import os
 import re
 import ast
@@ -44,7 +43,7 @@ from .. import applycal
 from .. import importdata
 from ..common import manifest
 
-from pipeline.extern.almarenorm import ACreNorm
+from pipeline.extern.almarenorm import alma_renorm
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -127,8 +126,8 @@ class RestoreDataInputs(vdp.StandardInputs):
         :type bdfflags: boolean True or False
         :param lazy: use the lazy filler to restore data
         :type lazy: boolean True or False
-        :param asis: list of ASDM tables to import as is
-        :type asis: comma delimated list of tables
+        :param asis: Creates verbatim copies of the ASDM tables in the output MS.
+        :type asis: space delimated list of tables
         """
         super(RestoreDataInputs, self).__init__()
 
@@ -229,7 +228,7 @@ class RestoreData(basetask.StandardTaskTemplate):
 
         # Copy the required calibration products from "someplace" on disk
         #   (default ../products) to ../rawdata. The pipeline manifest file
-        #   if present is used to determine which files to copy. Otherwise   
+        #   if present is used to determine which files to copy. Otherwise
         #   a file naming scheme is used. The latter is deprecated as it
         #   requires the exportdata / restoredata tasks to be synchronized
         #   but it is maintained for testing purposes.
@@ -271,8 +270,10 @@ class RestoreData(basetask.StandardTaskTemplate):
         # pipeline manifest.
         casa_version, pipeline_version, num_mpi = self._extract_casa_pipeline_version(pipemanifest)
 
-        # If necessary, renormalize ALMA IF data
-        renorm_applied = self._do_renormalize(pipemanifest, session_names=session_names, session_vislists=session_vislists)
+        # If necessary, renormalize ALMA IF data; returns bool declaring
+        # whether the renormalization was run.
+        renorm_applied = self._do_renormalize(pipemanifest, session_names=session_names,
+                                              session_vislists=session_vislists)
 
         # Return the results object, which will be used for the weblog
         return RestoreDataResults(import_results, apply_results, flagging_summaries, casa_version, pipeline_version,
@@ -298,13 +299,29 @@ class RestoreData(basetask.StandardTaskTemplate):
                 # for each non-target asdm/vis in the manifest structure
                 params = pipemanifest.get_renorm(vis)
                 if params:
-                    rn_params = {key:ast.literal_eval(val) if val else val for key,val in params.items()}
+                    # Convert input parameters with ast (string to bool, dict, etc).
+                    kwargs = {key: ast.literal_eval(val) if val else val for key, val in params.items()}
+
+                    # PIPE-1687: restrict input arguments to those needed by
+                    # renorm interface function.
+                    # PIPE-2049: if some parameters are absent from the manifest,
+                    # use default values adopted from extern.heuristics.ACreNorm.renormalize,
+                    # except for atm_auto_exclude, which is defaulted to False.
+                    kwargs = {
+                        'vis': vis,
+                        'spw': [int(x) for x in kwargs.get('spw', '').split(',') if x],
+                        'apply': kwargs.get('apply', False),
+                        'threshold': kwargs.get('threshold', None),
+                        'excludechan': kwargs.get('excludechan', {}),
+                        'correct_atm': kwargs.get('correctATM', False),
+                        'atm_auto_exclude': kwargs.get('atm_auto_exclude', False),
+                        'bwthreshspw': kwargs.get('bwthreshspw', {}),
+                    }
+
                     try:
-                        rn = ACreNorm(vis)
-                        LOG.info(f'Renormalizing {vis} with hifa_renorm {params}')
-                        rn.renormalize(docorr=rn_params['apply'], docorrThresh=rn_params['threshold'], correctATM=rn_params['correctATM'],
-                                        spws=rn_params['spw'], excludechan=rn_params['excludechan'])
-                        if rn_params['apply'] and rn.checkApply():
+                        LOG.info(f'Renormalizing {vis} with hifa_renorm {kwargs}')
+                        _, _, _, _, _, renorm_applied, _, _ = alma_renorm(**kwargs)
+                        if 'apply' in kwargs and kwargs['apply'] and renorm_applied:
                             applied = True
                         else:
                             LOG.error(f'Failed application of renormalization for {vis} {params}')
@@ -323,7 +340,7 @@ class RestoreData(basetask.StandardTaskTemplate):
 
         # Download the pipeline manifest file from the archive or
         #     products_dir to rawdata_dir
-        manifest_files = glob.glob(os.path.join(inputs.products_dir, template))
+        manifest_files = utils.glob_ordered(os.path.join(inputs.products_dir, template))
         for manifestfile in manifest_files:
             LOG.info('Copying %s to %s' % (manifestfile, inputs.rawdata_dir))
             shutil.copy(manifestfile, os.path.join(inputs.rawdata_dir,
@@ -338,9 +355,9 @@ class RestoreData(basetask.StandardTaskTemplate):
         # Get the list of files in the rawdata directory
         #   First find all the manifest files of any kind
         #   If there is more than one file in that list then try the more restrictive template
-        manifestfiles = glob.glob(os.path.join(inputs.rawdata_dir, template1))
+        manifestfiles = utils.glob_ordered(os.path.join(inputs.rawdata_dir, template1))
         if len(manifestfiles) > 1:
-            manifestfiles2 = glob.glob(os.path.join(inputs.rawdata_dir, template2))
+            manifestfiles2 = utils.glob_ordered(os.path.join(inputs.rawdata_dir, template2))
             if len(manifestfiles2) > 0 and len(manifestfiles2) < len(manifestfiles):
                 manifestfiles = manifestfiles2
 
@@ -365,7 +382,7 @@ class RestoreData(basetask.StandardTaskTemplate):
             inflagfiles = [os.path.join(inputs.products_dir, flagfile)
                            for flagfile in pipemanifest.get_final_flagversions(ouss).values()]
         else:
-            inflagfiles = glob.glob(os.path.join(inputs.products_dir, '*.flagversions.tgz'))
+            inflagfiles = utils.glob_ordered(os.path.join(inputs.products_dir, '*.flagversions.tgz'))
 
         for flagfile in inflagfiles:
             LOG.info('Copying %s to %s' % (flagfile, inputs.rawdata_dir))
@@ -377,7 +394,7 @@ class RestoreData(basetask.StandardTaskTemplate):
             incaltables = [os.path.join(inputs.products_dir, caltable)
                            for caltable in pipemanifest.get_caltables(ouss).values()]
         else:
-            incaltables = glob.glob(os.path.join(inputs.products_dir, '*.caltables.tgz'))
+            incaltables = utils.glob_ordered(os.path.join(inputs.products_dir, '*.caltables.tgz'))
 
         for caltable in incaltables:
             LOG.info('Copying %s to %s' % (caltable, inputs.rawdata_dir))
@@ -390,7 +407,7 @@ class RestoreData(basetask.StandardTaskTemplate):
             inapplycals = [os.path.join(inputs.products_dir, applycals)
                            for applycals in pipemanifest.get_applycals(ouss).values()]
         else:
-            inapplycals = glob.glob(os.path.join(inputs.products_dir, '*.calapply.txt'))
+            inapplycals = utils.glob_ordered(os.path.join(inputs.products_dir, '*.calapply.txt'))
 
         for calapply_list in inapplycals:
             LOG.info('Copying %s to %s' % (calapply_list, inputs.rawdata_dir))
@@ -422,8 +439,7 @@ class RestoreData(basetask.StandardTaskTemplate):
             flagversionpath = os.path.join(inputs.output_dir, flagversion)
             if os.path.exists(flagversionpath):
                 LOG.info('Removing default flagversion for %s' % ms.basename)
-                if not self._executor._dry_run:
-                    shutil.rmtree(flagversionpath)
+                shutil.rmtree(flagversionpath)
 
             # Untar MS.flagversions file in rawdata_dir to output_dir
             if ouss is not None:
@@ -436,20 +452,18 @@ class RestoreData(basetask.StandardTaskTemplate):
             LOG.info('    From %s' % tarfilename)
             LOG.info('    Into %s' % inputs.output_dir)
             with tarfile.open(tarfilename, 'r:gz') as tar:
-                if not self._executor._dry_run:
-                    tar.extractall(path=inputs.output_dir)
+                tar.extractall(path=inputs.output_dir)
 
             # Restore final flags version using flagmanager
             LOG.info('Restoring final flags for %s from flag version %s' % (ms.basename, flag_version_name))
-            if not self._executor._dry_run:
-                task = casa_tasks.flagmanager(vis=ms.name,
-                                              mode='restore',
-                                              versionname=flag_version_name)
-                try:
-                    self._executor.execute(task)
-                except Exception:
-                    LOG.error("Application of final flags failed for %s" % ms.basename)
-                    raise
+            task = casa_tasks.flagmanager(vis=ms.name,
+                                          mode='restore',
+                                          versionname=flag_version_name)
+            try:
+                self._executor.execute(task)
+            except Exception:
+                LOG.error("Application of final flags failed for %s" % ms.basename)
+                raise
 
             flagversionlist.append(flagversionpath)
 
@@ -473,19 +487,18 @@ class RestoreData(basetask.StandardTaskTemplate):
             LOG.info('Restoring calibration state for %s from %s'
                      '' % (ms.basename, applyfile_name))
 
-            if not self._executor._dry_run:
-                # Write converted calstate to a temporary file and use this
-                # for the import. the temporary file will automatically be
-                # deleted once out of scope
-                with tempfile.NamedTemporaryFile() as tmpfile:
-                    LOG.trace('Writing converted calstate to %s'
-                              '' % tmpfile.name)
-                    converted = self._convert_calstate_paths(applyfile_name)
-                    tmpfile.write(converted.encode(sys.stdout.encoding))
-                    tmpfile.flush()
+            # Write converted calstate to a temporary file and use this
+            # for the import. the temporary file will automatically be
+            # deleted once out of scope
+            with tempfile.NamedTemporaryFile() as tmpfile:
+                LOG.trace('Writing converted calstate to %s'
+                          '' % tmpfile.name)
+                converted = self._convert_calstate_paths(applyfile_name)
+                tmpfile.write(converted.encode(sys.stdout.encoding))
+                tmpfile.flush()
 
-                    inputs.context.callibrary.import_state(tmpfile.name,
-                                                           append=append)
+                inputs.context.callibrary.import_state(tmpfile.name,
+                                                       append=append)
             append = True
 
     def _convert_calstate_paths(self, applyfile):
@@ -538,8 +551,8 @@ class RestoreData(basetask.StandardTaskTemplate):
                     tarfilename = os.path.join(inputs.rawdata_dir,
                                                pipemanifest.get_caltables(ouss)['default'])
             elif ousid == '':
-                tarfilename = glob.glob(os.path.join(inputs.rawdata_dir,
-                                                     '*' + session + '.caltables.tgz'))[0]
+                tarfilename = utils.glob_ordered(os.path.join(inputs.rawdata_dir,
+                                                              '*' + session + '.caltables.tgz'))[0]
             else:
                 tarfilename = os.path.join(inputs.rawdata_dir,
                                            ousid + session + '.caltables.tgz')
@@ -547,8 +560,9 @@ class RestoreData(basetask.StandardTaskTemplate):
             with tarfile.open(tarfilename, 'r:gz') as tar:
                 tarmembers = tar.getmembers()
 
-                # Loop over the visibilities associated with that session
-                for vis in vislist:
+                # Retrieve any caltable associated with either session name or
+                # the measurement sets associated with this session.
+                for vis in vislist + [session]:
                     LOG.info('Restoring caltables for %s from %s'
                              '' % (os.path.basename(vis), tarfilename))
                     extractlist = []
@@ -559,15 +573,14 @@ class RestoreData(basetask.StandardTaskTemplate):
                             if member.name.endswith('.tbl/') or member.name.endswith('.tbl'):
                                 LOG.info('    Extracting caltable %s' % member.name)
 
-                    if not self._executor._dry_run:
-                        if len(extractlist) == len(tarmembers):
-                            tar.extractall(path=inputs.output_dir)
-                        else:
-                            tar.extractall(path=inputs.output_dir, members=extractlist)
+                    if len(extractlist) == len(tarmembers):
+                        tar.extractall(path=inputs.output_dir)
+                    else:
+                        tar.extractall(path=inputs.output_dir, members=extractlist)
 
     def _do_applycal(self):
-        container = vdp.InputsContainer(applycal.Applycal, self.inputs.context)
-        applycal_task = applycal.Applycal(container)
+        container = vdp.InputsContainer(applycal.SerialApplycal, self.inputs.context)
+        applycal_task = applycal.SerialApplycal(container)
         return self._executor.execute(applycal_task, merge=True)
 
     def _get_sessions(self, sessions=None, vis=None):

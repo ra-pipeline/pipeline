@@ -7,15 +7,13 @@ The keyword "NONE" can be written in case of non-detection of a continuum
 frequency range.
 """
 
+import collections
 import re
+from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
 
-from . import casa_tools
-from . import utils
-from . import logging
-
-from typing import Union, Tuple, List, Dict, Any, Generator
+from . import casa_tools, logging, utils
 
 LOG = logging.get_logger(__name__)
 
@@ -237,3 +235,209 @@ class ContFileHandler(object):
                                                               (float(item[0]), float(item[1])) for item in topo_freq_selection)))
 
         return topo_freq_selections, topo_chan_selections, aggregate_frame_bw
+
+
+def contfile_to_spwsel(vis, context, contfile='cont.dat', use_realspw=True):
+    """Translate continuum ranges specified in contfile to frequency selection string.
+
+    The return is a dictionary with field names with keys and spwsel as values, e.g.,
+        {'04287+1801': '20:327.464~328.183GHz;328.402~329.136GHz,26:340.207~340.239GHz;340.280~340.313GHz'}
+    By default (use_realspw=True), the frequency selection string is in real SPWs of input vis, even though
+    contfile is in virtual SPWs. If use_realspw=False, the output frequency selection string is in virtual SPWs.
+    If the frequencies specified in the contfile are in LSRK, they will be converted to TOPO.
+    """
+
+    contfile_handler = ContFileHandler(contfile)
+    contdict = contfile_handler.read(warn_nonexist=False)
+    m = context.observing_run.get_ms(vis)
+    fielddict = {}
+
+    for field in contdict['fields']:
+
+        fieldobj = m.get_fields(name=field)
+        fieldobjlist = [fieldobjitem for fieldobjitem in fieldobj]
+
+        # If field is not found, skip it.
+        if not fieldobjlist:
+            continue
+
+        spwstring = ''
+        for spw in contdict['fields'][field]:
+            crange_list = [crange for crange in contdict['fields'][field][spw] if crange != 'ALL']
+            if crange_list[0]['refer'] in ('LSRK', 'SOURCE'):
+                LOG.info("Converting from %s to TOPO...", crange_list[0]['refer'])
+                sname = field
+                field_id = str(fieldobjlist[0].id)
+
+                cranges_spwsel = collections.OrderedDict()
+                cranges_spwsel[sname] = collections.OrderedDict()
+                cranges_spwsel[sname][spw], _ = contfile_handler.get_merged_selection(sname, spw)
+
+                freq_ranges, _, _ = contfile_handler.to_topo(
+                    cranges_spwsel[sname][spw], [vis], [field_id], int(spw),
+                    context.observing_run)
+                freq_ranges_list = freq_ranges[0].split(';')
+                spwstring = spwstring + spw + ':'
+                for freqrange in freq_ranges_list:
+                    spwstring = spwstring + freqrange.replace(' TOPO', '') + ';'
+                spwstring = spwstring[:-1]
+                spwstring = spwstring + ','
+
+            if crange_list[0]['refer'] == 'TOPO':
+                LOG.info("Using TOPO frequency specified in {!s}".format(contfile))
+                spwstring = spwstring + spw + ':'
+                for freqrange in crange_list:
+                    spwstring = spwstring + str(freqrange['range'][0]) + '~' + str(freqrange['range'][1]) + 'GHz;'
+                spwstring = spwstring[:-1]
+                spwstring = spwstring + ','
+
+        # remove appending semicolon
+        spwstring = spwstring[:-1]
+
+        if use_realspw:
+            spwstring = context.observing_run.get_real_spwsel([spwstring], [vis])
+        fielddict[field] = spwstring[0]
+
+    LOG.info("Using frequencies in TOPO reference frame:")
+    for field, spwsel in fielddict.items():
+        LOG.info("    Field: {!s}   SPW: {!s}".format(field, spwsel))
+
+    return fielddict
+
+
+def contfile_to_chansel(vis, context, contfile='cont.dat', excludechans=False):
+    """Translate continuum ranges specified in contfile to channel selection string.
+
+    The return is a dictionary with field names with keys and chansel as values, e.g.,
+        {'04287+1801': '20:327~328,26:340~341'}
+    The channel selection string is in real SPWs of input vis.
+    If excludechans=True, the returned string will select channels outside the continuum ranges instead.        
+    """
+
+    spwsel_dict = contfile_to_spwsel(vis, context, contfile, use_realspw=True)
+    chansel_dict = collections.OrderedDict()
+    for field, spwsel in spwsel_dict.items():
+        chansel_dict[field] = spwsel2chansel(vis, field, spwsel, excludechans)
+
+    return chansel_dict
+
+
+def spwsel2chansel(vis, field, spwsel, excludechans):
+    """Convert selections of frequecy ranges to channel indexes.
+
+    This function can convert selections of spws/chans in to channel indexes.
+    If excludechans=True, it will select channels outside of the input selection.
+
+    This function starts as a copy of a private helper function (_quantityRangesToChannels) from 
+        casatasks.private.task_uvcontsub_old._quantityRangesToChannels (ver6.5.2/6.5.3)
+        casatasks.private.task_uvcontsub._quantityRangesToChannels (ver6.5.1)
+    https://open-bitbucket.nrao.edu/projects/CASA/repos/casa6/browse/casatasks/src/private/task_uvcontsub_old.py?at=refs%2Ftags%2F6.5.3.28#316
+    https://casadocs.readthedocs.io/en/v6.5.3/api/tt/casatasks.manipulation.uvcontsub_old.html (see the "fitspw" parameter)
+
+    A refactoring work was later done via PIPE-1815.
+
+    Also see the relevant disscussion on this action in JIRA:
+    https://open-jira.nrao.edu/browse/CAS-13631?focusedCommentId=203983&page=com.atlassian.jira.plugin.system.issuetabpanels%3Acomment-tabpanel#comment-203983
+
+    Examples:
+
+    CASA <17>: from pipeline.infrastructure.contfilehandler import spwsel2chansel
+    CASA <18>: spwsel2chansel('uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small.ms','helms30','0:215369.8696MHz~215490.8696MHz',False)
+    Out[18]: '0:56~63'
+
+    CASA <19>: spwsel2chansel('uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small.ms','helms30','0:215369.8696MHz~215490.8696MHz',True)
+    Out[19]: '0:0~55,0:64~127'
+    """
+
+    with casa_tools.TableReader(vis+'/SPECTRAL_WINDOW') as tb:
+        nspw = tb.nrows()
+
+    fullspwids = str(list(range(nspw))).strip('[,]')
+    tql = {'field': field, 'spw': fullspwids}
+
+    with casa_tools.MSReader(vis) as ms:
+
+        ms.msselect(tql, True)
+        allsels = ms.msselectedindices()
+        ms.reset()
+
+        # input fitspw selection
+        tql['spw'] = spwsel
+        ms.msselect(tql, True)
+        usersels = ms.msselectedindices()['channel']
+
+    # sort the arrays so that chan ranges are in order
+    usersels = usersels[np.lexsort((usersels[:, 1], usersels[:, 0]))]
+    spwid = -1
+    prevspwid = None
+    newchanlist = []
+    nsels = len(usersels)
+    # casalog.post("Usersels=",usersels)
+    if excludechans:
+        for isel in range(nsels):
+            prevspwid = spwid
+            spwid = usersels[isel][0]
+            lochan = usersels[isel][1]
+            hichan = usersels[isel][2]
+            stp = usersels[isel][3]
+            maxchanid = allsels['channel'][spwid][2]
+            # find left and right side ranges of the selected range
+            if spwid != prevspwid:
+                # first line in the selected spw
+                if lochan > 0:
+                    outloL = 0
+                    outhiL = lochan-1
+                    outloR = (0 if hichan+1 >= maxchanid else hichan+1)
+                    if outloR:
+                        if isel < nsels-1 and usersels[isel+1][0] == spwid:
+                            outhiR = usersels[isel+1][1]-1
+                        else:
+                            outhiR = maxchanid
+                    else:
+                        outhiR = 0  # higher end of the user selected range reaches maxchanid
+                        # so no right hand side range
+                    # casalog.post("outloL,outhiL,outloR,outhiR==", outloL,outhiL,outloR,outhiR)
+                else:
+                    # no left hand side range
+                    outloL = 0
+                    outhiL = 0
+                    outloR = hichan+1
+                    if isel < nsels-1 and usersels[isel+1][0] == spwid:
+                        outhiR = usersels[isel+1][1]-1
+                    else:
+                        outhiR = maxchanid
+            else:
+                #expect the left side range is already taken care of
+                outloL = 0
+                outhiL = 0
+                outloR = hichan+1
+                if outloR >= maxchanid:
+                    #No more boundaries to consider
+                    outloR = 0
+                    outhiR = 0
+                else:
+                    if isel < nsels-1 and usersels[isel+1][0] == spwid:
+                        outhiR = min(usersels[isel+1][1]-1, maxchanid)
+                    else:
+                        outhiR = maxchanid
+                    if outloR > outhiR:
+                        outloR = 0
+                        outhiR = 0
+            if (not(outloL == 0 and outhiL == 0)) and outloL <= outhiL:
+                newchanlist.append([spwid, outloL, outhiL, stp])
+            if (not(outloR == 0 and outhiR == 0)) and outloR <= outhiR:
+                newchanlist.append([spwid, outloR, outhiR, stp])
+        # casalog.post("newchanlist=",newchanlist)
+    else:
+        # excludechans=False
+        newchanlist = usersels
+
+    # return newchanlist
+    # create spw selection string from newchanlist
+    spwstr = ''
+    for irange, chanrange in enumerate(newchanlist):
+        spwstr += str(chanrange[0])+':'+str(chanrange[1])+'~'+str(chanrange[2])
+        if irange != len(newchanlist)-1:
+            spwstr += ','
+
+    return spwstr

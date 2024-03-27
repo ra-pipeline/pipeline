@@ -2,8 +2,7 @@ import bz2
 import pickle
 import time
 
-import pympler.asizeof as asizeof
-
+from pipeline.infrastructure.utils import get_obj_size
 import pipeline.infrastructure.logging as logging
 
 LOG = logging.get_logger(__name__)
@@ -19,25 +18,25 @@ class CompressedObj(object):
 
 
 def compress_object(obj, protocol=pickle.HIGHEST_PROTOCOL, compresslevel=9):
-    size_org = asizeof.asizeof(obj)
+    size_org = get_obj_size(obj)
     start = time.time()
     try:
         compressed = bz2.compress(pickle.dumps(obj, protocol), compresslevel=compresslevel)
     except:
         compressed = obj
     end = time.time()
-    size_comp = asizeof.asizeof(compressed)
+    size_comp = get_obj_size(compressed)
     LOG.debug('compress: size before {0} after {1} ({2} %)'.format(size_org, size_comp, float(size_comp)/float(size_org) * 100))
     LOG.debug('elapsed {0} sec'.format(end - start))
     return compressed
 
 
 def decompress_object(obj):
-    size_comp = asizeof.asizeof(obj)
+    size_comp = get_obj_size(obj)
     start = time.time()
     decompressed = pickle.loads(bz2.decompress(obj))
     end = time.time()
-    size_org = asizeof.asizeof(decompressed)
+    size_org = get_obj_size(decompressed)
     LOG.debug('decompress: size before {0} after {1} ({2} %)'.format(size_org, size_comp, float(size_comp)/float(size_org) * 100))
     LOG.debug('elapsed {0} sec'.format(end - start))
     return decompressed

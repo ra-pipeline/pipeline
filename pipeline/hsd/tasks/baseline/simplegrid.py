@@ -163,8 +163,9 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
         LOG.debug('{}: window={}, windowmode={}'.format(self.__class__.__name__, window, windowmode))
         grid_table = self.make_grid_table(datatable_dict, index_list)
         # LOG.debug('work_dir=%s'%(work_dir))
-        if len(window) != 0 and windowmode == 'replace':
+        if windowmode == 'replace' and (window is None or len(window) > 0):
             # gridding should not be necessary
+            LOG.info(f'Skip SimpleGridding: windowmode="{windowmode}", window="{window}"')
             retval = [None, None]
         else:
             import time
@@ -177,7 +178,6 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
                    'meta_data': retval[1],
                    'grid_table': grid_table}
         result = SDSimpleGriddingResults(task=self.__class__, success=True, outcome=outcome)
-        result.task = self.__class__
 
         return result
 
@@ -274,11 +274,11 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
         # Calculate Grid index for each position
         igrid_ra_corr = 1.0 / grid_ra_corr
         igrid_dec = 1.0 / grid_dec
-        index_ra = numpy.array((ras - min_ra) * igrid_ra_corr, dtype=numpy.int)
-        index_dec = numpy.array((decs - min_dec) * igrid_dec, dtype=numpy.int)
+        index_ra = numpy.array((ras - min_ra) * igrid_ra_corr, dtype=int)
+        index_dec = numpy.array((decs - min_dec) * igrid_dec, dtype=int)
 
         # Counter for distributing spectrum into several planes (nplane)
-        counter = numpy.zeros((ngrid_ra, ngrid_dec), dtype=numpy.int)
+        counter = numpy.zeros((ngrid_ra, ngrid_dec), dtype=int)
 
         # Make lists to store indexes for combine spectrum
         nplane = self.inputs.nplane
@@ -425,10 +425,10 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
         LOG.debug('sorted bind_to_grid=%s', bind_to_grid)
 
         # create storage for output
-        StorageOut = numpy.zeros((nrow, nchan), dtype=numpy.complex)
+        StorageOut = numpy.zeros((nrow, nchan), dtype=complex)
         StorageWeight = numpy.zeros((nrow, nchan), dtype=numpy.float32)
-        StorageNumSp = numpy.zeros((nrow), dtype=numpy.int)
-        StorageNumFlag = numpy.zeros((nrow), dtype=numpy.int)
+        StorageNumSp = numpy.zeros((nrow), dtype=int)
+        StorageNumFlag = numpy.zeros((nrow), dtype=int)
         OutputTable = []
 
         # Return empty result if all the spectra are flagged out

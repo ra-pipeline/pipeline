@@ -9,17 +9,17 @@ from xml.dom import minidom
 from pipeline import environment
 
 # # Set the command used to calculate MD5 (see infrastructure.renderer.logger)
-# CHECKSUM_CMD = None 
-# 
+# CHECKSUM_CMD = None
+#
 # if platform.system() == 'Darwin':
 #     # Look for md5 on OS X.
 #     md5_path = spawn.find_executable('md5')
 #     if md5_path:
-#         LOG.trace('Using md5 executable at \'%s\' to generate MD5' 
+#         LOG.trace('Using md5 executable at \'%s\' to generate MD5'
 #                   % md5_path)
 #         CHECKSUM_CMD = lambda name : (md5_path, name)
 # else:
-#     # .. otherwise try to find md5sum command.    
+#     # .. otherwise try to find md5sum command.
 #     md5sum_path = spawn.find_executable('md5sum')
 #     if md5sum_path:
 #         LOG.trace('Using convert executable at \'%s\' to generate MD5' % \
@@ -31,7 +31,7 @@ from pipeline import environment
 
 class PipelineManifest(object):
     """
-    Class for creating the pipeline data product manifest 
+    Class for creating the pipeline data product manifest
     """
     def __init__(self, ouss_id):
         self.ouss_id = ouss_id
@@ -47,7 +47,7 @@ class PipelineManifest(object):
 
     def set_ous(self, ous_name):
         """
-        Set an OUS element and return it 
+        Set an OUS element and return it
         """
         return eltree.SubElement(self.piperesults, "ous", name=ous_name)
 
@@ -124,7 +124,7 @@ class PipelineManifest(object):
     @staticmethod
     def set_session(ous, session_name):
         """
-        Set a SESSION element in an OUS element and return it 
+        Set a SESSION element in an OUS element and return it
         """
         return eltree.SubElement(ous, "session", name=session_name)
 
@@ -141,7 +141,7 @@ class PipelineManifest(object):
     @staticmethod
     def get_asdm(session, asdm_name):
         """
-        Get an ASDM element in a SESSION element and return it 
+        Get an ASDM element in a SESSION element and return it
         """
         for asdm in session.iter('asdm'):
             if asdm.attrib['name'] == asdm_name:
@@ -149,12 +149,12 @@ class PipelineManifest(object):
         return None
 
     @staticmethod
-    def add_caltables(session, caltables_file):
-        eltree.SubElement(session, "caltables", name=caltables_file)
+    def add_caltables(session, caltables_file, session_name):
+        eltree.SubElement(session, "caltables", name=caltables_file, level="N/A", session=session_name, package="N/A", datatype="caltables", format="tgz")
 
     @staticmethod
-    def add_auxcaltables(session, caltables_file):
-        eltree.SubElement(session, "aux_caltables", name=caltables_file)
+    def add_auxcaltables(session, caltables_file, session_name):
+        eltree.SubElement(session, "aux_caltables", name=caltables_file, level="N/A", session=session_name, package="N/A", datatype="caltables", format="tgz")
 
     @staticmethod
     def get_caltables(ous):
@@ -169,8 +169,8 @@ class PipelineManifest(object):
         """
         Add an ASDM element to a SESSION element
         """
-        asdm = eltree.SubElement(session, "asdm", name=asdm_name)
-        eltree.SubElement(asdm, "finalflags", name=flags_file)
+        asdm = eltree.SubElement(session, "asdm", name=asdm_name, datatype='asdm', format='sdm')
+        eltree.SubElement(asdm, "finalflags", name=flags_file, asdm=asdm_name, datatype="ms.flagversions", format="tgz")
         eltree.SubElement(asdm, "applycmds", name=calapply_file)
 
     @staticmethod
@@ -178,13 +178,13 @@ class PipelineManifest(object):
         """
         Add an ASDM element to a SESSION element
         """
-        asdm = eltree.SubElement(session, "asdm", name=asdm_name)
+        asdm = eltree.SubElement(session, "asdm", name=asdm_name, datatype="asdm", format="sdm")
         if ms_file is not None:
             eltree.SubElement(asdm, "finalms", name=ms_file)
         if flags_file is not None:
-            eltree.SubElement(asdm, "finalflags", name=flags_file)
+            eltree.SubElement(asdm, "finalflags", name=flags_file, asdm=asdm_name, datatype="ms.flagversions", format="tgz")
         if calapply_file is not None:
-            eltree.SubElement(asdm, "applycmds", name=calapply_file)
+            eltree.SubElement(asdm, "applycmds", name=calapply_file, asdm=asdm_name, datatype="ms.calapply", format="txt")
         for image in imagelist:
             eltree.SubElement(asdm, "image", name=image, imtype=imtype)
 
@@ -193,7 +193,7 @@ class PipelineManifest(object):
         """
         Add an ASDM element to a SESSION element
         """
-        asdm = eltree.SubElement(session, "aux_asdm", name=asdm_name)
+        asdm = eltree.SubElement(session, "aux_asdm", name=asdm_name, datatype="asdm", format="sdm")
         eltree.SubElement(asdm, "applycmds", name=calapply_file)
 
     @staticmethod
@@ -204,7 +204,7 @@ class PipelineManifest(object):
         finalflags_dict = collections.OrderedDict()
         for session in ous.iter('session'):
             for asdm in session.iter('asdm'):
-                for finalflags in asdm.iter('finalflags'): 
+                for finalflags in asdm.iter('finalflags'):
                     finalflags_dict[asdm.attrib['name']] = finalflags.attrib['name']
         return finalflags_dict
 
@@ -216,16 +216,16 @@ class PipelineManifest(object):
         applycmds_dict = collections.OrderedDict()
         for session in ous.iter('session'):
             for asdm in session.iter('asdm'):
-                for applycmds in asdm.iter('applycmds'): 
+                for applycmds in asdm.iter('applycmds'):
                     applycmds_dict[asdm.attrib['name']] = applycmds.attrib['name']
         return applycmds_dict
 
     @staticmethod
-    def add_pprfile(ous, ppr_file):
+    def add_pprfile(ous, ppr_file, ous_name):
         """
         Add the pipeline processing request file to the OUS element
         """
-        eltree.SubElement(ous, "piperequest", name=ppr_file)
+        eltree.SubElement(ous, "piperequest", name=ppr_file, level="N/A", ous=ous_name, package="N/A", datatype="pprequest", format="xml")
 
     @staticmethod
     def add_images(ous, imagelist, imtype, extra_attributes_list=None):
@@ -243,32 +243,32 @@ class PipelineManifest(object):
                 eltree.SubElement(ous, "image", name=image, imtype=imtype, manualstring="N/A", **extra_attributes_list[i])
 
     @staticmethod
-    def add_pipescript(ous, pipescript):
+    def add_pipescript(ous, pipescript, ous_name):
         """
         Add the pipeline processing script to the OUS element
         """
-        eltree.SubElement(ous, "pipescript", name=pipescript)
+        eltree.SubElement(ous, "pipescript", name=pipescript, level="N/A", ous=ous_name, package="N/A", datatype="casa_pipescript", format="py")
 
     @staticmethod
-    def add_restorescript(ous, restorescript):
+    def add_restorescript(ous, restorescript, ous_name):
         """
         Add the pipeline restore script to the OUS element
         """
-        eltree.SubElement(ous, "restorescript", name=restorescript)
+        eltree.SubElement(ous, "restorescript", name=restorescript, level="N/A", ous=ous_name, package="N/A", datatype="casa_piperestorescript", format="py")
 
     @staticmethod
-    def add_weblog(ous, weblog):
+    def add_weblog(ous, weblog, ous_name):
         """
         Add the weblog to the OUS element
         """
-        eltree.SubElement(ous, "weblog", name=weblog)
+        eltree.SubElement(ous, "weblog", name=weblog, level="N/A", ous=ous_name, package="N/A", datatype="weblog", format="tgz")
 
     @staticmethod
-    def add_casa_cmdlog(ous, casa_cmdlog):
+    def add_casa_cmdlog(ous, casa_cmdlog, ous_name):
         """
         Add the CASA commands log to the OUS element
         """
-        eltree.SubElement(ous, "casa_cmdlog", name=casa_cmdlog)
+        eltree.SubElement(ous, "casa_cmdlog", name=casa_cmdlog, level="N/A", ous=ous_name, package="N/A", datatype="casa_commands", format="log")
 
     @staticmethod
     def add_flux_file(ous, flux_file):
@@ -295,18 +295,18 @@ class PipelineManifest(object):
         eltree.SubElement(ous, "cont_file", name=cont_file)
 
     @staticmethod
-    def add_aux_products_file(ous, auxproducts_file):
+    def add_aux_products_file(ous, auxproducts_file, ous_name):
         """
         Add the auxiliary products file. Is one enough ?
         """
-        eltree.SubElement(ous, "aux_products_file", name=auxproducts_file)
+        eltree.SubElement(ous, "aux_products_file", name=auxproducts_file, level="N/A", ous=ous_name, package="N/A", datatype="auxproducts", format="tgz")
 
     @staticmethod
-    def add_aqua_report(ous, aqua_report):
+    def add_aqua_report(ous, aqua_report, ous_name):
         """
         Add the AQUA report to the OUS element
         """
-        eltree.SubElement(ous, "aqua_report", name=aqua_report)
+        eltree.SubElement(ous, "aqua_report", name=aqua_report, level="N/A", ous=ous_name, package="N/A", datatype="pipeline_aquareport", format="xml")
 
     def add_renorm(self, asdm_name, inputs):
         """

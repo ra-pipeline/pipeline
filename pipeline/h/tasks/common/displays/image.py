@@ -187,7 +187,7 @@ class ImageDisplay(object):
             self._plot_panel(fig, axs[0], nsubplots, 1, results.first(description), '')
 
         # Reduce the padding of the constrained layout.
-        fig.set_constrained_layout_pads(w_pad=0.02, h_pad=0.02)
+        fig.set_constrained_layout_pads(w_pad=0.04, h_pad=0.04)
 
         # # Plot the legend panel.
         self._plot_legend_panel(axs[-1], antennas, flagcmds)
@@ -299,7 +299,7 @@ class ImageDisplay(object):
         sentinel_set = set(np.ravel(flag_reason_plane))
         sentinel_set.discard(0)
 
-        sentinelvalues = np.array(list(sentinel_set), np.float) + 10.0
+        sentinelvalues = np.array(list(sentinel_set), float) + 10.0
 
         for sentinelvalue in sentinelvalues:
             sentinels[sentinelvalue] = cc.to_rgb(
@@ -313,7 +313,7 @@ class ImageDisplay(object):
         # calculate vmin, vmax without the sentinels. Leaving norm to do
         # this is not sufficient; the standard Normalize gets called
         # by something in matplotlib and initialises vmin and vmax incorrectly.
-        sentinel_mask = np.zeros(np.shape(data), np.bool)
+        sentinel_mask = np.zeros(np.shape(data), bool)
         for sentinel in sentinels:
             sentinel_mask += (data == sentinel)
         actual_data = data[np.logical_not(sentinel_mask)]
@@ -328,13 +328,15 @@ class ImageDisplay(object):
         # set my own colormap and normalise to plot sentinels
         cmap = _SentinelMap(plt.cm.gray, sentinels=sentinels)
         norm = _SentinelNorm(vmin=vmin, vmax=vmax, sentinels=list(sentinels.keys()))
+        cmap_sentinel_free = _SentinelMap(plt.cm.gray)
+        norm_sentinel_free = Normalize(vmin=vmin, vmax=vmax)
 
         # make antenna x antenna plots square
         aspect = 'auto'
-        cb_aspect = 50
+        cb_aspect = 40
         shrink = 0.8
         fraction = 0.15
-        pad = 0
+        pad = 0.015
         if ('ANTENNA' in xtitle.upper()) and ('ANTENNA' in ytitle.upper()):
             aspect = 'equal'
             shrink = 0.4
@@ -421,13 +423,14 @@ class ImageDisplay(object):
         # Create the color-bar.
         # plot wedge, make tick numbers smaller, label with units
         if vmin == vmax:
-            cb = fig.colorbar(img, ax=ax, shrink=shrink, fraction=fraction, pad=pad, aspect=cb_aspect, ticks=[-1, 0, 1])
+            cb = fig.colorbar(plt.cm.ScalarMappable(norm=norm_sentinel_free, cmap=cmap_sentinel_free), ax=ax,
+                              shrink=shrink, fraction=fraction, pad=pad, aspect=cb_aspect, ticks=[-1, 0, 1])
         else:
-            cb = fig.colorbar(img, ax=ax, shrink=shrink, fraction=fraction, pad=pad, aspect=cb_aspect)
+            cb = fig.colorbar(plt.cm.ScalarMappable(norm=norm_sentinel_free, cmap=cmap_sentinel_free),
+                              ax=ax, shrink=shrink, fraction=fraction, pad=pad, aspect=cb_aspect)
         cb.formatter.set_scientific(True)
         cb.formatter.set_powerlimits((-2, 2))
         cb.ax.yaxis.set_offset_position('left')
-        cb.update_ticks()
 
         # Set size of y-tick labels on the color-bar.
         for label in cb.ax.get_yticklabels():
@@ -635,7 +638,7 @@ class _SentinelNorm(Normalize):
         # values may not re-appear with the exact same value as those
         # registered in self.sentinels. Therefore, look for values that are
         # close to the sentinel within a very small tolerance.
-        sentinel_mask = np.zeros(np.shape(value), np.bool)
+        sentinel_mask = np.zeros(np.shape(value), bool)
         for sentinel in self.sentinels:
             sentinel_mask += np.isclose(value, sentinel, rtol=1.e-12, atol=1.e-12)
         sentinel_values = value[sentinel_mask]

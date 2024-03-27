@@ -44,7 +44,7 @@ class GaincalSnrListQAHandler(pqa.QAPlugin):
     """
     QA handler for a list containing GaincalSnrResults.
     """
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = gaincalsnr.GaincalSnrResults
     generating_task = gaincalsnr.GaincalSnr
 

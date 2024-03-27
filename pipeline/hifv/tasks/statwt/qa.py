@@ -56,7 +56,7 @@ class StatwtListQAHandler(pqa.QAPlugin):
     """
     QA handler for a list containing StatwtResults.
     """
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = statwt.StatwtResults
     generating_task = statwt.Statwt
 

@@ -34,8 +34,8 @@ class NewTask():
                 script_args = argv[idx + 1:]
 
         parser = argparse.ArgumentParser(prog="new_pipeline_task", add_help=False)
-        parser.add_argument('--package', help="Pipeline package.  One of 'h', 'hif', 'hifa', 'hifas', 'hifv', or 'hsd'.",
-                            type=str, choices=['h', 'hif', 'hifa', 'hifas', 'hifv', 'hsd'], required=True)
+        parser.add_argument('--package', help="Pipeline package.  One of 'h', 'hif', 'hifa', 'hifas', 'hifv', 'hsd', 'hsdn'.",
+                            type=str, choices=['h', 'hif', 'hifa', 'hifas', 'hifv', 'hsd', 'hsdn'], required=True)
         parser.add_argument('--task', help='New task name', type=str, required=True)
         parser.add_argument('--module',
                             help="Optional module name.  e.g. if task is 'foo' "
@@ -95,8 +95,7 @@ class NewTask():
         # -----------------------------------------------------------------------------
         module_file = '{tdir}/{task}.py'.format(tdir=task_dir, task=module_name)
         init_file = '{tdir}/__init__.py'.format(tdir=task_dir)
-        cli_file = '{cdir}/private/task_{area}_{task}.py'.format(cdir=cli_dir, area=area, task=task_name)
-        cli_xml = '{cdir}/{area}_{task}.xml'.format(cdir=cli_dir, area=area, task=task_name)
+        cli_file = '{cdir}/{area}_{task}.py'.format(cdir=cli_dir, area=area, task=task_name)
         weblog_mako = '{repo}/pipeline/{area}/templates/{task}.mako'.format(repo=self.repository_path, area=area, task=task_name)
 
         # -----------------------------------------------------------------------------
@@ -106,8 +105,6 @@ class NewTask():
                                             'pipeline_task_module.mako'.format(repo=self.repository_path))
         cli_template = Template(filename='{repo}/pipeline/infrastructure/new_pipeline_task/'
                                          'pipeline_cli_module.mako'.format(repo=self.repository_path))
-        cli_xml_template = Template(filename='{repo}/pipeline/infrastructure/new_pipeline_task/'
-                                             'pipeline_cli_xml.mako'.format(repo=self.repository_path))
         init_template = Template(filename='{repo}/pipeline/infrastructure/new_pipeline_task/'
                                           'pipeline_task_init.mako'.format(repo=self.repository_path))
 
@@ -126,10 +123,6 @@ class NewTask():
         print('\tCreating {f}'.format(f=cli_file))
         with open(cli_file, 'w+') as fd:
             fd.writelines(cli_template.render(package=area, taskname=task_name))
-
-        print('\tCreating {f}'.format(f=cli_xml))
-        with open(cli_xml, 'w+') as fd:
-            fd.writelines(cli_xml_template.render(package=area, taskname=task_name))
 
         # print('\tCreating {f}'.format(f=weblog_mako))
         # with open(weblog_mako, 'w+') as fd:

@@ -13,6 +13,7 @@ from .gfluxscaleflag import Gfluxscaleflag
 from .imageprecheck import ImagePreCheck
 from .importdata import ALMAImportData
 from .lock_refant import LockRefAnt
+from .polcal import Polcal
 from .polcalflag import Polcalflag
 from .restoredata import ALMARestoreData
 from .sessionrefant import SessionRefAnt

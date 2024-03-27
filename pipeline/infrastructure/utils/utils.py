@@ -2,32 +2,39 @@
 The utils module contains general-purpose uncategorised utility functions and
 classes.
 """
+import ast
+import bisect
 import collections
+import contextlib
 import copy
+import errno
+import fcntl
+import glob
 import itertools
 import operator
 import os
+import pickle
 import re
+import shutil
 import string
-import ast
-from typing import Collection, Dict, List, Tuple, Optional, Sequence, Union
+import tarfile
+from typing import Collection, Dict, List, Optional, Sequence, Tuple, Union
 
-import bisect
+import casaplotms
 import numpy as np
 
-from .conversion import range_to_list, dequote
-from .. import casa_tools
-from .. import logging
-
-import casaplotms.private.plotmstool as plotmstool
+from .. import casa_tools, logging, mpihelpers
+from .conversion import dequote, range_to_list
 
 LOG = logging.get_logger(__name__)
 
 __all__ = ['find_ranges', 'dict_merge', 'are_equal', 'approx_equal', 'get_num_caltable_polarizations',
            'flagged_intervals', 'get_field_identifiers', 'get_receiver_type_for_spws', 'get_spectralspec_to_spwid_map',
-           'imstat_items', 'get_stokes','get_taskhistory_fromimage',
+           'imstat_items', 'get_stokes', 'get_taskhistory_fromimage', 'glob_ordered', 'deduplicate',
            'get_casa_quantity', 'get_si_prefix', 'absolute_path', 'relative_path', 'get_task_result_count',
-           'place_repr_source_first', 'shutdown_plotms', 'get_casa_session_details']
+           'place_repr_source_first', 'shutdown_plotms', 'get_casa_session_details', 'get_obj_size', 'get_products_dir',
+           'export_weblog_as_tar', 'ensure_products_dir_exists', 'ignore_pointing', 'request_omp_threading',
+           'open_with_lock', 'nested_dict']
 
 
 def find_ranges(data: Union[str, List[int]]) -> str:
@@ -74,10 +81,6 @@ def dict_merge(a: Dict, b: Union[Dict, any]) -> Dict:
     (b) is a dictionary, then a copy of first argument (dictionary a) is created
     and the elements of b are merged into the new dictionary. Otherwise return
     argument b.
-
-    This utility function check the equivalence of array like objects. Two arrays
-    are equal if they have the same number of elements and elements of the same
-    index are equal.
 
     Examples:
     >>> dict_merge({'a': {'b': 1}}, {'c': 2})
@@ -475,17 +478,19 @@ def shutdown_plotms():
     This utility function shuts down the persist plotms process in the current CASA session, so the next plotms call
     can start from a new proc. It's implemented as a short-term workaround for two plotms behaviors due to the persistent
     state of plotms once it's called in a CASA session.
-        1. a plotms process always uses the initial working directory to construct the output plot path when the 
-           figure name is specified as a relative path (see CAS-13626), even after the working directory has changed 
+        1. a plotms process always uses the initial working directory to construct the output plot path when the
+           figure name is specified as a relative path (see CAS-13626), even after the working directory has changed
            in the Python perspective.
-        2. a plotms process always uses the same casa logfile when it was started for its logging, even after 
+        2. a plotms process always uses the same casa logfile when it was started for its logging, even after
            the casa log file location has been altered.
 
     Note: This function follows the practice illustrated inside casaplotms.private.plotmstool.__stub_check()
     """
+    plotmstool = casaplotms.plotmstool
+
     if plotmstool.__proc is not None:
         plotmstool.__proc.kill()
-        outs, errs = plotmstool.__proc.communicate()
+        _, _ = plotmstool.__proc.communicate()
         plotmstool.__proc = None
         plotmstool.__stub = None
         plotmstool.__uri = None
@@ -500,9 +505,9 @@ def get_casa_session_details():
         data_path: CASA data paths in-use.
         numa_mem: memory properties from the NUMA software perspective.
         numa_cpu: cpu properties from the NUMA software perspective.
-            The above CPU/mem properties might be different from the hardware specs obtained from 
+            The above CPU/mem properties might be different from the hardware specs obtained from
             standard Python functions (e.g. os.cpu_count()) or pipeline.environment.
-            On the difference between the "software" and hardware nodes, see 
+            On the difference between the "software" and hardware nodes, see
                 https://www.kernel.org/doc/html/latest/vm/numa.html
     """
     casa_session_details = casa_tools.utils.hostinfo()
@@ -548,3 +553,310 @@ def get_taskhistory_fromimage(imagename: str):
     LOG.info(f'Found {len(taskhistory_list)} task history entry/entries from {imagename}')
 
     return taskhistory_list
+
+
+def get_obj_size(obj, serialize=True):
+    """Estimate the size of a Python object.
+
+    If serialize=True, the size of a serialized object is returned. Note that this is NOT the
+    same as the object size in memory.
+
+    When serialize=False, the memory consumption of the object is returned via
+    the asizeof method of Pympler.:
+        pympler.asizeof.asizeof(obj) # https://pypi.org/project/Pympler
+    An alternative is the get_deep_size() function from objsize.
+        objsize.get_deep_size(obj)   # https://pypi.org/project/objsize
+    """
+
+    if serialize:
+        return len(pickle.dumps(obj, protocol=-1))
+    else:
+        try:
+            from pympler.asizeof import asizeof
+            # PIPE-1698: a workaround for NumPy-related issues with the recent Pympler/asizeof versions
+            # see https://github.com/pympler/pympler/issues/155
+            _ = asizeof(np.str_())
+        except ImportError as err:
+            LOG.debug('Import error: {!s}'.format(err))
+            raise Exception(
+                "Pympler/asizeof is not installed, which is required to run get_obj_size(obj, serialize=False).")
+        return asizeof(obj)
+
+
+def glob_ordered(pattern: str, *args, order: Optional[str] = None, **kwargs) -> List[str]:
+    """Return a sorted list of paths matching a pathname pattern."""
+
+    path_list = glob.glob(pattern, *args, **kwargs)
+
+    if order == 'mtime':
+        path_list.sort(key=os.path.getmtime)
+    elif order == 'ctime':
+        path_list.sort(key=os.path.getctime)
+    else:
+        if order is not None:
+            LOG.warning("Unknown sorting order requested: order=%r. Only 'mtime', 'ctime', or None is allowed.", order)
+            LOG.warning("We will use the default alphabetically/numerically ascending order (order=None) instead.")
+        path_list = sorted(path_list)
+
+    return path_list
+
+
+def deduplicate(items):
+    """Remove duplicate entries from a list, but preserve the order.
+
+    Note that the use of list(set(x)) can cause random order in the output.
+    The return of this function is guaranteed to be in the order that unique items show up in the input, unlike
+    a deduplicate-resorting solution like sorted(set(x).
+    Ref: https://stackoverflow.com/questions/480214/how-do-i-remove-duplicates-from-a-list-while-preserving-order
+    This solution only works for Python 3.7+.
+    """
+    deduplicated_items = list(dict.fromkeys(items))
+
+    return deduplicated_items
+
+
+@contextlib.contextmanager
+def ignore_pointing(vis):
+    """A context manager to ignore pointing tables of MSes during I/O operations.
+
+    The original pointing table will be temperarily renamed to POINTING_ORIGIN, and a new empty pointing table
+    is created. When the context manager exits, the original table is restored.
+
+    For example, to ignore the pointing table of a MS during mstransform() calls, use:
+
+        with ignore_pointing('test.ms'):
+            casatasks.mstransform(vis='test.ms',outputvis='test_output.ms',scan='16',datacolumn='data')
+
+    The pointing table of the output MS should be empty.
+
+    On the other hand, if the pointing table is needed in the output vis, e.g. for imaging with tclean(usepointing=True),
+    we can manually create hardlinks of pointing table afterwards while minimizing the disk space usage:
+
+        import shutil, os
+        shutil.rmtree('test_small.ms/POINTING')
+        shutil.copytree('test.ms/POINTING', 'test_output.ms/POINTING', copy_function=os.link)
+
+    One can verify the inodes of the pointing table files, which should be the same:
+
+        ls -lih test.ms/POINTING
+        ls -lih test_small.ms/POINTING
+
+    """
+    if isinstance(vis, list):
+        vis_list = vis
+    else:
+        vis_list = [vis]
+
+    vis_list_ignore = []
+    try:
+        for ms in vis_list:
+            if not os.path.isdir(ms+'/POINTING') and not os.path.isdir(ms+'/POINTING_ORIGIN'):
+                LOG.warning(f'No pointing table found in {ms}.')
+                continue
+            vis_list_ignore.append(ms)
+            if not os.path.isdir(ms+'/POINTING_ORIGIN'):
+                LOG.info(f'backup the pointing table for {ms}')
+                shutil.move(ms+'/POINTING', ms+'/POINTING_ORIGIN')
+            with casa_tools.TableReader(ms+'/POINTING_ORIGIN', nomodify=True) as table:
+                tabdesc = table.getdesc()
+                dminfo = table.getdminfo()
+            if os.path.isdir(ms+'/POINTING'):
+                shutil.rmtree(ms+'/POINTING')
+            LOG.info(f'empty the pointing table for {ms}')
+            tb = casa_tools.table
+            tb.create(ms+'/POINTING', tabdesc, dminfo=dminfo)
+            tb.close()
+        yield
+    finally:
+        for ms in vis_list_ignore:
+            if os.path.isdir(ms+'/POINTING_ORIGIN'):
+                if os.path.isdir(ms+'/POINTING'):
+                    shutil.rmtree(ms+'/POINTING')
+                LOG.info(f'restore the pointing table for {ms}')
+                shutil.move(ms+'/POINTING_ORIGIN', ms+'/POINTING')
+
+
+@contextlib.contextmanager
+def request_omp_threading(num_threads=None):
+    """A context manager to override the session-wise OMP threading setting on CASA MPI client.
+
+    This function is intended to improve certain CASAtask/tool call performance on the MPI client by
+    temporarily turning on OpenMP threading while the MPI servers are idle. This feature will only
+    take effect under restricted circumstances to avoid competing with the MPI server processes from
+    the tier0 or tier1 parallelization.
+
+    This function can be used as both a decorator and context manager. For example:
+
+        @request_omp_threading(4)
+        def do_something():
+            ...
+        or,
+        with request_omp_threading(4):
+            immoments(..)
+
+    Note: please use it with caution and examine the computing resource allocation circumstance
+    carefully at the execution point.
+    """
+
+    session_num_threads = casa_tools.casalog.ompGetNumThreads()
+    LOG.debug('session_num_threads = {!s}'.format(session_num_threads))
+    is_mpi_ready = mpihelpers.is_mpi_ready()  # return True if MPI is ready and we are on the MPI client.
+
+    num_threads_limits = []
+
+    # this is generally inherited from cgroup, but might be sub-optimal (too large) for high core-count
+    # workstations when cgroup limit is not applied.
+    casa_num_cpus = casa_tools.casalog.getNumCPUs()
+    LOG.info('casalog.getNumCPUs() = {!s}'.format(casa_num_cpus))
+    num_threads_limits.append(casa_num_cpus)
+
+    # check against MPI.UNIVERSE_SIZE, which is another way to limit the number of threads.
+    # see https://www.mpi-forum.org/docs/mpi-4.0/mpi40-report.pdf (Sec. 11.10.1, Universe Size)
+    try:
+        from mpi4py import MPI
+        if MPI.UNIVERSE_SIZE != MPI.KEYVAL_INVALID:
+            universe_size = MPI.COMM_WORLD.Get_attr(MPI.UNIVERSE_SIZE)
+            LOG.info('MPI.UNIVERSE_SIZE = {!s}'.format(universe_size))
+            if isinstance(universe_size, int) and universe_size > 1:
+                num_threads_limits.append(universe_size)
+            world_size = MPI.COMM_WORLD.Get_size()
+            LOG.info('MPI.COMM_WORLD.Get_size() = {!s}'.format(world_size))
+            if isinstance(world_size, int) and world_size > 1:
+                num_threads_limits.append(world_size)
+    except ImportError as ex:
+        pass
+
+    max_num_threads = min(num_threads_limits)
+
+    context_num_threads = None
+    if is_mpi_ready and session_num_threads == 1 and max_num_threads > 1:
+        if num_threads is not None:
+            if 0 < num_threads <= max_num_threads:
+                max_num_threads = num_threads
+            else:
+                LOG.warning(
+                    f'The requested num_threads ({num_threads}) is larger than the optimal number of logical CPUs ({max_num_threads}) assigned for this CASA session. ')
+
+        context_num_threads = max_num_threads
+    try:
+        if context_num_threads is not None:
+            casa_tools.casalog.ompSetNumThreads(context_num_threads)
+            LOG.info('adjust openmp threads to {}'.format(context_num_threads))
+        yield
+    finally:
+        if context_num_threads is not None:
+            casa_tools.casalog.ompSetNumThreads(session_num_threads)
+            LOG.info('restore openmp threads to {}'.format(session_num_threads))
+
+
+@contextlib.contextmanager
+def open_with_lock(filename, mode='r'):
+    """Open file with a lock.
+
+    The file open context manager function will try to lock the file upon opening 
+    so other processes using the same "opener" will wait for the file to unlock. 
+    The applied lock will be released when leaving the context.
+
+    Notes: 
+    
+    all file open calls with `open_with_lock` will block other `open_with_lock` usages 
+    (even from different processes/lustre-clients) from read/write until the lock is released.
+    However, this locking/blocking mechanism will not prevent the file access (potentially 
+    causing IO error) from other file openers (e.g. the default open() function).
+
+    Because the Python/fcntl API depends on the underlying OS/storage implementation: 
+        https://docs.python.org/3/library/fcntl.html
+    Not all OS/fsys is fully supported. For Lustre, it seems to depend on fsys mount `-o flock` 
+    options, which is indeed used for cv/naasc/aoc lustre systems:
+        $ mount -l | grep lustre
+            192.168.1.30@o2ib:/aoclst03 on /.lustre/aoc type lustre (rw,flock,user_xattr,lazystatfs)
+    For NFS, please see additional notes in PIPE-2051.
+
+    For a practical test, try the code snippet below from different clients/processes to see 
+    if the fnctl blocking mechanism can prevent non-exclusive access to a file.
+        import fcntl
+        fd=open(filename,'w')
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    Args:
+        filename (str): the file name
+        mode (str, optional): open mode. Defaults to 'r'.
+
+    """
+
+    with open(filename, mode) as fd:
+
+        LOG.debug('acquiring lock on %s', filename)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            LOG.debug('acquired lock on %s', filename)
+        except OSError as e:
+            LOG.warning('failed to acquire file lock due to the filesystem limitation,'
+                        'which might cause racing conditions if multiple processes access %s simultaneously.',
+                        filename)
+
+        yield fd
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            LOG.debug('released lock on %s', filename)
+        except OSError as e:
+            LOG.warning('failed to acquire file lock due to the filesystem limitation,'
+                        'which might cause racing conditions if multiple processes access %s simultaneously.',
+                        filename)
+
+def ensure_products_dir_exists(products_dir):
+    try:
+        LOG.trace(f"Creating products directory: {products_dir}")
+        os.makedirs(products_dir)
+    except OSError as exc:
+        if exc.errno != errno.EEXIST:
+            raise
+
+
+def export_weblog_as_tar(context, products_dir, name_builder):
+    # Construct filename prefix from oussid and recipe name if available.
+    prefix = context.get_oussid()
+    recipe_name = context.get_recipe_name()
+    if recipe_name:
+        prefix = prefix + '.' + recipe_name
+
+    # Construct filename for weblog output tar archive.
+    tarfilename = name_builder.weblog(project_structure=context.project_structure,
+                                      ousstatus_entity_id=prefix)
+
+    # Save weblog directory to tar archive.
+    LOG.info(f"Saving weblog in {tarfilename}")
+    tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
+    tar.add(os.path.join(os.path.basename(os.path.dirname(context.report_dir)), 'html'))
+    tar.close()
+    return tarfilename
+
+
+def get_products_dir(context):
+    if context.products_dir is None:
+        return os.path.abspath('./')
+    else:
+        return context.products_dir
+
+
+class pl_defaultdict(collections.defaultdict):
+    def __repr__(self):
+        return str(dict(self))
+
+    def as_plain_dict(self):
+        return to_plain_dict(self)
+
+
+def nested_dict():
+    return pl_defaultdict(nested_dict)
+
+
+def to_plain_dict(default_dict):
+    plain_dict = dict()
+    for k, v in default_dict.items():
+        if isinstance(v, collections.defaultdict):
+            plain_dict[k] = to_plain_dict(v)
+        else:
+            plain_dict[k] = v
+
+    return plain_dict

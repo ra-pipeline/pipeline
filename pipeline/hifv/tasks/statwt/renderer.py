@@ -104,7 +104,7 @@ class T2_4MDetailsstatwtRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         if (value is None) or (whole is None) or (stat is None) or (value == 'N/A'):
             return ''
         else:
-            summary = np.array(whole[stat], dtype=np.float)
+            summary = np.array(whole[stat], dtype=float)
 
             # When the table column has only one or zero entires, it doesn't make sense to compare
             # it to "the other values in the table"

@@ -241,8 +241,8 @@ class RawflagchansData(basetask.StandardTaskTemplate):
 
             # Initialize the data, and number of data points
             # used, for the flagging view.
-            data = np.zeros([len(corrs), nchans, nbaselines], np.complex)
-            ndata = np.zeros([len(corrs), nchans, nbaselines], np.int)
+            data = np.zeros([len(corrs), nchans, nbaselines], complex)
+            ndata = np.zeros([len(corrs), nchans, nbaselines], int)
 
             # Open MS and read in required data.       
             with casa_tools.MSReader(ms.name) as openms:

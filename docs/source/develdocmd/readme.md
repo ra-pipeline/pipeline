@@ -1,0 +1,1 @@
+This directory includes a copy of the markdown files from pipeline/doc.

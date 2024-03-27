@@ -97,7 +97,7 @@ class TsysSummaryChart(object):
         if not os.path.exists(pb_figfile):
             LOG.trace("Creating new plot: {}".format(pb_figfile))
             try:
-                task.execute(dry_run=False)
+                task.execute()
             except Exception as ex:
                 LOG.error("Could not create plot {}".format(pb_figfile))
                 LOG.exception(ex)
@@ -133,7 +133,7 @@ class TsysPerAntennaChart(common.PlotbandpassDetailBase):
 
         # Get list of Tsys spws in caltable.
         wrapper = common.CaltableWrapperFactory.from_caltable(self._caltable)
-        tsys_in_caltable = set(wrapper.spw) 
+        tsys_in_caltable = set(wrapper.spw)
 
         # Create a mapping between Tsys and science spws. Sometimes, not all
         # science spws have a matching Tsys window.
@@ -184,7 +184,7 @@ class TsysPerAntennaChart(common.PlotbandpassDetailBase):
                     wrappers.append(wrapper)
                 else:
                     LOG.trace('No plotbandpass detail plot found for %s spw '
-                              '%s antenna %s: %s not found', 
+                              '%s antenna %s: %s not found',
                               self._vis_basename, tsys_spw_id, ant_name, figfile)
         return wrappers
 
@@ -194,7 +194,7 @@ class TsysPerAntennaChart(common.PlotbandpassDetailBase):
         ant_ids = ','.join({str(ant_id) for _, ant_id in missing})
         try:
             task = self.create_task(spw_ids, ant_ids, showimage=showimage)
-            task.execute(dry_run=False)
+            task.execute()
         except Exception as ex:
             LOG.error('Could not create plotbandpass details plots')
             LOG.exception(ex)

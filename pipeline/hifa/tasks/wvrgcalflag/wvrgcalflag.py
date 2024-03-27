@@ -159,13 +159,9 @@ class Wvrgcalflag(basetask.StandardTaskTemplate):
 
             # If the associated qa score indicates that applying the WVR
             # calibration will make things worse then remove the calfile from
-            # the result so that it cannot be accepted into the context.
+            # the result so that it cannot be accepted into the context. 
             elif result.flaggerresult.dataresult.qa_wvr.overall_score is not None \
                     and result.flaggerresult.dataresult.qa_wvr.overall_score < inputs.accept_threshold:
-                LOG.warning('wvrgcal file has qa score ({0}) below'
-                            ' accept_threshold ({1}) and will not be'
-                            ' applied'.format(result.flaggerresult.dataresult.qa_wvr.overall_score,
-                                              inputs.accept_threshold))
                 result.flaggerresult.dataresult.final = []
 
         return result

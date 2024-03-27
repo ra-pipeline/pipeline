@@ -1,8 +1,10 @@
+import re
 import numpy as np
+
+from typing import List, Union, Optional
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.utils as utils
-import pipeline.domain.measures as measures
 from pipeline.infrastructure import casa_tools
 from .imageparams_base import ImageParamsHeuristics
 
@@ -47,7 +49,7 @@ class ImageParamsHeuristicsALMA(ImageParamsHeuristics):
         # Protection against spurious long baselines
         if protect_long is not None:
             l80, min_diameter = self.calc_percentile_baseline_length(80.)
-            LOG.info('ALMA uvtaper heuristic: L80 baseline length is %.1f meter' % (l80)) 
+            LOG.info('ALMA uvtaper heuristic: L80 baseline length is %.1f meter' % (l80))
 
             c = cqa.getvalue(cqa.convert(cqa.constants('c'), 'm/s'))[0]
             uvtaper_value = protect_long * l80 / cqa.getvalue(cqa.convert(cqa.constants('c'), 'm/s'))[0] * cqa.getvalue(cqa.convert(repr_freq, 'Hz'))[0]
@@ -79,7 +81,7 @@ class ImageParamsHeuristicsALMA(ImageParamsHeuristics):
         #
         # return uvtaper
 
-    def dr_correction(self, threshold, dirty_dynamic_range, residual_max, intent, tlimit):
+    def dr_correction(self, threshold, dirty_dynamic_range, residual_max, intent, tlimit, drcorrect):
         """Adjustment of cleaning threshold due to dynamic range limitations."""
 
         qaTool = casa_tools.quanta
@@ -88,6 +90,17 @@ class ImageParamsHeuristicsALMA(ImageParamsHeuristics):
 
         diameter = self.observing_run.get_measurement_sets()[0].antennas[0].diameter
         old_threshold = qaTool.convert(threshold, 'Jy')['value']
+
+        if drcorrect not in (None, -999):
+            if isinstance(drcorrect, (float, int)) and drcorrect > 0.0:
+                new_threshold = old_threshold*drcorrect
+                DR_correction_factor = drcorrect
+                LOG.info('DR correction: Modified threshold from {:.3g} Jy to {:.3g} Jy based on the user input correction factor: {}'.format(
+                    old_threshold, new_threshold, DR_correction_factor))
+                return '%.3gJy' % (new_threshold), DR_correction_factor, maxEDR_used
+            else:
+                raise Exception(f'Got an invalid input value for the DR correction factor: {drcorrect}')
+
         if intent == 'TARGET' or intent == 'CHECK':
             n_dr_max = 2.5
             if diameter == 12.0:
@@ -188,36 +201,22 @@ class ImageParamsHeuristicsALMA(ImageParamsHeuristics):
 
         return new_niter
 
-    def calc_percentile_baseline_length(self, percentile):
-        """Calculate percentile baseline length for the vis list used in this heuristics instance."""
-
-        min_diameter = 1.e9
-        percentileBaselineLengths = []
-        for msname in self.vislist:
-            ms_do = self.observing_run.get_ms(msname)
-            min_diameter = min(min_diameter, min([antenna.diameter for antenna in ms_do.antennas]))
-            percentileBaselineLengths.append(
-                np.percentile([float(baseline.length.to_units(measures.DistanceUnits.METRE))
-                               for baseline in ms_do.antenna_array.baselines], percentile))
-
-        return np.median(percentileBaselineLengths), min_diameter
-
     def calc_length_of_nth_baseline(self, n: int):
         """Calculate the length of the nth baseline for the vis list used in the heuristics instance."""
         baseline_lengths = []
         for msname in self.vislist:
             ms_do = self.observing_run.get_ms(msname)
-            ms_baseline_lengths = [float(baseline.length.to_units(measures.DistanceUnits.METRE))
-                                    for baseline in ms_do.antenna_array.baselines]
-            ms_baseline_lengths.sort()
-            if(len(ms_baseline_lengths) >= n):
-                baseline_lengths.append(ms_baseline_lengths[n-1])
+            baselines_m = ms_do.antenna_array.baselines_m
+            if n > len(baselines_m):
+                continue
 
-        if(len(baseline_lengths) > 0): 
+            baseline_lengths.append(np.sort(baselines_m)[n-1])
+
+        if len(baseline_lengths) > 0:
             return np.median(baseline_lengths)
-        else: 
+        else:
             return None
-            
+
     def get_autobox_params(self, iteration, intent, specmode, robust):
         """Default auto-boxing parameters for ALMA main array and ACA."""
 
@@ -350,6 +349,45 @@ class ImageParamsHeuristicsALMA(ImageParamsHeuristics):
 
         return 2
 
+    def _tlimit_cyclefactor_heuristic(self, iteration, field=None, intent=None, specmode=None, iter0_dirty_dynamic_range=None):
+        gridder = self.gridder(intent, field)
+
+        times_on_source_per_field = []
+        for vis in self.vislist:
+            ms_do = self.observing_run.get_ms(vis)
+            times_on_source_per_field.extend(ms_do.get_times_on_source_per_field_id(field, intent).values())
+
+        if not times_on_source_per_field:
+            return False
+
+        min_time_on_source_per_field = min(times_on_source_per_field)
+
+        if (gridder == 'mosaic'
+            and specmode in ('cube', 'repBW')
+            and min_time_on_source_per_field <= 60.0
+            and iter0_dirty_dynamic_range >= 30.0
+            and iteration > 0):
+            return True
+        else:
+            return False
+
+    def tlimit(self, iteration, field=None, intent=None, specmode=None, iter0_dirty_dynamic_range=None):
+        if field is None or intent is None or specmode is None or iter0_dirty_dynamic_range is None:
+            return 2.0
+        if self._tlimit_cyclefactor_heuristic(iteration, field, intent, specmode, iter0_dirty_dynamic_range):
+            return 5.0
+        else:
+            return 2.0
+
+    def cyclefactor(self, iteration, field=None, intent=None, specmode=None, iter0_dirty_dynamic_range=None):
+        if field is None or intent is None or specmode is None or iter0_dirty_dynamic_range is None:
+            # Use CASA default
+            return None
+        if self._tlimit_cyclefactor_heuristic(iteration, field, intent, specmode, iter0_dirty_dynamic_range):
+            return 3.0
+        else:
+            return None
+
     def mosweight(self, intent, field):
 
         if self.gridder(intent, field) == 'mosaic':
@@ -414,6 +452,11 @@ class ImageParamsHeuristicsALMA(ImageParamsHeuristics):
     def intent(self):
         return 'TARGET'
 
+    def stokes(self, intent: str = '', joint_intents: str = '') -> str:
+        if intent == 'POLARIZATION' and joint_intents == 'POLARIZATION':
+            return 'IQUV'
+        else:
+            return 'I'
 
     def weighting(self, specmode: str) -> str:
         """Determine the weighting scheme."""
@@ -429,3 +472,52 @@ class ImageParamsHeuristicsALMA(ImageParamsHeuristics):
         else:
             return True
 
+    def reffreq(self, deconvolver: Optional[str]=None, specmode: Optional[str]=None, spwsel: Optional[dict]=None) -> Optional[str]:
+        """Tclean reffreq parameter heuristics."""
+
+        if deconvolver != 'mtmfs' or specmode != 'cont':
+            return None
+
+        if spwsel in (None, ''):
+            LOG.attention('Cannot calculate reference frequency for mtmfs cleaning.')
+            return None
+
+        qaTool = casa_tools.quanta
+
+        n_sum = 0.0
+        d_sum = 0.0
+        p = re.compile(r'([\d.]*\s*)(~\s*)([\d.]*\s*)([A-Za-z]*\s*)(;?)')
+        for spwsel_v in spwsel.values():
+            freq_ranges, frame = spwsel_v.rsplit(' ', maxsplit=1)
+            freq_intervals = p.findall(freq_ranges)
+            for freq_interval in freq_intervals:
+                f_low = qaTool.quantity(float(freq_interval[0]), freq_interval[3])
+                f_low_v = float(qaTool.getvalue(qaTool.convert(f_low, 'GHz')))
+                f_high = qaTool.quantity(float(freq_interval[2]), freq_interval[3])
+                f_high_v = float(qaTool.getvalue(qaTool.convert(f_high, 'GHz')))
+                n_sum += f_high_v**2-f_low_v**2
+                d_sum += f_high_v-f_low_v
+        d_sum *= 2
+
+        if d_sum != 0.0:
+            return f'{n_sum/d_sum}GHz'
+        else:
+            LOG.attentation('Reference frequency calculation led to zero denominator.')
+            return None
+
+    def arrays(self, vislist: Optional[List[str]] = None):
+
+        """Return the array descriptions."""
+
+        if vislist is None:
+            local_vislist = self.vislist
+        else:
+            local_vislist = vislist
+
+        antenna_diameters = self.antenna_diameters(local_vislist)
+        array_descs = []
+        if 12.0 in antenna_diameters:
+            array_descs.append('12m')
+        if 7.0 in antenna_diameters:
+            array_descs.append('7m')
+        return ''.join(array_descs)

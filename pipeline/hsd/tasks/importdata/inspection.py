@@ -42,19 +42,15 @@ class SDInspection(object):
         if self.hm_rasterscan not in ['time', 'direction']:
             raise ValueError("hm_rasterscan must be either 'time' or 'direction'")
 
-    def execute(self, dry_run: bool = True) -> Tuple[Dict[int, MSReductionGroupDesc], Dict[str, Union[str, Dict]]]:
+    def execute(self) -> Tuple[Dict[int, MSReductionGroupDesc], Dict[str, Union[str, Dict]]]:
         """Execute inspection process.
 
         This method calls execute method of reader.py.
 
-        Args:
-            dry_run: dry run flag
         Return:
             reduction_group: dict of reduction group IDs (key) and MSReductionGroupDesc (value)
             org_directions: dict of org_direction
         """
-        if dry_run:
-            return None
 
         # per ms inspection: beam size and calibration strategy
         LOG.debug('inspect_beam_size')
@@ -70,11 +66,11 @@ class SDInspection(object):
         LOG.debug('register meta data to DataTable')
         table_name = self.table_name
         worker = reader.MetaDataReader(context=self.context, ms=self.ms, table_name=table_name)
+        invalid_pointing_data, msglist = worker.generate_flagdict_for_invalid_pointing_data()
         LOG.debug('table_name=%s' % table_name)
 
-        dry_run = not os.path.exists(self.ms.name)
         # worker.set_name(ms.name)
-        org_directions = worker.execute(dry_run=dry_run)
+        org_directions = worker.execute() if os.path.exists(self.ms.name) else None
 
         datatable = worker.get_datatable()
         datatable.exportdata(minimal=False)
@@ -152,7 +148,7 @@ class SDInspection(object):
         if is_alma and is_raster:
             worker.generate_flagcmd()
 
-        return reduction_group, org_directions
+        return reduction_group, org_directions, msglist
 
 #     def _inspect_reduction_group(self):
 #         reduction_group = {}
@@ -426,8 +422,7 @@ class SDInspection(object):
                             merge_table, merge_gap = raster_heuristic(sra_sel, sdec_sel)
                             raster_heuristic_ok = True
                         except RasterScanHeuristicsFailure as e:
-                            LOG.warn('RasterScanHeuristics failed with the following error. ' +
-                                     'Falling back to time domain grouping.\nOriginal Exception:\n{}'.format(e))
+                            LOG.warn('{} This often happens when pointing pattern deviates from regular raster. You may want to check the pointings in observation.'.format(e))
                             raster_heuristic_ok = False
 
                     if pattern != 'RASTER' or self.hm_rasterscan == 'time' or raster_heuristic_ok is False:

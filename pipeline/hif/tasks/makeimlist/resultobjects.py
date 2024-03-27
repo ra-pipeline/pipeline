@@ -12,7 +12,7 @@ class MakeImListResult(basetask.Results):
         self.linesfile = None
         self.targets = []
         self.clean_list_info = {}
-        self._max_num_targets = 0
+        self._expected_num_targets = 0
         self.clearlist = True
         self.mitigation_error = False
         self.synthesized_beams = None
@@ -72,11 +72,11 @@ class MakeImListResult(basetask.Results):
         return len(self.targets)
 
     @property
-    def max_num_targets(self):
-        return self._max_num_targets
+    def expected_num_targets(self):
+        return self._expected_num_targets
 
-    def set_max_num_targets(self, max_num_targets):
-        self._max_num_targets = max_num_targets
+    def set_expected_num_targets(self, expected_num_targets):
+        self._expected_num_targets = expected_num_targets
 
     def __repr__(self):
         repr = 'MakeImList:'

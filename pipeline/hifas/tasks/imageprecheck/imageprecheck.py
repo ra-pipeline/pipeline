@@ -241,7 +241,7 @@ class ImagePreCheck(hifa_task_imageprecheck.ImagePreCheck):
                     return ImagePreCheckResults(error=True, error_msg='Invalid beam')
 
                 cells[(robust, str(default_uvtaper), 'repBW')] = image_heuristics.cell(beams[(robust, str(default_uvtaper), 'repBW')])
-                imsizes[(robust, str(default_uvtaper), 'repBW')] = image_heuristics.imsize(field_ids, cells[(robust, str(default_uvtaper), 'repBW')], primary_beam_size, centreonly=False)
+                imsizes[(robust, str(default_uvtaper), 'repBW')] = image_heuristics.imsize(field_ids, cells[(robust, str(default_uvtaper), 'repBW')], primary_beam_size, centreonly=False, intent='TARGET')
 
                 try:
                     sensitivity, eff_ch_bw, sens_bw, known_per_spw_cont_sensitivities_all_chan = \
@@ -291,7 +291,7 @@ class ImagePreCheck(hifa_task_imageprecheck.ImagePreCheck):
                 return ImagePreCheckResults(error=True, error_msg='Invalid beam')
 
             cells[(robust, str(default_uvtaper), 'aggBW')] = image_heuristics.cell(beams[(robust, str(default_uvtaper), 'aggBW')])
-            imsizes[(robust, str(default_uvtaper), 'aggBW')] = image_heuristics.imsize(field_ids, cells[(robust, str(default_uvtaper), 'aggBW')], primary_beam_size, centreonly=False)
+            imsizes[(robust, str(default_uvtaper), 'aggBW')] = image_heuristics.imsize(field_ids, cells[(robust, str(default_uvtaper), 'aggBW')], primary_beam_size, centreonly=False, intent='TARGET')
 
             # Calculate full cont sensitivity (no frequency ranges excluded)
             try:
@@ -382,8 +382,8 @@ class ImagePreCheck(hifa_task_imageprecheck.ImagePreCheck):
         # Note that uvtaper is not computed for the ACA (7m) array, because robust of 2.0 is not in the checked range
         # (see robust_values_to_check).
         if hm_robust == 2.0 and cqa.getvalue(userAngResolution)[0] != 0.0:
-            # Calculate the length of the 190th baseline, used to set the upper limit on uvtaper. See PIPE-1104. 
-            length_of_190th_baseline = image_heuristics.calc_length_of_nth_baseline(190) 
+            # Calculate the length of the 190th baseline, used to set the upper limit on uvtaper. See PIPE-1104.
+            length_of_190th_baseline = image_heuristics.calc_length_of_nth_baseline(190)
             reprBW_mode_string = ['repBW' if reprBW_mode in ['nbin', 'repr_spw'] else 'aggBW']
             # self.calc_uvtaper method is only available in hifas_imageprecheck
             try:
@@ -404,7 +404,7 @@ class ImagePreCheck(hifa_task_imageprecheck.ImagePreCheck):
                     return ImagePreCheckResults(error=True, error_msg='Invalid beam')
 
                 cells[(hm_robust, str(hm_uvtaper), 'repBW')] = image_heuristics.cell(beams[(hm_robust, str(hm_uvtaper), 'repBW')])
-                imsizes[(hm_robust, str(hm_uvtaper), 'repBW')] = image_heuristics.imsize(field_ids, cells[(hm_robust, str(hm_uvtaper), 'repBW')], primary_beam_size, centreonly=False)
+                imsizes[(hm_robust, str(hm_uvtaper), 'repBW')] = image_heuristics.imsize(field_ids, cells[(hm_robust, str(hm_uvtaper), 'repBW')], primary_beam_size, centreonly=False, intent='TARGET')
                 if reprBW_mode in ['nbin', 'repr_spw']:
                     try:
                         sensitivity, eff_ch_bw, sens_bw, known_per_spw_cont_sensitivities_all_chan = \
@@ -448,7 +448,7 @@ class ImagePreCheck(hifa_task_imageprecheck.ImagePreCheck):
                     return ImagePreCheckResults(error=True, error_msg='Invalid beam')
 
                 cells[(hm_robust, str(hm_uvtaper), 'aggBW')] = image_heuristics.cell(beams[(hm_robust, str(hm_uvtaper), 'aggBW')])
-                imsizes[(hm_robust, str(hm_uvtaper), 'aggBW')] = image_heuristics.imsize(field_ids, cells[(hm_robust, str(hm_uvtaper), 'aggBW')], primary_beam_size, centreonly=False)
+                imsizes[(hm_robust, str(hm_uvtaper), 'aggBW')] = image_heuristics.imsize(field_ids, cells[(hm_robust, str(hm_uvtaper), 'aggBW')], primary_beam_size, centreonly=False, intent='TARGET')
                 try:
                     sensitivity, eff_ch_bw, sens_bw, known_per_spw_cont_sensitivities_all_chan = \
                         image_heuristics.calc_sensitivities(inputs.vis, repr_field, 'TARGET', cont_spw, -1, {}, 'cont', gridder, cells[(hm_robust, str(hm_uvtaper), 'aggBW')], imsizes[(hm_robust, str(hm_uvtaper), 'aggBW')], 'briggs', hm_robust, hm_uvtaper, True, known_per_spw_cont_sensitivities_all_chan, calcsb)

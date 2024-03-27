@@ -1,4 +1,4 @@
-from .applycal import Applycal, HpcApplycal
+from .applycal import Applycal
 from .exportdata import ExportData
 from .importdata import ImportData
 from .mstransform import MsSplit

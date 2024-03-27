@@ -12,7 +12,7 @@ vis = [ '<MS name>' ]
 context = pipeline.Pipeline().context
 inputs = pipeline.tasks.ImportData.Inputs(context, vis=vis)
 task = pipeline.tasks.ImportData(inputs)
-results = task.execute(dry_run=False)
+results = task.execute()
 results.accept(context)
 
 # Execute the flagging task
@@ -20,7 +20,7 @@ inputs = pipeline.tasks.flagging.FlagDeterBase.Inputs(context,\
       autocorr=True, shadow=True, scan=True, scannumber='4,5,8',\
       intents='*AMPLI*', edgespw=True, fracspw=0.1)
 task = pipeline.tasks.flagging.FlagDeterBase(inputs)
-result = task.execute(dry_run=True)
+result = task.execute()
 
 In other words, create a context, create the inputs (which sets the public
 variables to the correct values and creates the temporary flag command file),

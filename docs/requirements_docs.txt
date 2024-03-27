@@ -1,0 +1,25 @@
+# WARNING: The dependency versions are not specified, so the CASA shipped-in modules could get upgraded accidentally.
+# One recommended solution is to use docs/pipeline_docs.yaml to construct an isolated/dedicated docs building environment.
+
+## skip CASA packages
+# casatools
+# casatasks
+# casadata
+# casaplotms
+# casaviewer
+# casampi
+# almatasks
+# casashell
+
+future
+urllib3<2.0
+commonmark
+recommonmark
+nbsphinx # nbsphinx requires 'pandoc' (e.g. from macports or apt, not 'pandoc' from PyPI) to work properly.
+sphinx_rtd_theme
+sphinxcontrib-bibtex
+sphinx-astrorefs # https://github.com/jobovy/sphinx-astrorefs
+sphinx-copybutton
+
+#ipympl
+#nodejs

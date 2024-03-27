@@ -29,9 +29,9 @@ class GFluxscaleSummaryChart(setjy.BasebandSummaryChart):
                             'datacolumn'   : ydatacolumn,
                             'useflags'     : False,
                             'field'        : fields}
-                        
+
             task = casa_tasks.visstat(**visstat_args)
-            ampstats = task.execute(dry_run=False)
+            ampstats = task.execute()
             ampmax = ampstats['MODEL']['max']
             ampmin = ampstats['MODEL']['min']
             amprange = ampmax - ampmin

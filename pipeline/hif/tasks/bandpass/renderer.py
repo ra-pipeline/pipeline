@@ -250,7 +250,7 @@ class BaseBandpassPlotRenderer(basetemplates.JsonPlotRenderer):
     def __init__(self, uri, context, results, plots, title, outfile,
                  score_types):
         # wrap singular lists so the code works the same for scalars and vectors
-        if not isinstance(results, collections.Iterable):
+        if not isinstance(results, collections.abc.Iterable):
             results = [results]
 
         self._ms = {}

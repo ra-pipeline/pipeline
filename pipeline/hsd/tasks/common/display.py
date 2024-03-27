@@ -1,6 +1,9 @@
 """Set of base classes and utility functions for display modules."""
 import abc
+import collections
+import copy
 import datetime
+import enum
 import itertools
 import math
 import os
@@ -20,6 +23,7 @@ import pipeline.infrastructure.displays.pointing as pointing
 from pipeline.infrastructure import casa_tools
 from pipeline.domain.singledish import MSReductionGroupDesc
 from pipeline.infrastructure.renderer.logger import Plot
+from pipeline.infrastructure.utils import absolute_path
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -392,10 +396,24 @@ class SpectralImage(object):
         return (refpix, refval, increment)
 
 
+ChannelSelection = enum.Enum('ChannelSelection', ['ALL', 'LINE_ONLY', 'LINE_FREE'])
+
+
+class Moment(enum.IntEnum):
+    INTEGRATED = 0
+    MAXIMUM = 8
+
+
+MomentSpec = collections.namedtuple('MomentSpec', 'moments chans')
+
+
 class SDImageDisplayInputs(SingleDishDisplayInputs):
     """Manages input data for plotter classes for single dish images."""
 
-    MAP_MOMENT = 8
+    MomentMapList = [
+        MomentSpec(moments=[Moment.MAXIMUM], chans=ChannelSelection.ALL),
+        MomentSpec(moments=[Moment.INTEGRATED, Moment.MAXIMUM], chans=ChannelSelection.LINE_FREE)
+    ]
 
     def __init__(self,
                  context: infrastructure.launcher.Context,
@@ -414,10 +432,31 @@ class SDImageDisplayInputs(SingleDishDisplayInputs):
         """Return name of the single dish image."""
         return self.result.outcome['image'].imagename
 
-    @property
-    def moment_imagename(self) -> str:
-        """Return name of the moment image."""
-        return self.imagename.rstrip('/') + ('.mom%d' % self.MAP_MOMENT)
+    def moment_imagename(self, moments: Union[List[Moment], Moment], chans: ChannelSelection) -> str:
+        """Return name of the moment image.
+
+        If number of moments is 1, moment image name will include moment
+        type. On the other hand, moment image name will not contain
+        moment type if multiple moment types are specified. That is
+        because immoments treats given image name as a prefix when
+        the task computes multiple moments at once.
+
+        Args:
+            moments: Type of moment or list of them
+            chans: Channel selection spec
+
+        Returns:
+            Name of moment image name
+        """
+        name = self.imagename.rstrip('/') + f'.{chans.name.lower()}'
+
+        if isinstance(moments, Moment):
+            moments = [moments]
+
+        if len(moments) == 1:
+            name += f'.{moments[0].name.lower()}'
+
+        return name
 
     @property
     def spw(self) -> int:
@@ -541,13 +580,135 @@ class SDImageDisplayInputs(SingleDishDisplayInputs):
         """Return file name of the contamination plot."""
         return self.imagename.rstrip('/') + '.contamination.png'
 
-    def get_moment_image_instance(self) -> Optional[SpectralImage]:
-        """Return SpectralImage instance generated from moment image."""
-        if os.path.exists(self.moment_imagename):
-            v = SpectralImage(self.moment_imagename)
-        else:
-            v = None
-        return v
+    def valid_lines(self, is_freq_chan_reversed_image: bool=False) -> List[List[int]]:
+        """Return list of chnnel ranges of valid spectral lines."""
+        group_desc = self.reduction_group
+        ant_index = self.antennaid_list
+        spwid_list = self.spwid_list
+        msid_list = self.msid_list
+        fieldid_list = self.fieldid_list
+
+        line_list = []
+
+        msobj_list = self.context.observing_run.measurement_sets
+        msname_list = [absolute_path(msobj.name) for msobj in msobj_list]
+        for g in group_desc:
+            found = False
+            for (msid, ant, fid, spw) in zip(msid_list, ant_index, fieldid_list, spwid_list):
+                group_msid = msname_list.index(absolute_path(g.ms.name))
+                if group_msid == msid and g.antenna_id == ant and \
+                   g.field_id == fid and g.spw_id == spw:
+                    found = True
+                    break
+            if found:
+                for ll in copy.deepcopy(g.channelmap_range):
+                    if ll not in line_list and ll[2] is True:
+                        line_list.append(ll)
+        if is_freq_chan_reversed_image:
+            _right_edge = float(self.image.nchan - 1)
+            for ll in line_list:
+                ll[0] = _right_edge - ll[0]
+        return line_list
+
+    def create_channel_mask(self, channel_selection: ChannelSelection) -> str:
+        """Generate channel mask for immoments according to channel selection enum.
+
+        Args:
+            channel_selection: Channel selection enum.
+
+        Returns:
+            Channel selection string.
+        """
+        if channel_selection == ChannelSelection.ALL:
+            # use all channels
+            return ''
+
+        # convert line list into (start, end) list
+        range_list = []
+        for line in self.valid_lines():
+            line_center, line_width = line[:2]
+            line_start = int(round(line_center - line_width / 2))
+            line_end = int(round(line_start + line_width))
+            range_list.append((line_start, line_end))
+
+        # invert range if line-free channels are requested
+        if channel_selection == ChannelSelection.LINE_FREE:
+            range_list = invert_range_list(range_list, self.image.nchan)
+
+        # convert line list into channel selection string
+        # range_list is inclusive at the start while exclusive
+        # at the end, i.e., [start, end)
+        # On the other hand, CASA's channel selection is inclusive
+        # at both ends, i.e., [start, end]
+        return ';'.join([f'{s}~{e - 1}' for s, e in range_list])
+
+    def get_line_free_channels(self) -> List[int]:
+        """Get list of line-free channels.
+
+        Returns:
+            Indices of line-free channels
+        """
+        # per-channel mask to diffentiate line/line-free regions
+        # line regions: False
+        # line-free regions: True
+        is_line_free = np.ones(self.image.nchan, dtype=bool)
+
+        # invalidate line regions
+        for line in self.valid_lines():
+            line_center, line_width = line[:2]
+            line_start = int(round(line_center - line_width / 2))
+            line_end = int(round(line_start + line_width))
+            is_line_free[line_start:line_end] = False
+
+        return np.where(is_line_free)[0]
+
+    def compute_per_channel_stats(self) -> dict:
+        """Compute per-channel statistics of cube image.
+
+        Returns:
+            Statistics dictionary
+        """
+        spectral_axis = self.image.id_spectral
+        axes = list(range(len(self.image.image_shape)))
+        axes.pop(spectral_axis)
+        with casa_tools.ImageReader(self.imagename) as ia:
+            # cf. hif/tasks/tclean/tclean.py cube_stats_masked
+            stats = ia.statistics(
+                robust=True, stretch=True,
+                axes=axes, algorithm='chauvenet', maxiter=5
+            )
+        return stats
+
+
+def invert_range_list(range_list: List[List[int]], nchan: int) -> List[List[int]]:
+    """Invert channel range list.
+
+    Overlap among ranges is handled properly.
+
+    Args:
+        range_list: List of (start, end) ranges.
+        nchan: Length of target array.
+
+    Returns:
+        Inverted list of ranges.
+    """
+    # merge range
+    arr = np.zeros(nchan, dtype=bool)
+    for start, end in range_list:
+        # range_list is inclusive at the beginning while exclusive
+        # at the end, i.e., [start, end)
+        arr[start:end] = True
+
+    # detect change of value
+    idx = np.where(arr[1:] != arr[:-1])[0] + 1
+    if not arr[0]:
+        idx = np.insert(idx, 0, 0)
+    if not arr[-1]:
+        idx = np.append(idx, nchan)
+
+    inverted = [list(x) for x in idx.reshape(len(idx) // 2, 2)]
+
+    return inverted
 
 
 class SDCalibrationDisplay(object, metaclass=abc.ABCMeta):

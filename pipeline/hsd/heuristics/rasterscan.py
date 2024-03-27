@@ -560,6 +560,11 @@ def find_raster_gap(ra: np.ndarray, dec: np.ndarray, dtrow_list: List[np.ndarray
     Returns:
         np.ndarray of index for dtrow_list indicating boundary between raster maps
     """
+
+    msg = 'Failed to identify gap between raster map iteration.'
+    if len(dtrow_list) == 0:
+        raise RasterScanHeuristicsFailure(msg)
+
     distance_list = get_raster_distance(ra, dec, dtrow_list)
     delta_distance = distance_list[1:] - distance_list[:-1]
     threshold = HeuristicsParameter.RasterGapThresholdFactor * np.median(delta_distance)
@@ -580,8 +585,6 @@ def find_raster_gap(ra: np.ndarray, dec: np.ndarray, dtrow_list: List[np.ndarray
     LOG.debug('ndelta1 = %s', ndelta1)
     if ndelta1 > HeuristicsParameter.RoundTripRasterScanThresholdFactor * len(raster_gap):
         # possibly round-trip raster mapping which is not supported
-        msg = 'The pattern seems to be raster but is not supported by this heuristics.'
-        LOG.warning(msg)
         raise RasterScanHeuristicsFailure(msg)
     return raster_gap
 

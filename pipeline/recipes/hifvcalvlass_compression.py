@@ -2,17 +2,18 @@
 
 import traceback
 
+import pipeline
+from pipeline.infrastructure import casa_tools
+
+# Make pipeline tasks available in local name space
+pipeline.initcli(locals())
+
 # IMPORT_ONLY = 'Import only'
 IMPORT_ONLY = ''
 
 
 # Run the procedure
-def hifvcalvlass(vislist, importonly=False, pipelinemode='automatic', interactive=True):
-    import pipeline
-
-    # Pipeline imports
-    from pipeline.infrastructure import casa_tools
-    pipeline.initcli()
+def hifvcalvlass(vislist, importonly=False, interactive=True):
 
     echo_to_screen = interactive
     casa_tools.post_to_log("Beginning VLA Sky Survey pipeline run (with compression)...")
@@ -23,12 +24,12 @@ def hifvcalvlass(vislist, importonly=False, pipelinemode='automatic', interactiv
         # h_init(loglevel='trace', plotlevel='summary')
 
         # Load the data
-        hifv_importdata(vis=vislist, pipelinemode=pipelinemode)
+        hifv_importdata(vis=vislist)
         if importonly:
             raise Exception(IMPORT_ONLY)
 
         # Hanning smooth the data
-        hifv_hanning(pipelinemode=pipelinemode)
+        hifv_hanning()
 
         # Flag known bad data
         hifv_flagdata(intents='*POINTING*,*FOCUS*,*ATMOSPHERE*,*SIDEBAND_RATIO*, *UNKNOWN*, *SYSTEM_CONFIGURATION*, *UNSPECIFIED#UNSPECIFIED*',
@@ -37,7 +38,7 @@ def hifvcalvlass(vislist, importonly=False, pipelinemode='automatic', interactiv
                       shadow=True, quack=False, edgespw=False)
 
         # Fill model columns for primary calibrators
-        hifv_vlasetjy(pipelinemode=pipelinemode)
+        hifv_vlasetjy()
 
         # Gain curves, opacities, antenna position corrections,
         # requantizer gains (NB: requires CASA 4.1!)
@@ -45,10 +46,10 @@ def hifvcalvlass(vislist, importonly=False, pipelinemode='automatic', interactiv
         hifv_priorcals(show_tec_maps=True, apply_tec_correction=False, swpow_spw='6,14')
 
         # Syspower task
-        hifv_syspower(pipelinemode=pipelinemode)
+        hifv_syspower()
 
         # Initial test calibrations using bandpass and delay calibrators
-        hifv_testBPdcals(pipelinemode=pipelinemode)
+        hifv_testBPdcals()
 
         # Identify and flag basebands with bad deformatters or rfi based on
         # bp table amps and phases
@@ -59,7 +60,7 @@ def hifvcalvlass(vislist, importonly=False, pipelinemode='automatic', interactiv
 
         # DO SEMI-FINAL DELAY AND BANDPASS CALIBRATIONS
         # (semi-final because we have not yet determined the spectral index of the bandpass calibrator)
-        hifv_semiFinalBPdcals(pipelinemode=pipelinemode)
+        hifv_semiFinalBPdcals()
 
         # Use mode=allcals again on calibrators
         hifv_checkflag(checkflagmode='allcals-vlass')
@@ -72,13 +73,13 @@ def hifvcalvlass(vislist, importonly=False, pipelinemode='automatic', interactiv
         hifv_fluxboot(fitorder=2)
 
         # Make the final calibration tables
-        hifv_finalcals(pipelinemode=pipelinemode)
+        hifv_finalcals()
 
         # Polarization calibration
-        hifv_circfeedpolcal(pipelinemode=pipelinemode)
+        hifv_circfeedpolcal()
 
         # Flag the finalampgaincal.g calibration table
-        hifv_flagcal(pipelinemode=pipelinemode)
+        hifv_flagcal()
 
         # Apply all the calibrations and check the calibrated data
         hifv_applycals(flagsum=False, flagdetailedsum=False, gainmap=True)
@@ -87,19 +88,19 @@ def hifvcalvlass(vislist, importonly=False, pipelinemode='automatic', interactiv
         hifv_checkflag(checkflagmode='target-vlass')
 
         # Calculate data weights based on standard deviation within each spw
-        hifv_statwt(pipelinemode=pipelinemode)
+        hifv_statwt()
 
         # Plotting Summary
-        hifv_plotsummary(pipelinemode=pipelinemode)
+        hifv_plotsummary()
 
         # Apply time offsets to the pointing table
-        hifv_fixpointing(pipelinemode=pipelinemode)        
+        hifv_fixpointing()
 
         # Make a list of expected point source calibrators to be cleaned
-        # hif_makeimlist(intent='PHASE,BANDPASS', pipelinemode=pipelinemode)
+        # hif_makeimlist(intent='PHASE,BANDPASS')
 
         # Make clean images for the selected calibrators
-        # hif_makeimages(pipelinemode=pipelinemode)
+        # hif_makeimages()
 
         # Export the data
         hifv_exportdata(gainmap=True, exportmses=False, exportcalprods=True)

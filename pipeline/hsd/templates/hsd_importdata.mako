@@ -8,7 +8,7 @@ import os
 
 <%
 def get_imported_ms():
-	"""Retrun a list of imported MS domain objects."""
+	"""Return a list of imported MS domain objects."""
 	ms_list = []
 	for importdata_result in result:
 		ms_list.extend(importdata_result.mses)

@@ -32,10 +32,14 @@ class T2_4MDetailsFlagDeterBaseRenderer(basetemplates.T2_4MDetailsDefaultRendere
         flag_table_intents = ['TOTAL', 'SCIENCE SPWS']
         flag_table_intents.extend(intents_to_summarise)
 
+        # return all agents so we get ticks and crosses against each one
+        agents = ['before', 'intents', 'qa0', 'qa2', 'online', 'template', 'partialpol', 'autocorr', 'shadow',
+                  'edgespw', 'lowtrans']
+
         flag_totals = {}
         for r in result:
             flag_totals = utils.dict_merge(flag_totals,
-                                           flagutils.flags_for_result(r, pipeline_context, intents_to_summarise=intents_to_summarise))
+                flagutils.flags_for_result(r, pipeline_context, intents_to_summarise=intents_to_summarise))
 
             # copy template files across to weblog directory
             toggle_to_filenames = {'online': 'fileonline',
@@ -58,10 +62,6 @@ class T2_4MDetailsFlagDeterBaseRenderer(basetemplates.T2_4MDetailsDefaultRendere
                 flagcmds_file.write(terminated)
 
             flagcmd_files[ms.basename] = flagcmds_path
-
-        # return all agents so we get ticks and crosses against each one
-        agents = ['before', 'intents', 'qa0', 'qa2', 'online', 'template', 'partialpol', 'autocorr', 'shadow',
-                  'edgespw', 'lowtrans']
 
         flagplots = {os.path.basename(r.inputs['vis']): self.flagplot(r, pipeline_context)
                      for r in result}

@@ -23,9 +23,13 @@ __all__ = [
     "from_mjd_to_datetime"
 ]
 
-
-SOLAR_SYSTEM_MODELS_PATH = casa_tools.utils.resolve("alma/SolarSystemModels")
-IERS_TABLES_PATH = casa_tools.utils.resolve("geodetic")
+# PIPE-1845: as of CASA ver6.5.4, CASA/setjy use ctsys.resolve() to search calibrator models,
+# which is based the precedence list affected by the CASA/config.py:datapath variable.
+# On the other hand, casatools uses the path return ctsys.rundata() to look for essential
+# CASA runtime data (e.g. IERS tables). Therefore Pipeline uses the same methods used by casatools
+# casataks to search/examine the in-used data file version/modefication time.
+SOLAR_SYSTEM_MODELS_PATH = casa_tools.utils.resolve('alma/SolarSystemModels')
+IERS_TABLES_PATH = os.path.join(casa_tools.utils.rundata(), 'geodetic')
 
 
 def get_file_md5(filename: str) -> str:

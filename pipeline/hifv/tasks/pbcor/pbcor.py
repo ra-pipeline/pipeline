@@ -21,7 +21,7 @@ class PbcorResults(basetask.Results):
 
 class PbcorInputs(vdp.StandardInputs):
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_type = [DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     def __init__(self, context, vis=None):
         super(PbcorInputs, self).__init__()
@@ -32,6 +32,8 @@ class PbcorInputs(vdp.StandardInputs):
 @task_registry.set_equivalent_casa_task('hifv_pbcor')
 class Pbcor(basetask.StandardTaskTemplate):
     Inputs = PbcorInputs
+
+    is_multi_vis_task = True
 
     def prepare(self):
 

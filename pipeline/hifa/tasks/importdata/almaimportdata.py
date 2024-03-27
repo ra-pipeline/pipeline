@@ -1,17 +1,21 @@
-import certifi
 import os
 import ssl
 import urllib
 
+import certifi
+
 import pipeline.h.tasks.importdata.fluxes as fluxes
 import pipeline.h.tasks.importdata.importdata as importdata
 import pipeline.infrastructure as infrastructure
+import pipeline.infrastructure.sessionutils as sessionutils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.infrastructure import task_registry
+
 from . import dbfluxes
 
 __all__ = [
     'ALMAImportData',
+    'SerialALMAImportData',
     'ALMAImportDataInputs',
     'ALMAImportDataResults'
 ]
@@ -37,17 +41,19 @@ class ALMAImportDataInputs(importdata.ImportDataInputs):
     createmms = vdp.VisDependentProperty(default='false')
     # sets threshold for polcal parallactic angle coverage. See PIPE-597
     minparang = vdp.VisDependentProperty(default=0.0)
+    parallel = sessionutils.parallel_inputs_impl(default=False)
 
     def __init__(self, context, vis=None, output_dir=None, asis=None, process_caldevice=None, session=None,
                  overwrite=None, nocopy=None, bdfflags=None, lazy=None, save_flagonline=None, dbservice=None,
-                 createmms=None, ocorr_mode=None, datacolumns=None, minparang=None):
-        super(ALMAImportDataInputs, self).__init__(context, vis=vis, output_dir=output_dir, asis=asis,
-                                                   process_caldevice=process_caldevice, session=session,
-                                                   overwrite=overwrite, nocopy=nocopy, bdfflags=bdfflags, lazy=lazy,
-                                                   save_flagonline=save_flagonline, createmms=createmms,
-                                                   ocorr_mode=ocorr_mode, datacolumns=datacolumns)
+                 createmms=None, ocorr_mode=None, datacolumns=None, minparang=None, parallel=None):
+        super().__init__(context, vis=vis, output_dir=output_dir, asis=asis,
+                         process_caldevice=process_caldevice, session=session,
+                         overwrite=overwrite, nocopy=nocopy, bdfflags=bdfflags, lazy=lazy,
+                         save_flagonline=save_flagonline, createmms=createmms,
+                         ocorr_mode=ocorr_mode, datacolumns=datacolumns)
         self.dbservice = dbservice
         self.minparang = minparang
+        self.parallel = parallel
 
 
 class ALMAImportDataResults(importdata.ImportDataResults):
@@ -60,9 +66,7 @@ class ALMAImportDataResults(importdata.ImportDataResults):
             '\n\t'.join([ms.name for ms in self.mses]))
 
 
-@task_registry.set_equivalent_casa_task('hifa_importdata')
-@task_registry.set_casa_commands_comment('If required, ASDMs are converted to MeasurementSets.')
-class ALMAImportData(importdata.ImportData):
+class SerialALMAImportData(importdata.ImportData):
     Inputs = ALMAImportDataInputs
     Results = ALMAImportDataResults
 
@@ -124,3 +128,12 @@ class ALMAImportData(importdata.ImportData):
         combined_results = fluxes.import_flux(context.output_dir, observing_run)
 
         return fluxservice, combined_results, qastatus
+
+
+@task_registry.set_equivalent_casa_task('hifa_importdata')
+@task_registry.set_casa_commands_comment('If required, ASDMs are converted to MeasurementSets.')
+class ALMAImportData(sessionutils.ParallelTemplate):
+    """ALMAmportData class for parallelization."""
+
+    Inputs = ALMAImportDataInputs
+    Task = SerialALMAImportData

@@ -1,17 +1,26 @@
 import copy
+import functools
 import itertools
 import operator
 import os
 import platform
 import re
 import sys
+import types
+from inspect import signature
 
-import almatasks
-import casaplotms
 import casatasks
+import casaplotms
 
-from . import logging
-from . import utils
+# PIPE-2099: add the compatibility with the 'wvrgcal' task change from CAS-14218
+if hasattr(casatasks, 'wvrgcal'):
+    # wvrgcal was migrated into the casatasks package via CAS-14218
+    almatasks = casatasks
+else:
+    # before CAS-14218, the task wvrgcal was under the almatasks package
+    import almatasks
+
+from . import logging, utils
 
 LOG = logging.get_logger(__name__)
 
@@ -189,9 +198,8 @@ class JobRequest(object):
 
         # get the argument names and default argument values for the given
         # function
-        code = fn.__code__
-        argcount = code.co_argcount
-        argnames = code.co_varnames[:argcount]
+        argnames = list(signature(fn).parameters)
+        argcount = len(argnames)
         fn_defaults = fn.__defaults__ or list()
         argdefs = dict(zip(argnames[-len(fn_defaults):], fn_defaults))
 
@@ -213,22 +221,16 @@ class JobRequest(object):
         self._keyword = [FunctionArg(name, kw[name]) for name in argnames if name in kw]
         self._nameless = [NamelessArg(a) for a in args[argcount:]]
 
-    def execute(self, dry_run=False, verbose=False):
+    def execute(self, verbose=False):
         """
         Execute this job, returning any result to the caller.
 
-        :param dry_run: True if the job should be logged rather than executed\
-            (default: False)
-        :type dry_run: boolean
         :param verbose: True if the complete invocation, including all default\
             variables and arguments, should be logged instead of just those\
             explicitly given (default: False)
         :type verbose: boolean
         """
         msg = self._get_fn_msg(verbose, sort_args=False)
-        if dry_run:
-            sys.stdout.write('Dry run: %s\n' % msg)
-            return
 
         for hook in PREHOOKS:
             hook(self)
@@ -300,28 +302,48 @@ class JobRequest(object):
 
 
 def get_fn_name(fn):
-    """
-    Return a tuple stating the name of the function and whether the function
-    is a CASA task.
+    """Return a tuple stating the name of the callable and whether it's a CASA task.
 
     :param fn: the function to inspect
     :return: (function name, bool) tuple
-    """
-    module = fn.__module__
-    if isinstance(module, object):
 
-        #
-        # PIPE-697: uvcontfit and copytree commands now appear erroneously as
-        # casaplotms in casa_commands.log
-        #
-        # The pipeline has a handful of shutil file operations wrapped up in
-        # JobRequests and exposed on the casatasks module so that they can be
-        # called and logged in the same manner as CASA operations. The check
-        # below distinguishes CASA tasks/functions from non-CASA code.
-        #
-        for m in (almatasks, casatasks, casaplotms):
-            for k, v in m.__dict__.items():
-                if v == fn:
-                    return k, True
+    Pipeline has a handful of shutil file operations wrapped up in
+    JobRequests and exposed on the casa_tasks module so that they can be
+    called and logged in the same manner as CASA task operations. The check
+    below distinguishes CASA tasks from non-CASA code.
+
+    Note: as of CASA ver6.5, all genuine CASA tasks are callable class instances, rather than Python functions.
+    """
+
+    for m in (casatasks, casaplotms, almatasks):
+        for k in m.__all__:
+            v = getattr(m, k)
+            if v == fn and not isinstance(fn, types.FunctionType):
+                return k, True
 
     return fn.__name__, False
+
+
+def jobrequest_generator(func):
+    """Construct a JobRequest generator for a callable.
+    
+    This can be used as a decorator to create a JobRequest generator for any callables so they can be
+    called and logged via JobRequests.
+    
+    functools.wraps is used to preserve the original function's name and docstring.
+    The return typing of the wrapped function is specified as JobRequest.
+    
+    Note that the returned JobRequest creator function can NOT be transmitted via MPI messages (e.g. in 
+    the case of Tier0JobRquest) because serializing wrapped functions that are only visible in a local
+    scope is not supported by Python/pickle.
+    """
+    if not callable(func):
+        raise TypeError('fn must be a callable.')
+
+    @functools.wraps(func)
+    def job_generator(*args, **kwargs) -> JobRequest:
+        """Generate a JobRequest for the given callable."""
+        return JobRequest(func, *args, **kwargs)
+    job_generator.__name__, _ = get_fn_name(func)
+
+    return job_generator

@@ -3,7 +3,6 @@ import itertools
 import math
 import operator
 import os
-
 import numpy as np
 
 import pipeline.infrastructure as infrastructure
@@ -15,6 +14,7 @@ from pipeline.h.tasks.common import arrayflaggerbase
 from pipeline.h.tasks.common import flaggableviewresults
 from pipeline.h.tasks.common import ozone
 from pipeline.infrastructure import casa_tools
+from pipeline.infrastructure.utils.utils import find_ranges
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -45,15 +45,15 @@ def _get_ant_id_to_name_dict(ms):
     return antenna_id_to_name
 
 
-def _log_outlier(msg):
+def _log_outlier(msg, level=logging.DEBUG):
     """
     Pipeline DEBUG messages are only logged to the terminal unless the
     CASA logging priority level is also lowered. This method will log
     the outlier message as well as record it in the CASA log, so it can
     be referenced afterwards.
     """
-    if LOG.isEnabledFor(logging.DEBUG):
-        LOG.debug(msg)
+    if LOG.isEnabledFor(level):
+        LOG.log(level, msg)
         # Log outliers directly to CASA log (CAS-11313)
         casa_tools.post_to_log(msg)
 
@@ -480,7 +480,7 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
 
         # Initialize flags
         newflags = []
-        flag_reason = np.zeros(np.shape(flag), np.int)
+        flag_reason = np.zeros(np.shape(flag), int)
 
         # If there is no valid (non-flagged) data, then return early.
         if np.all(flag) and self.inputs.skip_fully_flagged:
@@ -536,34 +536,68 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
 
                 # Get indices to flag as the masked elements that were not
                 # already flagged, i.e. the newly masked elements.
-                ind2flag = np.logical_and(np.ma.getmask(data_masked),
+                new_flag = np.logical_and(np.ma.getmask(data_masked),
                                           np.logical_not(flag))
 
                 # No flagged data.
-                if not np.any(ind2flag):
+                if not np.any(new_flag):
                     continue
 
-                # If the view is for a specific set of antennas, then
-                # include these in the warning
+                # PIPE-344: If the flagged channels fall within ozone lines, then ignore these outliers
+                # (but still display a notification message that no action was taken)
+                ozone_channels = ozone.get_ozone_channels_for_spw(self.inputs.ms, spw)
+                new_flag_unfiltered = new_flag.copy()
+                new_flag[ozone_channels] = False
+                rejected_flagging_all_baselines = new_flag != new_flag_unfiltered
+
+                # If the view is for a specific set of antennas, then include these in the warning
                 if antenna:
                     ants_as_str = ", ant {}".format(antenna)
                 else:
                     ants_as_str = ""
 
+                if np.any(rejected_flagging_all_baselines):
+                    # collapse the array of rejected flags from num_channels*num_baselines to num_channels*num_antennas
+                    nchan = data.shape[0]
+                    nant = int(math.sqrt(data.shape[1]))
+                    rejected_flagging = np.logical_or(
+                        np.any(rejected_flagging_all_baselines.reshape(nchan, nant, nant), axis=1),
+                        np.any(rejected_flagging_all_baselines.reshape(nchan, nant, nant), axis=2))
+
+                    # compressed (human-readable) list of channels in which at least one antenna was affected
+                    rejected_channel_ranges = find_ranges(np.where(np.any(rejected_flagging, axis=1))[0])
+
+                    # list of affected antennas (those for which flagging was rejected in at least one channel)
+                    rejected_antenna_names = ','.join([
+                        (antenna_id_to_name[ant] if antenna_id_to_name else str(ant))
+                        for ant in np.where(np.any(rejected_flagging, axis=0))[0]
+                    ])
+
+                    msg = ("Outliers provisionally found with flagging rule '{}' for {}, spw {}, pol {}{}, channel {}, "
+                           "antenna {}, were not flagged because they overlap with known atmospheric ozone lines"
+                           "".format(rulename, os.path.basename(table), spw, pol, ants_as_str,
+                                     rejected_channel_ranges, rejected_antenna_names))
+
+                    # add a message at the "attention" level, creating a notification banner in the weblog
+                    _log_outlier(msg, logging.ATTENTION)
+
+                # check again if any outliers remained after excluding those within ozone lines
+                if not np.any(new_flag):
+                    continue
+
                 # Log a debug message with outliers.
-                outliers_as_str = ", ".join(sorted([str(ol) for ol in data_masked[ind2flag].data], reverse=True))
+                outliers_as_str = ", ".join(sorted([str(ol) for ol in data_masked[new_flag].data], reverse=True))
                 msg = ("Outliers found with flagging rule '{}' for {}, spw {}, pol {}{}.\n"
                        "Data: median = {}, MAD = {}. Max MAD threshold = {}, corresponding to {}.\n"
                        "{} outlier(s) found (highest to lowest): {}"
                        "".format(rulename, os.path.basename(table), spw, pol, ants_as_str, data_median, data_mad,
-                                 mad_max, outlier_threshold, len(data_masked[ind2flag].data), outliers_as_str))
+                                 mad_max, outlier_threshold, len(data_masked[new_flag].data), outliers_as_str))
                 _log_outlier(msg)
 
-                i2flag = i[ind2flag]
-                j2flag = j[ind2flag]
+                i2flag = i[new_flag]
+                j2flag = j[new_flag]
 
-                # Add new flag command to flag data underlying the
-                # view.
+                # Add new flag command to flag data underlying the view.
                 for flagcoord in zip(xdata[i2flag], ydata[j2flag]):
                     newflags.append(arrayflaggerbase.FlagCmd(
                         reason='outlier', filename=table, rulename=rulename, spw=spw, antenna=antenna,
@@ -595,27 +629,26 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
 
                 # Get indices to flag as the masked elements that were not
                 # already flagged, i.e. the newly masked elements.
-                ind2flag = np.logical_and(np.ma.getmask(data_masked),
+                new_flag = np.logical_and(np.ma.getmask(data_masked),
                                           np.logical_not(flag))
 
                 # No flagged data.
-                if not np.any(ind2flag):
+                if not np.any(new_flag):
                     continue
 
                 # Log a debug message with outliers.
-                outliers_as_str = ", ".join(sorted([str(ol) for ol in data_masked[ind2flag].data], reverse=True))
+                outliers_as_str = ", ".join(sorted([str(ol) for ol in data_masked[new_flag].data], reverse=True))
                 msg = ("Outliers found with flagging rule '{}' for {}, spw {}, pol {}.\n"
                        "Data: median = {}, MAD = {}. Max MAD threshold = {}, corresponding to {}.\n"
                        "{} outlier(s) found (highest to lowest): {}"
                        "".format(rulename, os.path.basename(table), spw, pol, data_median, data_mad, mad_max,
-                                 outlier_threshold, len(data_masked[ind2flag].data), outliers_as_str))
+                                 outlier_threshold, len(data_masked[new_flag].data), outliers_as_str))
                 _log_outlier(msg)
 
-                i2flag = i[ind2flag]
-                j2flag = j[ind2flag]
+                i2flag = i[new_flag]
+                j2flag = j[new_flag]
 
-                # Add new flag commands to flag data underlying the
-                # view.
+                # Add new flag commands to flag data underlying the view.
                 for flagcoord in zip(xdata[i2flag], ydata[j2flag]):
                     newflags.append(arrayflaggerbase.FlagCmd(
                         reason='low_outlier', filename=table, rulename=rulename, spw=spw, antenna=antenna,
@@ -647,26 +680,26 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
 
                 # Get indices to flag as the masked elements that were not
                 # already flagged, i.e. the newly masked elements.
-                ind2flag = np.logical_and(np.ma.getmask(data_masked),
+                new_flag = np.logical_and(np.ma.getmask(data_masked),
                                           np.logical_not(flag))
+
                 # No flags
-                if not np.any(ind2flag):
+                if not np.any(new_flag):
                     continue
 
                 # Log a debug message with outliers.
-                outliers_as_str = ", ".join(sorted([str(ol) for ol in data_masked[ind2flag].data], reverse=True))
+                outliers_as_str = ", ".join(sorted([str(ol) for ol in data_masked[new_flag].data], reverse=True))
                 msg = ("Outliers found with flagging rule '{}' for {}, spw {}, pol {}.\n"
                        "Data: median = {}, MAD = {}. Max MAD threshold = {}, corresponding to {}.\n"
                        "{} outlier(s) found (highest to lowest): {}"
                        "".format(rulename, os.path.basename(table), spw, pol, data_median, data_mad, mad_max,
-                                 outlier_threshold, len(data_masked[ind2flag].data), outliers_as_str))
+                                 outlier_threshold, len(data_masked[new_flag].data), outliers_as_str))
                 _log_outlier(msg)
 
-                i2flag = i[ind2flag]
-                j2flag = j[ind2flag]
+                i2flag = i[new_flag]
+                j2flag = j[new_flag]
 
-                # Add new flag commands to flag data underlying the
-                # view.
+                # Add new flag commands to flag data underlying the view.
                 for flagcoord in zip(xdata[i2flag], ydata[j2flag]):
                     newflags.append(arrayflaggerbase.FlagCmd(
                         reason='high_outlier', filename=table, rulename=rulename, spw=spw, antenna=antenna,
@@ -697,27 +730,26 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
 
                 # Get indices to flag as the masked elements that were not
                 # already flagged, i.e. the newly masked elements.
-                ind2flag = np.logical_and(np.ma.getmask(data_masked),
+                new_flag = np.logical_and(np.ma.getmask(data_masked),
                                           np.logical_not(flag))
 
                 # No flags
-                if not np.any(ind2flag):
+                if not np.any(new_flag):
                     continue
 
                 # Log a debug message with outliers.
-                outliers_as_str = ", ".join(sorted([str(ol) for ol in data_masked[ind2flag].data]))
+                outliers_as_str = ", ".join(sorted([str(ol) for ol in data_masked[new_flag].data]))
                 msg = ("Outliers found with flagging rule '{}' for {}, spw {}, pol {}.\n"
                        "Minimum threshold = {}.\n"
                        "{} outlier(s) found (lowest to highest): {}"
                        "".format(rulename, os.path.basename(table), spw, pol, limit,
-                                 len(data_masked[ind2flag].data), outliers_as_str))
+                                 len(data_masked[new_flag].data), outliers_as_str))
                 _log_outlier(msg)
 
-                i2flag = i[ind2flag]
-                j2flag = j[ind2flag]
+                i2flag = i[new_flag]
+                j2flag = j[new_flag]
 
-                # Add new flag commands to flag data underlying the
-                # view.
+                # Add new flag commands to flag data underlying the view.
                 for flagcoord in zip(xdata[i2flag], ydata[j2flag]):
                     newflags.append(arrayflaggerbase.FlagCmd(
                         reason='min_abs', filename=table, rulename=rulename, spw=spw, antenna=antenna,
@@ -748,27 +780,26 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
 
                 # Get indices to flag as the masked elements that were not
                 # already flagged, i.e. the newly masked elements.
-                ind2flag = np.logical_and(np.ma.getmask(data_masked),
+                new_flag = np.logical_and(np.ma.getmask(data_masked),
                                           np.logical_not(flag))
 
                 # No flags
-                if not np.any(ind2flag):
+                if not np.any(new_flag):
                     continue
 
                 # Log a debug message with outliers.
-                outliers_as_str = ", ".join(sorted([str(ol) for ol in data_masked[ind2flag].data], reverse=True))
+                outliers_as_str = ", ".join(sorted([str(ol) for ol in data_masked[new_flag].data], reverse=True))
                 msg = ("Outliers found with flagging rule '{}' for {}, spw {}, pol {}.\n"
                        "Maximum threshold = {}.\n"
                        "{} outlier(s) found (highest to lowest): {}"
                        "".format(rulename, os.path.basename(table), spw, pol, limit,
-                                 len(data_masked[ind2flag].data), outliers_as_str))
+                                 len(data_masked[new_flag].data), outliers_as_str))
                 _log_outlier(msg)
 
-                i2flag = i[ind2flag]
-                j2flag = j[ind2flag]
+                i2flag = i[new_flag]
+                j2flag = j[new_flag]
 
-                # Add new flag commands to flag data underlying the
-                # view.
+                # Add new flag commands to flag data underlying the view.
                 for flagcoord in zip(xdata[i2flag], ydata[j2flag]):
                     newflags.append(arrayflaggerbase.FlagCmd(
                         reason='max_abs', filename=table, rulename=rulename,  spw=spw, antenna=antenna,
@@ -793,7 +824,7 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
                 if axis == xtitle.upper().strip():
 
                     # Compute median number flagged
-                    num_flagged = np.zeros([np.shape(data)[1]], np.int)
+                    num_flagged = np.zeros([np.shape(data)[1]], int)
                     for iy in np.arange(len(ydata)):
                         num_flagged[iy] = len(data[:, iy][flag[:, iy]])
                     median_num_flagged = np.median(num_flagged)
@@ -814,8 +845,8 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
                             i2flag = i[:, iy][np.logical_not(flag[:, iy])]
                             j2flag = j[:, iy][np.logical_not(flag[:, iy])]
                         else:
-                            i2flag = np.zeros([0], np.int)
-                            j2flag = np.zeros([0], np.int)
+                            i2flag = np.zeros([0], int)
+                            j2flag = np.zeros([0], int)
 
                         # likewise for maxexcessflags
                         if len_flagged > median_num_flagged + maxexcessflags:
@@ -852,7 +883,7 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
                 elif axis == ytitle.upper().strip():
 
                     # Compute median number flagged
-                    num_flagged = np.zeros([np.shape(data)[0]], np.int)
+                    num_flagged = np.zeros([np.shape(data)[0]], int)
                     for ix in np.arange(len(xdata)):
                         num_flagged[ix] = len(data[ix, :][flag[ix, :]])
                     median_num_flagged = np.median(num_flagged)
@@ -872,8 +903,8 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
                             i2flag = i[ix, :][np.logical_not(flag[ix, :])]
                             j2flag = j[ix, :][np.logical_not(flag[ix, :])]
                         else:
-                            i2flag = np.zeros([0], np.int)
-                            j2flag = np.zeros([0], np.int)
+                            i2flag = np.zeros([0], int)
+                            j2flag = np.zeros([0], int)
 
                         len_flagged = len(data[ix, :][flag[ix, :]])
                         if len_flagged > median_num_flagged + maxexcessflags:
@@ -949,8 +980,7 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
                                " be flagged.".format(rulename, os.path.basename(table), spw, pol, maxfraction, frac_ef))
                         _log_outlier(msg)
 
-                        # Add new flag commands to flag data underlying
-                        # the view.
+                        # Add new flag commands to flag data underlying the view.
                         for flagcoord in zip(xdata[i2flag], ydata[j2flag]):
                             newflags.append(arrayflaggerbase.FlagCmd(
                                 reason='too_many_flags', filename=table, rulename=rulename,  spw=spw, antenna=antenna,
@@ -985,28 +1015,27 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
 
                 # Get indices to flag as the masked elements that were not
                 # already flagged, i.e. the newly masked elements.
-                ind2flag = np.logical_and(np.ma.getmask(data_masked),
+                new_flag = np.logical_and(np.ma.getmask(data_masked),
                                           np.logical_not(flag))
 
                 # No flags
-                if not np.any(ind2flag):
+                if not np.any(new_flag):
                     continue
 
                 # Log a debug message with outliers.
-                outliers_as_str = ", ".join(sorted([str(ol) for ol in data_masked[ind2flag].data]))
+                outliers_as_str = ", ".join(sorted([str(ol) for ol in data_masked[new_flag].data]))
                 msg = ("Outliers found with flagging rule '{}' for {}, spw {}, pol {}.\n"
                        "Data: median = {}. Low, high nmedian thresholds = {}, {}, corresponding to {}, {}.\n"
                        "{} outlier(s) found (lowest to highest): {}"
                        "".format(rulename, os.path.basename(table), spw, pol, data_median, lo_limit,
                                  hi_limit, outlier_low_threshold, outlier_high_threshold,
-                                 len(data_masked[ind2flag].data), outliers_as_str))
+                                 len(data_masked[new_flag].data), outliers_as_str))
                 _log_outlier(msg)
 
-                i2flag = i[ind2flag]
-                j2flag = j[ind2flag]
+                i2flag = i[new_flag]
+                j2flag = j[new_flag]
 
-                # Add new flag commands to flag the data underlying
-                # the view.
+                # Add new flag commands to flag the data underlying the view.
                 for flagcoord in zip(xdata[i2flag], ydata[j2flag]):
                     newflags.append(arrayflaggerbase.FlagCmd(
                         reason='nmedian', filename=table, rulename=rulename, spw=spw, antenna=antenna,
@@ -1060,14 +1089,13 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
 
                     # Get indices to flag as the masked elements that were not
                     # already flagged, i.e. the newly masked elements.
-                    ind2flag = np.logical_and(np.ma.getmask(ant_data_masked),
-                                              np.logical_not(ant_flag))
+                    new_flag = np.logical_and(np.ma.getmask(ant_data_masked), np.logical_not(ant_flag))
 
                     # If no low outliers were found, skip this antenna.
-                    if not np.any(ind2flag):
+                    if not np.any(new_flag):
                         continue
 
-                    j2flag_lo = j[iant, :][ind2flag]
+                    j2flag_lo = j[iant, :][new_flag]
 
                     # Determine number of points found to be low outliers that
                     # were not previously flagged.
@@ -1102,7 +1130,7 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
                             self.flag_reason_index['low outlier']
 
                         # Log a debug message with outliers.
-                        outliers_as_str = ", ".join(sorted([str(ol) for ol in ant_data_masked[ind2flag].data]))
+                        outliers_as_str = ", ".join(sorted([str(ol) for ol in ant_data_masked[new_flag].data]))
                         msg = ("Outliers found with flagging rule '{}' for {}, spw {}, pol {}.\n"
                                "Data: median = {}, MAD = {}. Max MAD threshold = {}, corresponding to {}.\n"
                                "For antenna {}: {} low outlier(s) found, representing {} fraction of its data"
@@ -1170,30 +1198,32 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
 
                 # Get indices to flag as the masked elements that were not
                 # already flagged, i.e. the newly masked elements.
-                ind2flag = np.logical_and(np.ma.getmask(data_masked),
-                                          np.logical_not(flag))
+                provisional_new_flag = np.logical_and(data_masked.mask, np.logical_not(flag))
 
                 # No flagged data.
-                if not np.any(ind2flag):
+                if not np.any(provisional_new_flag):
                     continue
 
-                i2flag = i[ind2flag]
-                j2flag = j[ind2flag]
+                # PIPE-344: If the flagged channels fall within ozone lines, then ignore (filter out) these outliers;
+                # store the "unfiltered" provisional list of flags and later compare it with the "filtered" one
+                # in which ozone lines are removed, in order to show a notification message when such removal
+                # affects the outcome of the "bad quadrant" rule (at this moment, it is not yet known
+                # whether a flagging would happen, because it depends on all baselines for a given antenna).
+                ozone_channels = ozone.get_ozone_channels_for_spw(self.inputs.ms, spw)
+                provisional_new_flag_unfiltered = provisional_new_flag.copy()
+                provisional_new_flag[ozone_channels] = False
 
-                # have to be careful here not to corrupt the data view
-                # as we go through it testing for bad quadrant/antenna.
-                # Make a copy of the view flags and go though these
-                # one antenna at a time testing for bad quadrant.
-                # If bad, copy 'outlier' and 'bad quadrant' flags to
-                # original view. 'unflagged_flag_copy' is a copy
-                # of the flags made before the 'outlier' flags are
-                # applied - it is used to estimate how many
-                # _additional_ points have been flagged.
-                unflagged_flag_copy = np.copy(flag)
-                flag_copy = np.copy(flag)
-                flag_reason_copy = np.copy(flag_reason)
-                flag_copy[i2flag, j2flag] = True
-                flag_reason_copy[i2flag, j2flag] = self.flag_reason_index['outlier']
+                # check again if any outliers remained after excluding those within ozone lines
+                if not np.any(provisional_new_flag):
+                    continue
+
+                # store the previous flagging state in 'previous_flag',
+                # then examine the provisional new flags one antenna and quadrant at a time,
+                # checking if the fraction of new flags in all baselines involving this antenna
+                # is above threshold (frac_limit) or if this fraction in individual baselines
+                # is above another threshold (baseline_frac_limit).
+                # If so, flag the entire quadrant for this antenna or for individual baseline.
+                previous_flag = np.copy(flag)
 
                 # look for bad antenna/quadrants in view copy
                 data_shape = np.shape(data)
@@ -1207,40 +1237,37 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
                     [nchan//2, nchan*3//4],
                     [nchan*3//4, nchan],
                 ]
+                rejected_flagging = np.zeros((nchan, nant), bool)
 
                 for ant in range(nant):
-                    # flag based on outliers in flag_copy, will set new flags
-                    # in a further copy so that outlier flags are not corrupted
-                    working_copy_flag = np.copy(flag_copy)
-                    working_copy_flag_reason = np.copy(flag_reason_copy)
-
                     # baselines involving this antenna
-                    baselines = [baseline
-                                 for baseline in range(nbaseline)
-                                 if (ant*nant <= baseline < (ant+1)*nant)
-                                 or (baseline % nant == ant)]
-                    baselines = np.array(baselines)
+                    baselines = np.array([baseline
+                                          for baseline in range(nbaseline)
+                                          if (ant*nant <= baseline < (ant+1)*nant)
+                                          or (baseline % nant == ant)])
 
                     for iquad in range(4):
+                        # first check all baselines involving this antenna in this quadrant,
+                        # examining the ratio of the number of provisional new flags
+                        # to the number of previously unflagged channels
                         quad_slice = slice(quadrant[iquad][0], quadrant[iquad][1])
-                        ninvalid = np.count_nonzero(
-                            working_copy_flag[quad_slice, baselines])
-                        ninvalid_on_entry = np.count_nonzero(
-                            unflagged_flag_copy[quad_slice, baselines])
-                        nvalid_on_entry = np.count_nonzero(np.logical_not(
-                            unflagged_flag_copy[quad_slice, baselines]))
-                        if nvalid_on_entry:
-                            frac = float(ninvalid - ninvalid_on_entry) /\
-                                   float(nvalid_on_entry)
+                        num_provisional_new_flag = np.count_nonzero(
+                            provisional_new_flag[quad_slice, baselines])
+                        num_provisional_new_flag_unfiltered = np.count_nonzero(
+                            provisional_new_flag_unfiltered[quad_slice, baselines])
+                        num_previous_unflagged = np.count_nonzero(np.logical_not(
+                            previous_flag[quad_slice, baselines]))
+                        if num_previous_unflagged:
+                            frac = num_provisional_new_flag * 1.0 / num_previous_unflagged
+                            frac_unfiltered = num_provisional_new_flag_unfiltered * 1.0 / num_previous_unflagged
                         else:
-                            frac = 0.0
+                            frac = frac_unfiltered = 0.0
 
                         if frac > frac_limit:
-                            # Add new flag commands to flag the data
-                            # underlying the view. These will flag the entire
-                            # quadrant/antenna. If the quadrant is not
-                            # bad then any 'outlier' points found
-                            # earlier will not be flagged.
+                            # Add new flag commands to flag the data underlying the view.
+                            # These will flag the entire quadrant/antenna.
+                            # If the quadrant is not bad, then any provisional outlier points
+                            # found earlier will not be flagged.
                             flagcoords = []
                             channels_to_flag = list(range(quadrant[iquad][0], quadrant[iquad][1]))
                             for chan in channels_to_flag:
@@ -1251,8 +1278,7 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
                                    "Threshold for maximum number of outliers per channel quadrant per antenna: {}.\n"
                                    "For antenna {}, channels quadrant {}: fraction outliers = {}, exceeding "
                                    "threshold => entire quadrant will be flagged."
-                                   "".format(rulename, os.path.basename(table), spw, pol, frac_limit, ant, iquad,
-                                             frac))
+                                   "".format(rulename, os.path.basename(table), spw, pol, frac_limit, ant, iquad, frac))
                             _log_outlier(msg)
 
                             for flagcoord in flagcoords:
@@ -1261,41 +1287,53 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
                                     antenna=antenna, axisnames=[xtitle, ytitle], flagcoords=flagcoord, pol=pol,
                                     extendfields=self.inputs.extendfields, antenna_id_to_name=antenna_id_to_name))
 
-                            # update working copy view with 'bad quadrant' flags
-                            i2flag = i[quad_slice, baselines][np.logical_not(working_copy_flag[quad_slice, baselines])]
-                            j2flag = j[quad_slice, baselines][np.logical_not(working_copy_flag[quad_slice, baselines])]
+                            # update flagging view with 'bad quadrant' flags
+                            where = np.logical_not(previous_flag[quad_slice, baselines])
+                            i2flag = i[quad_slice, baselines][where]
+                            j2flag = j[quad_slice, baselines][where]
+                            flag[i2flag, j2flag] = True
+                            flag_reason[i2flag, j2flag] = self.flag_reason_index['bad quadrant']
 
-                            if len(i2flag) > 0:
-                                working_copy_flag[i2flag, j2flag] = True
-                                working_copy_flag_reason[i2flag, j2flag] = self.flag_reason_index['bad quadrant']
-
-                            # copy flag state for this antenna
-                            # back to original
-                            flag[quad_slice, baselines] = working_copy_flag[quad_slice, baselines]
-                            flag_reason[quad_slice, baselines] = working_copy_flag_reason[quad_slice, baselines]
-
-                            # whole antenna/quadrant flagged, no need to check
-                            # individual baselines
+                            # whole antenna/quadrant flagged, no need to check individual baselines
                             continue
 
-                        # look for bad quadrant/baseline
+                        elif frac_unfiltered > frac_limit:
+                            # fraction of provisional new flags is below the threshold,
+                            # but had ozone lines not been rejected, it would have been above the threshold:
+                            # in this case, collect the information about channel/antenna pairs that were removed from
+                            # the flagging list add a notification message after all such cases have been identified.
+
+                            # determine indices of channels in this quadrant and antenna
+                            # that were initially flagged but subsequently removed from the flagging list
+                            rejected_channels = np.where(np.logical_and(
+                                ozone_channels[quad_slice],
+                                np.count_nonzero(
+                                    provisional_new_flag_unfiltered[quad_slice, baselines] !=
+                                    provisional_new_flag[quad_slice, baselines],
+                                    axis=1) > 0))[0]
+
+                            # mark up these channels in the overall table, adding a correct offset for the quadrant
+                            rejected_flagging[rejected_channels + quadrant[iquad][0], ant] = True
+
+                        # if the entire antenna was not flagged, look for individual bad baselines in this quadrant
                         for baseline in baselines:
-                            ninvalid = np.count_nonzero(working_copy_flag[quad_slice, baseline])
-                            ninvalid_on_entry = np.count_nonzero(unflagged_flag_copy[quad_slice, baseline])
-                            nvalid_on_entry = np.count_nonzero(
-                                np.logical_not(unflagged_flag_copy[quad_slice, baseline]))
-                            if nvalid_on_entry:
-                                frac = float(ninvalid - ninvalid_on_entry) / float(nvalid_on_entry)
+                            num_provisional_new_flag = np.count_nonzero(
+                                provisional_new_flag[quad_slice, baseline])
+                            num_provisional_new_flag_unfiltered = np.count_nonzero(
+                                provisional_new_flag_unfiltered[quad_slice, baseline])
+                            num_previous_unflagged = np.count_nonzero(np.logical_not(
+                                previous_flag[quad_slice, baseline]))
+                            if num_previous_unflagged:
+                                frac = num_provisional_new_flag * 1.0 / num_previous_unflagged
+                                frac_unfiltered = num_provisional_new_flag_unfiltered * 1.0 / num_previous_unflagged
                             else:
-                                frac = 0.0
+                                frac = frac_unfiltered = 0.0
 
                             if frac > baseline_frac_limit:
-
-                                # Add new flag commands to flag the data
-                                # underlying the view. These will flag the entire
-                                # quadrant/baseline. If the quadrant is not
-                                # bad then any 'outlier' points found
-                                # earlier will not be flagged.
+                                # Add new flag commands to flag the data underlying the view.
+                                # These will flag the entire quadrant/baseline.
+                                # If the quadrant is not bad, then any provisional outlier points
+                                # found earlier will not be flagged.
                                 flagcoords = []
                                 for chan in range(quadrant[iquad][0], quadrant[iquad][1]):
                                     flagcoords.append((chan, ydata[baseline]))
@@ -1316,26 +1354,46 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
                                         antenna=antenna, axisnames=[xtitle, ytitle], flagcoords=flagcoord, pol=pol,
                                         extendfields=self.inputs.extendfields, antenna_id_to_name=antenna_id_to_name))
 
-                                # update working copy view with 'bad quadrant' flags
-                                i2flag = i[quad_slice, baseline][
-                                    np.logical_not(working_copy_flag[quad_slice, baseline])]
-                                j2flag = j[quad_slice, baseline][
-                                    np.logical_not(working_copy_flag[quad_slice, baseline])]
+                                # update flagging view with 'bad quadrant' flags
+                                where = np.logical_not(previous_flag[quad_slice, baseline])
+                                i2flag = i[quad_slice, baseline][where]
+                                j2flag = j[quad_slice, baseline][where]
+                                flag[i2flag, j2flag] = True
+                                flag_reason[i2flag, j2flag] = self.flag_reason_index['bad quadrant']
 
-                                if len(i2flag) > 0:
-                                    working_copy_flag[i2flag, j2flag] = True
-                                    working_copy_flag_reason[i2flag, j2flag] = self.flag_reason_index['bad quadrant']
+                            elif frac_unfiltered > baseline_frac_limit:
+                                # determine which channels were initially flagged but subsequently rejected
+                                rejected_channels = np.where(np.logical_and(
+                                    ozone_channels[quad_slice],
+                                    provisional_new_flag_unfiltered[quad_slice, baseline] !=
+                                    provisional_new_flag[quad_slice, baseline]))[0]
 
-                                # copy flag state for this antenna back to original,
-                                # for any subsequent rules being evaluated.
-                                flag[quad_slice, baseline] = working_copy_flag[quad_slice, baseline]
-                                flag_reason[quad_slice, baseline] = working_copy_flag_reason[quad_slice, baseline]
+                                # mark up these channels in the overall table, adding a correct offset for the quadrant
+                                # (do not memorize the individual baselines, but only the antenna index)
+                                rejected_flagging[rejected_channels + quadrant[iquad][0], ant] = True
+
+                # PIPE-344: add a notification message if the bad_quadrant flagging was rejected due to ozone lines.
+                # do not report all possible channel/antenna combinations, but only the 1d projections of this 2d matrix
+                if np.any(rejected_flagging):
+                    # compressed (human-readable) list of channels in which at least one antenna was affected
+                    rejected_channel_ranges = find_ranges(np.where(np.any(rejected_flagging, axis=1))[0])
+
+                    # list of affected antennas (those for which flagging was rejected in at least one channel)
+                    rejected_antenna_names = ','.join([
+                        (antenna_id_to_name[ant] if antenna_id_to_name else str(ant))
+                        for ant in np.where(np.any(rejected_flagging, axis=0))[0]
+                    ])
+
+                    msg = ("Outliers provisionally found with flagging rule '{}' for {}, spw {}, pol {}, channel {}, "
+                           "antenna {}, were not flagged because they overlap with known atmospheric ozone lines"
+                           "".format(rulename, os.path.basename(table), spw, pol,
+                                     rejected_channel_ranges, rejected_antenna_names))
+                    _log_outlier(msg, logging.ATTENTION)
 
             else:
                 raise NameError('bad rule: %s' % rule)
 
-        # consolidate flagcmds that specify individual channels into fewer
-        # flagcmds that specify ranges
+        # consolidate flagcmds that specify individual channels into fewer flagcmds that specify ranges
         newflags = arrayflaggerbase.consolidate_flagcmd_channels(newflags, antenna_id_to_name=antenna_id_to_name)
 
         return newflags, flag_reason
@@ -1966,7 +2024,7 @@ class VectorFlagger(basetask.StandardTaskTemplate):
 
                 # Convert new channels-to-flag based on difference array to channels-to-flag within
                 # the original array.
-                flag_chan = np.zeros([len(newflag)+1], np.bool)
+                flag_chan = np.zeros([len(newflag)+1], bool)
                 flag_chan[:-1] = newflag
                 flag_chan[1:] = (flag_chan[1:] | newflag)
 
@@ -2038,10 +2096,10 @@ class VectorFlagger(basetask.StandardTaskTemplate):
                 # second, flag all channels if more than nchan_limit
                 # were flagged by the first stage
                 if np.count_nonzero(newflag) >= nchan_limit:
-                    newflag = np.ones(diff.shape, np.bool)
+                    newflag = np.ones(diff.shape, bool)
 
                 # set channels flagged
-                flag_chan = np.zeros([len(newflag)+1], np.bool)
+                flag_chan = np.zeros([len(newflag)+1], bool)
                 flag_chan[:-1] = newflag
                 flag_chan[1:] = np.logical_or(flag_chan[1:], newflag)
 

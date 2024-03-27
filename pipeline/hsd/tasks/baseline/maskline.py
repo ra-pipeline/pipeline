@@ -2,7 +2,7 @@
 import os
 import time
 
-from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Type
 
 import numpy
 
@@ -195,7 +195,6 @@ class MaskLine(basetask.StandardTaskTemplate):
             result = MaskLineResults(task=self.__class__,
                                      success=True,
                                      outcome=outcome)
-            result.task = self.__class__
 
             return result
 
@@ -245,7 +244,6 @@ class MaskLine(basetask.StandardTaskTemplate):
             result = MaskLineResults(task=self.__class__,
                                      success=True,
                                      outcome=outcome)
-            result.task = self.__class__
 
             return result
 
@@ -313,7 +311,6 @@ class MaskLine(basetask.StandardTaskTemplate):
         result = MaskLineResults(task=self.__class__,
                                  success=True,
                                  outcome=outcome)
-        result.task = self.__class__
 
         return result
 
@@ -323,6 +320,6 @@ class MaskLine(basetask.StandardTaskTemplate):
         Do nothing.
 
         Returns:
-            MaskLineResutls instance
+            MaskLineResults instance
         """
         return result

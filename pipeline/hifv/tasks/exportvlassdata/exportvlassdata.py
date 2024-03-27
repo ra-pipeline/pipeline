@@ -5,7 +5,6 @@ import os
 import shutil
 import tarfile
 import re
-import glob
 import traceback
 
 import numpy as np
@@ -110,7 +109,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
                 raise
 
         # Initialize the standard ous is string.
-        oussid = self.get_oussid(inputs.context)
+        oussid = inputs.context.get_oussid()
 
         # Define the results object
         result = ExportvlassdataResults()
@@ -169,13 +168,13 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
                     image_bundle.extend([pbcor_image_name, rms_image_name])
 
                     # No FITS file created
-                    tt0_initial_models = glob.glob('*iter1.model.tt0*')
+                    tt0_initial_models = utils.glob_ordered('*iter1.model.tt0*')
                     tt0_initial_models.sort(key=natural_keys)
                     tt0_initial_model_name = tt0_initial_models[0]
                     # tt0_initial_model_name = imageitem['imagename'].replace('iter3.image.subim', 'iter1.model.tt0')
                     # tt0_initial_model_name = tt0_initial_model_name.replace('s13', 's5')
 
-                    tt1_initial_models = glob.glob('*iter1.model.tt1*')
+                    tt1_initial_models = utils.glob_ordered('*iter1.model.tt1*')
                     tt1_initial_models.sort(key=natural_keys)
                     tt1_initial_model_name = tt1_initial_models[0]
                     # tt1_initial_model_name = imageitem['imagename'].replace('iter3.image.subim', 'iter1.model.tt1')
@@ -200,13 +199,13 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         # Add masks for PIPE-1038
         self.masks = []
         if type(img_mode) is str and img_mode.startswith('VLASS-SE-CONT'):
-            QLmasks = glob.glob('*.QLcatmask-tier1.mask')
+            QLmasks = utils.glob_ordered('*.QLcatmask-tier1.mask')
             QLmasks.sort(key=natural_keys)
             QLmask = QLmasks[-1]
-            secondmasks = glob.glob('*.secondmask.mask')
+            secondmasks = utils.glob_ordered('*.secondmask.mask')
             secondmasks.sort(key=natural_keys)
             secondmask = secondmasks[-1]
-            finalmasks = glob.glob('*.combined-tier2.mask')
+            finalmasks = utils.glob_ordered('*.combined-tier2.mask')
             finalmasks.sort(key=natural_keys)
             finalmask = finalmasks[-1]
 
@@ -304,7 +303,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         with casa_tools.ImageReader(imagename) as image:
 
             # We checked the kernel size and position correction offeset again the below tolerenaces but
-            # the results won't affect the smooth/regrid executation.
+            # the results won't affect the smooth/regrid execution.
             pstol = pixdiag_arcsec*0.2  # the tolerance for considering the convolution kernel as a point-source
             sptol = pixdiag_arcsec*0.1  # the tolerance to consider regridding less meaningful
 
@@ -356,23 +355,6 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
 
     def analyse(self, results):
         return results
-
-    def get_oussid(self, context):
-        """
-        Determine the ous prefix
-        """
-
-        # Get the parent ous ousstatus name. This is the sanitized ous
-        # status uid
-        ps = context.project_structure
-        if ps is None:
-            oussid = 'unknown'
-        elif ps.ousstatus_entity_id == 'unknown':
-            oussid = 'unknown'
-        else:
-            oussid = ps.ousstatus_entity_id.translate(str.maketrans(':/', '__'))
-
-        return oussid
 
     def get_recipename(self, context):
         """
@@ -499,23 +481,23 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         pipemanifest.add_procedure_name(ouss, context.project_structure.recipe_name)
 
         if stdfproducts.ppr_file:
-            pipemanifest.add_pprfile(ouss, os.path.basename(stdfproducts.ppr_file))
+            pipemanifest.add_pprfile(ouss, os.path.basename(stdfproducts.ppr_file), oussid)
 
         # Add the flagging and calibration products
         for session_name in sessiondict:
             session = pipemanifest.set_session(ouss, session_name)
-            pipemanifest.add_caltables(session, sessiondict[session_name][1])
+            pipemanifest.add_caltables(session, sessiondict[session_name][1], session_name)
             for vis_name in sessiondict[session_name][0]:
-                pipemanifest.add_asdm(session, vis_name, visdict[vis_name][0], visdict[vis_name][1])
+                pipemanifest.add_asdm(session, vis_name, visdict[vis_name][0], visdict[vis_name][1], oussid)
 
         # Add a tar file of the web log
-        pipemanifest.add_weblog(ouss, os.path.basename(stdfproducts.weblog_file))
+        pipemanifest.add_weblog(ouss, os.path.basename(stdfproducts.weblog_file), oussid)
 
         # Add the processing log independently of the web log
-        pipemanifest.add_casa_cmdlog(ouss, os.path.basename(stdfproducts.casa_commands_file))
+        pipemanifest.add_casa_cmdlog(ouss, os.path.basename(stdfproducts.casa_commands_file), oussid)
 
         # Add the processing script independently of the web log
-        pipemanifest.add_pipescript(ouss, os.path.basename(stdfproducts.casa_pipescript))
+        pipemanifest.add_pipescript(ouss, os.path.basename(stdfproducts.casa_pipescript), oussid)
 
         # Add the calibrator images
         pipemanifest.add_images(ouss, calimages, 'calibrator')
@@ -573,8 +555,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
                 outfile = file
             pprmatchesout.append(outfile)
             LOG.info('Copying pipeline processing file %s to %s' % (os.path.basename(file), os.path.basename(outfile)))
-            if not self._executor._dry_run:
-                shutil.copy(file, outfile)
+            shutil.copy(file, outfile)
 
         return pprmatchesout
 
@@ -651,10 +632,9 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         LOG.info('Saving final weblog in %s' % tarfilename)
 
         # Create the tar file
-        if not self._executor._dry_run:
-            tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
-            tar.add(os.path.join(os.path.basename(os.path.dirname(context.report_dir)), 'html'))
-            tar.close()
+        tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
+        tar.add(os.path.join(os.path.basename(os.path.dirname(context.report_dir)), 'html'))
+        tar.close()
 
         # Restore the original current working directory
         os.chdir(cwd)
@@ -678,27 +658,26 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
 
         # Create the tar file
 
-        if not self._executor._dry_run:
-            tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
+        tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
 
-            for mask in self.masks:
-                tar.add(mask, mask)
-                LOG.info('....Adding {!s}'.format(mask))
+        for mask in self.masks:
+            tar.add(mask, mask)
+            LOG.info('....Adding {!s}'.format(mask))
 
-            for initial_model in self.initial_models:
-                tar.add(initial_model, initial_model)
-                LOG.info('....Adding {!s}'.format(initial_model))
+        for initial_model in self.initial_models:
+            tar.add(initial_model, initial_model)
+            LOG.info('....Adding {!s}'.format(initial_model))
 
-            for final_model in self.final_models:
-                tar.add(final_model, final_model)
-                LOG.info('....Adding {!s}'.format(final_model))
+        for final_model in self.final_models:
+            tar.add(final_model, final_model)
+            LOG.info('....Adding {!s}'.format(final_model))
 
-            tar.add(self.selfcaltable, self.selfcaltable)
-            LOG.info('....Adding {!s}'.format(self.selfcaltable))
+        tar.add(self.selfcaltable, self.selfcaltable)
+        LOG.info('....Adding {!s}'.format(self.selfcaltable))
 
-            tar.add(self.flagversion, self.flagversion)
-            LOG.info('....Adding {!s}'.format(self.flagversion))
-            tar.close()
+        tar.add(self.flagversion, self.flagversion)
+        LOG.info('....Adding {!s}'.format(self.flagversion))
+        tar.close()
 
         # Restore the original current working directory
         os.chdir(cwd)
@@ -711,8 +690,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         out_parameterlist_file = os.path.join(products_dir, os.path.basename(parameterlist_name))
 
         LOG.info('Copying parameter list file %s to %s' % (parameterlist_name, out_parameterlist_file))
-        if not self._executor._dry_run:
-            shutil.copy(parameterlist_name, out_parameterlist_file)
+        shutil.copy(parameterlist_name, out_parameterlist_file)
 
         return os.path.basename(out_parameterlist_file)
 
@@ -726,8 +704,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         out_table_file = os.path.join(products_dir, table_file)
 
         LOG.info('Copying product from %s to %s' % (table_file, out_table_file))
-        if not self._executor._dry_run:
-            shutil.copytree(table_file, out_table_file)
+        shutil.copytree(table_file, out_table_file)
 
         return os.path.basename(out_table_file)
 
@@ -753,8 +730,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         #     out_casalog_file = os.path.join(products_dir, oussid + '.' + casalog_name)
 
         LOG.info('Copying casa commands log %s to %s' % (casalog_file, out_casalog_file))
-        if not self._executor._dry_run:
-            shutil.copy(casalog_file, out_casalog_file)
+        shutil.copy(casalog_file, out_casalog_file)
 
         return os.path.basename(out_casalog_file)
 
@@ -781,8 +757,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         #     out_casascript_file = os.path.join(products_dir, oussid + '.' + casascript_name)
 
         LOG.info('Copying casa script file %s to %s' % (casascript_file, out_casascript_file))
-        if not self._executor._dry_run:
-            shutil.copy(casascript_file, out_casascript_file)
+        shutil.copy(casascript_file, out_casascript_file)
 
         return os.path.basename(out_casascript_file)
 
@@ -793,8 +768,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
 
         out_manifest_file = os.path.join(products_dir, manifest_name)
         LOG.info('Creating manifest file %s' % out_manifest_file)
-        if not self._executor._dry_run:
-            pipemanifest.write(out_manifest_file)
+        pipemanifest.write(out_manifest_file)
 
         return out_manifest_file
 
@@ -890,8 +864,8 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         beam_target['positionangle'] = beam_target.pop('pa')
         myia.close()
 
-        # PIPE-1434: increase the target beam from ia.commonbeam() by a small margin to avoid potential 
-        # failures of ia.convolve2d() when the convolution kernel is too small on the minor axis near the 
+        # PIPE-1434: increase the target beam from ia.commonbeam() by a small margin to avoid potential
+        # failures of ia.convolve2d() when the convolution kernel is too small on the minor axis near the
         # numerical precision limit.
         beam_target['major']['value'] *= 1.00001
         beam_target['minor']['value'] *= 1.00001

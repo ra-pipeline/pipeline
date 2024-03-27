@@ -4,11 +4,9 @@ Created on 29 Oct 2014
 @author: sjw
 """
 import collections
-import copy
 import os
 
 import pipeline.infrastructure
-import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.filenamer as filenamer
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
@@ -150,6 +148,34 @@ class T2_4MDetailsGaincalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 plotter = gaincal_displays.GaincalPhaseVsTimeSummaryChart(context, result,
                                                                           result.phaseoffsetresult.final, '')
                 diagnostic_phaseoffset_vs_time_summaries[vis] = plotter.plot()
+
+                # PIPE-1762: add information about spw mapping (if any)
+                for plot in diagnostic_phaseoffset_vs_time_summaries[vis]:
+                    plotspw = plot.parameters['spw']
+                    spw_combined = []  # list of fields in which the spws are combined
+                    spw_mapped = []  # list of target spws and fields in which plotspw is mapped to a target spw
+                    num_fields_with_phase_intent = 0
+                    for ifld, spwmap in ms.spwmaps.items():
+                        if ifld.intent != 'PHASE':
+                            continue
+                        num_fields_with_phase_intent += 1
+                        if spwmap.combine:
+                            spw_combined.append(ifld.field)
+                        elif spwmap.spwmap and spwmap.spwmap[plotspw] != plotspw:
+                            # only add the message if the spw is not mapped onto itself
+                            spw_mapped.append((spwmap.spwmap[plotspw], ifld.field))
+                    # add a message to the caption of diagnostic phase offset plot in case that the spw is mapped.
+                    # in the case of more than one phase calibrator, append the field name in brackets to the spw name.
+                    captionmessage = []
+                    for targetspw, field in spw_mapped:
+                        captionmessage.append('spw {}{}'.format(
+                            targetspw, ' ({})'.format(field) if num_fields_with_phase_intent > 1 else ''))
+                    if spw_combined:
+                        captionmessage.append('all spws combined' + (' ({})'.format(', '.join(spw_combined))
+                                                                     if num_fields_with_phase_intent > 1 else ''))
+                    if captionmessage:
+                        plot.captionmessage = ('This spw is calibrated using the phase solution for {}.'.format(
+                            ', '.join(captionmessage)))
 
             # Generate detailed plots and render corresponding sub-pages.
             if pipeline.infrastructure.generate_detail_plots(result):
@@ -324,7 +350,7 @@ class GaincalPhaseVsTimeDiagnosticPlotRenderer(basetemplates.JsonPlotRenderer):
         title = 'Phase vs time for %s' % vis
         outfile = filenamer.sanitize('diagnostic_phase_vs_time-%s.html' % vis)
 
-        if not isinstance(results, collections.Iterable):
+        if not isinstance(results, collections.abc.Iterable):
             results = [results]
 
         # collect QA results generated for this vis

@@ -6,7 +6,7 @@ import os
 import sys
 import time
 from logging import Logger as pyLogger
-from typing import Any, Callable, Generator, Iterable, List, NewType, Optional, Sequence, Union, Tuple
+from typing import Any, Callable, Dict, Generator, Iterable, List, NewType, Optional, Sequence, Union, Tuple
 
 # Imported for annotation pupose only. Use table in casa_tools in code.
 from casatools import table as casa_table
@@ -62,8 +62,8 @@ def require_virtual_spw_id_handling(observing_run: ObservingRun) -> bool:
                       for spw in ms.get_spectral_windows(science_windows_only=True)])
 
 
-def convert_spw_virtual2real(context, spw_in: str,
-                             mses: List[MeasurementSet] = []) -> dict:
+def convert_spw_virtual2real(context, spw_in: Union[str, int],
+                             mses: List[MeasurementSet] = []) -> Dict[str, str]:
     """Convert virtual spw selection into real spw selection.
 
     Real spw selection can be different among MSes. This method returns
@@ -71,7 +71,8 @@ def convert_spw_virtual2real(context, spw_in: str,
 
     Args:
         context: pipeline context
-        spw_in: virtual spw selection string
+        spw_in: virtual spw selection string (a comma separated list of
+            virtual spw IDs) or an integer ID
         mses: list of measurementset domain objects (optional)
     Returns:
         real spw selection per MS
@@ -79,9 +80,12 @@ def convert_spw_virtual2real(context, spw_in: str,
     spw_out = {}
     observing_run = context.observing_run
     ms_list = mses if mses else context.observing_run.measurement_sets
-    if not isinstance(spw_in, str):
-        raise TypeError('spw_in must be string.')
-    elif len(spw_in) == 0:
+    if isinstance(spw_in, int):
+        spw_in = str(spw_in)
+    elif not isinstance(spw_in, str):
+        raise TypeError('spw_in must be string or integer.')
+    # construct per MS real SpW ID selection dictionary
+    if len(spw_in) == 0:
         spw_out = dict((ms.name, '') for ms in ms_list)
     else:
         # only supports comma-separated spw id list

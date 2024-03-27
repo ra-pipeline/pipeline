@@ -1,4 +1,6 @@
 """Display module for skycal task."""
+import collections
+import glob
 import os
 import matplotlib.pyplot as plt
 import numpy
@@ -14,15 +16,16 @@ from ..common import display as sd_display
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.displays.plotstyle import casa5style_plot
-from typing import TYPE_CHECKING, Any, Dict, List, NoReturn, Union, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, NoReturn, Optional, Union, Tuple
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
-    from pipeline.domain import Field, MeasurementSet
+    from pipeline.domain import Field, MeasurementSet, Scan
     from pipeline.hsd.tasks.skycal.skycal import SDSkyCalResults
     from pipeline.infrastructure.callibrary import CalApplication
     from pipeline.infrastructure.launcher import Context
     from pipeline.infrastructure.jobrequest import JobRequest
+
 
 LOG = logging.get_logger(__name__)
 
@@ -54,7 +57,7 @@ def get_field_from_ms(ms: 'MeasurementSet', field: str) -> List['Field']:
 
 class SingleDishSkyCalDisplayBase(object):
     """Base display class for skycal stage."""
-    
+
     def init_with_field(self, context: 'Context', result: 'SDSkyCalResults', field: str) -> None:
         """Initialize attributes using field information.
 
@@ -90,7 +93,7 @@ class SingleDishSkyCalDisplayBase(object):
 
     def add_field_identifier(self, plots: List[logger.Plot]) -> None:
         """Add field identifier.
-        
+
         Args:
             plots: List of plot object.
         """
@@ -100,7 +103,7 @@ class SingleDishSkyCalDisplayBase(object):
 
     def _update_figfile(self) -> NoReturn:
         """Update the name of figure file.
-        
+
         Raise:
              NotImplementedError
         """
@@ -109,11 +112,11 @@ class SingleDishSkyCalDisplayBase(object):
 
 class SingleDishSkyCalAmpVsFreqSummaryChart(common.PlotbandpassDetailBase, SingleDishSkyCalDisplayBase):
     """Class for plotting Amplitude vs. Frequency summary chart.
-    
+
     The summary charts are displayed in the main page of hsd_skycal in the weblog.
     The chart is plotted for each Measurement Set, Field and Spectral Window.
     """
-    
+
     def __init__(self, context: 'Context', result: 'SDSkyCalResults', field: str) -> None:
         """Initialize the class.
 
@@ -128,6 +131,7 @@ class SingleDishSkyCalAmpVsFreqSummaryChart(common.PlotbandpassDetailBase, Singl
                                                                     overlay='antenna',
                                                                     solutionTimeThresholdSeconds=3600.)
 
+        self.context = context
         # self._figfile structure: {spw_id: {antenna_id: filename}}
         self.spw_ids = list(self._figfile.keys())
         # take any value from the dictionary
@@ -136,10 +140,11 @@ class SingleDishSkyCalAmpVsFreqSummaryChart(common.PlotbandpassDetailBase, Singl
 
     def plot(self) -> List[logger.Plot]:
         """Plot the Amplitude vs. Frequency summary chart.
-        
+
         Return:
             List of plot object.
         """
+        commands = {}
         missing = [spw_id
                    for spw_id in self.spw_ids
                    if not os.path.exists(self._figfile[spw_id])]
@@ -150,7 +155,27 @@ class SingleDishSkyCalAmpVsFreqSummaryChart(common.PlotbandpassDetailBase, Singl
                 showimage = self._rxmap.get(spw_id, "") == "DSB"
                 try:
                     task = self.create_task(spw_id, '', showimage=showimage)
-                    task.execute(dry_run=False)
+                    commands[spw_id] = str(task)
+                    task.execute()
+                except Exception as ex:
+                    LOG.error('Could not create plotbandpass summary plots')
+                    LOG.exception(ex)
+
+        # workaround for CAS-13863
+        # So far, missing plots issue happens only for TP Spectral Scan data
+        missing = [spw_id
+                   for spw_id in self.spw_ids
+                   if not os.path.exists(self._figfile[spw_id])]
+        if missing:
+            LOG.info('Executing plotbandpass again for missing figures')
+            for spw_id in missing:
+                # PIPE-110: show image sideband for DSB receivers.
+                showimage = self._rxmap.get(spw_id, "") == "DSB"
+                try:
+                    task = self.create_task_for_tp_spectral_scan(spw_id, '', showimage=showimage)
+                    commands[spw_id] = str(task)
+                    task.execute()
+                    self.rename_and_clear_figure(spw_id)
                 except Exception as ex:
                     LOG.error('Could not create plotbandpass summary plots')
                     LOG.exception(ex)
@@ -161,13 +186,14 @@ class SingleDishSkyCalAmpVsFreqSummaryChart(common.PlotbandpassDetailBase, Singl
             showimage = self._rxmap.get(spw_id, "") == "DSB"
             if os.path.exists(figfile):
                 task = self.create_task(spw_id, '', showimage=showimage)
+                command = commands.get(spw_id, str(task))
                 wrapper = logger.Plot(figfile,
                                       x_axis=self._xaxis,
                                       y_axis=self._yaxis,
                                       parameters={'vis': self._vis_basename,
                                                   'spw': spw_id,
                                                   'field': self.field_name},
-                                      command=str(task))
+                                      command=command)
                 wrappers.append(wrapper)
             else:
                 LOG.trace('No plotbandpass summary plot found for spw '
@@ -177,7 +203,7 @@ class SingleDishSkyCalAmpVsFreqSummaryChart(common.PlotbandpassDetailBase, Singl
 
     def _update_figfile(self, old_prefix: str, new_prefix: str) -> None:
         """Update the name of figure file.
-        
+
         Args:
             old_prefix: Prefix before updating the name of figure file.
             new_prefix: Prefix after updating the name of figure file.
@@ -194,32 +220,181 @@ class SingleDishSkyCalAmpVsFreqSummaryChart(common.PlotbandpassDetailBase, Singl
             pieces.pop(spw_index - 1)
             self._figfile[spw_id] = '.'.join(pieces)
 
+    def create_task_for_tp_spectral_scan(self, spw_arg: int, antenna_arg: str,
+                                         showimage: bool=False) -> 'JobRequest':
+        """
+        Return plotbandpass task job with a tweaked parameter value.
+
+        A job of plotbandpass is created with
+            solutionTimeThresholdSeconds = a half of exposure time of a scan.
+
+        Args:
+            spw_arg: spw ID
+            antenna_arg: antenna selection string
+            showimage: If True, show the atmospheric curve for the image
+                sideband, too.
+        Returns:
+            A job of plotbandpass task.
+        """
+        kwargs_org = self._kwargs.copy()
+        try:
+            ms = self.context.observing_run.get_ms(self._vis)
+            def __get_sorted_reference_scans(msobj: 'MeasurementSet',
+                                             spw: Optional[Union[int, str,
+                                                                 collections.Sequence]] = None) -> List['Scan']:
+                """
+                Return a list of REFERENCE Scan objects sorted by scan IDs.
+                Args:
+                    msobj: MeasuremetSet object
+                    spw: Spw selection
+                Returns: a list of REFERENCE scan objects sorted by scan ID.
+                """
+                scans = msobj.get_scans(scan_intent='REFERENCE', spw=spw)
+                return sorted(scans, key=lambda s: s.id)
+
+            # The solutionTimeThresholdSeconds should be equal to or smaller than
+            # the time gap between the previous reference scan and a selected scan.
+            myqa = casa_tools.quanta
+            scans_all = __get_sorted_reference_scans(ms)
+            # The first scan of the selected spw
+            scan_spw = __get_sorted_reference_scans(ms, spw=spw_arg)[0]
+            idx_scan_spw = [s.id for s in scans_all].index(scan_spw.id)
+            if idx_scan_spw > 0:
+                start_time_scan_spw = myqa.convert(scan_spw.start_time['m0'], 's')['value']
+                end_time_previous_scan = myqa.convert(scans_all[idx_scan_spw - 1].end_time['m0'], 's')['value']
+                self._kwargs['solutionTimeThresholdSeconds'] = start_time_scan_spw - end_time_previous_scan
+            else: # I don't think this should happen but defining a reasonable value to avoid failure.
+                self._kwargs['solutionTimeThresholdSeconds'] = scan_spw.exposure_time(spw_arg).seconds / 2
+            self._kwargs['scans'] = scan_spw.id
+            task = super().create_task(spw_arg, antenna_arg, showimage)
+        finally:
+            self._kwargs = kwargs_org
+        return task
+
+    def rename_and_clear_figure(self, spw_id: int) -> None:
+        """
+        Select one figure per spw and rename the figure.
+
+        Args:
+            spw_id: Spw ID
+        """
+        figfile = self._figfile[spw_id]
+        if os.path.exists(figfile):
+            return
+
+        prefix, extension = os.path.splitext(self._figroot)
+        pattern = f'{prefix}.spw{spw_id}.t*{extension}'
+        figures = sorted(glob.glob(pattern))
+        if len(figures) == 0:
+            return
+        os.rename(figures[0], figfile)
+        for fig in figures[1:]:
+            os.remove(fig)
 
 class SingleDishSkyCalAmpVsFreqDetailChart(bandpass.BandpassDetailChart, SingleDishSkyCalDisplayBase):
     """Class for plotting Amplitude vs. Frequency detail chart.
-    
-    The detail charts are displayed in the sub page (sky_level_vs_frequency.html) of hsd_skycal 
+
+    The detail charts are displayed in the sub page (sky_level_vs_frequency.html) of hsd_skycal
     in the weblog.
     The chart is plotted for each Measurement Set, Antenna, Field and Spectral Window.
     """
 
+    @staticmethod
+    def get_caltable_from_result(result: 'SDSkyCalResults') -> str:
+        """Extract caltable name from the results object.
+
+        This method assumes result.final contains only one CalApplication
+        object. Results with multiple CalApplication objects is not supported.
+        Empty result will cause an error, too.
+
+        Args:
+            result: Results object generated by hsd_skycal
+
+        Returns:
+            Name of the caltable
+        """
+        assert len(result.final) == 1
+        calapp = result.final[0]
+        caltable = calapp.gaintable.rstrip('/')
+        return caltable
+
+    @staticmethod
+    def get_solution_interval(caltable: str) -> float:
+        """Compute appropriate solution interval for caltable.
+
+        The value should be given to solutionTimeThresholdSeconds
+        parameter when calling plotbandpass.
+
+        Returned value is usually a minimum interval which is
+        stored in the INTERVAL column. In case if minimum time
+        difference, which is a difference of time stamp taken
+        from the TIME column, is shorter than minimum interval,
+        returned value will be based on the time difference
+        rather than interval.
+
+        Args:
+            caltable: Name of the caltable
+
+        Returns:
+            Solution interval in seconds
+        """
+        with casa_tools.TableReader(caltable) as tb:
+            valid_rows = tb.query('not all(FLAG)')
+            intervalcol = valid_rows.getcol('INTERVAL')
+            valid_rows.close()
+
+            antennas = numpy.unique(tb.getcol('ANTENNA1'))
+            timecol = []
+            for a in antennas:
+                selected = tb.query(f'ANTENNA1 == {a}')
+                timecol.append(selected.getcol('TIME'))
+                selected.close()
+
+        max_interval = int(numpy.ceil(intervalcol.max()))
+        min_time_diff_per_antenna = map(
+            lambda x: numpy.diff(numpy.unique(x)).min(),
+            timecol
+        )
+        min_time_diff = int(numpy.floor(min(min_time_diff_per_antenna)))
+
+        LOG.info(f'max_interval is {max_interval}, min_time_diff is {min_time_diff}')
+
+        if max_interval < min_time_diff:
+            solution_interval = max_interval
+        else:
+            # The solution_interval should be shorter than min_time_diff.
+            # Multiply by 0.5 to show this relation explicitly.
+            # You can change numerical factor (0.5) if you want, but
+            # keep in mind that the factor should be positive and should
+            # not exceed 1.0.
+            solution_interval = min_time_diff * 0.5
+
+        LOG.info(f'caltable "{os.path.basename(caltable)}": '
+                 f'solution interval is {solution_interval} sec.')
+
+        return solution_interval
+
     def __init__(self, context: 'Context', result: 'SDSkyCalResults', field: str) -> None:
         """Initialize the class.
-        
-        Args: 
+
+        Args:
             context: Pipeline context.
             result: Pipeline task execution result.
             field: Field string. Either field id or field name.
         """
+        caltable = self.get_caltable_from_result(result)
+        solution_interval = self.get_solution_interval(caltable)
         super(SingleDishSkyCalAmpVsFreqDetailChart, self).__init__(
-            context, result, xaxis='freq', yaxis='amp', showatm=True, overlay='time')
+            context, result, xaxis='freq', yaxis='amp',
+            showatm=True, overlay='time',
+            solutionTimeThresholdSeconds=solution_interval)
 
         self.init_with_field(context, result, field)
 
     def plot(self) -> List[logger.Plot]:
         """Create Amplitude vs. Frequency detail plot.
-        
-        Return: 
+
+        Return:
             List of plot object.
         """
         wrappers = super(SingleDishSkyCalAmpVsFreqDetailChart, self).plot()
@@ -230,7 +405,7 @@ class SingleDishSkyCalAmpVsFreqDetailChart(bandpass.BandpassDetailChart, SingleD
 
     def _update_figfile(self, old_prefix: str, new_prefix: str) -> None:
         """Update the name of figure file.
-        
+
         Args:
             old_prefix: Prefix before updating the name of figure file.
             new_prefix: Prefix after updating the name of figure file.
@@ -243,10 +418,10 @@ class SingleDishSkyCalAmpVsFreqDetailChart(bandpass.BandpassDetailChart, SingleD
 
 class SingleDishPlotmsLeaf(object):
     """Class to execute plotms and return a plot wrapper.
-    
+
     Task arguments for plotms are customized for single dish usecase.
     """
-    
+
     def __init__(
         self,
         context: 'Context',
@@ -313,7 +488,7 @@ class SingleDishPlotmsLeaf(object):
 
     def plot(self) -> List[logger.Plot]:
         """Generate a sky calibration plot.
-        
+
         Return:
             List of plot object.
         """
@@ -345,7 +520,7 @@ class SingleDishPlotmsLeaf(object):
 
     def _create_task(self, title: str, figfile: str) -> 'JobRequest':
         """Create task of CASA plotms.
-        
+
         Args:
             title: Title of figure
             figfile: Name of figure file
@@ -370,11 +545,11 @@ class SingleDishPlotmsLeaf(object):
 
     def _get_plot_object(self, figfile: str, task: 'JobRequest') -> logger.Plot:
         """Generate parameters and return logger.Plot.
-        
+
         Args:
             figfile: Name of figure file.
             task: JobRequest object.
-                
+
         Return:
             logger.Plot
         """
@@ -392,32 +567,32 @@ class SingleDishPlotmsLeaf(object):
 
 class SingleDishPlotmsAntComposite(common.AntComposite):
     """Class to create a PlotLeaf for each antenna."""
-    
+
     leaf_class = SingleDishPlotmsLeaf
 
 
 class SingleDishPlotmsSpwComposite(common.SpwComposite):
     """Class to create a PlotLeaf for each spw."""
-    
+
     leaf_class = SingleDishPlotmsLeaf
 
 
 class SingleDishPlotmsAntSpwComposite(common.AntSpwComposite):
     """Class to create a PlotLeaf for each antenna and spw."""
-    
+
     leaf_class = SingleDishPlotmsSpwComposite
 
 
 class SingleDishSkyCalAmpVsTimeSummaryChart(SingleDishPlotmsSpwComposite):
     """Class for plotting Amplitude vs. Time summary chart.
-    
+
     The summary charts are displayed in the main page of hsd_skycal in the weblog.
     The chart is plotted for each Measurement Set, Field and Spectral Window.
     """
-    
+
     def __init__(self, context: 'Context', result: 'SDSkyCalResults', calapp: 'CalApplication') -> None:
         """Initialize the class.
-        
+
         Args:
             context: Pipeline context.
             result: SDSkyCalResults instance.
@@ -431,14 +606,14 @@ class SingleDishSkyCalAmpVsTimeSummaryChart(SingleDishPlotmsSpwComposite):
 class SingleDishSkyCalAmpVsTimeDetailChart(SingleDishPlotmsAntSpwComposite):
     """Class for plotting Amplitude vs. Time detail chart.
 
-    The detail charts are displayed in the sub page (sky_level_vs_time.html) of hsd_skycal 
+    The detail charts are displayed in the sub page (sky_level_vs_time.html) of hsd_skycal
     in the weblog.
     The chart is plotted for each Measurement Set, Antenna, Field and Spectral Window.
     """
-    
+
     def __init__(self, context: 'Context', result: 'SDSkyCalResults', calapp: 'CalApplication') -> None:
         """Initialize the class.
-        
+
         Args:
             context: Pipeline context.
             result: SDSkyCalResults instance.
@@ -451,13 +626,13 @@ class SingleDishSkyCalAmpVsTimeDetailChart(SingleDishPlotmsAntSpwComposite):
 
 class SingleDishSkyCalIntervalVsTimeDisplay(common.PlotbandpassDetailBase, SingleDishSkyCalDisplayBase):
     """Class to execute pyplot and return a plot (figure) of Interval vs. Time.
-    
+
     If figtype='summary', the first spw is used, while all spw are used if figtype='detail'.
     """
-    
+
     def __init__(self, context: 'Context', result: 'SDSkyCalResults', calapp: 'CalApplication', figtype: str='') -> None:
         """Initialize the class.
-        
+
         Args:
             context: Pipeline context.
             result: SDSkyCalResults instance.
@@ -473,7 +648,7 @@ class SingleDishSkyCalIntervalVsTimeDisplay(common.PlotbandpassDetailBase, Singl
     @casa5style_plot
     def plot(self) -> List[logger.Plot]:
         """Generate a Interval vs, Time plot.
-                
+
         Return:
             List of logger.Plot.
         """
@@ -562,13 +737,13 @@ class SingleDishSkyCalIntervalVsTimeDisplay(common.PlotbandpassDetailBase, Singl
 
 @casa5style_plot
 def plot_elevation_difference(
-        context: 'Context', 
-        result: 'SDSkyCalResults', 
-        eldiff: Dict, 
+        context: 'Context',
+        result: 'SDSkyCalResults',
+        eldiff: Dict,
         threshold: float=3.0
         ) -> List[logger.Plot]:
     """Generate plot of elevation difference.
-    
+
     Args:
         context: Pipeline context.
         result: SDSkyCalResults instance.
@@ -603,7 +778,7 @@ def plot_elevation_difference(
 
     def init_figure(figure_id: str) -> Tuple['Axes', 'Axes']:
         """Initialize the figure.
-        
+
         Args:
             figure_id: ID of figure.
         Return:
@@ -627,7 +802,7 @@ def plot_elevation_difference(
 
     def finalize_figure(figure_id: Union[str, int], vis: str, field_name: str, antenna_name: str) -> None:
         """Set axes, label, legend and title for the elevation difference figure.
-        
+
         Args:
             figure_id: ID of figure.
             vis: Name of Measurement Set.
@@ -735,7 +910,7 @@ def plot_elevation_difference(
                 xoff = sd_display.mjd_to_plotval(eld.timecal)
                 for a in [a0, a2]:
                     a.plot(xon, eld.elon, '.', color='black', mew=0)
-                    a.plot(xoff, eld.elcal, '.-', color='blue', mew=0)
+                    a.plot(xoff, eld.elcal, '.', color='blue', mew=0)
 
                 # Elevation Difference vs. Time
                 time0 = eld.time0

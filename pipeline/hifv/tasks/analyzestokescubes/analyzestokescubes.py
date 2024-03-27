@@ -1,10 +1,10 @@
-import glob
 import collections
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.vdp as vdp
 from pipeline.infrastructure import task_registry, casa_tools
+import pipeline.infrastructure.utils as utils
 
 import copy
 
@@ -63,8 +63,8 @@ class Analyzestokescubes(basetask.StandardTaskTemplate):
         # get the roi property and append them into the roi properties
         for imageitem in imlist:
 
-            img_name = glob.glob(imageitem['imagename'].replace('.subim', '.pbcor.tt0.subim'))[0]
-            rms_name = glob.glob(imageitem['imagename'].replace('.subim', '.pbcor.tt0.rms.subim'))[0]
+            img_name = utils.glob_ordered(imageitem['imagename'].replace('.subim', '.pbcor.tt0.subim'))[0]
+            rms_name = utils.glob_ordered(imageitem['imagename'].replace('.subim', '.pbcor.tt0.rms.subim'))[0]
             LOG.info(f'Getting properties from {img_name} and {rms_name}')
 
             with casa_tools.ImagepolReader(img_name) as imagepol:
@@ -122,7 +122,7 @@ class Analyzestokescubes(basetask.StandardTaskTemplate):
         frequency_list = []
         imagename_list = []
         for imageitem in imlist:
-            img_name = glob.glob(imageitem['imagename'].replace('.subim', '.pbcor.tt0.subim'))[0]
+            img_name = utils.glob_ordered(imageitem['imagename'].replace('.subim', '.pbcor.tt0.subim'))[0]
             imagename_list.append(img_name)
             with casa_tools.ImageReader(img_name) as image:
                 frequency_list.append(image.coordsys().referencevalue(

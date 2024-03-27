@@ -1,14 +1,14 @@
 """
 recipereducer is a utility to reduce data using a standard pipeline procedure.
 It parses a XML reduction recipe, converts it to pipeline tasks, and executes
-the tasks for the given data. It was written to give pipeline developers 
+the tasks for the given data. It was written to give pipeline developers
 without access to PPRs and/or a PPR generator a way to reduce data using the
 latest standard recipe.
 
 Note: multiple input datasets can be specified. Doing so will reduce the data
       as part of the same session.
 
-Example #1: process uid123.tar.gz using the standard recipe. 
+Example #1: process uid123.tar.gz using the standard recipe.
 
     import pipeline.recipereducer
     pipeline.recipereducer.reduce(vis=['uid123.tar.gz'])
@@ -16,24 +16,24 @@ Example #1: process uid123.tar.gz using the standard recipe.
 Example #2: process uid123.tar.gz using a named recipe.
 
     import pipeline.recipereducer
-    pipeline.recipereducer.reduce(vis=['uid123.tar.gz'], 
+    pipeline.recipereducer.reduce(vis=['uid123.tar.gz'],
                                   procedure='procedure_hif.xml')
 
 Example #3: process uid123.tar.gz and uid124.tar.gz using the standard recipe.
 
     import pipeline.recipereducer
-    pipeline.recipereducer.reduce(vis=['uid123.tar.gz', 'uid124.tar.gz']) 
+    pipeline.recipereducer.reduce(vis=['uid123.tar.gz', 'uid124.tar.gz'])
 
 Example #4: process uid123.tar.gz, naming the context 'testrun', thus
-            directing all weblog output to a directory called 'testrun'. 
+            directing all weblog output to a directory called 'testrun'.
 
     import pipeline.recipereducer
-    pipeline.recipereducer.reduce(vis=['uid123.tar.gz'], name='testrun') 
-    
+    pipeline.recipereducer.reduce(vis=['uid123.tar.gz'], name='testrun')
+
 Example #5: process uid123.tar.gz with a log level of TRACE
 
     import pipeline.recipereducer
-    pipeline.recipereducer.reduce(vis=['uid123.tar.gz'], loglevel='trace') 
+    pipeline.recipereducer.reduce(vis=['uid123.tar.gz'], loglevel='trace')
 
 """
 import ast
@@ -139,7 +139,7 @@ def _get_tasks(context, args, procedure):
         task = task_class(task_inputs)
         task._hif_call = _as_task_call(task_class, task_args)
         # we yield rather than return so that the context can be updated
-        # between task executions 
+        # between task executions
         yield task
 
 
@@ -202,7 +202,7 @@ def reduce(vis=None, infiles=None, procedure='procedure_hifa_calimage.xml',
             LOG.info('Executing pipeline task %s' % task._hif_call)
 
             try:
-                result = task.execute(dry_run=False)
+                result = task.execute()
                 result.accept(context)
             except Exception as ex:
                 # Log message if an exception occurred that was not handled by

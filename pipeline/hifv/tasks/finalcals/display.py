@@ -34,7 +34,7 @@ class finalcalsSummaryChart(object):
                          title='K table: finaldelay.tbl   Antenna: {!s}'.format('0~2'),
                          titlefont=8, xaxisfont=7, yaxisfont=7, showgui=False, plotfile=figfile)
 
-        job.execute(dry_run=False)
+        job.execute()
 
     def get_figfile(self):
         return os.path.join(self.context.report_dir, 'stage%s' % self.result.stage_number,
@@ -118,7 +118,7 @@ class finalDelaysPerAntennaChart(object):
                                          titlefont=8, xaxisfont=7, yaxisfont=7, showgui=False, plotfile=figfile,
                                          xconnector='step')
 
-                        job.execute(dry_run=False)
+                        job.execute()
 
                     except Exception as ex:
                         LOG.warning("Unable to plot " + filename + str(ex))
@@ -206,7 +206,7 @@ class finalphaseGainPerAntennaChart(object):
                                          titlefont=8, xaxisfont=7, yaxisfont=7, showgui=False, plotfile=figfile,
                                          xconnector='line')
 
-                        job.execute(dry_run=False)
+                        job.execute()
 
                     except Exception as ex:
                         LOG.warning("Unable to plot " + filename + str(ex))
@@ -314,7 +314,7 @@ class finalbpSolAmpPerAntennaChart(object):
                                          titlefont=8, xaxisfont=7, yaxisfont=7, showgui=False, plotfile=figfile,
                                          xconnector='step')
 
-                        job.execute(dry_run=False)
+                        job.execute()
 
                     except Exception as ex:
                         LOG.warning("Unable to plot " + filename + str(ex))
@@ -425,7 +425,7 @@ class finalbpSolPhasePerAntennaChart(object):
                                          titlefont=8, xaxisfont=7, yaxisfont=7, showgui=False, plotfile=figfile,
                                          xconnector='step')
 
-                        job.execute(dry_run=False)
+                        job.execute()
 
                     except Exception as ex:
                         LOG.warning("Unable to plot " + filename + str(ex))
@@ -515,7 +515,7 @@ class finalbpSolPhaseShortPerAntennaChart(object):
                                          titlefont=8, xaxisfont=7, yaxisfont=7, showgui=False, plotfile=figfile,
                                          xconnector='line')
 
-                        job.execute(dry_run=False)
+                        job.execute()
 
                     except Exception as ex:
                         LOG.warning("Unable to plot " + filename + str(ex))
@@ -612,7 +612,7 @@ class finalAmpTimeCalPerAntennaChart(object):
                                          titlefont=8, xaxisfont=7, yaxisfont=7, showgui=False, plotfile=figfile,
                                          xconnector='line')
 
-                        job.execute(dry_run=False)
+                        job.execute()
 
                     except Exception as ex:
                         LOG.warning("Unable to plot " + filename + str(ex))
@@ -703,7 +703,7 @@ class finalAmpFreqCalPerAntennaChart(object):
                                          titlefont=8, xaxisfont=7, yaxisfont=7, showgui=False, plotfile=figfile,
                                          xconnector='step')
 
-                        job.execute(dry_run=False)
+                        job.execute()
 
                     except Exception as ex:
                         LOG.warning("Unable to plot " + filename + str(ex))
@@ -793,7 +793,7 @@ class finalPhaseGainCalPerAntennaChart(object):
                                          titlefont=8, xaxisfont=7, yaxisfont=7, showgui=False, plotfile=figfile,
                                          xconnector='line')
 
-                        job.execute(dry_run=False)
+                        job.execute()
 
                     except Exception as ex:
                         LOG.warning("Problem with plotting " + filename + str(ex))

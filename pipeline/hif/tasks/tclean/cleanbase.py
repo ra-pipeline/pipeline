@@ -1,16 +1,12 @@
 import os
 import traceback
 
-import numpy as np
-
-import pipeline as pipeline
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 import pipeline.infrastructure.imageheader as imageheader
-from pipeline import environment
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import logging
@@ -28,6 +24,8 @@ class CleanBaseInputs(vdp.StandardInputs):
 
     antenna = vdp.VisDependentProperty(default='')
     datacolumn = vdp.VisDependentProperty(default='')
+    datatype = vdp.VisDependentProperty(default='')
+    datatype_info = vdp.VisDependentProperty(default='')
     deconvolver = vdp.VisDependentProperty(default='')
     cycleniter = vdp.VisDependentProperty(default=-999)
     cyclefactor = vdp.VisDependentProperty(default=-999.0)
@@ -63,6 +61,7 @@ class CleanBaseInputs(vdp.StandardInputs):
     pblimit = vdp.VisDependentProperty(default=0.2)
     is_per_eb = vdp.VisDependentProperty(default=False)
     phasecenter = vdp.VisDependentProperty(default='')
+    psf_phasecenter = vdp.VisDependentProperty(default='')
     restoringbeam = vdp.VisDependentProperty(default='common')
     robust = vdp.VisDependentProperty(default=-999.0)
     savemodel = vdp.VisDependentProperty(default='none')
@@ -120,11 +119,11 @@ class CleanBaseInputs(vdp.StandardInputs):
     def spwsel(self):
         return []
 
-    def __init__(self, context, output_dir=None, vis=None, imagename=None, datacolumn=None, intent=None, field=None,
+    def __init__(self, context, output_dir=None, vis=None, imagename=None, datacolumn=None, datatype=None, datatype_info=None, intent=None, field=None,
                  spw=None, spwsel=None, spwsel_all_cont=None, uvrange=None, orig_specmode=None, specmode=None, gridder=None, deconvolver=None,
                  uvtaper=None, nterms=None, cycleniter=None, cyclefactor=None, hm_minpsffraction=None,
                  hm_maxpsffraction=None, scales=None, outframe=None, imsize=None,
-                 cell=None, phasecenter=None, nchan=None, start=None, width=None, stokes=None, weighting=None,
+                 cell=None, phasecenter=None, psf_phasecenter=None, nchan=None, start=None, width=None, stokes=None, weighting=None,
                  robust=None, restoringbeam=None, iter=None, mask=None, savemodel=None, startmodel=None, hm_masking=None,
                  hm_sidelobethreshold=None, hm_noisethreshold=None, hm_lownoisethreshold=None, wprojplanes=None,
                  hm_negativethreshold=None, hm_minbeamfrac=None, hm_growiterations=None, hm_dogrowprune=None,
@@ -139,6 +138,8 @@ class CleanBaseInputs(vdp.StandardInputs):
 
         self.imagename = imagename
         self.datacolumn = datacolumn
+        self.datatype = datatype
+        self.datatype_info = datatype_info
         self.intent = intent
         self.field = field
         self.spw = spw
@@ -162,6 +163,7 @@ class CleanBaseInputs(vdp.StandardInputs):
         self.imsize = imsize
         self.cell = cell
         self.phasecenter = phasecenter
+        self.psf_phasecenter = psf_phasecenter
         self.nchan = nchan
         self.start = start
         self.width = width
@@ -206,7 +208,7 @@ class CleanBaseInputs(vdp.StandardInputs):
         self.rotatepastep = rotatepastep
         self.heuristics = heuristics
         self.calcpsf = calcpsf
-        self.calcres = calcres        
+        self.calcres = calcres
 
 
 class CleanBase(basetask.StandardTaskTemplate):
@@ -234,12 +236,16 @@ class CleanBase(basetask.StandardTaskTemplate):
                                    'stage%s' % inputs.context.stage.split('_')[0])
             field_ids = inputs.heuristics.field(inputs.intent, inputs.field)
             result = TcleanResult(vis=inputs.vis,
+                                  datacolumn=inputs.datacolumn,
+                                  datatype=inputs.datatype,
+                                  datatype_info=inputs.datatype_info,
                                   sourcename=inputs.field,
                                   field_ids=field_ids,
                                   intent=inputs.intent,
                                   spw=inputs.spw,
                                   orig_specmode=inputs.orig_specmode,
                                   specmode=inputs.specmode,
+                                  stokes=inputs.stokes,
                                   multiterm=inputs.nterms if inputs.deconvolver == 'mtmfs' else None,
                                   plotdir=plotdir, imaging_mode=inputs.heuristics.imaging_mode,
                                   is_per_eb=inputs.is_per_eb,
@@ -250,8 +256,10 @@ class CleanBase(basetask.StandardTaskTemplate):
         try:
             result = self._do_clean_cycle(scanidlist, result, iter=inputs.iter)
         except Exception as e:
-            LOG.error('%s/%s/spw%s clean error: %s' % (inputs.field, inputs.intent, inputs.spw, str(e)))
-            result.error = '%s/%s/spw%s clean error: %s' % (inputs.field, inputs.intent, inputs.spw, str(e))
+            error_msg = ('Cleaning failure for field {!s}, intent {!s}, specmode {!s}, spw {!s}, iteration {!s}: {!s}'.
+                         format(inputs.field, inputs.intent, inputs.specmode, inputs.spw, inputs.iter, e))
+            result.error = CleanBaseError(error_msg, 'Cleaning failure')
+            LOG.error(error_msg)
             LOG.info(traceback.format_exc())
         return result
 
@@ -319,7 +327,7 @@ class CleanBase(basetask.StandardTaskTemplate):
             'niter':         inputs.niter,
             'threshold':     inputs.threshold,
             'deconvolver':   inputs.deconvolver,
-            'interactive':   0,
+            'interactive':   False,
             'nchan':         inputs.nchan,
             'start':         inputs.start,
             'width':         inputs.width,
@@ -336,14 +344,16 @@ class CleanBase(basetask.StandardTaskTemplate):
             'perchanweightdensity':  inputs.hm_perchanweightdensity,
             'npixels':    inputs.hm_npixels,
             'parallel':     parallel,
-            'wbawp':        inputs.wbawp
-            }
+            'wbawp':        inputs.wbawp,
+            'fullsummary':   True
+        }
 
         # Set special phasecenter and outframe for ephemeris objects.
         # Needs to be done here since the explicit coordinates are
         # used in heuristics methods upstream.
         if inputs.heuristics.is_eph_obj(inputs.field):
             tclean_job_parameters['phasecenter'] = 'TRACKFIELD'
+            tclean_job_parameters['psfphasecenter'] = None
             # 2018-08-13: Spectral tracking has been implemented via a new
             # specmode option (CAS-11766).
             if inputs.specmode == 'cube':
@@ -358,6 +368,11 @@ class CleanBase(basetask.StandardTaskTemplate):
             #tclean_job_parameters['parallel'] = False
         else:
             tclean_job_parameters['phasecenter'] = inputs.phasecenter
+            if inputs.gridder == 'mosaic' and inputs.psf_phasecenter != inputs.phasecenter:
+                tclean_job_parameters['psfphasecenter'] = inputs.psf_phasecenter
+                result.used_psfphasecenter = True
+            else:
+                tclean_job_parameters['psfphasecenter'] = None
             tclean_job_parameters['outframe'] = inputs.outframe
 
         if scanidlist not in [[], None]:
@@ -535,7 +550,7 @@ class CleanBase(basetask.StandardTaskTemplate):
                 tclean_job_parameters['mosweight'] = mosweight
 
         tclean_job_parameters['nsigma'] = inputs.heuristics.nsigma(iter, inputs.hm_nsigma, inputs.hm_masking)
-        tclean_job_parameters['wprojplanes'] = inputs.heuristics.wprojplanes()
+        tclean_job_parameters['wprojplanes'] = inputs.heuristics.wprojplanes(gridder=inputs.gridder, spwspec=inputs.spw)
         tclean_job_parameters['rotatepastep'] = inputs.heuristics.rotatepastep()
         tclean_job_parameters['smallscalebias'] = inputs.heuristics.smallscalebias()
         tclean_job_parameters['usepointing'] = inputs.heuristics.usepointing()
@@ -547,6 +562,10 @@ class CleanBase(basetask.StandardTaskTemplate):
         # With CASA 6.2.0-57 the cube refactor is in place and the two step
         # process is no longer needed (PIPE-980). See removed code at:
         # https://open-bitbucket.nrao.edu/projects/PIPE/repos/pipeline/browse/pipeline/hif/tasks/tclean/cleanbase.py?at=15e495a29d0bfc93892c65eceb660d61a1805790#521
+
+        # PIPE-1672: use fullsummary=False for cube imaging to avoid potential MPIbuffer-related issues.
+        if 'cube' in tclean_job_parameters['specmode']:
+            tclean_job_parameters['fullsummary'] = False
 
         job = casa_tasks.tclean(**tclean_job_parameters)
         tclean_result = self._executor.execute(job)
@@ -661,7 +680,7 @@ class CleanBase(basetask.StandardTaskTemplate):
             for name in name_list:
                 if os.path.exists(name):
                     imageheader.set_miscinfo(name=name, spw=inputs.spw, virtspw=virtspw, field=inputs.field,
-                                             type=im_type, iter=iter,
+                                             datatype=inputs.datatype, type=im_type, iter=iter,
                                              intent=inputs.intent, specmode=inputs.orig_specmode,
                                              robust=inputs.robust, weighting=inputs.weighting,
                                              is_per_eb=inputs.is_per_eb,
@@ -689,14 +708,14 @@ class CleanBase(basetask.StandardTaskTemplate):
         result.set_imaging_params(iter, tclean_job_parameters)
 
         # This operation is used as a workaround for CAS-13401 and can be removed after the CAS ticket is resolved.
-        if tclean_job_parameters['stokes'] != 'I':
+        if tclean_job_parameters['stokes'] != 'I' and inputs.heuristics.imaging_mode != 'ALMA':
             self._copy_restoringbeam_from_psf(tclean_job_parameters['imagename'])
 
         return result
 
     def _copy_restoringbeam_from_psf(self, imagename):
         """Copy the per-plane beam set from .psf image to .image/.residual.
-        
+
         Note: this is a short-term workaround for CAS-13401, in which CASA/tclean(stokes='IQUV') doesn't save
               the per-plane restoring beam information into the residual and restored images.
         """

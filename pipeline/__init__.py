@@ -1,3 +1,5 @@
+"""Pipeline software package
+"""
 import atexit
 import http.server
 import os
@@ -5,10 +7,6 @@ import pathlib
 import pkg_resources
 import threading
 import webbrowser
-
-# required to get extern eggs on sys.path. This has to come first, before any
-# modules that depend on them.
-from . import extern
 
 from . import domain
 from . import environment
@@ -146,29 +144,25 @@ def stop_weblog():
             LOG.info(serve_message.format(host=sa[0], port=sa[1]))
             HTTP_SERVER = None
 
-
-def initcli():
+def initcli(user_globals=None):
     LOG.info('Initializing cli...')
-    my_globals = find_frame()
-    exec('from casashell import extra_task_modules', my_globals)
+    if user_globals is None:
+        my_globals = find_frame()
+    else:
+        my_globals = user_globals
+
     for package in ['h', 'hif', 'hifa', 'hifas', 'hifv', 'hsd', 'hsdn']:
         abs_cli_package = 'pipeline.{package}.cli'.format(package=package)
-        abs_gotasks_package = 'pipeline.{package}.cli.gotasks'.format(package=package)
         try:
             # Check the existence of the generated __init__ modules
             path_to_cli_init = pkg_resources.resource_filename(abs_cli_package, '__init__.py'.format(package))
-            path_to_gotasks_init = pkg_resources.resource_filename(abs_gotasks_package, '__init__.py'.format(package))
         except ImportError as e:
             LOG.debug('Import error: {!s}'.format(e))
             LOG.info('No tasks found for package: {!s}'.format(package))
         else:
             # Instantiate the pipeline tasks for the given package
-            exec('from {} import *'.format(abs_gotasks_package), my_globals)
-            # Add the tasks to taskhelp()
-            exec('import {} as {}_cli'.format(abs_cli_package, package), my_globals)
-            exec('extra_task_modules.append({}_cli)'.format(package), my_globals)
-            LOG.info('Loaded CASA tasks from package: {!s}'.format(package))
-
+            exec('from {} import *'.format(abs_cli_package), my_globals)
+            LOG.info('Loaded Pipeline commands from package: {!s}'.format(package))
 
 revision = environment.pipeline_revision
 
@@ -183,6 +177,13 @@ def log_host_environment():
             environment.host_distribution)
 
         LOG.info('Host environment: {!s}'.format(host_summary))
+        LOG.debug('Dependency details:')
+        for dep_name, dep_detail in environment.dependency_details.items():
+            if dep_detail is None:
+                LOG.debug('  {!s} : {!s}'.format(dep_name, 'not found'))
+            else:
+                LOG.debug('  {!s} = {!s} : {!s}'.format(
+                    dep_name, dep_detail['version'], dep_detail['path']))
     except NotImplemented:
         pass
 

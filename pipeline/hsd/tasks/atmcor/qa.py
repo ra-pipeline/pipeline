@@ -50,7 +50,7 @@ class SDATMCorrectionQAHandler(pqa.QAPlugin):
 class SDATMCorrectionListQAHandler(pqa.QAPlugin):
     """QA handler for hsd_atmcor stage."""
 
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = atmcor.SDATMCorrectionResults
 
     def handle(self, context: Context, result: result_cls):

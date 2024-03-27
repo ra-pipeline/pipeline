@@ -8,7 +8,8 @@ import platform
 import subprocess
 import threading
 
-import pipeline.extern.ps_mem as ps_mem
+import ps_mem
+
 from .. import jobrequest
 from .. import logging
 from .. import mpihelpers

@@ -56,7 +56,7 @@ class NewTask:
             area=area, task=task_name, captask=task_name.capitalize()))
         task = eval('pipeline.{area}.tasks.{task}.{captask}(inputs)'.format(
             area=area, task=task_name, captask=task_name.capitalize()))
-        result = task.execute(dry_run=False)
+        result = task.execute()
         result.accept(context)
         context.save()
 

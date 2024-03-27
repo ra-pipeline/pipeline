@@ -75,7 +75,7 @@ class Targetflag(basetask.StandardTaskTemplate):
             LOG.info('Applying pre-existing cal tables.')
             acinputs = applycal.IFApplycalInputs(
                 context=inputs.context, vis=inputs.vis, intent='TARGET', flagsum=False, flagbackup=False)
-            actask = applycal.IFApplycal(acinputs)
+            actask = applycal.SerialIFApplycal(acinputs)
             acresult = self._executor.execute(actask, merge=True)
             # copy across the vis:callibrary dict to our result. This dict 
             # will be inspected by the renderer to know if/which callibrary

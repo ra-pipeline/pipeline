@@ -84,9 +84,18 @@ class WVRPhaseVsBaselineChart(object):
         return set(self.result.dataresult.inputs['qa_intent'].split(','))
 
     def _get_plot_scans(self):
+        # PIPE-851: return only scans that match the plot intents and with SpW
+        # matching the gaintable SpW.
+
+        # If no valid QA SpW was set for this data result, then no valid
+        # matching scans can be found.
+        if not self.result.dataresult.qa_wvr.qa_spw:
+            return []
+
         plot_intents = self._get_plot_intents()
-        return [scan for scan in self.ms.scans
-                if not plot_intents.isdisjoint(scan.intents)]
+        qa_spw = int(self.result.dataresult.qa_wvr.qa_spw)
+        return [scan for scan in self.ms.scans if not plot_intents.isdisjoint(scan.intents)
+                for scan_spw in scan.spws if scan_spw.id == qa_spw]
 
     def get_symbol_and_colour(self, pol, state='BEFORE'):
         """
@@ -401,7 +410,7 @@ class WVRPhaseVsBaselineChart(object):
         # won't have values yet.
         fig.canvas.draw()
         # omit the last y axis tick label from the lower plot
-        ax2.set_yticklabels([t.get_text() for t in ax2.get_yticklabels()[0:-1]])
+        ax2.get_yticklabels()[-1].set_visible(False)   # PIPE-1673
 
         figfile = self.get_figfile(spw, scans, helper.antenna_filename_component)
         plt.savefig(figfile)
@@ -474,10 +483,11 @@ class WVRPhaseOffsetPlot(phaseoffset.PhaseOffsetPlot):
         ms = context.observing_run.get_ms(vis)
         plothelper = WVRPhaseOffsetPlotHelper(context, result.dataresult)
         scan_intent = result.dataresult.inputs['qa_intent']
+        scan_spw = result.dataresult.qa_wvr.qa_spw
         score_retriever = WVRScoreFinder(result.viewresult)
 
-        super(WVRPhaseOffsetPlot, self).__init__(
-            context, ms, plothelper, scan_intent=scan_intent, score_retriever=score_retriever)
+        super().__init__(context, ms, plothelper, scan_intent=scan_intent, scan_spw=scan_spw,
+                         score_retriever=score_retriever)
 
 
 class WVRPhaseOffsetSummaryPlotHelper(WVRPhaseOffsetPlotHelper):
@@ -491,7 +501,8 @@ class WVRPhaseOffsetSummaryPlot(phaseoffset.PhaseOffsetPlot):
         ms = context.observing_run.get_ms(vis)
         plothelper = WVRPhaseOffsetSummaryPlotHelper(context, result.dataresult)
         scan_intent = result.dataresult.inputs['qa_intent']
+        scan_spw = result.dataresult.qa_wvr.qa_spw
         score_retriever = WVRScoreFinder(result.viewresult)
 
-        super(WVRPhaseOffsetSummaryPlot, self).__init__(
-            context, ms, plothelper, scan_intent=scan_intent, score_retriever=score_retriever)
+        super().__init__(context, ms, plothelper, scan_intent=scan_intent, scan_spw=scan_spw,
+                         score_retriever=score_retriever)

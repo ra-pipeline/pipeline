@@ -347,7 +347,7 @@ class MetaDataReader(object):
         # key: antenna id
         # value: list of rows to be flagged
         try:
-            flagdict1 = self.generate_flagdict_for_invalid_pointing_data()
+            flagdict1, _ = self.generate_flagdict_for_invalid_pointing_data()
         except Exception:
             flagdict1 = {}
 
@@ -382,19 +382,18 @@ class MetaDataReader(object):
         self._generate_flagcmd(self.flagtemplate, flagdict1, reason='missing pointing data')
         self._generate_flagcmd(self.flagtemplate, flagdict2, reason='uniform image rms')
 
-    def generate_flagdict_for_invalid_pointing_data(self) -> collections.defaultdict:
-        """Return row IDs of DataTable with invalid pointing information.
+    def generate_flagdict_for_invalid_pointing_data(self) -> Tuple[collections.defaultdict, List[str]]:
+        """Return row IDs of DataTable with invalid pointing information and a list of message.
 
         Returns:
-            collections.defaultdict: dictionary of invalid pointing data
+            Tuple: contains dictionary of invalid pointing data and a list of message
         """
-        if len(self.invalid_pointing_data) > 0:
-            LOG.warning('There are rows without corresponding POINTING data. Affected rows are identified and will be flagged in hsd_flagdata stage.')
-            LOG.warning('Affected antennas are: {} in {}'.format(
-                ' '.join([self.ms.antennas[k].name for k in self.invalid_pointing_data]),
-                self.ms.basename))
 
-        return self.invalid_pointing_data
+        msglist = []
+        if len(self.invalid_pointing_data) > 0:
+            msg = 'There are rows without corresponding POINTING data. Affected rows are identified and will be flagged in hsd_flagdata stage. Affected antennas are: {} in {}'.format(' '.join([self.ms.antennas[k].name for k in self.invalid_pointing_data]), self.ms.basename)
+            msglist.append(msg)
+        return self.invalid_pointing_data, msglist
 
     def generate_flagdict_for_uniform_rms(self) -> Dict[Tuple[int, int], numpy.ndarray]:
         """Return row IDs of DataTable to flag.
@@ -403,7 +402,7 @@ class MetaDataReader(object):
             Dict: contains list of row IDs of datatable
         """
         # keys for dictionary are (spw_id, antenna_id) tuples
-        flagdict = rasterutil.flag_raster_map(self.datatable)
+        flagdict = rasterutil.flag_raster_map(self.datatable, self.ms)
 
         return flagdict
 
@@ -450,16 +449,12 @@ class MetaDataReader(object):
         cmd_merged = merge_flagcmd(cmdlist)
         write_flagcmd(flagtemplate, cmd_merged, reason)
 
-    def execute(self, dry_run: bool = True) -> Dict[str, Dict[str, Union[str, Dict]]]:
+    def execute(self) -> Dict[str, Dict[str, Union[str, Dict]]]:
         """Read MeasurementSet and fill DataTable.
 
-        Args:
-            dry_run: flag of dry run
         Returns:
             Dict: dictionary of ephemeris sources
         """
-        if dry_run:
-            return
 
         # name of the MS
         name = self.name
@@ -647,7 +642,7 @@ class MetaDataReader(object):
             field_ids = tb.getcol('FIELD_ID')
             getsourcename = numpy.vectorize(lambda x: ms.get_fields(x)[0].source.name, otypes=['str'])
             Tsrc = getsourcename(field_ids)
-            NchanArray = numpy.fromiter((nchan_map[n] for n in Tif), dtype=numpy.int)
+            NchanArray = numpy.fromiter((nchan_map[n] for n in Tif), dtype=int)
 
         ID = len(self.datatable)
         LOG.info('ID=%s' % ID)
@@ -891,21 +886,29 @@ class MetaDataReader(object):
         """
         outref = None
 
+        dirrefs = []
+
         if self.ms.representative_target[0] is not None:
             # if ms has representative target, take reference from that
             LOG.info(
                 'Use direction reference for representative target "{0}".'.format(self.ms.representative_target[0]))
             representative_source_name = self.ms.representative_target[0]
-            dirrefs = numpy.unique([f.mdirection['refer'] for f in self.ms.fields
-                                    if f.source.name == representative_source_name])
-            if len(dirrefs) == 0:
-                raise RuntimeError('Failed to get direction reference for representative source.')
-        else:
-            # if representative target is not given, take reference from one of the targets
-            dirrefs = numpy.unique([f.mdirection['refer'] for f in self.ms.fields if 'TARGET' in f.intents])
+            dirrefs.extend(
+                numpy.unique([f.mdirection['refer'] for f in self.ms.fields
+                             if f.source.name == representative_source_name])
+            )
+
+        if len(dirrefs) == 0:
+            # if representative target is not given, or is not observed,
+            # take reference from one of the targets
+            dirrefs.extend(
+                numpy.unique([f.mdirection['refer'] for f in self.ms.fields if 'TARGET' in f.intents])
+            )
+
             if len(dirrefs) == 0:
                 # no target field exists, something wrong
                 raise RuntimeError('No TARGET field exists.')
+
         if len(dirrefs) == 1:
             outref = dirrefs[0]
         else:

@@ -78,7 +78,7 @@ class checkflagSummaryChart(object):
 
         # run plotms
         job = casa_tasks.plotms(**plotms_args)
-        job.execute(dry_run=False)
+        job.execute()
 
         return plotms_args
 

@@ -1,0 +1,23 @@
+{
+    "importonly": true,
+    "selfcal": true,
+    "cont_image": true,
+    "cube_image": true,
+    "field_list": "",
+    "desired_angular_resolution": "",
+    "cube_list": [
+    {
+        "field": "04191+1523",
+        "spw": "X1527843298#ALMA_RB_07#BB_1#SW-01#FULL_RES",
+        "start": "329.3GHz",
+        "restferq": "GHz",
+        "nchan": 500
+    },
+    {
+        "field": "IRAM04191",
+        "spw": "X1527843298#ALMA_RB_07#BB_1#SW-01#FULL_RES",
+        "start": "329.21GHz",
+        "restferq": "GHz",
+        "nchan": 500
+    }]
+}

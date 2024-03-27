@@ -1,7 +1,9 @@
 import os
+import sys
 import shutil
 import collections
 import tarfile
+import io
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.vdp as vdp
@@ -83,7 +85,7 @@ class VLAExportData(exportdata.ExportData):
                                         stokeslast=True)
                 self._executor.execute(task)
 
-                # add new pbcor fits to'fitsfiles'
+                # add new pbcor fits to 'fitsfiles'
                 target['fitsfiles'].append(ee.pbcorfits)
                 # add new pbcor fits to fitslist
                 results.targetimages[1].append(ee.pbcorfits)
@@ -93,7 +95,7 @@ class VLAExportData(exportdata.ExportData):
                     target['auxfitsfiles'].append(ee.nonpbcor_fits)
                     target['fitsfiles'].remove(ee.nonpbcor_fits)
 
-        oussid = self.get_oussid(self.inputs.context)  # returns string of 'unknown' for VLA
+        oussid = self.inputs.context.get_oussid()  # returns string of 'unknown' for VLA
 
         # Make the imaging vislist and the sessions lists.
         #     Force this regardless of the value of imaging_only_products
@@ -115,12 +117,16 @@ class VLAExportData(exportdata.ExportData):
                                                    self.inputs.imaging_products_only)
 
         # Export the AQUA report
-        pipe_aqua_reportfile = self._export_aqua_report(self.inputs.context, oussid, self.inputs.products_dir)
+        pipe_aqua_reportfile = self._export_aqua_report(context=self.inputs.context,
+                                                        oussid=prefix,
+                                                        products_dir=self.inputs.products_dir,
+                                                        report_generator=vlaifaqua.VLAAquaXmlGenerator(),
+                                                        weblog_filename=results.weblog)
 
         # Update the manifest
         if auxfproducts is not None or pipe_aqua_reportfile is not None:
             manifest_file = os.path.join(self.inputs.products_dir, results.manifest)
-            self._add_to_manifest(manifest_file, auxfproducts, False, [], pipe_aqua_reportfile)
+            self._add_to_manifest(manifest_file, auxfproducts, False, [], pipe_aqua_reportfile, oussid)
 
         return results
 
@@ -184,9 +190,9 @@ class VLAExportData(exportdata.ExportData):
                 continue
 
         if vlassmode:
-            task_string += "\n    hifv_fixpointing(pipelinemode='automatic')"
+            task_string += "\n    hifv_fixpointing()"
 
-        task_string += "\n    hifv_statwt(pipelinemode='automatic')"
+        task_string += "\n    hifv_statwt()"
 
         template = '''h_init()
 try:
@@ -199,40 +205,9 @@ finally:
             casa_restore_file.write(template)
 
         LOG.info('Copying casa restore script %s to %s', script_file, out_script_file)
-        if not self._executor._dry_run:
-            shutil.copy(script_file, out_script_file)
+        shutil.copy(script_file, out_script_file)
 
         return os.path.basename(out_script_file)
-
-    def _export_aqua_report (self, context, oussid, products_dir):
-        """
-        Save the AQUA report.
-        """
-        aqua_file = os.path.join(context.output_dir, context.logs['aqua_report'])
-
-        report_generator = vlaifaqua.VLAAquaXmlGenerator()
-        LOG.info('Generating pipeline AQUA report')
-        try:
-            report_xml = report_generator.get_report_xml(context)
-            vlaifaqua.export_to_disk(report_xml, aqua_file)
-        except Exception as e:
-            LOG.exception('Error generating the pipeline AQUA report', exc_info=e)
-            return 'Undefined'
-
-        ps = context.project_structure
-        out_aqua_file = self.NameBuilder.aqua_report(context.logs['aqua_report'],
-                                                     project_structure=ps,
-                                                     ousstatus_entity_id=oussid,
-                                                     output_dir=products_dir)
-
-        LOG.info('Copying AQUA report %s to %s', aqua_file, out_aqua_file)
-        shutil.copy(aqua_file, out_aqua_file)
-
-        # put aqua report into html directory, so it can be linked to the weblog
-        LOG.info('Copying AQUA report %s to %s', aqua_file, context.report_dir)
-        shutil.copy(aqua_file, context.report_dir)
-
-        return os.path.basename(out_aqua_file)
 
     def _export_final_ms(self, context, vis, products_dir):
         """
@@ -249,9 +224,6 @@ finally:
             LOG.info('Storing final ms %s in %s', visname, tarfilename)
 
             # Create the tar file
-            if self._executor._dry_run:
-                return tarfilename
-
             tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
             tar.add(visname)
             tar.close()
@@ -262,3 +234,82 @@ finally:
             shutil.copytree(visname, os.path.join(products_dir, visname))
 
             return visname
+
+    def _export_final_flagversion(self, vis, flag_version_name, products_dir):
+        """
+        PIPE-1553: include additional flag versions in tarfile
+        """
+
+        # Define the name of the output tarfile
+        visname = os.path.basename(vis)
+        tarfilename = visname + '.flagversions.tgz'
+        if os.path.exists(tarfilename):
+            os.remove(tarfilename)
+        LOG.info('Storing final flags for %s in %s', visname, tarfilename)
+
+        # Create the tar file
+        tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
+
+        # Define the versions list file to be saved
+        flag_version_list = os.path.join(visname + '.flagversions', 'FLAG_VERSION_LIST')
+        tar_info = tarfile.TarInfo(flag_version_list)
+        LOG.info('Saving flag version list')
+
+        # retrieve all flagversions saved
+        task = casa_tasks.flagmanager(vis=visname, mode='list')
+        flag_dict = self._executor.execute(task)
+        # remove MS key entry if it exists; MS key does not conform with other entries
+        # more information about flagmanager return dictionary here:
+        # https://casadocs.readthedocs.io/en/stable/api/tt/casatasks.flagging.flagmanager.html#mode
+        flag_dict.pop('MS', None)
+        flag_keys = [y['name'] for y in flag_dict.values()]
+
+        export_final_flags_dict = dict()
+        if flag_version_name in flag_keys:
+            flag_comment = [y for y in flag_dict.values() if y['name'] == flag_version_name][0]['comment']
+            export_final_flags_dict[flag_version_name] = flag_comment
+
+        # rename flagversions to make them more deterministic
+        if 'Applycal_Final' not in flag_keys:
+            applycal_flags = sorted([y for y in flag_dict.values() if 'applycal' in y['name']],
+                                    key=lambda x: x['name'])
+            if applycal_flags:
+                export_final_flags_dict['Applycal_Final'] = applycal_flags[-1]['comment']
+                task = casa_tasks.flagmanager(vis=vis, mode='rename', oldname=applycal_flags[-1]['name'],
+                                              versionname='Applycal_Final', comment=applycal_flags[-1]['comment'])
+                self._executor.execute(task)
+        else:
+            applycal_comment = [y for y in flag_dict.values() if y['name'] == 'Applycal_Final'][0]['comment']
+            export_final_flags_dict['Applycal_Final'] = applycal_comment
+
+        if 'hifv_checkflag_target-vla' not in flag_keys:
+            target_RFI_key = [y for y in flag_dict.values() if 'hifv_checkflag_target-vla' in y['name']]
+            if target_RFI_key:
+                export_final_flags_dict['hifv_checkflag_target-vla'] = target_RFI_key[-1]['comment']
+                task = casa_tasks.flagmanager(vis=vis, mode='rename', oldname=target_RFI_key[-1]['name'],
+                                              versionname='hifv_checkflag_target-vla', comment=target_RFI_key[-1]['comment'])
+                self._executor.execute(task)
+        else:
+            hifv_comment = [y for y in flag_dict.values() if y['name'] == 'hifv_checkflag_target-vla'][0]['comment']
+            export_final_flags_dict['hifv_checkflag_target-vla'] = hifv_comment
+
+        if 'statwt_1' in flag_keys: 
+            statwt_comment = [y for y in flag_dict.values() if y['name'] == 'statwt_1'][0]['comment']
+            export_final_flags_dict['statwt_1'] = statwt_comment
+
+        # recreate tar file
+        line = ""
+        for flag_version, flag_version_comment in export_final_flags_dict.items():
+            # Define the directory to be saved, and where to store in tar archive.
+            flagsname = os.path.join(vis + '.flagversions', 'flags.' + flag_version)
+            flagsarcname = os.path.join(visname + '.flagversions', 'flags.' + flag_version)
+            LOG.info('Saving flag version %s', flag_version)
+            tar.add(flagsname, arcname=flagsarcname)
+            line += "{} : {}\n".format(flag_version, flag_version_comment)
+
+        line = line.encode(sys.stdout.encoding)
+        tar_info.size = len(line)
+        tar.addfile(tar_info, io.BytesIO(line))
+        tar.close()
+
+        return tarfilename

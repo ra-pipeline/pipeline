@@ -275,7 +275,7 @@ def get_amp_range(vis, field='', spw='', scan='', intent='', datacolumn='correct
                                          datacolumn=datacolumn, correlation=correlation, uvrange=uvrange,
                                          timeaverage=timeaverage, timebin=timebin, timespan=timespan,
                                          keepflags=False, reindex=False)
-            job.execute(dry_run=False)
+            job.execute()
             amp_range = _get_amp_range2(vis_tmp, datacolumn='data', useflags=useflags)
             if vis_averaged is None:
                 shutil.rmtree(vis_tmp, ignore_errors=True)

@@ -15,7 +15,7 @@ import string
 import typing
 from datetime import datetime, timedelta
 from numbers import Number
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, Union, Iterable
 
 import cachetools
 import pyparsing
@@ -68,7 +68,7 @@ class LoggingLRUCache(cachetools.LRUCache):
 MSTOOL_SELECTEDINDICES_CACHE: typing.Dict[str, LoggingLRUCache] = {}
 
 
-def commafy(l: Sequence[str], quotes: bool = True, multi_prefix: str = '', separator: str = ', ',
+def commafy(l: Iterable, quotes: bool = True, multi_prefix: str = '', separator: str = ', ',
             conjunction: str = 'and') -> str:
     """Convert the string list into the textual description.
 
@@ -87,7 +87,7 @@ def commafy(l: Sequence[str], quotes: bool = True, multi_prefix: str = '', separ
     Return:
         The textual description of the given list.
     """
-    if not isinstance(l, list) and isinstance(l, collections.Iterable):
+    if not isinstance(l, list) and isinstance(l, collections.abc.Iterable):
         l = [i for i in l]
 
     # turn 's' into 's '
@@ -144,7 +144,7 @@ def flatten(l: Sequence[Any]) -> Iterator[Any]:
         Single list.
     """
     for el in l:
-        if isinstance(el, collections.Iterable) and not isinstance(el, str):
+        if isinstance(el, collections.abc.Iterable) and not isinstance(el, str):
             for sub in flatten(el):
                 yield sub
         else:
@@ -371,8 +371,8 @@ def _convert_arg_to_id(arg_name: str, ms_path: str, arg_val: str) -> Dict[str, n
     Returns:
         A list of IDs matching the input selection.
     """
-    ms_basename = os.path.basename(ms_path)
-    if ms_basename not in MSTOOL_SELECTEDINDICES_CACHE:
+    ms_abspath = os.path.abspath(ms_path)
+    if ms_abspath not in MSTOOL_SELECTEDINDICES_CACHE:
         # PIPE-327:
         # Historically, a cache size of 1000 entries per EB has been
         # sufficient to avoid cache eviction. It would be possible to
@@ -383,9 +383,9 @@ def _convert_arg_to_id(arg_name: str, ms_path: str, arg_val: str) -> Dict[str, n
         # PIPE-1008:
         # increase maxsize to 40k entries for VLASS calibration
         # A typical VLASS observation can have 15-20k fields
-        MSTOOL_SELECTEDINDICES_CACHE[ms_basename] = LoggingLRUCache(ms_basename, maxsize=40000)
+        MSTOOL_SELECTEDINDICES_CACHE[ms_abspath] = LoggingLRUCache(ms_abspath, maxsize=40000)
 
-    cache_for_ms = MSTOOL_SELECTEDINDICES_CACHE[ms_basename]
+    cache_for_ms = MSTOOL_SELECTEDINDICES_CACHE[ms_abspath]
     cache_key = (arg_name, arg_val)
 
     try:

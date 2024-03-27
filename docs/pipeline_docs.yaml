@@ -1,0 +1,78 @@
+############################################################################
+# 
+# setup:
+#
+#   * Install mambaforge: recommend to use the minimal mambaforge installer
+#       https://github.com/conda-forge/miniforge#mambaforge
+#  
+#   * step-by-step to reproduce the Pipeline/CASA6 docs building environment
+#       $ mamba env create -f docs/pipeline_docs.yaml
+#       $ mamba activate pipeline_docs
+#
+#   update:
+#     $ mamba env update -f pipeline_docs.yaml
+#
+############################################################################
+
+name: pipeline_docs
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - conda-ecosystem-user-package-isolation # prevent new enviromentes picking up ~/.local
+  - python=3.8
+  - ipython
+  - pip
+  - numpy
+  - scipy
+  - matplotlib  
+  - certifi
+  - protobuf=3.20 # casatplotms requires ver<=3.20 at this moment
+  - astropy
+  - intervaltree
+  - pypubsub
+  - cachetools
+  - jupyterlab
+  - wheel
+  - future
+  - johnnydep
+  - line_profiler
+  - memory_profiler
+  - pylint
+  - flake8
+  - isort
+  - black
+  - pytest
+  - pydocstyle
+  - pycodestyle
+  - pytest-cov
+  - pytest-pep8
+  - mako
+  - sphinx
+  - sphinxcontrib-bibtex
+  - sphinx-copybutton
+  - nbsphinx
+  - sphinx_rtd_theme
+  - commonmark
+  - recommonmark
+  - ipympl
+  - nodejs 
+  - pandoc # nbsphinx requires 'pandoc' (available from macports/homebrew or apt, not 'pandoc' from PyPI)
+  - pip:
+    - --extra-index-url https://casa-pip.nrao.edu/repository/pypi-group/simple 
+    - casatools
+    - casatasks
+    - casadata
+    - casaplotms
+    - casaviewer
+    - casampi
+    - almatasks
+    - casashell
+    - csscompressor == 0.9.5
+    - logutils == 0.3.5    
+    - ps_mem == 3.14 
+    - bdsf == 1.10.2
+    - sphinx-astrorefs # https://github.com/jobovy/sphinx-astrorefs
+

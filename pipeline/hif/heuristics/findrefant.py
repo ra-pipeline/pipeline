@@ -665,7 +665,7 @@ class RefAntGeometry:
 
         # Get the number of good data, calculate the fraction of good
         # data, and calculate the good and bad weights
-        far = numpy.array(list(distance.values()), numpy.float)
+        far = numpy.array(list(distance.values()), float)
         fFar = far / float(numpy.max(far))
 
         wFar = fFar * len(far)
@@ -912,7 +912,7 @@ class RefAntFlagging:
             # Get the number of good data, calculate the fraction of good
             # data, and calculate the good and bad weights
 
-            nGood = numpy.array(list(good.values()), numpy.float)
+            nGood = numpy.array(list(good.values()), float)
             fGood = nGood / float(numpy.max(nGood))
 
             wGood = fGood * len(nGood)

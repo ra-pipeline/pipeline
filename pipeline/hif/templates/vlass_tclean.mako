@@ -25,7 +25,7 @@ try:
     long_description = '<br><small>{!s}'.format(result.metadata['long description'])
 except:
     long_description = ''
-%>Tclean/MakeImages${long_description}</%block>
+%>MakeImages${long_description}</%block>
 
 
 <h2>Image Details</h2>
@@ -52,7 +52,7 @@ except:
             % for row in image_info:
 
                 <%
-                rowspan = 14
+                rowspan = 15
                 if row.model_pos_flux is not None: rowspan += 1
                 if row.model_neg_flux is not None: rowspan += 1
                 if row.model_flux_inner_deg is not None: rowspan += 1
@@ -236,6 +236,11 @@ except:
                     <tr>
                         <th>image file</th>
                         <td colspan="2">${row.image_file}</td>
+                    </tr>
+
+                    <tr>
+                        <th>data type</th>
+                        <td colspan="2">${row.datatype_info}</td>
                     </tr>
                 %endif
             

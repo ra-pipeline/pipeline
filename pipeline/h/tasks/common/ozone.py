@@ -350,7 +350,7 @@ def get_ozone_channels_for_spw(ms, spwid):
     spw = ms.get_spectral_window(spwid)
 
     # Initialize array of channels where ozone lines appear.
-    oz_chans = np.zeros([spw.num_channels], np.bool)
+    oz_chans = np.zeros([spw.num_channels], bool)
 
     # For each channel in spw, check if it matches one of the ozone lines.
     for ichan, chan_freq in enumerate(spw.channels.chan_freqs):
