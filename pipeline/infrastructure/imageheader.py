@@ -7,6 +7,7 @@ import pipeline as pipeline
 import pipeline.infrastructure as infrastructure
 from pipeline import environment
 from pipeline.infrastructure import casa_tools
+from pipeline.infrastructure.utils import find_ranges
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -83,8 +84,12 @@ def set_miscinfo(name, spw=None, virtspw=True, field=None, nfield=None, datatype
             # PIPE-1615, limiting SPW and VIRTSPW keyword length to 68 characters
             # (limit specified by FITS conventions)
             if len(unique_spws) >= 68:
-                spw_sorted = sorted([int(x) for x in unique_spws.split(',')])
-                unique_spws = '{},...,{}'.format(spw_sorted[0], spw_sorted[-1])
+                spw_range = find_ranges(unique_spws)
+                if len(spw_range) >= 68:
+                    spw_sorted = sorted([int(x) for x in unique_spws.split(',')])
+                    unique_spws = '{},...,{}'.format(spw_sorted[0], spw_sorted[-1])
+                else:
+                    unique_spws = spw_range
             info['spw'] = unique_spws
             if virtspw:
                 info['virtspw'] = unique_spws
