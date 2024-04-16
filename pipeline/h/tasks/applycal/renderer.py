@@ -10,7 +10,6 @@ import os
 import shutil
 from typing import Dict, Iterable, List, Optional, Type, Union
 
-
 import pipeline.domain.measures as measures
 import pipeline.infrastructure
 import pipeline.infrastructure.callibrary as callibrary
@@ -19,12 +18,12 @@ import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.utils as utils
 from pipeline.domain.measurementset import MeasurementSet
+from pipeline.h.tasks.applycal.applycal import ApplycalResults
 from pipeline.infrastructure.basetask import ResultsList
 from pipeline.infrastructure.displays.summary import UVChart
 from pipeline.infrastructure.launcher import Context
-from pipeline.infrastructure.renderer.logger import Plot
-from pipeline.h.tasks.applycal.applycal import ApplycalResults
 from pipeline.infrastructure.renderer.basetemplates import JsonPlotRenderer
+from pipeline.infrastructure.renderer.logger import Plot
 from ..common import flagging_renderer_utils as flagutils, mstools
 from ..common.displays import applycal as applycal
 
@@ -350,15 +349,8 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             # no obvious drop in amplitude with uvdist, then use all the data.
             # A simpler compromise would be to use a uvrange that captures the
             # inner half the data.
-            baselines = sorted(ms.antenna_array.baselines,
-                               key=operator.attrgetter('length'))
-            # take index as midpoint + 1 so we include the midpoint in the
-            # constraint
-            half_baselines = baselines[0:(len(baselines)//2)+1]
-            uv_max = half_baselines[-1].length.to_units(measures.DistanceUnits.METRE)
-            uv_range = '<%s' % uv_max
+            max_uvs[vis], uv_range = utils.scale_uv_range(ms)
             LOG.debug('Setting UV range to %s for %s', uv_range, vis)
-            max_uvs[vis] = half_baselines[-1].length
 
             # source to select
             representative_source_name, _ = ms.get_representative_source_spw()

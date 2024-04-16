@@ -77,7 +77,7 @@ class GcorFluxscaleListQAHandler(pqa.QAPlugin):
     """
     QA handler for a list containing FluxCalibrationResults.
     """
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = commonfluxresults.FluxCalibrationResults
     generating_task = gcorfluxscale.GcorFluxscale
 

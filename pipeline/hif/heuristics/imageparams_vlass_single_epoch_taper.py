@@ -1,5 +1,5 @@
 import re
-from typing import Union, Tuple
+from typing import Union, Tuple, Optional
 
 import numpy
 
@@ -49,7 +49,7 @@ class ImageParamsHeuristicsVlassSeTaper(ImageParamsHeuristics):
         """Tclean imsize parameter heuristics."""
         return [4050, 4050]
 
-    def reffreq(self) -> str:
+    def reffreq(self, deconvolver: Optional[str]=None, specmode: Optional[str]=None, spwsel: Optional[dict]=None) -> Optional[str]:
         """Tclean reffreq parameter heuristics."""
         return '3.0GHz'
 

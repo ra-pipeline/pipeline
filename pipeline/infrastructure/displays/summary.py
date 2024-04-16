@@ -879,7 +879,7 @@ class UVChart(object):
             # get max UV via unprojected baseline
             spw = ms.get_spectral_window(self.spw_id)
             wavelength_m = 299792458 / float(spw.max_frequency.to_units(FrequencyUnits.HERTZ))
-            bl_max = float(ms.antenna_array.max_baseline.length.to_units(DistanceUnits.METRE))
+            bl_max = float(ms.antenna_array.baseline_max.length.to_units(DistanceUnits.METRE))
             self.uv_max = math.ceil(1.05 * bl_max / wavelength_m)
 
     def plot(self):
@@ -1198,22 +1198,20 @@ class SpwIdVsFreqChart(object):
                 ax_spw.annotate('%s' % spwid, (f+w/2, index-yspace), fontsize=14)
 
         # Make a plot of frequency vs. atm transmission
-        # For VLA data it is out of scope in PIPE-1415 and will be implemented in PIPE-1873. 
-        if self.context.project_summary.telescope not in ('VLA', 'EVLA'):  # For ALMA and NRO
-            atm_color = 'm'
-            ax_atm = ax_spw.twinx()
-            ax_atm.set_ylabel('ATM Transmission', color=atm_color, labelpad=2, fontsize=14)
-            ax_atm.set_ylim(0, 1.05)
-            ax_atm.tick_params(direction='out', colors=atm_color, labelsize=13)
-            ax_atm.yaxis.set_major_formatter(ticker.FuncFormatter(lambda t, pos: '{}%'.format(int(t * 100))))
-            ax_atm.yaxis.tick_right()
-            antid = 0
-            if hasattr(ms, 'reference_antenna') and isinstance(ms.reference_antenna, str):
-                antid = ms.get_antenna(search_term=ms.reference_antenna.split(',')[0])[0].id
+        atm_color = 'm'
+        ax_atm = ax_spw.twinx()
+        ax_atm.set_ylabel('ATM Transmission', color=atm_color, labelpad=2, fontsize=14)
+        ax_atm.set_ylim(0, 1.05)
+        ax_atm.tick_params(direction='out', colors=atm_color, labelsize=13)
+        ax_atm.yaxis.set_major_formatter(ticker.FuncFormatter(lambda t, pos: '{}%'.format(int(t * 100))))
+        ax_atm.yaxis.tick_right()
+        antid = 0
+        if hasattr(ms, 'reference_antenna') and isinstance(ms.reference_antenna, str):
+            antid = ms.get_antenna(search_term=ms.reference_antenna.split(',')[0])[0].id
 
-            for spwid in list_all_spwids:
-                atm_freq, atm_transmission = atmutil.get_transmission(vis=ms.name, antenna_id=antid, spw_id=spwid)
-                ax_atm.plot(atm_freq, atm_transmission, color=atm_color, marker='.', markersize=4, linestyle='-')
+        for spwid in list_all_spwids:
+            atm_freq, atm_transmission = atmutil.get_transmission(vis=ms.name, antenna_id=antid, spw_id=spwid)
+            ax_atm.plot(atm_freq, atm_transmission, color=atm_color, marker='.', markersize=4, linestyle='-')
 
         fig.savefig(filename)
         return self._get_plot_object()

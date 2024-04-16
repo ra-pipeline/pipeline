@@ -101,7 +101,7 @@ def capture_log(method):
 
         # To save space in the pickle, delete any inner CASA logs. The web
         # log will only write the outer CASA log to disk
-        if isinstance(result, collections.Iterable):
+        if isinstance(result, collections.abc.Iterable):
             for r in result:
                 if hasattr(r, 'casalog'):
                     del r.casalog

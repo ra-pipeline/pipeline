@@ -298,6 +298,26 @@ os.environ['WEBLOG_RERENDER_STAGES']='16'
 hr.WebLogGenerator.render(context)
 ```
 
+## Note on using executeppr/recipereducer and Pipeline CLI tasks
+
+All the above usecases rely on _global_ pipeline context object that holds various information on pipeline processing. Please be careful when executeppr/reciperedicer and CLI tasks are used together in a single CASA session, especially when running executeppr/recipereducer in the middle of interactive processing with CLI tasks, e.g.,
+
+1. `h_init` to start interactive processing (creates context #1 and register it to global scope)
+2. run various tasks interactively (with context #1)
+3. run executeppr (creates context #2 and overwrite global context #1)
+4. run some more tasks interactively (with context #2)
+
+In this example, step 2. and 4. are no longer continuous because they refer different context object. In such case, please save context object to disk before running executeppr/recipereducer and resume it when necessary. The above workflow should be tweaked as below.
+
+1. `h_init` to start interactive processing (creates context #1 and register it to global scope)
+2. run various tasks interactively (with context #1)
+3. save current state to disk with `h_save('interactive.context')` (save context #1 to disk)
+4. run executeppr (creates context #2 and overwrite global context #1)
+5. resume previous state to disk with `h_resume('interactive.context')` (load context #1 from disk and overwrite global context #2)
+6. run some more tasks interactively (with context #1)
+
+
+
 ## Known issues
 
 Don't worry about the following intermittent message at the end of a pipeline run. It's a bug

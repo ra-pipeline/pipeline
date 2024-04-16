@@ -370,7 +370,7 @@ class SerialFlagDeterALMASingleDish(flagdeterbase.FlagDeterBase):
 
         if isinstance(inputs.fracspw, float) or isinstance(inputs.fracspw, str):
             to_flag = super()._get_edgespw_cmds()
-        elif isinstance(inputs.fracspw, collections.Iterable):
+        elif isinstance(inputs.fracspw, collections.abc.Iterable):
             # inputs.fracspw is iterable indicating that the user want to flag
             # edge channels with different fractions/number of channels for
             # left and right edges

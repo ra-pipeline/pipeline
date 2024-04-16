@@ -154,7 +154,7 @@ class MakeImages(basetask.StandardTaskTemplate):
                     # Note add_result() removes 'heuristics' from worker_result
                     heuristics = target['heuristics']
                     result.add_result(worker_result, target, outcome='success')
-                    # Export RMS of  sources              
+                    # Export RMS of  sources
                     if self._is_target_for_sensitivity(worker_result, heuristics):
                         s = self._get_image_rms_as_sensitivity(worker_result, target, heuristics)
                         if s is not None:
@@ -236,7 +236,7 @@ class MakeImages(basetask.StandardTaskTemplate):
         if result.specmode == 'cube': # use nbin for cube and repBW
             msobj = self.inputs.context.observing_run.get_ms(name=result.vis[0])
             nbin = target['nbin'] if target['nbin'] > 0 else 1
-            SCF, physicalBW_of_1chan, effectiveBW_of_1chan = heuristics.get_bw_corr_factor(msobj, result.spw, nbin)
+            SCF, physicalBW_of_1chan, effectiveBW_of_1chan, _ = heuristics.get_bw_corr_factor(msobj, result.spw, nbin)
             effectiveBW_of_image = cqa.quantity(nbin / SCF**2 * effectiveBW_of_1chan, 'Hz')
         else: #continuum mode
             effectiveBW_of_image = result.aggregate_bw
@@ -464,6 +464,11 @@ def _get_description_map(intent):
             'mfs': 'Make polarization calibrator images',
             'cont': 'Make polarization calibrator images'
         }
+    elif intent == 'DIFFGAIN':
+        return {
+            'mfs': 'Make diffgain calibrator images',
+            'cont': 'Make diffgain calibrator images'
+        }
     elif intent == 'CHECK':
         return {
             'mfs': 'Make check source images',
@@ -481,7 +486,7 @@ def _get_description_map(intent):
         return {}
 
 def _get_sidebar_map(intent):
-    if intent in ('PHASE', 'BANDPASS', 'AMPLITUDE'):
+    if intent in ('PHASE', 'BANDPASS', 'AMPLITUDE', 'DIFFGAIN'):
         return {
             'mfs': 'cals',
             'cont': 'cals'

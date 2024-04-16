@@ -175,7 +175,7 @@ def get_tracebacks(result):
     :param result: a result or result list.
     :return: list of tracebacks as strings.
     """
-    if isinstance(result, collections.Iterable):
+    if isinstance(result, collections.abc.Iterable):
         tracebacks = [get_tracebacks(r) for r in result]
     else:
         tracebacks = [getattr(result, "tb", [])]
@@ -183,7 +183,7 @@ def get_tracebacks(result):
 
 
 def get_qascores(result, lo=None, hi=None):
-    if isinstance(result, collections.Iterable):
+    if isinstance(result, collections.abc.Iterable):
         scores = flatten([get_qascores(r, lo, hi) for r in result])
     else:
         scores = [s for s in result.qa.pool if s.score not in ('', 'N/A', None)]

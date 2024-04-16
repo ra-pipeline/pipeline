@@ -1,5 +1,8 @@
 import os
 import re
+import inspect
+
+from typing import Optional
 
 import numpy as np
 from scipy.ndimage import label
@@ -117,7 +120,7 @@ class TcleanInputs(cleanbase.CleanBaseInputs):
 
     def __init__(self, context, output_dir=None, vis=None, imagename=None, intent=None, field=None, spw=None,
                  spwsel_lsrk=None, spwsel_topo=None, uvrange=None, specmode=None, gridder=None, deconvolver=None,
-                 nterms=None, outframe=None, imsize=None, cell=None, phasecenter=None, stokes=None, nchan=None,
+                 nterms=None, outframe=None, imsize=None, cell=None, phasecenter=None, psf_phasecenter=None, stokes=None, nchan=None,
                  start=None, width=None, nbin=None, datacolumn=None, datatype=None, datatype_info=None, pblimit=None,
                  cfcache=None, restoringbeam=None, hm_masking=None, hm_sidelobethreshold=None, hm_noisethreshold=None,
                  hm_lownoisethreshold=None, hm_negativethreshold=None, hm_minbeamfrac=None, hm_growiterations=None,
@@ -140,8 +143,8 @@ class TcleanInputs(cleanbase.CleanBaseInputs):
                                            cycleniter=cycleniter, cyclefactor=cyclefactor,
                                            hm_minpsffraction=hm_minpsffraction, hm_maxpsffraction=hm_maxpsffraction,
                                            scales=scales, outframe=outframe, imsize=imsize, cell=cell, phasecenter=phasecenter,
-                                           nchan=nchan, start=start, width=width, stokes=stokes, weighting=weighting,
-                                           robust=robust, restoringbeam=restoringbeam, pblimit=pblimit,
+                                           psf_phasecenter=psf_phasecenter, nchan=nchan, start=start, width=width, stokes=stokes,
+                                           weighting=weighting, robust=robust, restoringbeam=restoringbeam, pblimit=pblimit,
                                            iter=iter, mask=mask, hm_masking=hm_masking, cfcache=cfcache,
                                            hm_sidelobethreshold=hm_sidelobethreshold,
                                            hm_noisethreshold=hm_noisethreshold,
@@ -284,6 +287,7 @@ class Tclean(cleanbase.CleanBase):
         self.width_as_velocity = None
         self.start_as_frequency = None
         self.width_as_frequency = None
+        self.aggregate_lsrk_bw = None
 
         # delete any old files with this naming root. One of more
         # of these (don't know which) will interfere with this run.
@@ -347,8 +351,11 @@ class Tclean(cleanbase.CleanBase):
 
         # Determine the phase center
         if inputs.phasecenter in ('', None):
-            field_id = self.image_heuristics.field(inputs.intent, inputs.field)
-            inputs.phasecenter = self.image_heuristics.phasecenter(field_id)
+            field_ids = self.image_heuristics.field(inputs.intent, inputs.field)
+            # TODO: This call will no longer work as expected after the PIPE-98 changes
+            #       (missing primary beam size and shift parameter compared to hif_makeimlist).
+            #       Need to decide whether to remove all hif_tclean fallback heuristics.
+            inputs.phasecenter, inputs.psf_phasecenter = self.image_heuristics.phasecenter(field_ids)
 
         # If imsize not set then use heuristic code to calculate the
         # centers for each field  / spw
@@ -565,7 +572,7 @@ class Tclean(cleanbase.CleanBase):
             inputs.spwsel_all_cont = all_continuum
 
         # Get TOPO frequency ranges for all MSs
-        (spw_topo_freq_param, _, _, spw_topo_chan_param_dict, _, _, aggregate_lsrk_bw) = self.image_heuristics.calc_topo_ranges(inputs)
+        (spw_topo_freq_param, _, _, spw_topo_chan_param_dict, _, _, self.aggregate_lsrk_bw) = self.image_heuristics.calc_topo_ranges(inputs)
 
         # Save continuum frequency ranges for later.
         if (inputs.specmode == 'cube') and (inputs.spwsel_lsrk.get('spw%s' % inputs.spw, None) not in (None,
@@ -699,7 +706,7 @@ class Tclean(cleanbase.CleanBase):
         # Record aggregate LSRK bandwidth and mosaic field sensitivities for weblog
         # TODO: Record total bandwidth as opposed to range
         #       Save channel selection in result for weblog.
-        result.set_aggregate_bw(aggregate_lsrk_bw)
+        result.set_aggregate_bw(self.aggregate_lsrk_bw)
         result.set_eff_ch_bw(eff_ch_bw)
 
         result.synthesized_beams = self.known_synthesized_beams
@@ -728,6 +735,16 @@ class Tclean(cleanbase.CleanBase):
          is removed.
         """
         inputs = self.inputs
+        qaTool = casa_tools.quanta
+
+        # Items for image header for manifest
+        obspatt = None
+        arrays = self.image_heuristics.arrays()
+        if inputs.nbin not in (None, -1):
+            modifier = f'binned{inputs.nbin}'
+        else:
+            modifier = ''
+        session = ','.join(inputs.context.observing_run.get_ms(_vis).session for _vis in inputs.vis)
 
         # Local list from input masks
         if type(inputs.mask) is list:
@@ -945,9 +962,20 @@ class Tclean(cleanbase.CleanBase):
                                                   pblimit_cleanmask=self.pblimit_cleanmask,
                                                   cont_freq_ranges=self.cont_freq_ranges)
 
-            self._update_miscinfo(result.image.replace('.image', '.image' + extension),
-                                  max([len(field_ids.split(',')) for field_ids in self.image_heuristics.field(inputs.intent, inputs.field)]),
-                                  pbcor_image_min, pbcor_image_max, nonpbcor_image_non_cleanmask_rms, inputs.stokes)
+            # Center frequency and effective bandwidth in Hz for the image header (and thus the manifest).
+            ctrfrq = 0.5 * (float(qaTool.getvalue(qaTool.convert(nonpbcor_image_robust_rms_and_spectra['nonpbcor_image_non_cleanmask_freq_ch1'], 'Hz')))
+                         +  float(qaTool.getvalue(qaTool.convert(nonpbcor_image_robust_rms_and_spectra['nonpbcor_image_non_cleanmask_freq_chN'], 'Hz'))))
+            if inputs.specmode in ('mfs', 'cont'):
+                effbw = float(qaTool.getvalue(qaTool.convert(self.aggregate_lsrk_bw, 'Hz')))
+            else:
+                msobj = self.inputs.context.observing_run.get_ms(name=inputs.vis[0])
+                nbin = inputs.nbin if inputs.nbin is not None and inputs.nbin > 0 else 1
+                _, _, _, effbw = self.image_heuristics.get_bw_corr_factor(msobj, inputs.spw, nbin)
+
+            self._update_miscinfo(imagename=result.image.replace('.image', '.image' + extension),
+                                  nfield=max([len(field_ids.split(',')) for field_ids in self.image_heuristics.field(inputs.intent, inputs.field)]),
+                                  datamin=pbcor_image_min, datamax=pbcor_image_max, datarms=nonpbcor_image_non_cleanmask_rms, stokes=inputs.stokes,
+                                  effbw=effbw, ctrfrq=ctrfrq)
 
             # Keep image cleanmask area min and max and non-cleanmask area RMS for weblog and QA
             result.set_image_min(pbcor_image_min)
@@ -1024,6 +1052,16 @@ class Tclean(cleanbase.CleanBase):
     def _do_iterative_imaging(self, sequence_manager):
 
         inputs = self.inputs
+        qaTool = casa_tools.quanta
+
+        # Items for image header for manifest
+        obspatt = 'mos' if self.image_heuristics.is_mosaic(inputs.field, inputs.intent) else 'sf'
+        arrays = self.image_heuristics.arrays()
+        if inputs.nbin not in (None, -1):
+            modifier = f'binned{inputs.nbin}'
+        else:
+            modifier = ''
+        session = ','.join(inputs.context.observing_run.get_ms(_vis).session for _vis in inputs.vis)
 
         # Compute the dirty image
         LOG.info('Compute the dirty image')
@@ -1091,9 +1129,20 @@ class Tclean(cleanbase.CleanBase):
 
         # All continuum
         if inputs.specmode == 'cube' and inputs.spwsel_all_cont:
-            self._update_miscinfo(result.image.replace('.image', '.image'+extension),
-                                  max([len(field_ids.split(',')) for field_ids in self.image_heuristics.field(inputs.intent, inputs.field)]),
-                                  pbcor_image_min, pbcor_image_max, nonpbcor_image_non_cleanmask_rms, inputs.stokes)
+            # Center frequency and effective bandwidth in Hz for the image header (and thus the manifest).
+            ctrfrq = 0.5 * (float(qaTool.getvalue(qaTool.convert(nonpbcor_image_robust_rms_and_spectra['nonpbcor_image_non_cleanmask_freq_ch1'], 'Hz')))
+                         +  float(qaTool.getvalue(qaTool.convert(nonpbcor_image_robust_rms_and_spectra['nonpbcor_image_non_cleanmask_freq_chN'], 'Hz'))))
+            if inputs.specmode in ('mfs', 'cont'):
+                effbw = float(qaTool.getvalue(qaTool.convert(self.aggregate_lsrk_bw, 'Hz')))
+            else:
+                msobj = self.inputs.context.observing_run.get_ms(name=inputs.vis[0])
+                nbin = inputs.nbin if inputs.nbin is not None and inputs.nbin > 0 else 1
+                _, _, _, effbw = self.image_heuristics.get_bw_corr_factor(msobj, inputs.spw, nbin)
+
+            self._update_miscinfo(imagename=result.image.replace('.image', '.image'+extension),
+                                  nfield=max([len(field_ids.split(',')) for field_ids in self.image_heuristics.field(inputs.intent, inputs.field)]),
+                                  datamin=pbcor_image_min, datamax=pbcor_image_max, datarms=nonpbcor_image_non_cleanmask_rms, stokes=inputs.stokes,
+                                  effbw=effbw, level='member', ctrfrq=ctrfrq, obspatt=obspatt, arrays=arrays, modifier=modifier, session=session)
 
             result.set_image_min(pbcor_image_min)
             result.set_image_min_iquv(pbcor_image_min_iquv)
@@ -1210,9 +1259,20 @@ class Tclean(cleanbase.CleanBase):
                                                   pblimit_cleanmask=self.pblimit_cleanmask,
                                                   cont_freq_ranges=self.cont_freq_ranges)
 
-            self._update_miscinfo(result.image.replace('.image', '.image'+extension),
-                                  max([len(field_ids.split(',')) for field_ids in self.image_heuristics.field(inputs.intent, inputs.field)]),
-                                  pbcor_image_min, pbcor_image_max, nonpbcor_image_non_cleanmask_rms, inputs.stokes)
+            # Center frequency and effective bandwidth in Hz for the image header (and thus the manifest).
+            ctrfrq = 0.5 * (float(qaTool.getvalue(qaTool.convert(nonpbcor_image_robust_rms_and_spectra['nonpbcor_image_non_cleanmask_freq_ch1'], 'Hz')))
+                         +  float(qaTool.getvalue(qaTool.convert(nonpbcor_image_robust_rms_and_spectra['nonpbcor_image_non_cleanmask_freq_chN'], 'Hz'))))
+            if inputs.specmode in ('mfs', 'cont'):
+                effbw = float(qaTool.getvalue(qaTool.convert(self.aggregate_lsrk_bw, 'Hz')))
+            else:
+                msobj = self.inputs.context.observing_run.get_ms(name=inputs.vis[0])
+                nbin = inputs.nbin if inputs.nbin is not None and inputs.nbin > 0 else 1
+                _, _, _, effbw = self.image_heuristics.get_bw_corr_factor(msobj, inputs.spw, nbin)
+
+            self._update_miscinfo(imagename=result.image.replace('.image', '.image'+extension),
+                                  nfield=max([len(field_ids.split(',')) for field_ids in self.image_heuristics.field(inputs.intent, inputs.field)]),
+                                  datamin=pbcor_image_min, datamax=pbcor_image_max, datarms=nonpbcor_image_non_cleanmask_rms, stokes=inputs.stokes,
+                                  effbw=effbw, level='member', ctrfrq=ctrfrq, obspatt=obspatt, arrays=arrays, modifier=modifier, session=session)
 
             keep_iterating, hm_masking = self.image_heuristics.keep_iterating(iteration, inputs.hm_masking,
                                                                               result.tclean_stopcode,
@@ -1326,8 +1386,10 @@ class Tclean(cleanbase.CleanBase):
                                                   cell=inputs.cell,
                                                   cfcache=inputs.cfcache,
                                                   phasecenter=inputs.phasecenter,
+                                                  psf_phasecenter=inputs.psf_phasecenter,
                                                   stokes=inputs.stokes,
                                                   nchan=inputs.nchan,
+                                                  nbin=inputs.nbin,
                                                   start=inputs.start,
                                                   width=inputs.width,
                                                   weighting=inputs.weighting,
@@ -1702,16 +1764,42 @@ class Tclean(cleanbase.CleanBase):
         # Update the result.
         result.set_mom8(maxiter, mom8_name)
 
-    def _update_miscinfo(self, imagename, nfield, datamin, datamax, datarms, stokes):
+    def _update_miscinfo(self, imagename: str, nfield: Optional[int] = None, datamin: Optional[float] = None,
+                         datamax: Optional[float] = None, datarms: Optional[float] = None,
+                         stokes: Optional[str] = None, effbw: Optional[float] = None,
+                         level: Optional[str] = None, ctrfrq: Optional[float] = None,
+                         obspatt: Optional[str] = None, arrays: Optional[str] = None,
+                         modifier: Optional[str] = None, session: Optional[str] = None):
+        """
+        Update image header keywords.
 
-        # Update metadata
+        Args:
+            imagename (str): image name
+            nfield (int): number of mosaic fields
+            datamin (float): minimum image value
+            datamax (float): maximum image value
+            datarms (float): rms image value
+            stokes (str): Stokes parameter
+            effbw (float): effective bandwidth in Hz
+            level (str): OUS kind (member, group)
+            obspatt (str): observing pattern (mos, sf, sd)
+            ctrfrq: Image center frequency in Hz
+            modifier (str): image name modifier (binnedN?)
+            session (str): session name
+        Returns:
+            None
+        """
+
         with casa_tools.ImageReader(imagename) as image:
+            # Get current header
             info = image.miscinfo()
 
-            info['nfield'] = nfield
-            info['datamin'] = datamin
-            info['datamax'] = datamax
-            info['datarms'] = datarms
-            info['stokes'] = stokes
+            # Update keywords that are not None
+            frame = inspect.currentframe()
+            keywords, _, _, values = inspect.getargvalues(frame)
+            for keyword in keywords:
+                if keyword not in ('self', 'imagename') and values[keyword] is not None:
+                    info[keyword] = values[keyword]
 
+            # Save header back to image
             image.setmiscinfo(info)

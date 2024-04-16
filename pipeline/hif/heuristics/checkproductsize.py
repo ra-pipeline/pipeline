@@ -118,7 +118,7 @@ class CheckProductSizeHeuristics(object):
             nbins = []
             nbin_mitigation = False
             for spw, nchan in nchans.items():
-                if (nchan == 3840) or (nchan in (1920, 960, 480) and utils.equal_to_n_digits(ch_width_ratios[spw], 2.667, 4)):
+                if (nchan in (7680, 3840)) or (nchan in (1920, 960, 480) and utils.equal_to_n_digits(ch_width_ratios[spw], 2.667, 4)):
                     LOG.info('Size mitigation: Setting nbin for SPW %s to 2.' % (spw))
                     nbins.append('%s:2' % (spw))
                     nbin_mitigation = True
@@ -240,7 +240,7 @@ class CheckProductSizeHeuristics(object):
                 nbins = []
                 nbin_mitigation = False
                 for spw, nchan in nchans.items():
-                    if (nchan == 3840) or (nchan in (1920, 960, 480) and utils.equal_to_n_digits(ch_width_ratios[spw], 2.667, 4)):
+                    if (nchan in (7680, 3840)) or (nchan in (1920, 960, 480) and utils.equal_to_n_digits(ch_width_ratios[spw], 2.667, 4)):
                         LOG.info('Size mitigation: Setting nbin for SPW %s to 2.' % (spw))
                         nbins.append('%s:2' % (spw))
                         nbin_mitigation = True

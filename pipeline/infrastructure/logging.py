@@ -5,6 +5,7 @@ import time
 import types
 import functools
 from contextlib import contextmanager
+from typing import Optional, Union, List
 
 from casatasks import casalog
 
@@ -404,6 +405,23 @@ def log_level(name, level=logging.WARNING):
         yield
     finally:
         logger.setLevel(current_level)
+
+
+@contextmanager
+def log_filtermsg(msglist: Union[str, List[str]]):
+    """Context manager to temporarily filter out specific messages from the CASA global logger.
+    
+    Note (as of CASA ver6.6.1):
+    * The use of this function will clear the list of message filters rather than reset back to 
+      the initial state due to the limitation of casalog API.
+    * casalog.filterMsg(None) will not alter/clear the internal filter list.
+    * Each casalog.filterMsg(msg) call will add additional element(s) in the filter.
+    """
+    casalog.filterMsg(msglist)
+    try:
+        yield
+    finally:
+        casalog.clearFilterMsgList()
 
 
 LOG = get_logger(__name__)

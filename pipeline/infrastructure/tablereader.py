@@ -7,16 +7,18 @@ import re
 import xml.etree.ElementTree as ElementTree
 from bisect import bisect_left
 from functools import reduce
+from typing import Tuple, List
 
 import cachetools
 import numpy
-from typing import Tuple
 
 import pipeline.domain as domain
 import pipeline.domain.measures as measures
 import pipeline.infrastructure.utils as utils
 from . import casa_tools
 from . import logging
+from .casa_tools import MSMDReader
+from ..domain import Antenna, AntennaArray
 
 LOG = logging.get_logger(__name__)
 
@@ -569,18 +571,28 @@ class SpectralWindowTable(object):
                 baseband = msmd.baseband(i)
 
             ref_freq = msmd.reffreq(i)
-            # Read transitions for target spws. Other spws may cause severe
-            # messages because the target source IDs may not have the spw.
-            if i in target_spw_ids:
-                try:  # TRANSITIONS column does not exist in old data
-                    # TODO: Are the transitions of a given spw the same for all
-                    #       target source IDs ?
-                    transitions = msmd.transitions(sourceid=first_target_source_id, spw=i)
-                    if transitions is False:
-                        transitions = ['Unknown']
-                except:
-                    transitions = ['Unknown']
-            else:
+            
+            # Read transitions for target spws.
+
+            # PIPE-2124: Missing of the TRANSITION column (e.g. old data) or lack of (sourceid, spwid) entries
+            # in the SOURCE table might cause dubious "SEVERE" messages. Here we temporarily filter out them and
+            # later replace with generic messages of missing the transition metadata in the MS subtable.
+            transitions = False
+            with logging.log_filtermsg('SOURCE table does not contain a row'):
+                if i in target_spw_ids:
+                    try:
+                        # The msmd.transitions(..) call below can return a boolean value of False or
+                        # a Numpy array with dtype=numpy.str_ , e.g.,
+                        #   CASA <15>: msmd.transitions(sourceid=2,spw=16)
+                        #   Out[15]: array(['N2H__v_0_J_1_0(ID=3925982)'], dtype='<U26')
+                        # For invalid source/spw combinations, the call could also trigger an exception with a RuntimeError.
+                        # Also see: https://casadocs.readthedocs.io/en/latest/api/tt/casatools.msmetadata.html#casatools.msmetadata.msmetadata.transitions
+                        transitions = msmd.transitions(sourceid=first_target_source_id, spw=i)
+                    except RuntimeError:
+                        pass
+
+            if transitions is False:
+                LOG.info('No transition info available for SOURCE_ID=%s and SPECTRAL_WINDOW_ID=%s', first_target_source_id, i)
                 transitions = ['Unknown']
 
             # Create simple name for spectral window if none was provided.
@@ -848,20 +860,16 @@ class ObservationTable(object):
 
 class AntennaTable(object):
     @staticmethod
-    def get_antenna_array(msmd):
+    def get_antenna_array(msmd: MSMDReader) -> AntennaArray:
         position = msmd.observatoryposition()            
         names = set(msmd.observatorynames())
         assert len(names) == 1
         name = names.pop()
-        array = domain.AntennaArray(name, position)
-
-        # .. and add a new Antenna for each row in the ANTENNA table
-        for antenna in AntennaTable.get_antennas(msmd):
-            array.add_antenna(antenna)
-        return array
+        antennas = AntennaTable.get_antennas(msmd)
+        return domain.AntennaArray(name, position, antennas)
 
     @staticmethod
-    def get_antennas(msmd):
+    def get_antennas(msmd: MSMDReader) -> List[Antenna]:
         antenna_table = os.path.join(msmd.name(), 'ANTENNA')
         LOG.trace('Opening ANTENNA table to read ANTENNA.FLAG_ROW')
         with casa_tools.TableReader(antenna_table) as table:
@@ -882,14 +890,6 @@ class AntennaTable(object):
             antennas.append(antenna)
 
         return antennas
-
-    @staticmethod
-    def _create_antenna(antenna_id, name, station, diameter, position, offset, flag):
-        # omit this antenna if it has been flagged
-        if flag is True:
-            return
-
-        return domain.Antenna(antenna_id, name, station, position, offset, diameter)
 
 
 class DataDescriptionTable(object):

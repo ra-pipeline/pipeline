@@ -140,7 +140,7 @@ class SkyDisplay(object):
             parameters['stokes'] = stokes
 
         try:
-            parameters['prefix'] = miscinfo['filnam01']
+            parameters['prefix'] = os.path.basename(result).split('.')[0]
         except:
             parameters['prefix'] = None
 

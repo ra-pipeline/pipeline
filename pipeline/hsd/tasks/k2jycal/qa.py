@@ -59,7 +59,7 @@ class SDK2JyCalQAHandler(pqa.QAPlugin):
 class SDK2JyCalListQAHandler(pqa.QAPlugin):
     """Class to handle QA score for a list of k2jycal results."""
 
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = k2jycal.SDK2JyCalResults
 
     def handle(self, context: 'Context', result: 'ResultsList') -> None:

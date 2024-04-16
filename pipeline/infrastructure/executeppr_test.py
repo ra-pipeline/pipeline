@@ -1,7 +1,7 @@
 import pytest
 
 from io import StringIO
-from .executeppr import _sanitize_for_ms
+from .filenamer import sanitize_for_ms
 from .executeppr import _getFirstRequest
 
 test_params = [('uid__A002_target.msXd3e89f_Xc53e', 'uid__A002_target.msXd3e89f_Xc53e'),
@@ -13,8 +13,8 @@ test_params = [('uid__A002_target.msXd3e89f_Xc53e', 'uid__A002_target.msXd3e89f_
 
 @pytest.mark.parametrize("visname, expected", test_params)
 def test_sanitize_ms(visname, expected):
-    """Test _sanitize_for_ms() from executeppr."""
-    assert _sanitize_for_ms(visname) == expected
+    """Test sanitize_for_ms() from executeppr."""
+    assert sanitize_for_ms(visname) == expected
 
 
 test_parameter_values = [(r"1,2,3", '1,2,3'),
@@ -98,7 +98,7 @@ def create_example_alma_ppr(input_parameter_str):
                     <Value>(1,2,3)</Value>
                     </Parameter>
                 </ParameterSet>
-                </ProcessingCommand>                                    
+                </ProcessingCommand>
             </ProcessingProcedure>
             <DataSet>
                 <SchedBlockSet>

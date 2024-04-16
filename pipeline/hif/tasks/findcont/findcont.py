@@ -302,12 +302,17 @@ class FindCont(basetask.StandardTaskTemplate):
                     # used in heuristics methods upstream.
                     if image_heuristics.is_eph_obj(target['field']):
                         phasecenter = 'TRACKFIELD'
+                        psf_phasecenter = None
                         # 'REST' does not yet work (see CAS-8965, CAS-9997)
                         #outframe = 'REST'
                         outframe = ''
                         specmode = 'cubesource'
                     else:
                         phasecenter = target['phasecenter']
+                        if gridder == 'mosaic' and target['psf_phasecenter'] != target['phasecenter']:
+                            psf_phasecenter = target['psf_phasecenter']
+                        else:
+                            psf_phasecenter = None
                         outframe = 'LSRK'
                         specmode = 'cube'
 
@@ -337,10 +342,11 @@ class FindCont(basetask.StandardTaskTemplate):
                                             mosweight=mosweight, perchanweightdensity=perchanweightdensity,
                                             pblimit=0.2, niter=0, threshold='0mJy', deconvolver='hogbom',
                                             interactive=False, imsize=target['imsize'], cell=target['cell'],
-                                            phasecenter=phasecenter, stokes='I', weighting=weighting,
-                                            robust=robust, uvtaper=uvtaper, npixels=0, restoration=False,
-                                            restoringbeam=[], pbcor=False, usepointing=usepointing,
-                                            savemodel='none', parallel=parallel, fullsummary=False)
+                                            phasecenter=phasecenter, psfphasecenter=psf_phasecenter,
+                                            stokes='I', weighting=weighting, robust=robust, uvtaper=uvtaper,
+                                            npixels=0, restoration=False, restoringbeam=[], pbcor=False,
+                                            usepointing=usepointing, savemodel='none', parallel=parallel,
+                                            fullsummary=False)
                     self._executor.execute(job)
 
                     # Try detecting continuum frequency ranges

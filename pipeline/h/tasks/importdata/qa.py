@@ -175,7 +175,7 @@ class ImportDataQAHandler(pqa.QAPlugin):
         return qacalc.score_science_spw_names(mses, virtual_science_spw_names)
 
 class ImportDataListQAHandler(pqa.QAPlugin):
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = importdata.ImportDataResults
 
     def handle(self, context, result):

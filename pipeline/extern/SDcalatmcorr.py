@@ -1,7 +1,7 @@
 #
 # [SCRIPT INFORMATION]
-# GIT REPO: https://bitbucket.alma.cl/scm/~harold.francke/sd-atm-line-correction-prototype.git
-# COMMIT:  b7bc39c4741
+# GIT REPO: https://bitbucket.alma.cl/scm/~harold.francke_ar/sd-atm-line-correction-prototype.git
+# COMMIT: a75554f8bb0
 #
 #SDcalatmcorr: Casapipescript with wrapper for TS script "atmcorr.py" for the removal
 #of atmospheric line residuals.
@@ -1096,7 +1096,7 @@ def getCalAtmData(ms, spws, spwsetup):
     return (tground_all, pground_all, hground_all, tmatm_all, tsys, trec, tau, antatm)
 
 def makeNANmetrics(fieldid, spwid, nmodels):
-    metricdtypes = np.dtype([('maxabs', np.float), ('maxabserr', np.float), ('intabs', np.float), ('intabserr', np.float), ('maxabsdiff', np.float), ('maxabsdifferr', np.float), ('intabsdiff', np.float), ('intabsdifferr', np.float), ('intsqdiff', np.float), ('intsqdifferr', np.float)])
+    metricdtypes = np.dtype([('maxabs', float), ('maxabserr', float), ('intabs', float), ('intabserr', float), ('maxabsdiff', float), ('maxabsdifferr', float), ('intabsdiff', float), ('intabsdifferr', float), ('intsqdiff', float), ('intsqdifferr', float)])
     metrics = {fieldid: {spwid: np.zeros(nmodels, dtype = metricdtypes)}}
     for k in range(nmodels):
         metrics[fieldid][spwid]['maxabs'][k] = np.nan
@@ -1367,10 +1367,10 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
         lapserate = [lapserate]
     if ('int' in str(type(scaleht))) or ('float' in str(type(scaleht))):
         scaleht = [scaleht]
-    modtypes = np.dtype([('atmtype', np.int), ('maxalt', np.float), ('lapserate', np.float), ('scaleht', np.float)])
+    modtypes = np.dtype([('atmtype', int), ('maxalt', float), ('lapserate', float), ('scaleht', float)])
     models = np.array([model for model in product(atmtype, maxalt, lapserate, scaleht)], dtype = modtypes)
     nmodels = len(models)
-    metricdtypes = np.dtype([('maxabs', np.float), ('maxabserr', np.float), ('intabs', np.float), ('intabserr', np.float), ('maxabsdiff', np.float), ('maxabsdifferr', np.float), ('intabsdiff', np.float), ('intabsdifferr', np.float), ('intsqdiff', np.float), ('intsqdifferr', np.float)])
+    metricdtypes = np.dtype([('maxabs', float), ('maxabserr', float), ('intabs', float), ('intabserr', float), ('maxabsdiff', float), ('maxabsdifferr', float), ('intabsdiff', float), ('intabsdifferr', float), ('intsqdiff', float), ('intsqdifferr', float)])
     print('fieldid: '+str(fieldid)+' spwstoprocess: '+str(spwstoprocess))
     #Create metric output dictionary
     if (len(spwstoprocess) > 0) and (jyperkfactor is not None):
@@ -1737,10 +1737,35 @@ def getJyperKfromCSV(jyperkfile = 'jyperk.csv', mssuffix = ''):
 
 def getJyperKfromCaltable(mslist, context):
     '''Get Jy/K factors from pipeline caltables. Will determine the MS list and tables from pipeline context.
+
+    This method could raise RuntimeError when Jy/K caltable associated with any of given MS does not exist.
     '''
     tb = createCasaTool(tbtool)
     callib = context.callibrary
-    jyperktables = [callib.get_calstate(callibrary.CalTo(vis)).get_caltable(caltypes='amp').pop() for vis in mslist]
+
+    def _extract_jyperk_table(vis: str) -> str:
+        """Extract name of Jy/K caltable from callibrary.
+
+        Args:
+            vis: name of MS
+
+        Raises:
+            RuntimeError: No Jy/K caltable is available.
+            RuntimeError: Found more than one Jy/K caltable.
+
+        Returns:
+            Name of Jy/K caltable
+        """
+        caltables = callib.get_calstate(callibrary.CalTo(vis)).get_caltable(caltypes='amp')
+        # there should be only one Jy/K caltable in callibrary
+        if len(caltables) == 0:
+            raise RuntimeError(f'No Jy/K caltable for {os.path.basename(vis)}.')
+        elif len(caltables) > 1:
+            raise RuntimeError(f'Detected more than one Jy/K caltables for {os.path.basename(vis)}. Something went wrong.')
+        return caltables.pop()
+
+    jyperktables = [_extract_jyperk_table(vis) for vis in mslist]
+
     output = {}
     for i, ms in enumerate(mslist):
         #Get SPW info for this MS

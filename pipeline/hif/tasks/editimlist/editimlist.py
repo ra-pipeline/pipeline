@@ -124,7 +124,7 @@ class EditimlistInputs(vdp.StandardInputs):
     def field(self, val):
         if not isinstance(val, (str, list, type(None))):
             # PIPE-1881: allow field names that mistakenly get casted into non-string datatype by
-            # recipereducer (recipereducer.string_to_val) and executeppr (XmlObjectifier.castType)
+            # recipereducer (utils.string_to_val) and executeppr (XmlObjectifier.castType)
             LOG.warning('The field selection input %r is not a string and will be converted.', val)
             val = str(val)
         if not isinstance(val, list):
@@ -425,7 +425,7 @@ class Editimlist(basetask.StandardTaskTemplate):
                                                         uvtaper=imlist_entry['uvtaper'],
                                                         pixperbeam=ppb,
                                                         known_beams=inp.context.synthesized_beams,
-                                                        force_calc=False)
+                                                        force_calc=False, shift=True)
         else:
             synthesized_beam = None
         imlist_entry['cell'] = th.cell(beam=synthesized_beam,
@@ -448,7 +448,13 @@ class Editimlist(basetask.StandardTaskTemplate):
         imlist_entry['width'] = inpdict['width']
 
         # for VLASS phasecenter is required user input (not determined by heuristics)
-        imlist_entry['phasecenter'] = th.phasecenter(fieldids) if not inpdict['phasecenter'] else inpdict['phasecenter']
+        if inpdict['phasecenter']:
+            imlist_entry['phasecenter'] = inpdict['phasecenter']
+            imlist_entry['psf_phasecenter'] = inpdict['phasecenter']
+        else:
+            phasecenter, psf_phasecenter = th.phasecenter(fieldids)
+            imlist_entry['phasecenter'] = phasecenter
+            imlist_entry['psf_phasecenter'] = psf_phasecenter
 
         # set the field name list in the image list target
         if fieldnames:

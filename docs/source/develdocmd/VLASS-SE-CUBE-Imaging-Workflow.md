@@ -1,5 +1,4 @@
-VLASS-SE-CUBE imaging workflow
-------------------------------
+# VLASS-SE-CUBE imaging workflow
 
 This documentation describes the VLASS [Coarse Cube Imaging Pipeline](https://open-confluence.nrao.edu/pages/viewpage.action?pageId=63897714) (CCIP) workflow.
 

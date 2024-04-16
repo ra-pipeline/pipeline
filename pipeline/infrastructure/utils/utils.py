@@ -34,7 +34,7 @@ __all__ = ['find_ranges', 'dict_merge', 'are_equal', 'approx_equal', 'get_num_ca
            'get_casa_quantity', 'get_si_prefix', 'absolute_path', 'relative_path', 'get_task_result_count',
            'place_repr_source_first', 'shutdown_plotms', 'get_casa_session_details', 'get_obj_size', 'get_products_dir',
            'export_weblog_as_tar', 'ensure_products_dir_exists', 'ignore_pointing', 'request_omp_threading',
-           'open_with_lock', 'nested_dict']
+           'open_with_lock', 'nested_dict', 'string_to_val']
 
 
 def find_ranges(data: Union[str, List[int]]) -> str:
@@ -860,3 +860,19 @@ def to_plain_dict(default_dict):
             plain_dict[k] = v
 
     return plain_dict
+
+
+def string_to_val(s):
+    """
+    Convert a string to a Python data type.
+    """
+    try:
+        pyobj = ast.literal_eval(s)
+        # PIPE-1030: prevent a string like "1,2,3" from being unexpectedly translated into tuple
+        if type(pyobj) is tuple and s.strip()[0] != '(':
+            pyobj = s
+        return pyobj
+    except ValueError:
+        return s
+    except SyntaxError:
+        return s

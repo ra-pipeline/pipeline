@@ -608,7 +608,7 @@ def format_spwmap(spwmap, scispws):
 
 	<%def name="ms_preamble(ms)">
 	% if uv_max[ms].value > 0.0:
-        <p>Calibrated amplitude vs frequency plots for the each measurement
+        <p>Calibrated amplitude vs frequency plots for each measurement
             set's representative source. For mosaics, the representative field is
             identified as the field with the highest median channel-averaged amplitude,
             calculated over all science spectral windows. The atmospheric transmission
@@ -664,11 +664,10 @@ def format_spwmap(spwmap, scispws):
 	</%def>
 
 	<%def name="preamble()">
-        <p>Calibrated amplitude vs frequency plots for the each measurement
+        <p>Calibrated amplitude vs frequency plots for each measurement
             set's representative source. For mosaics, the representative field is
             identified as the field with the highest median channel-averaged amplitude,
-            calculated over all science spectral windows. The atmospheric transmission
-            for each spectral window is overlayed on each plot in pink.</p>
+            calculated over all science spectral windows.</p>
 		<p>Data are plotted for all antennas and correlations, with different
 		spectral windows shown in different colours.</p>
 	</%def>

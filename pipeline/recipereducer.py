@@ -36,18 +36,20 @@ Example #5: process uid123.tar.gz with a log level of TRACE
     pipeline.recipereducer.reduce(vis=['uid123.tar.gz'], loglevel='trace')
 
 """
-import ast
 import collections
 import os
+import tempfile
 import traceback
+from typing import Any, Callable, List, Optional, Tuple
 import xml.etree.ElementTree as ElementTree
 
 import pkg_resources
 
+import pipeline.cli as cli
+import pipeline.h.cli.cli as h_cli
 import pipeline.infrastructure.launcher as launcher
 import pipeline.infrastructure.logging as logging
-import pipeline.infrastructure.vdp as vdp
-from pipeline.infrastructure import exceptions, task_registry, utils
+from pipeline.infrastructure import exceptions, utils
 
 LOG = logging.get_logger(__name__)
 
@@ -56,12 +58,86 @@ RECIPES_DIR = pkg_resources.resource_filename(__name__, 'recipes')
 TaskArgs = collections.namedtuple('TaskArgs', 'vis infiles session')
 
 
-def _create_context(loglevel, plotlevel, name):
-    return launcher.Pipeline(loglevel=loglevel, plotlevel=plotlevel,
-                             name=name).context
+def _create_context(loglevel: str, plotlevel: str, name: str) -> launcher.Context:
+    """Create Pipeline context.
+
+    Args:
+        loglevel: Logging level
+        plotlevel: Plot level
+        name: Name of the context
+
+    Returns:
+        Pipeline context object
+    """
+    pipeline = launcher.Pipeline(loglevel=loglevel, plotlevel=plotlevel,
+                                 name=name)
+    return pipeline.context
 
 
-def _get_context_name(procedure):
+def _register_context(loglevel: str, plotlevel: str, context: launcher.Context) -> None:
+    """Register given context to global scope.
+
+    If pipeline context already exists in global scope, it is saved on
+    disk to avoid being overwritten.
+
+    Args:
+        loglevel: Logging level
+        plotlevel: Plot level
+        context: Pipeline context object
+    """
+    # check if global context exists
+    pipeline_instance = h_cli.stack.get(h_cli.PIPELINE_NAME, None)
+    if pipeline_instance and isinstance(pipeline_instance, launcher.Pipeline):
+        # if global context exists, check identity with given context
+        global_context = pipeline_instance.context
+        if global_context == context:
+            # context is already registered
+            return
+        elif global_context.name != context.name:
+            # global context is different from given context
+            # save global context with intrinsic name
+            global_context.save()
+            context_file = f'{global_context.name}.context'
+            LOG.info(f'Global context exists. Saved it {context_file} to disk.')
+        else:
+            # global context is different from given context but
+            # they accidentally have the same name
+            # save global context with different name to avoid
+            # name conflict with new one
+            for i in range(10):
+                context_file = f'{global_context.name}-{i}.context'
+                if not os.path.exists(context_file):
+                    global_context.save(context_file)
+                    LOG.info(f'Global context exists. Saved it {context_file} to disk.')
+                    break
+            else:
+                # failed attempt to find appropriate context name
+                # it should rarely happen, but overwrite existing context
+                # if it happened
+                LOG.warning('Existing Pipeline context will be overridden by the current pipeline processing.')
+
+    # register given context to global scope
+    with tempfile.TemporaryDirectory(dir='.') as temp_dir:
+        context_name = os.path.join(temp_dir, context.name)
+        try:
+            # to disable some log messages during registration
+            temp_loglevel = 'error'
+            logging.set_logging_level(level=temp_loglevel)
+            context.save(context_name)
+            # create pipeline instance using temporary context
+            pipeline_instance = launcher.Pipeline(
+                loglevel=temp_loglevel, plotlevel=plotlevel,
+                context=context_name
+            )
+            # then, replace context
+            pipeline_instance.context = context
+            h_cli.stack[h_cli.PIPELINE_NAME] = pipeline_instance
+        finally:
+            # set user-specified loglevel
+            logging.set_logging_level(level=loglevel)
+
+
+def _get_context_name(procedure: str) -> str:
     root, _ = os.path.splitext(os.path.basename(procedure))
     return 'pipeline-%s' % root
 
@@ -88,13 +164,13 @@ def _get_processing_procedure(procedure: str) -> ElementTree:
     return procedure_xml
 
 
-def _get_procedure_title(procedure):
+def _get_procedure_title(procedure: str) -> str:
     procedure_xml = _get_processing_procedure(procedure)
     procedure_title = procedure_xml.findtext('ProcedureTitle', default='Undefined')
     return procedure_title
 
 
-def _get_tasks(context, args, procedure):
+def _get_tasks(context: launcher.Context, args: TaskArgs, procedure: str):
     procedure_xml = _get_processing_procedure(procedure)
 
     commands_seen = []
@@ -111,67 +187,54 @@ def _get_tasks(context, args, procedure):
                 and cli_command == 'hif_exportdata':
             continue
 
-        task_class = task_registry.get_pipeline_class_for_task(cli_command)
-
         task_args = {}
 
-        if cli_command in ['hif_importdata',
+        if cli_command in ['h_importdata',
+                           'hif_importdata',
                            'hifa_importdata',
                            'hifv_importdata',
+                           'hsd_importdata',
+                           'hsdn_importdata',
+                           'h_restoredata',
                            'hif_restoredata',
                            'hifa_restoredata',
-                           'hsd_importdata',
-                           'hsdn_importdata']:
+                           'hifv_restoredata',
+                           'hsd_restoredata']:
             task_args['vis'] = args.vis
             # we might override this later with the procedure definition
             task_args['session'] = args.session
 
-        elif cli_command in [ 'hsd_restoredata' ]:
-            task_args['infiles'] = args.infiles
+        elif cli_command in [ 'hsdn_restoredata' ]:
+            task_args['vis'] = args.vis
 
         for parameterset in processingcommand.findall('ParameterSet'):
             for parameter in parameterset.findall('Parameter'):
                 argname = parameter.findtext('Keyword')
                 argval = parameter.findtext('Value')
-                task_args[argname] = string_to_val(argval)
+                task_args[argname] = utils.string_to_val(argval)
 
-        task_inputs = vdp.InputsContainer(task_class, context, **task_args)
-        task = task_class(task_inputs)
-        task._hif_call = _as_task_call(task_class, task_args)
         # we yield rather than return so that the context can be updated
         # between task executions
-        yield task
+        task = cli.get_pipeline_task_with_name(cli_command)
+        yield task, task_args
 
 
-def string_to_val(s):
-    """
-    Convert a string to a Python data type.
-    """
-    try:
-        pyobj = ast.literal_eval(s)
-        # PIPE-1030: prevent a string like "1,2,3" from being unexpectedly translated into tuple
-        if type(pyobj) is tuple and s.strip()[0] != '(':
-            pyobj = s
-        return pyobj
-    except ValueError:
-        return s
-    except SyntaxError:
-        return s
-
-
-def _format_arg_value(arg_val):
+def _format_arg_value(arg_val: Tuple[Any, Any]) -> str:
     arg, val = arg_val
     return '%s=%r' % (arg, val)
 
 
-def _as_task_call(task_class, task_args):
+def _as_task_call(task_func: Callable, task_args: dict) -> str:
     kw_args = list(map(_format_arg_value, task_args.items()))
-    return '%s(%s)' % (task_class.__name__, ', '.join(kw_args))
+    return '%s(%s)' % (task_func.__name__, ', '.join(kw_args))
 
 
-def reduce(vis=None, infiles=None, procedure='procedure_hifa_calimage.xml',
-           context=None, name=None, loglevel='info', plotlevel='default',
-           session=None, exitstage=None, startstage=None):
+def reduce(vis: Optional[List[str]] = None, infiles: Optional[List[str]] = None,
+           procedure: str = 'procedure_hifa_calimage.xml',
+           context: Optional[launcher.Context] = None, name: Optional[str] = None,
+           loglevel: str = 'info', plotlevel: str = 'default',
+           session: Optional[List[str]] = None, exitstage: Optional[int] = None,
+           startstage: Optional[int] = None) -> launcher.Context:
     if vis is None:
         vis = []
 
@@ -184,6 +247,8 @@ def reduce(vis=None, infiles=None, procedure='procedure_hifa_calimage.xml',
         procedure_title = _get_procedure_title(procedure)
         context.set_state('ProjectStructure', 'recipe_name', procedure_title)
 
+    _register_context(loglevel, plotlevel, context)
+
     if session is None:
         session = ['default'] * len(vis)
 
@@ -195,19 +260,19 @@ def reduce(vis=None, infiles=None, procedure='procedure_hifa_calimage.xml',
     try:
         procedure_stage_nr = 0
         while True:
-            task = next(task_generator)
+            task, task_args = next(task_generator)
             procedure_stage_nr += 1
             if procedure_stage_nr < startstage:
                 continue
-            LOG.info('Executing pipeline task %s' % task._hif_call)
+            LOG.info('Executing pipeline task %s' % _as_task_call(task, task_args))
 
             try:
-                result = task.execute()
-                result.accept(context)
+                result = task(**task_args)
             except Exception as ex:
                 # Log message if an exception occurred that was not handled by
                 # standardtask template (not turned into failed task result).
-                LOG.error('Unhandled error in recipereducer while running pipeline task %s.' % task._hif_call)
+                _hif_call = _as_task_call(task, task_args)
+                LOG.error('Unhandled error in recipereducer while running pipeline task %s.' % _hif_call)
                 traceback.print_exc()
                 return context
 
@@ -222,6 +287,6 @@ def reduce(vis=None, infiles=None, procedure='procedure_hifa_calimage.xml',
         pass
     finally:
         LOG.info('Saving context...')
-        context.save()
+        cli.h_save()
 
     return context

@@ -87,7 +87,7 @@ def commafy(l: Iterable, quotes: bool = True, multi_prefix: str = '', separator:
     Return:
         The textual description of the given list.
     """
-    if not isinstance(l, list) and isinstance(l, collections.Iterable):
+    if not isinstance(l, list) and isinstance(l, collections.abc.Iterable):
         l = [i for i in l]
 
     # turn 's' into 's '
@@ -144,7 +144,7 @@ def flatten(l: Sequence[Any]) -> Iterator[Any]:
         Single list.
     """
     for el in l:
-        if isinstance(el, collections.Iterable) and not isinstance(el, str):
+        if isinstance(el, collections.abc.Iterable) and not isinstance(el, str):
             for sub in flatten(el):
                 yield sub
         else:

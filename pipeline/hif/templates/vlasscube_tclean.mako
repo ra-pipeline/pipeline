@@ -26,7 +26,7 @@ try:
     long_description = '<br><small>{!s}'.format(result.metadata['long description'])
 except:
     long_description = ''
-%>Tclean/MakeImages${long_description}</%block>
+%>MakeImages${long_description}</%block>
 
 %if len(result[0].targets) != 0:
     %if len(image_info) != 0:

@@ -25,7 +25,7 @@ try:
     long_description = '<br><small>{!s}'.format(result.metadata['long description'])
 except:
     long_description = ''
-%>Tclean/MakeImages${long_description}</%block>
+%>MakeImages${long_description}</%block>
 
 
 <h2>Image Details</h2>

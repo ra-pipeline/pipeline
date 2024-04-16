@@ -26,7 +26,7 @@ try:
     long_description = '<br><small>{!s}'.format(result.metadata['long description'])
 except:
     long_description = ''
-%>Tclean/MakeImages${long_description}</%block>
+%>MakeImages${long_description}</%block>
 
 %if imaging_mode == 'ALMA':
     <p>In this stage, images with significant emission are cleaned to a threshold of
@@ -320,6 +320,14 @@ except:
                     %endfor
                 </tr>
                 %endif
+                % if row.nmajordone_total is not None:
+                <tr>
+                    <th>total number of major cycles done</th>
+                    %for k in range(j, min(j+4, field_block_indices[i+1])):
+                        <td>${image_info[k].nmajordone_total}</td>
+                    %endfor
+                </tr>
+                % endif
                 <tr>
                     <th>clean residual peak / scaled MAD</th>
                     %for k in range(j, min(j+4, field_block_indices[i+1])):

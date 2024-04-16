@@ -1,3 +1,5 @@
+# Pipeline testing
+
 ## Unit tests
 
 The instruction of writing/running pipeline unit tests is described in [PIPE-862](https://open-jira.nrao.edu/browse/PIPE-862). Some tips for running local tests are below:

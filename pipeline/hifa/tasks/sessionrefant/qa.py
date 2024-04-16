@@ -13,7 +13,7 @@ class SessionRefAntListQAHandler(pqa.QAPlugin):
     """
     QA plugin to process lists of SessionRefAntResults.
     """
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = resultobjects.SessionRefAntResults
     generating_task = sessionrefant.SessionRefAnt
 

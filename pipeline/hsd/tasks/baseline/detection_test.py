@@ -19,7 +19,8 @@ MeasurementSetMock = collections.namedtuple(
 
 ANTENNA_ARRAY = antennaarray.AntennaArray(
     name='ALMA',
-    position=casa_tools.measures.observatory('ALMA')
+    position=casa_tools.measures.observatory('ALMA'),
+    antennas=[]
 )
 
 FIELD_0 = field.Field(

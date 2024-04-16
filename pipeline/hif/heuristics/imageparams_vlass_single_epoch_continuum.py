@@ -2,7 +2,7 @@ import os
 import re
 import shutil
 import uuid
-from typing import Union, Tuple, Dict
+from typing import Union, Tuple, Dict, Optional
 
 import numpy
 
@@ -68,7 +68,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         """Tclean imsize parameter heuristics."""
         return [16384, 16384]
 
-    def reffreq(self) -> str:
+    def reffreq(self, deconvolver: Optional[str]=None, specmode: Optional[str]=None, spwsel: Optional[dict]=None) -> Optional[str]:
         """Tclean reffreq parameter heuristics."""
         return '3.0GHz'
 

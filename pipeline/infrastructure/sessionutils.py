@@ -387,7 +387,7 @@ class ParallelTemplate(basetask.StandardTaskTemplate):
                     # for importdata/restoredata tasks, input and output vis
                     # can be different. sessionutils seems to require vis to
                     # be output vis
-                    if isinstance(worker_result, collections.Iterable):
+                    if isinstance(worker_result, collections.abc.Iterable):
                         result = worker_result[0]
                     else:
                         result = worker_result
@@ -410,7 +410,7 @@ class ParallelTemplate(basetask.StandardTaskTemplate):
         # retrieve measurementset domain objects from the results
         mses = []
         for _, _, vis_result in assessed:
-            if isinstance(vis_result, collections.Iterable):
+            if isinstance(vis_result, collections.abc.Iterable):
                 for r in vis_result:
                     mses.extend(getattr(r, 'mses', []))
             else:
@@ -425,7 +425,7 @@ class ParallelTemplate(basetask.StandardTaskTemplate):
                     final_result.append(fake_result)
 
                 else:
-                    if isinstance(vis_result, collections.Iterable):
+                    if isinstance(vis_result, collections.abc.Iterable):
                         final_result.extend(vis_result)
                     else:
                         final_result.append(vis_result)

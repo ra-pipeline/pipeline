@@ -27,7 +27,6 @@ results.accept(context)
 """
 import os
 import re
-import ast
 import sys
 import shutil
 import tarfile
@@ -300,23 +299,26 @@ class RestoreData(basetask.StandardTaskTemplate):
                 params = pipemanifest.get_renorm(vis)
                 if params:
                     # Convert input parameters with ast (string to bool, dict, etc).
-                    kwargs = {key: ast.literal_eval(val) if val else val for key, val in params.items()}
+                    kwargs = {key: utils.string_to_val(val) if val else val for key, val in params.items()}
 
                     # PIPE-1687: restrict input arguments to those needed by
                     # renorm interface function.
+                    # PIPE-2049: if some parameters are absent from the manifest,
+                    # use default values adopted from extern.heuristics.ACreNorm.renormalize,
+                    # except for atm_auto_exclude, which is defaulted to False.
                     kwargs = {
                         'vis': vis,
-                        'spw': [int(x) for x in kwargs['spw'].split(',') if x],
-                        'apply': kwargs['apply'],
-                        'threshold': kwargs['threshold'],
-                        'excludechan': kwargs['excludechan'],
-                        'correct_atm': kwargs['correctATM'],
-                        'atm_auto_exclude': kwargs['atm_auto_exclude'],
-                        'bwthreshspw': kwargs['bwthreshspw'],
+                        'spw': [int(x) for x in kwargs.get('spw', '').split(',') if x],
+                        'apply': kwargs.get('apply', False),
+                        'threshold': kwargs.get('threshold', None),
+                        'excludechan': kwargs.get('excludechan', {}),
+                        'correct_atm': kwargs.get('correctATM', False),
+                        'atm_auto_exclude': kwargs.get('atm_auto_exclude', False),
+                        'bwthreshspw': kwargs.get('bwthreshspw', {}),
                     }
 
                     try:
-                        LOG.info(f'Renormalizing {vis} with hifa_renorm {params}')
+                        LOG.info(f'Renormalizing {vis} with hifa_renorm {kwargs}')
                         _, _, _, _, _, renorm_applied, _, _ = alma_renorm(**kwargs)
                         if 'apply' in kwargs and kwargs['apply'] and renorm_applied:
                             applied = True

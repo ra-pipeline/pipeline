@@ -17,6 +17,7 @@ class CleanTarget(dict):
         self['imsize'] = None          # string / list
         self['pblimit'] = None         # float
         self['phasecenter'] = None     # string
+        self['psf_phasecenter'] = None # string
         self['specmode'] = None        # string
         self['gridder'] = None         # string
         self['datacolumn'] = None      # string

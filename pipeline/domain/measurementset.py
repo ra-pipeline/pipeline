@@ -242,7 +242,7 @@ class MeasurementSet(object):
                     spw = spw.split(',')
             spw = {int(i) for i in spw}
             pool = {scan for scan in pool for scan_spw in scan.spws if scan_spw.id in spw}
-            pool = list(pool)
+            pool = sorted(pool, key=lambda s: s.id)
 
         return pool
 

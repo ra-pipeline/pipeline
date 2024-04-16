@@ -264,15 +264,8 @@ class T2_4MDetailsplotsummaryRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
             # no obvious drop in amplitude with uvdist, then use all the data.
             # A simpler compromise would be to use a uvrange that captures the
             # inner half the data.
-            baselines = sorted(ms.antenna_array.baselines,
-                               key=operator.attrgetter('length'))
-            # take index as midpoint + 1 so we include the midpoint in the
-            # constraint
-            half_baselines = baselines[0:(len(baselines) // 2) + 1]
-            uv_max = half_baselines[-1].length.to_units(measures.DistanceUnits.METRE)
-            uv_range = '<%s' % uv_max
+            max_uvs[vis], uv_range = utils.scale_uv_range(ms)
             LOG.debug('Setting UV range to %s for %s', uv_range, vis)
-            max_uvs[vis] = half_baselines[-1].length
 
             brightest_fields = T2_4MDetailsplotsummaryRenderer.get_brightest_fields(ms)
 

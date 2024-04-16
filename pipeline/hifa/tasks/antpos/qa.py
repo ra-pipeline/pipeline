@@ -38,7 +38,7 @@ class ALMAAntposListQAHandler(pqa.QAPlugin):
     """
     QA handler for a list containing AntResults.
     """
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = antpos.AntposResults
     generating_task = almaantpos.ALMAAntpos
 

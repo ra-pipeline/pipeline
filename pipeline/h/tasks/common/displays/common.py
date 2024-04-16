@@ -1,21 +1,19 @@
 import collections
-import functools
 import itertools
-import re
 import operator
 import os
+import re
+from typing import Union, List, Dict
 
+import cachetools
 import matplotlib.dates
 import numpy
 
-import cachetools
-from typing import Union, List, Dict
-
-import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.callibrary as callibrary
-import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.renderer.logger as logger
+import pipeline.infrastructure.utils as utils
+from pipeline.domain import MeasurementSet
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 
@@ -833,7 +831,7 @@ class CaltableWrapper(object):
 
 
 class PhaseVsBaselineData(object):
-    def __init__(self, data, ms, corr_id, refant_id):
+    def __init__(self, data, ms: MeasurementSet, corr_id, refant_id):
         # While it is possible to do so, we shouldn't calculate statistics for
         # mixed antennas/spws/scans.
         if len(set(data.antenna)) == 0:
@@ -847,17 +845,57 @@ class PhaseVsBaselineData(object):
         #        assert len(set(data.scan)) is 1, 'Data slice contains multiple scans'
 
         self.data = data
-        self.ms = ms
-        self.corr = corr_id
         self.data_for_corr = self.data.data[:, corr_id]
-        self.__refant_id = int(refant_id)
-
-        self._cache = cachetools.LRUCache(maxsize=100)
-
         if len(self.data_for_corr) == 0:
             raise ValueError('No data for spw %s ant %s scan %s' % (data.spw[0],
                                                                     data.antenna[0],
                                                                     data.scan))
+
+        self.ms = ms
+        self.corr = corr_id
+        self.refant = int(refant_id)
+
+        self.baselines = self.ms.antenna_array.baselines_for_antennas(data.antenna)
+        self.median_baseline = numpy.median(self.baselines)
+        self.mean_baseline = numpy.median(self.baselines)
+
+        this_antenna_id = int(self.data.antenna[0])
+        self.distance_to_refant = self.ms.antenna_array.baseline_lookup[refant_id][this_antenna_id]
+
+        # backing for on-demand properties. It is very likely that these could be
+        # made simple instance properties but they are kept on-demand to avoid
+        # introducing additional risk into PIPE-1823.
+        self._unwrapped_data = None
+        self._offsets_from_median = None
+        self._rms_offset = None
+        self._unwrapped_rms = None
+        self._median_offset = None
+
+    def _safe_rms(self, x: numpy.ma.array, calculation: str):
+        """
+        Safely calculate the RMS of a numpy masked array, logging any
+        error and skipping to the next value if an error occurs.
+        """
+        def rms():
+            return numpy.ma.sqrt(numpy.ma.mean(x ** 2))
+
+        def err_handler(t, _):
+            ant = set(self.data.antenna).pop()
+            spw = set(self.data.spw).pop()
+            scan = set(self.data.scan).pop()
+            LOG.warning('Floating point error (%s) calculating %s for'
+                        ' Scan %s Spw %s Ant %s.' % (t, calculation, scan, spw, ant))
+
+        try:
+            return rms()
+        except FloatingPointError:
+            saved_handler = numpy.seterrcall(err_handler(calculation))
+            saved_err = numpy.seterr(all='call')
+            try:
+                return rms()
+            finally:
+                numpy.seterrcall(saved_handler)
+                numpy.seterr(**saved_err)
 
     @property
     def antenna(self):
@@ -876,136 +914,48 @@ class PhaseVsBaselineData(object):
         return len(self.data.data.shape[1])
 
     @property
-    def refant(self):
-        return self.__refant_id
-
-    @property
-    @cachetools.cachedmethod(operator.attrgetter('_cache'),
-                             key=functools.partial(cachetools.keys.hashkey, 'baselines'))
-    def baselines(self):
-        """
-        Get the baselines for the antenna in this data selection in metres.
-        """
-        antenna_ids = set(self.data.antenna)
-        baselines = [float(b.length.to_units(measures.DistanceUnits.METRE))
-                     for b in self.ms.antenna_array.baselines
-                     if b.antenna1.id in antenna_ids
-                     or b.antenna2.id in antenna_ids]
-        return baselines
-
-    @property
-    @cachetools.cachedmethod(operator.attrgetter('_cache'),
-                             key=functools.partial(cachetools.keys.hashkey, 'distance_to_refant'))
-    def distance_to_refant(self):
-        """
-        Return the distance between this antenna and the reference antenna in
-        metres.
-        """
-        antenna_id = int(self.data.antenna[0])
-        if antenna_id == self.refant:
-            return 0.0
-
-        baseline = self.ms.antenna_array.get_baseline(self.refant, antenna_id)
-        return float(baseline.length.to_units(measures.DistanceUnits.METRE))
-
-    @property
-    @cachetools.cachedmethod(operator.attrgetter('_cache'),
-                             key=functools.partial(cachetools.keys.hashkey, 'median_baseline'))
-    def median_baseline(self):
-        """
-        Return the median baseline for this antenna in metres.
-        """
-        return numpy.median(self.baselines)
-
-    @property
-    @cachetools.cachedmethod(operator.attrgetter('_cache'),
-                             key=functools.partial(cachetools.keys.hashkey, 'mean_baseline'))
-    def mean_baseline(self):
-        """
-        Return the mean baseline for this antenna in metres.
-        """
-        return numpy.mean(self.baselines)
-
-    @property
-    @cachetools.cachedmethod(operator.attrgetter('_cache'),
-                             key=functools.partial(cachetools.keys.hashkey, 'unwrapped_data'))
     def unwrapped_data(self):
-        rads = numpy.deg2rad(self.data_for_corr)
-        unwrapped_rads = numpy.unwrap(rads)
-        unwrapped_degs = numpy.rad2deg(unwrapped_rads)
-        # the operation above removed the mask, so add it back.
-        remasked = numpy.ma.MaskedArray((unwrapped_degs),
-                                        mask=self.data_for_corr.mask)
-        return remasked
+        if self._unwrapped_data is None:
+            rads = numpy.deg2rad(self.data_for_corr)
+            unwrapped_rads = numpy.unwrap(rads)
+            unwrapped_degs = numpy.rad2deg(unwrapped_rads)
+            # the operation above removed the mask, so add it back.
+            remasked = numpy.ma.MaskedArray(unwrapped_degs, mask=self.data_for_corr.mask)
+            self._unwrapped_data = remasked
+
+        return self._unwrapped_data
 
     @property
-    @cachetools.cachedmethod(operator.attrgetter('_cache'),
-                             key=functools.partial(cachetools.keys.hashkey, 'offsets_from_median'))
     def offsets_from_median(self):
-        try:
+        if self._offsets_from_median is None:
             unwrapped_degs = self.unwrapped_data
             deg_offsets = unwrapped_degs - numpy.ma.median(unwrapped_degs)
             # the operation above removed the mask, so add it back.
-            remasked = numpy.ma.MaskedArray((deg_offsets),
-                                            mask=self.data_for_corr.mask)
-            return remasked
-        except:
-            raise
+            remasked = numpy.ma.MaskedArray(deg_offsets, mask=self.data_for_corr.mask)
+            self._offsets_from_median = remasked
+
+        return self._offsets_from_median
 
     @property
-    @cachetools.cachedmethod(operator.attrgetter('_cache'),
-                             key=functools.partial(cachetools.keys.hashkey, 'rms_offset'))
     def rms_offset(self):
-        saved_handler = None
-        saved_err = None
-        try:
-            return numpy.ma.sqrt(numpy.ma.mean(self.offsets_from_median ** 2))
-        except FloatingPointError:
-            def err_handler(t, flag):
-                ant = set(self.data.antenna).pop()
-                spw = set(self.data.spw).pop()
-                scan = set(self.data.scan).pop()
-                LOG.warning('Floating point error (%s) calculating RMS offset for'
-                            ' Scan %s Spw %s Ant %s.' % (t, scan, spw, ant))
+        if self._rms_offset is None:
+            self._rms_offset = self._safe_rms(self.offsets_from_median, "RMS offset")
 
-            saved_handler = numpy.seterrcall(err_handler)
-            saved_err = numpy.seterr(all='call')
-            return numpy.ma.sqrt(numpy.ma.mean(self.offsets_from_median ** 2))
-        finally:
-            if saved_handler:
-                numpy.seterrcall(saved_handler)
-                numpy.seterr(**saved_err)
+        return self._rms_offset
 
     @property
-    @cachetools.cachedmethod(operator.attrgetter('_cache'),
-                             key=functools.partial(cachetools.keys.hashkey, 'unwrapped_rms'))
     def unwrapped_rms(self):
-        saved_handler = None
-        saved_err = None
-        try:
-            return numpy.ma.sqrt(numpy.ma.mean(self.unwrapped_data ** 2))
-        except FloatingPointError:
-            def err_handler(t, flag):
-                ant = set(self.data.antenna).pop()
-                spw = set(self.data.spw).pop()
-                scan = set(self.data.scan).pop()
-                LOG.warning('Floating point error (%s) calculating unwrapped RMS for'
-                            ' Scan %s Spw %s Ant %s.' % (t, scan, spw, ant))
+        if self._unwrapped_rms is None:
+            self._unwrapped_rms = self._safe_rms(self.unwrapped_data, "unwrapped RMS")
 
-            saved_handler = numpy.seterrcall(err_handler)
-            saved_err = numpy.seterr(all='call')
-            return numpy.ma.sqrt(numpy.ma.mean(self.unwrapped_data ** 2))
-        finally:
-            if saved_handler:
-                numpy.seterrcall(saved_handler)
-                numpy.seterr(**saved_err)
+        return self._unwrapped_rms
 
     @property
-    @cachetools.cachedmethod(operator.attrgetter('_cache'),
-                             key=functools.partial(cachetools.keys.hashkey, 'median_offset'))
     def median_offset(self):
-        abs_offset = numpy.ma.abs(self.offsets_from_median)
-        return numpy.ma.median(abs_offset)
+        if self._median_offset is None:
+            abs_offset = numpy.ma.abs(self.offsets_from_median)
+            self._median_offset = numpy.ma.median(abs_offset)
+        return self._median_offset
 
 
 class XYData(object):

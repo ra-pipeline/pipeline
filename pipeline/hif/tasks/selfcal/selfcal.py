@@ -103,7 +103,7 @@ class SelfcalInputs(vdp.StandardInputs):
     def field(self, val):
         if not isinstance(val, (str, type(None))):
             # PIPE-1881: allow field names that mistakenly get casted into non-string datatype by
-            # recipereducer (recipereducer.string_to_val) and executeppr (XmlObjectifier.castType)
+            # recipereducer (utils.string_to_val) and executeppr (XmlObjectifier.castType)
             LOG.warning('The field selection input %r is not a string and will be converted.', val)
             val = str(val)
         return val
@@ -705,7 +705,7 @@ class Selfcal(basetask.StandardTaskTemplate):
         avgarray = [1]*len(bwarray)
         for idx, bw in enumerate(bwarray):
             nchan = bw/chanwidth
-            nchan = np.round(nchan)
+            nchan = max(np.round(nchan), 1.0)
             avgarray[idx] = int(chanarray[idx]/nchan)
             if avgarray[idx] < 1.0:
                 avgarray[idx] = 1

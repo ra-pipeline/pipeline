@@ -37,7 +37,7 @@ class SolintListQAHandler(pqa.QAPlugin):
     """
     QA handler for a list containing SolintResults.
     """
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = solint.SolintResults
     generating_task = solint.Solint
 
@@ -109,7 +109,7 @@ class FluxbootListQAHandler(pqa.QAPlugin):
     """
     QA handler for a list containing FluxbootResults.
     """
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = FluxbootResults
 
     def handle(self, context, result):

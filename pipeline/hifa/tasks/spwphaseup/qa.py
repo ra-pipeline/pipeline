@@ -89,7 +89,7 @@ class SpwPhaseupListQAHandler(pqa.QAPlugin):
     """
     QA handler for a list containing SpwPhaseupResults.
     """
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = spwphaseup.SpwPhaseupResults
     generating_task = spwphaseup.SpwPhaseup
 

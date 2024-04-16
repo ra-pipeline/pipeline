@@ -402,7 +402,7 @@ class MetaDataReader(object):
             Dict: contains list of row IDs of datatable
         """
         # keys for dictionary are (spw_id, antenna_id) tuples
-        flagdict = rasterutil.flag_raster_map(self.datatable)
+        flagdict = rasterutil.flag_raster_map(self.datatable, self.ms)
 
         return flagdict
 

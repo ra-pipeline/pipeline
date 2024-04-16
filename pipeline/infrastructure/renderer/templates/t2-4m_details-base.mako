@@ -11,7 +11,7 @@ import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.htmlrenderer as hr
 import pipeline.infrastructure.renderer.rendererutils as rendererutils
 import pipeline.infrastructure.utils as utils
-from pipeline.infrastructure.pipelineqa import WebLogLocation
+from pipeline.infrastructure.pipelineqa import WebLogLocation, scores_with_location
 %>
 <html>
 <head>
@@ -192,7 +192,7 @@ from pipeline.infrastructure.pipelineqa import WebLogLocation
 </div>
 
 <%
-weblog_scores = rendererutils.scores_with_location(result.qa.pool, [WebLogLocation.ACCORDION, WebLogLocation.BANNER, WebLogLocation.UNSET])
+weblog_scores = scores_with_location(result.qa.pool, [WebLogLocation.ACCORDION, WebLogLocation.BANNER, WebLogLocation.UNSET])
 num_scores = 0
 score_color_counts = []
 representative_score = result.qa.representative

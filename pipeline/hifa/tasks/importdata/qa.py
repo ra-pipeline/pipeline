@@ -19,7 +19,7 @@ aqua.register_aqua_metric(aqua_exporter)
 
 
 class ALMAImportDataListQAHandler(pqa.QAPlugin):
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = ALMAImportDataResults
 
     def handle(self, context, result):

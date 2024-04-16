@@ -59,7 +59,7 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
     hm_weighting            Weighting scheme (natural,uniform,briggs,briggsabs[experimental],briggsbwtaper[experimental])
     hm_cleaning             Pipeline cleaning mode
     tlimit                  Times the sensitivity limit for cleaning
-    drcorretion             Override the default heuristics-based DR correction (for ALMA data only)
+    drcorrect               Override the default heuristics-based DR correction (for ALMA data only)
     masklimit               Times good mask pixels for cleaning
     cleancontranges         Clean continuum frequency ranges in cubes
     calcsb                  Force (re-)calculation of sensitivities and beams

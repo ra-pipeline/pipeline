@@ -1,5 +1,4 @@
-VLASS-SE-CONT imaging workflow
-------------------------------
+# VLASS-SE-CONT imaging workflow
 
 This document describes the implementation of the workflow presented in VLASS Memo 15 as a 
 CASA script ("VIP script") to the pipeline codebase. The relevant recipe is found in the pipeline repository at `pipeline/recipes/procedure_vlassSEIP.xml`.
@@ -12,7 +11,7 @@ The major peculiarities in the workflow are:
 
 Furthermore, astropy is a hard requirement for pyBDSF (the package documentation say otherwise, but in practice it was found to be necessary) and is included in the tarball builds. The hif_vlassmasking() task and hifv_selfcal() task weblog renderer also take advantage of astropy.
 
-### Imaging modes
+## Imaging modes
 
 The pipeline supports 3 VLASS-SE-CONT imaging modes (parameter used in hif_editimlist task). The modes differ in gridder related tclean parameters. 
 
@@ -21,7 +20,7 @@ The pipeline supports 3 VLASS-SE-CONT imaging modes (parameter used in hif_editi
 - VLASS-SE-CONT-AWP-P001: alternative widefield projection mode. It differs from the default mode by using one projection plane (i.e. `wprojplanes=1`), in order to speed up imaging.
 - VLASS-SE-CONT-MOSAIC: mosaic gridder based mode`gridder='mosaic'`, similar to the Quick Look Imaging Project (QLIP) recipe. 
 
-### Task level workflow
+## Task level workflow
 
 The Memo 15 workflow consists of 3 imaging steps: 1) compute image (with Tier-1 mask, derived from QL database) that is 
 used for self-calibration, 2) image self calibrated (corrected) data column and use the result for creating the Tier-2 mask, and 3) 
@@ -69,7 +68,7 @@ The imaging cycle (stages) include a `hif_editimlist`, an optional `hifv_vlassma
     hifv_vlassmasking(maskingmode='vlass-se-tier-2')
     hif_makeimages( hm_masking='manual')
 
-##### hif_editimlist()
+### hif_editimlist()
 
 The `context.clean_list_pending` list is filled with a single imaging target (`imlist_entry`). The following changes occur compared to the 
 normal task operation:
@@ -89,7 +88,7 @@ normal task operation:
     - Second imaging step: the Tier-1 mask name is obtained from the hifv_vlassmasking result object (context.results) and set as the 'mask' value.
     - Third imaging step: the Tier-1 mask name is obtained from the hifv_vlassmasking result object and a two element list is created with 'pb' at the last place. This is updated by hifv_vlassmasking(maskingmode='vlass-se-tier-2) by inserting the name of the Tier-2 mask to the middle of the list, forming a 3 element list.
 
-##### hifv_vlassmasking()
+### hifv_vlassmasking()
 
 The task requires the `vlass_ql_database` parameter. If it is not defined, then the default 
 `/home/vlass/packages/VLASS1Q.fits` is used (can be found on NMPOST machines). 
@@ -113,7 +112,7 @@ Note that the `context.clean_list_pending['mask']` key is a string in imaging st
 or list in imaging stage 1 (`vlass_stage=1`), depending on the `clean_no_mask_selfcal_image` `hif_editimlist` parameter. 
 If `clean_no_mask_selfcal_image=True` then the `'mask'` key value is a list in imaging stage 1: first element is the Tier-1 mask, second element is `'pb'`.
 
-##### hif_makeimages()
+### hif_makeimages()
 
 The following changes are implemented for the VLASS-SE-CONT mode:
 
@@ -149,7 +148,7 @@ The imaging sequence is implemented as `_do_iterative_vlass_se_imaging` method a
 The Tclean result object is changed to store information contained in the tclean return dictionary. This include: number of minor cycle in per major cycle, total flux cleaned in per major cycle, peak residual in per major cycle, and total number of major cycles done.
 
 
-### CASA 6.1 specific workaround
+## CASA 6.1 specific workaround
 
 This section lists CASA issues that the pipeline needs to work around as of the release of 2021.1.1 (based on the CASA 6.1 series). With future CASA version these issues are expected to be fixed.
 

@@ -133,7 +133,7 @@ class BandpassListQAHandler(pqa.QAPlugin):
     """
     QA handler for a list containing BandpassResults.
     """
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = common.BandpassResults
 
     def handle(self, context, result):

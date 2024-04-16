@@ -1,6 +1,6 @@
 import pytest
 
-from .recipereducer import string_to_val
+from .utils import string_to_val
 
 test_params = [(r"True", True),
                (r"false", 'false'),
@@ -17,5 +17,5 @@ test_params = [(r"True", True),
 
 @pytest.mark.parametrize("input_str, expected_value", test_params)
 def test_string_to_val(input_str, expected_value):
-    """Test string_to_val() from pipeline.recipereducer."""
+    """Test string_to_val() from pipeline.infrastructure.utils."""
     assert string_to_val(input_str) == expected_value

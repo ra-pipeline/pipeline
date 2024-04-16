@@ -31,9 +31,9 @@ class UVcontSubListQAHandler(pqa.QAPlugin):
     """
     QA handler for a list containing UVcontSubResults.
     """
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = uvcontsub.UVcontSubResults
-    generating_task = uvcontsub.UVcontSub
+    generating_task = uvcontsub.SerialUVcontSub
 
     def handle(self, context, result):
         # collate the QAScores from each child result, pulling them into our

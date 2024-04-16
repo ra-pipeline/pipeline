@@ -905,7 +905,7 @@ class DictCalLibrary(object):
         # CalState, we assume that the user really want the previous
         # CalFrom not to be ignored in future runs rather than adding
         # a second entry for this CalFrom into the CalState.
-        if not isinstance(calfroms, collections.Iterable):
+        if not isinstance(calfroms, collections.abc.Iterable):
             calfroms = [calfroms]
 
         calfroms_to_reactivate = self._active._removed.intersection(set(calfroms))

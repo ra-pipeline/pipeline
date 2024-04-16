@@ -193,7 +193,7 @@ def get_task_name(result_obj, include_stage=True):
 
 
 def get_stage_number(result_obj):
-    if not isinstance(result_obj, collections.Iterable):
+    if not isinstance(result_obj, collections.abc.Iterable):
         return get_stage_number([result_obj, ])
 
     if len(result_obj) == 0:
@@ -396,18 +396,13 @@ class T1_1Renderer(RendererBase):
                 time_on_source = utils.total_time_on_source(target_scans)
             time_on_source = utils.format_timedelta(time_on_source)
 
-            baseline_min = ms.antenna_array.min_baseline.length
-            baseline_max = ms.antenna_array.max_baseline.length
+            baseline_min = ms.antenna_array.baseline_min.length
+            baseline_max = ms.antenna_array.baseline_max.length
 
-            # compile a list of primitive numbers representing the baseline 
-            # lengths in metres..
-            bls = [bl.length.to_units(measures.DistanceUnits.METRE)
-                   for bl in ms.antenna_array.baselines]
-            # .. so that we can calculate the RMS baseline length with 
-            # consistent units
-            baseline_rms = math.sqrt(sum(bl**2 for bl in bls)/len(bls))
-            baseline_rms = measures.Distance(baseline_rms,
-                                             units=measures.DistanceUnits.METRE)
+            baseline_rms = measures.Distance(
+                value=numpy.sqrt(numpy.mean(numpy.square(ms.antenna_array.baselines_m))),
+                units=measures.DistanceUnits.METRE
+            )
 
             science_spws = ms.get_spectral_windows(science_windows_only=True)
             receivers = sorted(set(spw.band for spw in science_spws))
@@ -560,18 +555,13 @@ class T1_2Renderer(RendererBase):
             time_on_source = utils.total_time_on_source(target_scans)
             time_on_source = utils.format_timedelta(time_on_source)
 
-            baseline_min = ms.antenna_array.min_baseline.length
-            baseline_max = ms.antenna_array.max_baseline.length
+            baseline_min = ms.antenna_array.baseline_min.length
+            baseline_max = ms.antenna_array.baseline_max.length
 
-            # compile a list of primitive numbers representing the baseline 
-            # lengths in metres..
-            bls = [bl.length.to_units(measures.DistanceUnits.METRE)
-                   for bl in ms.antenna_array.baselines]
-            # .. so that we can calculate the RMS baseline length with 
-            # consistent units
-            baseline_rms = math.sqrt(sum(bl**2 for bl in bls)/len(bls))
-            baseline_rms = measures.Distance(baseline_rms,
-                                             units=measures.DistanceUnits.METRE)
+            baseline_rms = measures.Distance(
+                value=numpy.sqrt(numpy.mean(numpy.square(ms.antenna_array.baselines_m))),
+                units=measures.DistanceUnits.METRE
+            )
 
             science_spws = ms.get_spectral_windows(science_windows_only=True)
             receivers = sorted(set(spw.band for spw in science_spws))
@@ -789,8 +779,8 @@ class T2_1DetailsRenderer(object):
 
         calibrators = sorted({source.name for source in ms.sources if 'TARGET' not in source.intents})
 
-        baseline_min = ms.antenna_array.min_baseline.length
-        baseline_max = ms.antenna_array.max_baseline.length
+        baseline_min = ms.antenna_array.baseline_min.length
+        baseline_max = ms.antenna_array.baseline_max.length
 
         num_antennas = len(ms.antennas)
         num_baselines = int(num_antennas * (num_antennas-1) / 2)
@@ -1393,7 +1383,7 @@ class T2_4MRenderer(RendererBase):
 #         for result in context.results:
 #             # we only handle lists of results, so wrap single objects in a
 #             # list if necessary
-#             if not isinstance(result, collections.Iterable):
+#             if not isinstance(result, collections.abc.Iterable):
 #                 result = wrap_in_resultslist(result)
 #             
 #             # split the results in the list into streams, divided by session
@@ -1583,7 +1573,7 @@ class T2_4MDetailsRenderer(object):
         for task_result in context.results:
             # we only handle lists of results, so wrap single objects in a
             # list if necessary
-            if not isinstance(task_result, collections.Iterable):
+            if not isinstance(task_result, collections.abc.Iterable):
                 task_result = wrap_in_resultslist(task_result)
 
             # find the renderer appropriate to the task..
@@ -2104,13 +2094,13 @@ def cmp(a, b):
 #
 def filter_qascores(results_list, lo:float, hi:float) -> List[pipelineqa.QAScore]:
     all_scores: List[pipelineqa.QAScore] = results_list.qa.pool
-    # suppress scores not intended for the banner, taking care not to suppress
+    # suppress scores not intended for the weblog, taking care not to suppress
     # legacy scores with a default message destination (=UNSET) so that old
     # tasks continue to render as before
-    banner_scores = rendererutils.scores_with_location(
-        all_scores, [pipelineqa.WebLogLocation.BANNER, pipelineqa.WebLogLocation.UNSET]
+    weblog_scores = pipelineqa.scores_with_location(
+        all_scores, [pipelineqa.WebLogLocation.BANNER, pipelineqa.WebLogLocation.ACCORDION, pipelineqa.WebLogLocation.UNSET]
     )
-    with_score = [s for s in banner_scores if s.score not in ('', 'N/A', None)]
+    with_score = [s for s in weblog_scores if s.score not in ('', 'N/A', None)]
     return [s for s in with_score if lo < s.score <= hi]
 
 

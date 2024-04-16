@@ -1,4 +1,5 @@
 import copy
+import os
 import traceback
 
 import pipeline.infrastructure as infrastructure
@@ -103,6 +104,11 @@ class SerialRenorm(basetask.StandardTaskTemplate):
             LOG.warning('Running hifa_renorm on ALMA Band 9 (DSB) data')
         if 'ALMA Band 10' in bands:
             LOG.warning('Running hifa_renorm on ALMA Band 10 (DSB) data')
+
+        # PIPE-2150: safely create the "RN_plots" directory before calling the renormalization external code to prevent
+        # potential race condition when checking/examining the directory existence in the tier0 setup.
+        # This workaround might be removed after the changes from PIPE-2151
+        os.makedirs('RN_plots', exist_ok=True)
 
         # Create inputs for the call to the ALMA renorm function.
         alma_renorm_inputs = {
