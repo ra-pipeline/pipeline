@@ -1,7 +1,7 @@
 """Offline ATM correction stage."""
 import collections
 import os
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, TYPE_CHECKING
 
 import numpy as np
 
@@ -23,6 +23,9 @@ from pipeline.infrastructure.utils import relative_path
 from .. import common
 
 LOG = logging.get_logger(__name__)
+
+if TYPE_CHECKING:
+    from pipeline.domain import MeasurementSet
 
 
 ATMModelParam = collections.namedtuple('ATMModelParam', 'atmtype maxalt dtem_dh h0')
@@ -528,6 +531,40 @@ class SerialSDATMCorrection(basetask.StandardTaskTemplate):
 
     Inputs = SDATMCorrectionInputs
 
+    @staticmethod
+    def get_representative_field_spw(ms: 'MeasurementSet') -> Tuple[Optional[int], Optional[int]]:
+        """Get ids of representative field and spw.
+
+        MS contains an information on representative source and bandwidth.
+        This method translates them into a tuple of field id and spw id.
+        If representative source is not defined, the method will take
+        the first target field as a representative field.
+
+        These ids can be None if no representative source is defined nor
+        no target fields exist (which rarely happens in practice though),
+        and/or no representative bandwidth is defined.
+
+        Args:
+            ms: Measurementset domain object
+
+        Returns:
+            Two tuple of field id associated with representative
+            source and spw id associated with representative
+            bandwidth.
+        """
+        # representative spw and source
+        rep_source_name, rep_spw_id = ms.get_representative_source_spw()
+
+        # get list of fields that are associated with representative source
+        rep_fields = [f for f in ms.fields if f.source.name == rep_source_name]
+        if len(rep_fields) > 0:
+            # pick the first item from the list
+            rep_field_id = rep_fields[0].id
+        else:
+            rep_field_id = None
+
+        return rep_field_id, rep_spw_id
+
     def prepare(self) -> SDATMCorrectionResults:
         """Execute task and produce results instance.
 
@@ -627,19 +664,9 @@ class SerialSDATMCorrection(basetask.StandardTaskTemplate):
         best_model_index = -1
         LOG.info(f'default_model: {default_model}')
 
-        # representative spw and source
-        ms = self.inputs.ms
-        rep_source_name, rep_spw_id = ms.get_representative_source_spw()
-        # assuming field_name == source_name
-        rep_fields = ms.get_fields(rep_source_name)
-        if len(rep_fields) > 0:
-            rep_field_id = rep_fields[0].id
-        else:
-            rep_field_id = None
-        LOG.info(
-            'performing atmospheric model heuristics using '
-            f'field {rep_field_id} and spw {rep_spw_id}'
-        )
+        rep_field_id, rep_spw_id = self.get_representative_field_spw(self.inputs.ms)
+        msg = f'field {rep_field_id}' + (f' and spw {rep_spw_id}' if rep_spw_id else '')
+        LOG.info(f'Performing atmospheric model heuristics using {msg}.')
 
         # handle list inputs
         if isinstance(args['atmtype'], list):
