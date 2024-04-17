@@ -27,7 +27,6 @@ results.accept(context)
 """
 import os
 import re
-import ast
 import sys
 import shutil
 import tarfile
@@ -300,7 +299,7 @@ class RestoreData(basetask.StandardTaskTemplate):
                 params = pipemanifest.get_renorm(vis)
                 if params:
                     # Convert input parameters with ast (string to bool, dict, etc).
-                    kwargs = {key: ast.literal_eval(val) if val else val for key, val in params.items()}
+                    kwargs = {key: utils.string_to_val(val) if val else val for key, val in params.items()}
 
                     # PIPE-1687: restrict input arguments to those needed by
                     # renorm interface function.

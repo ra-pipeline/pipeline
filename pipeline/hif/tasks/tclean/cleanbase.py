@@ -50,6 +50,7 @@ class CleanBaseInputs(vdp.StandardInputs):
     hm_sidelobethreshold = vdp.VisDependentProperty(default=-999.0)
     mosweight = vdp.VisDependentProperty(default=None)
     nchan = vdp.VisDependentProperty(default=-1)
+    nbin = vdp.VisDependentProperty(default=-1)
     niter = vdp.VisDependentProperty(default=5000)
     hm_nsigma = vdp.VisDependentProperty(default=0.0)
     hm_perchanweightdensity = vdp.VisDependentProperty(default=None)
@@ -123,7 +124,7 @@ class CleanBaseInputs(vdp.StandardInputs):
                  spw=None, spwsel=None, spwsel_all_cont=None, uvrange=None, orig_specmode=None, specmode=None, gridder=None, deconvolver=None,
                  uvtaper=None, nterms=None, cycleniter=None, cyclefactor=None, hm_minpsffraction=None,
                  hm_maxpsffraction=None, scales=None, outframe=None, imsize=None,
-                 cell=None, phasecenter=None, psf_phasecenter=None, nchan=None, start=None, width=None, stokes=None, weighting=None,
+                 cell=None, phasecenter=None, psf_phasecenter=None, nchan=None, nbin=None, start=None, width=None, stokes=None, weighting=None,
                  robust=None, restoringbeam=None, iter=None, mask=None, savemodel=None, startmodel=None, hm_masking=None,
                  hm_sidelobethreshold=None, hm_noisethreshold=None, hm_lownoisethreshold=None, wprojplanes=None,
                  hm_negativethreshold=None, hm_minbeamfrac=None, hm_growiterations=None, hm_dogrowprune=None,
@@ -165,6 +166,7 @@ class CleanBaseInputs(vdp.StandardInputs):
         self.phasecenter = phasecenter
         self.psf_phasecenter = psf_phasecenter
         self.nchan = nchan
+        self.nbin = nbin
         self.start = start
         self.width = width
         self.stokes = stokes
@@ -377,6 +379,10 @@ class CleanBase(basetask.StandardTaskTemplate):
 
         if scanidlist not in [[], None]:
             tclean_job_parameters['scan'] = scanidlist
+
+        # special frequency interpolation setting for cube mode and nbin=2 (PIPE-2115)
+        if inputs.specmode == 'cube' and inputs.nbin == 2:
+            tclean_job_parameters['interpolation'] = 'nearest'
 
         # Set up masking parameters
         if inputs.hm_masking == 'auto':

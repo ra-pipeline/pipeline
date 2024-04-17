@@ -10,7 +10,7 @@ import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import task_registry
-from pipeline.infrastructure.executeppr import _sanitize_for_ms
+from pipeline.infrastructure.filenamer import sanitize_for_ms
 
 # the logger for this module
 LOG = infrastructure.get_logger(__name__)
@@ -56,8 +56,8 @@ class FlagTargetsALMAInputs(vdp.StandardInputs):
 
     .. py:attribute:: filetemplate
 
-        The filename of the ASCII file that contains the flagging template 
-    """    
+        The filename of the ASCII file that contains the flagging template
+    """
     # Search order of input vis
     processing_data_type = [DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
@@ -66,7 +66,7 @@ class FlagTargetsALMAInputs(vdp.StandardInputs):
 
     @vdp.VisDependentProperty
     def filetemplate(self):
-        vis_root = _sanitize_for_ms(self.vis)
+        vis_root = sanitize_for_ms(self.vis)
         return vis_root + '.flagtargetstemplate.txt'
 
     @filetemplate.convert
@@ -78,7 +78,7 @@ class FlagTargetsALMAInputs(vdp.StandardInputs):
 
     @vdp.VisDependentProperty
     def inpfile(self):
-        vis_root = _sanitize_for_ms(self.vis)
+        vis_root = sanitize_for_ms(self.vis)
         return os.path.join(self.output_dir, vis_root + '.flagtargetscmds.txt')
 
     def __init__(self, context, vis=None, output_dir=None, flagbackup=None, template=None, filetemplate=None):
@@ -97,11 +97,11 @@ class FlagTargetsALMAInputs(vdp.StandardInputs):
 
     def to_casa_args(self):
         """
-        Translate the input parameters of this class to task parameters 
-        required by the CASA task flagdata. The returned object is a 
+        Translate the input parameters of this class to task parameters
+        required by the CASA task flagdata. The returned object is a
         dictionary of flagdata arguments as keyword/value pairs.
 
-        :rtype: dict        
+        :rtype: dict
         """
         return {'vis': self.vis,
                 'mode': 'list',
@@ -159,7 +159,7 @@ class FlagTargetsALMA(basetask.StandardTaskTemplate):
 
     """
 
-    # link the accompanying inputs to this task 
+    # link the accompanying inputs to this task
     Inputs = FlagTargetsALMAInputs
 
     def prepare(self):
@@ -183,7 +183,7 @@ class FlagTargetsALMA(basetask.StandardTaskTemplate):
         # to save inspecting the file, also log the flag commands
         LOG.debug('Flag commands for %s:\n%s', inputs.vis, flag_str)
 
-        # Map the pipeline inputs to a dictionary of CASA task arguments 
+        # Map the pipeline inputs to a dictionary of CASA task arguments
         task_args = inputs.to_casa_args()
 
         # create and execute a flagdata job using these task arguments
@@ -194,8 +194,8 @@ class FlagTargetsALMA(basetask.StandardTaskTemplate):
 
         ordered_agents = ['before', 'template']
 
-        summary_reps = [agent_summaries[agent] 
-                        for agent in ordered_agents 
+        summary_reps = [agent_summaries[agent]
+                        for agent in ordered_agents
                         if agent in agent_summaries]
 
         # return the results object, which will be used for the weblog
@@ -242,6 +242,6 @@ class FlagTargetsALMA(basetask.StandardTaskTemplate):
         # strip out comments and empty lines to leave the real commands.
         # This is so we can compare the number of valid commands to the number
         # of commands specified in the file and complain if they differ
-        return [cmd for cmd in flaghelper.readFile(filename) 
+        return [cmd for cmd in flaghelper.readFile(filename)
                 if not cmd.strip().startswith('#')
                 and not all(c in string.whitespace for c in cmd)]

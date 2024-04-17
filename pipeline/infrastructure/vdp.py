@@ -695,7 +695,7 @@ class InputsContainer(object):
         properties = {}
 
         input_dicts = [i.as_dict() for i in self._active_instances]
-        all_keys = {key for d in input_dicts for key in d}
+        all_keys = utils.deduplicate([key for d in input_dicts for key in d])
         for key in all_keys:
             vals = [d.get(key, []) for d in input_dicts]
             properties[key] = format_value_list(vals)
