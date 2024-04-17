@@ -3,8 +3,6 @@ import collections
 import os
 from typing import List, Optional, Tuple, Union, TYPE_CHECKING
 
-import numpy as np
-
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.casa_tasks as casa_tasks
@@ -18,7 +16,6 @@ from pipeline.extern import SDcalatmcorr
 from pipeline.h.heuristics import fieldnames
 from pipeline.hsd.tasks.common.inspection_util import generate_ms, inspect_reduction_group, merge_reduction_group
 from pipeline.infrastructure import task_registry
-from pipeline.infrastructure.launcher import Context
 from pipeline.infrastructure.utils import relative_path
 from .. import common
 
@@ -26,6 +23,7 @@ LOG = logging.get_logger(__name__)
 
 if TYPE_CHECKING:
     from pipeline.domain import MeasurementSet
+    from pipeline.infrastructure.launcher import Context
 
 
 ATMModelParam = collections.namedtuple('ATMModelParam', 'atmtype maxalt dtem_dh h0')
@@ -266,7 +264,7 @@ class SDATMCorrectionInputs(vdp.StandardInputs):
         return ','.join(pols)
 
     def __init__(self,
-                 context: Context,
+                 context: 'Context',
                  atmtype: Optional[Union[int, str, List[int], List[str]]] = None,
                  dtem_dh: Optional[Union[float, str, dict, List[float], List[str], List[dict]]] = None,
                  h0: Optional[Union[float, str, dict, List[float], List[str], List[dict]]] = None,
@@ -478,7 +476,7 @@ class SDATMCorrectionResults(common.SingleDishResults):
         self.model_list = outcome['model_list']
         self.out_mses = []
 
-    def merge_with_context(self, context: Context):
+    def merge_with_context(self, context: 'Context'):
         """Merge execution result of atmcor stage into pipeline context.
 
         Args:
