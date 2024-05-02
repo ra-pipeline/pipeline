@@ -760,8 +760,6 @@ class MeasurementSet(object):
         # the input band/s. In such cases, 0 will be returned as maximum integration time.
         if len(integration_times) != 0:
             maximum_integration_time = max(integration_times)
-            median_integration_time = np.median(integration_times)
-
             int_time = maximum_integration_time
         else:
             LOG.warning("No integration time found. Setting integration time to 0.")
