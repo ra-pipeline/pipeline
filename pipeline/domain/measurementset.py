@@ -695,11 +695,11 @@ class MeasurementSet(object):
                         key=operator.itemgetter(1))
         return latest.end_time
 
-    def get_vla_max_integration_time(self):
+    def get_vla_max_integration_time(self, band=None):
         """Get the integration time used by the original VLA scripts
 
         Args:
-            None
+            band:   return maximum integration time for the given band, default None
 
         Returns:
             int_time: int value of the max integration time used
@@ -734,8 +734,20 @@ class MeasurementSet(object):
         # startdate=float(ms_summary['BeginTime'])
 
         integ_scan_list = []
+        spw2band = self.get_vla_spw2band()
+
         for scan in scan_summary:
-            integ_scan_list.append(int(scan))
+            # if no band is provided, add integration time of all scans to the
+            # integ_scan_list, later used to find maximum integration time
+            if band is None:
+                integ_scan_list.append(int(scan))
+            else:
+                # add the scan to the integ_scan_list only if the band of the
+                # current scan is in the input band list.
+                spws = scan_summary[scan]['0']['SpwIds']
+                if len(spws) != 0 and spw2band[spws[0]] in band:
+                    integ_scan_list.append(int(scan))
+
         sorted_scan_list = sorted(integ_scan_list)
 
         # find max and median integration times
@@ -744,10 +756,16 @@ class MeasurementSet(object):
         for ii in sorted_scan_list:
             integration_times.append(scan_summary[str(ii)]['0']['IntegrationTime'])
 
-        maximum_integration_time = max(integration_times)
-        median_integration_time = np.median(integration_times)
+        # integration_times may remain empty if there are no scans corresponding to
+        # the input band/s. In such cases, 0 will be returned as maximum integration time.
+        if len(integration_times) != 0:
+            maximum_integration_time = max(integration_times)
+            median_integration_time = np.median(integration_times)
 
-        int_time = maximum_integration_time
+            int_time = maximum_integration_time
+        else:
+            LOG.warning("No integration time found. Setting integration time to 0.")
+            int_time = 0
 
         return int_time
 
