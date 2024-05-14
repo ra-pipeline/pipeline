@@ -342,10 +342,9 @@ class Solint(basetask.StandardTaskTemplate):
             short_solint_str = "{:.12f}".format(short_solint)
 
             if limit_short_solint == 'int':
-                limit_short_solint = '0'
                 combtime = 'scan'
-                short_solint = float(limit_short_solint)
-                new_gain_solint1 = str(short_solint) + 's'
+                short_solint = limit_short_solint
+                new_gain_solint1 = str(limit_short_solint) + ' s'
             elif limit_short_solint == 'inf':
                 combtime = ''
                 short_solint = limit_short_solint
@@ -359,9 +358,9 @@ class Solint(basetask.StandardTaskTemplate):
         # PIPE-460.  Use solint='int' when the minimum solution interval corresponds to one integration
         # PIPE-696.  Need to compare short solint with int time and limit the precision.
         if short_solint == float("{:.6f}".format(m.get_vla_max_integration_time())):
-            new_gain_solint1 = 'int'
+            new_gain_solint1 = 'int ({!s}s)'.format(short_solint)
             LOG.info(
-                'The short solution interval used is: {!s} ({!s}).'.format(new_gain_solint1, str(short_solint) + 's'))
+                'The short solution interval used is: {!s}.'.format(new_gain_solint1))
 
             testgains_result = self._do_gtype_testgains(calMs, tablebase + table_suffix[4], solint=new_gain_solint1,
                                                         context=self.inputs.context, combtime=combtime,
@@ -369,9 +368,9 @@ class Solint(basetask.StandardTaskTemplate):
             bpdgain_touse = tablebase + table_suffix[4]
 
         LOG.info("Using short solint = " + str(new_gain_solint1))
-
-        if abs(longsolint - short_solint) <= soltime:
-            LOG.warning('Short solint = long solint +/- integration time of {}s'.format(soltime))
+        if short_solint != 'int':
+            if abs(longsolint - short_solint) <= soltime:
+                LOG.warning('Short solint = long solint +/- integration time of {}s'.format(soltime))
 
         return longsolint, gain_solint2, shortsol2, short_solint, new_gain_solint1, self.inputs.vis, bpdgain_touse
 
