@@ -414,12 +414,13 @@ class Solint(basetask.StandardTaskTemplate):
 
         return self._executor.execute(job)
 
-    def _do_determine_solint(self, calMs: str, spw: str = '', band=None):
+    def _do_determine_solint(self, calMs: str, spw: str = '', band: str = None):
         """Code to determine solution interval
 
         Args:
             calMs(str):  split off calibrators MS
             spw(str):  spw selection  '2,3,4', etc.
+            band(str): string band, 'L'  'U'  'X' etc.
 
         Returns:
             longsolint
