@@ -8,7 +8,8 @@ def hifa_wvrgcalflag(vis=None, caltable=None, offsetstable=None, hm_toffset=None
                      sourceflag=None, hm_tie=None, tie=None, nsol=None, disperse=None, wvrflag=None, hm_smooth=None,
                      smooth=None, scale=None, maxdistm=None, minnumants=None, mingoodfrac=None, refant=None,
                      flag_intent=None, qa_intent=None, qa_bandpass_intent=None, accept_threshold=None, flag_hi=None,
-                     fhi_limit=None, fhi_minsample=None, ants_with_wvr_thresh=None):
+                     fhi_limit=None, fhi_minsample=None,
+                     ants_with_wvr_thresh=None, ants_with_wvr_nr_thresh=None):
     """
     hifa_wvrgcalflag ----
     Generate a gain table based on Water Vapor Radiometer data, interpolating over
@@ -40,7 +41,8 @@ def hifa_wvrgcalflag(vis=None, caltable=None, offsetstable=None, hm_toffset=None
     antennas according to 'maxdistm' and 'minnumants'.
 
     Fourth, after flagging, if the remaining unflagged antennas with WVR number
-    fewer than 3, or represent a smaller fraction of antennas than the minimum
+    fewer than ants_with_wvr_nr_thresh (default 3), 
+    or represent a smaller fraction of antennas than the minimum
     threshold (ants_with_wvr_thresh), then the WVR calibration file is rejected
     and will not be merged into the context, i.e. not be used in subsequent
     calibration.
@@ -214,6 +216,15 @@ def hifa_wvrgcalflag(vis=None, caltable=None, offsetstable=None, hm_toffset=None
                          applied.
 
                          Example: ants_with_wvr_thresh=0.5
+    ants_with_wvr_nr_thresh  (default=3)
+                         This threshold sets the minimum number of antennas
+                         that should have WVR data for WVR calibration and flagging to proceed; the
+                         same threshold is used to determine, after flagging, whether there remain
+                         enough unflagged antennas with WVR data for the WVR calibration to be
+                         applied.
+
+                         Example: ants_with_wvr_nr_thresh=4 
+
 
     --------- examples -----------------------------------------------------------
 
