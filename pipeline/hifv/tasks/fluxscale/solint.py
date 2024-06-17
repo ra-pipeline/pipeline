@@ -198,7 +198,7 @@ class Solint(basetask.StandardTaskTemplate):
 
         # Solint section
 
-        (longsolint, gain_solint2) = self._do_determine_solint(calMs, ','.join(spwlist))
+        (longsolint, gain_solint2) = self._do_determine_solint(calMs, ','.join(spwlist), band)
 
         try:
             self.setjy_results = self.inputs.context.results[0].read()[0].setjy_results
@@ -218,7 +218,7 @@ class Solint(basetask.StandardTaskTemplate):
                         '10_{!s}.tbl'.format(band), 'scan_{!s}.tbl'.format(band), 'limit_{!s}.tbl'.format(band)]
         soltimes = [1.0, 3.0, 10.0]
         m = self.inputs.context.observing_run.get_ms(self.inputs.vis)
-        soltimes = [m.get_vla_max_integration_time() * x for x in soltimes]
+        soltimes = [m.get_vla_max_integration_time(band) * x for x in soltimes]
 
         solints = ['int', str(soltimes[1]) + 's', str(soltimes[2]) + 's']
         soltime = soltimes[0]
@@ -357,8 +357,9 @@ class Solint(basetask.StandardTaskTemplate):
                 combtime = 'scan'
         # PIPE-460.  Use solint='int' when the minimum solution interval corresponds to one integration
         # PIPE-696.  Need to compare short solint with int time and limit the precision.
-        if short_solint == float("{:.6f}".format(m.get_vla_max_integration_time())):
-            new_gain_solint1 = 'int ({!s}s)'.format(short_solint)
+        integration_time = m.get_vla_max_integration_time(band)
+        if short_solint == float("{:.6f}".format(integration_time)):
+            new_gain_solint1 = 'int'
             LOG.info(
                 'The short solution interval used is: {!s}.'.format(new_gain_solint1))
 
@@ -368,9 +369,9 @@ class Solint(basetask.StandardTaskTemplate):
             bpdgain_touse = tablebase + table_suffix[4]
 
         LOG.info("Using short solint = " + str(new_gain_solint1))
-        if short_solint != 'int':
-            if abs(longsolint - short_solint) <= soltime:
-                LOG.warning('Short solint = long solint +/- integration time of {}s'.format(soltime))
+
+        if abs(longsolint - short_solint) <= soltime:
+            LOG.warning('Short solint = long solint +/- integration time of {}s'.format(integration_time))
 
         return longsolint, gain_solint2, shortsol2, short_solint, new_gain_solint1, self.inputs.vis, bpdgain_touse
 
@@ -412,12 +413,13 @@ class Solint(basetask.StandardTaskTemplate):
 
         return self._executor.execute(job)
 
-    def _do_determine_solint(self, calMs: str, spw: str = ''):
+    def _do_determine_solint(self, calMs: str, spw: str = '', band: str = None):
         """Code to determine solution interval
 
         Args:
             calMs(str):  split off calibrators MS
             spw(str):  spw selection  '2,3,4', etc.
+            band(str): string band, 'L'  'U'  'X' etc.
 
         Returns:
             longsolint
@@ -488,7 +490,7 @@ class Solint(basetask.StandardTaskTemplate):
             durations = orig_durations
 
         nsearch = 5
-        integration_time = m.get_vla_max_integration_time()
+        integration_time = m.get_vla_max_integration_time(band)
         integration_time = np.around(integration_time, decimals=2)
         search_results = np.zeros(nsearch)
         longest_scan = np.round(np.max(orig_durations))

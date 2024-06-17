@@ -296,7 +296,10 @@ class testBPdcals(basetask.StandardTaskTemplate):
         table_suffix = ['_{!s}.tbl'.format(band), '3_{!s}.tbl'.format(band), '10_{!s}.tbl'.format(band)]
         soltimes = [1.0, 3.0, 10.0]
         m = self.inputs.context.observing_run.get_ms(self.inputs.vis)
-        soltimes = [m.get_vla_max_integration_time() * x for x in soltimes]
+        # PIPE-1703, in multi-band data the maximum integration time returned was
+        # by considering integration time of all scans. Updated the get_vla_max_integration_time
+        # method to retrun maximum integraton time for input band.
+        soltimes = [m.get_vla_max_integration_time(band) * x for x in soltimes]
         solints = ['int', str(soltimes[1]) + 's', str(soltimes[2]) + 's']
         soltime = soltimes[0]
         solint = solints[0]
