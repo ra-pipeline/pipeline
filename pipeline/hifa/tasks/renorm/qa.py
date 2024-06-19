@@ -20,6 +20,9 @@ class RenormQAHandler(pqa.QAPlugin):
     child_cls = None
 
     def handle(self, context, result):
+    
+        raise Exception("Intentionally thrown exception to test the QA exception handling mechanism.")
+    
         # Get task threshold value. In the future one might rely on
         # the automatic defaults in almarenorm. In that case the threshold
         # per spw needs to be fetched from the stats dictionary in the spw
