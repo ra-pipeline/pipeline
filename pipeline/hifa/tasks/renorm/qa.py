@@ -60,7 +60,7 @@ class RenormQAHandler(pqa.QAPlugin):
                         shortmsg = 'Unexpected values.'
                         longmsg = 'EB {} source {} spw {}: Error calculating corrections. Maximum factor is {}.'.format( \
                                   os.path.basename(result.vis), source, spw, max_factor)
-                    elif np.isnan(result.rnstats['N'][source][spw]).any():
+                    elif result.rnstats['invalid'][source][spw]:
                         # Any NaNs apart from max_factor?
                         score = 0.0
                         shortmsg = 'Unexpected values.'

@@ -1,6 +1,9 @@
+import collections
 import copy
 import os
 import traceback
+
+import numpy as np
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -116,9 +119,10 @@ class SerialRenorm(basetask.StandardTaskTemplate):
             LOG.info("Calling the renormalization heuristic function.")
             alltdm, atmExcludeCmd, atmWarning, corrApplied, corrColExists, renorm_applied, rnstats, stats = \
                 alma_renorm(**alma_renorm_inputs)
+            rnstats_light = self._get_rnstats_light(stats, rnstats)
 
             result = RenormResults(renorm_applied, inp.vis, inp.apply, inp.threshold, inp.correctATM, inp.spw,
-                                   inp.excludechan, corrApplied, corrColExists, stats, rnstats, alltdm,
+                                   inp.excludechan, corrApplied, corrColExists, stats, rnstats_light, alltdm,
                                    inp.atm_auto_exclude, atmWarning, atmExcludeCmd, inp.bwthreshspw)
         except Exception as e:
             LOG.error('Failure in running renormalization heuristic: {}'.format(e))
@@ -131,6 +135,25 @@ class SerialRenorm(basetask.StandardTaskTemplate):
     def analyse(self, results):
         return results
 
+    def _get_rnstats_light(self, stats, rnstats):
+        """
+        Extracts and summarizes the presence of NaN values in rnstats.
+
+        Args:
+            stats (dict): Dictionary containing statistics for each source and spectral window.
+            rnstats (dict): Dictionary containing numerical values for each source and spectral window.
+
+        Returns:
+            dict: A dictionary indicating whether any NaN values are present for each source and spectral window.
+                If the source or spectral window is not present in rnstats, it is marked as invalid (True).
+        """
+        rnstats_light = {'invalid': collections.defaultdict(dict)}
+
+        for source, spws in stats.items():
+            for spw in spws:
+                rnstats_light['invalid'][source][spw] = np.isnan(rnstats['N'].get(source, {}).get(spw, np.nan)).any()
+
+        return rnstats_light
 
 @task_registry.set_equivalent_casa_task('hifa_renorm')
 @task_registry.set_casa_commands_comment('Renormalize data affected by strong line emission.')
