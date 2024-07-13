@@ -211,8 +211,7 @@ class SerialRenorm(basetask.StandardTaskTemplate):
 
                 calto_args = {'vis': inp.vis,
                               'intent': 'TARGET',
-                              'field': field_name,
-                              'spw': spw}
+                              'field': field_name}
                 calto = callibrary.CalTo(**calto_args)
 
                 # The renorm results are applied like a Tsys calibration
