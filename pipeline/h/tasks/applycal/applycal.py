@@ -227,7 +227,7 @@ class SerialApplycal(basetask.StandardTaskTemplate):
         # the inputs. Using hide_empty gives the data the expected shape.
         merged = calstate.merged(hide_empty=True)
 
-        if os.getenv('DISABLE_CASA_CALLIBRARY', False):
+        if os.getenv('DISABLE_CASA_CALLIBRARY', True):
             LOG.info('CASA callibrary disabled: reverting to non-callibrary applycal call')
             jobs = jobs_without_calapply(merged, inputs, self.modify_task_args)
         elif contains_uvcont_table(merged):
