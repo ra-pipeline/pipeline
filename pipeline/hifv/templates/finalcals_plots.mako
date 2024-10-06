@@ -80,41 +80,59 @@ bandsort = {'4':0, 'P':1, 'L':2, 'S':3, 'C':4, 'X':5, 'U':6, 'K':7, 'A':8, 'Q':9
     % endfor
     </div>
     %if len(spwlist) > 0 and len(spw_plots) > 0:
-        % for spw in spwlist: 
-            <a id="${band}-${spw}"></a><br>
-                <hr>
-                <div class="row">
-                <h4>
-                Spw:
-                % for spwk in spwlist:
-                    <a href="#${band}-${spwk}">${spwk}</a>&nbsp;|&nbsp;
-                % endfor
-                <a href="#${band}">Top of ${band}-band</a> | (Click to Jump)<br><br>
-                       ${band}-band Spw: ${spw}
-                </h4> <br>
-            <%
-            sorted_spw_plots = sorted(spw_plots, key=lambda x: x.parameters['spw'])
-            %>
-            % for plot in sorted(sorted_spw_plots, key=lambda p: bandsort[p.parameters['bandname']]):
-                % if band == plot.parameters['bandname'] and spw == plot.parameters['spw']:
-                <div class="col-md-2 col-sm-3">
-                    <div class="thumbnail">
-                        <a data-fancybox="allplots"
-                           href="${os.path.relpath(plot.abspath, pcontext.report_dir)}"
-                           title="Antenna ${plot.parameters['ant']}  Band ${plot.parameters['bandname']} Spw ${plot.parameters['spw']}">
-                                <img src="${os.path.relpath(plot.thumbnail, pcontext.report_dir)}"
-                                     title="Antenna ${plot.parameters['ant']}  Band ${plot.parameters['bandname']} Spw ${plot.parameters['spw']}"
-                                    alt="">
-                        </a>
-                        <div class="caption">
-                            <span class="text-center">Antenna ${plot.parameters['ant']} &nbsp;&nbsp; Band: ${plot.parameters['bandname']} &nbsp;&nbsp; Spw: ${plot.parameters['spw']}</span>
+        <%
+        band_plots = [plot for plot in spw_plots if plot.parameters.get('bandname') == band]
+        %>
+        % if len(band_plots) > 0:
+            % for spw in spwlist:
+                <%
+                band_spw_plots = [plot for plot in band_plots if plot.parameters.get('spw') == spw]
+                %>
+                % if len(band_spw_plots) > 0:
+                <a id="${band}-${spw}"></a><br>
+                    <hr>
+                    <div class="row">
+                    <h4>
+                    Spw:
+                    % for spwk in spwlist:
+                        <%
+                        spwk_plots = list(filter(lambda p: p.parameters.get('spw') == spwk, band_spw_plots))
+                        %>
+
+                        % if len(spwk_plots) > 0:
+                        <a href="#${band}-${spwk}">${spwk}</a>&nbsp;|&nbsp;
+                        % endif
+                    % endfor
+                    <a href="#${band}">Top of ${band}-band</a> | (Click to Jump)<br><br>
+                        ${band}-band Spw: ${spw}
+                    </h4> <br>
+                %endif
+
+                <%
+                sorted_spw_plots = sorted(band_spw_plots, key=lambda x: x.parameters['spw'])
+                %>
+
+                % for plot in sorted_spw_plots:
+                    <div class="col-md-2 col-sm-3">
+                        <div class="thumbnail">
+                            <a data-fancybox="allplots"
+                            href="${os.path.relpath(plot.abspath, pcontext.report_dir)}"
+                            title="Antenna ${plot.parameters['ant']}  Band ${plot.parameters['bandname']} Spw ${plot.parameters['spw']}">
+                                    <img src="${os.path.relpath(plot.thumbnail, pcontext.report_dir)}"
+                                        title="Antenna ${plot.parameters['ant']}  Band ${plot.parameters['bandname']} Spw ${plot.parameters['spw']}"
+                                        alt="">
+                            </a>
+                            <div class="caption">
+                                <span class="text-center">Antenna ${plot.parameters['ant']} &nbsp;&nbsp; Band: ${plot.parameters['bandname']} &nbsp;&nbsp; Spw: ${plot.parameters['spw']}</span>
+                            </div>
                         </div>
                     </div>
-                </div>
+                % endfor
+                % if len(band_spw_plots) > 0:
+                    </div>
                 %endif
-            % endfor
-            </div>
-        %endfor
+            %endfor
+        % endif
     % endif
     % endif
 % endfor
