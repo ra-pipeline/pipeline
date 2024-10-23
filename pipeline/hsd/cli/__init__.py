@@ -15,6 +15,7 @@ from .hsd_restoredata import hsd_restoredata
 from .hsd_skycal import hsd_skycal
 from .hsd_tsysflag import hsd_tsysflag
 
+from pipeline.h.cli import utils as utils
 from pipeline.hsd.tasks.baseline.baseline import SDBaselineInputs
 
 __all__ = ['hsd_applycal',
@@ -31,3 +32,4 @@ __all__ = ['hsd_applycal',
            'hsd_tsysflag']
 
 inherit_google_docstring(SDBaselineInputs.__init__.__doc__, hsd_baseline)
+utils.inherit_type_hints(SDBaselineInputs.__init__, hsd_baseline)

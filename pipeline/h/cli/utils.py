@@ -1,4 +1,5 @@
 from functools import wraps
+import inspect
 from typing import Callable
 
 import pipeline.infrastructure as infrastructure
@@ -125,3 +126,11 @@ def _merge_results(context, results):
     except Exception:
         LOG.critical('Warning: Check merge to context for {}'.format(results.__class__.__name__))
         raise
+
+def inherit_type_hints(parent_func, child_func):
+    parent_annotations = parent_func.__annotations__
+    child_annotations = child_func.__annotations__
+    child_parameters = list(inspect.signature(child_func).parameters)
+    for param in child_parameters:
+        if param in parent_annotations:
+            child_annotations.setdefault(param, parent_annotations[param])
