@@ -1,5 +1,7 @@
 """ALMA Single Dish Tasks
 """
+from docstring_inheritance import inherit_google_docstring
+
 from .hsd_applycal import hsd_applycal
 from .hsd_atmcor import hsd_atmcor
 from .hsd_baseline import hsd_baseline
@@ -13,6 +15,8 @@ from .hsd_restoredata import hsd_restoredata
 from .hsd_skycal import hsd_skycal
 from .hsd_tsysflag import hsd_tsysflag
 
+from pipeline.hsd.tasks.baseline.baseline import SDBaselineInputs
+
 __all__ = ['hsd_applycal',
            'hsd_atmcor',
            'hsd_baseline',
@@ -25,3 +29,5 @@ __all__ = ['hsd_applycal',
            'hsd_restoredata',
            'hsd_skycal',
            'hsd_tsysflag']
+
+inherit_google_docstring(SDBaselineInputs.__init__.__doc__, hsd_baseline)

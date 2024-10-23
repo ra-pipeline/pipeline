@@ -3,7 +3,7 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
-@utils.cli_wrapper
+# @utils.cli_wrapper
 def hsd_baseline(fitfunc=None, fitorder=None, switchpoly=None,
                  linewindow=None, linewindowmode=None, edge=None, broadline=None,
                  clusteringalgorithm=None, deviationmask=None, parallel=None,
