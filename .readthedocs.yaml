@@ -15,8 +15,8 @@ build:
     # rust: "1.64"
     # golang: "1.19"
   jobs:
-    pre_install: 
-    - bash mkdir -p ~/.casa/data
+    pre_build: 
+      - mkdir -p ~/.casa/data
 # Build documentation in the "docs/" directory with Sphinx
 sphinx:
   configuration: docs/source/conf.py
