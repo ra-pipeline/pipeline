@@ -20,6 +20,6 @@ sphinx_rtd_theme
 sphinxcontrib-bibtex
 sphinx-astrorefs # https://github.com/jobovy/sphinx-astrorefs
 sphinx-copybutton
-
+astropy
 #ipympl
 #nodejs
