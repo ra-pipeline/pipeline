@@ -732,21 +732,25 @@ class MeasurementSet(object):
         with casa_tools.MSReader(self.name) as ms:
             scan_summary = ms.getscansummary()
         # startdate=float(ms_summary['BeginTime'])
-
         integ_scan_list = []
         spw2band = self.get_vla_spw2band()
 
         for scan in scan_summary:
-            # if no band is provided, add integration time of all scans to the
-            # integ_scan_list, later used to find maximum integration time
-            if band is None:
-                integ_scan_list.append(int(scan))
-            else:
-                # add the scan to the integ_scan_list only if the band of the
-                # current scan is in the input band list.
-                spws = scan_summary[scan]['0']['SpwIds']
-                if len(spws) != 0 and spw2band[spws[0]] in band:
+            scan_field = self.get_fields(scan_summary[scan]['0']['FieldId'])[0]
+            scan_intents = scan_field.intents
+            sys_config_intent = "SYSTEM_CONFIGURATION"
+            # PIPE-1703: ignoring sysconfig intents
+            if sys_config_intent not in scan_intents:
+                # if no band is provided, add integration time of all scans to the
+                # integ_scan_list, later used to find maximum integration time
+                if band is None:
                     integ_scan_list.append(int(scan))
+                else:
+                    # add the scan to the integ_scan_list only if the band of the
+                    # current scan is in the input band list.
+                    spws = scan_summary[scan]['0']['SpwIds']
+                    if len(spws) != 0 and spw2band[spws[0]] in band:
+                        integ_scan_list.append(int(scan))
 
         sorted_scan_list = sorted(integ_scan_list)
 
