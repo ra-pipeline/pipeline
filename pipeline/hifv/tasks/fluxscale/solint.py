@@ -68,11 +68,11 @@ class SolintResults(basetask.Results):
             final(List, optional): Calibration list applied - not used
             pool(List, optional): Calibration list assesed - not used
             preceding(List, optional): DEPRECATED results from worker tasks executed by this task
-            longsolint(float): numerical value of the long solution interval
-            gain_solint2(str):  str representation of longsolint with 's' seconds units
-            shortsol2(float): values based on the vla max integration time
-            short_solint(float): short solution interval numerical value
-            new_gain_solint1(str): str representation of short_solint with 's' seconds units.
+            longsolint(Dict): numerical value of the long solution interval
+            gain_solint2(Dict):  str representation of longsolint with 's' seconds units
+            shortsol2(Dict): values based on the vla max integration time
+            short_solint(Dict): short solution interval numerical value
+            new_gain_solint1(Dict): str representation of short_solint with 's' seconds units.
             bpdgain_touse(Dict):  Dictionary of tables per band
 
         """
@@ -344,7 +344,7 @@ class Solint(basetask.StandardTaskTemplate):
             if limit_short_solint == 'int':
                 combtime = 'scan'
                 short_solint = limit_short_solint
-                new_gain_solint1 = str(limit_short_solint) + ' s'
+                new_gain_solint1 = 'int ({:.6f}s)'.format(m.get_vla_max_integration_time(band))
             elif limit_short_solint == 'inf':
                 combtime = ''
                 short_solint = limit_short_solint
@@ -370,7 +370,7 @@ class Solint(basetask.StandardTaskTemplate):
 
         LOG.info("Using short solint = " + str(new_gain_solint1))
 
-        if abs(longsolint - short_solint) <= soltime:
+        if short_solint != 'int' and abs(longsolint - short_solint) <= soltime:
             LOG.warning('Short solint = long solint +/- integration time of {}s'.format(integration_time))
 
         return longsolint, gain_solint2, shortsol2, short_solint, new_gain_solint1, self.inputs.vis, bpdgain_touse
