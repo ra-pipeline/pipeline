@@ -422,8 +422,11 @@ class testBPdcals(basetask.StandardTaskTemplate):
                                      "The fraction of flagged solutions is " + str(fracFlaggedSolns10))
 
         LOG.info("Test amp and phase calibration on delay and bandpass calibrators complete for band {!s}".format(band))
-        LOG.info("Using short solint = {!s} for band {!s}".format(str(gain_solint1), band))
-
+        # PIPE-1703, showing integration time in LOG message
+        if solint == solints[0]:
+            LOG.info("Using short solint = {!s} =  {:.6f}s for band {!s}".format(str(gain_solint1), soltimes[0], band))
+        else:
+            LOG.info("Using short solint = {!s} for band {!s}".format(str(gain_solint1), band))
         LOG.info("Doing test bandpass calibration for band {!s}".format(band))
 
         if self.inputs.weakbp:
