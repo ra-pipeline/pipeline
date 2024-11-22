@@ -191,17 +191,31 @@ data_auto_update = True
 # Assign rundata/measurespath/datapath for casa6
 ###################################################################################################
 
-measurespath_checklist.insert(0, os.environ.get('CASADATA'))
-measurespath_checklist = [
-    os.path.abspath(os.path.expanduser(path)) for path in measurespath_checklist if isinstance(path, str)
-]
+if 'CASADATA' in os.environ:
+    measurespath_checklist = [os.environ.get('CASADATA')]
+else:
+    measurespath_checklist = [
+        os.path.abspath(os.path.expanduser(path)) for path in measurespath_checklist if isinstance(path, str)
+    ]
 datapath_list = [os.path.abspath(os.path.expanduser(path)) for path in datapath_list if isinstance(path, str)]
 
+measurespath = None
+datapath = []
 for path in measurespath_checklist:
     if os.path.isdir(os.path.join(path, 'geodetic')):
         rundata = measurespath = path
         datapath = [measurespath]
         break
+
+try:
+    import casaconfig
+except ImportError:
+    if measurespath is None:
+        print(
+            '!!! The value of rundata is not set and casatools can not find the expected data in datapath !!!'
+        )
+        print('!!! CASA6 can not continue. !!!')
+        os._exit(os.EX_CONFIG)
 
 datapath += [os.path.expanduser(path) for path in datapath_list if os.path.isdir(path)]
 
