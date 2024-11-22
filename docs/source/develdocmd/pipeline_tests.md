@@ -160,7 +160,7 @@ xvfb-run casa --nogui --nologger --log2term --agg -c"import pytest; pytest.main(
 
 ## `casa-data` and `pipeline-testdata`
 
-With the identical software stack, the numerical results from Pipeline tests can still differ due to various factors: runtime session environments (e.g. serial vs. mpicasa sessions, OpenMP threading), OS libraries, as well as the version of [`casa-data`](https://casadocs.readthedocs.io/en/latest/notebooks/external-data.html) (now managed by the [`casaconfig`](https://casadocs.readthedocs.io/en/latest/api/casaconfig.html) package).
+With an identical software stack, the numerical results from Pipeline tests can still differ due to various factors: runtime session environments (e.g. serial vs. mpicasa sessions, OpenMP threading), OS libraries, as well as the version of [`casa-data`](https://casadocs.readthedocs.io/en/latest/notebooks/external-data.html) (now managed by the [`casaconfig`](https://casadocs.readthedocs.io/en/latest/api/casaconfig.html) package).
 
 To streamline two typical use cases developers/testers usually encounter: Case 1, daily development and analysis with the latest `casa-data` version; Case 2: benchmarking tests or producing reported issues using a specific casa-data version, a recommended code snippet is provided below to customize the `casa-data` and extra [`pipeline-testadata`](https://open-bitbucket.nrao.edu/projects/PIPE/repos/pipeline-testdata/browse) path for casa sessions from [`~/.casa/config`](https://casadocs.readthedocs.io/en/latest/api/casaconfig.html#config-py):
 
