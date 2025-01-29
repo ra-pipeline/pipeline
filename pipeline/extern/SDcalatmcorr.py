@@ -18,7 +18,7 @@
 # 25/feb/2022: - (v2.4) Added feature to automatically select least flagged antenna for doing the metric measurement.
 #              - Changed default parameters to consider atmtype 1,2,3,4 only for models testing.
 #              - Remove remaining dependencies on analysisUtils
-#              - Cleaned up procedure to handle default model fallback case, including the return of 
+#              - Cleaned up procedure to handle default model fallback case, including the return of
 #                a 'fitstatus' variable decribing whether a best fit or a fallback to default model happened.
 # 27/jan/2022: - (v2.3) Fixed bug that made script crash with multiples EBs getting different
 #                SPW selection with multiple ATM selected for model testing
@@ -38,7 +38,7 @@
 #                it by one mstransform and several sdatmcor call, in order to calculate the corrected data
 #              - Added metrics 'intabsdiff' (integral of absolute value of derivative) and
 #                'intsqdiff' (integral of square value of derivative).
-#              - Improved statistical estimation of data errors 
+#              - Improved statistical estimation of data errors
 #              - Changed data normalization routine and science emission detection.
 #              - Uploaded to ALMA Bitbucket
 # 03/mar/2021: - Fixed bug handling datasets having TDM SPWs
@@ -83,6 +83,7 @@ from casatools import agentflagger as aftool
 from casaplotms import plotms
 from casatasks import sdatmcor
 from casatasks import mstransform
+from casatasks import casalog
 
 import pipeline.infrastructure.callibrary as callibrary
 pipelineloaded = True
@@ -153,7 +154,7 @@ def robuststats(A):
     return (mu, sigma)
 
 def binnedstats(x, A, Aerr, nbins = None, bins = None):
-    '''Return a tuple of arrays (of size nbins) of median and sigmas 
+    '''Return a tuple of arrays (of size nbins) of median and sigmas
     calculated from robuststats() from chopping the array A in nbins pieces.
     Alternatively, bins can be explicitly be given with the bins parameter in the form:
     bins = [[x0, x1], [x2, x3], ...]
@@ -193,7 +194,7 @@ def fitbaseline(x, y, dy, initialbins = 5, detectionsigma = (-99.0, 5.0),
                 minbinfracsize = 0.025, targetchi2 = 4.0, maxoutlierfrac = 0.9,
                 outlierprobmu = 0.5, outlierprobsigma = 0.25, bordertokeep = 0.05):
     '''Fit baseline to function y(x) (having error dy(x)).
-    Starts partitioning domain in 'initialbins' and the subdividing bins up to 
+    Starts partitioning domain in 'initialbins' and the subdividing bins up to
     a fractional size 'minbinfracsize' of the total number of channels.
     Returns PPoly instance with fit.
     '''
@@ -249,7 +250,7 @@ def fitbaseline(x, y, dy, initialbins = 5, detectionsigma = (-99.0, 5.0),
             dybin = dybin[allvalid]
         if np.sum(allvalid) <= 1:
             print('Could not converge to fit!!!')
-            blfit = None 
+            blfit = None
             #Calculate the residuals of the baseline fit and bin them
             res = (y - np.ma.median(y))
             chi2bin = chi2binaux
@@ -404,7 +405,7 @@ def sigclipfit(x, A, Asig, fitdeg, nclips, nsigma, bordertokeep = 0.05, progdegr
 
 def enlargesel(sel, box):
     '''Enlarge selection by "box" pixels around each selected pixel
-    in "sel" vector. 
+    in "sel" vector.
     '''
     n = len(sel)
     newsel = 0.0*sel
@@ -662,7 +663,7 @@ def getskylines(tauspec, spw, spwsetup, fraclevel = 0.5, minpeaklevel = 0.0, spw
     widthratio = np.zeros(npeak)
     #Fit "baseline" to tau
     nu = spwsetup[spw]['chanfreqs']/1.e09
-    taufit = sigclipfit(nu, np.ma.MaskedArray(tauspec, mask=np.zeros(nch)), 
+    taufit = sigclipfit(nu, np.ma.MaskedArray(tauspec, mask=np.zeros(nch)),
                         np.ma.MaskedArray(np.sqrt(tauspec), mask=np.zeros(nch)), 2, 3, 5.0)
     taubline = np.ma.sum([taufit['coefs'][deg]*(nu**(taudeg-deg)) for deg in range(taudeg + 1)], axis = 0)
     subtau = tauspec - taubline
@@ -1037,9 +1038,11 @@ def getCalAtmData(ms, spws, spwsetup):
     #Open CALATMOSPHERE table
     tb.open(os.path.join(ms, 'ASDM_CALATMOSPHERE'))
     #Get weather parameters
+    casalog.post("Start reading weather parameters from ASDM_CALATMOSPHERE table")
     tground_all = tb.getcol('groundTemperature')
     pground_all = tb.getcol('groundPressure')
     hground_all = tb.getcol('groundRelHumidity')
+    casalog.post("Done reading weather parameters from ASDM_CALATMOSPHERE table")
     #Get the spectra of the ATM measurements
     tmatm_all = {}
     tsys = {}
@@ -1196,7 +1199,7 @@ def makePlot(nu = None, tmavedata = None, skychansel = None, scisrcsel = None, b
         ymin2 = mintr - lowbuf2*trrange
         ymax2 = maxtr + atmhighbuf*trrange
         ywin = ymin2 + 0.1*lowbuf2*trrange
-        ax2 = ax1.twinx() 
+        ax2 = ax1.twinx()
         if np.sum(skychansel) > 0:
             ax2.plot(nu[skychansel], ywin*np.ones(np.sum(skychansel)), 's', color='black', markersize=psize)
         ax2.plot(nu, transm, linestyle='solid', linewidth=1.0, color='magenta')
@@ -1231,7 +1234,7 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
     jyperkfactor: Dictionary of Jy/K factors for each EB, antenna and SPW. Default will
     assume a factor of 1.0. To be obtained from getJyperKfromCSV() function
     dobackup: Whether to do a backup of the MS before applying the correction.
-    (True/False) Default is True. 
+    (True/False) Default is True.
     forcespws: Force the list of SPWs to process. If not specified, task will do all SPWs.
     forcefield: Force the FIELD ID to process. If not specified task will pick the first one.
     blinedeg: Degree of the baseline fitting polynomial.
@@ -1305,8 +1308,10 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
     print('Obtaining atmospheric parameters for MS: '+ms)
     tb = createCasaTool(tbtool)
     tb.open(os.path.join(ms, 'ASDM_CALWVR'))
+    casalog.post("Start reading water data from ASDM_CALWVR table")
     tmpwv_all = tb.getcol('startValidTime')
     pwv_all = tb.getcol('water')
+    casalog.post("Done reading water data from ASDM_CALWVR table")
     tb.close()
 
     #Open CALATMOSPHERE table
@@ -1461,11 +1466,13 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
         querystr = 'DATA_DESC_ID in {0:s} && FIELD_ID in {1:s}'.format(str(spwsetup[spwid]['ddi']), str(fieldid))
         print('Reading data for TaQL query: '+querystr)
         subtb = tb.query(querystr)
+        casalog.post(f"Start reading data for TaQL query: {querystr}")
         tmdata = subtb.getcol('TIME')
         data = subtb.getcol(datacolumn)
         flag = subtb.getcol('FLAG')
         flagrow = subtb.getcol('FLAG_ROW')
         ant1 = subtb.getcol('ANTENNA1')
+        casalog.post("Done reading data for TaQL query")
         npol = data.shape[0]
         #Add the flag ROW flag to the individual row flag arrays,
         #in order to use only one array.
@@ -1595,10 +1602,12 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
             querystr = 'DATA_DESC_ID in {0:s} && FIELD_ID in {1:s}'.format(str(spwsetup[spwid]['ddi']), str(fieldid))
             print('Reading data for TaQL query: '+querystr)
             subtb = tb.query(querystr)
+            casalog.post(f"Start reading data for TaQL query: {querystr}")
             tmdatak = subtb.getcol('TIME')
             datak = subtb.getcol('DATA')
             flagk = subtb.getcol('FLAG')
             flagrowk = subtb.getcol('FLAG_ROW')
+            casalog.post("Done reading data for TaQL query")
             #Add the flag ROW flag to the individual row flag arrays,
             #in order to use only one array.
             flaggedrowlistk = np.where(flagrowk)[0]
@@ -1629,7 +1638,7 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
                 #blinemodel[ipol] = np.ma.sum([blinefit[ipol]['coefs'][deg]*(nu**(blinedeg-deg)) for deg in range(blinedeg+1)], axis = 0)
             #Compute baseline subtracted data
             blinesubdataon = 0.0*tmavedataonk
-            for ipol in range(npol):                    
+            for ipol in range(npol):
                 blinesubdataon[ipol] = tmavedataonk[ipol] - blinemodel[ipol]
 
             #Plot corrected data with baseline fit, etc.
@@ -1638,7 +1647,7 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
             else:
                 bline = None
             plotlist.append({'nu': nu, 'tmavedata': tmavedataonk, 'skychansel': skychansel, 'scisrcsel': scisrcsel,
-                             'tau': tau[spwid], 'title': 'Model '+strmodel, 'diffsmoothbox': 1, 
+                             'tau': tau[spwid], 'title': 'Model '+strmodel, 'diffsmoothbox': 1,
                              'takediff': False, 'ischosen': False, 'bline': bline,
                              'isize': isize, 'psize': psize,
                              'output': plotsfolder+'/'+ms+'.field'+str(fieldid)+'.spw'+str(spwid)+'.model.'+str(k)+'.png'})
@@ -1772,18 +1781,20 @@ def getJyperKfromCaltable(mslist, context):
         spwsetup = getSpecSetup(ms)
         #Open Jy/K Amp table
         tb.open(jyperktables[i])
+        casalog.post("Start reading k2jy caltable")
         ant1 = tb.getcol('ANTENNA1')
         spw = tb.getcol('SPECTRAL_WINDOW_ID')
         cparam = tb.getcol('CPARAM')
+        casalog.post("Done reading k2jy caltable")
         jyperk = 1./np.square(np.real(cparam[0][0]))
         tb.close()
         output[ms] = {str(thisspw): np.mean(jyperk[(spw == thisspw)]) for thisspw in spw if thisspw in spwsetup['spwlist']}
     return output
 
 def selectModelParams(mslist, context = None, jyperkfactor = None, decisionmetric = 'intabsdiff',
-                      iant = 'auto', atmtype = [1,2,3,4], maxalt = [120], 
+                      iant = 'auto', atmtype = [1,2,3,4], maxalt = [120],
                       lapserate = [-5.6], scaleht = [2.0], resultsfile = None, plotsfolder = None,
-                      forcespws = None, forcefield = None, forcemetricline = None, blinedeg = 5, blinenclip = 1, 
+                      forcespws = None, forcefield = None, forcemetricline = None, blinedeg = 5, blinenclip = 1,
                       blinensigma = 10.0, maxonlyspw = False, minpeaklevel = 0.05,
                       timestamp = None, diffsmooth = 0.002, psize = 2, isize = 300,
                       defatmtype = 1, defmaxalt = 120, deflapserate = -5.6, defscaleht = 2.0,
@@ -1943,7 +1954,7 @@ def redPipeSDatmcorr(iant = 'auto', atmtype = [1, 2, 3, 4],
     scaleht: h0 parameter for at (water scale height; km). Default is 2.0
     decisionmetric: Metric to use to take the decision on best model selection (see selectModelParams())
     metricspws: List of SPWs to use for model selection. Parameter gets passed to task selectModelParams() as forcespws.
-    metricfield: List of Field to use for model selection. Currently only supported one. 
+    metricfield: List of Field to use for model selection. Currently only supported one.
     Parameter gets passed to task selectModelParams() as forcefield.
     dobackup: Whether to do a backup of the MS before applying the correction.
     (True/False) Default is True
