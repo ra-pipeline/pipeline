@@ -340,13 +340,14 @@ class finalbpSolAmpPerAntennaPerSpwChart(object):
         band2spw = collections.defaultdict(list)
         spwobjlist = self.ms.get_spectral_windows(science_windows_only=True)
         listspws = [spw.id for spw in spwobjlist]
+        specline_spwlist = [spw.id for spw in spwobjlist if spw.specline_window]
         for spw, band in spw2band.items():
             if spw in listspws:  # Science intents only
                 band2spw[band].append(str(spw))
 
-        for spw in spwobjlist:
-            if spw.specline_window:
-                for bandname, spwlist in band2spw.items():
+        for bandname, spwlist in band2spw.items():
+            for spw in spwlist:
+                if spw in specline_spwlist:
                     maxmaxphase, maxmaxamp = get_maxphase_maxamp(self.result.bpcaltable)
                     ampplotmax = maxmaxamp
 
@@ -522,13 +523,14 @@ class finalbpSolPhasePerAntennaPerSpwChart(object):
         band2spw = collections.defaultdict(list)
         spwobjlist = self.ms.get_spectral_windows(science_windows_only=True)
         listspws = [spw.id for spw in spwobjlist]
+        specline_spwlist = [spw.id for spw in spwobjlist if spw.specline_window]
         for spw, band in spw2band.items():
             if spw in listspws:  # Science intents only
                 band2spw[band].append(str(spw))
 
-        for spw in spwobjlist:
-            if spw.specline_window:
-                for bandname, spwlist in band2spw.items():
+        for bandname, spwlist in band2spw.items():
+            for spw in spwlist:
+                if spw in specline_spwlist:
                     maxmaxphase, maxmaxamp = get_maxphase_maxamp(self.result.bpcaltable)
                     phaseplotmax = maxmaxphase
 
@@ -803,6 +805,7 @@ class finalAmpTimeCalPerAntennaPerSpwChart(object):
         band2spw = collections.defaultdict(list)
         spwobjlist = self.ms.get_spectral_windows(science_windows_only=True)
         listspws = [spw.id for spw in spwobjlist]
+        specline_spwlist = [spw.id for spw in spwobjlist if spw.specline_window]
         for spw, band in spw2band.items():
             if spw in listspws:  # Science intents only
                 band2spw[band].append(str(spw))
@@ -812,9 +815,9 @@ class finalAmpTimeCalPerAntennaPerSpwChart(object):
         mintime = np.min(times)
         maxtime = np.max(times)
 
-        for spw in spwobjlist:
-            if spw.specline_window:
-                for bandname, spwlist in band2spw.items():
+        for bandname, spwlist in band2spw.items():
+            for spw in spwlist:
+                if spw in specline_spwlist:
 
                     with casa_tools.TableReader(self.result.finalampgaincaltable) as tb:
                         cpar = tb.getcol('CPARAM')
@@ -1090,6 +1093,7 @@ class finalPhaseGainCalPerAntennaPerSpwChart(object):
         band2spw = collections.defaultdict(list)
         spwobjlist = self.ms.get_spectral_windows(science_windows_only=True)
         listspws = [spw.id for spw in spwobjlist]
+        specline_spwlist = [spw.id for spw in spwobjlist if spw.specline_window]
         for spw, band in spw2band.items():
             if spw in listspws:  # Science intents only
                 band2spw[band].append(str(spw))
@@ -1099,10 +1103,9 @@ class finalPhaseGainCalPerAntennaPerSpwChart(object):
         mintime = np.min(times)
         maxtime = np.max(times)
 
-        for spw in spwobjlist:
-            if spw.specline_window:
-                for bandname, spwlist in band2spw.items():
-
+        for bandname, spwlist in band2spw.items():
+            for spw in spwlist:
+                if spw in specline_spwlist:
                     for ii in range(nplots):
 
                         filename = 'finalphasegaincal' + str(ii) + '_' + bandname + '_' + str(spw.id) + '.png'
@@ -1153,7 +1156,7 @@ class finalPhaseGainCalPerAntennaPerSpwChart(object):
                             except Exception as ex:
                                 LOG.warning("Unable to add plot to stack.  " + str(ex))
                                 plots.append(None)
-                        else: 
+                        else:
                             plots.append(None)
 
         return [p for p in plots if p is not None]
