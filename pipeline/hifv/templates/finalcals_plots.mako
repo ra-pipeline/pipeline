@@ -95,11 +95,7 @@ bandsort = {'4':0, 'P':1, 'L':2, 'S':3, 'C':4, 'X':5, 'U':6, 'K':7, 'A':8, 'Q':9
                     <h4>
                     Spw:
                     % for spwk in spwlist:
-                        <%
-                        spwk_plots = list(filter(lambda p: p.parameters.get('spw') == spwk, band_spw_plots))
-                        %>
-
-                        % if len(spwk_plots) > 0:
+                        % if spwk in context["band2spw"][band]:
                         <a href="#${band}-${spwk}">${spwk}</a>&nbsp;|&nbsp;
                         % endif
                     % endfor
