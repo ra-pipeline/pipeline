@@ -1,6 +1,7 @@
 import collections
 import os
 import shutil
+from typing import Callable, Dict, List
 
 import numpy as np
 
@@ -12,6 +13,8 @@ import pipeline.infrastructure.vdp as vdp
 from pipeline.h.heuristics import caltable as caltable_heuristic
 from pipeline.h.tasks.common import commonhelpermethods
 from pipeline.hif.tasks import gaincal
+from pipeline.hif.tasks.bandpass.common import BandpassResults
+from pipeline.hif.tasks.gaincal.common import GaincalResults
 from pipeline.hifa.heuristics import atm as atm_heuristic
 from pipeline.hifa.heuristics import wvrgcal as wvrgcal_heuristic
 from pipeline.hifa.tasks import bandpass
@@ -98,11 +101,148 @@ class WvrgcalInputs(vdp.StandardInputs):
         else:
             return value
 
+    # docstring and type hints: supplements hifa_wvrgcal
     def __init__(self, context, output_dir=None, vis=None, caltable=None, offsetstable=None, hm_toffset=None,
                  toffset=None, segsource=None, hm_tie=None, tie=None, sourceflag=None, nsol=None, disperse=None,
                  wvrflag=None, hm_smooth=None, smooth=None, scale=None, maxdistm=None, minnumants=None,
                  mingoodfrac=None, refant=None, qa_intent=None, qa_bandpass_intent=None, qa_spw=None,
                  accept_threshold=None, bandpass_result=None, nowvr_result=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            vis: List of input visibility files.
+                Default: none, in which case the vis files to be used
+                will be read from the context.
+
+                Example: vis=['ngc5921.ms']
+
+            caltable: List of output gain calibration tables.
+                Default: none, in which case the names of the caltables
+                will be generated automatically.
+
+                Example: caltable='ngc5921.wvr'
+
+            offsetstable: List of input temperature offsets table files to subtract
+                from WVR measurements before calculating phase corrections.
+                Default: none, in which case no offsets are applied.
+
+                Example: offsetstable=['ngc5921.cloud_offsets']
+
+            hm_toffset: If 'manual', set the ``toffset`` parameter to the user-specified value.
+                If 'automatic', set the ``toffset`` parameter according to the
+                date of the MeasurementSet; ``toffset`` = -1 if before 2013-01-21T00:00:00
+                ``toffset`` = 0 otherwise.
+
+            toffset: Time offset (sec) between interferometric and WVR data.
+
+            segsource: If True calculate new atmospheric phase correction coefficients
+                for each source, subject to the constraints of the ``tie`` parameter.
+                'segsource' is forced to be True if the ``tie`` parameter is set to a
+                non-empty value by the user or by the automatic heuristic.
+
+            hm_tie: If 'manual', set the ``tie`` parameter to the
+                user-specified value. If 'automatic', set the ``tie``
+                parameter to include with the target all calibrators
+                that are within 15 degrees of it: if no calibrators are
+                that close then ``tie`` is left empty.
+
+            tie: Use the same atmospheric phase correction coefficients
+                when calculating the WVR correction for all sources in
+                the ``tie``. If ``tie`` is not empty then ``segsource``
+                is forced to be True. Ignored unless ``hm_tie`` = 'manual'.
+
+                Example: tie=['3C273,NGC253', 'IC433,3C279']
+
+            sourceflag: Flag the WVR data for these source(s) as bad and do not
+                produce corrections for it. Requires ``segsource`` = True.
+
+                Example: ['3C273']
+
+            nsol: Number of solutions for phase correction coefficients during this
+                observation, evenly distributed in time throughout the observation. It
+                is used only if ``segsource`` = False because if ``segsource`` = True then the
+                coefficients are recomputed whenever the telescope moves to a new
+                source (within the limits imposed by ``tie``).
+
+            disperse: Apply correction for dispersion. (Deprecated; will be removed)
+
+            wvrflag: Flag the WVR data for the listed antennas as bad and replace
+                their data with values interpolated from the 3 nearest antennas with
+                unflagged data.
+
+                Example: ['DV03','DA05','PM02']
+
+            hm_smooth: If 'manual' set the ``smooth`` parameter to the user-specified value.
+                If 'automatic', run the wvrgcal task with the range of ``smooth`` parameters
+                required to match the integration time of the wvr data to that of the
+                interferometric data in each spectral window.
+
+            smooth: Smooth WVR data on this timescale before calculating the correction.
+                Ignored unless hm_smooth='manual'.
+
+            scale: Scale the entire phase correction by this factor.
+
+            maxdistm: Maximum distance in meters of an antenna used for interpolation
+                from a flagged antenna.
+                Default: -1  (automatically set to 100m if >50% of
+                antennas are 7m antennas without WVR and otherwise set to
+                500m).
+
+                Example: maxdistm=550
+
+            minnumants: Minimum number of nearby antennas (up to 3) used for
+                interpolation from a flagged antenna.
+
+                Example: minnumants=3
+
+            mingoodfrac: Minimum fraction of good data per antenna.
+
+            refant: Ranked comma delimited list of reference antennas.
+
+                Example: refant='DV01,DV02'
+
+            qa_intent: The list of data intents on which the wvr correction is to be
+                tried as a means of estimating its effectiveness.
+                A QA 'view' will be calculated for each specified intent, in each spectral
+                window in each vis file.
+                Each QA 'view' will consist of a pair of 2-d images with dimensions
+                ['ANTENNA', 'TIME'], one showing the data phase-noise before the
+                wvr application, the second showing the phase noise after (both 'before'
+                and 'after' images have a bandpass calibration applied as well).
+                An overall QA score is calculated for each vis file, by dividing the
+                'before' images by the 'after' and taking the median of the result. An
+                overall score of 1 would correspond to no change in the phase noise,
+                a score > 1 implies an improvement.
+                If the overall score for a vis file is less than the value in
+                'accept_threshold' then the wvr calibration file is not made available
+                for merging into the context for use in the subsequent reduction.
+                If you do not want any QA calculations then set qa_intent=''.
+
+                Example: qa_intent='PHASE'
+
+            qa_bandpass_intent: The data intent to use for the bandpass calibration in
+                the qa calculation. The default is blank to allow the underlying bandpass
+                task to select a sensible intent if the dataset lacks BANDPASS data.
+
+            qa_spw: The SpW(s) to use for the qa calculation, in the order that they
+                should be tried. Input as a comma-separated list. The default is blank, in
+                which case the task will try SpWs in order of decreasing median sky
+                opacity.
+
+            accept_threshold: The phase-rms improvement ratio
+                (rms without wvr / rms with wvr) above which the wrvg file will be
+                accepted into the context for subsequent application.
+
+            bandpass_result:
+
+            nowvr_result:
+
+        """
         super(WvrgcalInputs, self).__init__()
 
         # pipeline inputs
@@ -149,7 +289,7 @@ class Wvrgcal(basetask.StandardTaskTemplate):
 
     def prepare(self):
         inputs = self.inputs
-        result = resultobjects.WvrgcalResult(vis=inputs.vis)        
+        result = resultobjects.WvrgcalResult(vis=inputs.vis)
         jobs = []
 
         # get parameters that can be set from outside or which will be derived
@@ -257,7 +397,7 @@ class Wvrgcal(basetask.StandardTaskTemplate):
                 task = casa_tasks.wvrgcal(vis=inputs.vis, caltable=caltable,
                                           offsetstable=inputs.offsetstable,
                                           toffset=toffset, segsource=segsource,
-                                          tie=tie, sourceflag=sourceflag, 
+                                          tie=tie, sourceflag=sourceflag,
                                           nsol=nsol, disperse=disperse,
                                           wvrflag=wvrflag, smooth=smooth,
                                           scale=scale, maxdistm=maxdistm,
@@ -326,35 +466,45 @@ class Wvrgcal(basetask.StandardTaskTemplate):
         # wvrcal files to be applied
         result.final[:] = on_disk
 
+        # If no QA intent was provided, then return early. Otherwise, continue
+        # with computing the QA results.
         qa_intent = inputs.qa_intent.strip()
         if not qa_intent:
             return result
 
-        # calculate the qa results if required
+        # Return early if no WVR caltable was created.
         if not result.final:
             return result
 
-        # get the spw for which qa results are needed
-        # If no spw order was specified explicitly, then calculate an order
-        # here; otherwise use the specified order (e.g. calculated during
-        # previous iteration).
+        # Determine the list of SpWs for which QA results are needed. If no QA
+        # SpW order was specified explicitly, then calculate an order here based
+        # on SpW bandwidth and Tsys; otherwise use the specified order.
         if inputs.qa_spw == '':
-            atmheuristics = atm_heuristic.AtmHeuristics(
-                context=inputs.context, vis=inputs.vis)
-            # Preferably rank spws by Tsys and bandwidth:
+            # PIPE-2056: if the observing mode is band-to-band, then restrict
+            # the list of QA SpWs to only the diffgain on-source SpWs, otherwise
+            # use all science SpWs.
+            if inputs.ms.is_band_to_band:
+                spws = inputs.ms.get_spectral_windows(intent='DIFFGAINSRC')
+            else:
+                spws = inputs.ms.get_spectral_windows(science_windows_only=True)
+
+            # Initialize atmosphere heuristics.
+            atmheuristics = atm_heuristic.AtmHeuristics(context=inputs.context, vis=inputs.vis, spw=spws)
+
+            # Create a ranked list preferably by Tsys and SpW bandwidth.
             qa_spw_list = atmheuristics.spwid_rank_by_tsys_and_bandwidth(qa_intent)
+
             # If ranking by Tsys failed (e.g. no Tsys table, or due to
             # flagging), then fall back to ranking by opacity and bandwidth:
             if qa_spw_list is None:
-                LOG.info("qa: ranking spws by bandwidth and Tsys failed for "
-                         "{}; will rank by bandwidth and opacity "
-                         "instead.".format(os.path.basename(inputs.vis)))
+                LOG.info(f"qa: ranking spws by bandwidth and Tsys failed for {inputs.ms.basename}; will rank by"
+                         f" bandwidth and opacity instead.")
                 qa_spw_list = atmheuristics.spwid_rank_by_opacity_and_bandwidth()
         else:
             qa_spw_list = inputs.qa_spw.split(',')
 
         for qa_spw in qa_spw_list:
-            LOG.info('qa: %s attempting to calculate wvrgcal QA using spw %s' % (os.path.basename(inputs.vis), qa_spw))
+            LOG.info(f'qa: {inputs.ms.basename} attempting to calculate wvrgcal QA using spw {qa_spw}')
             inputs.qa_spw = qa_spw
 
             # Do a bandpass calibration
@@ -388,13 +538,13 @@ class Wvrgcal(basetask.StandardTaskTemplate):
         result.stage_number = inputs.context.task_counter
         result.accept(inputs.context)
 
-        # do a phase calibration on the bandpass and phase calibrators, now 
+        # do a phase calibration on the bandpass and phase calibrators, now
         # with bandpas *and* wvr preapplied.
         if not bp_result.final:
             LOG.warning('qa: calculating phase calibration with wvr applied')
         else:
             LOG.info('qa: calculating phase calibration with bandpass and wvr applied')
-        wvr_result = self._do_wvr_gaincal(inputs)            
+        wvr_result = self._do_wvr_gaincal(inputs)
 
         nowvr_caltable = nowvr_result.inputs['caltable']
         wvr_caltable = wvr_result.inputs['caltable']
@@ -402,8 +552,8 @@ class Wvrgcal(basetask.StandardTaskTemplate):
 
         # Edited for PIPE-1837 adding BPgood and PHgood
         LOG.info('qa: calculate ratio with-WVR phase RMS / without-WVR phase rms')
-        PHnoisy, BPnoisy, PHgood, BPgood = wvrg_qa.calculate_view(inputs.context, nowvr_caltable,
-                                                  wvr_caltable, result.qa_wvr, qa_intent)
+        PHnoisy, BPnoisy, PHgood, BPgood = wvrg_qa.calculate_view(inputs.context, nowvr_caltable, wvr_caltable,
+                                                                  result.qa_wvr, qa_intent)
         result.PHnoisy = PHnoisy
         result.BPnoisy = BPnoisy
         result.PHgood = PHgood
@@ -426,7 +576,7 @@ class Wvrgcal(basetask.StandardTaskTemplate):
 
         return result
 
-    def _report_wvr_improvement(self, result):
+    def _report_wvr_improvement(self, result: resultobjects.WvrgcalResult):
         """
         Report the improvement factors from QA data views to the log (PIPE-846).
         """
@@ -449,16 +599,16 @@ class Wvrgcal(basetask.StandardTaskTemplate):
                     LOG.info(f"Ant #{antid} ({ant_names[antid]}), time {timestamp}: {qa_result.data[xid, yid]:.2f}"
                              f" {'(flagged)' if qa_result.flag[xid, yid] else ''}")
 
-    def _do_qa_bandpass(self, inputs):
+    def _do_qa_bandpass(self, inputs: WvrgcalInputs) -> BandpassResults:
         """
         Create a bandpass caltable for QA analysis, returning the result of
         the worker bandpass task.
 
-        If a suitable bandpass caltable already exists, it will be reused. 
+        If a suitable bandpass caltable already exists, it will be reused.
         """
         if inputs.bandpass_result:
             # table already exists use it
-            LOG.info('Reusing B calibration result:\n%s' % 
+            LOG.info('Reusing B calibration result:\n%s' %
                      inputs.bandpass_result)
             return self._do_user_qa_bandpass(inputs)
         else:
@@ -467,7 +617,7 @@ class Wvrgcal(basetask.StandardTaskTemplate):
             return result
 
     @staticmethod
-    def _do_user_qa_bandpass(inputs):
+    def _do_user_qa_bandpass(inputs: WvrgcalInputs) -> BandpassResults:
         """
         Accept and return the bandpass result affixed to the inputs.
 
@@ -478,9 +628,9 @@ class Wvrgcal(basetask.StandardTaskTemplate):
         bp_result.accept(inputs.context)
         return bp_result
 
-    def _do_new_qa_bandpass(self, inputs):
+    def _do_new_qa_bandpass(self, inputs: WvrgcalInputs) -> BandpassResults:
         """
-        Create a new bandpass caltable by spawning a bandpass worker task, 
+        Create a new bandpass caltable by spawning a bandpass worker task,
         merging the results with the context.
         """
         # passing an empty string as intent tells bandpass to use all intents,
@@ -501,7 +651,7 @@ class Wvrgcal(basetask.StandardTaskTemplate):
                 'hm_bandpass': 'fixed',
                 'solint': 'inf,7.8125MHz'}
 
-        inputs = bandpass.ALMAPhcorBandpass.Inputs(inputs.context, **args)        
+        inputs = bandpass.ALMAPhcorBandpass.Inputs(inputs.context, **args)
         task = bandpass.ALMAPhcorBandpass(inputs)
         result = self._executor.execute(task, merge=False)
         if not result.final:
@@ -510,7 +660,7 @@ class Wvrgcal(basetask.StandardTaskTemplate):
             result.accept(inputs.context)
         return result
 
-    def _do_nowvr_gaincal(self, inputs):
+    def _do_nowvr_gaincal(self, inputs: WvrgcalInputs) -> GaincalResults:
         # do a phase calibration on the bandpass and phase
         # calibrators with B preapplied
         LOG.info('Calculating phase calibration with B applied')
@@ -522,24 +672,24 @@ class Wvrgcal(basetask.StandardTaskTemplate):
             return inputs.nowvr_result
         else:
             LOG.debug('Calculating new gaincal with B but no WVR')
-            # get namer that will add '.wvr' to caltable filename 
+            # get namer that will add '.wvr' to caltable filename
             nowvr_caltable_namer = self._get_nowvr_caltable_namer()
-            result = self._do_qa_gaincal(inputs, nowvr_caltable_namer)            
+            result = self._do_qa_gaincal(inputs, nowvr_caltable_namer)
             return result
 
-    def _do_wvr_gaincal(self, inputs):
-        # get namer that will add '.flags_1_2.wvr' to caltable filename 
-        wvr_caltable_namer = self._get_wvr_caltable_namer(inputs)            
-        return self._do_qa_gaincal(inputs, wvr_caltable_namer)                    
+    def _do_wvr_gaincal(self, inputs: WvrgcalInputs) -> GaincalResults:
+        # get namer that will add '.flags_1_2.wvr' to caltable filename
+        wvr_caltable_namer = self._get_wvr_caltable_namer(inputs)
+        return self._do_qa_gaincal(inputs, wvr_caltable_namer)
 
-    def _do_qa_gaincal(self, inputs, caltable_namer):
+    def _do_qa_gaincal(self, inputs: WvrgcalInputs, caltable_namer: Callable[[str], str]) -> GaincalResults:
         """
         Generate a new gain caltable via a call to a child pipeline task.
 
         Analysing the improvement gained by applying the WVR requires that
-        exactly the same gaincal job is called with and without the WVR 
+        exactly the same gaincal job is called with and without the WVR
         preapply. Coding the gaincal as a separate function with minimal
-        outside interaction helps enforce that requirement.  
+        outside interaction helps enforce that requirement.
         """
         args = {'vis': inputs.vis,
                 'intent': inputs.qa_intent,
@@ -560,11 +710,11 @@ class Wvrgcal(basetask.StandardTaskTemplate):
         return result
 
     @staticmethod
-    def _get_nowvr_caltable_namer():
-        """        
+    def _get_nowvr_caltable_namer() -> Callable[[str], str]:
+        """
         Returns a function that inserts a '.nowvr' component into a filename.
         """
-        def caltable_namer(caltable):
+        def caltable_namer(caltable: str) -> str:
             root, ext = os.path.splitext(caltable)
             new_caltable_name = '%s.nowvr%s' % (root, ext)
             LOG.debug('WVR uncorrected phase RMS gain table is %s' %
@@ -574,30 +724,39 @@ class Wvrgcal(basetask.StandardTaskTemplate):
         return caltable_namer
 
     @staticmethod
-    def _get_wvr_caltable_namer(inputs):
-        """        
+    def _get_wvr_caltable_namer(inputs: WvrgcalInputs) -> Callable[[str], str]:
+        """
         Returns a function that inserts a ''.flagged_<N>_antennas.wvr' component into a
         filename.
         """
         flags = '.flagged_%d_antennas' % len(inputs.wvrflag) if inputs.wvrflag else ''
 
-        def caltable_namer(caltable):
+        def caltable_namer(caltable: str) -> str:
             root, ext = os.path.splitext(caltable)
             new_caltable = '%s%s.wvr%s' % (root, flags, ext)
             LOG.debug('WVR-corrected phase RMS gain table is %s' %
                       os.path.basename(new_caltable))
             return new_caltable
 
-        return caltable_namer    
+        return caltable_namer
 
     @staticmethod
-    def _get_wvrinfos(result):
+    def _get_wvrinfos(result: Dict) -> List[WVRInfo]:
+        """
+        Retrieve necessary information from the result returned by the CASA
+        'wvrgcal' task.
 
-        def to_microns(x):
+        Args:
+            result: result dictionary returned by CASA 'wvrgcal'
+
+        Returns:
+            List containing WVR info for each antenna.
+        """
+        def to_microns(x: float) -> measures.Distance:
             return measures.Distance(x, measures.DistanceUnits.MICROMETRE)
 
         # copy result in case we need it unaltered elsewhere, then convert raw
-        # values to domain measures    
+        # values to domain measures
         copied = dict(result)
         copied['RMS_um'] = [to_microns(v) for v in copied['RMS_um']]
         copied['Disc_um'] = [to_microns(v) for v in copied['Disc_um']]

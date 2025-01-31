@@ -46,7 +46,7 @@ class FlagDeterALMAQAHandler(pqa.QAPlugin):
 
 
 class FlagDeterALMAListQAHandler(pqa.QAPlugin):
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = flagdeteralma.FlagDeterALMAResults
     generating_task = flagdeteralma.FlagDeterALMA
 
@@ -77,7 +77,7 @@ class FlagTargetsALMAQAHandler(pqa.QAPlugin):
 
 
 class FlagTargetsALMAListQAHandler(pqa.QAPlugin):
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = flagtargetsalma.FlagTargetsALMAResults
 
     def handle(self, context, result):

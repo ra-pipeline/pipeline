@@ -2,6 +2,12 @@
 rsc_path = ""
 import os
 import pipeline.infrastructure.renderer.htmlrenderer as hr
+
+def is_rejected(keep):
+    desc=''
+    if not keep:
+        desc = '<a style="color:red">rejected</a>'
+    return desc
 %>
 <%inherit file="t2-4m_details-base.mako"/>
 
@@ -30,7 +36,7 @@ else:
             </%def>
 
             <%def name="ms_preamble(basename)">
-
+            ${is_rejected(info_dict[basename])}
             <%
                 # restored stats
                 pbcor_min = plotter.result.pbcor_stats[basename].get('min')[0]

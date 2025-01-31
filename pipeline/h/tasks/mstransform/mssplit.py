@@ -20,7 +20,7 @@ __all__ = [
 
 # Define the minimum set of parameters required to split out
 # the requested data (defined by field, spw, intent) from the
-# original MS and optionally average in time and channel.  
+# original MS and optionally average in time and channel.
 #
 # If replace is True replace the parameter MS with the transformed
 # one on disk and in the context
@@ -39,8 +39,45 @@ class MsSplitInputs(vdp.StandardInputs):
         vis_root = os.path.splitext(self.vis)[0]
         return vis_root + '_split.ms'
 
+    # docstring and type hints: supplements h_mssplit
     def __init__(self, context, vis=None, output_dir=None, outputvis=None, field=None, intent=None, spw=None,
                  datacolumn=None, chanbin=None, timebin=None, replace=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            vis: The list of input MeasurementSets to be transformed. Defaults to the list of MeasurementSets specified in the pipeline import data task.
+                default '': Split all MeasurementSets in the context.
+                example: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            outputvis: The list of output split MeasurementSets. The output list must be the same length as the input list and the output names must be different
+                from the input names.
+                default '', The output name defaults to <msrootname>_split.ms
+                example: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
+
+            field: Set of data selection field names or ids, '' for all
+
+            intent: Select intents to split default: '', All data is selected.
+                example: 'TARGET'
+
+            spw: Select spectral windows to split. default: '', All spws are selected
+                example: '9', '9,13,15'
+
+            datacolumn: Select spectral windows to split. The standard CASA options are supported.
+                example: 'corrected', 'model'
+
+            chanbin: The channel binning factor. 1 for no binning, otherwise 2, 4, 8, or 16.
+                example: 2, 4
+
+            timebin: The time binning factor. '0s' for no binning.
+                example: '10s' for 10 second binning
+
+            replace: If a split was performed delete the parent MS and remove it from the context.
+        """
         super(MsSplitInputs, self).__init__()
 
         self.context = context
@@ -92,7 +129,7 @@ class MsSplit(basetask.StandardTaskTemplate):
         result = MsSplitResults(vis=inputs.vis, outputvis=inputs.outputvis)
 
         # Run CASA task
-        #    Does this need a try / except block 
+        #    Does this need a try / except block
 
         mstransform_args = inputs.to_casa_args()
         mstransform_job = casa_tasks.mstransform(**mstransform_args)
@@ -101,7 +138,7 @@ class MsSplit(basetask.StandardTaskTemplate):
         return result
 
     def analyse(self, result):
-        # Check for existence of the output vis. 
+        # Check for existence of the output vis.
         if not os.path.exists(result.outputvis):
             return result
 

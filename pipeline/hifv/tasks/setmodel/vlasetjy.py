@@ -252,9 +252,45 @@ class VLASetjyInputs(vdp.StandardInputs):
         standards = [heu_standard(field) for field in field_names]
         return standards[0] if len(standards) == 1 else standards
 
+    # docstring and type hints: supplements hifv_vlasetjy
     def __init__(self, context, output_dir=None, vis=None, field=None, intent=None, spw=None, model=None,
                  scalebychan=None, fluxdensity=None, spix=None, reffreq=None, standard=None,
                  refspectra=None, reffile=None, normfluxes=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the h_init or hifv_importdata task.
+
+            field: List of field names or ids.
+
+            intent: Observing intent of flux calibrators.
+
+            spw: List of spectral window ids.
+
+            model: File location for field model.
+
+            scalebychan: Scale the flux density on a per channel basis or else on a per spw basis.
+
+            fluxdensity: Specified flux density [I,Q,U,V]; -1 will lookup values.
+
+            spix: Spectral index of fluxdensity.  Can be set when fluxdensity is not -1.
+
+            reffreq: Reference frequency for spix.  Can be set when fluxdensity is not -1.
+
+            standard: Flux density standard.
+
+            refspectra:
+
+            reffile: Path to file with fluxes for non-solar system calibrators.
+
+            normfluxes:
+
+        """
 
         super(VLASetjyInputs, self).__init__()
 
@@ -304,13 +340,13 @@ class VLASetjy(basetask.StandardTaskTemplate):
 
     def prepare(self):
         inputs = self.inputs
-        result = commonfluxresults.FluxCalibrationResults(vis=inputs.vis) 
+        result = commonfluxresults.FluxCalibrationResults(vis=inputs.vis)
 
         # Return early if the field has no data of the required intent. This
         # could be the case when given multiple MSes, one of which could be
         # without an amplitude calibrator for instance.
         if not inputs.ms.get_fields(inputs.field, intent=inputs.intent):
-            LOG.warning('Field(s) \'%s\' in %s have no data with intent %s' % 
+            LOG.warning('Field(s) \'%s\' in %s have no data with intent %s' %
                         (inputs.field, inputs.ms.basename, inputs.intent))
             return result
 

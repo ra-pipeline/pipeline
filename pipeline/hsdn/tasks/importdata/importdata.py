@@ -28,6 +28,7 @@ class NROImportDataInputs(sd_importdata.SDImportDataInputs):
     This class extends importdata.ImportDataInputs.
     """
 
+    # docstring and type hints: supplements hsdn_importdata
     def __init__(self, context: Context, vis: Optional[List[str]]=None, output_dir: Optional[str]=None, session: Optional[List[str]]=None,
                  datacolumns: Optional[Dict]=None, overwrite: Optional[bool]=None, nocopy: Optional[bool]=None, createmms: Optional[str]=None,
                  hm_rasterscan: Optional[str] = None):
@@ -35,13 +36,55 @@ class NROImportDataInputs(sd_importdata.SDImportDataInputs):
 
         Args:
             context: pipeline context
-            vis: list of input visibility data
+
+            vis: List of visibility data files. These may be MSes,
+                or tar files of MSes.
+
+                Example: vis=['X227.ms', 'anyms.tar.gz']
+
             output_dir: path of output directory
-            session: list of visibility data sessions
-            overwrite: flag of overwrite existing files on import
-            nocopy: flag of disable copying of MS to working directory
-            createmms: operation string to create an MMS
-            hm_rasterscan: Heuristics method for raster scan analysis
+
+            session: List of sessions to which the visibility files belong.
+                Defaults to a single session containing all the visibility
+                files, otherwise a session must be assigned to each vis file.
+
+                Example: session=['Session_1', 'Sessions_2']
+
+            datacolumns: Dictionary defining the data types of existing columns.
+                The format is:
+
+                    {'data': 'data type 1'}
+
+                or
+
+                    {'data': 'data type 1', 'corrected': 'data type 2'}
+
+                For MSes one can define two different data types for the DATA and
+                CORRECTED_DATA columns and they can be any of the known data types
+                (RAW, REGCAL_CONTLINE_ALL, REGCAL_CONTLINE_SCIENCE,
+                SELFCAL_CONTLINE_SCIENCE, REGCAL_LINE_SCIENCE,
+                SELFCAL_LINE_SCIENCE, BASELINED, ATMCORR).
+                The intent selection strings _ALL or _SCIENCE can be skipped.
+                In that case the task determines this automatically by inspecting
+                the existing intents in the dataset.
+                Usually, a single datacolumns dictionary is used for all datasets.
+                If necessary, one can define a list of dictionaries, one for each MS,
+                with different setups per MS.
+                If no type is specified, {'data':'raw'} will be assumed.
+
+            overwrite: Overwrite existing files on import.
+                If overwrite=False and the MS already exists in output directory,
+                then this existing MS dataset will be used instead.
+
+            nocopy: Disable copying of MS to working directory.
+
+            createmms: Create an MMS
+
+            hm_rasterscan: Heuristics method for raster scan analysis.
+                Two analysis modes, time-domain analysis ('time') and
+                direction analysis ('direction'), are available.
+
+                Default: None (equivalent to 'time')
         """
         # no-op parameters for MS
         asis = ''

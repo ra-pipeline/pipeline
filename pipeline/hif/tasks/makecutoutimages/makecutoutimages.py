@@ -1,19 +1,16 @@
 import ast
+import collections
 import math
 import os
-import collections
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.imagelibrary as imagelibrary
-from pipeline.domain import DataType
-import pipeline.infrastructure.vdp as vdp
-from pipeline.infrastructure import casa_tasks
-from pipeline.infrastructure import task_registry
 import pipeline.infrastructure.utils as utils
-from pipeline.infrastructure import casa_tools
-from pipeline.infrastructure.utils import imstat_items
-from pipeline.infrastructure.utils import get_stokes
+import pipeline.infrastructure.vdp as vdp
+from pipeline.domain import DataType
+from pipeline.infrastructure import casa_tasks, casa_tools, task_registry
+from pipeline.infrastructure.utils import get_stokes, imstat_items
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -59,6 +56,7 @@ class MakecutoutimagesResults(basetask.Results):
                     spwlist=subitem['spwlist'], specmode=subitem['specmode'],
                     sourcetype=subitem['sourcetype'],
                     multiterm=subitem['multiterm'],
+                    metadata=subitem['metadata'],
                     imageplot=subitem['imageplot'])
                 if 'TARGET' in subitem['sourcetype']:
                     context.subimlist.add_item(imageitem)
@@ -81,7 +79,24 @@ class MakecutoutimagesInputs(vdp.StandardInputs):
     def offsettrc(self):
         return []   # Units of arcseconds
 
+    # docstring and type hints: supplements hif_makecutoutimages
     def __init__(self, context, vis=None, offsetblc=None, offsettrc=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            vis: List of visibility data files. These may be ASDMs, tar files of ASDMs, MSs,
+                or tar files of MSs.
+                If ASDM files are specified, they will be converted to
+                MS format.
+                example: vis=['X227.ms', 'asdms.tar.gz']
+
+            offsetblc: -x and -y offsets to the bottom lower corner (blc) in arcseconds
+
+            offsettrc: +x and +y offsets to the top right corner (trc) in arcseconds
+
+        """
         super(MakecutoutimagesInputs, self).__init__()
         self.context = context
         self.vis = vis
@@ -92,6 +107,7 @@ class MakecutoutimagesInputs(vdp.StandardInputs):
 @task_registry.set_equivalent_casa_task('hif_makecutoutimages')
 class Makecutoutimages(basetask.StandardTaskTemplate):
     Inputs = MakecutoutimagesInputs
+    is_multi_vis_task = True
 
     def prepare(self):
 
@@ -103,7 +119,7 @@ class Makecutoutimages(basetask.StandardTaskTemplate):
             if self.inputs.context.imaging_mode.startswith('VLASS-SE-CONT'):
                 is_vlass_se_cont = True
             if self.inputs.context.imaging_mode.startswith('VLASS-SE-CUBE'):
-                is_vlass_se_cube = True                
+                is_vlass_se_cube = True
         except Exception:
             pass
 
@@ -295,7 +311,7 @@ class Makecutoutimages(basetask.StandardTaskTemplate):
 
     def _do_stats(self, subimagenames):
         """Extract essential stats from images.
-        
+
         The return stats is a nested dictionary container: stats[spw_key][im_type][stats_type]
         """
         stats = collections.OrderedDict()

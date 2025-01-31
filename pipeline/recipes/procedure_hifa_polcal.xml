@@ -151,6 +151,20 @@
     </ProcessingCommand>
 
     <ProcessingCommand>
+        <Command xmlns="">hifa_renorm</Command>
+        <ParameterSet>
+            <Parameter>
+                <Keyword xmlns="">createcaltable</Keyword>
+                <Value xmlns="">True</Value>
+            </Parameter>
+            <Parameter>
+                <Keyword xmlns="">atm_auto_exclude</Keyword>
+                <Value xmlns="">True</Value>
+            </Parameter>
+        </ParameterSet>
+    </ProcessingCommand>
+
+    <ProcessingCommand>
         <Command xmlns="">hifa_targetflag</Command>
         <ParameterSet>
         </ParameterSet>
@@ -252,20 +266,6 @@
             <Parameter>
                 <Keyword xmlns="">maxproductsize</Keyword>
                 <Value xmlns="">500.0</Value>
-            </Parameter>
-        </ParameterSet>
-    </ProcessingCommand>
-
-    <ProcessingCommand>
-        <Command xmlns="">hifa_renorm</Command>
-        <ParameterSet>
-            <Parameter>
-                <Keyword xmlns="">apply</Keyword>
-                <Value xmlns="">True</Value>
-            </Parameter>
-            <Parameter>
-                <Keyword xmlns="">atm_auto_exclude</Keyword>
-                <Value xmlns="">True</Value>
             </Parameter>
         </ParameterSet>
     </ProcessingCommand>

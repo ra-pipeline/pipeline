@@ -1,5 +1,6 @@
 from .imageparams_alma import ImageParamsHeuristicsALMA
 from .imageparams_alma_scal import ImageParamsHeuristicsALMAScal
+from .imageparams_alma_srdp import ImageParamsHeuristicsALMASrdp
 from .imageparams_vlass_quick_look import ImageParamsHeuristicsVlassQl
 from .imageparams_vlass_single_epoch_continuum import ImageParamsHeuristicsVlassSeCont, ImageParamsHeuristicsVlassSeContAWPP001, ImageParamsHeuristicsVlassSeContMosaic
 from .imageparams_vlass_single_epoch_taper import ImageParamsHeuristicsVlassSeTaper
@@ -16,7 +17,9 @@ class ImageParamsHeuristicsFactory(object):
         if imaging_mode == 'ALMA':
             return ImageParamsHeuristicsALMA(vislist, spw, observing_run, imagename_prefix, proj_params, contfile, linesfile, imaging_params)
         if imaging_mode == 'ALMA-SCAL':
-            return ImageParamsHeuristicsALMAScal(vislist, spw, observing_run, imagename_prefix, proj_params, contfile, linesfile, imaging_params)            
+            return ImageParamsHeuristicsALMAScal(vislist, spw, observing_run, imagename_prefix, proj_params, contfile, linesfile, imaging_params)
+        if imaging_mode == 'ALMA-SRDP':
+            return ImageParamsHeuristicsALMASrdp(vislist, spw, observing_run, imagename_prefix, proj_params, contfile, linesfile, imaging_params)
         elif imaging_mode == 'VLASS-QL':  # quick look
             return ImageParamsHeuristicsVlassQl(vislist, spw, observing_run, imagename_prefix, proj_params, contfile, linesfile, imaging_params)
         elif imaging_mode in ['VLASS-SE-CONT', 'VLASS-SE-CONT-AWP-P032']:  # single epoch continuum

@@ -26,11 +26,48 @@ class UVcontSubInputs(vdp.StandardInputs):
 
     fitorder = vdp.VisDependentProperty(default={})
     intent = vdp.VisDependentProperty(default='TARGET')
-
+    field = vdp.VisDependentProperty(default='')
+    spw = vdp.VisDependentProperty(default='')
     parallel = sessionutils.parallel_inputs_impl(default=False)
 
+    # docstring and type hints: supplements hif_uvcontsub
     def __init__(self, context, output_dir=None, vis=None, field=None,
                  spw=None, intent=None, fitorder=None, parallel=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the h_init or hif_importdata task.
+                '': use all MeasurementSets in the context
+
+                Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
+
+            field: The list of field names or field ids for which UV continuum fits are computed. Defaults to all fields.
+
+                Examples: '3C279', '3C279,M82'
+
+            spw: The list of spectral windows and channels for which uv continuum fits are computed.
+                '', Defaults to all science spectral windows.
+
+                Example: '11,13,15,17'
+
+            intent: A string containing a comma delimited list of intents against which the selected fields are matched.
+
+                '': Defaults to all data with TARGET intent.
+
+            fitorder: Polynomial order for the continuum fits per source and spw. Defaults to {} which means fit order 1 for all sources and
+                spws. If an explicit dictionary is given then all unspecified
+                selections still default to 1.
+
+                Example: {'3C279': {'15': 1, '17': 2}, 'M82': {'13': 2}}
+
+            parallel: Execute using CASA HPC functionality, if available.
+
+        """
         self.context = context
         self.output_dir = output_dir
         self.vis = vis
@@ -52,6 +89,12 @@ class SerialUVcontSub(basetask.StandardTaskTemplate):
         # of the imaging heuristics methods to convert
         # frequency ranges to TOPO.
         MinimalTcleanHeuristicsInputsGenerator = namedtuple('MinimalTcleanHeuristicsInputs', 'vis field intent phasecenter spw spwsel_lsrk specmode')
+
+        # Check if this stage has been disabled for vla (never set for ALMA)
+        if inputs.context.vla_skip_mfs_and_cube_imaging:
+            result = UVcontSubResults()
+            result.skip_stage = True
+            return result
 
         # Check for size mitigation errors.
         if 'status' in inputs.context.size_mitigation_parameters:
@@ -167,9 +210,16 @@ class SerialUVcontSub(basetask.StandardTaskTemplate):
             fitspec[field_ids][real_spw]['fitorder'] = 1
 
             # Check for any user specified fit order.
+            user_fitorder = False
             if minimal_tclean_inputs.field in fitorder:
                 if minimal_tclean_inputs.spw in fitorder[minimal_tclean_inputs.field]:
                     fitspec[field_ids][real_spw]['fitorder'] = fitorder[minimal_tclean_inputs.field][minimal_tclean_inputs.spw]
+                    user_fitorder = True
+
+            # If there was no user defined fit order, check for hif_findcont flags.
+            if not user_fitorder:
+                if imaging_target['spwsel_low_bandwidth'] or imaging_target['spwsel_low_spread']:
+                    fitspec[field_ids][real_spw]['fitorder'] = 0
 
             # Collect fit order for weblog
             topo_freq_fitorder_dict[minimal_tclean_inputs.field][real_spw]['fitorder'] = fitspec[field_ids][real_spw]['fitorder']
@@ -213,7 +263,7 @@ class SerialUVcontSub(basetask.StandardTaskTemplate):
 
     def analyse(self, result):
 
-        if not result.mitigation_error:
+        if not result.mitigation_error and not result.skip_stage:
             # Check for existence of the output vis.
             if not os.path.exists(result.outputvis):
                 LOG.debug('Error creating science targets line MS %s' % (os.path.basename(result.outputvis)))
@@ -258,9 +308,10 @@ class UVcontSubResults(basetask.Results):
     def __init__(self):
         super().__init__()
         self.mitigation_error = False
+        self.skip_stage = False
         self.vis = None
         self.outputvis = None
-        self.field_intent_spw_list = None
+        self.field_intent_spw_list = []
         self.topo_freq_fitorder_dict = None
         self.line_mses = []
         self.casa_uvcontsub_result = None
@@ -268,6 +319,11 @@ class UVcontSubResults(basetask.Results):
         self.error_msg = ''
 
     def merge_with_context(self, context):
+        # Check to see if this stage was delibrately skipped
+        if self.skip_stage:
+            LOG.info("Skipping hif_uvcontsub due to VLA spectral lines MS not existing.")
+            return
+
         # Check for an output vis
         if not self.line_mses:
             LOG.error('No hif_uvcontsub results to merge')

@@ -34,7 +34,7 @@ class PriorcalsListQAHandler(pqa.QAPlugin):
     """
     QA handler for a list containing PriorcalsResults.
     """
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = resultobjects.PriorcalsResults
     generating_task = priorcals.Priorcals
 

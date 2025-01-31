@@ -8,15 +8,18 @@ import itertools
 import operator
 import os
 from functools import reduce
+from typing import Tuple
 
 import numpy as np
 from astropy.table import QTable
 
-from .. import casa_tools, logging
 from .conversion import flatten, spw_arg_to_id, to_pipeline_intent
+from .utils import list_to_str
+from .. import casa_tools, logging
 
 __all__ = ['OrderedDefaultdict', 'merge_td_columns', 'merge_td_rows', 'get_vis_from_plots', 'total_time_on_source',
-           'total_time_on_target_on_source', 'get_logrecords', 'get_intervals', 'table_to_html', 'plots_to_html']
+           'total_time_on_target_on_source', 'get_logrecords', 'get_intervals', 'table_to_html', 'plots_to_html',
+           'scale_uv_range']
 
 LOG = logging.get_logger(__name__)
 
@@ -180,7 +183,7 @@ def total_time_on_target_on_source(ms, autocorr_only=False):
                     if autocorr_only and a1 != a2:
                         continue
                     seltb = tb.query('DATA_DESC_ID == %d AND ANTENNA1 == %d AND ANTENNA2 == %d AND STATE_ID IN %s' % (
-                        dd, a1, a2, state_ids))
+                        dd, a1, a2, list_to_str(state_ids)))
                     try:
                         if seltb.nrows() == 0:
                             continue
@@ -221,7 +224,7 @@ def get_logrecords(result, loglevel):
     """
     try:
         # WeakProxy is registered as an Iterable (and a Container, Hashable, etc.)
-        # so we can't check for isinstance(result, collections.Iterable)
+        # so we can't check for isinstance(result, collections.abc.Iterable)
         # see https://bugs.python.org/issue24067
         _ = iter(result)
     except TypeError:
@@ -394,3 +397,26 @@ def plots_to_html(plots, title=None, alt=None, caption=None, group=None,
         plots_html.append(html)
 
     return plots_html
+
+
+def scale_uv_range(ms: 'MeasurementSet') -> Tuple['Distance', str]:
+    """
+    Return the UV range that captures the inner half of the data.
+
+    This function returns a 2-tuple with first value set to the UV range
+    as a domain object, and the second value set to a uvrange constraint
+    suitable for use in plotms calls.
+
+    :param ms: measurement set to analyse
+    :return: tuple of (UV range, plotms constraint)
+    """
+    # method=higher is preferred over method=nearest to ensure that the upper
+    # limit data point is included in the selection
+    uv_max = np.percentile(ms.antenna_array.baselines_m, 50, method='higher')
+    uv_range = f"<{uv_max}"
+
+    # domain.measures classes must be imported at runtime to avoid a circular
+    # dependency
+    from pipeline.domain.measures import Distance
+    from pipeline.domain.measures import DistanceUnits
+    return Distance(value=uv_max, units=DistanceUnits.METRE), uv_range

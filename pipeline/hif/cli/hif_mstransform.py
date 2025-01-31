@@ -3,12 +3,11 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
+# docstring and type hints: inherits from hif.tasks.mstransform.mstransform.MstransformInputs.__init__
 @utils.cli_wrapper
 def hif_mstransform(vis=None, outputvis=None, field=None, intent=None, spw=None, chanbin=None, timebin=None):
 
-    """
-    hif_mstransform ---- Create new MeasurementSets for science target imaging
-
+    """Create new MeasurementSets for science target imaging
 
     Create new MeasurementSets for imaging from the corrected column of the input
     MeasurementSet via a single call to mstransform with all data selection parameters.
@@ -16,53 +15,18 @@ def hif_mstransform(vis=None, outputvis=None, field=None, intent=None, spw=None,
     new MeasurementSet is not re-indexed to the selected data and the new MS will
     have the same source, field, and spw names and ids as it does in the parent MS.
 
-    Output
+    Returns:
+        The results object for the pipeline task is returned.
 
-    results -- The results object for the pipeline task is returned.
+    Examples:
+        1. Create a science target MS from the corrected column in the input MS.
 
-    --------- parameter descriptions ---------------------------------------------
+        >>> hif_mstransform()
 
-    vis           The list of input MeasurementSets. Defaults to the list of
-                  MeasurementSets specified in the h_init or hif_importdata task.
-                  '': use all MeasurementSets in the context
+        2. Make a phase and bandpass calibrator targets MS from the corrected
+        column in the input MS.
 
-                  Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
-    outputvis     The list of output transformed MeasurementSets to be used for
-                  imaging. The output list must be the same length as the input
-                  list. The default output name defaults to
-                  <msrootname>_targets.ms
-
-                  Examples: 'ngc5921.ms',
-                            ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
-    field         Select fields name(s) or id(s) to transform. Only fields with
-                  data matching the intent will be selected.
-
-                  Examples: '3C279', 'Centaurus*', '3C279,J1427-421'
-    intent        Select intents for which associated fields will be imaged.
-                  By default only TARGET data is selected.
-
-                  Examples: 'PHASE,BANDPASS'
-    spw           Select spectral window/channels to image. By default all
-                  science spws for which the specified intent is valid are
-                  selected .
-    chanbin       Width (bin) of input channels to average to form an output
-                  channel. If chanbin > 1 then chanaverage is automatically
-                  switched to True.
-    timebin       Bin width for time averaging. If timebin > 0s then
-                  timeaverage is automatically switched to True.
-
-    --------- examples -----------------------------------------------------------
-
-
-    1. Create a science target MS from the corrected column in the input MS.
-
-    >>> hif_mstransform()
-
-    2. Make a phase and bandpass calibrator targets MS from the corrected
-    column in the input MS.
-
-    >>> hif_mstransform(intent='PHASE,BANDPASS')
-
+        >>> hif_mstransform(intent='PHASE,BANDPASS')
 
     """
 

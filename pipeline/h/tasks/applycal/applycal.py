@@ -71,9 +71,59 @@ class ApplycalInputs(vdp.StandardInputs):
         science_spws = self.ms.get_spectral_windows(with_channels=True)
         return ','.join([str(spw.id) for spw in science_spws])
 
+    # docstring and type hints: supplements h_applycal
     def __init__(self, context, output_dir=None, vis=None, field=None, spw=None, antenna=None, intent=None,
                  parang=None, applymode=None, flagbackup=None, flagsum=None, flagdetailedsum=None,
                  parallel=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets in the pipeline context.
+                example: ['X227.ms']
+
+            field: A string containing the list of field names or field ids to which the calibration will be applied. Defaults to all fields in the pipeline
+                context.
+                example: '3C279', '3C279, M82'
+
+            spw: The list of spectral windows and channels to which the calibration will be applied. Defaults to all science windows in the pipeline
+                context.
+                example: '17', '11, 15'
+
+            antenna: The selection of antennas to which the calibration will be applied. Defaults to all antennas. Not currently supported.
+
+            intent: A string containing the list of intents against which the selected fields will be matched. Defaults to all supported intents
+                in the pipeline context.
+                example: `'*TARGET*'`
+
+            parang: Apply parallactic angle correction
+
+            applymode: Calibration apply mode
+
+                - 'calflag': calibrate data and apply flags from solutions
+                - 'calflagstrict': (default) same as above except flag spws for which calibration is
+                  unavailable in one or more tables (instead of allowing them to pass
+                  uncalibrated and unflagged)
+                - 'trial': report on flags from solutions, dataset entirely unchanged
+                - 'flagonly': apply flags from solutions only, data not calibrated
+                - 'flagonlystrict': same as above except flag spws for which calibration is
+                  unavailable in one or more tables
+                - 'calonly': calibrate data only, flags from solutions NOT applied
+
+            flagbackup: Backup the flags before the apply
+
+            flagsum: Compute before and after flagging summary statistics
+
+            flagdetailedsum: Compute detailed before and after flagging statistics summaries. Parameter available only when if flagsum is True.
+
+            parallel: Execute using CASA HPC functionality, if available. options: 'automatic', 'true', 'false', True, False
+                default: None (equivalent to False)
+
+        """
         super().__init__()
 
         # pipeline inputs

@@ -3,7 +3,7 @@
 #
 # This module creates HTML summary of currently available tasks.
 # The summary is based on XML files in <modules>/cli where 
-# <modules> is h, hif, hifa, hifas, hifv, and hsd.
+# <modules> is h, hif, hifa, hifv, and hsd.
 #
 # USAGE:
 #    import pipeline.infrastructure.docutils.createTaskList as tu
@@ -23,7 +23,6 @@ mapper = collections.defaultdict(lambda x: '',
                                  h='generic',
                                  hif='generic interferometric',
                                  hifa='ALMA-specific interferometric',
-                                 hifas='ALMA-specific SRDP interferometric',
                                  hifv='VLA-specific interferometric',
                                  hsd='single-dish')
 
@@ -334,7 +333,6 @@ class hetaskutil3(hetaskutil):
         super(hetaskutil3, self).__init__(dirname=dirname)
         self.addmodule('h', 'Generic')
         self.addmodule('hifa', 'Interferometry ALMA')
-        self.addmodule('hifas', 'Interferometry ALMA SRDP')
         self.addmodule('hifv', 'Interferometry VLA')
         self.addmodule('hif', 'Interferometry Generic')
         # TODO: should be uncommented when NRO specific tasks are available

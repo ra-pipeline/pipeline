@@ -26,6 +26,18 @@ maxAR_v = cqa.getvalue(cqa.convert(result[0].maxAcceptableAngResolution, 'arcsec
 minAR = '%#.3g arcsec' % (minAR_v)
 maxAR = '%#.3g arcsec' % (maxAR_v)
 maxBR_v = cqa.getvalue(result[0].maxAllowedBeamAxialRatio)[0]
+
+# SRDP user-specified min/max angular resolution
+user_minAR, userMaxAR = None, None
+if result[0].user_minAcceptableAngResolution:
+    user_minAR_v = cqa.getvalue(cqa.convert(result[0].user_minAcceptableAngResolution, 'arcsec'))
+    user_minAR = '%#.3g arcsec' % (user_minAR_v)
+
+if result[0].user_maxAcceptableAngResolution:
+    user_maxAR_v = cqa.getvalue(cqa.convert(result[0].user_maxAcceptableAngResolution, 'arcsec'))
+    user_maxAR = '%#.3g arcsec' % (user_maxAR_v)
+
+user_maxBR_v = cqa.getvalue(result[0].user_maxAllowedBeamAxialRatio)[0]
 sensitivityGoal_v = cqa.getvalue(cqa.convert(result[0].sensitivityGoal, 'mJy'))
 sensitivityGoal = '%#.3g mJy' % (sensitivityGoal_v)
 robust = '%.1f' % (result[0].hm_robust)
@@ -65,6 +77,7 @@ Min / Max Acceptable Resolution:
 %else:
     ${minAR} / ${maxAR}
 %endif
+
 <br>
 Maximum expected beam axial ratio (from OT):
 %if maxBR_v==0.0:
@@ -89,6 +102,17 @@ Single Continuum:
     ${single_continuum}
 %else:
     Not available
+%endif
+
+<!-- Only include the user-entered min and max angular resolution for SRDP -->
+%if user_minAR and user_maxAR: 
+ %if not(user_minAR_v==0.0 and user_maxAR_v==0.0):
+    <p>
+    <h4>Goals From User:</h4>
+    Min / Max Acceptable Resolution:
+        ${user_minAR} / ${user_maxAR}
+    <p>
+ %endif
 %endif
 
 <h4>Estimated Synthesized Beam and Sensitivities for the Representative

@@ -32,7 +32,27 @@ class SessionRefAntInputs(vdp.StandardInputs):
     # during a CASA gaincal the specified reference antenna was overridden.
     phase_threshold = vdp.VisDependentProperty(default=0.005)
 
+    # docstring and type hints: supplements hifa_session_refant
     def __init__(self, context, output_dir=None, vis=None, phase_threshold=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            vis: List of input MeasurementSets. Defaults to the list of
+                MeasurementSets specified in the pipeline context.
+
+                Example: vis=['ngc5921.ms']
+
+            phase_threshold: Threshold (in degrees) used to identify absolute phase
+                solution outliers in caltables.
+
+                Example: phase_threshold=0.005
+
+        """
         self.context = context
         self.output_dir = output_dir
         self.vis = vis

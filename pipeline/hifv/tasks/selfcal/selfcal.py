@@ -49,8 +49,33 @@ class SelfcalInputs(vdp.StandardInputs):
         else:
             return unprocessed
 
+    # docstring and type hints: supplements hifv_selfcal
     def __init__(self, context, vis=None, refantignore=None, combine=None, selfcalmode=None, refantmode=None,
                  overwrite_modelcol=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the h_init or hifv_importdata task.
+
+            refantignore: String list of antennas to ignore.
+
+            combine: Data axes which to combine for solve.
+                Options: '','obs','scan','spw',field', or any
+                comma-separated combination in a single string
+                Example: combine='scan,spw' - Extend solutions
+                over scan boundaries (up to the solint), and
+                combine spws for solving.
+                In selfcalmode='VLASS-SE' use the default value.
+
+            selfcalmode: Heuristics mode selection. Known modes are 'VLASS' and 'VLASS-SE'. Default value is 'VLASS'.
+
+            refantmode: Reference antenna mode.
+
+            overwrite_modelcol: Always write the model column, even if it already exists.
+
+        """
         self.context = context
         self.vis = vis
         self.refantignore = refantignore

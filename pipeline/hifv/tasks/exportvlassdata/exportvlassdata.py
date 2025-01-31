@@ -9,7 +9,7 @@ import traceback
 
 import numpy as np
 
-import xml.etree.cElementTree as eltree
+import xml.etree.ElementTree as eltree
 import astropy.io.fits as apfits
 
 import pipeline as pipeline
@@ -61,8 +61,36 @@ class ExportvlassdataInputs(exportdata.ExportDataInputs):
     gainmap = vdp.VisDependentProperty(default=False)
     processing_data_type = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
+    # docstring and type hints: supplements hifv_exportvlassdata
     def __init__(self, context, output_dir=None, session=None, vis=None, exportmses=None, pprfile=None, calintents=None,
                  calimages=None, targetimages=None, products_dir=None, gainmap=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            session:
+
+            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the h_init or hifv_importdata task.
+
+            exportmses:
+
+            pprfile:
+
+            calintents:
+
+            calimages:
+
+            targetimages:
+
+            products_dir:
+
+            gainmap:
+
+        """
         super(ExportvlassdataInputs, self).__init__(context, output_dir=output_dir, session=session, vis=vis,
                                                     exportmses=exportmses, pprfile=pprfile, calintents=calintents,
                                                     calimages=calimages, targetimages=targetimages,

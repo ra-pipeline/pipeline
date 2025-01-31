@@ -33,7 +33,7 @@ class PlotSummaryListQAHandler(pqa.QAPlugin):
     """
     QA handler for a list containing PlotSummaryResults.
     """
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = plotsummary.PlotSummaryResults
     generating_task = plotsummary.PlotSummary
 

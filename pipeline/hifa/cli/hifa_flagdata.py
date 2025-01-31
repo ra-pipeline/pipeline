@@ -3,14 +3,13 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
+# docstring and type hints: inherits from hifa.tasks.flagging.flagdeteralma.FlagDeterALMAInputs.__init__
 @utils.cli_wrapper
 def hifa_flagdata(vis=None, autocorr=None, shadow=None, tolerance=None, scan=None, scannumber=None, intents=None,
                   edgespw=None, fracspw=None, fracspwfps=None, online=None, partialpol=None, lowtrans=None,
                   mintransrepspw=None, mintransnonrepspws=None, fileonline=None, template=None, filetemplate=None,
                   hm_tbuff=None, tbuff=None, qa0=None, qa2=None, flagbackup=None):
-    """
-    hifa_flagdata ---- Do metadata based flagging of a list of MeasurementSets.
-
+    """Do metadata based flagging of a list of MeasurementSets.
 
     The hifa_flagdata data performs basic flagging operations on a list of
     measurements including:
@@ -43,100 +42,18 @@ def hifa_flagdata(vis=None, autocorr=None, shadow=None, tolerance=None, scan=Non
       in order to achieve 1875 MHz bandwidth (in effect, they are flagged by
       62.5 MHz on each side), and thus no warning is generated.
 
-    Output:
+    Returns:
+        The results object for the pipeline task is returned.
 
-        results -- The results object for the pipeline task is returned.
+    Examples:
+        1. Do basic flagging on a MeasurementSet:
 
-    --------- parameter descriptions ---------------------------------------------
+        >>> hifa_flagdata()
 
-    vis
-                       The list of input MeasurementSets. Defaults to the list of
-                       MeasurementSets defined in the pipeline context.
-    autocorr
-                       Flag autocorrelation data.
-    shadow
-                       Flag shadowed antennas.
-    tolerance
-                       Amount of antenna shadowing tolerated, in meters. A positive number
-                       allows antennas to overlap in projection. A negative number forces antennas
-                       apart in projection. Zero implies a distance of radius_1+radius_2 between
-                       antenna centers.
-    scan
-                       Flag a list of specified scans.
-    scannumber
-                       A string containing a comma delimited list of scans to be
-                       flagged.
+        2. Do basic flagging on a MeasurementSet flagging additional scans selected
+        by number as well:
 
-                       Example: scannumber='3,5,6'
-    intents
-                       A string containing a comma delimited list of intents against
-                       which the scans to be flagged are matched.
-
-                       Example: intents='`*BANDPASS*`'
-    edgespw
-                       Flag the edge spectral window channels.
-    fracspw
-                       Fraction of channels to flag at both edges of TDM spectral windows.
-    fracspwfps
-                       Fraction of channels to flag at both edges of ACA TDM
-                       spectral windows that were created with the earlier (original)
-                       implementation of the frequency profile synthesis (FPS) algorithm.
-    online
-                       Apply the online flags.
-    partialpol
-                       Identify integrations in multi-polarisation data where part
-                       of the polarization products are already flagged, and flag the other
-                       polarization products in those integrations.
-    lowtrans
-                       Flag spectral windows for which a significant fraction of
-                       the channels have atmospheric transmission below the
-                       threshold (``mintransrepspw``, ``mintransnonrepspws``).
-    mintransnonrepspws
-                       This atmospheric transmissivity threshold is used to flag
-                       a non-representative science spectral window when more than 60% of
-                       its channels have a transmissivity below this level.
-    mintransrepspw
-                       This atmospheric transmissivity threshold is used to flag the
-                       representative science spectral window when more than 60% of its channels
-                       have a transmissivity below this level.
-    fileonline
-                       File containing the online flags. These are computed by the
-                       h_init or hif_importdata data tasks. If the online flags files
-                       are undefined a name of the form 'msname.flagonline.txt' is assumed.
-    template
-                       Apply flagging templates
-    filetemplate
-                       The name of a text file that contains the flagging template
-                       for RFI, birdies, telluric lines, etc. If the template flags files
-                       is undefined a name of the form 'msname.flagtemplate.txt' is assumed.
-    hm_tbuff
-                       The heuristic for computing the default time interval padding
-                       parameter. The options are 'halfint' and 'manual'. In 'halfint' mode tbuff
-                       is set to half the maximum of the median integration time of the science
-                       and calibrator target observations. The value of 0.048 seconds is
-                       subtracted from the lower time limit to accommodate the behavior of the
-                       ALMA Control system.
-    tbuff
-                       The time in seconds used to pad flagging command time
-                       intervals if ``hm_tbuff`` = 'manual'. The default in
-                       manual mode is no flagging.
-    qa0
-                       QA0 flags.
-    qa2
-                       QA2 flags.
-    flagbackup
-                       Back up any pre-existing flags.
-
-    --------- examples -----------------------------------------------------------
-
-    1. Do basic flagging on a MeasurementSet:
-
-    >>> hifa_flagdata()
-
-    2. Do basic flagging on a MeasurementSet flagging additional scans selected
-    by number as well:
-
-    >>> hifa_flagdata(scannumber='13,18')
+        >>> hifa_flagdata(scannumber='13,18')
 
     """
     ##########################################################################

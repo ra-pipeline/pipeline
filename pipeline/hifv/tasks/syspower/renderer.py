@@ -115,6 +115,10 @@ class T2_4MDetailssyspowerRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             ms = os.path.basename(result.inputs['vis'])
 
             if result.template_table:
+                # PIPE-2184: plot data points only for science scans
+                m = context.observing_run.get_ms(ms)
+                science_scan_ids = ','.join(str(scan.id) for scan in m.scans
+                                            if not {'SYSTEM_CONFIGURATION', 'UNSPECIFIED#UNSPECIFIED', 'FOCUS', 'POINTING'} & scan.intents)
 
                 for band in result.template_table:
                     plotter = syspowerdisplay.syspowerBoxChart(context, result, result.dat_common[band], band)
@@ -152,7 +156,7 @@ class T2_4MDetailssyspowerRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
                     plotter = syspowerdisplay.syspowerPerAntennaChart(context, result, 'spgain',
                                                                       result.plotrq, 'syspower', 'rq',
-                                                                      band, spw, selectbasebands)
+                                                                      band, spw, selectbasebands, science_scan_ids)
                     plots = plotter.plot()
                     json_path = plotter.json_filename
 
@@ -169,7 +173,7 @@ class T2_4MDetailssyspowerRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                     # plot template pdiff table
                     plotter = syspowerdisplay.syspowerPerAntennaChart(context, result, 'spgain',
                                                                       result.template_table[band], 'syspower', 'pdiff',
-                                                                      band, spw, selectbasebands)
+                                                                      band, spw, selectbasebands, science_scan_ids)
                     plots = plotter.plot()
                     json_path = plotter.json_filename
 

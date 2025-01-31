@@ -84,7 +84,7 @@ def make_parang_plots(context, result):
                 task_args['plotfile'] = plot_name
 
             task = casa_tasks.plotms(**task_args)
-            Executor(context, False).execute(task)
+            Executor(context).execute(task)
 
             clearplots = False
 

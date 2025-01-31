@@ -34,7 +34,7 @@ class MstransformListQAHandler(pqa.QAPlugin):
     """
     QA handler for a list containing MstransformResults.
     """
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = mstransform.MstransformResults
     generating_task = mstransform.Mstransform
 

@@ -3,29 +3,19 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
+# docstring and type hints: inherits from hifv.tasks.plotsummary.plotsummary.PlotSummaryInputs.__init__
 @utils.cli_wrapper
 def hifv_plotsummary(vis=None):
 
-    """
-    hifv_plotsummary ---- Create pipeline summary plots
+    """Create pipeline summary plots.
 
-    Create pipeline summary plots
+    Returns:
+        The results object for the pipeline task is returned.
 
-    Output:
+    Examples:
+        1. Execute the pipeline plotting task:
 
-    results -- The results object for the pipeline task is returned.
-
-    --------- parameter descriptions ---------------------------------------------
-
-    vis           List of input visibility data
-
-    --------- examples -----------------------------------------------------------
-
-
-    1. Execute the pipeline plotting task.
-
-    >>> hifv_plotsummary()
-
+        >>> hifv_plotsummary()
 
     """
 

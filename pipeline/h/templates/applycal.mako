@@ -24,6 +24,8 @@ total_keys = {
     'POLANGLE'     : 'Polarization angle',
     'POLLEAKAGE'   : 'Polarization leakage',
 	'CHECK'		   : 'Check',
+    'DIFFGAINREF'  : 'Diffgain reference',
+    'DIFFGAINSRC'  : 'Diffgain on-source',
 }
 
 def template_agent_header1(agent):
@@ -177,6 +179,9 @@ def format_spwmap(spwmap, scispws):
     <i>Intents</i> column. If a field name is ambiguous and does not uniquely identify a field, e.g., when a field is
     observed with multiple intents, then the unambiguous field ID is listed instead of the field name. The order of
     entries in the <i>Fields</i> and <i>Intents</i> columns has no significance.</p>
+% if parang:
+    <p>Applycal was invoked with parang=True.</p>
+% endif
 <table class="table table-bordered table-striped table-condensed"
 	   summary="Applied Calibrations">
 	<caption>Applied Calibrations</caption>
@@ -608,7 +613,7 @@ def format_spwmap(spwmap, scispws):
 
 	<%def name="ms_preamble(ms)">
 	% if uv_max[ms].value > 0.0:
-        <p>Calibrated amplitude vs frequency plots for the each measurement
+        <p>Calibrated amplitude vs frequency plots for each measurement
             set's representative source. For mosaics, the representative field is
             identified as the field with the highest median channel-averaged amplitude,
             calculated over all science spectral windows. The atmospheric transmission
@@ -664,11 +669,10 @@ def format_spwmap(spwmap, scispws):
 	</%def>
 
 	<%def name="preamble()">
-        <p>Calibrated amplitude vs frequency plots for the each measurement
+        <p>Calibrated amplitude vs frequency plots for each measurement
             set's representative source. For mosaics, the representative field is
             identified as the field with the highest median channel-averaged amplitude,
-            calculated over all science spectral windows. The atmospheric transmission
-            for each spectral window is overlayed on each plot in pink.</p>
+            calculated over all science spectral windows.</p>
 		<p>Data are plotted for all antennas and correlations, with different
 		spectral windows shown in different colours.</p>
 	</%def>

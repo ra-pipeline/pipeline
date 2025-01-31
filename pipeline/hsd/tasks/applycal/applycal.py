@@ -30,6 +30,7 @@ class SDApplycalInputs(ApplycalInputs):
     flagdetailedsum = vdp.VisDependentProperty(default=True)
     intent = vdp.VisDependentProperty(default='TARGET')
 
+    # docstring and type hints: supplements hsd_applycal
     def __init__(self,
                  context: 'Context',
                  output_dir: Optional[str] = None,
@@ -48,20 +49,62 @@ class SDApplycalInputs(ApplycalInputs):
 
         Args:
             context: Pipeline context.
+
             output_dir: Output directory.
-            vis: Name of MS or list of MS names.
-            field: Field selection.
-            spw: Spectral window (spw) selection.
-            antenna: Antenna selection.
-            intent: Observing intent selection.
+
+            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets in the pipeline context.
+
+                Example: ['X227.ms']
+
+            field: A string containing the list of field names or field ids to which the calibration will be applied.
+                Defaults to all fields in the pipeline context.
+
+                Example: '3C279', '3C279, M82'
+
+            spw: The list of spectral windows and channels to which the calibration will be applied.
+                Defaults to all science windows in the pipeline context.
+
+                Example: '17', '11, 15'
+
+            antenna: The selection of antennas to which the calibration will be applied.
+                Defaults to all antennas. Not currently supported.
+
+            intent: A string containing the list of intents against which the selected fields will be matched.
+                Defaults to all supported intents in the pipeline context.
+
+                Example: `'*TARGET*'`
+
             parang: Apply parallactic angle correction. Not used.
-            applymode: Calibration mode. Defaults to 'calflagstrict'.
-            flagbackup: Automatically back up flag state before run. Defaults to True.
-            flagsum: Run flagdata task for flagging summary. Defaults to True.
-            flagdetailedsum: Generate detailed flagging summary. Defaults to False.
+
+            applymode: Calibration apply mode.
+
+                - 'calflag': calibrate data and apply flags from solutions.
+                - 'calflagstrict': same as above except flag spws for which calibration is
+                  unavailable in one or more tables (instead of allowing them to pass
+                  uncalibrated and unflagged). This is the default applymode.
+                - 'trial': report on flags from solutions, dataset entirely unchanged.
+                - 'flagonly': apply flags from solutions only, data not calibrated.
+                - 'flagonlystrict': same as above except flag spws for which calibration is
+                  unavailable in one or more tables.
+                - 'calonly': calibrate data only, flags from solutions NOT applied.
+
+            flagbackup: Backup the flags before the apply.
+
+                Default: None (equivalent to True)
+
+            flagsum: Run flagdata task for flagging summary.
+
+                Default: None (equivalent to True)
+
+            flagdetailedsum: Generate detailed flagging summary.
+
+                Default: None (equivalent to False)
+
             parallel: Execute using CASA HPC functionality, if available.
-                      Default is None, which intends to turn on parallel
-                      processing if possible.
+                Default is None, which is equivalent to 'automatic' that intends to
+                turn on parallel processing if possible.
+
+                Options: 'automatic', 'true', 'false', True, False
         """
         super().__init__(
             context, output_dir=output_dir, vis=vis,

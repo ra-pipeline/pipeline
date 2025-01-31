@@ -89,7 +89,7 @@ class testBPdcalsListQAHandler(pqa.QAPlugin):
     """
     QA handler for a list containing testBPdcalsResults.
     """
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = testBPdcalsResults
 
     def handle(self, context, result):

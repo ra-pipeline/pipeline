@@ -5,6 +5,7 @@ import time
 import types
 import functools
 from contextlib import contextmanager
+from typing import Optional, Union, List
 
 from casatasks import casalog
 
@@ -375,10 +376,12 @@ class Code(object):
         self.co_filename = code.co_filename
         self.co_name = code.co_name
 
+
 class Frame(object):
     def __init__(self, frame):
         self.f_globals = {"__file__": frame.f_globals["__file__"]}
         self.f_code = Code(frame.f_code)
+
 
 class Traceback(object):
     def __init__(self, tb):
@@ -391,19 +394,59 @@ class Traceback(object):
 
 
 @contextmanager
-def log_level(name, level=logging.WARNING):
+def log_level(name, level=logging.WARNING, filter=None):
     """Context manager to temporarily adjust the logging level of a logger.
     
-    The default level is WARNING, which means that all messages with level<=30 is filtered.
-    """
+    This context manager allows you to set a temporary logging level and 
+    optionally apply a logging filter to a logger. Once the context is 
+    exited, the logger's original logging level and filters are restored.
 
+    Parameters:
+    name (str): The name of the logger to adjust.
+    level (int, optional): The logging level to set for the logger. 
+                           Defaults to logging.WARNING (30).
+    filter (logging.Filter, optional): A logging filter to add to the logger.
+                                       Defaults to None.
+    
+    Usage example:
+    with log_level('my_logger', logging.DEBUG):
+        # The logger 'my_logger' will use DEBUG level within this block
+        pass
+
+    The default level is WARNING, which means that all messages with 
+    level <= 30 are filtered.
+
+    """
     logger = logging.getLogger(name)
     current_level = logger.getEffectiveLevel()
-    logger.setLevel(level)
+    if level is not None:
+        logger.setLevel(level)
+    if filter is not None:
+        logger.addFilter(filter)
     try:
         yield
     finally:
-        logger.setLevel(current_level)
+        if level is not None:
+            logger.setLevel(current_level)
+        if filter is not None:
+            logger.removeFilter(filter)
+
+
+@contextmanager
+def log_filtermsg(msglist: Union[str, List[str]]):
+    """Context manager to temporarily filter out specific messages from the CASA global logger.
+    
+    Note (as of CASA ver6.6.1):
+    * The use of this function will clear the list of message filters rather than reset back to 
+      the initial state due to the limitation of casalog API.
+    * casalog.filterMsg(None) will not alter/clear the internal filter list.
+    * Each casalog.filterMsg(msg) call will add additional element(s) in the filter.
+    """
+    casalog.filterMsg(msglist)
+    try:
+        yield
+    finally:
+        casalog.clearFilterMsgList()
 
 
 LOG = get_logger(__name__)

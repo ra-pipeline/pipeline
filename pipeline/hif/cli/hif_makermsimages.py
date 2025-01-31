@@ -2,34 +2,21 @@ import sys
 
 import pipeline.h.cli.utils as utils
 
-
+# docstring and type hints: inherits from hif.tasks.makermsimages.makermsimages.MakermsimagesInputs.__init__
 @utils.cli_wrapper
 def hif_makermsimages(vis=None):
 
-    """
-    hif_makermsimages ---- Create RMS images for VLASS data.
+    """Create RMS images for VLASS data.
 
     Create RMS images for VLASS data.
 
-    Output:
+    Returns:
+        The results object for the pipeline task is returned.
 
-    results -- The results object for the pipeline task is returned.
+    Examples:
+        1. Basic makermsimages task
 
-    --------- parameter descriptions ---------------------------------------------
-
-    vis           List of visibility data files. These may be ASDMs, tar files of ASDMs,
-                  MSs, or tar files of MSs, If ASDM files are specified, they will be
-                  converted  to MS format.
-
-                  example: vis=['X227.ms', 'asdms.tar.gz']
-
-    --------- examples -----------------------------------------------------------
-
-
-    1. Basic makermsimages task
-
-    >>> hif_makermsimages()
-
+        >>> hif_makermsimages()
 
     """
 

@@ -4,7 +4,6 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.vdp as vdp
 from pipeline.h.heuristics import caltable as caltable_heuristic
-from pipeline.infrastructure import task_registry
 from . import csvfilereader
 from . import worker
 
@@ -98,8 +97,6 @@ class SDAmpCalResults(basetask.Results):
         return s
 
 
-@task_registry.set_equivalent_casa_task('hsd_k2jycal')
-@task_registry.set_casa_commands_comment('The calibration tables to correct scale differences between beams are generated.')
 class SDAmpCal(basetask.StandardTaskTemplate):
     Inputs = SDAmpCalInputs
 

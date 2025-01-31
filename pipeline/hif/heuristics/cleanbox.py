@@ -102,7 +102,7 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
 
         LOG.info('Residual max: %s min: %s' % (residual_max, residual_min))
 
-        residual_stats = image.statistics(robust=True)
+        residual_stats = image.statistics(robust=True, excludepix=0.0)
         residual_robust_rms = residual_stats['medabsdevmed'][0] * 1.4826  # see CAS-9631
         LOG.debug('residual scaled MAD: %s' % residual_robust_rms)
 
@@ -223,7 +223,7 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
                     freq_axis = -1
             lcs.done()
             nonpbcor_image_non_cleanmask_freq_ch1 = qaTool.quantity(imhead['refval'][freq_axis] - imhead['refpix'][freq_axis] * imhead['incr'][freq_axis], imhead['axisunits'][freq_axis])
-            nonpbcor_image_non_cleanmask_freq_chN = qaTool.quantity(imhead['refval'][freq_axis] + (imhead['shape'][freq_axis] - imhead['refpix'][freq_axis]) * imhead['incr'][freq_axis], imhead['axisunits'][freq_axis])
+            nonpbcor_image_non_cleanmask_freq_chN = qaTool.quantity(imhead['refval'][freq_axis] + (imhead['shape'][freq_axis] - 1 - imhead['refpix'][freq_axis]) * imhead['incr'][freq_axis], imhead['axisunits'][freq_axis])
             # Get the spectral reference. Unfortunately this is coded in text
             # messages rather than a key/value pair. Hence the parsing code.
             try:
@@ -288,7 +288,7 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
                 nonpbcor_image_statsmask = statsmask
 
                 # Filter continuum frequency ranges if given
-                if cont_freq_ranges not in (None, '', 'NONE', 'ALL'):
+                if cont_freq_ranges not in (None, '', 'NONE', 'ALL', 'ALLCONT'):
                     # TODO: utils.freq_selection_to_channels uses casa_tools.image to get the frequency axis
                     #       and closes the global pipeline image tool. The context manager wrapped tool
                     #       used in this "with" statement is a different instance, so this is OK, but stacked

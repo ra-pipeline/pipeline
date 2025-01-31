@@ -1,10 +1,11 @@
 import os
 
-import numpy
+import numpy as np
 
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 from pipeline.infrastructure import casa_tools
+
 from . import display
 
 LOG = logging.get_logger(__name__)
@@ -14,8 +15,8 @@ class T2_4MDetailsMakecutoutimagesRenderer(basetemplates.T2_4MDetailsDefaultRend
     def __init__(self, uri='makecutoutimages.mako',
                  description='Produce cutout images',
                  always_rerender=False):
-        super(T2_4MDetailsMakecutoutimagesRenderer, self).__init__(uri=uri,
-                description=description, always_rerender=always_rerender)
+        super().__init__(uri=uri,
+                         description=description, always_rerender=always_rerender)
 
     def update_mako_context(self, ctx, context, results):
         weblog_dir = os.path.join(context.report_dir,
@@ -27,53 +28,43 @@ class T2_4MDetailsMakecutoutimagesRenderer(basetemplates.T2_4MDetailsDefaultRend
 
         # Get results info
         info_dict = {}
-
-        # Holds a mapping of image name to image stats. This information is used to scale the MOM8 images.
-        image_stats = {}
-
         subplots = {}
 
-        for r in results:
-            subimagenames = r.subimagenames
+        result = results[0]
 
-            for subimagename in subimagenames:
-                image_path = subimagename
-                LOG.info('Getting properties of %s for the weblog.' % (image_path))
+        for subimagename in result.subimagenames:
+            image_path = subimagename
+            LOG.info('Getting properties of %s for the weblog.' % (image_path))
 
-                with casa_tools.ImageReader(image_path) as image:
-                    info = image.miscinfo()
-                    spw = info.get('virtspw', None)
-                    field = ''
-                    #if 'field' in info:
-                    #    field = '%s (%s)' % (info['field'], r.intent)
+            with casa_tools.ImageReader(image_path) as image:
+                info = image.miscinfo()
+                spw = info.get('virtspw', None)
+                field = ''
+                coordsys = image.coordsys()
+                coord_names = np.array(coordsys.names())
+                coord_refs = coordsys.referencevalue(format='s')
+                coordsys.done()
+                pol = coord_refs['string'][coord_names == 'Stokes'][0]
+                info_dict[(field, spw, pol, 'image name')] = image.name(strippath=True)
 
-                    coordsys = image.coordsys()
-                    coord_names = numpy.array(coordsys.names())
-                    coord_refs = coordsys.referencevalue(format='s')
-                    coordsys.done()
-                    pol = coord_refs['string'][coord_names == 'Stokes'][0]
-                    info_dict[(field, spw, pol, 'image name')] = image.name(strippath=True)
+        image_size = result.image_size
+        # Make the plots of the rms images
+        plotter = display.CutoutimagesSummary(context, result)
+        plots = plotter.plot()
+        # PIPE-631: Weblog thumbnails are sorted according 'isalpha' parameter.
+        for p in plots:
+            if ".alpha" in p.basename:
+                p.parameters['isalpha'] = 1
+            else:
+                p.parameters['isalpha'] = 0
 
-                    stats = image.statistics(robust=False)
-                    beam = image.restoringbeam()
+        mslist_str = '<br>'.join([os.path.basename(vis) for vis in result.inputs['vis']])
+        subplots[mslist_str] = plots
 
-            image_size = r.image_size
-            # Make the plots of the rms images
-            plotter = display.CutoutimagesSummary(context, r)
-            plots = plotter.plot()
-            # PIPE-631: Weblog thumbnails are sorted according 'isalpha' parameter.
-            for p in plots:
-                if ".alpha" in p.basename:
-                    p.parameters['isalpha'] = 1
-                else:
-                    p.parameters['isalpha'] = 0
-            ms = os.path.basename(r.inputs['vis'])
-            subplots[ms] = plots
-
-        ctx.update({'subplots'     : subplots,
-                    'info_dict' : info_dict,
-                    'dirname'   : weblog_dir,
-                    'plotter'   : plotter,
+        ctx.update({'subplots': subplots,
+                    'info_dict': info_dict,
+                    'dirname': weblog_dir,
+                    'plotter': plotter,
                     'image_size': image_size})
 
 
@@ -97,45 +88,47 @@ class T2_4MDetailsMakecutoutimagesVlassCubeRenderer(basetemplates.T2_4MDetailsDe
         img_plots = {}
         rms_plots = {}
 
-        for r in results:
-            subimagenames = r.subimagenames
+        result = results[0]
 
-            for subimagename in subimagenames:
-                image_path = subimagename
-                LOG.info('Getting properties of %s for the weblog.' % (image_path))
+        for sci_im in result.subimagelist:
+            info_dict[sci_im['metadata']['spw']] = sci_im['metadata'].get('keep', True)
 
-                with casa_tools.ImageReader(image_path) as image:
-                    info = image.miscinfo()
-                    spw = info.get('virtspw', None)
-                    field = ''
+        for subimagename in result.subimagenames:
+            image_path = subimagename
+            LOG.info('Getting properties of %s for the weblog.' % (image_path))
 
-                    coordsys = image.coordsys()
-                    coord_names = numpy.array(coordsys.names())
-                    coord_refs = coordsys.referencevalue(format='s')
-                    coordsys.done()
-                    pol = coord_refs['string'][coord_names == 'Stokes'][0]
-                    info_dict[(field, spw, pol, 'image name')] = image.name(strippath=True)
+            with casa_tools.ImageReader(image_path) as image:
+                info = image.miscinfo()
+                spw = info.get('virtspw', None)
+                field = ''
 
-            image_size = r.image_size
+                coordsys = image.coordsys()
+                coord_names = np.array(coordsys.names())
+                coord_refs = coordsys.referencevalue(format='s')
+                coordsys.done()
+                pol = coord_refs['string'][coord_names == 'Stokes'][0]
+                info_dict[(field, spw, pol, 'image name')] = image.name(strippath=True)
 
-            # Make the plots of the cutout images
-            plotter = display.VlassCubeCutoutimagesSummary(context, r)
-            img_plots['Cutout Image Summary Plots'] = plotter.plot()
+        image_size = result.image_size
 
-            # Make the RMS summary plots
-            plotter = display.VlassCubeCutoutRmsSummary(context, r)
-            rms_plots['Cutout Rms Summary Plots'] = plotter.plot()
+        # Make the RMS summary plots
+        plotter = display.VlassCubeCutoutRmsSummary(context, result, info_dict)
+        rms_plots['Cutout Rms Summary Plots'] = plotter.plot()
 
-            # Export Stats summary
-            stats_summary = display.get_stats_summary(r.stats)
-            stats = r.stats
+        # Make the plots of the cutout images
+        plotter = display.VlassCubeCutoutimagesSummary(context, result)
+        img_plots['Cutout Image Summary Plots'] = plotter.plot()
 
-            # PIPE-631: Weblog thumbnails are sorted according 'isalpha' parameter.
-            for p in img_plots['Cutout Image Summary Plots']:
-                if ".alpha" in p.basename:
-                    p.parameters['isalpha'] = 1
-                else:
-                    p.parameters['isalpha'] = 0
+        # Export Stats summary
+        stats_summary = display.get_stats_summary(result.stats)
+        stats = result.stats
+
+        # PIPE-631: Weblog thumbnails are sorted according 'isalpha' parameter.
+        for p in img_plots['Cutout Image Summary Plots']:
+            if ".alpha" in p.basename:
+                p.parameters['isalpha'] = 1
+            else:
+                p.parameters['isalpha'] = 0
 
         ctx.update({'img_plots': img_plots,
                     'rms_plots': rms_plots,

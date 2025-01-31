@@ -30,3 +30,4 @@ from .fixpointing import Fixpointing
 from .analyzestokescubes import Analyzestokescubes
 from .vlassmasking import Vlassmasking
 from .restorepims import Restorepims
+from .mstransform import VlaMstransform

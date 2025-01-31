@@ -2,16 +2,15 @@ import collections
 import os
 
 import matplotlib.pyplot as plt
-
 import numpy as np
 from matplotlib.pyplot import cm
 
 import pipeline.infrastructure as infrastructure
+import pipeline.infrastructure.renderer.logger as logger
 import pipeline.infrastructure.utils.compatibility as compatibility
 from pipeline.h.tasks.common.displays import sky
 from pipeline.h.tasks.common.displays.imhist import ImageHistDisplay
 from pipeline.infrastructure import casa_tools
-import pipeline.infrastructure.renderer.logger as logger
 from pipeline.infrastructure.displays.plotstyle import matplotlibrc_formal
 
 LOG = infrastructure.get_logger(__name__)
@@ -251,9 +250,10 @@ def get_stats_summary(stats):
 class VlassCubeCutoutRmsSummary(object):
     """A class for the VLASS-CUBE makecutout rms-vs-frequency summary plots."""
 
-    def __init__(self, context, result):
+    def __init__(self, context, result, info_dict=None):
         self.context = context
         self.result = result
+        self.info_dict = info_dict
 
     @matplotlibrc_formal
     def plot(self, improp_list=None):
@@ -295,14 +295,21 @@ class VlassCubeCutoutRmsSummary(object):
 
             fig, ax = plt.subplots(figsize=(8, 6))
             cmap = cm.get_cmap('rainbow_r')
+            if isinstance(self.info_dict, dict):
+                keep_list = [self.info_dict.get(spw_label, True) for spw_label in spw_labels]
+            else:
+                keep_list = [True]*len(spw_labels)
             for idx, stokes in enumerate(stokes_list):
                 color_idx = idx/len(stokes_list)
-                ax.plot(x, y[:, idx], color=cmap(color_idx), label=fr'$\it {stokes}$', marker='o')
-                #ax.scatter(x, y[:, idx], color=cmap(color_idx), alpha=0.75, s=300, edgecolors='black')
-                if stokes == 'I':
-                    for idx_spw in range(len(x)):
+
+                ax.scatter(x, y[:, idx], facecolors='none', alpha=0.75, s=12**2, edgecolors='black')
+                ax.plot(x[keep_list], y[keep_list, idx], marker='o', markeredgecolor=cmap(color_idx),
+                        markerfacecolor=cmap(color_idx), markersize=12, label=fr'$\it {stokes}$', alpha=0.75)
+
+                for idx_spw in range(len(x)):
+                    if stokes == 'I':
                         text = ax.annotate(spw_labels[idx_spw], (x[idx_spw], y[idx_spw, idx]),
-                                           ha='center', va='top', fontsize=9.)
+                                           ha='center', va='center', fontsize=8.)
                         text.set_alpha(.7)
 
             ax.set_xlabel('Frequency [GHz]')

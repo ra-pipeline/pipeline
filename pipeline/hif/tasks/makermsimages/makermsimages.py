@@ -15,7 +15,7 @@ LOG = infrastructure.get_logger(__name__)
 
 class MakermsimagesResults(basetask.Results):
     def __init__(self, rmsimagelist=None, rmsimagenames=None):
-        super(MakermsimagesResults, self).__init__()
+        super().__init__()
 
         if rmsimagelist is None:
             rmsimagelist = []
@@ -39,6 +39,7 @@ class MakermsimagesResults(basetask.Results):
                     spwlist=rmsitem['spwlist'], specmode=rmsitem['specmode'],
                     sourcetype=rmsitem['sourcetype'],
                     multiterm=rmsitem['multiterm'],
+                    metadata=rmsitem['metadata'],
                     imageplot=rmsitem['imageplot'])
                 if 'TARGET' in rmsitem['sourcetype']:
                     context.rmsimlist.add_item(imageitem)
@@ -53,8 +54,20 @@ class MakermsimagesInputs(vdp.StandardInputs):
     # Search order of input vis
     processing_data_type = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
+    # docstring and type hints: supplements hif_makermsimages
     def __init__(self, context, vis=None):
-        super(MakermsimagesInputs, self).__init__()
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            vis: List of visibility data files. These may be ASDMs, tar files of ASDMs, MSs, or tar files of MSs, If ASDM files are specified, they will be
+                converted  to MS format.
+
+                Example: vis=['X227.ms', 'asdms.tar.gz']
+
+        """
+        super().__init__()
         # set the properties to the values given as input arguments
         self.context = context
         self.vis = vis
@@ -63,6 +76,7 @@ class MakermsimagesInputs(vdp.StandardInputs):
 @task_registry.set_equivalent_casa_task('hif_makermsimages')
 class Makermsimages(basetask.StandardTaskTemplate):
     Inputs = MakermsimagesInputs
+    is_multi_vis_task = True
 
     def prepare(self):
 

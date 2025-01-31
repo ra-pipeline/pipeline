@@ -66,7 +66,7 @@ class MakeImListQAHandler(pqa.QAPlugin):
 
 
 class MakeImListListQAHandler(pqa.QAPlugin):
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = resultobjects.MakeImListResult
 
     def handle(self, context, result):

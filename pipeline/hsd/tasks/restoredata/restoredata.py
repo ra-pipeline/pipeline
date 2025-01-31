@@ -29,10 +29,11 @@ LOG = infrastructure.get_logger(__name__)
 class SDRestoreDataInputs(restoredata.RestoreDataInputs):
     """SDRestoreDataInputs manages the inputs for the SDRestoreData task."""
 
-    asis = vdp.VisDependentProperty(default='SBSummary ExecBlock Annotation Antenna Station Receiver Source CalAtmosphere CalWVR')
+    asis = vdp.VisDependentProperty(default='SBSummary ExecBlock Annotation Antenna Station Receiver Source CalAtmosphere CalWVR SpectralWindow')
     ocorr_mode = vdp.VisDependentProperty(default='ao')
     hm_rasterscan = vdp.VisDependentProperty(default='time')
 
+    # docstring and type hints: supplements hsd_restoredata
     def __init__(self, context: 'Context', copytoraw: Optional[bool] = None, products_dir: Optional[str] = None,
                  rawdata_dir: Optional[str] = None, output_dir: Optional[str] = None, session: Optional[str] = None,
                  vis: List[str] = None, bdfflags: Optional[bool] = None, lazy: Optional[bool] = None,
@@ -42,17 +43,76 @@ class SDRestoreDataInputs(restoredata.RestoreDataInputs):
 
         Args:
             context: the pipeline Context state object
-            copytoraw: copy the required data products from products_dir to rawdata_dir
-            products_dir: the directory of archived pipeline products
-            rawdata_dir: the raw data directory for ASDM(s) and products
+
+            copytoraw: Copy calibration and flagging tables from ``products_dir``
+                to ``rawdata_dir`` directory.
+
+                Example: copytoraw=False
+
+                Default: None (equivalent to True)
+
+            products_dir: Name of the data products directory to copy
+                calibration products from.
+                The parameter is effective only when ``copytoraw`` = True.
+                When ``copytoraw`` = False, calibration products in
+                ``rawdata_dir`` will be used.
+
+                Example: products_dir='myproductspath'
+
+                Default: None (equivalent to '../products')
+
+            rawdata_dir: Name of the raw data directory.
+
+                Example: rawdata_dir='myrawdatapath'
+
+                Default: None (equivalent to '../rawdata')
+
             output_dir: the working directory for the restored data
-            session: the parent session of each vis
-            vis: the ASDMs(s) for which data is to be restored
-            bdfflags: set the BDF flags
-            lazy: use the lazy filler to restore data
+
+            session: List of sessions one per visibility file.
+
+                Example: session=['session_3']
+
+            vis: List of raw visibility data files to be restored.
+                Assumed to be in the directory specified by rawdata_dir.
+
+                Example: vis=['uid___A002_X30a93d_X43e']
+
+            bdfflags: Apply BDF flags on import.
+
+                Example: bdfflags=False
+
+                Default: None (equivalent to True)
+
+            lazy: Use the lazy filler option.
+
+                Example: lazy=True
+
+                Default: None (equivalent to False)
+
             asis: Creates verbatim copies of the ASDM tables in the output MS.
-                  The value given to this option must be a list of table names separated by space characters.
-            hm_rasterscan: Heuristics method for raster scan analysis
+                The value given to this option must be a list of table names
+                separated by space characters. Default value, None, is equivalent
+                to the following list.
+
+                    'SBSummary ExecBlock Annotation Antenna Station Receiver Source CalAtmosphere CalWVR SpectralWindow'
+
+                Example: asis='Source Receiver'
+
+            ocorr_mode: Selection of baseline correlation to import.
+                Valid only if input visibility is ASDM. See a document of CASA,
+                casatasks::importasdm, for available options.
+
+                Example: ocorr_mode='ca'
+
+                Default: None (equivalent to 'ao')
+
+            hm_rasterscan: Heuristics method for raster scan analysis.
+                Two analysis modes, time-domain analysis ('time') and
+                direction analysis ('direction'), are available.
+
+                Default: None (equivalent to 'time')
+
         """
         super(SDRestoreDataInputs, self).__init__(context, copytoraw=copytoraw, products_dir=products_dir,
                                                   rawdata_dir=rawdata_dir, output_dir=output_dir, session=session,

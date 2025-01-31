@@ -231,10 +231,64 @@ class FlagDeterVLAInputs(flagdeterbase.FlagDeterBaseInputs):
 
     quack = vdp.VisDependentProperty(default=True)
 
+    # docstring and type hints: supplements hifv_flagdata
     def __init__(self, context, vis=None, output_dir=None, flagbackup=None, autocorr=None, shadow=None, scan=None,
                  scannumber=None, quack=None, clip=None, baseband=None, intents=None, edgespw=None, fracspw=None,
                  fracspwfps=None, online=None, fileonline=None, template=None, filetemplate=None, hm_tbuff=None,
                  tbuff=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the h_init or hifv_importdata task.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            flagbackup: Backup pre-existing flags before applying new ones.
+
+            autocorr: Flag autocorrelation data
+
+            shadow: Flag shadowed antennas
+
+            scan: Flag specified scans
+
+            scannumber: A string containing a  comma delimited list of scans to be flagged.
+
+                Example: '3,5,6'
+
+            quack: Quack scans
+
+            clip: Clip mode
+
+            baseband: Flag 20MHz of each edge of basebands
+
+            intents: A string containing a comma delimited list of intents against which the scans to be flagged are matched.
+
+                Example: `'*BANDPASS*'`
+
+            edgespw: Fraction of the baseline correlator TDM edge channels to be flagged.
+
+            fracspw: Fraction of baseline correlator edge channels to be flagged.
+
+            fracspwfps:
+
+            online: Apply the online flags.
+
+            fileonline: File containing the online flags. These are computed by the h_init or hif_importdata data tasks. If the online flags files
+                are undefined a name of the form 'msname.flagonline.txt' is assumed.
+
+            template: Apply a flagging template.
+
+            filetemplate: The name of a text file that contains the flagging template for RFI, birdies, telluric lines, etc.  If the template flags files
+                is undefined a name of the form 'msname.flagtemplate.txt' is assumed.
+
+            hm_tbuff: The time buffer computation heuristic
+
+            tbuff: List of time buffers (sec) to pad timerange in flag commands.
+
+        """
         super(FlagDeterVLAInputs, self).__init__(
             context, vis=vis, output_dir=output_dir, flagbackup=flagbackup, autocorr=autocorr, shadow=shadow,
             scan=scan, scannumber=scannumber, intents=intents, edgespw=edgespw, fracspw=fracspw, fracspwfps=fracspwfps,
@@ -415,7 +469,7 @@ class FlagDeterVLA(flagdeterbase.FlagDeterBase):
         if inputs.online:
             if not os.path.exists(inputs.fileonline):
                 LOG.warning('Online ANOS flag file \'%s\' was not found. Online ANOS'
-                            'flagging for %s disabled.' % (inputs.fileonline, 
+                            'flagging for %s disabled.' % (inputs.fileonline,
                                                            inputs.ms.basename))
             else:
                 # ANTENNA_NOT_ON_SOURCE FLAG
@@ -491,7 +545,7 @@ class FlagDeterVLA(flagdeterbase.FlagDeterBase):
             flag_cmds.append('mode=\'summary\' name=\'clip\'')
 
         # Flag quack
-        if inputs.quack: 
+        if inputs.quack:
             flag_cmds.append(self._get_quack_cmds())
             flag_cmds.append('mode=\'summary\' name=\'quack\'')
 
@@ -641,7 +695,7 @@ class FlagDeterVLA(flagdeterbase.FlagDeterBase):
                     jj = len(sorted_frequencies)
             spwList.append(thisSpwList)
             BBC_bandwidths.append(BBC_bandwidth)
-            ii += 1        
+            ii += 1
 
         low_spws = []
         high_spws = []
@@ -689,12 +743,12 @@ class FlagDeterVLA(flagdeterbase.FlagDeterBase):
         # flagging of TDM windows
         super(FlagDeterVLA, self).verify_spw(spw)
 
-        # Skip if TDM mode where TDM modes are defined to be modes with 
+        # Skip if TDM mode where TDM modes are defined to be modes with
         # <= 256 channels per correlation
         dd = self.inputs.ms.get_data_description(spw=spw)
         ncorr = len(dd.corr_axis)
         if ncorr*spw.num_channels > 256:
-            raise ValueError('Skipping edge flagging for FDM spw %s' % spw.id)            
+            raise ValueError('Skipping edge flagging for FDM spw %s' % spw.id)
 
     def _add_file(self, filename):
         """
@@ -717,6 +771,6 @@ class FlagDeterVLA(flagdeterbase.FlagDeterBase):
         # strip out comments and empty lines to leave the real commands.
         # This is so we can compare the number of valid commands to the number
         # of commands specified in the file and complain if they differ
-        return [cmd for cmd in flaghelper.readFile(filename) 
+        return [cmd for cmd in flaghelper.readFile(filename)
                 if not cmd.strip().startswith('#')
                 and not all(c in string.whitespace for c in cmd)]

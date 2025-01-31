@@ -18,7 +18,8 @@ total_keys = {
     'POLANGLE'     : 'Polarization angle',
     'POLLEAKAGE'   : 'Polarization leakage',
 	'CHECK'		   : 'Check',
-	'DIFFGAIN'     : 'Diffgain',
+	'DIFFGAINREF'  : 'Diffgain reference',
+	'DIFFGAINSRC'  : 'Diffgain on-source',
 }
 %>
 

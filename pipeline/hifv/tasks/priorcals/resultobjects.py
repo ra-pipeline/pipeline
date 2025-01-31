@@ -39,28 +39,28 @@ class PriorcalsResults(basetask.Results):
         self.tecmaps_result = tecmaps_result
 
     def merge_with_context(self, context):
-        if self.gc_result:
+        if self.gc_result and self.inputs["apply_gaincurves"]:
             try:
                 self.gc_result.merge_with_context(context)
                 LOG.info("Priorcals:  Merged gain curves cal")
             except Exception as ex:
                 LOG.warning("No gain curves table written.")
 
-        if self.oc_result:
+        if self.oc_result and self.inputs["apply_opcal"]:
             try:
                 self.oc_result.merge_with_context(context)
                 LOG.info("Priorcals:  Merged Opac cal")
             except Exception as ex:
                 LOG.warning("No opacities table written.")
 
-        if self.rq_result:
+        if self.rq_result and self.inputs["apply_rqcal"]:
             try:
                 self.rq_result.merge_with_context(context)
                 LOG.info("Priorcals:  Merged Requantizer gains")
             except Exception as ex:
                 LOG.warning("No rq gains table written.")
 
-        if self.antpos_result:
+        if self.antpos_result and self.inputs["apply_antpos"]:
             try:
                 self.antpos_result.merge_with_context(context)
                 LOG.info("Priorcals:   Merged Antenna positions corrections.")
@@ -77,10 +77,10 @@ class PriorcalsResults(basetask.Results):
             else:
                 LOG.info('Priorcals:  TEC maps not applied.')
 
-        if self.sw_result:
+        if self.sw_result and self.inputs["apply_swpowcal"]:
             try:
-                # self.sw_result.merge_with_context(context)
-                LOG.info("Priorcals:  Switched Power caltable written to disk but not merged with context callibrary")
+                self.sw_result.merge_with_context(context)
+                LOG.info("Priorcals: Merged Switched Power caltable")
             except Exception as ex:
                 LOG.warning('No Switched Power table written.')
 

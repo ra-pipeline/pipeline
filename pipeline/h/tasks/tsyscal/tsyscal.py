@@ -1,11 +1,13 @@
 import collections
 from operator import itemgetter, attrgetter
+from typing import Dict, List, Set
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
+from pipeline.domain import MeasurementSet
 from pipeline.h.heuristics import caltable as caltable_heuristic
 from pipeline.h.heuristics.tsysspwmap import tsysspwmap
 from pipeline.infrastructure import casa_tasks
@@ -39,7 +41,29 @@ class TsyscalInputs(vdp.StandardInputs):
         casa_args = self._get_task_args(ignore=('caltable',))
         return namer.calculate(output_dir=self.output_dir, stage=self.context.stage, **casa_args)
 
+    # docstring and type hints: supplements h_tsyscal
     def __init__(self, context, output_dir=None, vis=None, caltable=None, chantol=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            vis: List of input visibility files.
+
+                Example: vis=['ngc5921.ms']
+
+            caltable: Name of output gain calibration tables.
+
+                Example: caltable='ngc5921.gcal'
+
+            chantol: The tolerance in channels for mapping atmospheric calibration windows (TDM) to science windows (FDM or TDM).
+
+                Example: chantol=5
+
+        """
         super(TsyscalInputs, self).__init__()
 
         # pipeline inputs
@@ -93,9 +117,6 @@ class Tsyscal(basetask.StandardTaskTemplate):
         return resultobjects.TsyscalResults(pool=calapps, unmappedspws=nospwmap)
 
     def analyse(self, result):
-        # With no best caltable to find, our task is simply to set the one
-        # caltable as the best result
-
         # double-check that the caltable was actually generated
         on_disk = [ca for ca in result.pool if ca.exists()]
         result.final[:] = on_disk
@@ -111,7 +132,7 @@ class Tsyscal(basetask.StandardTaskTemplate):
 GainfieldMapping = collections.namedtuple('GainfieldMapping', 'intent preferred fallback')
 
 
-def get_solution_map(ms, is_single_dish):
+def get_solution_map(ms: MeasurementSet, is_single_dish: bool) -> List[GainfieldMapping]:
     """
     Get gainfield solution map. Different solution maps are returned for
     single dish and interferometric data.
@@ -139,26 +160,28 @@ def get_solution_map(ms, is_single_dish):
         ]
 
     else:
-        # Intent mapping extracted from CAS-12213 ticket:
+        # Intent mapping extracted from CAS-12213 ticket.
+        # PIPE-2080: updated to add mapping for DIFFGAINREF, DIFFGAINSRC intent.
         #
         # ObjectToBeCalibrated 	TsysSolutionToUse 	IfNoSolutionPresentThenUse
         # BANDPASS cal 	        all BANDPASS cals 	fallback to 'nearest'
         # FLUX cal 	            all FLUX cals 	    fallback to 'nearest'
-        # DIFF_GAIN_CAL         all DIFF_GAIN_CALs 	fallback to 'nearest'
+        # DIFFGAIN[REF|SRC]     all DIFFGAIN cals 	fallback to BANDPASS
         # PHASE cal 	        all PHASE cals 	    all TARGETs
         # TARGET 	            all TARGETs 	    all PHASE cals
         # CHECK_SOURCE        	all TARGETs     	all PHASE cals
         return [
             GainfieldMapping(intent='BANDPASS', preferred=f('BANDPASS'), fallback='nearest'),
             GainfieldMapping(intent='AMPLITUDE', preferred=f('AMPLITUDE'), fallback='nearest'),
-            # GainfieldMapping(intent='DIFF_GAIN_CAL', preferred='DIFF_GAIN_CAL', fallback='nearest'),
+            GainfieldMapping(intent='DIFFGAINREF', preferred=f('DIFFGAINREF'), fallback=f('BANDPASS')),
+            GainfieldMapping(intent='DIFFGAINSRC', preferred=f('DIFFGAINSRC'), fallback=f('BANDPASS')),
             GainfieldMapping(intent='PHASE', preferred=f('PHASE'), fallback=f('TARGET')),
             GainfieldMapping(intent='TARGET', preferred=f('TARGET'), fallback=f('PHASE')),
             GainfieldMapping(intent='CHECK', preferred=f('TARGET'), fallback=f('PHASE')),
         ]
 
 
-def get_gainfield_map(ms, is_single_dish):
+def get_gainfield_map(ms: MeasurementSet, is_single_dish: bool) -> Dict:
     """
     Get the mapping of observing intent to gainfield parameter for a
     measurement set.
@@ -190,13 +213,13 @@ def get_gainfield_map(ms, is_single_dish):
     return converted
 
 
-def get_tsys_fields_for_intent(ms, intent):
+def get_tsys_fields_for_intent(ms: MeasurementSet, intent: str) -> Set[str]:
     """
     Returns the identity of the Tsys field(s) for an intent.
 
-    :param ms:
-    :param intent:
-    :return:
+    :param ms: MS to analyse
+    :param intent: intent to retrieve fields for.
+    :return: set of field identifiers corresponding to intent
     """
     # In addition to the science intent scan, a field must also have a Tsys
     # scan observed for a Tsys solution to be considered present. The
@@ -243,7 +266,8 @@ def get_tsys_fields_for_intent(ms, intent):
     return {field_identifiers[i] for i in r}
 
 
-def get_calapplications(ms, tsys_table, calfrom_defaults, origin, spw_map, is_single_dish):
+def get_calapplications(ms: MeasurementSet, tsys_table: str, calfrom_defaults: Dict, origin: callibrary.CalAppOrigin,
+                        spw_map: List, is_single_dish: bool) -> List[callibrary.CalApplication]:
     """
     Get a list of CalApplications that apply a Tsys caltable to a measurement
     set using the gainfield mapping defined in CAS-12213.
@@ -256,6 +280,8 @@ def get_calapplications(ms, tsys_table, calfrom_defaults, origin, spw_map, is_si
     :param tsys_table: name of Tsys table
     :param calfrom_defaults: dict of CalFrom constructor arguments
     :param origin: CalOrigin for the created CalApplications
+    :param spw_map: Tsys SpW map
+    :param is_single_dish: boolean declaring if current MS is for Single-Dish
     :return: list of CalApplications
     """
     # Get the map of intent:gainfield

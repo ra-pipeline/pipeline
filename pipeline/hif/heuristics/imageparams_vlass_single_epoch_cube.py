@@ -16,7 +16,7 @@ class ImageParamsHeuristicsVlassSeCube(ImageParamsHeuristicsVlassSeContMosaic):
         self.imaging_mode = 'VLASS-SE-CUBE'
         self.vlass_stage = 3
 
-    def reffreq(self) -> Optional[str]:
+    def reffreq(self, deconvolver: Optional[str]=None, specmode: Optional[str]=None, spwsel: Optional[dict]=None) -> Optional[str]:
         """Tclean reffreq parameter heuristics.
 
         tclean(reffreq=None) will automatically calculate the referenece frequency using the mean frequency of the selected spws.
@@ -60,7 +60,7 @@ class ImageParamsHeuristicsVlassSeCube(ImageParamsHeuristicsVlassSeContMosaic):
                             'hifv_flagtargetsdata'):
                         flagtargets_summary = [r.summaries for r in result_meta][0][-1]
 
-            n_flagged = n_total = 0
+            n_flagged = n_total = 0.
             for spwid in [spw.strip() for spw in spw_selection.split(',')]:
                 n_flagged += flagtargets_summary['spw'][str(spwid)]['flagged']
                 n_total += flagtargets_summary['spw'][str(spwid)]['total']

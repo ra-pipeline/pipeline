@@ -27,7 +27,6 @@ results.accept(context)
 """
 import os
 import re
-import ast
 import sys
 import shutil
 import tarfile
@@ -43,7 +42,7 @@ from .. import applycal
 from .. import importdata
 from ..common import manifest
 
-from pipeline.extern.almarenorm import alma_renorm
+from pipeline.extern.almarenorm_pl2023 import alma_renorm
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -102,6 +101,7 @@ class RestoreDataInputs(vdp.StandardInputs):
     def session(self):
         return []
 
+    # docstring and type hints: supplements h_restoredata
     def __init__(self, context, copytoraw=None, products_dir=None, rawdata_dir=None, output_dir=None, session=None,
                  vis=None, bdfflags=None, lazy=None, asis=None, ocorr_mode=None):
         """
@@ -128,6 +128,51 @@ class RestoreDataInputs(vdp.StandardInputs):
         :type lazy: boolean True or False
         :param asis: Creates verbatim copies of the ASDM tables in the output MS.
         :type asis: space delimated list of tables
+
+        Args:
+            context: the pipeline Context state object.
+
+            copytoraw: Copy calibration and flagging tables from products_dir to rawdata_dir directory.
+
+                Example: copytoraw=False
+
+            products_dir: Path to the data products directory, used to copy
+                calibration products from. The parameter is effective only when
+                copytoraw=True. When copytoraw=False, calibration products in
+                rawdata_dir will be used.
+
+                Example: products_dir='/path/to/my/products'
+
+            rawdata_dir: Path to the rawdata subdirectory.
+
+                Example: rawdata_dir='/path/to/my/rawdata'
+
+            output_dir: the working directory for the restored data.
+
+            session: List of sessions, one per visibility file.
+
+                Example: session=['session_3']
+
+            vis: List of raw visibility data files to be restored. Assumed to be in the directory specified by rawdata_dir.
+
+                Example: vis=['uid___A002_X30a93d_X43e']
+
+            bdfflags: Set the BDF flags.
+
+                Example: bdfflags=False
+
+            lazy: Use the lazy filler option.
+
+                Example: lazy=True
+
+            asis: Creates verbatim copies of the ASDM tables in the output MS. The value given to this option must be a list of table names separated by space characters.
+
+                Example: asis='Source Receiver'
+
+            ocorr_mode: Set correlation import mode.
+
+                Example: ocorr_mode='ca'
+
         """
         super(RestoreDataInputs, self).__init__()
 
@@ -300,23 +345,26 @@ class RestoreData(basetask.StandardTaskTemplate):
                 params = pipemanifest.get_renorm(vis)
                 if params:
                     # Convert input parameters with ast (string to bool, dict, etc).
-                    kwargs = {key: ast.literal_eval(val) if val else val for key, val in params.items()}
+                    kwargs = {key: utils.string_to_val(val) if val else val for key, val in params.items()}
 
                     # PIPE-1687: restrict input arguments to those needed by
                     # renorm interface function.
+                    # PIPE-2049: if some parameters are absent from the manifest,
+                    # use default values adopted from extern.heuristics.ACreNorm.renormalize,
+                    # except for atm_auto_exclude, which is defaulted to False.
                     kwargs = {
                         'vis': vis,
-                        'spw': [int(x) for x in kwargs['spw'].split(',') if x],
-                        'apply': kwargs['apply'],
-                        'threshold': kwargs['threshold'],
-                        'excludechan': kwargs['excludechan'],
-                        'correct_atm': kwargs['correctATM'],
-                        'atm_auto_exclude': kwargs['atm_auto_exclude'],
-                        'bwthreshspw': kwargs['bwthreshspw'],
+                        'spw': [int(x) for x in kwargs.get('spw', '').split(',') if x],
+                        'apply': kwargs.get('apply', False),
+                        'threshold': kwargs.get('threshold', None),
+                        'excludechan': kwargs.get('excludechan', {}),
+                        'correct_atm': kwargs.get('correctATM', False),
+                        'atm_auto_exclude': kwargs.get('atm_auto_exclude', False),
+                        'bwthreshspw': kwargs.get('bwthreshspw', {}),
                     }
 
                     try:
-                        LOG.info(f'Renormalizing {vis} with hifa_renorm {params}')
+                        LOG.info(f'Renormalizing {vis} with hifa_renorm {kwargs}')
                         _, _, _, _, _, renorm_applied, _, _ = alma_renorm(**kwargs)
                         if 'apply' in kwargs and kwargs['apply'] and renorm_applied:
                             applied = True

@@ -473,9 +473,57 @@ class CorrectedampflagInputs(vdp.StandardInputs):
     # tooManyIntegrationsFraction
     tmint = vdp.VisDependentProperty(default=0.085)
 
+    # docstring and type hints: supplements hif_correctedampflag
     def __init__(self, context, output_dir=None, vis=None, intent=None, field=None, spw=None, antnegsig=None,
                  antpossig=None, tmantint=None, tmint=None, tmbl=None, antblnegsig=None, antblpossig=None,
                  relaxed_factor=None, niter=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the h_init or hif_importdata task.
+                '': use all MeasurementSets in the context
+
+                Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
+
+            intent: A string containing a comma delimited list of intents against which the selected fields are matched. If undefined (default),
+                it will select all data with the BANDPASS intent.
+
+                Example: intent='`*PHASE*`'
+
+            field: The list of field names or field ids for which bandpasses are computed. If undefined (default), it will select all fields.
+
+                Examples: field='3C279', '3C279, M82'
+
+            spw: The list of spectral windows and channels for which bandpasses are computed. If undefined (default), it will select all
+                science spectral windows.
+
+                Example: spw='11,13,15,17'
+
+            antnegsig: Lower sigma threshold for identifying outliers as a result of bad antennas within individual timestamps
+
+            antpossig: Upper sigma threshold for identifying outliers as a result of bad antennas within individual timestamps
+
+            tmantint: Threshold for maximum fraction of timestamps that are allowed to contain outliers
+
+            tmint: Initial threshold for maximum fraction of "outlier timestamps" over "total timestamps" that a baseline may be a part of
+
+            tmbl: Initial threshold for maximum fraction of "bad baselines" over "all timestamps" that an antenna may be a part of
+
+            antblnegsig: Lower sigma threshold for identifying outliers as a result of "bad baselines" and/or "bad antennas" within baselines (across all timestamps)
+
+            antblpossig: Upper sigma threshold for identifying outliers as a result of "bad baselines" and/or "bad antennas" within baselines (across all timestamps)
+
+            relaxed_factor: Relaxed value to set the threshold scaling factor to under certain conditions (see task description)
+
+            niter: Maximum number of times to iterate on evaluation of flagging heuristics. If an iteration results in no new flags, then
+                subsequent iterations are skipped.
+
+        """
         super(CorrectedampflagInputs, self).__init__()
 
         # pipeline inputs
@@ -648,11 +696,11 @@ class Correctedampflag(basetask.StandardTaskTemplate):
                                 if field.name in list(utils.safe_split(inputs.field))]
 
             # If no valid fields were found, raise warning, and continue to
-            # next intent.
-            # PIPE-281: CHECK intent is optional and does not require a warning.
-            # PIPE-607: POLANGLE and POLLEAKAGE are also optional.
+            # next intent. The following intents are optional and do not require
+            # a warning: CHECK (PIPE-281), POLANGLE, POLLEAKAGE (PIPE-607),
+            # DIFFGAINREF, DIFFGAINSRC (PIPE-2082, PIPE-2145).
             if not valid_fields:
-                if intent not in ['CHECK', 'POLANGLE', 'POLLEAKAGE']:
+                if intent not in ['CHECK', 'DIFFGAINREF', 'DIFFGAINSRC', 'POLANGLE', 'POLLEAKAGE']:
                     LOG.warning("Invalid data selection for given intent(s) and field(s): fields {} do not include"
                                 " intent \'{}\'.".format(utils.commafy(utils.safe_split(inputs.field)), intent))
                 continue
@@ -753,8 +801,8 @@ class Correctedampflag(basetask.StandardTaskTemplate):
 
     def _uvbinFactor(self, uvmin: float, totalpts: int) -> float:
         # Determine the uvrange bin width for searching for outliers in TARGET data.
-        # ACA snapshot mosaics can have small number of visibility points per field that would 
-        # not support the option with finer bins at short baselines (18 bins from 7m-36m).  
+        # ACA snapshot mosaics can have small number of visibility points per field that would
+        # not support the option with finer bins at short baselines (18 bins from 7m-36m).
         # So, we must use the fixed sqrt(2) bin width in this case, which will lead to only 5 bins.
         # Where to set the threshold?
         # Example: 11 antenna array (one 30sec scan/6sec integrations)*11*10/2 = 275 points
@@ -780,7 +828,7 @@ class Correctedampflag(basetask.StandardTaskTemplate):
             factor = 1.6
             LOG.info('Using uvbinFactor=%.2f' % (factor))
         return factor
-        
+
     def _evaluate_heuristic_for_baseline_set(self, ms: MeasurementSet, intent: str, field: str, spwid: int,
                                              antenna_id_to_name: Dict,
                                              baseline_set: Optional[List] = None) -> List[FlagCmd]:
@@ -1061,7 +1109,7 @@ class Correctedampflag(basetask.StandardTaskTemplate):
 
                 # Build another set of uvbins, shifted by 1/2 bin from the original set
                 # Any visibilities in the first half of the original bin will be ignored by
-                # the second set of bins, while the final bin will be half the width of the 
+                # the second set of bins, while the final bin will be half the width of the
                 # original final bin.
                 uvbins2 = []
                 uv1 = np.mean(uvbins[0])
@@ -1092,7 +1140,7 @@ class Correctedampflag(basetask.StandardTaskTemplate):
                     for u, uvbin in enumerate(uvbins):
                         # Advance uvstart, but only if prior bin contained enough points to be evaluated.
                         # (This avoids leaving a small number of orphaned points unevaluated.)
-                        if npts >= minimumPoints: 
+                        if npts >= minimumPoints:
                             uvstart = uvbin[0]
                         id_uvbin = np.where(
                             np.logical_and(
@@ -1107,8 +1155,8 @@ class Correctedampflag(basetask.StandardTaskTemplate):
                                     uvdist_sel >= prior_uvstart,
                                     uvdist_sel < uvbin[1]))[0]
                         npts = len(id_uvbin)
-                        if npts < minimumPoints: 
-                            # If the logic is correct above, we should never arrive here while in the final bin, 
+                        if npts < minimumPoints:
+                            # If the logic is correct above, we should never arrive here while in the final bin,
                             # and thus we will never leave any data uninspected.
                             LOG.info('uvbin%d) has too few points (%d), including them into next bin.' % (u, npts))
                             continue
@@ -1295,7 +1343,10 @@ class Correctedampflag(basetask.StandardTaskTemplate):
                     # observations.
                     tmint_scaled = inputs.tmint * thresh_scale_factor
                     if nscans > 1:
-                        tmint_scaled = tmint_scaled * 2**0.5
+                        if icorr == 0:
+                            tmint_scaled = tmint_scaled * 2**0.5
+                        else: # increase the threshold for cross-polar visibilities, which can show an offset in scans taken near transit
+                            tmint_scaled = tmint_scaled * 3
 
                     # Identify "bad baselines" as those baselines whose number
                     # of timestamps with outliers exceeds the threshold.

@@ -165,8 +165,12 @@
     </ProcessingCommand>
 
     <ProcessingCommand>
-        <Command xmlns="">hif_mstransform</Command>
+        <Command xmlns="">hifv_mstransform</Command>
         <ParameterSet>
+            <Parameter>
+                <Keyword xmlns="">omit_contline_ms</Keyword>
+                <Value xmlns="">True</Value>
+            </Parameter>
         </ParameterSet>
     </ProcessingCommand>
 

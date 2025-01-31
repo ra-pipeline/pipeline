@@ -2,6 +2,7 @@
 rsc_path = ""
 import os
 import pipeline.infrastructure.renderer.htmlrenderer as hr
+import pipeline.infrastructure.utils as utils
 %>
 <%inherit file="t2-4m_details-base.mako"/>
 
@@ -116,7 +117,7 @@ def percent_flagged_diff(flagsummary1, flagsummary2):
     <ul>
         % for key, value in dataselect[ms].items():
             % if value!='':
-                <li> ${key}: ${repr(value)}
+                <li> ${key}: ${repr(utils.find_ranges(value))}
             %endif
         % endfor
     </ul>

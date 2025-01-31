@@ -64,7 +64,7 @@ class TsysflagListQAHandler(pqa.QAPlugin):
     """
     QA handler for a list containing TsysflagResults.
     """
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = resultobjects.TsysflagResults
 
     def handle(self, context, result):

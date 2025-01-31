@@ -8,7 +8,7 @@ LOG = infrastructure.get_logger(__name__)
 
 class AnalyzealphaResults(basetask.Results):
     def __init__(self, max_location=None, alpha_and_error=None, image_at_max=None):
-        super(AnalyzealphaResults, self).__init__()
+        super().__init__()
         self.pipeline_casa_task = 'Analyzealpha'
         self.max_location = max_location
         self.alpha_and_error = alpha_and_error
@@ -27,7 +27,24 @@ class AnalyzealphaResults(basetask.Results):
 
 
 class AnalyzealphaInputs(vdp.StandardInputs):
+    # docstring and type hints: supplements hif_analyzealpha
     def __init__(self, context, vis=None, image=None, alphafile=None, alphaerrorfile=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            vis: List of visisbility  data files. These may be ASDMs, tar files of ASDMs, MSs, or tar files of MSs, If ASDM files are specified, they will be
+                converted  to MS format.
+
+                Example: vis=['X227.ms', 'asdms.tar.gz']
+
+            image: Restored subimage
+
+            alphafile: Input spectral index map
+
+            alphaerrorfile: Input spectral index error map
+        """
         self.context = context
         self.vis = vis
         self.image = image
@@ -39,6 +56,7 @@ class AnalyzealphaInputs(vdp.StandardInputs):
 @task_registry.set_casa_commands_comment('Diagnostics of spectral index image.')
 class Analyzealpha(basetask.StandardTaskTemplate):
     Inputs = AnalyzealphaInputs
+    is_multi_vis_task = True
 
     def prepare(self):
         inputs = self.inputs
@@ -67,7 +85,7 @@ class Analyzealpha(basetask.StandardTaskTemplate):
                 alphaerrorfile = utils.glob_ordered(imlist[0]['imagename'].replace('.image.subim', '.alpha.error'))[0]
 
             # Extract the value from the .alpha and .alpha.error images (for wideband continuum MTMFS with nterms>1)
-            # 
+            #
             with casa_tools.ImageReader(subimagefile) as image:
                 stats = image.statistics(robust=False)
 
@@ -107,4 +125,3 @@ class Analyzealpha(basetask.StandardTaskTemplate):
 
     def analyse(self, results):
         return results
-

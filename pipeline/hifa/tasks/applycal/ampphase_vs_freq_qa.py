@@ -154,8 +154,8 @@ def get_best_fits_per_ant(wrapper):
                 LOG.info('Could not fit ant {} pol {}: data is completely flagged'.format(ant, pol))
                 continue
 
-            # PIPE-884: as of NumPy ver1.20, ma.abs() doesn't convert MaskedArray fill_value to float automatically. This 
-            # introduces a casting-related ComplexWarning when the result is passed to ma.median(). We mitigate the warning 
+            # PIPE-884: as of NumPy ver1.20, ma.abs() doesn't convert MaskedArray fill_value to float automatically. This
+            # introduces a casting-related ComplexWarning when the result is passed to ma.median(). We mitigate the warning
             # by using the real part of filled value explicitly. See also below.
             median_sn = np.ma.median(np.ma.abs(visibilities).real / np.ma.abs(ta_sigma).real)
             if median_sn > 3:  # PIPE-401: Check S/N and either fit or use average
@@ -523,9 +523,7 @@ def get_chi2_ang_model(angular_model, nu, omega, phi, angdata, angsigma):
 def fit_angular_model(angular_model, nu, angdata, angsigma):
     f_aux = lambda omega_phi: get_chi2_ang_model(angular_model, nu, omega_phi[0], omega_phi[1], angdata, angsigma)
     angle = np.ma.angle(angdata[~angdata.mask])
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore', np.ComplexWarning)
-        phi_init = np.ma.median(angle)
+    phi_init = np.ma.median(angle)
     fitres = scipy.optimize.minimize(f_aux, np.array([0.0, phi_init]), method='L-BFGS-B')
     return fitres
 

@@ -62,7 +62,7 @@ def chan_selection_to_frequencies(img: str, selection: str, unit: str = 'GHz') -
         List of pairs of frequency values (float) in the desired units
     """
 
-    if selection in ('NONE', 'ALL'):
+    if selection in ('NONE', 'ALL', 'ALLCONT'):
         return [selection]
 
     frequencies = []
@@ -110,7 +110,7 @@ def freq_selection_to_channels(img: str, selection: str) -> Union[List[int], Lis
         List of pairs of channel values (int)
     """
 
-    if selection in ('NONE', 'ALL'):
+    if selection in ('NONE', 'ALL', 'ALLCONT'):
         return [selection]
 
     channels = []
@@ -487,24 +487,21 @@ def predict_kernel(beam, target_beam, pstol=1e-6, patol=1e-3):
         target_bm = [cqa.tos(target_beam['major']), cqa.tos(target_beam['minor']), cqa.tos(target_beam[t_bpa_key])]
         origin_bm = [cqa.tos(beam['major']), cqa.tos(beam['minor']), cqa.tos(beam[bpa_key])]
 
-        # filter out the potential runtime error message when ia.beamforconvolvedsize() fails
-        clog.filterMsg('Unable to reach target resolution of major')
+        # filter out the potential runtime error message when ia.beamforconvolvedsize() fails.
+        with logging.log_filtermsg('Unable to reach target resolution of major'):
+            try:
+                rt_kernel = cia.beamforconvolvedsize(source=origin_bm, convolved=target_bm)
+                if cqa.convert(rt_kernel['major'], 'arcsec')['value'] < pstol:
+                    LOG.info('The kernel from ia.deconvolvefrombeam() is considered as a point-source under the tolerance ' +
+                            f'pstol = {pstol} arcsec.')
+                    rt_code = 1
+                else:
+                    LOG.info(f'The convolution kernel prediced by ia.deconvolvefrombeam is {rt_kernel} and larger than the tolerence ' +
+                            f'pstol = {pstol} arcsec')
+                    rt_code = 0
+            except RuntimeError as e:
+                LOG.info("Unable to reach the target beam shape because the original beam is probably already too large.")
+                rt_code = 2
 
-        try:
-            rt_kernel = cia.beamforconvolvedsize(source=origin_bm, convolved=target_bm)
-            if cqa.convert(rt_kernel['major'], 'arcsec')['value'] < pstol:
-                LOG.info('The kernel from ia.deconvolvefrombeam() is considered as a point-source under the tolerance ' +
-                         f'pstol = {pstol} arcsec.')
-                rt_code = 1
-            else:
-                LOG.info(f'The convolution kernel prediced by ia.deconvolvefrombeam is {rt_kernel} and larger than the tolerence ' +
-                         f'pstol = {pstol} arcsec')
-                rt_code = 0
-        except RuntimeError as e:
-            LOG.info("Unable to reach the target beam shape because the original beam is probably already too large.")
-            rt_code = 2
-
-        # clean up the filtered messages
-        clog.clearFilterMsgList()
 
     return rt_kernel, rt_code

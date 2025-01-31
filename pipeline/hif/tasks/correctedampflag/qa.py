@@ -19,7 +19,9 @@ class CorrectedampflagQAHandler(pqa.QAPlugin):
         vis = result.inputs['vis']
         ms = context.observing_run.get_ms(vis)
         scores = []
-        intents = result.inputs['intent'].split(',')
+        # PIPE-2203: restrict to intents that are requested in inputs and
+        # present in the MS.
+        intents = set(result.inputs['intent'].split(',')).intersection(ms.intents)
 
         # Create a separate flagging score for each intent.
         for intent in intents:

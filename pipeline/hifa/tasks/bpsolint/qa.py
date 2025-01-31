@@ -62,7 +62,7 @@ class BpSolintListQAHandler(pqa.QAPlugin):
     """
     QA handler for a list containing BpSolintResults.
     """
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = bpsolint.BpSolintResults
     generating_task = bpsolint.BpSolint
 

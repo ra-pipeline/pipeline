@@ -2,14 +2,40 @@ import collections
 import itertools
 import operator
 import os
-from typing import List, Tuple, Union, Optional
+from typing import List, Tuple, Union, Optional, TYPE_CHECKING
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.utils as utils
-from . import DataType
+from .datatype import DataType, TYPE_PRIORITY_ORDER
 from . import MeasurementSet
 
+if TYPE_CHECKING:
+    from datetime import datetime
+
 LOG = infrastructure.get_logger(__name__)
+
+
+def sort_measurement_set(ms: MeasurementSet) -> Tuple[int, 'datetime']:
+    """Return sort key for measurement set object.
+
+    Sort key consists of data priority and observation start time.
+    Data priority is determined from the data types of given
+    measurement set. Sort order of the data types is defined in
+    DATA_TYPE_PRIORITY list. If no DataType is set to the MS,
+    the lowest priority is assigned to the MS.
+
+    Returns:
+        Data priority and observation start time
+    """
+    data_types = set(itertools.chain(*ms.data_types_per_source_and_spw.values()))
+    assert all([t in TYPE_PRIORITY_ORDER for t in data_types])
+    if len(data_types) > 0:
+        data_priority = max([TYPE_PRIORITY_ORDER.index(t) for t in data_types])
+    else:
+        # no data type assignments, assign lowest priority (largest value)
+        data_priority = len(TYPE_PRIORITY_ORDER)
+    observation_start_time = utils.get_epoch_as_datetime(ms.start_time)
+    return data_priority, observation_start_time
 
 
 class ObservingRun(object):
@@ -50,6 +76,7 @@ class ObservingRun(object):
                     LOG.error(msg)
 
         self.measurement_sets.append(ms)
+        self.measurement_sets.sort(key=sort_measurement_set)
 
     def get_ms(self, name=None, intent=None):
         """Returns the first measurement set matching the given identifier.

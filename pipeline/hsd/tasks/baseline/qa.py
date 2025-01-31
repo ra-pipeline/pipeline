@@ -41,25 +41,12 @@ class SDBaselineQAHandler(pqa.QAPlugin):
         for qstat in result.outcome['baseline_quality_stat']:
             scores.append(qacalc.score_sd_baseline_quality(qstat.vis, qstat.field, qstat.ant,
                                                            qstat.spw, qstat.pol, qstat.stat))
+
+        scores.extend(
+            qacalc.score_sd_line_detection(context.observing_run.ms_reduction_group, result)
+        )
+
         result.qa.pool.extend(scores)
-
-
-def _get_plot(plots: List[logger.Plot], figfile: str) -> Optional[Union[compress.CompressedObj, logger.Plot]]:
-    """
-    Return Plot instance that matches figure file name.
-
-    Args:
-        plots: A list of plot objects
-        figfile: The name of figure file
-    Returns:
-        Plot instance. Returns None if no match is found.
-    """
-    for p in plots:
-        if isinstance(p, compress.CompressedObj):
-            p = p.decompress()
-        if p.basename == os.path.basename(figfile):
-            return p
-    return None
 
 
 class SDBaselineListQAHandler(pqa.QAPlugin):

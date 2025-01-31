@@ -3,7 +3,7 @@ import collections
 import itertools
 import operator
 # import platform
-import xml.etree.cElementTree as eltree
+import xml.etree.ElementTree as eltree
 from xml.dom import minidom
 
 from pipeline import environment
@@ -56,7 +56,14 @@ class PipelineManifest(object):
         Currently this assumes there is only one ous as is the case
         for member ous processing
         """
-        return self.piperesults.getchildren()[0]
+        return self.piperesults[0]
+
+    @staticmethod
+    def add_manifest(ous, manifestname, ous_name="N/A", level="N/A", package="N/A"):
+        """
+        Set the manifest information
+        """
+        eltree.SubElement(ous, "manifest", name=manifestname, ous=ous_name, level=level, package=package, datatype="pipeline_manifest", format="xml")
 
     @staticmethod
     def add_casa_version(ous, casa_version):
@@ -80,8 +87,8 @@ class PipelineManifest(object):
         # group node information by host
         root = eltree.SubElement(ous, 'execution_environment')
         groups = []
-        data = sorted(environment.cluster_details, key=operator.itemgetter('hostname'))
-        for _, g in itertools.groupby(data, operator.itemgetter('hostname')):
+        data = sorted(environment.cluster_details(), key=operator.attrgetter('hostname'))
+        for _, g in itertools.groupby(data, operator.attrgetter('hostname')):
             groups.append(list(g))
 
         for host_details in groups:
@@ -89,7 +96,7 @@ class PipelineManifest(object):
 
     @staticmethod
     def add_execution_node(root, host_details):
-        mpi_server_details = [d for d in host_details if 'MPI Server' in d['role']]
+        mpi_server_details = [d for d in host_details if 'MPI Server' in d.role]
         num_mpi_servers = str(len(mpi_server_details))
         eltree.SubElement(root, 'node', num_mpi_servers=num_mpi_servers)
 
@@ -149,12 +156,12 @@ class PipelineManifest(object):
         return None
 
     @staticmethod
-    def add_caltables(session, caltables_file, session_name):
-        eltree.SubElement(session, "caltables", name=caltables_file, level="N/A", session=session_name, package="N/A", datatype="caltables", format="tgz")
+    def add_caltables(session, caltables_file, session_name, ous_name="N/A", level="N/A", package="N/A"):
+        eltree.SubElement(session, "caltables", name=caltables_file, ous_name=ous_name, level=level, session=session_name, package=package, datatype="caltables", format="tgz")
 
     @staticmethod
-    def add_auxcaltables(session, caltables_file, session_name):
-        eltree.SubElement(session, "aux_caltables", name=caltables_file, level="N/A", session=session_name, package="N/A", datatype="caltables", format="tgz")
+    def add_auxcaltables(session, caltables_file, session_name, ous_name="N/A", level="N/A", package="N/A"):
+        eltree.SubElement(session, "aux_caltables", name=caltables_file, level=level, session=session_name, package=package, datatype="caltables", format="tgz")
 
     @staticmethod
     def get_caltables(ous):
@@ -221,11 +228,11 @@ class PipelineManifest(object):
         return applycmds_dict
 
     @staticmethod
-    def add_pprfile(ous, ppr_file, ous_name):
+    def add_pprfile(ous, ppr_file, ous_name="N/A", level="N/A", package="N/A"):
         """
         Add the pipeline processing request file to the OUS element
         """
-        eltree.SubElement(ous, "piperequest", name=ppr_file, level="N/A", ous=ous_name, package="N/A", datatype="pprequest", format="xml")
+        eltree.SubElement(ous, "piperequest", name=ppr_file, level=level, ous=ous_name, package=package, datatype="pprequest", format="xml")
 
     @staticmethod
     def add_images(ous, imagelist, imtype, extra_attributes_list=None):
@@ -243,32 +250,32 @@ class PipelineManifest(object):
                 eltree.SubElement(ous, "image", name=image, imtype=imtype, manualstring="N/A", **extra_attributes_list[i])
 
     @staticmethod
-    def add_pipescript(ous, pipescript, ous_name):
+    def add_pipescript(ous, pipescript, ous_name="N/A", level="N/A", package="N/A"):
         """
         Add the pipeline processing script to the OUS element
         """
-        eltree.SubElement(ous, "pipescript", name=pipescript, level="N/A", ous=ous_name, package="N/A", datatype="casa_pipescript", format="py")
+        eltree.SubElement(ous, "pipescript", name=pipescript, level=level, ous=ous_name, package=package, datatype="casa_pipescript", format="py")
 
     @staticmethod
-    def add_restorescript(ous, restorescript, ous_name):
+    def add_restorescript(ous, restorescript, ous_name="N/A", level="N/A", package="N/A"):
         """
         Add the pipeline restore script to the OUS element
         """
-        eltree.SubElement(ous, "restorescript", name=restorescript, level="N/A", ous=ous_name, package="N/A", datatype="casa_piperestorescript", format="py")
+        eltree.SubElement(ous, "restorescript", name=restorescript, level=level, ous=ous_name, package=package, datatype="casa_piperestorescript", format="py")
 
     @staticmethod
-    def add_weblog(ous, weblog, ous_name):
+    def add_weblog(ous, weblog, ous_name="N/A", level="N/A", package="N/A"):
         """
         Add the weblog to the OUS element
         """
-        eltree.SubElement(ous, "weblog", name=weblog, level="N/A", ous=ous_name, package="N/A", datatype="weblog", format="tgz")
+        eltree.SubElement(ous, "weblog", name=weblog, level=level, ous=ous_name, package=package, datatype="weblog", format="tgz")
 
     @staticmethod
-    def add_casa_cmdlog(ous, casa_cmdlog, ous_name):
+    def add_casa_cmdlog(ous, casa_cmdlog, ous_name="N/A", level="N/A", package="N/A"):
         """
         Add the CASA commands log to the OUS element
         """
-        eltree.SubElement(ous, "casa_cmdlog", name=casa_cmdlog, level="N/A", ous=ous_name, package="N/A", datatype="casa_commands", format="log")
+        eltree.SubElement(ous, "casa_cmdlog", name=casa_cmdlog, level=level, ous=ous_name, package=package, datatype="casa_commands", format="log")
 
     @staticmethod
     def add_flux_file(ous, flux_file):
@@ -295,18 +302,18 @@ class PipelineManifest(object):
         eltree.SubElement(ous, "cont_file", name=cont_file)
 
     @staticmethod
-    def add_aux_products_file(ous, auxproducts_file, ous_name):
+    def add_aux_products_file(ous, auxproducts_file, ous_name="N/A", level="N/A", package="N/A"):
         """
         Add the auxiliary products file. Is one enough ?
         """
-        eltree.SubElement(ous, "aux_products_file", name=auxproducts_file, level="N/A", ous=ous_name, package="N/A", datatype="auxproducts", format="tgz")
+        eltree.SubElement(ous, "aux_products_file", name=auxproducts_file, level=level, ous=ous_name, package=package, datatype="auxproducts", format="tgz")
 
     @staticmethod
-    def add_aqua_report(ous, aqua_report, ous_name):
+    def add_aqua_report(ous, aqua_report, ous_name="N/A", level="N/A", package="N/A"):
         """
         Add the AQUA report to the OUS element
         """
-        eltree.SubElement(ous, "aqua_report", name=aqua_report, level="N/A", ous=ous_name, package="N/A", datatype="pipeline_aquareport", format="xml")
+        eltree.SubElement(ous, "aqua_report", name=aqua_report, level=level, ous=ous_name, package=package, datatype="pipeline_aquareport", format="xml")
 
     def add_renorm(self, asdm_name, inputs):
         """

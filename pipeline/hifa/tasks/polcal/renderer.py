@@ -113,7 +113,7 @@ class T2_4MDetailsPolcalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             # on type of table.
             if tabletype == 'residual':
                 polcal_dict = session_results.cal_pfg_result
-            elif tabletype == 'polcal':
+            elif tabletype == 'polcal' and session_results.polcal_phase_result is not None:
                 polcal_dict = session_results.polcal_phase_result.polcal_returns[0]
             else:
                 polcal_dict = {}
@@ -134,10 +134,13 @@ class T2_4MDetailsPolcalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
         # Register each session MS in this new copy of the pipeline context.
         for session_results in result.session.values():
-            LOG.debug(f"Registering session MS {session_results.vis} to local copy of pipeline context for"
-                      f" weblog rendering.")
-            session_ms = tablereader.MeasurementSetReader.get_measurement_set(session_results.vis)
-            context.observing_run.add_measurement_set(session_ms)
+            if session_results.vis:
+                LOG.debug(f"Registering session MS {session_results.vis} to local copy of pipeline context for"
+                          f" weblog rendering.")
+                session_ms = tablereader.MeasurementSetReader.get_measurement_set(session_results.vis)
+                context.observing_run.add_measurement_set(session_ms)
+            else:
+                LOG.debug(f"No session MS found for session {session_results.session}, unable to render.")
 
         return context
 
@@ -145,8 +148,9 @@ class T2_4MDetailsPolcalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def create_amp_parang_plots(context, output_dir, result):
         plots = {}
         for session_name, session_results in result.session.items():
-            calto = callibrary.CalTo(vis=session_results.vis)
-            plots[session_name] = polcal.AmpVsParangSummaryChart(context, output_dir, calto).plot()
+            if session_results.vis:
+                calto = callibrary.CalTo(vis=session_results.vis)
+                plots[session_name] = polcal.AmpVsParangSummaryChart(context, output_dir, calto).plot()
 
         return plots
 
@@ -154,6 +158,9 @@ class T2_4MDetailsPolcalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def create_amp_scan_plots(context, result):
         plots = collections.defaultdict(list)
         for session_name, session_results in result.session.items():
+            if session_results.init_gcal_result is None:
+                continue
+
             # Create amp vs scan plots for 'before' calibration.
             plots_before = polcal.AmpVsScanChart(context, result, session_results.init_gcal_result.final).plot()
             # Add before/after calibration to plot parameters for display on
@@ -176,8 +183,9 @@ class T2_4MDetailsPolcalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def create_phase_channel_plots(context, result):
         plots = {}
         for session_name, session_results in result.session.items():
-            plots[session_name] = polcal.PhaseVsChannelChart(
-                context, result, session_results.polcal_phase_result.final).plot()
+            if session_results.polcal_phase_result is not None:
+                plots[session_name] = polcal.PhaseVsChannelChart(
+                    context, result, session_results.polcal_phase_result.final).plot()
 
         return plots
 
@@ -185,7 +193,8 @@ class T2_4MDetailsPolcalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def create_gain_ratio_rms_plots(context, output_dir, result):
         plots = {}
         for session_name, sresults in result.session.items():
-            plots[session_name] = polcal.GainRatioRMSVsScanChart(context, output_dir, sresults).plot()
+            if sresults.vis:
+                plots[session_name] = polcal.GainRatioRMSVsScanChart(context, output_dir, sresults).plot()
 
         return plots
 
@@ -196,6 +205,8 @@ class T2_4MDetailsPolcalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         subpages = {}
 
         for session_name, session_results in result.session.items():
+            if session_results.leak_polcal_result is None:
+                continue
             # Create the summary plots.
             summary_plots[session_results.vis].extend(polcal.XVsChannelSummaryChart(
                  context, result, session_results.leak_polcal_result.final, yaxis='real').plot())
@@ -230,6 +241,8 @@ class T2_4MDetailsPolcalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def create_xy_amp_ant_plots(context, result):
         plots_amp, plots_ampratio = {}, {}
         for session_name, session_results in result.session.items():
+            if session_results.xyratio_gcal_result is None:
+                continue
             plots_amp[session_name] = polcal.AmpVsAntennaChart(
                 context, result, session_results.xyratio_gcal_result.final).plot()
             plots_ampratio[session_name] = polcal.AmpVsAntennaChart(
@@ -241,6 +254,8 @@ class T2_4MDetailsPolcalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def create_real_imag_plots(context, output_dir, result):
         plots = {}
         for session_name, session_results in result.session.items():
+            if not session_results.vis:
+                continue
             calto = callibrary.CalTo(vis=session_results.vis)
             plots[session_name] = polcal.RealVsImagChart(context, output_dir, calto, correlation='XX,YY').plot()
             plots[session_name].extend(polcal.RealVsImagChart(context, output_dir, calto, correlation='XY,YX').plot())

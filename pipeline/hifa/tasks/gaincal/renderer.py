@@ -350,7 +350,7 @@ class GaincalPhaseVsTimeDiagnosticPlotRenderer(basetemplates.JsonPlotRenderer):
         title = 'Phase vs time for %s' % vis
         outfile = filenamer.sanitize('diagnostic_phase_vs_time-%s.html' % vis)
 
-        if not isinstance(results, collections.Iterable):
+        if not isinstance(results, collections.abc.Iterable):
             results = [results]
 
         # collect QA results generated for this vis

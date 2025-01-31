@@ -40,7 +40,7 @@ class ApplycalQAHandler(pqa.QAPlugin):
 
 
 class ApplycalListQAHandler(pqa.QAPlugin):
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = applycal.ApplycalResults
 
     def handle(self, context, result):

@@ -3,50 +3,22 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
+# docstring and type hints: inherits from hif.tasks.transformimagedata.transformimagedata.TransformimagedataInputs.__init__
 @utils.cli_wrapper
 def hif_transformimagedata(vis=None, outputvis=None, field=None, intent=None, spw=None, datacolumn=None, chanbin=None,
                            timebin=None, replace=None, clear_pointing=None, modify_weights=None, wtmode=None):
 
-    """
-    hif_transformimagedata ---- Extract fields for the desired VLASS image to a new MS and reset weights if desired
+    """Extract fields for the desired VLASS image to a new MS and reset weights if desired
 
     Extract fields for the desired VLASS image to a new MS and reset weights if desired
 
-    Output:
+    Returns:
+        The results object for the pipeline task is returned.
 
-    results -- The results object for the pipeline task is returned.
+    Examples:
+        1. Basic transformimagedata task
 
-    --------- parameter descriptions ---------------------------------------------
-
-    vis            List of visibility data files. These may be ASDMs, tar files of ASDMs,
-                   MSs, or tar files of MSs, If ASDM files are specified, they will be
-                   converted  to MS format.
-
-                   example: vis=['X227.ms', 'asdms.tar.gz']
-    outputvis      The output MeasurementSet.
-    field          Set of data selection field names or ids, \'\' for all.
-    intent         Set of data selection intents, \'\' for all.
-    spw            Set of data selection spectral window ids \'\' for all.
-    datacolumn     Select spectral windows to split. The standard CASA options are
-                   supported
-
-                   example: 'data', 'model'
-    chanbin        Bin width for channel averaging.
-    timebin        Bin width for time averaging.
-    replace        If a split was performed delete the parent MS and remove it from the context.
-
-                   example: True or False
-    clear_pointing Clear the pointing table.
-    modify_weights Re-initialize the weights.
-    wtmode         optional weight initialization mode when modify_weights=True
-
-    --------- examples -----------------------------------------------------------
-
-
-    1. Basic transformimagedata task
-
-    >>> hif_transformimagedata()
-
+        >>> hif_transformimagedata()
 
     """
 

@@ -49,7 +49,6 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
         # copy cont.dat file across to weblog directory
         contdat_filename = 'cont.dat'
-        contdat_path = os.path.join(weblog_dir, contdat_filename)
         contdat_weblink = os.path.join('stage%s' % results[0].stage_number, contdat_filename)
         contdat_path_link = '<a href="{!s}" class="replace-pre" data-title="{!s}">View</a>' \
                             ' or <a href="{!s}" download="{!s}">download</a> {!s} file.'.format(contdat_weblink, contdat_filename,
@@ -74,7 +73,13 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
                 status = ranges_dict[field][spw]['status']
 
-                ranges_for_spw = ranges_dict[field][spw].get('cont_ranges', ['NONE'])
+                ranges_and_flags_for_spw = ranges_dict[field][spw].get('cont_ranges', ['NONE'])
+                if ranges_and_flags_for_spw != ['NONE']:
+                    ranges_for_spw = ranges_and_flags_for_spw['ranges']
+                    flags_for_spw = ranges_and_flags_for_spw['flags']
+                else:
+                    ranges_for_spw = ['NONE']
+                    flags_for_spw = []
 
                 if ranges_for_spw in non_detection:
                     rows.append(TR(field='<b>{:s}</b>'.format(field), spw=spw, min='None', max='',
@@ -91,7 +96,7 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                     else:
                         refer = 'UNDEFINED'
                     sorted_ranges = sorted(raw_ranges_for_spw, key=operator.itemgetter(0))
-                    if 'ALL' in ranges_for_spw:
+                    if 'ALL' in flags_for_spw or 'ALLCONT' in flags_for_spw:
                         status += ' , All cont.'
                     for (range_min, range_max) in sorted_ranges:
                         # default units for Frequency is GHz, which matches the

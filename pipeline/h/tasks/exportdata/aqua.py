@@ -50,7 +50,7 @@ import operator
 import os
 import copy
 from typing import List, Optional
-import xml.etree.cElementTree as ElementTree
+import xml.etree.ElementTree as ElementTree
 from xml.dom import minidom
 
 import pipeline.infrastructure.logging as logging
@@ -98,7 +98,7 @@ class AquaXmlGenerator(object):
 
         :param context: pipeline context to parse
         :return: root XML Element of AQUA report
-        :rtype: xml.etree.cElementTree.Element
+        :rtype: xml.etree.ElementTree.Element
         """
         # read in all results in the context
         all_results = [r.read() for r in context.results]
@@ -143,7 +143,7 @@ class AquaXmlGenerator(object):
 
         :param context: pipeline context
         :return: XML for project structure
-        :rtype: xml.etree.cElementTree.Element
+        :rtype: xml.etree.ElementTree.Element
         """
         root = ElementTree.Element('ProjectStructure')
 
@@ -162,7 +162,7 @@ class AquaXmlGenerator(object):
 
         :param context: pipeline context
         :return: XML summarising execution
-        :rtype: xml.etree.cElementTree.Element
+        :rtype: xml.etree.ElementTree.Element
         """
         root = ElementTree.Element('QaSummary')
 
@@ -195,7 +195,7 @@ class AquaXmlGenerator(object):
         :param context: pipeline context
         :param all_results: all Results for this pipeline run
         :return: XML for all stages
-        :rtype: xml.etree.cElementTree.Element
+        :rtype: xml.etree.ElementTree.Element
         """
         # Get the stage summary element.
         xml_root = ElementTree.Element('QaPerStage')
@@ -280,7 +280,17 @@ class AquaXmlGenerator(object):
         if Intent == '':
             Intent = 'N/A'
 
-        return [ElementTree.Element('DataSelection', Asdm=Asdm, Session=Session, Spw=Spw, Intent=Intent)]
+        extra_attributes = {}
+
+        Field = ','.join(sorted(map(str, qa_score.applies_to.field)))
+        if len(Field) > 0:
+            extra_attributes['Field'] = Field
+
+        Antenna = ','.join(sorted(map(str, qa_score.applies_to.ant)))
+        if len(Antenna) > 0:
+            extra_attributes['Antenna'] = Antenna
+
+        return [ElementTree.Element('DataSelection', Asdm=Asdm, Session=Session, Spw=Spw, Intent=Intent, **extra_attributes)]
 
     def _get_xml_for_qa_scores(self, items, registry) -> List[ElementTree.Element]:
         """
@@ -314,7 +324,7 @@ class AquaXmlGenerator(object):
         :param context: pipeline context
         :param all_results: all Results for this pipeline run
         :return: XML for topics
-        :rtype: xml.etree.cElementTree.Element
+        :rtype: xml.etree.ElementTree.Element
         """
         # Set the top level topics element.
         root = ElementTree.Element('QaPerTopic')
@@ -348,7 +358,7 @@ class AquaXmlGenerator(object):
         :param context: pipeline context
         :param topic_results: list of Results for this topic
         :return: XML for calibration topic
-        :rtype: xml.etree.cElementTree.Element
+        :rtype: xml.etree.ElementTree.Element
         """
         return self._xml_for_topic('Calibration', context, topic_results)
 
@@ -359,7 +369,7 @@ class AquaXmlGenerator(object):
         :param context: pipeline context
         :param topic_results: list of Results for this topic
         :return: XML for dataset topic
-        :rtype: xml.etree.cElementTree.Element
+        :rtype: xml.etree.ElementTree.Element
         """
         return self._xml_for_topic('Dataset', context, topic_results)
 
@@ -370,7 +380,7 @@ class AquaXmlGenerator(object):
         :param context: pipeline context
         :param topic_results: list of Results for this topic
         :return: XML for flagging topic
-        :rtype: xml.etree.cElementTree.Element
+        :rtype: xml.etree.ElementTree.Element
         """
         return self._xml_for_topic('Flagging', context, topic_results)
 
@@ -381,7 +391,7 @@ class AquaXmlGenerator(object):
         :param context: pipeline context
         :param topic_results: list of Results for this topic
         :return: XML for imaging topic
-        :rtype: xml.etree.cElementTree.Element
+        :rtype: xml.etree.ElementTree.Element
         """
         return self._xml_for_topic('Imaging', context, topic_results)
 
@@ -630,7 +640,7 @@ def sensitivity_xml_for_stages(context, results, name=''):
     :param results: all results for the imaging topic
     :param name: the name of per stage tag (optional)
     :return: XML for sensitivities
-    :rtype: xml.etree.cElementTree.Element
+    :rtype: xml.etree.ElementTree.Element
     """
     xml_root = ElementTree.Element('ImageSensitivity')
 
@@ -656,7 +666,7 @@ def xml_for_sensitivity_stage(context, stage_results, exporter, name):
     :param exporter: function that returns a list of sensitivity dicts from the result
     :param name: the name of per stage tag (optional)
     :return: XML for all sensitivities reported by the result stage
-    :rtype: xml.etree.cElementTree.Element
+    :rtype: xml.etree.ElementTree.Element
     """
     stage_name, representative_score, _ = _get_pipeline_stage_and_scores(stage_results)
 
@@ -682,7 +692,7 @@ def xml_for_sensitivity(d):
 
     :param d: sensitivity dict
     :return: XML element
-    :rtype: xml.etree.cElementTree.Element
+    :rtype: xml.etree.ElementTree.Element
     """
     qa = casa_tools.quanta
 

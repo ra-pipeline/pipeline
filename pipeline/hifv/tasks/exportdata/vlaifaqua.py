@@ -1,6 +1,6 @@
 import operator
 import os
-import xml.etree.cElementTree as ElementTree
+import xml.etree.ElementTree as ElementTree
 
 import pipeline.domain.measures as measures
 import pipeline.infrastructure.logging as logging
@@ -122,7 +122,7 @@ def flux_xml_for_stages(context, results, accessor_dict):
     :param results: results to process
     :param accessor_dict: dict of accessor functions
     :return: XML for flux measurements
-    :rtype: xml.etree.cElementTree.Element
+    :rtype: xml.etree.ElementTree.Element
     """
     xml_root = ElementTree.Element('FluxMeasurements')
 
@@ -147,7 +147,7 @@ def xml_for_flux_stage(context, stage_results, origin, accessor, score_accessor)
     :param origin: text for Origin attribute value
     :param accessor: function that returns the flux measurements from the Result
     :param score_accessor: function that returns the QA score for the Result
-    :rtype: xml.etree.cElementTree.Element
+    :rtype: xml.etree.ElementTree.Element
     """
     score = score_accessor(stage_results)
     xml_root = ElementTree.Element('FluxMeasurements', Origin=origin, Score=score)
@@ -169,7 +169,7 @@ def xml_for_extracted_flux_measurements(all_measurements, ms):
     :param all_measurements: flux measurements dict.
     :param ms: measurement set
     :return: XML
-    :rtype: xml.etree.cElementTree.Element
+    :rtype: xml.etree.ElementTree.Element
     """
     asdm = aqua.vis_to_asdm(ms.name)
 

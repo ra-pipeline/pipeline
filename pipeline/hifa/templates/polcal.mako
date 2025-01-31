@@ -47,10 +47,14 @@ from pipeline.infrastructure.renderer import rendererutils
         nvis = len(vislists[session_name])
         %>
         <tr>
+        % if nvis == 0:
+            <td rowspan="1">${session_name}</td>
+        % else:
             <td rowspan="${nvis}">${session_name}</td>
             <td>${vislists[session_name][0]}</td>
             <td rowspan="${len(vislists[session_name])}">${polfields[session_name]}</td>
             <td rowspan="${len(vislists[session_name])}">${refants[session_name]}</td>
+        % endif
         </tr>
         % if len(vislists[session_name]) > 1:
             % for vis in vislists[session_name][1:]:

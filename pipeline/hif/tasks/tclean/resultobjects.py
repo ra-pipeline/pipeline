@@ -31,7 +31,7 @@ class TcleanResult(basetask.Results):
                  sourcename=None, field_ids=None, intent=None, spw=None,
                  orig_specmode=None, specmode=None, stokes=None, multiterm=None, plotdir=None,
                  imaging_mode=None, is_per_eb=None, is_eph_obj=None):
-        super(TcleanResult, self).__init__()
+        super().__init__()
         self.vis = vis
         self.datacolumn = datacolumn
         self.datatype = datatype
@@ -96,6 +96,10 @@ class TcleanResult(basetask.Results):
         self.bl_ratio = None
         # Polarization calibrator fit result
         self.polcal_fit = None
+        # Flag to indicate usage of psfphasecenter parameter
+        self.used_psfphasecenter = False
+        self.imaging_metadata = {}
+        self.im_names = {}
 
     def merge_with_context(self, context):
         # Calculated beams for later stages
@@ -623,8 +627,7 @@ class TcleanResult(basetask.Results):
 
     def set_tclean_stopreason(self, tclean_stopcode):
         # tclean exit conditions:
-        #   https://open-bitbucket.nrao.edu/projects/CASA/repos/casa6/browse/casatasks/src/modules/imagerhelpers/imager_base.py 
-        #   Search 'stopreasons'
+        #   https://casadocs.readthedocs.io/en/latest/notebooks/synthesis_imaging.html#Returned-Dictionary
         # See also CAS-6692 for additional information
         stopreasons = ['global stopping criterion not reached',  # CAS-13532
                        'iteration limit',
@@ -634,8 +637,9 @@ class TcleanResult(basetask.Results):
                        'peak residual increased by more than 3 times from the previous major cycle',
                        'peak residual increased by more than 3 times from the minimum reached',
                        'zero mask',
-                       'any combination of n-sigma and other valid exit criterion']
-        assert 0 <= tclean_stopcode <= len(stopreasons)-1,\
+                       'any combination of n-sigma and other valid exit criterion',
+                       'the major cycle limit (nmajor) reached']
+        assert 0 <= tclean_stopcode <= len(stopreasons)-1, \
             "tclean stop code {} does not index into stop reasons list".format(tclean_stopcode)
         self._tclean_stopreason = stopreasons[tclean_stopcode]
 

@@ -2,7 +2,7 @@
 Restore task module for NRO data, based on h_restoredata.
 
 The restore data module provides a class for reimporting, reflagging, and
-recalibrating a subset of the ASDMs belonging to a member OUS, using pipeline
+recalibrating a subset of the MSes belonging to a member OUS, using pipeline
 flagging and calibration data products.
 """
 import os
@@ -30,6 +30,7 @@ class NRORestoreDataInputs(restoredata.RestoreDataInputs):
     caltable = vdp.VisDependentProperty(default='')
     hm_rasterscan = vdp.VisDependentProperty(default='time')
 
+    # docstring and type hints: supplements hsdn_retoredata
     def __init__(self, context: Context, vis: List[str] = None, caltable: vdp.VisDependentProperty = None,
                  reffile: vdp.VisDependentProperty = None, products_dir: str = None,
                  copytoraw: vdp.VisDependentProperty = None, rawdata_dir: str = None, output_dir: str = None,
@@ -39,14 +40,77 @@ class NRORestoreDataInputs(restoredata.RestoreDataInputs):
 
         Args:
             context: the pipeline Context state object
-            vis: the ASDMs(s) for which data is to be restored
-            caltable: VisDependentProperty object, calibration table data
-            reffile: VisDependentProperty object, a scale file
-            products_dir: the directory of archived pipeline products
-            copytoraw: copy the required data products from products_dir to rawdata_dir
-            rawdata_dir: the raw data directory for ASDM(s) and products
+
+            vis: List of raw visibility data files to be restored.
+                Assumed to be in the directory specified by rawdata_dir.
+
+                Example: vis=['mg2.ms']
+
+            caltable: Name of output gain calibration tables.
+
+                Example: caltable='ngc5921.gcal'
+
+            reffile: Path to a file containing scaling factors between beams.
+                The format is equals to jyperk.csv with five fields:
+
+                    - MS name
+                    - beam name (instead of antenna name)
+                    - spectral window id
+                    - polarization string
+                    - the scaling factor
+
+                Example for the file is as follows::
+
+                    #MS,Beam,Spwid,Polarization,Factor
+                    mg2-20181016165248-181017.ms,NRO-BEAM0,0,I,1.000000000
+                    mg2-20181016165248-181017.ms,NRO-BEAM0,1,I,1.000000000
+                    mg2-20181016165248-181017.ms,NRO-BEAM0,2,I,1.000000000
+                    mg2-20181016165248-181017.ms,NRO-BEAM0,3,I,1.000000000
+                    mg2-20181016165248-181017.ms,NRO-BEAM1,0,I,3.000000000
+                    mg2-20181016165248-181017.ms,NRO-BEAM1,1,I,3.000000000
+                    mg2-20181016165248-181017.ms,NRO-BEAM1,2,I,3.000000000
+                    mg2-20181016165248-181017.ms,NRO-BEAM1,3,I,3.000000000
+                    mg2-20181016165248-181017.ms,NRO-BEAM2,0,I,0.500000000
+                    mg2-20181016165248-181017.ms,NRO-BEAM2,1,I,0.500000000
+                    mg2-20181016165248-181017.ms,NRO-BEAM2,2,I,0.500000000
+                    mg2-20181016165248-181017.ms,NRO-BEAM2,3,I,0.500000000
+                    mg2-20181016165248-181017.ms,NRO-BEAM3,0,I,2.000000000
+                    mg2-20181016165248-181017.ms,NRO-BEAM3,1,I,2.000000000
+                    mg2-20181016165248-181017.ms,NRO-BEAM3,2,I,2.000000000
+                    mg2-20181016165248-181017.ms,NRO-BEAM3,3,I,2.000000000
+
+                If no file name is specified or specified file doesn't exist,
+                all the factors are set to 1.0.
+
+                Example: reffile='', reffile='nroscalefactor.csv'
+
+            products_dir: Name of the data products directory.
+
+                Example: products_dir='myproductspath'
+
+                Default: None (equivalent to '../products')
+
+            copytoraw: Copy calibration and flagging tables to
+                raw data directory.
+
+                Example: copytoraw=False
+
+                Default: None (equivalent to True)
+
+            rawdata_dir: Name of the raw data directory.
+
+                Example: rawdata_dir='myrawdatapath'
+
+                Default: None (equivalent to '../rawdata')
+
             output_dir: the working directory for the restored data
-            hm_rasterscan: Heuristics method for raster scan analysis
+
+            hm_rasterscan: Heuristics method for raster scan analysis.
+                Two analysis modes, time-domain analysis ('time') and
+                direction analysis ('direction'), are available.
+
+                Default: None (equivalent to 'time')
+
         """
         super(NRORestoreDataInputs, self).__init__(context, vis=vis, products_dir=products_dir,
                                                    copytoraw=copytoraw, rawdata_dir=rawdata_dir,

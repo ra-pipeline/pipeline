@@ -36,6 +36,9 @@ class T2_4MDetailsTsyscalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         subpages = {}
         eb_plots = []
         for result in results:
+            if not result.final:
+                continue
+
             calapp = result.final[0]
             plotter = displays.TsysSummaryChart(pipeline_context, result, calapp)
             plots = plotter.plot()
@@ -112,7 +115,7 @@ class TsyscalPlotRenderer(basetemplates.JsonPlotRenderer):
 
         # need to wrap result in a list to give common implementation for the
         # following code that extracts spwmap and gaintable
-        if not isinstance(result, collections.Iterable):
+        if not isinstance(result, collections.abc.Iterable):
             result = [result]
         self._caltable = {os.path.basename(r.inputs['vis']): r.final[0].gaintable
                           for r in result}

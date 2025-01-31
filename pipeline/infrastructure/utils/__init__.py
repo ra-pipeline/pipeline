@@ -21,6 +21,7 @@ from .utils import *
 from .weblog import *
 from .math import *
 from .positioncorrection import *
+from .subprocess import *
 
 # IMPORTANT! If you import from a new submodule, please add it to the list below
 _all_modules = [
@@ -34,7 +35,8 @@ _all_modules = [
     'utils',
     'weblog',
     'math',
-    'positioncorrection'
+    'positioncorrection',
+    'subprocess'
 ]
 
 

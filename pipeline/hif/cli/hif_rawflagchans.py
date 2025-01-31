@@ -3,15 +3,14 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
+# docstring and type hints: inherits from hif.tasks.rawflagchans.rawflagchans.RawflagchansInputs.__init__
 @utils.cli_wrapper
 def hif_rawflagchans(vis=None, spw=None, intent=None,
   flag_hilo=None, fhl_limit=None, fhl_minsample=None,
   flag_bad_quadrant=None, fbq_hilo_limit=None,
   fbq_antenna_frac_limit=None, fbq_baseline_frac_limit=None):
 
-    """
-    hif_rawflagchans ---- Flag deviant baseline/channels in raw data
-
+    """Flag deviant baseline/channels in raw data
 
     hif_rawflagchans flags deviant baseline/channels in the raw data.
 
@@ -48,62 +47,18 @@ def hif_rawflagchans(vis=None, spw=None, intent=None,
     Suspect points are not flagged unless as part of a bad antenna or
     baseline quadrant.
 
+    Returns:
+        The results object for the pipeline task is returned.
 
-    Output
+    Examples:
+        1. Flag bad quadrants and wild outliers, default method:
 
-    results -- The results object for the pipeline task is returned.
+        >>> hif_rawflagchans()
 
-    --------- parameter descriptions ---------------------------------------------
+        equivalent to:
 
-    vis                     List of input MeasurementSets.
-
-                            default: [] - Use the MeasurementSets currently known to the pipeline
-                            context.
-    spw                     The list of spectral windows and channels to which the calibration
-                            will be applied. Defaults to all science windows in the pipeline
-                            context.
-
-                            example: spw='17', spw='11, 15'
-    intent                  A string containing the list of intents to be checked for antennas
-                            with deviant gains. The default is blank, which causes the task to select
-                            the 'BANDPASS' intent.
-
-                            example: intent='`*BANDPASS*`'
-    flag_hilo               True to flag channel/baseline data further from the view
-                            median than fhl_limit * MAD.
-    fhl_limit               If flag_hilo is True then flag channel/baseline data
-                            further from the view median than fhl_limit * MAD.
-    fhl_minsample           Do no flagging if the view median and MAD are derived
-                            from fewer than fhl_minsample view pixels.
-    flag_bad_quadrant       True to search for and flag bad antenna quadrants
-                            and baseline quadrants. Here a /'quadrant/' is one
-                            quarter of the channel axis.
-    fbq_hilo_limit          If flag_bad_quadrant is True then channel/baselines further
-                            from the view median than fbq_hilo_limit * MAD will be noted as
-                            'suspect'. If there are enough of them to indicate that an antenna or
-                            baseline quadrant is bad then all channel/baselines in that quadrant will
-                            be flagged.
-    fbq_antenna_frac_limit  If flag_bad_quadrant is True and the fraction of
-                            suspect channel/baselines in a particular antenna/quadrant exceeds
-                            fbq_antenna_frac_limit then all data for that antenna/quadrant will
-                            be flagged.
-    fbq_baseline_frac_limit If flag_bad_quadrant is True and the fraction of
-                            suspect channel/baselines in a particular baseline/quadrant exceeds
-                            fbq_baseline_frac_limit then all data for that baseline/quadrant will
-                            be flagged.
-
-    --------- examples -----------------------------------------------------------
-
-
-    1. Flag bad quadrants and wild outliers, default method:
-
-    >>> hif_rawflagchans()
-
-    equivalent to:
-
-    >>> hif_rawflagchans(flag_hilo=True, fhl_limit=20, flag_bad_quadrant=True, fbq_hilo_limit=8,
-        fbq_antenna_frac_limit=0.2, fbq_baseline_frac_limit=1.0)
-
+        >>> hif_rawflagchans(flag_hilo=True, fhl_limit=20, flag_bad_quadrant=True, fbq_hilo_limit=8,
+        ...                  fbq_antenna_frac_limit=0.2, fbq_baseline_frac_limit=1.0)
 
     """
 

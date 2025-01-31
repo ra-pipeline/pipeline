@@ -6,6 +6,7 @@ import numpy as np
 import pipeline.hif.tasks.tclean.renderer as clean_renderer
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.renderer.rendererutils as rendererutils
+from pipeline.domain import DataType
 
 columns = {
     'cleanmask' : 'Clean Mask',
@@ -26,7 +27,7 @@ try:
     long_description = '<br><small>{!s}'.format(result.metadata['long description'])
 except:
     long_description = ''
-%>Tclean/MakeImages${long_description}</%block>
+%>MakeImages${long_description}</%block>
 
 %if imaging_mode == 'ALMA':
     <p>In this stage, images with significant emission are cleaned to a threshold of
@@ -189,10 +190,12 @@ except:
         <ul>
             %for i in field_block_indices[:-1]:
                 <li>
-                <a href="#field_block_${i}">${image_info[i].field}
-                %if image_info[i].result.is_per_eb:
-                    (${image_info[i].vis})
-                %endif
+                <a href="#field_block_${i}">
+                    ${image_info[i].field}
+                    (${DataType.get_short_datatype_desc(image_info[i].datatype)})
+                    %if image_info[i].result.is_per_eb:
+                        (${image_info[i].vis})
+                    %endif
                 </a>
                 </li>
             %endfor
@@ -216,7 +219,10 @@ except:
             %endif
             %for j in range(field_block_indices[i], field_block_indices[i+1], 4):
                 <tr>
-                    <td rowspan="2" style="width:150px;">${image_info[j].field}</td>
+                    <td rowspan="2" style="width:150px;">
+                        ${image_info[j].field}
+                        (${DataType.get_short_datatype_desc(image_info[j].datatype)})
+                    </td>
                     %for k in range(j, min(j+4, field_block_indices[i+1])):
                         <td style="width:250px;height:50px;">
                             <div style="word-wrap:break-word;overflow-y:scroll;width:250px;height:50px;">
@@ -276,6 +282,16 @@ except:
                     %endfor
                 </tr>
                 <tr>
+                    <th>data type</th>
+                    %for k in range(j, min(j+4, field_block_indices[i+1])):
+                        <td style="width:250px;">
+                            <div style="word-wrap:break-word;width:250px;">
+                                ${image_info[k].datatype_info}
+                            </div>
+                        </td>
+                    %endfor
+                </tr>
+                <tr>
                     <th>${image_info[j].stokes_label}</th>
                     %for k in range(j, min(j+4, field_block_indices[i+1])):
                         <td style="width:250px;">${image_info[k].pol}</td>
@@ -320,6 +336,14 @@ except:
                     %endfor
                 </tr>
                 %endif
+                % if row.nmajordone_total is not None:
+                <tr>
+                    <th>total number of major cycles done</th>
+                    %for k in range(j, min(j+4, field_block_indices[i+1])):
+                        <td>${image_info[k].nmajordone_total}</td>
+                    %endfor
+                </tr>
+                % endif
                 <tr>
                     <th>clean residual peak / scaled MAD</th>
                     %for k in range(j, min(j+4, field_block_indices[i+1])):
@@ -395,16 +419,6 @@ except:
                         <td style="width:250px;">
                             <div style="word-wrap:break-word;width:250px;">
                                 ${image_info[k].image_file}
-                            </div>
-                        </td>
-                    %endfor
-                </tr>
-                <tr>
-                    <th>data type</th>
-                    %for k in range(j, min(j+4, field_block_indices[i+1])):
-                        <td style="width:250px;">
-                            <div style="word-wrap:break-word;width:250px;">
-                                ${image_info[k].datatype_info}
                             </div>
                         </td>
                     %endfor

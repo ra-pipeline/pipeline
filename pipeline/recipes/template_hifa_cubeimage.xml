@@ -5,7 +5,12 @@
     <!-- import MS: if importonly=True, no calibration shall be performed -->
     <ProcessingCommand>
         <Command xmlns="">hifa_importdata</Command>
-        <ParameterSet/>
+        <ParameterSet>
+            <Parameter>
+                <Keyword xmlns="">datacolumns</Keyword>
+                <Value xmlns="">{'data':'raw','corrected':'regcal_contline_all'}</Value>
+            </Parameter>
+        </ParameterSet>
     </ProcessingCommand>
     <!-- end of import MS-->
     {{/importonly}}
@@ -31,7 +36,7 @@
     </ProcessingCommand>
 
     <ProcessingCommand>
-        <Command xmlns="">hifas_imageprecheck</Command>
+        <Command xmlns="">hifa_imageprecheck</Command>
         <ParameterSet>
             <Parameter>
                 <Keyword xmlns="">desired_angular_resolution</Keyword>
@@ -84,6 +89,10 @@
     <ProcessingCommand>
         <Command xmlns="">hif_uvcontsub</Command>
         <ParameterSet>
+            <Parameter>
+                <Keyword xmlns="">field</Keyword>
+                <Value xmlns="">{{{field_list}}}</Value>
+            </Parameter>
         </ParameterSet>
     </ProcessingCommand>
 

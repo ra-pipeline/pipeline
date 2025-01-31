@@ -43,8 +43,10 @@ class T2_4MDetailsMakepbcorimagesRenderer(basetemplates.T2_4MDetailsDefaultRende
         mslist_str = '<br>'.join([os.path.basename(vis) for vis in pbcor_result.inputs['vis']])
         pbcorplots[mslist_str] = plot_dict
 
-        for _, pbcor_images in pbcor_dict.items():
-
+        for basename_keep, pbcor_images in pbcor_dict.items():
+            basename = basename_keep[0]
+            keep = basename_keep[1]
+            info_dict[basename] = keep
             for image_path in pbcor_images:
                 LOG.info('Getting properties of %s for the weblog.' % image_path)
 

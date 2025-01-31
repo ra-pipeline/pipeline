@@ -11,30 +11,33 @@ import errno
 import fcntl
 import glob
 import itertools
+from numbers import Number
 import operator
 import os
 import pickle
 import re
 import shutil
 import string
+import sys
 import tarfile
 from typing import Collection, Dict, List, Optional, Sequence, Tuple, Union
 
 import casaplotms
 import numpy as np
+import numpy.typing as npt
 
 from .. import casa_tools, logging, mpihelpers
 from .conversion import dequote, range_to_list
 
 LOG = logging.get_logger(__name__)
 
-__all__ = ['find_ranges', 'dict_merge', 'are_equal', 'approx_equal', 'get_num_caltable_polarizations',
+__all__ = ['find_ranges', 'dict_merge', 'are_equal', 'approx_equal', 'get_num_caltable_polarizations', 'fieldname_for_casa',
            'flagged_intervals', 'get_field_identifiers', 'get_receiver_type_for_spws', 'get_spectralspec_to_spwid_map',
            'imstat_items', 'get_stokes', 'get_taskhistory_fromimage', 'glob_ordered', 'deduplicate',
            'get_casa_quantity', 'get_si_prefix', 'absolute_path', 'relative_path', 'get_task_result_count',
            'place_repr_source_first', 'shutdown_plotms', 'get_casa_session_details', 'get_obj_size', 'get_products_dir',
            'export_weblog_as_tar', 'ensure_products_dir_exists', 'ignore_pointing', 'request_omp_threading',
-           'open_with_lock', 'nested_dict']
+           'open_with_lock', 'nested_dict', 'string_to_val', 'remove_trailing_string', 'list_to_str']
 
 
 def find_ranges(data: Union[str, List[int]]) -> str:
@@ -642,7 +645,7 @@ def ignore_pointing(vis):
         ls -lih test_small.ms/POINTING
 
     """
-    if isinstance(vis, list):
+    if isinstance(vis, (list, set)):
         vis_list = vis
     else:
         vis_list = [vis]
@@ -860,3 +863,54 @@ def to_plain_dict(default_dict):
             plain_dict[k] = v
 
     return plain_dict
+
+
+def string_to_val(s):
+    """
+    Convert a string to a Python data type.
+    """
+    try:
+        pyobj = ast.literal_eval(s)
+        # PIPE-1030: prevent a string like "1,2,3" from being unexpectedly translated into tuple
+        if type(pyobj) is tuple and s.strip()[0] != '(':
+            pyobj = s
+        return pyobj
+    except ValueError:
+        return s
+    except SyntaxError:
+        return s
+
+
+def remove_trailing_string(s, t):
+    """
+    Remove a trailing string if it exists.
+    """
+    if s.endswith(t):
+        return s[:-len(t)]
+    else:
+        return s
+
+
+def list_to_str(value: Union[List[Union[Number, str]], npt.NDArray]) -> str:
+    """Convert list or numpy.ndarray into string.
+
+    The list/ndarray should be 1-dimensional. In that case, the function
+    returns comma-separated sequence of its elements. Otherwise it just
+    returns default string representation of the value, str(value).
+
+    Args:
+        value: 1-dimensional list or numpy array
+
+    Returns:
+        String representation of the value. If input value is in
+        compliance with the requirement, it will be comma-separated
+        sequence of elements.
+    """
+    if isinstance(value, (list, np.ndarray)) \
+       and all(isinstance(x, (Number, str)) for x in value):
+        # use np.ndarray.tolist to ensure all the elements
+        # have Python builtin types
+        ret = str(np.asarray(value).tolist())
+    else:
+        ret = str(value)
+    return ret

@@ -9,7 +9,7 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.utils as utils
 from pipeline.infrastructure import casa_tools
-from pipeline.infrastructure.pipelineqa import QAScore, WebLogLocation
+from pipeline.infrastructure.pipelineqa import QAScore, WebLogLocation, scores_with_location
 
 from typing import Any
 
@@ -297,17 +297,6 @@ def scores_in_range(pool: List[QAScore], lo: float, hi: float) -> List[QAScore]:
     return [score for score in pool
             if score.score not in ('', 'N/A', None)
             and lo < score.score <= hi]
-
-
-def scores_with_location(pool: List[QAScore],
-                         locations: Optional[List[WebLogLocation]] = None) -> List[QAScore]:
-    """
-    Filter QA scores by web log location.
-    """
-    if not locations:
-        locations = list(WebLogLocation)
-
-    return [score for score in pool if score.weblog_location in locations]
 
 
 def get_notification_trs(result, alerts_info, alerts_success):

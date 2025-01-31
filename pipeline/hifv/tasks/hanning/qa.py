@@ -33,7 +33,7 @@ class HanningListQAHandler(pqa.QAPlugin):
     """
     QA handler for a list containing HanningResults.
     """
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = hanning.HanningResults
     generating_task = hanning.Hanning
 

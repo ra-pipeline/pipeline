@@ -25,7 +25,7 @@ class CheckProductSizeQAHandler(pqa.QAPlugin):
 
 
 class CheckProductSizeListQAHandler(pqa.QAPlugin):
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = resultobjects.CheckProductSizeResult
 
     def handle(self, context, result):

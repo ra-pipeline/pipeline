@@ -44,11 +44,55 @@ class FluxcalFlagInputs(vdp.StandardInputs):
 
     applyflags = vdp.VisDependentProperty(default=True)
 
+    # docstring and type hints: supplements hifa_fluxcalflag
     def __init__(self, context, vis=None, output_dir=None,
                  field=None, spw=None, intent=None,
                  threshold=None, appendlines=None, linesfile=None,
                  applyflags=None
                  ):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            vis: The list of input MeasurementSets. Defaults to the list of
+                MeasurementSets defined in the pipeline context.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            field: The list of field names or field ids for which the models are
+                to be set. Defaults to all fields with intent 'AMPLITUDE'.
+
+                Example: field='3C279', field='3C279, M82'
+
+            spw: Spectral windows and channels for which bandpasses are
+                computed. Defaults to all science spectral windows.
+
+                Example: spw='11,13,15,17'
+
+            intent: A string containing a comma delimited list of intents against
+                which the selected fields are matched. Defaults to all data
+                with amplitude intent.
+
+                Example: intent='AMPLITUDE'
+
+            threshold: If the fraction of a spectral window occupied by line regions
+                is greater than this threshold value, then flag the entire
+                spectral window.
+
+            appendlines: Append user defined line regions to the line dictionary.
+
+            linesfile: Read in a file containing lines regions and append it to the
+                builtin dictionary. Blank lines and comments beginning with #
+                are skipped. The data is contained in 4 whitespace delimited
+                fields containing the solar system object field name, e.g.
+                'Callisto', the molecular species name, e.g. '13CO', and the
+                starting and ending frequency in GHz.
+
+            applyflags: Boolean for whether to apply the generated flag commands. (default True)
+
+        """
         super(FluxcalFlagInputs, self).__init__()
 
         # pipeline inputs
@@ -79,7 +123,7 @@ class FluxcalFlagResults(basetask.Results):
 
     def merge_with_context(self, context):
 
-        if self._vis is None: 
+        if self._vis is None:
             LOG.error(' No results to merge ')
             return
 
@@ -101,7 +145,7 @@ class FluxcalFlagResults(basetask.Results):
                 linelist = linelist + \
                     '\tfield=%s line=%s spw=%d:%d~%d nchan=%d\n' % \
                     (line.fieldname, line.species, line.spwid, \
-                     line.chanrange[0], line.chanrange[1], line.nchan) 
+                     line.chanrange[0], line.chanrange[1], line.nchan)
             return linelist
 
 
@@ -129,7 +173,7 @@ class FluxcalFlag(basetask.StandardTaskTemplate):
             result.summaries = summaries
             return result
 
-        # Get the science spws. 
+        # Get the science spws.
         science_spws = inputs.ms.get_spectral_windows(task_arg=inputs.spw, science_windows_only=True)
         if not science_spws:
             LOG.warning('No science spw(s) specified for %s' % inputs.ms.basename)
@@ -165,7 +209,7 @@ class FluxcalFlag(basetask.StandardTaskTemplate):
             # Skip if field not in solar system object line list
             if field.name not in UserSolarSystemLineList:
                 continue
-            LOG.info('Searching field %s for spectral lines' % (field.name)) 
+            LOG.info('Searching field %s for spectral lines' % (field.name))
 
             # Loop over the science spectral windows for that field
             # NOTE: Use in field.valid_spws() in future
@@ -249,7 +293,7 @@ class FluxcalFlag(basetask.StandardTaskTemplate):
     def analyse(self, result):
         return result
 
-    # Read in a file containing lines regions and append it to 
+    # Read in a file containing lines regions and append it to
     # the builtin dictionary.
     #    Blank lines and comments beginning with # are skipped
     #    The data is contained in 4 whitespace delimited fields
@@ -283,7 +327,7 @@ class FluxcalFlag(basetask.StandardTaskTemplate):
                     #    If not create new species list
                     newspecies = True
                     for item in linedict[source]:
-                        if item[0] == species: 
+                        if item[0] == species:
                             item[1].append(region)
                             newspecies = False
                     if newspecies:
@@ -306,21 +350,21 @@ class FluxcalFlag(basetask.StandardTaskTemplate):
                 flagstats[line.fieldname] = {}
                 maskarrays[line.fieldname] = {}
                 spwmask = np.zeros(line.nchan, dtype=np.int32)
-                spwmask[line.chanrange[0]:line.chanrange[1]:1] = 1 
+                spwmask[line.chanrange[0]:line.chanrange[1]:1] = 1
                 flagstats[line.fieldname][line.spwid] = \
-                    np.sum(spwmask) / float(line.nchan) 
+                    np.sum(spwmask) / float(line.nchan)
                 maskarrays[line.fieldname][line.spwid] = spwmask
             elif line.spwid != prev_spwid:
                 spwmask = np.zeros(line.nchan, dtype=np.int32)
-                spwmask[line.chanrange[0]:line.chanrange[1]:1] = 1 
+                spwmask[line.chanrange[0]:line.chanrange[1]:1] = 1
                 flagstats[line.fieldname][line.spwid] = \
-                    np.sum(spwmask) / float(line.nchan) 
+                    np.sum(spwmask) / float(line.nchan)
                 maskarrays[line.fieldname][line.spwid] = spwmask
             else:
                 spwmask = maskarrays[line.fieldname][line.spwid]
-                spwmask[line.chanrange[0]:line.chanrange[1]:1] = 1 
+                spwmask[line.chanrange[0]:line.chanrange[1]:1] = 1
                 flagstats[line.fieldname][line.spwid] = \
-                    np.sum(spwmask) / float(line.nchan) 
+                    np.sum(spwmask) / float(line.nchan)
 
             prev_fieldname = line.fieldname
             prev_spwid = line.spwid
@@ -359,12 +403,12 @@ class FluxcalFlag(basetask.StandardTaskTemplate):
                         flagged = True
                         if svalue > threshold:
                             flaggedspws[skey] = spw
-                        else: 
+                        else:
                             unflaggedspws[skey] = spw
             if not flagged:
                 unflaggedspws[spw.id] = spw
 
-        # None need be completely flagged. 
+        # None need be completely flagged.
         if not flaggedspws:
             return True, [-1]
 
@@ -418,7 +462,7 @@ class FluxcalFlag(basetask.StandardTaskTemplate):
                 if flagall and flagstats[line.fieldname][line.spwid] > threshold:
                     pass
                 else:
-                    # Note: the value of spw field is not closed by single quote, 
+                    # Note: the value of spw field is not closed by single quote,
                     # for in case additional channel ranges are added.
                     flagcmd = "mode='manual' field='%s' intent='%s' spw='%d:%d~%d" % \
                         (line.fieldname, ','.join(obsmodes), line.spwid, line.chanrange[0], line.chanrange[1])
@@ -447,7 +491,7 @@ class FluxcalFlag(basetask.StandardTaskTemplate):
             vis - MS name
         fieldid - field id of the observed field for reference frame \
                   calculations
-          spwid - id of the spw 
+          spwid - id of the spw
         minfreq - minimum freq in Hz
         maxfreq - maximum freq in Hz
         refframe - frequency reference frame
@@ -544,6 +588,6 @@ class MolecularLine():
         self.fieldname = fieldname
         self.species = species
         self.freqrange = freqrange
-        self.spwid = spwid 
+        self.spwid = spwid
         self.chanrange = chanrange
         self.nchan = nchan

@@ -164,12 +164,6 @@ latex_elements = {
       \sphinxtableofcontentshook
       \tableofcontents
     \endgroup
-    \begin{sphinxadmonition}{note}{Note:}
-      \sphinxAtStartPar
-      The \sphinxcode{dryrun} and \sphinxcode{acceptresults} parameters for each task are no longer supported 
-      and may be removed in a future release. As such, they are excluded
-      from this manual.
-    \end{sphinxadmonition}
     % before resetting page counter, let's do the right thing.
     \if@openright\cleardoublepage\else\clearpage\fi
     \pagenumbering{arabic}% 

@@ -1,9 +1,12 @@
+import re
+from typing import List, Optional
+
 import numpy as np
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.utils as utils
-import pipeline.domain.measures as measures
 from pipeline.infrastructure import casa_tools
+
 from .imageparams_base import ImageParamsHeuristics
 
 LOG = infrastructure.get_logger(__name__)
@@ -17,7 +20,7 @@ class ImageParamsHeuristicsALMA(ImageParamsHeuristics):
                                        linesfile, imaging_params)
         self.imaging_mode = 'ALMA'
 
-    def robust(self):
+    def robust(self, specmode=None):
         """robust parameter heuristic."""
         if 'robust' in self.imaging_params:
             robust = self.imaging_params['robust']
@@ -26,7 +29,7 @@ class ImageParamsHeuristicsALMA(ImageParamsHeuristics):
         else:
             return 0.5
 
-    def uvtaper(self, beam_natural=None, protect_long=3):
+    def uvtaper(self, beam_natural=None, protect_long=3, beam_user=None, tapering_limit=None, repr_freq=None):
         """Adjustment of uvtaper parameter based on desired resolution or representative baseline length."""
 
         # Disabled heuristic for ALMA Cycle 6
@@ -204,13 +207,13 @@ class ImageParamsHeuristicsALMA(ImageParamsHeuristics):
         baseline_lengths = []
         for msname in self.vislist:
             ms_do = self.observing_run.get_ms(msname)
-            ms_baseline_lengths = [float(baseline.length.to_units(measures.DistanceUnits.METRE))
-                                    for baseline in ms_do.antenna_array.baselines]
-            ms_baseline_lengths.sort()
-            if(len(ms_baseline_lengths) >= n):
-                baseline_lengths.append(ms_baseline_lengths[n-1])
+            baselines_m = ms_do.antenna_array.baselines_m
+            if n > len(baselines_m):
+                continue
 
-        if(len(baseline_lengths) > 0):
+            baseline_lengths.append(np.sort(baselines_m)[n-1])
+
+        if len(baseline_lengths) > 0:
             return np.median(baseline_lengths)
         else:
             return None
@@ -437,14 +440,21 @@ class ImageParamsHeuristicsALMA(ImageParamsHeuristics):
 
     def threshold(self, iteration, threshold, hm_masking):
 
+        cqa = casa_tools.quanta
+
         if iteration == 0:
             return '0.0mJy'
         elif iteration == 1:
-            return threshold
+            maxthreshold = self.imaging_params.get('maxthreshold', None)
+            if maxthreshold and threshold and cqa.gt(threshold, maxthreshold):
+                LOG.info(
+                    f'Switching to use the pre-defined threshold upper limit value of {maxthreshold} instead of {threshold}')
+                return maxthreshold
+            else:
+                return threshold
         else:
             # Fallback to circular mask if auto-boxing fails.
             # CAS-10489: old centralregion option needs higher threshold
-            cqa = casa_tools.quanta
             return '%sJy' % (cqa.getvalue(cqa.mul(threshold, 2.0))[0])
 
     def intent(self):
@@ -456,17 +466,64 @@ class ImageParamsHeuristicsALMA(ImageParamsHeuristics):
         else:
             return 'I'
 
-    def weighting(self, specmode: str) -> str:
-        """Determine the weighting scheme."""
-        if specmode in ('mfs', 'cont'):
-            return 'briggs'
-        else:
-            return 'briggsbwtaper'
+    def reffreq(self, deconvolver: Optional[str] = None, specmode: Optional[str] = None, spwsel: Optional[dict] = None) -> Optional[str]:
+        """PIPE-1838: Tclean reffreq parameter heuristics."""
 
-    def perchanweightdensity(self, specmode: str) -> bool:
-        """Determine the perchanweightdensity parameter."""
-        if specmode in ('mfs', 'cont'):
-            return False
-        else:
-            return True
+        if deconvolver != 'mtmfs' or specmode != 'cont':
+            return None
 
+        if spwsel in (None, ''):
+            LOG.attention('Cannot calculate reference frequency for mtmfs cleaning.')
+            return None
+
+        qaTool = casa_tools.quanta
+
+        n_sum = 0.0
+        d_sum = 0.0
+        p = re.compile(r'([\d.]*\s*)(~\s*)([\d.]*\s*)([A-Za-z]*\s*)(;?)')
+        freqRangeFound = False
+        for spwsel_k, spwsel_v in spwsel.items():
+            try:
+                if spwsel_v not in ('', 'NONE'):
+                    freq_ranges, frame = spwsel_v.rsplit(' ', maxsplit=1)
+                    freqRangeFound = True
+                    freq_intervals = p.findall(freq_ranges)
+                    LOG.debug('ALMA reffreq heuristics: spwsel - key:value - %s:%s', spwsel_k, spwsel_v)
+                    for freq_interval in freq_intervals:
+                        f_low = qaTool.quantity(float(freq_interval[0]), freq_interval[3])
+                        f_low_v = float(qaTool.getvalue(qaTool.convert(f_low, 'GHz')))
+                        f_high = qaTool.quantity(float(freq_interval[2]), freq_interval[3])
+                        f_high_v = float(qaTool.getvalue(qaTool.convert(f_high, 'GHz')))
+                        LOG.debug('ALMA reffreq heuristics: aggregating interval: f_low_v / f_high_v: %s / %s GHz', f_low_v, f_high_v)
+                        n_sum += f_high_v**2-f_low_v**2
+                        d_sum += f_high_v-f_low_v
+            except:
+                LOG.attention('Cannot calculate reference frequency for mtmfs cleaning.')
+                return None
+        if not freqRangeFound:
+            LOG.info('No continuum frequency ranges found. No reference frequency calculated.')
+            return None
+        d_sum *= 2
+
+        if d_sum != 0.0:
+            return f'{n_sum/d_sum}GHz'
+        else:
+            LOG.attentation('Reference frequency calculation led to zero denominator.')
+            return None
+
+    def arrays(self, vislist: Optional[List[str]] = None):
+
+        """Return the array descriptions."""
+
+        if vislist is None:
+            local_vislist = self.vislist
+        else:
+            local_vislist = vislist
+
+        antenna_diameters = self.antenna_diameters(local_vislist)
+        array_descs = []
+        if 12.0 in antenna_diameters:
+            array_descs.append('12m')
+        if 7.0 in antenna_diameters:
+            array_descs.append('7m')
+        return ''.join(array_descs)

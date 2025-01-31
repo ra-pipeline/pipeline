@@ -3,13 +3,12 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
+# docstring and type hints: inherits from hif.tasks.applycal.ifapplycal.IFApplycalInputs.__init__
 @utils.cli_wrapper
 def hif_applycal(vis=None, field=None, intent=None, spw=None, antenna=None, parang=None, applymode=None, calwt=None,
                  flagbackup=None, flagsum=None, flagdetailedsum=None, parallel=None):
 
-    """
-    hif_applycal ---- Apply the calibration(s) to the data
-
+    """Apply the calibration(s) to the data
 
     Apply precomputed calibrations to the data.
 
@@ -20,57 +19,13 @@ def hif_applycal(vis=None, field=None, intent=None, spw=None, antenna=None, para
     Users can interact with the pipeline calibration state using the tasks
     h_export_calstate and h_import_calstate.
 
-    Output:
+    Returns:
+        The results object for the pipeline task is returned.
 
-    results -- The results object for the pipeline task is returned
+    Examples:
+        1. Apply the calibration to the target data
 
-    --------- parameter descriptions ---------------------------------------------
-
-    vis             The list of input MeasurementSets. Defaults to the list of MeasurementSets
-                    in the pipeline context.
-                    example: ['X227.ms']
-    field           A string containing the list of field names or field ids to which
-                    the calibration will be applied. Defaults to all fields in the pipeline
-                    context.
-                    example: '3C279', '3C279, M82'
-    intent          A string containing the list of intents against which the
-                    selected fields will be matched. Defaults to all supported intents
-                    in the pipeline context.
-                    example: `'*TARGET*'`
-    spw             The list of spectral windows and channels to which the calibration
-                    will be applied. Defaults to all science windows in the pipeline
-                    context.
-                    example: '17', '11, 15'
-    antenna         The selection of antennas to which the calibration will be applied.
-                    Defaults to all antennas. Not currently supported.
-    parang          Apply parallactic angle correction
-    applymode       Calibration apply mode
-                    'calflag': calibrate data and apply flags from solutions
-                    'calflagstrict': (default) same as above except flag spws for which calibration is
-                        unavailable in one or more tables (instead of allowing them to pass
-                        uncalibrated and unflagged)
-                    'trial': report on flags from solutions, dataset entirely unchanged
-                    'flagonly': apply flags from solutions only, data not calibrated
-                    'flagonlystrict': same as above except flag spws for which calibration is
-                        unavailable in one or more tables
-                    'calonly': calibrate data only, flags from solutions NOT applied
-    calwt           Calibrate the weights as well as the data
-    flagbackup      Backup the flags before the apply
-    flagsum         Compute before and after flagging summary statistics
-    flagdetailedsum Compute detailed before and after flagging statistics summaries.
-                    Parameter available only when if flagsum is True.
-    parallel        Execute using CASA HPC functionality, if available.
-                    options: 'automatic', 'true', 'false', True, False
-                    default: None (equivalent to False)
-
-    --------- examples -----------------------------------------------------------
-
-
-
-    1. Apply the calibration to the target data
-
-    >>> hif_applycal (intent='TARGET')
-
+        >>> hif_applycal (intent='TARGET')
 
     """
 

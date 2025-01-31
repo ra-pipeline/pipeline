@@ -25,8 +25,29 @@ class TecMapsInputs(vdp.StandardInputs):
     def parameter(self):
         return []
 
+    # docstring and type hints: supplements hifv_tecmaps
     def __init__(self, context, output_dir=None, vis=None, show_tec_maps=None, apply_tec_correction=None,
                  caltable=None, caltype=None, parameter=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the h_init or hifv_importdata task.
+
+            show_tec_maps:
+
+            apply_tec_correction:
+
+            caltable:
+
+            caltype:
+
+            parameter:
+        """
         super(TecMapsInputs, self).__init__()
         self.context = context
         self.output_dir = output_dir

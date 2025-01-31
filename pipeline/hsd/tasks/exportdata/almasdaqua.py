@@ -2,7 +2,7 @@
 
 from typing import List
 from xml.etree.ElementTree import Element
-import xml.etree.cElementTree as ElementTree
+import xml.etree.ElementTree as ElementTree
 
 from pipeline.h.tasks.common.sensitivity import Sensitivity
 import pipeline.h.tasks.exportdata.aqua as aqua

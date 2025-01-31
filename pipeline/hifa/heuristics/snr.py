@@ -1,4 +1,5 @@
 import collections
+import math
 import os
 import sys
 from copy import deepcopy
@@ -10,6 +11,7 @@ from pipeline.h.tasks.importdata.fluxes import ORIGIN_XML, ORIGIN_ANALYSIS_UTILS
 from pipeline.hifa.tasks.importdata.dbfluxes import ORIGIN_DB
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
+from pipeline.infrastructure.utils.math import round_up
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -1190,18 +1192,36 @@ def compute_bpsolint(ms, spwlist, spw_dict, reqPhaseupSnr, minBpNintervals, reqB
                         (asterisks, spwid, minBpNintervals, ms.basename))
 
         # Bandpass solution
-        #    Determine frequenty interval in MHz
+        #    Determine frequency interval in MHz
+        #
+        # Get number of channels.
         if requiredChannels > 1.0:
             if evenbpsolints:
-                solint_dict[spwid]['bpsolint'] = '%fMHz' % \
-                    (evenChannels * solint_dict[spwid]['chanwidth_Hz'] * 1.0e-6)
+                nchan = evenChannels
             else:
-                solint_dict[spwid]['bpsolint'] = '%fMHz' % \
-                    (requiredChannels * solint_dict[spwid]['chanwidth_Hz'] * 1.0e-6)
+                nchan = requiredChannels
         else:
-            # solint_dict[spwid]['bpsolint'] = '1ch'
-            solint_dict[spwid]['bpsolint'] = '%fMHz' % \
-                    (solint_dict[spwid]['chanwidth_Hz'] * 1.0e-6)
+            nchan = 1
+
+        # PIPE-2036: work-around for potential issue caused by:
+        #   * PL converts nr. of channels to frequency interval
+        #   * the frequency interval is passed with limited precision (typically
+        #     in MHz with 6 decimals, i.e. a precision of Hz)
+        #   * CASA's bandpass converts the frequency interval back to nr. of
+        #     channels and then take the floor
+        #
+        # This could have resulted in e.g. a required nr. of channels of 5
+        # corresponding to 4.8828125 MHz but getting passed as 4.882812 MHz,
+        # then converted back to 4.999999 channels, and floored to 4.
+        #
+        # As a work-around, check whether the converted frequency interval would
+        # trigger this, and if so, then round *up* the frequency interval to
+        # nearest Hz.
+        solint = nchan * solint_dict[spwid]['chanwidth_Hz']
+        if round(solint) / solint_dict[spwid]['chanwidth_Hz'] < math.floor(nchan):
+            solint_dict[spwid]['bpsolint'] = f"{round_up(solint) * 1.e-6:f}MHz"
+        else:
+            solint_dict[spwid]['bpsolint'] = f"{solint * 1.e-6:f}MHz"
 
         # Determine the number of channels in the bandpass
         # solution and the number of solutions

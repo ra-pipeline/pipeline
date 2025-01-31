@@ -178,7 +178,7 @@ class SDFlagPlotter(object):
 
         # Running mean flag before baseline fit
         for pol in pollist:
-            PlotData_dict['data'] = NPp_dict[pol]['data']['RunMeanPreFitFlag']
+            PlotData_dict[pol]['data'] = NPp_dict[pol]['data']['RunMeanPreFitFlag']
             PlotData_dict[pol]['flag'] = NPp_dict[pol]['flag']['RunMeanPreFitFlag']
             PlotData_dict[pol]['thre'] = [threshold_dict[pol][3][1]]
             PlotData_dict[pol]['title'] = "RMS ({}) for Baseline Deviation from the running mean (Nmean={:d}) before baseline subtraction".format(bunit, FlagRule_local_dict[pol]['RunMeanPreFitFlag']['Nmean'])
@@ -442,13 +442,16 @@ class SDFlagPlotter(object):
             ylim:     ylimits
         Returns:
             (none)
-        Raises:
-            'Exception' when no valid data exists for active flag type
         """
         # check consistency
         for pol in pollist:
             if PlotData_dict[pol]['data'] is None and PlotData_dict[pol]['isActive']:
-                raise Exception("Got no valid data for active flag type.")
+                LOG.info( "No statistics data to show for Active flags: ant:{} spw:{} pol:{} \"{}\"".format(
+                    PlotData_dict[pol]['ant_name'],
+                    PlotData_dict[pol]['spw'],
+                    pol,
+                    PlotData_dict[pol]['title']
+                ) )
 
         # loop over pols
         for pol in pollist:

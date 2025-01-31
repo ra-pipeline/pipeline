@@ -13,14 +13,17 @@ LOG = logging.get_logger(__name__)
 class VLAImportDataQAHandler(hqa.ImportDataQAHandler, pqa.QAPlugin):
     result_cls = importdata.VLAImportDataResults
     child_cls = None
-    generating_task = importdata.VLAImportData
+    generating_task = importdata.SerialVLAImportData
 
     def handle(self, context, result):
         score1 = self._check_intents(result.mses)
         score2 = self._check_history_column(result.mses, result.inputs)
+        # Check state of IERS tables relative to observation date (PIPE-2137)
+        scores3 = self._check_iersstate(result.mses)
 
         scores = [score1, score2]
         result.qa.pool.extend(scores)
+        result.qa.pool.extend(scores3)
 
     @staticmethod
     def _check_history_column(mses, inputs):
@@ -43,7 +46,7 @@ class VLAImportDataQAHandler(hqa.ImportDataQAHandler, pqa.QAPlugin):
 
 
 class VLAImportDataListQAHandler(pqa.QAPlugin):
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = importdata.VLAImportDataResults
 
     def handle(self, context, result):

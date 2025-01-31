@@ -3,40 +3,21 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
+# docstring and type hints: inherits from hif.tasks.makecutoutimages.makecutoutimages.MakecutoutimagesInputs.__init__
 @utils.cli_wrapper
 def hif_makecutoutimages(vis=None, offsetblc=None, offsettrc=None):
 
-    """
-    hif_makecutoutimages ---- Cutout central 1 sq. degree from VLASS QL, SE, and Coarse Cube images
-
+    """Cutout central 1 sq. degree from VLASS QL, SE, and Coarse Cube images
 
     Cutout central 1 sq. degree from VLASS QL, SE, and Coarse Cube images
 
-    Output:
+    Returns:
+        The results object for the pipeline task is returned.
 
-    results -- The results object for the pipeline task is returned.
+    Examples:
+        1. Basic makecutoutimages task
 
-    --------- parameter descriptions ---------------------------------------------
-
-    vis           List of visibility data files.
-                  These may be ASDMs, tar files of ASDMs, MSs,
-                  or tar files of MSs.
-                  If ASDM files are specified, they will be converted to
-                  MS format.
-
-                  example: vis=['X227.ms', 'asdms.tar.gz']
-    offsetblc     -x and -y offsets to the bottom lower corner (blc)
-                  in arcseconds
-    offsettrc     +x and +y offsets to the top right corner (trc)
-                  in arcseconds
-
-    --------- examples -----------------------------------------------------------
-
-
-    1. Basic makecutoutimages task
-
-    >>> hif_makecutoutimages()
-
+        >>> hif_makecutoutimages()
 
     """
 

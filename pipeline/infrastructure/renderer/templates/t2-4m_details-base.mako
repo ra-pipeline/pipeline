@@ -11,7 +11,7 @@ import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.htmlrenderer as hr
 import pipeline.infrastructure.renderer.rendererutils as rendererutils
 import pipeline.infrastructure.utils as utils
-from pipeline.infrastructure.pipelineqa import WebLogLocation
+from pipeline.infrastructure.pipelineqa import WebLogLocation, scores_with_location
 %>
 <html>
 <head>
@@ -74,17 +74,22 @@ from pipeline.infrastructure.pipelineqa import WebLogLocation
             <h5>${group_name}</h5>
         % endif
 
-        <div class="row">
-            % if plots_in_row is not None:
+        % if plots_in_row is not None:
+            % for plot_counter, plot in enumerate(rendererutils.sort_row_by(plots_in_row, sort_row_by)):
+            % if plot_counter // 4 > 0 and plot_counter % 4 == 0:
+            </div>
+            % endif
+            % if plot_counter % 4 == 0:
+            <div class="row">
+            % endif
 
-            % for plot in rendererutils.sort_row_by(plots_in_row, sort_row_by):
             <%
                 intent = plot.parameters.get('intent', 'No intent')
                 if isinstance(intent, list):
                     intent = utils.commafy(intent, quotes=False)
                 intent = intent.upper()
             %>
-            <div class="col-md-3 col-sm-4">
+            <div class="col-md-3">
                 % if os.path.exists(plot.thumbnail):
                 <%
                     fullsize_relpath = os.path.relpath(plot.abspath, pcontext.report_dir)
@@ -178,8 +183,8 @@ from pipeline.infrastructure.pipelineqa import WebLogLocation
                 % endif
             </div>
             % endfor
-            % endif
         </div><!-- end row -->
+        % endif
         % endfor
 
     % endfor
@@ -192,7 +197,7 @@ from pipeline.infrastructure.pipelineqa import WebLogLocation
 </div>
 
 <%
-weblog_scores = rendererutils.scores_with_location(result.qa.pool, [WebLogLocation.ACCORDION, WebLogLocation.BANNER, WebLogLocation.UNSET])
+weblog_scores = scores_with_location(result.qa.pool, [WebLogLocation.ACCORDION, WebLogLocation.BANNER, WebLogLocation.UNSET])
 num_scores = 0
 score_color_counts = []
 representative_score = result.qa.representative
@@ -255,7 +260,7 @@ if len(optimal_scores) > 0:
                         <u><i><b>All QA Scores (${', '.join(score_color_counts)})</b></i></u>
                         </a>
                     % else:
-                        QA Score: &nbsp; N/A &nbsp;
+                        QA Score: &nbsp; N/A &nbsp; ${representative_score.longmsg if representative_score.shortmsg!='No QA' else ''}
                         <a data-toggle="collapse" data-parent="#qa-details-accordion" href="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
                         <u><i><b>All QA Scores (${', '.join(score_color_counts)})</b></i></u>
                         </a>
@@ -267,7 +272,7 @@ if len(optimal_scores) > 0:
                         </tr>
                     % else:
                         <tr class="${representative_score_render_class}">
-                        QA Score: &nbsp; N/A
+                        QA Score: &nbsp; N/A &nbsp; ${representative_score.longmsg if representative_score.shortmsg!='No QA' else ''}
                         </tr>
                     % endif
                 % endif
@@ -324,6 +329,27 @@ if len(optimal_scores) > 0:
 
 <%
     notification_trs, most_severe_render_class = rendererutils.get_notification_trs(result, alerts_info, alerts_success)
+
+    # PIPE-2022 asked for low scores if PNG files are missing. This can only be checked in the
+    # weblog generation step after QA scoring is already done. Also any warning messages logged
+    # during the weblog rendering will not be caught by the automatic collection of logrecords
+    # in the result object. Thus there are PL tasks that send an "extra_logrecords" list into
+    # the Mako system to have these shown on weblog pages. The following block tries to get them.
+    # To make sure that the errors and warnings get to the top of the list, the two kinds of
+    # messages are processed in separate loops, inserting any new message at the first list position.
+    try:
+        for extra_logrecord in extra_logrecords:
+            if extra_logrecord.levelno == logging.logging.WARNING:
+                notification_trs.insert(0, rendererutils.format_notification('warning alert-warning', 'Warning!', extra_logrecord.msg))
+                if most_severe_render_class not in ('danger alert-danger', 'warning alert-warning'):
+                    most_severe_render_class = 'warning alert-warning'
+        for extra_logrecord in extra_logrecords:
+            if extra_logrecord.levelno == logging.logging.ERROR:
+                notification_trs.insert(0, rendererutils.format_notification('danger alert-danger', 'Error!', extra_logrecord.msg))
+                if most_severe_render_class != 'danger alert-danger':
+                    most_severe_render_class = 'danger alert-danger'
+    except Exception as e:
+        pass
 %>
 % if notification_trs:
 <div class="panel-group" id="notification-details-accordion" role="tablist" aria-multiselectable="true">

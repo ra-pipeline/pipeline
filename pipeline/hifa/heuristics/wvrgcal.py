@@ -2,6 +2,7 @@ import numpy as np
 
 import pipeline.infrastructure as infrastructure
 from pipeline.infrastructure import casa_tools
+from pipeline.infrastructure.utils import list_to_str
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -85,7 +86,7 @@ class WvrgcalHeuristics(object):
         # science targets, warn if there is a range of values
         with casa_tools.TableReader(ms.name) as table:
             taql = '''(STATE_ID IN %s AND FIELD_ID IN %s AND
-              DATA_DESC_ID in %s)''' % (science_state_ids, science_field_ids, wvr_dd_ids)
+              DATA_DESC_ID in %s)''' % (list_to_str(science_state_ids), list_to_str(science_field_ids), list_to_str(wvr_dd_ids))
             subtable = table.query(taql)
             integration = subtable.getcol('INTERVAL')
             self.wvr_integration = np.median(integration)
@@ -108,7 +109,7 @@ class WvrgcalHeuristics(object):
             for spw in science_spws:
                 dd_id = ms.get_data_description(spw).id
                 taql = '''(STATE_ID IN %s AND FIELD_ID IN %s AND
-                  DATA_DESC_ID in %s)''' % (science_state_ids, science_field_ids, dd_id)
+                  DATA_DESC_ID in %s)''' % (list_to_str(science_state_ids), list_to_str(science_field_ids), dd_id)
                 subtable = table.query(taql)
                 integration = subtable.getcol('INTERVAL')
 

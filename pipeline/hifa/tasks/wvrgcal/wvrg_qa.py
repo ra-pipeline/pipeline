@@ -6,6 +6,7 @@ import numpy as np
 import pipeline.infrastructure as infrastructure
 from pipeline.h.tasks.common import commonresultobjects
 from pipeline.infrastructure import casa_tools
+from pipeline.infrastructure.utils import list_to_str
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -176,7 +177,7 @@ def calculate_phase_rms(context, gaintable, qa_intent):
                 if len(intent_scans) <= 0:
                     continue
 
-                sb = table.query('SCAN_NUMBER in %s' % str(intent_scans))
+                sb = table.query('SCAN_NUMBER in %s' % list_to_str(intent_scans))
                 spectral_window_id = sb.getcol('SPECTRAL_WINDOW_ID')
                 spwids = sorted(set(spectral_window_id))
                 antenna1 = sb.getcol('ANTENNA1')

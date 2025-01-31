@@ -25,7 +25,10 @@ def fmt_model(amplitude,alpha):
 def fmt_spw(roi_stats,idx):
     reffreq=roi_stats['reffreq'][idx]
     spwstr=roi_stats['spw'][idx]
+    keep=roi_stats['keep'][idx]
     label=spwstr+' / ' +f'{reffreq/1e9:.3f}'
+    if not keep:
+        label+=' <a style="color:red">rejected</a>'
     return label
 
 def diff2shade(pct):
@@ -188,7 +191,10 @@ bgcolor_snr_list=[snr2shade(8.),snr2shade(6.),snr2shade(4.),snr2shade(2.)]
     <li>
         <i>I</i><sub>res,pct</sub>: percentage difference between the data and model: (<i>I</i>-<i>I</i><sub>model</sub>)/<i>I</i>.
         The color background is determined by the absolute percentage difference level: <p style="background-color:${bgcolor_pct_list[0]}; display:inline;">5&#37&le;pct&lt;10&#37</p>; <p style="background-color:${bgcolor_pct_list[1]}; display:inline;">10&#37&le;pct&lt;20&#37</p>; <p style="background-color:${bgcolor_pct_list[2]}; display:inline;">20&#37&le;pct&lt;30&#37</p>; <p style="background-color:${bgcolor_pct_list[3]}; display:inline;">30&#37&le;pct</p>.
-    </li>    
+    </li>  
+    <li>
+        Any rejected plane is excluded for spectral model fitting.
+    </li>        
 </caption>    
 
 <thead>

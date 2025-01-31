@@ -170,6 +170,11 @@ class MaskDeviation(object):
         if with_flag:
             mask = np.logical_and(mask, self.stdSP.mask == False)
 
+        # if there is no valid data, do not evaluate deviation mask
+        if np.all(np.logical_not(mask)):
+            self.masklist = []
+            return
+
         Nmask0 = 0
         for i in range(iteration):
             median = np.median(stdSP[np.where(mask == True)])

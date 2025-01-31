@@ -3,49 +3,20 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
-def hifa_polcal(vis=None, solint_chavg=None, vs_stats=None, vs_thresh=None):
-    """
-    hifa_polcal ---- Derive instrumental polarization calibration for ALMA.
-
+# docstring and type hints: inherits from hifa.tasks.polcal.polcal.PolcalInputs.__init__
+def hifa_polcal(vis=None, minpacov=None, solint_chavg=None, vs_stats=None, vs_thresh=None):
+    """Derive instrumental polarization calibration for ALMA.
 
     Derive the instrumental polarization calibrations for ALMA using the
     polarization calibrators.
 
-    Output:
+    Returns:
+        The results object for the pipeline task is returned.
 
-        results -- The results object for the pipeline task is returned.
+    Examples:
+        1. Compute the polarization calibrations:
 
-    --------- parameter descriptions ---------------------------------------------
-
-    vis
-                    The list of input MeasurementSets. Defaults to the list of
-                    MeasurementSets specified in the pipeline context.
-
-                    Example: ['M32A.ms', 'M32B.ms']
-    solint_chavg
-                    Channel averaging to include in solint for gaincal steps
-                    producing cross-hand delay, cross-hand phase, and leakage
-                    (D-terms) solutions.
-
-                    Default: '5MHz'
-    vs_stats
-                    List of visstat statistics to use for diagnostic comparison
-                    between the concatenated session MS and individual MSes in
-                    that session after applying polarization calibration tables.
-
-                    Default: ['min','max','mean']
-    vs_thresh
-                    Threshold to use in diagnostic comparison of visstat
-                    statistics; relative differences larger than this threshold
-                    are reported in the CASA log.
-
-                    Default: 1e-3
-
-    --------- examples -----------------------------------------------------------
-
-    1. Compute the polarization calibrations:
-
-    >>> hifa_polcal()
+        >>> hifa_polcal()
 
     """
     ##########################################################################

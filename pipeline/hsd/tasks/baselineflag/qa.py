@@ -10,7 +10,7 @@ LOG = logging.get_logger(__name__)
 
 
 class SDBLFlagListQAHandler(pqa.QAPlugin):
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = baselineflag.SDBLFlagResults
 
     def handle(self, context, result):

@@ -20,7 +20,22 @@ class LockRefAntInputs(vdp.StandardInputs):
         # refant does not use CASA tasks
         raise NotImplementedError
 
+    # docstring and type hints: supplements hifa_lock_refant
     def __init__(self, context, vis=None, output_dir=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            vis: List of input MeasurementSets. Defaults to the list of
+                MeasurementSets specified in the pipeline context.
+
+                Example: vis=['ngc5921.ms']
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+        """
         self.context = context
         self.vis = vis
         self.output_dir = output_dir

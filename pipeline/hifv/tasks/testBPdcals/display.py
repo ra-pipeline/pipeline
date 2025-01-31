@@ -85,6 +85,79 @@ class testBPdcalsSummaryChart(object):
         return None
 
 
+class testBPdcalsPerSpwSummaryChart(object):
+    def __init__(self, context, result, spw):
+        self.context = context
+        self.result = result
+        self.ms = context.observing_run.get_ms(result.inputs['vis'])
+        self.spw = str(spw)
+
+    def plot(self):
+        plots = [self.get_plot_wrapper('BPcal'), self.get_plot_wrapper('delaycal')]
+        return [p for p in plots if p is not None]
+
+    def create_plot(self, prefix):
+        figfile = self.get_figfile(prefix)
+
+        bandpass_field_select_string = self.context.evla['msinfo'][self.ms.name].bandpass_field_select_string
+        bandpass_scan_select_string = self.context.evla['msinfo'][self.ms.name].bandpass_scan_select_string
+        corrstring = self.ms.get_vla_corrstring()
+        delay_scan_select_string = self.context.evla['msinfo'][self.ms.name].delay_scan_select_string
+
+        if prefix == 'BPcal':
+            job = casa_tasks.plotms(vis=self.ms.name, xaxis='freq', yaxis='amp', ydatacolumn='corrected',
+                                    spw=self.spw, selectdata=True,
+                                    field=bandpass_field_select_string, scan=bandpass_scan_select_string,
+                                    correlation=corrstring, averagedata=True, avgtime='1e8', avgscan=True,
+                                    transform=False,
+                                    extendflag=False, iteraxis='', coloraxis='antenna2', plotrange=[], title='',
+                                    xlabel='', ylabel='', showmajorgrid=False, showminorgrid=False, plotfile=figfile,
+                                    overwrite=True, clearplots=True, showgui=False)
+
+        if (delay_scan_select_string != bandpass_scan_select_string) and prefix == 'delaycal':
+            job = casa_tasks.plotms(vis=self.ms.name, xaxis='freq', yaxis='amp', ydatacolumn='corrected',
+                                    selectdata=True, spw=self.spw,
+                                    scan=delay_scan_select_string, correlation=corrstring, averagedata=True,
+                                    avgtime='1e8', avgscan=True, transform=False, extendflag=False, iteraxis='',
+                                    coloraxis='antenna2', plotrange=[], title='', xlabel='', ylabel='',
+                                    showmajorgrid=False,
+                                    showminorgrid=False, plotfile=figfile, overwrite=True, clearplots=True,
+                                    showgui=False)
+
+        job.execute()
+
+    def get_figfile(self, prefix):
+        return os.path.join(self.context.report_dir,
+                            'stage%s' % self.result.stage_number,
+                            'testcalibrated_per_spw_' + self.spw + '_' + prefix + '-%s-summary.png' % self.ms.basename)
+
+    def get_plot_wrapper(self, prefix):
+        figfile = self.get_figfile(prefix)
+
+        bandpass_scan_select_string = self.context.evla['msinfo'][self.ms.name].bandpass_scan_select_string
+        delay_scan_select_string = self.context.evla['msinfo'][self.ms.name].delay_scan_select_string
+
+        if prefix == 'BPcal' or ((delay_scan_select_string != bandpass_scan_select_string) and prefix == 'delaycal'):
+            wrapper = logger.Plot(figfile, x_axis='freq', y_axis='amp',
+                                  parameters={'vis': self.ms.basename,
+                                              'type': prefix,
+                                              'spw': self.spw})
+
+            if not os.path.exists(figfile):
+                LOG.trace('testBPdcals summary per-spw plot not found. Creating new '
+                          'plot.')
+                try:
+                    self.create_plot(prefix)
+                except Exception as ex:
+                    LOG.error('Could not create ' + prefix + ' plot.')
+                    LOG.exception(ex)
+                    return None
+
+            return wrapper
+
+        return None
+
+
 class testDelaysPerAntennaChart(object):
     def __init__(self, context, result):
         self.context = context
@@ -356,40 +429,8 @@ class bpSolAmpPerAntennaChart(object):
         plots = []
 
         for bandname, bpcaltablename in self.result.bpcaltable.items():
-            with casa_tools.TableReader(self.result.bpdgain_touse[bandname]) as tb:
-                cpar = tb.getcol('CPARAM')
-                flgs = tb.getcol('FLAG')
-            amps = np.abs(cpar)
-            good = np.logical_not(flgs)
-            maxamp = np.max(amps[good])
-            plotmax = maxamp
-
-            with casa_tools.TableReader(bpcaltablename) as tb:
-                dataVarCol = tb.getvarcol('CPARAM')
-                flagVarCol = tb.getvarcol('FLAG')
-
-            rowlist = list(dataVarCol.keys())
-            nrows = len(rowlist)
-            maxmaxamp = 0.0
-            maxmaxphase = 0.0
-            for rrow in rowlist:
-                dataArr = dataVarCol[rrow]
-                flagArr = flagVarCol[rrow]
-                amps = np.abs(dataArr)
-                phases = np.arctan2(np.imag(dataArr), np.real(dataArr))
-                good = np.logical_not(flagArr)
-                tmparr = amps[good]
-                if len(tmparr) > 0:
-                    maxamp = np.max(amps[good])
-                    if maxamp > maxmaxamp:
-                        maxmaxamp = maxamp
-                tmparr = np.abs(phases[good])
-                if len(tmparr) > 0:
-                    maxphase = np.max(np.abs(phases[good])) * 180. / math.pi
-                    if maxphase > maxmaxphase:
-                        maxmaxphase = maxphase
+            _, maxmaxamp = get_maxphase_maxamp(self.result.bpdgain_touse[bandname], bpcaltablename)
             ampplotmax = maxmaxamp
-            phaseplotmax = maxmaxphase
 
             LOG.info("Plotting amp bandpass solutions")
 
@@ -447,6 +488,92 @@ class bpSolAmpPerAntennaChart(object):
         return [p for p in plots if p is not None]
 
 
+class bpSolAmpPerAntennaPerSpwChart(object):
+    def __init__(self, context, result):
+        self.context = context
+        self.result = result
+        self.ms = context.observing_run.get_ms(result.inputs['vis'])
+
+        self.json = {}
+        self.json_filename = os.path.join(context.report_dir,
+                                          'stage%s' % result.stage_number,
+                                          'bpsolamp-%s.json' % self.ms)
+
+    def plot(self):
+        context = self.context
+        result = self.result
+
+        nplots = len(self.ms.antennas)
+        plots = []
+
+        spws = self.ms.get_spectral_windows(science_windows_only=True)
+        for spw in spws:
+            if spw.specline_window:
+                for bandname, bpcaltablename in self.result.bpcaltable.items():
+                    _, maxmaxamp = get_maxphase_maxamp(self.result.bpdgain_touse[bandname], bpcaltablename)
+                    ampplotmax = maxmaxamp
+
+                    LOG.info("Plotting amp bandpass solutions")
+
+                    for ii in range(nplots):
+
+                        filename = 'testBPcal_amp' + str(ii) + '_' + bandname + '_' + str(spw.id) + '.png'
+                        antPlot = str(ii)
+
+                        stage = 'stage%s' % result.stage_number
+                        stage_dir = os.path.join(context.report_dir, stage)
+                        # construct the relative filename, eg. 'stageX/testdelay0.png'
+
+                        figfile = os.path.join(stage_dir, filename)
+
+                        plot_failed = False
+                        if not os.path.exists(figfile):
+                            try:
+
+                                # Get antenna name
+                                antName = antPlot
+                                if antPlot != '':
+                                    domain_antennas = self.ms.get_antenna(antPlot)
+                                    idents = [a.name if a.name else a.id for a in domain_antennas]
+                                    antName = ','.join(idents)
+
+                                LOG.debug("Plotting amp bandpass solutions " + antName)
+
+                                job = casa_tasks.plotms(vis=bpcaltablename, xaxis='freq', yaxis='amp', field='',
+                                                antenna=antPlot, timerange='',
+                                                spw=str(spw.id),
+                                                coloraxis='', plotrange=[0, 0, 0, ampplotmax], symbolshape='circle',
+                                                title='B table: {!s}   Antenna: {!s}  Band: {!s}  Spw: {!s}'.format(bpcaltablename, antName, bandname, str(spw.id)),
+                                                titlefont=8, xaxisfont=7, yaxisfont=7, showgui=False, plotfile=figfile,
+                                                xconnector='step')
+
+                                job.execute()
+
+                            except Exception as ex:
+                                plot_failed = True
+                                LOG.warning("Unable to plot " + filename)
+                        else:
+                            LOG.debug('Using existing ' + filename + ' plot.')
+
+                        if not plot_failed:
+                            try:
+                                plot = logger.Plot(figfile, x_axis='Freq', y_axis='Amp', field='',
+                                                parameters={'spw': str(spw.id),
+                                                            'pol': '',
+                                                            'ant': antName,
+                                                            'bandname': bandname,
+                                                            'type': 'Bandpass Amp Solution',
+                                                            'file': os.path.basename(figfile)})
+                                plots.append(plot)
+                            except Exception as ex:
+                                LOG.warning("Unable to add plot to stack")
+                                plots.append(None)
+                        else:
+                            plots.append(None)
+
+        return [p for p in plots if p is not None]
+
+
 class bpSolPhasePerAntennaChart(object):
     def __init__(self, context, result):
         self.context = context
@@ -466,39 +593,7 @@ class bpSolPhasePerAntennaChart(object):
         plots = []
 
         for bandname, bpcaltablename in self.result.bpcaltable.items():
-            with casa_tools.TableReader(result.bpdgain_touse[bandname]) as tb:
-                cpar = tb.getcol('CPARAM')
-                flgs = tb.getcol('FLAG')
-            amps = np.abs(cpar)
-            good = np.logical_not(flgs)
-            maxamp = np.max(amps[good])
-            plotmax = maxamp
-
-            with casa_tools.TableReader(bpcaltablename) as tb:
-                dataVarCol = tb.getvarcol('CPARAM')
-                flagVarCol = tb.getvarcol('FLAG')
-
-            rowlist = list(dataVarCol.keys())
-            nrows = len(rowlist)
-            maxmaxamp = 0.0
-            maxmaxphase = 0.0
-            for rrow in rowlist:
-                dataArr = dataVarCol[rrow]
-                flagArr = flagVarCol[rrow]
-                amps = np.abs(dataArr)
-                phases = np.arctan2(np.imag(dataArr), np.real(dataArr))
-                good = np.logical_not(flagArr)
-                tmparr = amps[good]
-                if len(tmparr) > 0:
-                    maxamp = np.max(amps[good])
-                    if maxamp > maxmaxamp:
-                        maxmaxamp = maxamp
-                tmparr = np.abs(phases[good])
-                if len(tmparr) > 0:
-                    maxphase = np.max(np.abs(phases[good])) * 180. / math.pi
-                    if maxphase > maxmaxphase:
-                        maxmaxphase = maxphase
-            ampplotmax = maxmaxamp
+            maxmaxphase, _ = get_maxphase_maxamp(self.result.bpdgain_touse[bandname], bpcaltablename)
             phaseplotmax = maxmaxphase
 
             LOG.info("Plotting phase bandpass solutions")
@@ -556,3 +651,129 @@ class bpSolPhasePerAntennaChart(object):
 
         return [p for p in plots if p is not None]
 
+
+class bpSolPhasePerAntennaPerSpwChart(object):
+    def __init__(self, context, result):
+        self.context = context
+        self.result = result
+        self.ms = context.observing_run.get_ms(result.inputs['vis'])
+
+        self.json = {}
+        self.json_filename = os.path.join(context.report_dir,
+                                          'stage%s' % result.stage_number,
+                                          'bpsolphase-%s.json' % self.ms)
+
+    def plot(self):
+        context = self.context
+        result = self.result
+
+        nplots = len(self.ms.antennas)
+        plots = []
+
+        spws = self.ms.get_spectral_windows(science_windows_only=True)
+        for spw in spws:
+            if spw.specline_window:
+                for bandname, bpcaltablename in self.result.bpcaltable.items():
+                    maxmaxphase, _ = get_maxphase_maxamp(self.result.bpdgain_touse[bandname], bpcaltablename)
+                    phaseplotmax = maxmaxphase
+
+                    LOG.info("Plotting phase bandpass solutions")
+
+                    for ii in range(nplots):
+
+                        filename = 'testBPcal_phase' + str(ii) + '_' + bandname + '_' + str(spw.id) + '.png'
+                        antPlot = str(ii)
+
+                        stage = 'stage%s' % result.stage_number
+                        stage_dir = os.path.join(context.report_dir, stage)
+                        # construct the relative filename, eg. 'stageX/testdelay0.png'
+
+                        figfile = os.path.join(stage_dir, filename)
+
+                        plot_failed = False
+                        if not os.path.exists(figfile):
+                            try:
+
+                                # Get antenna name
+                                antName = antPlot
+                                if antPlot != '':
+                                    domain_antennas = self.ms.get_antenna(antPlot)
+                                    idents = [a.name if a.name else a.id for a in domain_antennas]
+                                    antName = ','.join(idents)
+
+                                LOG.debug("Plotting phase bandpass solutions " + antName)
+
+                                job = casa_tasks.plotms(vis=bpcaltablename, xaxis='freq', yaxis='phase', field='',
+                                                        antenna=antPlot, timerange='', coloraxis='',
+                                                        spw=str(spw.id),
+                                                        plotrange=[0, 0, -phaseplotmax, phaseplotmax], symbolshape='circle',
+                                                        title='B table: {!s}   Antenna: {!s}  Band: {!s}  Spw: {!s}'.format(bpcaltablename, antName, bandname, str(spw.id)),
+                                                        titlefont=8, xaxisfont=7, yaxisfont=7, showgui=False, plotfile=figfile,
+                                                        xconnector='step')
+
+                                job.execute()
+
+                            except Exception as ex:
+                                plot_failed = True
+                                LOG.warning("Unable to plot " + filename)
+                        else:
+                            LOG.debug('Using existing ' + filename + ' plot.')
+
+                        if not plot_failed:
+                            try:
+
+                                plot = logger.Plot(figfile, x_axis='Freq', y_axis='Phase', field='',
+                                                parameters={'spw': str(spw.id),
+                                                            'pol': '',
+                                                            'ant': antName,
+                                                            'bandname': bandname,
+                                                            'type': 'Bandpass Phase Solution',
+                                                            'file': os.path.basename(figfile)})
+                                plots.append(plot)
+                            except Exception as ex:
+                                LOG.warning("Unable to add plot to stack")
+                                plots.append(None)
+                        else:
+                            plots.append(None)
+
+        return [p for p in plots if p is not None]
+
+
+def get_maxphase_maxamp(bpdgain_touse, bpcaltablename):
+    """
+    Calculates the maximum amplitude and phase values from the bandpass calibration table.
+
+    Args:
+        bpdgain_touse (str): The path to the bandpass calibration table.
+        bpcaltablename (str): The name of the bandpass calibration table.
+
+    Returns:
+        tuple: The maximum amplitude and phase values.
+    """
+    with casa_tools.TableReader(bpcaltablename) as tb:
+        dataVarCol = tb.getvarcol('CPARAM')
+        flagVarCol = tb.getvarcol('FLAG')
+
+    rowlist = list(dataVarCol.keys())
+    nrows = len(rowlist)
+    maxmaxamp = 0.0
+    maxmaxphase = 0.0
+    for rrow in rowlist:
+        dataArr = dataVarCol[rrow]
+        flagArr = flagVarCol[rrow]
+        amps = np.abs(dataArr)
+        phases = np.arctan2(np.imag(dataArr), np.real(dataArr))
+        good = np.logical_not(flagArr)
+        tmparr = amps[good]
+        if len(tmparr) > 0:
+            maxamp = np.max(amps[good])
+            if maxamp > maxmaxamp:
+                maxmaxamp = maxamp
+        tmparr = np.abs(phases[good])
+        if len(tmparr) > 0:
+            maxphase = np.max(np.abs(phases[good])) * 180. / math.pi
+            if maxphase > maxmaxphase:
+                maxmaxphase = maxphase
+    ampplotmax = maxmaxamp
+    phaseplotmax = maxmaxphase
+    return phaseplotmax, ampplotmax

@@ -1206,7 +1206,7 @@ def bpcal_score(bpcal_stats):
                 bpcal_score_RMS(math.sqrt(phase[s][k]['resVar']), 0.05)
 
             bpcal_scores['PHASE_SCORE_FN'][s][k] = \
-                bpcal_score_flatness(bpcal_stats['PHASE'][s][k]+45./180.*math.pi)
+                bpcal_score_flatness(bpcal_stats['PHASE'][s][k])
 
             bpcal_scores['PHASE_SCORE_DD'][s][k] = \
                 bpcal_score_derivative_deviation(bpcal_stats['PHASE'][s][k], 'phase', s, k)
@@ -1404,6 +1404,9 @@ def bpcal_score_SNR(SNR):
 # * A result of 1.0 means the shape is perfectly flat
 # * Determine score by evaluating the deviation of the Wiener
 #   Entropy from 1.0
+# * The Wiener Entropy can only be calculated for positive values.
+#   When encountering any negative ones, the algorithm shiftst the
+#   spectrum up to slightly positive values.
 
 # Inputs:
 # -------
@@ -1420,20 +1423,31 @@ def bpcal_score_SNR(SNR):
 # 2013 Aug 05 - Dirk Muders, MPIfR
 #               Weight Wiener entropy with error function
 #               to create sharper fall-off.
+# 2023 Dec 13 - Dirk Muders, MPIfR
+#               Avoid NaNs when part of the spectrum is negative.
 # ------------------------------------------------------------------------------
 def bpcal_score_flatness(values):
 
-    # Need to avoid zero mean
-    if numpy.ma.mean(values) == 0.0:
-        if (values == 0.0).all():
+    if numpy.ma.all(numpy.ma.getmaskarray(values)):
+        wEntropy = 1.0e10
+    elif numpy.ma.mean(values) == 0.0:
+        # Need to avoid zero mean as it would cause a division exception
+        if numpy.ma.all(values == 0.0):
             wEntropy = 1.0
         else:
             wEntropy = 1.0e10
     else:
-        # Geometrical mean can not be calculated for vectors <= 0.0 for all
+        # Geometrical mean can not be calculated for vectors <= 0.0 for any
         # elements.
-        if (values <= 0.0).all():
-            wEntropy = 1.0e10
+        if numpy.ma.all(values < 0.0):
+            # All negative -> just invert the spectrum to estimate the flatness
+            wEntropy = scipy.stats.mstats.gmean(-values)/numpy.ma.mean(-values)
+        elif numpy.ma.any(values <= 0.0):
+            # Some negative, some positive values (like in a phase spectrum)
+            # -> push to slightly positive numbers. Since gmean returns 0.0 if
+            # at least one value of the spectrum is 0.0, we offset with the
+            # minimum plus a small positive number.
+            wEntropy = scipy.stats.mstats.gmean(values-numpy.ma.min(values)+1e-10)/numpy.ma.mean(values-numpy.ma.min(values)+1e-10)
         else:
             wEntropy = scipy.stats.mstats.gmean(values)/numpy.ma.mean(values)
 

@@ -203,6 +203,10 @@ class Tsysflag(basetask.StandardTaskTemplate):
             # Store order of metrics in result.
             result.metric_order.extend(metric_order)
 
+        # handle use as a child task where all flags are calculated externally
+        if len(metric_order) == 0 and 'manual' in result.metric_order:
+            metric_order = ['manual']
+
         # Extract before and after flagging summaries from first and last metric:
         stats_before = result.components[metric_order[0]].summaries[0]
         stats_after = result.components[metric_order[-1]].summaries[-1]
@@ -320,6 +324,10 @@ class Tsysflag(basetask.StandardTaskTemplate):
         result = TsysflagspectraResults()
         result.caltable = inputs.caltable
         result.table = caltable_to_assess
+
+        # Save a snapshot of the inputs of the datatask. These are required for the renderer.
+        result.inputs = inputs.as_dict()
+        result.stage_number = inputs.context.task_counter
 
         # Load the tsys caltable to assess.
         tsystable = caltableaccess.CalibrationTableDataFiller.getcal(caltable_to_assess)

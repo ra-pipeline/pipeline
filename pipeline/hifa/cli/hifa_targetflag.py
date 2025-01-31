@@ -3,11 +3,10 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
+# docstring and type hints: inherits from hifa.tasks.targetflag.targetflag.TargetflagInputs.__init__
 @utils.cli_wrapper
 def hifa_targetflag(vis=None):
-    """
-    hifa_targetflag ---- Flag target source outliers
-
+    """Flag target source outliers
 
     This task flags very obvious target source outliers. The calibration tables and
     flags accumulated in the cal library up to this point are pre-applied, then
@@ -27,24 +26,13 @@ def hifa_targetflag(vis=None):
     Also, to avoid confusion in mosaics and single field surveys, the amp vs. uv distance
     plots only show field IDs with new flags.
 
-    Output:
+    Returns:
+        The results object for the pipeline task is returned.
 
-        results -- The results object for the pipeline task is returned.
+    Examples:
+        1. Run with recommended settings to flag outliers in science target(s):
 
-    --------- parameter descriptions ---------------------------------------------
-
-    vis
-                  The list of input MeasurementSets. Defaults to the list of
-                  MeasurementSets specified in the h_init or hif_importdata task.
-                  '': use all MeasurementSets in the context
-
-                  Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
-
-    --------- examples -----------------------------------------------------------
-
-    1. Run with recommended settings to flag outliers in science target(s):
-
-    >>> hifa_targetflag()
+        >>> hifa_targetflag()
 
     """
     ##########################################################################

@@ -31,7 +31,7 @@ class SetjyInputs(vdp.StandardInputs):
         field_ids = {f.id for f in fields}
 
         # Fields with different intents may have the same name. Check for this
-        # and return the field ids rather than the names to resolve any 
+        # and return the field ids rather than the names to resolve any
         # ambiguities.
         if len(unique_field_names) is len(field_ids):
             return ','.join(unique_field_names)
@@ -43,7 +43,7 @@ class SetjyInputs(vdp.StandardInputs):
     @vdp.VisDependentProperty
     def refspectra(self):
 
-        # If flux density was explicitly set and is not equal to -1, which is 
+        # If flux density was explicitly set and is not equal to -1, which is
         # hard-coded as the default value in the task interface return the
         # default tuple which is composed of the reference frequency, the
         # Stokes fluxdensity and the spectral index
@@ -59,7 +59,7 @@ class SetjyInputs(vdp.StandardInputs):
         #     1) from file, unless it's a solar system object
         #     2) from CASA
 
-        # TODO: Replace with reading directly from the context 
+        # TODO: Replace with reading directly from the context
 
         # Read the reference flux values from a file
         ref_flux = []
@@ -108,7 +108,7 @@ class SetjyInputs(vdp.StandardInputs):
         spw_ids = sorted(spw.id for spw in spws)
 
         # In order to print flux densities in the same order as the fields, we
-        # must retrieve the flux density for each field in turn 
+        # must retrieve the flux density for each field in turn
         field_flux = []
         for field_arg in utils.safe_split(self.field):
 
@@ -125,11 +125,11 @@ class SetjyInputs(vdp.StandardInputs):
                     LOG.info(info)
 
             # Find fluxes
-            flux_by_spw = [] 
+            flux_by_spw = []
             for spw_id in spw_ids:
                 reffreq = str(self.ms.get_spectral_window(spw_id).centre_frequency)
                 if self.normfluxes:
-                    flux = [(reffreq, [I/I, Q/I, U/I, V/I], spix) 
+                    flux = [(reffreq, [I/I, Q/I, U/I, V/I], spix)
                             for (ref_field_id, ref_spw_id, I, Q, U, V, spix, uvmin, uvmax) in ref_flux
                             if (ref_field_id in field_ids or ref_field_id in field_names) and ref_spw_id == spw_id]
                 else:
@@ -138,7 +138,7 @@ class SetjyInputs(vdp.StandardInputs):
                             if (ref_field_id in field_ids or ref_field_id in field_names) and ref_spw_id == spw_id]
 
                 # No flux measurements found for the requested field/spws, so do
-                # either a CASA model look-up (-1) or reset the flux to 1.                
+                # either a CASA model look-up (-1) or reset the flux to 1.
                 if not flux:
                     if any('AMPLITUDE' in f.intents for f in fields):
                         flux = (reffreq, -1, self.spix)
@@ -175,7 +175,7 @@ class SetjyInputs(vdp.StandardInputs):
         heu_standard = standard.Standard()
 
         # The field may be an integer, but the standard heuristic operates on
-        # strings so determine the corresponding name of the fields 
+        # strings so determine the corresponding name of the fields
         field_names = []
         for field in utils.safe_split(self.field):
             if str(field).isdigit():
@@ -188,6 +188,7 @@ class SetjyInputs(vdp.StandardInputs):
         standards = [heu_standard(field) for field in field_names]
         return standards[0] if len(standards) == 1 else standards
 
+    # docstring and type hints: supplements hif_setjy
     def __init__(self, context, output_dir=None, vis=None,
                  field=None, intent=None, spw=None,
                  model=None, scalebychan=None, fluxdensity=None,
@@ -195,7 +196,71 @@ class SetjyInputs(vdp.StandardInputs):
                  #    tuple containing reffreq, fluxdensity, spix
                  refspectra=None,
                  reffile=None, normfluxes=None):
+        """Initialize Inputs.
 
+        Args:
+            context: Pipeline context.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets defined in the pipeline context.
+
+            field: The list of field names or field ids for which the models are to be set. Defaults to all fields with intent '`*AMPLITUDE*`'.
+
+                Example: field='3C279', field='3C279, M82'
+
+            intent: A string containing a comma delimited list of intents against which the selected fields are matched. Defaults to all data
+                with amplitude intent.
+
+                Example: intent='`*AMPLITUDE*`'
+
+            spw: The list of spectral windows and channels for which bandpasses are computed. Defaults to all science spectral windows.
+
+                Example: spw='11,13,15,17'
+
+            model: Model image for setting model visibilities. Not fully supported.
+
+                Example: see details in help for CASA setjy task
+
+            scalebychan: This determines whether the fluxdensity set in the model is calculated on a per channel basis. If False then only one fluxdensity
+                value is calculated per spw.
+
+            fluxdensity: Specified flux density [I,Q,U,V] in Jy. Uses [1,0,0,0] flux density for unrecognized sources, and standard flux densities for
+                ones recognized by 'standard', including 3C286, 3C48, 3C147, and several
+                planets, moons, and asteroids.
+
+                Example: [3.06,0.0,0.0,0.0]
+
+            spix: Spectral index for fluxdensity S = fluxdensity * (freq/reffreq)**spix Only used if fluxdensity is being used. If fluxdensity is positive, and
+                spix is nonzero, then reffreq must be set too. It is applied in the same
+                way to all polarizations, and does not account for Faraday rotation or
+                depolarization.
+
+            reffreq: The reference frequency for spix, given with units. Provided to avoid division by zero. If the flux density is being scaled by spectral
+                index, then reffreq must be set to whatever reference frequency is correct
+                for the given fluxdensity and spix. It cannot be determined from vis. On
+                the other hand, if spix is 0, then any positive frequency can be used and
+                will be ignored.
+
+                Example: reffreq='86.0GHz', reffreq='4.65e9Hz'
+
+            standard: Flux density standard, used if fluxdensity[0] less than 0.0. The options are: 'Baars','Perley 90','Perley-Taylor 95', 'Perley-Taylor 99',
+                'Perley-Butler 2010' and 'Butler-JPL-Horizons 2010'.
+                default: 'Butler-JPL-Horizons 2012' for solar system object
+                'Perley-Butler 2010' otherwise
+
+            refspectra:
+
+            reffile: Path to a file containing flux densities for calibrators unknown to CASA. Values given in this file take precedence over the CASA-derived
+                values for all calibrators except solar system calibrators. By default the
+                path is set to the CSV file created by h_importdata, consisting of
+                catalogue fluxes extracted from the ASDM.
+                example: reffile='', reffile='working/flux.csv'
+
+            normfluxes: Normalize lookup fluxes.
+
+        """
         super(SetjyInputs, self).__init__()
 
         self.context = context
@@ -250,13 +315,13 @@ class Setjy(basetask.StandardTaskTemplate):
 
     def prepare(self):
         inputs = self.inputs
-        result = commonfluxresults.FluxCalibrationResults(vis=inputs.vis) 
+        result = commonfluxresults.FluxCalibrationResults(vis=inputs.vis)
 
         # Return early if the field has no data of the required intent. This
         # could be the case when given multiple MSes, one of which could be
         # without an amplitude calibrator for instance.
         if not inputs.ms.get_fields(inputs.field, intent=inputs.intent):
-            LOG.warning('Field(s) \'%s\' in %s have no data with intent %s' % 
+            LOG.warning('Field(s) \'%s\' in %s have no data with intent %s' %
                         (inputs.field, inputs.ms.basename, inputs.intent))
             return result
 
@@ -271,16 +336,16 @@ class Setjy(basetask.StandardTaskTemplate):
         for field_name in utils.safe_split(inputs.field):
             jobs = []
 
-            # Intent is now passed through to setjy, where the intents are 
-            # AND'ed to form the data selection. This causes problems when a 
-            # field name resolves to two field IDs with disjoint intents: 
-            # no data is selected. So, create our own OR data selection by 
-            # looping over the individual fields, specifying just those 
+            # Intent is now passed through to setjy, where the intents are
+            # AND'ed to form the data selection. This causes problems when a
+            # field name resolves to two field IDs with disjoint intents:
+            # no data is selected. So, create our own OR data selection by
+            # looping over the individual fields, specifying just those
             # intents present in the field.
             fields = inputs.ms.get_fields(field_name)
             if field_name.isdigit():
                 field_is_unique = False
-            else: 
+            else:
                 field_is_unique = True if len(fields) == 1 else False
 
             for field in fields:
@@ -291,12 +356,12 @@ class Setjy(basetask.StandardTaskTemplate):
                 field_identifier = field.name if field_is_unique else str(field.id)
                 # We're specifying field PLUS intent, so we're unlikely to
                 # have duplicate data selections. We ensure no duplicate
-                # selections by using field ID at the expense of losing some 
+                # selections by using field ID at the expense of losing some
                 # readability in the log. Also, this helps if the amplitude
                 # is time dependent.
                 inputs.field = field_identifier
 
-                for spw in spws:  
+                for spw in spws:
 
                     # Skip invalid spws
                     if spw.id not in valid_spwids:
@@ -304,14 +369,14 @@ class Setjy(basetask.StandardTaskTemplate):
                     inputs.spw = spw.id
 
                     orig_intent = inputs.intent
-                    try:                
+                    try:
                         # The field may not have all intents, which leads to its
                         # deselection in the setjy data selection. Only list
                         # the target intents that are present in the field.
-                        input_intents = set(inputs.intent.split(',')) 
+                        input_intents = set(inputs.intent.split(','))
                         targeted_intents = field.intents.intersection(input_intents)
                         if not targeted_intents:
-                            continue 
+                            continue
                         inputs.intent = ','.join(targeted_intents)
 
                         task_args = inputs.to_casa_args()

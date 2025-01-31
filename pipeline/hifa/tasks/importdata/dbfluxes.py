@@ -106,7 +106,7 @@ def flux_nosourcexml(ms):
 
 def buildurl(service_url, obs_time, frequency, sourcename):
     # Example:
-    # https://almascience.eso.org/sc/flux?DATE=10-August-2017&FREQUENCY=232101563000.0&NAME=J1924-2914&WEIGHTED=true&RESULT=1
+    # https://almascience.eso.org/sc/flux?DATE=10-August-2017&FREQUENCY=232101563000.0&NAME=J1924-2914&WEIGHTED=true&RESULT=1&CATALOGUE=5
     # New Example May 2019:
     # https://osf-sourcecat-2019apr.asa-test.alma.cl/sc/flux?DATE=27-March-2013&FREQUENCY=86837309056.169219970703125&WEIGHTED=true&RESULT=0&NAME=J1427-4206
     date = '{!s}-{!s}-{!s}'.format(str(obs_time.day).zfill(2), obs_time.strftime('%B'), obs_time.year)
@@ -114,6 +114,7 @@ def buildurl(service_url, obs_time, frequency, sourcename):
     urlparams = buildparams(sourcename, date, frequency)
 
     url = '{!s}?{!s}'.format(service_url, urlparams)
+    LOG.debug("SC URL: {}".format(url))
 
     return url
 
@@ -175,9 +176,9 @@ def fluxservice(service_url, obs_time, frequency, sourcename):
 def buildparams(name, date, frequency):
     """
     Inputs are all strings with the format:
-    NAME=3c279&DATE=04-Apr-2014&FREQUENCY=231.435E9&WEIGHTED=true&RESULT=1
+    NAME=3c279&DATE=04-Apr-2014&FREQUENCY=231.435E9&WEIGHTED=true&RESULT=1&CATALOGUE=5
     """
-    params = dict(NAME=name, DATE=date, FREQUENCY=frequency, WEIGHTED='true', RESULT=1, VERBOSE=1)
+    params = dict(NAME=name, DATE=date, FREQUENCY=frequency, WEIGHTED='true', RESULT=1, VERBOSE=1, CATALOGUE=5)
     return urllib.parse.urlencode(params)
 
 

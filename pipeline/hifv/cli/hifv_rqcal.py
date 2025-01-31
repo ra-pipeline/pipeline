@@ -6,27 +6,20 @@ import pipeline.h.cli.utils as utils
 @utils.cli_wrapper
 def hifv_rqcal(vis=None, caltable=None):
 
-    """
-    hifv_rqcal ---- Runs gencal in rq mode
+    """Runs gencal in rq mode.
 
-    Runs gencal in rq mode
+    Args:
+        vis: List of input visibility data.
 
-    Output:
+        caltable: String name of caltable.
 
-    results -- The results object for the pipeline task is returned.
+    Returns:
+        The results object for the pipeline task is returned.
 
-    --------- parameter descriptions ---------------------------------------------
+    Examples:
+        1. Load an ASDM list in the ../rawdata subdirectory into the context:
 
-    vis           List of input visibility data
-    caltable      String name of caltable
-
-    --------- examples -----------------------------------------------------------
-
-
-    1. Load an ASDM list in the ../rawdata subdirectory into the context.
-
-    >>> hifv_rqcal()
-
+        >>> hifv_rqcal()
 
     """
 

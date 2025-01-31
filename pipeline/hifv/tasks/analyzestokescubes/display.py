@@ -1,10 +1,10 @@
 import os
-import numpy as np
 
 import matplotlib.pyplot as plt
+import numpy as np
+from astropy.modeling import fitting, models
 from matplotlib.pyplot import cm
 from matplotlib.ticker import ScalarFormatter
-from astropy.modeling import models, fitting
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.renderer.logger as logger
@@ -38,13 +38,24 @@ class VlassCubeStokesSummary(object):
                 x = np.array(roi_stats['stokesq'])/np.array(roi_stats['stokesi'])
                 y = np.array(roi_stats['stokesu'])/np.array(roi_stats['stokesi'])
                 label_spw = roi_stats['spw']
-                label_full = [roi_stats['spw'][idx]+' : ' +
-                              f'{reffreq/1e9:.3f} GHz' for idx, reffreq in enumerate(roi_stats['reffreq'])]
+                label_full = []
+                for idx, reffreq in enumerate(roi_stats['reffreq']):
+                    label_str = roi_stats['spw'][idx]
+                    label_str += ' : '
+                    label_str += f'{reffreq/1e9:.3f} GHz'
+                    if not roi_stats['keep'][idx]:
+                        label_str += ' (rejected)'
+                    label_full.append(label_str)
+
                 fig, ax = plt.subplots(figsize=(10, 7))
                 cmap = cm.get_cmap('rainbow_r')
                 for idx in range(len(x)):
                     color_idx = idx/len(x)
-                    ax.scatter(x[idx], y[idx], color=cmap(color_idx),
+                    if 'rejected' in label_full[idx]:
+                        facecolors = 'none'
+                    else:
+                        facecolors = cmap(color_idx)
+                    ax.scatter(x[idx], y[idx], facecolors=facecolors,
                                label=label_full[idx], edgecolors='black', alpha=0.7, s=300.)
                     text = ax.annotate(label_spw[idx], (x[idx], y[idx]), ha='center', va='center', fontsize=9.)
                     text.set_alpha(.7)
@@ -113,11 +124,16 @@ class VlassCubeFluxSummary(object):
             try:
 
                 y = np.array(roi_stats['stokesi'])*1e3
+                weights = np.zeros(y.size)
+
+                idx_keep = np.where(roi_stats['keep'])
+                weights[idx_keep] = 1.0
                 x = np.array(roi_stats['reffreq'])/1e9
                 y_rms = np.array(roi_stats['rms'])[:, 0]*1e3
 
                 fig, ax = plt.subplots(figsize=(10, 7))
-                ax.scatter(x, y, label='Observed', color='black')
+                ax.scatter(x, y, label='Observed (rejected)', color='black', facecolors='none',s=10**2)
+                ax.scatter(x[idx_keep], y[idx_keep], label='Observed', color='black',s=10**2)
 
                 ax.set_xlabel('Freq [GHz]')
                 ax.set_ylabel('Flux [mJy/beam]')
@@ -159,8 +175,7 @@ class VlassCubeFluxSummary(object):
                                 alpha=0.5, label=r'Below $2\sigma$')
 
                 ax.set_title(f"{peak_loc}\n{peak_loc_xy}")
-
-                spec_model_fitted = self._model_powerlaw1d(x, y)
+                spec_model_fitted = self._model_powerlaw1d(x, y, weights=weights)
                 x_m = np.linspace(2, 4, num=100)
 
                 amplitude = spec_model_fitted.amplitude.value
@@ -193,13 +208,13 @@ class VlassCubeFluxSummary(object):
 
         return plot_wrappers
 
-    def _model_powerlaw1d(self, freq, flux):
+    def _model_powerlaw1d(self, freq, flux, weights=None):
 
         fit = fitting.LevMarLSQFitter()
         spec_model = models.PowerLaw1D(x_0=3.0)
         spec_model.amplitude.min = 0
         spec_model.x_0.fixed = True
-        spec_model_fitted = fit(spec_model, freq, flux)
+        spec_model_fitted = fit(spec_model, freq, flux, weights=weights)
         LOG.debug(str(spec_model_fitted))
 
         return spec_model_fitted

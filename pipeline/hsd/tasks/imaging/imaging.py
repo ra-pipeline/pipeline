@@ -21,7 +21,7 @@ from pipeline.domain import DataTable, DataType, MeasurementSet
 from pipeline.h.heuristics import fieldnames
 from pipeline.h.tasks.common.sensitivity import Sensitivity
 from pipeline.hsd.heuristics import rasterscan
-from pipeline.hsd.heuristics.rasterscan import RasterScanHeuristicsFailure
+from pipeline.hsd.heuristics.rasterscan import RasterScanHeuristicsResult, RasterScanHeuristicsFailure
 from pipeline.hsd.tasks import common
 from pipeline.hsd.tasks.baseline import baseline
 from pipeline.hsd.tasks.common import compress, direction_utils, observatory_policy, rasterutil, sdtyping
@@ -126,6 +126,7 @@ class SDImagingInputs(vdp.StandardInputs):
         )
         return _datatype
 
+    # docstring and type hints: supplements hsd_imaging
     def __init__(self, context: 'Context', mode: Optional[str]=None, restfreq: Optional[str]=None,
                  infiles: Optional[List[str]]=None, field: Optional[str]=None, spw: Optional[str]=None,
                  org_direction: Optional['sdtyping.Direction']=None):
@@ -133,13 +134,39 @@ class SDImagingInputs(vdp.StandardInputs):
 
         Args:
             context : Pipeline context
-            mode : Spectrum mode. Defaults to None, but in effect to 'line'.
-            restfreq : Rest frequency. Defaults to None, it executes without rest frequency.
-            infiles : String joined infiles list. Defaults to None.
-            field : Field ID. Defaults to None, all fields are used.
-            spw : Spectral window. Defaults to None, all spws are used.
-            org_direction : Directions of the origin for moving targets.
-                            Defaults to None, it doesn't have some moving targets.
+
+            mode: Imaging mode controls imaging parameters in the task.
+                Accepts either "line" (spectral line imaging) or "ampcal"
+                (image settings for amplitude calibrator).
+
+                Default: None (equivalent to 'line')
+
+            restfreq: Rest frequency. Defaults to None,
+                it executes without rest frequency.
+
+            infiles: List of data files. These must be a name of
+                MeasurementSets that are registered to context via
+                hsd_importdata or hsd_restoredata tasks.
+
+                Example: vis=['uid___A002_X85c183_X36f.ms', 'uid___A002_X85c183_X60b.ms']
+
+                Default: None (process all registered MeasurementSets)
+
+            field: Data selection by field names or ids.
+
+                Example: "`*Sgr*,M100`"
+
+                Default: None (process all science fields)
+
+            spw: Data selection by spw ids.
+
+                Example: "3,4" (generate images for spw 3 and 4)
+
+                Default: None (process all science spws)
+
+            org_direction: Directions of the origin for moving targets.
+                Defaults to None, it doesn't have some moving targets.
+
         """
         super(SDImagingInputs, self).__init__()
 
@@ -258,6 +285,7 @@ class SDImaging(basetask.StandardTaskTemplate):
     def _finalize_worker_result(cls,
                                 context: 'Context',
                                 result: 'SDImagingResults',
+                                session: str,
                                 sourcename: str,
                                 spwlist: List[int],
                                 antenna: str,
@@ -277,13 +305,15 @@ class SDImaging(basetask.StandardTaskTemplate):
                                 assoc_fields: List[int],
                                 assoc_spws: List[int],
                                 sensitivity_info: Optional[SensitivityInfo]=None,
-                                theoretical_rms: Optional[Dict]=None):
+                                theoretical_rms: Optional[Dict]=None,
+                                effbw: Optional[float]=None):
         """
         Fanalize the worker result.
 
         Args:
             context            : Pipeline context
             result             : SDImagingResults instance
+            session            : Session name
             sourcename         : Name of the source
             spwlist            : List of SpWs
             antenna            : Antenna name
@@ -304,6 +334,7 @@ class SDImaging(basetask.StandardTaskTemplate):
             assoc_spws         : List of associated SpWs
             sensitivity_info   : Sensitivity information
             theoretical_rms    : Theoretical RMS
+            effbw              : Effective channel bandwidth in Hz
         Returns:
             (none)
         """
@@ -353,25 +384,38 @@ class SDImaging(basetask.StandardTaskTemplate):
                                      is_per_eb=False,
                                      context=context)
 
-        # update miscinfo
-        # TODO: Eventually, the following code together with
-        #       Tclean.update_miscinfo should be merged into
-        #       imageheader.set_miscinfo.
-        with casa_tools.ImageReader(imagename) as image:
-            info = image.miscinfo()
+            # update miscinfo
+            # TODO: Eventually, the following code together with
+            #       Tclean.update_miscinfo should be merged into
+            #       imageheader.set_miscinfo.
+            with casa_tools.ImageReader(name) as image:
+                info = image.miscinfo()
 
-            if datamin:
-                info['datamin'] = datamin
+                if '.weight' not in name:
+                    if datamin:
+                        info['datamin'] = datamin
 
-            if datamax:
-                info['datamax'] = datamax
+                    if datamax:
+                        info['datamax'] = datamax
 
-            if datarms:
-                info['datarms'] = datarms
+                    if datarms:
+                        info['datarms'] = datarms
 
-            info['stokes'] = stokes
+                info['stokes'] = stokes
 
-            image.setmiscinfo(info)
+                if effbw:
+                    info['effbw'] = effbw
+
+                info['level'] = 'member'
+                info['obspatt'] = 'sd'
+                info['arrays'] = 'TP'
+                info['modifier'] = ''
+
+                # PIPE-2148, limiting 'sessionX' keyword length to 68 characters
+                # due to FITS header keyword string length limit.
+                info = imageheader.wrap_key(info, 'sessio', session)
+
+                image.setmiscinfo(info)
 
         # finally replace task attribute with the top-level one
         result.task = cls
@@ -409,6 +453,7 @@ class SDImaging(basetask.StandardTaskTemplate):
             restfreq_list=self.inputs.restfreq,
             ms_list=self.inputs.ms,
             ms_names=[msobj.name for msobj in self.inputs.ms],
+            session_names=[msobj.session for msobj in self.inputs.ms],
             args_spw=sdutils.convert_spw_virtual2real(self.inputs.context, self.inputs.spw),
             in_field=self.inputs.field,
             imagemode=self.inputs.mode.upper(),
@@ -802,6 +847,8 @@ class SDImaging(basetask.StandardTaskTemplate):
             _cp : Common parameter object of prepare()
             _rgp : Reduction group parameter object of prepare()
         """
+        __cqa = casa_tools.quanta
+
         LOG.info("Calculate spectral line and deviation mask frequency ranges in image.")
         with casa_tools.ImageReader(_rgp.imagename) as ia:
             __cs = ia.coordsys()
@@ -811,14 +858,18 @@ class SDImaging(basetask.StandardTaskTemplate):
             LOG.info("The spectral line and deviation mask frequency ranges = {}".format(str(__rms_exclude_freq)))
         _rgp.combined.rms_exclude.extend(__rms_exclude_freq)
         __file_index = [common.get_ms_idx(self.inputs.context, name) for name in _cp.infiles]
-        self._finalize_worker_result(self.inputs.context, _rgp.imager_result, sourcename=_rgp.source_name,
+        __spwid = str(_rgp.combined.v_spws[REF_MS_ID])
+        __spwobj = _rgp.ref_ms.get_spectral_window(__spwid)
+        __effective_bw = __cqa.quantity(__spwobj.channels.chan_effbws[0], 'Hz')
+        effbw = float(__cqa.getvalue(__effective_bw))
+        self._finalize_worker_result(self.inputs.context, _rgp.imager_result, session=','.join(_cp.session_names), sourcename=_rgp.source_name,
                                      spwlist=_rgp.v_spwids, antenna=_rgp.ant_name, specmode=_rgp.specmode,
                                      imagemode=_cp.imagemode, stokes=self.stokes,
                                      datatype=self.inputs.datatype, datamin=None, datamax=None, datarms=None,
                                      validsp=_rgp.validsps,
                                      rms=_rgp.rmss, edge=_cp.edge, reduction_group_id=_rgp.group_id,
                                      file_index=__file_index, assoc_antennas=_rgp.antids, assoc_fields=_rgp.fieldids,
-                                     assoc_spws=_rgp.v_spwids)
+                                     assoc_spws=_rgp.v_spwids, effbw=effbw)
 
     def __additional_imaging_process_for_nro(self, _cp: imaging_params.CommonParameters,
                                              _rgp: imaging_params.ReductionGroupParameters):
@@ -828,6 +879,8 @@ class SDImaging(basetask.StandardTaskTemplate):
             _cp : Common parameter object of prepare()
             _rgp : Reduction group parameter object of prepare()
         """
+        __cqa = casa_tools.quanta
+
         # Imaging was successful, proceed following steps
         # add image list to combine
         if os.path.exists(_rgp.imagename_nro) and os.path.exists(_rgp.imagename_nro + '.weight'):
@@ -835,14 +888,18 @@ class SDImaging(basetask.StandardTaskTemplate):
             _rgp.tocombine.org_directions_nro.append(_rgp.org_direction)
             _rgp.tocombine.specmodes.append(_rgp.specmode)
         __file_index = [common.get_ms_idx(self.inputs.context, name) for name in _cp.infiles]
-        self._finalize_worker_result(self.inputs.context, _rgp.imager_result_nro, sourcename=_rgp.source_name,
+        __spwid = str(_rgp.combined.v_spws[REF_MS_ID])
+        __spwobj = _rgp.ref_ms.get_spectral_window(__spwid)
+        __effective_bw = __cqa.quantity(__spwobj.channels.chan_effbws[0], 'Hz')
+        effbw = float(__cqa.getvalue(__effective_bw))
+        self._finalize_worker_result(self.inputs.context, _rgp.imager_result_nro, session=','.join(_cp.session_names), sourcename=_rgp.source_name,
                                      spwlist=_rgp.v_spwids, antenna=_rgp.ant_name, specmode=_rgp.specmode,
                                      imagemode=_cp.imagemode, stokes=_rgp.stokes_list[1],
                                      datatype=self.inputs.datatype, datamin=None, datamax=None, datarms=None,
                                      validsp=_rgp.validsps,
                                      rms=_rgp.rmss, edge=_cp.edge, reduction_group_id=_rgp.group_id,
                                      file_index=__file_index, assoc_antennas=_rgp.antids, assoc_fields=_rgp.fieldids,
-                                     assoc_spws=_rgp.v_spwids)
+                                     assoc_spws=_rgp.v_spwids, effbw=effbw)
         _cp.results.append(_rgp.imager_result_nro)
 
     def __make_post_grid_table(self, _cp: imaging_params.CommonParameters,
@@ -1042,7 +1099,8 @@ class SDImaging(basetask.StandardTaskTemplate):
                                           bandwidth=__bw, bwmode='cube', beam=_pp.beam, cell=_pp.qcell,
                                           sensitivity=_pp.theoretical_rms)
         __sensitivity_info = SensitivityInfo(__sensitivity, _pp.stat_freqs, (_cp.is_not_nro()))
-        self._finalize_worker_result(self.inputs.context, _rgp.imager_result, sourcename=_rgp.source_name,
+        effbw = float(__cqa.getvalue(__effective_bw))
+        self._finalize_worker_result(self.inputs.context, _rgp.imager_result, session=','.join(_cp.session_names), sourcename=_rgp.source_name,
                                      spwlist=_rgp.combined.v_spws, antenna='COMBINED', specmode=_rgp.specmode,
                                      imagemode=_cp.imagemode, stokes=self.stokes,
                                      datatype=self.inputs.datatype, datamin=_pp.image_min, datamax=_pp.image_max,
@@ -1050,7 +1108,7 @@ class SDImaging(basetask.StandardTaskTemplate):
                                      edge=_cp.edge, reduction_group_id=_rgp.group_id, file_index=__file_index,
                                      assoc_antennas=_rgp.combined.antids, assoc_fields=_rgp.combined.fieldids,
                                      assoc_spws=_rgp.combined.v_spws, sensitivity_info=__sensitivity_info,
-                                     theoretical_rms=__theoretical_noise)
+                                     theoretical_rms=__theoretical_noise, effbw=effbw)
 
     def __execute_combine_images_for_nro(self, _cp: imaging_params.CommonParameters,
                                          _rgp: imaging_params.ReductionGroupParameters,
@@ -1064,6 +1122,8 @@ class SDImaging(basetask.StandardTaskTemplate):
         Returns:
             False if a valid image to combine does not exist for a specified source or spw.
         """
+        __cqa = casa_tools.quanta
+
         if len(_rgp.tocombine.images_nro) == 0:
             LOG.warning("No valid image to combine for Source {}, Spw {:d}".format(_rgp.source_name, _rgp.spwids[0]))
             return False
@@ -1083,14 +1143,18 @@ class SDImaging(basetask.StandardTaskTemplate):
         if _rgp.imager_result.outcome is not None:
             # Imaging was successful, proceed following steps
             __file_index = [common.get_ms_idx(self.inputs.context, name) for name in _rgp.combined.infiles]
-            self._finalize_worker_result(self.inputs.context, _rgp.imager_result, sourcename=_rgp.source_name,
+            __spwid = str(_rgp.combined.v_spws[REF_MS_ID])
+            __spwobj = _rgp.ref_ms.get_spectral_window(__spwid)
+            __effective_bw = __cqa.quantity(__spwobj.channels.chan_effbws[0], 'Hz')
+            effbw = float(__cqa.getvalue(__effective_bw))
+            self._finalize_worker_result(self.inputs.context, _rgp.imager_result, session=','.join(_cp.session_names), sourcename=_rgp.source_name,
                                          spwlist=_rgp.combined.v_spws, antenna='COMBINED', specmode=_rgp.specmode,
                                          imagemode=_cp.imagemode, stokes=_rgp.stokes_list[1],
                                          datatype=self.inputs.datatype, datamin=_pp.image_min, datamax=_pp.image_max,
                                          datarms=_pp.image_rms, validsp=_pp.validsps,
                                          rms=_pp.rmss, edge=_cp.edge, reduction_group_id=_rgp.group_id,
                                          file_index=__file_index, assoc_antennas=_rgp.combined.antids,
-                                         assoc_fields=_rgp.combined.fieldids, assoc_spws=_rgp.combined.v_spws)
+                                         assoc_fields=_rgp.combined.fieldids, assoc_spws=_rgp.combined.v_spws, effbw=effbw)
             _cp.results.append(_rgp.imager_result)
         return True
 
@@ -1182,9 +1246,13 @@ class SDImaging(basetask.StandardTaskTemplate):
             _rgp : Reduction group parameter object of prepare()
         """
         # PIPE-251: detect contamination
-        if not basetask.DISABLE_WEBLOG:
-            detectcontamination.detect_contamination(self.inputs.context, _rgp.imager_result.outcome['image'],
-                                                     _rgp.imager_result.frequency_channel_reversed)
+        do_plot = not basetask.DISABLE_WEBLOG
+        contaminated = detectcontamination.detect_contamination(
+            self.inputs.context, _rgp.imager_result.outcome['image'],
+            _rgp.imager_result.frequency_channel_reversed,
+            do_plot
+        )
+        _rgp.imager_result.outcome['contaminated'] = contaminated
 
     def __append_result(self, _cp: imaging_params.CommonParameters, _rgp: imaging_params.ReductionGroupParameters):
         """Append result to RGP.
@@ -1493,7 +1561,7 @@ class SDImaging(basetask.StandardTaskTemplate):
                 raster_info_list.append(None)
             dt = _cp.dt_dict[msobj.basename]
             try:
-                raster_info_list.append(_analyze_raster_pattern(dt, msobj, fieldid, spwid, antid))
+                raster_info_list.append(_analyze_raster_pattern(dt, msobj, fieldid, spwid, antid, _rgp))
             except Exception:
                 f = msobj.get_fields(field_id=fieldid)[0]
                 a = msobj.get_antenna(antid)[0]
@@ -1797,7 +1865,12 @@ class SDImaging(basetask.StandardTaskTemplate):
             format(_tirp.msobj.basename, __field_name, _tirp.spwid,
                    _tirp.msobj.get_antenna(_tirp.antid)[0].name, str(_tirp.pol_names)))
         if _tirp.raster_info is None:
-            LOG.warning('Raster scan analysis failed. Skipping further calculation.')
+            __rsres = RasterScanHeuristicsResult(_tirp.msobj)
+            _rgp.imager_result.rasterscan_heuristics_results_incomp \
+                              .setdefault(_tirp.msobj.origin_ms, []) \
+                              .append(__rsres)
+            __rsres.set_result_fail(_tirp.antid, _tirp.spwid, _tirp.fieldid)
+            LOG.debug(f'Raster scan analysis incomplete. Skipping calculation of theoretical image RMS : EB:{_tirp.msobj.execblock_id}:{_tirp.msobj.antennas[_tirp.antid].name}')
             return __SKIP
         _tirp.dt = _cp.dt_dict[_tirp.msobj.basename]
         _tirp.index_list = common.get_index_list_for_ms(_tirp.dt, [_tirp.msobj.origin_ms],
@@ -1809,7 +1882,7 @@ class SDImaging(basetask.StandardTaskTemplate):
 
 
 def _analyze_raster_pattern(datatable: DataTable, msobj: MeasurementSet,
-                            fieldid: int, spwid: int, antid: int) -> RasterInfo:
+                            fieldid: int, spwid: int, antid: int, rgp: 'imaging_params.ReductionGroupParameters') -> RasterInfo:
     """Analyze raster scan pattern from pointing in DataTable.
 
     Args:
@@ -1818,6 +1891,7 @@ def _analyze_raster_pattern(datatable: DataTable, msobj: MeasurementSet,
         fieldid : A field ID to process
         spwid : An SpW ID to process
         antid : An antenna ID to process
+        rgp : Reduction group parameter object of prepare()
 
     Returns:
         A named Tuple of RasterInfo
@@ -1836,11 +1910,16 @@ def _analyze_raster_pattern(datatable: DataTable, msobj: MeasurementSet,
     radec_unit = datatable.getcolkeyword('OFS_RA', 'UNIT')
     assert radec_unit == datatable.getcolkeyword('OFS_DEC', 'UNIT')
     exp_unit = datatable.getcolkeyword('EXPOSURE', 'UNIT')
+    _rsres = RasterScanHeuristicsResult(msobj)
+    rgp.imager_result.rasterscan_heuristics_results_rgap \
+                     .setdefault(msobj.origin_ms, []) \
+                     .append(_rsres)
     try:
         gap_r = rasterscan.find_raster_gap(ra, dec, dtrow_list)
     except Exception as e:
         if isinstance(e, RasterScanHeuristicsFailure):
-            LOG.warning('{}'.format(e))
+            _rsres.set_result_fail(antid, spwid, fieldid)
+            LOG.debug('{} : EB:{}:{}'.format(e, msobj.execblock_id, msobj.antennas[antid].name))
         try:
             dtrow_list_large = rasterutil.extract_dtrow_list(timetable, for_small_gap=False)
             se_small = [(v[0], v[-1]) for v in dtrow_list]

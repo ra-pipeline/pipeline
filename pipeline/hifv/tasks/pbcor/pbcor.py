@@ -23,7 +23,16 @@ class PbcorInputs(vdp.StandardInputs):
     # Search order of input vis
     processing_data_type = [DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
+    # docstring and type hints: supplements hifv_pbcor
     def __init__(self, context, vis=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            vis: List of input visibility data.
+
+        """
         super(PbcorInputs, self).__init__()
         self.context = context
         self.vis = vis
@@ -57,7 +66,12 @@ class Pbcor(basetask.StandardTaskTemplate):
 
             imgname = sci_im['imagename']
             basename = imgname[:imgname.rfind('.image')]
+            keep = sci_im['metadata'].get('keep', True)
             pbname = basename + '.pb'
+
+            # PIPE-2205: do not run impbcor on VLA cube images
+            if '.cube.' in basename:
+                continue
 
             pbcor_images = []
             term_ext_list = multiterm_ext_list if sci_im['multiterm'] else ['']
@@ -78,7 +92,7 @@ class Pbcor(basetask.StandardTaskTemplate):
             pbcor_images.append(pbname+pb_term_ext)
 
             LOG.info("PBCOR image names: " + ','.join(pbcor_images))
-            pbcor_dict[basename] = pbcor_images
+            pbcor_dict[(basename, keep)] = pbcor_images
 
         return PbcorResults(pbcorimagenames=pbcor_dict, multitermlist=term_ext_list)
 

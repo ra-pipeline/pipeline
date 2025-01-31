@@ -11,11 +11,14 @@ LOG = infrastructure.get_logger(__name__)
 
 
 class fluxbootSummaryChart(object):
+    """
+    Handles the creation of the "Model calibrator. Plot of amp vs. freq." figure in plotms
+    """
+
     def __init__(self, context, result):
         self.context = context
         self.result = result
         self.ms = context.observing_run.get_ms(result.inputs['vis'])
-        # self.caltable = result.final[0].gaintable
 
     def plot(self):
         plots = [self.get_plot_wrapper()]
@@ -65,12 +68,15 @@ class fluxbootSummaryChart(object):
 
 
 class fluxgaincalSummaryChart(object):
+    """
+    Handles the creation of the "Caltable: fluxgaincal.g. Plot of amp vs. freq." figure in plotms
+    """
+
     def __init__(self, context, result, caltable):
         self.context = context
         self.result = result
         self.caltable = caltable
         self.ms = context.observing_run.get_ms(result.inputs['vis'])
-        # self.caltable = result.final[0].gaintable
 
     def plot(self):
         plots = [self.get_plot_wrapper()]
@@ -115,6 +121,10 @@ class fluxgaincalSummaryChart(object):
 
 
 class modelfitSummaryChart(object):
+    """
+    Handles the creation of the "Flux vs frequency" figure in matplotlib
+    """
+
     def __init__(self, context, result, webdicts):
         self.context = context
         self.result = result
@@ -132,9 +142,11 @@ class modelfitSummaryChart(object):
         plt.clf()
 
         mysize = 'small'
-        colors = ['red', 'blue', 'green', 'cyan', 'yellow', 'orange', 'purple']
+        # creates a range of colors evenly spaced along the color spectrum based on the number of sources to be plotted
+        n = max(len(webdicts), 2)
+        cmap = plt.colormaps["gist_rainbow"]
+        colors = [cmap(i / (n - 1)) for i in range(n)]
         colorcount = 0
-        title = ''
 
         fig = plt.figure(figsize=(10, 6))
         ax1 = fig.add_subplot(111)
@@ -176,7 +188,6 @@ class modelfitSummaryChart(object):
                             fitreff = single_fs_result[fieldid]['fitRefFreq']
                         except Exception as e:
                             LOG.debug("Field error.")
-                reffreq = fitreff / 1.e9
 
                 freqs = np.linspace(minfreq * 1.e9, maxfreq * 1.e9, 500)
 
@@ -265,6 +276,10 @@ class modelfitSummaryChart(object):
 
 
 class residualsSummaryChart(object):
+    """
+    Handles the creation of the "Fluxboot residuals vs. frequency" figure in matplotlib
+    """
+
     def __init__(self, context, result, webdicts):
         self.context = context
         self.result = result
@@ -285,9 +300,11 @@ class residualsSummaryChart(object):
         ax2 = ax1.twiny()
 
         mysize = 'small'
-        colors = ['red', 'blue', 'green', 'cyan', 'yellow', 'orange', 'purple']
+        # creates a range of colors evenly spaced along the color spectrum based on the number of sources to be plotted
+        n = max(len(webdicts), 2)
+        cmap = plt.colormaps["gist_rainbow"]
+        colors = [cmap(i / (n - 1)) for i in range(n)]
         colorcount = 0
-        title = ''
 
         minfreqlist = []
         maxfreqlist = []
@@ -297,7 +314,8 @@ class residualsSummaryChart(object):
                 frequencies = []
                 residuals = []
                 for datadict in datadicts:
-                    residuals.append(float(datadict['data']) - float(datadict['fitteddata']))
+                    # PIPE-989, use fractional residuals rather than the absolute residuals.
+                    residuals.append((float(datadict['data']) - float(datadict['fitteddata'])) / float(datadict['data']))
                     frequencies.append(float(datadict['freq']))
 
                 frequencies = np.array(frequencies)
@@ -331,9 +349,7 @@ class residualsSummaryChart(object):
         locs = locs[1:-1]
 
         precision = 2
-        # LOG.debug(locs)
         labels = ["{:.{}f}".format(loc, precision) for loc in (10 ** locs) / 1.e9]
-        # LOG.debug(labels)
 
         ax2.set_xlim(np.log10(np.array([minxlim, maxxlim])))
         ax2.set_xticks(locs)
@@ -344,7 +360,7 @@ class residualsSummaryChart(object):
         chartBox = ax1.get_position()
         ax1.set_position([chartBox.x0, chartBox.y0, chartBox.width * 0.6, chartBox.height])
         ax1.legend(loc='upper center', bbox_to_anchor=(1.45, 0.8), shadow=True, ncol=1)
-        ax1.set_ylabel('Residuals (data - fit) [Jy]', size=mysize)
+        ax1.set_ylabel('Residuals ((data - fit) / data) [Jy]', size=mysize)
         ax1.set_xlabel('log10 Frequency [Hz]', size=mysize)
         ax2.set_xlabel('Frequency [GHz]', size=mysize)
 

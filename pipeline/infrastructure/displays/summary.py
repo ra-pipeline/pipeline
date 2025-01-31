@@ -2,8 +2,9 @@ import datetime
 import math
 import operator
 import os
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Generator, List, Tuple
 
+import matplotlib
 import matplotlib.dates as dates
 import matplotlib.figure as figure
 import matplotlib.pyplot as plt
@@ -251,7 +252,8 @@ class ParameterVsTimeChart(object):
         ('POINTING', 'yellow'),
         ('SIDEBAND', 'orange'),
         ('WVR', 'lime'),
-        ('DIFFGAIN', 'maroon'),
+        ('DIFFGAINREF', 'maroon'),
+        ('DIFFGAINSRC', 'deeppink'),
         ('POLARIZATION', 'navy'),
         ('POLANGLE', 'mediumslateblue'),
         ('POLLEAKAGE', 'plum'),
@@ -879,7 +881,7 @@ class UVChart(object):
             # get max UV via unprojected baseline
             spw = ms.get_spectral_window(self.spw_id)
             wavelength_m = 299792458 / float(spw.max_frequency.to_units(FrequencyUnits.HERTZ))
-            bl_max = float(ms.antenna_array.max_baseline.length.to_units(DistanceUnits.METRE))
+            bl_max = float(ms.antenna_array.baseline_max.length.to_units(DistanceUnits.METRE))
             self.uv_max = math.ceil(1.05 * bl_max / wavelength_m)
 
     def plot(self):
@@ -1077,7 +1079,7 @@ class SpwIdVsFreqChartInputs(vdp.StandardInputs):
 
     @vdp.VisDependentProperty
     def output(self) -> str:
-        """Set file path of output PNG file.
+        """Return file path of output PNG file.
 
         Returns:
             output: File path of output PNG file
@@ -1116,7 +1118,32 @@ class SpwIdVsFreqChart(object):
         """
         self.inputs = inputs
         self.context = context
-        self.figfile = self._get_figfile()
+
+    def _extract_spwdata_vla(self) -> Generator[List[int], None, None]:
+        """Extract list of SPW IDs of VLA from measurement set.
+
+        Yields:
+            List of SPW IDs for a baseband, for science_windows_only=True.
+        """
+        ms = self.inputs.ms
+        banddict = ms.get_vla_baseband_spws(science_windows_only=True, return_select_list=False, warning=False)
+        for band in banddict:
+            for baseband in banddict[band]:
+                spw_list = [list(spwitem.keys())[0] for spwitem in banddict[band][baseband]]
+                yield spw_list
+
+    def _extract_spwdata_alma_nro(self) -> Generator[List[int], None, None]:
+        """Extract list of SPW IDs of ALMA or NRO from measurement set.
+
+        Yields:
+            List of SPW IDs for a tuning, for scan_intent='TARGET'.
+        """
+        ms = self.inputs.ms
+        request_spws = ms.get_spectral_windows()
+        targeted_scans = ms.get_scans(scan_intent='TARGET')
+        scan_spws = {spw for scan in targeted_scans for spw in scan.spws if spw in request_spws}
+        for spwid_list in utils.get_spectralspec_to_spwid_map(scan_spws).values():
+            yield spwid_list
 
     def plot(self) -> logger.Plot:
         """Create the plot.
@@ -1127,108 +1154,85 @@ class SpwIdVsFreqChart(object):
         filename = self.inputs.output
         if os.path.exists(filename):
             return self._get_plot_object()
-
-        fig = figure.Figure(figsize=(9.6, 7.2))
-        ax_spw = fig.add_axes([0.1, 0.1, 0.8, 0.8])
-
-        # Make a plot of frequency vs. spwid
         ms = self.inputs.ms
         request_spws = ms.get_spectral_windows()
         targeted_scans = ms.get_scans(scan_intent='TARGET')
-        scan_spws = {spw for scan in targeted_scans for spw in scan.spws if spw in request_spws}
-        list_bw = [float(spw.bandwidth.value)/1.0e9 for spw in request_spws]  # GHz
-        list_fmin = [float(spw.min_frequency.value)/1.0e9 for spw in request_spws]  # GHz
-        list_fmax = [float(spw.max_frequency.value)/1.0e9 for spw in request_spws]  # GHz
-        list_all_spwids = []
-        list_indices = []
-        list_all_indices = []
-        if self.context.project_summary.telescope in ('VLA', 'EVLA'):  # For VLA
-            banddict = ms.get_vla_baseband_spws(science_windows_only=True, return_select_list=False, warning=False)
-            list_spwids_baseband = []
-            for band in banddict:
-                for baseband in banddict[band]:
-                    spw = []
-                    minfreqs = []
-                    maxfreqs = []
-                    list_spwids = []
-                    for spwitem in banddict[band][baseband]:
-                        spw.append(next(iter(spwitem)))
-                    list_spwids_baseband.append(spw)
-            list_all_spwids = [spwid for list_spwids in list_spwids_baseband for spwid in list_spwids]
-            list_all_indices = list(range(len(list_all_spwids)))
-            ax_spw.barh(list_all_indices, list_bw, height=0.4, left=list_fmin)
-        else:  # For ALMA and NRO
-            for list_spwids in utils.get_spectralspec_to_spwid_map(scan_spws).values():
-                shift = len(list_all_spwids)
-                list_indices = [list_spwids.index(spwid)+shift for spwid in list_spwids]
-                start = len(list_all_spwids)
-                end = start + len(list_spwids)
-                list_all_spwids.extend(list_spwids)
-                list_all_indices.extend(list_indices)
-                fmins = list_fmin[start:end]
-                bws = list_bw[start:end]
-                ax_spw.barh(list_indices, bws, height=0.4, left=fmins)
+        antid = 0
+        if hasattr(ms, 'reference_antenna') and isinstance(ms.reference_antenna, str):
+            antid = ms.get_antenna(search_term=ms.reference_antenna.split(',')[0])[0].id
+        # prepare axes
+        fig = figure.Figure(figsize=(9.6, 7.2))
+        ax_spw = fig.add_axes([0.1, 0.1, 0.8, 0.8])
+        bar_height = 0.4
+        max_spws_to_annotate_VLA = 16  # request for VLA, PIPE-1415.
+        max_spws_to_annotate_ALMA_NRO = np.inf  # annotate all spws for ALMA/NRO
+        colorcycle = matplotlib.rcParams['axes.prop_cycle']()
+        atm_color = [0.17, 0.17, 0.17]  # very dark gray
+        ax_atm = ax_spw.twinx()
 
+        # plot spws
+        if self.context.project_summary.telescope in ('VLA', 'EVLA'):  # For VLA
+            spw_list_generator = self._extract_spwdata_vla()
+            scan_spws = request_spws
+            max_spws_to_annotate = max_spws_to_annotate_VLA
+        else:  # for ALMA or NRO
+            spw_list_generator = self._extract_spwdata_alma_nro()
+            scan_spws = {spw for scan in targeted_scans for spw in scan.spws if spw in request_spws}
+            max_spws_to_annotate = max_spws_to_annotate_ALMA_NRO
+        xmin, xmax = np.inf, -np.inf
+        totalnum_spws = len(scan_spws)
+        idx = 0
+        rmin = np.inf
+        for spwid_list in spw_list_generator:
+            color = next(colorcycle)['color']
+            for spwid in spwid_list:
+
+                # 1. draw bars
+                spwdata = [spw for spw in scan_spws if spw.id == spwid][0]
+                bw = float(spwdata.bandwidth.to_units(FrequencyUnits.GIGAHERTZ))
+                fmin = float(spwdata.min_frequency.to_units(FrequencyUnits.GIGAHERTZ))
+                xmin, xmax = min(xmin, fmin), max(xmax, fmin+bw)
+                ax_spw.barh(idx, bw, height=bar_height, left=fmin, color=color)
+
+                # 2. annotate each bars
+                if totalnum_spws <= max_spws_to_annotate or spwid in [spwid_list[0], spwid_list[-1]]:
+                    ax_spw.annotate(str(spwid), (fmin + bw/2, idx - bar_height/2), fontsize=14, ha='center', va='bottom')
+                idx += 1
+                rmin = min(rmin, abs(atmutil.get_spw_spec(vis=ms.name, spw_id=spwid)[2]))
+
+        # 3. Frequency vs. ATM transmission
+        center_freq = (xmin + xmax) / 2.0
+        # Determining the resolution value so that generates fine ATM transmission curve: it is set
+        # to smaller than 500 kHz but is set to larger than that corresponding to 48001 data points.
+        default_resolution = 5e-4  # To have 5 data points within the ozone feature of 2 MHz FWHM:
+                                   # 2 MHz/(5-1) = 500 kHz.
+        max_nchan = 48001  # 24 GHz/500 kHz, where 24 GHz covers both sidebands of a 4-12 GHz IF
+                           # for a single LO tuning.
+        fspan = xmax - xmin
+        resolution = min(default_resolution, rmin)
+        nchan = min(max_nchan, round(fspan / resolution) + 1)
+        resolution = fspan / (nchan - 1)
+        LOG.info("'Spectral Window ID vs. Frequency' plots the atmospheric transmission with %d data points at %.3f kHz intervals." % (nchan, resolution*1e6))
+        atm_freq, atm_transmission = atmutil.get_transmission_for_range(vis=ms.name, center_freq=center_freq, nchan=nchan, resolution=resolution, antenna_id=antid, doplot=False)
+
+        ax_atm.plot(atm_freq, atm_transmission, color=atm_color, alpha=0.6, linestyle='-', linewidth=2.0)
+
+        # set axes limits, title, label, grid, tick, and save the plot to file
+        ax_spw.set_xlim(xmin-(xmax-xmin)/15.0, xmax+(xmax-xmin)/15.0)
+        ax_spw.invert_yaxis()
+        ax_spw.set_ylim(totalnum_spws + totalnum_spws/20.0, -1.0 - totalnum_spws/20.0)  # The spw indices are from 0 to totalnum_spws. y-axis is inverted. totalnum_spws/20.0 is a mergin. -1.0 is upper edge.
         ax_spw.set_title('Spectral Window ID vs. Frequency', loc='center')
         ax_spw.set_xlabel("Frequency (GHz)", fontsize=14)
-        ax_spw.invert_yaxis()
         ax_spw.grid(axis='x')
         ax_spw.tick_params(labelsize=13)
-        ax_spw.set_ylim(float(len(list_all_indices)), -1.0)
         ax_spw.set_yticks([])
-        yspace = 0.3
-
-        # Annotate
-        if self.context.project_summary.telescope in ('VLA', 'EVLA') and \
-            len(list_all_spwids) >= 16:  # For VLA with many spws
-            list_all_spwids = []
-            for list_spwids in list_spwids_baseband:
-                shift = len(list_all_spwids)
-                list_indices = [list_spwids.index(spwid)+shift for spwid in list_spwids]
-                start = len(list_all_spwids)
-                end = start + len(list_spwids)
-                list_all_spwids.extend(list_spwids)
-                fmins = list_fmin[start:end]
-                bws = list_bw[start:end]
-                step = max(len(list_spwids) - 1, 1)
-                for f, w, spwid, index in zip(fmins[::step], bws[::step], list_spwids[::step], list_indices[::step]):
-                    ax_spw.annotate('%s' % spwid, (f+w/2, index-yspace), fontsize=14)
-        else:  # For ALMA, NRO and VLA with moderate spws
-            for f, w, spwid, index in zip(list_fmin, list_bw, list_all_spwids, list_all_indices):
-                ax_spw.annotate('%s' % spwid, (f+w/2, index-yspace), fontsize=14)
-
-        # Make a plot of frequency vs. atm transmission
-        # For VLA data it is out of scope in PIPE-1415 and will be implemented in PIPE-1873. 
-        if self.context.project_summary.telescope not in ('VLA', 'EVLA'):  # For ALMA and NRO
-            atm_color = 'm'
-            ax_atm = ax_spw.twinx()
-            ax_atm.set_ylabel('ATM Transmission', color=atm_color, labelpad=2, fontsize=14)
-            ax_atm.set_ylim(0, 1.05)
-            ax_atm.tick_params(direction='out', colors=atm_color, labelsize=13)
-            ax_atm.yaxis.set_major_formatter(ticker.FuncFormatter(lambda t, pos: '{}%'.format(int(t * 100))))
-            ax_atm.yaxis.tick_right()
-            antid = 0
-            if hasattr(ms, 'reference_antenna') and isinstance(ms.reference_antenna, str):
-                antid = ms.get_antenna(search_term=ms.reference_antenna.split(',')[0])[0].id
-
-            for spwid in list_all_spwids:
-                atm_freq, atm_transmission = atmutil.get_transmission(vis=ms.name, antenna_id=antid, spw_id=spwid)
-                ax_atm.plot(atm_freq, atm_transmission, color=atm_color, marker='.', markersize=4, linestyle='-')
-
+        ax_atm.set_ylabel('ATM Transmission', color=atm_color, labelpad=2, fontsize=14)
+        ax_atm.set_ylim(0, 1.05)
+        ax_atm.tick_params(direction='out', colors=atm_color, labelsize=13)
+        ax_atm.yaxis.set_major_formatter(ticker.FuncFormatter(lambda t, pos: '{}%'.format(int(t * 100))))
+        ax_atm.yaxis.tick_right()
         fig.savefig(filename)
         return self._get_plot_object()
-
-    def _get_figfile(self) -> str:
-        """Get filepath of output PNG file.
-
-        Returns:
-            Filepath of output PNG file
-        """
-        session_part = self.inputs.ms.session
-        ms_part = self.inputs.ms.basename
-        return os.path.join(self.context.report_dir,
-                            'session%s' % session_part,
-                            ms_part, 'spwid_vs_freq.png')
 
     def _get_plot_object(self) -> logger.Plot:
         """Get plot object.

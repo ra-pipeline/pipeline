@@ -7,7 +7,6 @@ import math
 import os
 import sys
 from operator import sub
-import scipy
 from matplotlib.animation import FuncAnimation, ImageMagickWriter
 from matplotlib.lines import Line2D
 import matplotlib.pyplot as plt
@@ -16,9 +15,12 @@ import pipeline.domain.datatable as datatable
 from pipeline.domain.datatable import DataTableImpl
 import pipeline.infrastructure.logging as logging
 from pipeline.infrastructure import casa_tools
-from typing import Generator, List, Optional, Tuple
+from typing import TYPE_CHECKING, Generator, List, Optional, Tuple
 
 from ...heuristics import rasterscan
+
+if TYPE_CHECKING:
+    from pipeline.domain.measurementset import MeasurementSet
 
 
 LOG = logging.get_logger(__name__)
@@ -335,12 +337,14 @@ def get_raster_flag_list(flagged1: List[int], flagged2: List[int], raster_index_
     return data_ids
 
 
-def flag_raster_map(datatable: DataTableImpl) -> List[int]:
+def flag_raster_map(datatable: DataTableImpl, ms: 'MeasurementSet', rasterscan_heuristics_result: rasterscan.RasterScanHeuristicsResult) -> List[int]:
     """
     Return list of index to be flagged by flagging heuristics for raster scan.
 
     Args:
-        datatable: input datatable to analyze
+        datatable (DataTableImpl): input datatable to analyze
+        ms (MeasurementSet): MeasurementSet domain object
+        rasterscan_heuristics_result (RasterScanHeuristicsResult): Result object of RasterScanHeuristics
 
     Returns:
         per-antenna list of indice to be flagged
@@ -372,9 +376,11 @@ def flag_raster_map(datatable: DataTableImpl) -> List[int]:
         dtrowdict[key] = dtrow_list
 
         # typical number of data per raster row
-        num_data_per_raster_row = [len(x) for x in itertools.chain(*dtrowdict.values())]
-        ndrowdict.setdefault(field_id, [])
-        ndrowdict[field_id].extend(num_data_per_raster_row)
+        # result is consolicated per field and spectralspec (PIPE-1990)
+        num_data_per_raster_row = [len(x) for x in dtrow_list]
+        spectralspec = str(ms.get_spectral_window(spw_id).spectralspec)
+        result_key = (field_id, spectralspec)
+        ndrowdict.setdefault(result_key, []).extend(num_data_per_raster_row)
 
     # rastergapdict stores list of datatable row ids per raster map
     rastergapdict = {}
@@ -389,7 +395,8 @@ def flag_raster_map(datatable: DataTableImpl) -> List[int]:
         try:
             raster_gap = rasterscan.find_raster_gap(metadata.ra, metadata.dec, dtrow_list)
         except rasterscan.RasterScanHeuristicsFailure as e:
-            LOG.warn('{} This often happens when pointing pattern deviates from regular raster. You may want to check the pointings in observation.'.format(e))
+            LOG.debug('{} This often happens when pointing pattern deviates from regular raster. You may want to check the pointings in observation.'.format(e))
+            rasterscan_heuristics_result.set_result_fail(key[2], key[1], key[0])
             # exclude combination of (field_id, spw_id, antenna_id) held by key
             # from the subsequent analysis
             continue
@@ -400,22 +407,25 @@ def flag_raster_map(datatable: DataTableImpl) -> List[int]:
         rastergapdict[key] = idx_list
 
         # compute number of data per raster map
-        field_id = key[0]
-        ndmapdict.setdefault(field_id, [])
-        ndmapdict[field_id].extend(list(map(len, idx_list)))
+        # result is consolidated per field and spectralspec (PIPE-1990)
+        field_id, spw_id, _ = key
+        spectralspec = str(ms.get_spectral_window(spw_id).spectralspec)
+        result_key = (field_id, spectralspec)
+        ndmapdict.setdefault(result_key, []).extend(list(map(len, idx_list)))
 
     repmapdict = {}
-    for field_id, ndmap in ndmapdict.items():
-        ndrow = ndrowdict[field_id]
-        LOG.trace('FIELD %s: Number of data per raster row = %s', field_id, ndrow)
+    for key, ndmap in ndmapdict.items():
+        ndrow = ndrowdict[key]
+        field_id, spectralspec = key
+        LOG.trace('FIELD %s spectralSpec %s: Number of data per raster row = %s', field_id, spectralspec, ndrow)
         nd_per_row_rep = find_most_frequent(ndrow)
-        LOG.debug('FIELD %s: number of raster row = %s', field_id, len(ndrow))
-        LOG.debug('FIELD %s: most frequent # of data per raster row = %s', field_id, nd_per_row_rep)
+        LOG.debug('FIELD %s spectralSpec %s: number of raster row = %s', field_id, spectralspec, len(ndrow))
+        LOG.debug('FIELD %s spectralSpec %s: most frequent # of data per raster row = %s', field_id, spectralspec, nd_per_row_rep)
         nd_per_raster_rep = find_most_frequent(ndmap)
-        LOG.debug('FIELD %s: number of raster map = %s', field_id, len(ndmap))
-        LOG.debug('FIELD %s: most frequent # of data per raster map = %s', field_id, nd_per_raster_rep)
-        LOG.debug('FIELD %s: nominal number of row per raster map = %s', field_id, nd_per_raster_rep // nd_per_row_rep)
-        repmapdict[field_id] = {
+        LOG.debug('FIELD %s spectralSpec %s: number of raster map = %s', field_id, spectralspec, len(ndmap))
+        LOG.debug('FIELD %s spectralSpec %s: most frequent # of data per raster map = %s', field_id, spectralspec, nd_per_raster_rep)
+        LOG.debug('FIELD %s spectralSpec %s: nominal number of row per raster map = %s', field_id, spectralspec, nd_per_raster_rep // nd_per_row_rep)
+        repmapdict[key] = {
             'row': nd_per_row_rep,
             'map': nd_per_raster_rep
         }
@@ -424,9 +434,12 @@ def flag_raster_map(datatable: DataTableImpl) -> List[int]:
         LOG.debug('Processing FIELD %s, SPW %s, ANTENNA %s', *key)
 
         # nominal number of data per row and per raster map
-        field_id = key[0]
-        nd_per_raster_rep = repmapdict[field_id]['map']
-        nd_per_row_rep = repmapdict[field_id]['row']
+        # these numbers depend on field as well as spectral spec (PIPE-1990)
+        field_id, spw_id, antenna_id = key
+        spectralspec = str(ms.get_spectral_window(spw_id).spectralspec)
+        result_key = (field_id, spectralspec)
+        nd_per_raster_rep = repmapdict[result_key]['map']
+        nd_per_row_rep = repmapdict[result_key]['row']
 
         # flag incomplete raster map
         flag_raster1 = flag_incomplete_raster(idx_list, nd_per_raster_rep, nd_per_row_rep)
@@ -443,7 +456,6 @@ def flag_raster_map(datatable: DataTableImpl) -> List[int]:
         row_list = metadata.dtrow[flag_list]
 
         # key for rowdict is (spw_id, antenna_id) tuple
-        field_id, spw_id, antenna_id = key
         new_key = (spw_id, antenna_id)
         val = rowdict.get(new_key, np.zeros(0, metadata.dtrow.dtype))
         rowdict[new_key] = np.append(val, row_list)

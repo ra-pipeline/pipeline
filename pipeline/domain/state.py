@@ -52,8 +52,10 @@ class State(object):
             red_intents.update(['AMPLITUDE'])
         if 'FLUX' in raw_intents:
             red_intents.update(['AMPLITUDE'])
-        if 'DIFFGAIN' in raw_intents:
-            red_intents.update(['DIFFGAIN'])
+        if 'DIFFGAINREF' in raw_intents:
+            red_intents.update(['DIFFGAINREF'])
+        if 'DIFFGAINSRC' in raw_intents:
+            red_intents.update(['DIFFGAINSRC'])
         if 'TARGET' in raw_intents:
             red_intents.update(['TARGET'])
         if ('PHASE' in raw_intents) and \
@@ -126,8 +128,8 @@ class StateALMA(State):
         'CALIBRATE_SIDEBAND_RATIO#OFF_SOURCE': 'SIDEBAND',
         'CALIBRATE_SIDEBAND_RATIO.OFF_SOURCE': 'SIDEBAND',
         'CALIBRATE_SIDEBAND_RATIO_OFF_SOURCE': 'SIDEBAND',
-        'CALIBRATE_DIFFGAIN#REFERENCE'       : 'DIFFGAIN',
-        'CALIBRATE_DIFFGAIN#ON_SOURCE'       : 'DIFFGAIN',
+        'CALIBRATE_DIFFGAIN#REFERENCE'       : 'DIFFGAINREF',
+        'CALIBRATE_DIFFGAIN#ON_SOURCE'       : 'DIFFGAINSRC',
         'CALIBRATE_DELAY#ON_SOURCE'          : 'CHECK',
         'CALIBRATE_DELAY.ON_SOURCE'          : 'CHECK',
         'CALIBRATE_DELAY_ON_SOURCE'          : 'CHECK',

@@ -14,7 +14,7 @@ LOG = logging.get_logger(__name__)
 class VLASubPlotRenderer(object):
     #template = 'testdelays_plots.html'
 
-    def __init__(self, context, result, plots, json_path, template, filename_prefix, bandlist):
+    def __init__(self, context, result, plots, json_path, template, filename_prefix, bandlist, spwlist=None, spw_plots=None):
         self.context = context
         self.result = result
         self.plots = plots
@@ -22,6 +22,13 @@ class VLASubPlotRenderer(object):
         self.template = template
         self.filename_prefix = filename_prefix
         self.bandlist = bandlist
+        self.spwlist = spwlist
+        self.spw_plots = spw_plots
+
+        if self.spwlist is None:
+            self.spwlist = []
+        if self.spw_plots is None:
+            self.spw_plots = []
 
         self.summary_plots = {}
         self.delay_subpages = {}
@@ -44,12 +51,14 @@ class VLASubPlotRenderer(object):
         return {'pcontext': self.context,
                 'result': self.result,
                 'plots': self.plots,
+                'spw_plots': self.spw_plots,
                 'dirname': self.dirname,
                 'json': self.json,
                 'delay_subpages': self.delay_subpages,
                 'phasegain_subpages': self.phasegain_subpages,
                 'bpsolamp_subpages': self.bpsolamp_subpages,
                 'bpsolphase_subpages': self.bpsolphase_subpages,
+                'spwlist': self.spwlist,
                 'bandlist': self.bandlist}
 
     @property
@@ -58,7 +67,7 @@ class VLASubPlotRenderer(object):
         return os.path.join(self.context.report_dir, stage)
 
     @property
-    def filename(self):        
+    def filename(self):
         filename = filenamer.sanitize(self.filename_prefix + '-%s.html' % self.ms)
         return filename
 
@@ -93,6 +102,7 @@ class T2_4MDetailssemifinalBPdcalsRenderer(basetemplates.T2_4MDetailsDefaultRend
                                   'stage%s' % results.stage_number)
 
         summary_plots = {}
+        summary_plots_per_spw = {}
         delay_subpages = {}
         ampgain_subpages = {}
         phasegain_subpages = {}
@@ -121,9 +131,24 @@ class T2_4MDetailssemifinalBPdcalsRenderer(basetemplates.T2_4MDetailsDefaultRend
             ms = os.path.basename(result.inputs['vis'])
             summary_plots[ms] = plots
 
+            # generate per-SPW semifinalBPdcals plots
+            spws = m.get_spectral_windows(science_windows_only=True)
+            spwlist = []
+            per_spw_plots = []
+            for spw in spws:
+                if spw.specline_window:
+                    plotter = semifinalBPdcalsdisplay.semifinalBPdcalsSpwSummaryChart(context, result, suffix=suffix, spw=spw.id)
+                    plots = plotter.plot()
+                    per_spw_plots.extend(plots)
+                    spwlist.append(str(spw.id))
+
+            if per_spw_plots:
+                summary_plots_per_spw[ms] = []
+                summary_plots_per_spw[ms].extend(per_spw_plots)
+
             # generate testdelay plots and JSON file
             plotter = semifinalBPdcalsdisplay.DelaysPerAntennaChart(context, result, suffix=suffix)
-            plots = plotter.plot() 
+            plots = plotter.plot()
             json_path = plotter.json_filename
 
             # write the html for each MS to disk
@@ -134,7 +159,7 @@ class T2_4MDetailssemifinalBPdcalsRenderer(basetemplates.T2_4MDetailsDefaultRend
 
             # generate phase Gain plots and JSON file
             plotter = semifinalBPdcalsdisplay.semifinalphaseGainPerAntennaChart(context, result, suffix=suffix)
-            plots = plotter.plot() 
+            plots = plotter.plot()
             json_path = plotter.json_filename
 
             # write the html for each MS to disk
@@ -145,27 +170,34 @@ class T2_4MDetailssemifinalBPdcalsRenderer(basetemplates.T2_4MDetailsDefaultRend
 
             # generate amp bandpass solution plots and JSON file
             plotter = semifinalBPdcalsdisplay.semifinalbpSolAmpPerAntennaChart(context, result, suffix=suffix)
-            plots = plotter.plot() 
+            plots = plotter.plot()
             json_path = plotter.json_filename
 
+            plotter = semifinalBPdcalsdisplay.semifinalbpSolAmpPerAntennaPerSpwChart(context, result, suffix=suffix)
+            spw_plots = plotter.plot()
+
             # write the html for each MS to disk
-            renderer = VLASubPlotRenderer(context, result, plots, json_path, 'semifinalcals_plots.mako', 'bpsolamp', bandlist)
+            renderer = VLASubPlotRenderer(context, result, plots, json_path, 'semifinalcals_plots.mako', 'bpsolamp', bandlist, spwlist, spw_plots=spw_plots)
             with renderer.get_file() as fileobj:
                 fileobj.write(renderer.render())
                 bpsolamp_subpages[ms] = renderer.filename
 
             # generate phase bandpass solution plots and JSON file
             plotter = semifinalBPdcalsdisplay.semifinalbpSolPhasePerAntennaChart(context, result, suffix=suffix)
-            plots = plotter.plot() 
+            plots = plotter.plot()
             json_path = plotter.json_filename
 
+            plotter = semifinalBPdcalsdisplay.semifinalbpSolPhasePerAntennaPerSpwChart(context, result, suffix=suffix)
+            spw_plots = plotter.plot()
+
             # write the html for each MS to disk
-            renderer = VLASubPlotRenderer(context, result, plots, json_path, 'semifinalcals_plots.mako', 'bpsolphase', bandlist)
+            renderer = VLASubPlotRenderer(context, result, plots, json_path, 'semifinalcals_plots.mako', 'bpsolphase', bandlist, spwlist, spw_plots=spw_plots)
             with renderer.get_file() as fileobj:
                 fileobj.write(renderer.render())
                 bpsolphase_subpages[ms] = renderer.filename
 
         ctx.update({'summary_plots': summary_plots,
+                    'summary_plots_per_spw': summary_plots_per_spw,
                     'delay_subpages': delay_subpages,
                     'phasegain_subpages': phasegain_subpages,
                     'bpsolamp_subpages': bpsolamp_subpages,

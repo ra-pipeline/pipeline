@@ -2,6 +2,7 @@ import collections
 import distutils.cmd
 import distutils.log
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -9,13 +10,13 @@ import setuptools
 from setuptools.command.build_py import build_py
 
 ENCODING = 'utf-8'  # locale.getpreferredencoding()
-PIPELINE_PACKAGES = ['h', 'hif', 'hifa', 'hifas', 'hifv', 'hsd', 'hsdn']
+PIPELINE_PACKAGES = ['h', 'hif', 'hifa', 'hifv', 'hsd', 'hsdn']
 
 
 def flatten(items):
     """Yield items from any nested iterable"""
     for x in items:
-        if isinstance(x, collections.Iterable) and not isinstance(x, (str, bytes)):
+        if isinstance(x, collections.abc.Iterable) and not isinstance(x, (str, bytes)):
             for sub_x in flatten(x):
                 yield sub_x
         else:
@@ -197,44 +198,14 @@ class VersionCommand(distutils.cmd.Command):
             f.write('\n')
 
 
-def _get_git_version():
-    # Retrieve info about current branch.
-    git_branch = None
+def _get_git_version() -> str:
     try:
-        git_branch = subprocess.check_output(['git', 'symbolic-ref', '--short', 'HEAD'],
-                                             stderr=subprocess.DEVNULL).decode().strip()
+        return subprocess.check_output(
+            [sys.executable, 'pipeline/infrastructure/version.py'],
+            stderr=subprocess.DEVNULL
+        ).decode().rstrip()
     except (FileNotFoundError, subprocess.CalledProcessError):
-        # FileNotFoundError: if git is not on PATH.
-        # subprocess.CalledProcessError: if git command returns error; for example, current checkout
-        #   may have a detached HEAD pointing at a specific tag (not pointing to a branch).
-        pass
-    if git_branch is not None and (git_branch == 'main' or git_branch.startswith('release/')):
-        ver = subprocess.check_output([sys.executable, 'pipeline/infrastructure/version.py'],
-                                      stderr=subprocess.DEVNULL).decode().rstrip().split(' ')
-        # Output of the version.py script is a string with two or three space-separated elements:
-        # last branch tag (possibly empty), last release tag, and possibly a "dirty" suffix.
-        # Version string returned by this routine contains the latest release tag and optionally
-        # a local version identifier ("dirty") as described in PEP440, separated by "+".
-        return '+'.join(ver[1:])
-    else:
-        # Retrieve info about current commit.
-        try:
-            # Set version to latest tag, number of commits since tag, and latest commit hash.
-            commit_hash = subprocess.check_output(['git', 'describe', '--always', '--tags', '--long', '--dirty'],
-                                                  stderr=subprocess.DEVNULL).decode().strip()
-        except (FileNotFoundError, subprocess.CalledProcessError):
-            # FileNotFoundError: if git is not on PATH.
-            # subprocess.CalledProcessError: if git command returns error.
-            commit_hash = None
-        # Consolidate into single version string.
-        if commit_hash is None:
-            version = "unknown"
-        elif git_branch is None:
-            version = commit_hash
-        else:
-            version = "{}-{}".format(commit_hash, git_branch)
-
-        return version
+        return '0.0.dev0'
 
 
 class PipelineBuildPyCommand(build_py):

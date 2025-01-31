@@ -1,6 +1,7 @@
 <%!
 rsc_path = ""
 import os
+from pipeline.domain import DataType
 
 columns = {'cleanmask' : ('Clean Mask', 'Clean Mask'),
            'flux' : ('Primary Beam', 'Primary Beam'),
@@ -32,7 +33,7 @@ def get_plot(plots, prefix, datatype, field, spw, stokes, i, colname, moment=Non
 
 
 <div class="page-header">
-    <h2>Clean results for ${field} SpW ${spw}
+    <h2>Clean results for ${field} (${DataType.get_short_datatype_desc(datatype)}) SpW ${spw}
         <div class="btn-toolbar pull-right" role="toolbar">
             % if qa_previous or qa_next:
             <div class="btn-group" role="group">

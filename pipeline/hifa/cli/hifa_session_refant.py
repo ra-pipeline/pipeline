@@ -3,38 +3,22 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
+# docstring and type hints: inherits from hifa.tasks.sessionrefant.sessionrefant.SessionRefAntInputs.__init__
 @utils.cli_wrapper
 def hifa_session_refant(vis=None, phase_threshold=None):
-    """
-    hifa_session_refant ---- Select best reference antenna for session(s)
-
+    """Select best reference antenna for session(s)
 
     This task re-evaluates the reference antenna lists from all measurement sets
     within a session and combines these to select a single common reference
     antenna (per session) that is to be used by any subsequent pipeline stages.
 
-    Output:
+    Returns:
+        The results object for the pipeline task is returned.
 
-        results -- The results object for the pipeline task is returned.
+    Examples:
+        1. Compute a single common reference antenna per session:
 
-    --------- parameter descriptions ---------------------------------------------
-
-    vis
-                    List of input MeasurementSets. Defaults to the list of
-                    MeasurementSets specified in the pipeline context.
-
-                    Example: vis=['ngc5921.ms']
-    phase_threshold
-                    Threshold (in degrees) used to identify absolute phase
-                    solution outliers in caltables.
-
-                    Example: phase_threshold=0.005
-
-    --------- examples -----------------------------------------------------------
-
-    1. Compute a single common reference antenna per session:
-
-    >>> hifa_session_refant()
+        >>> hifa_session_refant()
 
     """
     ##########################################################################

@@ -113,19 +113,22 @@ def identify_fully_flagged_antennas_from_flagview(
     antenna_id_to_name: Dict[int, str] = {ant.id: (ant.name if ant.name.strip() else str(ant.id))
                                           for ant in ms.antennas}
 
-    # Initialize the flagging state dict:
-    # keys are combinations of field, intent and spw, and values are
-    # 2d arrays (assembled as lists of arrays), with rows corresponding
-    # to scans, columns to antennas, and values indicating whether
-    # the antenna is fully flagged in the given scan.
-    flagging_state: Dict[FieldIntentSpw, list] = collections.defaultdict(list)
+    # Create an empty dictionary for aggregating information of fully flagged antenna.
+    fully_flagged_antennas: Dict[str, Set[FieldIntentSpw]] = collections.defaultdict(set)
 
-    # Create a summary of the flagging state by going through
-    # each view product for the specified metric.
+    # Going through each view product for the specified metric, search for fully flagged antenna
+    # for each combination of field, intent, and spw, and collect their information for the return.
     for description in results.descriptions():
 
         # Get final view.
         view = results.last(description)
+
+        # Initialize the flagging state dict:
+        # keys are combinations of field, intent, and spw, and values are
+        # 2d arrays (assembled as lists of arrays), with rows corresponding
+        # to scans, columns to antennas, and values indicating whether
+        # the antenna is fully flagged in the given scan.
+        flagging_state: Dict[FieldIntentSpw, list] = collections.defaultdict(list)
 
         # Go through each scan within view.
         for scan_index, scan_id in enumerate(view.axes[1].data):
@@ -149,14 +152,14 @@ def identify_fully_flagged_antennas_from_flagview(
                     if intents_of_interest is None or intent in intents_of_interest:
                         flagging_state[FieldIntentSpw(field_name, intent, view.spw)].append(flag_per_scan)
 
-    # Now analyze the flagging_state created above:
-    # for each combination of field, intent and spw in this dict,
-    # consider the 2d array with rows corresponding to scans and columns - to antennas,
-    # and collect the information about antennas that are fully flagged in all rows.
-    fully_flagged_antennas: Dict[str, Set[FieldIntentSpw]] = collections.defaultdict(set)
-    for key, value in flagging_state.items():
-        for iant in numpy.where(numpy.all(value, axis=0))[0]:
-            fully_flagged_antennas[antenna_id_to_name[iant]].add(key)
+        # Consider the 2d array with rows corresponding to scans and columns to antennas,
+        # and collect the information about antennas that are fully flagged in all rows.
+        for key, value in flagging_state.items():
+            for idx_ant in numpy.where(numpy.all(value, axis=0))[0]:
+                # PIPE-2147: mapping view column indices (corresponding to antennas) to antenna ids using
+                # the flagging view x-axis data.
+                antenna_id = view.axes[0].data[idx_ant]
+                fully_flagged_antennas[antenna_id_to_name[antenna_id]].add(key)
 
     return fully_flagged_antennas
 

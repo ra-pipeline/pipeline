@@ -77,6 +77,7 @@ class SDK2JyCalInputs(vdp.StandardInputs):
                 'caltype': self.caltype,
                 'endpoint': self.endpoint}
 
+    # docstring and type hints: supplements hsd_k2jycal
     def __init__(
         self,
         context: 'Context',
@@ -91,16 +92,78 @@ class SDK2JyCalInputs(vdp.StandardInputs):
 
         Args:
             context: Pipeline context
-            output_dir: Output directory. Defaults to None.
-            infiles: Name of MS or list of names. Defaults to None.
-            caltable: Name of caltable or list of names. Defaults to None.
-                      Name is automatically created from infiles if None is given.
-            reffile: Name of the file that stores Jy/K factors. Defaults to None.
-                     Name is 'jyperk.csv' if None is given.
-            dbservice: Access to Jy/K DB if True. Defaults to None.
-                       None is interpreted as True.
-            endpoint: Name of the DB endpoint. Defaults to None.
-                      Endpoint is 'asdm' if None is given.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            infiles: List of input MeasurementSets.
+
+                Example: vis='ngc5921.ms'
+
+            caltable: Name of output gain calibration tables.
+                Name is automatically created from infiles if None is given.
+
+                Example: caltable='ngc5921.gcal'
+
+            reffile: Path to a file containing Jy/K factors for science data,
+                which must be provided by associating calibrator reduction or the observatory
+                measurements. Jy/K factor must take into account all efficiencies, i.e.,
+                it must be a direct conversion factor from Ta* to Jy. The file must be
+                in either MS-based or session-based format. The MS-based format must
+                be in an CSV format with five fields: MS name, antenna name, spectral
+                window id, polarization string, and Jy/K conversion factor. Example for
+                the file is as follows::
+
+                    MS,Antenna,Spwid,Polarization,Factor
+                    uid___A002_X316307_X6f.ms,CM03,5,XX,10.0
+                    uid___A002_X316307_X6f.ms,CM03,5,YY,12.0
+                    uid___A002_X316307_X6f.ms,PM04,5,XX,2.0
+                    uid___A002_X316307_X6f.ms,PM04,5,YY,5.0
+
+                The first line in the above example is a header which may or may not
+                exist. Example for the session-based format is as follows::
+
+                    #OUSID=XXXXXX
+                    #OBJECT=Uranus
+                    #FLUXJY=yy,zz,aa
+                    #FLUXFREQ=YY,ZZ,AA
+                    #sessionID,ObservationStartDate(UTC),ObservationEndDate(UTC),
+                    Antenna,BandCenter(MHz),BandWidth(MHz),POL,Factor
+                    1,2011-11-11 01:00:00,2011-11-11 01:30:00,CM02,86243.0,500.0,I,10.0
+                    1,2011-11-11 01:00:00,2011-11-11 01:30:00,CM02,86243.0,1000.0,I,30.0
+                    1,2011-11-11 01:00:00,2011-11-11 01:30:00,CM03,86243.0,500.0,I,50.0
+                    1,2011-11-11 01:00:00,2011-11-11 01:30:00,CM03,86243.0,1000.0,I,70.0
+                    1,2011-11-11 01:00:00,2011-11-11 01:30:00,ANONYMOUS,86243.0,500.0,I,30.0
+                    1,2011-11-11 01:00:00,2011-11-11 01:30:00,ANONYMOUS,86243.0,1000.0,I,50.0
+                    2,2011-11-13 01:45:00,2011-11-13 02:15:00,PM04,86243.0,500.0,I,90.0
+                    2,2011-11-13 01:45:00,2011-11-13 02:15:00,PM04,86243.0,1000.0,I,110.0
+                    2,2011-11-13 01:45:00,2011-11-13 02:15:00,ANONYMOUS,86243.0,500.0,I,90.0
+                    2,2011-11-13 01:45:00,2011-11-13 02:15:00,ANONYMOUS,86243.0,1000.0,I,110.0
+
+                Lines starting with '#' are meta data and header.
+                The header must exist. The factor to apply is identified by matching the
+                session ID, antenna name, frequency and polarization of data in each line of
+                the file. Note the observation date is supplementary information and not used
+                for the matching so far. The lines whose antenna name is 'ANONYMOUS' are used
+                when there is no measurement for specific antenna in the session. In the above
+                example, if science observation of session 1 contains the antenna PM04, Jy/K
+                factor for ANONYMOUS antenna will be applied since there is no measurement for
+                PM04 in session 1.
+                If no file name is specified or specified file doesn't exist, all Jy/K factors
+                are set to 1.0.
+
+                Example: reffile='', reffile='working/jyperk.csv'
+
+            dbservice: Whether or not accessing Jy/K DB to retrieve conversion factors.
+
+                Default: None (equivalent to True)
+
+            endpoint: Which endpoints to use for query.
+
+                Options: 'asdm', 'model-fit', 'interpolation'
+
+                Default: None (equivalent to 'asdm')
+
         """
         super(SDK2JyCalInputs, self).__init__()
 

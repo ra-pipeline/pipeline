@@ -67,7 +67,19 @@ class WvrgcalResult(basetask.Results):
             if (hasattr(ms, 'reference_antenna')
                     and isinstance(ms.reference_antenna, str)):
                 refant = ms.reference_antenna.split(',')
-                bad_antennas = set(self.wvrflag).intersection(refant)
+
+                # PIPE-2057: CASA 'wvrgcal' cannot evaluate ALMA antennas that
+                # do not have WVR radiometers (which are the antennas whose name
+                # begins with "CM") and will automatically mark those as
+                # flagged. Since these "CM" antennas were not evaluated, do not
+                # let them be removed from the refant list for having "bad WVR".
+                if any("CM" in ant for ant in self.wvrflag):
+                    LOG.debug(f"{ms.basename}: wvrgcal has flagged 'CM' antennas, but this happens not because their"
+                              f" WVR data are bad, but because these antennas do not have WVR data at all (no WVR"
+                              f" radiometers). Since the 'CM' antennas were not evaluated, they are not removed here"
+                              f" from the refant list. Any non-'CM' antenna that got flagged by wvrgcal will get"
+                              f" removed from the refant list.")
+                bad_antennas = {ant for ant in self.wvrflag if "CM" not in ant}.intersection(refant)
                 if bad_antennas:
                     ms.update_reference_antennas(ants_to_remove=bad_antennas)
 

@@ -945,12 +945,19 @@ class SingleDishPointingChart(object):
         # Search for the first available SPW, antenna combination
         # observing_pattern is None for invalid combination.
         spw_id = None
-        for s in target_spws:
-            field_patterns = list(ms.observing_pattern[antenna_id][s.id].values())
-            if field_patterns.count(None) < len(field_patterns):
-                # at least one valid field exists.
-                spw_id = s.id
-                break
+        if target_field_id is None:
+            for s in target_spws:
+                field_patterns = list(ms.observing_pattern[antenna_id][s.id].values())
+                if field_patterns.count(None) < len(field_patterns):
+                    # at least one valid field exists.
+                    spw_id = s.id
+                    break
+        else:
+            for s in target_spws:
+                observing_pattern = ms.observing_pattern[antenna_id][s.id].get(target_field_id, None)
+                if observing_pattern:
+                    spw_id = s.id
+                    break
         if spw_id is None:
             LOG.info('No data with antenna=%d and spw=%s found in %s' % (antenna_id, str(target_spws), ms.basename))
             LOG.info('Skipping pointing plot')
@@ -959,7 +966,9 @@ class SingleDishPointingChart(object):
             LOG.debug('Generate pointing plot using antenna=%d and spw=%d of %s' % (antenna_id, spw_id, ms.basename))
         beam_size = casa_tools.quanta.convert(ms.beam_sizes[antenna_id][spw_id], 'deg')
         beam_size_in_deg = casa_tools.quanta.getvalue(beam_size)
-        obs_pattern = ms.observing_pattern[antenna_id][spw_id]
+        obs_pattern = dict((int(k), v) for k, v in ms.observing_pattern[antenna_id][spw_id].items())
+        if target_field_id:
+            obs_pattern = obs_pattern.get(target_field_id, obs_pattern)
         antenna_ids = self.datatable.getcol('ANTENNA')
         spw_ids = self.datatable.getcol('IF')
         if self.target_only:

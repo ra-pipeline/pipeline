@@ -32,7 +32,18 @@ class RestorepimsInputs(vdp.StandardInputs):
 
     reimaging_resources = vdp.VisDependentProperty(default='reimaging_resources.tgz')
 
+    # docstring and type hints: supplements hifv_restorepims
     def __init__(self, context, vis=None, reimaging_resources=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            vis: List of input visibility data.
+
+            reimaging_resources: file path of reimaging_resources.tgz from the SE imaging product.
+
+        """
         self.context = context
         self.vis = vis
         self.reimaging_resources = reimaging_resources

@@ -67,11 +67,11 @@ class PhaseOffsetPlotHelper(object):
 
 
 class PhaseOffsetPlot(object):
-    def __init__(self, context, ms, plothelper, scan_intent=None, scan_id=None, score_retriever=None):
+    def __init__(self, context, ms, plothelper, scan_intent=None, scan_id=None, scan_spw=None, score_retriever=None):
         self._context = context
         self._ms = ms        
-        self._plothelper = plothelper        
-        self._scans = ms.get_scans(scan_id=scan_id, scan_intent=scan_intent)
+        self._plothelper = plothelper
+        self._scans = ms.get_scans(scan_id=scan_id, scan_intent=scan_intent, spw=scan_spw)
         self._score_retriever = score_retriever if score_retriever else common.NullScoreFinder()
 
         self._caltables_loaded = False

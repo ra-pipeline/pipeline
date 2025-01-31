@@ -35,7 +35,7 @@ class RefantQAHandler(pqa.QAPlugin):
 
 
 class RefantListQAHandler(pqa.QAPlugin):
-    result_cls = collections.Iterable
+    result_cls = collections.abc.Iterable
     child_cls = referenceantenna.RefAntResults
 
     def handle(self, context, result):

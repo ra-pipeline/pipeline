@@ -1,5 +1,6 @@
 import os
 import tempfile
+from inspect import signature
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -7,14 +8,15 @@ import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
+
 from pipeline.domain import DataType
 from pipeline.h.tasks.common.sensitivity import Sensitivity
-from pipeline.infrastructure import casa_tools
-from pipeline.infrastructure import exceptions
-from pipeline.infrastructure import task_registry
-from .resultobjects import MakeImagesResult
+from pipeline.infrastructure import casa_tools, exceptions, task_registry
+
 from ..tclean import Tclean
 from ..tclean.resultobjects import TcleanResult
+from .resultobjects import MakeImagesResult
+import numpy as np
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -48,6 +50,20 @@ class MakeImagesInputs(vdp.StandardInputs):
     tlimit = vdp.VisDependentProperty(default=2.0)
     drcorrect = vdp.VisDependentProperty(default=-999.0)
     overwrite_on_export = vdp.VisDependentProperty(default=True)
+    vlass_plane_reject_im = vdp.VisDependentProperty(default=True)
+
+    @vlass_plane_reject_im.postprocess
+    def vlass_plane_reject_im(self, unprocessed):
+        """Convert the allowed argument input datatype to the dictionary form used by the task."""
+        vlass_plane_reject_dict = {
+            'apply': True, 'exclude_spw': '', 'flagpct_thresh': 0.8, 'beamdev_thresh': 0.2}
+        if isinstance(unprocessed, dict):
+            vlass_plane_reject_dict.update(unprocessed)
+        if isinstance(unprocessed, bool):
+            vlass_plane_reject_dict['apply'] = unprocessed
+        LOG.debug("convert the task input of 'vlass_plane_reject_im' from %r to %r.",
+                  unprocessed, vlass_plane_reject_dict)
+        return vlass_plane_reject_dict
 
     @vdp.VisDependentProperty(null_input=['', None, {}])
     def target_list(self):
@@ -60,16 +76,113 @@ class MakeImagesInputs(vdp.StandardInputs):
         else:
             return tlimit
 
+    # docstring and type hints: supplements hif_makeimages
     def __init__(self, context, output_dir=None, vis=None, target_list=None,
                  hm_masking=None, hm_sidelobethreshold=None, hm_noisethreshold=None,
                  hm_lownoisethreshold=None, hm_negativethreshold=None, hm_minbeamfrac=None, hm_growiterations=None,
                  hm_dogrowprune=None, hm_minpercentchange=None, hm_fastnoise=None, hm_nsigma=None,
                  hm_perchanweightdensity=None, hm_npixels=None, hm_cyclefactor=None, hm_minpsffraction=None,
                  hm_maxpsffraction=None, hm_weighting=None, hm_cleaning=None, tlimit=None, drcorrect=None, masklimit=None,
-                 cleancontranges=None, calcsb=None, hm_mosweight=None, overwrite_on_export=None,
+                 cleancontranges=None, calcsb=None, hm_mosweight=None, overwrite_on_export=None, vlass_plane_reject_im=None,
                  parallel=None,
                  # Extra parameters
                  ):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the h_init or hif_importdata task.
+                '': use all MeasurementSets in the context
+                Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
+
+            target_list: Dictionary specifying targets to be imaged; blank will read list from context
+
+            hm_masking: Clean masking mode. Options are 'centralregion', 'auto', 'manual' and 'none'
+
+            hm_sidelobethreshold: sidelobethreshold * the max sidelobe level
+
+            hm_noisethreshold: noisethreshold * rms in residual image
+
+            hm_lownoisethreshold: lownoisethreshold * rms in residual image
+
+            hm_negativethreshold: negativethreshold * rms in residual image
+
+            hm_minbeamfrac: Minimum beam fraction for pruning
+
+            hm_growiterations: Number of binary dilation iterations for growing the mask
+
+            hm_dogrowprune: Do pruning on the grow mask. Defaults to '' to enable the automatic heuristics calculation.
+                Can be set to True or False manually.
+
+            hm_minpercentchange: Mask size change threshold
+
+            hm_fastnoise: Faster noise calculation for automask or nsigma stopping. Defaults to '' to enable the automatic heuristics calculation.
+                Can be set to True or False manually.
+
+            hm_nsigma: Multiplicative factor for rms-based threshold stopping
+
+            hm_perchanweightdensity: Calculate the weight density for each channel independently. Defaults to '' to enable the automatic heuristics calculation.
+                Can be set to True or False manually.
+
+            hm_npixels: Number of pixels to determine uv-cell size for super-uniform weighting
+
+            hm_cyclefactor: Scaling on PSF sidelobe level to compute the minor-cycle stopping threshold
+
+            hm_minpsffraction: PSF fraction that marks the max depth of cleaning in the minor cycle
+
+            hm_maxpsffraction: PSF fraction that marks the minimum depth of cleaning in the minor cycle
+
+            hm_weighting: Weighting scheme (natural,uniform,briggs,briggsabs[experimental],briggsbwtaper[experimental])
+
+            hm_cleaning: Pipeline cleaning mode
+
+            tlimit: Times the sensitivity limit for cleaning
+
+            drcorrect: Override the default heuristics-based DR correction (for ALMA data only)
+
+            masklimit: Times good mask pixels for cleaning
+
+            cleancontranges: Clean continuum frequency ranges in cubes
+
+            calcsb: Force (re-)calculation of sensitivities and beams
+
+            hm_mosweight: Mosaic weighting Defaults to '' to enable the automatic heuristics calculation.
+                Can be set to True or False manually.
+
+            overwrite_on_export: Replace existing image products when h/hifa/hifv_exportdata is called.
+                If False, images that would have the same FITS name on export,
+                are amended to include a version number.  For example, if
+                oussid.J1248-4559_ph.spw21.mfs.I.pbcor.fits would already be
+                exported by a previous call to hif_makeimags, then
+                'oussid.J1248-4559_ph.spw21.mfs.I.pbcor.v2.fits' would also be
+                exported to the products/ directory. The first exported
+                product retains the same name.  Additional products start
+                counting with 'v2', 'v3', etc.
+
+            vlass_plane_reject_im: Only used for the 'VLASS-SE-CUBE' imaging mode.
+
+                Default: True
+
+                If True, reject VLASS Coarse Cube planes with high flagging percentages or outlier beam sizes (see the heuristics details below)
+
+                If False, do not perform the post-imaging VLASS Coarse Cube plane rejection.
+                If the input value is a dictionary, the plane rejection heuristics will be performed with custom thresholds.
+                The optional keys could be:
+
+                - exclude_spw, default: ''
+                  Spectral windows to be excluded from the VLASS Coarse Cube post-imaging plane rejection consideration, i.e. always preserve.
+                - flagpct_thresh, default: 0.8
+                  The flagging percentage across the entire mosaic to be considered to be high flagging level for the plane rejection.
+                - beamdev_thresh: default: 0.2
+                  Threshold for the fractional beam deviation from the expected value required for the plane rejection.
+
+            parallel: Clean images using MPI cluster
+
+        """
         self.context = context
         self.output_dir = output_dir
         self.vis = vis
@@ -101,6 +214,7 @@ class MakeImagesInputs(vdp.StandardInputs):
         self.hm_mosweight = hm_mosweight
         self.parallel = parallel
         self.overwrite_on_export = overwrite_on_export
+        self.vlass_plane_reject_im = vlass_plane_reject_im
 
 
 # tell the infrastructure to give us mstransformed data when possible by
@@ -154,7 +268,7 @@ class MakeImages(basetask.StandardTaskTemplate):
                     # Note add_result() removes 'heuristics' from worker_result
                     heuristics = target['heuristics']
                     result.add_result(worker_result, target, outcome='success')
-                    # Export RMS of  sources              
+                    # Export RMS of  sources
                     if self._is_target_for_sensitivity(worker_result, heuristics):
                         s = self._get_image_rms_as_sensitivity(worker_result, target, heuristics)
                         if s is not None:
@@ -184,7 +298,119 @@ class MakeImages(basetask.StandardTaskTemplate):
         return result
 
     def analyse(self, result):
+
+        if self.inputs.context.imaging_mode == 'VLASS-SE-CUBE':
+            result = self._add_vlass_se_cube_metadata(result)
+
         return result
+
+    def _add_vlass_se_cube_metadata(self, result):
+        """Attach extra imaging metadata to Tclean results for the VLASS Coarse Cube imaging."""
+
+        vlass_plane_reject_keys_allowed = [
+            'apply', 'exclude_spw', 'flagpct_thresh', 'beamdev_thresh']
+
+        for k in self.inputs.vlass_plane_reject_im:
+            if k not in vlass_plane_reject_keys_allowed:
+                LOG.warning("The key %r in the 'vlass_plane_reject_im' task input dictionary is not expected and will be ignored.", k)
+
+        beamdev_thresh = self.inputs.vlass_plane_reject_im['beamdev_thresh']
+        flagpct_thresh = self.inputs.vlass_plane_reject_im['flagpct_thresh']
+
+        bmajor_list = []
+        bminor_list = []
+        bpa_list = []
+        freq_list = []
+        spwgroup_list = []
+        flagpct_list = []
+        ref_idx = None
+        plane_keep = None
+
+        # loop over all Tclean results to attach the imaging metadata
+        # The imaging metadata will be entiredly merged into context.scimlist and context.calimlist
+        # as the ImageItem instance 'metadata' attribute.
+        for idx, tclean_result in enumerate(result.results):
+            target = result.targets[idx]
+            imaging_metadata = {'keep': False,
+                                # Flagging percentage of a VLASS-SE-CUBE plane within a 1deg^2 box.
+                                'flagpct': target['flagpct'],
+                                'spw': target['spw'],
+                                'freq': float(target['reffreq'].replace('GHz', '')),
+                                'beam': [None, None, None]}
+
+            if isinstance(tclean_result.image, str):
+                ext = '.tt0' if tclean_result.multiterm else ''
+                psf_name = tclean_result.psf+ext
+                if os.path.exists(psf_name):
+                    with casa_tools.ImagepolReader(psf_name) as imagepol:
+                        img_stokesi = imagepol.stokesi()
+                        restoringbeam = img_stokesi.restoringbeam(polarization=0)
+                    imaging_metadata['beam'] = [restoringbeam['major']['value'],
+                                                restoringbeam['minor']['value'],
+                                                restoringbeam['positionangle']['value']]
+                    imaging_metadata['keep'] = True
+                    bmajor_list.append(imaging_metadata['beam'][0])
+                    bminor_list.append(imaging_metadata['beam'][1])
+                    bpa_list.append(imaging_metadata['beam'][2])
+                    freq_list.append(imaging_metadata['freq'])
+                    spwgroup_list.append(imaging_metadata['spw'])
+                    flagpct_list.append(imaging_metadata['flagpct'])
+            tclean_result.imaging_metadata = imaging_metadata
+
+        # update tclean_result.imaging_metadata['keep'] based on the beam size and flagging percentage
+        if bminor_list:
+            ref_idx = np.argsort(bminor_list)[len(bminor_list)//2]
+
+            bmajor_expected = bmajor_list[ref_idx]*freq_list[ref_idx]/np.array(freq_list)
+            bminor_expected = bminor_list[ref_idx]*freq_list[ref_idx]/np.array(freq_list)
+            c1 = (bmajor_expected*(1.-beamdev_thresh) < np.array(bmajor_list))
+            c2 = (bmajor_expected*(1.+beamdev_thresh) > np.array(bmajor_list))
+            c3 = (bminor_expected*(1.-beamdev_thresh) < np.array(bminor_list))
+            c4 = (bminor_expected*(1.+beamdev_thresh) > np.array(bminor_list))
+            c5 = (np.array(flagpct_list) < flagpct_thresh)
+
+            spwgroup_keep = [False]*len(spwgroup_list)
+            for idx, spwgroup in enumerate(spwgroup_list):
+                is_spwgroup_excluded = set(map(str.strip, spwgroup.split(','))) & set(
+                    map(str.strip, self.inputs.vlass_plane_reject_im['exclude_spw'].split(',')))
+                if is_spwgroup_excluded or not self.inputs.vlass_plane_reject_im['apply']:
+                    spwgroup_keep[idx] = True
+
+            plane_keep = c1 & c2 & c3 & c4 & c5 | np.array(spwgroup_keep)
+            # create a lookup dict for the plane rejection info
+            plane_keep_dict = {spwgroup: plane_keep[idx] for idx, spwgroup in enumerate(spwgroup_list)}
+            for idx, tclean_result in enumerate(result.results):
+                target_spw = result.targets[idx]['spw']
+                if target_spw in plane_keep_dict:
+                    tclean_result.imaging_metadata['keep'] = plane_keep_dict[target_spw]
+                self._vlass_cube_set_miscinfo(tclean_result)
+
+        # attched the metadata w.r.t the plane rejection for the plane rejection plot.
+        result.metadata['vlass_cube_metadata'] = {'bmajor_list': np.array(bmajor_list),
+                                                  'bminor_list': np.array(bminor_list),
+                                                  'bpa_list': np.array(bpa_list),
+                                                  'freq_list': np.array(freq_list),
+                                                  'spwgroup_list': spwgroup_list,
+                                                  'flagpct_list': np.array(flagpct_list),
+                                                  'beam_dev': beamdev_thresh,
+                                                  'ref_idx': ref_idx,
+                                                  'flagpct_threshold': flagpct_thresh,
+                                                  'plane_keep': plane_keep}
+
+        return result
+
+    def _vlass_cube_set_miscinfo(self, tclean_result):
+        """Add the VLASS cube plane rejection header keyword."""
+
+        imagename = tclean_result.image
+        reject = not tclean_result.imaging_metadata['keep']
+        imlist = utils.glob_ordered(imagename.replace('.image', '.*'))
+        for name in imlist:
+            with casa_tools.ImageReader(name) as image:
+                info = image.miscinfo()
+                info['VLASSRJ'] = reject
+                LOG.info('mark the image %s as reject=%r', name, reject)
+                image.setmiscinfo(info)
 
     def _is_target_for_sensitivity(self, clean_result, heuristics):
         """
@@ -236,7 +462,7 @@ class MakeImages(basetask.StandardTaskTemplate):
         if result.specmode == 'cube': # use nbin for cube and repBW
             msobj = self.inputs.context.observing_run.get_ms(name=result.vis[0])
             nbin = target['nbin'] if target['nbin'] > 0 else 1
-            SCF, physicalBW_of_1chan, effectiveBW_of_1chan = heuristics.get_bw_corr_factor(msobj, result.spw, nbin)
+            SCF, physicalBW_of_1chan, effectiveBW_of_1chan, _ = heuristics.get_bw_corr_factor(msobj, result.spw, nbin)
             effectiveBW_of_image = cqa.quantity(nbin / SCF**2 * effectiveBW_of_1chan, 'Hz')
         else: #continuum mode
             effectiveBW_of_image = result.aggregate_bw
@@ -334,6 +560,12 @@ class CleanTaskFactory(object):
             is_tier0_job = True
             task_args['parallel'] = False
 
+        # we check/remove the task_arg dictionary keys that are not required by Tclean.Inputs
+        # then clean_targets objects would be free to carry extra metedata without causing problems during
+        # hif_tclean task execuation.
+        task_inputs_args = list(signature(Tclean.Inputs).parameters)
+        task_args = {k: v for k, v in task_args.items() if k in task_inputs_args}
+
         if is_tier0_job and parallel_wanted:
             executable = mpihelpers.Tier0PipelineTask(Tclean,
                                                       task_args,
@@ -383,7 +615,7 @@ class CleanTaskFactory(object):
         if target['robust'] not in (None, -999.0):
             task_args['robust'] = target['robust']
         else:
-            task_args['robust'] = image_heuristics.robust()
+            task_args['robust'] = image_heuristics.robust(sepecmode=target['specmode'])
 
         if target['uvtaper']:
             task_args['uvtaper'] = target['uvtaper']
@@ -464,6 +696,11 @@ def _get_description_map(intent):
             'mfs': 'Make polarization calibrator images',
             'cont': 'Make polarization calibrator images'
         }
+    elif intent in ('DIFFGAINREF', 'DIFFGAINSRC'):
+        return {
+            'mfs': 'Make diffgain calibrator images',
+            'cont': 'Make diffgain calibrator images'
+        }
     elif intent == 'CHECK':
         return {
             'mfs': 'Make check source images',
@@ -480,8 +717,9 @@ def _get_description_map(intent):
     else:
         return {}
 
+
 def _get_sidebar_map(intent):
-    if intent in ('PHASE', 'BANDPASS', 'AMPLITUDE'):
+    if intent in ('PHASE', 'BANDPASS', 'AMPLITUDE', 'DIFFGAINREF', 'DIFFGAINSRC'):
         return {
             'mfs': 'cals',
             'cont': 'cals'

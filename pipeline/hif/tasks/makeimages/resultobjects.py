@@ -32,37 +32,25 @@ class MakeImagesResult(basetask.Results):
         self.clean_list_info = info
 
     def merge_with_context(self, context):
-        # add the cleaned targets to the context
+        """Add the cleaned targets to the context."""
+
         for result in self.results:
             try:
                 img_params = {kk: vv['imaging_params'] for (kk, vv) in result.iterations.items()}
                 imageitem = imagelibrary.ImageItem(
-                  imagename=result.image, sourcename=result.sourcename,
-                  spwlist=result.spw, specmode=result.specmode,
-                  sourcetype=result.intent,
-                  multiterm=result.multiterm,
-                  imaging_params=img_params,  # imaging parameters for each iteration
-                  imageplot=result.imageplot)
+                    imagename=result.image, sourcename=result.sourcename,
+                    spwlist=result.spw, specmode=result.specmode,
+                    sourcetype=result.intent,
+                    multiterm=result.multiterm,
+                    metadata=result.imaging_metadata,
+                    imaging_params=img_params,  # imaging parameters for each iteration
+                    imageplot=result.imageplot)
                 if 'TARGET' in result.intent:
                     context.sciimlist.add_item(imageitem, self.overwrite)
                 else:
                     context.calimlist.add_item(imageitem, self.overwrite)
             except:
                 pass
-
-#        for item in context.sciimlist.get_imlist():
-#            print 'science'
-#            print item
-#            print item['imagename']
-#            print item['sourcename'], item['spwlist'], item['sourcetype']
-#            print item['imageplot']
-
-#        for item in context.calimlist.get_imlist():
-#            print 'calib'
-#            print item
-#            print item['imagename']
-#            print item['sourcename'], item['spwlist'], item['sourcetype']
-#            print item['imageplot']
 
         # Calculated sensitivities for later stages
         skip_recalc = False

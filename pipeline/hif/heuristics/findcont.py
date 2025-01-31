@@ -42,18 +42,25 @@ class FindContHeuristics(object):
         else:
             single_range_channel_fraction = 999.
 
+        flags = []
         if channel_selection == '':
             frequency_ranges_GHz = ['NONE']
         else:
             if all_continuum:
-                frequency_ranges_GHz = ['ALL']
-            else:
-                frequency_ranges_GHz = []
+                flags.append('ALLCONT')
 
             if is_eph_obj:
                 refer = 'SOURCE'
             else:
                 refer = 'LSRK'
-            frequency_ranges_GHz.extend([{'range': item, 'refer': refer} for item in utils.chan_selection_to_frequencies(dirty_cube, channel_selection, 'GHz')])
 
-        return frequency_ranges_GHz, png_name, single_range_channel_fraction, warning_strings, os.path.basename(joint_mask_name)
+            frequency_ranges_GHz = [{'range': item, 'refer': refer} for item in utils.chan_selection_to_frequencies(dirty_cube, channel_selection, 'GHz')]
+
+        if warning_strings[0]:
+            flags.append('LOWBANDWIDTH')
+        if warning_strings[1]:
+            flags.append('LOWSPREAD')
+
+        cont_ranges_and_flags = {'ranges': frequency_ranges_GHz, 'flags': flags}
+
+        return cont_ranges_and_flags, png_name, single_range_channel_fraction, warning_strings, os.path.basename(joint_mask_name)
