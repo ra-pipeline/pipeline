@@ -73,8 +73,12 @@ class FluxbootQAHandler(pqa.QAPlugin):
             webdicts[ms][row['source']].append({'freq': row['freq'], 'data': row['data'], 'error': row['error'],
                                                 'fitteddata': row['fitteddata']})
 
-        rmsmeanvalues = self.computeRMSandMean(webdicts[ms])
-        score1 = qacalc.score_vla_flux_residual_rms(rmsmeanvalues)
+        spix_list = []
+        for spi_result in result.spindex_results:
+            spix_list.append(spi_result["spix"])
+
+        fractional_residuals = self.getFractionalResiduals(webdicts[ms])
+        score1 = qacalc.score_vla_flux_residual_rms(fractional_residuals, len(result.spws), spix_list)
         scores = [score1]
         if scores == []:
             LOG.error('Error with computing flux density bootstrapping residuals')
@@ -83,26 +87,42 @@ class FluxbootQAHandler(pqa.QAPlugin):
 
         result.qa.pool.extend(scores)
 
-    def computeRMSandMean(self, webdicts):
-        rmsmeanvalues = []
+    def getFractionalResiduals(self, webdicts):
+        """
+        Compute the fractional residuals between observed and predicted data.
+
+        Parameters:
+            webdicts (dictionary) : A dictionary containing data and predicted data per source
+
+        Returns:
+            list : The fractional residuals, calculated as (observed - predicted) / observed.
+
+        Raises:
+            ZeroDivisionError: If any observed value is zero.
+
+        Example:
+            >>> webdicts = {'J1407+2827': [{'freq': '7.257',
+                            'data': '1.44, ',
+                            'error': '0.0017146284762749138',
+                            'fitteddata': '1.45'}],
+                            'J1820-2528': [{'freq': '7.257',
+                            'data': '0.73',
+                            'error': '0.0028120763231611317',
+                            'fitteddata': '0.70'}]
+                            }
+            >>> getFractionalResiduals(webdicts)
+            [[-0.006], [0.04]]
+        """
+        fractional_residuals = []
         for source, datadicts in webdicts.items():
             try:
-                frequencies = []
                 residuals = []
                 for datadict in datadicts:
-                    residuals.append(float(datadict['data']) - float(datadict['fitteddata']))
-                    frequencies.append(float(datadict['freq']))
-                rms = np.std(residuals)
-                mean = np.mean(residuals)
-
-                # Count number of residuals outside the mean +/- rms range
-                count = len(residuals) - len([resid for resid in residuals if ((mean - rms) < resid < (mean + rms))])
-                rmsmeanvalues.append((np.std(residuals), np.mean(residuals), count))
-
-            except Exception as e:
+                    residuals.append((float(datadict['data']) - float(datadict['fitteddata'])) / float(datadict['data']))
+                fractional_residuals.append(residuals)
+            except Exception:
                 continue
-
-        return rmsmeanvalues
+        return fractional_residuals
 
 
 class FluxbootListQAHandler(pqa.QAPlugin):

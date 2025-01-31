@@ -62,7 +62,7 @@ def chan_selection_to_frequencies(img: str, selection: str, unit: str = 'GHz') -
         List of pairs of frequency values (float) in the desired units
     """
 
-    if selection in ('NONE', 'ALL'):
+    if selection in ('NONE', 'ALL', 'ALLCONT'):
         return [selection]
 
     frequencies = []
@@ -110,7 +110,7 @@ def freq_selection_to_channels(img: str, selection: str) -> Union[List[int], Lis
         List of pairs of channel values (int)
     """
 
-    if selection in ('NONE', 'ALL'):
+    if selection in ('NONE', 'ALL', 'ALLCONT'):
         return [selection]
 
     channels = []

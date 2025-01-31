@@ -18,14 +18,18 @@ class T2_4MDetailsCorrectedampflagRenderer(basetemplates.T2_4MDetailsDefaultRend
     """
     Renders detailed HTML output for the Correctedampflag task.
     """
-    def __init__(self, uri='correctedampflag.mako',
+    # List of intents to consider for flagging summary.
+    task_intents = ('BANDPASS', 'PHASE', 'AMPLITUDE', 'CHECK', 'POLARIZATION', 'POLANGLE', 'POLLEAKAGE', 'TARGET',
+                    'DIFFGAINREF', 'DIFFGAINSRC')
+
+    def __init__(self,
+                 uri='correctedampflag.mako',
                  description='Flag corrected - model amplitudes for calibrator.',
                  always_rerender=False):
         super(T2_4MDetailsCorrectedampflagRenderer, self).__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
     def update_mako_context(self, mako_context, pipeline_context, results):
-
         # Generate HTML reports, including flag commands.
         htmlreports = self._get_htmlreports(pipeline_context, results)
 
@@ -39,7 +43,6 @@ class T2_4MDetailsCorrectedampflagRenderer(basetemplates.T2_4MDetailsDefaultRend
              })
 
     def _get_flag_totals(self, context, results):
-
         # Initialize items that are to be exported to the
         # mako context.
         flag_totals = collections.defaultdict(dict)
@@ -70,7 +73,8 @@ class T2_4MDetailsCorrectedampflagRenderer(basetemplates.T2_4MDetailsDefaultRend
 
         return htmlreports
 
-    def _write_flagcmd_to_disk(self, weblog_dir, result):
+    @staticmethod
+    def _write_flagcmd_to_disk(weblog_dir, result):
         tablename = os.path.basename(result.vis)
         filename = os.path.join(weblog_dir, '%s-flag_commands.txt' % tablename)
         flagcmds = [l.flagcmd for l in result.flagcmds()]
@@ -97,13 +101,13 @@ class T2_4MDetailsCorrectedampflagRenderer(basetemplates.T2_4MDetailsDefaultRend
 
         return utils.dict_merge(by_intent, by_spw)
 
-    def _flags_by_intent(self, ms, summaries):
+    @staticmethod
+    def _flags_by_intent(ms, summaries):
         # create a dictionary of scans per observing intent, eg. 'PHASE':[1,2,7]
         intent_scans = {}
-        for intent in ('BANDPASS', 'PHASE', 'AMPLITUDE', 'CHECK', 'POLARIZATION', 'POLANGLE', 'POLLEAKAGE', 'TARGET'):
+        for intent in T2_4MDetailsCorrectedampflagRenderer.task_intents:
             # convert IDs to strings as they're used as summary dictionary keys
-            intent_scans[intent] = [str(s.id) for s in ms.scans
-                                    if intent in s.intents]
+            intent_scans[intent] = [str(s.id) for s in ms.scans if intent in s.intents]
 
         # while we're looping, get the total flagged by looking in all scans
         intent_scans['TOTAL'] = [str(s.id) for s in ms.scans]
@@ -136,7 +140,8 @@ class T2_4MDetailsCorrectedampflagRenderer(basetemplates.T2_4MDetailsDefaultRend
 
         return total
 
-    def _flags_by_spws(self, summaries):
+    @staticmethod
+    def _flags_by_spws(summaries):
         total = collections.defaultdict(dict)
 
         previous_summary = None

@@ -7,7 +7,7 @@ import re
 import xml.etree.ElementTree as ElementTree
 from bisect import bisect_left
 from functools import reduce
-from typing import Tuple, List
+from typing import List, Tuple
 
 import cachetools
 import numpy
@@ -322,7 +322,7 @@ class MeasurementSetReader(object):
                 LOG.debug("Field "+str(field.id) + " not in spwsforfields dictionary.")
 
     @staticmethod
-    def get_measurement_set(ms_file):
+    def get_measurement_set(ms_file: str) -> domain.MeasurementSet:
         LOG.info('Analysing {0}'.format(ms_file))
         ms = domain.MeasurementSet(ms_file)
 
@@ -360,19 +360,20 @@ class MeasurementSetReader(object):
                     ms.representative_target = (sbinfo.repSource, sbinfo.repFrequency, sbinfo.repBandwidth)
                     ms.representative_window = sbinfo.repWindow
 
-                LOG.info('Populating ms.science_goals ...')
+                LOG.info('Populating ms.observing_modes...')
+                ms.observing_modes = SBSummaryTable.get_observing_modes(ms)
+
+                LOG.info('Populating ms.science_goals...')
                 if sbinfo.minAngResolution is None and sbinfo.maxAngResolution is None:
-                    observing_mode = SBSummaryTable.get_observing_mode(ms)
                     # Only warn if the number of 12m antennas is greater than the number of 7m antennas
                     # and if the observation is not single dish
                     if len([a for a in ms.get_antenna() if a.diameter == 12.0]) > \
                             len([a for a in ms.get_antenna() if a.diameter == 7.0]) \
-                            and 'Standard Single Dish' not in observing_mode:
+                            and 'Standard Single Dish' not in ms.observing_modes:
                         LOG.warning('Undefined angular resolution limits for %s' % ms.basename)
                     ms.science_goals = {'minAcceptableAngResolution': '0.0arcsec',
                                         'maxAcceptableAngResolution': '0.0arcsec'}
                 else:
-                    # LOG.info('Populating ms.science_goals ...')
                     ms.science_goals = {'minAcceptableAngResolution': sbinfo.minAngResolution,
                                         'maxAcceptableAngResolution': sbinfo.maxAngResolution}
 
@@ -397,9 +398,10 @@ class MeasurementSetReader(object):
             
                 # Populate the online ALMA Control Software names
                 LOG.info('Populating ms.acs_software_version and ms.acs_software_build_version...')
-                ms.acs_software_version, ms.acs_software_build_version  = MeasurementSetReader.get_acs_software_version(ms, msmd)
+                ms.acs_software_version, ms.acs_software_build_version = \
+                    MeasurementSetReader.get_acs_software_version(ms, msmd)
                     
-            LOG.info('Populating ms.array_name ...')
+            LOG.info('Populating ms.array_name...')
             # No MSMD functions to help populating the ASDM_EXECBLOCK table
             ms.array_name = ExecblockTable.get_execblock_info(ms)
 
@@ -512,7 +514,7 @@ class MeasurementSetReader(object):
 
                 acs_software_build_version = table.getcol('details')[1]
         except: 
-            LOG.info("Unable to read Annotation table infoformation for MS {}".format(_get_ms_basename(ms)))
+            LOG.info("Unable to read Annotation table information for MS {}".format(_get_ms_basename(ms)))
 
         return (acs_software_version, acs_software_build_version)
 
@@ -672,6 +674,7 @@ class SpectralWindowTable(object):
 
         return angle_info
 
+    @staticmethod
     def get_sdm_num_bin_info(ms, msmd):
         """
         Extract information about the online spectral averaging from the SPECTRAL_WINDOW
@@ -688,7 +691,7 @@ class SpectralWindowTable(object):
                 if 'SDM_NUM_BIN' in table.colnames():
                     sdm_num_bin = table.getcol('SDM_NUM_BIN')
                 else:
-                    LOG.info("SDM_NUM_BIN does not exist in the SPECTRAL_WINDOW Table of MS {}".format(_get_ms_basename(ms)))
+                    LOG.info(f"SDM_NUM_BIN does not exist in the SPECTRAL_WINDOW Table of MS {_get_ms_basename(ms)}")
         return sdm_num_bin
 
     @staticmethod
@@ -943,7 +946,7 @@ class SBSummaryTable(object):
                                  sensitivity=None, dynamicRange=None, spectralDynamicRangeBandWidth=None, sbName=None)
 
     @staticmethod
-    def get_observing_mode(ms):
+    def get_observing_modes(ms: domain.MeasurementSet) -> List[str]:
         msname = _get_ms_name(ms)
         sbsummary_table = os.path.join(msname, 'ASDM_SBSUMMARY')
         observing_modes = []
@@ -980,16 +983,13 @@ class SBSummaryTable(object):
         msname = _get_ms_name(ms)
         sbsummary_table = os.path.join(msname, 'ASDM_SBSUMMARY')        
         with casa_tools.TableReader(sbsummary_table) as table:
-            try:
-                scienceGoals = table.getcol('scienceGoal')
-                numScienceGoals = table.getcol('numScienceGoal')
-            except:
-                # LOG.warning('Error reading science goals for %s' % (ms.basename))
-                raise
+            scienceGoals = table.getcol('scienceGoal')
+            numScienceGoals = table.getcol('numScienceGoal')
 
             # shouldn't happen in a well-formed XML
             if len(scienceGoals) != numScienceGoals:
-                LOG.warning('numScienceGoal=%i but len(scienceGoal)=%i' % (numScienceGoals, len(scienceGoals)))
+                LOG.warning(f'{_get_ms_basename(ms)}: number of science goals found in the SB summary'
+                            f' ({len(scienceGoals)}) are fewer than the number that were declared ({numScienceGoals}).')
 
             repSources = []
             repFrequencies = []
@@ -1203,7 +1203,6 @@ class SourceTable(object):
             else: 
                 table_list.append("")
                 spacings_list.append("")
-
 
         all_sources = list(zip(ids, sourcenames, directions, propermotions, is_eph_objs, table_list, spacings_list))
 

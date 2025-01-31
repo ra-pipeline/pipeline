@@ -451,7 +451,16 @@ class FixpointingResults(basetask.Results):
 
 
 class FixpointingInputs(vdp.StandardInputs):
+    # docstring and type hints: supplements hifv_fixpointing
     def __init__(self, context, vis=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the h_init or hifv_importdata task.
+
+        """
         self.context = context
         self.vis = vis
 

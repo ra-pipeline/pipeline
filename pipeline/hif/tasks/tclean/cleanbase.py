@@ -29,6 +29,7 @@ class CleanBaseInputs(vdp.StandardInputs):
     deconvolver = vdp.VisDependentProperty(default='')
     cycleniter = vdp.VisDependentProperty(default=-999)
     cyclefactor = vdp.VisDependentProperty(default=-999.0)
+    nmajor = vdp.VisDependentProperty(default=None)
     cfcache = vdp.VisDependentProperty(default='')
     field = vdp.VisDependentProperty(default='')
     gridder = vdp.VisDependentProperty(default='')
@@ -70,6 +71,8 @@ class CleanBaseInputs(vdp.StandardInputs):
     scales = vdp.VisDependentProperty(default=None)
     sensitivity = vdp.VisDependentProperty(default=None)
     spwsel_all_cont = vdp.VisDependentProperty(default=None)
+    spwsel_low_bandwidth = vdp.VisDependentProperty(default=None)
+    spwsel_low_spread = vdp.VisDependentProperty(default=None)
     start = vdp.VisDependentProperty(default='')
     stokes = vdp.VisDependentProperty(default='I')
     threshold = vdp.VisDependentProperty(default=None)
@@ -121,8 +124,8 @@ class CleanBaseInputs(vdp.StandardInputs):
         return []
 
     def __init__(self, context, output_dir=None, vis=None, imagename=None, datacolumn=None, datatype=None, datatype_info=None, intent=None, field=None,
-                 spw=None, spwsel=None, spwsel_all_cont=None, uvrange=None, orig_specmode=None, specmode=None, gridder=None, deconvolver=None,
-                 uvtaper=None, nterms=None, cycleniter=None, cyclefactor=None, hm_minpsffraction=None,
+                 spw=None, spwsel=None, spwsel_all_cont=None, spwsel_low_bandwidth=None, spwsel_low_spread=None, uvrange=None, orig_specmode=None,
+                 specmode=None, gridder=None, deconvolver=None, uvtaper=None, nterms=None, cycleniter=None, cyclefactor=None, nmajor=None, hm_minpsffraction=None,
                  hm_maxpsffraction=None, scales=None, outframe=None, imsize=None,
                  cell=None, phasecenter=None, psf_phasecenter=None, nchan=None, nbin=None, start=None, width=None, stokes=None, weighting=None,
                  robust=None, restoringbeam=None, iter=None, mask=None, savemodel=None, startmodel=None, hm_masking=None,
@@ -146,6 +149,8 @@ class CleanBaseInputs(vdp.StandardInputs):
         self.spw = spw
         self.spwsel = spwsel
         self.spwsel_all_cont = spwsel_all_cont
+        self.spwsel_low_bandwidth = spwsel_low_bandwidth
+        self.spwsel_low_spread = spwsel_low_spread
         self.uvrange = uvrange
         self.savemodel = savemodel
         self.startmodel = startmodel
@@ -157,6 +162,7 @@ class CleanBaseInputs(vdp.StandardInputs):
         self.nterms = nterms
         self.cycleniter = cycleniter
         self.cyclefactor = cyclefactor
+        self.nmajor = nmajor
         self.hm_minpsffraction = hm_minpsffraction
         self.hm_maxpsffraction = hm_maxpsffraction
         self.scales = scales
@@ -370,7 +376,7 @@ class CleanBase(basetask.StandardTaskTemplate):
             #tclean_job_parameters['parallel'] = False
         else:
             tclean_job_parameters['phasecenter'] = inputs.phasecenter
-            if inputs.gridder == 'mosaic' and inputs.psf_phasecenter != inputs.phasecenter:
+            if inputs.gridder in ('mosaic', 'awproject') and inputs.psf_phasecenter != inputs.phasecenter:
                 tclean_job_parameters['psfphasecenter'] = inputs.psf_phasecenter
                 result.used_psfphasecenter = True
             else:
@@ -499,6 +505,13 @@ class CleanBase(basetask.StandardTaskTemplate):
             if cycleniter is not None:
                 tclean_job_parameters['cycleniter'] = cycleniter
 
+        if inputs.nmajor not in (None, -999):
+            tclean_job_parameters['nmajor'] = inputs.nmajor
+        else:
+            nmajor = inputs.heuristics.nmajor(iter)
+            if nmajor is not None:
+                tclean_job_parameters['nmajor'] = nmajor
+
         if inputs.scales:
             tclean_job_parameters['scales'] = inputs.scales
         else:
@@ -509,7 +522,7 @@ class CleanBase(basetask.StandardTaskTemplate):
         if inputs.uvrange:
             tclean_job_parameters['uvrange'] = inputs.uvrange
         else:
-            uvrange, _ = inputs.heuristics.uvrange(field=inputs.field, spwspec=inputs.spw)
+            uvrange, _ = inputs.heuristics.uvrange(field=inputs.field, spwspec=inputs.spw, specmode=inputs.specmode)
             if uvrange:
                 tclean_job_parameters['uvrange'] = uvrange
 
@@ -530,7 +543,7 @@ class CleanBase(basetask.StandardTaskTemplate):
         if inputs.restfreq:
             tclean_job_parameters['restfreq'] = inputs.restfreq
         else:
-            restfreq = inputs.heuristics.restfreq()
+            restfreq = inputs.heuristics.restfreq(specmode=inputs.specmode, nchan=inputs.nchan, start=inputs.start, width=inputs.width)
             if restfreq:
                 tclean_job_parameters['restfreq'] = restfreq
 
@@ -669,6 +682,8 @@ class CleanBase(basetask.StandardTaskTemplate):
         elif os.path.exists(mask_name):
             im_names['cleanmask'] = mask_name
 
+        result.im_names.update(im_names)
+
         for im_type, im_name in im_names.items():
             # Set misc info on imaging products
             # - Usually we only need to do this for a single image per image type;
@@ -722,8 +737,9 @@ class CleanBase(basetask.StandardTaskTemplate):
     def _copy_restoringbeam_from_psf(self, imagename):
         """Copy the per-plane beam set from .psf image to .image/.residual.
 
-        Note: this is a short-term workaround for CAS-13401, in which CASA/tclean(stokes='IQUV') doesn't save
+        Note: this is a workaround for CAS-13401, in which CASA/tclean(stokes='IQUV') doesn't save
               the per-plane restoring beam information into the residual and restored images.
+              For CASA ver>=6.6.0 (after the CAS-13401 implementation), this block should act as a no-op.
         """
         bm_src = '.psf'
         bm_src_ext_try = ['', '.tt0']
@@ -748,17 +764,20 @@ class CleanBase(basetask.StandardTaskTemplate):
                 for bm_ext0 in bm_dst_ext:
                     if os.path.exists(imagename+bm_dst0+bm_ext0):
                         with casa_tools.ImageReader(imagename+bm_dst0+bm_ext0) as bm_dst_im:
-                            LOG.info(f'Copy the per-plane beam set to {imagename+bm_dst0+bm_ext0}')
-                            dst_shape = bm_dst_im.shape()
-                            if (dst_shape == src_shape).all():
+                            if (bm_dst_im.shape() == src_shape).all() and not bm_dst_im.restoringbeam():
+                                # PIPE-2061: we only copy the beam info if the target and source images have the same shape
+                                # and the target image doesn't have a beam.
+                                LOG.info(f'Copy the per-plane beam set to {imagename+bm_dst0+bm_ext0}')
                                 for idx_c in range(src_shape[3]):
                                     for idx_p in range(src_shape[2]):
                                         LOG.debug(f'working on idx_chan={idx_c}, idx_pol={idx_p}')
                                         bm = bm_src_im.restoringbeam(channel=idx_c, polarization=idx_p)
                                         bm_dst_im.setrestoringbeam(beam=bm, channel=idx_c, polarization=idx_p)
                             else:
-                                LOG.warning(
-                                    'The restoring beam information source and destination images have different shapes. We will not copy the per-plane beam set.')
+                                LOG.info(
+                                    'The restoring beam copying source and target images have different shapes or the target '
+                                    'image already has a beam. We will skip copying the restoring beam')
+
 
 def rename_image(old_name, new_name, extensions=['']):
     """

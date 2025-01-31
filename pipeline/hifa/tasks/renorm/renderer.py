@@ -17,7 +17,7 @@ class T2_4MDetailsRenormRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     """
     Renders detailed HTML output for the Lowgainflag task.
     """
-    def __init__(self, uri='renorm.mako', 
+    def __init__(self, uri='renorm.mako',
                  description='Renormalize',
                  always_rerender=False):
         super().__init__(uri=uri, description=description, always_rerender=always_rerender)
@@ -26,17 +26,16 @@ class T2_4MDetailsRenormRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         weblog_dir = os.path.join(pipeline_context.report_dir,
                                   'stage%s' % result.stage_number)
 
-        (table_rows,
-         mako_context['alerts_info']) = make_renorm_table(pipeline_context, result, weblog_dir)
-        
-        # Make a list of the plots to be plotted 
+        table_rows = make_renorm_table(pipeline_context, result, weblog_dir)
+
+        # Make a list of the plots to be plotted
         summary_plots = make_renorm_plots(result, weblog_dir)
-       
-        # If the results were applied (apply=T), highlight table entries in blue, otherwise red.
+
+        # If the cal table was created (createcaltable=T), highlight table entries in blue, otherwise red.
         # This variable just updates the text describing the highlight color (PIPE-1264) in the table description.
-        if result.inputs['apply']:
+        if result.inputs['createcaltable']:
             table_color_text = 'blue. Renormalization has been applied as detailed in the task inputs.'
-        else: 
+        else:
             table_color_text = 'red. Renormalization has <i>not</i> been applied.'
 
         mako_context.update({
@@ -51,7 +50,6 @@ TR = collections.namedtuple('TR', 'vis source spw max pdf')
 def make_renorm_table(context, results, weblog_dir):
     # Will hold all the input and output MS(s)
     rows = []
-    alert = []
 
     scale_factors = []
     # Loop over the results
@@ -59,10 +57,6 @@ def make_renorm_table(context, results, weblog_dir):
         threshold = result.threshold
         vis = os.path.basename(result.inputs['vis'])
 
-        if result.alltdm:
-            alert = ['No FDM spectral windows are present, '
-                     'so the amplitude scale does not need to be '
-                     'assessed for renormalization.']
         for source, source_stats in result.stats.items():
             for spw, spw_stats in source_stats.items():
 
@@ -85,37 +79,37 @@ def make_renorm_table(context, results, weblog_dir):
 
                 specplot = spw_stats.get('spec_plot')
 
-                # Add links from the MS and SPW in the table to the relevant group of plots, or 
+                # Add links from the MS and SPW in the table to the relevant group of plots, or
                 # specific plot, respectively. See PIPE-1264
                 vis_html = f'<a href="#{vis}">{vis}</a>'
                 spw_html = f'<a href="#{specplot}">{spw}</a>'
 
                 tr = TR(vis_html, source, spw_html, maxrn_field, pdf_path_link)
                 rows.append(tr)
-    
+
 
     merged_rows = utils.merge_td_columns(rows, num_to_merge=2)
     merged_rows = [list(row) for row in merged_rows]  # convert tuples to mutable lists
 
-    # Fetch the input value of 'apply' which is the same for all results
-    apply_results = results[0].inputs['apply'] 
-    
+    # Fetch the input value of 'createcaltable' which is the same for all results
+    createcaltable_results = results[0].inputs['createcaltable']
+
     for row, _ in enumerate(merged_rows):
         mm = re.search(r'<td[^>]*>(\d+.\d*) \(\d+\)', merged_rows[row][-2])
         if mm:  # do we have a pattern match?
             scale_factor = scale_factors[row]
-            if scale_factor > threshold: 
+            if scale_factor > threshold:
                 for col in (-3, -2, -1):
                     cell = ET.fromstring(merged_rows[row][col])
                     innermost_child = getchild(cell)
                     # If the results are applied, make the table entries blue, if not, red
-                    if apply_results:
-                        innermost_child.set('class','info alert-info') 
+                    if createcaltable_results:
+                        innermost_child.set('class','info alert-info')
                     else:
-                        innermost_child.set('class','danger alert-danger') 
+                        innermost_child.set('class','danger alert-danger')
                     merged_rows[row][col] = ET.tostring(innermost_child)
 
-    return merged_rows, alert
+    return merged_rows
 
 def getchild(el):
     if el.findall('td'):
@@ -126,13 +120,13 @@ def getchild(el):
 
 def make_renorm_plots(results, weblog_dir: str) -> Dict[str, List[logger.Plot]]:
     """
-    Create and return a list of renorm plots. 
+    Create and return a list of renorm plots.
 
     Args:
-        results: the renormalization results. 
+        results: the renormalization results.
         weblog_dir: the weblog directory
     Returns:
-        summary_plots: dictionary with MS with some additional html 
+        summary_plots: dictionary with MS with some additional html
                     as the keys and lists of plot objects as the values
     """
     summary_plots = collections.defaultdict(list)
@@ -144,10 +138,10 @@ def make_renorm_plots(results, weblog_dir: str) -> Dict[str, List[logger.Plot]]:
             for spw, spw_stats in source_stats.items():
                 specplot = spw_stats.get('spec_plot')
                 specplot_path = f"RN_plots/{specplot}"
-                scale_factor = spw_stats.get('max_rn') 
-                if scale_factor > threshold: 
+                scale_factor = spw_stats.get('max_rn')
+                if scale_factor > threshold:
                     caption = "Scaling spectrum was above the threshold."
-                else: 
+                else:
                     caption = ""
                 if os.path.exists(specplot_path):
                     LOG.trace(f"Copying {specplot_path} to {weblog_dir}")

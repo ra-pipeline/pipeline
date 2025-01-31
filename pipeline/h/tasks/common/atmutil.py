@@ -7,7 +7,7 @@ Examples:
 """
 import math
 import os
-from typing import Union, Tuple
+from typing import Union, Tuple, Optional
 
 import casatools
 import matplotlib.pyplot as plt
@@ -15,7 +15,6 @@ import numpy as np
 
 import pipeline.extern.adopted as adopted
 from pipeline.infrastructure import casa_tools, get_logger
-
 
 LOG = get_logger(__name__)
 
@@ -38,8 +37,8 @@ def init_at(at: casatools.atmosphere, humidity: float = 20.0,
     Initialize atmospheric profile and spectral window setting.
 
     Initialize atmospheric profile and spectral window setting in CASA
-    atmosphere tool using input antenna site parameters and spectral window
-    frequencies.
+    atmosphere tool using input antenna site parameters, the center
+    frequency, and the width of a frequency range.
 
     Args:
         at: CASA atmosphere tool instance to initialize.
@@ -49,10 +48,10 @@ def init_at(at: casatools.atmosphere, humidity: float = 20.0,
         atmtype: An AtmType enum that defines a type of atmospheric profile.
         altitude: The altitude of antenna site to calculate atmospheric
             transmission (unit: m).
-        fcenter: The center frequency of spectral window (unit: GHz).
-        nchan: The number of channels in spectral window.
-        resolution: The channel width of spectral window (unit: GHz).
-    """
+        fcenter: Center frequency of the frequency range (unit: GHz).
+        nchan: Number of channels in the frequency range.
+        resolution: Frequency resolution (unit: GHz/ch).
+     """
     myqa = casa_tools.quanta
     at.initAtmProfile(humidity=humidity,
                       temperature=myqa.quantity(temperature, 'K'),
@@ -349,7 +348,7 @@ def get_representative_elevation(vis, antenna_id: int) -> float:
     myqa = casa_tools.quanta
     myme = casa_tools.measures
 
-    # correct necessary information using msmd tool
+    # collect necessary information using msmd tool
     with casa_tools.MSMDReader(vis) as mymsmd:
         mposition = mymsmd.antennaposition(antenna_id)
         target_field = mymsmd.fieldsforintent('OBSERVE_TARGET*')[0]
@@ -421,15 +420,11 @@ def get_transmission(vis: str, antenna_id: int = 0, spw_id: int = 0,
     Calculate the atmospheric transmission of a given spectral window for an
     elevation angle corresponding to pointings of a given antenna in a
     MeasurementSet.
-    The median of elevations in all pointings of the selected antenna is used
-    in calculation. The atmospheric profile is constructed by default site
-    parameters of the function, init_at. The median of zenith water vapor
-    column (pwv) is used to calculate the transmission.
 
     Args:
         vis: Path to MeasurementSet.
-        spw_id: A spectral window ID to select.
-        antenna_id: The antenna ID to select.
+        spw_id: A spectral window ID.
+        antenna_id: The antenna ID.
         doplot: If True, plot the atmospheric transmission and opacities.
 
     Returns:
@@ -438,6 +433,35 @@ def get_transmission(vis: str, antenna_id: int = 0, spw_id: int = 0,
         frequency.
     """
     center_freq, nchan, resolution = get_spw_spec(vis, spw_id)
+
+    return get_transmission_for_range(vis, center_freq, nchan, resolution, antenna_id, doplot)
+
+
+def get_transmission_for_range(vis: str, center_freq: float, nchan: int, resolution: float, antenna_id: int = 0, doplot: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Calculate atmospheric transmission covering a range of frequency.
+
+    A number of channels, a resolution of a frequency range, and
+    the median of elevations in all pointings of the selected antenna
+    are used to calculate the atmospheric transmission.
+    The atmospheric profile is constructed by default site parameters
+    of the function, init_at.
+    The median of zenith water vapor column (pwv) is used to calculate
+    the transmission.
+
+    Args:
+        vis: Path to MeasurementSet.
+        center_freq: Center frequency of the frequency range (unit: GHz).
+        nchan: Number of channels in the frequency range.
+        resolution: Frequency resolution (unit: GHz/ch).
+        antenna_id: The antenna ID.
+        doplot: If True, plot the atmospheric transmission and opacities.
+
+    Returns:
+        A tuple of 2 arrays. The first one is an array of frequencies in the
+        unit of GHz, and the other is the atmospheric transmission at each
+        frequency.
+    """
     # first try computing elevation value from phasecenter
     # if it fails, inspect POINTING table
     try:
@@ -445,10 +469,14 @@ def get_transmission(vis: str, antenna_id: int = 0, spw_id: int = 0,
     except Exception:
         elevation = get_median_elevation(vis, antenna_id)
 
-    # set pwv to 1.0
-    #pwv = 1.0
     # get median PWV using Todd's script
-    (pwv, pwvmad) = adopted.getMedianPWV(vis=vis)
+    if get_table_nrow(vis+'/ASDM_CALATMOSPHERE') or get_table_nrow(vis+'/ASDM_CALWVR'):
+        # PIPE-2212: Ensure that PWV is checked only if the relevant subtable exists and is not empty.
+        # This prevents open table tool istance from being left behind by adopted.getMedianPWV().
+        pwv, _ = adopted.getMedianPWV(vis=vis)
+    else:
+        # fallback to pwv=0.0
+        pwv = 0.0
 
     altitude = get_altitude(vis)
 
@@ -459,7 +487,6 @@ def get_transmission(vis: str, antenna_id: int = 0, spw_id: int = 0,
     myat.setUserWH2O(myqa.quantity(pwv, 'mm'))
 
     airmass = calc_airmass(elevation)
-
     dry_opacity = get_dry_opacity(myat)
     wet_opacity = get_wet_opacity(myat)
     transmission = calc_transmission(airmass, dry_opacity, wet_opacity)
@@ -469,5 +496,26 @@ def get_transmission(vis: str, antenna_id: int = 0, spw_id: int = 0,
         plot(frequency, dry_opacity, wet_opacity, transmission)
 
     myat.done()
-
     return frequency, transmission
+
+
+def get_table_nrow(table_name: str) -> Optional[int]:
+    """Get the number of rows in a specified table.
+
+    This function checks if the table exists, logs a debug message if it does not, and returns None.
+    If the table exists, it opens the table, retrieves the number of rows, and returns that number.
+
+    Args:
+        table_name (str): The name of the table to check.
+
+    Returns:
+        Optional[int]: The number of rows in the table, or None if the table does not exist.
+    """
+    if not os.path.exists(table_name):
+        LOG.debug('%s does not exist.', table_name)
+        return
+
+    with casa_tools.TableReader(table_name) as mytb:
+        nrow = mytb.nrows()
+
+    return nrow

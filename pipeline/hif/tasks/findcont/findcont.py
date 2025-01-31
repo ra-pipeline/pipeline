@@ -37,8 +37,37 @@ class FindContInputs(vdp.StandardInputs):
         # objects from the inputs' clean_list.
         return copy.deepcopy(self.context.clean_list_pending)
 
+    # docstring and type hints: supplements hif_findcont
     def __init__(self, context, output_dir=None, vis=None, target_list=None, hm_mosweight=None,
                  hm_perchanweightdensity=None, hm_weighting=None, datacolumn=None, parallel=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the h_init or hif_importdata task.
+                '': use all MeasurementSets in the context
+
+                Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
+
+            target_list: Dictionary specifying targets to be imaged; blank will read list from context.
+
+            hm_mosweight: Mosaic weighting. Defaults to '' to enable the automatic heuristics calculation.
+                Can be set to True or False manually.
+
+            hm_perchanweightdensity: Calculate the weight density for each channel independently.
+                Defaults to '' to enable the automatic heuristics calculation. Can be set to True or False manually.
+
+            hm_weighting: Weighting scheme (natural,uniform,briggs,briggsabs[experimental],briggsbwtaper[experimental])
+
+            datacolumn: Data column to image. Only to be used for manual overriding when the automatic choice by data type is not appropriate.
+
+            parallel: Use MPI cluster where possible.
+
+        """
         super(FindContInputs, self).__init__()
         self.context = context
         self.output_dir = output_dir
@@ -62,10 +91,15 @@ class FindCont(basetask.StandardTaskTemplate):
         inputs = self.inputs
         context = self.inputs.context
 
+        # Check if this stage has been disabled for VLA (never set for ALMA)
+        if inputs.context.vla_skip_mfs_and_cube_imaging:
+            result = FindContResult({}, {}, '', 0, 0, [])
+            return result
+
         # Check for size mitigation errors.
         if 'status' in inputs.context.size_mitigation_parameters and \
                 inputs.context.size_mitigation_parameters['status'] == 'ERROR':
-            result = FindContResult({}, [], '', 0, 0, [])
+            result = FindContResult({}, {}, '', 0, 0, [])
             result.mitigation_error = True
             return result
 
@@ -89,7 +123,7 @@ class FindCont(basetask.StandardTaskTemplate):
 
             if ms_objects_and_columns == collections.OrderedDict():
                 LOG.error('No data found for continuum finding.')
-                result = FindContResult({}, [], '', 0, 0, [])
+                result = FindContResult({}, {}, '', 0, 0, [])
                 return result
 
             LOG.info(f'Using data type {str(selected_datatype).split(".")[-1]} for continuum finding.')
@@ -128,22 +162,23 @@ class FindCont(basetask.StandardTaskTemplate):
         for i, target in enumerate(inputs.target_list):
             for spwid in target['spw'].split(','):
                 source_name = utils.dequote(target['field'])
+                spw_name = context.observing_run.virtual_science_spw_ids[int(spwid)]
 
                 # get continuum ranges dict for this source, also setting it if accessed for first time
                 source_continuum_ranges = result_cont_ranges.setdefault(source_name, {})
 
                 # get continuum ranges list for this source and spw, also setting them if accessed for first time
-                cont_ranges_source_spw = cont_ranges['fields'].setdefault(source_name, {}).setdefault(spwid, [])
+                cont_ranges_source_spw = cont_ranges['fields'].setdefault(source_name, {}).setdefault(spwid, {'spwname': spw_name, 'ranges': [], 'flags': []})
 
-                if len(cont_ranges_source_spw) > 0:
+                if len(cont_ranges_source_spw['ranges']) > 0:
                     LOG.info('Using existing selection {!r} for field {!s}, '
-                             'spw {!s}'.format(cont_ranges_source_spw, source_name, spwid))
+                             'spw {!s}'.format(cont_ranges_source_spw['ranges'], source_name, spwid))
                     source_continuum_ranges[spwid] = {
                         'cont_ranges': cont_ranges_source_spw,
                         'plotfile': 'none',
                         'status': 'OLD'
                     }
-                    if cont_ranges_source_spw != ['NONE']:
+                    if cont_ranges_source_spw['ranges'] != ['NONE']:
                         num_found += 1
 
                 else:
@@ -204,9 +239,11 @@ class FindCont(basetask.StandardTaskTemplate):
                     if (if0 == -1) or (if1 == -1):
                         LOG.error('No %s frequency intersect among selected MSs for Field %s '
                                   'SPW %s' % (frame, target['field'], spwid))
-                        cont_ranges['fields'][source_name][spwid] = ['NONE']
+                        cont_ranges['fields'][source_name][spwid]['spwname'] = spw_name
+                        cont_ranges['fields'][source_name][spwid]['ranges'] = ['NONE']
+                        cont_ranges['fields'][source_name][spwid]['flags'] = []
                         result_cont_ranges[source_name][spwid] = {
-                            'cont_ranges': ['NONE'],
+                            'cont_ranges': cont_ranges['fields'][source_name][spwid],
                             'plotfile': 'none',
                             'status': 'NEW'
                         }
@@ -369,10 +406,12 @@ class FindCont(basetask.StandardTaskTemplate):
                     spw_transitions = ref_ms.get_spectral_window(real_spwid).transitions
                     single_continuum = any(['Single_Continuum' in t for t in spw_transitions])
                     # PIPE-1855: use spectralDynamicRangeBandWidth from SBSummary if available
-                    dynrange_bw = ref_ms.science_goals['spectralDynamicRangeBandWidth']
+                    dynrange_bw = ref_ms.science_goals.get('spectralDynamicRangeBandWidth', None)
+
                     if dynrange_bw is not None:  # None means that a value was not provided, and it should remain None
                         dynrange_bw = qaTool.tos(dynrange_bw)
-                    (cont_range, png, single_range_channel_fraction, warning_strings, joint_mask_name) = \
+
+                    (cont_ranges_and_flags, png, single_range_channel_fraction, warning_strings, joint_mask_name) = \
                         findcont_heuristics.find_continuum(dirty_cube='%s.residual' % findcont_basename,
                                                            pb_cube='%s.pb' % findcont_basename,
                                                            psf_cube='%s.psf' % findcont_basename,
@@ -381,7 +420,9 @@ class FindCont(basetask.StandardTaskTemplate):
                                                            ref_ms_name=ref_ms.name,
                                                            nbin=reprBW_nbin,
                                                            dynrange_bw=dynrange_bw)
+
                     joint_mask_names[(source_name, spwid)] = joint_mask_name
+
                     # PIPE-74
                     if single_range_channel_fraction < 0.05:
                         LOG.warning('Only a single narrow range of channels was found for continuum in '
@@ -390,24 +431,28 @@ class FindCont(basetask.StandardTaskTemplate):
 
                     # Internal findContinuum warnings
                     for warning_msg in warning_strings:
-                        LOG.warning('Field {field}, spw {spw}: {warning_msg}'.format(field=target['field'], spw=spwid, warning_msg=warning_msg))
+                        # PIPE-2158: Exclude empty strings
+                        if warning_msg:
+                            LOG.warning('Field {field}, spw {spw}: {warning_msg}'.format(field=target['field'], spw=spwid, warning_msg=warning_msg))
 
                     is_repsource = (repsource_name == target['field']) and (repsource_spwid == spwid)
                     chanfrac = {'fraction'    : single_range_channel_fraction,
                                 'field'       : target['field'],
                                 'spw'         : spwid,
                                 'is_repsource': is_repsource}
+
                     single_range_channel_fractions.append(chanfrac)
 
-                    cont_ranges['fields'][source_name][spwid] = cont_range
+                    cont_ranges['fields'][source_name][spwid].update(cont_ranges_and_flags)
 
                     source_continuum_ranges[spwid] = {
-                        'cont_ranges': cont_range,
+                        'cont_ranges': cont_ranges_and_flags,
+                        'flags': [],
                         'plotfile': png,
                         'status': 'NEW'
                     }
 
-                    if cont_range not in [['NONE'], [''], []]:
+                    if cont_ranges_and_flags['ranges'] not in [['NONE'], [''], []]:
                         num_found += 1
 
                 num_total += 1

@@ -14,7 +14,7 @@ LOG = logging.get_logger(__name__)
 class VLASubPlotRenderer(object):
     #template = 'testdelays_plots.html'
 
-    def __init__(self, context, result, plots, json_path, template, filename_prefix, bandlist):
+    def __init__(self, context, result, plots, json_path, template, filename_prefix, bandlist, spwlist=None, spw_plots=None):
         self.context = context
         self.result = result
         self.plots = plots
@@ -22,6 +22,14 @@ class VLASubPlotRenderer(object):
         self.template = template
         self.filename_prefix = filename_prefix
         self.bandlist = bandlist
+        self.spwlist = spwlist
+        self.spw_plots = spw_plots
+
+        if self.spwlist is None:
+            self.spwlist = []
+
+        if self.spw_plots is None:
+            self.spw_plots = []
 
         self.summary_plots = {}
         self.testdelay_subpages = {}
@@ -46,6 +54,7 @@ class VLASubPlotRenderer(object):
         return {'pcontext': self.context,
                 'result': self.result,
                 'plots': self.plots,
+                'spw_plots': self.spw_plots,
                 'dirname': self.dirname,
                 'json': self.json,
                 'testdelay_subpages': self.testdelay_subpages,
@@ -53,6 +62,7 @@ class VLASubPlotRenderer(object):
                 'phasegain_subpages': self.phasegain_subpages,
                 'bpsolamp_subpages': self.bpsolamp_subpages,
                 'bpsolphase_subpages': self.bpsolphase_subpages,
+                'spwlist': self.spwlist,
                 'bandlist': self.bandlist}
 
     @property
@@ -96,6 +106,7 @@ class T2_4MDetailstestBPdcalsRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
                                   'stage%s' % results.stage_number)
 
         summary_plots = {}
+        summary_plots_per_spw = {}
         testdelay_subpages = {}
         ampgain_subpages = {}
         phasegain_subpages = {}
@@ -122,9 +133,24 @@ class T2_4MDetailstestBPdcalsRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
             ms = os.path.basename(result.inputs['vis'])
             summary_plots[ms] = plots
 
+            # generate per-SPW testBPdcals plots for specline windows
+            spws = m.get_spectral_windows(science_windows_only=True)
+            spwlist = []
+            per_spw_plots = []
+            for spw in spws:
+                if spw.specline_window:
+                    plotter = testBPdcalsdisplay.testBPdcalsPerSpwSummaryChart(context, result, spw=spw.id)
+                    plots = plotter.plot()
+                    per_spw_plots.extend(plots)
+                    spwlist.append(str(spw.id))
+
+            if per_spw_plots:
+                summary_plots_per_spw[ms] = []
+                summary_plots_per_spw[ms].extend(per_spw_plots)
+
             # generate testdelay plots and JSON file
             plotter = testBPdcalsdisplay.testDelaysPerAntennaChart(context, result)
-            plots = plotter.plot() 
+            plots = plotter.plot()
             json_path = plotter.json_filename
 
             # write the html for each MS to disk
@@ -135,7 +161,7 @@ class T2_4MDetailstestBPdcalsRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
 
             # generate amp Gain plots and JSON file
             plotter = testBPdcalsdisplay.ampGainPerAntennaChart(context, result)
-            plots = plotter.plot() 
+            plots = plotter.plot()
             json_path = plotter.json_filename
 
             # write the html for each MS to disk
@@ -146,7 +172,7 @@ class T2_4MDetailstestBPdcalsRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
 
             # generate phase Gain plots and JSON file
             plotter = testBPdcalsdisplay.phaseGainPerAntennaChart(context, result)
-            plots = plotter.plot() 
+            plots = plotter.plot()
             json_path = plotter.json_filename
 
             # write the html for each MS to disk
@@ -157,27 +183,36 @@ class T2_4MDetailstestBPdcalsRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
 
             # generate amp bandpass solution plots and JSON file
             plotter = testBPdcalsdisplay.bpSolAmpPerAntennaChart(context, result)
-            plots = plotter.plot() 
+            plots = plotter.plot()
             json_path = plotter.json_filename
 
+            # generate amp bandpass solution per-spw plots
+            plotter = testBPdcalsdisplay.bpSolAmpPerAntennaPerSpwChart(context, result)
+            spw_plots = plotter.plot()
+
             # write the html for each MS to disk
-            renderer = VLASubPlotRenderer(context, result, plots, json_path, 'testcals_plots.mako', 'bpsolamp', bandlist)
+            renderer = VLASubPlotRenderer(context, result, plots, json_path, 'testcals_plots.mako', 'bpsolamp', bandlist, spwlist, spw_plots=spw_plots)
             with renderer.get_file() as fileobj:
                 fileobj.write(renderer.render())
                 bpsolamp_subpages[ms] = renderer.filename
 
             # generate phase bandpass solution plots and JSON file
             plotter = testBPdcalsdisplay.bpSolPhasePerAntennaChart(context, result)
-            plots = plotter.plot() 
+            plots = plotter.plot()
             json_path = plotter.json_filename
 
+            # generate phase bandpass per spw solution plots
+            plotter = testBPdcalsdisplay.bpSolPhasePerAntennaPerSpwChart(context, result)
+            spw_plots = plotter.plot()
+
             # write the html for each MS to disk
-            renderer = VLASubPlotRenderer(context, result, plots, json_path, 'testcals_plots.mako', 'bpsolphase', bandlist)
+            renderer = VLASubPlotRenderer(context, result, plots, json_path, 'testcals_plots.mako', 'bpsolphase', bandlist, spwlist, spw_plots=spw_plots)
             with renderer.get_file() as fileobj:
                 fileobj.write(renderer.render())
                 bpsolphase_subpages[ms] = renderer.filename
 
         ctx.update({'summary_plots': summary_plots,
+                    'summary_plots_per_spw': summary_plots_per_spw,
                     'testdelay_subpages': testdelay_subpages,
                     'ampgain_subpages': ampgain_subpages,
                     'phasegain_subpages': phasegain_subpages,

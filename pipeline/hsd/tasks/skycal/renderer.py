@@ -289,29 +289,34 @@ class T2_4MDetailsSingleDishSkyCalRenderer(basetemplates.T2_4MDetailsDefaultRend
 
         Returns:
             Reference, RA and Declination.
+
+        Raises:
+            RuntimeError: No OFF source data exist for given field in the ms.
         """
         LOG.debug('_get_reference_coord({ms}, {field})'.format(ms=ms.basename, field=field.name))
         spws = ms.get_spectral_windows(science_windows_only=True)
-        dd = ms.get_data_description(spw=spws[0].id)
-        data_desc_id = dd.id
+        data_desc_ids = [ms.get_data_description(spw=spw.id).id for spw in spws]
         reference_states = [state for state in ms.states if 'REFERENCE' in state.intents]
         state_ids = [state.id for state in reference_states]
         field_id = field.id
         with casa_tools.TableReader(ms.name) as tb:
-            t = tb.query('ANTENNA1==ANTENNA2 && FIELD_ID=={field} && DATA_DESC_ID={ddid} && STATE_ID IN {states}'
-                         ''.format(field=field_id, ddid=data_desc_id, states=state_ids))
+            t = tb.query(f'ANTENNA1==ANTENNA2 && FIELD_ID=={field_id} && DATA_DESC_ID IN {utils.list_to_str(data_desc_ids)} && STATE_ID IN {utils.list_to_str(state_ids)}')
+            if t.nrows() == 0:
+                t.close()
+                raise RuntimeError(f'No OFF source data for field "{field.name}" (id {field_id}) in {ms.basename}')
+
             rownumbers = t.rownumbers()
-            antenna_ids = t.getcol('ANTENNA1')
-            times = t.getcol('TIME')
+            antenna_id = t.getcell('ANTENNA1', 0)
+            timestamp = t.getcell('TIME', 0)
             t.close()
             timeref = tb.getcolkeyword('TIME', 'MEASINFO')['Ref']
             timeunit = tb.getcolkeyword('TIME', 'QuantumUnits')[0]
         with casa_tools.MSMDReader(ms.name) as msmd:
             pointing_direction = msmd.pointingdirection(rownumbers[0])
-            antenna_position = msmd.antennaposition(antenna_ids[0])
+            antenna_position = msmd.antennaposition(antenna_id)
         qa = casa_tools.quanta
         me = casa_tools.measures
-        epoch = me.epoch(rf=timeref, v0=qa.quantity(times[0], timeunit))
+        epoch = me.epoch(rf=timeref, v0=qa.quantity(timestamp, timeunit))
 
         LOG.debug('pointing_direction=%s' % pointing_direction)
 

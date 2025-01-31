@@ -18,9 +18,12 @@ class VLAImportDataQAHandler(hqa.ImportDataQAHandler, pqa.QAPlugin):
     def handle(self, context, result):
         score1 = self._check_intents(result.mses)
         score2 = self._check_history_column(result.mses, result.inputs)
+        # Check state of IERS tables relative to observation date (PIPE-2137)
+        scores3 = self._check_iersstate(result.mses)
 
         scores = [score1, score2]
         result.qa.pool.extend(scores)
+        result.qa.pool.extend(scores3)
 
     @staticmethod
     def _check_history_column(mses, inputs):

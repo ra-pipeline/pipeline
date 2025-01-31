@@ -5,6 +5,7 @@ PipelineRegression class runs on pytest framework, so it needs to implement
 test_* methods for testing.
 """
 
+import ast
 import shutil
 import datetime
 import glob
@@ -123,15 +124,15 @@ class PipelineRegression(object):
         # example: s2.hifv_statwt.13A-537.sb24066356.eb24324502.56514.05971091435.mean
         keystring = keyval.split('=')[0]
 
+        # Try to convert the value in string to int, float, Boolean, or None
         try:
-            value = keyval.split('=')[-1]
-            if "None" in value: 
-                value = None
-            else:
-                value = float(keyval.split('=')[-1])
-        except ValueError: 
-            value = keyval.split('=')[-1]
-            raise ValueError("For the key: {}, value: {} cannot be converted to a float.".format(keystring, value))
+            value = ast.literal_eval(keyval.split("=")[-1])
+        except ValueError:
+            value = keyval.split("=")[-1]
+        if not isinstance(value, (float, int, bool, type(None))):
+            value = keyval.split("=")[-1]
+            raise ValueError(
+                "For the key: {}, value: {} cannot be converted to int/float/boolean/None.".format(keystring, value))
 
         try:
             tolerance = float(instring.split(':::')[-1].replace('\n', ''))
@@ -266,7 +267,7 @@ class PipelineRegression(object):
                     LOG.info(f'Comparing {oldval} to {newval} with a rel. tolerance of {tolerance}')
                     if oldval != pytest.approx(newval, rel=tolerance):
                         diff = oldval-newval
-                        percent_diff = (oldval-newval)/oldval * 100 
+                        percent_diff = (oldval-newval)/oldval * 100 if oldval != 0 else 100
                         if abs(diff) > abs(worst_diff[0]):
                             worst_diff = diff, oldkey
                         if abs(percent_diff) > abs(worst_percent_diff[0]):
@@ -452,7 +453,7 @@ def test_uid___A002_Xc46ab2_X15ae_selfcal_restore_regression():
     input_dir = 'pl-regressiontest/uid___A002_Xc46ab2_X15ae_selfcal_restore'
     ref_directory = 'pl-regressiontest/uid___A002_Xc46ab2_X15ae_selfcal_restore'
 
-    pr = PipelineRegression(recipe='procedure_hifa_image_selfcal.xml',
+    pr = PipelineRegression(recipe='procedure_hifa_image.xml',
                             input_dir=input_dir,
                             visname=['uid___A002_Xc46ab2_X15ae'],
                             expectedoutput_dir=ref_directory)
@@ -500,10 +501,10 @@ def test_uid___A002_X85c183_X36f__procedure_hsd_calimage__regression():
     pr = PipelineRegression(recipe='procedure_hsd_calimage.xml',
                             input_dir='pl-regressiontest/uid___A002_X85c183_X36f',
                             visname=['uid___A002_X85c183_X36f'],
-                            expectedoutput_file=('pl-regressiontest/uid___A002_X85c183_X36f/' +
-                                            'uid___A002_X85c183_X36f.casa-6.2.1-2-pipeline-2021.2.0.94-PIPE-1235.results.txt'))
+                            expectedoutput_dir=('pl-regressiontest/uid___A002_X85c183_X36f'))
 
     pr.run()
+
 
 @pytest.mark.fast
 @pytest.mark.alma
@@ -516,14 +517,14 @@ def test_uid___A002_X85c183_X36f_SPW15_23__PPR__regression():
     input_dir = 'pl-regressiontest/uid___A002_X85c183_X36f_SPW15_23'
     pr = PipelineRegression(input_dir=input_dir,
                             visname=['uid___A002_X85c183_X36f_SPW15_23.ms'],
-                            expectedoutput_file=('pl-regressiontest/uid___A002_X85c183_X36f_SPW15_23/' +
-                                            'uid___A002_X85c183_X36f_SPW15_23.casa-6.2.1-2-pipeline-2021.2.0.94-PIPE-1235.results.txt'))
+                            expectedoutput_dir=('pl-regressiontest/uid___A002_X85c183_X36f_SPW15_23'))
 
     # copy files use restore task into products folder
     input_products = casa_tools.utils.resolve(f'{input_dir}/products')
     shutil.copytree(input_products, f'{pr.output_dir}/products')
 
     pr.run(ppr=f'{input_dir}/PPR.xml')
+
 
 @pytest.mark.fast
 @pytest.mark.alma
@@ -534,12 +535,13 @@ def test_uid___mg2_20170525142607_180419__procedure_hsdn_calimage__regression():
     Dataset:                    mg2-20170525142607-180419
     Expected results version:   casa-6.2.0-119-pipeline-2020.2.0.23
     """
-    pr = PipelineRegression(recipe='procedure_hsdn_calimage.xml',
-                            input_dir='pl-regressiontest/mg2-20170525142607-180419',
-                            visname=['mg2-20170525142607-180419.ms'],
-                            expectedoutput_file=('pl-regressiontest/mg2-20170525142607-180419/' +
-                                            'mg2-20170525142607-180419.casa-6.2.0-119-pipeline-2021.2.0.23.results.txt'))
+    pr = PipelineRegression(
+        recipe='procedure_hsdn_calimage.xml', input_dir='pl-regressiontest/mg2-20170525142607-180419',
+        visname=['mg2-20170525142607-180419.ms'],
+        expectedoutput_file=('pl-regressiontest/mg2-20170525142607-180419/' +
+                             'mg2-20170525142607-180419.casa-6.6.6-6-pipeline-2024.2.0.3.results.txt'))
     pr.run()
+
 
 @pytest.mark.fast
 @pytest.mark.alma
@@ -552,11 +554,11 @@ def test_uid___mg2_20170525142607_180419__PPR__regression():
 
     input_dir = 'pl-regressiontest/mg2-20170525142607-180419'
 
-    pr = PipelineRegression(input_dir=input_dir,
-                            visname=['mg2-20170525142607-180419.ms'],
-                            expectedoutput_file=(f'{input_dir}/' +
-                                            'mg2-20170525142607-180419_PPR.casa-6.2.0-119-pipeline-2021.2.0.23.results.txt'),
-                            output_dir='mg2-20170525142607-180419_PPR')
+    pr = PipelineRegression(
+        input_dir=input_dir, visname=['mg2-20170525142607-180419.ms'],
+        expectedoutput_file=(f'{input_dir}/' +
+                             'mg2-20170525142607-180419_PPR.casa-6.6.6-6-pipeline-2024.2.0.3.results.txt'),
+        output_dir='mg2-20170525142607-180419_PPR')
 
     # copy files use restore task into products folder
     input_products = casa_tools.utils.resolve(f'{input_dir}/products')

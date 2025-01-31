@@ -78,6 +78,7 @@ class FlagDeterALMASingleDishInputs(flagdeterbase.FlagDeterBaseInputs):
     qa0 = vdp.VisDependentProperty(default=True)
     qa2 = vdp.VisDependentProperty(default=True)
 
+    # docstring and type hints: supplements hsd_flagdata
     def __init__(self,
                  context: 'Context',
                  vis: Optional[List[str]] = None,
@@ -107,56 +108,103 @@ class FlagDeterALMASingleDishInputs(flagdeterbase.FlagDeterBaseInputs):
 
         Args:
             context: Pipeline context.
-            vis: The list of input MeasurementSets. Defaults to the
-                 list of MeasurementSets defined in the pipeline context.
+
+            vis: The list of input MeasurementSets. Defaults to the list of
+                MeasurementSets defined in the pipeline context.
+
             output_dir: Output directory.
-            flagbackup: Back up any pre-existing flags before applying
-                        new ones. Defaults to True.
-            autocorr: Flag autocorrelation data. Defaults to False.
-            shadow: Flag shadowed antennas. Defaults to True.
-            scan: Flag a list of scans specified by scannumber.
-                  Defaults to True.
-            scannumber: A string containing a comma delimited list of scans to be
-                        flagged. Defaults to '' (no scans are flagged).
-            intents: A string containing a comma delimited list of intents against
-                     which the scans to be flagged are matched. Defaults to
-                     intents that are not relevant to pipeline processing.
-            edgespw: Flag the edge spectral window channels. Defaults to True.
-            fracspw: Fraction of the baseline correlator TDM edge channels
-                     to be flagged. Defaults to '1.875GHz'.
-            fracspwfps: Fraction of the ACS correlator TDM edge channels
-                        to be flagged. Defaults to 0.048387.
-            online: Apply the online flags. Defaults to True.
+
+            flagbackup: Back up any pre-existing flags before applying new ones.
+
+                Default: None (equivalent to True)
+
+            autocorr: Flag autocorrelation data.
+
+                Default: None (equivalent to False)
+
+            shadow: Flag shadowed antennas.
+
+                Default: None (equivalent to True)
+
+            scan: Flag a list of scans and intents specified by scannumber and intents.
+
+                Default: None (equivalent to True)
+
+            scannumber: A string containing a comma delimited list of scans to be flagged.
+
+                Default: None (equivalent to '')
+
+            intents: A string containing a comma delimited list of intents
+                against which the scans to be flagged are matched.
+                Defaults to intents that are not relevant to pipeline processing.
+
+                Example: `'*BANDPASS*'`
+
+            edgespw: Flag the edge spectral window channels.
+
+                Default: None (equivalent to True)
+
+            fracspw: Fraction of the baseline correlator TDM edge channels to be flagged.
+
+                Default: None (equivalent to 0.03125)
+
+            fracspwfps: Fraction of the ACA correlator TDM edge channels to be flagged.
+
+                Default: None (equivalent to 0.048387)
+
+            online: Apply the online flags.
+
+                Default: None (equivalent to True)
+
             fileonline: File containing the online flags. These are computed
-                        by the h_init or hif_importdata data tasks. If the
-                        online flags files are undefined a name of the form
-                        'msname.flagonline.txt' is assumed.
-            template: Apply a flagging template. Defaults to True.
+                by the h_init or hif_importdata data tasks. If the online flags files
+                are undefined a name of the form 'msname.flagonline.txt' is assumed.
+
+            template: Apply a flagging template.
+
+                Default: None (equivalent to True)
+
             filetemplate: The name of a text file that contains the flagging
-                          template for RFI, birdies, telluric lines, etc.
-                          If the template flags files is undefined a name of
-                          the form 'msname.flagtemplate.txt' is assumed.
+                template for RFI, birdies, telluric lines, etc.  If the
+                template flags files is undefined a name of the form
+                'msname.flagtemplate.txt' is assumed.
+
             pointing: Apply a flagging template for pointing flag.
-                      Defaults to True.
+
+                Default: None (equivalent to True)
+
             filepointing: The name of a text file that contains the flagging
-                          template for pointing flag. If the template flags
-                          files is undefined a name of the form
-                          'msname.flagpointing.txt' is assumed.
+                template for pointing flag. If the template flags files is
+                undefined a name of the form 'msname.flagpointing.txt' is assumed.
+
             incompleteraster: Apply commands to flag incomplete raster sequence.
-                              If this is False, relevant commands in filepointing
-                              are simply commented out. Defualts to True.
+                If this is False, relevant commands in filepointing are
+                simply commented out.
+
+                Default: None (equivalent to True)
+
             hm_tbuff: The heuristic for computing the default time interval
-                      padding parameter. The options are 'halfint' and 'manual'.
-                      In 'halfint' mode tbuff is set to half the maximum of the
-                      median integration time of the science and calibrator target
-                      observations.
-            tbuff: The time in seconds used to pad flagging command time intervals
-                   if hm_tbuff='manual'. Defaults to 0.0.
-            qa0: Apply QA0 flags. Defaults to True.
-            qa2: Apply QA2 flags. Defaults to True.
+                padding parameter. The options are 'halfint' and 'manual'.
+                In 'halfint' mode tbuff is set to half the maximum of the
+                median integration time of the science and calibrator target
+                observations.
+
+                Default: None (equivalent to 'halfint')
+
+            tbuff: The time in seconds used to pad flagging command time
+                intervals if hm_tbuff='manual'.
+
+                Default: None (equivalent to 0.0)
+
+            qa0: QA0 flags
+
+            qa2: QA2 flags
+
             parallel: Execute using CASA HPC functionality, if available.
-                      Default is None, which intends to turn on parallel
-                      processing if possible.
+
+                Options: 'automatic', 'true', 'false', True, False
+
+                Default: None (equivalent to 'automatic')
         """
         super().__init__(
             context, vis=vis, output_dir=output_dir, flagbackup=flagbackup, autocorr=autocorr, shadow=shadow, scan=scan,

@@ -7,6 +7,7 @@ import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataTable, DataType
 from pipeline.infrastructure import casa_tools
+from pipeline.infrastructure.utils import list_to_str
 from .. import common
 
 LOG = infrastructure.get_logger(__name__)
@@ -141,7 +142,7 @@ class WeightMS(basetask.StandardTaskTemplate):
         with casa_tools.TableReader(infile) as tb:
             # Tentative adding state id selection for sdatmcor data selection issue.
             tsel = tb.query('DATA_DESC_ID==%d && FIELD_ID==%d && ANTENNA1==%d && ANTENNA2==%d && STATE_ID IN %s' %
-                            (data_desc_id, fieldid, antid, antid, list(stateids)),
+                            (data_desc_id, fieldid, antid, antid, list_to_str(stateids)),
                             sortlist='TIME', style='python')
             if tsel.nrows() > 0:
                 in_rows = tsel.rownumbers()
@@ -235,7 +236,7 @@ class WeightMS(basetask.StandardTaskTemplate):
         with casa_tools.TableReader(outfile, nomodify=False) as tb:
             # The selection, tsel, contains all intents.
             # Need to match output element in selected table by rownumbers().
-            tsel = tb.query('ROWNUMBER() IN %s' % (list(row_map.values())), style='python')
+            tsel = tb.query('ROWNUMBER() IN %s' % (list_to_str(list(row_map.values()))), style='python')
             ms_weights = tsel.getcol('WEIGHT')
             rownumbers = tsel.rownumbers().tolist()
             for idx in range(len(in_rows)):
@@ -252,7 +253,7 @@ class WeightMS(basetask.StandardTaskTemplate):
         minmaxclip = False
         if minmaxclip:
             with casa_tools.TableReader(outfile, nomodify=False) as tb:
-                tsel = tb.query('ROWNUMBER() IN %s' % (list(row_map.values())),
+                tsel = tb.query('ROWNUMBER() IN %s' % (list_to_str(list(row_map.values()))),
                                 style='python')
                 if 'FLOAT_DATA' in tsel.colnames():
                     data_column = 'FLOAT_DATA'

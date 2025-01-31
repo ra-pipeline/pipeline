@@ -3,34 +3,20 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
+# docstring and type hints: inherits from hifv.tasks.priorcals.priorcals.PriorcalsInputs.__init__
 @utils.cli_wrapper
-def hifv_priorcals(vis=None, show_tec_maps=None, apply_tec_correction=None, swpow_spw=None, ant_pos_time_limit=None):
+def hifv_priorcals(vis=None, show_tec_maps=None, apply_tec_correction=None, apply_gaincurves=None, apply_opcal=None, apply_rqcal=None,
+                   apply_antpos=None, apply_swpowcal=None, swpow_spw=None, ant_pos_time_limit=None):
 
-    """
-    hifv_priorcals ---- Runs gaincurves, opacities, requantizer gains, antenna position corrections, tec_maps, switched power.
+    """Runs gaincurves, opacities, requantizer gains, antenna position corrections, tec_maps, switched power.
 
-    Runs gaincurves, opacities, requantizer gains, antenna position corrections, tec_maps, switched power.
+    Returns:
+        The results object for the pipeline task is returned.
 
-    Output:
+    Examples:
+        1. Run gaincurves, opacities, requantizer gains and antenna position corrections:
 
-    results -- The results object for the pipeline task is returned.
-    --------- parameter descriptions ---------------------------------------------
-
-    vis                  List of visibility data files. These may be ASDMs, tar files of ASDMs,
-                         MSes, or tar files of MSes, If ASDM files are specified, they will be
-                         converted  to MS format.
-                         example: vis=['X227.ms', 'asdms.tar.gz']
-    show_tec_maps        Plot tec maps
-    apply_tec_correction Apply tec correction
-    swpow_spw            Spectral-window(s) for plotting: "" ==>all, spw="6,14"
-    ant_pos_time_limit   Antenna position time limit in days, default to 150 days
-    --------- examples -----------------------------------------------------------
-
-
-    1. Run gaincurves, opacities, requantizer gains and antenna position corrections.
-
-    >>> hifv_priorcals()
-
+        >>> hifv_priorcals()
 
     """
 

@@ -48,7 +48,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         """Tclean deconvolver parameter heuristics."""
         return 'mtmfs'
 
-    def robust(self) -> float:
+    def robust(self, specmode=None) -> float:
         """Tclean robust parameter heuristics."""
         if self.vlass_stage == 3:
             return 1.0
@@ -64,7 +64,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         return ['0.6arcsec']
 
     def imsize(self, fields=None, cell=None, primary_beam=None, sfpblimit=None, max_pixels=None, centreonly=None,
-               vislist=None, spwspec=None, intent: str = '', joint_intents: str = '') -> Union[list, int]:
+               vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None) -> Union[list, int]:
         """Tclean imsize parameter heuristics."""
         return [16384, 16384]
 
@@ -72,7 +72,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         """Tclean reffreq parameter heuristics."""
         return '3.0GHz'
 
-    def cyclefactor(self, iteration: int) -> float:
+    def cyclefactor(self, iteration: int, field=None, intent=None, specmode=None, iter0_dirty_dynamic_range=None) -> float:
         """Tclean cyclefactor parameter heuristics."""
         return 3.0
 
@@ -95,24 +95,33 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         else:
             return 5000
 
+    def nmajor(self, iteration: int) -> Union[None, int]:
+        """Tclean nmajor parameter heuristics."""
+        if iteration == 0:
+            return None
+        else:
+            # PIPE-1745: default value of nmajor=220 for all editimlist stages of the VLASS QL/SE imaging workflow
+            return 220
+
     def scales(self, iteration: Union[int, None] = None) -> Union[list, None]:
         """Tclean scales parameter heuristics."""
-        if not iteration: return None
+        if not iteration:
+            return None
         if self.vlass_stage == 3 and iteration in [1, 2, 3]:
             return [0, 5, 12]
         else:
             return [0]
 
-    def uvtaper(self, beam_natural=None, protect_long=None) -> Union[str, list]:
+    def uvtaper(self, beam_natural=None, protect_long=None, beam_user=None, tapering_limit=None, repr_freq=None) -> Union[str, list]:
         """Tclean uvtaper parameter heuristics."""
         if self.vlass_stage == 3:
             return ''
         else:
-            # PIPE-1679: the previous default value of '3arcsec' has been changed to '3/(pi/(4ln(2)))arcsec' 
+            # PIPE-1679: the previous default value of '3arcsec' has been changed to '3/(pi/(4ln(2)))arcsec'
             # since CASA ver>=6.5.3 to maintain the beam size consistency due to the math correction from CAS-13260.
             return ['2.6476arcsec']
 
-    def uvrange(self, field=None, spwspec=None) -> tuple:
+    def uvrange(self, field=None, spwspec=None, specmode=None) -> tuple:
         """Tclean uvrange parameter heuristics."""
         return '<12km', None
 
@@ -128,7 +137,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
                 result_meta = result.read()
                 if hasattr(result_meta, 'pipeline_casa_task') and result_meta.pipeline_casa_task.startswith(
                         'hifv_vlassmasking'):
-                    mask_list = [r.combinedmask for r in result_meta][0]
+                    mask_list = result_meta.combinedmask
 
         # Add 'pb' string as a placeholder for cleaning without mask (pbmask only, see PIPE-977). This should
         # always stand at the last place in the mask list.
@@ -170,7 +179,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
     def pb_correction(self) -> bool:
         return False
 
-    def pblimits(self, pb: Union[None, str]) -> Tuple[float, float]:
+    def pblimits(self, pb: Union[None, str], specmode: Optional[str] = None) -> Tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
 
         pblimit_image, pblimit_cleanmask = super().pblimits(pb)
@@ -184,8 +193,8 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         return True
 
     def get_sensitivity(self, ms_do, field, intent, spw, chansel, specmode, cell, imsize, weighting, robust, uvtaper) \
-            -> Tuple[float, None, None]:
-        return 0.0, None, None
+            -> Tuple[float, None, None, None]:
+        return 0.0, None, None, None
 
     def find_fields(self, distance: str = '0deg', phase_center: bool = None, matchregex: str = '') -> list:
 
@@ -359,7 +368,6 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         return 5.0
 
     def get_autobox_params(self, iteration: int, intent: str, specmode: str, robust: float) -> tuple:
-
         """Default auto-boxing parameters."""
 
         sidelobethreshold = None
@@ -588,12 +596,11 @@ class ImageParamsHeuristicsVlassSeContMosaic(ImageParamsHeuristicsVlassSeCont):
         self.user_cycleniter_final_image_nomask = None
 
     def imsize(self, fields=None, cell=None, primary_beam=None, sfpblimit=None, max_pixels=None, centreonly=None,
-               vislist=None, spwspec=None, intent: str = '', joint_intents: str = '') -> Union[list, int]:
+               vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None) -> Union[list, int]:
         """Tclean imsize parameter heuristics."""
         return [12500, 12500]
 
     def mosweight(self, intent, field) -> bool:
-
         """tclean flag to use mosaic weighting."""
 
         # Currently only ALMA has decided to use this flag (CAS-11840). So
@@ -629,7 +636,7 @@ class ImageParamsHeuristicsVlassSeContMosaic(ImageParamsHeuristicsVlassSeCont):
         # Might change to True based on stackholder feedback
         return False
 
-    def pblimits(self, pb: Union[None, str]) -> Tuple[float, float]:
+    def pblimits(self, pb: Union[None, str], specmode: Optional[str] = None) -> Tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         pblimit_image, pblimit_cleanmask = super().pblimits(pb)
 

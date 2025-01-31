@@ -295,6 +295,21 @@ class QAPlugin(object, metaclass=abc.ABCMeta):
     def handle(self, context, result):
         pass
 
+    def handle_with_exception_catch(self, context, result):
+        """
+        Handle QA scoring with an exception catch.
+
+        Args:
+            context: Pipeline context
+            result: A Pipeline task result instance
+        """
+        try:
+            self.handle(context, result)
+        except Exception as ex:
+            # PIPE-2216: use a short generic message and score=-0.1 for QA execution failures and
+            # present the exception error message in warning.
+            result.qa.pool.append(QAScore(-0.1, 'Unable to calculate QA scores.', 'Unable to calculate QA scores'))
+            LOG.warning('QA execution failed with an exception: %s', ex)
 
 class QARegistry(object):
     """
@@ -343,7 +358,7 @@ class QARegistry(object):
                 if handler.is_handler_for(result):
                     LOG.debug('%s handling QA analysis for %s' % (handler.__class__.__name__,
                                                                   result.__class__.__name__))
-                    handler.handle(context, result)
+                    handler.handle_with_exception_catch(context, result)
 
             if hasattr(result, 'logrecords'):
                 result.logrecords.extend(logging_handler.buffer)

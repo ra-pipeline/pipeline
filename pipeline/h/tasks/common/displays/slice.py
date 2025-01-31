@@ -54,7 +54,7 @@ class SliceDisplay(object):
 
         stagenumber = context.stage
 
-        plots = []        
+        plots = []
 
         if description_to_plot is None:
             # plot all results
@@ -111,6 +111,11 @@ class SliceDisplay(object):
             if os.path.exists(plotfile):
                 LOG.trace('Not overwriting existing image at %s' % plotfile)
                 continue
+
+            # clear plot to avoid contamination of previous plots
+            plt.close(1)
+            plt.figure(1)
+            plt.clf()
 
             # do the plot
             if results.flagging:
@@ -267,7 +272,7 @@ class SliceDisplay(object):
 
         not_noisy = np.logical_not(noisy)
 
-        # plot 'not noisy' points first 
+        # plot 'not noisy' points first
         if overplot_spectrum is not None:
             # plot overplot data as light blue circles first
             plot_data = overplot_data[not_noisy]
@@ -317,8 +322,8 @@ class SliceDisplay(object):
 
         # plot points not valid in blue. Often these will be zero having
         # simply not been calculated because the underlying data are bad; this
-        # screws up the autoscaling. Hence if plotbad is False, plot them 
-        # floating at the correct x position above the bottom of the plot, to 
+        # screws up the autoscaling. Hence if plotbad is False, plot them
+        # floating at the correct x position above the bottom of the plot, to
         # suggest that the y value is unimportant. If plotbad is True then
         # plot the actual value.
         ymin, ymax = plt.ylim()
@@ -326,7 +331,7 @@ class SliceDisplay(object):
         bad_data = plot_data[plot_flag == True]
         if len(bad_data) > 0:
             if not plotbad:
-                bad_data[:] = yflag 
+                bad_data[:] = yflag
             bad_x = plot_axis[plot_flag == True]
             if xtitle.upper() == 'TIME':
                 temp = []
@@ -405,7 +410,7 @@ class SliceDisplay(object):
             if flagcmd.match(spectrum):
                 bad_data = data[flagcmd.flagchannels]
                 if len(bad_data) and not plotbad:
-                    bad_data[:] = yflag 
+                    bad_data[:] = yflag
                 bad_x = xaxis[flagcmd.flagchannels]
                 plt.errorbar(bad_x, bad_data, linestyle='None', marker='o',
                              markersize=5, alpha=0.5,

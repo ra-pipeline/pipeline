@@ -7,9 +7,7 @@ from . import cli, utils
 @utils.cli_wrapper
 def h_init(loglevel='info', plotlevel='default', weblog=True):
 
-    """
-    h_init ---- Initialize the pipeline
-
+    """Initialize the pipeline
 
     The h_init task initializes the pipeline.
 
@@ -21,23 +19,22 @@ def h_init(loglevel='info', plotlevel='default', weblog=True):
     into the context. hif_importdata or hsd_importdata can be used to load data.
 
     The pipeline context is returned.
+    
+    Args:
+        loglevel: Log level for pipeline messages. Log messages below this threshold will not be displayed.
 
-    --------- parameter descriptions ---------------------------------------------
+        plotlevel: Toggle generation of detail plots in the web log. A level of 'all' generates all plots; 'summary' omits detail plots; 'default' generates all plots
+            apart from for the hif_applycal task.
 
-    loglevel      Log level for pipeline messages. Log messages below this threshold will not be displayed.
-    plotlevel     Toggle generation of detail plots in the web log. A level of 'all' generates
-                  					 all plots; 'summary' omits detail plots; 'default' generates all plots
-                  					 apart from for the hif_applycal task.
-    weblog        Generate the web log
+        weblog: Generate the web log
 
-    --------- examples -----------------------------------------------------------
+    Returns:
+        The results object for the pipeline task is returned.
 
+    Examples:
+        1. Create the pipeline context
 
-
-    1. Create the pipeline context
-
-    >>> h_init()
-
+        >>> h_init()
 
     """
 

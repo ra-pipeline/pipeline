@@ -136,6 +136,7 @@ class ExportDataInputs(vdp.StandardInputs):
     def exportcalprods(self):
         return not (self.imaging_products_only or self.exportmses)
 
+    # docstring and type hints: supplements h_exportdata, hsd_exportdata, hsdn_exportdata
     def __init__(self, context, output_dir=None, session=None, vis=None, exportmses=None,
                  pprfile=None, calintents=None, calimages=None, targetimages=None,
                  products_dir=None, imaging_products_only=None):
@@ -159,6 +160,59 @@ class ExportDataInputs(vdp.StandardInputs):
         :type targetimages: a list
         :param products_dir: the data products directory for pipeline data
         :type products_dir: string
+
+        Args:
+            context: the pipeline Context state object
+
+            output_dir: the working directory for pipeline data
+
+            session: List of sessions one per visibility/autocorrelation file.
+                Defaults to a single virtual session containing all the
+                visibility files in vis.
+
+                Example: session=['session1', 'session2']
+
+            vis: List of visibility/autocorrelation data files for which
+                flagging and calibration information will be exported.
+                Defaults to the list maintained in the pipeline context.
+
+                Example: vis=['X227.ms', 'X228.ms']
+
+            exportmses: Export MeasurementSets defined in vis instead of flags,
+                caltables, and calibration instructions.
+
+                Example: exportmses = True
+
+                Default: None (equivalent to False)
+
+            pprfile: Name of the pipeline processing request to be exported.
+                Defaults to a file matching the template 'PPR_*.xml'.
+
+                Example: pprfile=['PPR_GRB021004.xml']
+
+            calintents: List of calibrator image types to be exported.
+                Defaults to all standard calibrator intents 'BANDPASS', 'PHASE', 'FLUX'
+
+                Example: calintents='PHASE'
+
+            calimages: List of calibrator images to be exported.
+                Defaults to all calibrator images recorded in the pipeline context.
+
+                Example: calimages=['3C454.3.bandpass', '3C279.phase']
+
+            targetimages: List of science target images to be exported.
+                Defaults to all science target images recorded in the pipeline context.
+
+                Example: targetimages=['NGC3256.band3', 'NGC3256.band6'],
+                targetimages=['r_aqr.CM02.spw5.line0.XXYY.sd.im', 'r_aqr.CM02.spw5.XXYY.sd.cont.im']
+
+            products_dir: Name of the data products subdirectory.
+                Defaults to './'.
+
+                Example: products_dir='../products'
+
+            imaging_products_only: Export the science target image products only.
+
         """
         super(ExportDataInputs, self).__init__()
         self.context = context
@@ -468,7 +522,7 @@ class ExportData(basetask.StandardTaskTemplate):
         # and tar them up.
         flag_version_list = []
         for visfile in vislist:
-            flag_version_file = self._export_final_flagversion(visfile, flag_version_name, products_dir)
+            flag_version_file = self._export_final_flagversion(context, visfile, flag_version_name, products_dir)
             flag_version_list.append(flag_version_file)
 
         # Loop over the measurements sets in the working directory, and
@@ -514,11 +568,10 @@ class ExportData(basetask.StandardTaskTemplate):
 
         return sessiondict
 
-    def _do_if_auxiliary_products(self, oussid, output_dir, products_dir, vislist, imaging_products_only):
+    def _do_if_auxiliary_products(self, oussid, output_dir, products_dir, vislist, imaging_products_only, pipeline_stats_file=None):
         """
         Generate the auxiliary products
         """
-
         if imaging_products_only:
             contfile_name = 'cont.dat'
             fluxfile_name = 'Undefined'
@@ -570,6 +623,10 @@ class ExportData(basetask.StandardTaskTemplate):
         if hasattr(self.inputs.context, 'selfcal_resources') and isinstance(self.inputs.context.selfcal_resources, list):
             selfcal_resources_list = self.inputs.context.selfcal_resources
         if selfcal_resources_list:
+            empty = False
+
+        # PIPE-2094: check for the pipeline stats file
+        if pipeline_stats_file and os.path.exists(pipeline_stats_file):
             empty = False
 
         if empty:
@@ -625,6 +682,12 @@ class ExportData(basetask.StandardTaskTemplate):
                     tar.add(selfcal_resource, arcname=selfcal_resource)
                     LOG.info('Saving auxiliary data product %s in %s', selfcal_resource, tarfilename)
 
+            # PIPE-2094: Save pipeline statistics file
+            if pipeline_stats_file and os.path.exists(pipeline_stats_file):
+                tar.add(pipeline_stats_file, arcname=pipeline_stats_file)
+                LOG.info('Saving pipeline statistics file %s in %s', pipeline_stats_file, tarfilename)
+            else:
+                LOG.info("Pipeline statistics file does not exist.")
             tar.close()
 
         return tarfilename
@@ -662,13 +725,13 @@ class ExportData(basetask.StandardTaskTemplate):
         pipemanifest.add_environment_info(ouss)
 
         if stdfproducts.ppr_file:
-            pipemanifest.add_pprfile(ouss, os.path.basename(stdfproducts.ppr_file), oussid)
+            pipemanifest.add_pprfile(ouss, os.path.basename(stdfproducts.ppr_file), oussid, level='member', package=context.project_structure.recipe_name)
 
         # Add the flagging and calibration products
         for session_name in sessiondict:
             session = pipemanifest.set_session(ouss, session_name)
             if exportcalprods:
-                pipemanifest.add_caltables(session, sessiondict[session_name][1], session_name)
+                pipemanifest.add_caltables(session, sessiondict[session_name][1], session_name, level='member', package=context.project_structure.recipe_name)
             for vis_name in sessiondict[session_name][0]:
                 immatchlist = [imname for imname in per_ms_calimages if imname.startswith(vis_name)]
                 (ms_file, flags_file, calapply_file) = (None, None, None)
@@ -680,17 +743,17 @@ class ExportData(basetask.StandardTaskTemplate):
                                              'calibrator')
 
         # Add a tar file of the web log
-        pipemanifest.add_weblog(ouss, os.path.basename(stdfproducts.weblog_file), oussid)
+        pipemanifest.add_weblog(ouss, os.path.basename(stdfproducts.weblog_file), oussid, level='member', package=context.project_structure.recipe_name)
 
         # Add the processing log independently of the web log
-        pipemanifest.add_casa_cmdlog(ouss, os.path.basename(stdfproducts.casa_commands_file), oussid)
+        pipemanifest.add_casa_cmdlog(ouss, os.path.basename(stdfproducts.casa_commands_file), oussid, level='member', package=context.project_structure.recipe_name)
 
         # Add the processing script independently of the web log
-        pipemanifest.add_pipescript(ouss, os.path.basename(stdfproducts.casa_pipescript), oussid)
+        pipemanifest.add_pipescript(ouss, os.path.basename(stdfproducts.casa_pipescript), oussid, level='member', package=context.project_structure.recipe_name)
 
         # Add the restore script independently of the web log
         if stdfproducts.casa_restore_script != 'Undefined':
-            pipemanifest.add_restorescript(ouss, os.path.basename(stdfproducts.casa_restore_script), oussid)
+            pipemanifest.add_restorescript(ouss, os.path.basename(stdfproducts.casa_restore_script), oussid, level='member', package=context.project_structure.recipe_name)
 
         # Add the calibrator images
         pipemanifest.add_images(ouss, per_ous_calimages, 'calibrator', per_ous_calimages_keywords)
@@ -765,10 +828,10 @@ class ExportData(basetask.StandardTaskTemplate):
         """
 
         LOG.info('Saving final flags for %s in flag version %s', os.path.basename(vis), flag_version_name)
-        task = casa_tasks.flagmanager(vis=vis, mode='save', versionname=flag_version_name)
+        task = casa_tasks.flagmanager(vis=vis, mode='save', versionname=flag_version_name, comment="Final pipeline flags")
         self._executor.execute(task)
 
-    def _export_final_flagversion(self, vis, flag_version_name, products_dir):
+    def _export_final_flagversion(self, context, vis, flag_version_name, products_dir):
         """
         Save the final flags version to a compressed tarfile in products.
         """
@@ -777,22 +840,42 @@ class ExportData(basetask.StandardTaskTemplate):
         tarfilename = visname + '.flagversions.tgz'
         LOG.info('Storing final flags for %s in %s', visname, tarfilename)
 
-        # Define the directory to be saved, and where to store in tar archive.
-        flagsname = os.path.join(vis + '.flagversions', 'flags.' + flag_version_name)
-        flagsarcname = os.path.join(visname + '.flagversions', 'flags.' + flag_version_name)
-        LOG.info('Saving flag version %s', flag_version_name)
-
         # Define the versions list file to be saved
         flag_version_list = os.path.join(visname + '.flagversions', 'FLAG_VERSION_LIST')
-        ti = tarfile.TarInfo(flag_version_list)
-        line = "{} : Final pipeline flags\n".format(flag_version_name).encode(sys.stdout.encoding)
-        ti.size = len(line)
+        tar_info = tarfile.TarInfo(flag_version_list)
         LOG.info('Saving flag version list')
 
-        # Create the tar file
+        # retrieve all flagversions saved
+        task = casa_tasks.flagmanager(vis=visname, mode='list')
+        flag_dict = self._executor.execute(task)
+        # remove MS key entry if it exists; MS key does not conform with other entries
+        # more information about flagmanager return dictionary here:
+        # https://casadocs.readthedocs.io/en/stable/api/tt/casatasks.flagging.flagmanager.html#mode
+        flag_dict.pop('MS', None)
+        flag_dict = {x['name']:x['comment'] for x in flag_dict.values()}
+
+        # Define the versions list file to be saved
+        # Define the directory to be saved, and where to store in tar archive.
+        if not isinstance(flag_version_name, list):
+            flag_version_name = [flag_version_name]
+        # PIPE-933: Add flag version 'after_deterministic_flagging' to tarfile
+        if "after_deterministic_flagging" in flag_dict and "after_deterministic_flagging" not in flag_version_name:
+            flag_version_name.append("after_deterministic_flagging")
+
+        # Create the tar file and populate it
         tar = tarfile.open(os.path.join(products_dir, tarfilename), "w:gz")
-        tar.add(flagsname, arcname=flagsarcname)
-        tar.addfile(ti, io.BytesIO(line))
+
+        line = ""
+        for f in flag_version_name:
+            LOG.info('Saving flag version %s', f)
+            flagsname = os.path.join(vis + '.flagversions', 'flags.' + f)
+            flagsarcname = os.path.join(visname + '.flagversions', 'flags.' + f)
+            line += "{} : {}\n".format(f, flag_dict[f])
+            tar.add(flagsname, arcname=flagsarcname)
+
+        line = line.encode(sys.stdout.encoding)
+        tar_info.size = len(line)
+        tar.addfile(tar_info, io.BytesIO(line))
         tar.close()
 
         return tarfilename
@@ -1011,6 +1094,9 @@ finally:
                                                       ousstatus_entity_id=oussid,
                                                       output_dir=products_dir)
         LOG.info('Creating manifest file %s', out_manifest_file)
+        # We can add the manifest element only now after the manifest name is known
+        ouss = pipemanifest.get_ous()
+        pipemanifest.add_manifest(ouss, os.path.basename(out_manifest_file), ous_name=oussid, level='member', package=self.inputs.context.project_structure.recipe_name)
         pipemanifest.write(out_manifest_file)
 
         return out_manifest_file
@@ -1243,18 +1329,18 @@ finally:
         return new_cleanlist, fits_list, fits_keywords_list
 
     @staticmethod
-    def _add_to_manifest(manifest_file, aux_fproducts, aux_caltablesdict, aux_calapplysdict, aqua_report, ous_name):
+    def _add_to_manifest(manifest_file, aux_fproducts, aux_caltablesdict, aux_calapplysdict, aqua_report, ous_name, package="N/A"):
 
         pipemanifest = manifest.PipelineManifest('')
         pipemanifest.import_xml(manifest_file)
         ouss = pipemanifest.get_ous()
 
         if aqua_report:
-            pipemanifest.add_aqua_report(ouss, os.path.basename(aqua_report), ous_name)
+            pipemanifest.add_aqua_report(ouss, os.path.basename(aqua_report), ous_name, level='member', package=package)
 
         if aux_fproducts:
             # Add auxiliary data products file
-            pipemanifest.add_aux_products_file(ouss, os.path.basename(aux_fproducts), ous_name)
+            pipemanifest.add_aux_products_file(ouss, os.path.basename(aux_fproducts), ous_name, level='member', package=package)
 
         # Add the auxiliary caltables
         if aux_caltablesdict:

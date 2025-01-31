@@ -75,8 +75,41 @@ class AntposInputs(vdp.StandardInputs):
         casa_args = self._get_task_args(ignore=('caltable',))
         return namer.calculate(output_dir=self.output_dir, stage=self.context.stage, **casa_args)
 
+    # docstring and type hints: supplements hif_antpos
     def __init__(self, context, output_dir=None, vis=None, caltable=None, hm_antpos=None, antposfile=None, antenna=None,
                  offsets=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            vis: List of input visibility files.
+
+                Example: ['ngc5921.ms']
+
+            caltable: Name of output gain calibration tables.
+
+                Example: ['ngc5921.gcal']
+
+            hm_antpos: Heuristics method for retrieving the antenna position corrections. The options are 'online' (not yet implemented), 'manual',
+                and 'file'.
+
+            antposfile: The file(s) containing the antenna offsets. Used if hm_antpos is 'file'.
+
+                Example: 'antennapos.csv'
+
+            antenna: The list of antennas for which the positions are to be corrected. Available when hm_antpos='manual'.
+
+                Example: antenna='DV05,DV07'
+
+            offsets: The list of antenna offsets for each antenna in 'antennas'. Each offset is a set of 3 floating point numbers separated by commas, specified
+                in the ITRF frame. Available when hm_antpos='manual'.
+
+                Example: offsets=[0.01, 0.02, 0.03, 0.03, 0.02, 0.01]
+        """
         super(AntposInputs, self).__init__()
 
         # pipeline inputs

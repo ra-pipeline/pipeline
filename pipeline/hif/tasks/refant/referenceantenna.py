@@ -62,8 +62,57 @@ class RefAntInputs(vdp.StandardInputs):
         # refant does not use CASA tasks
         raise NotImplementedError
 
+    # docstring and type hints: supplements hif_refant
     def __init__(self, context, vis=None, output_dir=None, field=None, spw=None, intent=None, hm_refant=None,
                  refant=None, geometry=None, flagging=None, refantignore=None, parallel=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets in the pipeline context.
+
+                Example: ['M31.ms']
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            field: The comma delimited list of field names or field ids for which flagging scores are computed if hm_refant='automatic' and  flagging = True
+
+                Example: '' (Default to fields with the specified intents), '3C279', '3C279,M82'
+
+            spw: A string containing the comma delimited list of spectral window ids for which flagging scores are computed if hm_refant='automatic' and  flagging = True.
+
+                Example: '' (all spws observed with the specified intents), '11,13,15,17'
+
+            intent: A string containing a comma delimited list of intents against which the selected fields are matched. Defaults to all supported
+                intents.
+
+                Example: 'BANDPASS', 'AMPLITUDE,BANDPASS,PHASE,POLARIZATION'
+
+            hm_refant: The heuristics method or mode for selection the reference antenna. The options are 'manual' and 'automatic. In manual
+                mode a user supplied reference antenna refant is supplied.
+                In 'automatic' mode the antennas are selected automatically.
+
+            refant: The user supplied reference antenna for hm_refant='manual'. If no antenna list is supplied an empty list is returned.
+
+                Example: 'DV05'
+
+            geometry: Score antenna by proximity to the center of the array. This option is quick as only the ANTENNA table must be read.
+                Parameter is available when ``hm_refant``='automatic'.
+
+            flagging: Score antennas by percentage of unflagged data.  This option requires computing flagging statistics.
+                Parameter is available when ``hm_refant``='automatic'.
+
+            refantignore: string list to be ignored as reference antennas.
+
+                Example:  refantignore='ea02,ea03'
+
+            parallel: Execute using CASA HPC functionality, if available. options: 'automatic', 'true', 'false', True, False
+
+                Default: None (equivalent to False)
+
+        """
         self.context = context
         self.vis = vis
         self.output_dir = output_dir

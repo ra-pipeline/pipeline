@@ -59,14 +59,20 @@ class T2_4MDetailsGFluxscaleRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
         flux_comparison_plots = self.create_flux_comparison_plots(pipeline_context, results)
 
+        # Generate rows for table of computed flux densities.
         table_rows = make_flux_table(pipeline_context, results)
 
+        # Generate rows for table of adopted flux densities.
         adopted_rows = make_adopted_table(results)
+
+        # Generate flagging commands summary table (PIPE-2155).
+        flagtable = make_flag_table(pipeline_context, results)
 
         mako_context.update({
             'adopted_table': adopted_rows,
             'ampuv_allant_plots': ampuv_allant_plots,
             'ampuv_ant_plots': ampuv_ant_plots,
+            'flagtable': flagtable,
             'flux_plots': flux_comparison_plots,
             'table_rows': table_rows
         })
@@ -140,6 +146,30 @@ class T2_4MDetailsGFluxscaleRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
 
 FluxTR = collections.namedtuple('FluxTR', 'vis field spw freqbw i q u v fluxratio spix')
+
+
+def make_flag_table(context, results):
+    weblog_dir = os.path.join(context.report_dir, f"stage{results.stage_number}")
+    flagtable = {}
+    for result in results:
+        for table_name, flagcmds in result.ampcal_flagcmds.items():
+            table_basename = os.path.basename(table_name)
+            flagcmd_abspath = write_flagcmds_to_disk(weblog_dir, table_basename, flagcmds)
+            flagcmd_relpath = os.path.relpath(flagcmd_abspath, context.report_dir)
+            flagtable[table_basename] = flagcmd_relpath
+
+    return flagtable
+
+
+def write_flagcmds_to_disk(weblog_dir, basename, flagcmds):
+    filename = os.path.join(weblog_dir, f"{basename}-flag_commands.txt")
+    with open(filename, 'w') as flagfile:
+        flagfile.writelines([f"# Flag commands for {basename}\n#\n"])
+        flagfile.writelines([f"{flagcmd}\n" for flagcmd in flagcmds])
+        if not flagcmds:
+            flagfile.writelines(["# No flag commands generated\n"])
+
+    return filename
 
 
 def make_flux_table(context, results):
@@ -344,10 +374,16 @@ def create_flux_comparison_plots(context, output_dir, result, showatm=True):
 
         x_min = 1e99
         x_max = 0
+        # Cycle through flux measurements, ordered by SpW ID, to plot the
+        # calibrated fluxes.
+        # PIPE-2083: keep a record of which SpW IDs are getting plotted here,
+        # to restrict which SpWs it needs to overplot catalogue fluxes for.
+        spws_plotted = []
         for m in sorted(measurements, key=operator.attrgetter('spw_id')):
             # cycle colours so that windows centred on the same frequency are distinguishable
             symbol, colour = next(symbols_and_colours)
 
+            spws_plotted.append(m.spw_id)
             spw = ms.get_spectral_window(m.spw_id)
             x = spw.centre_frequency.to_units(FrequencyUnits.GIGAHERTZ)
             x_unc = decimal.Decimal('0.5') * spw.bandwidth.to_units(FrequencyUnits.GIGAHERTZ)
@@ -375,7 +411,9 @@ def create_flux_comparison_plots(context, output_dir, result, showatm=True):
 
         ages = []
         for origin, label in catalogue_fluxes.items():
-            fluxes = [f for f in field.flux_densities if f.origin == origin]
+            # PIPE-2083: select which catalog fluxes to plot, based on origin
+            # and for which SpWs the flux measurements were plotted earlier.
+            fluxes = [f for f in field.flux_densities if f.origin == origin and f.spw_id in spws_plotted]
             if not fluxes:
                 continue
 

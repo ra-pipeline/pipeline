@@ -25,7 +25,7 @@ __all__ = [
     'VisResultTuple'
 ]
 
-LOG = logging.get_logger(__file__)
+LOG = logging.get_logger(__name__)
 
 # VisResultTuple is a data structure used by VDPTaskFactor to group
 # inputs and results.
@@ -232,6 +232,13 @@ class VDPTaskFactory(object):
         is_tier0_job = is_mpi_ready
 
         parallel_wanted = mpihelpers.parse_mpi_input_parameter(self.__inputs.parallel)
+
+        # PIPE-2114: always execute per-EB "SerialTasks" from the MPI client process in a single-EB
+        # data processing session.
+        if parallel_wanted and len(as_list(self.__inputs.vis)) == 1:
+            LOG.debug('Only a single EB is detected in the input vis list; switch to parallel=False '
+                      'to execute the task on the MPIclient.')
+            parallel_wanted = False
 
         if is_tier0_job and parallel_wanted:
             executable = mpihelpers.Tier0PipelineTask(self.__task, valid_args, self.__context_path)

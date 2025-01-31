@@ -68,7 +68,7 @@ class ImageLibrary(object):
 
 
 # This class contains information for image data product
-class ImageItem (object):
+class ImageItem:
     def __init__(self, imagename, sourcename, spwlist, specmode, sourcetype, multiterm=None, imageplot='',
                  metadata={}, imaging_params={},
                  org_direction=None):
@@ -79,7 +79,7 @@ class ImageItem (object):
         self.sourcetype = sourcetype
         self.multiterm = multiterm
         self.imageplot = imageplot
-        self._metadata = metadata
+        self.metadata = metadata
         self.imaging_params = imaging_params  # params used to create image. iterations dict w/imaging_params struct
         self.org_direction = org_direction
         self.version = 1

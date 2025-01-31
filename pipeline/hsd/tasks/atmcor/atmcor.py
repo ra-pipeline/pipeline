@@ -262,6 +262,7 @@ class SDATMCorrectionInputs(vdp.StandardInputs):
 
         return ','.join(pols)
 
+    # docstring and type hints: supplements hsd_atmcor
     def __init__(self,
                  context: Context,
                  atmtype: Optional[Union[int, str, List[int], List[str]]] = None,
@@ -278,18 +279,68 @@ class SDATMCorrectionInputs(vdp.StandardInputs):
 
         Args:
             context: pipeline context
-            atmtype: enumeration for atmospheric transmission model, or 'auto'
-            dtem_dh: temperature gradient [K/km]
-            h0: scale height for water [km]. Defaults to None.
+
+            atmtype: Type of atmospheric transmission model represented as an integer.
+                Available options are as follows. Integer values can be given as
+                either integer or string, i.e. both 1 and '1' are acceptable.
+
+                - 'auto': perform heuristics to choose best model (default).
+                - 1: tropical.
+                - 2: mid latitude summer.
+                - 3: mid latitude winter.
+                - 4: subarctic summer.
+                - 5: subarctic winter.
+
+                If list of integer is given, it also performs heuristics using the
+                provided values instead of default, [1, 2, 3, 4], which is used
+                when 'auto' is provided. List input should not contain 'auto'.
+
+                Default: None (equivalent to 'auto')
+
+            dtem_dh: Temperature gradient [K/km], e.g. -5.6 ("" = Tool default).
+                The value is directly passed to initialization method for ATM model.
+                Float and string types are acceptable. Float value is interpreted as
+                the value in K/km. String value should be the numeric value with unit
+                such as '-5.6K/km'. When list of values are given, it will
+                trigger heuristics to choose best model from the provided value.
+
+                Default: None (equivalent to tool default, -5.6K/km)
+
+            h0: Scale height for water [km], e.g. 2.0 ("" = Tool default).
+                The value is directly passed to initialization method for ATM model.
+                Float and string types are acceptable. Float value is interpreted as
+                the value in kilometer. String value should be the numeric value with
+                unit compatible with length, such as '2km' or '2000m'.
+                When list of values are given, it will trigger heuristics to
+                choose best model from the provided value.
+
+                Default: None (equivalent to tool default, 2.0km)
+
             maxalt: maximum altitude of the model [km]. Defaults to None.
-            infiles: MS selection. Defaults to None.
-            antenna: antenna selection. Defaults to None.
-            field: field selection. Defaults to None.
-            spw: spw selection. Defaults to None.
-            pol: polarization selection. Defaults to None.
+
+            infiles: ASDM or MS files to be processed. This parameter behaves as
+                data selection parameter. The name specified by infiles must be
+                registered to context before you run hsd_atmcor.
+
+            antenna: Data selection by antenna names or ids.
+
+                Example: 'PM03,PM04', '' (all antennas)
+
+            field: Data selection by field names or ids.
+
+                Example: '`*Sgr*,M100`', '' (all fields)
+
+            spw: Data selection by spw ids.
+
+                Example: '3,4' (spw 3 and 4), '' (all spws)
+
+            pol: Data selection by polarizations.
+
+                Example: 'XX,YY' (correlation XX and YY), '' (all polarizations)
+
             parallel: Execute using CASA HPC functionality, if available.
-                      Default is None, which intends to turn on parallel
-                      processing if possible.
+                Default is None, which intends to turn on parallel
+                processing if possible.
         """
         super().__init__()
 

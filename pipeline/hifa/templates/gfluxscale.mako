@@ -61,6 +61,16 @@ def rx_for_plot(plot):
 
 <%block name="title">Phased-up fluxscale</%block>
 
+<p>First, the gains are solved on the FLUX calibrator scan with the solution
+interval set to the integration time for the phase solves and to the scan time
+for the amplitude solves. The amplitude gain solutions are examined for obvious
+outliers introduced by gaincal and flagged prior to calling the fluxscale task
+to transfer the fluxscale to the transfer targets and populate their model
+column. The policy of using of 'T' amplitude solves, which pre-average the XX
+and YY data, effectively calibrates to the Stokes I flux densities measured by
+the ALMA calibrator survey program, and allows polarized calibrators to have
+differing flux densities in their calibrated XX and YY visibilities.</p>
+
 <h2>Contents</h2>
 <ul>
     <li>Tables:</li>
@@ -69,6 +79,9 @@ def rx_for_plot(plot):
             <li><a href="#adopted">Measurement sets using adopted flux calibrations</a></li>
         %endif
         <li><a href="#antennas">Antennas used for flux scaling</a></li>
+        % if flagtable:
+            <li><a href="#flagging">Flagging</a></li>
+        % endif
         <li><a href="#computed">Computed flux densities</a></li>
     </ul>
     <li>Plots:</li>
@@ -140,6 +153,29 @@ def rx_for_plot(plot):
 	</tbody>
 </table>
 
+% if flagtable:
+    <h3 id="flagging">Flagging</h3>
+    <table class="table table-bordered table-striped">
+        <caption>The temporary amplitude caltable(s) in this table are used only in this stage to derive flux scaling
+           factors, and are not registered to be applied to the measurement set(s).</caption>
+        <thead>
+            <tr>
+                <th>Temporary Caltable</th>
+                <th>Flagging Commands</th>
+                <th>Number of Statements</th>
+            </tr>
+        </thead>
+        <tbody>
+        % for msname, relpath in flagtable.items():
+            <tr>
+                <td>${msname}</td>
+                <td><a class="replace-pre" href="${relpath}">Flag commands file</a></td>
+                <td>${rendererutils.num_lines(os.path.join(pcontext.report_dir, relpath))}</td>
+            </tr>
+        % endfor
+        </tbody>
+    </table>
+% endif
 
 <h3 id="computed">Computed Flux Densities</h3>
 

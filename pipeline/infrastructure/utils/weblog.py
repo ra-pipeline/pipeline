@@ -14,6 +14,7 @@ import numpy as np
 from astropy.table import QTable
 
 from .conversion import flatten, spw_arg_to_id, to_pipeline_intent
+from .utils import list_to_str
 from .. import casa_tools, logging
 
 __all__ = ['OrderedDefaultdict', 'merge_td_columns', 'merge_td_rows', 'get_vis_from_plots', 'total_time_on_source',
@@ -182,7 +183,7 @@ def total_time_on_target_on_source(ms, autocorr_only=False):
                     if autocorr_only and a1 != a2:
                         continue
                     seltb = tb.query('DATA_DESC_ID == %d AND ANTENNA1 == %d AND ANTENNA2 == %d AND STATE_ID IN %s' % (
-                        dd, a1, a2, state_ids))
+                        dd, a1, a2, list_to_str(state_ids)))
                     try:
                         if seltb.nrows() == 0:
                             continue

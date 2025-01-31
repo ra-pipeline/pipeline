@@ -20,20 +20,30 @@ LOG = logging.get_logger(__name__)
 class VLASubPlotRenderer(object):
     # template = 'testdelays_plots.html'
 
-    def __init__(self, context, result, plots, json_path, template, filename_prefix):
+    def __init__(self, context, result, plots, json_path, template, filename_prefix, band, spw, allbands):
         self.context = context
         self.result = result
         self.plots = plots
         self.ms = os.path.basename(self.result.inputs['vis'])
         self.template = template
         self.filename_prefix = filename_prefix
+        self.band = band
+        self.spw = spw
+        self.allbands = allbands
 
         self.summary_plots = {}
         self.swpowspgain_subpages = {}
         self.swpowtsys_subpages = {}
 
-        self.swpowspgain_subpages[self.ms] = filenamer.sanitize('spgain' + '-%s.html' % self.ms)
-        self.swpowtsys_subpages[self.ms] = filenamer.sanitize('tsys' + '-%s.html' % self.ms)
+        # PIPE-1755: Links for the subpages at the top of each sub-rendering page
+        for bandname in allbands:
+            subpage = dict()
+            subpage[self.ms] = filenamer.sanitize('spgain-{!s}-band'.format(bandname) + '-%s.html' % self.ms)
+            self.swpowspgain_subpages[bandname] = subpage
+
+            subpage = dict()
+            subpage[self.ms] = filenamer.sanitize('tsys-{!s}-band'.format(bandname) + '-%s.html' % self.ms)
+            self.swpowtsys_subpages[bandname] = subpage
 
         if os.path.exists(json_path):
             with open(json_path, 'r') as json_file:
@@ -106,6 +116,10 @@ class T2_4MDetailspriorcalsRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             spw[ms] = result.oc_result.spw.split(',')
             center_frequencies[ms] = result.oc_result.center_frequencies
             opacities[ms] = result.oc_result.opacities
+            # PIPE-2184: plot data points only for science scans
+            m = context.observing_run.get_ms(ms)
+            science_scan_ids = ','.join(str(scan.id) for scan in m.scans
+                                        if not {'SYSTEM_CONFIGURATION', 'UNSPECIFIED#UNSPECIFIED', 'FOCUS', 'POINTING'} & scan.intents)
 
             plotter = opacitiesdisplay.opacitiesSummaryChart(context, result)
             plots = plotter.plot()
@@ -116,33 +130,53 @@ class T2_4MDetailspriorcalsRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             ms = os.path.basename(result.inputs['vis'])
             summary_plots[ms] = None
 
-            # generate switched power plots and JSON file
-            plotter = swpowdisplay.swpowPerAntennaChart(context, result, 'spgain')
-            if result.sw_result.final:
-                plots = plotter.plot()
-            else:
-                plots = None
-            json_path = plotter.json_filename
+            # PIPE-1755: Plot one SPW per baseband to speedup hifv_priorcals
+            m = context.observing_run.get_measurement_sets(ms)[0]
+            banddict = m.get_vla_baseband_spws(science_windows_only=True, return_select_list=False, warning=False)
+            spwstouse = ''
+            allbands = list(banddict.keys())
+            for band in banddict:
+                selectspw = []
+                selectbasebands = []
+                for baseband in banddict[band]:
+                    # select a SPW from a baseband
+                    if banddict[band][baseband]:
+                        ispw = int(len(banddict[band][baseband]) / 2)
+                        for key, value in banddict[band][baseband][ispw].items():
+                            selectspw.append(str(key))
+                        selectbasebands.append(baseband)
+                        spwstouse = ','.join(selectspw)
 
-            # write the html for each MS to disk
-            renderer = VLASubPlotRenderer(context, result, plots, json_path, 'swpow_plots.mako', 'spgain')
-            with renderer.get_file() as fileobj:
-                fileobj.write(renderer.render())
-                swpowspgain_subpages[ms] = renderer.filename
+                # generate switched power plots and JSON file
+                plotter = swpowdisplay.swpowPerAntennaChart(context, result, 'spgain', science_scan_ids, band, selectbasebands, spwstouse)
+                if result.sw_result.final:
+                    plots = plotter.plot()
+                else:
+                    plots = None
+                json_path = plotter.json_filename
 
-            # generate switched power plots and JSON file
-            plotter = swpowdisplay.swpowPerAntennaChart(context, result, 'tsys')
-            if result.sw_result.final:
-                plots = plotter.plot()
-            else:
-                plots = None
-            json_path = plotter.json_filename
+                # write the html for each MS to disk
+                renderer = VLASubPlotRenderer(context, result, plots, json_path, 'swpow_plots.mako', 'spgain-{!s}-band'.format(band), band, spw, allbands)
+                with renderer.get_file() as fileobj:
+                    fileobj.write(renderer.render())
+                    swpowspgain_subpages_band = dict()
+                    swpowspgain_subpages_band[ms] = renderer.filename
+                    swpowspgain_subpages[band] = swpowspgain_subpages_band
+                # generate switched power plots and JSON file
+                plotter = swpowdisplay.swpowPerAntennaChart(context, result, 'tsys', science_scan_ids, band, selectbasebands, spwstouse)
+                if result.sw_result.final:
+                    plots = plotter.plot()
+                else:
+                    plots = None
+                json_path = plotter.json_filename
 
-            # write the html for each MS to disk
-            renderer = VLASubPlotRenderer(context, result, plots, json_path, 'swpow_plots.mako', 'tsys')
-            with renderer.get_file() as fileobj:
-                fileobj.write(renderer.render())
-                swpowtsys_subpages[ms] = renderer.filename
+                # write the html for each MS to disk
+                renderer = VLASubPlotRenderer(context, result, plots, json_path, 'swpow_plots.mako', 'tsys-{!s}-band'.format(band), band, spw, allbands)
+                with renderer.get_file() as fileobj:
+                    fileobj.write(renderer.render())
+                    swpowtsys_subpages_band = dict()
+                    swpowtsys_subpages_band[ms] = renderer.filename
+                    swpowtsys_subpages[band] = swpowtsys_subpages_band
 
             # Plot already generated by tec_maps CASA recipe
             # Use plot name saved in the tec_maps results and move to appropriate pipeline context weblog

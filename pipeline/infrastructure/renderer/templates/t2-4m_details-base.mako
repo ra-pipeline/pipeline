@@ -74,17 +74,22 @@ from pipeline.infrastructure.pipelineqa import WebLogLocation, scores_with_locat
             <h5>${group_name}</h5>
         % endif
 
-        <div class="row">
-            % if plots_in_row is not None:
+        % if plots_in_row is not None:
+            % for plot_counter, plot in enumerate(rendererutils.sort_row_by(plots_in_row, sort_row_by)):
+            % if plot_counter // 4 > 0 and plot_counter % 4 == 0:
+            </div>
+            % endif
+            % if plot_counter % 4 == 0:
+            <div class="row">
+            % endif
 
-            % for plot in rendererutils.sort_row_by(plots_in_row, sort_row_by):
             <%
                 intent = plot.parameters.get('intent', 'No intent')
                 if isinstance(intent, list):
                     intent = utils.commafy(intent, quotes=False)
                 intent = intent.upper()
             %>
-            <div class="col-md-3 col-sm-4">
+            <div class="col-md-3">
                 % if os.path.exists(plot.thumbnail):
                 <%
                     fullsize_relpath = os.path.relpath(plot.abspath, pcontext.report_dir)
@@ -178,8 +183,8 @@ from pipeline.infrastructure.pipelineqa import WebLogLocation, scores_with_locat
                 % endif
             </div>
             % endfor
-            % endif
         </div><!-- end row -->
+        % endif
         % endfor
 
     % endfor
@@ -255,7 +260,7 @@ if len(optimal_scores) > 0:
                         <u><i><b>All QA Scores (${', '.join(score_color_counts)})</b></i></u>
                         </a>
                     % else:
-                        QA Score: &nbsp; N/A &nbsp;
+                        QA Score: &nbsp; N/A &nbsp; ${representative_score.longmsg if representative_score.shortmsg!='No QA' else ''}
                         <a data-toggle="collapse" data-parent="#qa-details-accordion" href="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
                         <u><i><b>All QA Scores (${', '.join(score_color_counts)})</b></i></u>
                         </a>
@@ -267,7 +272,7 @@ if len(optimal_scores) > 0:
                         </tr>
                     % else:
                         <tr class="${representative_score_render_class}">
-                        QA Score: &nbsp; N/A
+                        QA Score: &nbsp; N/A &nbsp; ${representative_score.longmsg if representative_score.shortmsg!='No QA' else ''}
                         </tr>
                     % endif
                 % endif

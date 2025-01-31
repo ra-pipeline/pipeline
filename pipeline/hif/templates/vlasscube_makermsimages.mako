@@ -2,6 +2,13 @@
 rsc_path = ""
 import os
 import pipeline.infrastructure.renderer.htmlrenderer as hr
+
+
+def is_rejected(keep):
+    desc=''
+    if not keep:
+        desc = ' <a style="color:red">rejected</a>'
+    return desc
 %>
 
 <%
@@ -189,9 +196,10 @@ $(function () {
                 cell_style.append('border-bottom: '+border_line)          
             cell_style='style="{}"'.format(('; ').join(cell_style))
             cell_title=''                    
+            reject_desc=is_rejected(info_dict.get(stats_per_spw['virtspw'],True))
             %> 
 
-            <td ${cell_style}><b>${stats_per_spw['virtspw']}</b></td>
+            <td ${cell_style}><b>${stats_per_spw['virtspw']} ${reject_desc}</b></td>
             % for idx_pol,name_pol in enumerate(['I','Q','U','V']):
                 % for item, cmap in [('Max','Reds'),('Min','Oranges'),('Mean','Greens'),('Median','Blues'),('Sigma','Purples'),('MADrms','Greys')]:
                     <%
@@ -239,6 +247,8 @@ $(function () {
 
         <%def name="caption_title(plot)">
            Spw: ${plot.parameters['virtspw']} Stokes: ${plot.parameters['stokes']}
+           <br>
+           ${is_rejected(info_dict.get(plot.parameters['virtspw'],True))} 
         </%def>
 
 </%self:plot_group>

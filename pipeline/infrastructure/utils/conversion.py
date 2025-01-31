@@ -8,7 +8,6 @@ user.
 import collections
 import decimal
 import math
-import numpy as np
 import os
 import re
 import string
@@ -17,8 +16,11 @@ from datetime import datetime, timedelta
 from numbers import Number
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, Union, Iterable
 
+import astropy.units as u
 import cachetools
+import numpy as np
 import pyparsing
+from astropy.coordinates import SkyCoord
 
 from .. import casa_tools, logging
 
@@ -26,7 +28,7 @@ LOG = logging.get_logger(__name__)
 
 __all__ = ['commafy', 'flatten', 'mjd_seconds_to_datetime', 'get_epoch_as_datetime', 'range_to_list', 'to_CASA_intent',
            'to_pipeline_intent', 'field_arg_to_id', 'spw_arg_to_id', 'ant_arg_to_id', 'safe_split', 'dequote',
-           'format_datetime', 'format_timedelta']
+           'format_datetime', 'format_timedelta', 'record_to_quantity']
 
 # By default we use CASA to parse arguments into spw/field/ant IDs. However, this
 # requires access to the data. Setting this property to False uses the pipeline's
@@ -45,6 +47,7 @@ class LoggingLRUCache(cachetools.LRUCache):
     tens of milliseconds. Hence, we want to be notified when the cache size
     limit is hit.
     """
+
     def __init__(self, name: str, *args, **kwargs):
         self.name = name
         super().__init__(*args, **kwargs)
@@ -690,3 +693,66 @@ def _parse_antenna(task_arg: Optional[str], antennas: Optional[Dict[str, np.ndar
                 results.add(ant)
 
     return sorted(list(results))
+
+
+def record_to_quantity(record: Union[Dict, List[Dict], Tuple[Dict]]) -> Union[u.Quantity, List[u.Quantity], Tuple[u.Quantity]]:
+    """Convert a CASA record to an Astropy quantity.
+
+    Optionally, the input can be a list/tuple in which each element is a CASA record.
+    """
+
+    if isinstance(record, (list, tuple)):
+        quantities = [record_to_quantity(r) for r in record]
+        if isinstance(record, tuple):
+            return tuple(quantities)
+        return quantities
+
+    return record['value'] * u.Unit(record['unit'])
+
+
+def phasecenter_to_skycoord(phasecenter):
+    """Convert a CASA-style coordinate string to an Astropy SkyCoord object."""
+
+    phasecenter_list = phasecenter.split()
+    if len(phasecenter_list) == 2:
+        ra = phasecenter_list[0]
+        dec = phasecenter_list[1]
+        refcode = 'icrs'
+    elif len(phasecenter_list) == 3:
+        ra = phasecenter_list[1]
+        dec = phasecenter_list[2]
+        refcode = phasecenter_list[0]
+    else:
+        LOG.error('cannot parse the phasecenter string %s', phasecenter)
+        return
+
+    dec = dec.replace('.', ':', 2)
+    frame = refcode_to_skyframe(refcode)
+    coord = SkyCoord(ra, dec, unit=(u.hourangle, u.deg), frame=frame)
+
+    return coord
+
+
+def refcode_to_skyframe(refcode):
+    """Conver a CASA coordsysy refcode to an Astropy SkyCoord frame name.
+    
+    Limitations:
+    
+    Currently, it only handles the common cases, e.g. J2000, B1950, ICRS
+    
+    To get a list of built-in astropy.coordinates frame names:
+        from astropy.coordinates import frame_transform_graph
+        print(frame_transform_graph.get_name())
+    To get a list of CASA csys reference code:
+        csys = cs.newcoordsys(direction=True)
+        clist = csys.referencecode('dir', True)
+    
+    """
+
+    frame = refcode.lower()
+    if frame == 'j2000':
+        frame = 'fk5'
+    if frame == 'b1950':
+        frame = 'fk4'
+
+    return frame

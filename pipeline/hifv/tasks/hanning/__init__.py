@@ -5,6 +5,7 @@ import pipeline.infrastructure.renderer.weblog as weblog
 
 from .hanning import Hanning
 from . import hanning
+from . import renderer
 
 # from . import qa
 
@@ -13,6 +14,6 @@ from . import hanning
 # qaadapter.registry.register_to_dataset_topic(hanning.HanningResults)
 
 weblog.add_renderer(Hanning,
-                    basetemplates.T2_4MDetailsDefaultRenderer(uri='hanning.mako',
+                    renderer.T2_4DetailsHanningRenderer(uri='hanning.mako',
                                                               description='VLA Hanning Smoothing'),
                     group_by=weblog.UNGROUPED)

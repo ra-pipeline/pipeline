@@ -3,14 +3,13 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
+# docstring and type hints: inherits from hifa.tasks.spwphaseup.spwphaseup.SpwPhaseupInputs.__init__
 @utils.cli_wrapper
 def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, hm_spwmapmode=None, maxnarrowbw=None,
                     minfracmaxbw=None, samebb=None, phasesnr=None, bwedgefrac=None, hm_nantennas=None,
                     maxfracflagged=None, combine=None, refant=None, minblperant=None, minsnr=None,
                     unregister_existing=None):
-    """
-    hifa_spwphaseup ---- Compute phase calibration spw map and per spw phase offsets
-
+    """Compute phase calibration spw map and per spw phase offsets
 
     The spw map for phase calibration is computed. Phase offsets as a function of
     spectral window are computed using high signal-to-noise calibration observations.
@@ -79,116 +78,19 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
     on a per-spw basis does not reach specific thresholds, then issue a warning and reduced
     QA score, with thresholds at ``phasesnr`` *0.75 (blue), *0.5 (yellow) and *0.33 (red).
 
-    Output:
+    Returns:
+        The results object for the pipeline task is returned.
 
-        results -- The results object for the pipeline task is returned.
+    Examples:
+        1. Compute the default spectral window map and the per spectral window phase
+        offsets:
 
-    --------- parameter descriptions ---------------------------------------------
+        >>> hifa_spwphaseup()
 
-    vis
-                        The list of input MeasurementSets. Defaults to the list of
-                        MeasurementSets specified in the pipeline context.
+        2. Compute the default spectral window map and the per spectral window phase
+        offsets set the spectral window mapping mode to 'simple':
 
-                        Example: vis=['M82A.ms', 'M82B.ms']
-    caltable
-                        The list of output calibration tables. Defaults to the standard
-                        pipeline naming convention.
-
-                        Example: caltable=['M82.gcal', 'M82B.gcal']
-    field
-                        The list of field names or field ids for which phase offset solutions
-                        are to be computed. Defaults to all fields with the default intent.
-
-                        Example: field='3C279', field='3C279, M82'
-    intent
-                        A string containing a comma delimited list of intents against
-                        which the selected fields are matched. Defaults to the BANDPASS
-                        observations.
-
-                        Example: intent='PHASE'
-    spw
-                        The list of spectral windows and channels for which gain solutions are
-                        computed. Defaults to all the science spectral windows.
-
-                        Example: spw='13,15'
-    hm_spwmapmode
-                        The spectral window mapping mode. The options are: 'auto',
-                        'combine', 'simple', and 'default'. In 'auto' mode hifa_spwphaseup
-                        estimates the SNR of the phase calibrator observations and uses these
-                        estimates to choose between 'combine' mode (low SNR) and 'default' mode
-                        (high SNR). In combine mode all spectral windows are combined and mapped to
-                        one spectral window. In 'simple' mode narrow spectral windows are mapped to
-                        wider ones using an algorithm defined by 'maxnarrowbw', 'minfracmaxbw', and
-                        'samebb'. In 'default' mode the spectral window map defaults to the
-                        standard one to one mapping.
-
-                        Example: hm_spwmapmode='combine'
-    maxnarrowbw
-                        The maximum bandwidth defining narrow spectral windows. Values
-                        must be in CASA compatible frequency units.
-
-                        Example: maxnarrowbw=''
-    minfracmaxbw
-                        The minimum fraction of the maximum bandwidth in the set of
-                        spws to use for matching.
-
-                        Example: minfracmaxbw=0.75
-    samebb
-                        Match within the same baseband if possible.
-
-                        Example: samebb=False
-    phasesnr
-                        The required gaincal solution signal-to-noise.
-
-                        Example: phaseupsnr=20.0
-    bwedgefrac
-                        The fraction of the bandwidth edges that is flagged.
-
-                        Example: bwedgefrac=0.0
-    hm_nantennas
-                        The heuristics for determines the number of antennas to use
-                        in the signal-to-noise estimate. The options are 'all' and 'unflagged'.
-                        The 'unflagged' options is not currently supported.
-
-                        Example: hm_nantennas='unflagged'
-    maxfracflagged
-                        The maximum fraction of an antenna that can be flagged
-                        before it is excluded from the signal-to-noise estimate.
-
-                        Example: maxfracflagged=0.80
-    combine
-                        Data axes to combine for solving. Options are '', 'scan', 'spw',
-                        'field' or any comma-separated combination.
-
-                        Example: combine=''
-    refant
-                        Reference antenna name(s) in priority order. Defaults to most recent
-                        values set in the pipeline context.  If no reference antenna is defined in
-                        the pipeline context the CASA defaults are used.
-
-                        Example: refant='DV01', refant='DV05,DV07'
-    minblperant
-                        Minimum number of baselines required per antenna for each solve.
-                        Antennas with fewer baselines are excluded from solutions.
-
-                        Example: minblperant=2
-    minsnr
-                        Solutions below this SNR are rejected.
-    unregister_existing
-                        Unregister previous spwphaseup calibrations from the pipeline context
-                        before registering the new calibrations from this task.
-
-    --------- examples -----------------------------------------------------------
-
-    1. Compute the default spectral window map and the per spectral window phase
-    offsets:
-
-    >>> hifa_spwphaseup()
-
-    2. Compute the default spectral window map and the per spectral window phase
-    offsets set the spectral window mapping mode to 'simple':
-
-    >>> hifa_spwphaseup(hm_spwmapmode='simple')
+        >>> hifa_spwphaseup(hm_spwmapmode='simple')
 
     """
     ##########################################################################

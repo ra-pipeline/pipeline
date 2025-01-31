@@ -31,7 +31,20 @@ class TargetflagResults(basetask.Results):
 
 
 class TargetflagInputs(vdp.StandardInputs):
+    # docstring and type hints: supplements hifa_targetflag
     def __init__(self, context, vis=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            vis: The list of input MeasurementSets. Defaults to the list of
+                MeasurementSets specified in the h_init or hif_importdata task.
+                '': use all MeasurementSets in the context
+
+                Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
+
+        """
         self.context = context
         self.vis = vis
 
@@ -77,7 +90,7 @@ class Targetflag(basetask.StandardTaskTemplate):
                 context=inputs.context, vis=inputs.vis, intent='TARGET', flagsum=False, flagbackup=False)
             actask = applycal.SerialIFApplycal(acinputs)
             acresult = self._executor.execute(actask, merge=True)
-            # copy across the vis:callibrary dict to our result. This dict 
+            # copy across the vis:callibrary dict to our result. This dict
             # will be inspected by the renderer to know if/which callibrary
             # files should be copied across to the weblog stage directory
             result.callib_map.update(acresult.callib_map)

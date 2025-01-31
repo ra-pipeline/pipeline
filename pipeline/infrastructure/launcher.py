@@ -8,21 +8,16 @@ import pickle
 import pprint
 from typing import Dict, Optional
 
-from pipeline import environment
-from . import callibrary
-from . import casa_tools
-from . import eventbus
-from . import imagelibrary
-from . import logging
-from . import project
-from . import utils
+from pipeline import domain, environment
+
+from . import (callibrary, casa_tools, eventbus, imagelibrary, logging,
+               project, utils)
 from .eventbus import ContextCreatedEvent, ContextResumedEvent
 
 LOG = logging.get_logger(__name__)
 
-
 # minimum allowed CASA revision. Set to 0 or None to disable
-MIN_CASA_REVISION = [6, 5, 4, 7]
+MIN_CASA_REVISION = [6, 6, 1, 17]
 # maximum allowed CASA revision. Set to 0 or None to disable
 MAX_CASA_REVISION = None
 
@@ -110,8 +105,13 @@ class Context(object):
     .. py:attribute:: selfcal_resources
 
         list of files/tables required for the self-calibration restoration
+    
+    .. py:attribute:: vla_skip_mfs_and_cube_imaging
 
+        skips the following stages for VLA: hif_makeimlist (mfs, cube),
+        hif_findcont, hif_uvcontsub, hif_makeimages(mfs, cube)
     """
+
     def __init__(self, name: Optional[str] = None):
         if name is None:
             # initialise the context name with something reasonable: a current
@@ -120,9 +120,6 @@ class Context(object):
             name = now.strftime('pipeline-%Y%m%dT%H%M%S')
         self.name = name
 
-        # domain depends on infrastructure.casa_tools, so infrastructure cannot
-        # depend on domain hence the run-time import
-        import pipeline.domain as domain
         self.observing_run = domain.ObservingRun()
 
         self.callibrary = callibrary.CalLibrary(self)
@@ -200,7 +197,7 @@ class Context(object):
             pickle.dump(self, context_file, protocol=-1)
 
     def __str__(self):
-        ms_names = [ms.name 
+        ms_names = [ms.name
                     for ms in self.observing_run.measurement_sets]
         return ('Context(name=\'{0}\', output_dir=\'{1}\')\n'
                 'Registered measurement sets:\n{2}'
@@ -255,6 +252,15 @@ class Context(object):
             return ''
         else:
             return ps.recipe_name
+
+    @property
+    def vla_skip_mfs_and_cube_imaging(self) -> bool:
+        """Check the stage skipping condition for the VLA specmode=mfs/cube imaging workflow."""
+
+        ms_list = self.observing_run.get_measurement_sets_of_type([domain.datatype.DataType.REGCAL_CONTLINE_SCIENCE], msonly=True)
+        telescope = self.project_summary.telescope
+
+        return 'VLA' in telescope.upper() and not ms_list
 
 
 class Pipeline(object):
@@ -331,16 +337,16 @@ class Pipeline(object):
 
         self._link_casa_log(self.context)
 
-        # define the plot level as a global setting rather than on the 
+        # define the plot level as a global setting rather than on the
         # context, as we want it to be a session-wide setting and adjustable
-        # mid-session for interactive use. 
-        import pipeline.infrastructure as infrastructure 
+        # mid-session for interactive use.
+        import pipeline.infrastructure as infrastructure
         infrastructure.set_plot_level(plotlevel)
 
     def _link_casa_log(self, context):
         report_dir = context.report_dir
 
-        # create a hard-link to the current CASA log in the report directory 
+        # create a hard-link to the current CASA log in the report directory
         src = casa_tools.log.logfile()
         dst = os.path.join(report_dir, os.path.basename(src))
         if not os.path.exists(dst):
@@ -357,7 +363,7 @@ class Pipeline(object):
         # the web log creates links to each casa log. The name of each CASA
         # log is appended to the context.
         if 'casalogs' not in context.logs:
-            # list as one casa log will be created per CASA session 
+            # list as one casa log will be created per CASA session
             context.logs['casalogs'] = []
         if src not in context.logs['casalogs']:
             context.logs['casalogs'].append(os.path.basename(dst))
@@ -371,18 +377,18 @@ class Pipeline(object):
 
         # .. and from these matches, create a dict mapping files to their
         # modification timestamps, ..
-        name_n_timestamp = dict([(f, os.stat(directory+f).st_mtime) 
+        name_n_timestamp = dict([(f, os.stat(directory+f).st_mtime)
                                  for f in files])
 
         # .. then return the file with the most recent timestamp
         return max(name_n_timestamp, key=name_n_timestamp.get)
 
     def __repr__(self):
-        ms_names = [ms.name 
+        ms_names = [ms.name
                     for ms in self.context.observing_run.measurement_sets]
         return 'Pipeline({0})'.format(ms_names)
 
     def close(self):
         filename = self.context.name
-        with open(filename, 'r+b') as session:            
+        with open(filename, 'r+b') as session:
             pickle.dump(self.context, session, protocol=-1)

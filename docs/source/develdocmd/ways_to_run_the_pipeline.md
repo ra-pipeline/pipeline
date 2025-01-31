@@ -181,7 +181,7 @@ Two [recommended](https://open-jira.nrao.edu/browse/PIPE-72?focusedCommentId=140
 
 ```python
 import json, pystache
-with open('srdp_examples/example4_hifa_cubeimage_selfcal.json') as f_json, open('template_hifa_cubeimage.xml') as f_template:
+with open('pipeline/recipes/tests/test_hifa_cubeimage.json') as f_json, open('template_hifa_cubeimage.xml') as f_template:
     d = json.load(f_json)
     t = f_template.read()
     with open('recipe.xml', 'w') as out:

@@ -132,8 +132,9 @@ class SDExportData(exportdata.ExportData):
         if auxfproducts is not None or pipe_aqua_reportfile is not None:
             manifest_file = os.path.join(self.inputs.context.products_dir,
                                          results.manifest)
+            recipe_name = self.inputs.context.project_structure.recipe_name
             self._add_to_manifest(manifest_file, auxfproducts, auxcaltables,
-                                  auxcalapplys, pipe_aqua_reportfile, oussid)
+                                  auxcalapplys, pipe_aqua_reportfile, oussid, recipe_name)
 
         return results
 

@@ -34,7 +34,7 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
         """Tclean deconvolver parameter heuristics."""
         return 'mtmfs'
 
-    def robust(self) -> float:
+    def robust(self, specmode=None) -> float:
         """Tclean robust parameter heuristics."""
         return 1.0
 
@@ -47,7 +47,7 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
         return ['1.0arcsec']
 
     def imsize(self, fields=None, cell=None, primary_beam=None, sfpblimit=None, max_pixels=None, centreonly=None,
-               vislist=None, spwspec=None, intent: str = '', joint_intents: str = '') -> Union[list, int]:
+               vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None) -> Union[list, int]:
         """Tclean imsize parameter heuristics."""
         return [7290, 7290]
 
@@ -55,19 +55,27 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
         """Tclean reffreq parameter heuristics."""
         return '3.0GHz'
 
-    def cyclefactor(self, iteration: int) -> float:
+    def cyclefactor(self, iteration: int, field=None, intent=None, specmode=None, iter0_dirty_dynamic_range=None) -> float:
         """Tclean cyclefactor parameter heuristics."""
         if iteration == 0:
             return 1.
         else:
             return 2.
 
-    def cycleniter(self, iteration: int ) -> int:
+    def cycleniter(self, iteration: int) -> int:
         """Tclean cycleniter parameter heuristics."""
         if iteration == 0:
             return -1
         else:
             return 500
+
+    def nmajor(self, iteration: int) -> Union[None, int]:
+        """Tclean nmajor parameter heuristics."""
+        if iteration == 0:
+            return None
+        else:
+            # PIPE-1745: default value of nmajor=220 for all editimlist stages of the VLASS QL/SE imaging workflow
+            return 220
 
     def scales(self, iteration: Union[int, None] = None) -> list:
         """Tclean scales parameter heuristics."""
@@ -77,7 +85,7 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
         """Tclean uvtaper parameter heuristics."""
         return []
 
-    def uvrange(self, field=None, spwspec=None) -> tuple:
+    def uvrange(self, field=None, spwspec=None, specmode=None) -> tuple:
         """Tclean uvrange parameter heuristics."""
         return None, None
 
@@ -112,7 +120,7 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
         return False
 
     def get_sensitivity(self, ms_do, field, intent, spw, chansel, specmode, cell, imsize, weighting, robust, uvtaper):
-        return 0.0, None, None
+        return 0.0, None, None, None
 
     def savemodel(self, iteration: int) -> str:
         """Tclean savemodel parameter heuristics."""

@@ -1,5 +1,4 @@
 """Worker task for baseline subtraction."""
-import abc
 import numpy
 import os
 
@@ -12,7 +11,7 @@ from pipeline.infrastructure.utils import relative_path
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataTable, DataType
 from pipeline.h.heuristics import caltable as caltable_heuristic
-from pipeline.hsd.heuristics import CubicSplineFitParamConfig
+from pipeline.hsd.heuristics import BaselineFitParamConfig
 from pipeline.hsd.tasks.common import utils as sdutils
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
@@ -23,130 +22,18 @@ from ..common import utils
 if TYPE_CHECKING:
     import numpy as np
 
-    from pipeline.infrastructure.api import Heuristic
     from pipeline.infrastructure.launcher import Context
     from pipeline.hsd.tasks.common.utils import RGAccumulator
 
 LOG = infrastructure.get_logger(__name__)
 
 
-class BaselineSubtractionInputsBase(vdp.StandardInputs):
-    """Base class of inputs for baseline subtraction task."""
-
-    # Search order of input vis
-    processing_data_type = [DataType.ATMCORR, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+class BaselineSubtractionWorkerInputs(vdp.StandardInputs):
+    """Inputs class for baseline subtraction tasks."""
 
     DATACOLUMN = {'CORRECTED_DATA': 'corrected',
                   'DATA': 'data',
                   'FLOAT_DATA': 'float_data'}
-
-    @vdp.VisDependentProperty
-    def colname(self) -> str:
-        """Return name of existing data column in MS.
-
-        The following column names are examined in order, and return
-        the name if the column exists in MS. If multiple columns exist,
-        the following list shows the priority.
-
-            - CORRECTED_DATA
-            - DATA
-            - FLOAT_DATA
-
-        For example, if MS has CORRECTED_DATA and DATA columns,
-        CORRECTED_DATA will be returned.
-
-        Returns:
-            Data column name
-        """
-        colname = ''
-        if isinstance(self.vis, str):
-            with casa_tools.TableReader(self.vis) as tb:
-                candidate_names = ['CORRECTED_DATA',
-                                   'DATA',
-                                   'FLOAT_DATA']
-                for name in candidate_names:
-                    if name in tb.colnames():
-                        colname = name
-                        break
-        return colname
-
-    def to_casa_args(self) -> dict:
-        """Convert Inputs instance to the list of keyword arguments for sdbaseline.
-
-        Note that core parameters such as blfunc will be set dynamically through
-        the heuristics or inside task.
-
-        Returns:
-            Keyword arguments for sdbaseline
-        """
-        args = super(BaselineSubtractionInputsBase, self).to_casa_args()  # {'vis': self.vis}
-        prefix = os.path.basename(self.vis.rstrip('/'))
-
-        # blparam
-        if self.blparam is None or len(self.blparam) == 0:
-            args['blparam'] = relative_path(os.path.join(self.output_dir, prefix + '_blparam.txt'))
-        else:
-            args['blparam'] = self.blparam
-
-        # baseline caltable filename
-        if self.bloutput is None or len(self.bloutput) == 0:
-            namer = caltable_heuristic.SDBaselinetable()
-            bloutput = relative_path(namer.calculate(output_dir=self.output_dir,
-                                                            stage=self.context.stage,
-                                                            **args))
-            args['bloutput'] = bloutput
-        else:
-            args['bloutput'] = self.bloutput
-
-        # outfile
-        if ('outfile' not in args or
-                args['outfile'] is None or
-                len(args['outfile']) == 0):
-            args['outfile'] = relative_path(os.path.join(self.output_dir, prefix + '_bl'))
-
-        args['datacolumn'] = self.DATACOLUMN[self.colname]
-
-        return args
-
-
-class BaselineSubtractionResults(common.SingleDishResults):
-    """Results class to hold the result of baseline subtraction."""
-
-    def __init__(self,
-                 task: Optional[Type[basetask.StandardTaskTemplate]] = None,
-                 success: Optional[bool] = None,
-                 outcome: Any = None) -> None:
-        """Construct BaselineSubtractionResults instance.
-
-        Args:
-            task: Task class that produced the result.
-            success: Whether task execution is successful or not.
-            outcome: Outcome of the task execution.
-        """
-        super(BaselineSubtractionResults, self).__init__(task, success, outcome)
-
-    def merge_with_context(self, context: 'Context') -> None:
-        """Merge result instance into context.
-
-        No specific merge operation is done.
-
-        Args:
-            context: Pipeline context.
-        """
-        super(BaselineSubtractionResults, self).merge_with_context(context)
-
-    def _outcome_name(self) -> str:
-        """Return string representation of outcome.
-
-        Returns:
-            Name of the blparam file with its format
-        """
-        # outcome should be a name of blparam text file
-        return 'blparam: "%s" bloutput: "%s"' % (self.outcome['blparam'], self.outcome['bloutput'])
-
-
-class BaselineSubtractionWorkerInputs(BaselineSubtractionInputsBase):
-    """Inputs class for baseline subtraction tasks."""
 
     # Search order of input vis
     processing_data_type = [DataType.ATMCORR, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
@@ -155,6 +42,7 @@ class BaselineSubtractionWorkerInputs(BaselineSubtractionInputsBase):
 
     vis = vdp.VisDependentProperty(default='', null_input=['', None, [], ['']])
     plan = vdp.VisDependentProperty(default=None)
+    fit_func = vdp.VisDependentProperty(default='cspline')
     fit_order = vdp.VisDependentProperty(default='automatic')
     switchpoly = vdp.VisDependentProperty(default=True)
     edge = vdp.VisDependentProperty(default=(0, 0))
@@ -249,11 +137,43 @@ class BaselineSubtractionWorkerInputs(BaselineSubtractionInputsBase):
         """
         return self.plan.get_channelmap_range_list()
 
+    @vdp.VisDependentProperty
+    def colname(self) -> str:
+        """Return name of existing data column in MS.
+
+        Scan through the column names in the MS, and return the most
+        'significant' one found from the following list.
+
+            - CORRECTED_DATA
+            - DATA
+            - FLOAT_DATA
+
+        For example, if MS has CORRECTED_DATA and DATA columns,
+        CORRECTED_DATA will be returned.
+
+        Returns a null string if none of them exist.
+
+        Returns:
+            Data column name
+        """
+        colname = ''
+        if isinstance(self.vis, str):
+            with casa_tools.TableReader(self.vis) as tb:
+                candidate_names = ['CORRECTED_DATA',
+                                   'DATA',
+                                   'FLOAT_DATA']
+                for name in candidate_names:
+                    if name in tb.colnames():
+                        colname = name
+                        break
+        return colname
+
     def __init__(
         self,
         context: 'Context',
         vis: Optional[Union[str, List[str]]] = None,
         plan: Optional[Union['RGAccumulator', List['RGAccumulator']]] = None,
+        fit_func: Optional[str] = None,
         fit_order: Optional[int] = None,
         switchpoly: Optional[bool] = None,
         edge: Optional[List[int]] = None,
@@ -272,10 +192,20 @@ class BaselineSubtractionWorkerInputs(BaselineSubtractionInputsBase):
             plan: Set of metadata for baseline subtraction, or List of
                   the them. Defaults to None. The task may fail if None
                   is given.
-            fit_order: Baseline fitting order. Defaults to None, which
-                       is to perform heuristics for fitting order.
-            switchpoly: Whther or not fall back to low order polynomial
-                        fit when large mask exist at the edge of spw.
+            fit_func: Fitting function for baseline subtraction. You can choose
+                      either cubic spline ('spline' or 'cspline') or polynomial
+                      ('poly' or 'polynomial'). Default is 'cspline'.
+            fit_order: Fitting order for polynomial. For cubic spline, it is used to determine
+                       how much the spectrum is segmented into. None is equivalent to 'automatic'.
+                       Default ('automatic') is to determine the order automatically.
+            switchpoly: Whether to fall back the fits from cubic spline to 1st or
+                        2nd order polynomial when large masks exist at the edges
+                        of the spw. Condition for switching is as follows:
+                            if nmask > nchan/2      => 1st order polynomial
+                            else if nmask > nchan/4 => 2nd order polynomial
+                            else                    => use fitfunc and fitorder
+                        where nmask is a number of channels for mask at edge while
+                        nchan is a number of channels of entire spectral window.
                         Defaults to True if None is given.
             edge: Edge channels to exclude. Defaults to None, which means
                   that all channels are processed.
@@ -300,6 +230,7 @@ class BaselineSubtractionWorkerInputs(BaselineSubtractionInputsBase):
         self.vis = vis
         self.plan = plan
         self.fit_order = fit_order
+        self.fit_func = fit_func
         self.switchpoly = switchpoly
         self.edge = edge
         self.deviationmask = deviationmask
@@ -308,23 +239,85 @@ class BaselineSubtractionWorkerInputs(BaselineSubtractionInputsBase):
         self.org_directions_dict = org_directions_dict
         self.parallel = parallel
 
+    def to_casa_args(self) -> dict:
+        """Convert Inputs instance to the list of keyword arguments for sdbaseline.
 
-# Base class for workers
+        Note that core parameters such as blfunc will be set dynamically through
+        the heuristics or inside task.
+
+        Returns:
+            Keyword arguments for sdbaseline
+        """
+        args = super().to_casa_args()  # {'vis': self.vis}
+        prefix = os.path.basename(self.vis.rstrip('/'))
+
+        # blparam
+        if self.blparam is None or len(self.blparam) == 0:
+            args['blparam'] = relative_path(os.path.join(self.output_dir, prefix + '_blparam.txt'))
+        else:
+            args['blparam'] = self.blparam
+
+        # baseline caltable filename
+        if self.bloutput is None or len(self.bloutput) == 0:
+            namer = caltable_heuristic.SDBaselinetable()
+            bloutput = relative_path(namer.calculate(output_dir=self.output_dir,
+                                                            stage=self.context.stage,
+                                                            **args))
+            args['bloutput'] = bloutput
+        else:
+            args['bloutput'] = self.bloutput
+
+        # outfile
+        if ('outfile' not in args or
+                args['outfile'] is None or
+                len(args['outfile']) == 0):
+            args['outfile'] = relative_path(os.path.join(self.output_dir, prefix + '_bl'))
+
+        args['datacolumn'] = self.DATACOLUMN[self.colname]
+
+        return args
+
+
+class BaselineSubtractionResults(common.SingleDishResults):
+    """Results class to hold the result of baseline subtraction."""
+
+    def __init__(self,
+                 task: Optional[Type[basetask.StandardTaskTemplate]] = None,
+                 success: Optional[bool] = None,
+                 outcome: Any = None) -> None:
+        """Construct BaselineSubtractionResults instance.
+
+        Args:
+            task: Task class that produced the result.
+            success: Whether task execution is successful or not.
+            outcome: Outcome of the task execution.
+        """
+        super(BaselineSubtractionResults, self).__init__(task, success, outcome)
+
+    def merge_with_context(self, context: 'Context') -> None:
+        """Merge result instance into context.
+
+        No specific merge operation is done.
+
+        Args:
+            context: Pipeline context.
+        """
+        super(BaselineSubtractionResults, self).merge_with_context(context)
+
+    def _outcome_name(self) -> str:
+        """Return string representation of outcome.
+
+        Returns:
+            Name of the blparam file with its format
+        """
+        # outcome should be a name of blparam text file
+        return 'blparam: "%s" bloutput: "%s"' % (self.outcome['blparam'], self.outcome['bloutput'])
+
+
 class SerialBaselineSubtractionWorker(basetask.StandardTaskTemplate):
     """Abstract worker class for baseline subtraction."""
 
     Inputs = BaselineSubtractionWorkerInputs
-
-    @abc.abstractproperty
-    def Heuristics(self) -> Type['Heuristic']:
-        """Return heuristics class.
-
-        This abstract property must be implemented in each subclass.
-
-        Returns:
-            A reference to the :class:`Heuristic` class.
-        """
-        raise NotImplementedError
 
     is_multi_vis_task = False
 
@@ -375,6 +368,9 @@ class SerialBaselineSubtractionWorker(basetask.StandardTaskTemplate):
                   antenna_id_list,
                   spw_id_list)
 
+        # blparam heuristics
+        blparam_heuristic = BaselineFitParamConfig(fitfunc=self.inputs.fit_func, switchpoly=self.inputs.switchpoly)
+
         # initialization of blparam file
         # blparam file needs to be removed before starting iteration through
         # reduction group
@@ -389,7 +385,6 @@ class SerialBaselineSubtractionWorker(basetask.StandardTaskTemplate):
                 deviationmask = deviationmask_list[(field_id, antenna_id, spw_id)]
             else:
                 deviationmask = None
-            blparam_heuristic = self.Heuristics(switchpoly=self.inputs.switchpoly)
             formatted_edge = list(common.parseEdge(edge))
             out_blparam = blparam_heuristic(self.datatable, ms, rowmap,
                                             antenna_id, field_id, spw_id,
@@ -504,20 +499,6 @@ class SerialBaselineSubtractionWorker(basetask.StandardTaskTemplate):
         return results
 
 
-# Worker class for cubic spline fit
-class SerialCubicSplineBaselineSubtractionWorker(SerialBaselineSubtractionWorker):
-    """Worker class of cspline baseline subtraction.
-
-    This is an implementation of BaselineSubtractionWorker class based on
-    segmented cubic spline fitting. Heuristics property returns
-    CubicSplineFitParamConfig heuristics class.
-    """
-
-    Inputs = BaselineSubtractionWorkerInputs
-    Heuristics = CubicSplineFitParamConfig
-
-
-# This is abstract class since Task is not specified yet
 class BaselineSubtractionWorker(sessionutils.ParallelTemplate):
     """Template class for parallel baseline subtraction task.
 
@@ -531,12 +512,4 @@ class BaselineSubtractionWorker(sessionutils.ParallelTemplate):
     """
 
     Inputs = BaselineSubtractionWorkerInputs
-
-
-class CubicSplineBaselineSubtractionWorker(BaselineSubtractionWorker):
-    """Parallel processing task for cspline baseline subtraction.
-
-    This executes CubicSplineBaselineSubtractionWorker in parallel.
-    """
-
-    Task = SerialCubicSplineBaselineSubtractionWorker
+    Task = SerialBaselineSubtractionWorker

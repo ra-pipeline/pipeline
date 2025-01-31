@@ -1,7 +1,7 @@
 #
 # [SCRIPT INFORMATION]
-# GIT REPO: https://bitbucket.alma.cl/scm/~harold.francke_ar/sd-atm-line-correction-prototype.git
-# COMMIT: a75554f8bb0
+# GIT REPO: https://bitbucket.alma.cl/scm/~harold.francke/sd-atm-line-correction-prototype.git
+# COMMIT: d563bd9cd29
 #
 #SDcalatmcorr: Casapipescript with wrapper for TS script "atmcorr.py" for the removal
 #of atmospheric line residuals.
@@ -324,7 +324,7 @@ def segmentEdges(seq, gap, label, sortdata = True):
         startseg = seq[0]
         enseg = seq[-1]
 
-    return np.array([(startseg[i], endseg[i], label) for i in range(len(startseg))],np.dtype([('tstart',np.float64),('tend',np.float64),('intent',np.unicode_,40)]))
+    return np.array([(startseg[i], endseg[i], label) for i in range(len(startseg))],np.dtype([('tstart',np.float64),('tend',np.float64),('intent',np.str_,40)]))
 
 def selectRanges(timeseq, rangetable):
     '''Return selection boolean array for a time sequence, given a table of time ranges.

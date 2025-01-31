@@ -2,6 +2,13 @@
 rsc_path = ""
 import os
 import pipeline.infrastructure.renderer.htmlrenderer as hr
+
+def is_rejected(keep):
+    desc=''
+    if not keep:
+        desc = ' <a style="color:red">rejected</a>'
+    return desc
+
 %>
 <%inherit file="t2-4m_details-base.mako"/>
 
@@ -263,8 +270,9 @@ $(function () {
       if idx_spw==len(stats)-1:
           cell_style.append('border-bottom: '+border_line)          
       cell_style='style="{}"'.format(('; ').join(cell_style))                    
+      reject_desc=is_rejected(info_dict.get(str(spw),True))
       %> 
-      <td ${cell_style}><b>${str(spw)}</b></td>
+      <td ${cell_style}><b>${str(spw)} ${reject_desc}</b></td>
       
       <%
       type_item_scale=[('image','peak',1e3),
@@ -388,5 +396,7 @@ $(function () {
 
         <%def name="caption_title(plot)">
             Spw: ${plot.parameters['virtspw']} Stokes: ${plot.parameters['stokes']} Type: ${plot.parameters['type']}
+            <br>
+            ${is_rejected(info_dict.get(plot.parameters['virtspw'],True))}             
         </%def>
 </%self:plot_group>

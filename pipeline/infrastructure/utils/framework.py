@@ -183,10 +183,9 @@ def get_tracebacks(result):
 
 
 def get_qascores(result, lo=None, hi=None):
-    if isinstance(result, collections.abc.Iterable):
-        scores = flatten([get_qascores(r, lo, hi) for r in result])
-    else:
-        scores = [s for s in result.qa.pool if s.score not in ('', 'N/A', None)]
+
+    # PIPE-2178: collect QA scores from ResultsList.
+    scores = [s for s in result.qa.pool if s.score not in ('', 'N/A', None)]
 
     if lo is None and hi is None:
         matches = lambda score: True
@@ -266,7 +265,7 @@ def flatten_dict(d, join=operator.add, lift=lambda x: (x,)):
     def visit(subdict, results, partial_key):
         for k, v in subdict.items():
             new_key = lift(k) if partial_key is flag_first else join(partial_key, lift(k))
-            if isinstance(v, collections.Mapping):
+            if isinstance(v, collections.abc.Mapping):
                 visit(v, results, new_key)
             else:
                 results.append((new_key, v))

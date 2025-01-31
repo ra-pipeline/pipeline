@@ -15,12 +15,64 @@ class ApplycalsInputs(applycal.IFApplycalInputs):
     """
     ApplycalInputs defines the inputs for the Applycal pipeline task.
     """
+    # docstring and type hints: supplements hifv_applycals
     def __init__(self, context, output_dir=None, vis=None,
                  # data selection arguments
                  field=None, spw=None, antenna=None, intent=None,
                  # preapply calibrations
                  parang=None, applymode=None, calwt=None,
                  flagbackup=None, flagsum=None, flagdetailedsum=None, gainmap=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the h_init or hifv_importdata task.
+
+            field: A string containing the list of field names or field ids to which the calibration will be applied. Defaults to all fields in the pipeline
+                context.
+
+                Example: '3C279', '3C279, M82'
+
+            spw: The list of spectral windows and channels to which the calibration will be applied. Defaults to all science windows in the pipeline.
+
+                Example: '17', '11, 15'
+
+            antenna: The selection of antennas to which the calibration will be applied. Defaults to all antennas. Not currently supported.
+
+            intent: A string containing the list of intents against which the selected fields will be matched. Defaults to all supported intents
+                in the pipeline context.
+
+                Example: `'*TARGET*'`
+
+            parang:
+
+            applymode: Calibration apply mode.
+
+                - 'calflag': calibrate data and apply flags from solutions
+                - 'calflagstrict': same as above except flag spws for which calibration is
+                  unavailable in one or more tables (instead of allowing them to pass
+                  uncalibrated and unflagged)
+                - 'trial': report on flags from solutions, dataset entirely unchanged
+                - 'flagonly': apply flags from solutions only, data not calibrated
+                - 'flagonlystrict': same as above except flag spws for which calibration is
+                  unavailable in one or more tables
+                - 'calonly': calibrate data only, flags from solutions NOT applied
+
+            calwt:
+
+            flagbackup: Backup the flags before the apply.
+
+            flagsum: Compute before and after flagging summary statistics.
+
+            flagdetailedsum: Compute detailed flagging statistics.
+
+            gainmap: Mode to map gainfields to scans.
+
+        """
         super(ApplycalsInputs, self).__init__(context, output_dir=output_dir, vis=vis, field=field, spw=spw,
                                               antenna=antenna, intent=intent, parang=parang,
                                               applymode=applymode, flagbackup=flagbackup, flagsum=flagsum,

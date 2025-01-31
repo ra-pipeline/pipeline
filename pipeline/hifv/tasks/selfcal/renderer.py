@@ -69,7 +69,7 @@ class VLASubPlotRenderer(object):
 
 
 class T2_4MDetailsselfcalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
-    def __init__(self, uri='selfcal.mako', description='Selfcal tables',
+    def __init__(self, uri='vlass_selfcal.mako', description='Selfcal tables',
                  always_rerender=False):
         super(T2_4MDetailsselfcalRenderer, self).__init__(
             uri=uri, description=description, always_rerender=always_rerender)
@@ -102,7 +102,7 @@ class T2_4MDetailsselfcalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
             # write the html for each MS to disk
             renderer = VLASubPlotRenderer(context, result, plots, json_path,
-                                          'selfcal_plots.mako', 'selfcalphasegaincal')
+                                          'vlass_selfcal_plots.mako', 'selfcalphasegaincal')
             with renderer.get_file() as fileobj:
                 fileobj.write(renderer.render())
                 selfcalphasegaincal_subpages[ms] = renderer.filename

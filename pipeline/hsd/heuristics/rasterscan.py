@@ -9,12 +9,14 @@ observing region.
 Note that it does not check if observing pattern is raster.
 """
 # import standard modules
-from typing import List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 # import 3rd party modules
 import numpy as np
+import numpy.typing as npt
 
 # import pipeline submodules
+from pipeline.domain.measurementset import MeasurementSet
 import pipeline.infrastructure.api as api
 import pipeline.infrastructure.utils.compatibility as compatibility
 import pipeline.infrastructure.logging as logging
@@ -536,7 +538,67 @@ def get_raster_distance(ra: np.ndarray, dec: np.ndarray, dtrow_list: List[List[i
     return distance_list
 
 
-def find_raster_gap(ra: np.ndarray, dec: np.ndarray, dtrow_list: List[np.ndarray]) -> np.ndarray:
+class RasterScanHeuristicsResult():
+    """Result class of raster scan analysis."""
+
+    def __init__(self, ms: MeasurementSet):
+        """Initialize an object.
+
+        Args:
+            ms (MeasurementSet): an MeasurementSet object related to the instance.
+        """
+        self.__ms = ms
+        self.__antenna = {}
+    
+    @property
+    def ms(self):
+        return self.__ms
+
+    @property
+    def antenna(self):
+        return self.__antenna
+    
+    def set_result_fail(self, antid: int, spwid: int, fieldid: int):
+        """Set False means raster analysis failure to self.antenna dictionary that is used for getting fail antennas.
+
+        Args:
+            antid (int): An Antenna ID of the result
+            spwid (int): An SpW ID of the result
+            fieldid (int): A field ID of the result
+        """
+        self._set_result(antid, spwid, fieldid, False)
+
+    def _set_result(self, antid: int, spwid: int, fieldid: int, result: bool):
+        """Set boolean that appears the result of raster analysis to self.antenna dictionary that is used for getting fail antennas.
+
+        Args:
+            antid (int): An Antenna ID of the result
+            spwid (int): An SpW ID of the result
+            fieldid (int): A field ID of the result
+            result (bool): result of raster analysis
+        """
+        field = self.antenna.setdefault(antid, {}) \
+                            .setdefault(spwid, {}) \
+                            .setdefault(fieldid, {})
+        field[fieldid] = result
+
+    def get_antennas_rasterscan_failed(self) -> List[str]:
+        """Get antennas which have had some error in raster scan analysis of the self.ms.
+
+        Returns:
+            List[str]: List of antenna names
+        """
+        def _contains_fail(value:Union[str, Dict[str, Dict]]):
+            if isinstance(value, dict):
+                return any(_contains_fail(v) for v in value.values())
+            return value is False
+        
+        antenna_ids = np.unique([k for k, v in self.__antenna.items() if _contains_fail(v)])
+        return sorted([self.ms.antennas[id].name for id in antenna_ids])
+
+
+def find_raster_gap(ra: npt.NDArray[np.float64], dec: npt.NDArray[np.float64], dtrow_list: List[npt.NDArray[np.int64]]) \
+        -> npt.NDArray[np.int64]:
     """
     Find gaps between individual raster map.
 
@@ -557,11 +619,15 @@ def find_raster_gap(ra: np.ndarray, dec: np.ndarray, dtrow_list: List[np.ndarray
         dtrow_list: List of np.ndarray holding array indices for ra and dec.
                     Each index array is supposed to represent single raster row.
 
+    Raises:
+        RasterScanHeuristicsFailure:
+            irregular row input or unsupported raster mapping
+
     Returns:
         np.ndarray of index for dtrow_list indicating boundary between raster maps
     """
-
     msg = 'Failed to identify gap between raster map iteration.'
+
     if len(dtrow_list) == 0:
         raise RasterScanHeuristicsFailure(msg)
 
@@ -592,7 +658,8 @@ def find_raster_gap(ra: np.ndarray, dec: np.ndarray, dtrow_list: List[np.ndarray
 class RasterScanHeuristic(api.Heuristic):
     """Heuristic to analyze raster scan pattern."""
 
-    def calculate(self, ra: np.ndarray, dec: np.ndarray) -> Tuple[List, List]:
+    def calculate(self, ra: npt.NDArray[np.float64], dec: npt.NDArray[np.float64]) \
+                      -> Tuple[List[npt.NDArray[np.int64]], List[npt.NDArray[np.int64]]]:
         """Detect gaps that separate individual raster rows and raster maps.
 
         Detected gaps are transrated into TimeTable and TimeGap described below.
@@ -600,6 +667,11 @@ class RasterScanHeuristic(api.Heuristic):
         Args:
             ra: horizontal position list
             dec: vertical position list
+
+        Raises:
+            RasterScanHeuristicsFailure (raised from find_raster_row() or find_raster_gap()):
+                scan pattern is not likely to be raster scan or
+                irregular row input, or unsupported raster mapping
 
         Returns:
             Two-tuple containing information on group membership

@@ -22,6 +22,14 @@ class PolcalQAHandler(pqa.QAPlugin):
         scores = []
 
         for session_name, session_result in result.session.items():
+            # Create QA score for whether the session was calibrated.
+            scores.append(qacalc.score_polcal_results(session_name, session_result.final))
+
+            # Skip remaining QA scores for this session if no valid results were
+            # returned at all.
+            if not session_result.final:
+                continue
+
             # Get first MS from session for antenna ID > name translation.
             ms = context.observing_run.get_ms(name=session_result.vislist[0])
             ant_names, _ = commonhelpermethods.get_antenna_names(ms)

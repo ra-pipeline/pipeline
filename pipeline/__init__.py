@@ -1,12 +1,15 @@
 """Pipeline software package
 """
 import atexit
+import decimal
 import http.server
 import os
 import pathlib
 import pkg_resources
 import threading
 import webbrowser
+
+from astropy.utils.iers import conf as iers_conf
 
 from . import domain
 from . import environment
@@ -28,6 +31,12 @@ from casatasks import casalog
 # Modify filter to get INFO1 message which the pipeline
 # treats as ATTENTION level.
 casalog.filter('INFO1')
+
+# PIPE-2195: Extend auto_max_age to reduce the frequency of IERS Bulletin-A table auto-updates.
+# This change increases the maximum age of predictive data before auto-downloading is triggered.
+# Note that the default auto_max_age value is 30 days as of Astropy ver 6.0.1:
+# https://docs.astropy.org/en/stable/utils/iers.html
+iers_conf.auto_max_age = 180
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -151,7 +160,7 @@ def initcli(user_globals=None):
     else:
         my_globals = user_globals
 
-    for package in ['h', 'hif', 'hifa', 'hifas', 'hifv', 'hsd', 'hsdn']:
+    for package in ['h', 'hif', 'hifa', 'hifv', 'hsd', 'hsdn']:
         abs_cli_package = 'pipeline.{package}.cli'.format(package=package)
         try:
             # Check the existence of the generated __init__ modules
@@ -168,15 +177,39 @@ revision = environment.pipeline_revision
 
 
 def log_host_environment():
-    LOG.info('Pipeline version {!s} running on {!s}'.format(environment.pipeline_revision, environment.hostname))
-    try:
-        host_summary = '{!s} memory, {!s} x {!s} running {!s}'.format(
-            measures.FileSize(environment.memory_size, measures.FileSizeUnits.BYTES),
-            environment.logical_cpu_cores,
-            environment.cpu_type,
-            environment.host_distribution)
+    env = environment.ENVIRONMENT
+    LOG.info('Pipeline version {!s} running on {!s}'.format(revision, env.hostname))
 
-        LOG.info('Host environment: {!s}'.format(host_summary))
+    ram = measures.FileSize(env.ram, measures.FileSizeUnits.BYTES)
+    try:
+        swap = measures.FileSize(env.swap, measures.FileSizeUnits.BYTES)
+    except decimal.InvalidOperation:
+        swap = 'unknown'
+
+    if env.cgroup_mem_limit != 'N/A':
+        cgroup_mem_limit = measures.FileSize(env.cgroup_mem_limit, measures.FileSizeUnits.BYTES)
+    else:
+        cgroup_mem_limit = 'N/A'
+
+    try:
+        LOG.info(
+            'Host environment:\n'
+            f'\tCPU: {env.cpu_type} '
+            f'(physical cores: {env.physical_cpu_cores}, logical cores: {env.logical_cpu_cores})\n'
+            f'\tMemory: {ram} RAM, {swap} swap\n'
+            f'\tOS: {env.host_distribution}\n'
+            f'\tcgroup limits: {env.cgroup_cpu_bandwidth} of {env.cgroup_num_cpus} CPU cores, '
+            f'memory limits={cgroup_mem_limit}\n'
+            f'\tulimit limits: CPU time={env.ulimit_cpu}, memory={env.ulimit_mem}, files={env.ulimit_files}'
+        )
+
+        LOG.info(
+            'Environment as detected by CASA:\n'
+            f'\tCPUs reported by CASA: {env.casa_cores} cores, '
+            f'max {env.casa_threads} OpenMP thread{"s" if env.casa_threads > 1 else ""}\n'
+            f'\tAvailable memory: {measures.FileSize(env.casa_memory, measures.FileSizeUnits.BYTES)}'
+        )
+
         LOG.debug('Dependency details:')
         for dep_name, dep_detail in environment.dependency_details.items():
             if dep_detail is None:
@@ -189,6 +222,38 @@ def log_host_environment():
 
 
 log_host_environment()
+
+
+def inherit_docstring_and_type_hints():
+    """Complement docstring and type hints of CLI tasks.
+
+    This function complements docstring of CLI tasks, and
+    adds type hints for parameters and return value for them.
+
+    Type hint for return value is taken from Task.prepare or
+    Task.execute methods where Task is underlying implementation
+    class. Other information, docstring and type hits for
+    parameters, are taken from Task.Inputs class.
+
+    For docstring, parameter description (Args section) is
+    merged into existing docstring. To make this function work
+    properly, all docstring must be in google style.
+    """
+    import pipeline.cli as cli
+    import pipeline.infrastructure.doctools as doctools
+
+    task_registry = infrastructure.task_registry
+    for task_name, cli_task in cli.__dict__.items():
+        try:
+            task_class = task_registry.get_pipeline_class_for_task(task_name)
+        except KeyError:
+            continue
+
+        doctools.inherit_docstring(task_class, cli_task)
+        doctools.inherit_annotations(task_class, cli_task)
+
+
+inherit_docstring_and_type_hints()
 
 # FINALLY import executeppr. Do so as late as possible in pipeline module
 # because executeppr make use of a part of pipeline module.

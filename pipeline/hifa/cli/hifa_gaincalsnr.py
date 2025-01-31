@@ -3,12 +3,11 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
+# docstring and type hints: inherits from hifa.tasks.gaincalsnr.gaincalsnr.GaincalSnrInputs.__init__
 @utils.cli_wrapper
 def hifa_gaincalsnr(vis=None, field=None, intent=None, spw=None, phasesnr=None, bwedgefrac=None, hm_nantennas=None,
                     maxfracflagged=None):
-    """
-    hifa_gaincalsnr ---- Compute gaincal signal-to-noise ratios per spw
-
+    """Compute gaincal signal-to-noise ratios per spw
 
     The gaincal solution signal-to-noise is determined as follows:
 
@@ -54,59 +53,14 @@ def hifa_gaincalsnr(vis=None, field=None, intent=None, spw=None, phasesnr=None, 
     - The QA score is based on how many signal-to-noise estimates greater than
       the requested signal-to-noise ratio can be computed.
 
-    Output:
+    Returns:
+        The results object for the pipeline task is returned.
 
-        results -- The results object for the pipeline task is returned.
+    Examples:
+        1. Estimate the per scan gaincal solution sensitivities and signal to noise
+        ratios for all the science spectral windows:
 
-    --------- parameter descriptions ---------------------------------------------
-
-    vis
-                   The list of input MeasurementSets. Defaults to the list of
-                   MeasurementSets specified in the pipeline context.
-
-                   Example: vis=['M82A.ms', 'M82B.ms']
-    field
-                   The list of field names of sources to be used for signal to noise
-                   estimation. Defaults to all fields with the standard intent.
-
-                   Example: field='3C279'
-    intent
-                   A string containing a comma delimited list of intents against which
-                   the selected fields are matched. Defaults to 'PHASE'.
-
-                   Example: intent='BANDPASS'
-    spw
-                   The list of spectral windows and channels for which gain solutions are
-                   computed. Defaults to all the science spectral windows for which there are
-                   both 'intent' and TARGET intents.
-
-                   Example: spw='13,15'
-    phasesnr
-                   The required gaincal solution signal to noise.
-
-                   Example: phasesnr=20.0
-    bwedgefrac
-                   The fraction of the bandwidth edges that is flagged.
-
-                   Example: bwedgefrac=0.0
-    hm_nantennas
-                   The heuristics for determines the number of antennas to use
-                   in the signal to noise estimate. The options are 'all' and 'unflagged'.
-                   The 'unflagged' options is not currently supported.
-
-                   Example: hm_nantennas='unflagged'
-    maxfracflagged
-                   The maximum fraction of an antenna that can be flagged
-                   before it is excluded from the signal to noise estimate.
-
-                   Example: maxfracflagged=0.80
-
-    --------- examples -----------------------------------------------------------
-
-    1. Estimate the per scan gaincal solution sensitivities and signal to noise
-    ratios for all the science spectral windows:
-
-    >>> hifa_gaincalsnr()
+        >>> hifa_gaincalsnr()
 
     """
     ##########################################################################

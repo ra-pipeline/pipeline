@@ -13,8 +13,75 @@ class ALMARestoreDataInputs(restoredata.RestoreDataInputs):
     asis = vdp.VisDependentProperty(
         default='SBSummary ExecBlock Antenna Annotation Station Receiver Source CalAtmosphere CalWVR CalPointing')
 
+    # docstring and type hints: supplements hifa_restoredata
     def __init__(self, context, copytoraw=None, products_dir=None, rawdata_dir=None, output_dir=None, session=None,
                  vis=None, bdfflags=None, lazy=None, asis=None, ocorr_mode=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            copytoraw: Copy calibration and flagging tables from ``products_dir`` to
+                ``rawdata_dir`` directory.
+
+                Default: True.
+
+                Example: copytoraw=False
+
+            products_dir: Name of the data products directory to copy calibration
+                products from.
+                Default: '../products'
+                The parameter is effective only when ``copytoraw`` = True.
+                When ``copytoraw`` = False, calibration products in
+                ``rawdata_dir`` will be used.
+
+                Example: products_dir='myproductspath'
+
+            rawdata_dir: Name of the raw data directory.
+
+                Default: '../rawdata'.
+
+                Example: rawdata_dir='myrawdatapath'
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            session: List of sessions one per visibility file.
+
+                Example: session=['session_3']
+
+            vis: List of raw visibility data files to be restored.
+                Assumed to be in the directory specified by rawdata_dir.
+
+                Example: vis=['uid___A002_X30a93d_X43e']
+
+            bdfflags: Set the BDF flags.
+
+                Default: True.
+
+                Example: bdfflags=False
+
+            lazy: Use the lazy filler option.
+
+                Default: False.
+
+                Example: lazy=True
+
+            asis: Creates verbatim copies of the ASDM tables in the output MS.
+                The value given to this option must be a string containing a
+                list of table names separated by whitespace characters.
+
+                Default: 'SBSummary ExecBlock Antenna Annotation Station Receiver Source CalAtmosphere CalWVR CalPointing'.
+
+                Example: asis='Source Receiver'
+
+            ocorr_mode: Set ocorr_mode.
+
+                Default: 'ca'.
+
+                Example: ocorr_mode='ca'
+
+        """
         super(ALMARestoreDataInputs, self).__init__(context, copytoraw=copytoraw, products_dir=products_dir,
                                                     rawdata_dir=rawdata_dir, output_dir=output_dir, session=session,
                                                     vis=vis, bdfflags=bdfflags, lazy=lazy, asis=asis,

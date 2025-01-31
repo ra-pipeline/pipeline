@@ -42,14 +42,26 @@ class FlagtargetsdataInputs(vdp.StandardInputs):
         vis_root = sanitize_for_ms(self.vis)
         return os.path.join(self.output_dir, vis_root + '.flagtargetscmds.txt')
 
+    # docstring and type hints: supplements hifv_flagtargetsdata
     def __init__(self, context, vis=None, output_dir=None, flagbackup=None, template=None, filetemplate=None):
-        """
+        """Initialize Inputs.
+
         Args:
-            vis(str): String name of the measurement set
-            output_dir(str):  Output directory
-            flagbackup(bool):  Back up flags or not
-            template(bool):  Used template or not
-            flagtemplate(str):  String filename of the flagging template to use
+            context: Pipeline context.
+
+            vis(str): The list of input MeasurementSets. Defaults to the list of MeasurementSets defined in the pipeline context.
+
+            output_dir(str): Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            flagbackup(bool): Back up any pre-existing flags.
+
+            template(bool): Apply flagging templates.
+
+            filetemplate(str): The name of a text file that contains the flagging template for issues with the science target data etc.
+                If the template flags files is undefined a name of the
+                form 'msname_flagtargetstemplate.txt' is assumed.
+
         """
 
         super(FlagtargetsdataInputs, self).__init__()

@@ -9,6 +9,7 @@ import string
 from typing import Any, Dict, List, Tuple, Union
 
 import numpy
+from pipeline.hsd.heuristics.rasterscan import RasterScanHeuristicsResult
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.utils as utils
@@ -22,6 +23,7 @@ from pipeline.infrastructure.launcher import Context
 
 from ..common import direction_utils as dirutil
 from ..common import rasterutil
+from ..common.utils import mjd_to_datetime
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -46,8 +48,9 @@ def mjdsec2str(t: float) -> str:
     Returns:
         str: formatted datetime
     """
-    qa = casa_tools.quanta
-    return '{year}/{month}/{monthday}/{hour}:{min}:{s:.7f}'.format(**qa.splitdate(qa.quantity(t, 's')))
+    date_time = mjd_to_datetime(t / 86400)
+    attributes = ('year', 'month', 'day', 'hour', 'minute', 'second', 'microsecond')
+    return '{}/{}/{}/{}:{}:{}.{:0>6d}'.format(*[getattr(date_time, name) for name in attributes])
 
 
 def get_state_id(ms: MeasurementSet, spw: str, intent: str) -> numpy.ndarray:
@@ -340,8 +343,13 @@ class MetaDataReader(object):
         """
         self.invalid_pointing_data[antenna_id].append(row)
 
-    def generate_flagcmd(self):
-        """Generate flag commands based on pointings of observation and save them in the flag template file."""
+    def generate_flagcmd(self, rasterscan_heuristics_result: RasterScanHeuristicsResult):
+        """
+        Generate flag commands based on pointings of observation and save them in the flag template file.
+
+        Args:
+            rasterscan_heuristics_result (RasterScanHeuristicsResult): Result object of RasterScanHeuristics
+        """
         # PIPE-646
         # per-antenna row list for the data without pointing data
         # key: antenna id
@@ -356,7 +364,7 @@ class MetaDataReader(object):
         # key: (spw id, antenna id) tuple
         # value: list of rows to be flagged
         try:
-            flagdict2 = self.generate_flagdict_for_uniform_rms()
+            flagdict2 = self.generate_flagdict_for_uniform_rms(rasterscan_heuristics_result)
         except Exception:
             flagdict2 = {}
 
@@ -395,14 +403,17 @@ class MetaDataReader(object):
             msglist.append(msg)
         return self.invalid_pointing_data, msglist
 
-    def generate_flagdict_for_uniform_rms(self) -> Dict[Tuple[int, int], numpy.ndarray]:
+    def generate_flagdict_for_uniform_rms(self, rasterscan_heuristics_result: RasterScanHeuristicsResult) -> Dict[Tuple[int, int], numpy.ndarray]:
         """Return row IDs of DataTable to flag.
+
+        Args:
+            rasterscan_heuristics_result (RasterScanHeuristicsResult): Result object of RasterScanHeuristics
 
         Returns:
             Dict: contains list of row IDs of datatable
         """
         # keys for dictionary are (spw_id, antenna_id) tuples
-        flagdict = rasterutil.flag_raster_map(self.datatable, self.ms)
+        flagdict = rasterutil.flag_raster_map(self.datatable, self.ms, rasterscan_heuristics_result)
 
         return flagdict
 
@@ -575,8 +586,8 @@ class MetaDataReader(object):
                     ephem_tables.update({field_id: ''})
                     LOG.info("FIELD_ID={} ({}) as NORMAL SOURCE".format(field_id, source_name))
 
-        with TableSelector(name, 'ANTENNA1 == ANTENNA2 && FEED1 == FEED2 && DATA_DESC_ID IN %s && STATE_ID IN %s' % (list(ddids),
-                                                                                                                     list(target_state_ids))) as tb:
+        with TableSelector(name, 'ANTENNA1 == ANTENNA2 && FEED1 == FEED2 && DATA_DESC_ID IN %s && STATE_ID IN %s' % (utils.list_to_str(ddids),
+                                                                                                                     utils.list_to_str(target_state_ids))) as tb:
             # find the first onsrc for each ephemeris source and pack org_directions
             org_directions = {}
             nrow = tb.nrows()
@@ -619,8 +630,8 @@ class MetaDataReader(object):
                 else:
                     org_direction = None
 
-        with TableSelector(name, 'ANTENNA1 == ANTENNA2 && FEED1 == FEED2 && DATA_DESC_ID IN %s && STATE_ID IN %s' % (list(ddids),
-                                                                                                                     list(state_ids))) as tb:
+        with TableSelector(name, 'ANTENNA1 == ANTENNA2 && FEED1 == FEED2 && DATA_DESC_ID IN %s && STATE_ID IN %s' % (utils.list_to_str(ddids),
+                                                                                                                     utils.list_to_str(state_ids))) as tb:
             nrow = tb.nrows()
             rows = tb.rownumbers()
             Texpt = tb.getcol('INTERVAL')

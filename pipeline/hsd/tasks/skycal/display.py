@@ -241,7 +241,7 @@ class SingleDishSkyCalAmpVsFreqSummaryChart(common.PlotbandpassDetailBase, Singl
             ms = self.context.observing_run.get_ms(self._vis)
             def __get_sorted_reference_scans(msobj: 'MeasurementSet',
                                              spw: Optional[Union[int, str,
-                                                                 collections.Sequence]] = None) -> List['Scan']:
+                                                                 collections.abc.Sequence]] = None) -> List['Scan']:
                 """
                 Return a list of REFERENCE Scan objects sorted by scan IDs.
                 Args:

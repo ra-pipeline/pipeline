@@ -6,6 +6,7 @@ import numpy as np
 import pipeline.hif.tasks.tclean.renderer as clean_renderer
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.renderer.rendererutils as rendererutils
+from pipeline.domain import DataType
 
 columns = {
     'cleanmask' : 'Clean Mask',
@@ -189,10 +190,12 @@ except:
         <ul>
             %for i in field_block_indices[:-1]:
                 <li>
-                <a href="#field_block_${i}">${image_info[i].field}
-                %if image_info[i].result.is_per_eb:
-                    (${image_info[i].vis})
-                %endif
+                <a href="#field_block_${i}">
+                    ${image_info[i].field}
+                    (${DataType.get_short_datatype_desc(image_info[i].datatype)})
+                    %if image_info[i].result.is_per_eb:
+                        (${image_info[i].vis})
+                    %endif
                 </a>
                 </li>
             %endfor
@@ -216,7 +219,10 @@ except:
             %endif
             %for j in range(field_block_indices[i], field_block_indices[i+1], 4):
                 <tr>
-                    <td rowspan="2" style="width:150px;">${image_info[j].field}</td>
+                    <td rowspan="2" style="width:150px;">
+                        ${image_info[j].field}
+                        (${DataType.get_short_datatype_desc(image_info[j].datatype)})
+                    </td>
                     %for k in range(j, min(j+4, field_block_indices[i+1])):
                         <td style="width:250px;height:50px;">
                             <div style="word-wrap:break-word;overflow-y:scroll;width:250px;height:50px;">
@@ -272,6 +278,16 @@ except:
                             %else:
                                 No image available
                             %endif
+                        </td>
+                    %endfor
+                </tr>
+                <tr>
+                    <th>data type</th>
+                    %for k in range(j, min(j+4, field_block_indices[i+1])):
+                        <td style="width:250px;">
+                            <div style="word-wrap:break-word;width:250px;">
+                                ${image_info[k].datatype_info}
+                            </div>
                         </td>
                     %endfor
                 </tr>
@@ -403,16 +419,6 @@ except:
                         <td style="width:250px;">
                             <div style="word-wrap:break-word;width:250px;">
                                 ${image_info[k].image_file}
-                            </div>
-                        </td>
-                    %endfor
-                </tr>
-                <tr>
-                    <th>data type</th>
-                    %for k in range(j, min(j+4, field_block_indices[i+1])):
-                        <td style="width:250px;">
-                            <div style="word-wrap:break-word;width:250px;">
-                                ${image_info[k].datatype_info}
                             </div>
                         </td>
                     %endfor

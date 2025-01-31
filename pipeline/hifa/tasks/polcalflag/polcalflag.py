@@ -66,7 +66,20 @@ class PolcalflagInputs(vdp.StandardInputs):
         # intents.
         return 'POLARIZATION,POLANGLE,POLLEAKAGE'
 
+    # docstring and type hints: supplements hifa_polcalflag
     def __init__(self, context, vis=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            vis: The list of input MeasurementSets. Defaults to the list of
+                MeasurementSets specified in the h_init or hif_importdata task.
+                '': use all MeasurementSets in the context
+
+                Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
+
+        """
         self.context = context
         self.vis = vis
 
@@ -127,7 +140,7 @@ class Polcalflag(basetask.StandardTaskTemplate):
             # corresponding flags
             LOG.info('Applying pre-existing cal tables.')
             callib_map = self._do_applycal(merge=False)
-            # copy across the vis:callibrary dict to our result. This dict 
+            # copy across the vis:callibrary dict to our result. This dict
             # will be inspected by the renderer to know if/which callibrary
             # files should be copied across to the weblog stage directory
             result.callib_map.update(callib_map)

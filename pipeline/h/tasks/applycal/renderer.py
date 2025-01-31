@@ -68,13 +68,17 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         # return all agents so we get ticks and crosses against each one
         agents = ['before', 'applycal']
 
+        # Denote whether applycal was invoked with parang=True.
+        parang = result[0].inputs['parang'] if result else False
+
         mako_context.update({
             'flags': flag_totals,
             'calapps': calapps,
             'caltypes': caltypes,
             'agents': agents,
             'dirname': weblog_dir,
-            'filesizes': filesizes
+            'filesizes': filesizes,
+            'parang': parang,
         })
 
         # these dicts map vis to the hrefs of the detail pages
@@ -86,18 +90,20 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             pipeline_context,
             result,
             applycal.AmpVsTimeSummaryChart,
-            ['PHASE', 'BANDPASS', 'AMPLITUDE', 'CHECK', 'TARGET', 'POLARIZATION', 'POLANGLE', 'POLLEAKAGE']
+            ['PHASE', 'BANDPASS', 'AMPLITUDE', 'CHECK', 'DIFFGAINREF', 'DIFFGAINSRC', 'TARGET', 'POLARIZATION',
+             'POLANGLE', 'POLLEAKAGE']
         )
 
         phase_vs_time_summary_plots, phase_vs_time_subpages = self.create_plots(
             pipeline_context,
             result,
             applycal.PhaseVsTimeSummaryChart,
-            ['PHASE', 'BANDPASS', 'AMPLITUDE', 'CHECK', 'POLARIZATION', 'POLANGLE', 'POLLEAKAGE']
+            ['PHASE', 'BANDPASS', 'AMPLITUDE', 'CHECK', 'DIFFGAINREF', 'DIFFGAINSRC', 'POLARIZATION', 'POLANGLE',
+             'POLLEAKAGE']
         )
 
         amp_vs_freq_summary_plots = utils.OrderedDefaultdict(list)
-        for intents in [['PHASE'], ['BANDPASS'], ['CHECK'], ['AMPLITUDE'],
+        for intents in [['PHASE'], ['BANDPASS'], ['CHECK'], ['DIFFGAINREF'], ['DIFFGAINSRC'], ['AMPLITUDE'],
                         ['POLARIZATION'], ['POLANGLE'], ['POLLEAKAGE']]:
             # it doesn't matter that the subpages dict is repeatedly redefined.
             # The only purpose of the returned dict is to map the vis to a
@@ -114,7 +120,8 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 amp_vs_freq_summary_plots[vis].extend(vis_plots)
 
         phase_vs_freq_summary_plots = utils.OrderedDefaultdict(list)
-        for intents in [['PHASE'], ['BANDPASS'], ['CHECK'], ['POLARIZATION'], ['POLANGLE'], ['POLLEAKAGE']]:
+        for intents in [['PHASE'], ['BANDPASS'], ['CHECK'], ['DIFFGAINREF'], ['DIFFGAINSRC'], ['POLARIZATION'],
+                        ['POLANGLE'], ['POLLEAKAGE']]:
             plots, phase_vs_freq_subpages = self.create_plots(
                 pipeline_context,
                 result,
@@ -128,7 +135,7 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         # CAS-7659: Add plots of all calibrator calibrated amp vs uvdist to
         # the WebLog applycal page
         amp_vs_uv_summary_plots = utils.OrderedDefaultdict(list)
-        for intents in [['AMPLITUDE'], ['PHASE'], ['BANDPASS'], ['CHECK'],
+        for intents in [['AMPLITUDE'], ['PHASE'], ['BANDPASS'], ['CHECK'], ['DIFFGAINREF'], ['DIFFGAINSRC'],
                         ['POLARIZATION'], ['POLANGLE'], ['POLLEAKAGE']]:
             plots, amp_vs_uv_subpages = self.create_plots(
                 pipeline_context,
@@ -159,6 +166,8 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                                        (['PHASE'], ''),
                                        (['BANDPASS'], ''),
                                        (['CHECK'], ''),
+                                       (['DIFFGAINREF'], ''),
+                                       (['DIFFGAINSRC'], ''),
                                        (['POLARIZATION'], ''),
                                        (['POLANGLE'], ''),
                                        (['POLLEAKAGE'], '')]:
@@ -198,7 +207,8 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             pipeline_context,
             result,
             applycal.CAS9154AmpVsTimeDetailChart,
-            ['AMPLITUDE', 'PHASE', 'BANDPASS', 'CHECK', 'TARGET', 'POLARIZATION', 'POLANGLE', 'POLLEAKAGE'],
+            ['AMPLITUDE', 'PHASE', 'BANDPASS', 'CHECK', 'DIFFGAINREF', 'DIFFGAINSRC', 'TARGET', 'POLARIZATION',
+             'POLANGLE', 'POLLEAKAGE'],
             ApplycalAmpVsTimePlotRenderer,
             avgchannel='9000'
         )
@@ -210,7 +220,8 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 pipeline_context,
                 result,
                 applycal.AmpVsFrequencyDetailChart,
-                ['BANDPASS', 'PHASE', 'CHECK', 'AMPLITUDE', 'POLARIZATION', 'POLANGLE', 'POLLEAKAGE'],
+                ['BANDPASS', 'PHASE', 'CHECK', 'DIFFGAINREF', 'DIFFGAINSRC', 'AMPLITUDE', 'POLARIZATION', 'POLANGLE',
+                 'POLLEAKAGE'],
                 ApplycalAmpVsFreqPlotRenderer
             )
 
@@ -218,7 +229,7 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 pipeline_context,
                 result,
                 applycal.PhaseVsFrequencyDetailChart,
-                ['BANDPASS', 'PHASE', 'CHECK', 'POLARIZATION', 'POLANGLE', 'POLLEAKAGE'],
+                ['BANDPASS', 'PHASE', 'CHECK', 'DIFFGAINREF', 'DIFFGAINSRC', 'POLARIZATION', 'POLANGLE', 'POLLEAKAGE'],
                 ApplycalPhaseVsFreqPlotRenderer
             )
 
@@ -226,7 +237,8 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 pipeline_context,
                 result,
                 applycal.PhaseVsTimeDetailChart,
-                ['AMPLITUDE', 'PHASE', 'BANDPASS', 'CHECK', 'POLARIZATION', 'POLANGLE', 'POLLEAKAGE'],
+                ['AMPLITUDE', 'PHASE', 'BANDPASS', 'CHECK', 'DIFFGAINREF', 'DIFFGAINSRC', 'POLARIZATION', 'POLANGLE',
+                 'POLLEAKAGE'],
                 ApplycalPhaseVsTimePlotRenderer
             )
 
@@ -307,8 +319,11 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             vis = os.path.basename(result.inputs['vis'])
             ms = context.observing_run.get_ms(vis)
 
-            plotter = UVChart(context, ms, customflagged=True, output_dir=weblog_dir, title_prefix="Post applycal: ")
-            uv_plots[vis] = [plotter.plot()]
+            plot = UVChart(context, ms, customflagged=True, output_dir=weblog_dir, title_prefix="Post applycal: ").plot()
+            
+            # PIPE-1294: only attached valid plot wrapper objects.
+            if plot is not None:
+                uv_plots[vis].append(plot)
 
         return uv_plots
 

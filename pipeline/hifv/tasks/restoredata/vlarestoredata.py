@@ -20,9 +20,64 @@ class VLARestoreDataInputs(restoredata.RestoreDataInputs):
     asis = vdp.VisDependentProperty(default='Receiver CalAtmosphere')
     gainmap = vdp.VisDependentProperty(default=False)
 
+    # docstring and type hints: supplements hifv_restoredata
     def __init__(self, context, copytoraw=None, products_dir=None, rawdata_dir=None,
                  output_dir=None, session=None, vis=None, bdfflags=None, lazy=None, asis=None,
                  ocorr_mode=None, gainmap=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            copytoraw: Copy calibration and flagging tables from ``products_dir`` to ``rawdata_dir`` directory.
+
+                Default: True
+
+                Example: copytoraw=False.
+
+            products_dir: Name of the data products directory to copy calibration products from.
+
+                Default: '../products'
+
+                The parameter is effective only when ``copytoraw`` = True.
+                When ``copytoraw`` = False, calibration products in
+                ``rawdata_dir`` will be used.
+
+                Example: products_dir='myproductspath'
+
+            rawdata_dir: Name of the raw data directory. Default: '../rawdata'
+
+                Example: rawdata_dir='myrawdatapath'
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            session: List of sessions one per visibility file.
+
+                Example: session=['session_3']
+
+            vis: List of visibility data files. These may be ASDMs, tar files of ASDMs, MSes, or tar files of MSes, If ASDM files are specified, they will be
+                converted  to MS format.
+
+                Example: vis=['X227.ms', 'asdms.tar.gz']
+
+            bdfflags: Set the BDF flags. Default: False
+
+            lazy: Use the lazy filler option. Default: False
+
+            asis: List of tables to import asis.
+
+                Default: 'Receiver CalAtmosphere'
+
+            ocorr_mode: Correlation import mode.
+
+                Default: 'co'
+
+            gainmap: If True, map gainfields to a particular list of scans when applying calibration tables.
+
+                Default: False
+
+        """
         super(VLARestoreDataInputs, self).__init__(context, copytoraw=copytoraw,
                                                    products_dir=products_dir, rawdata_dir=rawdata_dir,
                                                    output_dir=output_dir, session=session,
@@ -30,7 +85,6 @@ class VLARestoreDataInputs(restoredata.RestoreDataInputs):
                                                    ocorr_mode=ocorr_mode)
 
         self.gainmap = gainmap
-
 
 @task_registry.set_equivalent_casa_task('hifv_restoredata')
 class VLARestoreData(restoredata.RestoreData):
@@ -71,15 +125,35 @@ class VLARestoreData(restoredata.RestoreData):
         else:
             pipemanifest = self._do_get_manifest('*pipeline_manifest.xml', '*cal*pipeline_manifest.xml')
 
+        # Retrieve smoothing and spectral line spws information from the manifest
+        spws_to_smooth = None  # If not found in the manifest, assume old data.
+        specline_spws = 'none'
+        params = None
+        ms_name = "{}.ms".format(os.path.basename(vislist[0]))
+        for asdm in pipemanifest.get_ous().findall(f".//asdm[@name=\'{ms_name}\']"):
+            params = getattr(asdm.find('restoredata'), 'attrib', None)
+        if params:
+            spws_to_smooth = params.get('smoothed_spws', None)
+            specline_spws = params.get('specline_spws', 'none')
+
+            LOG.debug("Found smoothed_spws: {} and specline_spws: {} in the manifest".format(spws_to_smooth, specline_spws))
+        else:
+            LOG.debug("Didn't find smoothed_spws, specline_spws in the manifest.")
+
+        # If there was an empty string, indicating no specline spws, in the manifest,
+        # set the specline_spws to 'none' for hifv_importdata.
+        if len(specline_spws) == 0:
+            specline_spws = 'none'
+
         # Convert ASDMS assumed to be on disk in rawdata_dir. After this step
         # has been completed the MS and MS.flagversions directories will exist
         # and MS,flagversions will contain a copy of the original MS flags,
         # Flags.Original.
         #    TBD: Add error handling
-        import_results = self._do_importasdm(sessionlist=sessionlist, vislist=vislist)
+        import_results = self._do_importasdm(sessionlist=sessionlist, vislist=vislist, specline_spws=specline_spws)
 
         for ms in self.inputs.context.observing_run.measurement_sets:
-            hanning_results = self._do_hanningsmooth()
+            self._do_hanningsmooth(spws_to_smooth=spws_to_smooth)
 
         # Restore final MS.flagversions and flags
         self._do_restore_flags(pipemanifest)
@@ -102,13 +176,14 @@ class VLARestoreData(restoredata.RestoreData):
 
     # Override generic method and use an ALMA specific one. Not much difference
     # now but should simplify parameters in future
-    def _do_importasdm(self, sessionlist, vislist):
+    def _do_importasdm(self, sessionlist, vislist, specline_spws):
         inputs = self.inputs
         container = vdp.InputsContainer(
             importdata.VLAImportData, inputs.context,
             vis=vislist, session=sessionlist, save_flagonline=False,
             lazy=inputs.lazy, bdfflags=inputs.bdfflags,
-            asis=inputs.asis, ocorr_mode=inputs.ocorr_mode)
+            asis=inputs.asis, ocorr_mode=inputs.ocorr_mode,
+            specline_spws=specline_spws)
         importdata_task = importdata.VLAImportData(container)
         return self._executor.execute(importdata_task, merge=True)
 
@@ -162,8 +237,9 @@ class VLARestoreData(restoredata.RestoreData):
                 LOG.error("Application of final flags failed for %s" % ms.basename)
                 raise
 
-    def _do_hanningsmooth(self):
-        container = vdp.InputsContainer(hanning.Hanning, self.inputs.context)
+    def _do_hanningsmooth(self, spws_to_smooth):
+        container = vdp.InputsContainer(hanning.Hanning, self.inputs.context,
+                                        spws_to_smooth=spws_to_smooth)
         hanning_task = hanning.Hanning(container)
         return self._executor.execute(hanning_task, merge=True)
 

@@ -1,7 +1,9 @@
 import re
-from typing import Union
+import traceback
+from typing import Optional, Union
 
 import numpy as np
+
 import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.filenamer as filenamer
@@ -21,16 +23,20 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
                                        linesfile, imaging_params)
         self.imaging_mode = 'VLA'
 
-    def robust(self) -> float:
+    def robust(self, specmode=None) -> float:
         """Tclean robust parameter heuristics.
         See PIPE-680 and CASR-543"""
-        return 0.5
+        if specmode in ('cube', 'repBW'):
+            # PIPE-1346: use robust=2.0 for VLA cube imaging.
+            return 2.0
+        else:
+            return 0.5
 
-    def uvtaper(self, beam_natural=None, protect_long=None) -> Union[str, list]:
+    def uvtaper(self, beam_natural=None, protect_long=None, beam_user=None, tapering_limit=None, repr_freq=None) -> Union[str, list]:
         """Tclean uvtaper parameter heuristics."""
         return []
 
-    def uvrange(self, field=None, spwspec=None) -> tuple:
+    def uvrange(self, field=None, spwspec=None, specmode=None) -> tuple:
         """Tclean uvrange parameter heuristics.
 
         Restrict uvrange in case of very extended emission.
@@ -46,6 +52,10 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         :return: (None or string in the form of '> {x}klambda', where
             {x}=0.05*max(baseline), baseline ratio)
         """
+        if specmode in ('cube', 'repBW'):
+            # PIPE-1346: do not restrict uvrange for VLA cube imaging.
+            return None, None
+
         def get_mean_amplitude(vis, uvrange=None, axis='amplitude', field='', spw=None):
             stat_arg = {'vis': vis, 'uvrange': uvrange, 'axis': axis,
                         'useflags': True, 'field': field, 'spw': spw,
@@ -148,17 +158,20 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
             # Use complete uvrange
             return '>0.0klambda', ratio
 
-    def pblimits(self, pb):
+    def pblimits(self, pb: Union[None, str], specmode: Optional[str] = None):
         """PB gain level at which to cut off normalizations (tclean parameter).
         See PIPE-674 and CASR-543
         """
         # pblimits used in pipeline tclean._do_iterative_imaging() method (eventually in cleanbox.py) for
         # computing statistics on residual image products.
         if (pb not in [None, '']):
-            pblimit_image, pblimit_cleanmask = super().pblimits(pb)
+            pblimit_image, pblimit_cleanmask = super().pblimits(pb, specmode=specmode)
         # used for setting CASA tclean task pblimit parameter in pipeline tclean.prepare() method
         else:
-            pblimit_image = -0.1
+            if specmode == 'cube':
+                pblimit_image = 0.2
+            else:
+                pblimit_image = -0.1
             pblimit_cleanmask = 0.3
 
         return pblimit_image, pblimit_cleanmask
@@ -209,8 +222,13 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
 
     def deconvolver(self, specmode, spwspec, intent: str = '', stokes: str = '') -> str:
         """Tclean deconvolver parameter heuristics.
-        See PIPE-679 and CASR-543"""
-        return 'mtmfs'
+        
+        See PIPE-679 and CASR-543
+        """
+        if specmode == 'cube':
+            return 'hogbom'
+        else:
+            return 'mtmfs'
 
     def _get_vla_band(self, spwspec):
         """Get VLA band from spwspec, assuming spwspec from the same band."""
@@ -221,23 +239,37 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
             vla_band = find_EVLA_band(mean_freq_hz)
         return vla_band
 
-    def gridder(self, intent, field, spwspec=None) -> str:
-        """Tclean gridder parameter heuristics for VLA."""
+    def gridder(self, intent: str, field: str, spwspec: Optional[str] = None) -> str:
+        """Determine the appropriate tclean gridder parameter for VLA.
 
-        # the field heuristic which decides whether this is a mosaic or not
+        Args:
+            intent (str): The intent of the observation.
+            field (str): The field of the observation.
+            spwspec (str, optional): The spectral window specification. Defaults to None.
+
+        Returns:
+            str: The selected gridder parameter.
+        """
+
+        # Default gridder selection.
+        gridder_select = 'standard'
+
+        # The heuristic which decides whether this is a mosaic or not.
         field_str_list = self.field(intent, field)
         is_mosaic = self._is_mosaic(field_str_list)
 
-        gridder_select = 'standard'
-
-        # not really necessary for VLA, but as a placeholder for PIPE-684.
+        # Adjust gridder selection based on mosaic status and antenna diameters.
+        # Not really necessary for VLA, but as a placeholder for PIPE-684.
         if is_mosaic or (len(self.antenna_diameters()) > 1):
             gridder_select = 'mosaic'
 
         # PIPE-1641: switch to gridder='wproject' for L and S band sci-target imaging
-        vla_band = self._get_vla_band(spwspec)
-        if vla_band in ['L', 'S'] and 'TARGET' in intent:
-            gridder_select = 'wproject'
+        # PIPE-2225: disable the L/S-band wproject heuristics for efficient imaging
+        use_wproject = False
+        if use_wproject:
+            vla_band = self._get_vla_band(spwspec)
+            if vla_band in ['L', 'S'] and 'TARGET' in intent:
+                gridder_select = 'wproject'
 
         return gridder_select
 
@@ -372,7 +404,8 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
             return threshold
 
     def imsize(self, fields, cell, primary_beam, sfpblimit=None, max_pixels=None,
-               centreonly=False, vislist=None, spwspec=None, intent: str = '', joint_intents: str = '') -> Union[list, int]:
+               centreonly=False, vislist=None, spwspec=None, intent: str = '', joint_intents: str = '',
+               specmode=None) -> Union[list, int]:
         """
         Image size heuristics for single fields and mosaics. The pixel count along x and y image dimensions
         is determined by the cell size, primary beam size and the spread of phase centers in case of mosaics.
@@ -399,20 +432,24 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         :param joint_intents: stage intents
         :return: two element list of pixel count along x and y image axes.
         """
-        if spwspec is not None:
-            if type(spwspec) is not str:
-                spwspec = ",".join(spwspec)
-            freq_limits = self.get_min_max_freq(spwspec)
-            # 18 GHz and above (K, Ka, Q VLA bands)
-            if freq_limits['abs_min_freq'] >= 1.79e10:
-                # equivalent to first minimum of the Airy diffraction pattern; m = 1.22.
-                sfpblimit = 0.294
-            else:
-                # equivalent to second minimum of the Airy diffraction pattern; m = 2.233 in theta = m*lambda/D
-                sfpblimit = 0.016
+        if specmode in ('cube', 'repBW'):
+            return super().imsize(fields, cell, primary_beam, sfpblimit=sfpblimit, max_pixels=max_pixels,
+                                  centreonly=centreonly, vislist=vislist, intent=intent, specmode=specmode)
+        else:
+            if spwspec is not None:
+                if type(spwspec) is not str:
+                    spwspec = ",".join(spwspec)
+                freq_limits = self.get_min_max_freq(spwspec)
+                # 18 GHz and above (K, Ka, Q VLA bands)
+                if freq_limits['abs_min_freq'] >= 1.79e10:
+                    # equivalent to first minimum of the Airy diffraction pattern; m = 1.22.
+                    sfpblimit = 0.294
+                else:
+                    # equivalent to second minimum of the Airy diffraction pattern; m = 2.233 in theta = m*lambda/D
+                    sfpblimit = 0.016
 
-        return super().imsize(fields, cell, primary_beam, sfpblimit=sfpblimit, max_pixels=max_pixels,
-                              centreonly=centreonly, vislist=vislist, intent=intent)
+            return super().imsize(fields, cell, primary_beam, sfpblimit=sfpblimit, max_pixels=max_pixels,
+                                  centreonly=centreonly, vislist=vislist, intent=intent, specmode=specmode)
 
     def imagename(self, output_dir=None, intent=None, field=None, spwspec=None, specmode=None, band=None, datatype: str = None) -> str:
         try:
@@ -455,3 +492,87 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         # the name components individually.
         imagename = namer.get_filename()
         return imagename
+
+    def get_sensitivity(self, ms_do, field, intent, spw, chansel, specmode, cell, imsize, weighting, robust, uvtaper):
+        """
+        Correct the VLA theoretical sensitivity for the Hanning smoothed SPW.
+
+        PIPE-2131: Hanning smoothing introduces noise correlation between adjacent visibility channels,
+        which is not accounted for in the statwt() outcome. Here, we introduce a scaling factor of 1.633 
+        to correct this effect in sensitivity calculation.
+
+        Args:
+            ms_do (object): Measurement set data object.
+            field (str): Field selection.
+            intent (str): Observation intent.
+            spw (int): Spectral window.
+            chansel (str): Channel selection.
+            specmode (str): Spectral mode.
+            cell (float): Cell size.
+            imsize (int): Image size.
+            weighting (str): Weighting scheme.
+            robust (float): Robust parameter for weighting.
+            uvtaper (str): UV taper.
+
+        Returns:
+            tuple: Corrected sensitivity values.
+        """
+
+        ret = super().get_sensitivity(ms_do, field, intent, spw, chansel, specmode, cell, imsize, weighting, robust, uvtaper)
+        ret = list(ret)
+
+        real_spwid = self.observing_run.virtual2real_spw_id(spw, ms_do)
+        with casa_tools.TableReader(ms_do.name + '/SPECTRAL_WINDOW') as table:
+            if 'OFFLINE_HANNING_SMOOTH' in table.colnames():
+                is_smoothed = table.getcol('OFFLINE_HANNING_SMOOTH')[real_spwid]
+                if is_smoothed:
+                    LOG.info(
+                        'EB %s spw %s has been Hanning-smoothed; multiplying apparent sensitivity return by a factor of 1.633.',
+                        ms_do.name, real_spwid)
+                    ret[0] *= 1.633
+                else:
+                    LOG.info('EB %s spw %s has not been Hanning-smoothed; assuming the visibility noise is channel-independent.',
+                             ms_do.name, real_spwid)
+            else:
+                LOG.warning(
+                    'No offline Hanning smooth history is detected in EB %s spw %s; no correction for the VLA theoretical sensitivity.',
+                    ms_do.name, real_spwid)
+
+        return tuple(ret)
+
+    def restfreq(
+            self, specmode: Optional[str] = None, nchan: Optional[int] = None, start: Optional[Union[str, float]] = None,
+            width: Optional[Union[str, float]] = None) -> Optional[str]:
+        """Determine the rest frequency for CASA/tclean.
+
+        VLA often lacks valid rest frequencies in the SOURCE subtable. Therefore, the SPW center frequency
+        is used as the rest frequency when certain conditions are met.
+
+        Args:
+            specmode (Optional[str]): The spectral mode, typically 'cube' or 'repBW'.
+            nchan (Optional[int]): Number of channels.
+            start (Optional[Union[str, float]]): Start frequency, expected to be a string with units (e.g., 'Hz').
+            width (Optional[Union[str, float]]): Width frequency, expected to be a string with units (e.g., 'Hz').
+
+        Returns:
+            Optional[str]: The calculated rest frequency in GHz if conditions are met; otherwise, None.
+        """
+        rest_freq = None
+
+        if specmode in ('cube', 'repBW'):
+            if all(isinstance(param, str) and 'Hz' in param for param in (start, width)) and nchan not in (None, -1):
+                try:
+                    qa = casa_tools.quanta
+                    start_hz = qa.convert(start, 'Hz')['value']
+                    width_hz = qa.convert(width, 'Hz')['value']
+                    center_freq_hz = start_hz + (nchan // 2) * width_hz
+                    rest_freq = f'{center_freq_hz / 1e9:.10f}GHz'
+                    LOG.info('Use the cube center frequency as the rest frequency for VLA cube imaging: %s', rest_freq)
+                except Exception:
+                    LOG.warning('Failed to derive the heuristics-based rest frequency for VLA cube imaging.')
+                    traceback_msg = traceback.format_exc()
+                    LOG.debug(traceback_msg)
+            else:
+                LOG.warning('Cannot derive the heuristics-based rest frequency for VLA cube imaging.')
+
+        return rest_freq

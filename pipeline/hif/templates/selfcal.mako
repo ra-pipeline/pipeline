@@ -91,11 +91,7 @@ img {
 import numpy as np
 
 def fm_band(band):
-    return band.replace('_',' ')
-
-def fm_target(target):
-    target_str=target['field'].replace('_',' ')
-    return target_str
+    return '('+band.strip().replace('EVLA_', '').replace('_', ' ').capitalize()+')'
 
 def fm_sc_success(success):
     if success:
@@ -129,17 +125,19 @@ def fm_reason(slib):
         <tr>
             <th>Field</th>
             <th>Band</th>
-            <th>spw</th>
-            <th>phasecenter</th>
-            <th>cell</th>
-            <th>imsize</th>
-            <th>Solints to Attempt</th>
+            <th>SpW</th>
+            <th>Phasecenter</th>
+            <th>Cell</th>
+            <th>Imsize</th>
+            <th>Solints to attempt</th>
             <th>Success</th>
-            <th>Contline<br>applied</th>
+            <th>Cont.<br>applied</th>
             <th>Line<br>applied</th>
         <tr>
   </thead>
-  <caption>Self-calibration Target(s) Summary</caption>
+  <caption>
+    Self-Calibration Targets Summary: All attempted solution intervals (solints) are shown in <b>bold</b>. If a solint is highlighted in <b><a style="color:blue">blue</a></b>, it represents a final applicable solint.
+  </caption>
   <tbody>
   % for tr in targets_summary_table:
     <tr>
@@ -175,7 +173,7 @@ def fm_reason(slib):
 
     <a class="anchor" id="${id_name}"></a>
     <h4>
-      ${fm_target(target)}&nbsp;${fm_band(target['sc_band'])}&nbsp;
+      ${target['field']}&nbsp;${fm_band(target['sc_band'])}&nbsp;
       <a href="#targetlist"><sup>back to top</sup></a>&nbsp;&nbsp;
       <a class="btn btn-sm btn-light" data-toggle="collapse" 
           href="#${id_name}_summary" 

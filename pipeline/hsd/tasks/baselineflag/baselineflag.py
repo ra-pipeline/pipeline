@@ -196,6 +196,7 @@ class SDBLFlagInputs(vdp.StandardInputs):
 
         return ','.join(pols)
 
+    #  docstring and type hints: supplements hsd_blflag
     def __init__(self,
                  context: 'Context',
                  output_dir: Optional[str] = None,
@@ -228,52 +229,116 @@ class SDBLFlagInputs(vdp.StandardInputs):
 
         Args:
             context: Pipeline context.
+
             output_dir: Output directory.
-            iteration: Number of iterations to perform sigma clipping to
-                       calculate threshold value of flagging. Defaults to 5.
+
+            iteration: Number of iterations to perform sigma clipping
+                to calculate threshold value of flagging.
+
+                Default: None (equivalent to 5.0)
+
             edge: Number of channels to be dropped from the edge.
-                  Defaults to [0, 0], which means that all channels
-                  are processed.
+                The value must be a list of integer with length of one or
+                two. If list length is one, same number will be applied
+                both side of the band.
+
+                Example: [10,20], [10]
+
+                Default: None (equivalent to [0, 0])
+
             flag_tsys: Activate (True) or deactivate (False) Tsys flag.
-                       Defaults to True.
-            tsys_thresh: Threshold value for Tsys flag. Defaults to 3.0.
-            flag_prfre: Activate (True) or deactivate (False) flag by expected
-                        rms of pre-fit spectra. Defaults to True.
-            prfre_thresh: Threshold value for flag by expected rms of pre-fit
-                          spectra. Defaults to 3.0.
-            flag_pofre: Activate (True) or deactivate (False) flag by expected
-                        rms of post-fit spectra. Defualts to True.
-            pofre_thresh: Threshold value for flag by expected rms of post-fit
-                          spectra. Defaults to 1.333.
-            flag_prfr: Activate (True) or deactivate (False) flag by rms of
-                       pre-fit spectra. Defaults to True.
+                Default is None which is equivalent to True.
+
+            tsys_thresh: Threshold value for Tsys flag.
+                Default is None which sets 3.0 as a threshold.
+
+            flag_prfre: Activate (True) or deactivate (False) flag by
+                expected rms of pre-fit spectra.
+                Default is None which is equivalent to True.
+
+            prfre_thresh: Threshold value for flag by expected rms of
+                pre-fit spectra. Default is None which sets 3.0 to a threshold.
+
+            flag_pofre: Activate (True) or deactivate (False) flag by
+                expected rms of post-fit spectra.
+                Default is None which is equivalent to True.
+
+            pofre_thresh: Threshold value for flag by expected rms of
+                post-fit spectra. Default is None which sets 1.333 to a threshold.
+
+            flag_prfr: Activate (True) or deactivate (False) flag by
+                rms of pre-fit spectra.
+                Default is None which is equivalent to True.
+
             prfr_thresh: Threshold value for flag by rms of pre-fit spectra.
-                         Defaults to 4.5.
-            flag_pofr: Activate (True) or deactivate (False) flag by rms of
-                       post-fit spectra. Defaults to True.
+                Default is None which sets 4.5 to a threshold.
+
+            flag_pofr: Activate (True) or deactivate (False) flag by
+                rms of post-fit spectra.
+                Default is None which is equivalent to True.
+
             pofr_thresh: Threshold value for flag by rms of post-fit spectra.
-                         Defaults to 4.0.
-            flag_prfrm: Activate (True) or deactivate (False) flag by running
-                        mean of pre-fit spectra. Defaults to True.
-            prfrm_thresh: Threshold value for flag by running mean of pre-fit
-                          spectra. Defaults to 5.5.
+                Default is None which sets 4.0 to a threshold.
+
+            flag_prfrm: Activate (True) or deactivate (False) flag by
+                running mean of pre-fit spectra.
+                Default is None which is equivalent to True.
+
+            prfrm_thresh: Threshold value for flag by running mean of pre-fit spectra.
+                Default is None which sets 5.5 to a threshold.
+
             prfrm_nmean: Number of channels for running mean of pre-fit spectra.
-                         Defaults to 5.
-            flag_pofrm: Activate (True) or deactivate (False) flag by running
-                        mean of post-fit spectra. Defaults to True.
-            pofrm_thresh: Threshold value for flag by running mean of post-fit
-                          spectra. Defaults to 5.0.
+                Default is None which sets 5 channels for running mean.
+
+            flag_pofrm: Activate (True) or deactivate (False) flag by
+                running mean of post-fit spectra.
+                Default is None which is equivalent to True.
+
+            pofrm_thresh: Threshold value for flag by running mean of post-fit spectra.
+                Default is None which sets 5.0 to a threshold.
+
             pofrm_nmean: Number of channels for running mean of post-fit spectra.
-                         Defaults to 5.
-            plotflag: Create summary plots if True. Defaults to True.
-            infiles: MS selection.
-            antenna: Antenna selection.
-            field: Field selection.
-            spw: Spectral window (spw) selection.
-            pol: Polarization selection.
+                Default is None which sets 5 channels for running mean.
+
+            plotflag: True to plot result of data flagging.
+                Default is None which is equivalent to True.
+
+            infiles: ASDM or MS files to be processed. This parameter behaves
+                as data selection parameter. The name specified by infiles must be
+                registered to context before you run hsd_blflag.
+
+                Default: None (process all registered data)
+
+            antenna: Data selection by antenna names or ids.
+
+                Example: 'PM03,PM04', '' (all antennas)
+
+                Default: None (process all antennas)
+
+            field: Data selection by field names or ids.
+
+                Example: '`*Sgr*,M100`', '' (all fields)
+
+                Default: None (process all science fields)
+
+            spw: Data selection by spw ids.
+
+                Example: '3,4' (spw 3 and 4), '' (all spws)
+
+                Default: None (process all science spws)
+
+            pol: Data selection by polarizations.
+
+                Example: 'XX,YY' (correlation XX and YY), '' (all polarizations)
+
+                Default: None (process all polarizations)
+
             parallel: Execute using CASA HPC functionality, if available.
-                      Default is None, which intends to turn on parallel
-                      processing if possible.
+
+                Options: 'automatic', 'true', 'false', True, False
+
+                Default: None (equivalent to 'automatic')
+
         """
         super().__init__()
 

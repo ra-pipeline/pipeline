@@ -1,14 +1,17 @@
 import collections
+import contextlib
 import operator
 import os
 import uuid
 from functools import reduce
 from typing import List, Set, Tuple, Union
 
+import numpy as np
 import scipy.stats as stats
 
 import pipeline.domain as domain
 import pipeline.domain.measures as measures
+import pipeline.extern.adopted as adopted
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.callibrary as callibrary
@@ -17,6 +20,7 @@ import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import FluxMeasurement
 from pipeline.domain import MeasurementSet
 from pipeline.h.tasks.common import commonfluxresults, mstools
+from pipeline.h.tasks.flagging.flagdatasetter import FlagdataSetter
 from pipeline.hif.tasks import applycal
 from pipeline.hif.tasks import gaincal
 from pipeline.hif.tasks.fluxscale import fluxscale
@@ -44,17 +48,22 @@ ORIGIN = 'gcorfluxscale'
 
 class GcorFluxscaleResults(commonfluxresults.FluxCalibrationResults):
     def __init__(self, vis, resantenna=None, uvrange=None, measurements=None, fluxscale_measurements=None,
-                 applies_adopted=False):
+                 applies_adopted=False, ampcal_flagcmds=None):
         super(GcorFluxscaleResults, self).__init__(vis, resantenna=resantenna, uvrange=uvrange,
                                                    measurements=measurements)
         self.applies_adopted = applies_adopted
+
+        # PIPE-2155: to flagging commands for amplitude caltable.
+        if ampcal_flagcmds is None:
+            ampcal_flagcmds = {}
+        self.ampcal_flagcmds = ampcal_flagcmds
 
         # To store the fluxscale derived flux measurements:
         if fluxscale_measurements is None:
             fluxscale_measurements = collections.defaultdict(list)
         self.fluxscale_measurements = fluxscale_measurements
 
-        self.calapps_for_check_sources = [] 
+        self.calapps_for_check_sources = []
 
     def merge_with_context(self, context):
         # Update the measurement set with the calibrated visibility based flux
@@ -72,6 +81,7 @@ class GcorFluxscaleResults(commonfluxresults.FluxCalibrationResults):
 
 
 class GcorFluxscaleInputs(fluxscale.FluxscaleInputs):
+    amp_outlier_sigma = vdp.VisDependentProperty(default=50.0)
     antenna = vdp.VisDependentProperty(default='')
     hm_resolvedcals = vdp.VisDependentProperty(default='automatic')
     minsnr = vdp.VisDependentProperty(default=2.0)
@@ -88,13 +98,115 @@ class GcorFluxscaleInputs(fluxscale.FluxscaleInputs):
         return []
 
     solint = vdp.VisDependentProperty(default='inf')
-    # adds polarisation intent to transfer intent as required by PIPE-599
-    transintent = vdp.VisDependentProperty(default='PHASE,BANDPASS,CHECK,POLARIZATION,POLANGLE,POLLEAKAGE')
+    # Include polarisation (PIPE-599) and diffgain (PIPE-2083) intent in the
+    # transfer intent.
+    transintent = vdp.VisDependentProperty(default='PHASE,BANDPASS,CHECK,DIFFGAINREF,DIFFGAINSRC,POLARIZATION,POLANGLE,'
+                                                   'POLLEAKAGE')
     uvrange = vdp.VisDependentProperty(default='')
 
+    # docstring and type hints: supplements hifa_gfluxscale
     def __init__(self, context, output_dir=None, vis=None, caltable=None, fluxtable=None, reffile=None, reference=None,
                  transfer=None, refspwmap=None, refintent=None, transintent=None, solint=None, phaseupsolint=None,
-                 minsnr=None, refant=None, hm_resolvedcals=None, antenna=None, uvrange=None, peak_fraction=None):
+                 minsnr=None, refant=None, hm_resolvedcals=None, antenna=None, uvrange=None, peak_fraction=None,
+                 amp_outlier_sigma=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            vis: The list of input MeasurementSets. Defaults to the list of
+                MeasurementSets specified in the pipeline context.
+
+                Example: ['M32A.ms', 'M32B.ms']
+
+            caltable:
+
+            fluxtable:
+
+            reffile: Path to a file containing flux densities for calibrators.
+                Setjy will be run for any that have both reference and transfer intents.
+                Values given in this file will take precedence over MODEL column values
+                set by previous tasks. By default, the path is set to the CSV file created
+                by hifa_importdata, consisting of catalogue fluxes extracted from the ASDM
+                and / or edited by the user.
+
+                Example: reffile='', reffile='working/flux.csv'
+
+            reference: A string containing a comma delimited list of field names
+                defining the reference calibrators. Defaults to field names with
+                intent '`*AMP*`'.
+
+                Example: reference='M82,3C273'
+
+            transfer: A string containing a comma delimited list of field names
+                defining the transfer calibrators. Defaults to field names with
+                intent '`*PHASE*`'.
+
+                Example: transfer='J1328+041,J1206+30'
+
+            refspwmap: Vector of spectral window ids enabling scaling across
+                spectral windows. Defaults to no scaling.
+
+                Example: refspwmap=[1,1,3,3] - (4 spws, reference fields in 1 and 3, transfer
+                fields in 0,1,2,3)
+
+            refintent: A string containing a comma delimited list of intents
+                used to select the reference calibrators. Defaults to 'AMPLITUDE'.
+
+                Example: refintent='', refintent='AMPLITUDE'
+
+            transintent: A string containing a comma delimited list of intents
+                defining the transfer calibrators. Defaults to
+                'PHASE,BANDPASS,CHECK,POLARIZATION,POLANGLE,POLLEAKAGE'.
+
+                Example: transintent='', transintent='PHASE,BANDPASS'
+
+            solint: Time solution intervals in CASA syntax for the amplitude solution.
+
+                Example: solint='inf', solint='int', solint='100sec'
+
+            phaseupsolint: Time solution intervals in CASA syntax for the phase solution.
+
+                Example: phaseupsolint='inf', phaseupsolint='int', phaseupsolint='100sec'
+
+            minsnr: Minimum signal-to-noise ratio for gain calibration solutions.
+
+                Example: minsnr=1.5, minsnr=0.0
+
+            refant: A string specifying the reference antenna(s). By default,
+                this is read from the context.
+
+                Example: refant='DV05'
+
+            hm_resolvedcals: Heuristics method for handling resolved calibrators. The
+                options are 'automatic' and 'manual'. In automatic mode,
+                antennas closer to the reference antenna than the uv
+                distance where visibilities fall to ``peak_fraction`` of the
+                peak are used. In manual mode, the antennas specified in
+                ``antenna`` are used.
+
+            antenna: A comma delimited string specifying the antenna names or ids
+                to be used for the fluxscale determination. Used in
+                ``hm_resolvedcals`` = 'manual' mode.
+
+                Example: antenna='DV16,DV07,DA12,DA08'
+
+            uvrange:
+
+            peak_fraction: The limiting UV distance from the reference antenna for
+                antennas to be included in the flux calibration. Defined as
+                the point where the calibrator visibilities have fallen to
+                ``peak_fraction`` of the peak value.
+
+            amp_outlier_sigma: Sigma threshold used to identify outliers in the amplitude
+                caltable. Default: 50.0.
+
+                Example: amp_outlier_sigma=30.0
+
+        """
         super(GcorFluxscaleInputs, self).__init__(context, output_dir=output_dir, vis=vis, caltable=caltable,
                                                   fluxtable=fluxtable, reference=reference, transfer=transfer,
                                                   refspwmap=refspwmap, refintent=refintent, transintent=transintent)
@@ -107,6 +219,7 @@ class GcorFluxscaleInputs(fluxscale.FluxscaleInputs):
         self.antenna = antenna
         self.uvrange = uvrange
         self.peak_fraction = peak_fraction
+        self.amp_outlier_sigma = amp_outlier_sigma
 
 
 @task_registry.set_equivalent_casa_task('hifa_gfluxscale')
@@ -168,7 +281,10 @@ class GcorFluxscale(basetask.StandardTaskTemplate):
             LOG.error('Unable to complete flux scaling operation for MS %s' % (os.path.basename(inputs.vis)))
             return result
 
-        # Otherwise, continue with derivation of flux densities.
+        # PIPE-2155: flag outliers in the amplitude caltable and store the
+        # resulting flagging commands in the result.
+        result.ampcal_flagcmds[caltable] = self._flag_ampcal(caltable)
+
         # PIPE-644: derive both fluxscale-based scaling factors, as well as
         # calibrated visibility fluxes.
         try:
@@ -605,10 +721,10 @@ class GcorFluxscale(basetask.StandardTaskTemplate):
 
         # PIPE-1154: identify which fields covered the PHASE calibrator and/or
         # CHECK source intent while not also covering one of the other
-        # calibrator intents (typically AMPLITUDE, BANDPASS, POL*). For these
-        # fields, derive separate phase solutions for each combination of
-        # intent, field, and use optimal gaincal parameters based on spwmapping
-        # registered in the measurement set.
+        # calibrator intents (typically AMPLITUDE, BANDPASS, DIFFGAIN*, POL*).
+        # For these fields, derive separate phase solutions for each combination
+        # of intent, field, and use optimal gaincal parameters based on
+        # spwmapping registered in the measurement set.
         intent_field_to_assess = self._get_intent_field(self.inputs.ms, intents=pc_intents,
                                                         exclude_intents=exclude_intents)
 
@@ -817,6 +933,78 @@ class GcorFluxscale(basetask.StandardTaskTemplate):
         new_calapp = callibrary.copy_calapplication(orig_calapp, gaintable=fsresult.inputs['fluxtable'])
         LOG.debug(f'Adding calibration to callibrary:\n{new_calapp.calto}\n{new_calapp.calfrom}')
         inputs.context.callibrary.add(new_calapp.calto, new_calapp.calfrom)
+
+    def _flag_ampcal(self, caltable: str) -> List[str]:
+        # Get fields and SpWs to evaluate.
+        fields = self.inputs.ms.get_fields(name=','.join([self.inputs.transfer, self.inputs.reference]))
+        scispws = self.inputs.ms.get_spectral_windows()
+
+        # Create an antenna id-to-name translation dictionary.
+        antenna_id_to_name = {ant.id: ant.name for ant in self.inputs.ms.antennas if ant.name.strip()}
+
+        # Evaluate each field separately.
+        flagcmds = []
+        for field in fields:
+            # Retrieve unflagged amplitudes for current field from amplitude
+            # caltable.
+            with casa_tools.TableReader(caltable) as table:
+                with contextlib.closing(table.query(f"FIELD_ID == {field.id}")) as subtable:
+                    idx_unflagged = np.where(subtable.getcol('FLAG') == 0)
+                    amplitudes = np.abs(subtable.getcol('CPARAM')[idx_unflagged])
+
+            # Compute median and MAD for current field.
+            median = np.median(amplitudes)
+            mad = adopted.MAD(amplitudes)
+
+            # Evaluate each SpW separately.
+            for spw in scispws:
+                # Skip evaluation if no data are available for current field and
+                # SpW; this occurs for example with BandToBand datasets.
+                if spw not in field.valid_spws:
+                    continue
+
+                # Retrieve unflagged amplitudes, timestamps, and antennas for
+                # current field and SpW from amplitude caltable.
+                with casa_tools.TableReader(caltable) as table:
+                    taql = f"SPECTRAL_WINDOW_ID == {spw.id} && FIELD_ID == {field.id}"
+                    with contextlib.closing(table.query(taql)) as subtable:
+                        # Identify unflagged data. Note: CPARAM and FLAG are of
+                        # shape [pol, channel, row], while TIME and ANTENNA1
+                        # are of shape [row], hence using 3rd index for latter.
+                        flags = subtable.getcol('FLAG')
+                        # If this SpW is already fully flagged, skip it.
+                        if np.all(flags):
+                            continue
+                        idx_unflagged = np.where(flags == 0)
+                        amplitudes = np.abs(subtable.getcol('CPARAM')[idx_unflagged])
+                        times = subtable.getcol('TIME')[idx_unflagged[2]]
+                        antennas = subtable.getcol('ANTENNA1')[idx_unflagged[2]]
+
+                # Compute sigma and identify outliers.
+                sigma = np.abs(amplitudes - median) / mad
+                idx_to_flag = np.where(sigma > self.inputs.amp_outlier_sigma)[0]
+
+                # Generate flagging commands for outlier timestamps.
+                # Note: '&&&' is appended to the antenna name to restrict to
+                # flagging auto-correlation baselines for that antenna, and to
+                # ensure that the antenna gets flagged even if it is the refant
+                # (PIPE-2155).
+                for idx in idx_to_flag:
+                    start = casa_tools.quanta.time(casa_tools.quanta.quantity(times[idx] - 0.5, 's'), form=['ymd'])
+                    end = casa_tools.quanta.time(casa_tools.quanta.quantity(times[idx] + 0.5, 's'), form=['ymd'])
+                    flagcmds.append(f"mode='manual' antenna='{antenna_id_to_name[antennas[idx]]}&&&' spw='{spw.id}'"
+                                    f" field='{field.id}' timerange='{start[0]}~{end[0]}'"
+                                    f" reason='QA2:gfluxscale_amp_time_sigma={sigma[idx]:.6f}'")
+
+        # Apply flags.
+        if flagcmds:
+            flagsetterinputs = FlagdataSetter.Inputs(context=self.inputs.context, table=caltable, inpfile=[])
+            flagsettertask = FlagdataSetter(flagsetterinputs)
+            flagsettertask.flags_to_set(flagcmds)
+            self._executor.execute(flagsettertask)
+
+        # Return flag commands for rendering in weblog.
+        return flagcmds
 
 
 class SessionGcorFluxscaleInputs(GcorFluxscaleInputs):

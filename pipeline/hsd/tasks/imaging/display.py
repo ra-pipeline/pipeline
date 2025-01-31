@@ -98,7 +98,9 @@ class ImageAxesManager(MapAxesManagerBase):
             axes.colorbar = colorbar
         else:
             colorbar.mappable.set_clim((value_min, value_max))
-            colorbar.draw_all()
+            # it is recommended to call figure.draw_without_rendering() instead of colorbar.draw_all()
+            # colorbar.draw_all()
+            self.figure.draw_without_rendering()
             # set_clim and draw_all clears y-label
         fontsize = colorbar.ax.get_yticklabels()[0].get_fontsize()
         colorbar.ax.set_ylabel('[%s]' % value_unit, fontsize=fontsize)
@@ -800,7 +802,7 @@ class SDSparseMapDisplay(SDImageDisplay):
 class SDChannelMapDisplay(SDImageDisplay):
     """Plotter to create a channel map."""
 
-    NumChannelMap = 15
+    NUM_CHANNELMAP = 15
     NhPanel = 5
     NvPanel = 3
 
@@ -902,7 +904,7 @@ class SDChannelMapDisplay(SDImageDisplay):
             return plot_list
 
         # Set data
-        Map = numpy.zeros((self.NumChannelMap,
+        Map = numpy.zeros((self.NUM_CHANNELMAP,
                            (self.y_max - self.y_min + 1),
                            (self.x_max - self.x_min + 1)),
                           dtype=numpy.float32)
@@ -994,24 +996,24 @@ class SDChannelMapDisplay(SDImageDisplay):
             # 2007/9/13 Change the magnification factor 1.2 to your preference (to Dirk)
             # be sure the width of one channel map is integer
             # 2014/1/12 factor 1.4 -> 1.0 since velocity structure was taken into account for the range in validation.py
-            indices_width_of_line = max(int(_line_width / self.NumChannelMap + 0.5), 1)
-            idx_left_end = int(idx_line_center - self.NumChannelMap / 2.0 * indices_width_of_line + 0.5 + _offset)
+            indices_slice_width = max(int(_line_width / self.NUM_CHANNELMAP + 0.5), 1)
+            idx_left_end = int(idx_line_center - self.NUM_CHANNELMAP / 2.0 * indices_slice_width + 0.5 + _offset)
             # 2007/9/10 remedy for 'out of index' error
-            LOG.debug('idx_left_end, indices_width_of_line, NchanMap : '
-                      f'{idx_left_end}, {indices_width_of_line}, {self.NumChannelMap}')
+            LOG.debug('idx_left_end, indices_slice_width, NchanMap : '
+                      f'{idx_left_end}, {indices_slice_width}, {self.NUM_CHANNELMAP}')
             if idx_left_end < 0:
-                indices_width_of_line = int(idx_line_center * 2.0 / self.NumChannelMap)
-                if indices_width_of_line == 0:
+                indices_slice_width = int(idx_line_center * 2.0 / self.NUM_CHANNELMAP)
+                if indices_slice_width == 0:
                     continue
-                idx_left_end = int(idx_line_center - self.NumChannelMap / 2.0 * indices_width_of_line)
-            elif idx_left_end + indices_width_of_line * self.NumChannelMap > self.nchan:
-                indices_width_of_line = int((self.nchan - 1 - idx_line_center) * 2.0 / self.NumChannelMap)
-                if indices_width_of_line == 0:
+                idx_left_end = int(idx_line_center - self.NUM_CHANNELMAP / 2.0 * indices_slice_width)
+            elif idx_left_end + indices_slice_width * self.NUM_CHANNELMAP > self.nchan:
+                indices_slice_width = int((self.nchan - 1 - idx_line_center) * 2.0 / self.NUM_CHANNELMAP)
+                if indices_slice_width == 0:
                     continue
-                idx_left_end = int(idx_line_center - self.NumChannelMap / 2.0 * indices_width_of_line)
+                idx_left_end = int(idx_line_center - self.NUM_CHANNELMAP / 2.0 * indices_slice_width)
 
             chan0 = max(idx_left_end - 1, 0)
-            chan1 = min(idx_left_end + self.NumChannelMap * indices_width_of_line, self.nchan - 1)
+            chan1 = min(idx_left_end + self.NUM_CHANNELMAP * indices_slice_width, self.nchan - 1)
             V0 = min(self.velocity[chan0], self.velocity[chan1]) - velocity_line_center
             V1 = max(self.velocity[chan0], self.velocity[chan1]) - velocity_line_center
             LOG.debug('chan0, chan1, V0, V1, velocity_line_center : '
@@ -1027,20 +1029,35 @@ class SDChannelMapDisplay(SDImageDisplay):
                 axes_integsp1.axvline(x=self.frequency[chan1], linewidth=0.3, color='r')
             )
 
-            # vertical lines for integrated spectrum #2
-            for i in range(self.NumChannelMap + 1):
-                idx_chan_left_end = int(idx_left_end + i * indices_width_of_line)
-                vel_chan_left_end = None
-                if idx_chan_left_end == 0:
-                    vel_chan_left_end = 0.5 * (self.velocity[idx_chan_left_end] -
-                                               self.velocity[idx_chan_left_end - 1]) - velocity_line_center
-                else:
-                    vel_chan_left_end = 0.5 * (self.velocity[idx_chan_left_end] +
-                                               self.velocity[idx_chan_left_end - 1]) - velocity_line_center
-                vertical_lines.append(
-                    axes_integsp2.axvline(x=vel_chan_left_end, linewidth=0.3, color='r')
-                )
-                LOG.debug(f'i, Vel[idx_chan_left_end] : {i}, {vel_chan_left_end}')
+            # Drawing red vertical lines for integrated spectrum #2
+            # For detail, see the MEMO below.
+            _indices_width_of_emission_line = indices_slice_width * self.NUM_CHANNELMAP
+            _x_chan = numpy.arange(idx_left_end, idx_left_end + _indices_width_of_emission_line)
+            _y_vel = self.velocity[idx_left_end:idx_left_end + _indices_width_of_emission_line]
+            chan2vel = interpolate.interp1d(_x_chan, _y_vel, bounds_error=False, fill_value='extrapolate')
+
+            # calculate relative velocities for red vertical lines
+            _chans = [idx_left_end + i * indices_slice_width - 0.5 for i in range(self.NUM_CHANNELMAP + 1)]
+            vertlines = chan2vel(_chans) - velocity_line_center
+
+            vertical_lines.extend(
+                (axes_integsp2.axvline(x, linewidth=0.3, color='r') for x in vertlines)
+            )
+
+            LOG.debug('Relative velocities of the vertical lines: %s', vertlines)
+
+            # MEMO:
+            # - For the velocity plot #2, the red vertical lines are drawn at the relative velocity
+            #   values calculated by linear interpolation.
+            #   These lines indicate the boundaries of NUM_CHANNELMAP slices, with each slice having
+            #   a number of indices_slice_width channels. The velocity values at the boundaries are
+            #   calculated by linear interpolating the channel-center velocity values (self.velocity[]).
+            #   Extrapolation for 1/2 channels will be done to calculate the velocity values at the
+            #   very end of the line_window.
+            # - On the other hand, for the frequency plot #1, the channel-center velocity values
+            #   (self.velocity[]) are directly used to indicate the bounderies of the line_window as two
+            #   red vertical lines, hence no interpolations. Therefore the positions of the red lines of
+            #   plot #1 are slightly shifted by 0.5 ch compared to the corresponding lines in plot #2.
 
             # loop over polarizations
             for pol in range(self.npol):
@@ -1120,10 +1137,10 @@ class SDChannelMapDisplay(SDImageDisplay):
                 NMap = 0
                 Vmax0 = Vmin0 = 0
                 Title = []
-                for i in range(self.NumChannelMap):
-                    ii = self.NumChannelMap - i - 1
-                    C0 = idx_left_end + indices_width_of_line * ii
-                    C1 = C0 + indices_width_of_line
+                for i in range(self.NUM_CHANNELMAP):
+                    ii = self.NUM_CHANNELMAP - i - 1
+                    C0 = idx_left_end + indices_slice_width * ii
+                    C1 = C0 + indices_slice_width
                     if C0 < 0 or C1 >= self.nchan - 1:
                         continue
                     velo = (self.velocity[C0] + self.velocity[C1 - 1]) / 2.0 - velocity_line_center

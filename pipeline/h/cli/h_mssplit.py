@@ -3,14 +3,12 @@ import sys
 from . import utils
 
 
+# docstring and type hints: inherits from h.tasks.mstransform.mssplit.MsSplitInputs.__init__
 @utils.cli_wrapper
 def h_mssplit(vis=None, outputvis=None, field=None, intent=None, spw=None, datacolumn=None, chanbin=None, timebin=None,
               replace=None):
 
-    """
-    h_mssplit ---- Select data from calibrated MS(s) to form new MS(s) for imaging
-
-    Select data from calibrated MS(s) to form new MS(s) for imaging
+    """Select data from calibrated MS(s) to form new MS(s) for imaging
 
     Create new MeasurementSets for imaging from the corrected column of the input
     MeasurementSet. By default all science target data is copied to the new MS. The new
@@ -19,40 +17,13 @@ def h_mssplit(vis=None, outputvis=None, field=None, intent=None, spw=None, datac
 
     The results object for the pipeline task is returned.
 
-    --------- parameter descriptions ---------------------------------------------
+    Returns:
+        The results object for the pipeline task is returned.
 
-    vis           The list of input MeasurementSets to be transformed. Defaults to the
-                  list of MeasurementSets specified in the pipeline import data task.
-                  default '': Split all MeasurementSets in the context.
-                  example: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
-    outputvis     The list of output split MeasurementSets. The output list must
-                  be the same length as the input list and the output names must be different
-                  from the input names.
-                  default '', The output name defaults to <msrootname>_split.ms
-                  example: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
-    field         Set of data selection field names or ids, \'\' for all
-    intent        Select intents to split
-                  default: '', All data is selected.
-                  example: 'TARGET'
-    spw           Select spectral windows to split.
-                  default: '', All spws are selected
-                  example: '9', '9,13,15'
-    datacolumn    Select spectral windows to split. The standard CASA options are supported.
-                  example: 'corrected', 'model'
-    chanbin       The channel binning factor. 1 for no binning, otherwise 2, 4, 8, or 16.
-                  example: 2, 4
-    timebin       The time binning factor. '0s' for no binning
-                  example: '10s' for 10 second binning
-    replace       If a split was performed delete the parent MS and remove it from the context.
+    Examples:
+        1. Create a 4X channel smoothed output MS from the input MS
 
-    --------- examples -----------------------------------------------------------
-
-
-
-    1. Create a 4X channel smoothed output MS from the input MS
-
-    >>> h_mssplit(chanbin=4)
-
+        >>> h_mssplit(chanbin=4)
 
     """
 

@@ -96,10 +96,49 @@ class TransformimagedataInputs(mssplit.MsSplitInputs):
     def outputvis(self, value=''):
         return value
 
+    # docstring and type hints: supplements hif_transformimagedata
     def __init__(self, context, vis=None, output_dir=None,
                  outputvis=None, field=None, intent=None, spw=None,
                  datacolumn=None, chanbin=None, timebin=None, replace=None,
                  clear_pointing=None, modify_weights=None, wtmode=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            vis: List of visibility data files. These may be ASDMs, tar files of ASDMs, MSs, or tar files of MSs, If ASDM files are specified, they will be
+                converted  to MS format.
+
+                Example: vis=['X227.ms', 'asdms.tar.gz']
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            outputvis: The output MeasurementSet.
+
+            field: Set of data selection field names or ids, '' for all.
+
+            intent: Set of data selection intents, '' for all.
+
+            spw: Set of data selection spectral window ids '' for all.
+
+            datacolumn: Select spectral windows to split. The standard CASA options are supported
+
+                Example: 'data', 'model'
+
+            chanbin: Bin width for channel averaging.
+
+            timebin: Bin width for time averaging.
+
+            replace: If a split was performed delete the parent MS and remove it from the context. example: True or False
+
+            clear_pointing: Clear the pointing table.
+
+            modify_weights: Re-initialize the weights.
+
+            wtmode: optional weight initialization mode when modify_weights=True
+
+        """
 
         # super(TransformimagedataInputs, self).__init__()
 

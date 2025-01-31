@@ -84,8 +84,10 @@ class CheckProductSizeHeuristics(object):
             for spw, real_spw in zip(spws, real_spws)])
 
         if nfields == 0:
-            LOG.error('Cannot determine any default imaging targets')
-            return {}, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, True, {'longmsg': 'Cannot determine any default imaging targets', 'shortmsg': 'Cannot determine targets'}, known_synthesized_beams
+            LOG.warning("Cannot determine any default specmode='cube' imaging targets")
+            long_short_msg = {'longmsg': "Cannot determine any default specmode='cube' imaging targets",
+                              'shortmsg': 'Cannot determine targets'}
+            return {}, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, True, long_short_msg, known_synthesized_beams
 
         # Get representative target information
         repr_target, \
@@ -478,7 +480,7 @@ class CheckProductSizeHeuristics(object):
                 original_imsize.append(imsize_request)
 
             # Get original maximum cube and product sizes for compatibility
-            cubesizes, maxcubesize, productsizes, im_productsize = self.calculate_sizes([im])
+            _, _, _, im_productsize = self.calculate_sizes([im])
             original_productsize += im_productsize
 
             LOG.info('Default imaging leads to image pixel count of %s for target %s' % (imsize_request, im['field']))

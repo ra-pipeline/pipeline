@@ -28,7 +28,7 @@ LOG = logging.get_logger(__name__)
 
 class T2_4MDetailsTsysflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     # list of intents to consider for the summary table (only the ones that actually exist will be shown)
-    task_intents = ('AMPLITUDE', 'BANDPASS', 'DIFFGAIN', 'PHASE', 'TARGET')
+    task_intents = ('AMPLITUDE', 'BANDPASS', 'DIFFGAINREF', 'DIFFGAINSRC', 'PHASE', 'TARGET')
 
     """
     Renders detailed HTML output for the Tsysflag task.
@@ -142,8 +142,7 @@ class T2_4MDetailsTsysflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 for vis in subpages:
                     subpages[vis] = renderer.path
 
-        # PIPE-1806: add DIFFGAIN intent to the results table
-        # and use a common infrastructure to retrieve the existing intents
+        # Define which intents to show in the flagging summary table.
         flag_table_intents = ['TOTAL']
         flag_table_intents.extend(
             flagutils.intents_to_summarise(pipeline_context, T2_4MDetailsTsysflagRenderer.task_intents))

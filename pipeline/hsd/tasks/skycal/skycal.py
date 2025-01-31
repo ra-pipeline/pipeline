@@ -57,6 +57,7 @@ class SDSkyCalInputs(vdp.StandardInputs):
         self.vis = value
         return value
 
+    # docstring and type hints: supplements hsd_skycal
     def __init__(
             self,
             context: 'Context',
@@ -77,22 +78,85 @@ class SDSkyCalInputs(vdp.StandardInputs):
 
         Args:
             context: Pipeline context.
+
             calmode: Calibration mode.
-            fraction: Value of fraction of OFF scan data against total data number.
-            noff: Number of OFF scan data.
-            width: Value of pixel width, e.g., a median spatial separation between
-            neighboring two data in time.
-            elongated: Whether observed area is elongated in one direction (True)
-            or not (False).
+                Available options are 'auto' (default), 'ps', 'otf', and
+                'otfraster'. When 'auto' is set, the task will use preset
+                calibration mode that is determined by inspecting data.
+                'ps' mode is simple position switching using explicit reference
+                scans. Other two modes, 'otf' and 'otfraster', will generate
+                reference data from scans at the edge of the map. Those modes
+                are intended for OTF observation and the former is defined for
+                generic scanning pattern such as Lissajous, while the latter is
+                specific use for raster scan.
+
+                Options: 'auto', 'ps', 'otf', 'otfraster'
+
+                Default: None (equivalent to 'auto')
+
+            fraction: Sub-parameter for calmode. Edge marking parameter for
+                'otf' and 'otfraster' mode. It specifies a number of OFF scans
+                as a fraction of total number of data points.
+
+                Options: String style like '20%', or float value less than 1.0.
+                    For 'otfraster' mode, you can also specify 'auto'.
+
+                Default: None (equivalent to '10%')
+
+            noff: Sub-parameter for calmode. Edge marking parameter for
+                'otfraster' mode. It is used to specify a number of OFF scans
+                near edge directly instead to specify it by fractional
+                number by 'fraction'. If it is set, the value will come
+                before setting by 'fraction'.
+
+                Options: any positive integer value
+
+                Default: None (equivalent to '')
+
+            width: Sub-parameter for calmode. Edge marking parameter for
+                'otf' mode. It specifies pixel width with respect to
+                a median spatial separation between neighboring two data
+                in time. Default will be fine in most cases.
+
+                Options: any float value
+
+                Default: None (equivalent to 0.5)
+
+            elongated: Sub-parameter for calmode. Edge marking parameter
+                for 'otf' mode. Please set True only if observed area is
+                elongated in one direction.
+
+                Default: None (equivalent to False)
+
             output_dir: Name of output directory.
-            infiles: Name of MS or list of names.
+
+            infiles: List of data files. These must be a name of
+                MeasurementSets that are registered to context
+                via hsd_importdata or hsd_restoredata task.
+
+                Example: vis=['X227.ms', 'X228.ms']
+
             outfile: Name of the output file.
-            field: Field selection.
-            spw: Spectral window (spw) selection.
-            scan: Scan selection.
+
+            field: Data selection by field name.
+
+            spw: Data selection by spw.
+
+                Example: '3,4' (generate caltable for spw 3 and 4), ['0','2'] (spw 0 for first data, 2 for second)
+
+                Default: None (process all science spws)
+
+            scan: Data selection by scan number. (default all scans)
+
+                Example: '22,23' (use scan 22 and 23 for calibration), ['22','24'] (scan 22 for first data, 24 for second)
+
+                Default: None (process all scans)
+
             parallel: Execute using CASA HPC functionality, if available.
-                      Default is None, which intends to turn on parallel
-                      processing if possible.
+
+                Options: 'automatic', 'true', 'false', True, False
+
+                Default: None (equivalent to 'automatic')
         """
         super(SDSkyCalInputs, self).__init__()
 

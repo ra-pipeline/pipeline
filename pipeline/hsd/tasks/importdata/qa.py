@@ -3,6 +3,7 @@
 from typing import List
 
 import pipeline.h.tasks.importdata.qa as importdataqa
+from pipeline.infrastructure.launcher import Context
 import pipeline.infrastructure.logging as logging
 import pipeline.qa.scorecalculator as qacalc
 from pipeline.domain.measurementset import MeasurementSet
@@ -39,6 +40,21 @@ class SDImportDataQAHandler(importdataqa.ImportDataQAHandler, QAPlugin):
             QAScore object
         """
         return qacalc.score_missing_intents(mses, array_type='ALMA_TP')
+
+    def handle(self, context:'Context', result:'importdata.SDImportDataResults'):
+        """Generate QA score for hsd_importdata.
+        
+        Most scores are calculated with the QA handler of h_importdata.
+
+        Args:
+            context (Context): The context object of pipeline executing.
+            result (importdata.SDImportDataResults): The result object of SDImportData executing.
+        """
+        super().handle(context, result)
+        score = qacalc.score_rasterscan_correctness_direction_domain_rasterscan_fail(result)
+        result.qa.pool.extend(score)
+        score = qacalc.score_rasterscan_correctness_time_domain_rasterscan_fail(result)
+        result.qa.pool.extend(score)
 
 
 class SDImportDataListQAHandler(importdataqa.ImportDataListQAHandler, QAPlugin):

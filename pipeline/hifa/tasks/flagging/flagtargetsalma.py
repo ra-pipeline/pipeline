@@ -81,7 +81,29 @@ class FlagTargetsALMAInputs(vdp.StandardInputs):
         vis_root = sanitize_for_ms(self.vis)
         return os.path.join(self.output_dir, vis_root + '.flagtargetscmds.txt')
 
+    # docstring and type hints: supplements hifa_flagtargets
     def __init__(self, context, vis=None, output_dir=None, flagbackup=None, template=None, filetemplate=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            vis: The list of input MeasurementSets. Defaults to the list
+                of MeasurementSets defined in the pipeline context.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            flagbackup: Back up any pre-existing flags; defaults to False.
+
+            template: Apply flagging templates; defaults to True.
+
+            filetemplate: The name of a text file that contains the flagging
+                template for issues with the science target data etc.
+                If the template flags files is undefined a name of the
+                form 'msname_flagtargetstemplate.txt' is assumed.
+
+        """
 
         super(FlagTargetsALMAInputs, self).__init__()
 

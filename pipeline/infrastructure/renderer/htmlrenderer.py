@@ -1,9 +1,10 @@
 import collections
 import contextlib
 import datetime
+import decimal
+import enum
 import functools
 import itertools
-import math
 import operator
 import os
 import pydoc
@@ -17,20 +18,20 @@ import numpy
 import pkg_resources
 
 import pipeline as pipeline
-from pipeline.domain.measurementset import MeasurementSet
 import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.displays.pointing as pointing
 import pipeline.infrastructure.displays.summary as summary
-from pipeline.infrastructure.launcher import Context
 import pipeline.infrastructure.logging as logging
 from pipeline import environment
-from pipeline.infrastructure import casa_tools
+from pipeline.domain.measurementset import MeasurementSet
+from pipeline.infrastructure import casa_tools, mpihelpers
 from pipeline.infrastructure import task_registry
 from pipeline.infrastructure import utils
+from pipeline.infrastructure.launcher import Context
 from pipeline.infrastructure.renderer.templates import resources
-from . import qaadapter, rendererutils, weblog
+from . import qaadapter, weblog
 from .. import eventbus
 from .. import pipelineqa
 from ..eventbus import WebLogStageRenderingStartedEvent, WebLogStageRenderingCompleteEvent, \
@@ -315,7 +316,7 @@ class T1_1Renderer(RendererBase):
     TableRow = collections.namedtuple(
                 'Tablerow', 
                 'ousstatus_entity_id schedblock_id schedblock_name session '
-                'execblock_id ms acs_software_version acs_software_build_version href filesize ' 
+                'execblock_id ms acs_software_version acs_software_build_version observing_modes href filesize ' 
                 'receivers '
                 'num_antennas beamsize_min beamsize_max '
                 'time_start time_end time_on_source '
@@ -330,8 +331,77 @@ class T1_1Renderer(RendererBase):
                 'baseline_min baseline_max baseline_rms '
                 'merge2_version')
 
-    EnvironmentTableRow = collections.namedtuple('EnvironmentTableRow',
-                                                 'hostname num_mpi_servers num_cores cpu ram os ulimit')
+    class EnvironmentProperty(enum.Enum):
+        """
+        Enumeration of environment properties that describe the host
+        execution environment and resource limits.
+        """
+
+        HOSTNAME = 'Hostname'
+        CPU_TYPE = 'CPU'
+        LOGICAL_CPU_CORES = 'Logical CPU cores'
+        PHYSICAL_CPU_CORES = 'Physical CPU cores'
+        NUM_MPI_SERVERS = "Number of MPI servers"
+        RAM = "RAM"
+        SWAP = "Swap"
+        OS = "OS"
+        ULIMIT_FILES = "Max open file descriptors"
+        ULIMIT_MEM = "Memory usage ulimit"
+        ULIMIT_CPU = "CPU time ulimit in seconds"
+        CASA_CORES = "CASA-reported CPU cores availability"
+        CASA_THREADS = "Max OpenMP threads per CASA instance"
+        CASA_MEMORY = "Memory available to pipeline"
+        CGROUP_NUM_CPUS = "Cgroup CPU allocation"
+        CGROUP_CPU_BANDWIDTH = "Cgroup CPU bandwidth"
+        CGROUP_CPU_WEIGHT = "CPU distribution within cgroup"
+        CGROUP_MEM_LIMIT = "Cgroup memory limit"
+
+        def description(self, ctx):
+            if self is self.CASA_MEMORY:
+                return f'Memory available to {"pipeline" if is_singledish_ms(ctx) else "tclean"}'
+            return self.value
+
+    class EnvironmentTable:
+        """
+        Representation of the resource limit table in the weblog.
+
+        Rows in the output table will have the same order as the rows constructor
+        argument.
+
+        @param rows: properties to present in the table
+        @param data: dict of environment properties per host
+        """
+        def __init__(
+                self,
+                ctx: Context,
+                rows: List["T1_1Renderer.EnvironmentProperty"],
+                data: Dict["T1_1Renderer.EnvironmentProperty", List[str]]
+            ):
+
+            # 'memory available to pipeline' should not be presented for SD data
+            if is_singledish_ms(ctx):
+                rows = [r for r in rows if r != T1_1Renderer.EnvironmentProperty.CASA_MEMORY]
+
+            # getNumCPUs is confusing when run in an MPI context, giving the
+            # number of cores that the process can migrate to rather than
+            # number of cores used by CASA. To avoid confusion, we remove the
+            # CASA cores row completely for MPI runs.
+            if mpihelpers.is_mpi_ready():
+                rows = [r for r in rows if r != T1_1Renderer.EnvironmentProperty.CASA_CORES]
+
+            unmerged_rows = [(prop.description(ctx), *data[prop]) for prop in rows]
+            merged_rows = utils.merge_td_rows(utils.merge_td_columns(unmerged_rows))
+
+            # we want headings in column 1 so need to replace markup
+            # we could also achieve this with CSS but it's easier just to modify the data
+            formatted = ([
+                (row[0].replace('<td>', '<th scope="row">').replace('</td>', '</th>'), *row[1:])
+                for row in merged_rows
+            ])
+
+            self.table_rows = formatted
+            # required to set the colspan property of the table title
+            self.num_columns = len(data[T1_1Renderer.EnvironmentProperty.HOSTNAME]) + 1
 
     @staticmethod
     def get_display_context(context):
@@ -441,6 +511,7 @@ class T1_1Renderer(RendererBase):
                                             ms=ms.basename,
                                             acs_software_version = ms.acs_software_version,             # None for VLA
                                             acs_software_build_version = ms.acs_software_build_version, # None for VLA
+                                            observing_modes=ms.observing_modes,
                                             href=href,
                                             filesize=ms.filesize,
                                             receivers=receivers,
@@ -456,7 +527,7 @@ class T1_1Renderer(RendererBase):
 
             ms_summary_rows.append(row)
 
-        execution_mode, environment_rows = T1_1Renderer.get_cluster_tablerows()
+        execution_mode, environment_tables = T1_1Renderer.get_environment_tables(context)
 
         return {
             'pcontext': context,
@@ -483,43 +554,87 @@ class T1_1Renderer(RendererBase):
             'ppr_uid': None,
             'observers': observers,
             'ms_summary_rows': ms_summary_rows,
-            'environment': environment_rows,
+            'environment_tables': environment_tables,
             'execution_mode': execution_mode
         }
 
     @staticmethod
-    def get_cluster_tablerows():
-        environment_rows = []
-        node_environments = {}
-        data = sorted(pipeline.environment.cluster_details, key=operator.itemgetter('hostname'))
-        for k, g in itertools.groupby(data, operator.itemgetter('hostname')):
+    def get_environment_tables(ctx: Context):
+        # alias to make the following code more compact and easier to read
+        props = T1_1Renderer.EnvironmentProperty
+
+        node_environments: Dict[str, List[environment.Environment]] = {}
+
+        data = sorted(pipeline.environment.cluster_details(), key=operator.attrgetter('hostname'))
+        for k, g in itertools.groupby(data, operator.attrgetter('hostname')):
             node_environments[k] = list(g)
 
+        data_rows = collections.defaultdict(list)
         for node, node_envs in node_environments.items():
             if not node_envs:
                 continue
-            mpi_server_envs = [n for n in node_envs if 'MPI Server' in n['role']]
-            num_mpi_servers = len(mpi_server_envs) if mpi_server_envs else 'N/A'
+
             # all hardware on a node has the same value so just take first
             # environment dict
             n = node_envs[0]
-            row = T1_1Renderer.EnvironmentTableRow(
-                # take just the hostname, ignoring domain
-                hostname=node.split('.')[0],
-                cpu=n['cpu'],
-                num_cores=n['num_cores'],
-                num_mpi_servers=num_mpi_servers,
-                ram=str(measures.FileSize(n['ram'], measures.FileSizeUnits.BYTES)),
-                os=n['os'],
-                ulimit=n['ulimit']
+
+            mpi_server_envs = [n for n in node_envs if 'MPI Server' in n.role]
+            num_mpi_servers = len(mpi_server_envs) if mpi_server_envs else 'N/A'
+            data_rows[props.NUM_MPI_SERVERS].append(num_mpi_servers)
+
+            data_rows[props.HOSTNAME].append(node.split('.')[0])
+            data_rows[props.CPU_TYPE].append(n.cpu_type)
+            data_rows[props.LOGICAL_CPU_CORES].append(n.logical_cpu_cores)
+            data_rows[props.PHYSICAL_CPU_CORES].append(n.physical_cpu_cores)
+
+            data_rows[props.RAM].append(str(measures.FileSize(n.ram, measures.FileSizeUnits.BYTES)))
+            try:
+                data_rows[props.SWAP].append(measures.FileSize(n.swap, measures.FileSizeUnits.BYTES))
+            except decimal.InvalidOperation:
+                data_rows[props.SWAP].append('unknown')
+
+            data_rows[props.CGROUP_NUM_CPUS].append(n.cgroup_num_cpus)
+            data_rows[props.CGROUP_CPU_BANDWIDTH].append(n.cgroup_cpu_bandwidth)
+            data_rows[props.CGROUP_CPU_WEIGHT].append(n.cgroup_cpu_weight)
+            try:
+                data_rows[props.CGROUP_MEM_LIMIT].append(measures.FileSize(n.cgroup_mem_limit, measures.FileSizeUnits.BYTES))
+            except decimal.InvalidOperation:
+                data_rows[props.CGROUP_MEM_LIMIT].append('N/A')
+
+            data_rows[props.CASA_CORES].append(n.casa_cores)
+            data_rows[props.CASA_THREADS].append(n.casa_threads)
+            data_rows[props.CASA_MEMORY].append(str(measures.FileSize(n.casa_memory, measures.FileSizeUnits.BYTES)))
+
+            data_rows[props.OS].append(n.host_distribution)
+            data_rows[props.ULIMIT_FILES].append(n.ulimit_files)
+            data_rows[props.ULIMIT_MEM].append(n.ulimit_mem)
+            data_rows[props.ULIMIT_CPU].append(n.ulimit_cpu)
+
+        tables = {
+            "Host information": T1_1Renderer.EnvironmentTable(
+                ctx=ctx,
+                rows=[props.HOSTNAME, props.OS, props.NUM_MPI_SERVERS, props.ULIMIT_FILES],
+                data=data_rows
+            ),
+            "CPU resources and limits": T1_1Renderer.EnvironmentTable(
+                ctx=ctx,
+                rows=[props.HOSTNAME, props.CPU_TYPE, props.PHYSICAL_CPU_CORES,
+                      props.LOGICAL_CPU_CORES, props.CGROUP_NUM_CPUS,
+                      props.CGROUP_CPU_BANDWIDTH, props.ULIMIT_CPU,
+                      props.CASA_CORES, props.CASA_THREADS],
+                data=data_rows
+            ),
+            "Available memory and limits": T1_1Renderer.EnvironmentTable(
+                ctx=ctx,
+                rows=[props.HOSTNAME, props.RAM, props.SWAP, props.CGROUP_MEM_LIMIT,
+                      props.ULIMIT_MEM, props.CASA_MEMORY],
+                data=data_rows
             )
-            environment_rows.append(row)
-        environment_rows.sort(key=operator.itemgetter(0))
-        environment_rows = utils.merge_td_columns(environment_rows)
+        }
 
-        mode = 'Parallel' if any(['MPI Server' in d['role'] for d in pipeline.environment.cluster_details]) else 'Serial'
+        mode = 'Parallel' if any(['MPI Server' in d.role for d in pipeline.environment.cluster_details()]) else 'Serial'
 
-        return mode, environment_rows
+        return mode, tables
 
 
 class T1_2Renderer(RendererBase):
@@ -629,9 +744,12 @@ class T1_3MRenderer(RendererBase):
                         for field in resultitem.flagsummary:
                             # Get the field intents, but only for those that
                             # the pipeline processes. This can be an empty
-                            # list (PIPE-394: POINTING, WVR intents; PIPE-1806: DIFFGAIN).
-                            intents_list = [f.intents for f in ms.get_fields(
-                                intent='BANDPASS,PHASE,AMPLITUDE,POLARIZATION,POLANGLE,POLLEAKAGE,CHECK,TARGET,DIFFGAIN')
+                            # list (PIPE-394: POINTING, WVR intents; PIPE-1806:
+                            # DIFFGAIN* intents).
+                            intents_list = [f.intents
+                                            for f in ms.get_fields(intent='BANDPASS,PHASE,AMPLITUDE,POLARIZATION,'
+                                                                          'POLANGLE,POLLEAKAGE,CHECK,TARGET,'
+                                                                          'DIFFGAINREF,DIFFGAINSRC')
                                             if field in f.name]
                             if len(intents_list) == 0:
                                 continue

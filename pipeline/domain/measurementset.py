@@ -1,26 +1,27 @@
 """Provide a class to store logical representation of MeasurementSet."""
 import collections
 import contextlib
+import inspect
 import itertools
 import operator
 import os
+import re
 from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
 import numpy as np
-import re
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.utils as utils
 from pipeline.infrastructure import casa_tools
-from pipeline.infrastructure.utils import conversion
+
 if TYPE_CHECKING:  # Avoid circular import. Used only for type annotation.
     from pipeline.infrastructure.tablereader import RetrieveByIndexContainer
 
-from . import measures
-from . import spectralwindow
+from pipeline.infrastructure import logging
+
+from . import measures, spectralwindow
 from .antennaarray import AntennaArray
 from .datatype import DataType
-from pipeline.infrastructure.utils import range_to_list
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -50,6 +51,8 @@ class MeasurementSet(object):
         spectralspec_spwmap: A dictionary mapping SpectralSpec to corresponding
             spectral window IDs.
         fields: A list of Field objects associated with MS
+        scans: A list of Scan objects associated with MS
+        sources: A list of Source objects associated with MS
         states: A list of State objects associated with MS
         spwmaps: Spectral window mapping to use for combining/mapping, split by
             (intent, field), used in ALMA interferometry calibration tasks.
@@ -59,6 +62,8 @@ class MeasurementSet(object):
         data_types_per_source_and_spw: A dictionary to store a list of
             available data types (values) in this MS per (source,spw) tuples
             (keys)
+        observing_modes: The name(s) of the Observing Mode(s) used for this MS
+            (empty list if not ALMA).
         reference_antenna_locked: If True, reference antenna is locked to
             prevent modification
         origin_ms: A path to the first generation MeasurementSet from which
@@ -95,6 +100,8 @@ class MeasurementSet(object):
         self.data_descriptions: Union[RetrieveByIndexContainer, list] = []
         self.spectral_windows: Union[RetrieveByIndexContainer, list] = []
         self.fields: Union[RetrieveByIndexContainer, list] = []
+        self.scans: list = []
+        self.sources: Union[RetrieveByIndexContainer, list] = []
         self.states: Union[RetrieveByIndexContainer, list] = []
         self.reference_spwmap: Optional[List[int]] = None
         self.origin_ms: str = name
@@ -110,6 +117,10 @@ class MeasurementSet(object):
         self.acs_software_build_version = None
 
         self.data_types_per_source_and_spw: dict = {}
+
+        # ALMA only: the name(s) of the Observing Mode(s) selected for this MS,
+        # populated from the ASDM_SBSUMMARY table (PIPE-2084).
+        self.observing_modes: List[str] = []
 
         # Dictionary mapping phase calibrator fields to corresponding fields
         # with TARGET / CHECK intents (PIPE-1154).
@@ -194,6 +205,15 @@ class MeasurementSet(object):
     def basename(self):
         return os.path.basename(self.name)
 
+    @property
+    def is_band_to_band(self) -> bool:
+        # PIPE-2084: declares whether this MS is for band-to-band
+        # interferometry. This is deemed True if either the observing mode
+        # declares it as band-to-band, or if the diffgain intent + SpW setup are
+        # consistent with band-to-band (latter covers datasets that don't have
+        # correct observing mode set in their metadata).
+        return "BandToBand Interferometry" in self.observing_modes or self.get_diffgain_mode() == "B2B"
+
     def get_antenna(self, search_term=''):
         if search_term == '':
             return self.antennas
@@ -213,7 +233,7 @@ class MeasurementSet(object):
 
         if scan_id is not None:
             # encase raw numbers in a tuple
-            if not isinstance(scan_id, collections.Sequence):
+            if not isinstance(scan_id, collections.abc.Sequence):
                 scan_id = (scan_id,)
             pool = [s for s in pool if s.id in scan_id]
 
@@ -231,13 +251,13 @@ class MeasurementSet(object):
             pool = [s for s in pool if not fields_with_name.isdisjoint(s.fields)]
 
         if spw is not None:
-            if not isinstance(spw, collections.Sequence):
+            if not isinstance(spw, collections.abc.Sequence):
                 spw = (spw,)
             if isinstance(spw, str):
                 if spw in ('', '*'):
                     spw = ','.join(str(spw.id) for spw in self.spectral_windows)
                 if '~' in spw:
-                    spw = conversion.range_to_list(spw)
+                    spw = utils.range_to_list(spw)
                 else:
                     spw = spw.split(',')
             spw = {int(i) for i in spw}
@@ -280,6 +300,12 @@ class MeasurementSet(object):
         """
         qa = casa_tools.quanta
         cme = casa_tools.measures
+
+        # PIPE-1504: only issue certain messages at the WARNING level if they are executed by hifa_imageprecheck
+        if 'hifa_imageprecheck' in [fn_name for (_, _, _, fn_name, _, _) in inspect.stack()]:
+            log_level = logging.WARNING
+        else:
+            log_level = logging.INFO
 
         if source_name:
             # Use the first target source that matches the user defined name
@@ -361,8 +387,8 @@ class MeasurementSet(object):
             try:
                 target_spwid = [s.id for s in self.get_spectral_windows() if s.name == self.representative_window][0]
             except:
-                LOG.warning('Could not translate spw name %s to ID. Trying frequency matching heuristics.' %
-                            self.representative_window)
+                LOG.log(log_level, 'Could not translate spw name %s to ID. Trying frequency matching heuristics.' %
+                        self.representative_window)
 
         if target_spwid is not None:
             return (target_source_name, target_spwid)
@@ -370,8 +396,10 @@ class MeasurementSet(object):
         # Get the representative bandwidth
         #     Return if there isn't one
         if not self.representative_target[2]:
-            LOG.warning('Undefined representative bandwidth for data set %s' % self.basename)
+            if self.antenna_array.name not in ('VLA', 'EVLA'):
+                LOG.warning('Undefined representative bandwidth for data set %s' % self.basename)
             return (target_source_name, None)
+        
         target_bw = cme.frequency('TOPO',
             qa.quantity(qa.getvalue(self.representative_target[2]),
             qa.getunit(self.representative_target[2])))
@@ -456,8 +484,9 @@ class MeasurementSet(object):
         target_spws_freq = [spw for spw in target_spws_bw
                             if spw.min_frequency.value <= target_frequency_topo['m0']['value'] <= spw.max_frequency.value]
         if len(target_spws_freq) <= 0:
-            LOG.warning('No target spws with channel spacing <= representative bandwith overlap the representative frequency in data set %s' %
-                        self.basename)
+            LOG.log(log_level,
+                    'No target spws with channel spacing <= representative bandwith overlap the representative frequency in data set %s' %
+                    self.basename)
             max_chanwidth = None
             for spw in target_spws_bw:
                 chanwidth = spw.channels[0].getWidth().to_units(measures.FrequencyUnits.HERTZ)
@@ -506,7 +535,7 @@ class MeasurementSet(object):
 
         if field_id is not None:
             # encase raw numbers in a tuple
-            if not isinstance(field_id, collections.Sequence):
+            if not isinstance(field_id, collections.abc.Sequence):
                 field_id = (field_id,)
             pool = [f for f in pool if f.id in field_id]
 
@@ -539,7 +568,7 @@ class MeasurementSet(object):
                                '{1}'.format(spw_id, self.basename))
 
     def get_spectral_windows(self, task_arg='', with_channels=False, num_channels=(), science_windows_only=True,
-                             spectralspecs=None):
+                             spectralspecs=None, intent=None):
         """
         Return the spectral windows corresponding to the given CASA-style spw
         argument, filtering out windows that may not be science spectral 
@@ -555,17 +584,21 @@ class MeasurementSet(object):
         if spectralspecs is not None:
             spws = [w for w in spws if w.spectralspec in spectralspecs]
 
+        # If requested, filter spws by intent.
+        if intent is not None:
+            spws = [w for w in spws if not set(intent.split(',')).isdisjoint(w.intents)]
+
         if not science_windows_only:
             return spws
 
         if self.antenna_array.name == 'ALMA':
             science_intents = {'TARGET', 'PHASE', 'BANDPASS', 'AMPLITUDE',
                                'POLARIZATION', 'POLANGLE', 'POLLEAKAGE',
-                               'CHECK', 'DIFFGAIN'}
+                               'CHECK', 'DIFFGAINREF', 'DIFFGAINSRC'}
             return [w for w in spws if w.num_channels not in self.exclude_num_chans
                     and not science_intents.isdisjoint(w.intents)]
 
-        if self.antenna_array.name == 'VLA' or self.antenna_array.name == 'EVLA':
+        if self.antenna_array.name in ('VLA', 'EVLA'):
             science_intents = {'TARGET', 'PHASE', 'BANDPASS', 'AMPLITUDE',
                                'POLARIZATION', 'POLANGLE', 'POLLEAKAGE',
                                'CHECK'}
@@ -582,7 +615,8 @@ class MeasurementSet(object):
         """Return list of all spectral specs used in the MS."""
         return list(self.spectralspec_spwmap.keys())
 
-    def get_all_spectral_windows(self, task_arg='', with_channels=False):
+    def get_all_spectral_windows(self, task_arg: str = '', with_channels: bool = False) \
+            -> List[Union[spectralwindow.SpectralWindow, spectralwindow.SpectralWindowWithChannelSelection]]:
         """Return the spectral windows corresponding to the given CASA-style
         spw argument.
         """
@@ -606,57 +640,47 @@ class MeasurementSet(object):
             spws.append(proxy)
         return spws
 
-    def get_diffgain_spectral_windows(self):
+    def get_diffgain_mode(self) -> Optional[str]:
         """
-        Determine the correspondence between spws used for phase calibration and for science target
-        in the DIFFGAIN observing mode (only for ALMA).
-        Returns:
-            a dict with two lists (not necessarily of the same length):
-            REFERENCE contains the spws used for phase calibration in the DIFFGAIN mode;
-            SCIENCE contains the spws used for science target observing in the DIFFGAIN mode.
-            If DIFFGAIN is not used or the observatory is not ALMA, both lists are empty.
-        """
-        spws = self.get_all_spectral_windows()
-        if self.antenna_array.name == 'ALMA':
-            phasecalspws = []
-            sciencespws = []
-            for w in spws:
-                if w.num_channels not in self.exclude_num_chans and 'DIFFGAIN' in w.intents:
-                    if 'PHASE' in w.intents:
-                        phasecalspws.append(w)
-                    elif 'TARGET' in w.intents:
-                        sciencespws.append(w)
-            return dict(REFERENCE=phasecalspws, SCIENCE=sciencespws)
-        else:
-            return dict(REFERENCE=[], SCIENCE=[])
+        Determine if the intents and SpW setup in this measurement set are
+        consistent with an observing mode that uses a differential gain
+        calibrator: BandToBand (B2B) or BandwidthSwitching (BWSW).
 
-    def get_diffgain_mode(self):
-        """
-        Determine if the dataset has bandwidth switching for any spws
         Returns:
-            'B2B' if the ratio of frequencies between science target and reference spws is above 1.661;
-            'BWSW' if the ratio of bandwidths between reference and science target is above 1.5;
-            None  otherwise (including the normal case with no DIFFGAIN intent)
+            'B2B' if the ratio of frequencies between on-source and reference spws is above 1.661;
+            'BWSW' if the ratio of bandwidths between reference and on-source is above 1.5;
+            None if there are no DIFFGAIN* intents in this MS.
+
         Raises:
-            ValueError if the DIFFGAIN intent is present but neither of the above conditions are satisfied
+            ValueError if the DIFFGAIN* intents are present in the MS, but either
+            a. the MS is missing diffgain reference or on-source SpWs
+            b. the SpW setup does not match either BandToBand or BandwidthSwitching.
         """
-        if 'DIFFGAIN' in self.intents:
-            # examine only the first spw, the setup is expected to be the same for all spws
-            diffspw = self.get_diffgain_spectral_windows()
-            if not diffspw['REFERENCE']:
-                raise ValueError(f'DIFFGAIN intent missing in calibration sources for dataset {self.basename}')
-            if not diffspw['SCIENCE']:
-                raise ValueError(f'DIFFGAIN intent missing in science sources for dataset {self.basename}')
-            refcent = diffspw['REFERENCE'][0].centre_frequency.value
-            scicent = diffspw['SCIENCE'][0].centre_frequency.value
-            refwidth = diffspw['REFERENCE'][0].bandwidth.value
-            sciwidth = diffspw['SCIENCE'][0].bandwidth.value
+        if 'DIFFGAINREF' in self.intents or 'DIFFGAINSRC' in self.intents:
+            # Retrieve diffgain reference and diffgain on-source SpWs.
+            dg_refspws = self.get_spectral_windows(intent='DIFFGAINREF')
+            if not dg_refspws:
+                raise ValueError(f'DIFFGAINREF intent missing in calibration sources for dataset {self.basename}')
+            dg_srcspws = self.get_spectral_windows(intent='DIFFGAINSRC')
+            if not dg_srcspws:
+                raise ValueError(f'DIFFGAINSRC intent missing in science sources for dataset {self.basename}')
+
+            # Retrieve the center frequency and bandwidth from the first
+            # diffgain on-source SpW and first diffgain reference SpW. The setup
+            # is expected to be the same for all SpWs.
+            refcent = dg_refspws[0].centre_frequency.value
+            scicent = dg_srcspws[0].centre_frequency.value
+            refwidth = dg_refspws[0].bandwidth.value
+            sciwidth = dg_srcspws[0].bandwidth.value
+
             # [at least] one of the above conditions has to be satisfied
-            if scicent/refcent > 1.661 :  # simple ratio to be out of band Cycle 10
+            if scicent/refcent > 1.661:  # simple ratio to be out of band Cycle 10
                 return 'B2B'
             elif refwidth/sciwidth > 1.5:
                 return 'BWSW'
+
             raise ValueError(f'DIFFGAIN intent with an unsupported spectral setup for dataset {self.basename}')
+
         return None
 
     def get_original_intent(self, intent=None):
@@ -681,7 +705,6 @@ class MeasurementSet(object):
             return cycle_number
         else:
             return None
-
 
     @property
     def start_time(self):
@@ -1187,7 +1210,7 @@ class MeasurementSet(object):
             state_ids = [-1]
 
         with casa_tools.TableReader(self.name) as table:
-            taql = '(STATE_ID IN %s AND FIELD_ID IN %s)' % (state_ids, field_ids)
+            taql = '(STATE_ID IN %s AND FIELD_ID IN %s)' % (utils.list_to_str(state_ids), utils.list_to_str(field_ids))
             with contextlib.closing(table.query(taql)) as subtable:
                 integration = subtable.getcol('INTERVAL')
             return np.median(integration)
@@ -1242,7 +1265,7 @@ class MeasurementSet(object):
         science_spw_dd_ids = [self.get_data_description(spw).id for spw in science_spws]
 
         with casa_tools.TableReader(self.name) as table:
-            taql = '(STATE_ID IN %s AND FIELD_ID IN %s AND DATA_DESC_ID in %s)' % (science_state_ids, science_field_ids, science_spw_dd_ids)
+            taql = '(STATE_ID IN %s AND FIELD_ID IN %s AND DATA_DESC_ID in %s)' % (utils.list_to_str(science_state_ids), utils.list_to_str(science_field_ids), utils.list_to_str(science_spw_dd_ids))
             with contextlib.closing(table.query(taql)) as subtable:
                 integration = subtable.getcol('INTERVAL')
             return np.median(integration)
@@ -1264,7 +1287,7 @@ class MeasurementSet(object):
         times_on_source_per_field_id = dict()
         for field_id in field_ids:
             with casa_tools.TableReader(self.name) as table:
-                taql = '(STATE_ID IN %s AND FIELD_ID IN [%s] AND DATA_DESC_ID in [%s] AND SCAN_NUMBER in [%s] AND ANTENNA1=%s AND ANTENNA2=%s)' % (state_ids, field_id, first_science_spw_dd_id, scan_ids, ant1, ant2)
+                taql = '(STATE_ID IN %s AND FIELD_ID IN [%s] AND DATA_DESC_ID in [%s] AND SCAN_NUMBER in %s AND ANTENNA1=%s AND ANTENNA2=%s)' % (utils.list_to_str(state_ids), field_id, first_science_spw_dd_id, utils.list_to_str(scan_ids), ant1, ant2)
                 with contextlib.closing(table.query(taql)) as subtable:
                     integration = subtable.getcol('INTERVAL')
                 times_on_source_per_field_id[field_id] = np.sum(integration)
@@ -1363,9 +1386,9 @@ class MeasurementSet(object):
         return [colname for colname in self.all_colnames() if colname in ('DATA', 'FLOAT_DATA', 'CORRECTED_DATA')]
 
     def set_data_column(self, dtype: DataType, column: str,
-                        source: Optional[str]=None,
-                        spw: Optional[str]=None,
-                        overwrite: bool=False):
+                        source: Optional[str] = None,
+                        spw: Optional[str] = None,
+                        overwrite: bool = False):
         """
         Set data type and column.
 
@@ -1397,33 +1420,20 @@ class MeasurementSet(object):
 
         # Check if data type is already associated with another column
         if not overwrite and dtype in self.data_column and self.get_data_column(dtype) != column:
-            raise ValueError('Data type {} is already associated with column {} in {}'.format(dtype, self.get_data_column(dtype), self.basename))
+            raise ValueError('Data type {} is already associated with column {} in {}'.format(
+                dtype, self.get_data_column(dtype), self.basename))
 
         # Check if column is already assigned to another data type
         if not overwrite and column in self.data_column.values() and self.get_data_column(dtype) != column:
-            raise ValueError('Column {} is already associated with data type {} in {}'.format(column, [k for k,v in self.data_column.items() if v == column][0], self.basename))
+            raise ValueError('Column {} is already associated with data type {} in {}'.format(
+                column, [k for k, v in self.data_column.items() if v == column][0], self.basename))
+
+        source_name_list = self._source_select_to_list(source)
+        spw_id_list = self._spw_select_to_list(spw)
 
         # Update data types per (source,spw) selection
-        if source is None:
-            source_names = ','.join(utils.dequote(s.name) for s in self.sources)
-        else:
-            # Check for empty or blank strings
-            if source.strip():
-                source_names = ','.join(utils.dequote(s.strip()) for s in source.split(','))
-            else:
-                source_names = ','.join(utils.dequote(s.name) for s in self.sources)
-
-        if spw is None:
-            spw_ids = ','.join(str(s.id) for s in self.spectral_windows)
-        else:
-            # Check for empty or blank strings
-            if spw.strip():
-                spw_ids = spw
-            else:
-                spw_ids = ','.join(str(s.id) for s in self.spectral_windows)
-
-        for source_name in source_names.split(','):
-            for spw_id in map(int, range_to_list(spw_ids)):
+        for source_name in source_name_list:
+            for spw_id in spw_id_list:
                 key = (source_name, spw_id)
                 if key in self.data_types_per_source_and_spw:
                     if dtype not in self.data_types_per_source_and_spw[key]:
@@ -1432,24 +1442,26 @@ class MeasurementSet(object):
                     self.data_types_per_source_and_spw[key] = [dtype]
 
         # Check for existing column registration and remove it
-        column_keys = [k for k,v in self.data_column.items() if v == column]
-        if column_keys!= []:
-           for k in column_keys:
-               del(self.data_column[k])
+        column_keys = [k for k, v in self.data_column.items() if v == column]
+        if column_keys != []:
+            for k in column_keys:
+                del (self.data_column[k])
 
         # Update MS domain object
         if dtype not in self.data_column:
             self.data_column[dtype] = column
             LOG.info('Updated data column information of {}. Set {} to column {}'.format(self.basename, dtype, column))
 
-    def get_data_column(self, dtype: DataType, source: Optional[str]=None, spw: Optional[str]=None) -> Optional[str]:
+    def get_data_column(self, dtype: DataType, source: Optional[str] = None, spw: Optional[str] = None) -> Optional[str]:
         """
         Return the column name associated with a DataType in an MS domain object.
 
         Args:
             dtype: DataType to fetch column name for
-            source: Comma separated list of source names to filter for.
-            spw: Comma separated list of real spw IDs to filter for.
+            source: source names (comma separated name selection string) to filter for. 
+                    If unset, all sources will be used.
+            spw: spectral windows (comma separated real spw ID selection string) to filter for. 
+                 If unset, all real spw IDs will be used.
 
             If source and spw are both unset, the method will just look
             at the MS data type and column information. If one or both
@@ -1466,20 +1478,13 @@ class MeasurementSet(object):
         if source is None and spw is None:
             return self.data_column[dtype]
 
-        if source is None:
-            source_names = ','.join(utils.dequote(s.name) for s in self.sources)
-        else:
-            source_names = ','.join(utils.dequote(s.strip()) for s in source.split(','))
-
-        if spw is None:
-            spw_ids = ','.join(str(s.id) for s in self.spectral_windows)
-        else:
-            spw_ids = spw
+        source_name_list = self._source_select_to_list(source)
+        spw_id_list = self._spw_select_to_list(spw)
 
         # Check all (source,spw) combinations
         data_exists_for_all_source_spw_combinations = True
-        for source_name in source_names.split(','):
-            for spw_id in map(int, spw_ids.split(',')):
+        for source_name in source_name_list:
+            for spw_id in spw_id_list:
                 key = (source_name, spw_id)
                 if dtype not in self.data_types_per_source_and_spw.get(key, []):
                     data_exists_for_all_source_spw_combinations = False
@@ -1489,14 +1494,16 @@ class MeasurementSet(object):
         else:
             return None
 
-    def get_data_type(self, column: str, source: Optional[str]=None, spw: Optional[str]=None) -> Optional[DataType]:
+    def get_data_type(self, column: str, source: Optional[str] = None, spw: Optional[str] = None) -> Optional[DataType]:
         """
         Return the DataType associated with a column in an MS domain object.
 
         Args:
             column: name of column in MS
-            source: Comma separated list of source names to filter for.
-            spw: Comma separated list of real spw IDs to filter for.
+            source: source names (comma separated name selection string) to filter for. 
+                    If unset, all sources will be used.
+            spw: spectral windows (comma separated real spw ID selection string) to filter for. 
+                 If unset, all real spw IDs will be used.
 
             If source and spw are both unset, the method will just look
             at the MS data type and column information. If one or both
@@ -1518,21 +1525,14 @@ class MeasurementSet(object):
         if source is None and spw is None:
             return data_type[column]
 
-        if source is None:
-            source_names = ','.join(utils.dequote(s.name) for s in self.sources)
-        else:
-            source_names = ','.join(utils.dequote(s.strip()) for s in source.split(','))
-
-        if spw is None:
-            spw_ids = ','.join(str(s.id) for s in self.spectral_windows)
-        else:
-            spw_ids = spw
+        source_name_list = self._source_select_to_list(source)
+        spw_id_list = self._spw_select_to_list(spw)
 
         # Check all (source,spw) combinations
         data_exists_for_all_source_spw_combinations = True
         column_dtype = data_type[column]
-        for source_name in source_names.split(','):
-            for spw_id in map(int, spw_ids.split(',')):
+        for source_name in source_name_list:
+            for spw_id in spw_id_list:
                 key = (source_name, spw_id)
                 if column_dtype not in self.data_types_per_source_and_spw.get(key, []):
                     data_exists_for_all_source_spw_combinations = False
@@ -1541,3 +1541,41 @@ class MeasurementSet(object):
             return column_dtype
         else:
             return None
+
+    def _source_select_to_list(self, source_select: Union[str, None]) -> List[str]:
+        """
+        Convert a CASA-style source selection string to a list of source names.
+
+        Args:
+            source_select: source string to convert
+
+        Returns:
+            A list of source names (as strings)
+        """
+
+        if source_select is None or not source_select.strip():
+            # if None or empty or blank selection string, use all sources
+            source_list = [utils.dequote(s.name) for s in self.sources]
+        else:
+            source_list = [utils.dequote(s.strip()) for s in source_select.split(',')]
+
+        return source_list
+
+    def _spw_select_to_list(self, spw_select: Union[str, None]) -> List[int]:
+        """
+        Convert a CASA-style spw selection string to a list of spw IDs.
+
+        Args:
+            spw_select: spw selection string to convert
+
+        Returns:
+            A list of spw IDs (as integers)
+        """
+
+        if spw_select is None or not spw_select.strip():
+            # if None or empty or blank selection string, use all spws
+            spw_list = [s.id for s in self.spectral_windows]
+        else:
+            spw_list = utils.range_to_list(spw_select)
+
+        return spw_list

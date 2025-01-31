@@ -29,7 +29,15 @@ def test_create_averages_from_ms_fail_as_expected():
     because the 'corrected_data' column is not populated in the unprocessed test dataset.
     """
     ms = MeasurementSetReader.get_measurement_set(MS_NAME)
-    with pytest.raises(np.AxisError):
+    # Since NumPy 2, all the exceptions are in np.exceptions submodule
+    # and older references in main NumPy name space have been removed.
+    # On the other hand, CASA 6.6.1 or lower are based on NumPy < 1.24,
+    # which don't have exceptions submodule yet.
+    if np.version.version.startswith('2'):
+        expected_exception = np.exceptions.AxisError
+    else:
+        expected_exception = np.AxisError
+    with pytest.raises(expected_exception):
         wrapper = MSWrapper.create_averages_from_ms(ms.name, SCAN_ID, SPW_ID, 1)
 
 

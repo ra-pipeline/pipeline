@@ -29,16 +29,16 @@ def plot_type(plot):
 
 <%block name="header" />
 
-<%block name="title">Flagging of phase, pol, and flux calibrator</%block>
+<%block name="title">Flagging of flux, diffgain, phase calibrators and check source</%block>
 
 <p>
-    This task computes the flagging heuristics on the phase calibrator and flux
-    calibrator by calling hif_correctedampflag which looks for outlier
-    visibility points by statistically examining the scalar difference of
-    corrected amplitudes minus model amplitudes, and flags those outliers. The
-    philosophy is that only outlier data points that have remained outliers
-    after calibration will be flagged. The heuristic works equally well on
-    resolved calibrators and point sources because it is not performing a
+    This task computes the flagging heuristics on the flux, diffgain, and phase
+    calibrators and the check source, by calling hif_correctedampflag which
+    looks for outlier visibility points by statistically examining the scalar
+    difference of corrected amplitudes minus model amplitudes, and flags those
+    outliers. The philosophy is that only outlier data points that have remained
+    outliers after calibration will be flagged. The heuristic works equally well
+    on resolved calibrators and point sources because it is not performing a
     vector difference, and thus is not sensitive to nulls in the flux density
     vs. uvdistance domain. Note that the phase of the data is not assessed.
 </p>
@@ -91,6 +91,18 @@ def plot_type(plot):
 
 <h2 id="flagged_data_summary" class="jumptarget">Flagged data summary</h2>
 
+<p> The values in the following table(s) are computed from the temporarily-calibrated visibility data after applying 
+the integration-based phase 'G' solutions and the scan-based amplitude 'A' solutions computed in this stage. 
+The "flagged before" column is the percentage of flagged visibilities before also applying the newly-generated 
+flags computed from the statistical analysis of the surviving calibrated data, while the "flagged after" column 
+also includes those flags. High values on this page are indicative of low SNR achieved on the corresponding 
+object on the per-integration timescale. In all cases, both columns will naturally be higher than the 
+corresponding values seen on the later hif_applycal stage because in that stage the phase solutions are 
+scan-based, thus have higher SNR. The spw mapping/combination heuristics determined in hifa_spwphaseup are used 
+in computing the solutions in this stage. Note that with 50 antennas, a loss of 10% of the antenna solutions (5) 
+will result in a loss of 19% of the baselines (235).
+</p>
+
 % for ms in flags.keys():
 <h4>Measurement Set: ${os.path.basename(ms)}</h4>
 <table class="table table-bordered table-striped ">
@@ -106,7 +118,7 @@ def plot_type(plot):
 		</tr>
 	</thead>
 	<tbody>
-		% for k in ['TOTAL', 'BANDPASS', 'AMPLITUDE', 'PHASE', 'CHECK', 'TARGET']:
+		% for k in ['TOTAL', 'BANDPASS', 'AMPLITUDE', 'PHASE', 'CHECK', 'DIFFGAINREF', 'DIFFGAINSRC', 'TARGET']:
 		<tr>
 			<th>${k}</th>
 			% for step in ['before','after']:

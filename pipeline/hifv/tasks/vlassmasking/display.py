@@ -3,7 +3,6 @@ import copy
 import os
 
 import matplotlib
-import numpy as np
 
 import pipeline.infrastructure as infrastructure
 from pipeline.h.tasks.common.displays import sky as sky

@@ -14,7 +14,6 @@ Pipeline Documentation
    pipeline.h.cli
    pipeline.hif.cli
    pipeline.hifa.cli
-   pipeline.hifas.cli
    pipeline.hifv.cli
    pipeline.hsd.cli
    pipeline.hsdn.cli

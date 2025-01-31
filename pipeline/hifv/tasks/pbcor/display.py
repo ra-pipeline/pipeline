@@ -29,7 +29,8 @@ class PbcorimagesSummary(object):
         self.result.residual_stats = {}
         self.result.pbcor_stats = {}
 
-        for basename, pbcor_images in self.result.pbcorimagenames.items():
+        for basename_keep, pbcor_images in self.result.pbcorimagenames.items():
+            basename = basename_keep[0]
             plot_wrappers = []
             for pbcor_imagename in pbcor_images:
 

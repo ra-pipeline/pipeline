@@ -36,12 +36,16 @@ class ImportDataQAHandler(pqa.QAPlugin):
 
         score7 = self._check_science_spw_names(result.mses, context.observing_run.virtual_science_spw_names)
 
+        # Check state of IERS tables relative to observation date (PIPE-2137)
+        scores8 = self._check_iersstate(result.mses)
+
         LOG.todo('ImportData QA: missing source.xml and calibrator unknown to '
                  'CASA')
         LOG.todo('ImportData QA: missing BDFs')
 
         scores = [score1, score3, score4, score5, score6, score7]
         result.qa.pool.extend(scores)
+        result.qa.pool.extend(scores8)
 
     @staticmethod
     def _check_contiguous(mses):
@@ -173,6 +177,13 @@ class ImportDataQAHandler(pqa.QAPlugin):
         Check science spw names
         '''
         return qacalc.score_science_spw_names(mses, virtual_science_spw_names)
+    
+    def _check_iersstate(self, mses) -> pqa.QAScore:
+        """
+        Check state of IERS tables relative to observation date
+        """
+        return qacalc.score_iersstate(mses)
+
 
 class ImportDataListQAHandler(pqa.QAPlugin):
     result_cls = collections.abc.Iterable

@@ -2,13 +2,15 @@
 Utilities used for correcting image center coordinates.
 """
 import os
-from typing import Union, Dict, Tuple
+from typing import Dict, Tuple, Union
 
-import numpy as np
 import astropy.io.fits as apfits
+import astropy.units as u
+import numpy as np
+from astropy.coordinates import offset_by
 
-from .. import casa_tools
-from .. import logging
+from .. import casa_tools, logging
+from . import record_to_quantity as rtq
 
 LOG = logging.get_logger(__name__)
 
@@ -67,12 +69,8 @@ def do_wide_field_pos_cor(fitsname: str, date_time: Union[Dict, None] = None,
 
             # Check whether position correction was already applied
             if 'Position correction ' in str(header['history']):
-                message = "Positions are already corrected in  {}".format(fitsname)
-                try:
-                    LOG.warning(message)
-                except NameError:
-                    print(message)
-                return None
+                LOG.warning('Positions are already corrected in %s', fitsname)
+                return
 
             # Get original coordinates
             ra_head = {'unit': header['cunit1'], 'value': header['crval1']}
@@ -86,52 +84,45 @@ def do_wide_field_pos_cor(fitsname: str, date_time: Union[Dict, None] = None,
                 date_time = casa_tools.measures.epoch(timesys, date_obs)
 
             # Compute correction
-            offset = calc_wide_field_pos_cor(ra=ra_head, dec=dec_head, obs_long=obs_long,
-                                             obs_lat=obs_lat, date_time=date_time)
-            
+            offset_pa = list(rtq(calc_wide_field_pos_cor(ra=ra_head, dec=dec_head, obs_long=obs_long,
+                                                         obs_lat=obs_lat, date_time=date_time, offset_pa=True)))
+
             # PIPE-1356: perform additional freqency-dependent scaling from the 3GHz prediction.
             freq_scale = (3.e9/freq_head['value'])**2
-            offset[0]['value'] = offset[0]['value']*freq_scale
-            offset[1]['value'] = offset[1]['value']*freq_scale
+            offset_pa[0] = offset_pa[0]*freq_scale
+
+            pa_rad = offset_pa[1].to_value(u.rad)
+            offset_arcsec = offset_pa[0].to_value(u.arcsec)
 
             # Apply corrections
-            ra_rad_fixed = casa_tools.quanta.sub(
-                ra_head, casa_tools.quanta.div(offset[0], casa_tools.quanta.cos(dec_head)))
-            dec_rad_fixed = casa_tools.quanta.sub(dec_head, offset[1])
+            ra_fixed, dec_fixed = offset_by(header['crval1']*u.deg, header['crval2']*u.deg,
+                                            offset_pa[1]+180*u.deg, offset_pa[0].to_value(u.rad))
 
             # Update FITS image header, use degrees
-            header['crval1'] = casa_tools.quanta.convert(ra_rad_fixed, 'deg')['value']
+            header['crval1'] = ra_fixed.to_value(u.deg)
             header['cunit1'] = 'deg'
-            header['crval2'] = casa_tools.quanta.convert(dec_rad_fixed, 'deg')['value']
+            header['crval2'] = dec_fixed.to_value(u.deg)
             header['cunit2'] = 'deg'
 
             # Update history, "Position correction..." message should remain the last record in list.
             messages = ['Uncorrected CRVAL1 = {:.12E} deg'.format(casa_tools.quanta.convert(ra_head, 'deg')['value']),
                         'Uncorrected CRVAL2 = {:.12E} deg'.format(casa_tools.quanta.convert(dec_head, 'deg')['value']),
                         'Position correction ({:.3E}/cos(CRVAL2), {:.3E}) arcsec applied'.format(
-                            casa_tools.quanta.convert(offset[0], 'arcsec')['value'] * -1.0,
-                            casa_tools.quanta.convert(offset[1], 'arcsec')['value'] * -1.0)]
+                            -offset_arcsec*np.sin(pa_rad), -offset_arcsec*np.cos(pa_rad))]
             for m in messages:
                 header.add_history(m)
 
             # Save changes and inform log
             hdulist.flush()
-            try:
-                LOG.info("{} to {}".format(messages[-1], fitsname))
-            except NameError:
-                print("{} to {}".format(messages[-1], fitsname))
+            LOG.info(f'{messages[-1]} to {fitsname}')
     else:
-        message = 'Image {} does not exist. No position correction was done.'.format(fitsname)
-        try:
-            LOG.warning(message)
-        except NameError:
-            print(message)
+        LOG.warning(f'Image {fitsname} does not exist. No position correction was done.')
 
-    return None
+    return
 
 
 def calc_wide_field_pos_cor(ra: Dict, dec: Dict, obs_long: Dict, obs_lat: Dict,
-                            date_time: Dict) -> Tuple[Dict, Dict]:
+                            date_time: Dict, offset_pa: bool = False) -> Tuple[Dict, Dict]:
     """Computes the wide field position correction.
 
     Args:
@@ -140,6 +131,7 @@ def calc_wide_field_pos_cor(ra: Dict, dec: Dict, obs_long: Dict, obs_lat: Dict,
         obs_long: Geographic longitude of observatory.
         obs_lat: Geographic latitude of observatory.
         date_time: Date and time of observation.
+        offset_pa: Return the angular offset and parallactic angle instead of offset along RA and Dec.
 
     The arguments are all in casa_tools.quanta format (dictionary containing
     value (float) and unit (str)). The function internally uses radian units for
@@ -201,8 +193,11 @@ def calc_wide_field_pos_cor(ra: Dict, dec: Dict, obs_long: Dict, obs_lat: Dict,
         chi = chi + np.pi
 
     # Offset values
+    if offset_pa:
+        return ({'value': deltatot, 'unit': 'rad'},
+                {'value': chi, 'unit': 'rad'})
+
     offset[0] = deltatot * np.sin(chi)
     offset[1] = deltatot * np.cos(chi)
-
     return ({'value': offset[0], 'unit': 'rad'},
             {'value': offset[1], 'unit': 'rad'})

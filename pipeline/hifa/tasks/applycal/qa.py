@@ -150,7 +150,6 @@ class ALMAApplycalQAHandler(pqa.QAPlugin):
         result.qa.representative = min(result.qa.pool, key=operator.attrgetter('score'))
 
 
-
 def get_qa_scores(ms: MeasurementSet, export_outliers: bool, outlier_score: float, flag_all: bool):
     """
     Calculate amp/phase vs freq outliers for an EB and convert to QA scores.
@@ -160,7 +159,8 @@ def get_qa_scores(ms: MeasurementSet, export_outliers: bool, outlier_score: floa
     to detect outliers, converting the outlier descriptions to normalised QA
     scores.
     """
-    intents = ['AMPLITUDE', 'BANDPASS', 'PHASE', 'CHECK', 'POLARIZATION', 'POLANGLE', 'POLLEAKAGE']
+    intents = ['AMPLITUDE', 'BANDPASS', 'PHASE', 'CHECK', 'DIFFGAINREF', 'DIFFGAINSRC', 'POLARIZATION', 'POLANGLE',
+               'POLLEAKAGE']
 
     all_scores = []
 

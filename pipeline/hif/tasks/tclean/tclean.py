@@ -36,7 +36,8 @@ class TcleanInputs(cleanbase.CleanBaseInputs):
     # This is just an initial default to get any vis. The real selection is
     # usually made in hif_makeimlist and passed on as explicit parameter
     # via hif_makeimages.
-    processing_data_type = [DataType.SELFCAL_LINE_SCIENCE, DataType.REGCAL_LINE_SCIENCE, DataType.SELFCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_type = [DataType.SELFCAL_LINE_SCIENCE, DataType.REGCAL_LINE_SCIENCE,  DataType.SELFCAL_CONT_SCIENCE, DataType.REGCAL_CONT_SCIENCE,
+                           DataType.SELFCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     # simple properties ------------------------------------------------------------------------------------------------
 
@@ -129,18 +130,18 @@ class TcleanInputs(cleanbase.CleanBaseInputs):
                  iter=None, mask=None, niter=None, threshold=None, tlimit=None, drcorrect=None, masklimit=None,
                  calcsb=None, cleancontranges=None, parallel=None,
                  # Extra parameters not in the CLI task interface
-                 weighting=None, robust=None, uvtaper=None, scales=None, cycleniter=None, cyclefactor=None,
+                 weighting=None, robust=None, uvtaper=None, scales=None, cycleniter=None, cyclefactor=None, nmajor=None,
                  hm_minpsffraction=None, hm_maxpsffraction=None,
                  sensitivity=None, reffreq=None, restfreq=None, conjbeams=None, is_per_eb=None, antenna=None,
-                 usepointing=None, mosweight=None, spwsel_all_cont=None, num_all_spws=None, num_good_spws=None,
-                 bl_ratio=None, cfcache_nowb=None,
+                 usepointing=None, mosweight=None, spwsel_all_cont=None, spwsel_low_bandwidth=None,
+                 spwsel_low_spread=None, num_all_spws=None, num_good_spws=None, bl_ratio=None, cfcache_nowb=None,
                  # End of extra parameters
                  heuristics=None, pbmask=None):
         super(TcleanInputs, self).__init__(context, output_dir=output_dir, vis=vis, imagename=imagename, antenna=antenna,
                                            datacolumn=datacolumn, datatype=datatype, datatype_info=datatype_info,
                                            intent=intent, field=field, spw=spw, uvrange=uvrange, specmode=specmode,
                                            gridder=gridder, deconvolver=deconvolver, uvtaper=uvtaper, nterms=nterms,
-                                           cycleniter=cycleniter, cyclefactor=cyclefactor,
+                                           cycleniter=cycleniter, cyclefactor=cyclefactor, nmajor=nmajor,
                                            hm_minpsffraction=hm_minpsffraction, hm_maxpsffraction=hm_maxpsffraction,
                                            scales=scales, outframe=outframe, imsize=imsize, cell=cell, phasecenter=phasecenter,
                                            psf_phasecenter=psf_phasecenter, nchan=nchan, start=start, width=width, stokes=stokes,
@@ -169,6 +170,8 @@ class TcleanInputs(cleanbase.CleanBaseInputs):
         self.spwsel_lsrk = spwsel_lsrk
         self.spwsel_topo = spwsel_topo
         self.spwsel_all_cont = spwsel_all_cont
+        self.spwsel_low_bandwidth = spwsel_low_bandwidth
+        self.spwsel_low_spread = spwsel_low_spread
         self.num_all_spws = num_all_spws
         self.num_good_spws = num_good_spws
         self.bl_ratio = bl_ratio
@@ -274,8 +277,7 @@ class Tclean(cleanbase.CleanBase):
         context = self.inputs.context
         self.known_synthesized_beams = self.inputs.context.synthesized_beams
 
-        LOG.info('\nCleaning for intent "%s", field %s, spw %s\n',
-                 inputs.intent, inputs.field, inputs.spw)
+        LOG.info('Start imaging for intent %s, field %s, spw %s', inputs.intent, inputs.field, inputs.spw)
 
         per_spw_cont_sensitivities_all_chan = context.per_spw_cont_sensitivities_all_chan
         qaTool = casa_tools.quanta
@@ -302,7 +304,7 @@ class Tclean(cleanbase.CleanBase):
         self.image_heuristics = inputs.image_heuristics
 
         # Set initial masking limits
-        self.pblimit_image, self.pblimit_cleanmask = self.image_heuristics.pblimits(None)
+        self.pblimit_image, self.pblimit_cleanmask = self.image_heuristics.pblimits(None, inputs.specmode)
         if not inputs.pblimit:
             inputs.pblimit = self.pblimit_image
 
@@ -349,13 +351,6 @@ class Tclean(cleanbase.CleanBase):
             #  antenna sizes are not listed) could be added in some future configurations by removing this character.
             inputs.antenna = [','.join(map(str, antenna_ids.get(os.path.basename(v), '')))+'&' for v in inputs.vis]
 
-        # Determine the phase center
-        if inputs.phasecenter in ('', None):
-            field_ids = self.image_heuristics.field(inputs.intent, inputs.field)
-            # TODO: This call will no longer work as expected after the PIPE-98 changes
-            #       (missing primary beam size and shift parameter compared to hif_makeimlist).
-            #       Need to decide whether to remove all hif_tclean fallback heuristics.
-            inputs.phasecenter, inputs.psf_phasecenter = self.image_heuristics.phasecenter(field_ids)
 
         # If imsize not set then use heuristic code to calculate the
         # centers for each field  / spw
@@ -389,7 +384,7 @@ class Tclean(cleanbase.CleanBase):
                                                   cell=inputs.cell,
                                                   primary_beam=largest_primary_beam,
                                                   spwspec=imsize_spwlist,
-                                                  intent=inputs.intent)
+                                                  intent=inputs.intent,specmode=inputs.specmode)
 
             if inputs.imsize in (None, [], ''):
                 inputs.imsize = imsize
@@ -411,7 +406,8 @@ class Tclean(cleanbase.CleanBase):
                                             sourcename=inputs.field,
                                             intent=inputs.intent,
                                             spw=inputs.spw,
-                                            specmode=inputs.specmode)
+                                            specmode=inputs.specmode,
+                                            imaging_mode=self.image_heuristics.imaging_mode)
                 error_result.error = '%s/%s/spw%s clean error: No frequency intersect among selected MSs' % (inputs.field, inputs.intent, inputs.spw)
                 return error_result
 
@@ -437,7 +433,8 @@ class Tclean(cleanbase.CleanBase):
                                                 sourcename=inputs.field,
                                                 intent=inputs.intent,
                                                 spw=inputs.spw,
-                                                specmode=inputs.specmode)
+                                                specmode=inputs.specmode,
+                                                imaging_mode=self.image_heuristics.imaging_mode)
                     error_result.error = '%s/%s/spw%s clean error: f_start < f_low_native' % (inputs.field,
                                                                                               inputs.intent, inputs.spw)
                     return error_result
@@ -449,7 +446,8 @@ class Tclean(cleanbase.CleanBase):
                                             sourcename=inputs.field,
                                             intent=inputs.intent,
                                             spw=inputs.spw,
-                                            specmode=inputs.specmode)
+                                            specmode=inputs.specmode,
+                                            imaging_mode=self.image_heuristics.imaging_mode)
                 error_result.error = '%s/%s/spw%s clean error: width and nbin are mutually exclusive' % (inputs.field,
                                                                                                          inputs.intent,
                                                                                                          inputs.spw)
@@ -473,7 +471,8 @@ class Tclean(cleanbase.CleanBase):
                                                 sourcename=inputs.field,
                                                 intent=inputs.intent,
                                                 spw=inputs.spw,
-                                                specmode=inputs.specmode)
+                                                specmode=inputs.specmode,
+                                                imaging_mode=self.image_heuristics.imaging_mode)
                     error_result.error = '%s/%s/spw%s clean error: user channel width too small' % (inputs.field,
                                                                                                     inputs.intent,
                                                                                                     inputs.spw)
@@ -512,7 +511,8 @@ class Tclean(cleanbase.CleanBase):
                                                 sourcename=inputs.field,
                                                 intent=inputs.intent,
                                                 spw=inputs.spw,
-                                                specmode=inputs.specmode)
+                                                specmode=inputs.specmode,
+                                                imaging_mode=self.image_heuristics.imaging_mode)
                     error_result.error = '%s/%s/spw%s clean error: f_stop > f_high' % (inputs.field,
                                                                                        inputs.intent, inputs.spw)
                     return error_result
@@ -544,19 +544,23 @@ class Tclean(cleanbase.CleanBase):
         # this does not (yet) happen in hif_editimlist.
         if inputs.spwsel_lsrk == {}:
             all_continuum = True
+            low_bandwidth = True
+            low_spread = True
             for spwid in inputs.spw.split(','):
 
 
-                cont_ranges_spwsel, all_continuum_spwsel = self.image_heuristics.cont_ranges_spwsel()
+                cont_ranges_spwsel, all_continuum_spwsel, low_bandwidth_spwsel, low_spread_spwsel = self.image_heuristics.cont_ranges_spwsel()
                 spwsel_spwid = cont_ranges_spwsel.get(utils.dequote(inputs.field), {}).get(spwid, 'NONE')
                 all_continuum = all_continuum and all_continuum_spwsel.get(utils.dequote(inputs.field), {}).get(spwid, False)
+                low_bandwidth = low_bandwidth and low_bandwidth_spwsel.get(utils.dequote(inputs.field), {}).get(spwid, False)
+                low_spread = low_spread and low_spread_spwsel.get(utils.dequote(inputs.field), {}).get(spwid, False)
 
                 if inputs.intent == 'TARGET':
                     if (spwsel_spwid == 'NONE') and self.image_heuristics.warn_missing_cont_ranges():
                         LOG.warning('No continuum frequency range information detected for %s, spw %s.' % (inputs.field,
                                                                                                            spwid))
 
-                if spwsel_spwid in ('ALL', '', 'NONE'):
+                if spwsel_spwid in ('ALL', 'ALLCONT', '', 'NONE'):
                     if self.image_heuristics.is_eph_obj(inputs.field):
                         spwsel_spwid_refer = 'SOURCE'
                     else:
@@ -570,6 +574,8 @@ class Tclean(cleanbase.CleanBase):
 
                 inputs.spwsel_lsrk['spw%s' % spwid] = spwsel_spwid
             inputs.spwsel_all_cont = all_continuum
+            inputs.spwsel_low_bandwidth = low_bandwidth
+            inputs.spwsel_low_spread = low_spread
 
         # Get TOPO frequency ranges for all MSs
         (spw_topo_freq_param, _, _, spw_topo_chan_param_dict, _, _, self.aggregate_lsrk_bw) = self.image_heuristics.calc_topo_ranges(inputs)
@@ -582,19 +588,20 @@ class Tclean(cleanbase.CleanBase):
             self.cont_freq_ranges = ''
 
         # Get sensitivity
+        sens_reffreq = None
         if inputs.sensitivity is not None:
             # Override with manually set value
             sensitivity = qaTool.convert(inputs.sensitivity, 'Jy')['value']
             eff_ch_bw = 1.0
         else:
             # Get a noise estimate from the CASA sensitivity calculator
-            (sensitivity, eff_ch_bw, _, per_spw_cont_sensitivities_all_chan) = \
+            (sensitivity, eff_ch_bw, _, sens_reffreq, per_spw_cont_sensitivities_all_chan) = \
                 self.image_heuristics.calc_sensitivities(inputs.vis, inputs.field, inputs.intent, inputs.spw,
                                                          inputs.nbin, spw_topo_chan_param_dict, inputs.specmode,
                                                          inputs.gridder, inputs.cell, inputs.imsize, inputs.weighting,
                                                          inputs.robust, inputs.uvtaper,
                                                          known_sensitivities=per_spw_cont_sensitivities_all_chan,
-                                                         force_calc=inputs.calcsb)
+                                                         force_calc=inputs.calcsb, calc_reffreq=True)
 
         if sensitivity is None:
             LOG.error('Could not calculate the sensitivity for Field %s Intent %s SPW %s' % (inputs.field,
@@ -603,9 +610,27 @@ class Tclean(cleanbase.CleanBase):
                                         sourcename=inputs.field,
                                         intent=inputs.intent,
                                         spw=inputs.spw,
-                                        specmode=inputs.specmode)
+                                        specmode=inputs.specmode,
+                                        imaging_mode=self.image_heuristics.imaging_mode)
             error_result.error = '%s/%s/spw%s clean error: no sensitivity' % (inputs.field, inputs.intent, inputs.spw)
             return error_result
+
+        # PIPE-2130: for the VLA-PI workflow only, determine the optimal reffreq value from spw center frequencies
+        # weighted by predicted per-spw sensitivity.
+        # This is only triggered if all below conditions meet:
+        #   * reffreq is not specified in the Tclean/input (from MakeImList or Editimlist)
+        #   * deconvolver is mtmfs
+        #   * nterms>=2 or CASA default nterms=None
+        if (
+            self.image_heuristics.imaging_mode in {"VLA", "VLA-SCAL"}
+            and inputs.specmode == "cont"
+            and inputs.deconvolver == "mtmfs"
+            and (inputs.nterms is None or inputs.nterms >= 2)
+            and inputs.reffreq is None
+            and sens_reffreq is not None
+        ):
+            # Set reffreq in GHz
+            inputs.reffreq = f"{sens_reffreq/1e9}GHz"
 
         # Choose TOPO frequency selections
         if inputs.specmode != 'cube':
@@ -1092,7 +1117,7 @@ class Tclean(cleanbase.CleanBase):
 
         # Determine masking limits depending on PB
         extension = '.tt0' if result.multiterm else ''
-        self.pblimit_image, self.pblimit_cleanmask = self.image_heuristics.pblimits(result.flux+extension)
+        self.pblimit_image, self.pblimit_cleanmask = self.image_heuristics.pblimits(result.flux+extension, specmode=inputs.specmode)
 
         # Keep pblimits for mom8_fc QA statistics and score (PIPE-704)
         result.set_pblimit_image(self.pblimit_image)
@@ -1143,6 +1168,11 @@ class Tclean(cleanbase.CleanBase):
                                   nfield=max([len(field_ids.split(',')) for field_ids in self.image_heuristics.field(inputs.intent, inputs.field)]),
                                   datamin=pbcor_image_min, datamax=pbcor_image_max, datarms=nonpbcor_image_non_cleanmask_rms, stokes=inputs.stokes,
                                   effbw=effbw, level='member', ctrfrq=ctrfrq, obspatt=obspatt, arrays=arrays, modifier=modifier, session=session)
+
+            # PIPE-2211: Update some keywords for manifest usage on all other imaging products
+            for im_name in result.im_names.values():
+                if os.path.exists(im_name):
+                    self._update_miscinfo(imagename=im_name, stokes=inputs.stokes, level='member', obspatt=obspatt, arrays=arrays, modifier=modifier, session=session)
 
             result.set_image_min(pbcor_image_min)
             result.set_image_min_iquv(pbcor_image_min_iquv)
@@ -1274,6 +1304,11 @@ class Tclean(cleanbase.CleanBase):
                                   datamin=pbcor_image_min, datamax=pbcor_image_max, datarms=nonpbcor_image_non_cleanmask_rms, stokes=inputs.stokes,
                                   effbw=effbw, level='member', ctrfrq=ctrfrq, obspatt=obspatt, arrays=arrays, modifier=modifier, session=session)
 
+            # PIPE-2211: Update some keywords for manifest usage on all other imaging products
+            for im_name in result.im_names.values():
+                if os.path.exists(im_name):
+                    self._update_miscinfo(imagename=im_name, stokes=inputs.stokes, level='member', obspatt=obspatt, arrays=arrays, modifier=modifier, session=session)
+
             keep_iterating, hm_masking = self.image_heuristics.keep_iterating(iteration, inputs.hm_masking,
                                                                               result.tclean_stopcode,
                                                                               dirty_dynamic_range, residual_max,
@@ -1364,6 +1399,8 @@ class Tclean(cleanbase.CleanBase):
                                                   spw=inputs.spw,
                                                   spwsel=inputs.spwsel_topo,
                                                   spwsel_all_cont=inputs.spwsel_all_cont,
+                                                  spwsel_low_bandwidth=inputs.spwsel_low_bandwidth,
+                                                  spwsel_low_spread=inputs.spwsel_low_spread,
                                                   reffreq=inputs.reffreq,
                                                   restfreq=inputs.restfreq,
                                                   conjbeams=inputs.conjbeams,
@@ -1378,6 +1415,7 @@ class Tclean(cleanbase.CleanBase):
                                                   nterms=inputs.nterms,
                                                   cycleniter=inputs.cycleniter,
                                                   cyclefactor=cyclefactor,
+                                                  nmajor=inputs.nmajor,
                                                   hm_minpsffraction=inputs.hm_minpsffraction,
                                                   hm_maxpsffraction=inputs.hm_maxpsffraction,
                                                   scales=inputs.scales,
@@ -1529,7 +1567,7 @@ class Tclean(cleanbase.CleanBase):
         if cont_chan_ranges[0] != 'NONE':
 
             # Create a channel ranges string.
-            if cont_chan_ranges[0] == 'ALL':
+            if cont_chan_ranges[0] in ('ALL', 'ALLCONT'):
                 cont_chan_ranges_str = ''
                 cont_chan_indices = slice(None)
             else:

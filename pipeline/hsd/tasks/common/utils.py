@@ -1,12 +1,15 @@
 """A collection of Single Dish utility methods and classes."""
 import collections
 import contextlib
+import datetime
 import functools
 import os
 import sys
 import time
 from logging import Logger as pyLogger
 from typing import Any, Callable, Dict, Generator, Iterable, List, NewType, Optional, Sequence, Union, Tuple
+
+from astropy.time import Time
 
 # Imported for annotation pupose only. Use table in casa_tools in code.
 from casatools import table as casa_table
@@ -19,7 +22,7 @@ from pipeline.domain import DataTable, Field, MeasurementSet, ObservingRun
 from pipeline.domain.datatable import OnlineFlagIndex
 from pipeline.infrastructure import Context
 from pipeline.infrastructure import casa_tools
-from pipeline.infrastructure.utils import absolute_path, relative_path
+from pipeline.infrastructure.utils import absolute_path, relative_path, list_to_str
 from . import compress
 
 LOG = infrastructure.get_logger(__name__)
@@ -281,6 +284,20 @@ def parseEdge(edge: Union[float, List[float]]) -> Tuple[float, float]:
     return EdgeL, EdgeR
 
 
+def mjd_to_datetime(val: float) -> datetime.datetime:
+    """Convert MJD to datetime instance.
+
+    Args:
+        val: MJD value in day.
+
+    Returns:
+        datetime.datetime: datetime instance
+    """
+    t = Time(val, format='mjd')
+    date_time = t.datetime
+    return date_time
+
+
 def mjd_to_datestring(t: float, unit: str='sec') -> str:
     """
     Convert a given Modified Julian Date (MJD) to a date string.
@@ -305,18 +322,14 @@ def mjd_to_datestring(t: float, unit: str='sec') -> str:
         'Wed Nov 17 00:00:00 1858 UTC'
     """
     if unit in ['sec', 's']:
-        mjd = t
+        # 1 day = 24hour * 60min * 60sec = 86400sec
+        mjd = t / 86400.0
     elif unit in ['day', 'd']:
-        mjd = t * 86400.0
+        mjd = t
     else:
         mjd = 0.0
-    import datetime
-    mjdzero = datetime.datetime(1858, 11, 17, 0, 0, 0)
-    zt = time.gmtime(0.0)
-    timezero = datetime.datetime(zt.tm_year, zt.tm_mon, zt.tm_mday, zt.tm_hour, zt.tm_min, zt.tm_sec)
-    dtd = timezero-mjdzero
-    dtsec = mjd-(float(dtd.days)*86400.0+float(dtd.seconds)+float(dtd.microseconds)*1.0e-6)
-    mjdstr = time.asctime(time.gmtime(dtsec))+' UTC'
+    date_time = mjd_to_datetime(mjd)
+    mjdstr = time.asctime(date_time.timetuple()) + ' UTC'
     return mjdstr
 
 
@@ -761,9 +774,9 @@ def make_row_map(src_ms: MeasurementSet, derived_vis: str,
         if v != state_values[0]:
             is_unique_state_set = False
     if is_unique_field_set and is_unique_state_set:
-        taql = 'ANTENNA1 == ANTENNA2 && SCAN_NUMBER IN %s && FIELD_ID IN %s && STATE_ID IN %s' % (scan_numbers, field_values[0], state_values[0])
+        taql = 'ANTENNA1 == ANTENNA2 && SCAN_NUMBER IN %s && FIELD_ID IN %s && STATE_ID IN %s' % (list_to_str(scan_numbers), list_to_str(field_values[0]), list_to_str(state_values[0]))
     else:
-        taql = 'ANTENNA1 == ANTENNA2 && (%s)' % (' || '.join(['(SCAN_NUMBER == %s && FIELD_ID IN %s && STATE_ID IN %s)' % (scan, fields[scan], states[scan]) for scan in scan_numbers]))
+        taql = 'ANTENNA1 == ANTENNA2 && (%s)' % (' || '.join(['(SCAN_NUMBER == %s && FIELD_ID IN %s && STATE_ID IN %s)' % (scan, list_to_str(fields[scan]), list_to_str(states[scan])) for scan in scan_numbers]))
     LOG.trace('taql=\'%s\'' % (taql))
 
     with casa_tools.TableReader(os.path.join(vis0, 'OBSERVATION')) as tb:

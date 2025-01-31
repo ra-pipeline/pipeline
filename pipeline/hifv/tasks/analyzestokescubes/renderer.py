@@ -21,15 +21,15 @@ class T2_4MDetailsAnalyzestokesCubeRenderer(basetemplates.T2_4MDetailsDefaultRen
                                   'stage%s' % results.stage_number)
 
         # Get results info (only one)
-        r = results[0]
+        result = results[0]
 
         # Make the Stokes Q vs. U plot
-        stokesplots = {'Stokes Summary Plots': analyzestokescube.VlassCubeStokesSummary(context, r).plot()}
+        stokesplots = {'Stokes Summary Plots': analyzestokescube.VlassCubeStokesSummary(context, result).plot()}
 
         # Make the Sokes I vs. Freq plot
-        fluxplots = {'Flux vs. Freq Plots': analyzestokescube.VlassCubeFluxSummary(context, r).plot()}
+        fluxplots = {'Flux vs. Freq Plots': analyzestokescube.VlassCubeFluxSummary(context, result).plot()}
 
-        stats = r.stats
+        stats = result.stats
         for idx, (roi_name, roi_stats) in enumerate(stats.items()):
             for key in ['model_flux', 'model_amplitude', 'model_alpha']:
                 try:
@@ -51,9 +51,12 @@ class T2_4MDetailsAnalyzestokesCubeRenderer(basetemplates.T2_4MDetailsDefaultRen
                     result_meta = result
                     if hasattr(result_meta, 'pipeline_casa_task') and result_meta.pipeline_casa_task.startswith(
                             'hif_makecutoutimages'):
-                        r_makecutoutimages_copy = copy.deepcopy(result_meta[0])
-            r_makecutoutimages_copy.stage_number = r.stage_number
-            plotter = VlassCubeCutoutRmsSummary(context, r_makecutoutimages_copy)
+                        r_makecutoutimages_copy = copy.deepcopy(result_meta)
+            r_makecutoutimages_copy.stage_number = result.stage_number
+            info_dict = {}
+            for sci_im in r_makecutoutimages_copy.subimagelist:
+                info_dict[sci_im['metadata']['spw']] = sci_im['metadata'].get('keep', True)
+            plotter = VlassCubeCutoutRmsSummary(context, r_makecutoutimages_copy, info_dict)
             rmsplots = {'Rms Summary Plot': plotter.plot(improp_list=[('rms', 'Median')])}
 
         except Exception as e:

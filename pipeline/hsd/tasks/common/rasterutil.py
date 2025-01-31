@@ -337,13 +337,14 @@ def get_raster_flag_list(flagged1: List[int], flagged2: List[int], raster_index_
     return data_ids
 
 
-def flag_raster_map(datatable: DataTableImpl, ms: 'MeasurementSet') -> List[int]:
+def flag_raster_map(datatable: DataTableImpl, ms: 'MeasurementSet', rasterscan_heuristics_result: rasterscan.RasterScanHeuristicsResult) -> List[int]:
     """
     Return list of index to be flagged by flagging heuristics for raster scan.
 
     Args:
-        datatable: input datatable to analyze
-        ms: MeasurementSet domain object
+        datatable (DataTableImpl): input datatable to analyze
+        ms (MeasurementSet): MeasurementSet domain object
+        rasterscan_heuristics_result (RasterScanHeuristicsResult): Result object of RasterScanHeuristics
 
     Returns:
         per-antenna list of indice to be flagged
@@ -394,7 +395,8 @@ def flag_raster_map(datatable: DataTableImpl, ms: 'MeasurementSet') -> List[int]
         try:
             raster_gap = rasterscan.find_raster_gap(metadata.ra, metadata.dec, dtrow_list)
         except rasterscan.RasterScanHeuristicsFailure as e:
-            LOG.warn('{} This often happens when pointing pattern deviates from regular raster. You may want to check the pointings in observation.'.format(e))
+            LOG.debug('{} This often happens when pointing pattern deviates from regular raster. You may want to check the pointings in observation.'.format(e))
+            rasterscan_heuristics_result.set_result_fail(key[2], key[1], key[0])
             # exclude combination of (field_id, spw_id, antenna_id) held by key
             # from the subsequent analysis
             continue

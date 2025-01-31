@@ -68,38 +68,32 @@ NAxis = namedtuple('NAxis', ['x', 'y', 'sp'])
 
 def detect_contamination(context: 'Context',
                          item: 'ImageItem',
-                         is_frequency_channel_reversed: Optional[bool]=False):
+                         is_frequency_channel_reversed: Optional[bool]=False,
+                         do_plot: bool = True) -> bool:
     """
     Detect contamination (the emission at OFF position, which affects the data quality) in the given image item.
 
     This method defines 'contamination' as a deep absorption feature, which is in most cases
     due to a strong emission feature in the OFF position. Note that a strong absorption feature
-    in the ON position may also be warned as well.
+    in the ON position may also be detected as 'contamination'.
 
     This function is the main routine of the module. It detects contamination in the provided image item
-    and generates a contamination report.
+    and returns boolean value indicating if potential contamination is detected or not.
 
     Args:
         context (Context): The pipeline context object.
         item (ImageItem): The image item object to be analyzed.
         is_frequency_channel_reversed (bool, optional): True if the frequency axis is flipped (case for LSB)
             by the imaging process (see worker.py). Defaults to False.
+        do_plot (bool): Set True to make figure. Default is True.
+
+    Returns:
+        True if potential contamination is detected, False otherwise.
     """
     LOG.info("=================")
 
-    # Create a directory for the current stage
-    stage_dir = os.path.join(context.report_dir, f'stage{context.task_counter}')
-    os.makedirs(stage_dir, exist_ok=True)
-
-    # Define the output file name for the contamination report
-    output_name = os.path.join(stage_dir, item.imagename.rstrip('/') + '.contamination.png')
-    LOG.info(f'The output file name for the contamination report: {output_name}')
-
     # Read FITS and its header
     cube_regrid, naxis = _read_image(item.imagename)
-    image_obj = sd_display.SpectralImage(item.imagename)
-    freq_spec = _get_frequency_spec(naxis, image_obj)
-    dir_spec = _get_direction_spec(image_obj)
 
     # Calculate RMS and Peak S/N maps
     rms_map, peak_sn_map, spectrum_at_peak, idx, idy = \
@@ -112,13 +106,27 @@ def detect_contamination(context: 'Context',
     mask_map = np.where(peak_sn_map < peak_sn_threshold, 1.0, 0.0)
     masked_average_spectrum = np.nanmean(np.where(mask_map > 0.5, cube_regrid, np.nan), axis=(1, 2))
 
-    # Generate the contamination report figures
-    _make_figures(peak_sn_map, mask_map, rms_map, masked_average_spectrum,
-                  peak_sn_threshold, spectrum_at_peak, idy, idx, output_name,
-                  freq_spec, dir_spec)
+    # Check if an absorption feature is detected
+    contaminated = _detect_deep_absorption_feature(masked_average_spectrum)
 
-    # Issue a warning if an absorption feature is detected
-    _warn_deep_absorption_feature(masked_average_spectrum, item)
+    # Generate the contamination report figures
+    if do_plot:
+        # Create a directory for the current stage
+        stage_dir = os.path.join(context.report_dir, f'stage{context.task_counter}')
+        os.makedirs(stage_dir, exist_ok=True)
+
+        # Define the output file name for the contamination report
+        output_name = os.path.join(stage_dir, item.imagename.rstrip('/') + '.contamination.png')
+        LOG.info(f'The output file name for the contamination report: {output_name}')
+
+        image_obj = sd_display.SpectralImage(item.imagename)
+        freq_spec = _get_frequency_spec(naxis, image_obj)
+        dir_spec = _get_direction_spec(image_obj)
+        _make_figures(peak_sn_map, mask_map, rms_map, masked_average_spectrum,
+                      peak_sn_threshold, spectrum_at_peak, idy, idx, output_name,
+                      freq_spec, dir_spec)
+
+    return contaminated
 
 
 def _pick_quiet_slice(naxis: NAxis,
@@ -214,7 +222,7 @@ def _make_figures(peak_sn_map: 'sdtyping.NpArray2D',
         freq_spec (FrequencySpec, optional): Frequency specification. Defaults to None.
         dir_spec (DirectionSpec, optional): Direction specification. Defaults to None.
     """
-    
+
     # Initialize the figure with a specified size
     _figure = figure.Figure(figsize=(20, 5))
     _grid = gridspec.GridSpec( 1, 3, width_ratios=[1,1,1], wspace=0.3)
@@ -286,7 +294,7 @@ def _plot_peak_SN_map(plot: 'Axes',
     LOG.debug(f'scx = {scx}, scy = {scy}')
     LOG.debug('peak_sn.shape = {}'.format(peak_sn_map.shape))
     LOG.debug('ylim = {}'.format(list(plot.get_ylim())))
-    
+
     # plot the peak S/N map
     _plot_map(plot, "Peak S/N map", peak_sn_map, dir_unit, kw)
 
@@ -299,7 +307,7 @@ def _plot_peak_SN_map(plot: 'Axes',
     # Plot a scatter marker at the specified coordinates of the maximum peak S/N location.
     plot.scatter(scx, scy, s=300, marker="o", facecolors='none',
                  edgecolors='grey', linewidth=5, transform=trans)
-    
+
     # dummy scatter to display a legend
     plot.scatter([], [], s=50, marker='o', facecolors='none',
                  edgecolors='grey', linewidth=3, label="Max")
@@ -325,7 +333,7 @@ def _plot_mask_map(plot: 'Axes',
     """
     # plot the mask map
     _plot_map(plot, f"Mask map (1: S/N<{peak_sn_threshold})", mask_map, dir_unit, kw)
-    
+
     # display the colorbar
     _display_colorbar(plot, colorbar, mask_map,
                       {'ticks': [0, 1],
@@ -374,12 +382,12 @@ def _display_colorbar(plot: 'Axes',
     colorbar.get_yaxis().get_major_formatter().set_useOffset(False)
 
     # display the colorbar of DEFAULT_COLORMAP colored
-    matplotlib.colorbar.Colorbar(ax=colorbar, 
+    matplotlib.colorbar.Colorbar(ax=colorbar,
         mappable=matplotlib.cm.ScalarMappable(
-            matplotlib.colors.Normalize(np.nanmin(map), np.nanmax(map)), 
+            matplotlib.colors.Normalize(np.nanmin(map), np.nanmax(map)),
             DEFAULT_COLORMAP),
         **options)
-    
+
     # set position of the colorbar
     ppos = plot.get_position()
     cpos = colorbar.get_position()
@@ -502,17 +510,17 @@ def _configure_axis(axis: 'Axis',
     axis.set_tick_params(rotation=rotation)
 
 
-def _warn_deep_absorption_feature(masked_average_spectrum: 'sdtyping.NpArray1D',
-                                  imageitem: Optional['ImageItem']=None):
+def _detect_deep_absorption_feature(masked_average_spectrum: 'sdtyping.NpArray1D') -> bool:
     """
-    Warn if a strong absorption feature is detected in the spectrum.
+    Check if a strong absorption feature exists in the spectrum.
 
     This function checks the masked average spectrum for any strong absorption features.
-    If detected, it logs a warning message with details about the image item (if provided).
 
     Args:
         masked_average_spectrum (NpArray1D): 1D array of the average spectrum of the masked regions.
-        imageitem (Optional['ImageItem']): ImageItem object containing details about the image. Defaults to None.
+
+    Returns:
+        True if contamination was detected, False otherwise.
     """
     # Calculate the standard deviation of the masked average spectrum
     std_value = np.nanstd(masked_average_spectrum)
@@ -520,18 +528,7 @@ def _warn_deep_absorption_feature(masked_average_spectrum: 'sdtyping.NpArray1D',
     # Determine if the spectrum has a strong absorption feature
     _has_strong_absorption = np.nanmin(masked_average_spectrum) <= STDDEV_THRESHOLD_FACTOR * std_value
 
-    # If a strong absorption feature is detected, log a warning message
-    if _has_strong_absorption:
-        if imageitem is not None:
-            field = imageitem.sourcename
-            spw = ','.join(map(str, np.unique(imageitem.spwlist)))
-            warning_sentence = (f'Field {field} Spw {spw}: '
-                                'Absorption feature is detected in the lower S/N area. '
-                                'Please check calibration result in detail.')
-        else:
-            warning_sentence = ('Absorption feature detected but an image item is not specificated. '
-                                'Please check calibration result in detail.')
-        LOG.warning(warning_sentence)
+    return _has_strong_absorption
 
 
 def _read_image(input: str) -> Tuple['sdtyping.NpArray3D', NAxis]:

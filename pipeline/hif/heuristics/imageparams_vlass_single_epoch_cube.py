@@ -60,7 +60,7 @@ class ImageParamsHeuristicsVlassSeCube(ImageParamsHeuristicsVlassSeContMosaic):
                             'hifv_flagtargetsdata'):
                         flagtargets_summary = [r.summaries for r in result_meta][0][-1]
 
-            n_flagged = n_total = 0
+            n_flagged = n_total = 0.
             for spwid in [spw.strip() for spw in spw_selection.split(',')]:
                 n_flagged += flagtargets_summary['spw'][str(spwid)]['flagged']
                 n_total += flagtargets_summary['spw'][str(spwid)]['total']

@@ -13,8 +13,14 @@ columns = {
     'image' : 'Image',
     'residual' : 'Residual',
     'model' : 'Final Model',
-    'psf' : 'PSF'
-}
+    'psf' : 'PSF'}
+
+def is_rejected(spw,plane_keep_dict):
+    plane_keep_dict[spw]
+    desc=''
+    if not plane_keep_dict[spw]:
+        desc = ' <a style="color:red">(rejected)</a>'
+    return desc
 %>
 <%inherit file="t2-4m_details-base.mako"/>
 
@@ -112,6 +118,7 @@ except:
                 %if image_info[i].result.is_per_eb:
                     (${image_info[i].vis})
                 %endif
+                ${is_rejected(image_info[i].spw,plane_keep_dict)}
                 </a>
                 </li>
             %endfor
@@ -119,10 +126,10 @@ except:
     %endif
 
 
-
-
-
-
+    %if isinstance(vlass_cubesummary_plots_html,str):
+        <h3>VLASS Coarse Cube Plane Summary</h3>
+        ${vlass_cubesummary_plots_html}
+    %endif
 
 
     <div class="table-responsive">
@@ -146,7 +153,7 @@ except:
             %>
             <tr>
                 
-                <td rowspan="6">${row.spw.replace(',',', ')}</td>
+                <td rowspan="6">${row.spw.replace(',',', ')}${is_rejected(row.spw,plane_keep_dict)}</td>
                 
                 <th>${row.frequency_label}</th>
                 <td>${row.frequency}</td> 

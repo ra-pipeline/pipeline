@@ -24,7 +24,7 @@ class CheckProductSizeResult(basetask.Results):
                  status,
                  reason,
                  synthesized_beams):
-        super(CheckProductSizeResult, self).__init__()
+        super().__init__()
         self.allowed_maxcubesize = allowed_maxcubesize
         self.allowed_maxcubelimit = allowed_maxcubelimit
         self.allowed_productsize = allowed_productsize

@@ -1,7 +1,7 @@
 """The NRO pipeline data product manifest class."""
 
 from xml.etree.ElementTree import Element
-import xml.etree.cElementTree as eltree
+import xml.etree.ElementTree as eltree
 
 import pipeline.h.tasks.common.manifest as manifest
 

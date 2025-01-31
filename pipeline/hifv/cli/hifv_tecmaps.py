@@ -3,27 +3,19 @@ import sys
 import pipeline.h.cli.utils as utils
 
 
+# docstring and type hints: inherits from hifv.tasks.tecmaps.tecmaps.TecMapsInputs.__init__
 @utils.cli_wrapper
 def hifv_tecmaps(vis=None):
 
-    """
-    hifv_tecmaps ---- Base tecmaps task
+    """Base tecmaps task
 
-    Output:
-    results -- The results object for the pipeline task is returned.
+    Returns:
+        The results object for the pipeline task is returned.
 
-    --------- parameter descriptions ---------------------------------------------
+    Examples:
+        1. Basic tecmaps task:
 
-    vis           The list of input MeasurementSets. Defaults to the list of MeasurementSets
-                  specified in the h_init or hifv_importdata task.
-
-    --------- examples -----------------------------------------------------------
-
-
-    1. Basic tecmaps task
-
-    >>> hifv_tecmaps()
-
+        >>> hifv_tecmaps()
 
     """
 

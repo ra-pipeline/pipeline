@@ -35,7 +35,20 @@ class FlagcalInputs(vdp.StandardInputs):
     caltable = vdp.VisDependentProperty(default='finalampgaincal.tbl')
     clipminmax = vdp.VisDependentProperty(default=[0.9, 1.1])
 
+    # docstring and type hints: supplements hifv_flagcal
     def __init__(self, context, vis=None, caltable=None, clipminmax=None):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            vis: List of input visibility data.
+
+            caltable: String name of the caltable.
+
+            clipminmax: Range to use for clipping.
+
+        """
         super(FlagcalInputs, self).__init__()
         self.context = context
         self.vis = vis

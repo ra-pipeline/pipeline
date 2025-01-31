@@ -33,14 +33,27 @@ class SolintInputs(vdp.StandardInputs):
     """
     limit_short_solint = vdp.VisDependentProperty(default='')
     refantignore = vdp.VisDependentProperty(default='')
+    refant = vdp.VisDependentProperty(default='')
 
-    def __init__(self, context, vis=None, limit_short_solint=None, refantignore=None):
-        """
+    # docstring and type hints: supplements hifv_solint
+    def __init__(self, context, vis=None, limit_short_solint=None, refantignore=None, refant=None):
+        """Initialize Inputs.
+
         Args:
             context (:obj:): Pipeline context
-            vis(str, optional): String name of the measurement set
-            limit_short_solint(str):  Limit to the short solution interval
-            refantignore(str):  csv string of reference antennas to ignore - 'ea24,ea15,ea08'
+
+            vis(str, optional): The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the h_init or hifv_importdata task.
+
+            limit_short_solint(str): Keyword argument in units of seconds to limit the short solution interval. Can be a string or float numerical value in units of seconds of '0.45' or 0.45.
+                Can be set to a string value of 'int'.
+
+            refantignore(str): String list of antennas to ignore.
+
+                Example:  refantignore='ea02, ea03'
+
+            refant(str): A csv string of reference antenna(s). When used, disables ``refantignore``.
+
+                Example: refant = 'ea01, ea02'
 
         """
         super(SolintInputs, self).__init__()
@@ -50,6 +63,7 @@ class SolintInputs(vdp.StandardInputs):
         self.refantignore = refantignore
         self.gain_solint1 = 'int'
         self.gain_solint2 = 'int'
+        self.refant = refant
 
 
 class SolintResults(basetask.Results):
@@ -99,7 +113,7 @@ class SolintResults(basetask.Results):
         self.new_gain_solint1 = new_gain_solint1
         self.bpdgain_touse = bpdgain_touse
 
-    def merge_with_context(self, context):    
+    def merge_with_context(self, context):
         m = context.observing_run.get_ms(self.vis)
         context.evla['msinfo'][m.name].gain_solint2 = self.gain_solint2
         context.evla['msinfo'][m.name].longsolint = self.longsolint
@@ -229,13 +243,17 @@ class Solint(basetask.StandardTaskTemplate):
         refantfield = self.inputs.context.evla['msinfo'][m.name].calibrator_field_select_string
 
         self.ignorerefant = self.inputs.context.evla['msinfo'][m.name].ignorerefant
-        refantignore = self.inputs.refantignore + ','.join(self.ignorerefant)
+        # PIPE-1637: adding ',' in the manual and auto refantignore parameter
+        refantignore = self.inputs.refantignore + ','.join(['', *self.ignorerefant])
+        # PIPE-595: if refant list is not provided, compute refants else use provided refant list.
+        if len(self.inputs.refant) == 0:
+            refantobj = findrefant.RefAntHeuristics(vis=calMs, field=refantfield,
+                                                    geometry=True, flagging=True, intent='',
+                                                    spw='', refantignore=refantignore)
 
-        refantobj = findrefant.RefAntHeuristics(vis=calMs, field=refantfield,
-                                                geometry=True, flagging=True, intent='',
-                                                spw='', refantignore=refantignore)
-
-        RefAntOutput = refantobj.calculate()
+            RefAntOutput = refantobj.calculate()
+        else:
+            RefAntOutput = self.inputs.refant.split(",")
 
         refAnt = ','.join(RefAntOutput)
 
@@ -432,7 +450,7 @@ class Solint(basetask.StandardTaskTemplate):
         old_field = ''
 
         with casa_tools.MSReader(calMs) as ms:
-            scan_summary = ms.getscansummary()    
+            scan_summary = ms.getscansummary()
 
             m = self.inputs.context.observing_run.get_ms(self.inputs.vis)
 

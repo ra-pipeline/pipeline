@@ -56,10 +56,7 @@ img {
 import numpy as np
 
 def fm_band(band):
-    return band.replace('_',' ')
-
-def fm_target(target):
-    return target.replace('_',' ') 
+    return '('+band.strip().replace('EVLA_', '').replace('_', ' ').capitalize()+')'    
 
 def fm_sc_success(success):
     if success:
@@ -77,7 +74,7 @@ def fm_reason(slib):
 vislist=slib['vislist']
 %>
 
-<h3>${fm_target(target)} ${fm_band(band)}</h3>
+<h3>${target}&nbsp;${fm_band(band)}</h3>
 
 <h4>
   Passed: ${fm_sc_success(slib[vislist[-1]][solint]['Pass'])}

@@ -30,11 +30,11 @@ import time
 from typing import Tuple
 
 # import memory_profiler
-import numpy
+import numpy as np
 
 import pipeline.infrastructure as infrastructure
 from pipeline.infrastructure import casa_tools
-from pipeline.infrastructure.utils import absolute_path
+from pipeline.infrastructure.utils import absolute_path, list_to_str
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -228,8 +228,8 @@ class DataTableIndexer(object):
         j = self.origin_mses.index(origin_ms)
         base = sum(self.nrow_per_ms[:j])
         length = self.nrow_per_ms[j]
-        perms_list = numpy.where(numpy.logical_and(index_list >= base,
-                                                   index_list < base + length), index_list)
+        perms_list = np.where(np.logical_and(index_list >= base,
+                                             index_list < base + length), index_list)
         return perms_list - base
 
 
@@ -318,7 +318,7 @@ class DataTableImpl(object):
     def position_group_id(self):
         key = 'POSGRP_REP'
         if self.haskeyword(key):
-            return numpy.max(numpy.fromiter((int(x) for x in self.getkeyword(key)), dtype=numpy.int32)) + 1
+            return np.max(np.fromiter((int(x) for x in self.getkeyword(key)), dtype=np.int32)) + 1
         else:
             return 0
 
@@ -353,12 +353,12 @@ class DataTableImpl(object):
         else:
             subkey = 'LARGE'
         pattern = r'^TIMETABLE_%s_.*' % subkey
-        if numpy.any(numpy.fromiter((re.match(pattern, x) is not None for x in self.keywordnames()), dtype=bool)):
+        if np.any(np.fromiter((re.match(pattern, x) is not None for x in self.keywordnames()), dtype=bool)):
             group_id = 0
             for key in self.tb2.keywordnames():
                 if re.match(pattern, key) is not None:
-                    max_id = numpy.max(
-                        numpy.fromiter((int(x) for x in self.getkeyword(key)), dtype=numpy.int32)) + 1
+                    max_id = np.max(
+                        np.fromiter((int(x) for x in self.getkeyword(key)), dtype=np.int32)) + 1
                     group_id = max(group_id, max_id)
             return group_id
         else:
@@ -562,8 +562,8 @@ class DataTableImpl(object):
                         # update chunk
                         chunk_min = start_row
                         chunk_max = start_row + size_chunk - 1
-                        target_rows = dirty_rows[numpy.logical_and(chunk_min <= dirty_rows,
-                                                                   dirty_rows <= chunk_max)]
+                        target_rows = dirty_rows[np.logical_and(chunk_min <= dirty_rows,
+                                                                dirty_rows <= chunk_max)]
                         for row in target_rows:
                             chunk_index = row - start_row
                             # LOG.info('row {0}, chunk_index {1}'.format(row, chunk_index))
@@ -811,7 +811,7 @@ class DataTableImpl(object):
                 # absolute OFF
                 test_prefix = '{}_OFF_'.format(to_field.clean_name)
                 #LOG.info('test_prefix {}, atm_fields {}'.format(test_prefix, [a.clean_name for a in atm_fields]))
-                nearest_id = numpy.where([a.clean_name.startswith(test_prefix) for a in atm_fields])[0]
+                nearest_id = np.where([a.clean_name.startswith(test_prefix) for a in atm_fields])[0]
                 #LOG.info('nearest_id = {}'.format(nearest_id))
                 if len(nearest_id) > 0:
                     from_fields = [atm_fields[i].id for i in nearest_id]
@@ -837,7 +837,7 @@ class DataTableImpl(object):
         LOG.info('from_fields = {}'.format(from_fields))
 
         with casa_tools.TableReader(tsystable) as tb:
-            tsel = tb.query('FIELD_ID IN {}'.format(list(from_fields)))
+            tsel = tb.query('FIELD_ID IN {}'.format(list_to_str(from_fields)))
             spws = tsel.getcol('SPECTRAL_WINDOW_ID')
             times = tsel.getcol('TIME')
             #fieldids = tsel.getcol('FIELD_ID')
@@ -846,7 +846,7 @@ class DataTableImpl(object):
             for i in range(tsel.nrows()):
                 tsys = tsel.getcell('FPARAM', i)
                 flag = tsel.getcell('FLAG', i)
-                tsys_masked[i] = numpy.ma.masked_array(tsys, mask=(flag == True))
+                tsys_masked[i] = np.ma.masked_array(tsys, mask=(flag == True))
             tsel.close()
 
         #LOG.info('tsys={}'.format(tsys_masked))
@@ -856,10 +856,10 @@ class DataTableImpl(object):
             Map the channel ID ranges of ATMCal spw that covers frequency range of a science spw
             Arguments: spw object of ATMCal and science spws
             """
-            atm_freqs = numpy.array(atm_spw.channels.chan_freqs)
-            min_chan = numpy.where(abs(atm_freqs - float(science_spw.min_frequency.value)) == min(
+            atm_freqs = np.array(atm_spw.channels.chan_freqs)
+            min_chan = np.where(abs(atm_freqs - float(science_spw.min_frequency.value)) == min(
                 abs(atm_freqs - float(science_spw.min_frequency.value))))[0][0]
-            max_chan = numpy.where(abs(atm_freqs - float(science_spw.max_frequency.value)) == min(
+            max_chan = np.where(abs(atm_freqs - float(science_spw.max_frequency.value)) == min(
                 abs(atm_freqs - float(science_spw.max_frequency.value))))[0][-1]
             start_atmchan = min(min_chan, max_chan)
             end_atmchan = max(min_chan, max_chan)
@@ -872,7 +872,7 @@ class DataTableImpl(object):
         _dt_antenna = self.getcol('ANTENNA')
         _dt_spw = self.getcol('IF')
         dt_field = self.getcol('FIELD_ID')
-        field_sel = numpy.where(dt_field == to_fieldid)[0]
+        field_sel = np.where(dt_field == to_fieldid)[0]
         dt_antenna = _dt_antenna[field_sel]
         dt_spw = _dt_spw[field_sel]
         atm_spws = set(spws)
@@ -894,13 +894,13 @@ class DataTableImpl(object):
             LOG.info('Transfer Tsys from spw {} (chans: {}~{}) to {}'.format(spw_from, start_atmchan, end_atmchan, spw_to))
             for ant_to in to_antids:
                 # select caltable row id by SPW and ANT
-                cal_idxs = numpy.where(numpy.logical_and(spws == spw_from, antids == ant_to))[0]
+                cal_idxs = np.where(np.logical_and(spws == spw_from, antids == ant_to))[0]
                 if len(cal_idxs) == 0:
                     continue
                 # atsys.shape = (nrow, npol)
-                atsys = numpy.asarray([tsys_masked[i].take(corr_index, axis=0)[:, start_atmchan:end_atmchan+1].mean(axis=1).data
+                atsys = np.asarray([tsys_masked[i].take(corr_index, axis=0)[:, start_atmchan:end_atmchan+1].mean(axis=1).data
                                            for i in cal_idxs])
-                dtrows = field_sel[numpy.where(numpy.logical_and(dt_antenna == ant_to, dt_spw == spw_to))[0]]
+                dtrows = field_sel[np.where(np.logical_and(dt_antenna == ant_to, dt_spw == spw_to))[0]]
                 #LOG.info('ant {} spw {} dtrows {}'.format(ant_to, spw_to, len(dtrows)))
                 time_sel = times.take(cal_idxs)  # in sec
                 for dt_id in dtrows:
@@ -934,7 +934,7 @@ class DataTableImpl(object):
         # back to previous impl. with reduced memory usage
         # (performance degraded)
         ms_rows = self.getcol('ROW')
-        tmp_array = numpy.empty((4, 1,), dtype=numpy.int32)
+        tmp_array = np.empty((4, 1,), dtype=np.int32)
         with casa_tools.TableReader(infile) as tb:
             # for dt_row in index[0]:
             for dt_row, ms_row in enumerate(ms_rows):
@@ -943,7 +943,7 @@ class DataTableImpl(object):
                 rowflag = tb.getcell('FLAG_ROW', ms_row)
                 # irow += 1
                 npol = flag.shape[0]
-                #online_flag = numpy.empty((npol, 1,), dtype=numpy.int32)
+                #online_flag = np.empty((npol, 1,), dtype=np.int32)
                 online_flag = tmp_array[:npol, :]
                 if rowflag == True:
                     online_flag[:] = 0
@@ -996,7 +996,7 @@ class RWDataTableColumn(RODataTableColumn):
     def __init__(self, table, name, dtype):
         super(RWDataTableColumn, self).__init__(table, name, dtype)
         if dtype == list:
-            self.caster_put = numpy.asarray
+            self.caster_put = np.asarray
         else:
             self.caster_put = dtype
 
@@ -1004,7 +1004,7 @@ class RWDataTableColumn(RODataTableColumn):
         self.tb.putcell(self.name, int(idx), self.caster_put(val))
 
     def putcol(self, val, startrow=0, nrow=-1, rowincr=1):
-        self.tb.putcol(self.name, numpy.asarray(val), int(startrow), int(nrow), int(rowincr))
+        self.tb.putcol(self.name, np.asarray(val), int(startrow), int(nrow), int(rowincr))
 
     def putcellslice(self, rownr, value, blc, trc, incr):
         return self.tb.putcellslice(self.name, rownr, value, blc, trc, incr)
@@ -1026,7 +1026,7 @@ class DataTableColumnNoChange(RWDataTableColumn):
 
 
 class DataTableColumnMaskList(RWDataTableColumn):
-    NoMask = numpy.zeros((1, 2), dtype=numpy.int32) - 1  # [[-1,-1]]
+    NoMask = np.zeros((1, 2), dtype=np.int32) - 1  # [[-1,-1]]
 
     def __init__(self, table):
         super(RWDataTableColumn, self).__init__(table, "MASKLIST", list)
@@ -1034,7 +1034,7 @@ class DataTableColumnMaskList(RWDataTableColumn):
     def getcell(self, idx):
         v = self.tb.getcell(self.name, int(idx))
         if sum(v[0]) < 0:
-            return numpy.zeros(0, dtype=numpy.int32)
+            return np.zeros(0, dtype=np.int32)
         else:
             return v
 
@@ -1061,7 +1061,7 @@ class DataTableColumnMaskList(RWDataTableColumn):
             v = self.NoMask
         else:
             v = val
-        self.tb.putcell(self.name, int(idx), numpy.asarray(v))
+        self.tb.putcell(self.name, int(idx), np.asarray(v))
 
     def putcol(self, val, startrow=0, nrow=-1, rowincr=1):
         """
@@ -1072,7 +1072,7 @@ class DataTableColumnMaskList(RWDataTableColumn):
             nrow = min(startrow + len(val) * rowincr, self.tb.nrows())
         idx = 0
         for i in range(startrow, nrow, rowincr):
-            self.putcell(i, numpy.asarray(val[idx]))
+            self.putcell(i, np.asarray(val[idx]))
             idx += 1
 
 

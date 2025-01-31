@@ -15,6 +15,7 @@ from .hifv_fluxboot import hifv_fluxboot
 from .hifv_gaincurves import hifv_gaincurves
 from .hifv_hanning import hifv_hanning
 from .hifv_importdata import hifv_importdata
+from .hifv_mstransform import hifv_mstransform
 from .hifv_opcal import hifv_opcal
 from .hifv_pbcor import hifv_pbcor
 from .hifv_plotsummary import hifv_plotsummary
@@ -49,6 +50,7 @@ __all__ = ['hifv_analyzestokescubes',
            'hifv_gaincurves',
            'hifv_hanning',
            'hifv_importdata',
+           'hifv_mstransform',
            'hifv_opcal',
            'hifv_pbcor',
            'hifv_plotsummary',

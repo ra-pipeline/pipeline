@@ -1,4 +1,5 @@
 import itertools
+import math
 import os
 
 import pipeline.domain.measures as measures
@@ -15,6 +16,7 @@ from pipeline.infrastructure import callibrary
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import exceptions
 from pipeline.infrastructure import task_registry
+from pipeline.infrastructure.utils.math import round_up
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -32,6 +34,10 @@ class ALMAPhcorBandpassInputs(bandpassmode.BandpassModeInputs):
     bpsnr = vdp.VisDependentProperty(default=50.0)
     minbpsnr = vdp.VisDependentProperty(default=20.0)
     evenbpints = vdp.VisDependentProperty(default=True)
+
+    # Boolean declaring how to populate the bandpass solution parameter
+    # "fillgaps" (PIPE-2116, also depends on hm_bandpass modes).
+    hm_auto_fillgaps = vdp.VisDependentProperty(default=True)
 
     # Bandpass heuristics, options are 'fixed', 'smoothed', and 'snr'
     hm_bandpass = vdp.VisDependentProperty(default='snr')
@@ -61,20 +67,184 @@ class ALMAPhcorBandpassInputs(bandpassmode.BandpassModeInputs):
     phaseupsnr = vdp.VisDependentProperty(default=20.0)
     phaseupsolint = vdp.VisDependentProperty(default='int')
     solint = vdp.VisDependentProperty(default='inf')
-    # PIPE-628: new parameter to unregister existing bcals before appending to callibrary 
+    # PIPE-628: new parameter to unregister existing bcals before appending to callibrary
     unregister_existing = vdp.VisDependentProperty(default=False)
-    # PIPE-712: Expose fillgaps parameter 
-    fillgaps = vdp.VisDependentProperty(default=0)
 
+    # docstring and type hints: supplements hifa_bandpass
     def __init__(self, context, output_dir=None, vis=None, mode='channel', hm_phaseup=None, phaseupbw=None,
                  phaseupsolint=None, phaseupsnr=None, phaseupnsols=None, hm_bandpass=None, solint=None,
-                 maxchannels=None, evenbpints=None, bpsnr=None, minbpsnr=None, bpnsols=None, unregister_existing=None, 
-                 fillgaps=None, **parameters):
+                 maxchannels=None, evenbpints=None, bpsnr=None, minbpsnr=None, bpnsols=None, unregister_existing=None,
+                 hm_auto_fillgaps=None, **parameters):
+        """Initialize Inputs.
+
+        Args:
+            context: Pipeline context.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            vis: List of input MeasurementSets. Defaults to the list of
+                MeasurementSets specified in the pipeline context.
+
+                Example: vis=['ngc5921.ms']
+
+            mode:
+
+            hm_phaseup: The pre-bandpass solution phaseup gain heuristics. The
+                options are:
+
+                - 'snr': compute solution required to achieve the specified SNR
+                - 'manual': use manual solution parameters
+                - '': skip phaseup
+
+                Example: hm_phaseup='manual'
+
+            phaseupbw: Bandwidth to be used for phaseup. Used when
+                ``hm_phaseup`` = 'manual'.
+
+                Example:
+
+                - phaseupbw='' to use entire bandpass
+                - phaseupbw='500MHz' to use central 500MHz
+
+            phaseupsolint: The phase correction solution interval in CASA syntax.
+                Used when ``hm_phaseup`` = 'manual' or as a default if
+                the ``hm_phaseup`` = 'snr' heuristic computation fails.
+
+                Example: phaseupsolint='300s'
+
+            phaseupsnr: The required SNR for the phaseup solution. Used to calculate
+                the phaseup time solint, and only if
+                ``hm_phaseup`` = 'snr'.
+
+                Example: phaseupsnr=10.0
+
+            phaseupnsols: The minimum number of phaseup gain solutions. Used only
+                if ``hm_phaseup`` = 'snr'.
+
+                Example: phaseupnsols=4
+
+            hm_bandpass: The bandpass solution heuristics. The options are:
+                'snr': compute the solution required to achieve the specified SNR
+                'smoothed': simple 'smoothing' i.e. spectral solint>1chan
+                'fixed': use the user defined parameters for all spws
+
+                Example: hm_bandpass='snr'
+
+            solint: Time and channel solution intervals in CASA syntax.
+                Default is solint='inf', which is used when
+                ``hm_bandpass`` = 'fixed'.
+                If ``hm_bandpass`` = 'snr', then the task will attempt
+                to compute and use an optimal SNR-based solint (and warn
+                if this solint is not good enough).
+                If ``hm_bandpass`` = 'smoothed', the task will override
+                the spectral solint with bandwidth/maxchannels.
+
+                Example: solint='int'
+
+            maxchannels: The bandpass solution 'smoothing' factor in channels,
+                i.e. spectral solint will be set to bandwidth / maxchannels
+                Set to 0 for no smoothing. Used if
+                ``hm_bandpass`` = 'smoothed'.
+
+                Example: maxchannels=240
+
+            evenbpints: Force the per spw frequency solint to be evenly divisible
+                into the spw bandpass if ``hm_bandpass`` = 'snr'.
+
+                Example: evenbpints=False
+
+            bpsnr: The required SNR for the bandpass solution. Used only if
+                ``hm_bandpass`` = 'snr'.
+
+                Example: bpsnr=30.0
+
+            minbpsnr: The minimum required SNR for the bandpass solution
+                when strong atmospheric lines exist in Tsys spectra.
+                Used only if ``hm_bandpass``='snr'.
+
+                Example: minbpsnr=10.0
+
+            bpnsols: The minimum number of bandpass solutions. Used only if
+                ``hm_bandpass`` = 'snr'.
+
+                Example: bpnsols=8
+
+            unregister_existing: Unregister all bandpass calibrations from the pipeline
+                context before registering the new bandpass calibrations
+                from this task. Defaults to False.
+
+                Example: unregister_existing=True
+
+            hm_auto_fillgaps: If True, then the ``hm_bandpass`` = 'snr' or 'smoothed'
+                modes, that solve bandpass per SpW, are performed with
+                CASA bandpass task parameter 'fillgaps' set to a quarter
+                of the respective SpW bandwidth (in channels).
+                If False, then these bandpass solves will use
+                fillgaps=0.
+                The ``hm_bandpass`` = 'fixed' mode is unaffected by
+                ``hm_auto_fillgaps`` and always uses fillgaps=0.
+
+            caltable: List of names for the output calibration tables. Defaults
+                to the standard pipeline naming convention.
+
+                Example: caltable=['ngc5921.gcal']
+
+            field: The list of field names or field ids for which
+                bandpasses are computed. Set to field='' by default,
+                which means the task will select all fields.
+
+                Example: field='3C279', field='3C279,M82'
+
+            intent: A string containing a comma delimited list of intents
+                against which the selected fields are matched. Set to
+                intent='' by default, which means the task will select
+                all data with the BANDPASS intent.
+
+                Example: intent='`*PHASE*`'
+
+            spw: The list of spectral windows and channels for which
+                bandpasses are computed. Set to spw='' by default, which
+                means the task will select all science spectral windows.
+
+                Example: spw='11,13,15,17'
+
+            antenna: Set of data selection antenna IDs
+
+            combine: Data axes to combine for solving. Axes are '', 'scan',
+                'spw', 'field' or any comma-separated combination.
+
+                Example: combine='scan,field'
+
+            refant: List of reference antenna names. Defaults to the
+                value(s) stored in the pipeline context. If undefined in
+                the pipeline context defaults to the CASA reference
+                antenna naming scheme.
+
+                Example: refant='DV06,DV07'
+
+            solnorm: Normalise the bandpass solution; defaults to True.
+
+                Example: solnorm=False
+
+            minblperant: Minimum number of baselines required per antenna for
+                each solve. Antennas with fewer baselines are excluded
+                from solutions.
+
+                Example: minblperant=4
+
+            minsnr: Solutions below this SNR are rejected in the phaseup and
+                bandpass solves.
+
+                Example: minsnr=3.0
+
+        """
         super(ALMAPhcorBandpassInputs, self).__init__(context, output_dir=output_dir, vis=vis, mode=mode, **parameters)
         self.bpnsols = bpnsols
         self.bpsnr = bpsnr
         self.minbpsnr = minbpsnr
         self.evenbpints = evenbpints
+        self.hm_auto_fillgaps = hm_auto_fillgaps
         self.hm_bandpass = hm_bandpass
         self.hm_phaseup = hm_phaseup
         self.maxchannels = maxchannels
@@ -84,7 +254,6 @@ class ALMAPhcorBandpassInputs(bandpassmode.BandpassModeInputs):
         self.phaseupsolint = phaseupsolint
         self.solint = solint
         self.unregister_existing = unregister_existing
-        self.fillgaps = fillgaps
 
 
 @task_registry.set_equivalent_casa_task('hifa_bandpass')
@@ -369,14 +538,48 @@ class ALMAPhcorBandpass(bandpassworker.BandpassWorker):
                 # Smooth if FDM and if it makes sense
                 if ncorr * spw.num_channels > 256:
                     if (spw.num_channels // inputs.maxchannels) < 1:
+                        LOG.info(f"{inputs.ms.basename}: Too few channels ({spw.num_channels}) in SpW {spw.id} to use"
+                                 f" smoothing (maxchannels={inputs.maxchannels}), reverting to default bandpass solint"
+                                 f" {orig_solint}.")
                         inputs.solint = orig_solint
                     else:
-                        bandwidth = spw.bandwidth.to_units(
-                            otherUnits=measures.FrequencyUnits.MEGAHERTZ)
-                        inputs.solint = orig_solint + ',' + \
-                            str(bandwidth / inputs.maxchannels) + 'MHz'
+                        # PIPE-2036: work-around for potential issue caused by:
+                        #   * PL defined solint as a frequency interval, and
+                        #     this may correspond to an exact nr. of channels.
+                        #   * the frequency interval is passed with limited
+                        #     precision (typically in MHz with 6 decimals, i.e.
+                        #     a precision of Hz)
+                        #   * CASA's bandpass converts the frequency interval
+                        #     back to nr. of channels and then take the floor
+                        #
+                        # This can result in e.g. a required nr. of channels of
+                        # 5 corresponding to 4.8828125 MHz but getting passed as
+                        # 4.882812 MHz, then converted back to 4.999999
+                        # channels, and floored to 4.
+                        #
+                        # As a work-around, check whether the frequency interval
+                        # would trigger this, and if so, then round *up* the
+                        # frequency interval to nearest Hz.
+                        bandwidth = spw.bandwidth.to_units(otherUnits=measures.FrequencyUnits.HERTZ)
+                        newsolint = bandwidth / inputs.maxchannels
+                        chanwidth = bandwidth / spw.num_channels
+                        if round(newsolint) / chanwidth < math.floor(newsolint / chanwidth):
+                            inputs.solint = f"{orig_solint},{round_up(newsolint) * 1.e-6:f}MHz"
+                        else:
+                            inputs.solint = f"{orig_solint},{float(newsolint) * 1.e-6:f}MHz"
+                        LOG.info(f"{inputs.ms.basename}: using smoothed bandpass solint {inputs.solint} for SpW"
+                                 f" {spw.id}.")
                 else:
                     inputs.solint = orig_solint
+                    LOG.warning(f"Reverting to default bandpass solint {inputs.solint} for spw {spw.id} in MS"
+                                f" {inputs.ms.basename}")
+
+                # PIPE-2116: if requested, set fillgaps to a quarter of the
+                # number of channels of current SpW.
+                if inputs.hm_auto_fillgaps:
+                    inputs.fillgaps = int(spw.num_channels / 4)
+                else:
+                    inputs.fillgaps = 0
 
                 # Compute and append bandpass solution
                 inputs.spw = spw.id
@@ -436,9 +639,6 @@ class ALMAPhcorBandpass(bandpassworker.BandpassWorker):
                 # Find the best solint for that window
                 try:
                     solindex = snr_result.spwids.index(spw.id)
-                    # Default to original 1 / 240 smoothing algorithm
-                    #if snr_result.nbpsolutions[solindex] < inputs.bpnsols:
-                        #solindex = -1
                 except:
                     solindex = -1
 
@@ -460,18 +660,51 @@ class ALMAPhcorBandpass(bandpassworker.BandpassWorker):
                     LOG.info('Setting bandpass solint to %s for spw %s' % (inputs.solint, spw.id))
 
                 elif ncorr * spw.num_channels > 256:
-
+                    LOG.warning(f"{inputs.ms.basename}: no SNR based bandpass solint was found for spw {spw.id},"
+                                f" reverting to smoothing algorithm.")
                     if (spw.num_channels // inputs.maxchannels) < 1:
+                        LOG.info(f"{inputs.ms.basename}: Too few channels ({spw.num_channels}) in SpW {spw.id} to use"
+                                 f" smoothing (maxchannels={inputs.maxchannels}), reverting to default bandpass solint"
+                                 f" {orig_solint}.")
                         inputs.solint = orig_solint
                     else:
-                        bandwidth = spw.bandwidth.to_units(
-                            otherUnits=measures.FrequencyUnits.MEGAHERTZ)
-                        inputs.solint=orig_solint + ',' + \
-                            str(bandwidth / inputs.maxchannels) + 'MHz'
+                        # PIPE-2036: work-around for potential issue caused by:
+                        #   * PL defined solint as a frequency interval, and
+                        #     this may correspond to an exact nr. of channels.
+                        #   * the frequency interval is passed with limited
+                        #     precision (typically in MHz with 6 decimals, i.e.
+                        #     a precision of Hz)
+                        #   * CASA's bandpass converts the frequency interval
+                        #     back to nr. of channels and then take the floor
+                        #
+                        # This can result in e.g. a required nr. of channels of
+                        # 5 corresponding to 4.8828125 MHz but getting passed as
+                        # 4.882812 MHz, then converted back to 4.999999
+                        # channels, and floored to 4.
+                        #
+                        # As a work-around, check whether the frequency interval
+                        # would trigger this, and if so, then round *up* the
+                        # frequency interval to nearest Hz.
+                        bandwidth = spw.bandwidth.to_units(otherUnits=measures.FrequencyUnits.HERTZ)
+                        newsolint = bandwidth / inputs.maxchannels
+                        chanwidth = bandwidth / spw.num_channels
+                        if round(newsolint) / chanwidth < math.floor(newsolint / chanwidth):
+                            inputs.solint = f"{orig_solint},{round_up(newsolint) * 1.e-6:f}MHz"
+                        else:
+                            inputs.solint = f"{orig_solint},{float(newsolint) * 1.e-6:f}MHz"
+                        LOG.info(f"{inputs.ms.basename}: using smoothed bandpass solint {inputs.solint} for SpW"
+                                 f" {spw.id}.")
                 else:
                     inputs.solint = orig_solint
                     LOG.warning("Reverting to default bandpass solint %s for spw %s in MS %s" %
                                 (inputs.solint, spw.id, inputs.ms.basename))
+
+                # PIPE-2116: if requested, set fillgaps to a quarter of the
+                # number of channels of current SpW.
+                if inputs.hm_auto_fillgaps:
+                    inputs.fillgaps = int(spw.num_channels / 4)
+                else:
+                    inputs.fillgaps = 0
 
                 # Compute and append bandpass solution
                 inputs.spw = spw.id
