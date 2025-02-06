@@ -1455,6 +1455,12 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
                      atmtype=int(models['atmtype'][k]), atmdetail=False)
 
     #Open uncorrected data to measure skylines and presence of science target
+    tb.open(ms + '/STATE')
+    tb_on = tb.query('OBS_MODE ~ m/^OBSERVE_TARGET#ON_SOURCE/')
+    state_ids_on = tb_on.rownumbers()
+    tb_on.close()
+    tb.close()
+
     tb.open(ms, nomodify=False)
     for spwid in spwstoprocess:
         print('Processing spw '+str(spwid))
@@ -1464,29 +1470,21 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
         ### Calculate and apply correction values
         ################################################################
         querystr = 'DATA_DESC_ID in {0:s} && FIELD_ID in {1:s}'.format(str(spwsetup[spwid]['ddi']), str(fieldid))
+        querystr += f' && NOT FLAG_ROW && STATE_ID IN {state_ids_on.tolist()}'
         print('Reading data for TaQL query: '+querystr)
         subtb = tb.query(querystr)
         casalog.post(f"Start reading_data_spw{spwid} for TaQL query: {querystr}")
-        tmdata = subtb.getcol('TIME')
-        data = subtb.getcol(datacolumn)
+        tmdataon = subtb.getcol('TIME')
+        data = subtb.getcol(datacolumn).real
         flag = subtb.getcol('FLAG')
-        flagrow = subtb.getcol('FLAG_ROW')
-        ant1 = subtb.getcol('ANTENNA1')
+        antson = subtb.getcol('ANTENNA1')
+        subtb.close()
         casalog.post(f"Done reading_data_spw{spwid} for TaQL query")
         npol = data.shape[0]
-        #Add the flag ROW flag to the individual row flag arrays,
-        #in order to use only one array.
-        flaggedrowlist = np.where(flagrow)[0]
-        for row in flaggedrowlist:
-            flag[:,:,row] = np.logical_or(flag[:,:,row],~flag[:,:,row])
-        #Create selection vector for on-source rows
-        onsel = selectRanges(tmdata, onsourcetab)
-        tmdataon = tmdata[onsel]
-        antson = ant1[onsel]
 
         #Create masked data numpy array for ease of use, cdata to contain the data before correction
         #and diffbuffer after correction
-        cdata = np.ma.masked_array(np.real(data.copy()), mask=flag, fill_value=0.0)
+        dataon = np.ma.masked_array(data, mask=flag, fill_value=0.0)
 
         #Search for science target channels
         dataon = np.transpose(np.transpose(cdata)[onsel])
@@ -1600,32 +1598,23 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
             ################################################################
             tb.open(msk, nomodify=False)
             querystr = 'DATA_DESC_ID in {0:s} && FIELD_ID in {1:s}'.format(str(spwsetup[spwid]['ddi']), str(fieldid))
+            querystr += f' && NOT FLAG_ROW && STATE_ID IN {state_ids_on.tolist()}'
             print('Reading data for TaQL query: '+querystr)
             subtb = tb.query(querystr)
             casalog.post(f"Start reading_data_spw{spwid}_model{k} for TaQL query: {querystr}")
-            tmdatak = subtb.getcol('TIME')
-            datak = subtb.getcol('DATA')
+            datak = subtb.getcol('DATA').real
             flagk = subtb.getcol('FLAG')
-            flagrowk = subtb.getcol('FLAG_ROW')
+            subtb.close()
             casalog.post(f"Done reading_data_spw{spwid}_model{k} for TaQL query")
-            #Add the flag ROW flag to the individual row flag arrays,
-            #in order to use only one array.
-            flaggedrowlistk = np.where(flagrowk)[0]
-            for row in flaggedrowlistk:
-                flagk[:,:,row] = np.logical_or(flagk[:,:,row],~flag[:,:,row])
-
-            #Create selection vector for on-source rows
-            onselk = selectRanges(tmdatak, onsourcetab)
-
             #Create masked data numpy array for ease of use, data after correction
-            cdatak = np.ma.masked_array(np.real(datak.copy()), mask=flagk, fill_value=0.0)
+            diffdataonk = np.ma.masked_array(datak, mask=flagk, fill_value=0.0)
 
             #Calculate metrics for model k
-            #First select channel range, and average over time
-            diffdataonk = np.transpose(np.transpose(cdatak)[onselk])
             npolk, nchk, nrowk = np.shape(diffdataonk)
             tmavedataonk = np.ma.mean(diffdataonk, axis = 2)
             tmstddataonk = np.ma.std(diffdataonk, axis = 2)/np.sqrt(nrowk)
+
+            del diffdataonk
 
             #Fit baseline
             for ipol in range(npol):
