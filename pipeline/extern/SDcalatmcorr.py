@@ -1486,8 +1486,6 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
         #and diffbuffer after correction
         dataon = np.ma.masked_array(data, mask=flag, fill_value=0.0)
 
-        #Search for science target channels
-        dataon = np.transpose(np.transpose(cdata)[onsel])
         #Pre-correction average
         precorravedataon = np.ma.mean(dataon, axis = 2)
         maskedchans = np.any(precorravedataon.mask, axis = 0)
