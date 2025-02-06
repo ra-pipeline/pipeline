@@ -1466,13 +1466,13 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
         querystr = 'DATA_DESC_ID in {0:s} && FIELD_ID in {1:s}'.format(str(spwsetup[spwid]['ddi']), str(fieldid))
         print('Reading data for TaQL query: '+querystr)
         subtb = tb.query(querystr)
-        casalog.post(f"Start reading data for TaQL query: {querystr}")
+        casalog.post(f"Start reading_data_spw{spwid} for TaQL query: {querystr}")
         tmdata = subtb.getcol('TIME')
         data = subtb.getcol(datacolumn)
         flag = subtb.getcol('FLAG')
         flagrow = subtb.getcol('FLAG_ROW')
         ant1 = subtb.getcol('ANTENNA1')
-        casalog.post("Done reading data for TaQL query")
+        casalog.post(f"Done reading_data_spw{spwid} for TaQL query")
         npol = data.shape[0]
         #Add the flag ROW flag to the individual row flag arrays,
         #in order to use only one array.
@@ -1602,12 +1602,12 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
             querystr = 'DATA_DESC_ID in {0:s} && FIELD_ID in {1:s}'.format(str(spwsetup[spwid]['ddi']), str(fieldid))
             print('Reading data for TaQL query: '+querystr)
             subtb = tb.query(querystr)
-            casalog.post(f"Start reading data for TaQL query: {querystr}")
+            casalog.post(f"Start reading_data_spw{spwid}_model{k} for TaQL query: {querystr}")
             tmdatak = subtb.getcol('TIME')
             datak = subtb.getcol('DATA')
             flagk = subtb.getcol('FLAG')
             flagrowk = subtb.getcol('FLAG_ROW')
-            casalog.post("Done reading data for TaQL query")
+            casalog.post(f"Done reading_data_spw{spwid}_model{k} for TaQL query")
             #Add the flag ROW flag to the individual row flag arrays,
             #in order to use only one array.
             flaggedrowlistk = np.where(flagrowk)[0]
