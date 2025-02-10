@@ -76,8 +76,8 @@ class finalDelaysPerAntennaChart(object):
         result = self.result
         m = context.observing_run.measurement_sets[0]
         plots = []
-        nplots = len(m.antennas)
-
+        nplots = len(m. antennas)
+        antName = ''
         LOG.info("Plotting finalDelay calibration tables")
 
         spw2band = self.ms.get_vla_spw2band()
@@ -161,7 +161,7 @@ class finalphaseGainPerAntennaChart(object):
 
         nplots = len(m.antennas)
         plots = []
-
+        antName = ''
         LOG.info("Plotting final phase gain solutions")
 
         spw2band = self.ms.get_vla_spw2band()
@@ -248,7 +248,7 @@ class finalbpSolAmpPerAntennaChart(object):
 
         nplots = len(m.antennas)
         plots = []
-
+        antName = ''
         spw2band = self.ms.get_vla_spw2band()
         band2spw = collections.defaultdict(list)
         spwobjlist = self.ms.get_spectral_windows(science_windows_only=True)
@@ -335,15 +335,16 @@ class finalbpSolAmpPerAntennaPerSpwChart(object):
 
         nplots = len(m.antennas)
         plots = []
-
+        antName = ''
         spw2band = self.ms.get_vla_spw2band()
         band2spw = collections.defaultdict(list)
         spwobjlist = self.ms.get_spectral_windows(science_windows_only=True)
         listspws = [spw.id for spw in spwobjlist]
         specline_spwlist = [spw.id for spw in spwobjlist if spw.specline_window]
+
         for spw, band in spw2band.items():
             if spw in listspws:  # Science intents only
-                band2spw[band].append(str(spw))
+                band2spw[band].append(spw)
 
         for bandname, spwlist in band2spw.items():
             for spw in spwlist:
@@ -355,7 +356,7 @@ class finalbpSolAmpPerAntennaPerSpwChart(object):
 
                     for ii in range(nplots):
 
-                        filename = 'finalBPcal_amp' + str(ii) + '_' + bandname + '_' + str(spw.id) + '.png'
+                        filename = 'finalBPcal_amp' + str(ii) + '_' + bandname + '_' + str(spw) + '.png'
                         antPlot = str(ii)
 
                         stage = 'stage%s' % result.stage_number
@@ -376,9 +377,9 @@ class finalbpSolAmpPerAntennaPerSpwChart(object):
 
                                 LOG.debug("Plotting amp bandpass solutions " + antName)
                                 job = casa_tasks.plotms(vis=self.result.bpcaltable, xaxis='freq', yaxis='amp', field='',
-                                                antenna=antPlot, spw=str(spw.id), timerange='',
+                                                antenna=antPlot, spw=str(spw), timerange='',
                                                 coloraxis='', plotrange=[0, 0, 0, ampplotmax], symbolshape='circle',
-                                                title='B table: {!s}   Antenna: {!s}  Band: {!s}  Spw: {!s}'.format('finalBPcal.tbl', antName, bandname, str(spw.id)),
+                                                title='B table: {!s}   Antenna: {!s}  Band: {!s}  Spw: {!s}'.format('finalBPcal.tbl', antName, bandname, str(spw)),
                                                 titlefont=8, xaxisfont=7, yaxisfont=7, showgui=False, plotfile=figfile,
                                                 xconnector='step')
 
@@ -395,7 +396,7 @@ class finalbpSolAmpPerAntennaPerSpwChart(object):
                                 real_figfile = figfile
 
                                 plot = logger.Plot(real_figfile, x_axis='Freq', y_axis='Amp', field='',
-                                                parameters={'spw': str(spw.id),
+                                                parameters={'spw': str(spw),
                                                             'pol': '',
                                                             'ant': antName,
                                                             'bandname': bandname,
@@ -430,7 +431,7 @@ class finalbpSolPhasePerAntennaChart(object):
 
         nplots = len(m.antennas)
         plots = []
-
+        antName = ''
         spw2band = self.ms.get_vla_spw2band()
         band2spw = collections.defaultdict(list)
         spwobjlist = self.ms.get_spectral_windows(science_windows_only=True)
@@ -518,7 +519,7 @@ class finalbpSolPhasePerAntennaPerSpwChart(object):
 
         nplots = len(m.antennas)
         plots = []
-
+        antName = ''
         spw2band = self.ms.get_vla_spw2band()
         band2spw = collections.defaultdict(list)
         spwobjlist = self.ms.get_spectral_windows(science_windows_only=True)
@@ -526,7 +527,7 @@ class finalbpSolPhasePerAntennaPerSpwChart(object):
         specline_spwlist = [spw.id for spw in spwobjlist if spw.specline_window]
         for spw, band in spw2band.items():
             if spw in listspws:  # Science intents only
-                band2spw[band].append(str(spw))
+                band2spw[band].append(spw)
 
         for bandname, spwlist in band2spw.items():
             for spw in spwlist:
@@ -538,7 +539,7 @@ class finalbpSolPhasePerAntennaPerSpwChart(object):
 
                     for ii in range(nplots):
 
-                        filename = 'finalBPcal_phase' + str(ii) + '_' + bandname + '_' + str(spw.id) + '.png'
+                        filename = 'finalBPcal_phase' + str(ii) + '_' + bandname + '_' + str(spw) + '.png'
                         antPlot = str(ii)
 
                         stage = 'stage%s' % result.stage_number
@@ -559,10 +560,10 @@ class finalbpSolPhasePerAntennaPerSpwChart(object):
 
                                 LOG.debug("Plotting phase bandpass solutions " + antName)
                                 job = casa_tasks.plotms(vis=self.result.bpcaltable, xaxis='freq', yaxis='phase', field='',
-                                                antenna=antPlot, spw=str(spw.id), timerange='',
+                                                antenna=antPlot, spw=str(spw), timerange='',
                                                 coloraxis='', plotrange=[0, 0, -phaseplotmax, phaseplotmax],
                                                 symbolshape='circle',
-                                                title='B table: {!s}   Antenna: {!s}  Band: {!s}  Spw: {!s}'.format('finalBPcal.tbl', antName, bandname, str(spw.id)),
+                                                title='B table: {!s}   Antenna: {!s}  Band: {!s}  Spw: {!s}'.format('finalBPcal.tbl', antName, bandname, str(spw)),
                                                 titlefont=8, xaxisfont=7, yaxisfont=7, showgui=False, plotfile=figfile,
                                                 xconnector='step')
 
@@ -579,7 +580,7 @@ class finalbpSolPhasePerAntennaPerSpwChart(object):
                                 real_figfile = figfile
 
                                 plot = logger.Plot(real_figfile, x_axis='Freq', y_axis='Phase', field='',
-                                                parameters={'spw': str(spw.id),
+                                                parameters={'spw': str(spw),
                                                             'pol': '',
                                                             'ant': antName,
                                                             'bandname': bandname,
@@ -614,7 +615,7 @@ class finalbpSolPhaseShortPerAntennaChart(object):
 
         nplots = len(m.antennas)
         plots = []
-
+        antName = ''
         LOG.info("Plotting phase short gaincal")
 
         spw2band = self.ms.get_vla_spw2band()
@@ -703,7 +704,7 @@ class finalAmpTimeCalPerAntennaChart(object):
         nplots = len(m.antennas)
 
         plots = []
-
+        antName = ''
         spw2band = self.ms.get_vla_spw2band()
         band2spw = collections.defaultdict(list)
         spwobjlist = self.ms.get_spectral_windows(science_windows_only=True)
@@ -800,7 +801,7 @@ class finalAmpTimeCalPerAntennaPerSpwChart(object):
         nplots = len(m.antennas)
 
         plots = []
-
+        antName = ''
         spw2band = self.ms.get_vla_spw2band()
         band2spw = collections.defaultdict(list)
         spwobjlist = self.ms.get_spectral_windows(science_windows_only=True)
@@ -808,7 +809,7 @@ class finalAmpTimeCalPerAntennaPerSpwChart(object):
         specline_spwlist = [spw.id for spw in spwobjlist if spw.specline_window]
         for spw, band in spw2band.items():
             if spw in listspws:  # Science intents only
-                band2spw[band].append(str(spw))
+                band2spw[band].append(spw)
 
         with casa_tools.TableReader(self.result.finalampgaincaltable) as tb:
             times = tb.getcol('TIME')
@@ -831,7 +832,7 @@ class finalAmpTimeCalPerAntennaPerSpwChart(object):
 
                     for ii in range(nplots):
 
-                        filename = 'finalamptimecal' + str(ii) + '_' + bandname + '_' + str(spw.id) + '.png'
+                        filename = 'finalamptimecal' + str(ii) + '_' + bandname + '_' + str(spw) + '.png'
                         antPlot = str(ii)
 
                         stage = 'stage%s' % result.stage_number
@@ -852,9 +853,9 @@ class finalAmpTimeCalPerAntennaPerSpwChart(object):
 
                                 LOG.debug("Plotting final amp timecal " + antName)
                                 job = casa_tasks.plotms(vis=self.result.finalampgaincaltable, xaxis='time', yaxis='amp', field='',
-                                                antenna=antPlot, spw=str(spw.id), timerange='',
+                                                antenna=antPlot, spw=str(spw), timerange='',
                                                 coloraxis='', plotrange=[mintime, maxtime, 0, plotmax], symbolshape='circle',
-                                                title='G table: finalampgaincal.tbl   Antenna: {!s}  Band: {!s}  Spw: {!s}'.format(antName, bandname, str(spw.id)),
+                                                title='G table: finalampgaincal.tbl   Antenna: {!s}  Band: {!s}  Spw: {!s}'.format(antName, bandname, str(spw)),
                                                 titlefont=8, xaxisfont=7, yaxisfont=7, showgui=False, plotfile=figfile,
                                                 xconnector='line')
 
@@ -869,7 +870,7 @@ class finalAmpTimeCalPerAntennaPerSpwChart(object):
                         if not plot_failed:
                             try:
                                 plot = logger.Plot(figfile, x_axis='Time', y_axis='Amp', field='',
-                                                parameters={'spw': str(spw.id),
+                                                parameters={'spw': str(spw),
                                                             'pol': '',
                                                             'ant': antName,
                                                             'bandname': bandname,
@@ -905,7 +906,7 @@ class finalAmpFreqCalPerAntennaChart(object):
         nplots = len(m.antennas)
 
         plots = []
-
+        antName = ''
         spw2band = self.ms.get_vla_spw2band()
         band2spw = collections.defaultdict(list)
         spwobjlist = self.ms.get_spectral_windows(science_windows_only=True)
@@ -997,7 +998,7 @@ class finalPhaseGainCalPerAntennaChart(object):
 
         nplots = len(m.antennas)
         plots = []
-
+        antName = ''
         LOG.info("Plotting final phase freqcal")
 
         spw2band = self.ms.get_vla_spw2band()
@@ -1086,7 +1087,7 @@ class finalPhaseGainCalPerAntennaPerSpwChart(object):
         spws = m.get_spectral_windows(science_windows_only=True)
         nplots = len(m.antennas)
         plots = []
-
+        antName = ''
         LOG.info("Plotting final phase freqcal per spw for spectral window spws")
 
         spw2band = self.ms.get_vla_spw2band()
@@ -1096,7 +1097,7 @@ class finalPhaseGainCalPerAntennaPerSpwChart(object):
         specline_spwlist = [spw.id for spw in spwobjlist if spw.specline_window]
         for spw, band in spw2band.items():
             if spw in listspws:  # Science intents only
-                band2spw[band].append(str(spw))
+                band2spw[band].append(spw)
 
         with casa_tools.TableReader(self.result.finalphasegaincaltable) as tb:
             times = tb.getcol('TIME')
@@ -1108,7 +1109,7 @@ class finalPhaseGainCalPerAntennaPerSpwChart(object):
                 if spw in specline_spwlist:
                     for ii in range(nplots):
 
-                        filename = 'finalphasegaincal' + str(ii) + '_' + bandname + '_' + str(spw.id) + '.png'
+                        filename = 'finalphasegaincal' + str(ii) + '_' + bandname + '_' + str(spw) + '.png'
                         antPlot = str(ii)
 
                         stage = 'stage%s' % result.stage_number
@@ -1129,9 +1130,9 @@ class finalPhaseGainCalPerAntennaPerSpwChart(object):
 
                                 LOG.debug("Plotting final phase freqcal " + antName)
                                 job = casa_tasks.plotms(vis=self.result.finalphasegaincaltable, xaxis='time', yaxis='phase', field='',
-                                                antenna=antPlot, spw=str(spw.id), timerange='',
+                                                antenna=antPlot, spw=str(spw), timerange='',
                                                 coloraxis='', plotrange=[mintime, maxtime, -180, 180], symbolshape='circle',
-                                                title='G table: finalphasegaincal.tbl   Antenna: {!s}  Band: {!s}  Spw: {!s}'.format(antName, bandname, str(spw.id)),
+                                                title='G table: finalphasegaincal.tbl   Antenna: {!s}  Band: {!s}  Spw: {!s}'.format(antName, bandname, str(spw)),
                                                 titlefont=8, xaxisfont=7, yaxisfont=7, showgui=False, plotfile=figfile,
                                                 xconnector='line')
 
@@ -1146,7 +1147,7 @@ class finalPhaseGainCalPerAntennaPerSpwChart(object):
                         if not plot_failed:
                             try:
                                 plot = logger.Plot(figfile, x_axis='time', y_axis='phase', field='',
-                                                parameters={'spw': str(spw.id),
+                                                parameters={'spw': str(spw),
                                                             'pol': '',
                                                             'ant': antName,
                                                             'bandname': bandname,
