@@ -8,7 +8,7 @@ bandsort = {'4':0, 'P':1, 'L':2, 'S':3, 'C':4, 'X':5, 'U':6, 'K':7, 'A':8, 'Q':9
 
 <a id="topofpage"></a>
 <div class="page-header">
-	<h1>${plots[0].parameters['type'].title()} Plots<button class="btn btn-default pull-right" onClick="javascript:window.history.back();">Back</button></h1>
+       <h1>${plots[0].parameters['type'].title()} Plots<button class="btn btn-default pull-right" onClick="javascript:window.history.back();">Back</button></h1>
 </div>
 
 <br>
@@ -40,14 +40,20 @@ bandsort = {'4':0, 'P':1, 'L':2, 'S':3, 'C':4, 'X':5, 'U':6, 'K':7, 'A':8, 'Q':9
         % endif
     % endfor
     <%
-    if len(spwlist) > 0:
+    band_plots = [plot for plot in spw_plots if plot.parameters.get('bandname') == band]
+
+    if len(spwlist) > 0 and len(band_plots)>0:
         spwlist.sort(key=lambda x: int(x))
-        first_spw = spwlist[0]
+        first_spw = None
+        for spwk in spwlist:
+            if spwk in context["band2spw"][band]:
+                first_spw = spwk
+                break
     else: 
         first_spw = None
     %>
     <a href="#topofpage">Top of page </a> | (Click to Jump)<br><br>
-    % if first_spw is not None: 
+    % if first_spw is not None and len(band_plots) > 0:
         <a href="#${band}-${first_spw}">${band}-band per-spw</a><br><br>
             ${band}-band
      % else:
@@ -75,9 +81,6 @@ bandsort = {'4':0, 'P':1, 'L':2, 'S':3, 'C':4, 'X':5, 'U':6, 'K':7, 'A':8, 'Q':9
     </div>
 
     %if len(spwlist) > 0 and len(spw_plots) > 0:
-        <%
-        band_plots = [plot for plot in spw_plots if plot.parameters.get('bandname') == band]
-        %>
         % if len(band_plots) > 0:
             % for spw in spwlist:
                 <%
