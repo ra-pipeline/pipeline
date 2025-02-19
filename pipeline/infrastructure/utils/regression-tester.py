@@ -194,7 +194,7 @@ class PipelineRegression(object):
             mpihelpers.exec_func(os.chdir, 'working')
 
             # switch to per-test casa/PL logfile paths and backup the default(initial) casa logfile name
-            now_str = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+            now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M%S")
             casa_logfile = f'casa-{now_str}.log'
             mpihelpers.exec_func(reset_logfiles, casa_logfile=casa_logfile, prepend=True)
 
@@ -653,6 +653,7 @@ def test_vlass_quicklook():
 
 # Section for longer-running tests
 
+
 @pytest.fixture(autouse=True)
 def data_directory(scope="module") -> str:
     if hasattr(pytest, 'pytestconfig'):
@@ -667,27 +668,34 @@ def data_directory(scope="module") -> str:
     return big_data_dir
 
 
-def dbservice_urls(urls=None):
-    last_urls = (dbfluxes.FLUX_SERVICE_URL, dbfluxes.FLUX_SERVICE_URL_BACKUP)
-    if isinstance(urls, list) and len(urls) == 2:
-        dbfluxes.FLUX_SERVICE_URL = urls[0]
-        dbfluxes.FLUX_SERVICE_URL_BACKUP = urls[1]
-    return last_urls
+def config_dbservice(enable: bool = True) -> None:
+    """Enable or disable the flux service for `dbfluxes`.
+
+    Args:
+        enable (bool, optional): If True, enables the flux service. 
+                                 If False, disables it. Default is True.
+
+    Returns:
+        None
+    """
+    dbfluxes.dbfluxes_enable = enable
 
 
 @pytest.fixture(autouse=True)
 def test_config(scope="module"):
     """Standardize regression tests setup."""
 
-    # executeppr expects $SCIPIPE_ROOTDIR pointing to the path of "working/"; after PIPE-2093, if 
-    # $SCIPIPE_ROOTDIR is not set, executeppr will also take the CWD as a fallback. However, because 
+    # executeppr expects $SCIPIPE_ROOTDIR pointing to the path of "working/"; after PIPE-2093, if
+    # $SCIPIPE_ROOTDIR is not set, executeppr will also take the CWD as a fallback. However, because
     # specifying $SCIPIPE_ROOTDIR from the shell will cause the regression tester to fail in detecting
-    # "rawdata/", due to the CWD change behavior between individual tests, here we must explictly disable 
+    # "rawdata/", due to the CWD change behavior between individual tests, here we must explictly disable
     # $SCIPIE_ROOTDIR during a Pytest session.
     env_scipipe_rootdir = os.environ.pop('SCIPIPE_ROOTDIR', None)
 
     # The online regression test plan doesn't use dbservice; so by default, we disable dbservice
     # URL during a Pytest session.
+
+    dbfluxes_enable_last = dbfluxes.dbfluxes_enable
 
     if hasattr(pytest, 'pytestconfig'):
         dbservice = pytest.pytestconfig.getoption('--dbservice')
@@ -696,8 +704,7 @@ def test_config(scope="module"):
 
     # disable dbservice URLs during a Pytest session.
     if not dbservice:
-        last_urls = dbservice_urls()
-        mpihelpers.exec_func(dbservice_urls, ['', ''])
+        mpihelpers.exec_func(config_dbservice, False)
 
     yield
 
@@ -707,7 +714,7 @@ def test_config(scope="module"):
 
     # enable dbservice URLs after a Pytest session.
     if not dbservice:
-        mpihelpers.exec_func(dbservice_urls, last_urls)
+        mpihelpers.exec_func(config_dbservice, dbfluxes_enable_last)
 
 
 def setup_flux_antennapos(test_directory, output_dir):

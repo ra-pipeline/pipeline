@@ -148,13 +148,14 @@ class SerialALMAImportData(importdata.ImportData):
     def _get_fluxes(self, context, observing_run):
         # get the flux measurements from Source.xml for each MS
 
-        if self.inputs.dbservice:
+        if not dbfluxes.dbfluxes_enable:
+            LOG.warning('Flux service is disabled from the session configuration.')
+
+        if self.inputs.dbservice and dbfluxes.dbfluxes_enable:
             testquery = '?DATE=27-March-2013&FREQUENCY=86837309056.169219970703125&WEIGHTED=true&RESULT=1&NAME=J1427-4206&VERBOSE=1'
             # Test for service response
-            baseurl = dbfluxes.FLUX_SERVICE_URL
-            url = baseurl + testquery
-            if baseurl == '':
-                url = ''
+            flux_url, backup_flux_url = dbfluxes.get_flux_urls()
+            url = flux_url + testquery
 
             try:
                 ssl_context = ssl.create_default_context(cafile=certifi.where())
@@ -166,12 +167,9 @@ class SerialALMAImportData(importdata.ImportData):
                 try:
                     LOG.warning('Unable to execute initial test query with primary flux service.')
                     ssl_context = ssl.create_default_context(cafile=certifi.where())
-                    baseurl = dbfluxes.FLUX_SERVICE_URL_BACKUP
-                    url = baseurl + testquery
-                    if baseurl == '':
-                        url = ''
-                    LOG.info('Attempting test query at backup: {!s}'.format(url))
-                    response = urllib.request.urlopen(url, context=ssl_context, timeout=60.0)
+                    url = backup_flux_url + testquery
+                    LOG.info('Attempting test query at backup: %s', url)
+                    urllib.request.urlopen(url, context=ssl_context, timeout=60.0)
                     xml_results, qastatus = dbfluxes.get_setjy_results(observing_run.measurement_sets)
                     fluxservice='BACKUPURL'
                 except Exception as e2:

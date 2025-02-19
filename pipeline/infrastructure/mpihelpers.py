@@ -390,7 +390,7 @@ def is_mpi_ready():
 
 
 def is_mpi_server():
-    """check if the current process is on an MPI server."""
+    """Check if the current process is on an MPI server."""
     return MPIEnvironment.is_mpi_enabled and not MPIEnvironment.is_mpi_client
 
 
@@ -423,7 +423,7 @@ def parse_mpi_input_parameter(input_arg):
 
 
 def exec_func(fn, *args, include_client=True, **kwargs):
-    """execute the same identical function on the client and individual mpiserver processes.
+    """Execute the same identical function on the client and individual mpiserver processes.
     
     This function is mostfly useful for certain MPI client/servers setup tasks, e.g. switch CWD.
     """

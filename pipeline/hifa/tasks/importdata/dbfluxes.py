@@ -17,6 +17,7 @@ import pipeline.infrastructure.utils as utils
 
 LOG = infrastructure.get_logger(__name__)
 ORIGIN_DB = 'DB'
+dbfluxes_enable = True
 
 
 def get_valid_url(env_var, default):
