@@ -25,9 +25,9 @@ import abc
 import collections
 import enum
 import operator
-from typing import Optional, Set, List
+import traceback
+from typing import List, Optional, Set
 
-from . import eventbus
 from . import logging
 
 LOG = logging.get_logger(__name__)
@@ -296,8 +296,7 @@ class QAPlugin(object, metaclass=abc.ABCMeta):
         pass
 
     def handle_with_exception_catch(self, context, result):
-        """
-        Handle QA scoring with an exception catch.
+        """Handle QA scoring with an exception catch.
 
         Args:
             context: Pipeline context
@@ -310,6 +309,8 @@ class QAPlugin(object, metaclass=abc.ABCMeta):
             # present the exception error message in warning.
             result.qa.pool.append(QAScore(-0.1, 'Unable to calculate QA scores.', 'Unable to calculate QA scores'))
             LOG.warning('QA execution failed with an exception: %s', ex)
+            traceback_msg = traceback.format_exc()
+            LOG.debug(traceback_msg)
 
 class QARegistry(object):
     """

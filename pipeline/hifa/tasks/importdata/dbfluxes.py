@@ -17,6 +17,9 @@ import pipeline.infrastructure.utils as utils
 
 LOG = infrastructure.get_logger(__name__)
 ORIGIN_DB = 'DB'
+# `dbfluxes_enable` is a module-level attribute that can disable the usage of the dbfluxes service at
+# the session configuration level. It is typically disabled only for testing purposes, such as running
+# regression tests in an isolated sandbox environment.
 dbfluxes_enable = True
 
 

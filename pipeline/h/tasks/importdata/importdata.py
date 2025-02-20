@@ -139,7 +139,7 @@ class ImportDataResults(basetask.Results):
     """
 
     def __init__(self, mses=None, setjy_results=None):
-        super(ImportDataResults, self).__init__()
+        super().__init__()
         self.mses = [] if mses is None else mses
         self.setjy_results = setjy_results
         self.origin = {}

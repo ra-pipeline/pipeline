@@ -149,7 +149,7 @@ class SerialALMAImportData(importdata.ImportData):
         # get the flux measurements from Source.xml for each MS
 
         if not dbfluxes.dbfluxes_enable:
-            LOG.warning('Flux service is disabled from the session configuration.')
+            LOG.warning('Flux catalog service is disabled based on the Pipeline session configuration.')
 
         if self.inputs.dbservice and dbfluxes.dbfluxes_enable:
             testquery = '?DATE=27-March-2013&FREQUENCY=86837309056.169219970703125&WEIGHTED=true&RESULT=1&NAME=J1427-4206&VERBOSE=1'

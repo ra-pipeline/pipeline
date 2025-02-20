@@ -3968,14 +3968,19 @@ def score_polcal_results(session_name: str, caltables: list) -> pqa.QAScore:
 
 @log_qa
 def score_fluxservice(result):
-    """
-    If the primary FS query fails and the backup is invoked,
-    the severity level should be BLUE (below standard; numerically, on its own, 0.9).
-    If the backup FS query also fails, the warning should be YELLOW (WARNING; numerically, on its own, 0.6).
-    But it should keep running as it currently does.
+    """Score flux service usage based on query results.
+    
+    Args:
+        result: The result object containing flux service information and measurements.
+
+    Returns:
+        pqa.QAScore: A QA score object with the following attributes:
+            - score: Float between 0.3 to 1.0 indicating the quality of flux service.
+            - longmsg/shortmsg: Explanation of the score, including reason for the score and any warnings.
+            - origin: The metric name and units for tracking.
     """
 
-    if result.inputs['dbservice'] is False:
+    if result.fluxservice is None:
         score = 1.0
         msg = "Flux catalog service not used."
         for setjy_result in result.setjy_results:
@@ -3993,60 +3998,59 @@ def score_fluxservice(result):
                               metric_score=score,
                               metric_units='flux service')
         return pqa.QAScore(score, longmsg=msg, shortmsg=msg, origin=origin)
-    elif result.inputs['dbservice'] is True:
-        msg = ""
-        if result.fluxservice == 'FIRSTURL':
-            msg += "Flux catalog service used.  "
-            score = 1.0
-        elif result.fluxservice == 'BACKUPURL':
-            msg += "Backup flux catalog service used.  "
-            score = 0.9
-        elif result.fluxservice == 'FAIL':
-            msg += "Neither primary or backup flux service could be queried.  ASDM values used."
-            score = 0.3
 
-        agecounter = 0
-        if result.fluxservice in ['FIRSTURL', 'BACKUPURL']:
-            for setjy_result in result.setjy_results:
-                measurements = setjy_result.measurements
-                for measurement in measurements.items():
-                    try:
-                        fieldid = measurement[0]
-                        mm = result.mses[0]
-                        fieldobjs = mm.get_fields(field_id=fieldid)
-                        intentlist = []
-                        for fieldobj in fieldobjs:
-                            intentlist.append(fieldobj.intents)
+    msg = ""
+    if result.fluxservice == 'FIRSTURL':
+        msg += "Flux catalog service used.  "
+        score = 1.0
+    elif result.fluxservice == 'BACKUPURL':
+        msg += "Backup flux catalog service used.  "
+        score = 0.9
+    elif result.fluxservice == 'FAIL':
+        msg += "Neither primary or backup flux service could be queried.  ASDM values used."
+        score = 0.3
 
-                        # PIPE-1124.  Only determine QA age scoring if 'AMPLITUDE' intent is present for a source.
-                        if 'AMPLTIUDE' in intentlist:
-                            age = measurement[1][0].age  # second element of a tuple, first element of list of flux objects
-                            if int(abs(age)) > 14:
-                                agecounter = agecounter + 1
-                    except IndexError:
-                        LOG.debug("Skip since there is no age present")
+    # Check if measurements are from monitoring points older than 14 days
+    agecounter = 0
+    if result.fluxservice in ['FIRSTURL', 'BACKUPURL']:
+        for setjy_result in result.setjy_results:
+            measurements = setjy_result.measurements
+            for measurement in measurements.items():
+                try:
+                    fieldid = measurement[0]
+                    mm = result.mses[0]
+                    fieldobjs = mm.get_fields(field_id=fieldid)
+                    intentlist = []
+                    for fieldobj in fieldobjs:
+                        intentlist.append(fieldobj.intents)
 
-            # Any sources with age of nearest monitoring point greater than 14 days?
-            if agecounter > 0:
-                score = 0.5
-                msg += "Age of nearest monitor point is greater than 14 days."
+                    # PIPE-1124.  Only determine QA age scoring if 'AMPLITUDE' intent is present for a source.
+                    if 'AMPLTIUDE' in intentlist:
+                        age = measurement[1][0].age  # second element of a tuple, first element of list of flux objects
+                        if int(abs(age)) > 14:
+                            agecounter = agecounter + 1
+                except IndexError:
+                    LOG.debug("Skip since there is no age present")
 
-        origin = pqa.QAOrigin(metric_name='score_fluxservice',
-                              metric_score=score,
-                              metric_units='flux service')
-        return pqa.QAScore(score, longmsg=msg, shortmsg=msg, origin=origin)
+        # Any sources with age of nearest monitoring point greater than 14 days?
+        if agecounter > 0:
+            score = 0.5
+            msg += "Age of nearest monitor point is greater than 14 days."
+
+    origin = pqa.QAOrigin(metric_name='score_fluxservice',
+                            metric_score=score,
+                            metric_units='flux service')
+    return pqa.QAScore(score, longmsg=msg, shortmsg=msg, origin=origin)
 
 
 @log_qa
 def score_fluxservicemessages(result):
-    """
-    Report any flux service messaging and status codes
-    """
-    if result.inputs['dbservice'] is False:
+    """Report any flux service messaging and status codes."""
+    if result.fluxservice is None:
         score = 1.0
         longmsg = "Flux catalog service not used.  No warning messages reported."
         shortmsg = longmsg
-    elif result.inputs['dbservice'] is True:
+    else:
         score = 1.0
         longmsg = "No warning messages from the flux catalog service."
         shortmsg = longmsg
@@ -4069,22 +4073,20 @@ def score_fluxservicemessages(result):
 
 @log_qa
 def score_fluxservicestatuscodes(result):
-    """
-    Report any flux service codes for status_code > 1
-    """
-    if result.inputs['dbservice'] is False:
+    """Report any flux service codes for status_code > 1."""
+    if result.fluxservice is None:
         score = 1.0
         msg = "Flux catalog service not used.  No status codes to report."
-    elif result.inputs['dbservice'] is True:
+    else:
         score = 1.0
         msg = "Flux catalog service status queries returned code 0 or 1."
         if result.qastatus:
-            scores = []
             for qacode in result.qastatus:
                 # Status code can be 0,1,2,3
                 if int(qacode['status_code']) > 1:
                     score = 0.3
-                    msg = "A query of the flux catalog service returned a status code: {!s}".format(str(qacode['status_code']))
+                    msg = "A query of the flux catalog service returned a status code: {!s}".format(
+                        str(qacode['status_code']))
 
     origin = pqa.QAOrigin(metric_name='score_fluxservice_statuscode',
                           metric_score=score,
