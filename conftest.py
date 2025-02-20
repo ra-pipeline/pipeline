@@ -12,27 +12,26 @@ def pytest_addoption(parser):
     """Add custom pytest command-line options."""
 
     nologfile_help = r"""
-        Do not create CASA log files, equivalent to 'casa --nologfile'.
-        Please note that if you're using regression-tester.py, casa logfiles 
-        will still be generated within individual test "working/" directories and 
-        appear in test weblogs. In general, this option is only recommended when 
-        manually/frequently running unit tests, to keep your local repo clean.
+        Prevents CASA from creating log files, equivalent to running `casa --nologfile`.
+        Note: If using regression-tester.py, CASA log files will still be generated in individual `working/`
+        directories and included in test weblogs. In general, this option is recommended for manual or frequent
+        unit test runs to keep your local repository clean.
         """
     parser.addoption("--collect-tests", action="store_true", default=False,
-                     help="Collect tests and export test node ids to a plain text file `collected_tests.txt`")
+                     help="Collect test cases and export their node IDs to `collected_tests.txt`.")
     parser.addoption("--nologfile", action="store_true", default=False,
                      help=nologfile_help)
     parser.addoption("--pyclean", action="store_true", default=False,
-                     help="Clean up .pyc to reproduce certain warnings only issued when the bytecode is compiled.")
+                     help="Removes .pyc files to reproduce warnings that only appear when bytecode is compiled.")
     parser.addoption("--remove-workdir", action="store_true", default=False,
-                     help="Remove individual working directories from regression tests.")
-    parser.addoption("--longtests", action="store_true", default=False, help="Run longer tests.")
+                     help="Remove individual working directories after regression testing.")
+    parser.addoption("--longtests", action="store_true", default=False, help="Run longer-duration tests.")
     parser.addoption("--compare-only", action="store_true", default=False,
-                     help="Skip running the recipe and do the comparison using the working directories from a previous test run.")
+                     help="Skips executing the test recipe and instead performs a comparison using results from a previous test run.")
     parser.addoption("--data-directory", action="store", default="/lustre/cv/projects/pipeline-test-data/regression-test-data/",
                      help="Specify directory where larger test data files are stored.")
     parser.addoption("--dbservice", action="store_true", default=False,
-                     help="Enable the online flux service. By default, it's disabled.")
+                     help="Enables the online flux service. (Disabled by default.)")
 
 def pytest_sessionstart(session):
     """Prepare pytest session."""

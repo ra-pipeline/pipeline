@@ -40,7 +40,7 @@ A summary of various test frameworks and tools is available in [PIPE-806](https:
 
 ## Regression tests
 
-See https://open-confluence.nrao.edu/display/PL/Regression+Testing for details
+See <https://open-confluence.nrao.edu/display/PL/Regression+Testing> for details
 
 To add the *xdist* flavor to your local regression run, one can try:
 
@@ -75,7 +75,16 @@ Alternatively, if you want to figure out the coverage of a single regression tes
 PYTHONNOUSERSITE=1 xvfb-run -d ${casa_dir}/bin/python3 -m pytest -v --pyclean --cov=pipeline --cov-report=html \
     ${pipeline_dir}/pipeline/infrastructure/utils/regression-tester.py::test_uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small__procedure_hifa_calimage__regression
 ```
-The coverage report will be saved as `htmlcov/index.html`. A similar call can be issued to report the test coverage of the entire regression test suite, although such run will take much longer. 
+
+The coverage report will be saved as `htmlcov/index.html`. A similar call can be issued to report the test coverage of the entire regression test suite, although such run will take much longer.
+
+You can also run regression tests in an MPI-enabled CASA session using the following command:
+
+```console
+PYTHONNOUSERSITE=1 xvfb-run -d ${casa_dir}/bin/mpicasa -display-allocation -display-map --report-bindings -oversubscribe -n 5 \
+    ${casa_dir}/bin/casa --nologger --log2term --nogui --agg --logfile casa-20250220-042314.log -c \
+    "import pytest; pytest.main(['-vv', '--junitxml=regression-results.xml', '${pipeline_dir}/pipeline/infrastructure/utils/regression-tester.py::test_E2E6_1_00010_S__uid___A002_Xd0a588_X2239_regression'])"
+```
 
 ## Custom pytest options
 
@@ -84,12 +93,19 @@ Pipeline has several pytest custom options, which can be found by invoking `--he
 ```console
 casa_python -m pytest --help
 ...
-custom options:
-  --collect-tests       collect tests and export test node ids to a plain text file `collected_tests.txt`
-  --nologfile           do not create CASA log files, equivalent to 'casa --nologfile'
-  --pyclean             clean up .pyc to reproduce certain warnings only issued when the bytecode is compiled.
-  --compare-only        do the comparison between the results in a working area from a previously-run test and the saved reference values (do not re-run the pipeline recipe)
-  --longtests           run longer-running tests which are excluded by default
+Custom options:
+  --collect-tests       Collect test cases and export their node IDs to `collected_tests.txt`.
+  --nologfile           Prevents CASA from creating log files, equivalent to running `casa --nologfile`.
+                        Note: If using regression-tester.py, CASA log files will still be generated in individual `working/`
+                        directories and included in test weblogs. In general, this option is recommended for manual or frequent
+                        unit test runs to keep your local repository clean.
+  --pyclean             Removes .pyc files to reproduce warnings that only appear when bytecode is compiled.
+  --remove-workdir      Remove individual working directories after regression testing.
+  --longtests           Run longer-duration tests.
+  --compare-only        Skips executing the test recipe and instead performs a comparison using results from a previous test run.
+  --data-directory=DATA_DIRECTORY
+                        Specify directory where larger test data files are stored.
+  --dbservice           Enables the online flux service. (Disabled by default.)
 ...
 ```
 
@@ -109,16 +125,16 @@ casa_python -m pytest -n 4 -v --pyclean --nologfile .
 
 The `--compare-only` option is used to generate new pytest results from a previous test run without re-running the pipeline recipe. It uses the existing working directories to
 extract values for comparison with the reference values. For example, the following will use the existing working directories for the previously run fast alma tests to compare
-these results to the reference values. This should be run in a directory which contains the test output results for each test. 
+these results to the reference values. This should be run in a directory which contains the test output results for each test.
 
 ```console
 xvfb-run casa --nogui --nologger --log2term --agg -c \
     "import pytest; pytest.main(['-vv', '-m alma and fast', '--compare-only', '<pipeline_dir>/pipeline/infrastructure/utils/regression-tester.py'])"
 ```
 
-The `--longtests` option enables the longer tests to be run. When this option is not specified, only the quicker set of tests will be run. 
+The `--longtests` option enables the longer tests to be run. When this option is not specified, only the quicker set of tests will be run.
 
-The `--data-directory` option allows the specification of the directory where the larger input data files are stored. If not specified, this defaults to 
+The `--data-directory` option allows the specification of the directory where the larger input data files are stored. If not specified, this defaults to
 `/lustre/cv/projects/pipeline-test-data/regression-test-data/` which requires the tests to be run somewhere with access to lustre.
 
 ```console
@@ -126,35 +142,33 @@ xvfb-run casa --nogui --nologger --log2term --agg -c \
     "import pytest; pytest.main(['-vv', '-m alma and slow', '--data-directory=/users/kberry/big_data_directory/', '<pipeline_dir>/pipeline/infrastructure/utils/regression-tester.py'])"
 ```
 
-
 ## Custom markers
 
-There are several custom markers used for the pipeline regression tests. These are specified in pytest.ini and also listed below: 
+There are several custom markers used for the pipeline regression tests. These are specified in pytest.ini and also listed below:
 
 * alma: alma test
 * vla: vla test (does not include vlass)
 * vlass: vlass test
 * fast: shorter-running test
 * slow: longer-running test
-* twelve: 12m ALMA 
+* twelve: 12m ALMA
 * seven: 7m ALMA
 * sd: single dish
 
-These markers can be used to select the tests to run using the -m option to pytest. For example, if you want to only run vlass tests, try: 
+These markers can be used to select the tests to run using the -m option to pytest. For example, if you want to only run vlass tests, try:
 
 ```console
 xvfb-run casa --nogui --nologger --log2term --agg -c"import pytest; pytest.main(['-vv', '-m vlass', '--longtests', '<pipeline_dir>/pipeline/infrastructure/utils/regression-tester.py'])"
 ```
 
- Markers can also be combined using 'and', 'or', or 'not'. The following example demonstrates how to run only fast vla tests: 
+ Markers can also be combined using 'and', 'or', or 'not'. The following example demonstrates how to run only fast vla tests:
 
 ```console
  xvfb-run casa --nogui --nologger --log2term --agg -c"import pytest; pytest.main(['-vv', '-m vla and fast', 'pipeline/pipeline/infrastructure/utils/regression_tester.py'])"
 ```
 
-And to run everything besides the vlass tests, run the following: 
+And to run everything besides the vlass tests, run the following:
 
 ```console
  xvfb-run casa --nogui --nologger --log2term --agg -c"import pytest; pytest.main(['-vv', '-m not vlass', 'pipeline/pipeline/infrastructure/utils/regression_tester.py'])"
 ```
-
