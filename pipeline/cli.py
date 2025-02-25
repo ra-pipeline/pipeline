@@ -7,6 +7,7 @@ from .hifv.cli import *
 from .hsd.cli import *
 from .hsdn.cli import *
 
+from prefect import flow, task
 
 def get_pipeline_task_with_name(task_name: str) -> Callable:
     """Return Pipeline CLI task with specified name.
@@ -17,4 +18,4 @@ def get_pipeline_task_with_name(task_name: str) -> Callable:
     Returns:
         Pipeline CLI task
     """
-    return globals()[task_name]
+    return flow(globals()[task_name], log_prints=True, name=task_name)

@@ -51,6 +51,8 @@ import pipeline.infrastructure.launcher as launcher
 import pipeline.infrastructure.logging as logging
 from pipeline.infrastructure import exceptions, utils
 
+from prefect import flow, task
+
 LOG = logging.get_logger(__name__)
 
 RECIPES_DIR = pkg_resources.resource_filename(__name__, 'recipes')
@@ -228,7 +230,7 @@ def _as_task_call(task_func: Callable, task_args: dict) -> str:
     kw_args = list(map(_format_arg_value, task_args.items()))
     return '%s(%s)' % (task_func.__name__, ', '.join(kw_args))
 
-
+@flow(log_prints=True)
 def reduce(vis: Optional[List[str]] = None, infiles: Optional[List[str]] = None,
            procedure: str = 'procedure_hifa_calimage.xml',
            context: Optional[launcher.Context] = None, name: Optional[str] = None,
