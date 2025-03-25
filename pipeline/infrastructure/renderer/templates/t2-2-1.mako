@@ -119,26 +119,45 @@ import pipeline.infrastructure.renderer.htmlrenderer as hr
 </table>
 
 % if mosaics:
-<h2>Mosaic Pointings</h2>	
+<h2>Mosaic Pointings</h2>
 <ul class="thumbnails">
-	% for source, plot in [(s,p) for s,p in mosaics if p]:
-	<li>
-		<div class="thumbnail">
-			<a href="${os.path.relpath(plot.abspath, pcontext.report_dir)}"
-			   data-fancybox>
-				<img class="lazyload"
-                     data-src="${os.path.relpath(plot.thumbnail, pcontext.report_dir)}"
-					 title="Mosaic Pointings for ${source.name} in ${ms.basename}"
-					 alt="Mosaic Pointings for ${source.name} in ${ms.basename}" />
-			</a>
-			<div class="caption">
-				<h4>${source.name}</h4>
-				<p>Mosaic pointings for Source #${source.id}: ${source.name}.</p>
-			</div>				
-		</div>
-	</li>
-	% endfor
+    % for source, plots in [(s, p) for s, p in mosaics if p]:
+    <li>
+        <div class="thumbnail">
+            <div class="plot-container">
+                % for plot in plots:
+                <div class="plot-item">
+                    <a href="${os.path.relpath(plot.abspath, pcontext.report_dir)}"
+                       data-fancybox>
+                        <img class="lazyload"
+                             data-src="${os.path.relpath(plot.thumbnail, pcontext.report_dir)}"
+                             title="Mosaic Pointings for ${source.name} in ${ms.basename}"
+                             alt="Mosaic Pointings for ${source.name} in ${ms.basename}" />
+                    </a>
+                </div>
+                % endfor
+            </div>
+            <div class="caption">
+                <h4>${source.name}</h4>
+                <p>Mosaic pointings for Source #${source.id}: ${source.name}.</p>
+            </div>
+        </div>
+    </li>
+    % endfor
 </ul>
+
+<style>
+    .plot-container {
+        display: flex;
+        gap: 10px; /* Adjust spacing between plots */
+        flex-wrap: wrap; /* Ensures plots wrap if they exceed container width */
+        justify-content: center; /* Centers plots within the container */
+    }
+    .plot-item img {
+        max-width: 100%;
+        height: auto;
+    }
+</style>
 % endif
 
 </body>

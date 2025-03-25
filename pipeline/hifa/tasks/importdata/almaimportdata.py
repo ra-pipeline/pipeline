@@ -3,14 +3,9 @@ import urllib
 
 import certifi
 
-import pipeline.h.tasks.importdata.fluxes as fluxes
-import pipeline.h.tasks.importdata.importdata as importdata
-import pipeline.infrastructure as infrastructure
-import pipeline.infrastructure.sessionutils as sessionutils
-import pipeline.infrastructure.vdp as vdp
-from pipeline.infrastructure import task_registry
-
-from . import dbfluxes
+from pipeline.h.tasks.importdata import fluxes, importdata
+from pipeline.hifa.tasks.importdata import dbfluxes
+from pipeline.infrastructure import logging, sessionutils, vdp, task_registry
 
 
 __all__ = [
@@ -20,11 +15,14 @@ __all__ = [
     'ALMAImportDataResults'
 ]
 
-LOG = infrastructure.get_logger(__name__)
+LOG = logging.get_logger(__name__)
 
 
 class ALMAImportDataInputs(importdata.ImportDataInputs):
-    asis = vdp.VisDependentProperty(default='Annotation Antenna CalAtmosphere CalPointing CalWVR ExecBlock Receiver SBSummary Source Station')
+    # PIPE-2067: Added Pointing to retrieve ASDM_POINTING table for offset information
+    asis = vdp.VisDependentProperty(
+        default='Annotation Antenna CalAtmosphere CalPointing CalWVR ExecBlock Receiver Pointing SBSummary Source Station'
+        )
     dbservice = vdp.VisDependentProperty(default=False)
     createmms = vdp.VisDependentProperty(default='false')
     # sets threshold for polcal parallactic angle coverage. See PIPE-597

@@ -1,3 +1,6 @@
+# Do not evaluate type annotations at definition time.
+from __future__ import annotations
+
 import datetime
 import math
 import operator
@@ -11,21 +14,16 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 
-import pipeline.infrastructure as infrastructure
-import pipeline.infrastructure.renderer.logger as logger
-import pipeline.infrastructure.utils as utils
-import pipeline.infrastructure.vdp as vdp
+from pipeline import infrastructure
 from pipeline.domain.measures import FrequencyUnits, DistanceUnits
 from pipeline.h.tasks.common import atmutil
-from pipeline.infrastructure import casa_tasks
-from pipeline.infrastructure import casa_tools
-from pipeline.infrastructure.displays.plotstyle import casa5style_plot
-from . import plotmosaic
-from . import plotpwv
-from . import plotweather
-from . import plotsuntrack
+from pipeline.infrastructure import casa_tasks, casa_tools, utils, vdp
+from pipeline.infrastructure.displays import plotmosaic, plotpwv, plotstyle, plotsuntrack, plotweather
+from pipeline.infrastructure.renderer import logger
+
 
 if TYPE_CHECKING:
+    from pipeline.domain import MeasurementSet, Source
     from pipeline.infrastructure.launcher import Context
 
 LOG = infrastructure.get_logger(__name__)
@@ -331,7 +329,7 @@ class FieldVsTimeChart(ParameterVsTimeChart):
     def __init__(self, inputs):
         self.inputs = inputs
 
-    @casa5style_plot
+    @plotstyle.casa5style_plot
     def plot(self):
         ms = self.inputs.ms
 
@@ -576,36 +574,75 @@ class PWVChart(object):
 
 
 class MosaicChart(object):
-    def __init__(self, context, ms, source):
+    def __init__(self, context: Context, ms: MeasurementSet, source: Source):
         self.context = context
         self.ms = ms
         self.source = source
         self.figfile = self._get_figfile()
 
     def plot(self):
-        if os.path.exists(self.figfile):
-            return self._get_plot_object()
-
-        try:
-            plotmosaic.plot_mosaic(self.ms, self.source, self.figfile)
-        except Exception as e:
-            LOG.warn('Could not create mosaic plot: {}'.format(e))
-            return None
-
-        return self._get_plot_object()
+        raise NotImplementedError
 
     def _get_figfile(self):
-        session_part = self.ms.session
-        ms_part = self.ms.basename
-        return os.path.join(self.context.report_dir,
-                            'session%s' % session_part,
-                            ms_part, 'mosaic_source%s.png' % self.source.id)
+        raise NotImplementedError
 
     def _get_plot_object(self):
         return logger.Plot(self.figfile,
                            x_axis='RA Offset',
                            y_axis='Dec Offset',
                            parameters={'vis': self.ms.basename})
+
+
+class MosaicPointingsChart(MosaicChart):
+    def __init__(self, context: Context, ms: MeasurementSet, source: Source):
+        super().__init__(context, ms, source)
+
+    def plot(self):
+        if os.path.exists(self.figfile):
+            LOG.debug("%s already exists.", self.figfile)
+            return self._get_plot_object()
+
+        try:
+            plotmosaic.plot_mosaic_source(self.ms, self.source, self.figfile)
+        except Exception as e:
+            LOG.warning('Could not create mosaic plot: %s', e)
+            return None
+
+        return self._get_plot_object()
+
+    def _get_figfile(self):
+        return os.path.join(
+            self.context.report_dir,
+            f"session{self.ms.session}",
+            self.ms.basename,
+            f"mosaic_source{self.source.id}.png"
+        )
+
+
+class MosaicTsysChart(MosaicChart):
+    def __init__(self, context: Context, ms: MeasurementSet, source: Source):
+        super().__init__(context, ms, source)
+
+    def plot(self):
+        if os.path.exists(self.figfile):
+            LOG.debug("%s already exists.", self.figfile)
+            return self._get_plot_object()
+
+        try:
+            plotmosaic.plot_mosaic_tsys_scans(self.ms, self.source, self.figfile)
+        except Exception as e:
+            LOG.warning('Could not create mosaic plot: %s', e)
+            return None
+
+        return self._get_plot_object()
+
+    def _get_figfile(self):
+        return os.path.join(
+            self.context.report_dir,
+            f"session{self.ms.session}",
+            self.ms.basename,
+            f"mosaic_source{self.source.id}_tsys_scans.png"
+        )
 
 
 class PlotAntsChart(object):
@@ -1091,7 +1128,7 @@ class SpwIdVsFreqChartInputs(vdp.StandardInputs):
                               ms_part, 'spwid_vs_freq.png')
         return output
 
-    def __init__(self, context: 'Context', vis: str) -> None:
+    def __init__(self, context: Context, vis: str) -> None:
         """Construct SpwIdVsFreqChartInputs instance.
 
         Args:
@@ -1109,7 +1146,7 @@ class SpwIdVsFreqChart(object):
 
     Inputs = SpwIdVsFreqChartInputs
 
-    def __init__(self, inputs: SpwIdVsFreqChartInputs, context: 'Context') -> None:
+    def __init__(self, inputs: SpwIdVsFreqChartInputs, context: Context) -> None:
         """Construct SpwIdVsFreqChart instance.
 
         Args:
