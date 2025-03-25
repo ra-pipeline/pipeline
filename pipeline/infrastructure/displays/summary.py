@@ -15,7 +15,7 @@ import matplotlib.ticker as ticker
 import numpy as np
 
 from pipeline import infrastructure
-from pipeline.domain.measures import FrequencyUnits, DistanceUnits
+from pipeline.domain import measures
 from pipeline.h.tasks.common import atmutil
 from pipeline.infrastructure import casa_tasks, casa_tools, utils, vdp
 from pipeline.infrastructure.displays import plotmosaic, plotpwv, plotstyle, plotsuntrack, plotweather
@@ -917,8 +917,8 @@ class UVChart(object):
 
             # get max UV via unprojected baseline
             spw = ms.get_spectral_window(self.spw_id)
-            wavelength_m = 299792458 / float(spw.max_frequency.to_units(FrequencyUnits.HERTZ))
-            bl_max = float(ms.antenna_array.baseline_max.length.to_units(DistanceUnits.METRE))
+            wavelength_m = 299792458 / float(spw.max_frequency.to_units(measures.FrequencyUnits.HERTZ))
+            bl_max = float(ms.antenna_array.baseline_max.length.to_units(measures.DistanceUnits.METRE))
             self.uv_max = math.ceil(1.05 * bl_max / wavelength_m)
 
     def plot(self):
@@ -1230,8 +1230,8 @@ class SpwIdVsFreqChart(object):
 
                 # 1. draw bars
                 spwdata = [spw for spw in scan_spws if spw.id == spwid][0]
-                bw = float(spwdata.bandwidth.to_units(FrequencyUnits.GIGAHERTZ))
-                fmin = float(spwdata.min_frequency.to_units(FrequencyUnits.GIGAHERTZ))
+                bw = float(spwdata.bandwidth.to_units(measures.FrequencyUnits.GIGAHERTZ))
+                fmin = float(spwdata.min_frequency.to_units(measures.FrequencyUnits.GIGAHERTZ))
                 xmin, xmax = min(xmin, fmin), max(xmax, fmin+bw)
                 ax_spw.barh(idx, bw, height=bar_height, left=fmin, color=color)
 

@@ -6,25 +6,24 @@ from typing import TYPE_CHECKING, Any, Dict, List, Tuple, TypedDict, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.lines import Line2D
-from matplotlib.patches import Circle
-from matplotlib.ticker import FuncFormatter
-from scipy.interpolate import UnivariateSpline
+from matplotlib import lines, patches, ticker
+from scipy import interpolate
 
-from pipeline.domain import unitformat
-from pipeline.domain.measures import FrequencyUnits, DistanceUnits, Distance, ArcUnits, EquatorialArc
+from pipeline import infrastructure
+from pipeline.domain import measures, unitformat
 from pipeline.h.tasks.tsyscal import tsyscal
-from pipeline.infrastructure import casa_tools, logging, utils
+from pipeline.infrastructure import casa_tools, utils
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
     from pipeline.domain import Field, MeasurementSet, Source
+    from pipeline.domain.measures import Distance, EquatorialArc
 
-LOG = logging.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 # used when deciding primary beam colour
-SEVEN_M = Distance(7, DistanceUnits.METRE)
+SEVEN_M = measures.Distance(7, measures.DistanceUnits.METRE)
 # used to convert frequency to wavelength
 C_MKS = 299792458
 # used to convert between radians and arcsec
@@ -60,15 +59,15 @@ def compute_mosaic_data(
     """
 
     median_ref_freq = np.median([
-        spw.ref_frequency.to_units(FrequencyUnits.HERTZ)
+        spw.ref_frequency.to_units(measures.FrequencyUnits.HERTZ)
         for spw in ms.get_spectral_windows(science_windows_only=True)
     ])
-    median_ref_wavelength = Distance(C_MKS / median_ref_freq, DistanceUnits.METRE)
+    median_ref_wavelength = measures.Distance(C_MKS / median_ref_freq, measures.DistanceUnits.METRE)
 
-    dish_diameters = [Distance(d, DistanceUnits.METRE) for d in {a.diameter for a in ms.antennas}]
+    dish_diameters = [measures.Distance(d, measures.DistanceUnits.METRE) for d in {a.diameter for a in ms.antennas}]
     taper = antenna_taper_factor(ms.antenna_array.name)
     beam_diameters = [float(primary_beam_fwhm(median_ref_wavelength, dish_diameter, taper)
-                            .to_units(ArcUnits.ARC_SECOND))
+                            .to_units(measures.ArcUnits.ARC_SECOND))
                       for dish_diameter in dish_diameters]
 
     ra = np.array([casa_tools.quanta.convert(f.mdirection['m0']['value'], 'rad')['value'] for f in source.fields])
@@ -144,7 +143,7 @@ def add_elements_to_plot(
         tsys_scans_dict: Dict[int, Dict[str, Union[Tuple[float, float], bool]]] = None,
         fontsize: int = 10,
         draw_labels: bool = False
-        ) -> Tuple[Dict[str, Line2D], Dict[str, str]]:
+        ) -> Tuple[Dict[str, lines.Line2D], Dict[str, str]]:
     """Plot element circles and labels
 
     Args:
@@ -162,7 +161,7 @@ def add_elements_to_plot(
 
     for field_id, specs in fields_dict.items():
 
-        ax.add_patch(Circle((specs['x'], specs['y']), radius=0.5 * specs['beam diameter'],
+        ax.add_patch(patches.Circle((specs['x'], specs['y']), radius=0.5 * specs['beam diameter'],
                             facecolor='none', edgecolor=specs['color'], linestyle='dotted', alpha=0.6))
 
         if draw_labels:
@@ -172,13 +171,15 @@ def add_elements_to_plot(
             ax.plot(specs['x'], specs['y'], f'{specs["color"]}+', markersize=4)
 
         if specs['label'] not in legend_labels:
-            legend_labels[specs['label']] = Line2D([0], [0], color=specs['color'], linewidth=2, linestyle='dotted')
+            legend_labels[specs['label']] = lines.Line2D(
+                [0], [0], color=specs['color'], linewidth=2, linestyle='dotted'
+                )
             legend_colors[specs['label']] = specs['color']
 
     if tsys_scans_dict:
         for scan_id, scan_dict in tsys_scans_dict.items():
             x, y = scan_dict['radec']
-            ax.add_patch(Circle((x, y), radius=0.5 * scan_dict['beam diameter'],
+            ax.add_patch(patches.Circle((x, y), radius=0.5 * scan_dict['beam diameter'],
                                 facecolor='none', edgecolor='r', linestyle='dotted', alpha=0.6))
 
             if scan_dict['azel offset']:
@@ -187,7 +188,7 @@ def add_elements_to_plot(
                 ax.plot(x, y, f'{"r"}+', markersize=4)
 
         if 'Tsys Scan' not in legend_labels:
-            legend_labels['Tsys Scan'] = Line2D([0], [0], color='r', linewidth=2, linestyle='dotted')
+            legend_labels['Tsys Scan'] = lines.Line2D([0], [0], color='r', linewidth=2, linestyle='dotted')
             legend_colors['Tsys Scan'] = 'r'
 
     return legend_labels, legend_colors
@@ -229,7 +230,7 @@ def compute_element_locs(
 
 def configure_labels(
         ax: Axes,
-        legend_labels: Dict[str, Line2D],
+        legend_labels: Dict[str, lines.Line2D],
         legend_colors: Dict[str, str],
         mean_ra: float,
         mean_dec: float,
@@ -256,11 +257,11 @@ def configure_labels(
     ax.set_title(title_string, size=12)
 
     ra_string = r'{:02d}$^{{\rm h}}${:02d}$^{{\rm m}}${:02.3f}$^{{\rm s}}$'.format(
-        *EquatorialArc(mean_ra % (2*np.pi), ArcUnits.RADIAN).toHms())
+        *measures.EquatorialArc(mean_ra % (2*np.pi), measures.ArcUnits.RADIAN).toHms())
     ax.set_xlabel(f'Right ascension offset from {ra_string}')
 
     dec_string = r'{:02d}$\degree${:02d}$^\prime${:02.1f}$^{{\prime\prime}}$'.format(
-        *EquatorialArc(mean_dec, ArcUnits.RADIAN).toDms())
+        *measures.EquatorialArc(mean_dec, measures.ArcUnits.RADIAN).toDms())
     ax.set_ylabel(f'Declination offset from {dec_string}')
 
     # Add legend
@@ -269,7 +270,7 @@ def configure_labels(
         text.set_color(legend_colors[text.get_text()])
 
     ax.axis('equal')
-    arcsec_formatter = FuncFormatter(label_format)
+    arcsec_formatter = ticker.FuncFormatter(label_format)
     ax.xaxis.set_major_formatter(arcsec_formatter)
     ax.yaxis.set_major_formatter(arcsec_formatter)
     ax.xaxis.grid(True, which='major')
@@ -448,9 +449,9 @@ def primary_beam_fwhm(wavelength: Distance, diameter: List[Distance], taper: flo
         An Equatorial Arc object on the calculated magnitude and units.
     """
     b = baars_taper_factor(taper) * central_obstruction_factor(diameter)
-    lambda_m = float(wavelength.to_units(DistanceUnits.METRE))
-    diameter_m = float(diameter.to_units(DistanceUnits.METRE))
-    return EquatorialArc(b * lambda_m / diameter_m, ArcUnits.RADIAN)
+    lambda_m = float(wavelength.to_units(measures.DistanceUnits.METRE))
+    diameter_m = float(diameter.to_units(measures.DistanceUnits.METRE))
+    return measures.EquatorialArc(b * lambda_m / diameter_m, measures.ArcUnits.RADIAN)
 
 
 def central_obstruction_factor(diameter: Distance, obscuration: float = 0.75) -> float:
@@ -466,8 +467,8 @@ def central_obstruction_factor(diameter: Distance, obscuration: float = 0.75) ->
     Returns:
         A UnivariateSpline object adjusted by a factor of 1.22.
     """
-    epsilon = obscuration / float(diameter.to_units(DistanceUnits.METRE))
-    spline_func = UnivariateSpline([0, 0.1, 0.2, 0.33, 0.4], [1.22, 1.205, 1.167, 1.098, 1.058], s=0)
+    epsilon = obscuration / float(diameter.to_units(measures.DistanceUnits.METRE))
+    spline_func = interpolate.UnivariateSpline([0, 0.1, 0.2, 0.33, 0.4], [1.22, 1.205, 1.167, 1.098, 1.058], s=0)
     return spline_func(epsilon) / 1.22
 
 
