@@ -1,12 +1,21 @@
+# Do not evaluate type annotations at definition time.
+from __future__ import annotations
+
 import ssl
 import urllib
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 import certifi
 
+from pipeline import infrastructure
 from pipeline.h.tasks.importdata import fluxes, importdata
 from pipeline.hifa.tasks.importdata import dbfluxes
-from pipeline.infrastructure import logging, sessionutils, vdp, task_registry
+from pipeline.infrastructure import sessionutils, vdp, task_registry
 
+if TYPE_CHECKING:
+    from pipeline.domain import MeasurementSet, ObservingRun
+    from pipeline.infrastructure.launcher import Context
+    from pipeline.h.tasks.common.commonfluxresults import FluxCalibrationResults
 
 __all__ = [
     'ALMAImportData',
@@ -15,7 +24,7 @@ __all__ = [
     'ALMAImportDataResults'
 ]
 
-LOG = logging.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class ALMAImportDataInputs(importdata.ImportDataInputs):
@@ -30,9 +39,14 @@ class ALMAImportDataInputs(importdata.ImportDataInputs):
     parallel = sessionutils.parallel_inputs_impl(default=False)
 
     # docstring and type hints: supplements hifa_importdata
-    def __init__(self, context, vis=None, output_dir=None, asis=None, process_caldevice=None, session=None,
-                 overwrite=None, nocopy=None, bdfflags=None, lazy=None, save_flagonline=None, dbservice=None,
-                 createmms=None, ocorr_mode=None, datacolumns=None, minparang=None, parallel=None):
+    def __init__(
+            self, context: Context, vis: Optional[List[str]] = None, output_dir: Optional[str] = None,
+            asis: Optional[str] = None, process_caldevice: Optional[bool] = None, session: Optional[str] = None,
+            overwrite: Optional[bool] = None, nocopy: Optional[bool] = None, bdfflags: Optional[bool] = None,
+            lazy: Optional[bool] = None, save_flagonline: Optional[bool] = None, dbservice: Optional[bool] = None,
+            createmms: Optional[str] = None, ocorr_mode: Optional[str] = None, datacolumns: Optional[Dict[str, str]] = None,
+            minparang: Optional[float] = None, parallel: Optional[bool] = None
+            ):
         """Initialize Inputs.
 
         Args:
@@ -130,11 +144,15 @@ class ALMAImportDataInputs(importdata.ImportDataInputs):
 
 
 class ALMAImportDataResults(importdata.ImportDataResults):
-    def __init__(self, mses=None, setjy_results=None):
+    def __init__(
+            self,
+            mses: Optional[List[MeasurementSet]] = None,
+            setjy_results: Optional[List[FluxCalibrationResults]] = None
+            ):
         super().__init__(mses=mses, setjy_results=setjy_results)
         self.parang_ranges = {}
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return 'ALMAImportDataResults:\n\t{0}'.format(
             '\n\t'.join([ms.name for ms in self.mses]))
 
@@ -143,7 +161,9 @@ class SerialALMAImportData(importdata.ImportData):
     Inputs = ALMAImportDataInputs
     Results = ALMAImportDataResults
 
-    def _get_fluxes(self, context, observing_run):
+    def _get_fluxes(
+            self, context: Context, observing_run: ObservingRun
+            ) -> Tuple[str, List[FluxCalibrationResults], Union[List[Dict[str, Union[str, None]]], None]]:
         # get the flux measurements from Source.xml for each MS
 
         if self.inputs.dbservice:

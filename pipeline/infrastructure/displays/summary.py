@@ -5,14 +5,12 @@ import datetime
 import math
 import operator
 import os
-from typing import TYPE_CHECKING, Generator, List, Tuple
+from typing import TYPE_CHECKING, Generator, List, Optional, Tuple
 
 import matplotlib
-import matplotlib.dates as dates
-import matplotlib.figure as figure
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import numpy as np
+from matplotlib import dates, figure, ticker
 
 from pipeline import infrastructure
 from pipeline.domain import measures
@@ -21,12 +19,11 @@ from pipeline.infrastructure import casa_tasks, casa_tools, utils, vdp
 from pipeline.infrastructure.displays import plotmosaic, plotpwv, plotstyle, plotsuntrack, plotweather
 from pipeline.infrastructure.renderer import logger
 
-
 if TYPE_CHECKING:
     from pipeline.domain import MeasurementSet, Source
     from pipeline.infrastructure.launcher import Context
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 DISABLE_PLOTMS = False
 
 ticker.TickHelper.MAXTICKS = 10000
@@ -574,30 +571,89 @@ class PWVChart(object):
 
 
 class MosaicChart(object):
+    """Base class for generating mosaic charts.
+
+    This class provides a framework for creating and managing mosaic plots for a 
+    given measurement set and source.
+
+    Attributes:
+        context: The context of the processing session.
+        ms: The measurement set to be analyzed.
+        source: The source for which the mosaic plot is generated.
+        figfile: The file path where the plot will be saved.
+    """
+
     def __init__(self, context: Context, ms: MeasurementSet, source: Source):
+        """
+        Initializes the MosaicChart with the given context, measurement set, and source.
+
+        Args:
+            context: The processing session context.
+            ms: The measurement set to analyze.
+            source: The source for which the mosaic is created.
+        """
         self.context = context
         self.ms = ms
         self.source = source
-        self.figfile = self._get_figfile()
+        self.figfile: str = self._get_figfile()
 
-    def plot(self):
+    def plot(self) -> Optional[logger.Plot]:
+        """
+        Abstract method to generate the mosaic plot.
+
+        Raises:
+            NotImplementedError: If the subclass does not implement this method.
+        """
         raise NotImplementedError
 
-    def _get_figfile(self):
+    def _get_figfile(self) -> str:
+        """
+        Abstract method to determine the file path for the plot.
+
+        Returns:
+            str: The file path for storing the generated plot.
+
+        Raises:
+            NotImplementedError: If the subclass does not implement this method.
+        """
         raise NotImplementedError
 
-    def _get_plot_object(self):
-        return logger.Plot(self.figfile,
-                           x_axis='RA Offset',
-                           y_axis='Dec Offset',
-                           parameters={'vis': self.ms.basename})
+    def _get_plot_object(self) -> logger.Plot:
+        """
+        Creates a Plot object with metadata.
+
+        Returns:
+            A plot object containing metadata about the generated mosaic.
+        """
+        return logger.Plot(
+            self.figfile,
+            x_axis='RA Offset',
+            y_axis='Dec Offset',
+            parameters={'vis': self.ms.basename}
+            )
 
 
 class MosaicPointingsChart(MosaicChart):
+    """Generates a mosaic plot of pointings for a given source in a measurement set."""
+
     def __init__(self, context: Context, ms: MeasurementSet, source: Source):
+        """
+        Initializes the MosaicPointingsChart with the given parameters.
+
+        Args:
+            context: The processing session context.
+            ms: The measurement set to analyze.
+            source: The source for which the mosaic is created.
+        """
         super().__init__(context, ms, source)
 
-    def plot(self):
+    def plot(self) -> Optional[logger.Plot]:
+        """
+        Generates and saves the mosaic pointings plot.
+
+        Returns:
+            The plot object if successful, otherwise None.
+        """
         if os.path.exists(self.figfile):
             LOG.debug("%s already exists.", self.figfile)
             return self._get_plot_object()
@@ -610,7 +666,13 @@ class MosaicPointingsChart(MosaicChart):
 
         return self._get_plot_object()
 
-    def _get_figfile(self):
+    def _get_figfile(self) -> str:
+        """
+        Determines the file path for the mosaic pointings plot.
+
+        Returns:
+            The file path for storing the mosaic pointings plot.
+        """
         return os.path.join(
             self.context.report_dir,
             f"session{self.ms.session}",
@@ -620,10 +682,26 @@ class MosaicPointingsChart(MosaicChart):
 
 
 class MosaicTsysChart(MosaicChart):
+    """Generates a mosaic plot of system temperature (Tsys) scans for a given source."""
+
     def __init__(self, context: Context, ms: MeasurementSet, source: Source):
+        """
+        Initializes the MosaicTsysChart with the given parameters.
+
+        Args:
+            context: The processing session context.
+            ms: The measurement set to analyze.
+            source: The source for which the Tsys mosaic is created.
+        """
         super().__init__(context, ms, source)
 
-    def plot(self):
+    def plot(self) -> Optional[logger.Plot]:
+        """
+        Generates and saves the mosaic Tsys plot.
+
+        Returns:
+            The plot object if successful, otherwise None.
+        """
         if os.path.exists(self.figfile):
             LOG.debug("%s already exists.", self.figfile)
             return self._get_plot_object()
@@ -636,7 +714,13 @@ class MosaicTsysChart(MosaicChart):
 
         return self._get_plot_object()
 
-    def _get_figfile(self):
+    def _get_figfile(self) -> str:
+        """
+        Determines the file path for the mosaic Tsys plot.
+
+        Returns:
+            The file path for storing the Tsys mosaic plot.
+        """
         return os.path.join(
             self.context.report_dir,
             f"session{self.ms.session}",

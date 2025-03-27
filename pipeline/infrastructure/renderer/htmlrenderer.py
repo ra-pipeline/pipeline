@@ -14,7 +14,7 @@ import pydoc
 import re
 import shutil
 import sys
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, Tuple, Union
 
 import mako
 import numpy as np
@@ -29,10 +29,12 @@ from pipeline.infrastructure.displays import pointing, summary
 from pipeline.infrastructure.renderer import qaadapter, templates, weblog
 
 if TYPE_CHECKING:
+    from pipeline.domain import Source
     from pipeline.domain.measurementset import MeasurementSet
     from pipeline.infrastructure.launcher import Context
+    from pipeline.infrastructure.renderer import logger
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 def get_task_description(result_obj, context, include_stage=True):
@@ -1060,7 +1062,10 @@ class T2_2_1Renderer(T2_2_XRendererBase):
     template = 't2-2-1.mako'
 
     @staticmethod
-    def get_display_context(context, ms):
+    def get_display_context(
+        context: Context,
+        ms: MeasurementSet
+        ) -> Dict[str, Union[Context, MeasurementSet, List[Tuple[Source, List[Union[logger.Plot, None]]]]]]:
         mosaics = []
         for source in ms.sources:
             num_pointings = len([f for f in ms.fields 
