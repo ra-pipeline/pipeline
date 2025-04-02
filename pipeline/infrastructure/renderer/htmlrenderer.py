@@ -1072,8 +1072,11 @@ class T2_2_1Renderer(T2_2_XRendererBase):
                                  if f.source_id == source.id])
             if num_pointings > 1:
                 task1 = summary.MosaicPointingsChart(context, ms, source)
+                pointings_plot = task1.plot()
                 task2 = summary.MosaicTsysChart(context, ms, source)
-                mosaics.append((source, [task1.plot(), task2.plot()]))
+                tsys_plot = task2.plot()
+                plots = [x for x in [pointings_plot, tsys_plot] if x]
+                mosaics.append((source, plots))
 
         return {'pcontext' : context,
                 'ms'       : ms,

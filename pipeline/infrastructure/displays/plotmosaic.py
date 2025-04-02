@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, Any, Dict, List, Tuple, TypedDict, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Tuple, TypedDict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -55,7 +55,7 @@ def compute_mosaic_data(
         dec: Dec values in radians for each field related to the source.
         median_ref_freq: the median reference wavelength in meters.
         dish_diameters: a list of dish diameters in meters.
-        beam_diamters: a list of primary beam diameters in arcsecs.
+        beam_diameters: a list of primary beam diameters in arcsecs.
     """
 
     median_ref_freq = np.median([
@@ -139,8 +139,7 @@ def create_mosaic_figure(
 
 def add_elements_to_plot(
         ax: Axes,
-        fields_dict: Dict[int, Dict[str, Union[int, str]]],
-        tsys_scans_dict: Dict[int, Dict[str, Union[Tuple[float, float], bool]]] = None,
+        plot_dict: Dict[str, Dict[str, Dict[int, Dict[str, Any]] | float]],
         fontsize: int = 10,
         draw_labels: bool = False
         ) -> Tuple[Dict[str, lines.Line2D], Dict[str, str]]:
@@ -148,8 +147,7 @@ def add_elements_to_plot(
 
     Args:
         ax: the Axes object containing information related to the x- and y- plot axes.
-        fields_dict: dictionary containing field information used for plotting.
-        tsys_scans_dict: dictionary containing information about the Tsys scans used for plotting.
+        plot_dict: dictionary containing field information for each dish diameter used for plotting.
         fontsize: the size used for the text information printed on the figure.
         draw_labels: indicates whether the field/scan number is printed or just a '+' at the circle center.
 
@@ -159,37 +157,37 @@ def add_elements_to_plot(
     """
     legend_labels, legend_colors = {}, {}
 
-    for field_id, specs in fields_dict.items():
+    for values in plot_dict.values():
+        beam_diameter = values['beam diameter']
+        for key, specs in values['target fields'].items():
+            ax.add_patch(patches.Circle((specs['x'], specs['y']), radius=0.5 * beam_diameter,
+                                facecolor='none', edgecolor=specs['color'], linestyle='dotted', alpha=0.6))
 
-        ax.add_patch(patches.Circle((specs['x'], specs['y']), radius=0.5 * specs['beam diameter'],
-                            facecolor='none', edgecolor=specs['color'], linestyle='dotted', alpha=0.6))
-
-        if draw_labels:
-            ax.text(specs['x'], specs['y'], f'{field_id}',
-                    ha='center', va='center', fontsize=fontsize, color=specs['color'])
-        else:
-            ax.plot(specs['x'], specs['y'], f'{specs["color"]}+', markersize=4)
-
-        if specs['label'] not in legend_labels:
-            legend_labels[specs['label']] = lines.Line2D(
-                [0], [0], color=specs['color'], linewidth=2, linestyle='dotted'
-                )
-            legend_colors[specs['label']] = specs['color']
-
-    if tsys_scans_dict:
-        for scan_id, scan_dict in tsys_scans_dict.items():
-            x, y = scan_dict['radec']
-            ax.add_patch(patches.Circle((x, y), radius=0.5 * scan_dict['beam diameter'],
-                                facecolor='none', edgecolor='r', linestyle='dotted', alpha=0.6))
-
-            if scan_dict['azel offset']:
-                ax.text(x, y, f'{scan_id}', ha='center', va='center', fontsize=fontsize, color='r')
+            if draw_labels:
+                ax.text(specs['x'], specs['y'], f'{key}',
+                        ha='center', va='center', fontsize=fontsize, color=specs['color'])
             else:
-                ax.plot(x, y, f'{"r"}+', markersize=4)
+                ax.plot(specs['x'], specs['y'], f'{specs["color"]}+', markersize=4)
 
-        if 'Tsys Scan' not in legend_labels:
-            legend_labels['Tsys Scan'] = lines.Line2D([0], [0], color='r', linewidth=2, linestyle='dotted')
-            legend_colors['Tsys Scan'] = 'r'
+            if specs['label'] not in legend_labels:
+                legend_labels[specs['label']] = lines.Line2D(
+                    [0], [0], color=specs['color'], linewidth=2, linestyle='dotted'
+                    )
+                legend_colors[specs['label']] = specs['color']
+        if 'tsys scans' in values.keys():
+            for scan_id, scan_dict in values['tsys scans'].items():
+                x, y = scan_dict['radec']
+                ax.add_patch(patches.Circle((x, y), radius=0.5 * beam_diameter,
+                                    facecolor='none', edgecolor='r', linestyle='dotted', alpha=0.6))
+
+                if scan_dict['azel offset']:
+                    ax.text(x, y, f'{scan_id}', ha='center', va='center', fontsize=fontsize, color='r')
+                else:
+                    ax.plot(x, y, f'{"r"}+', markersize=4)
+
+            if 'Tsys Scan' not in legend_labels:
+                legend_labels['Tsys Scan'] = lines.Line2D([0], [0], color='r', linewidth=2, linestyle='dotted')
+                legend_colors['Tsys Scan'] = 'r'
 
     return legend_labels, legend_colors
 
@@ -199,8 +197,9 @@ def compute_element_locs(
         delta_ra: List[float],
         delta_dec: List[float],
         dish_diameters: List[Distance],
-        beam_diameters: List[float]
-        ) -> Dict[int, Dict[str, Union[int, str]]]:
+        beam_diameters: List[float],
+        tsys_scans_dict: Dict[int, Dict[str, Tuple[float, float] | bool]] | None = None,
+        ) -> Dict[str, Dict[str, Dict[int, Dict[str, Any]] | float]]:
     """Compute the field locations to use for plotting.
 
     Args:
@@ -215,15 +214,21 @@ def compute_element_locs(
     """
     plot_dict = {}
     for dish_diameter, beam_diameter in zip(dish_diameters, beam_diameters):
+        plot_dict[str(dish_diameter.value)] = {'beam diameter': beam_diameter,
+                                               'target fields': {}}
         for field, rel_ra, rel_dec in zip(source.fields, delta_ra, delta_dec):
             if not is_tsys_only(field):
-                plot_dict[field.id] = {
+                field_dict = {
                     'x': rel_ra * RADIANS_TO_ARCSEC,
                     'y': rel_dec * RADIANS_TO_ARCSEC,
                     'color': 'b' if dish_diameter == SEVEN_M else 'k',
                     'label': str(dish_diameter),
-                    'beam diameter': beam_diameter
                     }
+                plot_dict[str(dish_diameter.value)]['target fields'][field.id] = field_dict
+            else:
+                del plot_dict[str(dish_diameter.value)]
+        if tsys_scans_dict:
+            plot_dict[str(dish_diameter.value)]['tsys scans'] = tsys_scans_dict
 
     return plot_dict
 
@@ -293,16 +298,14 @@ def plot_mosaic_source(ms: MeasurementSet, source: Source, figfile: str) -> None
     """
     # Retrieve field positions and configurations
     ra, dec, median_ref_freq, dish_diameters, beam_diameters = compute_mosaic_data(ms, source)
-
     delta_ra, delta_dec, mean_ra, mean_dec = compute_offsets(ra, dec)
 
     # Create mosaic plot
     fig, ax, fontsize = create_mosaic_figure(delta_ra, delta_dec, beam_diameters)
-
     draw_field_labels = len(source.fields) <= 500  # field labels become hard to read if there are too many of them
-    fields_dict = compute_element_locs(source, delta_ra, delta_dec, dish_diameters, beam_diameters)
+    plot_dict = compute_element_locs(source, delta_ra, delta_dec, dish_diameters, beam_diameters)
     legend_labels, legend_colors = add_elements_to_plot(
-        ax, fields_dict, fontsize=fontsize, draw_labels=draw_field_labels
+        ax, plot_dict, fontsize=fontsize, draw_labels=draw_field_labels
         )
 
     # Add title, legend, and labels
@@ -348,20 +351,16 @@ def plot_mosaic_tsys_scans(ms: MeasurementSet, source: Source, figfile: str) -> 
             tsys_field = ms.get_fields(name=tsys_fields[0])[0]
 
     # Calculate Tsys scan(s) offset to apply to plot
-    scans_dict = tsys_off_source_radec(ms, tsys_field)
+    tsys_scans_dict = tsys_off_source_radec(ms, tsys_field)
 
-    # Retrieve field positions and configurations
+    # Retrieve TARGET field positions and configurations
     ra, dec, median_ref_freq, dish_diameters, beam_diameters = compute_mosaic_data(ms, source)
-    for scan_dict in scans_dict.values():
-        scan_dict['beam diameter'] = beam_diameters[0]  # TODO: projects/runs using both 7m and 12m antennas
-
     delta_ra, delta_dec, mean_ra, mean_dec = compute_offsets(ra, dec)
 
     # Create mosaic plot
     fig, ax, fontsize = create_mosaic_figure(delta_ra, delta_dec, beam_diameters)
-
-    fields_dict = compute_element_locs(source, delta_ra, delta_dec, dish_diameters, beam_diameters)
-    legend_labels, legend_colors = add_elements_to_plot(ax, fields_dict, scans_dict=scans_dict, fontsize=fontsize)
+    plot_dict = compute_element_locs(source, delta_ra, delta_dec, dish_diameters, beam_diameters, tsys_scans_dict=tsys_scans_dict)
+    legend_labels, legend_colors = add_elements_to_plot(ax, plot_dict, fontsize=fontsize)
 
     # Add title, legend, and labels
     configure_labels(ax, legend_labels, legend_colors, mean_ra, mean_dec, median_ref_freq, ms.basename, source.name)
@@ -517,7 +516,7 @@ def tsys_off_source_radec(
         tsys_field: Field,
         intent: str = 'CALIBRATE_ATMOSPHERE#OFF_SOURCE',
         observatory: str = 'ALMA',
-        ) -> Union[Dict[int, Dict[str, Union[Tuple[float, float], bool]]], None]:
+        ) -> Dict[int, Dict[str, Tuple[float, float] | bool]] | None:
     """
     Computes the off-source RA/Dec based on pointing and ASDM_POINTING tables.
     Adapted from Todd Hunter's AU tool tsysOffSourceRADec
@@ -535,8 +534,7 @@ def tsys_off_source_radec(
     with casa_tools.TableReader(os.path.join(vis, 'POINTING')) as mytb:
         if mytb.nrows() < 1:
             mytb.close()
-            LOG.warning("The POINTING table is empty.")
-            return
+            raise Exception("The POINTING table is empty.")
 
         pointing_times = mytb.getcol('TIME')  # MJD seconds
         pointing_offsets = mytb.getcol('POINTING_OFFSET')[:, 0, :]  # radians
@@ -632,10 +630,11 @@ def tsys_off_source_radec(
             if len(pointing_times) != len(time_origins):
                 LOG.warning("WARNING: POINTING table entries (%s) ≠ ASDM_POINTING table entries (%s)",
                             len(pointing_times), len(time_origins))
-
-            radec_offsets = np.nanmedian(source_offsets[idx, 0]), np.nanmedian(source_offsets[idx, 1])
-            LOG.info("Median offset = %+.2f in RA and %+.2f in Dec (arcsec)",
-                    3600 * np.degrees(radec_offsets[0]), 3600 * np.degrees(radec_offsets[1]))
+                LOG.warning("No RA/Dec offset will be applied.")
+            else:
+                radec_offsets = np.nanmedian(source_offsets[idx, 0]), np.nanmedian(source_offsets[idx, 1])
+                LOG.info("Median offset = %+.2f in RA and %+.2f in Dec (arcsec)",
+                        3600 * np.degrees(radec_offsets[0]), 3600 * np.degrees(radec_offsets[1]))
 
         # Apply offset to RA/Dec and compare with field RA/Dec
         field_ra, field_dec = direction_to_radec(field_direction)
