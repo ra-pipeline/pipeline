@@ -2253,17 +2253,20 @@ class ImageParamsHeuristics(object):
     def pb_correction(self):
         return True
 
-    def antenna_diameters(self, vislist=None):
-
-        """Count the antennas of given diameters per MS."""
-
+    def antenna_diameters(self, vislist: list[str] | None = None) -> dict[float, int]:
+        """Count the antennas of given diameters per measurement set.
+        
+        Args:
+            vislist: List of visibility dataset paths. Uses self.vislist if None.
+            
+        Returns:
+            Dictionary mapping antenna diameters to their count.
+        """
         if vislist is None:
-            local_vislist = self.vislist
-        else:
-            local_vislist = vislist
+            vislist = self.vislist
 
         antenna_diameters = {}
-        for vis in local_vislist:
+        for vis in vislist:
             for antenna in self.observing_run.get_ms(vis).antennas:
                 if antenna.diameter not in antenna_diameters:
                     antenna_diameters[antenna.diameter] = 0
@@ -2271,35 +2274,39 @@ class ImageParamsHeuristics(object):
 
         return antenna_diameters
 
-    def majority_antenna_ids(self, vislist=None):
-
-        """Get the IDs of the majority (by diameter) antennas per MS."""
-
+    def majority_antenna_ids(self, vislist: list[str] | None = None) -> dict[str, list[int]]:
+        """Get the IDs of the majority (by diameter) antennas per measurement set.
+        
+        Args:
+            vislist: List of visibility dataset paths. Uses self.vislist if None.
+            
+        Returns:
+            Dictionary mapping MS basename to list of majority antenna IDs.
+        """
         if vislist is None:
-            local_vislist = self.vislist
-        else:
-            local_vislist = vislist
-
-        # Determine majority diameter
-        antenna_diameters = self.antenna_diameters(local_vislist)
-        majority_diameter = sorted(antenna_diameters.items(), key=operator.itemgetter(1))[-1][0]
+            vislist = self.vislist
 
         majority_antenna_ids = {}
-        for vis in local_vislist:
-            majority_antenna_ids[os.path.basename(vis)] = [antenna.id
-                                                           for antenna in self.observing_run.get_ms(vis).antennas
-                                                           if antenna.diameter == majority_diameter]
+        for vis in vislist:
+            # Determine majority diameter (most common antenna size)
+            antenna_diameters = self.antenna_diameters([vis])
+            majority_diameter = sorted(antenna_diameters.items(), key=operator.itemgetter(1))[-1][0]
+
+            # Collect IDs of antennas matching the majority diameter
+            majority_antenna_ids[os.path.basename(vis)] = [
+                antenna.id
+                for antenna in self.observing_run.get_ms(vis).antennas
+                if antenna.diameter == majority_diameter
+            ]
 
         return majority_antenna_ids
 
     def arrays(self, vislist: Optional[List[str]] = None) -> str:
-
         """Return the array descriptions."""
 
         return None
 
     def antenna_ids(self, intent, vislist=None):
-
         """Get the antenna IDs to be used for imaging."""
 
         if vislist is None:
