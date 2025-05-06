@@ -225,10 +225,11 @@ def compute_element_locs(
                     'label': str(dish_diameter),
                     }
                 plot_dict[str(dish_diameter.value)]['target fields'][field.id] = field_dict
-            else:
-                del plot_dict[str(dish_diameter.value)]
         if tsys_scans_dict:
             plot_dict[str(dish_diameter.value)]['tsys scans'] = tsys_scans_dict
+        # Clean-up dictionary if empty (possible with mixed antenna datasets)
+        if not plot_dict[str(dish_diameter.value)]:
+            del plot_dict[str(dish_diameter.value)]
 
     return plot_dict
 
