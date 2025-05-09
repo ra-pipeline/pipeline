@@ -641,9 +641,11 @@ def tsys_off_source_radec(
         # Apply offset to RA/Dec and compare with field RA/Dec
         field_ra, field_dec = direction_to_radec(field_direction)
         offset_ra, offset_dec = apply_offset_to_radec(myicrs, offsets=radec_offsets)
+        source_ra, source_dec = direction_to_radec(source.direction)
         LOG.info("Calculating the total offset")
-        LOG.info("FIELD radec = %s", radec_to_sexagesimal(field_ra, field_dec))
-        LOG.info("OFF_SOURCE radec = %s", radec_to_sexagesimal(offset_ra, offset_dec))
+        LOG.info("Tsys FIELD radec = %s", radec_to_sexagesimal(field_ra, field_dec))
+        LOG.info("OFFSET radec = %s", radec_to_sexagesimal(offset_ra, offset_dec))
+        LOG.info("SOURCE radec = %s", radec_to_sexagesimal(source_ra, source_dec))
         scans_dict[scan_id]['radec'] = diff_directions(source.direction, radec_to_direction(offset_ra, offset_dec))
 
     # cleanup measures tool
