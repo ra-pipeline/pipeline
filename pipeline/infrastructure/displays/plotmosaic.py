@@ -352,7 +352,7 @@ def plot_mosaic_tsys_scans(ms: MeasurementSet, source: Source, figfile: str) -> 
             tsys_field = ms.get_fields(name=tsys_fields[0])[0]
 
     # Calculate Tsys scan(s) offset to apply to plot
-    tsys_scans_dict = tsys_off_source_radec(ms, tsys_field)
+    tsys_scans_dict = tsys_off_source_radec(ms, source, tsys_field)
 
     # Retrieve TARGET field positions and configurations
     ra, dec, median_ref_freq, dish_diameters, beam_diameters = compute_mosaic_data(ms, source)
@@ -514,6 +514,7 @@ def antenna_taper_factor(array_name: str) -> float:
 
 def tsys_off_source_radec(
         ms: MeasurementSet,
+        source: Source,
         tsys_field: Field,
         intent: str = 'CALIBRATE_ATMOSPHERE#OFF_SOURCE',
         observatory: str = 'ALMA',
@@ -643,7 +644,7 @@ def tsys_off_source_radec(
         LOG.info("Calculating the total offset")
         LOG.info("FIELD radec = %s", radec_to_sexagesimal(field_ra, field_dec))
         LOG.info("OFF_SOURCE radec = %s", radec_to_sexagesimal(offset_ra, offset_dec))
-        scans_dict[scan_id]['radec'] = diff_directions(field_direction, radec_to_direction(offset_ra, offset_dec))
+        scans_dict[scan_id]['radec'] = diff_directions(source.direction, radec_to_direction(offset_ra, offset_dec))
 
     # cleanup measures tool
     myme.done()
