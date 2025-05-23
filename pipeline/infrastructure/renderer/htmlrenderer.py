@@ -1072,7 +1072,7 @@ class T2_2_1Renderer(T2_2_XRendererBase):
 
             plots = [summary.MosaicPointingsChart(context, ms, source).plot()]
 
-            if 'ATMOSPHERE' in ms.intents:
+            if 'ATMOSPHERE' in ms.intents and ms.antenna_array.name == 'ALMA':
                 plots.append(summary.MosaicTsysChart(context, ms, source).plot())
 
             mosaics.append((source, plots))
