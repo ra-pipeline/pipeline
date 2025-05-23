@@ -1055,32 +1055,29 @@ class T2_2_XRendererBase(object):
 
 
 class T2_2_1Renderer(T2_2_XRendererBase):
-    """
-    T2-2-1 renderer - Spatial Setup
-    """
+    """T2-2-1 renderer - Spatial Setup."""
+
     output_file = 't2-2-1.html'
     template = 't2-2-1.mako'
 
     @staticmethod
     def get_display_context(
-        context: Context,
-        ms: MeasurementSet
-        ) -> Dict[str, Union[Context, MeasurementSet, List[Tuple[Source, List[Union[logger.Plot, None]]]]]]:
+        context: Context, ms: MeasurementSet
+    ) -> Dict[str, Union[Context, MeasurementSet, List[Tuple[Source, List[Union[logger.Plot, None]]]]]]:
         mosaics = []
         for source in ms.sources:
-            num_pointings = len([f for f in ms.fields 
-                                 if f.source_id == source.id])
-            if num_pointings > 1:
-                task1 = summary.MosaicPointingsChart(context, ms, source)
-                pointings_plot = task1.plot()
-                task2 = summary.MosaicTsysChart(context, ms, source)
-                tsys_plot = task2.plot()
-                plots = [x for x in [pointings_plot, tsys_plot] if x]
-                mosaics.append((source, plots))
+            pointings = [f for f in ms.fields if f.source_id == source.id]
+            if len(pointings) <= 1:
+                continue
 
-        return {'pcontext' : context,
-                'ms'       : ms,
-                'mosaics'  : mosaics}
+            plots = [summary.MosaicPointingsChart(context, ms, source).plot()]
+
+            if 'ATMOSPHERE' in ms.intents:
+                plots.append(summary.MosaicTsysChart(context, ms, source).plot())
+
+            mosaics.append((source, plots))
+
+        return {'pcontext': context, 'ms': ms, 'mosaics': mosaics}
 
 
 class T2_2_2Renderer(T2_2_XRendererBase):
