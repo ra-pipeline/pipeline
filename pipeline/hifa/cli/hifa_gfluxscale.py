@@ -19,7 +19,7 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
       using the calibrator data selected by the ``reference`` and ``refintent``
       parameters and the ``transfer`` and ``transintent`` parameters, the value
       of the ``phaseupsolint`` parameter, and any spw combination determined
-      in hifa_spwphaseup.
+      in hifa_spwmapping.
 
     - computing complex amplitude only solutions for all the science spectral
       windows using calibrator data selected with ``reference`` and

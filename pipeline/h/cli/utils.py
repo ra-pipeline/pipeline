@@ -1,3 +1,4 @@
+import warnings
 from functools import wraps
 from typing import Callable
 
@@ -6,10 +7,11 @@ import pipeline.infrastructure.api as api
 import pipeline.infrastructure.argmapper as argmapper
 import pipeline.infrastructure.vdp as vdp
 from pipeline.infrastructure import exceptions, task_registry, utils
-from . import cli
-from .. import heuristics
 
-LOG = infrastructure.get_logger(__name__)
+from .. import heuristics
+from . import cli
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 def cli_wrapper(func: Callable):
@@ -19,13 +21,35 @@ def cli_wrapper(func: Callable):
     calls, which commonly exists in archival casa_pipescript.py/casa_pipestorescript.py scripts generated
     by old pipeline versions before PIPE-1686.
     """
+
     @wraps(func)
     def wrapped_func(*args, **kwargs):
         if 'pipelinemode' in kwargs:
-            LOG.attention('The pipeline task argument "pipelinemode" does not affect results and will be removed in the future.')
+            LOG.attention(
+                'The pipeline task argument "pipelinemode" does not affect results and will be removed in the future.'
+            )
             kwargs.pop('pipelinemode')
         return func(*args, **kwargs)
+
     return wrapped_func
+
+
+def deprecated(reason: str, version: str | None = None):
+    """Mark a function as deprecated."""
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            msg = f'{func.__name__} is deprecated'
+            if version:
+                msg += f' and will be removed in version {version}'
+            msg += f'. {reason}'
+            warnings.warn(msg, DeprecationWarning, stacklevel=2)
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 def get_context():

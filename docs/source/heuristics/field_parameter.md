@@ -289,7 +289,7 @@ often employs either if statements or for loops to go through different paths fo
 each intent, and within those if/for blocks, there are typically separate local
 definitions for identifying which fields belong to current given intent.
 
-Examples are found in hifa_gfluxscaleflag, hifa_spwphaseup, and hifa_timegaincal,
+Examples are found in hifa_gfluxscaleflag, hifa_spwmapping, and hifa_timegaincal,
 that use e.g.:
 
         for field in inputs.ms.get_fields(intent=intent): 
@@ -304,7 +304,7 @@ patterns), but in practice, they do not really use these input parameters, becau
 the heuristics are so specifically written for particular intents. I.e. a user
 could remove "PHASE" from the inputs.intent in hifa_timegaincal, but that would
 effectively undermine the purpose of the task, with likely unexpected outcome in
-the task result. In fact, I note in hifa_spwphaseup that the actual intents it
+the task result. In fact, I note in hifa_spwmapping that the actual intents it
 operates on are now hard-coded inside the task, with no way for users to override.
 
 

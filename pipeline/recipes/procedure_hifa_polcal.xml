@@ -89,7 +89,7 @@
     </ProcessingCommand>
 
     <ProcessingCommand>
-        <Command xmlns="">hifa_spwphaseup</Command>
+        <Command xmlns="">hifa_spwmapping</Command>
         <ParameterSet>
         </ParameterSet>
     </ProcessingCommand>
@@ -129,7 +129,7 @@
     </ProcessingCommand>
 
     <ProcessingCommand>
-        <Command xmlns="">hifa_spwphaseup</Command>
+        <Command xmlns="">hifa_spwmapping</Command>
         <ParameterSet>
             <Parameter>
                 <Keyword xmlns="">unregister_existing</Keyword>

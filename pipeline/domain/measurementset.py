@@ -106,11 +106,11 @@ class MeasurementSet(object):
             Time plots.
         phasecal_mapping: A dictionary mapping phase calibrator fields to
             corresponding fields with TARGET or CHECK intent; typically
-            populated by the hifa_spwphaseup task (ALMA-only).
+            populated by the hifa_spwmapping task (ALMA-only).
         phaseup_caltable_for_phase_rms: The bandpass phase-up caltable created
             during the hifa_bandpass task (prior to deriving the bandpass
             solution), for use in subsequent phase RMS stability assessment
-            during the hifa_spwphaseup task (ALMA-interferometry-only).
+            during the hifa_spwmapping task (ALMA-interferometry-only).
         reference_antenna_locked: If True, reference antenna is locked to
             prevent modification. Typically used in polarization calibration
             stages / recipes.

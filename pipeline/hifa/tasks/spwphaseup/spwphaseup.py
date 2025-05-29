@@ -214,8 +214,7 @@ class SpwPhaseupInputs(gtypegaincal.GTypeGaincalInputs):
         self.samebb = samebb
         self.unregister_existing = unregister_existing
 
-
-@task_registry.set_equivalent_casa_task('hifa_spwphaseup')
+@task_registry.set_equivalent_casa_task('hifa_spwmapping')
 class SpwPhaseup(gtypegaincal.GTypeGaincal):
     Inputs = SpwPhaseupInputs
 

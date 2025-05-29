@@ -129,7 +129,7 @@ class BandpassResults(basetask.Results):
         self.final.extend(copy.deepcopy(final))
         self.preceding.extend(copy.deepcopy(preceding))
 
-        # PIPE-1624: Bandpass phaseup caltable is saved off so it can be used in the Phase RMS structure function analysis in spwphaseup.
+        # PIPE-1624: Bandpass phaseup caltable is saved off so it can be used in the Phase RMS structure function analysis in spwmapping.
         self.phaseup_caltable_for_phase_rms = []
 
     def merge_with_context(self, context: Context):
