@@ -1,10 +1,11 @@
 import collections
 import copy
 import os
+import traceback
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Set, Tuple
 
 import numpy
-import traceback
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -36,6 +37,16 @@ __all__ = [
 
 IntentField = collections.namedtuple('IntentField', 'intent field')
 SpwMapping = collections.namedtuple('SpwMapping', 'combine spwmap snr_info snr_threshold_used solint gaintype')
+
+
+@dataclass
+class SnrTestResult:
+    has_no_snrs: bool                      # Boolean to denote whether no SNRs were derived for any SpW.
+    spw_ids: list[int]                     # list of SpW IDs for which SNR was derived
+    snr_values: list[float | None]         # list of derived SNRs
+    is_good_snr: list[bool | None]         # list of booleans denoting whether derived SNR was good (>= SNR threshold)
+    reference_times: list[float | None]    # list of reference times in minutes
+    integration_times: list[float | None]  # list of integration times in minutes
 
 
 class SpwPhaseupInputs(gtypegaincal.GTypeGaincalInputs):
@@ -464,16 +475,22 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
 
             # Run a task to estimate the gaincal SNR for given intent, field,
             # and spectral windows.
-            nosnrs, spwids, snrs, _, reftime, inttime = self._do_snrtest(intent, field, spws)
+            snr_test_result = self._do_snrtest(intent, field, spws)
 
             # No SNR estimates available, so stick with default values.
-            if nosnrs:
+            if snr_test_result.has_no_snrs:
                 LOG.warning(f"{inputs.ms.basename}, intent={intent}, field={field}: no SNR estimates for any SpWs,"
                             f" setting gaincal solint to {solint} and gaintype to {gaintype}.")
             else:
                 # Compute the optimal solint and gaintype based on estimated SNR.
-                solint, gaintype, snr_thr_used = self._compute_solint(spwids, snrs, reftime, inttime, intent,
-                                                                      mappingmode='single')
+                solint, gaintype, snr_thr_used = self._compute_solint(
+                    spwids=snr_test_result.spw_ids,
+                    snrs=snr_test_result.snr_values,
+                    ref_times=snr_test_result.reference_times,
+                    int_times=snr_test_result.integration_times,
+                    intent=intent,
+                    mappingmode='single'
+                )
 
         # If there are multiple SpWs, then continue with computing the SpW
         # optimal map according to the rules defined by each mapping mode.
@@ -484,7 +501,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         elif inputs.hm_spwmapmode == 'auto':
             # Run a task to estimate the gaincal SNR for given intent, field,
             # and spectral windows.
-            nosnrs, spwids, snrs, goodsnrs, reftime, inttime = self._do_snrtest(intent, field, spws)
+            snr_test_result = self._do_snrtest(intent, field, spws)
 
             # PIPE-2499: set SNR limit to use in the derivation of any
             # subsequent SNR-based narrow-to-wide SpW mapping. For the CHECK and
@@ -494,7 +511,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
 
             # No SNR estimates available, default to simple narrow-to-wide SpW
             # mapping and stick to default values.
-            if nosnrs:
+            if snr_test_result.has_no_snrs:
                 spwmap = simple_n2wspwmap(spws, inputs.maxnarrowbw, inputs.minfracmaxbw, inputs.samebb)
                 LOG.warning(f"{inputs.ms.basename}, intent={intent}, field={field}: no SNR estimates available for"
                             f" any SpWs, will force simple narrow-to-wide spw mapping {spwmap}, with solint={solint}"
@@ -503,11 +520,18 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             # PIPE-2499: all SpWs have good SNR estimates: in this case, check
             # whether the optimal solint is 'int' and if so use that + the
             # standard (empty) SpW mapping (i.e. each SpW mapped to itself).
-            elif all(goodsnrs):
+            elif all(snr_test_result.is_good_snr):
                 # Compute the optimal solint and gaintype based on estimated
                 # SNR, while assuming no SpW-remapping mode.
-                solint, gaintype, snr_thr_used = self._compute_solint(spwids, snrs, reftime, inttime, intent,
-                                                                      mappingmode='single')
+                # Compute the optimal solint and gaintype based on estimated SNR.
+                solint, gaintype, snr_thr_used = self._compute_solint(
+                    spwids=snr_test_result.spw_ids,
+                    snrs=snr_test_result.snr_values,
+                    ref_times=snr_test_result.reference_times,
+                    int_times=snr_test_result.integration_times,
+                    intent=intent,
+                    mappingmode='single'
+                )
 
                 # If the optimal solint is 'int', then proceed with this, and
                 # the default of no SpW mapping.
@@ -528,7 +552,8 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
 
                     # Scale the SNR limit based on the optimal solint and the
                     # integration time (converted to seconds).
-                    snrlimit_scaled = snrlimit * numpy.sqrt(quanta.quantity(solint)['value'] / inttime[0] * 60.)
+                    integration_time_in_secs = snr_test_result.integration_times[0] * 60.0
+                    snrlimit_scaled = snrlimit * numpy.sqrt(quanta.quantity(solint)['value'] / integration_time_in_secs)
 
                     # Compute an SNR-based narrow-to-wide SpW mapping with the
                     # scaled SNR limit.
@@ -541,8 +566,15 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                     if goodmap:
                         LOG.info(f"{inputs.ms.basename}, intent={intent}, field={field}: found good match for all spws"
                                  f" using spw map {spwmap}.")
-                        solint, gaintype, snr_thr_used = self._compute_solint(spwids, snrs, reftime, inttime, intent,
-                                                                              mappingmode='mapping')
+                        solint, gaintype, snr_thr_used = self._compute_solint(
+                            spwids=snr_test_result.spw_ids,
+                            snrs=snr_test_result.snr_values,
+                            ref_times=snr_test_result.reference_times,
+                            int_times=snr_test_result.integration_times,
+                            intent=intent,
+                            mappingmode='mapping'
+                        )
+
                     # Otherwise, proceed with SpW combination instead of SpW
                     # mapping, and re-compute the optimal solint and gaintype
                     # assuming "combine" mode.
@@ -557,19 +589,25 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                         # Re-compute the optimal solint and gaintype based on
                         # estimated SNR, while assuming SpW combination mode,
                         # and compute the expected combined SpW SNRs.
-                        solint, gaintype, snr_thr_used = self._compute_solint(spwids, snrs, reftime, inttime, intent,
-                                                                              mappingmode='combine')
+                        solint, gaintype, snr_thr_used = self._compute_solint(
+                            spwids=snr_test_result.spw_ids,
+                            snrs=snr_test_result.snr_values,
+                            ref_times=snr_test_result.reference_times,
+                            int_times=snr_test_result.integration_times,
+                            intent=intent,
+                            mappingmode='combine'
+                        )
                         combined_snrs = self._do_combined_snr_test(spwids, snrs, spwmap)
 
             # No spws have good SNR values, so force combined spw mapping.
-            elif not any(goodsnrs):
+            elif not any(snr_test_result.is_good_snr):
                 LOG.info(f"{inputs.ms.basename}, intent={intent}, field={field}: no spws have good enough SNR, so will"
                          f" force combined spw mapping.")
 
                 # Report spws for which no SNR estimate was available.
-                if None in goodsnrs:
+                if None in snr_test_result.is_good_snr:
                     LOG.warning(f"{inputs.ms.basename}, intent={intent}, field={field}: spws without SNR measurements"
-                                f" {[spwid for spwid, goodsnr in zip(spwids, goodsnrs) if goodsnr is None]}.")
+                                f" {[spwid for spwid, goodsnr in zip(spwids, snr_test_result.is_good_snr) if goodsnr is None]}.")
 
                 # Create a spw mapping for combining spws.
                 spwmap = combine_spwmap(spws)
@@ -578,8 +616,14 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                 # Re-compute the optimal solint and gaintype based on estimated
                 # SNR, while assuming SpW combination mode, and compute the
                 # expected combined SpW SNRs.
-                solint, gaintype, snr_thr_used = self._compute_solint(spwids, snrs, reftime, inttime, intent,
-                                                                      mappingmode='combine')
+                solint, gaintype, snr_thr_used = self._compute_solint(
+                    spwids=snr_test_result.spw_ids,
+                    snrs=snr_test_result.snr_values,
+                    ref_times=snr_test_result.reference_times,
+                    int_times=snr_test_result.integration_times,
+                    intent=intent,
+                    mappingmode='combine'
+                )
                 combined_snrs = self._do_combined_snr_test(spwids, snrs, spwmap)
 
             # If some, but not all, spws have good SNR values, then try to use
@@ -590,9 +634,9 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                          f" consider spw mapping or combination.")
 
                 # Report spws for which no SNR estimate was available.
-                if None in goodsnrs:
+                if None in snr_test_result.is_good_snr:
                     LOG.warning(f"{inputs.ms.basename}, intent={intent}, field={field}: spws without SNR measurements"
-                                f" {[spwid for spwid, goodsnr in zip(spwids, goodsnrs) if goodsnr is None]}.")
+                                f" {[spwid for spwid, goodsnr in zip(spwids, snr_test_result.is_good_snr) if goodsnr is None]}.")
 
                 # Compute the SNR-based narrow-to-wide (low-SNR to high-SNR) SpW
                 # mapping.
@@ -603,8 +647,14 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                 # gaintype assuming the "mapping" mode.
                 if goodmap:
                     LOG.info(f'Using spw map {spwmap} for {inputs.ms.basename}, intent={intent}, field={field}')
-                    solint, gaintype, snr_thr_used = self._compute_solint(spwids, snrs, reftime, inttime, intent,
-                                                                          mappingmode='mapping')
+                    solint, gaintype, snr_thr_used = self._compute_solint(
+                        spwids=snr_test_result.spw_ids,
+                        snrs=snr_test_result.snr_values,
+                        ref_times=snr_test_result.reference_times,
+                        int_times=snr_test_result.integration_times,
+                        intent=intent,
+                        mappingmode='mapping'
+                    )
 
                 # Otherwise, proceed with SpW combination instead of SpW
                 # mapping, and re-compute the optimal solint and gaintype
@@ -620,8 +670,14 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                     # Re-compute the optimal solint and gaintype based on
                     # estimated SNR, while assuming SpW combination mode,
                     # and compute the expected combined SpW SNRs.
-                    solint, gaintype, snr_thr_used = self._compute_solint(spwids, snrs, reftime, inttime, intent,
-                                                                          mappingmode='combine')
+                    solint, gaintype, snr_thr_used = self._compute_solint(
+                        spwids=snr_test_result.spw_ids,
+                        snrs=snr_test_result.snr_values,
+                        ref_times=snr_test_result.reference_times,
+                        int_times=snr_test_result.integration_times,
+                        intent=intent,
+                        mappingmode='combine'
+                    )
                     combined_snrs = self._do_combined_snr_test(spwids, snrs, spwmap)
 
 
@@ -636,14 +692,15 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
 
             # Run a task to estimate the gaincal SNR for given intent, field,
             # and spectral windows.
-            nosnrs, spwids, snrs, _, reftime, inttime = self._do_snrtest(intent, field, spws)
+            snr_test_result = self._do_snrtest(intent, field, spws)
 
             # If no SNR estimates are available then set solint based on intent.
-            if nosnrs:
+            if snr_test_result.has_no_snrs:
                 # For CHECK and PHASE intent, override the solint to a quarter
                 # of the scan (exposure) time, and set gaintype to T.
                 if intent in {'CHECK', 'PHASE'}:
-                    solint = quanta.tos(quanta.quantity(reftime[0] * 60. / 4., 's'), 3)
+                    integration_time_in_secs = snr_test_result.integration_times[0] * 60.0
+                    solint = quanta.tos(quanta.quantity(integration_time_in_secs / 4., 's'), 3)
                     gaintype = "T"
                     LOG.warning(f"{inputs.ms.basename}, intent={intent}, field={field}: no SNR estimates available for"
                                 f" any SpWs, setting solint to 1/4 scan time and gaintype={gaintype}.")
@@ -656,8 +713,14 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             # estimated SNR assuming SpW combination mode, and compute expected
             # combined SpW SNRs.
             else:
-                solint, gaintype, snr_thr_used = self._compute_solint(spwids, snrs, reftime, inttime, intent,
-                                                                      mappingmode='combine')
+                solint, gaintype, snr_thr_used = self._compute_solint(
+                    spwids=snr_test_result.spw_ids,
+                    snrs=snr_test_result.snr_values,
+                    ref_times=snr_test_result.reference_times,
+                    int_times=snr_test_result.integration_times,
+                    intent=intent,
+                    mappingmode='combine'
+                )
                 combined_snrs = self._do_combined_snr_test(spwids, snrs, spwmap)
 
         # For the "hm_spwmapmode=simple" spw mapping mode, force the use of a
@@ -693,7 +756,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
 
         return SpwMapping(combine, spwmap, snr_info, snr_thr_used, solint, gaintype)
 
-    def _do_snrtest(self, intent: str, field: str, spws: list[SpectralWindow]) -> tuple[bool, list, list, list, list, list]:
+    def _do_snrtest(self, intent: str, field: str, spws: list[SpectralWindow]) -> SnrTestResult:
         """
         Run gaincal SNR task to perform SNR test for specified intent and
         field.
@@ -704,13 +767,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             spws: list of spectral window objects for which to perform SNR test.
 
         Returns:
-            6-tuple containing:
-              * Boolean to denote whether no SNRs were derived for any SpW.
-              * list of SpW IDs for which SNR was derived
-              * list of derived SNRs
-              * list of booleans denoting whether derived SNR was good (>= SNR threshold)
-              * list of reference times in minutes
-              * list of integration times in minutes
+            SnrTestResult that characterises the results of the gaincal SNR test
         """
         # Simplify inputs.
         inputs = self.inputs
@@ -735,7 +792,8 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         # The weaker calibrators CHECK and PHASE will use an SNR limit of 32
         # (phasesnr) and scan-based values. The other, brighter, calibrators
         # typically use an SNR limit of 10 (intphasesnr).
-        if intent in {'CHECK', 'PHASE'}:
+        WEAK_CALIBRATOR_INTENTS = {'CHECK', 'PHASE'}
+        if intent in WEAK_CALIBRATOR_INTENTS:
             snrs = result.snrs
             snrlimit = inputs.phasesnr
             ref_times_to_use = result.scantimes
@@ -745,27 +803,28 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             ref_times_to_use = result.inttimes
 
         # Check whether no SNRs were found for any SpW.
-        nosnr = all(snr is None for snr in snrs)
+        has_no_snrs = all(snr is None for snr in snrs)
 
         # Initialize and populate outputs.
-        goodsnrs = []
-        ref_times = []
-        int_times = []
+        goodsnrs, ref_times, int_times = [], [], []
         for i, snr in enumerate(snrs):
             if snr is None:
                 goodsnrs.append(None)
                 ref_times.append(None)
                 int_times.append(None)
-            elif snr < snrlimit:
-                goodsnrs.append(False)
-                ref_times.append(ref_times_to_use[i])
-                int_times.append(result.inttimes[i])
             else:
-                goodsnrs.append(True)
+                goodsnrs.append(snr >= snrlimit)
                 ref_times.append(ref_times_to_use[i])
                 int_times.append(result.inttimes[i])
 
-        return nosnr, result.spwids, snrs, goodsnrs, ref_times, int_times
+        return SnrTestResult(
+            has_no_snrs=has_no_snrs,
+            spw_ids=result.spwids,
+            snr_values=snrs,
+            is_good_snr=goodsnrs,
+            reference_times=ref_times,
+            integration_times=int_times
+        )
 
     def _do_combined_snr_test(self, spwlist: list, perspwsnr: list, spwmap: list) -> dict:
         """
@@ -1076,7 +1135,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                     LOG.info(f'{ms.basename}: will not derive spwmap for field {field.name} (#{field.id}) and intent'
                              f' {intent} because this field also covers the BANDPASS calibrator intent.')
                     continue
-                    
+
                 if not excluded_intents_found:
                     intent_field.append((intent, field.name))
                 else:
@@ -1091,7 +1150,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
     def _compute_solint(
             self, spwids: list, snrs: list, ref_times: list, int_times: list, intent: str, mappingmode: str
     ) -> tuple[str, str, float]:
-        """ 
+        """
         Compute the optimal solution interval and gaintype.
 
         Computes the optimal values to use for solution interval and gaintype
@@ -1180,7 +1239,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         elif mappingmode == 'mapping':
             # If using SpW re-mapping, then use the highest (best) SNR.
             snr_to_use = max(snrs)
-        elif mappingmode == 'combine':       
+        elif mappingmode == 'combine':
             # If using SpW combination, then compute the Euclidean norm of the
             # SNR values to represent the combined SNR.
             snr_to_use = numpy.linalg.norm(snrs)
