@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Set, Tuple
 
 import numpy
+from numpy.ma.core import MaskedConstant
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -17,11 +18,13 @@ from pipeline.domain.measurementset import MeasurementSet
 from pipeline.h.tasks.common import commonhelpermethods
 from pipeline.hif.tasks.gaincal import gtypegaincal
 from pipeline.hif.tasks.gaincal.common import GaincalResults
+from pipeline.hif.tasks.gaincal.gtypegaincal import GTypeGaincalInputs, GTypeGaincal
 from pipeline.hifa.heuristics.phasemetrics import PhaseStabilityHeuristics
 from pipeline.hifa.heuristics.phasespwmap import combine_spwmap
 from pipeline.hifa.heuristics.phasespwmap import simple_n2wspwmap
 from pipeline.hifa.heuristics.phasespwmap import snr_n2wspwmap
 from pipeline.hifa.heuristics.phasespwmap import update_spwmap_for_band_to_band
+from pipeline.hifa.tasks.fluxscale.qa import CaltableWrapperFactory, CaltableWrapper
 from pipeline.hifa.tasks.gaincalsnr import gaincalsnr
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import task_registry
@@ -502,6 +505,9 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             # Run a task to estimate the gaincal SNR for given intent, field,
             # and spectral windows.
             snr_test_result = self._do_snrtest(intent, field, spws)
+
+            # PIPE-2505: adjust the SNRs using a gain caltable, where possible
+            self._compute_snr_from_gaincal(snr_test_result, field, intent)
 
             # PIPE-2499: set SNR limit to use in the derivation of any
             # subsequent SNR-based narrow-to-wide SpW mapping. For the CHECK and
@@ -1428,6 +1434,215 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             snr_info.append((str(spwid), snr))
 
         return snr_info
+
+    def _compute_snr_from_gaincal(
+            self,
+            snr_result: SnrTestResult,
+            field: str,
+            intent: str,
+            low_snr_threshold: float = 6,
+            estimated_snr_multiplier: float = 0.75
+    ):
+        """
+        Estimates the Signal-to-Noise Ratio (SNR) by generating and analyzing a gaincal
+        calibration table. Updates the SNR values in the provided SnrTestResult object
+        based on the analysis results.
+
+        This function implements the SNR estimation logic described in PIPE-2505:
+        - For SPWs with SNR below threshold: applies a scaling factor to avoid calibration failures
+        - For SPWs with SNR above threshold: computes new SNR estimates using gaincal analysis
+
+        Parameters:
+            snr_result: SnrTestResult
+                Object containing SNR test results, including spw_ids and snr_values that
+                will be updated based on the analysis.
+            field: str
+                Field identifier to use for the gaincal calculation.
+            intent: str
+                Intent identifier to use for the gaincal calculation.
+            low_snr_threshold: float, optional
+                Threshold below which SPWs are considered low SNR and gaincal is not attempted.
+                Default is 6 (corresponds to 'X' in PIPE-2505).
+            estimated_snr_multiplier: float, optional
+                Scaling factor applied to both estimated and measured SNR values.
+                Default is 0.75 (corresponds to 'Y' in PIPE-2505).
+
+        Returns:
+            None
+                The function updates the snr_result object in place.
+        """
+        if snr_result.has_no_snrs:
+            return
+
+        # dict to map spw IDs to corrected SNR values
+        snr_corrections = {spw_id: snr for spw_id, snr in zip(snr_result.spw_ids, snr_result.snr_values)
+                           if snr is not None}
+
+        # identify spws above/below the low-SNR threshold (='X' in PIPE-2505 spec)
+        low_snr_spws, high_snr_spws = self._classify_spws_by_snr(snr_corrections, low_snr_threshold)
+
+        # running gaincal minsnr=2 would result in failure for low-SNR spws. For these
+        # low-SNR spws, set the estimated SNR to Y * SNR
+        self._update_snr_for_low_snr_spws(snr_corrections, low_snr_spws, low_snr_threshold, estimated_snr_multiplier)
+
+        # For the remaining high SNR windows, generate a G caltable and set the
+        # estimated SNR to Y * median SNR, as measured from the caltable
+        if high_snr_spws:
+            caltable = self._generate_gain_caltable(field, intent, high_snr_spws)
+            self._update_snr_for_high_snr_spws(snr_corrections, high_snr_spws, caltable, estimated_snr_multiplier)
+
+        self._update_snr_result(snr_result, snr_corrections)
+
+    def _classify_spws_by_snr(self, snr_corrections: dict[int, float], threshold: float) -> tuple[set[int], set[int]]:
+        """
+        Classifies spectral windows (SPWs) into two sets based on their Signal-to-Noise
+        Ratio (SNR) compared to a provided threshold. This method identifies and
+        categorizes SPWs with low SNR and high SNR, returning them as two separate sets.
+
+        Parameters:
+            snr_corrections (dict[int, float]): A dictionary mapping SPW IDs to their
+                corresponding SNR values.
+            threshold (float): The SNR threshold for classification. SPWs with SNRs
+                lower than this value are categorized as low SNR, while the rest are
+                categorized as high SNR.
+
+        Returns:
+            tuple[set[int], set[int]]: A tuple containing two sets:
+                - The first set contains the SPW IDs of SPWs with SNR lower than the
+                  threshold (low SNR).
+                - The second set contains the SPW IDs of SPWs with SNR equal to or
+                  higher than the threshold (high SNR).
+        """
+        low_snr_spws = {spw_id for spw_id, snr in snr_corrections.items() if snr < threshold}
+        high_snr_spws = set(snr_corrections.keys()) - low_snr_spws
+        return low_snr_spws, high_snr_spws
+
+    def _update_snr_for_low_snr_spws(
+            self,
+            snr_corrections: dict[int, float],
+            low_snr_spws: set[int],
+            threshold: float,
+            multiplier: float
+    ) -> None:
+        """
+        Handles low signal-to-noise ratio (SNR) spectral windows (spws) by applying a
+        multiplier to their SNR values. This method modifies the provided
+        `snr_corrections` dictionary in place.
+
+        Parameters:
+            snr_corrections (dict[int, float]): A dictionary mapping spw IDs to their
+                SNR values. The SNR values are updated for spws that meet the low-SNR
+                condition.
+            low_snr_spws (set[int]): A set of spw IDs that are identified as having
+                low SNR values (below the threshold).
+            threshold (float): The SNR threshold used for identifying spws as low-SNR
+                spws.
+            multiplier (float): The multiplication factor applied to the SNR values of
+                low-SNR spws.
+
+        Returns:
+            None
+        """
+        for spw_id in sorted(low_snr_spws):
+            snr_corrections[spw_id] *= multiplier
+            LOG.info(f"SNR for {self.inputs.vis} spw {spw_id} is below threshold "
+                     f"{threshold}. Skipping gaincal; estimated SNR set to "
+                     f"{snr_corrections[spw_id]:.3f}")
+
+    def _generate_gain_caltable(self, field: str, intent: str, high_snr_spws: set[int]) -> CaltableWrapper:
+        """
+        Generates a gain caltable for high SNR spectral windows.
+
+        Parameters:
+            field (str): The field to calibrate.
+            intent (str): The scan intent to process
+            high_snr_spws (set[int]): A set of spectral window indices with high
+                signal-to-noise ratios
+
+        Returns:
+            CaltableWrapper: A wrapper object for the generated calibration table.
+        """
+        inputs = GTypeGaincalInputs(
+            context=self.inputs.context,
+            vis=self.inputs.vis,
+            field=field,
+            intent=intent,
+            # note: we only select the high SNR spws here
+            spw=','.join(map(str, sorted(high_snr_spws))),
+            calmode='p',
+            solint='inf',
+            minsnr=2,
+            append=False,
+        )
+        task = GTypeGaincal(inputs)
+        _ = self._executor.execute(task)
+        return CaltableWrapperFactory.from_caltable(inputs.caltable)
+
+    def _update_snr_for_high_snr_spws(
+            self,
+            snr_corrections: dict[int, float],
+            high_snr_spws: set[int],
+            caltable: CaltableWrapper,
+            multiplier: float
+    ) -> None:
+        """
+        Processes high Signal-to-Noise Ratio (SNR) spectral windows (spws) and updates
+        the SNR corrections dictionary with computed or default values based on the
+        filtered calibrated table data.
+
+        Parameters:
+            snr_corrections (dict[int, float]): A dictionary to store SNR corrections
+                for each spectral window where the keys are the spectral window IDs,
+                and the values are the corresponding corrections.
+            high_snr_spws (set[int]): A set containing IDs of the spectral windows
+                determined to have high SNR values.
+            caltable (CaltableWrapper): A wrapper object representing the calibration
+                table used to filter and retrieve calibration data.
+            multiplier (float): A multiplier factor applied to the median SNR values
+                for applying a scaling adjustment to the estimated SNR.
+
+        Returns:
+            None
+        """
+        for spw in high_snr_spws:
+            try:
+                snr_data = caltable.filter(spw=spw).data['SNR']
+            except KeyError:
+                LOG.info(f'No SNR data present in phaseup caltable for {self.inputs.vis} '
+                         f'spw {spw}. Setting estimated SNR to zero.')
+                snr_corrections[spw] = 0
+                continue
+
+            median_snr = numpy.ma.median(snr_data)
+            if median_snr == MaskedConstant:
+                LOG.info(f'All SNR data masked in phaseup caltable for {self.inputs.vis} '
+                         f'spw {spw}. Setting estimated SNR to zero.')
+                snr_corrections[spw] = 0
+            else:
+                snr_corrections[spw] = float(median_snr * multiplier)
+                LOG.info(f'Estimated SNR for {self.inputs.vis} spw {spw} = '
+                         f'{snr_corrections[spw]:.3f} (median SNR = {median_snr:.3f})')
+
+    def _update_snr_result(self, snr_result: SnrTestResult, snr_corrections: dict[int, float]) -> None:
+        """
+        Updates the snr_result object with corrected SNR values based on the given
+        snr_corrections. The function maps each spectral window's (SPW) ID from
+        snr_result to a corrected SNR value using the snr_corrections dictionary. If
+        no correction is found for a particular SPW ID, the original SNR value is
+        retained.
+
+        Parameters:
+            snr_result (SnrTestResult): An object of type SnrTestResult. It contains
+                the SPW IDs and their corresponding SNR values to be updated.
+            snr_corrections (dict[int, float]): A dictionary mapping SPW IDs (int) to
+                corrected SNR values (float).
+
+        Returns:
+            None
+        """
+        new_snr_values = [snr_corrections.get(spw, snr)
+                          for spw, snr in zip(snr_result.spw_ids, snr_result.snr_values)]
+        snr_result.snr_values = new_snr_values
 
 
 class SpwPhaseupResults(basetask.Results):
