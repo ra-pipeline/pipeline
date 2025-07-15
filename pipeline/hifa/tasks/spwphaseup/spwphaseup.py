@@ -1719,7 +1719,20 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                 snr_corrections[spw] = 0
                 continue
 
-            median_snr = numpy.ma.median(snr_data)
+            # Get number of correlations for this SpW.
+            corr_type = commonhelpermethods.get_corr_products(self.inputs.ms, spw)
+            ncorrs = len(corr_type)
+            is_single_polarisation = ncorrs == 1
+
+            if is_single_polarisation:
+                # For single pol, one column will be populated with zeroes or nulls.
+                # Identify which column holds data for the median SNR calculation
+                idx_for_pol = commonhelpermethods.get_pol_id(self.inputs.ms, spw, corr_type[0])
+                median_snr = numpy.ma.median(snr_data[:, idx_for_pol])
+            else:
+                # otherwise, calculate the median over all pols
+                median_snr = numpy.ma.median(snr_data)
+
             if median_snr == MaskedConstant:
                 LOG.info(f'All SNR data masked in phaseup caltable for {self.inputs.vis} '
                          f'spw {spw}. Setting estimated SNR to zero.')
