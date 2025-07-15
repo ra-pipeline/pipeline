@@ -1,5 +1,6 @@
 import collections
 import copy
+import dataclasses
 import os
 import traceback
 from dataclasses import dataclass
@@ -38,18 +39,83 @@ __all__ = [
     'SpwPhaseupResults'
 ]
 
+WEAK_CALIBRATOR_INTENTS = {'CHECK', 'PHASE'}
+
 IntentField = collections.namedtuple('IntentField', 'intent field')
 SpwMapping = collections.namedtuple('SpwMapping', 'combine spwmap snr_info snr_threshold_used solint gaintype')
 
 
 @dataclass
-class SnrTestResult:
-    has_no_snrs: bool                      # Boolean to denote whether no SNRs were derived for any SpW.
-    spw_ids: list[int]                     # list of SpW IDs for which SNR was derived
-    snr_values: list[float | None]         # list of derived SNRs
-    is_good_snr: list[bool | None]         # list of booleans denoting whether derived SNR was good (>= SNR threshold)
-    reference_times: list[float | None]    # list of reference times in minutes
-    integration_times: list[float | None]  # list of integration times in minutes
+class SNRTestResult:
+    """
+    Data structure to store the results of SNR tests.
+
+    This class encapsulates the results of Signal-to-Noise Ratio (SNR) calculations for multiple
+    spectral window (SpW) IDs. It tracks which SpWs have valid SNR results, the list of SNR values,
+    and associated metadata such as reference and integration times.
+
+    Attributes
+    ----------
+    spw_ids : list[int]
+        List of spectral window (SpW) IDs for which SNR was derived.
+    snr_values : list[float | None]
+        List of derived SNR values, where None represents missing or undefined SNR.
+    is_good_snr : list[bool | None]
+        List of boolean values indicating whether the derived SNR is above a predefined threshold
+        (considered good). None represents missing evaluation.
+    reference_times : list[float | None]
+        List specifying reference times in minutes, where None represents missing data.
+    integration_times : list[float | None]
+        List specifying integration times in minutes, where None represents missing data.
+    """
+    spw_ids: list[int] = dataclasses.field(default_factory=list)
+    snr_values: list[float | None] = dataclasses.field(default_factory=list)
+    is_good_snr: list[bool | None] = dataclasses.field(default_factory=list)
+    reference_times: list[float | None] = dataclasses.field(default_factory=list)
+    integration_times: list[float | None] = dataclasses.field(default_factory=list)
+
+    @property
+    def has_no_snrs(self) -> bool:
+        """
+        Indicates whether there are no SNRs available.
+
+        This property checks the inverse state of another attribute to determine if no
+        SNRs are present.
+
+        Returns:
+            bool: True if there are no SNRs, False otherwise.
+        """
+        return not self.has_snrs
+
+    @property
+    def has_snrs(self) -> bool:
+        """
+        Checks if the object has non-empty and non-None SNR (Signal-to-Noise Ratio)
+        values.
+
+        Returns
+            bool: True if there are SNR values and at least one of them is not None,
+                otherwise False.
+        """
+        return len(self.snr_values) > 0 and any(snr is not None for snr in self.snr_values)
+
+    def has_snrs_greater_than(self, snr_limit: float) -> bool:
+        """
+        Determines if all SNR (Signal-to-Noise Ratio) values are greater than a specified limit.
+
+        Returns a boolean indicating whether all defined SNR values in the list are greater
+        than or equal to the provided limit. If the list of SNR values is empty, the method
+        returns `False`.
+
+        Args:
+            snr_limit: A floating-point number representing the minimum threshold
+                       for the SNR values.
+
+        Returns:
+            bool: True if all SNR values are greater than or equal to the limit,
+                    False otherwise.
+        """
+        return self.has_snrs and all(snr >= snr_limit for snr in self.snr_values)
 
 
 class SpwPhaseupInputs(gtypegaincal.GTypeGaincalInputs):
@@ -460,8 +526,10 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         gaintype = 'G'
         combine = False
         spwmap = []  # i.e. each SpW is mapped to itself.
-        snrs = []
-        spwids = []
+        # SNR tests are omitted for 'simple' or 'default' mapping, so populate a
+        # default SNRTestResult instance to provide a common interface for methods calls
+        # that operate on instances and instance properties
+        snr_test_result = SNRTestResult()
         # The list of combined SpW SNRs is empty; only updated if SpW
         # combination is necessary; needed for SNR info shown in task weblog.
         combined_snrs = []
@@ -526,7 +594,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             # PIPE-2499: all SpWs have good SNR estimates: in this case, check
             # whether the optimal solint is 'int' and if so use that + the
             # standard (empty) SpW mapping (i.e. each SpW mapped to itself).
-            elif all(snr_test_result.is_good_snr):
+            elif snr_test_result.has_snrs_greater_than(snrlimit):
                 # Compute the optimal solint and gaintype based on estimated
                 # SNR, while assuming no SpW-remapping mode.
                 # Compute the optimal solint and gaintype based on estimated SNR.
@@ -563,7 +631,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
 
                     # Compute an SNR-based narrow-to-wide SpW mapping with the
                     # scaled SNR limit.
-                    goodmap, spwmap = snr_n2wspwmap(spws, snrs, snrlimit_scaled)
+                    goodmap, spwmap = snr_n2wspwmap(spws, snr_test_result.snr_values, snrlimit_scaled)
 
                     # If the SNR-based mapping with the new SNR limit gave a
                     # good match for all spws, then proceed to use this, and
@@ -603,7 +671,11 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                             intent=intent,
                             mappingmode='combine'
                         )
-                        combined_snrs = self._do_combined_snr_test(spwids, snrs, spwmap)
+                        combined_snrs = self._do_combined_snr_test(
+                            snr_test_result.spw_ids,
+                            snr_test_result.snr_values,
+                            spwmap
+                        )
 
             # No spws have good SNR values, so force combined spw mapping.
             elif not any(snr_test_result.is_good_snr):
@@ -612,8 +684,10 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
 
                 # Report spws for which no SNR estimate was available.
                 if None in snr_test_result.is_good_snr:
-                    LOG.warning(f"{inputs.ms.basename}, intent={intent}, field={field}: spws without SNR measurements"
-                                f" {[spwid for spwid, goodsnr in zip(spwids, snr_test_result.is_good_snr) if goodsnr is None]}.")
+                    LOG.warning(
+                        f"{inputs.ms.basename}, intent={intent}, field={field}: spws without SNR measurements "
+                        f"{[spwid for spwid, goodsnr in zip(snr_test_result.spw_ids, snr_test_result.is_good_snr) if goodsnr is None]}."
+                    )
 
                 # Create a spw mapping for combining spws.
                 spwmap = combine_spwmap(spws)
@@ -630,7 +704,11 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                     intent=intent,
                     mappingmode='combine'
                 )
-                combined_snrs = self._do_combined_snr_test(spwids, snrs, spwmap)
+                combined_snrs = self._do_combined_snr_test(
+                    snr_test_result.spw_ids,
+                    snr_test_result.snr_values,
+                    spwmap
+                )
 
             # If some, but not all, spws have good SNR values, then try to use
             # an SNR-based approach first, but fall back to combined spw mapping
@@ -641,12 +719,14 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
 
                 # Report spws for which no SNR estimate was available.
                 if None in snr_test_result.is_good_snr:
-                    LOG.warning(f"{inputs.ms.basename}, intent={intent}, field={field}: spws without SNR measurements"
-                                f" {[spwid for spwid, goodsnr in zip(spwids, snr_test_result.is_good_snr) if goodsnr is None]}.")
+                    LOG.warning(
+                        f"{inputs.ms.basename}, intent={intent}, field={field}: spws without SNR measurements "
+                        f"{[spwid for spwid, goodsnr in zip(snr_test_result.spw_ids, snr_test_result.is_good_snr) if goodsnr is None]}."
+                    )
 
                 # Compute the SNR-based narrow-to-wide (low-SNR to high-SNR) SpW
                 # mapping.
-                goodmap, spwmap = snr_n2wspwmap(spws, snrs, snrlimit)
+                goodmap, spwmap = snr_n2wspwmap(spws, snr_test_result.snr_values, snrlimit)
 
                 # If the SNR-based mapping gave a good match for all spws, then
                 # proceed to use this, and re-compute the optimal solint and
@@ -684,7 +764,11 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                         intent=intent,
                         mappingmode='combine'
                     )
-                    combined_snrs = self._do_combined_snr_test(spwids, snrs, spwmap)
+                    combined_snrs = self._do_combined_snr_test(
+                        snr_test_result.spw_ids,
+                        snr_test_result.snr_values,
+                        spwmap
+                    )
 
 
         # For the "hm_spwmapmode=combine" spw mapping mode, force the use of
@@ -704,7 +788,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             if snr_test_result.has_no_snrs:
                 # For CHECK and PHASE intent, override the solint to a quarter
                 # of the scan (exposure) time, and set gaintype to T.
-                if intent in {'CHECK', 'PHASE'}:
+                if intent in WEAK_CALIBRATOR_INTENTS:
                     integration_time_in_secs = snr_test_result.integration_times[0] * 60.0
                     solint = quanta.tos(quanta.quantity(integration_time_in_secs / 4., 's'), 3)
                     gaintype = "T"
@@ -727,7 +811,11 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                     intent=intent,
                     mappingmode='combine'
                 )
-                combined_snrs = self._do_combined_snr_test(spwids, snrs, spwmap)
+                combined_snrs = self._do_combined_snr_test(
+                    snr_test_result.spw_ids,
+                    snr_test_result.snr_values,
+                    spwmap
+                )
 
         # For the "hm_spwmapmode=simple" spw mapping mode, force the use of a
         # simple narrow-to-wide spw map.
@@ -758,11 +846,11 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                      f" band-to-band dataset, updated spw map to {spwmap}.")
 
         # Collect SNR info.
-        snr_info = self._get_snr_info(spwids, snrs, combined_snrs)
+        snr_info = self._get_snr_info(snr_test_result, combined_snrs)
 
         return SpwMapping(combine, spwmap, snr_info, snr_thr_used, solint, gaintype)
 
-    def _do_snrtest(self, intent: str, field: str, spws: list[SpectralWindow]) -> SnrTestResult:
+    def _do_snrtest(self, intent: str, field: str, spws: list[SpectralWindow]) -> SNRTestResult:
         """
         Run gaincal SNR task to perform SNR test for specified intent and
         field.
@@ -798,7 +886,6 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         # The weaker calibrators CHECK and PHASE will use an SNR limit of 32
         # (phasesnr) and scan-based values. The other, brighter, calibrators
         # typically use an SNR limit of 10 (intphasesnr).
-        WEAK_CALIBRATOR_INTENTS = {'CHECK', 'PHASE'}
         if intent in WEAK_CALIBRATOR_INTENTS:
             snrs = result.snrs
             snrlimit = inputs.phasesnr
@@ -807,9 +894,6 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             snrs = result.snrsint
             snrlimit = inputs.intphasesnr
             ref_times_to_use = result.inttimes
-
-        # Check whether no SNRs were found for any SpW.
-        has_no_snrs = all(snr is None for snr in snrs)
 
         # Initialize and populate outputs.
         goodsnrs, ref_times, int_times = [], [], []
@@ -823,8 +907,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                 ref_times.append(ref_times_to_use[i])
                 int_times.append(result.inttimes[i])
 
-        return SnrTestResult(
-            has_no_snrs=has_no_snrs,
+        return SNRTestResult(
             spw_ids=result.spwids,
             snr_values=snrs,
             is_good_snr=goodsnrs,
@@ -1031,7 +1114,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         for (intent, field), spwmapping in spwmaps.items():
             # PIPE-2499: for the CHECK and PHASE calibrators, force the use of
             # solint='inf' in the upcoming diagnostic phase solve.
-            if intent in {'CHECK', 'PHASE'}:
+            if intent in WEAK_CALIBRATOR_INTENTS:
                 solint = 'inf'
             else:
                 solint = spwmapping.solint
@@ -1402,22 +1485,25 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         LOG.info('Temporarily resetting spwmaps for %s', ms.basename)
         ms.spwmaps = {}
 
-    def _get_snr_info(self, spwids: List[int], snrs: List[float], combined_snrs: Dict) -> List[Tuple[str, float]]:
+    def _get_snr_info(self, snr_test_result: SNRTestResult, combined_snrs: dict) -> list[tuple[str, float]]:
         """
         Helper method that takes phase SNR info from the SNR test, and returns
         phase SNR info for all SpWs specified in inputs.spw.
 
-        Args:
-            spwids: list of SpW IDs for which phase SNRs were determined.
-            snrs: list of phase SNRs.
-            combined_snrs: dictionary of reference SpWs with list of
-                corresponding combined SpW and combined phase SNR.
+        Parameters:
+            spwids: SnrTestResult
+                SnrTestResult used as reference source for SNRs per spectral
+                window
+            combined_snrs: dict
+                Dictionary of reference SpWs with list of corresponding
+                combined SpW and combined phase SNR.
 
         Returns:
             List of tuples, specifying string representing SpW(s) and
             corresponding phase SNR.
         """
-        spw_snr = {str(k): v for k, v in zip(spwids, snrs)}
+        spw_snr = {str(spw_id): snr
+                   for spw_id, snr in zip(snr_test_result.spw_ids, snr_test_result.snr_values)}
         snr_info = []
 
         # Create entry for each SpW specified by inputs.
@@ -1437,7 +1523,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
 
     def _compute_snr_from_gaincal(
             self,
-            snr_result: SnrTestResult,
+            snr_result: SNRTestResult,
             field: str,
             intent: str,
             low_snr_threshold: float = 6,
@@ -1491,7 +1577,25 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             caltable = self._generate_gain_caltable(field, intent, high_snr_spws)
             self._update_snr_for_high_snr_spws(snr_corrections, high_snr_spws, caltable, estimated_snr_multiplier)
 
-        self._update_snr_result(snr_result, snr_corrections)
+        snr_limit = self._snr_limit_for_intent(intent)
+        self._update_snr_result(snr_result, snr_corrections, snr_limit)
+
+
+    def _snr_limit_for_intent(self, intent: str):
+        """
+        Determines the appropriate signal-to-noise ratio (SNR) limit based on the given intent.
+
+        The method compares the provided intent with a predefined set of weak calibrator
+        intents to decide which SNR limit should be applied.
+
+        Parameters:
+            intent (str): the intent to evaluate
+
+        Returns:
+            float: the applicable SNR limit based on the provided intent.
+        """
+        return self.inputs.phasesnr if intent in WEAK_CALIBRATOR_INTENTS else self.inputs.intphasesnr
+
 
     def _classify_spws_by_snr(self, snr_corrections: dict[int, float], threshold: float) -> tuple[set[int], set[int]]:
         """
@@ -1562,6 +1666,8 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         Returns:
             CaltableWrapper: A wrapper object for the generated calibration table.
         """
+        solint = 'inf' if intent in WEAK_CALIBRATOR_INTENTS else 'int'
+
         inputs = GTypeGaincalInputs(
             context=self.inputs.context,
             vis=self.inputs.vis,
@@ -1570,7 +1676,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             # note: we only select the high SNR spws here
             spw=','.join(map(str, sorted(high_snr_spws))),
             calmode='p',
-            solint='inf',
+            solint=solint,
             minsnr=2,
             append=False,
         )
@@ -1623,7 +1729,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                 LOG.info(f'Estimated SNR for {self.inputs.vis} spw {spw} = '
                          f'{snr_corrections[spw]:.3f} (median SNR = {median_snr:.3f})')
 
-    def _update_snr_result(self, snr_result: SnrTestResult, snr_corrections: dict[int, float]) -> None:
+    def _update_snr_result(self, snr_result: SNRTestResult, snr_corrections: dict[int, float], snr_limit: float) -> None:
         """
         Updates the snr_result object with corrected SNR values based on the given
         snr_corrections. The function maps each spectral window's (SPW) ID from
@@ -1632,17 +1738,24 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         retained.
 
         Parameters:
-            snr_result (SnrTestResult): An object of type SnrTestResult. It contains
+            snr_result (SNRTestResult): An object of type SnrTestResult. It contains
                 the SPW IDs and their corresponding SNR values to be updated.
             snr_corrections (dict[int, float]): A dictionary mapping SPW IDs (int) to
                 corrected SNR values (float).
+            snr_limit (float): The SNR threshold used to identify spws with acceptable
+                SNR.
 
         Returns:
             None
         """
-        new_snr_values = [snr_corrections.get(spw, snr)
-                          for spw, snr in zip(snr_result.spw_ids, snr_result.snr_values)]
-        snr_result.snr_values = new_snr_values
+        new_snrs = [snr_corrections.get(spw, snr)
+                    for spw, snr in zip(snr_result.spw_ids, snr_result.snr_values)]
+
+        # recompute good_snrs and has_no_snrs as they are used as triggers in the mapping process
+        good_snrs = [snr >= snr_limit for snr in new_snrs]
+
+        snr_result.snr_values = new_snrs
+        snr_result.is_good_snr = good_snrs
 
 
 class SpwPhaseupResults(basetask.Results):
