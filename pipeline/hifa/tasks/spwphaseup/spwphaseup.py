@@ -1728,13 +1728,18 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
                 # For single pol, one column will be populated with zeroes or nulls.
                 # Identify which column holds data for the median SNR calculation
                 idx_for_pol = commonhelpermethods.get_pol_id(self.inputs.ms, spw, corr_type[0])
-                median_snr = numpy.ma.median(snr_data[:, idx_for_pol])
+                # note the use of numpy.median over numpy.ma.median: we WANT to include
+                # the masked/flagged values in the median calculation. To avoid triggering
+                # the UserWarning that results from operating on a masked array, we operate
+                # on data
+                # See https://open-jira.nrao.edu/browse/PIPE-2505?focusedId=237663&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-237663
+                median_snr = numpy.median(snr_data.data[:, idx_for_pol])
             else:
-                # otherwise, calculate the median over all pols
-                median_snr = numpy.ma.median(snr_data)
+                # otherwise, calculate the median over all pols. As obove, including masked values
+                median_snr = numpy.median(snr_data.data)
 
-            if median_snr == MaskedConstant:
-                LOG.info(f'All SNR data masked in phaseup caltable for {self.inputs.vis} '
+            if median_snr in (numpy.inf, numpy.nan):
+                LOG.info(f'No valid data in phaseup caltable for {self.inputs.vis} '
                          f'spw {spw}. Setting estimated SNR to zero.')
                 snr_corrections[spw] = 0
             else:
