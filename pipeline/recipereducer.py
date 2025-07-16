@@ -164,13 +164,38 @@ def _get_processing_procedure(procedure: str) -> ElementTree:
     return procedure_xml
 
 
-def _get_procedure_title(procedure: str) -> str:
+def _get_procedure_details(procedure: str) -> tuple[str, list[tuple[str, dict]]]:
     procedure_xml = _get_processing_procedure(procedure)
     procedure_title = procedure_xml.findtext('ProcedureTitle', default='Undefined')
-    return procedure_title
+
+    procedure_commands = []
+    for processingcommand in procedure_xml.findall('ProcessingCommand'):
+        cli_command = processingcommand.findtext('Command')
+        # commands_seen.append(cli_command)
+
+        # ignore breakpoints
+        if cli_command == 'breakpoint':
+            continue
+
+        # skip exportdata when preceded by a breakpoint
+        if len(procedure_commands) > 1 and procedure_commands[-2] == ['breakpoint'] \
+                and cli_command == 'hif_exportdata':
+            continue
+
+        task_args = {}
+
+        for parameterset in processingcommand.findall('ParameterSet'):
+            for parameter in parameterset.findall('Parameter'):
+                argname = parameter.findtext('Keyword')
+                argval = parameter.findtext('Value')
+                task_args[argname] = utils.string_to_val(argval)
+
+        procedure_commands.append((cli_command, task_args))
+
+    return procedure_title, procedure_commands
 
 
-def _get_tasks(context: launcher.Context, args: TaskArgs, procedure: str):
+def _get_tasks(args: TaskArgs, procedure: str):
     procedure_xml = _get_processing_procedure(procedure)
 
     commands_seen = []
@@ -240,22 +265,22 @@ def reduce(vis: Optional[List[str]] = None, infiles: Optional[List[str]] = None,
     if infiles is None:
         infiles = []
 
-    if context is None:
-        name = name if name else _get_context_name(procedure)
-        context = _create_context(loglevel, plotlevel, name)
-        procedure_title = _get_procedure_title(procedure)
-        context.set_state('ProjectStructure', 'recipe_name', procedure_title)
-
-    _register_context(loglevel, plotlevel, context)
-
     if session is None:
         session = ['default'] * len(vis)
 
+    if context is None:
+        name = name if name else _get_context_name(procedure)
+        context = _create_context(loglevel, plotlevel, name)
+        procedure_title, procedure_commands = _get_procedure_details(procedure)
+        context.set_state('ProjectStructure', 'recipe_name', procedure_title)
+        context.set_state('ProjectStructure', 'recipe_commands', procedure_commands)
+
+    _register_context(loglevel, plotlevel, context)
+
     if startstage is None:
         startstage = 0
-
     task_args = TaskArgs(vis, infiles, session)
-    task_generator = _get_tasks(context, task_args, procedure)
+    task_generator = _get_tasks(task_args, procedure)
     try:
         procedure_stage_nr = 0
         while True:

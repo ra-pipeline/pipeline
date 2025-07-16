@@ -34,7 +34,7 @@ class ProjectStructure(object):
     def __init__(self, ous_entity_type='ObsProject', ous_entity_id='unknown', ous_part_id='unknown',
                  ous_title='undefined', ous_type='Member', ps_entity_type='ProjectStatus', ps_entity_id='unknown',
                  ousstatus_type='OUSStatus', ousstatus_entity_id='unknown', ppr_type='SciPipeRequest',
-                 ppr_entity_id='unknown', ppr_file='', recipe_name='Undefined'):
+                 ppr_entity_id='unknown', ppr_file='', recipe_name='Undefined', recipe_commands=None):
 
         self.ous_entity_type = ous_entity_type
         self.ous_entity_id = ous_entity_id
@@ -49,6 +49,10 @@ class ProjectStructure(object):
         self.ppr_entity_id = ppr_entity_id
         self.ppr_file = ppr_file
         self.recipe_name = recipe_name
+        if recipe_commands is not None:
+            self.recipe_commands = recipe_commands
+        else:
+            self.recipe_commands = []
 
     def __iter__(self):
         return iter(vars(self).items())

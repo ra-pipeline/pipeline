@@ -48,8 +48,9 @@ class ALMAImportDataQAHandler(pqa.QAPlugin):
 
     def handle(self, context: Context, result: almaimportdata.ALMAImportDataResults) -> None:
         # Check for the presence of polarization intents
-        recipe_name = context.project_structure.recipe_name
-        polcal_scores = _check_polintents(recipe_name, result.mses)
+        recipe_commands = context.project_structure.recipe_commands
+        polcal_scores = _check_polintents(recipe_commands, result.mses)
+        b2b_scores = qacalc.score_b2b(recipe_commands, result.mses)
 
         # Check for the presence of receiver bands with calibration issues
         score2 = _check_bands(result.mses)
@@ -68,7 +69,7 @@ class ALMAImportDataQAHandler(pqa.QAPlugin):
         score6 = _check_fluxcsv(result)
 
         # Check if amp/bp/phcal objects are the same (returns list of pqa)
-        scores7 = _check_calobjects(recipe_name, result.mses)
+        scores7 = _check_calobjects(recipe_commands, result.mses)
 
         # Check for flux service messages/warnings
         score8 = _check_fluxservicemessages(result)
@@ -78,17 +79,16 @@ class ALMAImportDataQAHandler(pqa.QAPlugin):
 
         # Add all scores to QA score pool in result.
         result.qa.pool.extend(polcal_scores)
+        result.qa.pool.extend(b2b_scores)
         result.qa.pool.extend([score2, score4, score6, score8, score9])
         result.qa.pool.extend(scores3)
         result.qa.pool.extend(scores5)
         result.qa.pool.extend(scores7)
 
 
-def _check_polintents(recipe_name: str, mses: list[MeasurementSet]) -> list[pqa.QAScore]:
-    """
-    Check each measurement set for polarization intents
-    """
-    return qacalc.score_polintents(recipe_name, mses)
+def _check_polintents(recipe_commands: list[tuple[str, dict]], mses: list[MeasurementSet]) -> list[pqa.QAScore]:
+    """Check each measurement set for polarization intents."""
+    return qacalc.score_polintents(recipe_commands, mses)
 
 
 def _check_bands(mses: list[MeasurementSet]) -> pqa.QAScore:
@@ -140,9 +140,6 @@ def _check_fluxcsv(result: Results) -> pqa.QAScore:
     return qacalc.score_fluxcsv(result)
 
 
-def _check_calobjects(recipe_name: str, mses: list[MeasurementSet]) -> list[pqa.QAScore]:
-    """
-    Check if BP/Phcal/Ampcal are all the same object
-    """
-
-    return qacalc.score_samecalobjects(recipe_name, mses)
+def _check_calobjects(recipe_commands: list[tuple[str, dict]], mses: list[MeasurementSet]) -> list[pqa.QAScore]:
+    """Check if BP/Phcal/Ampcal are all the same object."""
+    return qacalc.score_samecalobjects(recipe_commands, mses)

@@ -120,7 +120,8 @@ def executeppr(pprXmlFile: str, importonly: bool = True, loglevel: str = 'info',
 
     context.project_structure = project.ProjectStructure(
         ppr_file=pprXmlFile,
-        recipe_name=procedureName)
+        recipe_name=procedureName,
+        recipe_commands=commandsList)
 
     # Create performance parameters object
     context.project_performance_parameters = _getPerformanceParameters(intentsDict)

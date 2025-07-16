@@ -595,20 +595,19 @@ def score_parallactic_range(
 
 
 @log_qa
-def score_polintents(recipe_name: str, mses: list[MeasurementSet]) -> list[pqa.QAScore]:
-    """
-    Score a MeasurementSet object based on the presence of
-    polarization intents.
-    """
+def score_polintents(recipe_commands: list[tuple[str, dict]], mses: list[MeasurementSet]) -> list[pqa.QAScore]:
+    """Score a MeasurementSet object based on the presence of polarization intents."""
     pol_intents = {'POLARIZATION', 'POLANGLE', 'POLLEAKAGE'}
-    # these recipes are allowed to process polarisation data
-    pol_recipes = {'hifa_polcal', 'hifa_polcalimage', 'hifa_polcal_renorm', 'hifa_polcalimage_renorm'}
+    # these tasks are exepcted present in recipe to process polarisation data
+    pol_task_set = {'hifa_polcal', 'hifa_polcalflag'}
+
+    recipe_task_set = {cmd[0] for cmd in recipe_commands}
 
     # Sort to ensure presentation consistency
     mses = sorted(mses, key=lambda ms: ms.basename)
 
     # are polarisation intents expected? true if pol recipe, false if not
-    pol_intents_expected = recipe_name in pol_recipes
+    pol_intents_expected = pol_task_set & recipe_task_set
 
     # holds the final list of QA scores
     scores: list[pqa.QAScore] = []
@@ -701,43 +700,77 @@ def score_polintents(recipe_name: str, mses: list[MeasurementSet]) -> list[pqa.Q
 
 
 @log_qa
-def score_samecalobjects(recipe_name: str, mses: list[MeasurementSet]) -> list[pqa.QAScore]:
-    """
-        Check if BP/Phcal/Ampcal are all the same object and score appropriately
-    """
-    alma_recipes = {'hifa_cal', 'hifa_calimage', 'hifa_calsurvey', 'hifa"image', 'hifa_polcal', 'hifa_polcalimage'}
+def score_samecalobjects(recipe_commands: list[tuple[str, dict]], mses: list[MeasurementSet]) -> list[pqa.QAScore]:
+    """Check if BP/Phcal/Ampcal are all the same object and score appropriately."""
+    required_tasks = {'hifa_importdata', 'hif_applycal'}
+    recipe_task_set = {cmd[0] for cmd in recipe_commands}
 
     # Sort to ensure presentation consistency
     mses = sorted(mses, key=lambda ms: ms.basename)
 
-    # We are just considering ALMA recipes.   True if an ALMA recipe, false if not
-    alma_recipes_expected = recipe_name in alma_recipes
+    if not required_tasks.issubset(recipe_task_set):
+        return []
 
     # holds the final list of QA scores
     scores: list[pqa.QAScore] = []
 
-    if alma_recipes_expected:
-        for ms in mses:
-            # Get list of calibrator names
-            calfields = ms.get_fields(intent='AMPLITUDE,PHASE,BANDPASS')
-            calfieldnames = [field.name for field in calfields]
+    for ms in mses:
+        # Get list of calibrator names
+        calfields = ms.get_fields(intent='AMPLITUDE,PHASE,BANDPASS')
+        calfieldnames = [field.name for field in calfields]
 
-            # Check for any duplicate names in the list of calibrator field names
-            # samefieldnames = all(element == calfieldnames[0] for element in calfieldnames)
-            samefieldnames = any(calfieldnames.count(x) > 1 for x in calfieldnames)
-            if samefieldnames:
-                scorevalue = 0.3
-                msg = "Some calibrators are the same object."
-            else:
-                scorevalue = 1.0
-                msg = "Calibrators are different objects."
+        # Check for any duplicate names in the list of calibrator field names
+        # samefieldnames = all(element == calfieldnames[0] for element in calfieldnames)
+        samefieldnames = any(calfieldnames.count(x) > 1 for x in calfieldnames)
+        if samefieldnames:
+            scorevalue = 0.3
+            msg = "Some calibrators are the same object."
+        else:
+            scorevalue = 1.0
+            msg = "Calibrators are different objects."
 
-            origin = pqa.QAOrigin(metric_name='score_samecalobjects',
-                                  metric_score=scorevalue,
-                                  metric_units='samecalobjects')
+        origin = pqa.QAOrigin(metric_name='score_samecalobjects',
+                              metric_score=scorevalue,
+                              metric_units='samecalobjects')
 
-            score = pqa.QAScore(scorevalue, longmsg=msg, shortmsg=msg, origin=origin)
+        score = pqa.QAScore(scorevalue, longmsg=msg, shortmsg=msg, origin=origin)
 
+        scores.append(score)
+
+    return scores
+
+
+@log_qa
+def score_b2b(recipe_commands: list[tuple[str, dict]], mses: list[MeasurementSet]) -> list[pqa.QAScore]:
+    """Checks for recipe mismatches in Band-to-Band (B2B) calibration processing.
+
+    Args:
+        recipe_commands: A list of recipe commands, where each command is a
+            tuple containing the task name and its parameters.
+        mses: A list of MeasurementSet objects to be evaluated.
+
+    Returns:
+        A list of QAScore objects for each MeasurementSet where a B2B
+        processing mismatch was detected.
+    """
+    # A B2B recipe is identified by the presence of this specific task.
+    B2B_TASK = {'hifa_diffgaincal'}
+    recipe_task_set = {cmd[0] for cmd in recipe_commands}
+    recipe_has_b2b_task = B2B_TASK.issubset(recipe_task_set)
+
+    scores: list[pqa.QAScore] = []
+    # Sort MeasurementSets by name to ensure a consistent output order.
+    for ms in sorted(mses, key=lambda x: x.basename):
+        # Check for calibrators specifically intended for B2B calibration.
+
+        # Flag an issue only if DIFFGAIN fields exist but the B2B task was not run.
+        if ms.is_band_to_band and not recipe_has_b2b_task:
+            score_value = 0.5
+            msg = f"{ms.basename} contains DIFFGAIN intents, but 'hifa_diffgaincal' is absent from the data processing recipe."
+            origin = pqa.QAOrigin(metric_name='score_b2b',
+                                  metric_score=score_value,
+                                  metric_units='b2b_check')
+            score = pqa.QAScore(score=score_value, longmsg=msg, shortmsg=msg, origin=origin)
             scores.append(score)
 
     return scores
