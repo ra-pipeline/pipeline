@@ -2489,6 +2489,73 @@ class ImageParamsHeuristics(object):
 
         return newcommonbeam, np.where(np.logical_not(weight))[0]
 
+    @staticmethod
+    def test_find_good_commonbeam(psf_filename):
+        """
+        Find and replace outlier beams to calculate a good common beam.
+        Method from Urvashi Rao.
+
+        Returns new common beam and array of channel numbers with invalid beams.
+        Leaves old beams in the PSF as is.
+        """
+
+        cqa = casa_tools.quanta
+
+        with casa_tools.ImageReader(psf_filename) as image:
+            allbeams = image.restoringbeam()
+            commonbeam = image.commonbeam()
+            nchan = allbeams['nChannels']
+            areas = np.zeros(nchan, 'float')
+            axratio = np.zeros(nchan, 'float')
+            weight = np.zeros(nchan, 'bool')
+
+            for ii in range(0, nchan):
+                axmajor = cqa.convert(cqa.quantity(allbeams['beams']['*'+str(ii)]['*0']['major']), 'arcsec')['value']
+                axminor = cqa.convert(cqa.quantity(allbeams['beams']['*'+str(ii)]['*0']['minor']), 'arcsec')['value']
+                areas[ii] = axmajor * axminor
+                axratio[ii] = axmajor/axminor
+                weight[ii] = np.isfinite( axratio[ii] )
+
+            ## Detect outliers based on axis ratio
+            ## The iterative loop is to get robust autoflagging
+            ## Add a linear fit instead of just a 'mean' to account for slopes (useful for flagging on beam_area)
+            local_axratio = axratio.copy()
+            for steps in range(0, 2):  ### Heuristic : how many iterations here ?
+                local_axratio[ weight==False ] = np.nan
+                mean_axrat = np.nanmean(local_axratio)
+                std_axrat = np.nanstd(local_axratio)
+                ## Flag all points deviating from the mean by 3 times stdev
+                weight[ np.fabs(local_axratio-mean_axrat) > 3 * std_axrat ] = False
+
+            ## Find the first channel with a valid beam
+            validbeamchans = np.where(weight)
+            chanid=0
+            if len(validbeamchans)>0:
+                chanid=validbeamchans[0][0]
+            else:
+                LOG.error('No valid beams in {!s}'.format(psf_filename))
+                return None, np.arange(nchan)
+
+            ## Fill all flagged channels with the largest/first valid beam
+            dummybeam = allbeams['beams']['*'+str(chanid)]['*0']
+            for ii in range(0, nchan):
+                if weight[ii]==False:
+                    image.setrestoringbeam( major=dummybeam['major'], minor=dummybeam['minor'], pa=dummybeam['positionangle'], channel=ii)
+
+        ## Need to close and reopen for commonbeam() to see the new chan beams !
+        with casa_tools.ImageReader(psf_filename) as image:
+            ## Recalculate common beam
+            newcommonbeam = image.commonbeam()
+
+        ## Reinstate the old beam to get back to the original iter0 product
+        with casa_tools.ImageReader(psf_filename) as image:
+            for ii in range(0, nchan):
+                if weight[ii]==False:
+                    beam = allbeams['beams']['*'+str(ii)]['*0']
+                    image.setrestoringbeam( major=beam['major'], minor=beam['minor'], pa=beam['positionangle'], channel=ii )
+
+        return newcommonbeam, np.where(np.logical_not(weight))[0]
+
     def get_cfcaches(self, cfcache: str):
         """Parses comma separated cfcache string
 
