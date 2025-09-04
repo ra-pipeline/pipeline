@@ -131,12 +131,21 @@ class SingleDishSkyCalAmpVsFreqSummaryChart(common.PlotbandpassDetailBase, Singl
                                                                     showatm=True,
                                                                     overlay='antenna',
                                                                     solutionTimeThresholdSeconds=3600.)
+        with casa_tools.TableReader(self._caltable) as tb:
+            antenna_ids = np.unique(tb.getcol('ANTENNA1'))
+        self.num_antennas = len(antenna_ids)
+        if len(antenna_ids) < 2:
+            # PIPE-2825 ad hoc fix for plotbandpass's strange behavior that,
+            # when overlay is set to "antenna", it doesn't create any plot
+            # if there are data from only one antenna in the caltable.
+            # To avoid this problem, antenna overlay is disabled here.
+            self._kwargs['overlay'] = ''
 
         self.context = context
         # self._figfile structure: {spw_id: {antenna_id: filename}}
         self.spw_ids = list(self._figfile.keys())
-        # take any value from the dictionary
-        self._figfile = dict((spw_id, list(self._figfile[spw_id].values())[0]) for spw_id in self.spw_ids)
+        # use filename for the antenna corresponding to the smallest id
+        self._figfile = dict((spw_id, self._figfile[spw_id][antenna_ids[0]]) for spw_id in self.spw_ids)
         self.init_with_field(context, result, field)
 
     def plot(self) -> list[logger.Plot]:
@@ -213,12 +222,22 @@ class SingleDishSkyCalAmpVsFreqSummaryChart(common.PlotbandpassDetailBase, Singl
             self._figfile[spw_id] = figfile.replace(old_prefix, new_prefix)
             spw_indicator = 'spw{}'.format(spw_id)
             pieces = self._figfile[spw_id].split('.')
-            try:
-                spw_index = pieces.index(spw_indicator)
-            except:
-                spw_index = -3
-            # remove antenna name from the filename
-            pieces.pop(spw_index - 1)
+            if self.num_antennas > 1:
+                # If you get to here, antenna overlay should be enabled.
+                #
+                # In that case, plot files created by plotbandpass will
+                # not contain antenna name. Therefore, antenna name must
+                # be removed from the filename.
+                #
+                # Oritinal filename pattern:
+                #     <prefix>.<antenna_name>.spw<spw_id>.t00.png
+                # Updated filename pattern:
+                #     <prefix>.spw<spw_id>.t00.png
+                try:
+                    spw_index = pieces.index(spw_indicator)
+                except Exception:
+                    spw_index = -3
+                pieces.pop(spw_index - 1)
             self._figfile[spw_id] = '.'.join(pieces)
 
     def create_task_for_tp_spectral_scan(self, spw_arg: int, antenna_arg: str,
