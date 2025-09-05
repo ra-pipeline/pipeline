@@ -135,14 +135,14 @@ class GcorFluxscaleInputs(fluxscale.FluxscaleInputs):
                 Example: reffile='', reffile='working/flux.csv'
 
             reference: A string containing a comma delimited list of field names
-                defining the reference calibrators. Defaults to field names with
-                intent '`*AMP*`'.
+                defining the reference calibrators. Defaults to names of fields
+                with intents in ``refintent``.
 
                 Example: reference='M82,3C273'
 
             transfer: A string containing a comma delimited list of field names
-                defining the transfer calibrators. Defaults to field names with
-                intent '`*PHASE*`'.
+                defining the transfer calibrators. Defaults to names of fields
+                with intents in ``transintent``.
 
                 Example: transfer='J1328+041,J1206+30'
 
@@ -159,7 +159,7 @@ class GcorFluxscaleInputs(fluxscale.FluxscaleInputs):
 
             transintent: A string containing a comma delimited list of intents
                 defining the transfer calibrators. Defaults to
-                'PHASE,BANDPASS,CHECK,POLARIZATION,POLANGLE,POLLEAKAGE'.
+                'PHASE,BANDPASS,CHECK,DIFFGAINREF,DIFFGAINSRC,POLARIZATION,POLANGLE,POLLEAKAGE'.
 
                 Example: transintent='', transintent='PHASE,BANDPASS'
 
@@ -245,9 +245,26 @@ class SerialGcorFluxscale(basetask.StandardTaskTemplate):
             LOG.error('%s has no data with reference intent %s' % (inputs.ms.basename, inputs.refintent))
             return result
 
-        # Run setjy for sources in the reference list which have transfer intents.
+        # If the reference intent field(s) (amplitude calibrator) also covered
+        # one or more of the transfer intents, then:
         if inputs.ms.get_fields(inputs.reference, intent=inputs.transintent):
+            # First run setjy on the reference field(s), where the setjy always
+            # acts on the transfer intent scans. This is essential to ensure
+            # that the transfer intent scans on this reference field (typically
+            # amplitude calibrator) get their model flux set.
             self._do_setjy(reffile=inputs.reffile, field=inputs.reference)
+
+            # PIPE-2822: after the setjy step, update the list of transfer
+            # intents to only keep those intents that are not already covered by
+            # the reference field.
+            transintent_to_keep = []
+            for intent in inputs.transintent.split(','):
+                if inputs.ms.get_fields(inputs.reference, intent=intent):
+                    LOG.info(f"{inputs.ms.basename}: removing {intent} from the amplitude solve list as this intent is"
+                             f" already covered by the amplitude calibrator field(s) {inputs.reference}.")
+                else:
+                    transintent_to_keep.append(intent)
+            inputs.transintent = ','.join(transintent_to_keep)
         else:
             LOG.info('Flux calibrator field(s) {!r} in {!s} have no data with '
                      'intent {!s}'.format(inputs.reference, inputs.ms.basename, inputs.transintent))
@@ -734,11 +751,14 @@ class SerialGcorFluxscale(basetask.StandardTaskTemplate):
 
         # PIPE-1831: update the CalApplication to add the other non-phase/check
         # calibrator intents as valid intents that this phase caltable can be
-        # applied to. This is necessary for datasets where a field that covers
-        # both the amplitude calibrator and other (non-phase/check)
-        # calibrators. Without this, any subsequent gaincal on this field would
-        # split the call for this field into separate ones for AMP and other
-        # intents, leading to undesired duplicate solutions.
+        # applied to. This is necessary for datasets where the amplitude
+        # calibrator field(s) also cover one or more of the "other" (non-phase/
+        # non-check) calibrator intents. Without this, any subsequent gaincal on
+        # this field would split the call for this field into separate ones for
+        # AMP and other intents, leading to undesired duplicate solutions.
+        # This does assume that the AMPLITUDE *scans* on the amplitude
+        # calibrator field(s) also covered those "other" calibrator intents;
+        # this is not always the case, see discussion on PIPE-2822.
         if phase_result.pool:
             original_calapp = phase_result.pool[0]
             intents_str = ",".join({original_calapp.intent} | non_pc_intents)
