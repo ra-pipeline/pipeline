@@ -27,7 +27,8 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
     model_sum = None
     if model is not None:
         with casa_tools.ImageReader(model + extension) as image:
-            model_stats = image.statistics(robust=False, axes=[0, 1, 3])
+            axes = [0, 1, 3] if image.shape()[2] > 1 else None
+            model_stats = image.statistics(robust=False, axes=axes)
             model_sum = model_stats['sum'][0]
             LOG.debug('Sum of model: %s' % model_sum)
 
@@ -46,12 +47,13 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
         # get the rms of the residual image inside the cleaned area
         LOG.todo('Cannot use dirname in mask')
         residual_cleanmask_rms = None
+        axes = [0, 1, 3] if image.shape()[2] > 1 else None
 
         if cleanmask is not None and os.path.exists(cleanmask):
             # Area inside clean mask
             statsmask = '"%s" > 0.1' % (os.path.basename(cleanmask))
 
-            resid_clean_stats = image.statistics(mask=statsmask, axes=[0, 1, 3], robust=False, stretch=True)
+            resid_clean_stats = image.statistics(mask=statsmask, axes=axes, robust=False, stretch=True)
 
             try:
                 residual_cleanmask_rms = resid_clean_stats['rms'][0]
@@ -74,7 +76,7 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
             have_mask = False
             statsmask = ''
 
-        residual_stats = image.statistics(mask=statsmask, axes=[0, 1, 3], robust=False, stretch=True)
+        residual_stats = image.statistics(mask=statsmask, axes=axes, robust=False, stretch=True)
 
         try:
             residual_non_cleanmask_rms = residual_stats['rms'][0]
@@ -89,9 +91,9 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
         # where spikes can occur)
         if pb is not None and os.path.exists(pb+extension):
             residual_stats = image.statistics(
-              mask='"%s" > %f' % (os.path.basename(pb)+extension, pblimit_image), axes=[0, 1, 3], robust=False, stretch=True)
+              mask='"%s" > %f' % (os.path.basename(pb)+extension, pblimit_image), axes=axes, robust=False, stretch=True)
         else:
-            residual_stats = image.statistics(axes=[0, 1, 3], robust=False)
+            residual_stats = image.statistics(axes=axes, robust=False)
 
         try:
             # This filters just Stokes I. For the time being (PIPE-2464)
@@ -105,7 +107,7 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
 
         LOG.info('Residual max: %s min: %s' % (residual_max, residual_min))
 
-        residual_stats = image.statistics(axes=[0, 1, 3], robust=True, excludepix=0.0)
+        residual_stats = image.statistics(axes=axes, robust=True, excludepix=0.0)
         residual_robust_rms = residual_stats['medabsdevmed'][0] * 1.4826  # see CAS-9631
         LOG.debug('residual scaled MAD: %s' % residual_robust_rms)
 
@@ -132,6 +134,7 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
     if restored not in [None, '']:
         # get min and max of the pb-corrected cleaned result
         with casa_tools.ImageReader(restored.replace('.image', '.image%s' % extension)) as image:
+            axes = [0, 1, 3] if image.shape()[2] > 1 else None
             if pb is not None and os.path.exists(pb+extension):
                 have_mask = True
                 # Default is area pb > 0.3
@@ -148,7 +151,7 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
                 image_stats = image.statistics(mask=statsmask, stretch=True)
                 # For polarization calibrators we need stats for I, Q, U and V, so exclude the
                 # Stokes axis from collapsing.
-                image_stats_iquv = image.statistics(mask=statsmask, axes=[0, 1, 3], stretch=True)
+                image_stats_iquv = image.statistics(mask=statsmask, axes=axes, stretch=True)
             else:
                 # Restrict region to inner 25% x 25% of the image for calibrators to
                 # avoid picking up sidelobes (PIPE-611)
@@ -159,7 +162,7 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
                 image_stats = image.statistics(mask=statsmask, region=region, stretch=True)
                 # For polarization calibrators we need stats for I, Q, U and V, so exclude the
                 # Stokes axis from collapsing.
-                image_stats_iquv = image.statistics(mask=statsmask, region=region, axes=[0, 1, 3], stretch=True)
+                image_stats_iquv = image.statistics(mask=statsmask, region=region, axes=axes, stretch=True)
                 rgTool.done()
 
             pbcor_image_min = image_stats['min'][0]
@@ -199,7 +202,8 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
                     flattened_mask_image = image.collapse(
                         function='max', axes=[2, 3], outfile=flattened_mask, overwrite=True)
                 try:
-                    npoints_mask = flattened_mask_image.statistics(mask='"%s" > 0.1' % (os.path.basename(flattened_mask)), axes=[0, 1, 3], robust=False, stretch=True)['npts'][0]
+                    axes = [0, 1, 3] if flattened_mask_image()[2] > 1 else None
+                    npoints_mask = flattened_mask_image.statistics(mask='"%s" > 0.1' % (os.path.basename(flattened_mask)), axes=axes, robust=False, stretch=True)['npts'][0]
                     if npoints_mask.shape != (0,):
                         nonpbcor_image_cleanmask_npoints = int(npoints_mask)
                     else:
