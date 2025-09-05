@@ -26,10 +26,13 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
     # cleaned
     model_sum = None
     if model is not None:
-        with casa_tools.ImageReader(model + extension) as image:
-            model_stats = image.statistics(robust=False, axes=[0, 1, 3])
-            model_sum = model_stats['sum'][0]
-            LOG.debug('Sum of model: %s' % model_sum)
+        try:
+            with casa_tools.ImageReader(model + extension) as image:
+                model_stats = image.statistics(robust=False, axes=[0, 1, 3])
+                model_sum = model_stats['sum'][0]
+        except:
+            model_sum = 0.0
+        LOG.debug('Sum of model: %s' % str(model_sum))
 
     LOG.debug('Fixing coordsys of pb and cleanmask')
     with casa_tools.ImageReader(residual + extension) as image:
