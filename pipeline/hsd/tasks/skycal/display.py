@@ -229,7 +229,7 @@ class SingleDishSkyCalAmpVsFreqSummaryChart(common.PlotbandpassDetailBase, Singl
                 # not contain antenna name. Therefore, antenna name must
                 # be removed from the filename.
                 #
-                # Oritinal filename pattern:
+                # Original filename pattern:
                 #     <prefix>.<antenna_name>.spw<spw_id>.t00.png
                 # Updated filename pattern:
                 #     <prefix>.spw<spw_id>.t00.png
