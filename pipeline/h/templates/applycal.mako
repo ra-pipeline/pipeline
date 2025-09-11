@@ -497,15 +497,15 @@ def format_spwmap(spwmap, scispws):
 	<%def name="mouseover(plot)">Click to show amplitude vs time for spectral window ${plot.parameters['spw']}</%def>
 
 	<%def name="fancybox_caption(plot)">
-		Spectral window: ${plot.parameters['spw']}<br>
+		Spw: ${plot.parameters['spw']}<br>
 		Antenna: all<br>
-		Fields: all
+		Field: all
 	</%def>
 
 	<%def name="caption_title(plot)">
-		Spectral Window: ${plot.parameters['spw']}<br>
+		Spw: ${plot.parameters['spw']}<br>
 		Antenna: all<br>
-		Fields: all
+		Field: all
         </%def>
 
 </%self:plot_group>
