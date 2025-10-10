@@ -159,6 +159,15 @@ class VLAExportData(exportdata.ExportData):
         auxfproducts = self._do_if_auxiliary_products(prefix, self.inputs.output_dir, self.inputs.products_dir, vislist,
                                                    self.inputs.imaging_products_only)
 
+        # Create and export the pipeline stats file
+        pipeline_stats_file = None
+        try:
+            pipeline_stats_file = self._export_stats_file(context=self.inputs.context, oussid=oussid)
+        except Exception as e:
+            LOG.info("Unable to output pipeline statistics file: {}".format(e))
+            LOG.debug(traceback.format_exc())
+            pass
+
         # Export the AQUA report
         pipe_aqua_reportfile = self._export_aqua_report(context=self.inputs.context,
                                                         oussid=prefix,
