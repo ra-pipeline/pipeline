@@ -339,14 +339,8 @@ class PipelineRegression:
         if not self.compare_only and omp_num_threads is not None:
             casa_tools.casalog.ompSetNumThreads(default_nthreads)
 
-    def __compare_results(self, new_file: str, relative_tolerance: float) -> None:
-        """
-        Compare results between new one loaded from file and old one.
 
-        Args:
-            new_file : file path of new results
-            relative_tolerance : relative tolerance of output value
-        """
+    def __compare_reference_txt(self, new_file: str, relative_tolerance: float) -> None: 
         with open(self.expectedoutput_file) as expected_fd, open(new_file) as new_fd:
             expected_results = expected_fd.readlines()
             new_results = new_fd.readlines()
@@ -391,6 +385,30 @@ class PipelineRegression:
                 pytest.fail("Failed to match {0} result value{1} within tolerance{1} :\n{2}".format(
                     n_errors, '' if n_errors == 1 else 's', '\n'.join(errors)), pytrace=True)
 
+    def __compare_reference_json(self, new_file, relative_tolerance): 
+        # compare two pipeline stats json files. 
+        with open(self.expectedoutput_file, 'r') as reference_json, open(newfile, 'r') as current_json:
+            reference_dict = json.load(reference_json)
+            current_dict = json.load(current_json)
+
+
+
+
+
+    def __compare_results(self, new_file: str, relative_tolerance: float, json=False) -> None:
+        """
+        Compare results between new one loaded from file and old one.
+
+        Args:
+            new_file : file path of new results
+            relative_tolerance : relative tolerance of output value
+        """
+        if not json: 
+            self.__compare_reference_txt(new_file, relative_tolerance)
+        else: 
+            self.__compare_reference_json(new_file, relative_tolerance)
+
+
     def __save_new_results_to(self, new_file: str, new_results: list[str]) -> None:
         """
         Compare results between new one and old one, both results are loaded from specified files.
@@ -401,6 +419,7 @@ class PipelineRegression:
         """
         with open(new_file, 'w') as fd:
             fd.writelines([str(x) + '\n' for x in new_results])
+
 
     def __get_results_of_from_current_context(self) -> list[str]:
         """
@@ -419,6 +438,7 @@ class PipelineRegression:
         1. rawdata, working, products directories are present
         2. *.pipeline_manifest.xml is present under the products directory
         3. Non-existence of errorexit-*.txt in working directory
+        4. No negative QA scores
         """
         context = launcher.Pipeline(context='last').context
 
@@ -439,6 +459,13 @@ class PipelineRegression:
         # 3. Non-existence of errorexit-*.txt in working directory
         if regression.errorexit_present(context):
             msg = "errorexit-*.txt is present in working directory"
+            LOG.warning(msg)
+            pytest.fail(msg)
+
+        # 4. No negative QA scores
+        negative_qa_score, task = regression.negative_qa(context)
+        if negative_qa_score:
+            msg = f"QA Score negative for {task}"
             LOG.warning(msg)
             pytest.fail(msg)
 
