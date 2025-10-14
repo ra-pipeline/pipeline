@@ -1,3 +1,4 @@
+from prefect import task
 import sys
 
 import pipeline.h.cli.utils as utils
@@ -5,6 +6,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hifa.tasks.bandpassflag.bandpassflag.BandpassflagInputs.__init__
 @utils.cli_wrapper
+@task
 def hifa_bandpassflag(vis=None, caltable=None, intent=None, field=None, spw=None, antenna=None, hm_phaseup=None,
                       phaseupbw=None, phaseupmaxsolint=None, phaseupsolint=None, phaseupsnr=None, phaseupnsols=None,
                       hm_phaseup_combine=None, hm_bandpass=None, solint=None, maxchannels=None, evenbpints=None,

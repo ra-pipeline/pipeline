@@ -1,3 +1,4 @@
+from prefect import task
 import sys
 
 import pipeline.h.cli.utils as utils
@@ -5,6 +6,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hifa.tasks.targetflag.targetflag.TargetflagInputs.__init__
 @utils.cli_wrapper
+@task
 def hifa_targetflag(vis=None, parallel=None):
     """Flag target source outliers.
 

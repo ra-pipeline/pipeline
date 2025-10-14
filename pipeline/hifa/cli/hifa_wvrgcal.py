@@ -1,3 +1,4 @@
+from prefect import task
 import sys
 
 import pipeline.h.cli.utils as utils
@@ -5,6 +6,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hifa.tasks.wvrgcal.wvrgcal.WvrgcalInputs.__init__
 @utils.cli_wrapper
+@task
 def hifa_wvrgcal(vis=None, caltable=None, offsetstable=None, hm_toffset=None, toffset=None, segsource=None,
                  sourceflag=None, hm_tie=None, tie=None, nsol=None, disperse=None, wvrflag=None, hm_smooth=None,
                  smooth=None, scale=None, maxdistm=None, minnumants=None, mingoodfrac=None, refant=None, qa_intent=None,

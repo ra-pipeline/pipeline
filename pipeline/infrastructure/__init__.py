@@ -29,6 +29,7 @@ PLOT_LEVEL = '20'
 _PLOT_LEVELS = {'all': 30,
                 'default': 20,
                 'summary': 10}
+
 # detail plots will be generated if PLOT_LEVEL is greater than this
 _PLOT_DETAIL_THRESHOLDS = {'default': 20,
                            'hif_applycal': 30,

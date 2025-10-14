@@ -1,3 +1,5 @@
+from prefect import task
+
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.launcher as launcher
 
@@ -5,6 +7,7 @@ from . import cli, utils
 
 
 @utils.cli_wrapper
+@task
 def h_init(loglevel='info', plotlevel='default', weblog=True, processing_intents=dict()):
 
     """Initialize the pipeline

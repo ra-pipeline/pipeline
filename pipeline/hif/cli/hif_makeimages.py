@@ -1,3 +1,4 @@
+from prefect import task
 import sys
 
 import pipeline.h.cli.utils as utils
@@ -5,6 +6,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hif.tasks.makeimages.makeimages.MakeImagesInputs.__init__
 @utils.cli_wrapper
+@task
 def hif_makeimages(vis=None, target_list=None, hm_masking=None,
                    hm_sidelobethreshold=None, hm_noisethreshold=None, hm_lownoisethreshold=None,
                    hm_negativethreshold=None, hm_minbeamfrac=None, hm_growiterations=None,

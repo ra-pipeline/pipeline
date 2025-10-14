@@ -1,3 +1,4 @@
+from prefect import task
 import sys
 
 import pipeline.h.cli.utils as utils
@@ -5,6 +6,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hifa.tasks.exportdata.almaexportdata.ALMAExportDataInputs.__init__
 @utils.cli_wrapper
+@task
 def hifa_exportdata(vis=None, session=None, imaging_products_only=None, exportmses=None, tarms=None,
                     pprfile=None, calintents=None,
                     calimages=None, targetimages=None, products_dir=None):

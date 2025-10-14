@@ -1,3 +1,4 @@
+from prefect import task
 import sys
 
 import pipeline.h.cli.utils as utils
@@ -5,6 +6,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hifa.tasks.antpos.almaantpos.ALMAAntposInputs.__init__
 @utils.cli_wrapper
+@task
 def hifa_antpos(vis=None, caltable=None, hm_antpos=None, antenna=None, offsets=None, antposfile=None,
                 threshold=None, snr=None, search=None):
     """Derive an antenna position calibration table

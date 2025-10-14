@@ -1,3 +1,4 @@
+from prefect import task
 import sys
 
 import pipeline.h.cli.utils as utils
@@ -5,6 +6,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hifa.tasks.spwphaseup.spwphaseup.SpwPhaseupInputs.__init__
 @utils.cli_wrapper
+@task
 def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, hm_spwmapmode=None, maxnarrowbw=None,
                     minfracmaxbw=None, samebb=None, phasesnr=None, intphasesnr=None, intphasesnrmin=None,
                     phaseupmaxsolint=None, bwedgefrac=None, hm_nantennas=None, maxfracflagged=None, combine=None,

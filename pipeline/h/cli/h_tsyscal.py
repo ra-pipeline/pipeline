@@ -1,3 +1,4 @@
+from prefect import task
 import sys
 
 from . import utils
@@ -5,6 +6,7 @@ from . import utils
 
 # docstring and type hints: inherits from h.tasks.tsyscal.tsyscal.TsyscalInputs.__init__
 @utils.cli_wrapper
+@task
 def h_tsyscal(vis=None, caltable=None, chantol=None, parallel=None):
 
     """Derive a Tsys calibration table

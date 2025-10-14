@@ -1,3 +1,4 @@
+from prefect import task
 import sys
 
 import pipeline.h.cli.utils as utils
@@ -5,6 +6,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hifa.tasks.importdata.almaimportdata.ALMAImportDataInputs.__init__
 @utils.cli_wrapper
+@task
 def hifa_importdata(vis=None, session=None, asis=None, process_caldevice=None, overwrite=None, nocopy=None,
                     bdfflags=None, datacolumns=None, lazy=None, dbservice=None, ocorr_mode=None, createmms=None,
                     minparang=None, parallel=None):

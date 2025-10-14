@@ -1,3 +1,4 @@
+from prefect import task
 import sys
 
 import pipeline.h.cli.utils as utils
@@ -5,6 +6,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hifa.tasks.renorm.renorm.RenormInputs.__init__
 @utils.cli_wrapper
+@task
 def hifa_renorm(vis=None, createcaltable=None, threshold=None, spw=None, excludechan=None,
                 atm_auto_exclude=None, bwthreshspw=None, parallel=None):
     """ALMA renormalization task

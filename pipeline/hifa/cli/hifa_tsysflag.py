@@ -1,3 +1,4 @@
+from prefect import task
 import sys
 
 import pipeline.h.cli.utils as utils
@@ -5,6 +6,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hifa.tasks.tsysflag.tsysflag.TsysflagInputs.__init__
 @utils.cli_wrapper
+@task
 def hifa_tsysflag(vis=None, caltable=None,
                   flag_nmedian=None, fnm_limit=None, fnm_byfield=None,
                   flag_derivative=None, fd_max_limit=None,

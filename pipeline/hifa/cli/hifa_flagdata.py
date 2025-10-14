@@ -1,3 +1,4 @@
+from prefect import task
 import sys
 
 import pipeline.h.cli.utils as utils
@@ -5,6 +6,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hifa.tasks.flagging.flagdeteralma.FlagDeterALMAInputs.__init__
 @utils.cli_wrapper
+@task
 def hifa_flagdata(vis=None, autocorr=None, shadow=None, tolerance=None, scan=None, scannumber=None, intents=None,
                   edgespw=None, fracspw=None, fracspwfps=None, online=None, partialpol=None, lowtrans=None,
                   mintransrepspw=None, mintransnonrepspws=None, fileonline=None, template=None, filetemplate=None,

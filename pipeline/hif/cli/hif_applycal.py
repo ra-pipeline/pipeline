@@ -1,3 +1,4 @@
+from prefect import task
 import sys
 
 import pipeline.h.cli.utils as utils
@@ -5,6 +6,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hif.tasks.applycal.ifapplycal.IFApplycalInputs.__init__
 @utils.cli_wrapper
+@task
 def hif_applycal(vis=None, field=None, intent=None, spw=None, antenna=None, parang=None, applymode=None, calwt=None,
                  flagbackup=None, flagsum=None, flagdetailedsum=None, parallel=None):
 

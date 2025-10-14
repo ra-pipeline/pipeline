@@ -1,3 +1,4 @@
+from prefect import task
 import sys
 
 import pipeline.h.cli.utils as utils
@@ -5,6 +6,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hif.tasks.lowgainflag.lowgainflag.LowgainflagInputs.__init__
 @utils.cli_wrapper
+@task
 def hif_lowgainflag(vis=None, intent=None, spw=None, refant=None, flag_nmedian=None, fnm_lo_limit=None,
                     fnm_hi_limit=None, tmef1_limit=None):
     """Flag antennas with low or high gain

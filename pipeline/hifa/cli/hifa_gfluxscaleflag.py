@@ -1,3 +1,4 @@
+from prefect import task
 import sys
 
 import pipeline.h.cli.utils as utils
@@ -5,6 +6,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hifa.tasks.gfluxscaleflag.gfluxscaleflag.GfluxscaleflagInputs.__init__
 @utils.cli_wrapper
+@task
 def hifa_gfluxscaleflag(vis=None, intent=None, phaseupsolint=None, solint=None, minsnr=None, refant=None,
                         antnegsig=None, antpossig=None, tmantint=None, tmint=None, tmbl=None, antblnegsig=None,
                         antblpossig=None, relaxed_factor=None, niter=None, parallel=None):

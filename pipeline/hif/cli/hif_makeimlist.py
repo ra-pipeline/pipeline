@@ -1,3 +1,4 @@
+from prefect import task
 import sys
 
 import pipeline.h.cli.utils as utils
@@ -5,6 +6,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hif.tasks.makeimlist.makeimlist.MakeImListInputs.__init__
 @utils.cli_wrapper
+@task
 def hif_makeimlist(vis=None, imagename=None, intent=None, field=None,
                    spw=None, stokes=None, contfile=None, linesfile=None,
                    uvrange=None, specmode=None, outframe=None, hm_imsize=None,

@@ -4,6 +4,7 @@ import os
 import sys
 import traceback
 import inspect
+from prefect import flow
 
 # Pipeline imports
 import pipeline
@@ -16,6 +17,7 @@ IMPORT_ONLY = 'Import only'
 
 
 # Run the procedure
+@flow
 def hifacal(vislist, importonly=True, dbservice=True, interactive=True):
 
     echo_to_screen = interactive

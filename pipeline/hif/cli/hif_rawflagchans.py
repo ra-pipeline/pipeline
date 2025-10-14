@@ -1,3 +1,4 @@
+from prefect import task
 import sys
 
 import pipeline.h.cli.utils as utils
@@ -5,6 +6,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hif.tasks.rawflagchans.rawflagchans.RawflagchansInputs.__init__
 @utils.cli_wrapper
+@task
 def hif_rawflagchans(vis=None, spw=None, intent=None,
                      flag_hilo=None, fhl_limit=None, fhl_minsample=None,
                      flag_bad_quadrant=None, fbq_hilo_limit=None,

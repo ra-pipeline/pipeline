@@ -1,3 +1,4 @@
+from prefect import task
 import sys
 
 import pipeline.h.cli.utils as utils
@@ -5,6 +6,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hifa.tasks.tsysflag_contamination.tsysflagcontamination.TsysFlagContaminationInputs.__init__
 @utils.cli_wrapper
+@task
 def hifa_tsysflagcontamination(
     vis=None,
     caltable=None,

@@ -1,3 +1,4 @@
+from prefect import task
 import sys
 
 import pipeline.h.cli.utils as utils
@@ -5,6 +6,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hifa.tasks.fluxcalflag.fluxcalflag.FluxcalFlagInputs.__init__
 @utils.cli_wrapper
+@task
 def hifa_fluxcalflag(vis=None, field=None, intent=None, spw=None, threshold=None, appendlines=None, linesfiles=None,
                      applyflags=None):
     """Locate and flag line regions in solar system flux calibrators
