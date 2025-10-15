@@ -8,6 +8,7 @@ import pipeline.h.cli.utils as utils
 @utils.cli_wrapper
 @task
 def hifa_tsysflagcontamination(
+    results,
     vis=None,
     caltable=None,
     filetemplate=None,

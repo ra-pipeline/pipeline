@@ -7,7 +7,7 @@ import pipeline.h.cli.utils as utils
 # docstring and type hints: inherits from hifa.tasks.imageprecheck.imageprecheck.ImagePreCheckInputs.__init__
 @utils.cli_wrapper
 @task
-def hifa_imageprecheck(vis=None, desired_angular_resolution=None, calcsb=None, parallel=None):
+def hifa_imageprecheck(results, vis=None, desired_angular_resolution=None, calcsb=None, parallel=None):
     """Calculates the best Briggs robust parameter to achieve sensitivity and angular resolution goals.
 
     In this task, the representative source and the spw containing the representative

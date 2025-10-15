@@ -25,99 +25,99 @@ def hifacal(vislist, importonly=True, dbservice=True, interactive=True):
 
     try:
         # Initialize the pipeline
-        h_init()
+        results = h_init()
 
         # Load the data
-        hifa_importdata(vis=vislist, dbservice=dbservice)
+        results = hifa_importdata(results, vis=vislist, dbservice=dbservice)
         if importonly:
             raise Exception(IMPORT_ONLY)
 
         # Flag known bad data
-        hifa_flagdata()
+        results = hifa_flagdata(results)
 
         # Flag lines in solar system calibrators and compute the default
         # reference spectral window map.
-        hifa_fluxcalflag()
+        results = hifa_fluxcalflag(results)
 
         # Flag bad channels in the raw data
-        hif_rawflagchans()
+        results = hif_rawflagchans(results)
 
         # Compute the prioritized lists of reference antennas
-        hif_refant()
+        results = hif_refant(results)
 
         # Compute the system temperature calibration
-        h_tsyscal()
+        results = h_tsyscal(results)
 
         # Flag system temperature calibration
-        hifa_tsysflag()
+        results = hifa_tsysflag(results)
 
         # flag line contamination
-        hifa_tsysflagcontamination()
+        results = hifa_tsysflagcontamination(results)
 
         # Flag system temperature calibration
-        hifa_antpos()
+        results = hifa_antpos(results)
 
         # Compute the WVR calibration, flag and interpolate over bad antennas
-        hifa_wvrgcalflag()
+        results = hifa_wvrgcalflag(results)
 
         # Flag antennas with low gain
-        hif_lowgainflag()
+        results = hif_lowgainflag(results)
 
         # Set the flux calibrator model
-        hif_setmodels()
+        results = hif_setmodels(results)
 
         # Derive and temporarily apply a preliminary bandpass calibration,
         # and flag outliers in corrected - model amplitudes for bandpass
         # calibrator.
-        hifa_bandpassflag()
+        results = hifa_bandpassflag(results)
 
         # Compute the bandpass calibration.
-        hifa_bandpass()
+        results = hifa_bandpass(results)
 
         # Compute phase calibration spw map and per spw phase offsets.
-        hifa_spwphaseup()
+        results = hifa_spwphaseup(results)
 
         # Derive the flux density scale from standard calibrators, and flag
         # outliers in corrected - model amplitudes for flux and phase
         # calibrators.
-        hifa_gfluxscaleflag()
+        results = hifa_gfluxscaleflag(results)
 
         # Determine flux values for the bandpass and gain calibrators
         # assuming point sources and set their model fluxes
-        hifa_gfluxscale()
+        results = hifa_gfluxscale(results)
 
         # Compute the time dependent gain calibration
-        hifa_timegaincal()
+        results = hifa_timegaincal(results)
 
         # Run renormalization
-        hifa_renorm(createcaltable=True, atm_auto_exclude=True)
+        results = hifa_renorm(results, createcaltable=True, atm_auto_exclude=True)
 
         # Flag ultrahigh calibrated target data
-        hifa_targetflag()
+        results = hifa_targetflag(results)
 
         # Apply the calibrations
-        hif_applycal()
+        results = hif_applycal(results)
 
         # Make a list of expected point source calibrators to be cleaned
-        hif_makeimlist(intent='PHASE,BANDPASS,AMPLITUDE')
+        results = hif_makeimlist(results, intent='PHASE,BANDPASS,AMPLITUDE')
 
         # Make clean images for the selected calibrators
-        hif_makeimages()
+        results = hif_makeimages(results)
 
         # Make a list of check source calibrators to be cleaned
-        hif_makeimlist(intent='CHECK', per_eb=True)
+        results =  hif_makeimlist(results, intent='CHECK', per_eb=True)
 
         # Make clean images for the selected calibrators
-        hif_makeimages()
+        results = hif_makeimages(results)
 
         # Check imaging parameters against PI specified values
-        hifa_imageprecheck()
+        results = hifa_imageprecheck(results)
 
         # Check product size limits and mitigate imaging parameters
-        hif_checkproductsize(maxcubesize=40.0, maxcubelimit=60.0, maxproductsize=500.0)
+        results = hif_checkproductsize(results, maxcubesize=40.0, maxcubelimit=60.0, maxproductsize=500.0)
 
         # Export the data
-        hifa_exportdata()
+        results = hifa_exportdata(results)
 
     except Exception as e:
         if str(e) == IMPORT_ONLY:
@@ -133,3 +133,6 @@ def hifacal(vislist, importonly=True, dbservice=True, interactive=True):
         h_save()
 
         casa_tools.post_to_log("Terminating procedure execution ...", echo_to_screen=echo_to_screen)
+
+if __name__ == '__main__':
+    hifacal('./uid___A002_X1181695_X1c6a4_8ant.ms', importonly=False)

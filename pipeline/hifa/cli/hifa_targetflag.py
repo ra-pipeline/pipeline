@@ -7,7 +7,7 @@ import pipeline.h.cli.utils as utils
 # docstring and type hints: inherits from hifa.tasks.targetflag.targetflag.TargetflagInputs.__init__
 @utils.cli_wrapper
 @task
-def hifa_targetflag(vis=None, parallel=None):
+def hifa_targetflag(results, vis=None, parallel=None):
     """Flag target source outliers.
 
     This task flags very obvious target source outliers. The calibration tables and

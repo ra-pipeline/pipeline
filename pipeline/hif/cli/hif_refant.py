@@ -7,7 +7,7 @@ import pipeline.h.cli.utils as utils
 # docstring and type hints: inherits from hif.tasks.refant.referenceantenna.RefAntInputs.__init__
 @utils.cli_wrapper
 @task
-def hif_refant(vis=None, field=None, spw=None, intent=None, hm_refant=None,
+def hif_refant(results, vis=None, field=None, spw=None, intent=None, hm_refant=None,
                refant=None, geometry=None, flagging=None, parallel=None,
                refantignore=None):
 

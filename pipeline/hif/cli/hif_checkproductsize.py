@@ -7,7 +7,7 @@ import pipeline.h.cli.utils as utils
 # docstring and type hints: inherits from hif.tasks.checkproductsize.checkproductsize.CheckProductSizeInputs.__init__
 @utils.cli_wrapper
 @task
-def hif_checkproductsize(vis=None, maxcubesize=None, maxcubelimit=None, maxproductsize=None, maximsize=None,
+def hif_checkproductsize(results, vis=None, maxcubesize=None, maxcubelimit=None, maxproductsize=None, maximsize=None,
                          calcsb=None, parallel=None):
 
     """Check imaging product size

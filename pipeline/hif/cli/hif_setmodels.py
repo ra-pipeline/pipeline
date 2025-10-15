@@ -7,7 +7,7 @@ import pipeline.h.cli.utils as utils
 # docstring and type hints: inherits from hif.tasks.setmodel.setmodel.SetModelsInputs.__init__
 @utils.cli_wrapper
 @task
-def hif_setmodels(vis=None, reference=None, refintent=None, transfer=None, transintent=None, reffile=None,
+def hif_setmodels(results, vis=None, reference=None, refintent=None, transfer=None, transintent=None, reffile=None,
                   normfluxes=None, scalebychan=None, parallel=None):
     """Set calibrator source models.
 

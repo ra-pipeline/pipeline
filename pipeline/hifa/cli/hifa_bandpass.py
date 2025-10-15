@@ -7,7 +7,7 @@ import pipeline.h.cli.utils as utils
 # docstring and type hints: inherits from hifa.tasks.bandpass.almaphcorbandpass.ALMAPhcorBandpassInputs.__init__
 @utils.cli_wrapper
 @task
-def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, antenna=None, hm_phaseup=None,
+def hifa_bandpass(results, vis=None, caltable=None, field=None, intent=None, spw=None, antenna=None, hm_phaseup=None,
                   phaseupbw=None, phaseupmaxsolint=None, phaseupsolint=None, phaseupsnr=None, phaseupnsols=None,
                   hm_phaseup_combine=None, hm_bandpass=None, solint=None, maxchannels=None, evenbpints=None, bpsnr=None,
                   minbpsnr=None, bpnsols=None, combine=None, refant=None, solnorm=None, minblperant=None, minsnr=None,
