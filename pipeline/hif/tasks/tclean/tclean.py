@@ -612,7 +612,7 @@ class Tclean(cleanbase.CleanBase):
                                                          inputs.gridder, inputs.cell, inputs.imsize, inputs.weighting,
                                                          inputs.robust, inputs.uvtaper,
                                                          known_sensitivities=per_spw_cont_sensitivities_all_chan,
-                                                         force_calc=inputs.calcsb, calc_reffreq=True)
+                                                         force_calc=inputs.calcsb, calc_reffreq=True, is_cluster=context.is_cluster)
 
         if sensitivity is None:
             LOG.error('Could not calculate the sensitivity for Field %s Intent %s SPW %s' % (inputs.field,

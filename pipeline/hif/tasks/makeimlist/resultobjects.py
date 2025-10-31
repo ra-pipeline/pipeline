@@ -19,6 +19,7 @@ class MakeImListResult(basetask.Results):
         self.error = error
         self.error_msg = error_msg
         self.skip_stage = False
+        self.is_cluster = False
 
     def add_target(self, target):
         self.targets.append(target)
@@ -67,6 +68,8 @@ class MakeImListResult(basetask.Results):
                 del context.synthesized_beams['recalc']
             else:
                 utils.update_beams_dict(context.synthesized_beams, self.synthesized_beams)
+        # PIPE-684: updating if cluster is detected or not, used only for VLA.
+        context.is_cluster = self.is_cluster
 
     @property
     def num_targets(self):
@@ -183,3 +186,6 @@ class MakeImListResult(basetask.Results):
                 repr += '{0:{1}}'.format(str(target['uvrange']), uvrange_width)
 
         return repr
+
+    def set_is_cluster(self, is_cluster):
+        self.is_cluster = is_cluster

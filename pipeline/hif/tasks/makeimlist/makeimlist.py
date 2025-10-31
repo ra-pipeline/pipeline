@@ -3,6 +3,11 @@ import operator
 import os
 
 import numpy as np
+import astropy.units as u
+
+from astropy.coordinates import SkyCoord
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import connected_components
 
 import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
@@ -720,7 +725,7 @@ class MakeImList(basetask.StandardTaskTemplate):
             repr_target, repr_source, repr_spw, _, reprBW_mode, real_repr_target, _, _, _, _ = (
                 self.heuristics.representative_target()
             )
-        
+
         # representative target case
         if inputs.specmode == 'repBW':
             repr_target_mode = True
@@ -888,14 +893,54 @@ class MakeImList(basetask.StandardTaskTemplate):
                     else:
                         spwlist_local = spwlist
 
-                    # get list of field_ids/intents to be cleaned
-                    if (not repr_target_mode) or (repr_target_mode and image_repr_target):
-                        field_intent_list = self.heuristics.field_intent_list(
-                          intent=inputs.intent, field=inputs.field)
+                    is_cluster = False
+                    # PIPE-684: running clustering to find overlapping fields only
+                    # for VLA.
+                    if 'VLA' in imaging_mode:
+                        clusters = self._find_clusters(vislist, inputs.context)
+                        is_cluster = any(len(sublist) > 1 for sublist in clusters)
+
+                    if is_cluster:
+                        # PIPE-684: setting is_cluster in context
+                        inputs.context.is_cluster = is_cluster
+                        result.set_is_cluster(is_cluster)
+
+                        # VLA pipeline supports only one vis, so directly using
+                        # vislist[0]
+                        ms = inputs.context.observing_run.get_ms(vislist[0])
+                        field_intent_list_temp = []
+                        for cluster in clusters:
+                            cluster_fields = []
+                            for fid in cluster:
+                                field = ms.get_fields(field_id=int(fid))
+                                cluster_fields.append(field[0].name)
+                            cluster_field_name = ",".join(cluster_fields)
+                            if cluster_field_name:
+                                field_intent_list_temp.append(self.heuristics.field_intent_list(intent=inputs.intent, field=cluster_field_name))
+
+                        output_set = set()
+                        for element in field_intent_list_temp:
+                            # Group names by intent within this set
+                            intent_groups = {}
+                            for name, intent in element:
+                                intent_groups.setdefault(intent, []).append(name)
+                            # Add each group as a tuple to output
+                            for intent, names in intent_groups.items():
+                                names_str = ",".join(sorted(names))
+                                output_set.add((names_str, intent))
+                        field_intent_list = output_set
                         if not field_intent_list:
                             continue
                     else:
-                        continue
+                        # get list of field_ids/intents to be cleaned
+                        if (not repr_target_mode) or (repr_target_mode and image_repr_target):
+                            # field_intent_list = self.heuristics.field_intent_list(
+                            # intent=inputs.intent, field=inputs.field)
+                            field_intent_list = self.heuristics.field_intent_list(intent=inputs.intent, field='OPHA_X1,OPHA_X2')
+                            if not field_intent_list:
+                                continue
+                        else:
+                            continue
 
                     # Expand cont spws
                     if inputs.specmode == 'cont':
@@ -914,7 +959,9 @@ class MakeImList(basetask.StandardTaskTemplate):
                             # TODO: This is missing spws that got removed in hif_uvcontsub.
                             #       Need to involve the full spwlist from above.
                             ms_science_spwids = [s.id for s in ms_domain_obj.get_spectral_windows()]
-                            if field_intent[0] in [f.name for f in ms_domain_obj.fields]:
+                            # TODO: check if just is_cluster is enough or need
+                            #       to update this condidtion
+                            if field_intent[0] in [f.name for f in ms_domain_obj.fields] or is_cluster:
                                 try:
                                     # Get a field domain object. Make sure that it has the necessary intent. Otherwise the list of spw IDs
                                     # will not match with the available science spw IDs.
@@ -970,6 +1017,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                         ms_domain_obj = inputs.context.observing_run.get_ms(vis)
                         valid_data[vis] = {}
                         for field_intent in field_intent_list:
+
                             valid_data[vis][field_intent] = {}
                             if field_intent not in valid_data[str(vislist)]:
                                 valid_data[str(vislist)][field_intent] = {}
@@ -986,7 +1034,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                                         # Also save cont selection
                                         all_spw_keys.append(','.join(map(str, observed_spwids_list)))
                                         for observed_spwid in map(str, observed_spwids_list):
-                                            valid_data[vis][field_intent][str(observed_spwid)] = self.heuristics.has_data(field_intent_list=[field_intent], spwspec=observed_spwid, vislist=[vis])[field_intent]
+                                            valid_data[vis][field_intent][str(observed_spwid)] = self.heuristics.has_data(field_intent_list=[field_intent], spwspec=observed_spwid, vislist=[vis], is_cluster=is_cluster)[field_intent]
                                             if not valid_data[vis][field_intent][str(observed_spwid)] and vis in observed_vis_list:
                                                 LOG.warning('Data for EB {}, field {}, spw {} is completely flagged.'.format(
                                                     os.path.basename(vis), field_intent[0], observed_spwid))
@@ -1088,7 +1136,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                             synthesized_beams[spwspec], known_synthesized_beams = self.heuristics.synthesized_beam(
                                 field_intent_list=actual_field_intent_list, spwspec=spwspec, robust=robust, uvtaper=uvtaper,
                                 pixperbeam=pixperbeam, known_beams=known_synthesized_beams, force_calc=calcsb,
-                                parallel=parallel, shift=True)
+                                parallel=parallel, shift=True, is_cluster=is_cluster)
 
                             if synthesized_beams[spwspec] == 'invalid':
                                 LOG.warning(
@@ -1143,7 +1191,13 @@ class MakeImList(basetask.StandardTaskTemplate):
                     if phasecenter == '':
                         for field_intent in field_intent_list:
                             try:
-                                field_ids = self.heuristics.field(field_intent[1], field_intent[0], vislist=vislist_field_intent_spw_combinations[field_intent]['vislist'])
+                                if is_cluster:
+                                    # PIPE-684: For VLA mosaic, the field_intent will have multiple fields seprated by ","
+                                    # field method needs either a field or list of fields, splitting the field_intent[0] to
+                                    # pass list of fields to field method.
+                                    field_ids = self.heuristics.field(field_intent[1], field_intent[0].split(","), vislist=vislist_field_intent_spw_combinations[field_intent]['vislist'])
+                                else:
+                                    field_ids = self.heuristics.field(field_intent[1], field_intent[0], vislist=vislist_field_intent_spw_combinations[field_intent]['vislist'])
                                 phasecenters[field_intent[0]], psf_phasecenters[field_intent[0]] = self.heuristics.phasecenter(field_ids, vislist=vislist_field_intent_spw_combinations[field_intent]['vislist'], intent=field_intent[1], primary_beam=largest_primary_beams[min_freq_spwlist[0]], shift_to_nearest_field=True)
                             except Exception as e:
                                 # problem defining center
@@ -1169,7 +1223,12 @@ class MakeImList(basetask.StandardTaskTemplate):
                             for spwspec in min_freq_spwlist:
 
                                 try:
-                                    field_ids = self.heuristics.field(field_intent[1], field_intent[0], vislist=vislist_field_intent_spw_combinations[field_intent]['vislist'])
+                                    if is_cluster:
+                                        # PIPE-684: passing a field list instead of string of fields seprated by ","
+                                        field_ids = self.heuristics.field(field_intent[1], field_intent[0].split(","), vislist=vislist_field_intent_spw_combinations[field_intent]['vislist'])
+                                    else:
+                                        field_ids = self.heuristics.field(field_intent[1], field_intent[0], vislist=vislist_field_intent_spw_combinations[field_intent]['vislist'])
+
                                     # Image size (FOV) may be determined depending on the fractional bandwidth of the
                                     # selected spectral windows. In continuum spectral mode pass the spw list string
                                     # to imsize heuristics (used only for VLA), otherwise pass None to disable the feature.
@@ -1259,6 +1318,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                         sorted_field_intent_list = utils.place_repr_source_first(sorted_field_intent_list, repr_source)
 
                     for field_intent in sorted_field_intent_list:
+                        # TODO: PIPE-684: check if mosweight needs to be updated for comma seperated fields
                         mosweight = self.heuristics.mosweight(field_intent[1], field_intent[0])
                         for spwspec in filtered_spwlist_local:
                             # Start with original vis list
@@ -1401,13 +1461,15 @@ class MakeImList(basetask.StandardTaskTemplate):
                                                         ' found.'.format(spwid, field_intent[0]))
                                             spwspec_ok = False
                                         continue
-                                    #elif (spwsel_spwid == ''):
-                                    #    LOG.warning('Empty continuum frequency range for %s, spw %s. Run hif_findcont ?' % (field_intent[0], spwid))
-
-                                all_continuum = all_continuum and all_continuum_spwsel_dict[spwid].get(utils.dequote(field_intent[0]), {}).get(spwid, False)
-                                low_bandwidth = low_bandwidth and low_bandwidth_spwsel_dict[spwid].get(utils.dequote(field_intent[0]), {}).get(spwid, False)
+                                if is_cluster:
+                                    # PIPE-684: passing field list instead of string of fields
+                                    all_continuum = all_continuum and all_continuum_spwsel_dict[spwid].get(utils.dequote(field_intent[0].split(",")[0]), {}).get(spwid, False)
+                                    low_bandwidth = low_bandwidth and low_bandwidth_spwsel_dict[spwid].get(utils.dequote(field_intent[0].split(",")[0]), {}).get(spwid, False)
+                                else:
+                                    all_continuum = all_continuum and all_continuum_spwsel_dict[spwid].get(utils.dequote(field_intent[0]), {}).get(spwid, False)
+                                    low_bandwidth = low_bandwidth and low_bandwidth_spwsel_dict[spwid].get(utils.dequote(field_intent[0]), {}).get(spwid, False)
                                 low_spread = low_spread and low_spread_spwsel_dict[spwid].get(utils.dequote(field_intent[0]), {}).get(spwid, False)
-
+                                # from IPython import embed; embed()
                                 if spwsel_spwid in ('ALL', 'ALLCONT', '', 'NONE'):
                                     spwsel_spwid_freqs = ''
                                     if target_heuristics.is_eph_obj(field_intent[0]):
@@ -1498,11 +1560,19 @@ class MakeImList(basetask.StandardTaskTemplate):
                                 antenna = [','.join(map(str, antenna_ids.get(os.path.basename(v), '')))+'&'
                                            for v in filtered_vislist]
 
-                                drcorrect, maxthreshold = self._get_drcorrect_maxthreshold(
-                                    field_intent[0], actual_spwspec, local_selected_datatype_str)
-                                target_heuristics.imaging_params['maxthreshold'] = maxthreshold
-                                nfrms_multiplier = self._get_nfrms_multiplier(
-                                    field_intent[0], actual_spwspec, local_selected_datatype_str)
+                                if is_cluster:
+                                    # PIPE-684: passing first field name
+                                    drcorrect, maxthreshold = self._get_drcorrect_maxthreshold(
+                                        field_intent[0].split(",")[0], actual_spwspec, local_selected_datatype_str)
+                                    target_heuristics.imaging_params['maxthreshold'] = maxthreshold
+                                    nfrms_multiplier = self._get_nfrms_multiplier(
+                                        field_intent[0].split(",")[0], actual_spwspec, local_selected_datatype_str)
+                                else:
+                                    drcorrect, maxthreshold = self._get_drcorrect_maxthreshold(
+                                        field_intent[0], actual_spwspec, local_selected_datatype_str)
+                                    target_heuristics.imaging_params['maxthreshold'] = maxthreshold
+                                    nfrms_multiplier = self._get_nfrms_multiplier(
+                                        field_intent[0], actual_spwspec, local_selected_datatype_str)
                                 target_heuristics.imaging_params['nfrms_multiplier'] = nfrms_multiplier
 
                                 deconvolver, nterms = self._get_deconvolver_nterms(field_intent[0], field_intent[1],
@@ -1511,7 +1581,12 @@ class MakeImList(basetask.StandardTaskTemplate):
 
                                 reffreq = target_heuristics.reffreq(deconvolver, inputs.specmode, spwsel)
                                 target_heuristics.imaging_params['allow_wproject'] = inputs.allow_wproject
-                                gridder = target_heuristics.gridder(field_intent[1], field_intent[0], spwspec=actual_spwspec)
+
+                                if is_cluster:
+                                    # PIPE-684: passing a list of fields instead of string of fields
+                                    gridder = target_heuristics.gridder(field_intent[1], field_intent[0].split(","), spwspec=actual_spwspec)
+                                else:
+                                    gridder = target_heuristics.gridder(field_intent[1], field_intent[0], spwspec=actual_spwspec)
 
                                 # Get field-specific uvrange value
                                 uvrange = inputs.uvrange if inputs.uvrange not in (None, [], '') else None
@@ -1611,6 +1686,70 @@ class MakeImList(basetask.StandardTaskTemplate):
 
     def analyse(self, result):
         return result
+
+    def _find_clusters(self, vislist, context):
+        # TODO: make this measurement set specific
+        # For VLA, hpbw (in arcmin) = 42.0 / observing frequency in GHz
+        hpbw = 42.0 / 10.0 * 60.0
+        overlap_tol = 1.5
+        for vis in vislist:
+            ms = context.observing_run.get_ms(vis)
+            fields = ms.fields
+            ra = []
+            dec = []
+            fieldnames = []
+            fieldids = []
+            for field in fields:
+                ra.append(field.ra)
+                dec.append(field.dec.replace(".", ":", 2))
+                fieldnames.append(field.name)
+                fieldids.append(field.id)
+            coords = SkyCoord(ra, dec, unit=(u.hourangle, u.deg))
+            idx_a, idx_b, _, _ = coords.search_around_sky(coords, hpbw * overlap_tol * u.arcsec)
+            groups = self._merge_pairs(list(zip(idx_a, idx_b)))
+
+            return groups
+
+    def _merge_pairs(self, pairs):
+        """Merge connected pairs into groups of directly/indirectly connected elements.
+
+        Args:
+            pairs (list of tuple): A list of pairs (tuples) where each tuple (a, b)
+                                represents a connection between elements `a` and `b`.
+
+        Returns:
+            list of list: A list of groups, where each group is a list of connected elements.
+
+        Example:
+            >>> merge_pairs([(1, 2), (2, 3), (4, 5), (6, 7), (5, 6)])
+            [[1, 2, 3], [4, 5, 6, 7]]
+        """
+
+        if not pairs:
+            return []
+
+        # Create unique ID mapping
+        unique_ids = {x for pair in pairs for x in pair}
+        id_map = {id_: i for i, id_ in enumerate(unique_ids)}
+
+        # Create adjacency matrix
+        n = len(unique_ids)
+        adjacency_matrix = np.zeros((n, n), dtype=bool)
+
+        for a, b in pairs:
+            adjacency_matrix[id_map[a], id_map[b]] = True
+            adjacency_matrix[id_map[b], id_map[a]] = True
+
+        # Find connected components
+        graph = csr_matrix(adjacency_matrix)
+        n_components, labels = connected_components(csgraph=graph, directed=False)
+
+        # Group elements based on components
+        clusters = {i: [] for i in range(n_components)}
+        for id_, label in zip(unique_ids, labels):
+            clusters[label].append(id_)
+
+        return list(clusters.values())
 
     def _get_nfrms_multiplier(self, field, spw, datatype_str):
         """Get the nfrms multiplier for the selfcal-succesfull imaging target for VLA."""
