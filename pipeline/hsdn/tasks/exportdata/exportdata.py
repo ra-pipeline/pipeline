@@ -134,6 +134,15 @@ class NROExportData(sdexportdata.SDExportData):
         if template_file is not None:
             self._update_manifest(manifest_file, scalefile=template_file)
 
+        # Create and export the pipeline stats file
+        pipeline_stats_file = None
+        try:
+            pipeline_stats_file = self._export_stats_file(context=self.inputs.context, oussid=oussid)
+        except Exception as e:
+            LOG.info("Unable to output pipeline statistics file: {}".format(e))
+            LOG.debug(traceback.format_exc())
+            pass
+
         return results
 
     def _export_reduction_template(self, products_dir: str) -> str:
