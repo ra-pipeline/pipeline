@@ -936,9 +936,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                     else:
                         # get list of field_ids/intents to be cleaned
                         if (not repr_target_mode) or (repr_target_mode and image_repr_target):
-                            # field_intent_list = self.heuristics.field_intent_list(
-                            # intent=inputs.intent, field=inputs.field)
-                            field_intent_list = self.heuristics.field_intent_list(intent=inputs.intent, field='OPHA_X1,OPHA_X2')
+                            field_intent_list = self.heuristics.field_intent_list(intent=inputs.intent, field=inputs.field)
                             if not field_intent_list:
                                 continue
                         else:
