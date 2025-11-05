@@ -515,24 +515,18 @@ class Tclean(cleanbase.CleanBase):
 
             if inputs.nchan not in (None, -1):
                 if1 = if0 + channel_width * inputs.nchan
-                if if1 > if1_auto:
-                    LOG.error('Calculated stop frequency (%s GHz) > f_high_native (%s GHz) for Field %s '
-                              'SPW % s' % (if1/1e9, if1_auto/1e9, inputs.field, inputs.spw))
-                    error_result = TcleanResult(vis=inputs.vis,
-                                                sourcename=inputs.field,
-                                                intent=inputs.intent,
-                                                spw=inputs.spw,
-                                                specmode=inputs.specmode,
-                                                imaging_mode=self.image_heuristics.imaging_mode)
-                    error_result.error = '%s/%s/spw%s clean error: f_stop > f_high' % (inputs.field,
-                                                                                       inputs.intent, inputs.spw)
-                    return error_result
                 LOG.info('Using supplied nchan %d' % inputs.nchan)
+                if if1 > if1_auto:
+
+                    LOG.warning('Calculated stop frequency (%s GHz) > f_high_native (%s GHz) for Field %s '
+                                'SPW %s', if1/1e9, if1_auto/1e9, inputs.field, inputs.spw)
+
             else:
                 # Skip edge channels and extra channels if no nchan is supplied.
                 # Adjust to binning since the normal nchan heuristics already includes it.
                 if inputs.nbin not in (None, -1):
-                    inputs.nchan = int(utils.round_half_up((if1 - if0) / channel_width - 2)) - 2 * int(extra_skip_channels // inputs.nbin)
+                    inputs.nchan = int(utils.round_half_up((if1 - if0) / channel_width - 2)) - \
+                        2 * int(extra_skip_channels // inputs.nbin)
                 else:
                     inputs.nchan = int(utils.round_half_up((if1 - if0) / channel_width - 2)) - 2 * extra_skip_channels
 
