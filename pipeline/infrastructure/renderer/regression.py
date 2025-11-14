@@ -321,19 +321,19 @@ def is_iterable(obj):
         return False
 
 
-def negative_qa(context: Context) -> bool:
-    all_results = [r.read() for r in context.results]
-    for result_list in all_results:
-        if is_iterable(result_list):
-            for result in result_list:
-                for qa_score in result.qa.pool:
-                    if qa_score.score < 0:
-                        return False
-        else:
-            for qa_score in result.qa.pool:
-                if qa_score.score < 0:
-                    return False
-    return True
+# def negative_qa(context: Context) -> bool:
+#     all_results = [r.read() for r in context.results]
+#     for result_list in all_results:
+#         if is_iterable(result_list):
+#             for result in result_list:
+#                 for qa_score in result.qa.pool:
+#                     if qa_score.score < 0:
+#                         return False
+#         else:
+#             for qa_score in result.qa.pool:
+#                 if qa_score.score < 0:
+#                     return False
+#     return True
 
 
 def get_all_subclasses(cls: RegressionExtractor) -> list[RegressionExtractor]:
