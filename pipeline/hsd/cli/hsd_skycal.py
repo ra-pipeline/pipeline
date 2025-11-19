@@ -2,9 +2,11 @@ import sys
 
 import pipeline.h.cli.utils as utils
 
+from prefect import task
 
 # docstring and type hints: inherits from hsd.tasks.skycal.skycal.SDSkyCalInputs.__init__
 @utils.cli_wrapper
+@task
 def hsd_skycal(calmode=None, fraction=None, noff=None,
                  width=None, elongated=None, parallel=None,
                  infiles=None, field=None,

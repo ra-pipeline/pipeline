@@ -2,9 +2,11 @@ import sys
 
 import pipeline.h.cli.utils as utils
 
+from prefect import task
 
 # docstring and type hints: inherits from hsd.tasks.flagging.flagdeteralmasd.FlagDeterALMASingleDishInputs.__init__
 @utils.cli_wrapper
+@task
 def hsd_flagdata(vis=None, autocorr=None, shadow=None, scan=None,
                  scannumber=None, intents=None, edgespw=None, fracspw=None,
                  fracspwfps=None, online=None, fileonline=None, template=None,

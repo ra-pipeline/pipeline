@@ -1,10 +1,11 @@
 import sys
 
 import pipeline.h.cli.utils as utils
-
+from prefect import task
 
 # docstring and type hints: inherits from hsd.tasks.atmcor.atmcor.SDATMCorrectionInputs.__init__
 @utils.cli_wrapper
+@task
 def hsd_atmcor(atmtype=None, dtem_dh=None, h0=None,
                infiles=None, antenna=None, field=None, spw=None, pol=None):
 

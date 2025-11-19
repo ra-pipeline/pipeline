@@ -2,9 +2,11 @@ import sys
 
 import pipeline.h.cli.utils as utils
 
+from prefect import task
 
 # docstring and type hints: inherits from hsd.tasks.restoredata.restoredata.SDRestoreDataInputs.__init__
 @utils.cli_wrapper
+@task
 def hsd_restoredata(vis=None, session=None, products_dir=None, copytoraw=None, rawdata_dir=None, lazy=None,
                     bdfflags=None, ocorr_mode=None, asis=None, hm_rasterscan=None):
 

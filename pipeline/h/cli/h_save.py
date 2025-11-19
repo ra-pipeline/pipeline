@@ -1,8 +1,9 @@
 import datetime
 
 from . import utils
+from prefect import task
 
-
+@task
 def h_save(filename=None):
 
     """Save the pipeline state to disk

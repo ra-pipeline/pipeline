@@ -2,9 +2,11 @@ import sys
 
 import pipeline.h.cli.utils as utils
 
+from prefect import task
 
 # docstring and type hints: inherits from hsd.tasks.k2jycal.k2jycal.SDK2JyCalInputs.__init__
 @utils.cli_wrapper
+@task
 def hsd_k2jycal(dbservice=None, endpoint=None, reffile=None,
                 infiles=None, caltable=None):
 

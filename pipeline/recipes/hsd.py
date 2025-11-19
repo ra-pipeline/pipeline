@@ -9,6 +9,8 @@ import inspect
 import pipeline
 from pipeline.infrastructure import casa_tools
 
+from prefect import flow
+
 # Make pipeline tasks available in local name space
 pipeline.initcli(locals())
 
@@ -18,6 +20,7 @@ ITERATION = 2
 
 
 # Run the procedure
+@flow
 def hsdms(vislist, importonly=False, interactive=True):
 
     echo_to_screen = interactive

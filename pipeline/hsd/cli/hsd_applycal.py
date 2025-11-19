@@ -2,9 +2,11 @@ import sys
 
 import pipeline.h.cli.utils as utils
 
+from prefect import task
 
 # docstring and type hints: inherits from hsd.tasks.applycal.applycal.SDApplycalInputs.__init__
 @utils.cli_wrapper
+@task
 def hsd_applycal(vis=None, field=None, intent=None, spw=None, antenna=None,
     applymode=None, flagbackup=None, parallel=None):
 

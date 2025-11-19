@@ -2,9 +2,12 @@ import sys
 
 import pipeline.h.cli.utils as utils
 
+from prefect import task
+
 
 # docstring and type hints: inherits from hsd.tasks.baseline.baseline.SDBaselineInputs.__init__
 @utils.cli_wrapper
+@task
 def hsd_baseline(fitfunc=None, fitorder=None, switchpoly=None,
                  linewindow=None, linewindowmode=None, edge=None, broadline=None,
                  clusteringalgorithm=None,

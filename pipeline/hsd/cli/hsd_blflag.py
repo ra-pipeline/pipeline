@@ -7,8 +7,11 @@ import sys
 
 import pipeline.h.cli.utils as utils
 
+from prefect import task
+
 # docstring and type hints: inherits from hsd.tasks.baselineflag.baselineflag.SDBLFlagInputs.__init__
 @utils.cli_wrapper
+@task
 def hsd_blflag(iteration=None, edge=None, flag_tsys=None, tsys_thresh=None,
                  flag_prfre=None, prfre_thresh=None,
                  flag_pofre=None, pofre_thresh=None,
