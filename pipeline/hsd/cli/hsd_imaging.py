@@ -7,7 +7,15 @@ from prefect import task
 # docstring and type hints: inherits from hsd.tasks.imaging.imaging.SDImagingInputs.__init__
 @utils.cli_wrapper
 @task
-def hsd_imaging(mode=None, restfreq=None, infiles=None, field=None, spw=None):
+def hsd_imaging(
+        mode=None,
+        restfreq=None,
+        infiles=None,
+        field=None,
+        spw=None,
+        *args,
+        **kwargs
+):
 
     """Generate single dish images.
 

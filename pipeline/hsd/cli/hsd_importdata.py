@@ -7,8 +7,23 @@ from prefect import task
 # docstring and type hints: inherits from hsd.tasks.importdata.importdata.SDImportDataInputs.__init__
 @utils.cli_wrapper
 @task
-def hsd_importdata(vis=None, session=None, hm_rasterscan=None, parallel=None, asis=None, process_caldevice=None, overwrite=None,
-                   nocopy=None, bdfflags=None, datacolumns=None, lazy=None, with_pointing_correction=None, createmms=None):
+def hsd_importdata(
+        vis=None,
+        session=None,
+        hm_rasterscan=None,
+        parallel=None,
+        asis=None,
+        process_caldevice=None,
+        overwrite=None,
+        nocopy=None,
+        bdfflags=None,
+        datacolumns=None,
+        lazy=None,
+        with_pointing_correction=None,
+        createmms=None,
+        *args,
+        **kwargs
+):
 
     """Imports data into the single dish pipeline.
 

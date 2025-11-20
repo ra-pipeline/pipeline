@@ -6,7 +6,13 @@ from prefect import task
 # docstring and type hints: inherits from h.tasks.exportdata.exportdata.ExportDataInputs.__init__
 @utils.cli_wrapper
 @task
-def hsd_exportdata(pprfile=None,targetimages=None, products_dir=None):
+def hsd_exportdata(
+        pprfile=None,
+        targetimages=None,
+        products_dir=None,
+        *args,
+        **kwargs
+):
 
     """Prepare single dish data for export.
 

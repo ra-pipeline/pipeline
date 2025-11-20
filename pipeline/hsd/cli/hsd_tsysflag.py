@@ -4,17 +4,32 @@ import pipeline.h.cli.utils as utils
 
 from prefect import task
 
-# docstring and type hints: inherits from hsd.tasks.tsysflag.tsysflag.TsysflagInputs.__init__
 @utils.cli_wrapper
 @task
-def hsd_tsysflag(vis=None, caltable=None,
-                 flag_nmedian=None, fnm_limit=None, fnm_byfield=None,
-                 flag_derivative=None, fd_max_limit=None,
-                 flag_edgechans=None, fe_edge_limit=None,
-                 flag_fieldshape=None, ff_refintent=None, ff_max_limit=None,
-                 flag_birdies=None, fb_sharps_limit=None,
-                 flag_toomany=None, tmf1_limit=None, tmef1_limit=None,
-                 metric_order=None, normalize_tsys=None, filetemplate=None):
+def hsd_tsysflag(
+        vis=None,
+        caltable=None,
+        flag_nmedian=None,
+        fnm_limit=None,
+        fnm_byfield=None,
+        flag_derivative=None,
+        fd_max_limit=None,
+        flag_edgechans=None,
+        fe_edge_limit=None,
+        flag_fieldshape=None,
+        ff_refintent=None,
+        ff_max_limit=None,
+        flag_birdies=None,
+        fb_sharps_limit=None,
+        flag_toomany=None,
+        tmf1_limit=None,
+        tmef1_limit=None,
+        metric_order=None,
+        normalize_tsys=None,
+        filetemplate=None,
+        *args,
+        **kwargs
+):
 
     """Flag deviant system temperature measurements.
 
@@ -82,3 +97,4 @@ def hsd_tsysflag(vis=None, caltable=None,
     results = utils.execute_task(context, task_name, all_inputs)
 
     return results
+# docstring and type hints: inherits from hsd.tasks.tsysflag.tsysflag.TsysflagInputs.__init__

@@ -4,7 +4,7 @@ from . import utils
 from prefect import task
 
 @task
-def h_save(filename=None):
+def h_save(filename=None, *args, **kwargs):
 
     """Save the pipeline state to disk
 

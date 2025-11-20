@@ -7,10 +7,20 @@ from prefect import task
 # docstring and type hints: inherits from hsd.tasks.skycal.skycal.SDSkyCalInputs.__init__
 @utils.cli_wrapper
 @task
-def hsd_skycal(calmode=None, fraction=None, noff=None,
-                 width=None, elongated=None, parallel=None,
-                 infiles=None, field=None,
-                 spw=None, scan=None):
+def hsd_skycal(
+        calmode=None,
+        fraction=None,
+        noff=None,
+        width=None,
+        elongated=None,
+        parallel=None,
+        infiles=None,
+        field=None,
+        spw=None,
+        scan=None,
+        *args,
+        **kwargs
+):
 
     """Calibrate data.
 
