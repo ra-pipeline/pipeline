@@ -170,3 +170,14 @@ Locally you want to now open an ssh connection with the port forwarded.
 
 You should now be able to paste the dashboard address into your favorite web browser and see the dashboard running.
 
+#### Data Retrieval
+
+You can get a copy of the data used for this study from the `toolviper` data repository.
+
+```angular2html
+python -m pip install toolviper
+
+>>> import toolviper
+>>> toolviper.utils.data.update()
+>>> toolviper.utils.data.download(file="absolute_off", folder=".", overwrite=True)
+```
