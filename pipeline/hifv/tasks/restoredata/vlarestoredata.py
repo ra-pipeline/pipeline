@@ -5,8 +5,8 @@ import tarfile
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.vdp as vdp
 from pipeline.h.tasks.restoredata import restoredata
-from pipeline.infrastructure import task_registry
-from pipeline.infrastructure import casa_tasks
+from pipeline.infrastructure import casa_tasks, task_registry, utils
+
 from ..finalcals import applycals
 from ..hanning import hanning
 from ..importdata import importdata
@@ -256,3 +256,16 @@ class VLARestoreData(restoredata.RestoreData):
                                         flagsum=flagsum, flagdetailedsum=flagdetailedsum)
         applycal_task = applycals.Applycals(container)
         return self._executor.execute(applycal_task, merge=True)
+
+    def _convert_calstate_paths(self, applyfile: str) -> str:
+        """Convert paths in the exported calstate to point to the new output directory.
+
+        Args:
+            applyfile: The path to the exported calstate file.
+
+        Returns:
+            The content of the file as a string.
+        """
+        # search-and-replace directory names in the exported calstate file
+        with open(applyfile, 'r', encoding='utf-8') as f:
+            return utils.convert_paths_to_basenames(f.read())

@@ -22,7 +22,6 @@ from pipeline.infrastructure import exceptions
 from pipeline.infrastructure import task_registry
 from pipeline.infrastructure.pipelineqa import TargetDataSelection
 from pipeline.infrastructure.utils.math import round_up
-import pipeline.infrastructure.sessionutils as sessionutils
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -193,7 +192,7 @@ class ALMAPhcorBandpassInputs(bandpassmode.BandpassModeInputs):
                 solution. Accepts one of following 3 options:
 
                 - 'snr', default: heuristics will use combine='spw' in phase-up
-                  gaincal, when SpWs have SNR <20.
+                  gaincal, when SpWs have SNR < phaseupsnr (default = 20).
                 - 'always': heuristic will force combine='spw' in the phase-up
                   gaincal.
                 - 'never': heuristic will not use spw combination; this was the
@@ -521,14 +520,18 @@ class SerialALMAPhcorBandpass(bandpassworker.BandpassWorker):
             # For Band-to-Band datasets, only refine solint based on the TARGET
             # (high frequency) spectral windows that are expected to have the
             # lowest SNRs.
-            LOG.info(f"{inputs.ms.basename} is a Band-to-Band dataset: selecting high-frequency SpWs for solint"
-                     f" refinement.")
-            spwindex = [snr_result.spwids.index(s.id) for s in inputs.ms.get_spectral_windows(intent='TARGET')]
+            LOG.info(
+                '%s is a Band-to-Band dataset: selecting high-frequency SpWs for solint refinement.', inputs.ms.basename
+            )
+            spwindex = [
+                snr_result.spwids.index(s.id)
+                for s in inputs.ms.get_spectral_windows(inputs.spw, intent='TARGET')
+            ]
         else:
             # For all other datasets, restrict the refinement to the SpWs of a
             # single SpectralSpec. Start with retrieving mapping of SpectralSpec
             # to science spectral windows.
-            spspec_to_spwid = utils.get_spectralspec_to_spwid_map(inputs.ms.get_spectral_windows())
+            spspec_to_spwid = utils.get_spectralspec_to_spwid_map(inputs.ms.get_spectral_windows(inputs.spw))
 
             # If there is only 1 SpectralSpec, then use that one.
             if len(spspec_to_spwid) == 1:

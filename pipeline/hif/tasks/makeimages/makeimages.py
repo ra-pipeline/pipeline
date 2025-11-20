@@ -227,7 +227,7 @@ class MakeImagesInputs(vdp.StandardInputs):
 
 # tell the infrastructure to give us mstransformed data when possible by
 # registering our preference for imaging measurement sets
-#api.ImagingMeasurementSetsPreferred.register(MakeImagesInputs)
+# api.ImagingMeasurementSetsPreferred.register(MakeImagesInputs)
 
 
 @task_registry.set_equivalent_casa_task('hif_makeimages')
@@ -369,14 +369,23 @@ class MakeImages(basetask.StandardTaskTemplate):
 
         # update tclean_result.imaging_metadata['keep'] based on the beam size and flagging percentage
         if bminor_list:
-            ref_idx = np.argsort(bminor_list)[len(bminor_list)//2]
 
-            bmajor_expected = bmajor_list[ref_idx]*freq_list[ref_idx]/np.array(freq_list)
-            bminor_expected = bminor_list[ref_idx]*freq_list[ref_idx]/np.array(freq_list)
-            c1 = (bmajor_expected*(1.-beamdev_thresh) < np.array(bmajor_list))
-            c2 = (bmajor_expected*(1.+beamdev_thresh) > np.array(bmajor_list))
-            c3 = (bminor_expected*(1.-beamdev_thresh) < np.array(bminor_list))
-            c4 = (bminor_expected*(1.+beamdev_thresh) > np.array(bminor_list))
+            bminor_array = np.array(bminor_list)
+            freq_array = np.array(freq_list)
+            weighted_values = bminor_array * freq_array
+            sorted_indices = np.argsort(weighted_values)
+            ref_idx = sorted_indices[len(bminor_list) // 2]
+
+            bmajor_expected = (
+                bmajor_list[ref_idx] * freq_list[ref_idx] / np.array(freq_list)
+            )
+            bminor_expected = (
+                bminor_list[ref_idx] * freq_list[ref_idx] / np.array(freq_list)
+            )
+            c1 = bmajor_expected * (1.0 - beamdev_thresh) < np.array(bmajor_list)
+            c2 = bmajor_expected * (1.0 + beamdev_thresh) > np.array(bmajor_list)
+            c3 = bminor_expected * (1.0 - beamdev_thresh) < np.array(bminor_list)
+            c4 = bminor_expected * (1.0 + beamdev_thresh) > np.array(bminor_list)
             c5 = (np.array(flagpct_list) < flagpct_thresh)
 
             spwgroup_keep = [False]*len(spwgroup_list)

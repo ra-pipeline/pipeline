@@ -176,7 +176,7 @@ class BandpassflagInputs(ALMAPhcorBandpassInputs):
                 solution. Accepts one of following 3 options:
 
                 - 'snr', default: heuristics will use combine='spw' in phase-up
-                  gaincal when SpWs have SNR <20.
+                  gaincal when SpWs have SNR < phaseupsnr (default = 20).
                 - 'always': heuristic will force combine='spw' in the phase-up
                   gaincal.
                 - 'never': heuristic will not use spw combination; this was the

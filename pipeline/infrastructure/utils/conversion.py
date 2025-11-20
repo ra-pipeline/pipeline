@@ -14,7 +14,8 @@ import math
 import os
 import re
 import string
-from typing import TYPE_CHECKING, Any, Iterator, Sequence, Iterable
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Iterable, Iterator, Sequence
 
 import astropy.units as u
 import cachetools
@@ -27,6 +28,7 @@ from pipeline.infrastructure import casa_tools
 
 if TYPE_CHECKING:
     from datetime import datetime, timedelta
+
     from pipeline.domain import Field, MeasurementSet
 
 LOG = infrastructure.logging.get_logger(__name__)
@@ -48,6 +50,7 @@ __all__ = [
     'spw_arg_to_id',
     'to_CASA_intent',
     'to_pipeline_intent',
+    'convert_paths_to_basenames',
     ]
 
 # By default we use CASA to parse arguments into spw/field/ant IDs. However, this
@@ -781,8 +784,7 @@ def refcode_to_skyframe(refcode: str) -> str:
 
 
 def invert_dict(input_dict: dict) -> dict:
-    """
-    Inverts a dictionary so that values become keys and keys become grouped in a list.
+    """Inverts a dictionary so that values become keys and keys become grouped in a list.
 
     Args:
         input_dict: The original dictionary.
@@ -794,3 +796,45 @@ def invert_dict(input_dict: dict) -> dict:
     for key, value in input_dict.items():
         inverted[value].append(key)
     return dict(inverted)
+
+
+def convert_paths_to_basenames(command_string: str) -> str:
+    """Convert all absolute and relative file paths in command string to basenames.
+
+    Handles multi-line strings with comments and preserves all formatting while
+    converting only the file paths to basenames. Ensures proper quote pair matching
+    and excludes strings with ANY nested quotes (both same and different types).
+
+    Args:
+        command_string: CASA command string(s) with file paths to convert.
+
+    Returns:
+        Command string with all paths converted to basenames only.
+    """
+
+    def replace_path(match: re.Match) -> str:
+        full_match = match.group(0)
+        quote_char = full_match[0]
+        path_content = full_match[1:-1]
+
+        if "'" in path_content or '"' in path_content:
+            return full_match
+
+        # Convert to basename only if it contains path separators
+        if '/' in path_content:
+            basename = Path(path_content).name
+            return f'{quote_char}{basename}{quote_char}'
+        return full_match
+
+    lines = command_string.split('\n')
+    converted_lines = []
+
+    for line in lines:
+        if line.strip().startswith('#'):
+            converted_lines.append(line)
+        else:
+            pattern = r"'[^']*'|\"[^\"]*\""
+            converted_line = re.sub(pattern, replace_path, line)
+            converted_lines.append(converted_line)
+
+    return '\n'.join(converted_lines)

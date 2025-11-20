@@ -21,7 +21,7 @@ LOG = infrastructure.get_logger(__name__)
 
 class AntposResults(basetask.Results):
     def __init__(self, final=[], pool=[], preceding=[], antenna='', offsets=[]):
-        super(AntposResults, self).__init__()
+        super().__init__()
         self.pool = pool[:]
         self.final = final[:]
         self.preceding = preceding[:]

@@ -1566,13 +1566,13 @@ finally:
         Returns:
           The filename of the outputfile.
         """
-        from pipeline.infrastructure import stats_extractor
+        from pipeline.infrastructure import pipeline_statistics as pstats
 
         statsfile_name = "pipeline_stats_{}.json".format(oussid)
         stats_file = os.path.join(context.output_dir, statsfile_name)
         LOG.info('Generating pipeline statistics file')
 
-        stats_dict = stats_extractor.generate_stats(context)
+        stats_dict = pstats.generate_stats(context)
 
         # Write the stats file to disk
         with open(stats_file, 'w', encoding='utf-8') as f:

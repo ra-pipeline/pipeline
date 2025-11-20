@@ -74,13 +74,11 @@ def plot_beams_vlasscube(vlass_cube_metadata, figfile='beams_vlasscube.png', log
     )
 
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.25), fancybox=False, shadow=False, ncol=3, frameon=False)
-
     ax.set_xlabel('Ref. Freq. [GHz]')
-    ax2.set_xlabel('Spw Selection')
-
     with plt.rc_context({'mathtext.default': 'regular'}):
-        ax.set_xlabel(
-            rf'Spw Selection\n BeamDev$_\mathdefault{{th}}$={beam_dev}, flagpct$_\mathdefault{{th}}$={flagpct_threshold * 100}%'
+        ax2.set_xlabel(
+            'Spw Selection\n'
+            rf'BeamDev$_\mathdefault{{th}}$={beam_dev}, flagpct$_\mathdefault{{th}}$={flagpct_threshold * 100}%'
         )
 
     ax.set_ylabel('Beam Size [arcsec]')

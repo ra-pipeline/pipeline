@@ -9,6 +9,7 @@ import numpy as np
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.renderer.logger as logger
 from pipeline.h.tasks.common.displays import sky as sky
+from pipeline.hif.heuristics.cleanbox import image_statistics_per_stokes
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.utils import get_stokes
 
@@ -92,7 +93,7 @@ class CleanSummary(object):
                         if image_path not in self.image_stats:
                             LOG.trace('No cached image statistics found for {!s}'.format(image_path))
                             with casa_tools.ImageReader(image_path) as image:
-                                stats = image.statistics(axes=[0, 1, 3], robust=False)
+                                stats = image_statistics_per_stokes(image, stokescontrol='f', robust=False)
                                 image_rms = stats.get('rms')[0]
                                 image_max = stats.get('max')[0]
                                 self.image_stats[image_path] = ImageStats(rms=image_rms, max=image_max)

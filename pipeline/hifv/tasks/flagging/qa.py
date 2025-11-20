@@ -58,9 +58,8 @@ class FlagdataQAHandler(pqa.QAPlugin):
     def handle(self, context, result):
         vis = result.inputs['vis']
         ms = context.observing_run.get_ms(vis)
-
-        score = qacalc.score_vla_agents(ms, result.summaries)
-        result.qa.pool[:] = [score]
+        scores = qacalc.score_vla_agents(ms, result.summaries)
+        result.qa.pool[:] = scores
 
 
 class FlagdataListQAHandler(pqa.QAPlugin):

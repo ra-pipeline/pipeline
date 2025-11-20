@@ -1,10 +1,18 @@
+from __future__ import annotations
+
 import os.path
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.utils as utils
 from pipeline.infrastructure import casa_tools
+
+if TYPE_CHECKING:
+    import casatools.image
+    from pipeline.infrastructure.casa_tools import _logging_image_cls as LoggingImage
+
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -27,7 +35,7 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
     model_sum = None
     if model is not None:
         with casa_tools.ImageReader(model + extension) as image:
-            model_stats = image.statistics(robust=False, axes=[0, 1, 3])
+            model_stats = image_statistics_per_stokes(image, robust=False, stokescontrol='f')
             model_sum = model_stats['sum'][0]
             LOG.debug('Sum of model: %s' % model_sum)
 
@@ -49,9 +57,8 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
 
         if cleanmask is not None and os.path.exists(cleanmask):
             # Area inside clean mask
-            statsmask = '"%s" > 0.1' % (os.path.basename(cleanmask))
-
-            resid_clean_stats = image.statistics(mask=statsmask, axes=[0, 1, 3], robust=False, stretch=True)
+            statsmask = f'"{os.path.basename(cleanmask)}" > 0.1'
+            resid_clean_stats = image_statistics_per_stokes(image, mask=statsmask, robust=False, stretch=True)
 
             try:
                 residual_cleanmask_rms = resid_clean_stats['rms'][0]
@@ -74,7 +81,8 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
             have_mask = False
             statsmask = ''
 
-        residual_stats = image.statistics(mask=statsmask, axes=[0, 1, 3], robust=False, stretch=True)
+        residual_stats = image_statistics_per_stokes(
+            image, stokescontrol='f', mask=statsmask, robust=False, stretch=True)
 
         try:
             residual_non_cleanmask_rms = residual_stats['rms'][0]
@@ -87,11 +95,16 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
 
         # get the max, min of the residual image (avoiding the edges
         # where spikes can occur)
-        if pb is not None and os.path.exists(pb+extension):
-            residual_stats = image.statistics(
-              mask='"%s" > %f' % (os.path.basename(pb)+extension, pblimit_image), axes=[0, 1, 3], robust=False, stretch=True)
+        if pb is not None and os.path.exists(pb + extension):
+            residual_stats = image_statistics_per_stokes(
+                image,
+                stokescontrol='f',
+                mask=f'"{os.path.basename(pb) + extension}" > {pblimit_image:f}',
+                robust=False,
+                stretch=True,
+            )
         else:
-            residual_stats = image.statistics(axes=[0, 1, 3], robust=False)
+            residual_stats = image_statistics_per_stokes(image, stokescontrol='f', robust=False)
 
         try:
             # This filters just Stokes I. For the time being (PIPE-2464)
@@ -103,11 +116,10 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
             residual_max = None
             residual_min = None
 
-        LOG.info('Residual max: %s min: %s' % (residual_max, residual_min))
-
-        residual_stats = image.statistics(axes=[0, 1, 3], robust=True, excludepix=0.0)
+        LOG.info('Residual max: %s min: %s', residual_max, residual_min)
+        residual_stats = image_statistics_per_stokes(image, stokescontrol='f', robust=True, excludepix=0.0)
         residual_robust_rms = residual_stats['medabsdevmed'][0] * 1.4826  # see CAS-9631
-        LOG.debug('residual scaled MAD: %s' % residual_robust_rms)
+        LOG.debug('residual scaled MAD: %s', residual_robust_rms)
 
     pbcor_image_min = None
     pbcor_image_min_iquv = None
@@ -148,18 +160,18 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
                 image_stats = image.statistics(mask=statsmask, stretch=True)
                 # For polarization calibrators we need stats for I, Q, U and V, so exclude the
                 # Stokes axis from collapsing.
-                image_stats_iquv = image.statistics(mask=statsmask, axes=[0, 1, 3], stretch=True)
+                image_stats_iquv = image_statistics_per_stokes(image, stokescontrol='a', mask=statsmask, stretch=True)
             else:
                 # Restrict region to inner 25% x 25% of the image for calibrators to
                 # avoid picking up sidelobes (PIPE-611)
                 shape = image.shape()
                 rgTool = casa_tools.regionmanager
                 nPixels = max(shape[0], shape[1])
-                region = rgTool.box([nPixels*0.375-1, nPixels*0.375-1, 0, 0], [nPixels*0.625-1, nPixels*0.625-1, shape[1]-1, shape[2]-1])
+                region = rgTool.box([nPixels*0.375-1, nPixels*0.375-1, 0, 0], [nPixels*0.625-1, nPixels*0.625-1, shape[2]-1, shape[3]-1])
                 image_stats = image.statistics(mask=statsmask, region=region, stretch=True)
                 # For polarization calibrators we need stats for I, Q, U and V, so exclude the
                 # Stokes axis from collapsing.
-                image_stats_iquv = image.statistics(mask=statsmask, region=region, axes=[0, 1, 3], stretch=True)
+                image_stats_iquv = image_statistics_per_stokes(image, stokescontrol='a', mask=statsmask,region=region, stretch=True)
                 rgTool.done()
 
             pbcor_image_min = image_stats['min'][0]
@@ -405,3 +417,92 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
              'nonpbcor_image_statsmask': nonpbcor_image_statsmask},
             pbcor_image_min_iquv, pbcor_image_max_iquv, nonpbcor_image_non_cleanmask_rms_min_iquv,
             nonpbcor_image_non_cleanmask_rms_max_iquv, nonpbcor_image_non_cleanmask_rms_iquv)
+
+
+def image_statistics_per_stokes(
+    image: casatools.image.image | LoggingImage,
+    stokescontrol: str = 'a',
+    region: dict | None = None,
+    **kwargs: Any,
+) -> dict[str, np.ndarray]:
+    """Compute statistics for each Stokes plane of a 4D CASA image cube.
+
+    This function iterates through the Stokes planes (e.g., I, Q, U, V) of a 4D image cube, computes a standard
+    set of statistics for each plane, and returns the results in a dictionary. The expected image shape is
+    [nx, ny, nstokes, nfreq].
+
+    It is used as a workaround for CAS-14660 when deriving per-Stokes cube statistics.
+
+    Args:
+        image: A CASA image object with a .shape() method and .statistics() method.
+        stokescontrol: If 'f', only the first Stokes plane (index 0) is processed; otherwise all planes are processed.
+        region: Optional region record to constrain the statistics to a specific area.
+        **kwargs: Passed directly to the image's .statistics() method (e.g., verbose, stretch).
+
+    Returns:
+        A dictionary mapping statistic names (e.g., 'max', 'mean', 'rms') to NumPy arrays.
+        Each array contains values for the processed Stokes planes.
+
+    Raises:
+        AttributeError: If the image object lacks a .shape() method.
+        ValueError: If the image is not 4-dimensional.
+
+    Example:
+        >>> stats = image_statistics_per_stokes(my_image, stokescontrol='a', verbose=True)
+        >>> print(stats['mean'])  # Mean values for all Stokes planes
+        [0.001, 0.002, 0.001, 0.003]
+    """
+    # Validate input image
+    try:
+        img_shape = image.shape()
+    except AttributeError as e:
+        raise AttributeError("The 'image' object must provide a .shape() method.") from e
+    if len(img_shape) != 4:
+        raise ValueError(f'Expected 4D image, got {len(img_shape)}D with shape {img_shape}.')
+
+    # Avoid CAS-14660 bug by discarding explicit axis specification
+    kwargs.pop('axes', None)
+
+    # Initialize statistics containers
+    stats_items = [
+        'max',
+        'mean',
+        'medabsdevmed',
+        'median',
+        'min',
+        'npts',
+        'q1',
+        'q3',
+        'rms',
+        'sigma',
+        'sum',
+        'sumsq',
+    ]
+    stats_per_stokes: dict[str, list[float]] = {key: [] for key in stats_items}
+
+    # Handle region specification
+    if isinstance(region, dict) and {'blc', 'trc'} <= region.keys() and region.get('name') == 'LCSlicer':
+        # rg.box uses zero-based indices; region records return one-based indices, so convert back
+        blc = region['blc'].copy() - 1
+        trc = region['trc'].copy() - 1
+        if stokescontrol == 'f':
+            trc[2] = blc[2]
+    else:
+        if region:
+            LOG.warning('Unsupported region format %r; ignoring.', region)
+        blc = [0, 0, 0, 0]
+        stokes_last = 0 if stokescontrol == 'f' else img_shape[2] - 1
+        trc = [img_shape[0] - 1, img_shape[1] - 1, stokes_last, img_shape[3] - 1]
+
+    rg = casa_tools.regionmanager
+    for stokes_idx in range(int(blc[2]), int(trc[2]) + 1):
+        blc_stokes, trc_stokes = blc.copy(), trc.copy()
+        blc_stokes[2] = trc_stokes[2] = stokes_idx
+        region_stokes = rg.box(blc=blc_stokes, trc=trc_stokes)
+
+        stats_current = image.statistics(region=region_stokes, **kwargs)
+        for key in stats_per_stokes:
+            if key in stats_current and stats_current[key].size:
+                stats_per_stokes[key].append(stats_current[key][0])
+
+    return {key: np.array(values) for key, values in stats_per_stokes.items()}

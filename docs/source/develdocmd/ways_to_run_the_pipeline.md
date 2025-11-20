@@ -1,8 +1,10 @@
 # Ways to run the Pipeline
 
-## PPR
+## PPR: pipeline processing request
 
-At the highest level of abstraction, we can execute a pipeline processing request (ppr)
+At the highest level of abstraction, we can execute a pipeline processing request (ppr), which is how Pipeline
+is run in operations at the ALMA centers.
+
 This can be done at the command line, or at a CASA command prompt.
 
 Execute PPR from the command line:
@@ -18,6 +20,7 @@ At a CASA command prompt:
 CASA <1>: import pipeline.infrastructure.executevlappr as eppr
 CASA <2>: eppr.executeppr('PPR_VLAT003.xml', importonly=False)
 ```
+
 
 ## Series of steps invoking CASA Pipeline tasks
 
@@ -58,13 +61,13 @@ CASA <3>: pipeline.infrastructure.utils.enable_memstats()
 We can also turn weblog and plotting off:
 
 ```python
-CASA <1>: h_init(loglevel="info",plotlevel="summary",output_dir="./",weblog=False,overwrite=True)
+CASA <1>: h_init(loglevel="info", plotlevel="summary", output_dir="./", weblog=False, overwrite=True)
 ```
 
 Or we can turn debug mode on, weblog off:
 
 ```python
-CASA <1>: h_init(loglevel="debug",plotlevel="summary",output_dir="./",weblog=True,overwrite=True)
+CASA <1>: h_init(loglevel="debug", plotlevel="summary", output_dir="./", weblog=True, overwrite=True)
 ```
 
 Full example of running Pipeline importdata task on CASA prompt:
@@ -78,30 +81,27 @@ CASA <5>: h_save()
 CASA <6>: exit
 ```
 
+Resuming from a previous Pipeline run on CASA prompt:
 ```python
 casa
 CASA <1>: context = h_resume(filename='last')
 ```
 
-## Creating and running Pipeline tasks, bypassing CASA task interface
+
+## Creating and running Pipeline tasks in Python, bypassing the task interface
 
 At the lowest level of abstraction, we can bypass the CASA Pipeline Task interface, and work directly within
-CASA / Python, by instantiating a Pipeline InputsContainer object for the Pipeline Task, using it to instantiate a Pipeline Task object,
-and then running its 'execute' method to get the task result, as shown in this example (assumed to run in a
-directory where the Pipeline has already been partly run, i.e. a context already exists):
+CASA / Python, by instantiating a Pipeline `InputsContainer` object for the Pipeline Task, using it to instantiate a
+Pipeline Task object, and then running its `execute` method to get the task result, as shown in the example below. Here,
+the example should be run in a directory where the Pipeline has been partly run, i.e. a context already exists.
 
 ```python
-CASA <1>: context = pipeline.Pipeline(context='last').context
-
-CASA <1>: vis='13A-537.sb24066356.eb24324502.56514.05971091435.ms'
-CASA <2>: m = context.observing_run.get_ms(vis)
-CASA <3>: spws=m.get_spectral_windows()
-
-CASA <4>: inputs = pipeline.infrastructure.vdp.InputsContainer(pipeline.hifv.tasks.hanning.Hanning, context)
-CASA <5>: task = pipeline.hifv.tasks.hanning.Hanning(inputs)
-CASA <6>: result = task.execute()
-CASA <7>: result.accept(context)
-CASA <8>: context.save()
+context = pipeline.Pipeline(context='last').context
+inputs = pipeline.infrastructure.vdp.InputsContainer(pipeline.hifv.tasks.hanning.Hanning, context)
+task = pipeline.hifv.tasks.hanning.Hanning(inputs)
+result = task.execute()
+result.accept(context)
+context.save()
 ```
 
 If we don't have a PPR or an executable script available.
@@ -116,7 +116,7 @@ hifv.hifv(['../rawdata/13A-537.foofoof.eb.barbar.2378.2934723984397'], importonl
 context = pipeline.Pipeline(context='last').context
 vis = '13A-537.foofoof.eb.barbar.2378.2934723984397.ms'
 # get the domain object
-m = context.observering_run.get_ms(vis)
+m = context.observing_run.get_ms(vis)
 type(m)
 # study this m object for INTENTS
 # <class 'pipeline.domain.measurementset.MeasurementSet>
@@ -124,49 +124,194 @@ m.intents  # shows a python set of the MS intents
 m.polarization  # show a list of polarization objects
 ```
 
+
 ## Running Pipeline with the "recipereducer"
+The `recipereducer` module is a tool for Pipeline developer to be able to run
+the Pipeline without using the Pipeline Processing Request (PPR) system that is
+only available at the ALMA centers.
 
-To run one of the standard recipes we can use a recipereducer:
+All that you need to pass along to the `recipereducer` is the recipe name and the
+path to a directory containing the raw ASDM datasets.
 
+### Simple "recipereducer" example
+Run pipeline for your ASDM, with default pipeline recipe (hifa_calimage):
 ```python
 import pipeline.recipereducer
-pipeline.recipereducer.reduce(vis=['../rawdata/yourasdm'], procedure='procedure_hifv.xml')
+pipeline.recipereducer.reduce(
+  vis=['../rawdata/yourasdm'],
+  # procedure='procedure_hifa_calimage.xml',
+)
 ```
 
-To run a standard recipe until the end of a specified stage number (dependent on recipe) and running it with
-a different log level:
+### About the procedure parameter
+For the `procedure` parameter, you can specify either:
+- the filename of one of the standard recipes (procedure files) located in `pipeline/recipes`
+- a relative/absolute path to a file containing your own (customized) recipe file, 
+  e.g. `procedure='/path/to/local/procedure.xml'`, or `procedure='../test_procedure_for_PIPE-1234.xml'`
 
+If the `procedure` parameter is not specified, `recipereducer` will by default
+run the full ALMA calibration + imaging recipe, `procedure_hifa_calimage.xml`.
+
+### Examples with a different procedure file
+Run Single-Dish calibration + imaging on 2 ASDMs:
 ```python
 import pipeline.recipereducer
-pipeline.recipereducer.reduce(vis=['../rawdata/yourasdm'], procedure='procedure_hifa.xml', exitstage=6, loglevel='trace')
+pipeline.recipereducer.reduce(
+  vis=['../rawdata/yourasdm', '../rawdata/yourasdm_2'],
+  procedure='procedure_hsd_calimage.xml',
+)
 ```
 
-This can be useful to run the Pipeline just up to the stage that you want to debug / develop. Once the PL run has exited
-after e.g. stage 6, you could tarball the "working" directory (to be able to restore the run up to this point),
-then create a short script in "../debug.script" with:
+Run VLA standard recipe:
+```python
+import pipeline.recipereducer
+pipeline.recipereducer.reduce(
+  vis=['../rawdata/yourasdm'],
+  procedure='procedure_hifv.xml',
+)
+```
 
+Run with a local copy of a recipe that you may have modified for development:
+```python
+import pipeline.recipereducer
+pipeline.recipereducer.reduce(
+  vis=['../rawdata/yourasdm'],
+  procedure='../test_procedure_for_PIPE-1234.xml',
+)
+```
+
+### Examples of stopping / starting at specific stages
+Stop after stage 3 has completed. It will depend on the recipe which task this
+stage number corresponds to.
+```python
+import pipeline.recipereducer
+pipeline.recipereducer.reduce(
+    vis=['../rawdata/yourasdm'],
+    procedure='procedure_hifa_calimage.xml',
+    exitstage=3,
+)
+```
+
+Assuming the developer developed / debugged stage 4, once that is done, it is
+possible to use `recipereducer` to resume with the remainder of the recipe, with:
+```python
+import pipeline
+import pipeline.recipereducer
+context = pipeline.Pipeline(context='last').context
+pipeline.recipereducer.reduce(
+    vis=['../rawdata/yourasdm'],
+    context=context,
+    procedure='procedure_hifa_calimage.xml',
+    startstage=5,
+)
+```
+Here, since Pipeline is resuming from an earlier run, so the existing context is passed into `recipereducer`.
+
+### Example with sessions
+Some datasets will have measurement sets grouped together in separate sessions, which can be specified with:
+```python
+import pipeline.recipereducer
+pipeline.recipereducer.reduce(
+    vis=['../rawdata/yourasdm_1', '../rawdata/yourasdm_2', '../rawdata/yourasdm_3'],
+    session=['session1', 'session3', 'session3'],
+    procedure='procedure_hifa_calimage.xml',
+    exitstage=3,
+)
+```
+Here, the 1st ASDM belongs to "session1" while the latter 2 ASDMs are both in "session3".
+Note, session names are assigned during operations, will normally be populated in the PPR files, and may not
+always appear to have sequential numbers. 
+
+### Example changing log level
+If not specified, the loglevel is `info` by default, but this can be change to e.g. `debug` or `trace` to get 
+(a lot) more diagnostic information during the run:
+```python
+import pipeline.recipereducer
+pipeline.recipereducer.reduce(
+    vis=['../rawdata/yourasdm_1'],
+    loglevel='debug',
+    plotlevel='summary',
+)
+```
+
+### Example workflows for a Pipeline developer
+
+For developers, a common workflow is to iteratively run a specific task to reproduce an issue, debug a specific task,
+and/or implement a new stage.
+
+Pipeline does not currently support snapshotting of the state after each run, and various pipeline tasks do
+permanently change the stage of the measurement set (flagging, corrected, and/or model column) or calibration state in
+the context. As a result, it would normally not be representative to keep re-running the same stage multiple times in
+a row, as each subsequent execution starts from a different state.
+
+Since a full Pipeline run can take a significant amount of time (hours to days depending on the size and complexity of
+the dataset), a recommended workflow for developers would be to:
+
+- run with recipereducer and the `exitstage` option up to the start of the stage you want to debug / implement
+- create a tarball of the `working` directory, or restore the `working` directory from a previously created tarball
+- run the stage-to-develop/debug individually (regular or in interactive debugger mode)
+
+To this end, it may help to create a couple of custom Python scripts:
+
+A `template.script` that runs pipeline up to just before the stage where you wish to implement / debug a task.
+```python
+import pipeline.recipereducer
+pipeline.recipereducer.reduce(
+    vis=['../rawdata/yourasdm'],
+    loglevel='info',
+    # exitstage=1,  # uncomment this line and set correct stage to stop after.
+)
+```
+Place it in the parent of the working directory, and run with:
+```console
+cd working
+casa -c ../template.script
+```
+
+A `debug.script` that executes an individual task:
 ```python
 task_to_run = 'hifa_tsysflag'
+
 import pipeline
 from pipeline.infrastructure import task_registry
+
 context = pipeline.Pipeline(context='last', loglevel='info', plotlevel='default').context
+
 taskclass = task_registry.get_pipeline_class_for_task(task_to_run)
 inputs = pipeline.infrastructure.vdp.InputsContainer(taskclass, context)
+
 # Optionally override input parameter(s) for debugging, e.g.:
 # inputs.normalize_tsys = True
+
 task = taskclass(inputs)
 result = task.execute()
 result.accept(context)
 context.save()
 ```
 
-and then run this with:
-
+Place it in the parent of the working directory, and run with:
 ```console
 casa -c ../debug.script
 ```
 
-### Create custom Pipeline processing recipes from SRDP Mustache templates
+Note: as an alternative to re-running an entire task for investigating and debugging issues, see the
+`infrastructure.utils.utils.function_io_dumper` decorator functionality that is documented in `FunctionIODumper.md`,
+introduced in [PIPE-2354 (2025 release)](https://open-jira.nrao.edu/browse/PIPE-2354).
+
+Note: a Pipeline run is relocatable, so one can resume from a working directory (and context) that is located at
+a different path from where the run was originally started. Depending on the ticket at hand, this can allow a developer
+a couple of short-cuts:
+
+- Create a run up through stage N, tarball `working` to snapshot, and optionally unpack to multiple copies
+  (working1, working2, working3) to run (in parallel) a given stage with different checkouts of the Pipeline.
+- When working on a shared cluster such as at NRAO Charlottesville, one can copy the run from a different developer / 
+  PWG member into their own workspace, and resume the context (optionally even one of the pickled results from the
+  stage, located under `pipeline-[...]/saved_state`) to inspect the context, re-run a stage with the
+  interactive debugger, etc. This can be particularly useful for times where one has to urgently debug an issue that
+  occurred for a large dataset.
+
+
+## Create custom Pipeline processing recipes from SRDP Mustache templates
 
 The SDRP templates are [mustache](http://mustache.github.io/) templates that can be used to generate custom SDRP processing recipe XML files.
 All templates are located in the [pipeline/recipes](pipeline/recipes) directory (template_*.xml).
@@ -288,15 +433,53 @@ The path of pickled context files is: `output_dir`/`context_name`/`saved_state`/
 
 ## Re-render Weblog
 
-A common development task is improving weblog. Without re-running a time-consuming pipeline task itself, you can only re-render the weblog using the existing context/result to test a small weblog-related change (e.g., minor tweaks in mako templates). Note: this will only rerun the weblog rendering portion of a pipeline stage (therefore limits your testing scope).
+A common development task is improving weblog. Without re-running a
+time-consuming pipeline task itself, you can only re-render the weblog using the
+existing context/result to test a small weblog-related change (e.g., minor tweaks
+in mako templates). Note: this will only rerun the weblog rendering portion of a
+pipeline stage (therefore limits your testing scope).
 
 ```python
-import pipeline, os
-from pipeline.infrastructure.renderer import htmlrenderer as hr
+import os
+import pipeline
+import pipeline.infrastructure.renderer.htmlrenderer as hr
+
+# Modify this to select which stage number to re-render weblog for.
+os.environ['WEBLOG_RERENDER_STAGES'] = "16"
+
 context = pipeline.Pipeline(context='last', loglevel='debug', plotlevel='default').context
-os.environ['WEBLOG_RERENDER_STAGES']='16'
 hr.WebLogGenerator.render(context)
 ```
+
+## Re-run QA heuristics
+A common development task is to implement or improve the QA heuristics for a task.
+The QA step is normally run after the main task heuristics are completed and the
+task `Results` have been created. 
+
+As such, after having run the task at least once, one can rapidly re-run the QA
+heuristic on the existing task result in the context to iterate more rapidly on
+the heuristic without having to re-run the time-consuming pipeline task itself.
+
+```python
+import pipeline
+from pipeline.infrastructure import pipelineqa
+context = pipeline.Pipeline(context='last', loglevel='debug', plotlevel='default').context
+
+# Modify this to select which stage to run QA for.
+stage_number = 14
+
+task_results = context.results[stage_number-1].read()
+pipelineqa.qa_registry.do_qa(context, task_results)
+```
+
+Note, the snippet above only re-runs the QA heuristic on a copy of the results read
+in from disk, and updates the QA scores in this copy of the results in-place.
+However, this does not modify the results on disk nor does it attempt to re-run
+the weblog rendering; therefore re-running the QA this way will not update the QA
+scores that are displayed in the task weblog. Instead, the snippet is primarily
+useful for interactively debugging the QA heuristics. Once debugged, it would be
+recommended to re-run the entire stage.
+
 
 ## Note on using executeppr/recipereducer and Pipeline CLI tasks
 

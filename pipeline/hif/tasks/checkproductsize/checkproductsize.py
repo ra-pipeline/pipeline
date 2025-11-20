@@ -1,11 +1,11 @@
 import pipeline.infrastructure as infrastructure
-#import pipeline.infrastructure.api as api
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.project as project
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
 from pipeline.hif.heuristics import checkproductsize
 from pipeline.infrastructure import task_registry
+
 from .resultobjects import CheckProductSizeResult
 
 LOG = infrastructure.get_logger(__name__)
@@ -124,12 +124,14 @@ class CheckProductSize(basetask.StandardTaskTemplate):
         elif self.inputs.maxcubelimit != -1 and self.inputs.maxproductsize != -1 and self.inputs.maxcubelimit >= self.inputs.maxproductsize:
             skip_status_msgs = ('ERROR', 'Parameter error: maxproductsize must be > maxcubelimit', 'Parameter error')
 
-        # Skip the VLA cube production size mitigation check-up if no CONTLINE_SCIENCE or LINE_SCIENCE datatype
+        # Skip the cube production size mitigation assessment (currently just for VLA) if no CONTLINE_SCIENCE or LINE_SCIENCE datatype
         # is registered in the Pipeline context.
-        elif self.inputs.maximsize == -1 and self.inputs.context.vla_skip_mfs_and_cube_imaging:
+        elif self.inputs.maximsize == -1 and self._skip_cube_mitigation():
             skip_status_msgs = (
-                'OK', 'Skip the VLA cube product size mitigation due to absence of required datatypes: CONTLINE_SCIENCE or LINE_SCIENCE',
-                'Stage skipped')
+                'OK',
+                'Skip the cube imaging size mitigation due to absence of relevant datatypes: CONTLINE_SCIENCE or LINE_SCIENCE',
+                'Stage skipped',
+            )
 
         # If skip_status_msgs is set, create a CheckProductSizeResult object and log the summary information.
         if skip_status_msgs:
@@ -147,7 +149,8 @@ class CheckProductSize(basetask.StandardTaskTemplate):
                                             {},
                                             skip_status_msgs[0],
                                             {'longmsg': skip_status_msgs[1], 'shortmsg': skip_status_msgs[2]},
-                                            None)
+                                            None,
+                                            skip_stage=True)
             # Log summary information
             LOG.info('%s', result)
             return result
@@ -211,3 +214,18 @@ class CheckProductSize(basetask.StandardTaskTemplate):
 
     def analyse(self, result):
         return result
+
+    def _skip_cube_mitigation(self) -> bool:
+        """Check if we need to skip the cube imaging migitation heuristics.
+
+        Note: this is only relevant for VLA to detect if we can proceed with VLA cube imaging
+        """
+        cube_imaging_datatypes = [
+            DataType.SELFCAL_LINE_SCIENCE,
+            DataType.REGCAL_LINE_SCIENCE,
+            DataType.SELFCAL_CONTLINE_SCIENCE,
+            DataType.REGCAL_CONTLINE_SCIENCE,
+        ]
+        ms_list = self.inputs.context.observing_run.get_measurement_sets_of_type(cube_imaging_datatypes, msonly=True)
+        telescope = self.inputs.context.project_summary.telescope
+        return 'VLA' in telescope.upper() and not ms_list

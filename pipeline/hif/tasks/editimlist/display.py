@@ -75,7 +75,8 @@ class VlassFlagSummary(object):
                     xticklabels[idx].set_color('red')
             with plt.rc_context({'mathtext.default': 'regular'}):
                 ax.set_xlabel(
-                    rf'Spw Selection\n n$_\mathdefault{{field}}$ (flagpct>flagpct$_\mathdefault{{th}}$): '
+                    'Spw Selection\n '
+                    rf'n$_\mathdefault{{field}}$ (flagpct>flagpct$_\mathdefault{{th}}$): '
                     rf'n$_\mathdefault{{th}}$={nfield_thresh}, flagpct$_\mathdefault{{th}}$={flagpct_thresh * 100}%'
                 )
             ax.set_ylabel('VLASS Image Row: 1st field name')

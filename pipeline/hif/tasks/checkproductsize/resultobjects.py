@@ -23,7 +23,8 @@ class CheckProductSizeResult(basetask.Results):
                  size_mitigation_parameters,
                  status,
                  reason,
-                 synthesized_beams):
+                 synthesized_beams,
+                 skip_stage=False):
         super().__init__()
         self.allowed_maxcubesize = allowed_maxcubesize
         self.allowed_maxcubelimit = allowed_maxcubelimit
@@ -40,6 +41,7 @@ class CheckProductSizeResult(basetask.Results):
         self.status = status
         self.reason = reason
         self.synthesized_beams = synthesized_beams
+        self.skip_stage = skip_stage
 
     def merge_with_context(self, context):
         # Store mitigation parameters for subsequent hif_makeimlist calls.

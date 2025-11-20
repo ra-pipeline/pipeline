@@ -1,15 +1,16 @@
-# Do not evaluate type annotations at definition time.
 from __future__ import annotations
 
 import json
 import os
+import traceback
 from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
 from pipeline import infrastructure
 from pipeline.hif.tasks.antpos import antpos
-from pipeline.infrastructure import casa_tasks, casa_tools, task_registry, utils, vdp
+from pipeline.hif.tasks.antpos.antpos import AntposResults
+from pipeline.infrastructure import casa_tasks, casa_tools, exceptions, task_registry, utils, vdp
 
 if TYPE_CHECKING:
     from pipeline.infrastructure.launcher import Context
@@ -215,16 +216,32 @@ class ALMAAntpos(antpos.Antpos):
 
     def prepare(self):
         inputs = self.inputs
+
         if inputs.hm_antpos == 'online':
             # PIPE-51: retrieve json file for MS to include in the call to gencal
             antpos_args = inputs.to_antpos_args()
             if not os.path.exists(antpos_args['outfile']):
                 antpos_job = casa_tasks.getantposalma(**antpos_args)
-                self._executor.execute(antpos_job)
+                try:
+                    # PIPE-2868: catch RuntimeError from getantposalma task and continue with the current session.
+                    self._executor.execute(antpos_job)
+                except RuntimeError as ex:
+                    LOG.warning('CASA/getantposalma task failed without generating %s: %s', antpos_args['outfile'], ex)
+                    traceback_msg = traceback.format_exc()
+                    if os.getenv('ALLOW_GETANTPOSALMA_FAILURE', 'false').lower() == 'true':
+                        LOG.info(traceback_msg)
+                    else:
+                        raise exceptions.PipelineException(traceback_msg)
             else:
                 LOG.warning('Antenna position file %s exists. Skipping getantposalma task.', antpos_args['outfile'])
-            # PIPE-2653 remove antennas from JSON file that are missing from the MS
-            self._remove_missing_antennas_from_json(antpos_args['outfile'])
+
+            if os.path.exists(antpos_args['outfile']):
+                # PIPE-2653 remove antennas from JSON file that are missing from the MS
+                self._remove_missing_antennas_from_json(antpos_args['outfile'])
+            else:
+                # PIPE-2868: likely getantposalma failed and no json file was created.
+                # set result offsets to None instead of empty list [] and continue with the current session.
+                return AntposResults(offsets=None)
 
         return super().prepare()
 
@@ -285,13 +302,14 @@ class ALMAAntpos(antpos.Antpos):
         result = super().analyse(result)
 
         # add the offsets to the result for online query
-        if self.inputs.hm_antpos == 'online':
+        antpos_args = self.inputs.to_antpos_args()
+        if self.inputs.hm_antpos == 'online' and os.path.exists(antpos_args['outfile']):
             offsets_dict = self._get_antenna_offsets()
             antenna_names, offsets = self._get_antennas_with_significant_offset(offsets_dict)
             if antenna_names:
-                result.antenna = ",".join(antenna_names)
+                result.antenna = ','.join(antenna_names)
                 result.offsets = offsets
-                LOG.info("Antennas with non-zero corrections applied: %s", result.antenna)
+                LOG.info('Antennas with non-zero corrections applied: %s', result.antenna)
 
         return result
 

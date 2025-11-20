@@ -7,7 +7,7 @@ import datetime
 import json
 import os
 import shelve
-from contextlib import closing
+import traceback
 
 from . import eventbus
 from . import logging
@@ -66,19 +66,27 @@ class TaskTimeTracker(object):
         now = datetime.datetime.now()
         stage_number = event.stage_number
 
-        with closing(shelve.DbfilenameShelf(self.db_path, writeback=True)) as db:
-            if db_key not in db:
-                db[db_key] = {}
+        try:
+            with shelve.open(self.db_path, writeback=True) as db:
+                if db_key not in db:
+                    db[db_key] = {}
 
-            if isinstance(event, start_event):
-                tes = ExecutionState(stage=stage_number, start=now, end=now, state=event.state)
-            elif isinstance(event, stop_events):
-                old_tes = db[db_key][stage_number]
-                tes = ExecutionState(stage=stage_number, start=old_tes.start, end=now, state=event.state)
-            else:
-                raise ValueError('Unhandled event type: {}'.format(event.__class__.__name__))
+                if isinstance(event, start_event):
+                    tes = ExecutionState(stage=stage_number, start=now, end=now, state=event.state)
+                elif isinstance(event, stop_events):
+                    old_tes = db[db_key][stage_number]
+                    tes = ExecutionState(stage=stage_number, start=old_tes.start, end=now, state=event.state)
+                else:
+                    raise ValueError(f'Unhandled event type: {event.__class__.__name__}')
 
-            db[db_key][stage_number] = tes
+                # PIPE-2848: no explict db.sync() is required at the end as it will be taken care
+                # of by contextmanager:
+                # see: https://docs.python.org/3.10/library/shelve.html#shelve.Shelf.sync
+                db[db_key][stage_number] = tes
+        except OSError as e:
+            LOG.info('timetracker database I/O error: %s', e)
+            traceback_msg = traceback.format_exc()
+            LOG.debug(traceback_msg)
 
         if export_on and isinstance(event, export_on):
             self.export()
@@ -108,7 +116,7 @@ class TaskTimeTracker(object):
         """
         r = {}
 
-        with closing(shelve.DbfilenameShelf(self.db_path)) as db:
+        with shelve.open(self.db_path) as db:
             for k, stages in db.items():
                 r[k] = {}
                 for e in stages.values():
@@ -128,7 +136,7 @@ class TaskTimeTracker(object):
                 duration_hms = utils.format_timedelta(duration)
                 r['total'][result_state.stage] = {'seconds': duration_secs, 'hms': duration_hms}
 
-        with open(self.json_path, 'w') as json_file:
+        with open(self.json_path, 'w', encoding='utf-8') as json_file:
             json.dump(r, json_file, sort_keys=True, indent=4, separators=(',', ': '))
 
 

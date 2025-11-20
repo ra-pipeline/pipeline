@@ -8,16 +8,20 @@ Created on Dec 4, 2017
 
 @author: kana
 """
+from __future__ import annotations
+
 import os
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 import pipeline.hsd.tasks.importdata.importdata as sd_importdata
 import pipeline.infrastructure as infrastructure
-from pipeline.domain.fluxmeasurement import FluxMeasurement
-from pipeline.domain.measurementset import MeasurementSet
-from pipeline.domain.singledish import MSReductionGroupDesc
 from pipeline.infrastructure import casa_tools, task_registry
-from pipeline.infrastructure.launcher import Context
+
+if TYPE_CHECKING:
+    from pipeline.domain.fluxmeasurement import FluxMeasurement
+    from pipeline.domain.measurementset import MeasurementSet
+    from pipeline.domain.singledish import MSReductionGroupDesc
+    from pipeline.infrastructure.launcher import Context
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -29,9 +33,18 @@ class NROImportDataInputs(sd_importdata.SDImportDataInputs):
     """
 
     # docstring and type hints: supplements hsdn_importdata
-    def __init__(self, context: Context, vis: Optional[List[str]]=None, output_dir: Optional[str]=None, session: Optional[List[str]]=None,
-                 datacolumns: Optional[Dict]=None, overwrite: Optional[bool]=None, nocopy: Optional[bool]=None, createmms: Optional[str]=None,
-                 hm_rasterscan: Optional[str] = None):
+    def __init__(
+            self,
+            context: Context,
+            vis: list[str] | None = None,
+            output_dir: str | None = None,
+            session: list[str] | None = None,
+            datacolumns: dict | None = None,
+            overwrite: bool | None = None,
+            nocopy: bool | None = None,
+            createmms: str | None = None,
+            hm_rasterscan: str | None = None,
+            ):
         """Initialise NROImportDataInputs class.
 
         Args:
@@ -94,12 +107,10 @@ class NROImportDataInputs(sd_importdata.SDImportDataInputs):
         ocorr_mode = 'ao'
         save_flagonline = False
 
-        super(NROImportDataInputs, self).__init__(context, vis=vis, output_dir=output_dir, asis=asis,
-                                                  process_caldevice=process_caldevice, session=session,
-                                                  overwrite=overwrite, nocopy=nocopy, save_flagonline=save_flagonline,
-                                                  bdfflags=bdfflags, lazy=lazy, createmms=createmms,
-                                                  ocorr_mode=ocorr_mode, datacolumns=datacolumns,
-                                                  hm_rasterscan=hm_rasterscan)
+        super().__init__(context, vis=vis, output_dir=output_dir, asis=asis, process_caldevice=process_caldevice,
+                         session=session, overwrite=overwrite, nocopy=nocopy, save_flagonline=save_flagonline,
+                         bdfflags=bdfflags, lazy=lazy, createmms=createmms, ocorr_mode=ocorr_mode,
+                         datacolumns=datacolumns, hm_rasterscan=hm_rasterscan)
 
 
 class NROImportDataResults(sd_importdata.SDImportDataResults):
@@ -114,8 +125,13 @@ class NROImportDataResults(sd_importdata.SDImportDataResults):
     SetJy results generated from flux entries in Source.xml.
     """
 
-    def __init__(self, mses: Optional[List[MeasurementSet]]=None, reduction_group_list: Optional[List[Dict[int, MSReductionGroupDesc]]]=None,
-                 datatable_prefix: Optional[str]=None, setjy_results: Optional[List[FluxMeasurement]]=None):
+    def __init__(
+            self,
+            mses: list[MeasurementSet] | None = None,
+            reduction_group_list: list[dict[int, MSReductionGroupDesc]] | None = None,
+            datatable_prefix: str | None = None,
+            setjy_results: list[FluxMeasurement] | None = None,
+            ):
         """Initialise NROImportDataResults class.
 
         Args:
@@ -124,19 +140,20 @@ class NROImportDataResults(sd_importdata.SDImportDataResults):
             datatable_prefix: table name prefix of MeasurementSet
             setjy_results: the flux results generated from Source.xml
         """
-        super(NROImportDataResults, self).__init__(mses=mses, reduction_group_list=reduction_group_list,
-                                                   datatable_prefix=datatable_prefix, setjy_results=setjy_results)
+        super().__init__(mses=mses, reduction_group_list=reduction_group_list, datatable_prefix=datatable_prefix,
+                         setjy_results=setjy_results)
 
-    def merge_with_context(self, context: Context):
+    def merge_with_context(self, context: Context) -> None:
         """Override method of basetask.Results.merge_with_context.
 
         Args:
             context: pipeline context
         """
-        super(NROImportDataResults, self).merge_with_context(context)
+        super().merge_with_context(context)
         # Set observatory information
         for ms in self.mses:
             if ms.antenna_array.name in ('NRO',):
+                ms.array_name = 'TP'
                 context.project_summary.telescope = 'NRO'
                 context.project_summary.observatory = 'Nobeyama Radio Observatory'
                 break
@@ -152,7 +169,7 @@ class NROImportData(sd_importdata.SerialSDImportData):
 
     Inputs = NROImportDataInputs
 
-    def prepare(self, **parameters: Dict[str, Any]) -> NROImportDataResults:
+    def prepare(self, **parameters: dict[str, Any]) -> NROImportDataResults:
         """Prepare job requests for execution.
 
         Args:
@@ -163,7 +180,7 @@ class NROImportData(sd_importdata.SerialSDImportData):
         # the input data should be MSes
         # TODO: check data type
         # get results object by running super.prepare()
-        results = super(NROImportData, self).prepare()
+        results = super().prepare()
         myresults = NROImportDataResults(mses=results.mses, reduction_group_list=results.reduction_group_list,
                                          datatable_prefix=results.datatable_prefix, setjy_results=results.setjy_results)
         myresults.origin = results.origin

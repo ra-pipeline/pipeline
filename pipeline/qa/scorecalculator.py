@@ -16,6 +16,7 @@ import re
 import shutil
 import traceback
 from typing import TYPE_CHECKING, Any
+from xml.etree import ElementTree
 
 import numpy as np
 from scipy import interpolate, special
@@ -988,21 +989,90 @@ def score_lowtrans_flagcmds(ms, result):
 
 @log_qa
 def score_vla_agents(ms, summaries):
-    """
-    Get a score for the fraction of data flagged by online, shadow, and template agents.
+    """Get a score for the fraction of data flagged by online, shadow, and template agents.
 
     0 < score < 1 === 60% < frac_flagged < 5%
     """
-    score = score_vla_science_data_flagged_by_agents(ms, summaries, 0.05, 0.6,
-                                                     ['online', 'template', 'autocorr', 'edgespw',
-                                                      'clip', 'quack', 'baseband'])
+    qascore_list = []
 
-    new_origin = pqa.QAOrigin(metric_name='score_vla_agents',
-                              metric_score=score.origin.metric_score,
-                              metric_units='Fraction of data newly flagged by online, shadow, and template agents')
-    score.origin = new_origin
+    # PIPE-2576: Part-1: if flag template is used score < 0.5
+    for flag_stat in summaries:
+        if flag_stat['name'] == 'template':
+            score_val = 0.3
+            msg = 'Flag template is used for flagging.'
+            origin = pqa.QAOrigin(metric_name='score_flagdata', metric_score=score_val, metric_units='')
+            qascore_list.append(pqa.QAScore(score_val, longmsg=msg, shortmsg=msg, origin=origin))
 
-    return score
+    # PIPE-2576: Part-2: if clipping > 1% with spectral line window
+    # indentified, score < 0.5
+    is_continuum_only = True
+    for flag_stat in summaries:
+        if flag_stat['name'] == 'clip':
+            for spw_id in flag_stat['spw'].keys():
+                spw = ms.get_spectral_window(spw_id)
+                flag_fraction = flag_stat['spw'][spw_id]['flagged'] / flag_stat['spw'][spw_id]['total']
+                if spw.specline_window and is_continuum_only:
+                    is_continuum_only = False
+                if spw.specline_window and flag_fraction > 0.01:
+                    score_val = 0.3
+                    msg = f'Clipping {flag_fraction:.2%} in spectral line spw {spw_id}.'
+                    origin = pqa.QAOrigin(
+                        metric_name='score_flagdata',
+                        metric_score=score_val,
+                        metric_units='Fraction of data that is flagged in clipping',
+                    )
+                    qascore_list.append(pqa.QAScore(score_val, longmsg=msg, shortmsg=msg, origin=origin))
+
+    # PIPE-2576: Part-3:  if clipping > 5% with continuum line window
+    for flag_stat in summaries:
+        if flag_stat['name'] == 'clip' and is_continuum_only:
+            flag_fraction = flag_stat['flagged'] / flag_stat['total']
+            if flag_fraction > 0.05:
+                score_val = 0.3
+                msg = f'Clipping {flag_fraction:.2%} in continuum spw(s).'
+                origin = pqa.QAOrigin(
+                    metric_name='score_flagdata',
+                    metric_score=score_val,
+                    metric_units='Fraction of data that is flagged in clipping',
+                )
+                qascore_list.append(pqa.QAScore(score_val, longmsg=msg, shortmsg=msg, origin=origin))
+
+    # PIPE-2576: Part-4: if total flagging >30%, score < 0.5
+    if summaries:
+        flag_fraction = summaries[-1]['flagged'] / summaries[-1]['total']
+        score_val = max([(1 - flag_fraction / 0.60), 0.0])
+        msg = f'Total flag fraction is {flag_fraction:.2%}.'
+        origin = pqa.QAOrigin(
+            metric_name='score_flagdata', metric_score=score_val, metric_units='Total Fraction of data that is flagged'
+        )
+        qascore_list.append(pqa.QAScore(score_val, longmsg=msg, shortmsg=msg, origin=origin))
+    else:
+        score_val = 0.0
+        msg = 'No flag summaries found'
+        origin = pqa.QAOrigin(
+            metric_name='score_flagdata', metric_score=score_val, metric_units='Total Fraction of data that is flagged'
+        )
+        qascore_list.append(pqa.QAScore(score_val, longmsg=msg, shortmsg=msg, origin=origin))
+
+    # PIPE-2576: Part-5: endtime = 0 in flag.xml then score <0.5
+    flag_table = os.path.join(ms.name, 'Flag.xml')
+    if os.path.exists(flag_table):
+        source_element = ElementTree.parse(flag_table)
+        if source_element:
+            for flagset in source_element.findall('row'):
+                endtime = flagset.findtext('endTime')
+                if int(endtime):
+                    score_val = 0.3
+                    msg = 'In flag.xml for online flags, end time is 0'
+                    origin = pqa.QAOrigin(
+                        metric_name='score_flagdata',
+                        metric_score=score_val,
+                        metric_units='Total Fraction of data that is flagged',
+                    )
+                    qascore_list.append(pqa.QAScore(score_val, longmsg=msg, shortmsg=msg, origin=origin))
+                    break
+
+    return qascore_list
 
 
 @log_qa
@@ -2894,7 +2964,9 @@ def score_sd_line_detection(reduction_group: dict, result: 'SDBaselineResults') 
         groups = np.split(idx, np.where(np.diff(idx) != 1)[0] + 1)
         return [(grp[0], grp[-1]) for grp in groups]
 
-    def make_score(score_val: float, msg: str, metric_val: str, metric_units: str, ms_name: str, field: str = '', spws: set[int] = set(), ants: set[str] = set()):
+    def make_score(score_val: float, msg: str, metric_val: str, metric_units: str,
+                   ms_name: str | None = None, field: str | None = None, spws: set[int] = set(), ants: set[str] = set()):
+
         """
         Build a QAScore object for score_sd_line_detection.
 
@@ -2903,7 +2975,7 @@ def score_sd_line_detection(reduction_group: dict, result: 'SDBaselineResults') 
             msg (str): Description of the QA result.
             metric_val (str): The metric value of score.
             metric_units (str): Units for the metric_value.
-            ms_name (str): Name of the Measurement Set (EB).
+            ms_name (str): Name of the Measurement Set (EB). (optional)
             field (str): Field name (optional).
             spws (set[int]): Set of spectral window IDs (optional).
             ants (set[str]): Set of antenna names (optional).
@@ -2912,14 +2984,21 @@ def score_sd_line_detection(reduction_group: dict, result: 'SDBaselineResults') 
             pqa.QAScore: A fully populated QAScore with long and short messages,
                         origin (metric name/score/units), and target selection.
         """
-        spw_str = ', '.join(map(str, sorted(spws)))
-        ant_str = ', '.join(sorted(ants))
-        longmsg = f'{msg} in EB {ms_name}, Field {field}, Spw {spw_str}, Antenna {ant_str}.'
+        ms_str = f'EB {ms_name}' if ms_name else ""
+        field_str = f', Field {field}' if field else ""
+        spw_str = ', Spw ' + ', '.join(map(str, sorted(spws))) if spws else ""
+        ant_str = ', Antenna ' + ', '.join(sorted(ants)) if ants else ""
         shortmsg = f'{msg}.'
+        longmsg = f'{msg} in {ms_str}{field_str}{spw_str}{ant_str}.' if ms_name or field or spws or ants else shortmsg
         origin = pqa.QAOrigin(metric_name='score_sd_line_detection',
                               metric_score=metric_val,
                               metric_units=metric_units)
-        selection = pqa.TargetDataSelection(vis={ms_name}, spw=spws, field={field}, ant=ants, intent={'TARGET'})
+        selection = pqa.TargetDataSelection(
+            vis={ms_name} if ms_name else None,
+            spw=spws,
+            field={field} if field else None,
+            ant=ants,
+            intent={'TARGET'})
         return pqa.QAScore(score_val, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=selection)
 
     # Precompute ATM masks per MS/SPW
@@ -3039,9 +3118,8 @@ def score_sd_line_detection(reduction_group: dict, result: 'SDBaselineResults') 
     if len(line_detection_scores) == 0:
         # add new entry with score of 0.8 if no spectral lines
         # were detected in any spws/fields
-        line_detection_scores.append(make_score(0.8,  'No line ranges were detected in all SPWs.',
-                                    'N/A', 'Channel range(s) of detected lines',
-                                    next(iter(atm_masks))))
+        line_detection_scores.append(make_score(0.8,  'No line ranges were detected in all SPWs',
+                                    'N/A', 'Channel range(s) of detected lines'))
 
     return line_detection_scores + dm_scores
 

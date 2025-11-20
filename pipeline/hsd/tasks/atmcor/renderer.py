@@ -128,8 +128,13 @@ def identify_heuristics_plots(stage_dir: str, results: 'SDATMCorrectionResults')
                 }
             )
         )
-    LOG.debug(f'{heuristics_plots}')
-    return heuristics_plots
+    # sort plots by model string
+    # Sample model string: "atmtype 1, dtem_dh -5.6K/km, h0 2.0km.".
+    sorted_heuristics_plots = sorted(
+        heuristics_plots,
+        key=lambda x: x.parameters['model']
+    )
+    return sorted_heuristics_plots
 
 
 def iterate_field_spw(vis: str, field_id_list: List[int], spw_id_list: List[int]) -> Generator[Tuple[int, int], None, None]:

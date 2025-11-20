@@ -18,32 +18,62 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
 
     hifa_spwphaseup performs two functions:
 
-    - Determines the spectral window mapping or combination mode, for each phase
-      and check source, to use when solving for phase as a function of time
-      (gfluxscale and timegaincal), and when applying those solutions to
-      targets.
-
+    - Determines the spectral window mapping or combination mode, gaintype and
+      solint, for each independent bandpass, amplitude, diffgain, phase and check
+      source, to use when solving the phaseup (phase as a function of time) in
+      subsequent stages (mapping mode and gaintype in gfluxscaleflag, all
+      parameters for gfluxscale and timegaincal), and when applying those solutions
+      to targets.
+    
     - Computes the per-spectral-window phase offset table that will be applied
       to the data to remove mean phase differences between the spectral windows.
 
     If ``hm_spwmapmode`` = 'auto', then the spectral window map is computed for
-    each SpectralSpec and each source with phase or check intent, using the
-    following algorithm:
+    each SpectralSpec and each calibrator source, using the following algorithm:
 
-    - Estimate the per-spectral-window (spw) per-scan signal-to-noise ratio for
-      each phase and check source based on catalog flux densities, Tsys, number
-      of antennas, and integration scan time.
+    - Estimate the per-spectral-window (spw) signal-to-noise ratio based on
+      catalog flux densities, Tsys, number of antennas, and integration scan time.
+      These estimates are shown in the weblog.
+    
+    - Compute the per-spw signal-to-noise for each above mentioned intent based
+      on an temporary phaseup gain calibration using solint ``inf`` for the PHASE
+      and CHECK intents, and ``int`` otherwise. These computed signal-to-noise
+      values override the use of the estimated values unless none are found.
 
-    - If the signal-to-noise of all spws is greater than ``phasesnr``, then
-      ``hm_spwmapmode`` = 'default' mapping is used in which each spw is used
-      to calibrate itself.
+    - If SNR calculation fails, then subsequent heuristics are skipped, warnings
+      printed, and mapping falls back to narrow-to-wide.
+    
+    - If the signal-to-noise of all spws is greater than ``phasesnr`` for a 
+      PHASE or CHECK intent, or greater than ``intphasesnr'' for the other 
+      intents, then if SNR is high enough to keep solint='int', then
+      no mapping is used (each spw is used to calibrate itself).  If the calculated
+      solint is >'int' then mapping and combine are attempted, to favor a
+      short solint over keeping the spws independent.
 
     - If the signal-to-noise of only some spws are greater than the value of
-      ``phasesnr``, then each lower-SNR spw is mapped to the highest SNR spw
+      ``phasesnr`` for the PHASE or CHECK intent, or ``intphasesnr`` for the 
+      other intents, then each lower-SNR spw is mapped to the highest SNR spw
       in the same SpectralSpec.
+    
+    - If all spws have low SNR (or all spws in a given SpectraSpec for
+      multi-SpectralSpec observations), then spws are combined.
 
-    - If all spws have low SNR, or SNR cannot be computed for any reason (for
-      example, there is no flux information), then ``hm_spwmapmode`` = 'combine'.
+    - The time solint is calculated and stored for phaseup in subsequent stages. 
+      If ``hm_spwmapmode`` is not 'combine' then there is at least one high
+      signal-to-noise spw, then by definition that has a solint = 'int'. For
+      ``hm_spwmapmode`` = 'combine', the computed signal-to-noise is used 
+      in conjunction with ``phasesnr'' for the phase and check intents, or 
+      ``intphasesnr'' for the other intents.  First the gaintype is changed
+      from G to T (combine polarization) and thereafter solint is increased
+      from 'int' up to the limits of 1/2 scan for the phase or check intent, or
+      to the input ``maxphaseupsolint`` for the other intents
+
+    - If ``hm_spwmapmode'' is combine and no SNRs are found, the PHASE and CHECK
+      intents will default to a solint of 1/4 scan.
+
+    - If the intent is AMPLITUDE, and gaintype was changed from 'G' to 'T',
+      the signal-to-noise required to be met before increasing solint > 'int' 
+      is reduced to ``intphasesnrmin``
 
     If ``hm_spwmapmode`` = 'combine', hifa_spwphaseup maps all the science windows
     to a single science spectral window. For example, if the list of science
@@ -67,16 +97,26 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
 
     If ``hm_spwmapmode`` = 'default' the spw mapping is assumed to be one to one.
 
-    Phase offsets per spectral window are determined by computing a phase only gain
+
+
+    After determining the combine and mapping parameters and time solints, 
+    phase offsets per spectral window are determined by computing a phase only gain
     calibration on the selected data, normally the high signal-to-noise bandpass
     calibrator observations, using the solution interval 'inf'.
 
-    At the end of the task the spectral window map and the phase offset calibration
-    table in the pipeline are stored in the context for use by later tasks.
+    At the end of the task the spectral window map, solint and gaintype along 
+    with the phase offset calibration table(s) in the pipeline are stored in
+    the context for use by later tasks.
+    
+    Finally, the SNR of the calibration solutions are inspected and if the median
+    value on a per-spw basis does not reach specific thresholds, a warning is
+    issued with a reduced QA score.  For PHASE intent, blue, yellow, and red QA
+    result if the achieved SNR is less than 0.75, 0.5, and 0.33 times ``phasesnr``,
+    respectively.  For BANDPASS, AMPLITUDE, and DIFFGAIN intent, QA messages are
+    based on 0.75, 0.5, and 0.33 times ``intphasesnr`` (unless ``intphasesnrmin``
+    was used for BANDPASS or AMPLITUDE).  Finally, for CHECK intent the QA score
+    is always blue, but scales depending on achieved SNR relative to ``phasesnr``.
 
-    Finally, the SNR of the calibration solutions are inspected and if the median value
-    on a per-spw basis does not reach specific thresholds, then issue a warning and reduced
-    QA score, with thresholds at ``phasesnr`` *0.75 (blue), *0.5 (yellow) and *0.33 (red).
 
     Returns:
         The results object for the pipeline task is returned.
@@ -88,9 +128,9 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
         >>> hifa_spwphaseup()
 
         2. Compute the default spectral window map and the per spectral window phase
-        offsets set the spectral window mapping mode to 'simple':
+        offsets set the spectral window mapping mode to 'combine':
 
-        >>> hifa_spwphaseup(hm_spwmapmode='simple')
+        >>> hifa_spwphaseup(hm_spwmapmode='combine')
 
     """
     ##########################################################################

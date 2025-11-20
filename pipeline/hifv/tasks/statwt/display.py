@@ -25,19 +25,19 @@ class weightboxChart(object):
 
     @staticmethod
     def _get_weight_from_wtable(tbl, this_ant='', this_spw='', this_scan='', spw_list=[]):
-        """Get the weights from the weights table with the specificed ant, spw, and scan. 
+        """Get the weights from the weights table with the specified ant, spw, and scan.
         The spw_list parameter only works with only the this_ant specified, and restricts
         the selection of entries in the weights table to those with spws in the spw_list."""
 
         if (this_ant != '') and (this_spw != '') and (this_scan!=''):
-            query_str = 'SPECTRAL_WINDOW_ID=={0} && ANTENNA1=={1} && SCAN_NUMBER=={2} ntrue(FLAG)==0'.format(this_spw, this_ant, this_scan)
+            query_str = 'SPECTRAL_WINDOW_ID=={0} && ANTENNA1=={1} && SCAN_NUMBER=={2} && ntrue(FLAG)==0'.format(this_spw, this_ant, this_scan)
         elif (this_ant != '') and (this_spw != ''):
             query_str = 'SPECTRAL_WINDOW_ID=={0} && ANTENNA1=={1} && ntrue(FLAG)==0'.format(this_spw, this_ant)
         elif (this_ant != '') and (this_scan != ''):
             query_str = 'SCAN_NUMBER=={0} && ANTENNA1=={1} && ntrue(FLAG)==0'.format(this_scan, this_ant)
         elif (this_scan != '') and (this_spw != ''):
             query_str = 'SPECTRAL_WINDOW_ID=={0} && SCAN_NUMBER=={1} && ntrue(FLAG)==0'.format(this_spw, this_scan)
-        elif (this_ant != '') and spw_list: 
+        elif (this_ant != '') and spw_list:
             query_str = 'ANTENNA1=={0} && ntrue(FLAG)==0 && SPECTRAL_WINDOW_ID IN {1}'.format(this_ant, list(map(int, spw_list)))
         elif (this_ant != ''):
             query_str = 'ANTENNA1=={0} && ntrue(FLAG)==0'.format(this_ant)
@@ -56,12 +56,12 @@ class weightboxChart(object):
         return weights.real
 
     # This is used to get the scans for a band by passing in the appropriate list of spws
-    # and is only used for the VLA-PI code 
+    # and is only used for the VLA-PI code
     def _get_scans_with_spws(self, tbl: str, spws: List=[]):
         """Get the scans from the weights table with the spws in the input list"""
 
         query = 'ntrue(FLAG)==0 && SPECTRAL_WINDOW_ID IN {0}'.format(list(map(int, spws)))
-        scans = None        
+        scans = None
         with casa_tools.TableReader(tbl) as tb:
             stb = tb.query(query)
             scans = np.sort(np.unique(stb.getcol('SCAN_NUMBER')))
@@ -74,8 +74,8 @@ class weightboxChart(object):
             plots.extend(self._get_plot_wrapper(suffix=k))
         return [p for p in plots if p is not None]
 
-    def _split(self, to_split: List, n: int) -> Tuple[List]: 
-        """Utility function to divide the input list to_split into sublists of size n and return 
+    def _split(self, to_split: List, n: int) -> Tuple[List]:
+        """Utility function to divide the input list to_split into sublists of size n and return
         a tuple of these lists"""
         quotient, remainder = divmod(len(to_split), n)
         return (to_split[i*quotient+min(i, remainder):(i+1)*quotient+min(i+1, remainder)] for i in range(n))
@@ -110,10 +110,10 @@ class vlaWeightboxChart(weightboxChart):
                               parameters={'vis': self.ms.basename,
                                           'x_axis': 'ant/spw/scan',
                                           'y_axis': 'weight',
-                                          'type': suffix, 
+                                          'type': suffix,
                                           'band': band})
                     wrappers.append(wrapper)
-                
+
             except Exception as ex:
                 LOG.error('Could not create ' + suffix + ' plot.')
                 LOG.exception(ex)
@@ -132,8 +132,8 @@ class vlaWeightboxChart(weightboxChart):
             ant_names = tb.getcol('NAME')
             ant_idxs = range(len(ant_names))
 
-        # VLA PI plots are separated out by band, so determine the spws 
-        # for each band.  
+        # VLA PI plots are separated out by band, so determine the spws
+        # for each band.
         spw2band = self.ms.get_vla_spw2band() # Format: {'1':'C', '2':'K' }
         band2spw = collections.defaultdict(list)
         listspws = [spw for spw in spws]
@@ -143,7 +143,7 @@ class vlaWeightboxChart(weightboxChart):
         self.band2spw = band2spw  # Format: {'C':[1,2,3], 'K':[4,5,6]}
 
         bands_return = []
-        for band in self.band2spw: 
+        for band in self.band2spw:
             figfile = self._get_figfile(suffix, band)
             LOG.info('Making antenna-based weight plot: {0} for band: {1}'.format(figfile, band))
             bxpstats_per_ant = list()
@@ -185,7 +185,7 @@ class vlaWeightboxChart(weightboxChart):
                     bxpstats[0]['max'] = None
                     bxpstats_per_spw.extend(bxpstats)
                 bxpstats_per_spw[-1]['spw'] = this_spw
-           
+
             scans = self._get_scans_with_spws(tbl, self.band2spw[band])
 
             bxpstats_per_scan = list()
@@ -211,16 +211,16 @@ class vlaWeightboxChart(weightboxChart):
             # Setup plot sizes and number of plots
 
             # Scan plots are split into subplots every 75 scans for readability
-            max_scans_per_plot = 75 
+            max_scans_per_plot = 75
             number_of_scan_plots = math.ceil(len(scans)/max_scans_per_plot)
-            number_of_plots = number_of_scan_plots + 2 # There is always one spw plot and one antenna plot.
+            number_of_plots = number_of_scan_plots + 2  # There is always one spw plot and one antenna plot.
             plot_len = 15
             plot_height = number_of_plots * 2
             fig, subplots = plt.subplots(number_of_plots, 1, figsize=(plot_len, plot_height))
 
             if number_of_scan_plots == 1:
                 ax1, ax2, ax3 = subplots
-            else: 
+            else:
                 ax1 = subplots[0]
                 ax2 = subplots[1]
                 ax_scans = subplots[2:]
@@ -240,7 +240,7 @@ class vlaWeightboxChart(weightboxChart):
             ax2.set_xlabel('SPW ID')
             ax2.set_ylabel('$Wt_{i}$')
             ax2.get_yaxis().get_major_formatter().set_useOffset(False)
-            
+
             # Save-off y-axis limits so they can be re-used for the scans plots. 
             # Since the scan plost can be split up if there are more than max_scans_per_plot scans, 
             # this is used to keep the y-axes consistent.
@@ -253,7 +253,7 @@ class vlaWeightboxChart(weightboxChart):
                 ax3.set_xlabel('Scan Number')
                 ax3.set_ylabel('$Wt_{i}$')
                 ax3.get_yaxis().get_major_formatter().set_useOffset(False)
-            else: 
+            else:
                 bxpstats_per_scan_split = list(self._split(bxpstats_per_scan, number_of_scan_plots))
                 scans_split = list(self._split(scans, number_of_scan_plots))
                 for i, axis in enumerate(ax_scans): 
@@ -270,11 +270,11 @@ class vlaWeightboxChart(weightboxChart):
 
             if not self.result.weight_stats:
                 self.result.weight_stats[suffix] = {}
-            self.result.weight_stats[suffix][band] =  {'per_spw': bxpstats_per_spw,
-                                                       'per_ant': bxpstats_per_ant,
-                                                       'per_scan': bxpstats_per_scan}
+            self.result.weight_stats[suffix][band] = {'per_spw': bxpstats_per_spw,
+                                                      'per_ant': bxpstats_per_ant,
+                                                      'per_scan': bxpstats_per_scan}
             bands_return.append(band)
-                                                    
+
         return bands_return
 
 
@@ -288,7 +288,7 @@ class vlassWeightboxChart(weightboxChart):
             os.mkdir(stage_dir)
         fig_basename = '-'.join(list(filter(None, ['statwt',
                                            self.ms.basename, 'summary', suffix])))+'.png'
-        
+
         return os.path.join(stage_dir, fig_basename)
 
     def _get_plot_wrapper(self, suffix:str='') -> List[logger.Plot]:
@@ -313,7 +313,7 @@ class vlassWeightboxChart(weightboxChart):
                 return None
         return wrappers
 
-    def  _create_plot_from_wtable(self, suffix):
+    def _create_plot_from_wtable(self, suffix):
         tbl = self.result.wtables[suffix]
 
         with casa_tools.TableReader(tbl) as tb:

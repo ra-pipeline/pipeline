@@ -370,7 +370,10 @@ class SkyDisplay:
 
         # remove any incomplete matplotlib plots, if left these can cause weird errors
         plt.close('all')
-        fig, ax = plt.subplots(figsize=self.figsize, constrained_layout=True)
+
+        # PIPE-2843: disable constrained layout to prevent potential bad interaction with AnnotationBbox
+        # Also see: https://github.com/matplotlib/matplotlib/issues/24453
+        fig, ax = plt.subplots(figsize=self.figsize, constrained_layout=False)
 
         # plot data
         if 'cmap' not in imshow_args:
@@ -393,7 +396,7 @@ class SkyDisplay:
         for line in ax.xaxis.get_ticklines() + ax.yaxis.get_ticklines():
             line.set_color('white')
         for labels in ax.xaxis.get_ticklabels() + ax.yaxis.get_ticklabels():
-            labels.set_fontsize(0.75 * labels.get_fontsize())
+            labels.set_fontsize(0.5 * labels.get_fontsize())
 
         # colour bar
         if self.exclude_desc:

@@ -192,7 +192,7 @@ class SelfcalHeuristics(object):
             dogrowprune = True
             minpercentchange = 1.0
             growiterations = 75
-            minbeamfrac = 0.3
+            minbeamfrac = 0.1
             # cyclefactor=1.0
 
         elif 'VLA' in telescope:
@@ -738,12 +738,11 @@ class SelfcalHeuristics(object):
 
         for target in all_targets:
             for band in selfcal_library[target].keys():
-
                 selfcal_library[target][band]['per_spw_stats'] = {}
                 vislist = selfcal_library[target][band]['vislist'].copy()
 
-                selfcal_library[target][band]['spw_map'], selfcal_library[target][band]['reverse_spw_map'] = get_spw_map(selfcal_library,
-                                                                                                                         target, band, self.telescope)
+                selfcal_library[target][band]['spw_map'], selfcal_library[target][band]['reverse_spw_map'] = get_spw_map(
+                    self.image_heuristics.observing_run)
 
                 # code to work around some VLA data not having the same number of spws due to missing BlBPs
                 # selects spwlist from the visibilities with the greates number of spws

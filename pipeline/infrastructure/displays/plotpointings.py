@@ -366,21 +366,7 @@ def plot_tsys_scans(ms: MeasurementSet, source: Source, figfile: str) -> None:
     """
     LOG.info("Creating Tsys plot for source %s.", source.name)
     # Retrieve correct Tsys field for source based on mapping
-    tsys_fields = get_intent_to_tsysfield_map(ms, is_single_dish=False)['TARGET'].split(',')
-    if not tsys_fields:
-        raise Exception('No Tsys fields associated with TARGET.')
-
-    try:
-        # Grabs correct field if more that one Tsys field and/or the returned ID or name match
-        tsys_field = [
-            field for field in source.fields if str(field.id) in tsys_fields or field.name in tsys_fields
-            ][0]
-    except IndexError:
-        # Defaults to first Tsys TARGET field if there are no Tsys fields associated with source
-        if tsys_fields[0].isdigit():
-            tsys_field = ms.get_fields(field_id=int(tsys_fields[0]))[0]
-        else:
-            tsys_field = ms.get_fields(name=tsys_fields[0])[0]
+    tsys_field = select_tsys_field(ms, source)
 
     # Retrieve TARGET field positions and configurations
     fields = [f for f in source.fields if not is_tsys_only(f)]
@@ -389,7 +375,7 @@ def plot_tsys_scans(ms: MeasurementSet, source: Source, figfile: str) -> None:
     mean_direction = radec_to_direction(mean_ra, mean_dec)
 
     # Calculate Tsys scans offset to apply to plot
-    tsys_scans_dict = tsys_scans_radec(ms, mean_direction, tsys_field, observatory=ms.antenna_array.name.upper())
+    tsys_scans_dict = tsys_scans_radec(ms, mean_direction, tsys_field)
 
     # Create Tsys scans plot
     fig, ax, fontsize = create_figure(delta_ra, delta_dec, beam_diameters)
@@ -473,6 +459,55 @@ def label_format(x: float, _: Any) -> str:
         formatted = f"{arcmin:.{precision}f}" + r"$^\prime$"
 
     return formatted
+
+
+def select_tsys_field(
+        ms: MeasurementSet,
+        source: Source,
+        ) -> Field:
+    """
+    Pick the best-matching Tsys field for a given source.
+
+    Selection order (stop at first non-empty result):
+      1) Exact ID match among the source's fields
+      2) Exact NAME match among the source's fields (case-insensitive configurable)
+      3) Partial NAME match to account for prefix/suffix additions
+
+    Args:
+        ms: MeasurementSet object.
+        source: Source object.
+
+    Returns:
+        A Field object of the associated Tsys field.
+
+    Raises:
+        LookupError if no Tsys fields are found or if no Tsys field is matched to the source.
+    """
+    # Retrieve correct Tsys field for source based on mapping
+    is_sd = ms.array_name == 'TP'
+    tsys_fields = get_intent_to_tsysfield_map(ms, is_single_dish=is_sd)['TARGET'].split(',')
+    if not tsys_fields:
+        raise LookupError('No Tsys fields associated with TARGET.')
+
+    # Precompute lookup structures
+    src_fields = source.fields
+    src_by_id = {f.id: f for f in src_fields}
+    src_by_name = {f.name.strip().strip('"'): f for f in src_fields}
+
+    # ID or name match to a source field
+    for field_str in tsys_fields:
+        field_str_clean = field_str.strip().strip('"')
+        if field_str_clean.isdigit() and int(field_str_clean) in src_by_id:
+            return src_by_id[int(field_str_clean)]
+        if field_str_clean in src_by_name:
+            return src_by_name[field_str_clean]
+        # PIPE-2869: Partial name match
+        for name in src_by_name:
+            if name in field_str_clean:
+                return ms.get_fields(name=field_str)[0]
+
+    # If truly nothing matched, raise a clear error instead of returning a wrong field silently.
+    raise LookupError(f"No Tsys field match for Tsys fields: {tsys_fields}")
 
 
 def is_tsys_only(field: Field) -> bool:
@@ -577,7 +612,6 @@ def tsys_scans_radec(
         ms: MeasurementSet,
         mean_direction: MDirection,
         tsys_field: Field,
-        observatory: str = 'ALMA',
 ) -> dict[str, dict[int, dict[str, tuple[float, float] | bool]]]:
     """
     Computes the offset RA/Dec values based on pointing and ASDM_POINTING tables.
@@ -587,13 +621,14 @@ def tsys_scans_radec(
         ms: MeasurementSet object.
         mean_direction: CASA 'direction' measure dictionary representing mean RA and Dec values.
         tsys_field: The field used for TARGET Tsys.
-        observatory: Observatory name for Az/El to RA/Dec conversion. Default is 'ALMA'.
 
     Returns:
         A dictionary containing Tsys OFF_SOURCE (and possibly ON_SOURCE) scan information, including
         offset values in arcsecs and whether a horizontal coordinate offset was applied.
     """
     vis = ms.basename
+    observatory = ms.antenna_array.name.upper()
+    ALMA_cycle_number = ms.get_alma_cycle_number()
     # Read POINTING table and return if it's empty
     with casa_tools.TableReader(os.path.join(vis, 'POINTING')) as mytb:
         if mytb.nrows() < 1:
@@ -622,9 +657,8 @@ def tsys_scans_radec(
     else:
         LOG.warning("ASDM_POINTING table not found.")
         if observatory == 'ALMA':
-            ALMA_cycle_number = ms.get_alma_cycle_number()
             if ALMA_cycle_number:
-                if ms.get_alma_cycle_number() < '11':
+                if int(ms.get_alma_cycle_number()) < 11:
                     LOG.attention("This is likely fine for data before Cycle 11.")
                 else:
                     LOG.warning("Result may be inaccurate, especially if it's (0,0).")
@@ -646,15 +680,16 @@ def tsys_scans_radec(
         scans_dict = {'OFF': {scan: copy.deepcopy(base_dict) for scan in off_tsys_scans}}
 
         # Check if there are any ON_SOURCE intents to plot
-        intents = ms.get_original_intent('ATMOSPHERE')
-        on_source_intents = ['CALIBRATE_ATMOSPHERE#ON_SOURCE', 'CALIBRATE_ATMOSPHERE#TEST']
-        if any(item in on_source_intents for item in intents):
-            on_intent = 'CALIBRATE_ATMOSPHERE#ON_SOURCE'
-            on_intent = on_intent if on_intent in intents else 'CALIBRATE_ATMOSPHERE#TEST'
-            on_intent_scans = mymsmd.scansforintent(on_intent)
-            on_tsys_scans = np.intersect1d(tsys_field_scans, on_intent_scans)
-            if on_tsys_scans.size > 0:
-                scans_dict['ON'] = {scan: copy.deepcopy(base_dict) for scan in on_tsys_scans}
+        if ALMA_cycle_number and int(ALMA_cycle_number) > 2:
+            intents = ms.get_original_intent('ATMOSPHERE')
+            on_source_intents = ['CALIBRATE_ATMOSPHERE#ON_SOURCE', 'CALIBRATE_ATMOSPHERE#TEST']
+            if any(item in on_source_intents for item in intents):
+                on_intent = 'CALIBRATE_ATMOSPHERE#ON_SOURCE'
+                on_intent = on_intent if on_intent in intents else 'CALIBRATE_ATMOSPHERE#TEST'
+                on_intent_scans = mymsmd.scansforintent(on_intent)
+                on_tsys_scans = np.intersect1d(tsys_field_scans, on_intent_scans)
+                if on_tsys_scans.size > 0:
+                    scans_dict['ON'] = {scan: copy.deepcopy(base_dict) for scan in on_tsys_scans}
 
         for key, scan_dict in scans_dict.items():
             intent = on_intent if key == 'ON' else off_intent

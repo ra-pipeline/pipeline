@@ -15,16 +15,17 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
 
     Flux values are determined by:
 
-    - computing phase only solutions for all the science spectral windows
+    - computing phase-up solutions for all the science spectral windows
       using the calibrator data selected by the ``reference`` and ``refintent``
-      parameters and the ``transfer`` and ``transintent`` parameters, the value
-      of the ``phaseupsolint`` parameter, and any spw combination determined
-      in hifa_spwphaseup.
+      parameters and the ``transfer`` and ``transintent`` parameters, with 
+      solint and gaintype parameters, and spw mapping or combination as
+      determined in hifa_spwphaseup. If no solint is defined, ``phaseupsolint``
+      is used (default = 'int').
 
-    - computing complex amplitude only solutions for all the science spectral
+    - computing amplitude only solutions for all the science spectral
       windows using calibrator data selected with ``reference`` and
       ``refintent`` parameters and the ``transfer`` and ``transintent``
-      parameters, the value of the ``solint`` parameter.
+      parameters.
 
     - examining the amplitude-only solutions for obvious outliers and flagging
       them in the caltable.
@@ -42,7 +43,16 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
     used. In manual mode, the antennas specified in ``antenna`` are used.
 
     Note that the flux corrected calibration table computed internally is
-    not currently used in later pipeline apply calibration steps.
+    not currently used in later pipeline apply calibration steps because the
+    relevant calibrator flux densities have been set in the MODEL_DATA column.
+
+    Note that for very low SNR, noise bias already positively skews the amplitudes.
+    The time solint could be greater for either ``transintent`` or ``refintent``,
+    which has a compounding effect: if the phase stability is insufficient over
+    that longer solint, an optimal phaseup will not be able to be calculated,
+    and this also results in an artificial increase in amplitudes because
+    the amplitude gains compensate for the uncorrected decorrelation.
+    
 
     Returns:
         The results object for the pipeline task is returned.

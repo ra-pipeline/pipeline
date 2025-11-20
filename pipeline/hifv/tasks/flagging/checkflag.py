@@ -413,7 +413,6 @@ class Checkflag(basetask.StandardTaskTemplate):
         calcftdev = self.inputs.checkflagmode not in ('semi', '', 'target', 'bpd', 'allcals')
 
         if rflag_standard is not None:
-
             for datacolumn, correlation, scale, extendflags in rflag_standard:
                 if '_' in correlation:
                     polselect = correlation.split('_')[1]
@@ -422,40 +421,110 @@ class Checkflag(basetask.StandardTaskTemplate):
                     if not mssel_valid(self.inputs.vis, field=fieldselect, spw=spwselect, correlation=polselect,
                                        scan=scanselect, intent=intentselect):
                         continue
-                if datacolumn == 'residual':
-                    # PIPE-1256: determine if we can use the 'RESIDUAL' column in the 'bpd-vlass/vla' mode.
-                    #   The usage of 'RESIDUAL' is only valid if the model of bpd source(s) is properly filled *AND*
-                    #   the first-order gain/passband calibration has been applied in 'CORRECTED'.
-                    #   Here we check each field from the data selection and see if they all meet the above requirements.
-                    #   We only examine the parallel hand amplitude:
-                    #       - setjy() has only I models for 3C48/3C138/3C286/3C147.
-                    #       - setjy(fluxdensity=-1) will fill the cross-hand with zero values.
-                    LOG.info("Determining if we can use the RESIDUAL column for rflag:")
-                    if self._is_model_setjy():
-                        LOG.info("  MODEL_DATA is present and none of the model(s) from selected data is a 1Jy point source.")
-                    else:
-                        datacolumn = 'corrected'
-                        correlation = correlation.replace('REAL_', 'ABS_')
-                        LOG.info("  MODEL_DATA s not found or the model(s) from selected data contains 1Jy point source(s).")
-                    LOG.info("  Use the {} column and correlation = {!r} for rflag".format(datacolumn.upper(), correlation))
-                method_args = {'mode': 'rflag',
-                               'field': fieldselect,
-                               'correlation': correlation,
-                               'scan': scanselect,
-                               'intent': intentselect,
-                               'spw': spwselect,
-                               'ntime': 'scan',
-                               'timedevscale': scale,
-                               'freqdevscale': scale,
-                               'datacolumn': datacolumn,
-                               'flagbackup': flagbackup,
-                               'savepars': False,
-                               'calcftdev': calcftdev,
-                               'useheuristic': True,
-                               'ignore_sefd': ignore_sefd,
-                               'extendflags': extendflags}
+                if self.inputs.checkflagmode == "allcals-vla":
+                    ms = self.inputs.context.observing_run.get_ms(self.inputs.vis)
+                    fields = ms.get_fields(fieldselect)
 
-                self._do_rflag(**method_args)
+                    for field in fields:
+                        field_scanselect = scanselect
+                        field_spwselect = spwselect
+                        field_intentselect = intentselect
+
+                        if field_scanselect:
+                            scanlist = field_scanselect.split(",")
+                            scans = ms.get_scans(field=field.id)
+                            sub_scanlist = []
+                            for scan in scans:
+                                if str(scan.id) in scanlist:
+                                    sub_scanlist.append(str(scan.id))
+                            field_scanselect = ",".join(sub_scanlist)
+
+                        if field_spwselect:
+                            spwlist = field_spwselect.split(",")
+                            spws = field.valid_spws
+                            sub_spwlist = []
+                            for spw in spws:
+                                if str(spw.id) in spwlist:
+                                    sub_spwlist.append(str(spw.id))
+                            field_spwselect = ",".join(sub_spwlist)
+
+                        if field_intentselect:
+                            intentlist = field_intentselect.split(",")
+                            intents = field.intents
+                            sub_intentlist = []
+                            for intent in intents:
+                                if intent in intentlist:
+                                    sub_intentlist.append(intent)
+                            field_intentselect = ",".join(sub_intentlist)
+                        # PIPE-1729: checking if flux calibrator is bandpass calibrator or not
+                        if "BANDPASS" not in field.intents:
+                            # PIPE-1729: checking if model is 1jy point source or not,
+                            # if model is not a 1 Jy point source, setting datacolumn to 'residual'
+                            # otherwise setting it to 'corrected'
+                            if self._is_model_setjy(fieldselect=str(field.id), scanselect=field_scanselect,
+                                                    intentselect=field_intentselect, spwselect=field_spwselect):
+                                LOG.info(f" Model is not 1Jy point source, using data column residual for field {field.id}")
+                                datacolumn = "residual"
+                            else:
+                                LOG.info(f" MODEL_DATA not found or model is 1Jy point source, using data column corrected for field {field.id}")
+                                datacolumn = "corrected"
+                        else:
+                            LOG.info(f"Flux calibrator is a bandpass calibrator, using data column corrected for field {field.id}")
+                            datacolumn = "corrected"
+
+                        method_args = {'mode': 'rflag',
+                                       'field': str(field.id),
+                                       'correlation': correlation,
+                                       'scan': field_scanselect,
+                                       'intent': field_intentselect,
+                                       'spw': field_spwselect,
+                                       'ntime': 'scan',
+                                       'timedevscale': scale,
+                                       'freqdevscale': scale,
+                                       'datacolumn': datacolumn,
+                                       'flagbackup': flagbackup,
+                                       'savepars': False,
+                                       'calcftdev': calcftdev,
+                                       'useheuristic': True,
+                                       'ignore_sefd': ignore_sefd,
+                                       'extendflags': extendflags}
+                        self._do_rflag(**method_args)
+                else:
+                    if datacolumn == 'residual':
+                        # PIPE-1256: determine if we can use the 'RESIDUAL' column in the 'bpd-vlass/vla' mode.
+                        #   The usage of 'RESIDUAL' is only valid if the model of bpd source(s) is properly filled *AND*
+                        #   the first-order gain/passband calibration has been applied in 'CORRECTED'.
+                        #   Here we check each field from the data selection and see if they all meet the above requirements.
+                        #   We only examine the parallel hand amplitude:
+                        #       - setjy() has only I models for 3C48/3C138/3C286/3C147.
+                        #       - setjy(fluxdensity=-1) will fill the cross-hand with zero values.
+                        LOG.info("Determining if we can use the RESIDUAL column for rflag:")
+                        if self._is_model_setjy():
+                            LOG.info("  MODEL_DATA is present and none of the model(s) from selected data is a 1Jy point source.")
+                        else:
+                            datacolumn = 'corrected'
+                            correlation = correlation.replace('REAL_', 'ABS_')
+                            LOG.info("  MODEL_DATA s not found or the model(s) from selected data contains 1Jy point source(s).")
+                        LOG.info("  Use the {} column and correlation = {!r} for rflag".format(datacolumn.upper(), correlation))
+
+                    method_args = {'mode': 'rflag',
+                                   'field': fieldselect,
+                                   'correlation': correlation,
+                                   'scan': scanselect,
+                                   'intent': intentselect,
+                                   'spw': spwselect,
+                                   'ntime': 'scan',
+                                   'timedevscale': scale,
+                                   'freqdevscale': scale,
+                                   'datacolumn': datacolumn,
+                                   'flagbackup': flagbackup,
+                                   'savepars': False,
+                                   'calcftdev': calcftdev,
+                                   'useheuristic': True,
+                                   'ignore_sefd': ignore_sefd,
+                                   'extendflags': extendflags}
+
+                    self._do_rflag(**method_args)
 
         if tfcrop_standard is not None:
 
@@ -862,14 +931,31 @@ class Checkflag(basetask.StandardTaskTemplate):
 
         return summary_plots
 
-    def _is_model_setjy(self):
+    def _is_model_setjy(self, fieldselect: str | None = None,
+                        scanselect: str | None = None, intentselect: str | None = None,
+                        spwselect: str | None = None) -> bool:
         """Check the model column status of selected fields.
 
-        return True, if the below requirements are met:
-            - the model column is present.
-            - none of selected field(s) contain a model of 1Jy point source at the phasecenter (in the parallel hands)
+        Parameters:
+            fieldselect: Comma-separated list of field IDs or names to check.
+            scanselect: Comma-separated list of scan ids to include.
+            intentselect: Comma-separated list of intents to filter the data.
+            spwselect: Comma-separated list of spw ids to include.
+
+        Returns:
+            True if the model column is present and no 1 Jy point source at the
+            phase center is found in the selected fields; False otherwise.
         """
-        fieldselect, scanselect, intentselect, columnselect = self._select_data()
+        field_list, scan_list, intent_list, columnselect = self._select_data()
+        if fieldselect is None:
+            fieldselect = field_list
+        if scanselect is None:
+            scanselect = scan_list
+        if intentselect is None:
+            intentselect = intent_list
+        if spwselect is None:
+            spwselect = self.sci_spws
+
         is_model_setjy = True
 
         # set False if the MODEL column is not present.
@@ -881,7 +967,7 @@ class Checkflag(basetask.StandardTaskTemplate):
             with casa_tools.MSReader(self.inputs.vis) as msfile:
                 # we expect fieldselect is not an empty string here...
                 for field in fieldselect.split(','):
-                    staql = {'field': field, 'spw': self.sci_spws, 'scan': scanselect,
+                    staql = {'field': field, 'spw': spwselect, 'scan': scanselect,
                              'scanintent': intentselect, 'polarization': '', 'uvdist': ''}
                     if msfile.msselect(staql, onlyparse=False):
                         vis_ampstats = msfile.statistics(field=field, scan=scanselect, intent=intentselect,

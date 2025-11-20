@@ -50,7 +50,14 @@ LOG = infrastructure.get_logger(__name__)
 
 class EditimlistInputs(vdp.StandardInputs):
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_LINE_SCIENCE, DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_type = [
+        DataType.SELFCAL_LINE_SCIENCE,
+        DataType.REGCAL_LINE_SCIENCE,
+        DataType.SELFCAL_CONTLINE_SCIENCE,
+        DataType.REGCAL_CONTLINE_SCIENCE,
+        DataType.REGCAL_CONTLINE_ALL,
+        DataType.RAW,
+    ]
 
     search_radius_arcsec = vdp.VisDependentProperty(default=1000.0)
     conjbeams = vdp.VisDependentProperty(default=False)
@@ -500,8 +507,13 @@ class Editimlist(basetask.StandardTaskTemplate):
         if img_mode.startswith('VLASS-SE-CONT'):
             # If 0 hif_makeimlist results are found, then we are in stage 1
             th.vlass_stage = utils.get_task_result_count(inp.context, 'hif_makeimages') + 1
+
             # Below method only exists for ImageParamsHeuristicsVlassSeCont and ImageParamsHeuristicsVlassSeContAWPP001
             th.set_user_cycleniter_final_image_nomask(inpdict['cycleniter_final_image_nomask'])
+
+            # PIPE-2834: set custom wprojplanes for VLASS-SE-CONT-AWP modes if speciefied by user
+            if img_mode in ('VLASS-SE-CONT', 'VLASS-SE-CONT-AWP', 'VLASS-SE-CONT-AWP2', 'VLASS-SE-CONT-AWPHPG'):
+                imlist_entry['wprojplanes'] = inpdict.get('wprojplanes', None)
 
         # For VLASS-SE-CUBE, we only run hif_makeimages once and reuse most imaging heuristics
         # from SE-CONT-MOSAIC/vlass_stage=3. Therefore, ImageParamsHeuristicsVlassSeCube is constructed
@@ -533,11 +545,13 @@ class Editimlist(basetask.StandardTaskTemplate):
         imlist_entry['uvtaper'] = (th.uvtaper() if not 'uvtaper' in inp.context.imaging_parameters
                                    else inp.context.imaging_parameters['uvtaper']) if not inpdict['uvtaper'] else inpdict['uvtaper']
 
-        imlist_entry['deconvolver'] = th.deconvolver(None, None) if not inpdict['deconvolver'] else inpdict['deconvolver']
+        imlist_entry['specmode'] = th.specmode() if not inpdict['specmode'] else inpdict['specmode']
+        imlist_entry['deconvolver'] = th.deconvolver(
+            imlist_entry['specmode'], None) if not inpdict['deconvolver'] else inpdict['deconvolver']
         imlist_entry['mask'] = th.mask() if not inpdict['mask'] else inpdict['mask']
         imlist_entry['pbmask'] = None if not inpdict['pbmask'] else inpdict['pbmask']
-        imlist_entry['specmode'] = th.specmode() if not inpdict['specmode'] else inpdict['specmode']
-        imlist_entry['robust'] = th.robust(specmode=imlist_entry['specmode']) if inpdict['robust'] in (None, -999.0) else inpdict['robust']
+        imlist_entry['robust'] = th.robust(specmode=imlist_entry['specmode']
+                                           ) if inpdict['robust'] in (None, -999.0) else inpdict['robust']
 
         imlist_entry['uvrange'], _ = th.uvrange(field=fieldnames[0] if fieldnames else None,
                                                 spwspec=imlist_entry['spw'],

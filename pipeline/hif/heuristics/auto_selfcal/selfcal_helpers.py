@@ -1211,86 +1211,48 @@ def get_spw_chanavg(vis, widtharray, bwarray, chanarray, desiredWidth=15.625e6):
         if desiredWidth > bwarray[i]:
             avgarray[i] = chanarray[i]
         else:
-            nchan = bwarray[i]/desiredWidth
+            nchan = bwarray[i] / desiredWidth
             nchan = np.round(nchan)
-            avgarray[i] = chanarray[i]/nchan
+            avgarray[i] = chanarray[i] / nchan
         if avgarray[i] < 1.0:
             avgarray[i] = 1.0
     return avgarray
 
 
-def get_spw_map(selfcal_library, target, band, telescope):
-    # Get the list of EBs from the selfcal_library
-    vislist = selfcal_library[target][band]['vislist'].copy()
+def get_spw_map(observing_run) -> tuple[dict[int, dict[str, int]], dict[str, dict[int, int]]]:
+    """Generate spectral window mappings between virtual and real SPW IDs.
 
-    # If we are looking at VLA data, find the EB with the maximum number of SPWs so that we have the fewest "odd man out" SPWs hanging out at the end as possible.
-    if "VLA" in telescope:
-        maxspws = 0
-        maxspwvis = ''
-        for vis in vislist:
-            if selfcal_library[target][band][vis]['n_spws'] >= maxspws:
-                maxspws = selfcal_library[target][band][vis]['n_spws']
-                maxspwvis = vis+''
+    Creates both forward and reverse mappings to facilitate conversion between virtual science
+    spectral window IDs and their corresponding real SPW IDs across measurement sets.
 
-        vislist.remove(maxspwvis)
-        vislist = [maxspwvis] + vislist
+    Args:
+        observing_run: ObservingRun instance containing measurement sets and SPW mapping methods.
 
+    Returns:
+        A tuple containing:
+            - Forward mapping: virtual_spw_id -> {ms_basename: real_spw_id}
+            - Reverse mapping: ms_basename -> {real_spw_id: virtual_spw_id}
+    """
+    ms_list = observing_run.measurement_sets
+    virtual_science_spw_ids = observing_run.virtual_science_spw_ids
+
+    # Build forward mapping: virtual SPW -> {MS basename: real SPW}
     spw_map = {}
+    for virt_spw in virtual_science_spw_ids:
+        spw_map[virt_spw] = {}
+        for ms in ms_list:
+            real_spw = observing_run.virtual2real_spw_id(virt_spw, ms)
+            if real_spw is not None:
+                spw_map[virt_spw][ms.basename] = real_spw
+
+    # Build reverse mapping: MS basename -> {real SPW: virtual SPW}
     reverse_spw_map = {}
-    virtual_index = 0
-    # This code is meant to be generic in order to prepare for cases where multiple EBs might have unique SPWs in them (e.g. inhomogeneous data),
-    # but the criterea for which SPWs match will need to be updated for this to truly generalize.
-    for vis in vislist:
-        reverse_spw_map[vis] = {}
-        for spw in selfcal_library[target][band][vis]['spwsarray']:
-            spw = int(spw)  # can't seriaize np.int64 into JSON as keys using the built-in serializer
-            found_match = False
-            for s in spw_map:
-                for v in spw_map[s]:
-                    if vis == v:
-                        continue
-
-                    if telescope == "ALMA" or telescope == "ACA":
-                        # NOTE: This assumes that matching based on SPW name is ok. Fine for now... but will need to update this for inhomogeneous data.
-                        msmd.open(vis)
-                        spwname = msmd.namesforspws(spw)[0]
-                        msmd.close()
-
-                        msmd.open(v)
-                        sname = msmd.namesforspws(spw_map[s][v])[0]
-                        msmd.close()
-
-                        if spwname == sname:
-                            found_match = True
-                    elif 'VLA' in telescope:
-                        msmd.open(vis)
-                        bandwidth1 = msmd.bandwidths(spw)
-                        chanwidth1 = msmd.chanwidths(spw)[0]
-                        chanfreq1 = msmd.chanfreqs(spw)[0]
-                        msmd.close()
-
-                        msmd.open(v)
-                        bandwidth2 = msmd.bandwidths(spw_map[s][v])
-                        chanwidth2 = msmd.chanwidths(spw_map[s][v])[0]
-                        chanfreq2 = msmd.chanfreqs(spw_map[s][v])[0]
-                        msmd.close()
-
-                        if bandwidth1 == bandwidth2 and chanwidth1 == chanwidth2 and chanfreq1 == chanfreq2:
-                            found_match = True
-
-                    if found_match:
-                        spw_map[s][vis] = spw
-                        reverse_spw_map[vis][spw] = s
-                        break
-
-                if found_match:
-                    break
-
-            if not found_match:
-                spw_map[virtual_index] = {}
-                spw_map[virtual_index][vis] = spw
-                reverse_spw_map[vis][spw] = virtual_index
-                virtual_index += 1
+    for ms in ms_list:
+        reverse_spw_map[ms.basename] = {}
+        for virt_spw in virtual_science_spw_ids:
+            if ms.basename in spw_map[virt_spw]:
+                real_spw = spw_map[virt_spw][ms.basename]
+                reverse_spw_map[ms.basename][real_spw] = virt_spw
 
     LOG.info('spw_map: %s', spw_map)
     LOG.info('reverse_spw_map: %s', reverse_spw_map)

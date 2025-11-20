@@ -7,9 +7,7 @@ import pipeline.infrastructure.tablereader as tablereader
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
 from pipeline.h.tasks.mstransform import mssplit
-from pipeline.infrastructure import casa_tasks
-from pipeline.infrastructure import casa_tools
-from pipeline.infrastructure import task_registry
+from pipeline.infrastructure import casa_tasks, casa_tools, task_registry, utils
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -187,22 +185,13 @@ class Transformimagedata(mssplit.MsSplit):
         # Split is required so create the results structure
         result = TransformimagedataResults(vis=inputs.vis, outputvis=inputs.outputvis)
 
-        # Run CASA task
-        #    Does this need a try / except block
-
         visfields = []
         visspws = []
         for imageparam in inputs.context.clean_list_pending:
             visfields.extend(imageparam['field'].split(','))
             visspws.extend(imageparam['spw'].split(','))
-
-        visfields = set(visfields)
-        visfields = list(visfields)
-        visfields = ','.join(visfields)
-
-        visspws = set(visspws)
-        visspws = sorted(visspws)
-        visspws = ','.join(visspws)
+        visfields = ','.join(utils.deduplicate(visfields))
+        visspws = ','.join(utils.deduplicate(visspws))
 
         mstransform_args = inputs.to_casa_args()
         mstransform_args['field'] = visfields

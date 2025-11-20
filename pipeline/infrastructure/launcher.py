@@ -275,23 +275,8 @@ class Context(object):
         else:
             return ps.recipe_name
 
-    @property
-    def vla_skip_mfs_and_cube_imaging(self) -> bool:
-        """Return the stage skipping condition for the VLA specmode=mfs/cube imaging workflow.
 
-        This is currently used to skip the following stages for VLA:
-        - hif_makeimlist (mfs, cube)
-        - hif_findcont
-        - hif_uvcontsub
-        - hif_makeimages(mfs, cube)
-        """
-        ms_list = self.observing_run.get_measurement_sets_of_type([domain.datatype.DataType.REGCAL_CONTLINE_SCIENCE], msonly=True)
-        telescope = self.project_summary.telescope
-
-        return 'VLA' in telescope.upper() and not ms_list
-
-
-class Pipeline(object):
+class Pipeline:
     """
     Pipeline is the entry point for initialising the pipeline. It is
     responsible for the creation of new Context objects and for loading

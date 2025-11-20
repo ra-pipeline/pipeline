@@ -26,6 +26,8 @@ class FailureType(Enum):
     PHASE = "phase"
     AMP = "amp"
     AMP_AND_PHASE = "amp and phase"
+    SPW_BINNING = "binning"
+    SPW_SMALL_BANDWIDTH = "bandwidth"
 
 
 @dataclass
@@ -40,6 +42,11 @@ def add_spw_failure(failing_spws: dict[int, SpwFailure], spw_id: int,
     Adds failure information for a single antenna and associated failure type
     to the dict of failing spws.
     """
+    if failure_type in (FailureType.SPW_BINNING, FailureType.SPW_SMALL_BANDWIDTH):
+        # This fails for the entire spw so we don't need per-antenna information
+        failing_spws[spw_id] = SpwFailure(set(), failure_type)
+        return
+
     if spw_id in failing_spws:
         failing_spws[spw_id].ant_set.add(ant_id)
         if failure_type != failing_spws[spw_id].failure_type:
@@ -304,6 +311,30 @@ def evalPerAntBP_Platform(data, output_dir, ms, caltable) -> dict:
             LOG.info(f"Subband qa heuristic not evaluated for spw {ispw} as it is not a FDM spw.")
             continue
 
+        ################################
+        # Read ancillary information
+        ################################
+        spw_bandwidth = data[fieldname][ispw]['bw']
+        spw_nchan = data[fieldname][ispw]['nchan']
+        spw_freq = data[fieldname][ispw]['freq']
+        subb_bw = 62.5e6 * 15.0/16.0  # for edge channels
+        subb_num = abs(int(round(spw_bandwidth / subb_bw)))  # Number of subband chunks
+        subb_nchan = int(spw_nchan / subb_num)  # Number of channels per subband
+
+        # This heuristic is not evaluated if the spw binning is high enough that the channel width
+        # is larger than the subband width
+        chanwidth = spw_bandwidth/spw_nchan
+
+        if chanwidth >= subb_bw:
+            add_spw_failure(spws_affected, ispw, "", FailureType.SPW_BINNING)
+            continue
+
+        # This heuristic is not evaluated if the bandwidth of the spw is equal
+        # or smaller than twice the subband width
+        if spw_bandwidth <= 2 * subb_bw:
+            add_spw_failure(spws_affected, ispw, "", FailureType.SPW_SMALL_BANDWIDTH)
+            continue
+
         #################################
         # naming plot files
         # bandpass amp   pol0 pol1
@@ -314,15 +345,6 @@ def evalPerAntBP_Platform(data, output_dir, ms, caltable) -> dict:
         fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(18, 15))
         fig.suptitle(pldir + ' ' + vis + ' ' + 'ant ' + iant + ' spw ' + str(ispw), fontsize=20)
 
-        ################################
-        # Read ancillary information
-        ################################
-        spw_bandwidth = data[fieldname][ispw]['bw']
-        spw_nchan = data[fieldname][ispw]['nchan']
-        spw_freq = data[fieldname][ispw]['freq']
-        subb_bw = 62.5e6 * 15.0/16.0  # for edge channels
-        subb_num = abs(int(round(spw_bandwidth / subb_bw)))  # Number of subband chunks
-        subb_nchan = int(spw_nchan / subb_num)  # Number of channels per subband
 
         ################################
         # Generating or using the pre-computed atmospheric transmission model using median pwv value
@@ -452,10 +474,10 @@ def evalPerAntBP_Platform(data, output_dir, ms, caltable) -> dict:
                     for b, bound in enumerate(bounds):
                         if (subb_center_freq<bound[1] and subb_center_freq>bound[0]):
                             atmimpact = True
-                    tid = np.argmax(frequency[np.where(frequency<subb_center_freq)[0]])            
+                    tid = np.argmin(np.abs(frequency-subb_center_freq))
                     if (transmission[tid]<0.3):
                         transimpact = True
-                    ############################    
+                    ############################
 
                     ###################################
                     # Pre-check:
@@ -508,31 +530,31 @@ def evalPerAntBP_Platform(data, output_dir, ms, caltable) -> dict:
                             flagchan_range_phs.append(this_flagchan_range)
                             #########################
                     
-                    #############################
-                    # check, the subband is either the first or the last subband
-                    #############################
-                    elif (isubb == 0 or isubb == subb_num - 1):
-                        ############################
-                        # check if the standard deviation of the Sobel filtered value is 10 x larger than
-                        # the median value of the subbands with the Sobel filtered phase value
-                        ############################
-                        if (np.nanstd(sobel_phs[(isubb * subb_nchan):((isubb + 1) * subb_nchan)]) > 10.0 * subb_phs_sobel_rms_med):
-                            yesorno = 'YES'
-                            ###########################
-                            # this verbose message, which can be skipped for PL
-                            ###########################
-                            this_note_platform = ' QA0_High_phase_spectral_rms subband: '+str(isubb)+' Spw '+str(ispw)+' Ant '+iant+'  P:'+str(ipol)+' BB:'+' TBD'+'  '+ "%.2f"%(subb_phs_rms[isubb]) + 'deg ('+"%.2f" %(subb_phs_rms[isubb]/subb_phs_rms_med)+'sigma)'
-                            note_platform += (this_note_platform+'\n')
-                            add_spw_failure(spws_affected, ispw, iant, FailureType.PHASE)
-                            #########################
+                        #############################
+                        # check, the subband is either the first or the last subband
+                        #############################
+                        elif (isubb == 0 or isubb == subb_num - 1):
+                            ############################
+                            # check if the standard deviation of the Sobel filtered value is 10 x larger than
+                            # the median value of the subbands with the Sobel filtered phase value
+                            ############################
+                            if (np.nanstd(sobel_phs[(isubb * subb_nchan):((isubb + 1) * subb_nchan)]) > 10.0 * subb_phs_sobel_rms_med):
+                                yesorno = 'YES'
+                                ###########################
+                                # this verbose message, which can be skipped for PL
+                                ###########################
+                                this_note_platform = ' QA0_High_phase_spectral_rms subband: '+str(isubb)+' Spw '+str(ispw)+' Ant '+iant+'  P:'+str(ipol)+' BB:'+' TBD'+'  '+ "%.2f"%(subb_phs_rms[isubb]) + 'deg ('+"%.2f" %(subb_phs_rms[isubb]/subb_phs_rms_med)+'sigma)'
+                                note_platform += (this_note_platform+'\n')
+                                add_spw_failure(spws_affected, ispw, iant, FailureType.PHASE)
+                                #########################
 
-                            #########################
-                            # this list contains the frequency range of the affected subband
-                            # it is necessary for plotting
-                            #########################
-                            this_flagchan_range = [spw_freq[(isubb)*subb_nchan], spw_freq[(isubb+1)*subb_nchan-1]]
-                            flagchan_range_phs.append(this_flagchan_range)
-                            ###########################
+                                #########################
+                                # this list contains the frequency range of the affected subband
+                                # it is necessary for plotting
+                                #########################
+                                this_flagchan_range = [spw_freq[(isubb)*subb_nchan], spw_freq[(isubb+1)*subb_nchan-1]]
+                                flagchan_range_phs.append(this_flagchan_range)
+                                ###########################
 
                 #######################
                 # this string is important and appends the heuristics values for each heuristics
@@ -572,7 +594,7 @@ def evalPerAntBP_Platform(data, output_dir, ms, caltable) -> dict:
                     for b, bound in enumerate(bounds):
                         if (subb_center_freq < bound[1] and subb_center_freq > bound[0]):
                             atmimpact=True
-                    tid = np.argmax(frequency[np.where(frequency < subb_center_freq)[0]])            
+                    tid = np.argmin(np.abs(frequency-subb_center_freq))
                     if (transmission[tid] < 0.3):
                         transimpact=True
 
@@ -697,7 +719,7 @@ def evalPerAntBP_Platform(data, output_dir, ms, caltable) -> dict:
                     for b, bound in enumerate(bounds):
                         if (subb_center_freq < bound[1] and subb_center_freq > bound[0]):
                             atmimpact = True
-                    tid = np.argmax(frequency[np.where(frequency<subb_center_freq)[0]])            
+                    tid = np.argmin(np.abs(frequency-subb_center_freq))
                     if (transmission[tid] < 0.3):
                         transimpact=True
 
@@ -766,7 +788,7 @@ def evalPerAntBP_Platform(data, output_dir, ms, caltable) -> dict:
                     for b, bound in enumerate(bounds):
                         if (subb_center_freq < bound[1] and subb_center_freq > bound[0]):
                             atmimpact = True
-                    tid = np.argmax(frequency[np.where(frequency < subb_center_freq)[0]])            
+                    tid = np.argmin(np.abs(frequency-subb_center_freq))
                     if (transmission[tid] < 0.3):
                         transimpact=True
                     ###########################
@@ -840,7 +862,7 @@ def evalPerAntBP_Platform(data, output_dir, ms, caltable) -> dict:
                     for b, bound in enumerate(bounds):
                         if (subb_center_freq < bound[1] and subb_center_freq > bound[0]):
                             atmimpact = True
-                    tid = np.argmax(frequency[np.where(frequency < subb_center_freq)[0]])            
+                    tid = np.argmin(np.abs(frequency-subb_center_freq))
                     if (transmission[tid] < 0.3):
                         transimpact = True
 
@@ -955,7 +977,7 @@ def evalPerAntBP_Platform(data, output_dir, ms, caltable) -> dict:
                     for b, bound in enumerate(bounds):
                         if (subb_center_freq < bound[1] and subb_center_freq > bound[0]):
                             atmimpact = True
-                    tid = np.argmax(frequency[np.where(frequency < subb_center_freq)[0]])            
+                    tid = np.argmin(np.abs(frequency-subb_center_freq))
                     if (transmission[tid] < 0.3):
                         transimpact = True
 
@@ -1029,7 +1051,7 @@ def evalPerAntBP_Platform(data, output_dir, ms, caltable) -> dict:
                     for b, bound in enumerate(bounds):
                         if (subb_center_freq < bound[1] and subb_center_freq > bound[0]):
                             atmimpact = True
-                    tid = np.argmax(frequency[np.where(frequency < subb_center_freq)[0]])            
+                    tid = np.argmin(np.abs(frequency-subb_center_freq))
                     if (transmission[tid] < 0.3):
                         transimpact = True
                     ###########################
@@ -1103,7 +1125,7 @@ def evalPerAntBP_Platform(data, output_dir, ms, caltable) -> dict:
                     for b, bound in enumerate(bounds):
                         if (subb_center_freq < bound[1] and subb_center_freq > bound[0]):
                             atmimpact = True
-                    tid = np.argmax(frequency[np.where(frequency < subb_center_freq)[0]])            
+                    tid = np.argmin(np.abs(frequency-subb_center_freq))
                     if (transmission[tid] < 0.3):
                         transimpact = True
                     
@@ -1137,18 +1159,32 @@ def evalPerAntBP_Platform(data, output_dir, ms, caltable) -> dict:
                     if maxvalue_ch < np.max([ch_step,ch_step1]):
                         maxvalue_ch=np.max([ch_step,ch_step1])
                     ###########################
-                    
+
                     ###########################
                     # measure a spike for the given subband
                     # and count it if the spike is significant
                     ###########################
 
                     # Spectral channel segment for spike estimate
-                    ishift_spk = np.max([int(subb_nchan*0.3),3])
+                    ishift_spk = np.max([int(subb_nchan * 0.3), 1])
+                    left = np.nanmean(bp_amp[isubb * subb_nchan - 2 * ishift_spk:isubb * subb_nchan - ishift_spk])
+                    right = np.nanmean(bp_amp[isubb * subb_nchan + ishift_spk:isubb * subb_nchan + 2 * ishift_spk])
 
-                    left = np.nanmean(bp_amp[isubb*subb_nchan-2*ishift_spk:isubb*subb_nchan-ishift_spk])
-                    right = np.nanmean(bp_amp[isubb*subb_nchan+ishift_spk:isubb*subb_nchan+2*ishift_spk])
-                    subb_spk = np.abs(np.nanmean([left,right]) - bp_amp[isubb*subb_nchan-ishift_spk:isubb*subb_nchan+ishift_spk])
+                    if (isubb * subb_nchan) - ishift_spk < 0:
+                        LOG.info(f"Falling back to 0 for lower index in spike detection array in correlator subband QA metrics for MS: {vis} ant: {iant} spw: {ispw} pol: {ipol}")
+
+                    lower_index = max(0, isubb * subb_nchan - ishift_spk)
+
+                    if (isubb * subb_nchan) + ishift_spk > len(bp_amp) - 1:
+                        LOG.info(f"Falling back to (length - 1) for upper index in spike detection array in correlator subband QA metrics for MS: {vis} ant: {iant} spw: {ispw} pol: {ipol}")
+    
+                    upper_index = min(isubb * subb_nchan + ishift_spk, len(bp_amp) - 1)
+
+                    if lower_index >= upper_index:
+                        LOG.warning(f"Not evaluating remaining correlator subband QA metrics for MS: {vis} ant: {iant} spw: {ispw} pol: {ipol} due to invalid slice bounds.")
+                        break
+
+                    subb_spk = np.abs(np.nanmean([left,right]) - bp_amp[lower_index:upper_index])
                     subb_spkmax_id = np.argmax(subb_spk)
                     spk_step = subb_spk[subb_spkmax_id]
 
@@ -1371,22 +1407,16 @@ def setup_bandpass_dict(ms: MeasurementSet, caltable: str) -> dict:
         tmp = tb.getcol('ANTENNA2')
         _ = scipy.stats.mode(tmp)
         refAnt = antennaNames[np.bincount(tb.getcol('ANTENNA2')).argmax()]
-        LOG.debug(f"FieldNames {fieldNames}")
-        LOG.debug(f"RefAnt: {refAnt}")
         bandpass_library['RefAnt'] = refAnt
 
         # Check bandwidth and nchan
         spw_bandwidth = science_spw_bandwidths(ms)
-        LOG.debug(f"Spw bandwidths: {spw_bandwidth}")
 
         for j, myfield in enumerate(fieldNames):
-            LOG.debug(f"Processing field: {myfield}")
             myfieldid = fieldIds[j]
             bandpass_library[myfield] = {}
 
             for m, myspw in enumerate(spwIds):
-                LOG.debug(f"Processing spw: {myspw}")
-
                 bandpass_library[myfield][myspw] = {}
                 spw_nchan = caltable_tools.nchan_from_caltable(caltable, myspw)
                 spw_freq = caltable_tools.chan_freq_from_caltable(caltable, myspw)  # GHz

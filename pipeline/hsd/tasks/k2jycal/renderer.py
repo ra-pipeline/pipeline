@@ -52,7 +52,7 @@ class T2_4MDetailsSingleDishK2JyCalRenderer(basetemplates.T2_4MDetailsDefaultRen
         ms_list = []
         reffile_list = []
         spw_tr = collections.defaultdict(list)
-        
+
         dovirtual = sdutils.require_virtual_spw_id_handling(context.observing_run)
         trfunc_r = lambda vsp, vis, rsp, ant, pol, factor: JyperKTR(rsp, vis, ant, pol, factor)
         trfunc_v = lambda vsp, vis, rsp, ant, pol, factor: JyperKTRV(vsp, vis, rsp, ant, pol, factor)
@@ -93,28 +93,17 @@ class T2_4MDetailsSingleDishK2JyCalRenderer(basetemplates.T2_4MDetailsDefaultRen
                         spw_tr[vspwid].append(trfunc(vspwid, ms_label, spwid, ant_name, corr, jyperk))
             reffile_list.append(r.reffile)
         reffile_list = list(dict.fromkeys(reffile_list))
-        
-        # Capture warnings for outliers.
-        extra_logrecords_handler = logging.CapturingHandler(logging.WARNING)
-        logging.add_handler(extra_logrecords_handler)
-        
+
         # Compute stats and flag outliers for each SPW.
         for spw_id, spw_info in spw_data.items():
             if not spw_info["all_factors"]:
                 continue
             stats = self.__calculate_stats(spw_info["all_factors"])
-            upper, lower, m_val = stats["upper_limit"], stats["lower_limit"], stats["median"]
+            upper, lower = stats["upper_limit"], stats["lower_limit"]
             for ms_label, factor_list in spw_info["ms_dict"].items():
                 for factor, corr, ant in factor_list:
                     if factor < lower or factor > upper:
                         spw_info["outliers"].append((ms_label, factor))
-                        LOG.warning(
-                            "Value of factor %f for pol %s, spw %s on antenna %s in ms '%s' is significantly away from the median value %f (upper fence %f, lower fence %f).",
-                            factor, corr, spw_id, ant, ms_label, m_val, upper, lower
-                        )
-        
-        logging.remove_handler(extra_logrecords_handler)
-        extra_logrecords = extra_logrecords_handler.buffer
 
         stage_dir = os.path.join(context.report_dir, f'stage{results.stage_number}')
         reffile_copied_list = []
@@ -128,40 +117,37 @@ class T2_4MDetailsSingleDishK2JyCalRenderer(basetemplates.T2_4MDetailsDefaultRen
         if any(len(info["ms_dict"]) > 0 for info in spw_data.values()):
             task = display.K2JyBoxScatterDisplay(stage_dir, spw_data, ms_list)
             plots.extend(task.plot())
-        
+
         # Merge transformation rows for display.
         row_values = []
         for factor_list in spw_tr.values():
             row_values.extend(factor_list)
-        
+
         # Update the context with tables, plots, and additional info.
         ctx.update({
             'jyperk_rows': utils.merge_td_columns(row_values),
             'reffile_list': reffile_copied,
             'jyperk_plot': plots,
             'dovirtual': dovirtual,
-            'extra_logrecords': extra_logrecords
         })
 
     @staticmethod
     def __calculate_stats(values: list = [], whis: float = 1.5) -> Dict[str, float]:
-        """ Helper to compute statistical metrics for a given list of factors. 
-        
+        """ Helper to compute statistical metrics for a given list of factors.
+
         Args:
             values: A list of numeric factor values.
-            whis:  The position of the whiskers. 
-                   The lower whisker is at the lowest datum above Q1 - whis*(Q3-Q1), 
-                   and the upper whisker at the highest datum below Q3 + whis*(Q3-Q1), 
-                   where Q1 and Q3 are the first and third quartiles. 
+            whis:  The position of the whiskers.
+                   The lower whisker is at the lowest datum above Q1 - whis*(Q3-Q1),
+                   and the upper whisker at the highest datum below Q3 + whis*(Q3-Q1),
+                   where Q1 and Q3 are the first and third quartiles.
                    Defaults to 1.5
 
         Returns:
             A dictionary containing:
                 - "upper_limit" (float): The upper fence of the values = Q3 + (1.5 * IQR)
                 - "lower_limit" (float): The lower fence of the values = Q1 – (1.5 * IQR)
-                - "median" (float): The median value of the data.
         """
-        m = median(values)
         q1 = percentile(values, 25)
         q3 = percentile(values, 75)
         iqr = q3 - q1
@@ -169,8 +155,7 @@ class T2_4MDetailsSingleDishK2JyCalRenderer(basetemplates.T2_4MDetailsDefaultRen
         up = q3 + whis * iqr
         return {
             "upper_limit": up,
-            "lower_limit": low,
-            "median": m
+            "lower_limit": low
         }
 
     @staticmethod

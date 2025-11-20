@@ -9,7 +9,7 @@ LOG = infrastructure.get_logger(__name__)
 
 
 class FindContResult(basetask.Results):
-    def __init__(self, result_cont_ranges, cont_ranges, joint_mask_names, num_found, num_total, single_range_channel_fractions, momDiffSNRs):
+    def __init__(self, result_cont_ranges, cont_ranges, joint_mask_names, num_found, num_total, single_range_channel_fractions, momDiffSNRs, skip_stage=False):
         super(FindContResult, self).__init__()
         self.result_cont_ranges = result_cont_ranges
         self.cont_ranges = cont_ranges
@@ -20,14 +20,14 @@ class FindContResult(basetask.Results):
         self.plot_path = None
         self.single_range_channel_fractions = single_range_channel_fractions
         self.momDiffSNRs = momDiffSNRs
+        self.skip_stage = skip_stage
 
     def merge_with_context(self, context):
-
         if not self.mitigation_error:
-
             # write the new ranges to the continuum file
-            if not context.vla_skip_mfs_and_cube_imaging:
-                # PIPE-2255: avoid writing a blank cont.dat file if hif_findcont is bypassed in the VLA cube-imaging workflow.
+            if not self.skip_stage:
+                # PIPE-2255: if the findcontinuum heuristics is skipped (e.g. for the VLA cube imaging workflow),
+                # we will skip the cont.dat writeout to avoid a blank cont.dat file.
                 contfile_handler = contfilehandler.ContFileHandler(context.contfile)
                 contfile_handler.write(self.cont_ranges)
 

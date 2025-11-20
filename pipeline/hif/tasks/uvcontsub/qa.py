@@ -15,18 +15,24 @@ class UVcontSubQAHandler(pqa.QAPlugin):
     generating_task = uvcontsub.SerialUVcontSub
 
     def handle(self, context, result):
-
         scores = []
 
         if result.mitigation_error:
-            scores.append(pqa.QAScore(0.0, longmsg='Size mitigation error. No continuum information available.',
-                                      shortmsg='Size mitigation error'))
-        elif context.vla_skip_mfs_and_cube_imaging:
+            scores.append(
+                pqa.QAScore(
+                    0.0,
+                    longmsg='Size mitigation error. No continuum information available.',
+                    shortmsg='Size mitigation error',
+                )
+            )
+        elif result.skip_stage:
             scores.append(
                 pqa.QAScore(
                     None,
-                    longmsg='Skipped VLA continuum subtraction due to absence of required datatype: CONTLINE_SCIENCE',
-                    shortmsg='Stage skipped'))
+                    longmsg='Skipped continuum subtraction due to absence of required datatype: CONTLINE_SCIENCE',
+                    shortmsg='Stage skipped',
+                )
+            )
         else:
             scores.append(pqa.QAScore(1.0, longmsg='Continuum subtraction applied.', shortmsg=''))
 

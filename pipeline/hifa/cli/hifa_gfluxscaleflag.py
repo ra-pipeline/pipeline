@@ -32,6 +32,10 @@ def hifa_gfluxscaleflag(vis=None, intent=None, phaseupsolint=None, solint=None, 
     is the standard data flagging score, which depends on the fraction of data
     flagged.
 
+    The preliminary phase solutions use the mapping/combine and gaintype options
+    as established in hifa_spwphaseup.
+
+
     Returns:
         The results object for the pipeline task is returned.
 

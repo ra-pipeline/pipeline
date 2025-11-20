@@ -689,9 +689,11 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
             else:
                 result.logrecords.extend(handler.buffer)
 
-            event = TaskCompleteEvent(context_name=self.inputs.context.name,
-                                      stage_number=self.inputs.context.task_counter)
-            eventbus.send_message(event)
+            if utils.is_top_level_task():
+                event = TaskCompleteEvent(
+                    context_name=self.inputs.context.name, stage_number=self.inputs.context.task_counter
+                )
+                eventbus.send_message(event)
 
             return result
 

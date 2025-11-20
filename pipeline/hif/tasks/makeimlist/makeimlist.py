@@ -411,13 +411,16 @@ class MakeImList(basetask.StandardTaskTemplate):
         result.metadata['sidebar suffix'] = '/'.join(sidebar_suffixes)
 
         # Check if this stage has been disabled for vla (never set for ALMA)
-        if inputs.context.vla_skip_mfs_and_cube_imaging and inputs.specmode in ('mfs', 'cube'):
-            result.set_info({'msg': 'Line imaging stages have been disabled for VLA due to no MS being produced for line imaging.',
-                                 'intent': inputs.intent,
-                                 'specmode': inputs.specmode,
-                                 'stokes': inputs.stokes})
+        if self._skip_mfs_and_cube_imaging():
+            result.set_info({
+                'msg': 'Cube imaging stages have been disabled due to the absence of data in suitable Datatypes.',
+                'intent': inputs.intent,
+                'specmode': inputs.specmode,
+                'stokes': inputs.stokes,
+            })
             result.contfile = None
             result.linesfile = None
+            result.skip_stage = True
             return result
 
         # Check for size mitigation errors.
@@ -1719,6 +1722,21 @@ class MakeImList(basetask.StandardTaskTemplate):
                     break
 
         return drcorrect, maxthreshold
+
+    def _skip_mfs_and_cube_imaging(self) -> bool:
+        """Check if we can proceed with the cube imaging planning.
+
+        Note: this is only relevant for VLA to check if we should proceed with VLA cube imaging
+        """
+        cube_imaging_datatypes = [
+            DataType.SELFCAL_LINE_SCIENCE,
+            DataType.REGCAL_LINE_SCIENCE,
+            DataType.SELFCAL_CONTLINE_SCIENCE,
+            DataType.REGCAL_CONTLINE_SCIENCE,
+        ]
+        ms_list = self.inputs.context.observing_run.get_measurement_sets_of_type(cube_imaging_datatypes, msonly=True)
+        telescope = self.inputs.context.project_summary.telescope
+        return 'VLA' in telescope.upper() and self.inputs.specmode in ('mfs', 'cube') and not ms_list
 
 
 # maps intent, specmode and stokes inputs parameters to textual description of execution context.

@@ -1,34 +1,74 @@
 # Pipeline Flagging Tasks
 
-The Pipeline contains a number of tasks that flag bad data, based on e.g. online flags or user-provided flags. A 
-sub-set of the pipeline flagging tasks will flag data based on evaluation of their own flagging heuristics, and a 
-majority of this sub-set use a common Pipeline Flagging framework. The following note provides a description of the
-common flagging framework, and an in-depth explanation of individual flagging tasks. 
+The Pipeline contains a number of tasks that flag bad data, based on e.g. online flags, user-provided flags, or
+evaluation of custom heuristics defined by the Pipeline Working Group.
 
-## Summary current pipeline tasks
+The Pipeline flagging tasks can be categorized into three groups:
+- tasks based on task-specific heuristics and/or input flags
+- tasks using the common "corrected amplitude" flagging task
+- tasks using the common View Flagging Framework
 
-Status as of May 2021:
+The following note provides a description of each group, and an in-depth
+explanation for some individual flagging tasks. 
 
-The following pipeline tasks make use of the flagging framework and are part of (at least) one of the standard pipeline recipes:
+
+## Summary of flagging tasks based on task-specific heuristics and/or input flags
+
+- `hifa_flagdata`: performs basic deterministic flagging on MS (shadowed antennas, online flags, spw edges, autocorrelations, etc).
+- `hifa_flagtargets`: performs deterministic flagging on science target MS (input template file).
+- `hifa_fluxcalflag`: locates and flags line regions in solar-system flux calibrators.
+
+
+## Summary of tasks using corrected-amplitude flagging
+
+The corrected-amplitude flagging task, `hif_correctedampflag` was introduced in CAS-9437 Spring 2017 for Cycle 5 release
+as a pipeline data flagging heuristic that is based on comparing the amplitude of corrected data with the model for each
+major calibrator.
+
+`hif_correctedampflag` is not run as a top-level stage in recipes, but rather as a worker task common to various
+calibrator / target flagging stages.
+
+As of September 2025, the following pipeline tasks make use of `hif_correctedampflag` and are part of (at least) one
+of the standard pipeline recipes:
+- hifa_bandpassflag (CAS-9438): flags corrected-model amplitude outliers for the bandpass calibrator.
+- hifa_gfluxscaleflag (CAS-10158, CAS-10387): flags corrected-model amplitude outliers for the phase and flux calibrators.
+- hifa_polcalflag (PIPE-607): flags corrected-model amplitude outliers for the polarisation calibrator(s).
+- hifa_targetflag (PIPE-337): flags corrected-model amplitude outliers for the target source.
+
+The common workflow in these stages is to:
+- generate a number of temporary caltables
+- create a backup of the flagging state in the MS
+- run applycal to apply all registered caltables
+  - this updates the CORRECTED_DATA column in the MS, but also propagates flags from caltables to the FLAG column in the MS
+- run the corrected amplitude flagging heuristic based on the MODEL column (`hif_correctedampflag`)
+- restore the backup of the flagging state
+- apply the newly found flags from correctedampflag.
+
+The steps to backup and restore the flagging state is done to ensure that the flags propagated from caltables into the
+MS during the temporary applycal do not remain there at the end of the stage, so as to not affect subsequent stages.
+The only new flags that would remain in the MS are the new flags found by `hif_correctedampflag`, which are re-applied
+after the flagging state is restored.
+
+Note: besides propagating flags, the applycal step also affects the CORRECTED_DATA column in the MS. However,
+it is deemed unnecessary to "restore" this CORRECTED_DATA column to what it was before the 'applycal' step, because
+any subsequent applycal step will overwrite the entire column. Here, it is assumed that no subsequent calibration
+pipeline tasks ever act on the CORRECTED_DATA column without first running their own local applycal step (or before the
+top-level `hif_applycal` stage has run).
+
+
+## Summary of tasks using the view-flagging framework
+
+As of September 2025, the following pipeline tasks make use of the view-flagging
+framework and are part of (at least) one of the standard pipeline recipes:
 - hif_rawflagchans: flags raw data in MS.
-- [hifa/hsd]_tsysflag: flags Tsys caltable created by [hifa/hsd]_tsyscal.
+- [hifa/hsd]_tsysflag: flags the Tsys caltable that is created by [hifa/hsd]_tsyscal.
 - hif_lowgainflag: flags antennas in MS, based on evaluating heuristics on gain amplitude caltable created within task.
 - hifa_wvrgcalflag: evaluates if applying WVR correction provides tangible improvement, flagging WVR caltable in process where needed, using WVR caltable created within task (using hifa_wvrgcal).
 
-The following pipeline tasks perform flagging but do not make use of the common flagging framework:
-- hif_correctedampflag: Flag corrected - model amplitudes based on calibrators.
-- hifa_bandpassflag: uses hif_correctedampflag to flag corrected-model amplitude outliers for the bandpass calibrator.
-- hifa_gfluxscaleflag: uses hif_correctedampflag to flag corrected-model amplitude outliers for the phase and flux calibrators.
-- hifa_polcalflag: uses hif_correctedampflag to flag corrected-model amplitude outliers for the polarisation calibrators.
-- hifa_targetflag: uses hif_correctedampflag to flag corrected-model amplitude outliers for the target source.
-- hifa_flagdata: performs basic deterministic flagging on MS (e.g. shadowed antennas, online flags, autocorrelations, etc).
-- hifa_flagtargets: performs deterministic flagging on science target MS (input template file).
-- hifa_fluxcalflag: locates and flags line regions in solar-system flux calibrators.
 
+### General overview of a view-flagging task:
 
-## General overview of a flagging task within framework
-
-The main flagging pipeline tasks are done in two steps:
+The workflow of view-flagging tasks comprises two steps:
 
 1. Generate a "flagging view"
 
@@ -43,9 +83,9 @@ The main flagging pipeline tasks are done in two steps:
    In a single flagging pipeline task, a list of Flag Commands are compiled from the evaluation of all flagging views, and these flagging commands are immediately applied to the appropriate MS or caltable before the end of the flagging task.
 
 
-## How individual flagging tasks work
+### How individual view-flagging tasks work
 
-### Task: hif_rawflagchans
+#### Task: hif_rawflagchans
 This task uses raw data for the intent = 'BANDPASS' to identify outliers. Flagging commands for outlier data points are applied to all intents in the MS.
 
 **View generation**
@@ -97,7 +137,7 @@ The views are evaluated against the following two flagging rules:
    
    If the number of data points in the flagging view are smaller than the minimum sample 'fhl_minsample' (default: 5), then no flagging is attempted.
 
-### Task: hif_lowgainflag
+#### Task: hif_lowgainflag
 
 This task first creates a phased-up bandpass caltable, then a gain phase caltable, and finally a gain amplitude caltable. This final gain amplitude caltable is used to identify antennas with outlier gains, for each spw. Flagging commands for outlier antennas (per spw) are applied to the entire MS.
 
@@ -114,7 +154,7 @@ The views are evaluated against the "nmedian" matrix flagging rule, where data p
 
 Flagging commands are generated for each of the identified outlier data points.
 
-### Task: hifa_tsysflag, hsd_tsysflag
+#### Task: hifa_tsysflag, hsd_tsysflag
 
 This task flags the Tsys cal table created by the [hifa/hsd]_tsyscal pipeline task.
 

@@ -7,7 +7,7 @@ import pipeline.infrastructure.utils as utils
 
 class MakeImListResult(basetask.Results):
     def __init__(self, error=False, error_msg=None):
-        super(MakeImListResult, self).__init__()
+        super().__init__()
         self.contfile = None
         self.linesfile = None
         self.targets = []
@@ -18,6 +18,7 @@ class MakeImListResult(basetask.Results):
         self.synthesized_beams = None
         self.error = error
         self.error_msg = error_msg
+        self.skip_stage = False
 
     def add_target(self, target):
         self.targets.append(target)

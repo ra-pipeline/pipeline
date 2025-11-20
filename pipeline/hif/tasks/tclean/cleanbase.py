@@ -405,6 +405,13 @@ class CleanBase(basetask.StandardTaskTemplate):
         if tclean_job_parameters['gridder'] == 'awphpg' and tclean_job_parameters['savemodel'] == 'modelcolumn':
             tclean_job_parameters['gridder'] = 'awp2'
 
+        # PIPE-2834: allow user override of wprojplanes, only used for VLASS
+        if inputs.wprojplanes not in (None, -999):
+            tclean_job_parameters['wprojplanes'] = inputs.wprojplanes
+        else:
+            tclean_job_parameters['wprojplanes'] = inputs.heuristics.wprojplanes(
+                gridder=inputs.gridder, spwspec=inputs.spw)
+
         if scanidlist not in [[], None]:
             tclean_job_parameters['scan'] = scanidlist
 
@@ -604,7 +611,6 @@ class CleanBase(basetask.StandardTaskTemplate):
         tclean_job_parameters['nsigma'] = inputs.heuristics.nsigma(
             iter, inputs.hm_nsigma, inputs.hm_masking, rms_multiplier=rms_multiplier)
 
-        tclean_job_parameters['wprojplanes'] = inputs.heuristics.wprojplanes(gridder=inputs.gridder, spwspec=inputs.spw)
         tclean_job_parameters['rotatepastep'] = inputs.heuristics.rotatepastep()
         tclean_job_parameters['smallscalebias'] = inputs.heuristics.smallscalebias()
         tclean_job_parameters['usepointing'] = inputs.heuristics.usepointing()
