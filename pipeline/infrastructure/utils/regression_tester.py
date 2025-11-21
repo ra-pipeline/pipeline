@@ -25,6 +25,7 @@ from casatasks.private import tec_maps
 from pipeline import environment, infrastructure, recipereducer
 from pipeline.infrastructure import casa_tools, executeppr, executevlappr, launcher, utils
 from pipeline.infrastructure.renderer import regression
+from pipeline.infrastructure import pipeline_statistics
 
 if TYPE_CHECKING:
     from packaging.version import Version
@@ -46,6 +47,7 @@ class PipelineRegression:
             output_dir: Optional[str] = None,
             expectedoutput_file: Optional[str] = None,
             expectedoutput_dir: Optional[str] = None
+            use_json: bool = True,
             ):
         """
         Initializes a PipelineRegression instance.
@@ -79,12 +81,16 @@ class PipelineRegression:
             self.output_dir = f'{self.project_id}__{self.visname[0]}_test_output'
         else:
             self.output_dir = f'{self.visname[0]}_test_output'
+        self.use_json = use_json
         if expectedoutput_file:
             self.expectedoutput_file = casa_tools.utils.resolve(expectedoutput_file)
         else:
             # Find the reference file in expectedoutput_dir that matches the current CASA version and use that.
             if expectedoutput_dir:
-                reference_data_files = glob.glob(casa_tools.utils.resolve(expectedoutput_dir)+'/*.results.txt')
+                if use_json:
+                    reference_data_files = glob.glob(casa_tools.utils.resolve(expectedoutput_dir)+'/pipeline_stats_*.json')
+                else:
+                    reference_data_files = glob.glob(casa_tools.utils.resolve(expectedoutput_dir)+'/*.results.txt')
                 if reference_data_files:
                     self.expectedoutput_file = self._pick_results_file(reference_data_files=reference_data_files)
                     if self.expectedoutput_file:
@@ -244,8 +250,8 @@ class PipelineRegression:
     def run(self,
             telescope: str = 'alma',
             default_relative_tolerance: float = 1e-7,
-            omp_num_threads: Optional[int] = None
-            ) -> None:
+            omp_num_threads: Optional[int] = None,
+            use_json=True) -> None:
         """
         Run test with PPR if supplied or recipereducer if no PPR and compared to expected results.
 
@@ -315,17 +321,20 @@ class PipelineRegression:
             # Do sanity checks
             self.__do_sanity_checks()
 
-            # Get new results
-            new_results = self.__get_results_of_from_current_context()
+            if not use_json:
+                # new results file path (txt pathway)
+                new_file = f'{self.visname[0]}.NEW.results.txt'
 
-            # new results file path
-            new_file = f'{self.visname[0]}.NEW.results.txt'
+                # Get new results
+                new_results = self.__get_results_of_from_current_context()
 
-            # Store new results in a file
-            self.__save_new_results_to(new_file, new_results)
+                # Store new results in a file
+                self.__save_new_results_to(new_file, new_results)
+            else:
+                new_file = self.__get_pipeline_stats_file()
 
             # Compare new results with expected results
-            self.__compare_results(new_file, default_relative_tolerance)
+            self.__compare_results(new_file, default_relative_tolerance, json=use_json)
 
         finally:
             if not self.compare_only:
@@ -342,6 +351,25 @@ class PipelineRegression:
         if not self.compare_only and omp_num_threads is not None:
             casa_tools.casalog.ompSetNumThreads(default_nthreads)
 
+    def __get_pipeline_stats_file(self):
+        """
+        Get the path to the pipeline stats file.
+
+        Returns:
+            path to the pipeline stats file
+        """
+        # glob to find the pipeline stats file which has the form pipeline_stats_*.json
+        pipeline_stats_files = glob.glob(os.path.join(self.output_dir, 'pipeline_stats_*.json'))
+        if len(pipeline_stats_files) != 0:
+            pipeline_stats_file = pipeline_stats_files[0] 
+        else:
+            context = launcher.Pipeline(context='last').context
+            pipeline_stats = pipeline_statistics.generate_stats(context)
+            with open('pipeline_stats_testing.json', 'w') as f:
+                json.dump(pipeline_stats, f)
+            pipeline_stats_file = 'pipeline_stats_testing.json'
+
+        return pipeline_stats_file 
 
     def __compare_reference_txt(self, new_file: str, relative_tolerance: float) -> None: 
         with open(self.expectedoutput_file) as expected_fd, open(new_file) as new_fd:
@@ -406,7 +434,7 @@ class PipelineRegression:
             if _is_numeric(ref_val) and _is_numeric(cur_val):
                 if not math.isclose(ref_val, cur_val, rel_tol=relative_tolerance, abs_tol=relative_tolerance):
                     errors.append(
-                        f"values differ by > a relative difference of {tolerance}\n\texpected: {ref_val}, new: {cur_val}, "
+                        f"values differ by > a relative difference of {relative_tolerance}\n\texpected: {ref_val}, new: {cur_val}, "
                     )
                 return
 
@@ -462,26 +490,14 @@ class PipelineRegression:
                 pytrace=True,
             )
 
-    def __compare_results(self, new_file: str, relative_tolerance: float, json=None) -> None:
+    def __compare_results(self, new_file: str, relative_tolerance: float, json=True) -> None:
         """
         Compare results between new one loaded from file and old one.
 
         Args:
             new_file : file path of new results
             relative_tolerance : relative tolerance of output value
-            json : If None, auto-detect based on file extension. If True/False, use that format.
         """
-        # Auto-detect file type if not specified
-        if json is None:
-            # Check file extension to determine format
-            if self.expectedoutput_file.lower().endswith('.json'):
-                json = True
-            elif self.expectedoutput_file.lower().endswith('.txt'):
-                json = False
-            else:
-                # Default to text format for backward compatibility
-                json = False
-        
         if not json:
             self.__compare_reference_txt(new_file, relative_tolerance)
         else:
@@ -878,7 +894,8 @@ def test_13A_537__procedure_hifv__regression():
         visname=['13A-537.sb24066356.eb24324502.56514.05971091435'],
         recipe='procedure_hifv.xml',
         input_dir=input_dir,
-        expectedoutput_dir=input_dir,
+#        expectedoutput_dir=input_dir,
+        expectedoutput_file='pipeline_stats_example.json',
         output_dir='13A_537__procedure_hifv__regression'
         )
 
