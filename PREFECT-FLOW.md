@@ -28,6 +28,7 @@ casaconfig                         1.4.0
 casaplotms                         2.7.4
 casatasks                          6.7.2.42
 casatools                          6.7.2.42
+casashell                          6.7.2.42
 ```
 
 These should match the `pipeline` branch that is being used for the example. In addition, I am using `prefect 3.6.2` and
