@@ -1,25 +1,49 @@
 import sys
 
+from prefect import task
+
 import pipeline.h.cli.utils as utils
 
-from prefect import task
+
+class RandomErrorException(Exception):
+    def __init__(self, message, error_code):
+        super().__init__(message)
+        self.message = message
+        self.error_code = error_code
+
+    def __str__(self):
+        return f"{self.message} (Error Code: {self.error_code})"
+
+
+def retry_handler(task, task_run, state) -> bool:
+    """
+    Retry handler that checks the exception and retires if RandomErrorException
+    """
+    try:
+        state.result()
+    except RandomErrorException as error:
+        print(error)
+        return True
+
+    except Exception:
+        return False
+
 
 # docstring and type hints: inherits from hsd.tasks.applycal.applycal.SDApplycalInputs.__init__
 @utils.cli_wrapper
-@task
+@task(retries=3, retry_condition_fn=retry_handler)
 def hsd_applycal(
-        vis=None,
-        field=None,
-        intent=None,
-        spw=None,
-        antenna=None,
-        applymode=None,
-        flagbackup=None,
-        parallel=None,
-        *args,
-        **kwargs
+    vis=None,
+    field=None,
+    intent=None,
+    spw=None,
+    antenna=None,
+    applymode=None,
+    flagbackup=None,
+    parallel=None,
+    *args,
+    **kwargs,
 ):
-
     """Apply the calibration(s) to the data.
 
     hsd_applycal applies the precomputed calibration tables stored in the pipeline
@@ -42,7 +66,11 @@ def hsd_applycal(
         >>> hsd_applycal(field='3C279, M82', spw='17', intent='TARGET')
 
     """
+    # Testing retry function in prefect with a 50% failure rate in hsd_applycal
+    import random
 
+    if random.random() >= 0.7:
+        raise RandomErrorException(message="Random error!", error_code=70)
 
     ##########################################################################
     #                                                                        #
