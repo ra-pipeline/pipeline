@@ -376,13 +376,13 @@ def format_spwmap(spwmap, scispws):
 
 	<%def name="fancybox_caption(plot)">
 		Receiver: ${utils.commafy(plot.parameters['receiver'], quotes=False)}<br>
-		Spectral window: ${plot.parameters['spw']})<br>
+		Spw: ${plot.parameters['spw']}<br>
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
 		Fields: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 	<%def name="caption_title(plot)">
-		Spectral Window ${plot.parameters['spw']}
+		Spw ${plot.parameters['spw']}
 	</%def>
 
 	<%def name="caption_subtitle(plot)">
@@ -420,13 +420,13 @@ def format_spwmap(spwmap, scispws):
 
 	<%def name="fancybox_caption(plot)">
 		Receiver: ${utils.commafy(plot.parameters['receiver'], quotes=False)}<br>
-		Spectral window: ${plot.parameters['spw']}<br>
+		Spw: ${plot.parameters['spw']}<br>
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
 		Fields: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 	<%def name="caption_title(plot)">
-		Spectral Window ${plot.parameters['spw']}
+		Spw ${plot.parameters['spw']}
 	</%def>
 
 	<%def name="caption_subtitle(plot)">
@@ -462,13 +462,13 @@ def format_spwmap(spwmap, scispws):
 
 	<%def name="fancybox_caption(plot)">
 		Receiver: ${utils.commafy(plot.parameters['receiver'], quotes=False)}<br>
-		Spectral window: ${plot.parameters['spw']}<br>
+		Spw: ${plot.parameters['spw']}<br>
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
 		Fields: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 	<%def name="caption_title(plot)">
-		Spectral Window ${plot.parameters['spw']}
+		Spw ${plot.parameters['spw']}
 	</%def>
 
 	<%def name="caption_subtitle(plot)">
@@ -532,13 +532,13 @@ def format_spwmap(spwmap, scispws):
 
 	<%def name="fancybox_caption(plot)">
 		Receiver: ${utils.commafy(plot.parameters['receiver'], quotes=False)}<br>
-		Spectral window: ${plot.parameters['spw']}<br>
+		Spw: ${plot.parameters['spw']}<br>
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
 		Fields: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 	<%def name="caption_title(plot)">
-		Spectral Window ${plot.parameters['spw']}
+		Spw ${plot.parameters['spw']}
 	</%def>
 
 	<%def name="caption_subtitle(plot)">
@@ -576,13 +576,13 @@ def format_spwmap(spwmap, scispws):
 	<%def name="mouseover(plot)">Click to show the ratio of the corrected amplitude to model column for spw ${plot.parameters['spw']}</%def>
 
 	<%def name="fancybox_caption(plot)">
-		Spectral window: ${plot.parameters['spw']}<br>
+		Spw: ${plot.parameters['spw']}<br>
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
 		Fields: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 	<%def name="caption_title(plot)">
-		Spectral Window ${plot.parameters['spw']}<br>
+		Spw ${plot.parameters['spw']}<br>
 	</%def>
 
 	<%def name="caption_subtitle(plot)">
@@ -620,13 +620,13 @@ def format_spwmap(spwmap, scispws):
 	<%def name="mouseover(plot)">Click to show the ratio of the corrected amplitude to model column for spw ${plot.parameters['spw']}</%def>
 
 	<%def name="fancybox_caption(plot)">
-		Spectral window: ${plot.parameters['spw']}<br>
+		Spw: ${plot.parameters['spw']}<br>
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
 		Fields: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 	<%def name="caption_title(plot)">
-		Spectral Window ${plot.parameters['spw']}<br>
+		Spw ${plot.parameters['spw']}<br>
 	</%def>
 
 	<%def name="caption_subtitle(plot)">
