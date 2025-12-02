@@ -46,7 +46,7 @@ class PipelineRegression:
             input_dir: Optional[str] = None,
             output_dir: Optional[str] = None,
             expectedoutput_file: Optional[str] = None,
-            expectedoutput_dir: Optional[str] = None
+            expectedoutput_dir: Optional[str] = None,
             use_json: bool = True,
             ):
         """
