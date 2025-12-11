@@ -5,13 +5,13 @@ import pytest
 
 from .. import casa_tools
 from .casa_data import (
-    get_file_md5,
-    get_iso_mtime,
-    get_solar_system_model_files,
-    get_filename_info,
-    get_object_info_string,
     IERSInfo,
-    from_mjd_to_datetime
+    from_mjd_to_datetime,
+    get_file_md5,
+    get_filename_info,
+    get_iso_mtime,
+    get_object_info_string,
+    get_solar_system_model_files,
 )
 
 # Validation of ISO 8601 strings
@@ -158,6 +158,7 @@ def test_string_representation_for_IERS_info():
         '"IERSeop2000": "0001.0144"}, "IERSeop2000_last_MJD": 59184.0, '
         '"IERSeop2000_last": "2020-12-01 00:00:00+00:00", "IERSpredict_last": "2021-04-25 00:00:00+00:00"}'
     )
+
 
 @skip_if_no_data_repo
 def test_date_message_type():
