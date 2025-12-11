@@ -96,7 +96,7 @@ class TestPcleanWithValidDataset:
     """Integration tests using a real MeasurementSet.
     
     Note that the current tests focus on verifying that pclean runs.
-    The mpi-cluster setup (<=4 cores/proc) is restricted to stay within the current 
+    The mpi-cluster setup (<=4 processes) is restricted to stay within the current 
     GitHub Runner limit:
         https://docs.github.com/en/actions/reference/runners/github-hosted-runners
     """

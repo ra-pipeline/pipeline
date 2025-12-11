@@ -88,7 +88,7 @@ def pclean(
         # Inline script to run inside the subprocess
         script = textwrap.dedent(
             f"""\
-            
+
             import pickle
             import sys
 
@@ -98,7 +98,7 @@ def pclean(
             casaconfig.config.logfile={casatasks.casalog.logfile()!r}
             casaconfig.config.log2term = {bool(getattr(casaconfig.config, 'log2term', False))}
             
-            import casampi.private.start_mpi  # nescary if not executed via casashell
+            import casampi.private.start_mpi  # necessary if not executed via casashell
             import casatasks
             from casatasks import tclean
             casatasks.casalog.showconsole(onconsole={bool(getattr(casaconfig.config, 'log2term', False))})
@@ -129,7 +129,7 @@ def pclean(
 
         # Base call: run the Python interpreter with the inline script
         # We intentionally avoid `casa` or `python -m casashell` here to reduce
-        # dependencies and diffiencetial between monolithic and modular CASA6 environments.
+        # dependencies and differential between monolithic and modular CASA6 environments.
         # casatasks should be importable directly from the standard Python environment.
         call_args = [sys.executable, '-c', script]
 

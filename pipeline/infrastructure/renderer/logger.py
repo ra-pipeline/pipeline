@@ -38,7 +38,7 @@ THUMBNAIL_CMD = None
 
 
 # first try to find ImageMagick's 'mogrify' command. We assume that
-# ImageMagick's 'convert' commnand can be found in the same directory. We
+# ImageMagick's 'convert' command can be found in the same directory. We
 # do not search for 'convert' directly as some utilities also provide a
 # 'convert' command which may come earlier on the PATH.
 mogrify_path = shutil.which('mogrify')
