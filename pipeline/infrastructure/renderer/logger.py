@@ -19,12 +19,12 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
 # *****************************************************************************
 import collections
+import shutil
 import itertools
 import os
 import platform
 import re
 import string
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -33,31 +33,29 @@ from pipeline.infrastructure import logging
 LOG = logging.get_logger(__name__)
 
 # Set the command used to shrink plots down to thumbnails. If set to None, no
-# thumbnails will be generated 
-THUMBNAIL_CMD = None 
+# thumbnails will be generated
+THUMBNAIL_CMD = None
 
 
 # first try to find ImageMagick's 'mogrify' command. We assume that
-# ImageMagick's 'convert' command can be found in the same directory. We
+# ImageMagick's 'convert' commnand can be found in the same directory. We
 # do not search for 'convert' directly as some utilities also provide a
-# 'convert' command which may come earlier on the PATH. 
+# 'convert' command which may come earlier on the PATH.
 mogrify_path = shutil.which('mogrify')
 if mogrify_path:
     bin_dir = os.path.dirname(mogrify_path)
     convert_path = os.path.join(bin_dir, 'convert')
     if os.path.exists(convert_path):
-        LOG.trace('Using convert executable at \'%s\' to generate '
-                  'thumbnails' % convert_path)
-        THUMBNAIL_CMD = lambda full, thumb, size : (convert_path, full, '-thumbnail', size, thumb)
+        LOG.trace("Using convert executable at '%s' to generate thumbnails", convert_path)
+        THUMBNAIL_CMD = lambda full, thumb: (convert_path, full, '-thumbnail', '250x188', thumb)
 
 if THUMBNAIL_CMD is None and platform.system() == 'Darwin':
     # macOS only: fallback to sips if ImageMagick, e.g. from MacPorts or Homebrew is not found on macOS. sips is a system
     # executable that should be available on all macOS systems.
     sips_path = shutil.which('sips')
     if sips_path:
-        LOG.trace('Using sips executable at \'%s\' to generate thumbnails'
-                  % sips_path)
-        THUMBNAIL_CMD = lambda full, thumb, size : (sips_path, '-Z', size.split('x')[0], '--out', thumb, full)
+        LOG.trace("Using sips executable at '%s' to generate thumbnails", sips_path)
+        THUMBNAIL_CMD = lambda full, thumb: (sips_path, '-Z', '250', '--out', thumb, full)
 
 if THUMBNAIL_CMD is None:
     LOG.warning('Could not find the ImageMagick \'convert\' or macOS \'sips\' command. '
@@ -69,7 +67,7 @@ def getPath(filename):
     return path
 
 
-class Parameters:
+class Parameters(object):
     """
     Provides a set of utility functions that describe how the plot parameters
     given as keys of the optional parameters dictionary given to Plot() should
@@ -124,7 +122,7 @@ class Parameters:
             return t
 
 
-class PlotGroup:
+class PlotGroup(object):
     # the full template for the selectors in this series of plots
     full_template = string.Template('<li class="selectorHeading">$description'
         + ':<ul class="selector">\n$selectors</ul>\n</li>\n')
@@ -244,7 +242,7 @@ class PlotGroup:
         return self.toHtml()
 
 
-class Selector:
+class Selector(object):
     # CSS classes have a restricted character sets, so we use a regex to 
     # remove them
     _regex = re.compile(r'\W')
@@ -358,12 +356,11 @@ class Plot:
         return Plot.create_thumbnail(self.abspath)
 
     @staticmethod
-    def create_thumbnail(image_path: str | Path, thumbnail_size: str = '250x188') -> str:
+    def create_thumbnail(image_path: str | Path) -> str:
         """Creates a scaled-down thumbnail from a given image file.
 
         Args:
             image_path: The absolute path to the original image file.
-            thumbnail_size: Maximum thumbnail size passed to the image converter.
 
         Returns:
             The path to the created thumbnail. If creation fails or is
@@ -386,7 +383,7 @@ class Plot:
             return source_path.name
 
         LOG.trace('Creating thumbnail for %s', source_path)
-        cmd = THUMBNAIL_CMD(str(source_path), str(thumb_path), thumbnail_size)
+        cmd = THUMBNAIL_CMD(str(source_path), str(thumb_path))
 
         # Create a copy of the environment without LD_LIBRARY_PATH to avoid conflicts.
         env = os.environ.copy()
