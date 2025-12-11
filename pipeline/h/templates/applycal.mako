@@ -334,7 +334,7 @@ def format_spwmap(spwmap, scispws):
 		Receiver: ${utils.commafy(plot.parameters['receiver'], quotes=False)}<br>
 		Spw: ${plot.parameters['spw']}<br>
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
-		Fields: ${html.escape(plot.parameters['field'], True)}
+		Field: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 	<%def name="caption_title(plot)">
@@ -347,7 +347,7 @@ def format_spwmap(spwmap, scispws):
 
 	<%def name="caption_text(plot, intent)">
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
-		Fields: ${html.escape(plot.parameters['field'], True)}
+		Field: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 </%self:plot_group>
@@ -378,7 +378,7 @@ def format_spwmap(spwmap, scispws):
 		Receiver: ${utils.commafy(plot.parameters['receiver'], quotes=False)}<br>
 		Spw: ${plot.parameters['spw']}<br>
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
-		Fields: ${html.escape(plot.parameters['field'], True)}
+		Field: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 	<%def name="caption_title(plot)">
@@ -391,7 +391,7 @@ def format_spwmap(spwmap, scispws):
 
 	<%def name="caption_text(plot, intent)">
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
-		Fields: ${html.escape(plot.parameters['field'], True)}
+		Field: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 </%self:plot_group>
@@ -422,7 +422,7 @@ def format_spwmap(spwmap, scispws):
 		Receiver: ${utils.commafy(plot.parameters['receiver'], quotes=False)}<br>
 		Spw: ${plot.parameters['spw']}<br>
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
-		Fields: ${html.escape(plot.parameters['field'], True)}
+		Field: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 	<%def name="caption_title(plot)">
@@ -435,7 +435,7 @@ def format_spwmap(spwmap, scispws):
 
 	<%def name="caption_text(plot, intent)">
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
-		Fields: ${html.escape(plot.parameters['field'], True)}
+		Field: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 </%self:plot_group>
@@ -464,7 +464,7 @@ def format_spwmap(spwmap, scispws):
 		Receiver: ${utils.commafy(plot.parameters['receiver'], quotes=False)}<br>
 		Spw: ${plot.parameters['spw']}<br>
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
-		Fields: ${html.escape(plot.parameters['field'], True)}
+		Field: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 	<%def name="caption_title(plot)">
@@ -534,7 +534,7 @@ def format_spwmap(spwmap, scispws):
 		Receiver: ${utils.commafy(plot.parameters['receiver'], quotes=False)}<br>
 		Spw: ${plot.parameters['spw']}<br>
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
-		Fields: ${html.escape(plot.parameters['field'], True)}
+		Field: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 	<%def name="caption_title(plot)">
@@ -578,7 +578,7 @@ def format_spwmap(spwmap, scispws):
 	<%def name="fancybox_caption(plot)">
 		Spw: ${plot.parameters['spw']}<br>
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
-		Fields: ${html.escape(plot.parameters['field'], True)}
+		Field: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 	<%def name="caption_title(plot)">
@@ -588,7 +588,7 @@ def format_spwmap(spwmap, scispws):
 	<%def name="caption_subtitle(plot)">
 		${rx_for_plot(plot)}
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
-		Fields: ${html.escape(plot.parameters['field'], True)}
+		Field: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 </%self:plot_group>
@@ -622,7 +622,7 @@ def format_spwmap(spwmap, scispws):
 	<%def name="fancybox_caption(plot)">
 		Spw: ${plot.parameters['spw']}<br>
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
-		Fields: ${html.escape(plot.parameters['field'], True)}
+		Field: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 	<%def name="caption_title(plot)">
@@ -632,7 +632,7 @@ def format_spwmap(spwmap, scispws):
 	<%def name="caption_subtitle(plot)">
 		${rx_for_plot(plot)}
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
-		Fields: ${html.escape(plot.parameters['field'], True)}
+		Field: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 </%self:plot_group>
@@ -677,7 +677,7 @@ def format_spwmap(spwmap, scispws):
 		Receiver: ${utils.commafy(plot.parameters['receiver'], quotes=False)}<br>
 		Spw: ${plot.parameters['spw']}<br>
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
-		Fields: ${html.escape(plot.parameters['field'], True)}
+		Field: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 	<%def name="caption_title(plot)">
@@ -723,7 +723,7 @@ def format_spwmap(spwmap, scispws):
 		Receiver: ${utils.commafy(plot.parameters['receiver'], quotes=False)}<br>
 		Spw: ${plot.parameters['spw']}<br>
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
-		Fields: ${html.escape(plot.parameters['field'], True)}
+		Field: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 	<%def name="caption_title(plot)">
@@ -798,7 +798,7 @@ def format_spwmap(spwmap, scispws):
 
 	<%def name="fancybox_caption(plot)">
 		Spw: ${plot.parameters['spw']}<br>
-		Fields: ${html.escape(plot.parameters['field'], True)}
+		Field: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 	<%def name="caption_title(plot)">
