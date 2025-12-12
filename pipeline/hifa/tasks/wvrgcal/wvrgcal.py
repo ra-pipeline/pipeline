@@ -110,33 +110,33 @@ class WvrgcalInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
-                Defaults to None, which corresponds to the current working directory.
+                Defaults to ``None``, which corresponds to the current working directory.
 
             vis: List of input visibility files.
-                Default: none, in which case the vis files to be used
+                Default: ``None``, in which case the vis files to be used
                 will be read from the context.
 
-                Example: vis=['ngc5921.ms']
+                Example: ``vis=['ngc5921.ms']``
 
             caltable: List of output gain calibration tables.
                 Default: none, in which case the names of the caltables
                 will be generated automatically.
 
-                Example: caltable='ngc5921.wvr'
+                Example: ``caltable='ngc5921.wvr'``
 
             offsetstable: List of input temperature offsets table files to subtract
                 from WVR measurements before calculating phase corrections.
                 Default: none, in which case no offsets are applied.
 
-                Example: offsetstable=['ngc5921.cloud_offsets']
+                Example: ``offsetstable=['ngc5921.cloud_offsets']``
 
             hm_toffset: If 'manual', set the ``toffset`` parameter to the user-specified value.
                 If 'automatic', set the ``toffset`` parameter according to the
-                date of the MeasurementSet; ``toffset`` = -1 if before 2013-01-21T00:00:00
-                ``toffset`` = 0 otherwise.
+                date of the MeasurementSet; ``toffset=-1`` if before 2013-01-21T00:00:00
+                ``toffset=0`` otherwise.
 
             toffset: Time offset (sec) between interferometric and WVR data.
 
@@ -156,12 +156,12 @@ class WvrgcalInputs(vdp.StandardInputs):
                 the ``tie``. If ``tie`` is not empty then ``segsource``
                 is forced to be True. Ignored unless ``hm_tie`` = 'manual'.
 
-                Example: tie=['3C273,NGC253', 'IC433,3C279']
+                Example: ``tie=['3C273,NGC253', 'IC433,3C279']``
 
             sourceflag: Flag the WVR data for these source(s) as bad and do not
                 produce corrections for it. Requires ``segsource`` = True.
 
-                Example: ['3C273']
+                Example: ``['3C273']``
 
             nsol: Number of solutions for phase correction coefficients during this
                 observation, evenly distributed in time throughout the observation. It
@@ -175,7 +175,7 @@ class WvrgcalInputs(vdp.StandardInputs):
                 their data with values interpolated from the 3 nearest antennas with
                 unflagged data.
 
-                Example: ['DV03','DA05','PM02']
+                Example: ``['DV03','DA05','PM02']``
 
             hm_smooth: If 'manual' set the ``smooth`` parameter to the user-specified value.
                 If 'automatic', run the wvrgcal task with the range of ``smooth`` parameters
@@ -193,18 +193,18 @@ class WvrgcalInputs(vdp.StandardInputs):
                 antennas are 7m antennas without WVR and otherwise set to
                 500m).
 
-                Example: maxdistm=550
+                Example: ``maxdistm=550``
 
             minnumants: Minimum number of nearby antennas (up to 3) used for
                 interpolation from a flagged antenna.
 
-                Example: minnumants=3
+                Example: ``minnumants=3``
 
             mingoodfrac: Minimum fraction of good data per antenna.
 
             refant: Ranked comma delimited list of reference antennas.
 
-                Example: refant='DV01,DV02'
+                Example: ``refant='DV01,DV02'``
 
             qa_intent: The list of data intents on which the wvr correction is to be
                 tried as a means of estimating its effectiveness.
@@ -223,7 +223,7 @@ class WvrgcalInputs(vdp.StandardInputs):
                 for merging into the context for use in the subsequent reduction.
                 If you do not want any QA calculations then set qa_intent=''.
 
-                Example: qa_intent='PHASE'
+                Example: ``qa_intent='PHASE'``
 
             qa_bandpass_intent: The data intent to use for the bandpass calibration in
                 the qa calculation. The default is blank to allow the underlying bandpass
@@ -243,7 +243,7 @@ class WvrgcalInputs(vdp.StandardInputs):
             nowvr_result:
 
         """
-        super(WvrgcalInputs, self).__init__()
+        super().__init__()
 
         # pipeline inputs
         self.context = context

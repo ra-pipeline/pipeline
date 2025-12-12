@@ -38,6 +38,7 @@ VISLIST_RESET_KEY = '_do_not_reset_vislist'
 
 
 def timestamp(method):
+    @functools.wraps(method)
     def attach_timestamp_to_results(self, *args, **kw):
         start = datetime.datetime.utcnow()
         result = method(self, *args, **kw)
@@ -60,6 +61,7 @@ def result_finaliser(method):
 
     TODO: refactor so this is done as part of execute!
     """
+    @functools.wraps(method)
     def finalise_pipeline_result(self, *args, **kw):
         result = method(self, *args, **kw)
 
@@ -82,6 +84,7 @@ def result_finaliser(method):
 
 
 def capture_log(method):
+    @functools.wraps(method)
     def capture(self, *args, **kw):
         # get the size of the CASA log before task execution
         logfile = casa_tools.log.logfile()
@@ -613,8 +616,8 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
         """
         raise NotImplementedError
 
-    @timestamp
     @matplotlibrc_handler
+    @timestamp
     @capture_log
     @result_finaliser
     def execute(self, **parameters):

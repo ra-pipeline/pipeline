@@ -4759,8 +4759,7 @@ def score_iersstate(mses: list[MeasurementSet]) -> list[pqa.QAScore]:
 
 @log_qa
 def score_amp_vs_time_plots(context: Context, result: SDApplycalResults) -> list[pqa.QAScore]:
-    """
-    Calculate score about calibrated amplitude vs. time plot of Single Dish Applycal.
+    """Calculate score about calibrated amplitude vs. time plot of Single Dish Applycal.
 
     Calculate score according to the existence of plot file for each EB, spw and antenna
     and the quality of it.
@@ -4773,13 +4772,12 @@ def score_amp_vs_time_plots(context: Context, result: SDApplycalResults) -> list
       2. Check whether the number of flagged data is equal to that of total data or not.
 
     Args:
-        context: Pipeline context.
+        context: Pipeline context object containing state information.
         result: SDApplycalResults instance.
 
     Returns:
         list[pqa.QAScore]: List which contains QAScore objects.
     """
-
     vis = os.path.basename(result.inputs['vis'])
     ms = context.observing_run.get_ms(vis)
     spwids = [spw.id for spw in ms.get_spectral_windows()]

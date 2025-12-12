@@ -65,8 +65,7 @@ class AntposInputs(vdp.StandardInputs):
 
     @vdp.VisDependentProperty
     def caltable(self):
-        """
-        Get the caltable argument for these inputs.
+        """Get the caltable argument for these inputs.
 
         If set to a table-naming heuristic, this should give a sensible name
         considering the current CASA task arguments.
@@ -81,36 +80,36 @@ class AntposInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
 
             vis: List of input visibility files.
 
-                Example: ['ngc5921.ms']
+                Example: ``['ngc5921.ms']``
 
             caltable: Name of output gain calibration tables.
 
-                Example: ['ngc5921.gcal']
+                Example: ``['ngc5921.gcal']``
 
-            hm_antpos: Heuristics method for retrieving the antenna position corrections. The options are 'online' (not yet implemented), 'manual',
-                and 'file'.
+            hm_antpos: Heuristics method for retrieving the antenna position corrections. The options are ``'online'`` (not yet implemented), ``'manual'``,
+                and ``'file'``.
 
-            antposfile: The file(s) containing the antenna offsets. Used if hm_antpos is 'file'.
+            antposfile: The file(s) containing the antenna offsets. Used if hm_antpos is ``'file'``.
 
-                Example: 'antennapos.csv'
+                Example: ``'antennapos.csv'``
 
-            antenna: The list of antennas for which the positions are to be corrected. Available when hm_antpos='manual'.
+            antenna: The list of antennas for which the positions are to be corrected. Available when ``hm_antpos='manual'``.
 
-                Example: antenna='DV05,DV07'
+                Example: ``antenna='DV05,DV07'``
 
-            offsets: The list of antenna offsets for each antenna in 'antennas'. Each offset is a set of 3 floating point numbers separated by commas, specified
-                in the ITRF frame. Available when hm_antpos='manual'.
+            offsets: The list of antenna offsets for each antenna in ``'antennas'``. Each offset is a set of 3 floating point numbers separated by commas, specified
+                in the ITRF frame. Available when ``hm_antpos='manual'``.
 
-                Example: offsets=[0.01, 0.02, 0.03, 0.03, 0.02, 0.01]
+                Example: ``offsets=[0.01, 0.02, 0.03, 0.03, 0.02, 0.01]``
         """
-        super(AntposInputs, self).__init__()
+        super().__init__()
 
         # pipeline inputs
         self.context = context

@@ -12,13 +12,12 @@ module was imported.
 """
 import functools
 import shutil
+import subprocess
 import sys
+from inspect import signature
 
-import casatasks
 import casaplotms
-
-
-
+import casatasks
 
 from . import logging
 from .jobrequest import JobRequest
@@ -198,9 +197,40 @@ def plotbandpass(*v, **k) -> JobRequest:
     return JobRequest(casatasks.plotbandpass, *v, **k)
 
 
+def xvfb_plotms(self, *args, **kwargs):
+    cmd = []
+    xvfb_run = shutil.which('xvfb-run')
+    python = sys.executable
+    cmd = [xvfb_run, '-a', python, '-c']
+    all_args = [f"{value!r}" for value in args] + [f"{name}={value!r}" for name, value in kwargs.items()]
+    py_cmds = ['from casaplotms import plotms', 'import numpy as np', 'plotms({})'.format(', '.join(all_args))]
+    py_cmd = '; '.join(py_cmds)
+    cmd.append(f'"{py_cmd}"')
+    cmd = ' '.join(cmd)
+    try:
+        LOG.debug(f'subprocess-cmd: {cmd}')
+        ret = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT).decode().strip()
+        LOG.debug(f'subprocess-ret: {ret}')
+    except (FileNotFoundError, subprocess.CalledProcessError) as ex:
+        ret = "error"
+    return ret
+
+# copy the casa/plotms callable attribute to the wrapper function.
+xvfb_plotms.__name__ = 'plotms'
+xvfb_plotms.__doc__ = casaplotms.plotms.__doc__
+xvfb_plotms.__wrapped__ = casaplotms.plotms.__call__
+xvfb_plotms.__signature__ = signature(casaplotms.plotms.__call__)
+xvfb_plotms.__defaults__ = casaplotms.plotms.__call__.__defaults__
+xvfb_plotms.__kwdefaults__ = casaplotms.plotms.__call__.__kwdefaults__
+
+
 @register_task
 def plotms(*v, **k) -> JobRequest:
-    return JobRequest(casaplotms.plotms, *v, **k)
+    xvfb_subprocess = False
+    if xvfb_subprocess:
+        return JobRequest(xvfb_plotms, *v, **k)
+    else:
+        return JobRequest(casaplotms.plotms, *v, **k)
 
 
 @register_task

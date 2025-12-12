@@ -1,5 +1,3 @@
-import sys
-
 import pipeline.h.cli.utils as utils
 
 
@@ -10,8 +8,7 @@ def hifa_wvrgcalflag(vis=None, caltable=None, offsetstable=None, hm_toffset=None
                      smooth=None, scale=None, maxdistm=None, minnumants=None, mingoodfrac=None, refant=None,
                      flag_intent=None, qa_intent=None, qa_bandpass_intent=None, accept_threshold=None, flag_hi=None,
                      fhi_limit=None, fhi_minsample=None, ants_with_wvr_thresh=None, parallel=None):
-    """Generate a gain table based on Water Vapor Radiometer data, interpolating over
-    antennas with bad radiometers.
+    """Flag bad WVR calibration in gain table and interpolate over antennas with bad radiometers.
 
     This task will first identify for each vis whether it includes at least 3
     antennas with Water Vapor Radiometer (WVR) data, and that the fraction of
@@ -57,24 +54,3 @@ def hifa_wvrgcalflag(vis=None, caltable=None, offsetstable=None, hm_toffset=None
         >>> hifa_wvrgcalflag(hm_tie='automatic')
 
     """
-    ##########################################################################
-    #                                                                        #
-    #  CASA task interface boilerplate code starts here. No edits should be  #
-    #  needed beyond this point.                                             #
-    #                                                                        #
-    ##########################################################################
-
-    # create a dictionary containing all the arguments given in the
-    # constructor
-    all_inputs = vars()
-
-    # get the name of this function for the weblog, eg. 'hif_flagdata'
-    task_name = sys._getframe().f_code.co_name
-
-    # get the context on which this task operates
-    context = utils.get_context()
-
-    # execute the task
-    results = utils.execute_task(context, task_name, all_inputs)
-
-    return results

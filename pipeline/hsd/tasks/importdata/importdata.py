@@ -69,7 +69,7 @@ class SDImportDataInputs(importdata.ImportDataInputs):
                 MSes, or tar files of MSes, If ASDM files are specified, they will be
                 converted to MS format.
 
-                Example: vis=['X227.ms', 'asdms.tar.gz']
+                Example: ``vis=['X227.ms', 'asdms.tar.gz']``
 
             output_dir: path of output directory
 
@@ -78,28 +78,28 @@ class SDImportDataInputs(importdata.ImportDataInputs):
                 separated by space characters. Default value, None, is
                 equivalent to the following list.
 
-                    'SBSummary ExecBlock Annotation Antenna Station Receiver Source CalAtmosphere CalWVR SpectralWindow'
+                    ``'SBSummary ExecBlock Annotation Antenna Station Receiver Source CalAtmosphere CalWVR SpectralWindow'``
 
-                Example: 'Receiver', ''
+                Example: ``'Receiver'``, ``''``
 
             process_caldevice: Import the ASDM caldevice table.
 
-                Example: True
+                Example: ``True``
 
-                Default: None (equivalent to True)
+                Default: ``None`` (equivalent to ``True``)
 
             session: List of sessions to which the visibility files belong.
                 Defaults to a single session containing all the visibility files,
                 otherwise a session must be assigned to each vis file.
 
-                Example: session=['Session_1', 'Sessions_2']
+                Example: ``session=['Session_1', 'Sessions_2']``
 
             overwrite: Overwrite existing files on import. When converting
                 ASDM to MS, if overwrite=False and the MS already exists in
                 output directory, then this existing MS dataset will be used
                 instead.
 
-                Default: None (equivalent to False)
+                Default: ``None`` (equivalent to ``False``)
 
             nocopy: Disable copying of MS to working directory
 
@@ -108,11 +108,11 @@ class SDImportDataInputs(importdata.ImportDataInputs):
             datacolumns: Dictionary defining the data types of existing columns.
                 The format is:
 
-                    {'data': 'data type 1'}
+                    ``{'data': 'data type 1'}``
 
                 or
 
-                    {'data': 'data type 1', 'corrected': 'data type 2'}
+                    ``{'data': 'data type 1', 'corrected': 'data type 2'}``
 
                 For ASDMs the data type can only be RAW and one can only specify
                 it for the data column.
@@ -131,39 +131,39 @@ class SDImportDataInputs(importdata.ImportDataInputs):
 
             save_flagonline: Save flag commands, flagging template, imaging targets, to text files。
 
-                Default: None (equivalent to True)
+                Default: ``None`` (equivalent to ``True``)
 
             lazy: Use the lazy filter import.
 
-                Default: None (equivalent to False)
+                Default: ``None`` (equivalent to ``False``)
 
             with_pointing_correction: Apply pointing correction to DIRECTION.
                 Add (ASDM::Pointing::encoder - ASDM::Pointing::pointingDirection)
                 to the value to be written in MS::Pointing::direction.
 
-                Default: None (equivalent to True)
+                Default: ``None`` (equivalent to ``True``)
 
             createmms: Create an MMS.
 
-                Default: None (equivalent to False)
+                Default: ``None`` (equivalent to ``False``)
 
             ocorr_mode: Selection of baseline correlation to import.
                 Valid only if input visibility is ASDM. See a document of CASA,
                 casatasks::importasdm, for available options.
 
-                Default: None (equivalent to 'ao')
+                Default: ``None`` (equivalent to ``'ao'``)
 
             hm_rasterscan: Heuristics method for raster scan analysis.
                 Two analysis modes, time-domain analysis ('time') and
                 direction analysis ('direction'), are available.
 
-                Default: None (equivalent to 'time')
+                Default: ``None`` (equivalent to ``'time'``)
 
             parallel: Execute using CASA HPC functionality, if available.
 
-                Options: 'automatic', 'true', 'false', True, False
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
 
-                Default: None (equivalent to 'automatic')
+                Default: ``None`` (equivalent to ``'automatic'``)
         """
         super().__init__(context, vis=vis, output_dir=output_dir, asis=asis,
                          process_caldevice=process_caldevice, session=session,

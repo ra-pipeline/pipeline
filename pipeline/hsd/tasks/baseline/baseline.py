@@ -113,32 +113,32 @@ class SDBaselineInputs(vdp.StandardInputs):
             infiles: List of data files. These must be a name of MeasurementSets that are
                 registered to context via hsd_importdata or hsd_restoredata task.
 
-                Example: vis=['X227.ms', 'X228.ms']
-                Default: None (process all registered MeasurementSets)
+                Example: ``vis=['X227.ms', 'X228.ms']``
+                Default: ``None`` (process all registered MeasurementSets)
 
             antenna: Data selection by antenna.
 
                 Example: '1' (select by ANTENNA_ID), 'PM03' (select by antenna name), '' (all antennas)
 
-                Default: None (equivalent to '')
+                Default: ``None`` (equivalent to ``''``)
 
             spw: Data selection by spw.
 
-                Example: '3,4' (process spw 3 and 4), ['0','2'] (spw 0 for first data, 2 for second), '' (all spws)
+                Example: ``'3,4'`` (process spw 3 and 4), ['0','2'] (spw 0 for first data, 2 for second), ``''`` (all spws)
 
-                Default: None (equivalent to '')
+                Default: ``None`` (equivalent to ``''``)
 
             pol: Data selection by polarizations.
 
-                Example: '0' (process pol 0), ['0~1','0'] (pol 0 and 1 for first data, only 0 for second), '' (all polarizations)
+                Example: ``'0'`` (process pol 0), ``['0~1','0']`` (pol 0 and 1 for first data, only 0 for second), ``''`` (all polarizations)
 
-                Default: None (equivalent to '')
+                Default: ``None`` (equivalent to ``''``)
 
             field: Data selection by field.
 
-                Example: '1' (select by FIELD_ID), 'M100*' (select by field name), '' (all fields)
+                Example: ``'1'`` (select by FIELD_ID), ``'M100*'`` (select by field name), ``''`` (all fields)
 
-                Default: None (equivalent to '')
+                Default: ``None`` (equivalent to ``''``)
 
             linewindow: Pre-defined line window. If this is set, specified line windows are used as
                 a line mask for baseline subtraction instead to determine masks based on line detection and
@@ -228,35 +228,37 @@ class SDBaselineInputs(vdp.StandardInputs):
                 The value must be a list with length of 2, whose values specify left and right edge channels,
                 respectively.
 
-                Example: [10,10]
+                Example: ``[10,10]``
 
-                Default: None
+                Default: ``None``
 
-            broadline: Try to detect broad component of spectral line if True.
+            broadline: Try to detect broad component of spectral line if ``True``.
 
-                Default: None (equivalent to True)
+                Default: ``None`` (equivalent to ``True``)
 
             fitfunc: Fitting function for baseline subtraction. You can choose either cubic spline
                 ('spline' or 'cspline'), polynomial ('poly' or 'polynomial').
 
                 Accepts:
+
                 - A string: Applies the same function to all spectral windows (SPWs).
                 - A dictionary: Maps SPW IDs (int or str) to a specific fitting function.
 
-                If an SPW ID is not present in the dictionary, 'cspline' will be used as the default.
+                If an SPW ID is not present in the dictionary, ``'cspline'`` will be used as the default.
 
-                Default: None (equivalent to 'cspline')
+                Default: ``None`` (equivalent to ``'cspline'``)
 
             fitorder: Fitting order for polynomial. For cubic spline, it is used to determine how
                 much the spectrum is segmented into.
 
                 Accepts:
-                - An integer: Applies the same order to all SPWs. Valid values: -1 (automatic), 0, or any positive integer.
+
+                - An integer: Applies the same order to all SPWs. Valid values: ``-1`` (automatic), ``0``, or any positive integer.
                 - A dictionary: Maps SPW IDs (int or str) to a specific fitting order.
 
-                If an SPW ID is not present in the dictionary, -1 will be used as the default, triggering automatic order selection.
+                If an SPW ID is not present in the dictionary, ``-1`` will be used as the default, triggering automatic order selection.
 
-                Default: None (equivalent to -1)
+                Default: ``None`` (equivalent to ``-1``)
 
             switchpoly: Whether to fall back the fits from cubic spline to 1st or 2nd order polynomial
                 when large masks exist at the edges of the spw. Condition for switching is as follows:
@@ -268,32 +270,32 @@ class SDBaselineInputs(vdp.StandardInputs):
                 where nmask is a number of channels for mask at edge while
                 nchan is a number of channels of entire spectral window.
 
-                Default: None (equivalent to True)
+                Default: ``None`` (equivalent to ``True``)
 
             clusteringalgorithm: Selection of the algorithm used in the clustering analysis
                 to check the validity of detected line features. The 'kmean' algorithm,
                 hierarchical clustering algorithm, 'hierarchy', and their combination ('both')
                 are so far implemented.
 
-                Default: None (equivalent to 'hierarchy')
+                Default: ``None`` (equivalent to ``'hierarchy'``)
 
             deviationmask: Apply deviation mask in addition to masks determined by the automatic line detection.
 
-                Default: None (equivalent to True)
+                Default: ``None`` (equivalent to ``True``)
 
             deviationmask_sigma_threshold: Threshold factor (F) to detect the deviation.
                 Actual threshold will be median + F * standard-deviation of the spectrum.
 
-                Default: None (equivallent to 5.0)
+                Default: ``None`` (equivallent to ``5.0``)
 
             parallel: Execute using CASA HPC functionality, if available.
 
-                Options: 'automatic', 'true', 'false', True, False.
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``.
 
-                Default: None (equivalent to 'automatic').
+                Default: ``None`` (equivalent to ``'automatic'``).
 
         """
-        super(SDBaselineInputs, self).__init__()
+        super().__init__()
 
         self.context = context
         self.infiles = infiles
@@ -361,7 +363,7 @@ class SDBaselineResults(common.SingleDishResults):
           - register deviation mask to each measurementset domain object
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
         """
         super(SDBaselineResults, self).merge_with_context(context)
 

@@ -21,7 +21,7 @@ class PhcorBandpassInputs(bandpassmode.BandpassModeInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             mode: Effectively unused. Fixed to 'channel' in implementation.
 

@@ -1,5 +1,4 @@
-"""
-The conversion module contains utility functions.
+"""Utility functions for data type conversion and string formatting.
 
 The conversion module contains utility functions that convert between data
 types and assist in formatting objects as strings for presentation to the
@@ -27,8 +26,6 @@ from pipeline import infrastructure
 from pipeline.infrastructure import casa_tools
 
 if TYPE_CHECKING:
-    from datetime import datetime, timedelta
-
     from pipeline.domain import Field, MeasurementSet
 
 LOG = infrastructure.logging.get_logger(__name__)
@@ -51,6 +48,7 @@ __all__ = [
     'to_CASA_intent',
     'to_pipeline_intent',
     'convert_paths_to_basenames',
+    'human_file_size',
     ]
 
 # By default we use CASA to parse arguments into spw/field/ant IDs. However, this
@@ -177,7 +175,7 @@ def flatten(l: Sequence[Any]) -> Iterator[Any]:
             yield el
 
 
-def unix_seconds_to_datetime(unix_secs: list[int | float]) -> datetime | list[datetime]:
+def unix_seconds_to_datetime(unix_secs: list[int | float]) -> list[datetime.datetime]:
     """Convert list of UNIX epoch times to a list of equivalent datetime objects.
 
     Args:
@@ -188,7 +186,7 @@ def unix_seconds_to_datetime(unix_secs: list[int | float]) -> datetime | list[da
     return [datetime.datetime.utcfromtimestamp(s) for s in unix_secs]
 
 
-def mjd_seconds_to_datetime(mjd_secs: list[int | float]) -> list[datetime]:
+def mjd_seconds_to_datetime(mjd_secs: list[int | float]) -> list[datetime.datetime]:
     """Convert list of MJD seconds to a list of equivalent datetime objects.
 
     Convert the input list of elapsed seconds since MJD epoch to the
@@ -205,7 +203,7 @@ def mjd_seconds_to_datetime(mjd_secs: list[int | float]) -> list[datetime]:
     return unix_seconds_to_datetime(mjd_secs_with_offsets)
 
 
-def get_epoch_as_datetime(epoch: dict) -> datetime:
+def get_epoch_as_datetime(epoch: dict) -> datetime.datetime:
     """Convert a CASA 'epoch' measure into a Python datetime.
 
     Args:
@@ -452,7 +450,7 @@ def dequote(s: str) -> str:
     return s.replace('"', '').replace("'", "")
 
 
-def format_datetime(dt: datetime, dp: int = 0) -> str:
+def format_datetime(dt: datetime.datetime, dp: int = 0) -> str:
     """Convert a datetime to a formatted string representation.
 
     Convert a Python datetime object into a string representation, including
@@ -475,7 +473,7 @@ def format_datetime(dt: datetime, dp: int = 0) -> str:
         return s
 
 
-def format_timedelta(td: timedelta, dp: int = 0) -> str:
+def format_timedelta(td: datetime.timedelta, dp: int = 0) -> str:
     """Convert a timedelta to a formatted string representation.
 
     Convert a Python timedelta object into a string representation, including
@@ -838,3 +836,65 @@ def convert_paths_to_basenames(command_string: str) -> str:
             converted_lines.append(converted_line)
 
     return '\n'.join(converted_lines)
+
+
+def human_file_size(size_in_bytes: int | float) -> str:
+    """Converts a file size in bytes to a human-readable string format.
+
+    Uses binary prefixes (KB, MB, GB, TB, PB, EB, ZB, YB) where 1 KB = 1024 bytes.
+
+    Args:
+        size_in_bytes: The size in bytes (integer or float).
+
+    Returns:
+        A string representing the human-readable file size (e.g., "1.2 KB", "3.45 MB").
+
+    Raises:
+        ValueError: If the input size_in_bytes is negative.
+
+    Examples:
+        >>> bytes_to_human_readable(0)
+        '0 Bytes'
+        >>> bytes_to_human_readable(500)
+        '500 Bytes'
+        >>> bytes_to_human_readable(1024)
+        '1.0 KB'
+        >>> bytes_to_human_readable(1500)
+        '1.46 KB'
+        >>> bytes_to_human_readable(1024 * 1024)
+        '1.0 MB'
+        >>> bytes_to_human_readable(2500000)
+        '2.38 MB'
+        >>> bytes_to_human_readable(1024**3 * 1.5)
+        '1.5 GB'
+        >>> bytes_to_human_readable(1024**6)
+        '1.0 EB'
+    """
+    if size_in_bytes < 0:
+        raise ValueError("File size cannot be negative.")
+
+    if size_in_bytes == 0:
+        return "0 Bytes"
+
+    # Define the units and the base (1024 for binary prefixes)
+    unit_labels = ("Bytes", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")
+    base = 1024
+
+    # Calculate the index of the appropriate unit
+    unit_index = int(math.floor(math.log(size_in_bytes, base)))
+
+    # Ensure the index does not exceed the available units
+    unit_index = min(unit_index, len(unit_labels) - 1)
+
+    # Calculate the size in the chosen unit
+    human_readable_size = size_in_bytes / (base**unit_index)
+
+    # Get the unit label
+    unit = unit_labels[unit_index]
+
+    # Format the output string
+    if unit == "Bytes":
+        return f"{int(human_readable_size)} {unit}"
+    else:
+        # Format to one decimal place, adjust as needed
+        return f"{human_readable_size:.1f} {unit}"

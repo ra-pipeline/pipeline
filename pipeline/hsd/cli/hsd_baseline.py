@@ -1,5 +1,3 @@
-import sys
-
 import pipeline.h.cli.utils as utils
 
 
@@ -10,7 +8,6 @@ def hsd_baseline(fitfunc=None, fitorder=None, switchpoly=None,
                  clusteringalgorithm=None,
                  deviationmask=None, deviationmask_sigma_threshold=None, parallel=None,
                  infiles=None, field=None, antenna=None, spw=None, pol=None):
-
     """Detect and validate spectral lines, subtract baseline by masking detected lines.
 
     The hsd_baseline task subtracts baseline from calibrated spectra.
@@ -70,25 +67,3 @@ def hsd_baseline(fitfunc=None, fitorder=None, switchpoly=None,
                          linewindowmode='merge')
 
     """
-
-    ##########################################################################
-    #                                                                        #
-    #  CASA task interface boilerplate code starts here. No edits should be  #
-    #  needed beyond this point.                                             #
-    #                                                                        #
-    ##########################################################################
-
-    # create a dictionary containing all the arguments given in the
-    # constructor
-    all_inputs = vars()
-
-    # get the name of this function for the weblog, eg. 'hif_flagdata'
-    task_name = sys._getframe().f_code.co_name
-
-    # get the context on which this task operates
-    context = utils.get_context()
-
-    # execute the task
-    results = utils.execute_task(context, task_name, all_inputs)
-
-    return results

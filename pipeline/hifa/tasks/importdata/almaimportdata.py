@@ -40,35 +40,35 @@ class ALMAImportDataInputs(importdata.ImportDataInputs):
 
     # docstring and type hints: supplements hifa_importdata
     def __init__(
-            self,
-            context: Context,
-            vis: list[str] | None = None,
-            output_dir: str | None = None,
-            asis: str | None = None,
-            process_caldevice: bool | None = None,
-            session: str | None = None,
-            overwrite: bool | None = None,
-            nocopy: bool | None = None,
-            bdfflags: bool | None = None,
-            lazy: bool | None = None,
-            save_flagonline: bool | None = None,
-            dbservice: bool | None = None,
-            createmms: str | None = None,
-            ocorr_mode: str | None = None,
-            datacolumns: dict[str, str] | None = None,
-            minparang: float | None = None,
-            parallel: bool | None = None
-            ):
+        self,
+        context: Context,
+        vis: list[str] | None = None,
+        output_dir: str | None = None,
+        asis: str | None = None,
+        process_caldevice: bool | None = None,
+        session: str | None = None,
+        overwrite: bool | None = None,
+        nocopy: bool | None = None,
+        bdfflags: bool | None = None,
+        lazy: bool | None = None,
+        save_flagonline: bool | None = None,
+        dbservice: bool | None = None,
+        createmms: str | None = None,
+        ocorr_mode: str | None = None,
+        datacolumns: dict[str, str] | None = None,
+        minparang: float | None = None,
+        parallel: bool | None = None,
+    ):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             vis: List of visibility data files. These may be ASDMs, tar
                 files of ASDMs, MSes, or tar files of MSes. If ASDM files
                 are specified, they will be converted to MS format.
 
-                Example: vis=['X227.ms', 'asdms.tar.gz']
+                Example: ``vis=['X227.ms', 'asdms.tar.gz']``
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
@@ -82,19 +82,19 @@ class ALMAImportDataInputs(importdata.ImportDataInputs):
             session: List of session names, one for each visibility dataset,
                 used to group the MSes into sessions.
 
-                Example: session=['session_1', 'session_2']
+                Example: ``session=['session_1', 'session_2']``
 
             overwrite: Overwrite existing files on import; defaults to False.
                 When converting ASDM to MS, if overwrite=False and the MS
                 already exists in the output directory, then this existing
                 MS dataset will be used instead.
 
-                Example: overwrite=True
+                Example: ``overwrite=True``
 
             nocopy: Disable copying of MS to working directory; defaults to
                 False.
 
-                Example: nocopy=True
+                Example: ``nocopy=True``
 
             bdfflags: Apply BDF flags on import.
 
@@ -111,11 +111,11 @@ class ALMAImportDataInputs(importdata.ImportDataInputs):
             datacolumns: Dictionary defining the data types of existing columns.
                 The format is:
 
-                {'data': 'data type 1'}
+                ``{'data': 'data type 1'}``
 
                 or
 
-                {'data': 'data type 1', 'corrected': 'data type 2'}.
+                ``{'data': 'data type 1', 'corrected': 'data type 2'}``.
 
                 For ASDMs the data type can only be RAW and one
                 can only specify it for the data column.
@@ -143,9 +143,10 @@ class ALMAImportDataInputs(importdata.ImportDataInputs):
                 non-polarisation processing.
 
             parallel: Process multiple MeasurementSets in parallel using the casampi parallelization framework.
-                options: 'automatic', 'true', 'false', True, False
-                default: None (equivalent to False)
 
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``None`` (equivalent to ``False``)
         """
         super().__init__(context, vis=vis, output_dir=output_dir, asis=asis,
                          process_caldevice=process_caldevice, session=session,

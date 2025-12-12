@@ -20,7 +20,7 @@ from .restoredata import ALMARestoreData
 from .sessionrefant import SessionRefAnt
 from .spwphaseup import SpwPhaseup
 from .targetflag import Targetflag
-from .tsysflag import Tsysflag as ALMATsysflag
+from .tsysflag import Tsysflag
 from .tsysflag_contamination import TsysFlagContamination
 from .unlock_refant import UnlockRefAnt
 from .wvrgcal import Wvrgcal

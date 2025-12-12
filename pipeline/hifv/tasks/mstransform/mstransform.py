@@ -33,7 +33,7 @@ class VlaMstransformInputs(mst.MstransformInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
@@ -41,7 +41,7 @@ class VlaMstransformInputs(mst.MstransformInputs):
             vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the hifv_importdata task.
                 '': use all MeasurementSets in the context
 
-                Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
+                Examples: ``'ngc5921.ms'``, ``['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']``
 
             outputvis: A list of output MeasurementSets that will contain the transformed and flagged data 
                 for continuum imaging. This list must have the same length as the input list.
@@ -50,16 +50,16 @@ class VlaMstransformInputs(mst.MstransformInputs):
                 will produce an output named `<msrootname>_targets_cont.ms`.
 
                 Examples:
-                    - outputvis='ngc5921_targets_cont.ms'
-                    - outputvis=['ngc5921a_targets_cont.ms', 'ngc5921b_targets_cont.ms', 'ngc5921c_targets_cont.ms']
+                    - ``outputvis='ngc5921_targets_cont.ms'``
+                    - ``outputvis=['ngc5921a_targets_cont.ms', 'ngc5921b_targets_cont.ms', 'ngc5921c_targets_cont.ms']``
 
             field: Select fields name(s) or id(s) to transform. Only fields with data matching the intent will be selected.
 
-                Examples: '3C279', 'Centaurus*', '3C279,J1427-421'
+                Examples: ``'3C279'``, ``'Centaurus*'``, ``'3C279,J1427-421'``
 
             intent: Select intents for which associated fields will be imaged. By default only TARGET data is selected.
 
-                Examples: 'PHASE, BANDPASS'
+                Examples: ``'PHASE,BANDPASS'``
 
             spw: Select spectral window/channels to include for continuum imaging. By default all science spws for which the specified intent is valid are
                 selected.
@@ -81,10 +81,10 @@ class VlaMstransformInputs(mst.MstransformInputs):
                 will produce an output named `<msrootname>_targets.ms`.
 
                 Examples:
-                    - outputvis_for_line='ngc5921_targets.ms'
-                    - outputvis_for_line=['ngc5921a_targets.ms', 'ngc5921b_targets.ms', 'ngc5921c_targets.ms']
+                    - ``outputvis_for_line='ngc5921_targets.ms'``
+                    - ``outputvis_for_line=['ngc5921a_targets.ms', 'ngc5921b_targets.ms', 'ngc5921c_targets.ms']``
             
-            omit_contline_ms: If True, don't make the contline ms (_targets.ms). Only make cont MS (_targets_cont.ms). Default is False.
+            omit_contline_ms: If ``True``, don't make the contline ms (_targets.ms). Only make cont MS (_targets_cont.ms). Default is ``False``.
 
         """
         super().__init__(context, output_dir, vis, outputvis, field, intent, spw, chanbin, timebin)

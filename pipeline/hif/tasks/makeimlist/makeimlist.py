@@ -198,7 +198,7 @@ class MakeImListInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
@@ -325,8 +325,10 @@ class MakeImListInputs(vdp.StandardInputs):
             datacolumn: Data column to image. Only to be used for manual overriding when the automatic choice by data type is not appropriate.
 
             parallel: Use the CASA imager parallel processing when possible.
-                options: 'automatic', 'true', 'false', True, False
-                default: 'automatic'
+
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``'automatic'``
 
             known_synthesized_beams:
 

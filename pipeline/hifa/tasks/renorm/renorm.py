@@ -83,23 +83,23 @@ class RenormInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             vis: List of input MeasurementSets. Defaults to the list of
                 MeasurementSets specified in the pipeline context.
 
-                Example: vis=['ngc5921.ms']
+                Example: ``vis=['ngc5921.ms']``
 
             createcaltable: Boolean to select whether to create the renormalization
                 correction cal table (True), or only run the assessment
                 (False, default).
 
-                Example: createcaltable=True
+                Example: ``createcaltable=True``
 
             threshold: Apply correction if max correction is above this threshold
-                value and ``apply`` = True. Default is 1.02 (i.e. 2%).
+                value and ``apply= True``. Default is 1.02 (i.e. 2%).
 
-                Example: threshold=1.02
+                Example: ``threshold=1.02``
 
             spw: The list of real (not virtual - i.e. the actual spwIDs in
                 the MS) spectral windows to evaluate.
@@ -111,8 +111,8 @@ class RenormInputs(vdp.StandardInputs):
 
                 Examples:
 
-                - spw="11,13,15,17"
-                - spw=["11,13,15,17", "5,7,11,13"]
+                - ``spw='11,13,15,17'`
+                - ``spw=['11,13,15,17', '5,7,11,13']``
 
             excludechan: Channels to exclude in either channel or frequency space
                 (TOPO, GHz), specifying the real (not virtual) spectral
@@ -123,9 +123,9 @@ class RenormInputs(vdp.StandardInputs):
 
                 Examples:
 
-                - excludechan={'22':'100~150;800~850', '24':'100~200'}
-                - excludechan={'22':'230.1GHz~230.2GHz'}
-                - excludechan=[{'22':'100~150'}, {'15':'100~150'}]
+                - ``excludechan={'22':'100~150;800~850', '24':'100~200'}``
+                - ``excludechan={'22':'230.1GHz~230.2GHz'}``
+                - ``excludechan=[{'22':'100~150'}, {'15':'100~150'}]``
 
             atm_auto_exclude: Automatically find and exclude regions with atmospheric
                 features. Default is False
@@ -136,13 +136,15 @@ class RenormInputs(vdp.StandardInputs):
                 due to needing potentially various 'nsegments' when EBs
                 have very different SPW bandwidths.
 
-                Example: bwthreshspw={'16: 64e6, '22: 64e6}
+                Example: ``bwthreshspw={'16: 64e6, '22: 64e6}``
 
             caltable:
 
             parallel: Process multiple MeasurementSets in parallel using the casampi parallelization framework.
-                options: 'automatic', 'true', 'false', True, False
-                default: None (equivalent to 'automatic')
+
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``None`` (equivalent to ``antomatic``)
 
         """
         super().__init__()

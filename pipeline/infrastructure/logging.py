@@ -1,18 +1,17 @@
 import copy
+import functools
 import logging
+import os
 import sys
 import time
 import types
-import functools
 from contextlib import contextmanager
-from typing import Optional, Union, List
-
-from casatasks import casalog
+from logging import CRITICAL, DEBUG, ERROR, INFO, WARNING
+from typing import List, Optional, Union
 
 import logutils
 import logutils.colorize as colorize
-
-from logging import CRITICAL, WARNING, ERROR, INFO, DEBUG
+from casatasks import casalog
 
 # Register three new logging levels with the standard logger
 TRACE = 5
@@ -230,7 +229,10 @@ def get_logger(name,
         logger.addHandler(hdlr)
 
     if stream:
-        hdlr = colorize.ColorizingStreamHandler(stream)
+        if 'SLURM_JOB_ID' not in os.environ:
+            hdlr = colorize.ColorizingStreamHandler(stream)
+        else:
+            hdlr = logging.StreamHandler(stream)
         hdlr.setLevel(level)
         hdlr.setFormatter(fmt)
         logger.addHandler(hdlr)

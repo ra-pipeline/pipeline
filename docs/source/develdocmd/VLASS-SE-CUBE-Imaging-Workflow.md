@@ -5,7 +5,7 @@ This documentation describes the VLASS [Coarse Cube Imaging Pipeline](https://op
 In general, the CCIP workflow uses similar imaging heuristics as the VLASS-SE-CONT workflow, with two major differences:
 
 1. The CCIP workflow skips several selfcal/masking-related stages in VLASS-SE-CONT, and replaces them with a single equivalent `hifv_restorepims()` stage that utilizes the products from VLASS-SE-CONT (e.g. reimaging_esource.tgz and tier1/tier2 masks).
-   `hifv_restorepims()` restores the `flag`, `corrected`, and `weight` columns in a PIMS to the same state of the final imaging-ready MS in the VLASS-SE-CONT production run.
+   `hifv_restorepims()` restores the `flag`, `corrected`, and `weight` columns in a Per-Image Measurement Set (PIMS) to the same state of the final imaging-ready MS in the VLASS-SE-CONT production run.
    
 2. The imaging operation will go through individual specified SPW groups and generate/analyze/export full-Stokes images, using slightly less expensive algorithms (mosaic gridder, nterm=1). However, the per-iteration imaging masks and sequence of each spw group are the same as that used in the final imaging stage (`vlass_stage=3`) of VLASS-SE-CONT. 
 
@@ -42,7 +42,7 @@ For the "cube" mode of hif_editimlist, i.e. imaging_mode='VLASS-SE-CUBE' in the 
    * `spw=['2,3,4','5,6,7']`
    Plese note that a channel-wise selection (e.g. `spw=['2:0~15','2:16~31']`) and a range-syntax selection (e.g. `spw=['1~4','5~7']` are not allowed.
 
- * the `reffreq` parameter for `tclean` will be expiciltly set to the mean frequency of  each spw/spwgroup.
+ * the `reffreq` parameter for `tclean` will be explicitly set to the mean frequency of  each spw/spwgroup.
  * If the spw-selected data is flagged above a percentage threshold (currently, hardcoded to 100%, i.e., completely flagged ), then that spw/spwgroup will not be added to the imaging target list, and a warning will be issued on the weblog.
  * The weblog is improved to show imagename/mask/spw/frereq of each imaging target in separate rows.
  
@@ -58,7 +58,7 @@ Besides the tier-0 parallelization, the imaging heuristics of `VLASS-SE-CUBE` is
 * CASA/tclean is run in the nterms=1 mode, and a Stokes IQUV cube is generated in a single tclean call.
 * tclean input mask (iter1/iter2 from QL/combined mask of SE), are copied as *.iter1/2.cleanmask for each target.
 * Only *.cleanmask/.image/.residual are preserved for iter1/iter2 to reduce storage I/O and disk space usage.
-* If imaging fails on one target, the weblog will still present the succeed targets and show the failed target(s) in the top error message banner.
+* If imaging fails on one target, the weblog will still present the successful targets and show the failed one(s) in the top error message banner.
 * The weblog uses the VLASS-cube-specific template, which has a grid layout with four Stokes planes in columns and different imaging targets in rows.
 * The tclean summary plot shows the peak residual model flux of each Stokes planes.
 * A workaround for CAS-13401 is implemented: the beam information is missing in residual/restored image from CASA/tclean when Stokes='IQUV'.

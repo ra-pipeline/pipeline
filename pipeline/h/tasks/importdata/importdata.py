@@ -58,15 +58,14 @@ class ImportDataInputs(vdp.StandardInputs):
             ocorr_mode: str | None = None,
             datacolumns: dict[str, str] | None = None,
             ):
-        """
-        Initialize Inputs.
+        """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             vis: List of visibility data files. These may be ASDMs, tar files of ASDMs, MSs, or tar files of MSs, If ASDM files are specified, they will be
                 converted to MS format.
-                example: vis=['X227.ms', 'asdms.tar.gz']
+                example: ``vis=['X227.ms', 'asdms.tar.gz']``
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
@@ -74,13 +73,13 @@ class ImportDataInputs(vdp.StandardInputs):
             asis: Creates verbatim copies of the ASDM tables in the output MS. The value given to this option must be a list of table names
                 separated by space characters.
                 default: 'Antenna Station Receiver CalAtmosphere'
-                example: 'Receiver', ''
+                example: ``'Receiver'``, ``''``
 
             process_caldevice: Ingest the ASDM caldevice table.
 
             session: List of sessions to which the visibility files belong. Defaults to a single session containing all the visibility files, otherwise
                 a session must be assigned to each vis file.
-                example: session=['session_1', 'session_2']
+                example: ``session=['session_1', 'session_2']``
 
             overwrite: Overwrite existing files on import. When converting ASDM to MS, if overwrite=False and the MS
                 already exists in output directory, then this existing MS
@@ -90,7 +89,7 @@ class ImportDataInputs(vdp.StandardInputs):
 
             save_flagonline: Save flag commands, flagging template, imaging targets, to text files。
 
-                Default: None (equivalent to True)
+                Default: ``None`` (equivalent to True)
 
             bdfflags: Apply BDF flags on import.
 
@@ -104,11 +103,11 @@ class ImportDataInputs(vdp.StandardInputs):
             datacolumns: Dictionary defining the data types of existing columns.
                 The format is:
 
-                    {'data': 'data type 1'}
+                    ``{'data': 'data type 1'}``
 
                 or
 
-                    {'data': 'data type 1', 'corrected': 'data type 2'}
+                    ``{'data': 'data type 1', 'corrected': 'data type 2'}``
 
                 For ASDMs the data type can only be RAW and one can only specify
                 it for the data column.

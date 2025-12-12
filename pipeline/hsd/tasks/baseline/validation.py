@@ -155,7 +155,7 @@ class ValidateLineResults(common.SingleDishResults):
         No specific merge operation is done.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
         """
         super(ValidateLineResults, self).merge_with_context(context)
 
@@ -2229,7 +2229,7 @@ class ValidateLineRaster(basetask.StandardTaskTemplate):
             MemberList contains positions of cluster member with Marginal+Valid detection
             MemberList[n]: [[(x00,y00),(x01,y01),........,(x0k-1,y0k-1)],
                             [(x10,y10),(x11,y11),..,(x1i-1,y1i-1)],
-                                    ......
+                                    ...
                             [(xn-10,yn-10),(xn-11,yn-11),..,(xn-1i-1,yn-1i-1)]]
             Realmember contains number of cluster members with only Valid detection
             RealMember: [Nvalid_00, Nvalid_01, ..., Nvalid_n-1i-1]

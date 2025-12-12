@@ -206,117 +206,99 @@ class SelfcalInputs(vdp.StandardInputs):
                  usermask=None, usermodel=None, allow_wproject=None,
                  apply=None, parallel=None, recal=None, restore_only=None, overwrite=None,
                  restore_resources=None):
-        """Initialize Inputs.
+        r"""Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
-            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the <hifa,hifv>_importdata task.
+            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets defined in the pipeline context.
 
-                default = "": use all MeasurementSets in the context
+            field: Select field(s) for self-calibration. Use field name(s) NOT id(s). Mosaics are assumed to have common source/field names.
 
-            field: Select fields to image. Use field name(s) NOT id(s). Mosaics are assumed to have common source / field names.  If intent is
-                specified only fields with data matching the intent will be
-                selected. The fields will be selected from MeasurementSets in
-                "vis".
+            spw: Select spectral windows for self-calibration.
 
-                default= "" Fields matching intent, one image per target source.
+            contfile: Name of file to specify line-free frequency ranges for selfcal continuum imaging. Defaults to ``'cont.dat'``.
 
-            spw: Select spectral windows to image. "": Images will be computed for all science spectral windows.
 
-            contfile: Name of file to specify line-free frequency ranges for selfcal continuum imaging.
+            hm_imsize: self-calibration imaging dimension in pixels, or PB level for single fields.
 
-                default="cont.dat"
+            hm_cell: self-calibration imaging cell size.
 
-            hm_imsize: Image X and Y size in pixels or PB level for single fields.
-            
-            hm_cell: Image X and Y cell sizes     
+            n_solints: number of solution intervals to attempt for self-calibration. Defaults to ``4``.
 
-            n_solints: number of solution intervals to attempt for self-calibration. default: 4
+            amplitude_selfcal: Attempt amplitude self-calibration following phase-only self-calibration; if median time
+                between scans of a given target is < 150s, solution intervals of ``300s`` and ``inf`` will be attempted,
+                otherwise just ``inf`` will be attempted. Defaults to ``False``.
 
-            amplitude_selfcal: Attempt amplitude self-calibration following phase-only self-calibration; if median time between scans of a given target is < 150s,
-                solution intervals of 300s and inf will be attempted, otherwise just
-                inf will be attempted.
+            gaincal_minsnr: Minimum S/N for a solution to not be flagged by gaincal. Defaults to ``2.0``.
 
-                default = False
+            refantignore: Antennas to be ignored as reference antennas. Defaults to ``''``. Examples:
 
-            gaincal_minsnr: Minimum S/N for a solution to not be flagged by gaincal. default = 2.0
-
-            refantignore: string list of antennas to be ignored as reference antennas. example:  refantignore='ea02,ea03'
-                One could also specifiy at the per-ms level, e.g. refantignore={'ms1.ms':'ea02,ea03','ms2.ms': 'ea03'}.
-
-                default = ''
+                * ``refantignore='ea02,ea03'``
+                * ``refantignore={'ms1.ms':'ea02,ea03','ms2.ms': 'ea03'}``, specified at the per-ms level.
 
             minsnr_to_proceed: Minimum estimated S/N on a per antenna basis to attempt self-calibration of a source.
-
-                default = 3.0
+                Defaults to ``3.0``.
 
             delta_beam_thresh: Allowed fractional change in beam size for selfcalibration to accept results of a solution interval.
-
-                default = 0.05
+                Defaults to ``0.05``.
 
             apply_cal_mode_default: Apply mode to use for applycal task during self-calibration; same options as applycal.
+                Defaults to ``'calflag'``.
 
-                default = 'calflag'
-
-            rel_thresh_scaling: Scaling type to determine how clean thresholds per solution interval should be determined going from the starting
-                clean threshold to 3.0 * RMS for the final solution interval.
-
-                default='log10'
-
-                options: 'linear', 'log10', or 'loge' (natural log)
+            rel_thresh_scaling: Scaling type to determine how clean thresholds per solution interval should be determined going
+                from the starting clean threshold to 3.0 * RMS for the final solution interval. Defaults to ``'log10'``.
+                Available options: ``'linear'``, ``'log10'``, or ``'loge'`` (natural log)
 
             dividing_factor: Scaling factor to determine clean threshold for first self-calibration solution interval.
-                Equivalent to (Peak S/N / dividing_factor) *RMS = First clean threshold;
-                however, if (Peak S/N / dividing_factor) *RMS is < 5.0; a value of 5.0
-                is used for the first clean threshold.
+                Equivalent to (Peak S/N / dividing_factor) \* RMS as the first clean threshold;
+                however, if  `(Peak S/N / dividing_factor) < 5.0`;
+                a value of 5.0 is used for the first clean threshold.
+                Defaults to ``40`` for < 8 GHz or ``15`` for > 8 GHz.
 
-                default = 40 for < 8 GHz; 15 for > 8 GHz
+            check_all_spws: If ``True``, the S/N of mfs images created on a per-spectral-window basis will be compared at the
+                initial stages final self-calibration. Defaults to ``False``.
 
-            check_all_spws: If True, the S/N of mfs images created on a per-spectral-window basis will be compared at the initial stages final self-calibration.
+            inf_EB_gaincal_combine: change gain solution combination parameters for the inf_EB solution interval. if ``True``,
+                the gaincal combine parameter will be set to ``'scan,spw'``; if ``False``, the gaincal combine parameter will
+                be set to ``'scan'``. Defaults to ``False``.
 
-                default=False
 
-            inf_EB_gaincal_combine: change gain solution combination parameters for the inf_EB solution interval. if True, the gaincal combine parameter will be set to 'scan,spw'; if False,
-                the gaincal combine parameter will be set to 'scan'.
+            allow_wproject: Allow the wproject heuristics for self-calibration imaging. Defaults to ``False``.
 
-                default=False
-            
-            usermask: User mask to be used for self-calibration imaging.
-            
-            usermodel: User model to be used for self-calibration imaging.                
-
-            allow_wproject: Allow the wproject heuristics for imaging.
-
-            apply: Apply final selfcal solutions back to the input MeasurementSets. default = True
+            apply: Apply final selfcal solutions back to the input MeasurementSets. Defaults to ``True``.
 
             parallel: Process multiple MeasurementSets in parallel using the casampi parallelization framework, and use CASA/tclean
                 parallel imaging, when possible.
-                options: 'automatic', 'true', 'false', True, False
-                default: None (equivalent to 'automatic')
+
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``None`` (equivalent to ```'automatic'``)
 
             recal: Always re-do self-calibration even solutions/caltables are found in the Pipeline context or json restore file.
+                Defaults to `False`.
 
-                default = False
-                Note that the selfcal solutions might not be applied if self-calibrated data labeled by the pipeline Datatypes already exists.
-                see `overwrite` below.
+                Note that the selfcal solutions might not be applied if self-calibrated data labeled by the pipeline Datatypes already
+                exists. See ``overwrite`` below.
 
-            restore_only:   Only attempt to apply pre-existing selfcal calibration tables and would not run 
+            restore_only:   Only attempt to apply pre-existing selfcal calibration tables and would not run
                             the self-calibration sequence if their records (.selfcal.json, gaintables) are not present.
-                            default = False
-                            note: restore_only will take precedence over recal=True/False
+                            Defaults to `False`. ``restore_only`` will take precedence over ``recal``.
 
             overwrite: Allow overwriting pre-existing self-calibrated data of applicable field/spw labeled by DataType.
-            
-                default = False        
+                Defaults to ``False``.
 
-            restore_resources: Path to the restore resources from a standard run of hif_selfcal. hif_selfcal will automatically 
+            restore_resources: Path to the restore resources from a standard run of hif_selfcal. hif_selfcal will automatically
                 do an exhaustive search to lookup/extract/verify
                 the selfcal restore resources, i.e., selfcal.json and all selfcal-caltable referred
-                in selfcal.json, starting from working/, to products/ and rawdata/.
+                in selfcal.json, starting from *working/*, to *products/* and *rawdata/*.
                 If restore_resources is specified, this file path will be evaluated first
                 before the pre-defined exhaustive search list.
-                The value can be the file path of *auxproducts.tgz file or *selfcal.json file.
+                The value can be the file path of *\*auxproducts.tgz* file or *\*selfcal.json* file.
+
+            usermask: User mask to be used for self-calibration imaging. (not implemented)
+
+            usermodel: User model to be used for self-calibration imaging. (not implemented)
 
         """
         super().__init__()
@@ -770,12 +752,12 @@ class Selfcal(basetask.StandardTaskTemplate):
         else:
             inf_EB_gaincal_combine = 'scan'
 
-        parallel = mpihelpers.parse_mpi_input_parameter(self.inputs.parallel)
+        parallel = mpihelpers.parse_parallel_input_parameter(self.inputs.parallel)
         taskqueue_parallel_request = len(scal_targets) > 1 and parallel
         self.inputs.refantignore
         with TaskQueue(parallel=taskqueue_parallel_request) as tq:
             for target in scal_targets:
-                target['sc_parallel'] = (parallel and not tq.is_async())
+                target['sc_parallel'] = (parallel and mpihelpers.is_mpi_ready() and not tq.is_async())
                 tq.add_functioncall(self._run_selfcal_sequence, target,
                                     gaincal_minsnr=self.inputs.gaincal_minsnr,
                                     minsnr_to_proceed=self.inputs.minsnr_to_proceed,
@@ -913,7 +895,7 @@ class Selfcal(basetask.StandardTaskTemplate):
             self.inputs.context.callibrary.add(calapp.calto, calapp.calfrom)
 
         vislist = sorted(set(vislist))
-        parallel = mpihelpers.parse_mpi_input_parameter(self.inputs.parallel)
+        parallel = mpihelpers.parse_parallel_input_parameter(self.inputs.parallel)
         taskqueue_parallel_request = len(vislist) > 1 and parallel
         with TaskQueue(parallel=taskqueue_parallel_request, executor=self._executor) as tq:
             for vis in vislist:
@@ -1039,7 +1021,7 @@ class Selfcal(basetask.StandardTaskTemplate):
         mt_inputvis_list = [(vis, '_CONTLINE_' in target['datatype'])
                             for target in scal_targets for vis in target['vis']]
 
-        parallel = mpihelpers.parse_mpi_input_parameter(self.inputs.parallel)
+        parallel = mpihelpers.parse_parallel_input_parameter(self.inputs.parallel)
         taskqueue_parallel_request = len(mt_inputvis_list) > 1 and parallel
 
         inputvis_list = utils.deduplicate([m[0] for m in mt_inputvis_list])

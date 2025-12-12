@@ -175,7 +175,6 @@ class GriddingBase(basetask.StandardTaskTemplate):
         GridTable format:
           [[[IF0,...,IFN],POL,0,0,RAcent,DECcent,[[index0,r0,RMS0,ant0],[index1,r1,RMS1,ant1],..,[indexN,rN,RMSN,antn]]]
            [[IF0,...,IFN],POL,0,1,RAcent,DECcent,[[index0,r0,RMS0,ant0],[index1,r1,RMS1,index1,ant1],..,[indexN,rN,RMSN,antn]]]
-                        ......
            [[IF0,...,IFN],POL,M,N,RAcent,DECcent,[[index0,r0,RMS0,ant0],[index1,r1,RMS1,ant1],..,[indexN,rowN,rN,RMSN,antn]]]]
          where row0,row1,...,rowN should be combined to one for better S/N spectra
                'r' is a distance from grid position
@@ -186,7 +185,7 @@ class GriddingBase(basetask.StandardTaskTemplate):
         OutputTable format:
            [[IF, POL, X, Y, RA, DEC, # of Combined Sp., # of flagged Sp., RMS]
             [IF, POL, X, Y, RA, DEC, # of Combined Sp., # of flagged Sp., RMS]
-                    ......
+                    ...
             [IF, POL, X, Y, RA, DEC, # of Combined Sp., # of flagged Sp., RMS]]
         """
         start = time.time()

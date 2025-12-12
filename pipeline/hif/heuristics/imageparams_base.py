@@ -3,15 +3,15 @@ from __future__ import annotations
 import collections
 import copy
 import fnmatch
-import inspect
 import math
 import operator
 import os.path
 import re
 import shutil
+import traceback
 import uuid
 from typing import TYPE_CHECKING, List, Optional, Union
-import traceback
+
 import astropy.units as u
 import numpy as np
 from astropy.coordinates import SkyCoord
@@ -27,6 +27,7 @@ import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.utils as utils
 from pipeline.hif.heuristics import mosaicoverlap
 from pipeline.infrastructure import casa_tools, logging
+from pipeline.infrastructure.launcher import current_task_name
 from pipeline.infrastructure.utils.conversion import phasecenter_to_skycoord, refcode_to_skyframe
 
 if TYPE_CHECKING:
@@ -791,8 +792,8 @@ class ImageParamsHeuristics(object):
         is_mos_or_het = self._is_mosaic(fields) or len(self.antenna_diameters()) > 1
         if not is_mos_or_het:
             max_separation_uarcsec = cqa.getvalue(cqa.convert(max_separation, "uarcsec"))[0]  # in micro arcsec
-            # PIPE-1504: only issue this message at the WARNING level if it's executed by hifa_imageprecheck
-            if 'hifa_imageprecheck' in [fn_name for (_, _, _, fn_name, _, _) in inspect.stack()]:
+            # PIPE-1504/PIPE-2859: only issue this message at the WARNING level if it's executed by hifa_imageprecheck
+            if current_task_name.get() == 'hifa_imageprecheck':
                 log_level = logging.WARNING
             else:
                 log_level = logging.INFO

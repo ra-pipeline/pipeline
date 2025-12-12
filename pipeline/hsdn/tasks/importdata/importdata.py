@@ -53,7 +53,7 @@ class NROImportDataInputs(sd_importdata.SDImportDataInputs):
             vis: List of visibility data files. These may be MSes,
                 or tar files of MSes.
 
-                Example: vis=['X227.ms', 'anyms.tar.gz']
+                Example: ``vis=['X227.ms', 'anyms.tar.gz']``
 
             output_dir: path of output directory
 
@@ -61,16 +61,16 @@ class NROImportDataInputs(sd_importdata.SDImportDataInputs):
                 Defaults to a single session containing all the visibility
                 files, otherwise a session must be assigned to each vis file.
 
-                Example: session=['Session_1', 'Sessions_2']
+                Example: ``session=['Session_1', 'Sessions_2']``
 
             datacolumns: Dictionary defining the data types of existing columns.
                 The format is:
 
-                    {'data': 'data type 1'}
+                    ``{'data': 'data type 1'}``
 
                 or
 
-                    {'data': 'data type 1', 'corrected': 'data type 2'}
+                    ``{'data': 'data type 1', 'corrected': 'data type 2'}``
 
                 For MSes one can define two different data types for the DATA and
                 CORRECTED_DATA columns and they can be any of the known data types
@@ -83,7 +83,7 @@ class NROImportDataInputs(sd_importdata.SDImportDataInputs):
                 Usually, a single datacolumns dictionary is used for all datasets.
                 If necessary, one can define a list of dictionaries, one for each MS,
                 with different setups per MS.
-                If no type is specified, {'data':'raw'} will be assumed.
+                If no type is specified, ``{'data':'raw'}`` will be assumed.
 
             overwrite: Overwrite existing files on import.
                 If overwrite=False and the MS already exists in output directory,
@@ -97,7 +97,7 @@ class NROImportDataInputs(sd_importdata.SDImportDataInputs):
                 Two analysis modes, time-domain analysis ('time') and
                 direction analysis ('direction'), are available.
 
-                Default: None (equivalent to 'time')
+                Default: ``None`` (equivalent to ``'time'``)
         """
         # no-op parameters for MS
         asis = ''
@@ -107,10 +107,12 @@ class NROImportDataInputs(sd_importdata.SDImportDataInputs):
         ocorr_mode = 'ao'
         save_flagonline = False
 
-        super().__init__(context, vis=vis, output_dir=output_dir, asis=asis, process_caldevice=process_caldevice,
-                         session=session, overwrite=overwrite, nocopy=nocopy, save_flagonline=save_flagonline,
-                         bdfflags=bdfflags, lazy=lazy, createmms=createmms, ocorr_mode=ocorr_mode,
-                         datacolumns=datacolumns, hm_rasterscan=hm_rasterscan)
+        super().__init__(context, vis=vis, output_dir=output_dir, asis=asis,
+                         process_caldevice=process_caldevice, session=session,
+                         overwrite=overwrite, nocopy=nocopy, save_flagonline=save_flagonline,
+                         bdfflags=bdfflags, lazy=lazy, createmms=createmms,
+                         ocorr_mode=ocorr_mode, datacolumns=datacolumns,
+                         hm_rasterscan=hm_rasterscan)
 
 
 class NROImportDataResults(sd_importdata.SDImportDataResults):

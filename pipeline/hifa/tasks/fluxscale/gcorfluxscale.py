@@ -111,7 +111,7 @@ class GcorFluxscaleInputs(fluxscale.FluxscaleInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
@@ -119,7 +119,7 @@ class GcorFluxscaleInputs(fluxscale.FluxscaleInputs):
             vis: The list of input MeasurementSets. Defaults to the list of
                 MeasurementSets specified in the pipeline context.
 
-                Example: ['M32A.ms', 'M32B.ms']
+                Example: ``['M32A.ms', 'M32B.ms']``
 
             caltable:
 
@@ -132,53 +132,53 @@ class GcorFluxscaleInputs(fluxscale.FluxscaleInputs):
                 by hifa_importdata, consisting of catalogue fluxes extracted from the ASDM
                 and / or edited by the user.
 
-                Example: reffile='', reffile='working/flux.csv'
+                Example: ``reffile=''``, ``reffile='working/flux.csv'``
 
             reference: A string containing a comma delimited list of field names
                 defining the reference calibrators. Defaults to names of fields
                 with intents in ``refintent``.
 
-                Example: reference='M82,3C273'
+                Example: ``reference='M82,3C273'``
 
             transfer: A string containing a comma delimited list of field names
                 defining the transfer calibrators. Defaults to names of fields
                 with intents in ``transintent``.
 
-                Example: transfer='J1328+041,J1206+30'
+                Example: ``transfer='J1328+041,J1206+30'``
 
             refspwmap: Vector of spectral window ids enabling scaling across
                 spectral windows. Defaults to no scaling.
 
-                Example: refspwmap=[1,1,3,3] - (4 spws, reference fields in 1 and 3, transfer
+                Example: ``refspwmap=[1,1,3,3]`` - (4 spws, reference fields in 1 and 3, transfer
                 fields in 0,1,2,3)
 
             refintent: A string containing a comma delimited list of intents
                 used to select the reference calibrators. Defaults to 'AMPLITUDE'.
 
-                Example: refintent='', refintent='AMPLITUDE'
+                Example: ``refintent=''``, r``efintent='AMPLITUDE'``
 
             transintent: A string containing a comma delimited list of intents
                 defining the transfer calibrators. Defaults to
                 'PHASE,BANDPASS,CHECK,DIFFGAINREF,DIFFGAINSRC,POLARIZATION,POLANGLE,POLLEAKAGE'.
 
-                Example: transintent='', transintent='PHASE,BANDPASS'
+                Example: ``transintent=''``, ``transintent='PHASE,BANDPASS'``
 
             solint: Time solution intervals in CASA syntax for the amplitude solution.
 
-                Example: solint='inf', solint='int', solint='100sec'
+                Example: ``solint='inf'``, ``solint='int'``, ``solint='100sec'``
 
             phaseupsolint: Time solution intervals in CASA syntax for the phase solution.
 
-                Example: phaseupsolint='inf', phaseupsolint='int', phaseupsolint='100sec'
+                Example: ``phaseupsolint='inf'``, ``phaseupsolint='int'``, ``phaseupsolint='100sec'``
 
             minsnr: Minimum signal-to-noise ratio for gain calibration solutions.
 
-                Example: minsnr=1.5, minsnr=0.0
+                Example: ``minsnr=1.5``, ``minsnr=0.0``
 
             refant: A string specifying the reference antenna(s). By default,
                 this is read from the context.
 
-                Example: refant='DV05'
+                Example: ``refant='DV05'``
 
             hm_resolvedcals: Heuristics method for handling resolved calibrators. The
                 options are 'automatic' and 'manual'. In automatic mode,
@@ -189,9 +189,9 @@ class GcorFluxscaleInputs(fluxscale.FluxscaleInputs):
 
             antenna: A comma delimited string specifying the antenna names or ids
                 to be used for the fluxscale determination. Used in
-                ``hm_resolvedcals`` = 'manual' mode.
+                ``hm_resolvedcals='manual'`` mode.
 
-                Example: antenna='DV16,DV07,DA12,DA08'
+                Example: ``antenna='DV16,DV07,DA12,DA08'``
 
             uvrange:
 
@@ -203,11 +203,13 @@ class GcorFluxscaleInputs(fluxscale.FluxscaleInputs):
             amp_outlier_sigma: Sigma threshold used to identify outliers in the amplitude
                 caltable. Default: 50.0.
 
-                Example: amp_outlier_sigma=30.0
+                Example: ``amp_outlier_sigma=30.0``
 
             parallel: Process multiple MeasurementSets in parallel using the casampi parallelization framework.
-                options: 'automatic', 'true', 'false', True, False
-                default: None (equivalent to False)         
+
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``None`` (equivalent to ``False``)
 
         """
         super().__init__(context, output_dir=output_dir, vis=vis, caltable=caltable,

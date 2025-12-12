@@ -1,5 +1,13 @@
-"""
-environment.py defines functions and variables related to the execution environment.
+"""Module for managing and querying the execution environment.
+
+This module provides functions and variables to detect, represent, and
+interact with the characteristics of the Python execution environment,
+including details about the host system (CPU, memory, OS), container
+or cgroup limits, and user resource limits (ulimits).
+
+It aims to consolidate environment-specific information for use by
+other parts of the application, facilitating adaptation to different
+runtime contexts.
 """
 from __future__ import annotations
 
@@ -10,22 +18,21 @@ import os
 import platform
 import re
 import resource
+import shutil
+import subprocess
 import sys
 import typing
-from importlib.metadata import version, PackageNotFoundError
-from importlib.util import find_spec
+from importlib.metadata import (PackageNotFoundError, distribution, metadata,
+                                version)
+from io import StringIO
 from pathlib import Path
+from typing import AnyStr, Optional, TextIO, Union
 
 import casatasks
-import pkg_resources
 
-from .infrastructure import casa_tools
-from .infrastructure import logging
-from .infrastructure import mpihelpers
-from .infrastructure import utils
+from .infrastructure import casa_tools, logging, mpihelpers, utils
 from .infrastructure.mpihelpers import MPIEnvironment
-from .infrastructure.utils.subprocess import safe_run
-from .infrastructure.version import get_version
+from .infrastructure.version import get_version_string_from_git
 
 LOG = logging.get_logger(__name__)
 
@@ -33,15 +40,96 @@ __all__ = ['casa_version', 'casa_version_string', 'compare_casa_version', 'pipel
            'dependency_details']
 
 
-def _load(path: str, encoding: str = 'UTF-8') -> typing.AnyStr:
-    """
-    Read in a file and return the contents
+LOG = logging.get_logger(__name__)
 
-    @param path: path to file
-    @param encoding: optional encoding used to decode the file
+
+def _run(
+    command: str,
+    stdout: Optional[Union[TextIO, StringIO]] = None,
+    stderr: Optional[Union[TextIO, StringIO]] = None,
+    cwd: Optional[str] = None,
+    shell: bool = True
+) -> int:
+    """Run a command in a subprocess.
+
+    This helper function is intended to hide the boilerplate required to
+    create and handle a subprocess while capturing its output. Rather than
+    having functions call subprocess directly, they should consider calling
+    this routine so that we have uniform handling.
+
+    Args:
+        command: The command to execute.
+        stdout: Optional stream to direct stdout to. Defaults to sys.stderr.
+        stderr: Optional stream to direct stderr to. Defaults to sys.stderr.
+        cwd: Working directory for command. Defaults to None.
+        shell: Whether to use the shell as the program to execute. Defaults to True.
+
+    Returns:
+        int: Exit code of the process in which the command executed.
+    """
+    stdout = stdout or sys.stderr
+    stderr = stderr or sys.stderr
+
+    out = subprocess.PIPE if isinstance(stdout, StringIO) else stdout
+    err = subprocess.PIPE if isinstance(stderr, StringIO) else stderr
+
+    proc = subprocess.Popen(command, shell=shell, stdout=out, stderr=err, cwd=cwd)
+
+    proc_stdout, proc_stderr = proc.communicate()
+    if proc_stdout:
+        stdout.write(proc_stdout.decode("utf-8", errors="ignore"))
+    if proc_stderr:
+        stderr.write(proc_stderr.decode("utf-8", errors="ignore"))
+    return proc.returncode
+
+
+def _safe_run(command: str, on_error: str = 'N/A', cwd: Optional[str] = None, log_errors: bool = True) -> str:
+    """Safely run a command in a subprocess, returning the given string if an error occurs.
+    
+    Executes the specified command and returns its stdout output. If the command
+    fails for any reason, returns the specified error message instead.
+    
+    Args:
+        command: The command to execute as a subprocess.
+        on_error: Message to return if an exception occurs.
+        cwd: Working directory for command execution.
+        log_errors: Whether to log errors that occur while running the command.
+        
+    Returns:
+        str: The process stdout output (stripped) if successful, or the on_error 
+            message if any error occurs.
+    """
+    stdout = StringIO()
+    try:
+        exit_code = _run(command, stdout=stdout, stderr=subprocess.DEVNULL, cwd=cwd)
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        if log_errors:
+            LOG.exception(f'Error running {command}', exc_info=e)
+    else:
+        if exit_code == 0:
+            return stdout.getvalue().strip()
+
+    return on_error
+
+
+def _load(path: str, encoding: str = 'UTF-8', on_error: Optional[AnyStr] = None) -> AnyStr:
+    """Reads a file and returns its contents.
+
+    Args:
+        path: Path to the file to be read.
+        encoding: Character encoding used to decode the file. Defaults to 'UTF-8'.
+        on_error: Value to return if reading fails. Defaults to None.
+
+    Returns:
+        The contents of the file as a string or bytes object depending on encoding.
+
+    Raises:
+        FileNotFoundError: If the file doesn't exist.
+        PermissionError: If the user lacks permission to read the file.
     """
     with open(path, 'r', encoding=encoding, newline="") as file:
         return file.read()
+    return on_error
 
 
 class Environment(typing.Protocol):
@@ -129,6 +217,7 @@ class CommonEnvironment:
     CommonEnvironment does not provide all required properties to satisfy the
     Environment interface, and is not intended to be instantiated directly.
     """
+
     def __init__(self):
         logsink = casa_tools.logsink
 
@@ -189,7 +278,7 @@ class LinuxEnvironment(CommonEnvironment):
     def __init__(self):
         super().__init__()
 
-        lscpu_json = json.loads(safe_run('lscpu -J', on_error='{"lscpu": {}}'))
+        lscpu_json = json.loads(_safe_run('lscpu -J', on_error='{"lscpu": {}}'))
         self.cpu_type = self._from_lscpu(lscpu_json, 'Model name:')
         self.logical_cpu_cores = self._from_lscpu(lscpu_json, 'CPU(s):')
 
@@ -201,7 +290,7 @@ class LinuxEnvironment(CommonEnvironment):
             self.physical_cpu_cores = 'unknown'
 
         self.ram = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
-        self.swap = safe_run('swapon --show=SIZE --bytes --noheadings')
+        self.swap = _safe_run('swapon --show=SIZE --bytes --noheadings')
 
         cgroup_controllers = CGroupControllerParser.get_controllers()
         self.cgroup_num_cpus = str(CGroupLimit.CPUAllocation.get_limit(cgroup_controllers))
@@ -334,7 +423,7 @@ class CGroupControllerParser:
             )
             results[name] = controller
 
-        is_cgroups_v2 = safe_run('stat -fc %T /sys/fs/cgroup/') == 'cgroup2fs'
+        is_cgroups_v2 = _safe_run('stat -fc %T /sys/fs/cgroup/') == 'cgroup2fs'
 
         # stage 2: read /proc/self/cgroup and determine:
         #   - the cgroup path for cgroups v2 or
@@ -459,8 +548,7 @@ class CGroupLimit:
         @staticmethod
         def get_limit(controllers: typing.Dict[str, CGroupController]):
             if 'cpu' not in controllers:
-                return 'N/A'
-
+                return 'N/A'            
             controller = controllers['cpu']
             if controller.enabled and controller.hierarchy_id == 0:
                 str_limits = controller.get_limits([], ['cpu.max'])
@@ -586,7 +674,7 @@ class MacOSEnvironment(CommonEnvironment):
 
     @staticmethod
     def _from_sysctl(prop: str) -> str:
-        return safe_run(f'sysctl -n {prop}')
+        return _safe_run(f'sysctl -n {prop}')
 
     @staticmethod
     def _get_swap():
@@ -610,8 +698,67 @@ def _pipeline_revision() -> str:
     attempt to get version from built package.
     :return: string describing pipeline version.
     """
-    pl_path = pkg_resources.resource_filename(__name__, '')
-    return get_version(pl_path)
+
+    version_str = 'unknown'
+    # check the version of installed package matching 'Pipeline'
+    try:
+        # PIPE-1669: try to retrieve version from PEP566 metadata:
+        # https://peps.python.org/pep-0566/
+        # However, be aware that the metadata version string might be out-of-date
+        # from the package being imported depending on your workflow
+        # https://packaging.python.org/en/latest/guides/single-sourcing-package-version/#single-sourcing-the-version
+        # In addition, the version string could be converted form compliance reasons:
+        # https://peps.python.org/pep-0440/#local-version-segments
+        # '1.0.0-dev1+PIPE-1243' -> 1.0.0-dev1+PIPE.1243'.
+        version_str = version('pipeline')
+        LOG.debug('Pipeline version found from importlib.metadata: %s', version_str)
+    except PackageNotFoundError:
+        # likely the package is not installed
+        LOG.debug('Pipeline version is not found from importlib.metadata; '
+                  'the package is likely not pip-installed but added at runtime.')
+
+    # more reliable method with the string most correctly preserved.
+    try:
+        from ._version import version as version_str
+        LOG.debug('Pipeline version found from pipeline._version: %s', version_str)
+    except ModuleNotFoundError:
+        pass
+
+    # We try to check version via the Git history again; this monkey patch is to deal with
+    # the situation that the PEP566 metadata might be out of date, e.g. developers
+    # are using a Python interpreter with older Pipeline versions installed but add
+    # the latest Git repo to sys.path for testing at runtime. The '.git' pre-check is intended
+    # to avoid the unnecessary cost of subprocess call cost. In addition, it avoids pulling
+    # the Git-based version string if the imported Python code is coming from a scratch directory
+    # inside the repo, etc. build/lib/pipeline
+    git_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.git'))
+    src_path = os.path.abspath(os.path.join(os.path.dirname(__file__)))
+    if os.path.exists(git_path):
+        LOG.debug('A Git repo is found at: %s', git_path)
+        LOG.debug('Checking the Git history from %s', src_path)
+        gitbin = shutil.which('git')
+        try:
+            # Silently test if this is a Git repo; if not, a CalledProcessError Exception
+            # will be triggered due to a non-zero subprocess exit status.
+            subprocess.check_output([gitbin, 'rev-parse'], cwd=src_path, stderr=subprocess.DEVNULL)
+            # If it's a Git repo, continue with fetching the desired Git-derived package version string.
+            version_str = get_version_string_from_git(src_path)
+            LOG.debug('Pipeline version derived from Git at runtime: %s', version_str)
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            pass
+
+    return version_str
+
+
+def _cluster_details():
+    env_details = [node_details]
+    if mpihelpers.is_mpi_ready():
+        mpi_results = mpihelpers.mpiclient.push_command_request('pipeline.environment.node_details', block=True,
+                                                                target_server=mpihelpers.mpi_server_list)
+        for r in mpi_results:
+            env_details.append(r['ret'])
+
+    return env_details
 
 
 casa_version = casatasks.version()
@@ -619,44 +766,65 @@ casa_version_string = casatasks.version_string()
 compare_casa_version = casa_tools.utils.compare_version
 
 
-def _get_dependency_details(package_list=None):
-    """Get dependency package version/path.
+def _get_dependency_details(package_names):
+    """Get dependency package version/path."""
 
-    See https://docs.python.org/3.8/library/importlib.metadata.html#metadata
-    """
-    if package_list is None:
-        package_list = [
-            'numpy',
-            'scipy',
-            'matplotlib',
-            'astropy',
-            'bdsf',
-            'casatools',
-            'casatasks',
-            'casampi',
-            'casaplotms',
-        ]
-
-    package_details = dict.fromkeys(package_list)
-    for package in package_list:
+    package_details = dict.fromkeys(package_names)
+    for package_name in package_names:
         try:
-            package_version = version(package)
-            module_spec = find_spec(package)
-            if module_spec is not None:
-                package_details[package] = {
-                    'version': package_version,
-                    'path': os.path.dirname(module_spec.origin)
-                }
+            dist = distribution(package_name)
+            package_details[package_name] = {'version': dist.version, 'path': dist.locate_file('')}
         except PackageNotFoundError:
             pass
     return package_details
 
 
-dependency_details = _get_dependency_details()
+def _get_required_dependencies(package_name):
+    """Get required package dependencies, excluding optional ones.
+
+    Args:
+        package_name: Name of an installed package
+
+    Returns:
+        List of required dependency package names without version info
+    """
+    try:
+        meta = metadata(package_name)
+        requirements = meta.get_all('Requires-Dist') or []
+
+        required_deps = []
+        for req in requirements:
+            # Skip if it's an optional dependency (has a marker with "extra")
+            if ';' in req and ('extra ==' in req.lower() or 'extra =' in req.lower()):
+                continue
+            # Skip conditions that aren't extras but still optional
+            if ';' in req and (
+                'python_version' in req.lower()
+                or 'platform_' in req.lower()
+                or 'sys_platform' in req.lower()
+                or 'implementation_name' in req.lower()
+            ):
+                continue
+            # Extract just the package name
+            match = re.match(r'^([A-Za-z0-9._-]+)', req)
+            if match:
+                required_deps.append(match.group(1))
+
+        if required_deps:
+            return required_deps
+    except (ImportError, AttributeError, Exception):
+        pass
+
+    return []
+
+
+_casa6_packages = ['numpy', 'scipy', 'matplotlib', 'casaconfig', 'casatools', 'casatasks', 'casampi', 'casaplotms']
+dependency_details = _get_dependency_details(_casa6_packages + _get_required_dependencies('pipeline'))
+
 iers_info = utils.IERSInfo()
 pipeline_revision = _pipeline_revision()
-
 ENVIRONMENT = EnvironmentFactory.create()
+
 
 def cluster_details():
     # defer calculation as running this code at import time blocks MPI
@@ -676,5 +844,6 @@ def cluster_details():
         _cluster_details = env_details
 
     return _cluster_details
+
 
 _cluster_details = None

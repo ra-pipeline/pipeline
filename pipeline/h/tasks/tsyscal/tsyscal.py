@@ -49,26 +49,28 @@ class TsyscalInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
 
             vis: List of input visibility files.
 
-                Example: vis=['ngc5921.ms']
+                Example: ``vis=['ngc5921.ms']``
 
             caltable: Name of output gain calibration tables.
 
-                Example: caltable='ngc5921.gcal'
+                Example: ``caltable='ngc5921.gcal'``
 
             chantol: The tolerance in channels for mapping atmospheric calibration windows (TDM) to science windows (FDM or TDM).
 
-                Example: chantol=5
+                Example: ``chantol=5``
 
             parallel: Process multiple MeasurementSets in parallel using the casampi parallelization framework.
-                options: 'automatic', 'true', 'false', True, False
-                default: None (equivalent to False)
+
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``None`` (equivalent to ``False``)
 
         """
         super().__init__()
