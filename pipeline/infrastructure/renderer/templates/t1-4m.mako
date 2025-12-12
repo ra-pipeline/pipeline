@@ -53,7 +53,7 @@ $(document).ready(function() {
                 </div>
             </td>
 			<td><span class="badge${rendererutils.get_badge_class(qascore)}">${rendererutils.format_score(qascore)}</span></td>
-			<td>${task_duration[i]}</td>
+			<td>${task_duration[i]+result_duration[i]}</td>
 		</tr>
 		% endfor
 	</tbody>
