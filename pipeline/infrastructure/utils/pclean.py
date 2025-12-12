@@ -169,8 +169,14 @@ def pclean(
             raise RuntimeError('tclean subprocess execution failed') from e
 
         # read result
-        with open(output_file, 'rb') as f:
-            output = pickle.load(f)
+        try:
+            with open(output_file, 'rb') as f:
+                output = pickle.load(f)
+        except (FileNotFoundError, OSError) as e:
+            LOG.error('Failed to read output file %s: %s', output_file, e)
+            raise RuntimeError(
+                f"Failed to read output file '{output_file}'. This may be due to disk space issues, permission errors, or a problem in the subprocess."
+            ) from e
 
         if not output.get('success', False):
             raise RuntimeError(f'{output.get("type")}: {output.get("error")}')
