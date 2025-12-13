@@ -11,7 +11,7 @@ import os
 import re
 import traceback
 import xml
-from typing import TYPE_CHECKING, Generic, TypedDict, TypeVar
+from typing import TYPE_CHECKING
 
 import cachetools
 import numpy as np
@@ -21,21 +21,10 @@ from pipeline.domain import measures
 from pipeline.infrastructure import casa_tools, utils
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
-    from typing import Any
-
-    from numpy import generic
     from numpy.typing import NDArray
-
-    from pipeline.domain import Antenna, AntennaArray, DataDescription, Field, MeasurementSet, \
-        ObservingRun, Polarization, Scan, Source, SpectralWindow, State
-    from pipeline.domain.measures import Frequency, FrequencyRange
-    from pipeline.domain.state import StateFactory
-    from pipeline.infrastructure.utils.casa_types import DirectionDict, LongLatDict, QuantityDict
+    from pipeline.domain import Antenna, AntennaArray, MeasurementSet
 
 LOG = infrastructure.logging.get_logger(__name__)
-
-T = TypeVar('T')
 
 
 def find_EVLA_band(frequency: float, bandlimits: list[float] | None = None, BBAND: str | None = '?4PLSCXUKAQ?') -> str:
@@ -155,7 +144,7 @@ def _get_science_goal_value(
 
 class ObservingRunReader:
     @staticmethod
-    def get_observing_run(ms_files: str | list) -> ObservingRun:
+    def get_observing_run(ms_files):
         if isinstance(ms_files, str):
             ms_files = [ms_files]
 
@@ -168,7 +157,7 @@ class ObservingRunReader:
 
 class MeasurementSetReader:
     @staticmethod
-    def get_scans(msmd: Any, ms: MeasurementSet) -> list[Scan]:
+    def get_scans(msmd, ms):
         LOG.debug('Analysing scans in {0}'.format(ms.name))
         with casa_tools.TableReader(ms.name) as openms:
             scan_number_col = openms.getcol('SCAN_NUMBER')
@@ -203,6 +192,10 @@ class MeasurementSetReader:
                 intents = functools.reduce(lambda s, t: s.union(t.intents), states, set())
 
                 fields = [f for f in ms.fields if f.id in fieldsforscans[str(scan_id)]]
+
+                # can't use msmd.timesforscan as we need unique times grouped
+                # by spw
+                # scan_times = msmd.timesforscan(scan_id)
 
                 exposures = {spw_id: msmd.exposuretime(scan=scan_id, spwid=spw_id, obsid=obs_id)
                              for spw_id in spwsforscans[str(scan_id)]}
@@ -318,7 +311,7 @@ class MeasurementSetReader:
                 spw.band = EVLA_band_dict[EVLA_band]
 
     @staticmethod
-    def add_spectralspec_spwmap(ms: MeasurementSet) -> None:
+    def add_spectralspec_spwmap(ms):
         ms.spectralspec_spwmap = utils.get_spectralspec_to_spwid_map(ms.spectral_windows)
 
     @staticmethod
@@ -329,7 +322,7 @@ class MeasurementSetReader:
                 spw.grouping_id, spw.spectralspec = _get_groupingid_spectralspec_from_alma_spw_name(spw.name)
 
     @staticmethod
-    def link_intents_to_spws(msmd: Any, ms: MeasurementSet) -> None:
+    def link_intents_to_spws(msmd, ms):
         # we can't use msmd.intentsforspw directly as we may have a modified
         # obsmode mapping
 
@@ -339,7 +332,7 @@ class MeasurementSetReader:
         # arguments are repeated. This cache speeds up the subsequent
         # duplicate calls.
         class StatesCache(cachetools.LRUCache):
-            def __missing__(self, key: int) -> NDArray:
+            def __missing__(self, key):
                 return msmd.statesforscan(key)
 
         cached_states = StatesCache(1000)
@@ -356,11 +349,11 @@ class MeasurementSetReader:
             LOG.trace('Intents for spw #{0}: {1}'.format(spw.id, ','.join(spw.intents)))
 
     @staticmethod
-    def link_fields_to_states(msmd: Any, ms: MeasurementSet) -> None:
+    def link_fields_to_states(msmd, ms):
         # for each field..
 
         class StatesCache(cachetools.LRUCache):
-            def __missing__(self, key: int) -> NDArray:
+            def __missing__(self, key):
                 return msmd.statesforscan(key)
 
         cached_states = StatesCache(1000)
@@ -391,7 +384,7 @@ class MeasurementSetReader:
                 field.intents.update(state.intents)
 
     @staticmethod
-    def link_fields_to_sources(msmd: Any, ms: MeasurementSet) -> None:
+    def link_fields_to_sources(msmd, ms):        
         for source in ms.sources:
             field_ids = msmd.fieldsforsource(source.id, False)
             fields = [f for f in ms.fields if f.id in field_ids]
@@ -401,7 +394,7 @@ class MeasurementSetReader:
                 field.source = source
 
     @staticmethod
-    def link_spws_to_fields(msmd: Any, ms: MeasurementSet) -> None:
+    def link_spws_to_fields(msmd, ms):
         spwsforfields = msmd.spwsforfields()
         for field in ms.fields:
             try:
@@ -411,7 +404,7 @@ class MeasurementSetReader:
                 LOG.debug("Field "+str(field.id) + " not in spwsforfields dictionary.")
 
     @staticmethod
-    def get_measurement_set(ms_file: str) -> MeasurementSet:
+    def get_measurement_set(ms_file: str) -> domain.MeasurementSet:
         LOG.info('Analysing {0}'.format(ms_file))
         ms = domain.MeasurementSet(ms_file)
 
@@ -542,13 +535,13 @@ class MeasurementSetReader:
         return ms
 
     @staticmethod
-    def _get_range(filename: str, column: str) -> NDArray:
+    def _get_range(filename, column):
         with casa_tools.MSReader(filename) as ms:
             data = ms.range([column])
             return list(data.values())[0]
 
     @staticmethod
-    def _get_correlator_name(ms: MeasurementSet) -> str:
+    def _get_correlator_name(ms: domain.MeasurementSet) -> str:
         """
         Get correlator name information from the PROCESSOR table in the MS. 
         
@@ -579,7 +572,7 @@ class MeasurementSetReader:
         return correlator_name
 
     @staticmethod
-    def get_acs_software_version(ms: MeasurementSet, msmd: Any) -> tuple[str, str]:
+    def get_acs_software_version(ms, msmd) -> tuple[str, str]:
         """
         Retrieve the ALMA Common Software version and build version from the ASDM_ANNOTATION table. 
 
@@ -608,7 +601,7 @@ class MeasurementSetReader:
         return (acs_software_version, acs_software_build_version)
 
     @staticmethod
-    def get_history(ms_name: str) -> NDArray[generic] | None:
+    def get_history(ms_name: str) -> np.ndarray | None:
         """Retrieve the MS history from the HISTORY table.
 
         Args:
@@ -631,7 +624,7 @@ class MeasurementSetReader:
 
 class SpectralWindowTable:
     @staticmethod
-    def get_spectral_windows(msmd: Any, ms: MeasurementSet) -> list[SpectralWindow]:
+    def get_spectral_windows(msmd, ms):
         # map spw ID to spw type
         spw_types = {i: 'FDM' for i in msmd.fdmspws()}
         spw_types.update({i: 'TDM' for i in msmd.tdmspws()})
@@ -658,9 +651,6 @@ class SpectralWindowTable:
 
         # Read in information about the SDM_NUM_BIN column for the current ms
         sdm_num_bins = SpectralWindowTable.get_sdm_num_bin_info(ms, msmd)
-
-        # PIPE-117: Read per-channel spectral resolution from the RESOLUTION column.
-        resolution_info = SpectralWindowTable.get_resolution_info(ms, msmd)
 
         # PIPE-1538: Compute median feed receptor angle.
         receptor_angle_info = SpectralWindowTable.get_receptor_angle(ms)
@@ -729,13 +719,10 @@ class SpectralWindowTable:
                 median_receptor_angle = None
 
             # If the earlier get_sdm_num_bin_info call returned None, need to set sdm_num_bin value to None for each spw
-            if sdm_num_bins is None:
+            if sdm_num_bins is None: 
                 sdm_num_bin = None
-            else:
+            else: 
                 sdm_num_bin = sdm_num_bins[i]
-
-            # PIPE-117: Extract per-channel resolutions for current spw if available.
-            chan_resolutions = None if resolution_info is None else resolution_info[i]
 
             # Fetch and add correlation bits information
             correlation_bits = msmd.corrbit(i)
@@ -743,13 +730,13 @@ class SpectralWindowTable:
             spw = domain.SpectralWindow(i, spw_name, spw_type, bandwidth, ref_freq, mean_freq, chan_freqs, chan_widths,
                                         chan_effective_bws, sideband, baseband, receiver, freq_lo,
                                         transitions=transitions, sdm_num_bin=sdm_num_bin, correlation_bits=correlation_bits,
-                                        median_receptor_angle=median_receptor_angle, chan_resolutions=chan_resolutions)
+                                        median_receptor_angle=median_receptor_angle)
             spws.append(spw)
 
         return spws
 
     @staticmethod
-    def get_receptor_angle(ms: MeasurementSet) -> dict:
+    def get_receptor_angle(ms):
         """
         Extract information about the feed receptor angle from the FEED table's
         RECEPTOR_ANGLE column, and compute an average value over all antennas
@@ -791,7 +778,7 @@ class SpectralWindowTable:
         return angle_info
 
     @staticmethod
-    def get_sdm_num_bin_info(ms: MeasurementSet, msmd: Any) -> NDArray:
+    def get_sdm_num_bin_info(ms, msmd):
         """
         Extract information about the online spectral averaging from the SPECTRAL_WINDOW
         table's SDM_NUM_BIN column.
@@ -811,27 +798,7 @@ class SpectralWindowTable:
         return sdm_num_bin
 
     @staticmethod
-    def get_resolution_info(ms: MeasurementSet, msmd: Any) -> dict | None:
-        """
-        Extract per-channel spectral resolution from the SPECTRAL_WINDOW table's
-        RESOLUTION column when present.
-
-        The RESOLUTION column contains variable-length arrays (one value per channel),
-        so it must be read row-by-row with getcell rather than getcol.
-
-        :param ms: measurement set to inspect
-        :param msmd: msmetadata (casa_tools.MSMDReader) for the measurement set.
-        :return: dict mapping SPW index to numpy array of channel resolutions (Hz),
-                 or None if the column is absent.
-        """
-        with casa_tools.TableReader(ms.name + '/SPECTRAL_WINDOW') as table:
-            if 'RESOLUTION' not in table.colnames():
-                LOG.info(f'RESOLUTION does not exist in the SPECTRAL_WINDOW table of MS {_get_ms_basename(ms)}')
-                return None
-            return {i: table.getcell('RESOLUTION', i) for i in range(table.nrows())}
-
-    @staticmethod
-    def get_receiver_info(ms: MeasurementSet, get_band_info: bool = False) -> dict:
+    def get_receiver_info(ms, get_band_info=False):
         """
         Extract information about the receiver from the ASDM_RECEIVER table.
         The following properties are extracted by default:
@@ -892,7 +859,7 @@ class SpectralWindowTable:
         return receiver_info
 
     @staticmethod
-    def parse_spectral_window_ids_from_xml(xml_path: str) -> list:
+    def parse_spectral_window_ids_from_xml(xml_path):
         """
         Extract the spectral window ID element from each row of an XML file.
 
@@ -913,7 +880,7 @@ class SpectralWindowTable:
         return ids
 
     @staticmethod
-    def get_data_description_spw_ids(ms: MeasurementSet) -> list:
+    def get_data_description_spw_ids(ms):
         """
         Extract a list of spectral window IDs from the DataDescription XML for an
         ASDM.
@@ -934,7 +901,7 @@ class SpectralWindowTable:
         return result
 
     @staticmethod
-    def get_spectral_window_spw_ids(ms: MeasurementSet) -> list:
+    def get_spectral_window_spw_ids(ms):
         """
         Extract a list of spectral window IDs from the SpectralWindow XML for an
         ASDM.
@@ -955,7 +922,7 @@ class SpectralWindowTable:
         return result
 
     @staticmethod
-    def get_asdm_to_ms_spw_mapping(ms: MeasurementSet) -> dict:
+    def get_asdm_to_ms_spw_mapping(ms):
         """
         Get the mapping of ASDM spectral window ID to Measurement Set spectral
         window ID.
@@ -974,7 +941,7 @@ class SpectralWindowTable:
 
 class ObservationTable:
     @staticmethod
-    def get_project_info(msmd: Any) -> tuple[str, str, str, str]:
+    def get_project_info(msmd):
         project_id = msmd.projects()[0]
         observer = msmd.observers()[0]
 
@@ -999,7 +966,7 @@ class ObservationTable:
 
 class AntennaTable:
     @staticmethod
-    def get_antenna_array(msmd: Any) -> AntennaArray:
+    def get_antenna_array(msmd: casa_tools._logging_msmd_cls) -> AntennaArray:
         position = msmd.observatoryposition()            
         names = set(msmd.observatorynames())
         assert len(names) == 1
@@ -1008,7 +975,7 @@ class AntennaTable:
         return domain.AntennaArray(name, position, antennas)
 
     @staticmethod
-    def get_antennas(msmd: Any) -> list[Antenna]:
+    def get_antennas(msmd: casa_tools._logging_msmd_cls) -> list[Antenna]:
         antenna_table = os.path.join(msmd.name(), 'ANTENNA')
         LOG.trace('Opening ANTENNA table to read ANTENNA.FLAG_ROW')
         with casa_tools.TableReader(antenna_table) as table:
@@ -1023,7 +990,7 @@ class AntennaTable:
             position = msmd.antennaposition(i)
             offset = msmd.antennaoffset(i)
             diameter_m = casa_tools.quanta.convert(msmd.antennadiameter(i), 'm')
-            diameter = casa_tools.quanta.getvalue(diameter_m).item()
+            diameter = casa_tools.quanta.getvalue(diameter_m)[0]
 
             antenna = domain.Antenna(i, name, station, position, offset, diameter)
             antennas.append(antenna)
@@ -1033,7 +1000,7 @@ class AntennaTable:
 
 class DataDescriptionTable:
     @staticmethod
-    def get_descriptions(msmd: Any, ms: MeasurementSet) -> list[DataDescription]:
+    def get_descriptions(msmd, ms):
         spws = ms.spectral_windows
         # read the data descriptions table and create the objects
         descriptions = [DataDescriptionTable._create_data_description(spws, *row) 
@@ -1042,12 +1009,7 @@ class DataDescriptionTable:
         return descriptions            
 
     @staticmethod
-    def _create_data_description(
-            spws: list[SpectralWindow],
-            dd_id: int,
-            spw_id: int,
-            pol_id: int
-        ) -> DataDescription:
+    def _create_data_description(spws, dd_id, spw_id, pol_id):
         # find the SpectralWindow matching the given spectral window ID
         matching_spws = [spw for spw in spws if spw.id == spw_id]
         spw = matching_spws[0]
@@ -1055,7 +1017,7 @@ class DataDescriptionTable:
         return domain.DataDescription(dd_id, spw, pol_id)
 
     @staticmethod
-    def _read_table(msmd: Any) -> list[tuple[int, int, int]]:
+    def _read_table(msmd):
         """
         Read the DATA_DESCRIPTION table of the given measurement set.
         """
@@ -1075,7 +1037,7 @@ SBSummaryInfo = collections.namedtuple(
 
 class SBSummaryTable:
     @staticmethod
-    def get_sbsummary_info(ms: MeasurementSet, obsnames: list[str]) -> SBSummaryInfo:
+    def get_sbsummary_info(ms, obsnames):
         try:
             sbsummary_info = [SBSummaryTable._create_sbsummary_info(*row) for row in SBSummaryTable._read_table(ms)]
             return sbsummary_info[0]
@@ -1087,7 +1049,7 @@ class SBSummaryTable:
                                  sensitivity=None, dynamicRange=None, spectralDynamicRangeBandWidth=None, sbName=None)
 
     @staticmethod
-    def get_observing_modes(ms: MeasurementSet) -> list[str]:
+    def get_observing_modes(ms: domain.MeasurementSet) -> list[str]:
         msname = _get_ms_name(ms)
         sbsummary_table = os.path.join(msname, 'ASDM_SBSUMMARY')
         observing_modes = []
@@ -1105,26 +1067,15 @@ class SBSummaryTable:
         return observing_modes
 
     @staticmethod
-    def _create_sbsummary_info(
-            repSource: str | None,
-            repFrequency: QuantityDict | None,
-            repBandwidth: QuantityDict | None,
-            repWindow: str | None,
-            minAngResolution: QuantityDict | None,
-            maxAngResolution: QuantityDict | None,
-            maxAllowedBeamAxialRatio: QuantityDict | None,
-            sensitivity: QuantityDict | None,
-            dynamicRange: QuantityDict | None,
-            spectralDynamicRangeBandWidth: QuantityDict | None,
-            sbName: str | None,
-            ) -> SBSummaryInfo:
+    def _create_sbsummary_info(repSource, repFrequency, repBandwidth, repWindow, minAngResolution, maxAngResolution,
+                               maxAllowedBeamAxialRatio, sensitivity, dynamicRange, spectralDynamicRangeBandWidth, sbName):
         return SBSummaryInfo(repSource=repSource, repFrequency=repFrequency, repBandwidth=repBandwidth,
                              repWindow=repWindow, minAngResolution=minAngResolution, maxAngResolution=maxAngResolution,
                              maxAllowedBeamAxialRatio=maxAllowedBeamAxialRatio, sensitivity=sensitivity,
                              dynamicRange=dynamicRange, spectralDynamicRangeBandWidth=spectralDynamicRangeBandWidth, sbName=sbName)
 
     @staticmethod
-    def _read_table(ms: MeasurementSet) -> list[tuple[str | QuantityDict]]:
+    def _read_table(ms):
         """
         Read the ASDM_SBSummary table
         For all practical purposes this table consists of a single row
@@ -1257,7 +1208,7 @@ class SBSummaryTable:
 
 class ExecblockTable:
     @staticmethod
-    def get_execblock_info(ms: MeasurementSet) -> str | None:
+    def get_execblock_info(ms):
         try:
             execblock_info = [ExecblockTable._create_execblock_info(*row) for row in ExecblockTable._read_table(ms)]
             if execblock_info[0][0] == 'ALMA':
@@ -1271,11 +1222,11 @@ class ExecblockTable:
             return None
 
     @staticmethod
-    def _create_execblock_info(telescopeName: str, configName: str) -> tuple[str, str]:
+    def _create_execblock_info(telescopeName, configName):
         return telescopeName, configName
 
     @staticmethod
-    def _read_table(ms: MeasurementSet) -> list[tuple[str, str]]:
+    def _read_table(ms):
         """
         Read the ASDM_EXECBLOCK table
         For all practical purposes this table consists of a single row
@@ -1297,7 +1248,7 @@ class ExecblockTable:
 
 class PolarizationTable:
     @staticmethod
-    def get_polarizations(msmd: Any) -> list[Polarization]:
+    def get_polarizations(msmd):
         pol_ids = sorted({int(i) for i in msmd.polidfordatadesc()})
 
         num_corrs = [msmd.ncorrforpol(i) for i in pol_ids]
@@ -1308,18 +1259,13 @@ class PolarizationTable:
                 for row in zip(pol_ids, num_corrs, corr_types, corr_products)]
 
     @staticmethod
-    def _create_pol_description(
-            id: int,
-            num_corr: int,
-            corr_type: NDArray,
-            corr_product: NDArray
-            ) -> Polarization:
+    def _create_pol_description(id, num_corr, corr_type, corr_product):
         return domain.Polarization(id, num_corr, corr_type, corr_product)
 
 
 class SourceTable:
     @staticmethod
-    def get_sources(msmd: Any) -> list[SourceTable]:
+    def get_sources(msmd):
         rows = SourceTable._read_table(msmd)
 
         # duplicate source entries may be present due to duplicate entries
@@ -1335,19 +1281,11 @@ class SourceTable:
         return [SourceTable._create_source(*row) for row in no_dups]
 
     @staticmethod
-    def _create_source(
-            source_id: int,
-            name: str,
-            direction: DirectionDict,
-            proper_motion: LongLatDict,
-            is_eph_obj: bool,
-            table_names: str,
-            avg_spacings: float | str,
-            ) -> Source:
+    def _create_source(source_id, name, direction, proper_motion, is_eph_obj, table_names, avg_spacings):
         return domain.Source(source_id, name, direction, proper_motion, is_eph_obj, table_names, avg_spacings)
 
     @staticmethod
-    def _read_table(msmd: Any) -> list[tuple]:
+    def _read_table(msmd):
         """
         Read the SOURCE table of the given measurement set.
         """
@@ -1389,7 +1327,7 @@ class SourceTable:
         return [row for row in all_sources if source_id_to_scans.get(row[0], False)]
 
     @staticmethod
-    def _get_eph_sourcenames(msname: str) -> tuple[list, dict, dict]:
+    def _get_eph_sourcenames(msname):
         ephemeris_tables = utils.glob_ordered(msname+'/FIELD/EPHEM*.tab')
 
         eph_sourcenames = []
@@ -1412,7 +1350,7 @@ class SourceTable:
 
 class StateTable:
     @staticmethod
-    def get_states(msmd: Any) -> list[State]:
+    def get_states(msmd):
         state_factory = StateTable.get_state_factory(msmd)
 
         LOG.trace('Opening STATE table to read STATE.OBS_MODE')
@@ -1428,7 +1366,7 @@ class StateTable:
         return states
 
     @staticmethod
-    def get_state_factory(msmd: Any) -> StateFactory:
+    def get_state_factory(msmd):
         names = set(msmd.observatorynames())
         assert len(names) == 1
         facility = names.pop()
@@ -1448,63 +1386,49 @@ class StateTable:
 
         epoch_start = me.epoch(time_ref, qa.quantity(scan_start, time_unit))
         str_start = qa.time(epoch_start['m0'], form=['fits'])[0]
-        dt_start = datetime.datetime.strptime(str_start, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=datetime.timezone.utc)
+        # https://casadocs.readthedocs.io/en/latest/api/tt/casatools.quanta.html#casatools.quanta.quanta.time
+        # The 'fits' specification returns a string in ISO 8601 format with no subsecond precision
+        dt_start = datetime.datetime.fromisoformat(str_start).replace(tzinfo=datetime.timezone.utc)
 
         return domain.state.StateFactory(facility, dt_start)        
 
 
 class FieldTable:
     @staticmethod
-    def _read_table(msmd: Any) -> list[tuple]:
+    def _read_table(msmd):
         num_fields = msmd.nfields()
+        field_ids = list(range(num_fields))
         field_names = msmd.namesforfields()
-
-        # Determine which field IDs have scans first, so we can skip
-        # expensive per-field msmd calls for fields without scans.
-        fields_with_scans = {
-            field_id
-            for field_id in range(num_fields)
-            if len(msmd.scansforfield(field_id)) != 0
-        }
-
-        if not fields_with_scans:
-            return []
+        times = [msmd.timesforfield(i) for i in field_ids]
+        phase_centres = [msmd.phasecenter(i) for i in field_ids]
+        source_ids = [msmd.sourceidforfield(i) for i in field_ids]
 
         LOG.trace('Opening FIELD table to read FIELD.SOURCE_TYPE')
         field_table = os.path.join(msmd.name(), 'FIELD')
         with casa_tools.TableReader(field_table) as table:
+            # TODO can this old code be removed? We've not handled non-APDMs
+            # for a *long* time!
+            #
             # FIELD.SOURCE_TYPE contains the intents in non-APDM MS
             if 'SOURCE_TYPE' in table.colnames():
                 source_types = table.getcol('SOURCE_TYPE')
             else:
-                source_types = None
+                source_types = [None] * num_fields
 
-        # Only compute expensive per-field data for fields that have scans
-        return [
-            (
-                field_id,
-                field_names[field_id],
-                msmd.sourceidforfield(field_id),
-                msmd.timesforfield(field_id),
-                source_types[field_id] if source_types is not None else None,
-                msmd.phasecenter(field_id),
-            )
-            for field_id in sorted(fields_with_scans)
-        ]
+        all_fields = list(zip(field_ids, field_names, source_ids, times, source_types, phase_centres))
+
+        # only return sources for which scans are present
+        # create a mapping of source id to a boolean of whether any scans are present for that source
+        field_id_to_scans = {field_id: (len(msmd.scansforfield(field_id)) != 0) for field_id in set(field_ids)}
+
+        return [row for row in all_fields if field_id_to_scans.get(row[0], False)]
 
     @staticmethod
-    def get_fields(msmd: Any) -> list[Field]:
+    def get_fields(msmd):
         return [FieldTable._create_field(*row) for row in FieldTable._read_table(msmd)]
 
     @staticmethod
-    def _create_field(
-            field_id: int,
-            name: str,
-            source_id: int,
-            time: NDArray,
-            source_type: str,
-            phase_centre: DirectionDict,
-            ) -> Field:
+    def _create_field(field_id, name, source_id, time, source_type, phase_centre):
         field = domain.Field(field_id, name, source_id, time, phase_centre)
 
         if source_type:
@@ -1513,7 +1437,7 @@ class FieldTable:
         return field
 
 
-def _make_range(f_min: int, f_max: int) -> FrequencyRange:
+def _make_range(f_min, f_max):
     return measures.FrequencyRange(measures.Frequency(f_min),
                                    measures.Frequency(f_max))
 
@@ -1547,7 +1471,7 @@ class BandDescriber:
     unknown = {'Unknown': measures.FrequencyRange()}
 
     @staticmethod
-    def get_description(f: Frequency | FrequencyRange, observatory: str = 'ALMA') -> str:
+    def get_description(f, observatory='ALMA'):
         if observatory.upper() in ('ALMA',):
             bands = BandDescriber.alma_bands
         elif observatory.upper() in ('VLA', 'EVLA'):
@@ -1562,7 +1486,7 @@ class BandDescriber:
         return 'Unknown'
 
 
-class RetrieveByIndexContainer(Generic[T]):
+class RetrieveByIndexContainer:
     """
     RetrieveByIndexContainer is a container for items whose numeric index or
     other unique identifier is stored in an instance attribute.
@@ -1574,11 +1498,7 @@ class RetrieveByIndexContainer(Generic[T]):
     item at position 3.
     """
 
-    def __init__(
-            self,
-            items: list[T],
-            index_fn: Callable[[T], int] = operator.attrgetter('id'),
-            ):
+    def __init__(self, items, index_fn=operator.attrgetter('id')):
         """
         Create a new RetrieveByIndexContainer.
 
@@ -1592,13 +1512,13 @@ class RetrieveByIndexContainer(Generic[T]):
         self.__items = items
         self.__index_fn = index_fn
 
-    def __iter__(self) -> Iterator[T]:
+    def __iter__(self):
         return iter(self.__items)
 
-    def __len__(self) -> int:
+    def __len__(self):
         return len(self.__items)
 
-    def __getitem__(self, index: int | str) -> T:
+    def __getitem__(self, index):
         try:
             index = int(index)
         except ValueError:
@@ -1612,5 +1532,5 @@ class RetrieveByIndexContainer(Generic[T]):
             raise IndexError('more than one object found with ID {}'.format(index))
         return with_id.pop()
 
-    def __str__(self) -> str:
+    def __str__(self):
         return '<RetrieveByIndexContainer({})>'.format(str(self.__items))
