@@ -18,6 +18,7 @@ from ..tclean import Tclean
 from ..tclean.resultobjects import TcleanResult
 from .resultobjects import MakeImagesResult
 import numpy as np
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -239,6 +240,7 @@ class MakeImages(basetask.StandardTaskTemplate):
 
     is_multi_vis_task = True
 
+    @profile_io(output_file="makeimages_io_log.csv")
     def prepare(self):
         inputs = self.inputs
 
@@ -307,6 +309,7 @@ class MakeImages(basetask.StandardTaskTemplate):
 
         return result
 
+    @profile_io(output_file="makeimages_io_log.csv")
     def analyse(self, result):
         if self.inputs.context.imaging_mode is not None and self.inputs.context.imaging_mode.startswith('VLASS-'):
             result = self._add_vlass_metadata(result)

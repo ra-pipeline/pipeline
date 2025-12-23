@@ -7,6 +7,7 @@ import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as qacalc
 from . import priorcals
 from . import resultobjects
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = logging.get_logger(__name__)
 
@@ -16,6 +17,7 @@ class PriorcalsQAHandler(pqa.QAPlugin):
     child_cls = None
     generating_task = priorcals.Priorcals
 
+    @profile_io(output_file="priorcals_io_log.csv")
     def handle(self, context, result):
         # Check for existence of the the target MS.
         score1 = self._ms_exists(os.path.dirname(result.inputs['vis']), os.path.basename(result.inputs['vis']))

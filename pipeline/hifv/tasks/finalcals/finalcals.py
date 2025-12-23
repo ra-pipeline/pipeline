@@ -15,6 +15,7 @@ from pipeline.hifv.heuristics import uvrange, weakbp
 from pipeline.hifv.heuristics.lib_EVLApipeutils import vla_minbaselineforcal
 from pipeline.hifv.tasks.setmodel.vlasetjy import standard_sources
 from pipeline.infrastructure import casa_tasks, casa_tools, task_registry
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -130,6 +131,7 @@ class Finalcals(basetask.StandardTaskTemplate):
     """
     Inputs = FinalcalsInputs
 
+    @profile_io(output_file="finalcals_io_log.csv")
     def prepare(self):
         """Bulk of task execution occurs here.
 
@@ -354,6 +356,7 @@ class Finalcals(basetask.StandardTaskTemplate):
         return bpdgain_touse, gtypecaltable, ktypecaltable, bpcaltable, phaseshortgaincaltable, \
             finalampgaincaltable, finalphasegaincaltable, flaggedSolnApplycalbandpass, flaggedSolnApplycaldelay
 
+    @profile_io(output_file="finalcals_io_log.csv")
     def analyse(self, results):
         """Determine the best parameters by analysing the given jobs before returning any final jobs to execute.
 

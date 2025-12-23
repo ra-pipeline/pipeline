@@ -4,6 +4,7 @@ import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 from . import resultobjects
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = logging.get_logger(__name__)
 
@@ -12,6 +13,7 @@ class MakeImListQAHandler(pqa.QAPlugin):
     result_cls = resultobjects.MakeImListResult
     child_cls = None
 
+    @profile_io(output_file="imlist_io_log.csv")
     def handle(self, context, result):
         # There are two types of scores:
         # S1: comparing number of targets against expected number

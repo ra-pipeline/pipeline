@@ -9,6 +9,7 @@ import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 
 from . import resultobjects
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = logging.get_logger(__name__)
 
@@ -17,6 +18,7 @@ class MakeImagesQAHandler(pqa.QAPlugin):
     result_cls = resultobjects.MakeImagesResult
     child_cls = None
 
+    @profile_io(output_file="makeimages_io_log.csv")
     def handle(self, context, result):
         # calculate QA score as minimum of all sub-scores
         if result.mitigation_error:

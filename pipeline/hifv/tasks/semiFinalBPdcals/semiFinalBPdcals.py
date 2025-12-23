@@ -13,7 +13,7 @@ from pipeline.hifv.heuristics import weakbp, do_bandpass, uvrange
 from pipeline.hifv.heuristics.lib_EVLApipeutils import vla_minbaselineforcal
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import task_registry
-
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -111,6 +111,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
     """
     Inputs = semiFinalBPdcalsInputs
 
+    @profile_io(output_file="semifinalBPdcals_io_log.csv")
     def prepare(self):
         """Bulk of task execution occurs here.
 
@@ -154,6 +155,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
                                        flaggedSolnApplycalbandpass=flaggedSolnApplycalbandpass,
                                        flaggedSolnApplycaldelay=flaggedSolnApplycaldelay)
 
+    @profile_io(output_file="semifinalBPdcals_io_log.csv")
     def analyse(self, results):
         """Determine the best parameters by analysing the given jobs before returning any final jobs to execute.
 

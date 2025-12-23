@@ -5,6 +5,8 @@ import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
 from pipeline.infrastructure import task_registry
+from pipeline.infrastructure.utils.profiling import profile_io
+
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -48,6 +50,7 @@ class PlotSummaryResults(h_applycal.ApplycalResults):
 class PlotSummary(basetask.StandardTaskTemplate):
     Inputs = PlotSummaryInputs
 
+    @profile_io(output_file="plotsummary_io_log.csv")
     def prepare(self):
         # get the applied calibration state from callibrary.active. This holds
         # the CalApplications for everything applied by the pipeline in this run.
@@ -59,5 +62,6 @@ class PlotSummary(basetask.StandardTaskTemplate):
 
         return result
 
+    @profile_io(output_file="plotsummary_io_log.csv")
     def analyse(self, results):
         return results

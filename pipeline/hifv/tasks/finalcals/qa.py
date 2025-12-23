@@ -6,6 +6,7 @@ import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as qacalc
 from . import Finalcals
 from . import FinalcalsResults
+from pipeline.infrastructure.utils.profiling import profile_io
 
 
 LOG = logging.get_logger(__name__)
@@ -16,6 +17,7 @@ class FinalcalsQAHandler(pqa.QAPlugin):
     child_cls = None
     generating_task = Finalcals
 
+    @profile_io(output_file="finalcals_io_log.csv")
     def handle(self, context, result):
         # get a QA score for fraction of failed (flagged) bandpass solutions in the bandpass table
         # < 5%   of data flagged  --> 1

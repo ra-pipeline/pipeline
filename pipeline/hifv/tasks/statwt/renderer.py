@@ -8,6 +8,8 @@ import pipeline.infrastructure.exceptions as exceptions
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 
 from . import display as statwtdisplay
+from pipeline.infrastructure.utils.profiling import profile_io
+
 
 class T2_4MDetailsstatwtRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def __init__(self, uri='statwt.mako', description='Statwt summary',
@@ -15,6 +17,7 @@ class T2_4MDetailsstatwtRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         super(T2_4MDetailsstatwtRenderer, self).__init__(uri=uri, description=description,
                                                          always_rerender=always_rerender)
 
+    @profile_io(output_file="statwt_io_log.csv")
     def get_display_context(self, context, results):
         super_cls = super(T2_4MDetailsstatwtRenderer, self)
         ctx = super_cls.get_display_context(context, results)

@@ -74,7 +74,7 @@ from pipeline.h.tasks.flagging import flagdeterbase
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import task_registry
-
+from pipeline.infrastructure.utils.profiling import profile_io
 # ------------------------------------------------------------------------------
 
 # Initialize a logger
@@ -398,6 +398,7 @@ class FlagDeterVLA(flagdeterbase.FlagDeterBase):
 
     Inputs = FlagDeterVLAInputs
 
+    @profile_io(output_file="flagdata_io_log.csv")
     def prepare(self):
         """
         Prepare and execute a flagdata flagging job appropriate to the

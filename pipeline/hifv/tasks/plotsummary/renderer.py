@@ -14,6 +14,7 @@ import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.utils as utils
 from pipeline.h.tasks.common.displays import applycal as applycal
 from . import display as plotsummarydisplay
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = logging.get_logger(__name__)
 
@@ -24,6 +25,7 @@ class T2_4MDetailsplotsummaryRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
         super(T2_4MDetailsplotsummaryRenderer, self).__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
+    @profile_io(output_file="plotsummary_io_log.csv")
     def update_mako_context(self, ctx, context, results_list):
         weblog_dir = os.path.join(context.report_dir,
                                   'stage%s' % results_list.stage_number)

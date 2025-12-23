@@ -13,7 +13,7 @@ from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import task_registry
 from pipeline.infrastructure import utils
-
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -143,6 +143,7 @@ class Solint(basetask.StandardTaskTemplate):
     """
     Inputs = SolintInputs
 
+    @profile_io(output_file="solint_io_log.csv")
     def prepare(self):
         """Bulk of task execution occurs here.
 
@@ -193,6 +194,7 @@ class Solint(basetask.StandardTaskTemplate):
                              short_solint=short_solint, new_gain_solint1=new_gain_solint1, vis=vis,
                              bpdgain_touse=bpdgain_touse, integration_time=integration_time)
 
+    @profile_io(output_file="solint_io_log.csv")
     def analyse(self, results):
         """Determine the best parameters by analysing the given jobs before returning any final jobs to execute.
 

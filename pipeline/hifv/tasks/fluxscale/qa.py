@@ -9,6 +9,7 @@ import pipeline.qa.scorecalculator as qacalc
 from . import Fluxboot
 from . import FluxbootResults
 from . import solint
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = logging.get_logger(__name__)
 
@@ -18,6 +19,7 @@ class SolintQAHandler(pqa.QAPlugin):
     child_cls = None
     generating_task = solint.Solint
 
+    @profile_io(output_file="solint_io_log.csv")
     def handle(self, context, result):
 
         # Check for existence of the the target MS.
@@ -57,6 +59,7 @@ class FluxbootQAHandler(pqa.QAPlugin):
     child_cls = None
     generating_task = Fluxboot
 
+    @profile_io(output_file="fluxboot_io_log.csv")
     def handle(self, context, result):
         # Get a QA score based on RMS of the residuals per receiver band and source
 

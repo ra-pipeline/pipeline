@@ -6,6 +6,7 @@ import pipeline.infrastructure.renderer.basetemplates as basetemplates
 from pipeline.infrastructure import casa_tools
 
 from . import display as pbcorimages
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = logging.get_logger(__name__)
 
@@ -17,6 +18,7 @@ class T2_4MDetailsMakepbcorimagesRenderer(basetemplates.T2_4MDetailsDefaultRende
         super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
+    @profile_io(output_file="pbcor_io_log.csv")
     def update_mako_context(self, ctx, context, results):
         weblog_dir = os.path.join(context.report_dir,
                                   'stage%s' % results.stage_number)

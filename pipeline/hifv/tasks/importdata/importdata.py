@@ -13,6 +13,7 @@ import pipeline.infrastructure.vdp as vdp
 from pipeline.hifv.heuristics.vlascanheuristics import VLAScanHeuristics
 from pipeline.hifv.heuristics.specline_detect import detect_spectral_lines
 from pipeline.infrastructure import casa_tasks, casa_tools, task_registry
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -232,6 +233,7 @@ class VLAImportDataResults(basetask.Results):
 class SerialVLAImportData(importdata.ImportData):
     Inputs = VLAImportDataInputs
 
+    @profile_io(output_file="importdata_io_log.csv")
     def prepare(self, **parameters):
         # get results object by running super.prepare()
         results = super().prepare()

@@ -9,6 +9,7 @@ from pipeline.hif.tasks import applycal
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import task_registry
 from pipeline.infrastructure import utils
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -105,6 +106,7 @@ class Applycals(applycal.SerialIFApplycal):
     # Note this is a temporary workaround
     antenna_to_apply = '*&*'
 
+    @profile_io(output_file="applycals_io_log.csv")
     def prepare(self):
 
         # Run applycal
@@ -112,6 +114,7 @@ class Applycals(applycal.SerialIFApplycal):
 
         return applycal_results
 
+    @profile_io(output_file="applycals_io_log.csv")
     def analyse(self, results):
         return results
 

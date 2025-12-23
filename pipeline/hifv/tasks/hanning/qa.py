@@ -7,6 +7,7 @@ import pipeline.infrastructure.pipelineqa as pqa
 from pipeline import infrastructure
 from pipeline.infrastructure import utils
 from . import hanning
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -20,6 +21,7 @@ class HanningQAHandler(pqa.QAPlugin):
     child_cls = None
     generating_task = hanning.Hanning
 
+    @profile_io(output_file="hanning_io_log.csv")
     def handle(self, context: Context, result: Results) -> None:
         # Check if the hanningsmooth task was successful or not
         score1 = self._task_success(result.task_successful, result.qa_message)

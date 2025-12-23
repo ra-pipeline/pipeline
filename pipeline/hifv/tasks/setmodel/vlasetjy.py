@@ -14,7 +14,7 @@ from pipeline.hifv.heuristics import standard
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import task_registry
-
+from pipeline.infrastructure.utils.profiling import profile_io
 # Paper
 # http://iopscience.iop.org/article/10.1088/0067-0049/204/2/19/pdf
 
@@ -337,6 +337,7 @@ class VLASetjyInputs(vdp.StandardInputs):
 class VLASetjy(basetask.StandardTaskTemplate):
     Inputs = VLASetjyInputs
 
+    @profile_io(output_file="setjy_io_log.csv")
     def prepare(self):
         inputs = self.inputs
         result = commonfluxresults.FluxCalibrationResults(vis=inputs.vis)
@@ -471,5 +472,6 @@ class VLASetjy(basetask.StandardTaskTemplate):
 
         return result
 
+    @profile_io(output_file="setjy_io_log.csv")
     def analyse(self, result):
         return result

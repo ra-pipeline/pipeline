@@ -9,6 +9,7 @@ from pipeline import infrastructure
 from pipeline.domain.measures import FrequencyUnits
 from pipeline.infrastructure import basetask, casa_tasks, casa_tools, task_registry, vdp
 from pipeline.infrastructure.utils import conversion, find_ranges
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -119,6 +120,7 @@ class Hanning(basetask.StandardTaskTemplate):
     """
     Inputs = HanningInputs
 
+    @profile_io(output_file="hanning_io_log.csv")
     def prepare(self) -> HanningResults:
         """Method where the hanning smoothing operation is executed.
 
@@ -209,6 +211,7 @@ class Hanning(basetask.StandardTaskTemplate):
 
         return HanningResults(task_successful=task_successful, qa_message=qa_message, smoothed_spws=smoothing_dict)
 
+    @profile_io(output_file="hanning_io_log.csv")
     def analyse(self, results: Results) -> Results:
         """Determine the best parameters by analysing the given jobs before returning any final jobs to execute.
 

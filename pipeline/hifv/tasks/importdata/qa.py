@@ -7,6 +7,7 @@ from pipeline import infrastructure
 from pipeline.infrastructure import utils
 from pipeline.h.tasks.importdata import qa as hqa
 from . import importdata
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -16,6 +17,7 @@ class VLAImportDataQAHandler(hqa.ImportDataQAHandler, pqa.QAPlugin):
     child_cls = None
     generating_task = importdata.SerialVLAImportData
 
+    @profile_io(output_file="importdata_io_log.csv")
     def handle(self, context, result):
         score1 = self._check_intents(result.mses)
         score2 = self._check_history_column(result.mses, result.inputs)

@@ -11,6 +11,7 @@ from pipeline.hifv.heuristics import set_add_model_column_parameters
 from pipeline.infrastructure import (casa_tasks, casa_tools, task_registry,
                                      utils)
 from pipeline.infrastructure.contfilehandler import contfile_to_spwsel
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -84,6 +85,7 @@ class StatwtResults(basetask.Results):
 class Statwt(basetask.StandardTaskTemplate):
     Inputs = StatwtInputs
 
+    @profile_io(output_file="statwt_io_log.csv")
     def prepare(self):
 
         if self.inputs.datacolumn == 'residual_data':
@@ -119,6 +121,7 @@ class Statwt(basetask.StandardTaskTemplate):
 
         return StatwtResults(jobs=[statwt_result], flag_summaries=flag_summaries, wtables=wtables)
 
+    @profile_io(output_file="statwt_io_log.csv")
     def analyse(self, results):
         return results
 

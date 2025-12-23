@@ -19,7 +19,7 @@ from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import task_registry
 from pipeline.domain.measures import FrequencyUnits
-
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -158,6 +158,7 @@ class FluxbootResults(basetask.Results):
 class Fluxboot(basetask.StandardTaskTemplate):
     Inputs = FluxbootInputs
 
+    @profile_io(output_file="fluxboot_io_log.csv")
     def prepare(self):
 
         m = self.inputs.context.observing_run.get_ms(self.inputs.vis)
@@ -187,6 +188,7 @@ class Fluxboot(basetask.StandardTaskTemplate):
                                spindex_results=spindex_results, vis=vis, caltable=caltable,
                                fluxscale_result=fluxscale_result)
 
+    @profile_io(output_file="fluxboot_io_log.csv")
     def analyse(self, results):
         return results
 

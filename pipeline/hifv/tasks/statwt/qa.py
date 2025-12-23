@@ -9,6 +9,7 @@ from pipeline.infrastructure.renderer import rendererutils
 import pipeline.qa.scorecalculator as qacalc
 
 from . import statwt
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = logging.get_logger(__name__)
 
@@ -27,6 +28,7 @@ class StatwtQAHandler(pqa.QAPlugin):
         above_threshold = np.any(weights > threshold)
         return above_threshold
 
+    @profile_io(output_file="statwt_io_log.csv")
     def handle(self, context, result):
         vis = result.inputs['vis']
 

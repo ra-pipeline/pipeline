@@ -9,6 +9,7 @@ import pipeline.infrastructure.renderer.weblog as weblog
 import pipeline.infrastructure.utils as utils
 from . import fluxbootdisplay
 from . import testgainsdisplay
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = logging.get_logger(__name__)
 
@@ -80,6 +81,7 @@ class T2_4MDetailsSolintRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         super(T2_4MDetailsSolintRenderer, self).__init__(uri=uri,
                                                          description=description, always_rerender=always_rerender)
 
+    @profile_io(output_file="solint_io_log.csv")
     def get_display_context(self, context, results):
         super_cls = super(T2_4MDetailsSolintRenderer, self)
         ctx = super_cls.get_display_context(context, results)
@@ -179,6 +181,7 @@ class T2_4MDetailsfluxbootRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         super(T2_4MDetailsfluxbootRenderer, self).__init__(uri=uri,
                                                            description=description, always_rerender=always_rerender)
 
+    @profile_io(output_file="fluxboot_io_log.csv")
     def get_display_context(self, context, results):
         super_cls = super(T2_4MDetailsfluxbootRenderer, self)
         ctx = super_cls.get_display_context(context, results)

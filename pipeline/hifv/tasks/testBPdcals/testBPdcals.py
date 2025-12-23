@@ -16,7 +16,7 @@ from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import task_registry
 from pipeline.infrastructure import utils
 from pipeline.hifv.heuristics import getBCalStatistics
-
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -167,6 +167,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
     """
     Inputs = testBPdcalsInputs
 
+    @profile_io(output_file="testbpdcals_io_log.csv")
     def prepare(self):
         """Bulk of task execution occurs here.
 
@@ -307,6 +308,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
         """
         return results
 
+    @profile_io(output_file="testbpdcals_io_log.csv")
     def _do_testBPdcals(self, band: str, spwlist: List[str]):
         """Execute testBPdcals heuristics per band and spwlist
 

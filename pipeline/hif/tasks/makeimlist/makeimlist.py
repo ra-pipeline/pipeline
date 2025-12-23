@@ -17,6 +17,8 @@ from pipeline.infrastructure import casa_tools, task_registry
 
 from .cleantarget import CleanTarget, CleanTargetInfo
 from .resultobjects import MakeImListResult
+from pipeline.infrastructure.utils.profiling import profile_io
+
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -381,6 +383,7 @@ class MakeImList(basetask.StandardTaskTemplate):
 
     is_multi_vis_task = True
 
+    @profile_io(output_file="imlist_io_log.csv")
     def prepare(self):
         # this python class will produce a list of images to be calculated.
         inputs = self.inputs
@@ -1611,6 +1614,7 @@ class MakeImList(basetask.StandardTaskTemplate):
 
         return result
 
+    @profile_io(output_file="imlist_io_log.csv")
     def analyse(self, result):
         return result
 

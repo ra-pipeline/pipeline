@@ -22,7 +22,7 @@ from pipeline.infrastructure import task_registry
 from casatasks.private.correct_ant_posns_evla import correct_ant_posns_evla as correct_ant_posns
 from . import resultobjects
 from . import vlaantpos
-
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -109,6 +109,7 @@ class Priorcals(basetask.StandardTaskTemplate):
     """
     Inputs = PriorcalsInputs
 
+    @profile_io(output_file="priorcals_io_log.csv")
     def prepare(self):
 
         callist = []
@@ -133,6 +134,7 @@ class Priorcals(basetask.StandardTaskTemplate):
                                               antpos_result=antpos_result, antcorrect=antcorrect,
                                               tecmaps_result=tecmaps_result, sw_result=sw_result)
 
+    @profile_io(output_file="priorcals_io_log.csv")
     def analyse(self, results):
         return results
 

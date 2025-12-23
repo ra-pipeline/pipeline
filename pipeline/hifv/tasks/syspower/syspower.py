@@ -14,6 +14,7 @@ import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import task_registry
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -186,6 +187,7 @@ class SyspowerInputs(vdp.StandardInputs):
 class Syspower(basetask.StandardTaskTemplate):
     Inputs = SyspowerInputs
 
+    @profile_io(output_file="syspower_io_log.csv")
     def prepare(self):
         m = self.inputs.context.observing_run.get_ms(self.inputs.vis)
 
@@ -651,6 +653,7 @@ class Syspower(basetask.StandardTaskTemplate):
                                clip_sp_template=clip_sp_template, template_table=template_table,
                                band_baseband_spw=band_baseband_spw, plotrq=temprq)
 
+    @profile_io(output_file="syspower_io_log.csv")
     def analyse(self, results):
         return results
 

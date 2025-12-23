@@ -3,6 +3,7 @@ import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
 from pipeline.infrastructure import casa_tasks, task_registry
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -44,6 +45,7 @@ class Pbcor(basetask.StandardTaskTemplate):
 
     is_multi_vis_task = True
 
+    @profile_io(output_file="pbcor_io_log.csv")
     def prepare(self):
 
         sci_imlist = self.inputs.context.sciimlist.get_imlist()

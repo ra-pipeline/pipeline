@@ -9,6 +9,7 @@ import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.utils as utils
 from . import displaycheckflag
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = logging.get_logger(__name__)
 
@@ -22,6 +23,7 @@ class T2_4MDetailsFlagDeterVLARenderer(basetemplates.T2_4MDetailsDefaultRenderer
 
         super().__init__(uri=uri, description=description, always_rerender=always_rerender)
 
+    @profile_io(output_file="flagdata_io_log.csv")
     def get_display_context(self, context, result):
         ctx = super().get_display_context(context, result)
 
@@ -111,6 +113,7 @@ class T2_4MDetailscheckflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                  always_rerender=False):
         super().__init__(uri=uri, description=description, always_rerender=always_rerender)
 
+    @profile_io(output_file="checkflag_io_log.csv")
     def get_display_context(self, context, results):
         ctx = super().get_display_context(context, results)
 

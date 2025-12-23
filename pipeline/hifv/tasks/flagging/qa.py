@@ -8,6 +8,7 @@ import pipeline.qa.scorecalculator as qacalc
 from . import checkflag
 from . import targetflag
 from . import flagdetervla
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = logging.get_logger(__name__)
 
@@ -55,6 +56,7 @@ class FlagdataQAHandler(pqa.QAPlugin):
     child_cls = None
     generating_task = flagdetervla.FlagDeterVLA
 
+    @profile_io(output_file="flagdata_io_log.csv")
     def handle(self, context, result):
         vis = result.inputs['vis']
         ms = context.observing_run.get_ms(vis)
@@ -82,6 +84,7 @@ class CheckflagQAHandler(pqa.QAPlugin):
     child_cls = None
     generating_task = checkflag.Checkflag
 
+    @profile_io(output_file="checkflag_io_log.csv")
     def handle(self, context, result):
         # get a QA score for flagging
         # < 5%   of data flagged  --> 1

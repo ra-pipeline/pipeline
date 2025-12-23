@@ -13,6 +13,7 @@ import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.utils as utils
 from pipeline.hif.tasks.setmodel import display as setjy_display
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = logging.get_logger(__name__)
 
@@ -24,6 +25,7 @@ class T2_4MDetailsVLASetjyRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         super(T2_4MDetailsVLASetjyRenderer, self).__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
+    @profile_io(output_file="setjy_io_log.csv")
     def update_mako_context(self, ctx, context, result):
         amp_vs_uv_summary_plots = collections.defaultdict(list)
         for intents in ['AMPLITUDE']:

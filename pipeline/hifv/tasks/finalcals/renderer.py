@@ -11,7 +11,7 @@ import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.utils as utils
 from pipeline.h.tasks.common.displays import applycal
 from pipeline.hifv.tasks.common.renderer import renderer as baseRenderer
-
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = logging.get_logger(__name__)
 
@@ -22,6 +22,7 @@ class T2_4MDetailsfinalcalsRenderer(baseRenderer.calsRenderer):
         super().__init__(uri=uri, description=description,
                          always_rerender=always_rerender, taskname="finalcals")
 
+    @profile_io(output_file="finalcals_io_log.csv")
     def get_display_context(self, context, results):
         ctx = super().get_display_context(context, results)
         return ctx
@@ -34,6 +35,7 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
         super(T2_4MDetailsVLAApplycalRenderer, self).__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
+    @profile_io(output_file="applycals_io_log.csv")
     def update_mako_context(self, ctx, context, result):
         weblog_dir = os.path.join(context.report_dir,
                                   'stage%s' % result.stage_number)

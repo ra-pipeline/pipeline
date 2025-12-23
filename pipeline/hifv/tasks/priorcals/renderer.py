@@ -13,6 +13,7 @@ import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.renderer.weblog as weblog
 from . import opacitiesdisplay
 from . import swpowdisplay
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = logging.get_logger(__name__)
 
@@ -50,6 +51,7 @@ class VLASubPlotRenderer(object):
                 self.json = json_file.readlines()[0]
         else:
             self.json = '{}'
+
 
     def _get_display_context(self):
         return {'pcontext': self.context,
@@ -94,6 +96,7 @@ class T2_4MDetailspriorcalsRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                                                             description=description,
                                                             always_rerender=always_rerender)
 
+    @profile_io(output_file="priorcals_io_log.csv")
     def get_display_context(self, context, results):
         super_cls = super(T2_4MDetailspriorcalsRenderer, self)
         ctx = super_cls.get_display_context(context, results)

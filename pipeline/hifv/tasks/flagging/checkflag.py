@@ -12,6 +12,7 @@ from pipeline.infrastructure import (casa_tasks, casa_tools, task_registry,
 from pipeline.infrastructure.contfilehandler import contfile_to_spwsel
 
 from .displaycheckflag import checkflagSummaryChart
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -116,6 +117,7 @@ class CheckflagResults(basetask.Results):
 class Checkflag(basetask.StandardTaskTemplate):
     Inputs = CheckflagInputs
 
+    @profile_io(output_file="checkflag_io_log.csv")
     def prepare(self):
 
         LOG.info("Checkflag task: {}".format(repr(self.inputs.checkflagmode)))
@@ -251,6 +253,7 @@ class Checkflag(basetask.StandardTaskTemplate):
 
         return checkflag_result
 
+    @profile_io(output_file="checkflag_io_log.csv")
     def analyse(self, results):
         return results
 

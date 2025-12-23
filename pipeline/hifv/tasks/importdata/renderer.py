@@ -3,6 +3,7 @@ import operator
 
 from pipeline import infrastructure
 from pipeline.infrastructure.renderer import basetemplates, rendererutils
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -14,6 +15,7 @@ class T2_4MDetailsVLAImportDataRenderer(basetemplates.T2_4MDetailsDefaultRendere
         super(T2_4MDetailsVLAImportDataRenderer, self).__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
+    @profile_io(output_file="importdata_io_log.csv")
     def get_display_context(self, context, result):
         super_cls = super(T2_4MDetailsVLAImportDataRenderer, self)        
         ctx = super_cls.get_display_context(context, result)

@@ -6,6 +6,7 @@ from pipeline import infrastructure
 from pipeline.h.tasks.common import commonfluxresults
 from pipeline.infrastructure import casa_tasks
 from . import vlasetjy
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -15,6 +16,7 @@ class VLASetjyQAHandler(pqa.QAPlugin):
     child_cls = None
     generating_task = vlasetjy.VLASetjy
 
+    @profile_io(output_file="setjy_io_log.csv")
     def handle(self, context, result):
         vis = result.inputs['vis']
         _, standard_source_fields = vlasetjy.standard_sources(vis)

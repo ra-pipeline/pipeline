@@ -6,6 +6,7 @@ import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as qacalc
 from . import plotsummary
+from pipeline.infrastructure.utils.profiling import profile_io
 
 LOG = logging.get_logger(__name__)
 
@@ -15,6 +16,7 @@ class PlotSummaryQAHandler(pqa.QAPlugin):
     child_cls = None
     generating_task = plotsummary.PlotSummary
 
+    @profile_io(output_file="plotsummary_io_log.csv")
     def handle(self, context, result):
         # Check for existence of the the target MS.
         score1 = self._ms_exists(os.path.dirname(result.inputs['vis']), os.path.basename(result.inputs['vis']))
