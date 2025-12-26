@@ -691,7 +691,7 @@ def format_spwmap(spwmap, scispws):
 		Receiver: ${utils.commafy(plot.parameters['receiver'], quotes=False)}<br>
 		Spw: ${plot.parameters['spw']}<br>
 		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
-		Fields: ${html.escape(plot.parameters['field'], True)}
+		Field: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
 	<%def name="caption_title(plot)">
