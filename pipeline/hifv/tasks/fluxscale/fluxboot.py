@@ -18,6 +18,7 @@ from pipeline.hifv.tasks.setmodel.vlasetjy import standard_sources
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import task_registry
+from pipeline.infrastructure.cachehandler.vla_cachehandler import VLA_CacheHandler
 from pipeline.domain.measures import FrequencyUnits
 
 
@@ -279,11 +280,17 @@ class Fluxboot(basetask.StandardTaskTemplate):
             refantfield = self.inputs.context.evla['msinfo'][m.name].calibrator_field_select_string
             # PIPE-595: if refant list is not provided, compute refants else use provided refant list.
             if len(self.inputs.refant) == 0:
+                """
                 refantobj = findrefant.RefAntHeuristics(vis=calMs, field=refantfield,
                                                         geometry=True, flagging=True, intent='',
                                                         spw='', refantignore=refantignore)
 
                 RefAntOutput = refantobj.calculate()
+                """
+                # PIPE-2873: cache and reuse similar casa calls
+                RefAntOutput = VLA_CacheHandler.compute_refant_output(vis=calMs, field=refantfield,
+                                                       geometry=True, flagging=True, intent='',
+                                                       spw='', refantignore=refantignore)
             else:
                 RefAntOutput = self.inputs.refant.split(",")
 
