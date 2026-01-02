@@ -5,6 +5,7 @@ import numpy
 
 import pipeline.infrastructure.logging as logging
 from pipeline.infrastructure import casa_tools
+from pipeline.infrastructure.cachehandler.vla_cachehandler import VLA_CacheHandler
 
 # the logger for this module
 LOG = logging.get_logger(__name__)
@@ -185,10 +186,20 @@ def buildscans(msfile, scd):
     # print 'Found '+str(ndd)+' DataDescription IDs'
     #
     # The SPECTRAL_WINDOW table
+    """
     with casa_tools.TableReader(msfile + '/SPECTRAL_WINDOW') as table:
         nchanarr=table.getcol("NUM_CHAN")
         spwnamearr=table.getcol("NAME")
         reffreqarr=table.getcol("REF_FREQUENCY")
+    """
+
+    # PIPE-2873: reading the column for the first time and using cached column on next call
+    tblname = msfile + '/SPECTRAL_WINDOW'
+    cols = VLA_CacheHandler.get_columndata(tblname, ['NUM_CHAN', 'NAME', 'REF_FREQUENCY'])
+    nchanarr = cols['NUM_CHAN']
+    spwnamearr = cols['NAME']
+    reffreqarr = cols['REF_FREQUENCY']
+
     nspw = len(nchanarr)
     spwlookup = {}
     for isp in range(nspw):

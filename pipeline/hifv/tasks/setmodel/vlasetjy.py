@@ -14,6 +14,7 @@ from pipeline.hifv.heuristics import standard
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import task_registry
+from pipeline.infrastructure.cachehandler.vla_cachehandler import VLA_CacheHandler
 
 # Paper
 # http://iopscience.iop.org/article/10.1088/0067-0049/204/2/19/pdf
@@ -369,13 +370,19 @@ class VLASetjy(basetask.StandardTaskTemplate):
         field_spws = m.get_vla_field_spws()
         spw2band = m.get_vla_spw2band()
         # bands = spw2band.values()
-
+        """
         # Look in spectral window domain object as this information already exists!
         with casa_tools.TableReader(self.inputs.vis + '/SPECTRAL_WINDOW') as table:
             channels = table.getcol('NUM_CHAN')
             originalBBClist = table.getcol('BBC_NO')
             spw_bandwidths = table.getcol('TOTAL_BANDWIDTH')
             reference_frequencies = table.getcol('REF_FREQUENCY')
+        """
+        # PIPE-2873: reading the column for the first time and using cached column on next call
+        tblname = str(self.inputs.vis) + '/SPECTRAL_WINDOW'
+        cols = VLA_CacheHandler.get_columndata(tblname, ['TOTAL_BANDWIDTH', 'REF_FREQUENCY'])
+        spw_bandwidths = cols['TOTAL_BANDWIDTH']
+        reference_frequencies = cols['REF_FREQUENCY']
 
         center_frequencies = [rf + spwbw / 2 for rf, spwbw in zip(reference_frequencies, spw_bandwidths)]
 

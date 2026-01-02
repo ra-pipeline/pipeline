@@ -74,7 +74,7 @@ from pipeline.h.tasks.flagging import flagdeterbase
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import task_registry
-
+from pipeline.infrastructure.cachehandler.vla_cachehandler import VLA_CacheHandler
 # ------------------------------------------------------------------------------
 
 # Initialize a logger
@@ -664,11 +664,21 @@ class FlagDeterVLA(flagdeterbase.FlagDeterBase):
 
         # Determination of baseband taken from original EVLA scripted pipeline
         # -----MS info script part
+        """
         with casa_tools.TableReader(self.inputs.vis + '/SPECTRAL_WINDOW') as table:
             reference_frequencies = table.getcol('REF_FREQUENCY')  # spwobj.ref_frequency
             spw_bandwidths = table.getcol('TOTAL_BANDWIDTH')  # spwobj.bandwidth
             originalBBClist = table.getcol('BBC_NO')  # spwobj.baseband
             channels = table.getcol('NUM_CHAN')  # spwobj.num_channels
+        """
+
+        tblname = str(self.inputs.vis) + '/SPECTRAL_WINDOW'
+        # PIPE-2873: reading the column for the first time and using cached column on next call
+        cols = VLA_CacheHandler.get_columndata(tblname, ['TOTAL_BANDWIDTH', 'REF_FREQUENCY', 'BBC_NO', 'NUM_CHAN'])
+        reference_frequencies = cols['REF_FREQUENCY']
+        spw_bandwidths = cols['TOTAL_BANDWIDTH']
+        originalBBClist = cols['BBC_NO']
+        channels = cols['NUM_CHAN']
 
         sorted_indices = reference_frequencies.argsort()
         sorted_frequencies = reference_frequencies[sorted_indices]

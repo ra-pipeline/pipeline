@@ -17,6 +17,7 @@ from pipeline import infrastructure
 from pipeline.domain import measures, spectralwindow
 from pipeline.infrastructure import casa_tools, tablereader, utils
 from pipeline.infrastructure.launcher import current_task_name
+from pipeline.infrastructure.cachehandler.vla_cachehandler import VLA_CacheHandler
 
 if TYPE_CHECKING:
     from pipeline.domain import Antenna, AntennaArray, DataDescription, DataType, Field, Polarization, Scan, State
@@ -1044,6 +1045,12 @@ class MeasurementSet:
         with casa_tools.TableReader(vis+'/SPECTRAL_WINDOW') as table:
             channels = table.getcol('NUM_CHAN')
 
+        """
+        # PIPE-2873: reading the column for the first time and using cached column on next call
+        tblname = str(vis) + '/SPECTRAL_WINDOW'
+        cols = VLA_CacheHandler.get_columndata(tblname, ['NUM_CHAN'])
+        channels = cols['NUM_CHAN']
+        """
         return channels
 
     def get_vla_tst_bpass_spw(self, spwlist=[]):

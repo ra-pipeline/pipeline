@@ -1,7 +1,7 @@
 from . import CacheHandler
 from functools import lru_cache
 
-import pipeline.hif.heuristics.findrefant as findrefant
+from pipeline.infrastructure import casa_tools
 
 
 class VLA_CacheHandler(CacheHandler):
@@ -13,9 +13,13 @@ class VLA_CacheHandler(CacheHandler):
         pass
 
     @staticmethod
-    @lru_cache(maxsize=128)
+    @lru_cache(maxsize=16)
     def compute_refant_output(vis, field, spw, intent, geometry, flagging, refantignore=None):
         """Compute and cache the reference antenna output."""
+
+        # import is done here to avoid importing
+        # 'MeasurementSet' from partially initialized module
+        import pipeline.hif.heuristics.findrefant as findrefant
 
         refantobj = findrefant.RefAntHeuristics(
             vis=vis,
@@ -27,3 +31,26 @@ class VLA_CacheHandler(CacheHandler):
             refantignore=refantignore
         )
         return refantobj.calculate()
+
+    @staticmethod
+    @lru_cache(maxsize=128)
+    def _read_single_column(table_path, column):
+        """Read and cache a single column from disk."""
+        with casa_tools.TableReader(table_path) as table:
+            data = table.getcol(column)
+            return data
+
+    @classmethod
+    def get_columndata(cls, table_path, columns):
+        """
+        Return one or more columns.
+        Each column is read individually and cached automatically.
+        """
+        if isinstance(columns, str):
+            columns = [columns]
+
+        result = {}
+        for col in columns:
+            # Each column read will use lru_cache
+            result[col] = cls._read_single_column(table_path, col)
+        return result
