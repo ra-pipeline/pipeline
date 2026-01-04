@@ -211,11 +211,17 @@ class Finalcals(basetask.StandardTaskTemplate):
         refantfield = self.inputs.context.evla['msinfo'][m.name].calibrator_field_select_string
         # PIPE-595: if refant list is not provided, compute refants else use provided refant list.
         if len(self.inputs.refant) == 0:
+            """
             refantobj = findrefant.RefAntHeuristics(vis=self.inputs.vis, field=refantfield,
                                                     geometry=True, flagging=True, intent='',
                                                     spw='', refantignore=refantignore)
 
             RefAntOutput = refantobj.calculate()
+            """
+            # PIPE-2873: cache and reuse similar casa calls
+            RefAntOutput = VLA_CacheHandler.compute_refant_output(vis=self.inputs.vis, field=refantfield,
+                                                                  geometry=True, flagging=True, intent='',
+                                                                  spw='', refantignore=refantignore)
         else:
             RefAntOutput = self.inputs.refant.split(",")
 
