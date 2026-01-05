@@ -11,6 +11,7 @@ import pipeline.infrastructure.filenamer as filenamer
 from pipeline.infrastructure import casa_tasks, casa_tools
 from pipeline.infrastructure.tablereader import find_EVLA_band
 import pipeline.infrastructure.utils as utils
+from pipeline.infrastructure.cachehandler.vla_cachehandler import VLA_CacheHandler
 
 from .auto_selfcal.selfcal_helpers import estimate_near_field_SNR, estimate_SNR
 from .imageparams_base import ImageParamsHeuristics
@@ -730,8 +731,10 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         repr_source = target_sources[0]
 
         # Determine least flagged spectral window
-        job = casa_tasks.flagdata(vis=repr_ms.name, field=utils.fieldname_for_casa(repr_source), mode='summary')
-        flag_stats = job.execute()
+        # job = casa_tasks.flagdata(vis=repr_ms.name, field=utils.fieldname_for_casa(repr_source), mode='summary')
+        # flag_stats = job.execute()
+        # check defaults for other parameters
+        flag_stats = VLA_CacheHandler.run_flagdata(vis=repr_ms.name, field=utils.fieldname_for_casa(repr_source), mode='summary')
         flag_stats_spw = flag_stats['spw']
 
         spw_flagfrac = {

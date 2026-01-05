@@ -38,6 +38,7 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.vdp as vdp
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
+from pipeline.infrastructure.cachehandler.vla_cachehandler import VLA_CacheHandler
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -864,6 +865,7 @@ class RefAntFlagging:
 
     def _get_good(self, intent: str) -> Dict[str, float]:
         # Update April 2015 to use the flagging task instead of the agent flagger
+        """
         task_args = {'vis'          : self.vis,
                      'mode'         : 'summary',
                      'field'        : self.field,
@@ -874,7 +876,9 @@ class RefAntFlagging:
                      'savepars'     : False}
         task = casa_tasks.flagdata(**task_args)
         result = task.execute()
-
+        """
+        result = VLA_CacheHandler.run_flagdata(vis=self.vis, mode='summary',
+                                               field=self.field, spw=self.spw, intent=intent, display='', flagbackup=False, savepars=False)
         # Calculate the number of good data for each antenna and return them
         good = dict()
         try:

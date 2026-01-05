@@ -1,7 +1,7 @@
 from . import CacheHandler
 from functools import lru_cache
 
-from pipeline.infrastructure import casa_tools
+from pipeline.infrastructure import casa_tools, casa_tasks
 
 
 class VLA_CacheHandler(CacheHandler):
@@ -11,6 +11,21 @@ class VLA_CacheHandler(CacheHandler):
     """
     def __init__(self):
         pass
+
+    @staticmethod
+    @lru_cache(maxsize=64)
+    def run_flagdata(vis, mode='', field='', spw='', intent='', display='', flagbackup=False, savepars=False):
+        task_args = {'vis': vis,
+                     'mode': mode,
+                     'field': field,
+                     'spw': spw,
+                     'intent': intent,
+                     'display': display,
+                     'flagbackup': flagbackup,
+                     'savepars': savepars}
+        task = casa_tasks.flagdata(**task_args)
+        result = task.execute()
+        return result
 
     @staticmethod
     @lru_cache(maxsize=16)
