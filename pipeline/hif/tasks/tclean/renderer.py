@@ -691,6 +691,14 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         extra_logrecords_handler.addFilter(missing_png_filter)
         logging.add_handler(extra_logrecords_handler)
 
+        imaging_mode = None
+        plots = []
+        plots_dict = {}
+        final_rows = []
+        chk_fit_rows = []
+        pol_fit_rows = []
+        pol_fit_plots = []
+
         try:
             plotter = display.CleanSummary(context, makeimages_result, image_stats)
             plots = plotter.plot()
@@ -736,7 +744,6 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             ]
             tab_links = triadwise([renderer.path if renderer else None for renderer in tab_renderer])
 
-            final_rows = []
             for row, renderer, qa_urls, tab_url in zip(image_rows, qa_renderers, qa_links, tab_links):
 
                 # PIPE-2668: "prefix" is the top-level key in `plots_dict`, derived from plot wrapper objects
@@ -822,15 +829,13 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             if final_rows and 'VLA' in final_rows[0].result.imaging_mode:
                 final_rows.sort(key=lambda row: (row.vis, row.datatype, row.field, utils.natural_sort_key(row.spw), row.pol))
 
-            chk_fit_rows = []
             for row in final_rows:
                 if row.frequency is not None:
                     chk_fit_rows.append((row.vis, row.fieldname, row.spw, row.aggregate_bw_num, row.chk_pos_offset, row.chk_frac_beam_offset, row.chk_fitflux,
                                         row.img_snr, row.chk_fitpeak_fitflux_ratio, row.chk_gfluxscale, row.chk_gfluxscale_snr, row.chk_fitflux_gfluxscale_ratio))
             chk_fit_rows = utils.merge_td_columns(chk_fit_rows, num_to_merge=2)
 
-            pol_fit_rows = []
-            pol_fit_plots = []
+
             for row in final_rows:
                 if row.pol == 'I':
                     # Save only once for weblog because the fit is the same for all Stokes parameters
