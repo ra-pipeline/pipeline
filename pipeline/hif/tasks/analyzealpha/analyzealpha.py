@@ -31,12 +31,7 @@ class AnalyzealphaInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
-
-            vis: List of visisbility  data files. These may be ASDMs, tar files of ASDMs, MSs, or tar files of MSs, If ASDM files are specified, they will be
-                converted  to MS format.
-
-                Example: vis=['X227.ms', 'asdms.tar.gz']
+            context: Pipeline context object containing state information.
 
             image: Restored subimage
 

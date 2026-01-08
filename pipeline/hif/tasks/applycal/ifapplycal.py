@@ -25,45 +25,45 @@ class IFApplycalInputs(applycal.ApplycalInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
 
             vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets in the pipeline context.
 
-                Example: ['X227.ms']
+                Example: ``['X227.ms']``
 
             field: A string containing the list of field names or field ids to which the calibration will be applied. Defaults to all fields in the pipeline
                 context.
 
-                Example: '3C279', '3C279, M82'
+                Examples: ``'3C279'``, ``'3C279, M82'``
 
             spw: The list of spectral windows and channels to which the calibration will be applied. Defaults to all science windows in the pipeline
                 context.
 
-                Example: '17', '11, 15'
+                Examples: ``'17'``, ``'11, 15'``
 
             antenna: The selection of antennas to which the calibration will be applied. Defaults to all antennas. Not currently supported.
 
             intent: A string containing the list of intents against which the selected fields will be matched. Defaults to all supported intents
                 in the pipeline context.
 
-                Example: `'*TARGET*'`
+                Example: ``'*TARGET*'``
 
             parang: Apply parallactic angle correction
 
-            applymode: Calibration apply mode
+            applymode: Calibration apply mode. Options:
 
-                - 'calflag': calibrate data and apply flags from solutions
-                - 'calflagstrict': (default) same as above except flag spws for which calibration is
+                - ``'calflag'``: calibrate data and apply flags from solutions
+                - ``'calflagstrict'``: (default) same as above except flag spws for which calibration is
                   unavailable in one or more tables (instead of allowing them to pass
                   uncalibrated and unflagged)
-                - 'trial': report on flags from solutions, dataset entirely unchanged
-                - 'flagonly': apply flags from solutions only, data not calibrated
-                - 'flagonlystrict': same as above except flag spws for which calibration is
+                - ``'trial'``: report on flags from solutions, dataset entirely unchanged
+                - ``'flagonly'``: apply flags from solutions only, data not calibrated
+                - ``'flagonlystrict'``: same as above except flag spws for which calibration is
                   unavailable in one or more tables
-                - 'calonly': calibrate data only, flags from solutions NOT applied
+                - ``'calonly'``: calibrate data only, flags from solutions **not** applied
 
             calwt: Calibrate the weights as well as the data
 
@@ -74,8 +74,10 @@ class IFApplycalInputs(applycal.ApplycalInputs):
             flagdetailedsum: Compute detailed before and after flagging statistics summaries. Parameter available only when if flagsum is True.
 
             parallel: Process multiple MeasurementSets in parallel using the casampi parallelization framework.
-                options: 'automatic', 'true', 'false', True, False
-                default: None (equivalent to False)
+
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``None`` (equivalent to ``False``)
         """
         super().__init__(context, output_dir=output_dir, vis=vis, field=field, spw=spw,
                          antenna=antenna, intent=intent, parang=parang, applymode=applymode,

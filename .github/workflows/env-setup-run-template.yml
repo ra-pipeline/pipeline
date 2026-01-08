@@ -1,0 +1,119 @@
+name: "Template: Environment Setup and Run"
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        description: "Operating System to run on"
+        required: false
+        default: "ubuntu-latest"
+        type: string
+      pip_install:
+        description: "pip install command after environment setup"
+        required: false
+        default: "."
+        type: string
+      test_data:
+        description: "Type of test data to checkout (e.g., 'unit')"
+        required: false
+        default: "none"
+        type: string
+      run_command:
+        description: "Bash commands to run after setup"
+        required: true
+        type: string
+      artifact_name:
+        description: "Name of the artifact to upload"
+        required: false
+        type: string
+      artifact_path:
+        description: "Path of files to upload"
+        required: false
+        type: string
+
+jobs:
+  run-in-env:
+    name: Run in Pipeline Env
+    runs-on: ${{ inputs.os }}
+    defaults:
+      run:
+        # Crucial: Enforce the shell that activates Conda
+        shell: bash -el {0}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup Mamba/Conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          activate-environment: pipeline
+          environment-file: environment.yml
+          channel-priority: strict
+          use-only-tar-bz2: true
+          miniforge-version: latest
+          use-mamba: true
+
+      - name: Install System Dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            git xvfb
+
+      - name: Install System Dependencies (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          # GH macOS runners use Homebrew for package management          
+          brew install git
+          # Note: xvfb is X11 specific. macOS usually doesn't need it for headless browsers,
+          # or requires XQuartz (brew install --cask xquartz) if you specifically need X11.          
+          brew install --cask xquartz
+
+      - name: Install Python Package
+        if: inputs.pip_install != ''
+        run: |
+          python -m pip install ${{ inputs.pip_install }}
+          mkdir -p ~/.casa/data
+
+      - name: Get latest testdata commit hash
+        id: testdata-commit
+        if: inputs.test_data == 'unit'
+        shell: bash
+        run: |
+          # Get the latest commit hash from the remote repository's default branch
+          # This will be used as part of the cache key.
+          echo "sha=$(git ls-remote https://open-bitbucket.nrao.edu/scm/pipe/pipeline-testdata.git HEAD | awk '{ print $1 }')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pipeline-testdata
+        if: inputs.test_data == 'unit'
+        uses: actions/cache@v4
+        id: cache-testdata
+        with:
+          path: pipeline-testdata
+          key: testdata-${{ runner.os }}-${{ steps.testdata-commit.outputs.sha }}
+
+      - name: Checkout and LFS pull test data
+        if: inputs.test_data == 'unit' && steps.cache-testdata.outputs.cache-hit != 'true'
+        run: |
+          # This creates the directory 'pipeline-testdata' INSIDE the current workspace ($GITHUB_WORKSPACE)
+          git clone --filter=blob:none --sparse https://open-bitbucket.nrao.edu/scm/pipe/pipeline-testdata.git pipeline-testdata
+          cd pipeline-testdata
+          # Configure sparse checkout & Pull LFS files
+          git sparse-checkout set pl-unittest
+          git lfs pull
+
+      - name: Execute Custom Commands
+        run: ${{ inputs.run_command }}
+
+      - name: Upload Artifacts
+        if: inputs.artifact_name != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ inputs.artifact_path }}
+          if-no-files-found: warn

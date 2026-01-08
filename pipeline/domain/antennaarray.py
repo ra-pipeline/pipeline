@@ -1,16 +1,15 @@
 import collections
 import itertools
 import math
+import warnings
 from typing import Sequence
 
 import numpy
 
 from pipeline.infrastructure import casa_tools
-from . import measures, Antenna
-from .measures import Distance, DistanceUnits
-from .. import infrastructure
 
-LOG = infrastructure.get_logger(__name__)
+from . import Antenna, measures
+from .measures import Distance, DistanceUnits
 
 Baseline = collections.namedtuple('Baseline', 'antenna1 antenna2 length')
 
@@ -167,7 +166,9 @@ class AntennaArray(object):
     @property
     def baselines(self) -> list[Baseline]:
         """Return a list of Baseline tuples for all antennas in the array."""
-        LOG.warning('Deprecated: AntennaArray.baselines is deprecated. Use AntennaArray.baselines_m instead')
+        warnings.warn('AntennaArray.baselines is deprecated. '
+                      'Use AntennaArray.baselines_m instead.',
+                      category=DeprecationWarning, stacklevel=2)
         return self._baselines
 
     @staticmethod

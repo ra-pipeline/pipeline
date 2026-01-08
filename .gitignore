@@ -72,14 +72,18 @@ instance/
 
 # Sphinx documentation
 docs/_build/**
-docs/source/_apidoc/**
 docs/source/_autosummary/**
-docs/source/_taskdocs/**
+docs/source/_automodapi/**
 
-# CASA log files
-casa-*.log
+# CASA/Pipeline log files
+**/casa-*.log
 docs/casa-*.log
 docs/source/casa-*.log
+*.last
+**/casacalls-*.txt
+
+# Slurm
+**/*.out
 
 # PyBuilder
 target/
@@ -164,3 +168,34 @@ tags
 
 # ignore _version.py, created by setup.py
 _version.py
+
+# auto-generated recipe scripts (any .py files except __init__.py and recipe_converter*.py)
+pipeline/recipes/python_recipes
+docs/source/references/pipeline-resolved.bib
+
+**/.DS_Store
+
+# Ruff cache
+.ruff_cache
+
+# data etc.
+**/*.zarr
+**/*.ms
+**/*.tar
+**/*.zip
+**/*.fits
+**/*.im
+**/*.image
+**/*.model
+**/*.residual
+**/*.mask
+**/*.pbcor
+**/*.sumwt
+**/*.flux
+**/*.weight
+**/*.sigma
+**/*.cube
+**/*.moment
+**/*.moment0
+**/*.moment1
+**/*.moment2

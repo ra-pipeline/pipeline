@@ -38,7 +38,7 @@ Citations (from .bib)
 --------------------
 
 References relevant to CASA and Pipeline:
-:cite:`Raba:2019aa` and :cite:`Emonts:2019ab`
+:cite:`2020ASPC..527..271R`, :cite:`2020ASPC..527..267E`, :cite:`2023PASP..135g4501H`
 
 
 .. bibliography::

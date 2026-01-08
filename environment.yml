@@ -1,0 +1,27 @@
+name: pipeline
+
+channels:
+  - conda-forge
+
+dependencies:
+  - conda-ecosystem-user-package-isolation
+  - python=3.12
+  - ipython
+  - pip
+  - openmpi
+  - mpi4py
+  - certifi
+  - sqlite=3.49 # required by myst_nb; higher versions have library mismatch issues.
+  - poppler # required by PL
+  - imagemagick # required by PL
+  - pandoc # required by nbsphinx; not 'pandoc' Python library from PyPI
+  - pip:
+      - --extra-index-url https://casa-pip.nrao.edu/repository/pypi-group/simple
+      - casashell==6.7.3.*
+        # casatools/casatasks/numpy etc. will be installed as indirect dependencies
+      - casampi
+      - protobuf~=3.20 # casatplotms still requires ver<=3.20 currently
+        # https://casadocs.readthedocs.io/en/stable/notebooks/introduction.html#Known-Issues
+      - casaplotms
+      - casaplotserver
+      - -r requirements.txt

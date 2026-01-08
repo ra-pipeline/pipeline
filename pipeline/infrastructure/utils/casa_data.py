@@ -23,11 +23,11 @@ __all__ = [
     "from_mjd_to_datetime"
 ]
 
-# PIPE-1845: as of CASA ver6.5.4, CASA/setjy use ctsys.resolve() to search calibrator models,
-# which is based the precedence list affected by the CASA/config.py:datapath variable.
-# On the other hand, casatools uses the path return ctsys.rundata() to look for essential
-# CASA runtime data (e.g. IERS tables). Therefore Pipeline uses the same methods used by casatools
-# casataks to search/examine the in-used data file version/modefication time.
+# PIPE-1845: as of CASA version 6.5.4, CASA/setjy uses ctsys.resolve() to search for calibrator models. 
+# This search is influenced by the precedence list defined in CASA/config.py via the datapath variable. 
+# Meanwhile, casatools uses the path returned by ctsys.rundata() to locate essential CASA runtime data 
+# (e.g., IERS tables). Therefore, the Pipeline adopts the same methods used by casatools and casatasks 
+# to search for and examine the in-use data file's version and modification time.
 SOLAR_SYSTEM_MODELS_PATH = casa_tools.utils.resolve('alma/SolarSystemModels')
 IERS_TABLES_PATH = os.path.join(casa_tools.utils.rundata(), 'geodetic')
 

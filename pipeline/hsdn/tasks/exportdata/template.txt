@@ -220,7 +220,7 @@ if Do_MakeImages:
                         cell=cell,
                         phasecenter=phasecenter,
                         restfreq=rest_frequencies[spwID],
-                        stokes='pseudoI',
+                        stokes='I',
                         overwrite=Overwrite_Products,
                         brightnessunit='K'
                     )

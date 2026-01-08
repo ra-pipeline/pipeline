@@ -7,11 +7,6 @@ import xml.dom.minidom as minidom
 
 from . import recipe_converter
 
-# Skip all tests for the time being because PIPE-1684 removed all task
-# XML files which were the source of type information for the recipe
-# converter. To be re-enabled once the recipe converter and the CLI
-# files have been ported to a new setup in a future ticket.
-pytestmark = pytest.mark.skip
 
 def helper_get_document(xml_string):
     return minidom.parseString(xml_string)
@@ -72,7 +67,7 @@ def test_get_element(xml_string, tag_name, expected):
         ('<a><b>data</b></a>', AttributeError),
     ]
 )
-def test_get_element(xml_string, expected):
+def test_get_data(xml_string, expected):
     """Test get_data."""
     # Element
     dom_node = helper_get_root_element(xml_string, 'a')
@@ -112,150 +107,13 @@ def test_parse_parameter(xml_string, expected):
 @pytest.mark.parametrize(
     'xml_string, expected',
     [
-        ('<root><task><shortdescription>do something</shortdescription></task></root>', 'do something'),
-        ('<root><shortdescription>do something</shortdescription></root>', StopIteration),
-    ]
-)
-def test_get_short_description(xml_string, expected):
-    """Test get_short_description."""
-    for dom_node in helper_generate_document_and_element(xml_string, 'root'):
-        if isinstance(expected, type) and issubclass(expected, Exception):
-            with pytest.raises(expected):
-                desc = recipe_converter.get_short_description(dom_node)
-        elif isinstance(expected, str):
-            desc = recipe_converter.get_short_description(dom_node)
-            assert isinstance(desc, str)
-            assert desc == expected
-        else:
-            pytest.fail('Should not reach here')
-
-
-@pytest.mark.parametrize(
-    'xml_string, expected',
-    [
-        # ERROR: name attribute is missing
-        ('<param type="string"><value></value></param>', AssertionError),
-        # ERROR: type attribute is missing
-        ('<param name="spw"><value></value></param>', AssertionError),
-        ('<param name="spw" type="string"><value></value></param>', ('string', [])),
-        # any/variant without subtype is acceptable (although not practical)
-        ('<param name="spw" type="any"><value></value></param>', ('any', [])),
-        ('<param name="spw" type="variant"><value></value></param>', ('variant', [])),
-        # subtype specification
-        ('<param name="spw" type="any"><type>string</type><type>int</type><value></value></param>', ('any', ['string', 'int'])),
-        ('<param name="spw" type="variant"><type>string</type><type>int</type><value></value></param>', ('variant', ['string', 'int'])),
-        ('<param name="spw" type="any"><any limittype="string int"></any><value></value></param>', ('any', ['string', 'int'])),
-        ('<param name="spw" type="any"><any limittypes="string int"></any><value></value></param>', ('any', ['string', 'int'])),
-        ('<param name="spw" type="variant"><any limittype="string int"></any><value></value></param>', ('variant', ['string', 'int'])),
-        ('<param name="spw" type="variant"><any limittypes="string int"></any><value></value></param>', ('variant', ['string', 'int'])),
-    ]
-)
-def test_get_parameter_type(xml_string, expected):
-    """Test get_parameter_type."""
-    # Element
-    dom_node = helper_get_root_element(xml_string, 'param')
-    if isinstance(expected, type) and issubclass(expected, Exception):
-        with pytest.raises(expected):
-            data = recipe_converter.get_parameter_type(dom_node)
-    elif isinstance(expected, tuple):
-        data = recipe_converter.get_parameter_type(dom_node)
-        print(data)
-        assert isinstance(data, tuple)
-        assert len(data) == 2
-        assert data[0] == expected[0]
-        assert data[1] == expected[1]
-    else:
-        pytest.fail('Should not reach here.')
-
-    # Document (always raise AttributeError)
-    dom_node = helper_get_document(xml_string)
-    with pytest.raises(AttributeError):
-        data = recipe_converter.get_parameter_type(dom_node)
-
-
-@pytest.mark.parametrize(
-    'xml_string, expected',
-    [
-        # no desired node exists
-        ('<task><shortdescription>do something</shortdescription></task>', {}),
-        # desired node exists but in the wrong place
-        ('<task><param name="spw" type="string"><value></value></param></task>', {}),
-        # expected structure
-        ('<task><input><param name="spw" type="string"><value></value></param></input></task>', {'spw': ('string', [])}),
-        (
-            '<task><input><param name="vis" type="string"></param><param name="spw" type="any"><type>string</type><type>int</type><value></value></param></input></task>',
-            {'vis': ('string', []), 'spw': ('any', ['string', 'int'])}
-        ),
-    ]
-)
-def test_get_param_types(xml_string, expected):
-    """Test get_param_types."""
-    for dom_node in helper_generate_document_and_element(xml_string, 'task'):
-        if isinstance(expected, type) and issubclass(expected, Exception):
-            with pytest.raises(expected):
-                desc = recipe_converter.get_param_types(dom_node)
-        elif isinstance(expected, dict):
-            desc = recipe_converter.get_param_types(dom_node)
-            print(desc)
-            assert isinstance(desc, dict)
-            assert len(desc) == len(expected)
-            for k, v in desc.items():
-                assert k in expected
-                ref = expected[k]
-                assert isinstance(v, tuple)
-                assert len(v) == 2
-                assert v[0] == ref[0]
-                assert v[1] == ref[1]
-        else:
-            pytest.fail('Should not reach here')
-
-
-@pytest.mark.parametrize(
-    'task_name, expected',
-    [
-        # valid task
-        ('h_save', {'comment': 'not_tested', 'parameter_types': {'filename': ('string', [])}}),
-        # breakpoint
-        ('breakpoint', {}),
-        # invalid task
-        ('hsd_notexist', AssertionError),
-    ]
-)
-def test_get_task_property(task_name, expected):
-    """Test get_task_property."""
-    if isinstance(expected, type) and issubclass(expected, Exception):
-        # error case
-        with pytest.raises(expected):
-            prop = recipe_converter.get_task_property(task_name)
-    elif isinstance(expected, dict):
-        prop = recipe_converter.get_task_property(task_name)
-        assert isinstance(prop, dict)
-        assert len(prop) == len(expected)
-        for key in expected.keys():
-            assert key in prop
-
-        if 'parameter_types' in expected:
-            types = prop['parameter_types']
-            assert isinstance(types, dict)
-            for k, v in expected['parameter_types'].items():
-                assert k in types
-                t = types[k]
-                assert isinstance(t, tuple)
-                assert len(t) == 2
-                assert t[0] == v[0]
-                assert t[1] == v[1]
-
-
-@pytest.mark.parametrize(
-    'xml_string, expected',
-    [
         # valid Command with default parameters
         (
             '<ProcessingCommand>' \
             '<Command>h_save</Command>' \
             '<ParameterSet></ParameterSet>' \
             '</ProcessingCommand>',
-            {'h_save': {'comment': 'not_tested', 'parameter': {}, 'parameter_types': {'not_tested': None}}}
+            {'h_save': {'comment': 'not_tested', 'parameter': {}}}
         ),
         # valid Command with custom parameters
         (
@@ -265,7 +123,7 @@ def test_get_task_property(task_name, expected):
             '<Parameter><Keyword>filename</Keyword><Value>output.context</Value></Parameter>' \
             '</ParameterSet>' \
             '</ProcessingCommand>',
-            {'h_save': {'comment': 'not_tested', 'parameter': {'filename': 'output.context'}, 'parameter_types': {'not_tested': None}}}
+            {'h_save': {'comment': 'not_tested', 'parameter': {'filename': 'output.context'}}}
         ),
         # breakpoint
         (
@@ -326,7 +184,7 @@ def test_parse_command(xml_string, expected):
             '<ProcedureTitle>h_test</ProcedureTitle>' \
             '<ProcessingCommand><Command>h_save</Command><ParameterSet></ParameterSet></ProcessingCommand>' \
             '</ProcessingProcedure>',
-            ('h_test', [{'h_save': {'comment': 'not_tested', 'parameter': {}, 'parameter_types': {'not_tested': None}}}])
+            ('h_test', [{'h_save': {'comment': 'not_tested', 'parameter': {}}}])
         )
     ]
 )
@@ -400,10 +258,9 @@ def test_get_comment(task_name, config, expected):
         (
             'hsd_baseline',
             {
-                'parameter': {'pstr': 'strval', 'pint': '3', 'pany': '0'},
-                'parameter_types': {'pstr': ('string', []), 'pint': ('int', []), 'pany': ('any', ['string', 'int'])}
+                'parameter': {'pstr': 'strval', 'pint': '3'}
             },
-            '        hsd_baseline(pstr=\'strval\', pint=3, pany=\'0\')'
+            '        hsd_baseline(pstr=\'strval\', pint=3)'
         ),
         # importdata tasks
         (
@@ -414,8 +271,6 @@ def test_get_comment(task_name, config, expected):
             '        if importonly:\n' \
             '            raise Exception(IMPORT_ONLY)'
         ),
-        # ERROR: invalid config
-        ('hsd_baseline', {}, KeyError),
     ]
 )
 def test_get_execution_command(task_name, config, expected):
@@ -505,7 +360,7 @@ def test_export(plotlevel_summary, init_args):
     with tempfile.NamedTemporaryFile('w+') as f:
         outfile = f.name
         recipe_converter.export(
-            func_name=func_name,
+            recipe_name=func_name,
             commands=task_property_list,
             script_name=outfile,
             plotlevel_summary=plotlevel_summary

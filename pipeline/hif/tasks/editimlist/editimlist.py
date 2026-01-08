@@ -197,22 +197,27 @@ class EditimlistInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
-                Defaults to None, which corresponds to the current working directory.
+
+                Default: ``None``, corresponds to the current working directory.
 
             vis: List of input visibility files.
 
             search_radius_arcsec: Size of the field finding beam search radius in arcsec.
 
-            cell: Image X and Y cell size(s) with units or pixels per beam. Single value same for both. '<number>ppb' for pixels per beam.
-                Compute cell size based on the UV coverage of all the fields
-                to be imaged and use a 5 pix per beam sampling.
-                The pix per beam specification uses the above default cell size
-                ('5ppb') and scales it accordingly.
+            cell: Image cell size(s) in X and Y, specified in angular units or pixels per beam.
 
-                Example: ['0.5arcsec', '0.5arcsec'] '3ppb'
+                - A single value applies to both axes.
+
+                - Use the format ``'<number>ppb'`` to specify pixels per beam.
+
+                By default, the cell size is computed from the UV coverage of all fields to be imaged,
+                assuming a sampling of 5 pixels per beam, i.e., `'5ppb'``. When using the pixels-per-beam format
+                (e.g., ``'3ppb'``), the cell size is scaled accordingly.
+
+                Examples: ``['0.5arcsec', '0.5arcsec']``, ``'3ppb'``
 
             cfcache: Convolution function cache directory name
 
@@ -224,9 +229,9 @@ class EditimlistInputs(vdp.StandardInputs):
 
             nmajor: Controls the maximum number of major cycles to evaluate.
 
-            datatype: Data type(s) to image. The default '' selects the best available data type (e.g. selfcal over regcal) with
+            datatype: Data type(s) to image. The default ``''`` selects the best available data type (e.g. selfcal over regcal) with
                 an automatic fallback to the next available data type.
-                With the ``datatype`` parameter of 'regcal' or 'selfcal', one
+                With the ``datatype`` parameter of ``'regcal'`` or ``'selfcal'``, one
                 can force the use of only given data type(s).
                 Note that this parameter is only for non-VLASS data when the datacolumn
                 is not explictly set by user or imaging heuristics.
@@ -235,7 +240,7 @@ class EditimlistInputs(vdp.StandardInputs):
 
             deconvolver: Minor cycle algorithm (multiscale or mtmfs)
 
-            editmode: The edit mode of the task ('add' or 'replace'). Defaults to 'add'.
+            editmode: The edit mode of the task (``'add'`` or ``'replace'``). Defaults to ``'add'``.
 
             field: Set of data selection field names or ids.
 
@@ -243,7 +248,7 @@ class EditimlistInputs(vdp.StandardInputs):
 
             imagename: Prefix for output image names.
 
-            imsize: Image X and Y size(s) in pixels or PB level (single fields), '' for default. Single value same for both. '<number>pb' for PB level.
+            imsize: Image X and Y size(s) in pixels or PB level (single fields), ``''`` for default. Single value same for both. ``'<number>pb'`` for PB level.
 
             intent: Set of data selection intents
 
@@ -251,11 +256,13 @@ class EditimlistInputs(vdp.StandardInputs):
 
             mask: Used to declare whether to use a predefined mask for tclean.
 
-            pbmask: Used to declare primary beam gain level for cleaning with primary beam mask (usemask='pb'), used only for VLASS-SE-CONT imaging mode.
+            pbmask: Used to declare primary beam gain level for cleaning with primary beam mask (``usemask='pb'``), used only for VLASS-SE-CONT imaging mode.
 
             nbin: Channel binning factor.
 
-            nchan: Number of channels, -1 = all
+            nchan: Number of channels,
+
+                Default: ``-1``, which means all channels.
 
             niter: The max total number of minor cycle iterations allowed for tclean
 
@@ -267,7 +274,7 @@ class EditimlistInputs(vdp.StandardInputs):
 
             phasecenter: The default phase center is set to the mean of the field directions of all fields that are to be image together.
 
-                Example: 0, 'J2000 19h30m00 -40d00m00'
+                Example: ``0``, ``'J2000 19h30m00 -40d00m00'``
 
             reffreq: Reference frequency of the output image coordinate system
 
@@ -277,13 +284,13 @@ class EditimlistInputs(vdp.StandardInputs):
 
             scales: The scales for multi-scale imaging.
 
-            specmode: Spectral gridding type (mfs, cont, cube, '' for default)
+            specmode: Spectral gridding type. Options: ``'mfs'``, ``'cont'``, ``'cube'``, ``''``.
 
-            spw: Set of data selection spectral window/channels, '' for all
+            spw: Set of data selection spectral window/channels, ``''`` for all
 
             start: First channel for frequency mode images. Starts at first input channel of the spw.
 
-                Example: '22.3GHz'
+                Example: ``'22.3GHz'``
 
             stokes: Stokes Planes to make
 
@@ -293,7 +300,7 @@ class EditimlistInputs(vdp.StandardInputs):
 
             uvtaper: Used to set a uv-taper during clean.
 
-            uvrange: Set of data selection uv ranges, '' for all.
+            uvrange: Set of data selection uv ranges, ``''`` for all.
 
             width: Channel width
 
@@ -301,22 +308,35 @@ class EditimlistInputs(vdp.StandardInputs):
 
             clean_no_mask_selfcal_image:
 
-            vlass_plane_reject_ms: Only used for the 'VLASS-SE-CUBE' imaging mode. default: True If True, reject VLASS Coarse Cube planes with high flagging percentages (see the heuristics details below)
-                If False, do not perform flagging-based VLASS Coarse Cube plane rejection.
-                If the input value is a dictionary, the plane rejection heuristics will be performed with custom thresholds.
-                The optional keys are:
+            vlass_plane_reject_ms (bool or dict, optional): Control VLASS Coarse Cube plane
+                rejection based on flagging percentages. Only applies to the ``'VLASS-SE-CUBE'``
+                imaging mode.
 
-                - exclude_spw, default: ''
-                  Spectral windows to be excluded from the VLASS Coarse Cube plane rejection consideration, i.e. always preserve.
-                - flagpct_thresh, default: 0.9
-                  Flagging percentage threshold per field for the plane rejection.
-                - nfield_thresh: default: 12
-                  A minimal number of fields above the flagging percentage threshold is required for the plane rejection.
+                Default is ``True``, which automatically rejects planes with high flagging
+                percentages using built-in heuristics (see details below).
+
+                Options:
+
+                - ``True``: Enable automatic plane rejection with default thresholds.
+
+                - ``False``: Disable flagging-based plane rejection entirely.
+
+                - ``dict``: Enable plane rejection with custom threshold parameters.
+
+                When providing a dictionary, supported keys are:
+
+                - ``exclude_spw`` (str, default ``''``): Comma-separated list of spectral
+                windows to exclude from rejection consideration (always preserved).
+
+                - ``flagpct_thresh`` (float, default ``0.9``): Flagging percentage threshold
+                per field for triggering plane rejection.
+
+                - ``nfield_thresh`` (int, default ``12``): Minimum number of fields that must
+                exceed the flagging threshold before rejecting the plane.
 
             cycleniter_final_image_nomask:
 
         """
-
         super().__init__()
         self.context = context
         self.output_dir = output_dir
@@ -661,6 +681,7 @@ class Editimlist(basetask.StandardTaskTemplate):
         if fieldnames:
             imlist_entry['field'] = fieldnames[0]
         else:
+            # only used for VLASS imaging modes where fieldnames is empty
             if imlist_entry['phasecenter'] not in ['', None]:
                 # TODO: remove the dependency on cell size being in arcsec
 
@@ -671,10 +692,18 @@ class Editimlist(basetask.StandardTaskTemplate):
                 imlist_entry['cell'] = imlist_entry['cell'].strip('[').strip(']')
                 imlist_entry['cell'] = imlist_entry['cell'].replace("'", '')
                 imlist_entry['cell'] = imlist_entry['cell'].replace('"', '')
-                # We always search for fields in 1sq degree with a surrounding buffer
-                mosaic_side_arcsec = 3600  # 1 degree
-                dist = (mosaic_side_arcsec / 2.) + float(buffer_arcsec)
-                dist_arcsec = str(dist) + 'arcsec'
+
+                cutout_imsize = inpdict.get('cutout_imsize', None)
+                if cutout_imsize is not None:
+                    imlist_entry['imsize'], dist_arcsec = th.imaging_imsize(
+                        cutout_imsize, imlist_entry['cell'], largest_primary_beam)
+                    imlist_entry['misc_vlass'] = (imlist_entry['misc_vlass'] or {}) | {'cutout_imsize': cutout_imsize}
+                else:
+                    # We always search for fields in 1sq degree with a surrounding buffer
+                    mosaic_side_arcsec = 3600  # 1 degree
+                    dist = (mosaic_side_arcsec / 2.) + float(buffer_arcsec)
+                    dist_arcsec = str(dist) + 'arcsec'
+
                 LOG.info("{k} = {v}".format(k='dist_arcsec', v=dist_arcsec))
 
                 # PIPE-1948/PIPE-2004: we updated the field select algorithm for VLASS-PL2023.

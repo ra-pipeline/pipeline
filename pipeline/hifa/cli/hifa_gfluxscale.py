@@ -1,14 +1,12 @@
-import sys
-
 import pipeline.h.cli.utils as utils
 
 
 # docstring and type hints: inherits from hifa.tasks.fluxscale.gcorfluxscale.GcorFluxscaleInputs.__init__
 @utils.cli_wrapper
 def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, transintent=None, refspwmap=None,
-                    reffile=None, phaseupsolint=None, solint=None, minsnr=None, refant=None, hm_resolvecals=None,
+                    reffile=None, phaseupsolint=None, solint=None, minsnr=None, refant=None, hm_resolvedcals=None,
                     antenna=None, peak_fraction=None, amp_outlier_sigma=None, parallel=None):
-    """Derive flux density scales from standard calibrators
+    """Derive flux density scales from standard calibrators.
 
     Derive flux densities for point source transfer calibrators using flux models
     for reference calibrators.
@@ -17,7 +15,7 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
 
     - computing phase-up solutions for all the science spectral windows
       using the calibrator data selected by the ``reference`` and ``refintent``
-      parameters and the ``transfer`` and ``transintent`` parameters, with 
+      parameters and the ``transfer`` and ``transintent`` parameters, with
       solint and gaintype parameters, and spw mapping or combination as
       determined in hifa_spwphaseup. If no solint is defined, ``phaseupsolint``
       is used (default = 'int').
@@ -52,7 +50,7 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
     that longer solint, an optimal phaseup will not be able to be calculated,
     and this also results in an artificial increase in amplitudes because
     the amplitude gains compensate for the uncorrected decorrelation.
-    
+
 
     Returns:
         The results object for the pipeline task is returned.
@@ -64,24 +62,3 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
         >>> hifa_gfluxscale()
 
     """
-    ##########################################################################
-    #                                                                        #
-    #  CASA task interface boilerplate code starts here. No edits should be  #
-    #  needed beyond this point.                                             #
-    #                                                                        #
-    ##########################################################################
-
-    # create a dictionary containing all the arguments given in the
-    # constructor
-    all_inputs = vars()
-
-    # get the name of this function for the weblog, eg. 'hif_flagdata'
-    task_name = sys._getframe().f_code.co_name
-
-    # get the context on which this task operates
-    context = utils.get_context()
-
-    # execute the task
-    results = utils.execute_task(context, task_name, all_inputs)
-
-    return results

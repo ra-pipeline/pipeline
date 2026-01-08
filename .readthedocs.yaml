@@ -1,0 +1,26 @@
+version: 2
+
+# Build tools and environment setup
+build:
+  os: ubuntu-24.04
+  tools:
+    python: miniconda-latest # use miniconda-latest before miniforge3 becomes available.
+  apt_packages:
+    - git
+    - xvfb
+    - imagemagick
+    - poppler-utils
+    - latexmk
+    - texlive-latex-recommended
+    - texlive-latex-extra
+    - texlive-fonts-recommended
+  # Build commands for HTML and PDF
+  commands:
+    - conda env update --file=environment.yml
+    - conda run -n pipeline python -m pip install .[docs]
+    - mkdir -p ~/.casa/data
+    - cd docs && conda run -n pipeline make html_docs
+    - cd docs && conda run -n pipeline make latexpdf
+    - mkdir --parents _readthedocs/html/ _readthedocs/pdf/
+    - cp --recursive docs/_build/html/* _readthedocs/html/
+    - cp --recursive docs/_build/latex/*.pdf _readthedocs/pdf/

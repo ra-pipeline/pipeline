@@ -1,8 +1,4 @@
-"""
-The utils module contains general-purpose uncategorised utility functions and
-classes.
-"""
-# Do not evaluate type annotations at definition time.
+"""general-purpose uncategorised utility functions and classes."""
 from __future__ import annotations
 
 import ast
@@ -28,15 +24,14 @@ from collections.abc import Iterable
 from datetime import datetime
 from functools import wraps
 from numbers import Number
-from typing import (Any, Callable, Collection, Dict, List, Optional, Sequence,
-                    Tuple, TYPE_CHECKING, Union, Iterator, TextIO)
+from typing import (TYPE_CHECKING, Any, Callable, Collection, Dict, Iterator,
+                    List, Optional, Sequence, TextIO, Tuple, Union)
 from urllib.parse import urlparse
 
-import casaplotms
 import numpy as np
 import numpy.typing as npt
 
-from .. import casa_tools, logging, mpihelpers
+from .. import casa_tools, logging
 from .conversion import commafy, dequote, range_to_list
 
 if TYPE_CHECKING:
@@ -48,6 +43,7 @@ __all__ = [
     'absolute_path',
     'approx_equal',
     'are_equal',
+    'clear_time_cache',
     'deduplicate',
     'dict_merge',
     'ensure_products_dir_exists',
@@ -58,7 +54,6 @@ __all__ = [
     'find_ranges',
     'flagged_intervals',
     'get_casa_quantity',
-    'get_casa_session_details',
     'get_field_identifiers',
     'get_obj_size',
     'get_products_dir',
@@ -79,8 +74,6 @@ __all__ = [
     'place_repr_source_first',
     'relative_path',
     'remove_trailing_string',
-    'request_omp_threading',
-    'shutdown_plotms',
     'string_to_val',
     'validate_url'
 ]
@@ -508,54 +501,6 @@ def place_repr_source_first(itemlist: Union[List[str], List[Tuple]], repr_source
     return itemlist
 
 
-def shutdown_plotms():
-    """Shutdown the existing plotms process in the current CASA session.
-
-    This utility function shuts down the persist plotms process in the current CASA session, so the next plotms call
-    can start from a new proc. It's implemented as a short-term workaround for two plotms behaviors due to the persistent
-    state of plotms once it's called in a CASA session.
-        1. a plotms process always uses the initial working directory to construct the output plot path when the
-           figure name is specified as a relative path (see CAS-13626), even after the working directory has changed
-           in the Python perspective.
-        2. a plotms process always uses the same casa logfile when it was started for its logging, even after
-           the casa log file location has been altered.
-
-    Note: This function follows the practice illustrated inside casaplotms.private.plotmstool.__stub_check()
-    """
-    plotmstool = casaplotms.plotmstool
-
-    if plotmstool.__proc is not None:
-        plotmstool.__proc.kill()
-        _, _ = plotmstool.__proc.communicate()
-        plotmstool.__proc = None
-        plotmstool.__stub = None
-        plotmstool.__uri = None
-
-
-def get_casa_session_details():
-    """Get the current CASA session details.
-
-    return a dictionary including the following keys:
-        casa_dir: the root directory of the monolithic CASA distribution.
-        omp_num_threads: the number of OpenMP threads in the current parallel region.
-        data_path: CASA data paths in-use.
-        numa_mem: memory properties from the NUMA software perspective.
-        numa_cpu: cpu properties from the NUMA software perspective.
-            The above CPU/mem properties might be different from the hardware specs obtained from
-            standard Python functions (e.g. os.cpu_count()) or pipeline.environment.
-            On the difference between the "software" and hardware nodes, see
-                https://www.kernel.org/doc/html/latest/vm/numa.html
-    """
-    casa_session_details = casa_tools.utils.hostinfo()
-    casa_session_details['casa_dir'] = casa_tools.utils.getrc()
-    casa_session_details['omp_num_threads'] = casa_tools.casalog.ompGetNumThreads()
-    casa_session_details['data_path'] = casa_tools.utils.defaultpath()
-    casa_session_details['numa_cpu'] = casa_session_details.pop('cpus')
-    casa_session_details['numa_mem'] = casa_session_details.pop('memory')
-
-    return casa_session_details
-
-
 def get_taskhistory_fromimage(imagename: str):
     """Retrieve past CASA/tclean() call parameters from the image history.
 
@@ -591,38 +536,47 @@ def get_taskhistory_fromimage(imagename: str):
     return taskhistory_list
 
 
-def get_obj_size(obj, serialize=True):
+def get_obj_size(obj: Any, serialize: bool = True) -> int:
     """Estimate the size of a Python object.
 
-    If serialize=True, the size of a serialized object is returned. Note that this is NOT the
-    same as the object size in memory.
+    If serialize is True, returns the size of the serialized object. Note that this is NOT
+    the same as the object size in memory.
 
-    When serialize=False, the memory consumption of the object is returned via
-    the asizeof method of Pympler.:
-        pympler.asizeof.asizeof(obj) # https://pypi.org/project/Pympler
-    An alternative is the get_deep_size() function from objsize.
-        objsize.get_deep_size(obj)   # https://pypi.org/project/objsize
+    When serialize is False, returns the memory consumption of the object via the asizeof
+    method of Pympler (https://pypi.org/project/Pympler).
+    An alternative is the get_deep_size() function from objsize (https://pypi.org/project/objsize).
+
+    The serialization-based approach was a fallback solution for the issues described in PIPE-1698/PIPE-2877.
+    The `asize.py` bug described in PIPE-2877 remain unresolved as of Pympler ver 1.1.
+
+    See the GH issues for details and PIPE-1698 and PIPE-2877 for background:
+        https://github.com/pympler/pympler/issues/155
+        https://github.com/pympler/pympler/issues/151
+
+    Args:
+        obj: The Python object to measure.
+        serialize: If True, measure serialized size; if False, measure memory size using Pympler.
+
+    Returns:
+        The size of the object in bytes.
+
+    Raises:
+        Exception: If serialize is False and Pympler is not installed.
     """
-
     if serialize:
         return len(pickle.dumps(obj, protocol=-1))
-    else:
-        try:
-            from pympler.asizeof import asizeof
-
-            # PIPE-1698: a workaround for NumPy-related issues with the recent Pympler/asizeof versions
-            # see https://github.com/pympler/pympler/issues/155
-            _ = asizeof(np.str_())
-        except ImportError as err:
-            LOG.debug('Import error: {!s}'.format(err))
-            raise Exception(
-                "Pympler/asizeof is not installed, which is required to run get_obj_size(obj, serialize=False).")
+    try:
+        from pympler.asizeof import asizeof
         return asizeof(obj)
+    except ImportError as err:
+        LOG.debug('Pympler import failed: %s', err)
+        raise ModuleNotFoundError(
+            'Pympler is required for in-memory size calculation. Please install it with: pip install pympler'
+        ) from err
 
 
 def glob_ordered(pattern: str, *args, order: Optional[str] = None, **kwargs) -> List[str]:
     """Return a sorted list of paths matching a pathname pattern."""
-
     path_list = glob.glob(pattern, *args, **kwargs)
 
     if order == 'mtime':
@@ -711,79 +665,6 @@ def ignore_pointing(vis):
                     shutil.rmtree(ms+'/POINTING')
                 LOG.info(f'restore the pointing table for {ms}')
                 shutil.move(ms+'/POINTING_ORIGIN', ms+'/POINTING')
-
-
-@contextlib.contextmanager
-def request_omp_threading(num_threads=None):
-    """A context manager to override the session-wise OMP threading setting on CASA MPI client.
-
-    This function is intended to improve certain CASAtask/tool call performance on the MPI client by
-    temporarily turning on OpenMP threading while the MPI servers are idle. This feature will only
-    take effect under restricted circumstances to avoid competing with the MPI server processes from
-    the tier0 or tier1 parallelization.
-
-    This function can be used as both a decorator and context manager. For example:
-
-        @request_omp_threading(4)
-        def do_something():
-            ...
-        or,
-        with request_omp_threading(4):
-            immoments(..)
-
-    Note: please use it with caution and examine the computing resource allocation circumstance
-    carefully at the execution point.
-    """
-
-    session_num_threads = casa_tools.casalog.ompGetNumThreads()
-    LOG.debug('session_num_threads = {!s}'.format(session_num_threads))
-    is_mpi_ready = mpihelpers.is_mpi_ready()  # return True if MPI is ready and we are on the MPI client.
-
-    num_threads_limits = []
-
-    # this is generally inherited from cgroup, but might be sub-optimal (too large) for high core-count
-    # workstations when cgroup limit is not applied.
-    casa_num_cpus = casa_tools.casalog.getNumCPUs()
-    LOG.info('casalog.getNumCPUs() = {!s}'.format(casa_num_cpus))
-    num_threads_limits.append(casa_num_cpus)
-
-    # check against MPI.UNIVERSE_SIZE, which is another way to limit the number of threads.
-    # see https://www.mpi-forum.org/docs/mpi-4.0/mpi40-report.pdf (Sec. 11.10.1, Universe Size)
-    try:
-        from mpi4py import MPI
-        if MPI.UNIVERSE_SIZE != MPI.KEYVAL_INVALID:
-            universe_size = MPI.COMM_WORLD.Get_attr(MPI.UNIVERSE_SIZE)
-            LOG.info('MPI.UNIVERSE_SIZE = {!s}'.format(universe_size))
-            if isinstance(universe_size, int) and universe_size > 1:
-                num_threads_limits.append(universe_size)
-            world_size = MPI.COMM_WORLD.Get_size()
-            LOG.info('MPI.COMM_WORLD.Get_size() = {!s}'.format(world_size))
-            if isinstance(world_size, int) and world_size > 1:
-                num_threads_limits.append(world_size)
-    except ImportError as ex:
-        pass
-
-    max_num_threads = min(num_threads_limits)
-
-    context_num_threads = None
-    if is_mpi_ready and session_num_threads == 1 and max_num_threads > 1:
-        if num_threads is not None:
-            if 0 < num_threads <= max_num_threads:
-                max_num_threads = num_threads
-            else:
-                LOG.warning(
-                    f'The requested num_threads ({num_threads}) is larger than the optimal number of logical CPUs ({max_num_threads}) assigned for this CASA session. ')
-
-        context_num_threads = max_num_threads
-    try:
-        if context_num_threads is not None:
-            casa_tools.casalog.ompSetNumThreads(context_num_threads)
-            LOG.info('adjust openmp threads to {}'.format(context_num_threads))
-        yield
-    finally:
-        if context_num_threads is not None:
-            casa_tools.casalog.ompSetNumThreads(session_num_threads)
-            LOG.info('restore openmp threads to {}'.format(session_num_threads))
 
 
 @contextlib.contextmanager
@@ -1288,3 +1169,38 @@ def get_valid_url(env_var: str, default: str | list[str]) -> str | list[str]:
 
     LOG.info('Environment variable %s set to list of URLs %s.', env_var, urls)
     return urls
+
+
+def clear_time_cache():
+    """Clear the time cache in the CASA measures tool.
+
+    See details in PIPE-2891/PIPEREQ-402/CAS-13831.
+    A workaround solution provided by T. Nakazato (NAOJ), 2025-10-16.
+    """
+    # Define constants for the dummy conversion.
+    DUMMY_EPOCH_MJD = 37665.0 # MJD corresponds to beginning of IERS data coverage: 1962-01-01
+    DUMMY_AZIMUTH_DEG = 0.0
+    DUMMY_ELEVATION_DEG = 90.0
+    OBSERVATORY = 'ALMA'
+
+    with contextlib.closing(casa_tools.measures) as measures_tool:
+        quanta_tool = casa_tools.quanta
+
+        # Set a time frame well before any real observation.
+        epoch = measures_tool.epoch(rf='UTC', v0=quanta_tool.quantity(DUMMY_EPOCH_MJD, 'd'))
+        measures_tool.doframe(epoch)
+
+        # Set an observatory position frame.
+        position = measures_tool.observatory(OBSERVATORY)
+        measures_tool.doframe(position)
+
+        # Perform the dummy direction conversion that triggers the cache clear.
+        dummy_direction = measures_tool.direction(
+            rf='AZELGEO',
+            v0=quanta_tool.quantity(DUMMY_AZIMUTH_DEG, 'deg'),
+            v1=quanta_tool.quantity(DUMMY_ELEVATION_DEG, 'deg'),
+        )
+
+        measures_tool.measure(rf='ICRS', v=dummy_direction)
+
+    LOG.debug('Successfully cleared the CASA measures tool time cache.')

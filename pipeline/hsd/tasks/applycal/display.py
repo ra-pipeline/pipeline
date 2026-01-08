@@ -40,7 +40,7 @@ class ApplyCalSingleDishPlotmsLeaf(object):
         to customize plotms but currently those parameters are ignored.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
             result: SDApplycalResults instance.
             ms: Measurement Set.
             xaxis: The content of X-axis of the plot.
@@ -160,7 +160,7 @@ class ApplyCalSingleDishPlotmsSpwComposite(common.LeafComposite):
         """Construct ApplyCalSingleDishPlotmsSpwComposite instance.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
             result: SDApplycalResults instance.
             ms: Measurement Set.
             xaxis: The content of X-axis of the plot.
@@ -186,7 +186,7 @@ class ApplyCalSingleDishPlotmsAntSpwComposite(common.LeafComposite):
         """Construct ApplyCalSingleDishPlotmsAntSpwComposite instance.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
             result: SDApplycalResults instance.
             ms: Measurement Set.
             xaxis: The content of X-axis of the plot.

@@ -258,7 +258,7 @@ def get_imaging_policy(context: Context) -> Type[ObservatoryImagingPolicy]:
     """Get appropriate observatory policy for imaging.
 
     Args:
-        context: Pipeline context.
+        context: Pipeline context object containing state information.
 
     Returns:
         One of the subclass of ObservatoryImagingPolicy.

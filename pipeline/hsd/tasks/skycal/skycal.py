@@ -83,7 +83,7 @@ class SDSkyCalInputs(vdp.StandardInputs):
         """Initialize SDK2JyCalInputs instance.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             calmode: Calibration mode.
                 Available options are 'auto' (default), 'ps', 'otf', and
@@ -96,9 +96,9 @@ class SDSkyCalInputs(vdp.StandardInputs):
                 generic scanning pattern such as Lissajous, while the latter is
                 specific use for raster scan.
 
-                Options: 'auto', 'ps', 'otf', 'otfraster'
+                Options: ``'auto'``, ``'ps'``, ``'otf'``, ``'otfraster'``
 
-                Default: None (equivalent to 'auto')
+                Default: ``None`` (equivalent to ``'auto'``)
 
             fraction: Sub-parameter for calmode. Edge marking parameter for
                 'otf' and 'otfraster' mode. It specifies a number of OFF scans
@@ -107,7 +107,7 @@ class SDSkyCalInputs(vdp.StandardInputs):
                 Options: String style like '20%', or float value less than 1.0.
                     For 'otfraster' mode, you can also specify 'auto'.
 
-                Default: None (equivalent to '10%')
+                Default: ``None`` (equivalent to ``'10%'``)
 
             noff: Sub-parameter for calmode. Edge marking parameter for
                 'otfraster' mode. It is used to specify a number of OFF scans
@@ -117,7 +117,7 @@ class SDSkyCalInputs(vdp.StandardInputs):
 
                 Options: any positive integer value
 
-                Default: None (equivalent to '')
+                Default: ``None`` (equivalent to ``''``)
 
             width: Sub-parameter for calmode. Edge marking parameter for
                 'otf' mode. It specifies pixel width with respect to
@@ -126,13 +126,13 @@ class SDSkyCalInputs(vdp.StandardInputs):
 
                 Options: any float value
 
-                Default: None (equivalent to 0.5)
+                Default: ``None`` (equivalent to ``0.5``)
 
             elongated: Sub-parameter for calmode. Edge marking parameter
                 for 'otf' mode. Please set True only if observed area is
                 elongated in one direction.
 
-                Default: None (equivalent to False)
+                Default: ``None`` (equivalent to ``False``)
 
             output_dir: Name of output directory.
 
@@ -140,7 +140,7 @@ class SDSkyCalInputs(vdp.StandardInputs):
                 MeasurementSets that are registered to context
                 via hsd_importdata or hsd_restoredata task.
 
-                Example: vis=['X227.ms', 'X228.ms']
+                Example: ``vis=['X227.ms', 'X228.ms']``
 
             outfile: Name of the output file.
 
@@ -148,23 +148,23 @@ class SDSkyCalInputs(vdp.StandardInputs):
 
             spw: Data selection by spw.
 
-                Example: '3,4' (generate caltable for spw 3 and 4), ['0','2'] (spw 0 for first data, 2 for second)
+                Example: ``'3,4'`` (generate caltable for spw 3 and 4), ``['0','2']`` (spw 0 for first data, 2 for second)
 
-                Default: None (process all science spws)
+                Default: ``None`` (process all science spws)
 
             scan: Data selection by scan number. (default all scans)
 
-                Example: '22,23' (use scan 22 and 23 for calibration), ['22','24'] (scan 22 for first data, 24 for second)
+                Example: ``'22,23'`` (use scan 22 and 23 for calibration), ``['22','24']`` (scan 22 for first data, 24 for second)
 
                 Default: None (process all scans)
 
             parallel: Execute using CASA HPC functionality, if available.
 
-                Options: 'automatic', 'true', 'false', True, False
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
 
-                Default: None (equivalent to 'automatic')
+                Default: ``None`` (equivalent to ``'automatic'``)
         """
-        super(SDSkyCalInputs, self).__init__()
+        super().__init__()
 
         # context and vis must be set first so that properties that require
         # domain objects can be function
@@ -233,7 +233,7 @@ class SDSkyCalResults(SingleDishResults):
         the pipeline context.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
         """
         super(SDSkyCalResults, self).merge_with_context(context)
 
@@ -458,7 +458,7 @@ def compute_elevation_difference(context: Context, results: SDSkyCalResults) -> 
     """Compute elevation difference.
 
     Args:
-        context: Pipeline context.
+        context: Pipeline context object containing state information.
         results: SDSkyCalResults instance.
 
     Returns:

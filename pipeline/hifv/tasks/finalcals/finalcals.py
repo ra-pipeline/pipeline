@@ -890,7 +890,10 @@ class Finalcals(basetask.StandardTaskTemplate):
 
         """
         m = self.inputs.context.observing_run.get_ms(self.inputs.vis)
-        fluxcalfieldlist = str.split(self.inputs.context.evla['msinfo'][m.name].flux_field_select_string)
+        # PIPE-2904: To work with multiple sources with Flux calibration
+        # intent, doing a safe split.
+        fluxcalfieldlist = utils.safe_split(self.inputs.context.evla['msinfo'][m.name].flux_field_select_string)
+
         # PIPE-1729, setting fluxdensity to 1 for calibrators failed in hifv_fluxboot.
         fluxdensity, setjy_standard = [-1, standard.Standard()(field)] if os.path.isdir(
             'fluxgaincalFcal_{!s}.g'.format(field)) or field in fluxcalfieldlist else [1, 'manual']

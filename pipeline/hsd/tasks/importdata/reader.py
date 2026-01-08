@@ -829,6 +829,7 @@ class MetaDataReader(object):
             # NOTE: data is valid if Tflagrow is 0
             #       data is valid if pflags[3] is 1
             pflags_template[:, OnlineFlagIndex] = 1 if Tflagrow[x] == 0 else 0
+            flag_summary_template = pflags_template[:, OnlineFlagIndex]
             sDate = mjd_to_datestring(Tmjd[x] / 86400.0, unit='day')
             self.datatable.putcell('DATE', ID, sDate)
             self.datatable.putcell('MASKLIST', ID, masklist)

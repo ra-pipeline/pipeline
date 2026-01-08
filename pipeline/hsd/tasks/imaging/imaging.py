@@ -144,7 +144,7 @@ class SDImagingInputs(vdp.StandardInputs):
                 Accepts either "line" (spectral line imaging) or "ampcal"
                 (image settings for amplitude calibrator).
 
-                Default: None (equivalent to 'line')
+                Default: ``None`` (equivalent to ``'line'``)
 
             restfreq: Rest frequency. Defaults to None,
                 it executes without rest frequency.
@@ -153,27 +153,27 @@ class SDImagingInputs(vdp.StandardInputs):
                 MeasurementSets that are registered to context via
                 hsd_importdata or hsd_restoredata tasks.
 
-                Example: vis=['uid___A002_X85c183_X36f.ms', 'uid___A002_X85c183_X60b.ms']
+                Example: ``vis=['uid___A002_X85c183_X36f.ms', 'uid___A002_X85c183_X60b.ms']``
 
-                Default: None (process all registered MeasurementSets)
+                Default: ``None`` (process all registered MeasurementSets)
 
             field: Data selection by field names or ids.
 
-                Example: "`*Sgr*,M100`"
+                Example: ``"*Sgr*,M100"``
 
-                Default: None (process all science fields)
+                Default: ``None`` (process all science fields)
 
             spw: Data selection by spw ids.
 
-                Example: "3,4" (generate images for spw 3 and 4)
+                Example: ``"3,4"`` (generate images for spw 3 and 4)
 
-                Default: None (process all science spws)
+                Default: ``None`` (process all science spws)
 
             org_direction: Directions of the origin for moving targets.
-                Defaults to None, it doesn't have some moving targets.
+                Defaults to ``None``, it doesn't have some moving targets.
 
         """
-        super(SDImagingInputs, self).__init__()
+        super().__init__()
 
         self.context = context
         self.restfreq = restfreq

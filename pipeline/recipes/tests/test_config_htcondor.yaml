@@ -1,0 +1,24 @@
+pipeconfig:
+  xvfb: true
+  loglevel: "debug"
+  dask:
+    clustertype: "htcondor"
+    n_workers: null
+    distributed:
+      worker:
+        nthreads: 1 # Number of threads per worker
+        memory:
+          target: 0.6 # When 60% memory usage is reached, start spilling to disk
+          spill: 0.7 # When 70% memory usage is reached, spill more to disk
+          pause: 0.8 # When 80% memory usage is reached, pause worker activity
+          terminate: 0.95 # When 95% memory usage is reached, terminate the worker
+      scheduler:
+        host: "localhost" # Scheduler host
+        port: 0 # Port of the scheduler
+      client:
+        heartbeat_interval: 10000 # Heartbeat interval in milliseconds
+    tier0futures: true
+    autostart: true
+
+casaconfig:
+  log2term: false

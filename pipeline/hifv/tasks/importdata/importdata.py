@@ -29,18 +29,35 @@ class VLAImportDataInputs(importdata.ImportDataInputs):
     parallel = sessionutils.parallel_inputs_impl(default=False)
 
     # docstring and type hints: supplements hifv_importdata
-    def __init__(self, context, vis=None, output_dir=None, asis=None, process_caldevice=None, session=None,
-                 overwrite=None, nocopy=None, bdfflags=None, lazy=None, save_flagonline=None, createmms=None,
-                 ocorr_mode=None, datacolumns=None, specline_spws=None, minparang=None, parallel=None):
+    def __init__(
+        self,
+        context,
+        vis=None,
+        output_dir=None,
+        asis=None,
+        process_caldevice=None,
+        session=None,
+        overwrite=None,
+        nocopy=None,
+        bdfflags=None,
+        lazy=None,
+        save_flagonline=None,
+        createmms=None,
+        ocorr_mode=None,
+        datacolumns=None,
+        specline_spws=None,
+        minparang=None,
+        parallel=None,
+    ):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             vis: List of visibility data files. These may be ASDMs, tar files of ASDMs, MSes, or tar files of MSes, If ASDM files are specified, they will be
                 converted  to MS format.
 
-                Example: vis=['X227.ms', 'asdms.tar.gz']
+                Example: ``vis=['X227.ms', 'asdms.tar.gz']``
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
@@ -49,15 +66,15 @@ class VLAImportDataInputs(importdata.ImportDataInputs):
                 separated by space characters.
                 examples:
 
-                - asis='Receiver CalAtmosphere'
-                - asis='Receiver', asis=''
+                - ``asis='Receiver CalAtmosphere'``
+                - ``asis='Receiver'``, ``asis=''``
 
             process_caldevice:
 
             session: List of sessions to which the visibility files belong. Defaults to a single session containing all the visibility files, otherwise
                 a session must be assigned to each vis file.
 
-                Example: session=['Session_1', 'Sessions_2']
+                Example: ``session=['Session_1', 'Sessions_2']``
 
             overwrite: Overwrite existing files on import.
 
@@ -76,11 +93,11 @@ class VLAImportDataInputs(importdata.ImportDataInputs):
 
             datacolumns: Dictionary defining the data types of existing columns. The format is:
 
-                {'data': 'data type 1'}
+                ``{'data': 'data type 1'}``
 
                 or
 
-                {'data': 'data type 1', 'corrected': 'data type 2'}
+                ``{'data': 'data type 1', 'corrected': 'data type 2'}``
 
                 For ASDMs the data type can only be RAW and one
                 can only specify it for the data column.
@@ -108,15 +125,17 @@ class VLAImportDataInputs(importdata.ImportDataInputs):
                 values are 'auto', 'none' (no spws will be defined as spectral line), or
                 a string of spw definitions in the CASA format.
 
-                Example: specline_spws='2, 3, 4~9, 23'
+                Example: ``specline_spws='2, 3, 4~9, 23'``
 
             minparang: Minimum required parallactic angle range for polarisation
                 calibrator, in degrees. The default of 0.0 is used for
                 non-polarisation processing.
 
             parallel: Process multiple MeasurementSets in parallel using the casampi parallelization framework.
-                options: 'automatic', 'true', 'false', True, False
-                default: False
+
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``None`` (equivalent to ``False``)
 
         """
         super().__init__(context, vis=vis, output_dir=output_dir, asis=asis,

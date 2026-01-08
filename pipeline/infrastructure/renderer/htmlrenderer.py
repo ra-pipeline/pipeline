@@ -14,11 +14,11 @@ import pydoc
 import re
 import shutil
 import sys
+from importlib.resources import files
 from typing import TYPE_CHECKING, Any
 
 import mako
 import numpy as np
-import pkg_resources
 
 import pipeline
 import pipeline.infrastructure.pipelineqa as pqa
@@ -278,7 +278,7 @@ class RendererBase(object):
         if os.path.exists(path) and not cls.rerender(context):
             return
 
-        path_to_resources_pkg = pkg_resources.resource_filename(templates.resources.__name__, '')
+        path_to_resources_pkg = str(files(templates.resources.__name__))
         path_to_js = os.path.join(path_to_resources_pkg, 'js', 'pipeline_common.min.js')
         use_minified_js = os.path.exists(path_to_js)
 
@@ -1938,14 +1938,10 @@ class WebLogGenerator(object):
             shutil.rmtree(outdir)
 
         # copy all uncompressed non-python resources to output directory
-        src = pkg_resources.resource_filename(templates.resources.__name__, '')
+        src = str(files(templates.resources.__name__))
         dst = outdir
-        ignore_fn = shutil.ignore_patterns('*.zip', '*.py', '*.pyc', 'CVS*',
-                                           '.svn')
-        shutil.copytree(src, 
-                        dst, 
-                        symlinks=False, 
-                        ignore=ignore_fn)
+        ignore_fn = shutil.ignore_patterns('*.zip', '*.py', '*.pyc', 'CVS*', '.svn')
+        shutil.copytree(src, dst, symlinks=False, ignore=ignore_fn)
 
     @staticmethod
     def render(context):

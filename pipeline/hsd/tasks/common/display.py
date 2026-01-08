@@ -163,7 +163,7 @@ class SingleDishDisplayInputs(object):
         """Construct SingleDishDisplayInputs instance.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
             result: Pipeline task execution result.
         """
         self.context = context
@@ -406,7 +406,7 @@ class SDImageDisplayInputs(SingleDishDisplayInputs):
         """Construct SDImageDisplayInputs instance.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
             result: Pipeline task execution result.
         """
         super(SDImageDisplayInputs, self).__init__(context, result)

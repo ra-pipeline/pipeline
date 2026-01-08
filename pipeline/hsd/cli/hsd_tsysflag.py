@@ -1,5 +1,3 @@
-import sys
-
 import pipeline.h.cli.utils as utils
 
 
@@ -13,7 +11,6 @@ def hsd_tsysflag(vis=None, caltable=None,
                  flag_birdies=None, fb_sharps_limit=None,
                  flag_toomany=None, tmf1_limit=None, tmef1_limit=None,
                  metric_order=None, normalize_tsys=None, filetemplate=None):
-
     """Flag deviant system temperature measurements.
 
     Flag deviant system temperature measurements for single dish measurements. This is done by running a
@@ -25,23 +22,23 @@ def hsd_tsysflag(vis=None, caltable=None,
 
     The tests are:
 
-      1. Flag Tsys spectra with high median values
+    1. Flag Tsys spectra with high median values
 
-      2. Flag Tsys spectra with high median derivatives. This is meant to spot
-        spectra that are 'ringing'.
+    2. Flag Tsys spectra with high median derivatives. This is meant to spot
+      spectra that are 'ringing'.
 
-      3. Flag the edge channels of the Tsys spectra in each SpW.
+    3. Flag the edge channels of the Tsys spectra in each SpW.
 
-      4. Flag Tsys spectra whose shape is different from that associated with
-        the BANDPASS intent.
+    4. Flag Tsys spectra whose shape is different from that associated with
+      the BANDPASS intent.
 
-      5. Flag 'birdies'.
+    5. Flag 'birdies'.
 
-      6. Flag the Tsys spectra of all antennas in a timestamp and spw if
-        proportion of antennas already flagged in this timestamp and spw exceeds
-        a threshold, and flag Tsys spectra for all antennas and all timestamps
-        in a spw, if proportion of antennas that are already entirely flagged
-        in all timestamps exceeds a threshold.
+    6. Flag the Tsys spectra of all antennas in a timestamp and spw if
+      proportion of antennas already flagged in this timestamp and spw exceeds
+      a threshold, and flag Tsys spectra for all antennas and all timestamps
+      in a spw, if proportion of antennas that are already entirely flagged
+      in all timestamps exceeds a threshold.
 
     Returns:
         The results object for the pipeline task is returned.
@@ -57,26 +54,3 @@ def hsd_tsysflag(vis=None, caltable=None,
         >>> hsd_tsysflag(flag_fieldshape=False)
 
     """
-
-
-    ##########################################################################
-    #                                                                        #
-    #  CASA task interface boilerplate code starts here. No edits should be  #
-    #  needed beyond this point.                                             #
-    #                                                                        #
-    ##########################################################################
-
-    # create a dictionary containing all the arguments given in the
-    # constructor
-    all_inputs = vars()
-
-    # get the name of this function for the weblog, eg. 'hif_flagdata'
-    task_name = sys._getframe().f_code.co_name
-
-    # get the context on which this task operates
-    context = utils.get_context()
-
-    # execute the task
-    results = utils.execute_task(context, task_name, all_inputs)
-
-    return results

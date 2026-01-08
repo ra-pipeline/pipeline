@@ -123,7 +123,7 @@ class SDSimpleGriddingResults(common.SingleDishResults):
         No specific merge operation is done.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
         """
         super(SDSimpleGriddingResults, self).merge_with_context(context)
 
@@ -219,7 +219,7 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
                [row1,r1,RMS1,index1,ant1],
                ...,
                [rowN,rN,RMSN,indexN,antn]]],
-                        ......
+                        ...
              [IF,POL,M,N,RAcent,DECcent,
               [[row0,r0,RMS0,index0,ant0],
                [row1,r1,RMS1,index1,ant1],
@@ -361,7 +361,6 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
             [
              [IF, POL, X, Y, RA, DEC, # of Combined Sp., # of flagged Sp., RMS]
              [IF, POL, X, Y, RA, DEC, # of Combined Sp., # of flagged Sp., RMS]
-                     ......
              [IF, POL, X, Y, RA, DEC, # of Combined Sp., # of flagged Sp., RMS]
             ]
 

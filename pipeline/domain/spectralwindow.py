@@ -4,6 +4,7 @@ Store frequency information of MeasurementSet.
 This module provides classes to store logical representation of spectral
 windows, channel frequency information, and channel selection.
 """
+
 # Do not evaluate type annotations at definition time.
 from __future__ import annotations
 
@@ -14,11 +15,9 @@ from typing import Iterable, Iterator, Sequence
 
 import numpy
 
-from pipeline import infrastructure
 from pipeline.infrastructure import casa_tools
-from pipeline.domain import measures
 
-LOG = infrastructure.logging.get_logger(__name__)
+from . import measures
 
 
 class ArithmeticProgression:

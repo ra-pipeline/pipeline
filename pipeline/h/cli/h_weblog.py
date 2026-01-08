@@ -2,9 +2,7 @@ from pipeline import show_weblog
 
 
 def h_weblog(relpath=None):
-    """Open the pipeline weblog in a browser
-
-    h_weblog opens the weblog in a new browser tab or window.
+    """Open the pipeline weblog in a browser tab or window.
 
     Args:
         relpath: Relative path to the weblog index file. This file must be located
@@ -13,7 +11,7 @@ def h_weblog(relpath=None):
             displayed.
 
     Returns:
-        The results object for the pipeline task is returned.
+        None
 
     Examples:
         1. Open pipeline weblog in a browser:

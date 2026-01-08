@@ -67,7 +67,7 @@ class ExportvlassdataInputs(exportdata.ExportDataInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
@@ -468,18 +468,15 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
             # Identify self cal table
             selfcal_result = None
             for result in context.results:
-                try:
-                    selfcal_result = result.read()[0]
-                    if 'self-cal' in selfcal_result.caltable:
-                        break
-                except Exception as e:
-                    continue
+                task_result = result.read()
+                if task_result.taskname == "hifv_selfcal":
+                    selfcal_result = task_result[0]
+                    break
 
-            if selfcal_result:
+            if selfcal_result and os.path.exists(selfcal_result.caltable):
                 self.selfcaltable = selfcal_result.caltable
             else:
                 self.selfcaltable = ''
-                LOG.warning('Unable to locate self-cal table.')
 
             # Identify flagversion
             self.flagversion = os.path.basename(self.inputs.vis)+'.flagversions'
@@ -692,10 +689,11 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         for final_model in self.final_models:
             tar.add(final_model, final_model)
             LOG.info('....Adding {!s}'.format(final_model))
-
-        tar.add(self.selfcaltable, self.selfcaltable)
-        LOG.info('....Adding {!s}'.format(self.selfcaltable))
-
+        if os.path.exists(self.selfcaltable):
+            tar.add(self.selfcaltable, self.selfcaltable)
+            LOG.info('....Adding {!s}'.format(self.selfcaltable))
+        else:
+            LOG.warning('selfcal table not present.')
         tar.add(self.flagversion, self.flagversion)
         LOG.info('....Adding {!s}'.format(self.flagversion))
         tar.close()
