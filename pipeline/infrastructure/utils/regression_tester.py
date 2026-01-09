@@ -98,9 +98,9 @@ class PipelineRegression:
                     else:
                         LOG.warning(
                             "None of the reference files in %s match the current CASA/Pipeline version. This test will fail.",
-                            expectedoutput_dir
+                            reference_data_files
                             )
-                else: 
+                else:
                     LOG.warning("No reference files found in %s. This test will fail.", expectedoutput_dir)
 
         self.testinput = [f'{input_dir}/{vis}' for vis in self.visname]
@@ -359,19 +359,19 @@ class PipelineRegression:
             path to the pipeline stats file
         """
         # glob to find the pipeline stats file which has the form pipeline_stats_*.json
-        pipeline_stats_files = glob.glob(os.path.join(self.output_dir, 'pipeline_stats_*.json'))
+        pipeline_stats_files = glob.glob('pipeline_stats_*.json')
         if len(pipeline_stats_files) != 0:
-            pipeline_stats_file = pipeline_stats_files[0] 
+            pipeline_stats_file = pipeline_stats_files[0]
         else:
             context = launcher.Pipeline(context='last').context
             pipeline_stats = pipeline_statistics.generate_stats(context)
             with open('pipeline_stats_testing.json', 'w') as f:
-                json.dump(pipeline_stats, f)
+                json.dump(pipeline_stats, f, ensure_ascii=False, indent=4, sort_keys=True)
             pipeline_stats_file = 'pipeline_stats_testing.json'
+        LOG.info("Using %s for the current results json file", pipeline_stats_file)
+        return pipeline_stats_file
 
-        return pipeline_stats_file 
-
-    def __compare_reference_txt(self, new_file: str, relative_tolerance: float) -> None: 
+    def __compare_reference_txt(self, new_file: str, relative_tolerance: float) -> None:
         with open(self.expectedoutput_file) as expected_fd, open(new_file) as new_fd:
             expected_results = expected_fd.readlines()
             new_results = new_fd.readlines()
@@ -424,6 +424,8 @@ class PipelineRegression:
         def _should_skip(path):
             skip_paths = {
                 ("header", "stats_file_creation_date"),
+                ("stage_duration"),
+                ("total_time"),
             }
             return tuple(path) in skip_paths
 
@@ -503,7 +505,6 @@ class PipelineRegression:
         else:
             self.__compare_reference_json(new_file, relative_tolerance)
 
-
     def __save_new_results_to(self, new_file: str, new_results: list[str]) -> None:
         """
         Compare results between new one and old one, both results are loaded from specified files.
@@ -514,7 +515,6 @@ class PipelineRegression:
         """
         with open(new_file, 'w') as fd:
             fd.writelines([str(x) + '\n' for x in new_results])
-
 
     def __get_results_of_from_current_context(self) -> list[str]:
         """
@@ -811,7 +811,7 @@ def test_uid___mg2_20170525142607_180419__procedure_hsdn_calimage__regression():
         recipe='procedure_hsdn_calimage.xml',
         input_dir='pl-regressiontest/mg2-20170525142607-180419',
         expectedoutput_file=('pl-regressiontest/mg2-20170525142607-180419/' +
-                             'mg2-20170525142607-180419.casa-6.6.6-16-pipeline-2025.0.2.7.results.txt'))
+                             'pipeline_stats_casa-6.6.6-16-pipeline-2025.1.1.33.json'))
     pr.run()
 
 
@@ -830,7 +830,7 @@ def test_uid___mg2_20170525142607_180419__PPR__regression():
         ppr=f'{input_dir}/PPR.xml',
         input_dir=input_dir,
         expectedoutput_file=(f'{input_dir}/' +
-                             'mg2-20170525142607-180419_PPR.casa-6.6.6-16-pipeline-2025.0.1.18.results.txt'),
+                             'pipeline_stats_casa-6.6.6-16-pipeline-2025.1.1.33.json'),
         output_dir='mg2-20170525142607-180419_PPR')
 
     # copy files use restore task into products folder
@@ -894,8 +894,7 @@ def test_13A_537__procedure_hifv__regression():
         visname=['13A-537.sb24066356.eb24324502.56514.05971091435'],
         recipe='procedure_hifv.xml',
         input_dir=input_dir,
-#        expectedoutput_dir=input_dir,
-        expectedoutput_file='pipeline_stats_example.json',
+        expectedoutput_dir=input_dir,
         output_dir='13A_537__procedure_hifv__regression'
         )
 
@@ -941,7 +940,7 @@ def test_13A_537__restore__PPR__regression():
         ppr=f'{input_dir}/PPR_13A-537_restore.xml',
         input_dir=input_dir,
         expectedoutput_file=f'{input_dir}/restore/' +
-                             '13A-537.casa-6.2.1.7-pipeline-2021.2.0.128.restore.results.txt',
+                             'pipeline_stats_casa-6.6.6-16-pipeline-2025.1.1.33.json',
         output_dir='13A_537__restore__PPR__regression'
         )
 
