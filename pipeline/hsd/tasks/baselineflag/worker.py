@@ -3,7 +3,7 @@ import copy
 import math
 import os
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generator
 
 import numpy
 
@@ -17,13 +17,13 @@ from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 from .. import common
 from .SDFlagRule import INVALID_STAT
+from pipeline.domain import DataTable, DataType, MeasurementSet
+
 
 LOG = infrastructure.logging.get_logger(__name__)
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
-
-    from pipeline.domain import DataTable, DataType, MeasurementSet
+    from pipeline.domain import DataType
 
 
 class SDBLFlagWorkerInputs(vdp.StandardInputs):

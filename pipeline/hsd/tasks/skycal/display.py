@@ -1,4 +1,5 @@
 """Display module for skycal task."""
+
 from __future__ import annotations
 
 import glob
@@ -12,10 +13,12 @@ from matplotlib.ticker import NullFormatter
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.renderer.logger as logger
-from ..common import display as sd_display
-from pipeline.infrastructure import casa_tasks
-from pipeline.infrastructure import casa_tools
+from pipeline.h.tasks.common.displays.bandpass import BandpassDetailChart
+from pipeline.h.tasks.common.displays.common import AntComposite, LeafComposite, PlotbandpassDetailBase
+from pipeline.infrastructure import casa_tasks, casa_tools
 from pipeline.infrastructure.displays.plotstyle import casa5style_plot
+
+from ..common import display as sd_display
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -24,14 +27,10 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
 
     from pipeline.domain import Field, MeasurementSet, Scan
-    from pipeline.h.tasks.common.displays.bandpass import BandpassDetailChart
-    from pipeline.h.tasks.common.displays.common import (
-        AntComposite, LeafComposite, PlotbandpassDetailBase,
-    )
     from pipeline.hsd.tasks.skycal.skycal import SDSkyCalResults
     from pipeline.infrastructure.callibrary import CalApplication
-    from pipeline.infrastructure.launcher import Context
     from pipeline.infrastructure.jobrequest import JobRequest
+    from pipeline.infrastructure.launcher import Context
 
 LOG = infrastructure.logging.get_logger(__name__)
 

@@ -29,9 +29,9 @@ if TYPE_CHECKING:
     from pipeline.domain import DataTable, Field, MeasurementSet, ObservingRun
     from pipeline.infrastructure import Context
 
-LOG = infrastructure.logging.get_logger(__name__)
+    TableLike: TypeAlias = casa_tools._logging_table_cls | casa_table
 
-TableLike: TypeAlias = casa_tools._logging_table_cls | casa_table
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 def profiler(func: Callable):
