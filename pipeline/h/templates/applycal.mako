@@ -182,9 +182,9 @@ def format_spwmap(spwmap, scispws):
 
 <h2 id="appliedcal" class="jumptarget">Applied calibrations</h2>
 <p>The <i>Field</i> column lists fields within the measurement set containing any of the intents listed in the
-    <i>Intents</i> column. If a field name is ambiguous and does not uniquely identify a field, e.g., when a field is
+    <i>Intent</i> column. If a field name is ambiguous and does not uniquely identify a field, e.g., when a field is
     observed with multiple intents, then the unambiguous field ID is listed instead of the field name. The order of
-    entries in the <i>Field</i> and <i>Intents</i> columns has no significance.</p>
+    entries in the <i>Field</i> and <i>Intent</i> columns has no significance.</p>
 % if parang:
     <p>Applycal was invoked with parang=True.</p>
 % endif
