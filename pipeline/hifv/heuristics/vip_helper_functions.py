@@ -395,35 +395,32 @@ def edit_pybdsf_islands(catalog_fits_file='', r_squared_threshold=0.99,
     # pickle.dump(catalogmsk, open("catalogmsk.p", "wb"))
     # pickle.dump(rejected_islands, open("rejected_islands.p", "wb"))
 
-    cat_to_ds9_rgn(catalog_dat[np.in1d(catalog_dat['Isl_id'], rejected_islands)],
-                   outfile=catalog_fits_file.replace('.fits', '') + '.rejected.ds9.reg',
-                   region_color='red')
+    base_name = catalog_fits_file.removesuffix('.fits')
+    rejected_reg = f'{base_name}.rejected.ds9.reg'
+    accepted_reg = f'{base_name}.accepted.ds9.reg'
 
-    LOG.info('wrote region file of rejected islands to: {0}'.format(catalog_fits_file.replace('.fits', '')
-                                                                    + '.rejected.ds9.reg'))
+    rejected_mask = np.isin(catalog_dat['Isl_id'], rejected_islands)
+    cat_to_ds9_rgn(catalog_dat[rejected_mask], outfile=rejected_reg, region_color='red')
+    LOG.info('wrote region file of rejected islands to: %s', rejected_reg)
 
-    cat_to_ds9_rgn(catalog_dat[~np.in1d(catalog_dat['Isl_id'], linear_islands)],
-                   outfile=catalog_fits_file.replace('.fits', '') + '.accepted.ds9.reg',
-                   region_color='green')
+    accepted_mask = np.isin(catalog_dat['Isl_id'], linear_islands, invert=True)
+    cat_to_ds9_rgn(catalog_dat[accepted_mask], outfile=accepted_reg, region_color='green')
+    LOG.info('wrote region file of accepted islands to: %s', accepted_reg)
 
-    LOG.info('wrote region file of accepted islands to: {0}'.format(catalog_fits_file.replace('.fits', '')
-                                                                    + '.accepted.ds9.reg'))
-
-    hdu[1].data = catalog_dat[~np.in1d(catalog_dat['Isl_id'], linear_islands)]
+    hdu[1].data = catalog_dat[accepted_mask]
 
     edited_catalog_fits_file = catalog_fits_file.replace('.fits', '') + '.edited.fits'
     hdu.writeto(edited_catalog_fits_file, overwrite=True)
 
     hdu.close()
 
-    LOG.info('wrote catalog of accepted islands to: {0}'.format(edited_catalog_fits_file))
+    LOG.info('wrote catalog of accepted islands to: %s', edited_catalog_fits_file)
 
     return edited_catalog_fits_file, num_rejected_islands, num_rejected_islands_onedeg
 
 
 def cat_to_ds9_rgn(catalog_fits_file, outfile='ds9.reg', region_color='red'):
-    """
-    Write each component to a ds9 region
+    """Write each component to a ds9 region.
 
     Copy of script located at:
     /users/jmarvil/scripts/edit_pybdsf_islands.py

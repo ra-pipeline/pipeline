@@ -59,6 +59,28 @@ import os
 	</div>
 % endif
 
+% if zd_telmjd_plot:
+	<div class="col-md-4">
+		<a href="${os.path.relpath(zd_telmjd_plot.abspath, pcontext.report_dir)}" data-fancybox>
+			<h3>Zenith Angle vs. Time</h3>
+		</a>
+        <div class="col-md-12">
+		  	<div class="thumbnail">
+				<a href="${os.path.relpath(zd_telmjd_plot.abspath, pcontext.report_dir)}"
+				   data-fancybox>
+					<img class="lazyload"
+                         data-src="${os.path.relpath(zd_telmjd_plot.thumbnail, pcontext.report_dir)}"
+						 title="Zenith Angle vs. Time for ${ms.basename}"
+						 alt="Zenith Angle vs. Time Details for ${ms.basename}" />
+			    </a>
+			    <div class="caption">
+					<h4>Zenith Angle vs. Time</h4>
+				</div>
+			</div>
+		</div>
+	</div>
+% endif
+
 %if plot_uv is not None:
 	<div class="col-md-4">
         <a href="${os.path.relpath(plot_uv.abspath, pcontext.report_dir)}" data-fancybox>
