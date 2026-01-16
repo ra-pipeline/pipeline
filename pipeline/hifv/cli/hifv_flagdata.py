@@ -1,5 +1,3 @@
-import sys
-
 import pipeline.h.cli.utils as utils
 
 
@@ -11,8 +9,7 @@ def hifv_flagdata(vis=None, autocorr=None, shadow=None, scan=None,
                   online=None, fileonline=None, template=None,
                   filetemplate=None, hm_tbuff=None, tbuff=None,
                   flagbackup=None):
-
-    """Do basic deterministic flagging of a list of MeasurementSets.
+    """Do basic deterministic flagging.
 
     The hifv_flagdata task performs basic flagging operations on a list of MeasurementSets including:
 
@@ -40,26 +37,3 @@ def hifv_flagdata(vis=None, autocorr=None, shadow=None, scan=None,
         >>> hifv_flagdata(scan=True intent='*BANDPASS*')
 
     """
-
-
-    ##########################################################################
-    #                                                                        #
-    #  CASA task interface boilerplate code starts here. No edits should be  #
-    #  needed beyond this point.                                             #
-    #                                                                        #
-    ##########################################################################
-
-    # create a dictionary containing all the arguments given in the
-    # constructor
-    all_inputs = vars()
-
-    # get the name of this function for the weblog, eg. 'hif_flagdata'
-    task_name = sys._getframe().f_code.co_name
-
-    # get the context on which this task operates
-    context = utils.get_context()
-
-    # execute the task
-    results = utils.execute_task(context, task_name, all_inputs)
-
-    return results

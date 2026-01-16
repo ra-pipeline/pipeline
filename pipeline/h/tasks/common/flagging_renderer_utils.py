@@ -174,17 +174,16 @@ def adjust_non_science_totals(flagtotals, non_science_agents=None):
 
 
 def intents_to_summarise(context: Context, all_flag_summary_intents: Optional[Sequence[str]] = None) -> List[str]:
-    """
-    Find out which intents to list in the flagging table.
+    """Find out which intents to list in the flagging table.
+
     Arguments:
-        context: Pipeline context.
+        context: Pipeline context object containing state information.
         all_flag_summary_intents: a list of intents to summarise;
         if None, the default list of all relevant intents (calibration and target) is used.
     Returns:
         the subset of intents from the input list all_flag_summary_intents that are actually present in at least one MS
         (a list of strings in the same order as input, but omitting missing ones).
     """
-
     # First get all intents across all MSes in context
     context_intents = functools.reduce(lambda x, m: x.union(m.intents),
                                        context.observing_run.measurement_sets,

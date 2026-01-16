@@ -1,4 +1,6 @@
-"""Observatory policy for single-dish imaging."""
+"""Observatory policy for single-dish imaging and calibration."""
+from __future__ import annotations
+
 import abc
 from typing import Type
 
@@ -182,6 +184,7 @@ class ALMAImagingPolicy(ObservatoryImagingPolicy):
         """
         return 0.1597
 
+
 class NROImagingPolicy(ObservatoryImagingPolicy):
     """Implementation of imaging policy for NRO 45m telescope."""
 
@@ -255,7 +258,7 @@ def get_imaging_policy(context: Context) -> Type[ObservatoryImagingPolicy]:
     """Get appropriate observatory policy for imaging.
 
     Args:
-        context: Pipeline context.
+        context: Pipeline context object containing state information.
 
     Returns:
         One of the subclass of ObservatoryImagingPolicy.
@@ -265,3 +268,63 @@ def get_imaging_policy(context: Context) -> Type[ObservatoryImagingPolicy]:
         return NROImagingPolicy
     else:
         return ALMAImagingPolicy
+
+
+class ObservatoryCalibrationPolicy( abc.ABC ):
+    """Base class for observatory calibration policy."""
+
+    @staticmethod
+    @abc.abstractmethod
+    def get_jyperk_range(ms: MeasurementSet, spw_id: int) -> list[float]:
+        """Get acceptable range for Jansky per Kelvin factor
+
+        Args:
+            ms: MS domain object
+            spw_id: Spectral window id
+        Raises:
+            NotImplementedError
+        Returns:
+            (supposed to be) Acceptable range of jyperk factor
+        """
+        raise NotImplementedError('should be implemented in subclass')
+
+
+class ALMACalibrationPolicy(ObservatoryCalibrationPolicy):
+    """Implementation of calibration policy for ALMA."""
+
+    @staticmethod
+    def get_jyperk_valid_range( ms: MeasurementSet, spw: int, ant_name: str, pol_name: str ) -> list[float]:
+        """Get valid range for Jasnky per Kelvin factor
+
+        At this moment the range consists of fixed values regardless the ms, spw, ant, or pol,
+        but these parameters are implemented for possible future use.
+
+        Args:
+            ms: MS domain object
+            spw: Spectral window id
+            ant_name: Antenna id
+            pol_name: Polarization
+
+        Returns:
+            Valid range
+        """
+        valid_range = [30.0, 50.0]
+
+        return valid_range
+
+
+def get_calibration_policy(context: Context) -> Type[ObservatoryCalibrationPolicy]:
+    """Get appropriate observatory policy for calibration.
+
+    Args:
+        context: Pipeline context.
+
+    Returns:
+        One of the subclass of ObservatoryCalibrationPolicy.
+    Raises:
+        NotImplementedError for non-ALMA cases
+    """
+    if context.project_summary.telescope == "ALMA":
+        return ALMACalibrationPolicy
+    else:
+        raise NotImplementedError

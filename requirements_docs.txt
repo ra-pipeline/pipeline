@@ -1,0 +1,24 @@
+# WARNING: Dependency versions not specified; CASA shipped modules may be accidentally upgraded.
+
+# Core Dependencies
+future
+urllib3
+
+# Markdown and Jupyter Support
+myst-parser
+myst_nb
+linkify-it-py
+jupytext
+nbsphinx                # Requires 'pandoc' from macports/apt/conda-forge
+ipympl
+nodejs
+
+# Sphinx and Extensions
+sphinx_rtd_theme 
+sphinxcontrib-bibtex
+sphinx-astrorefs        # https://github.com/jobovy/sphinx-astrorefs
+sphinx-copybutton
+sphinx-markdown-tables  # https://pypi.org/project/sphinx-markdown-tables/
+sphinx-automodapi
+sphinx-autoapi
+sphinxcontrib-mermaid

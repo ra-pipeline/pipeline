@@ -20,14 +20,14 @@ class ALMARestoreDataInputs(restoredata.RestoreDataInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             copytoraw: Copy calibration and flagging tables from ``products_dir`` to
                 ``rawdata_dir`` directory.
 
-                Default: True.
+                Default: ``True``.
 
-                Example: copytoraw=False
+                Example: ``copytoraw=False``
 
             products_dir: Name of the data products directory to copy calibration
                 products from.
@@ -36,57 +36,57 @@ class ALMARestoreDataInputs(restoredata.RestoreDataInputs):
                 When ``copytoraw`` = False, calibration products in
                 ``rawdata_dir`` will be used.
 
-                Example: products_dir='myproductspath'
+                Example: ``products_dir='myproductspath'``
 
             rawdata_dir: Name of the raw data directory.
 
-                Default: '../rawdata'.
+                Default: ``'../rawdata'``.
 
-                Example: rawdata_dir='myrawdatapath'
+                Example: ``rawdata_dir='myrawdatapath'``
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
 
             session: List of sessions one per visibility file.
 
-                Example: session=['session_3']
+                Example: ``session=['session_3']``
 
             vis: List of raw visibility data files to be restored.
                 Assumed to be in the directory specified by rawdata_dir.
 
-                Example: vis=['uid___A002_X30a93d_X43e']
+                Example: ``vis=['uid___A002_X30a93d_X43e']``
 
             bdfflags: Set the BDF flags.
 
                 Default: True.
 
-                Example: bdfflags=False
+                Example: ``bdfflags=False``
 
             lazy: Use the lazy filler option.
 
-                Default: False.
+                Default: ``False``.
 
-                Example: lazy=True
+                Example: ``lazy=True``
 
             asis: Creates verbatim copies of the ASDM tables in the output MS.
                 The value given to this option must be a string containing a
                 list of table names separated by whitespace characters.
 
-                Default: 'SBSummary ExecBlock Antenna Annotation Station Receiver Source CalAtmosphere CalWVR CalPointing'.
+                Default: ``'SBSummary ExecBlock Antenna Annotation Station Receiver Source CalAtmosphere CalWVR CalPointing'``.
 
-                Example: asis='Source Receiver'
+                Example: ``asis='Source Receiver'``
 
             ocorr_mode: Set ocorr_mode.
 
-                Default: 'ca'.
+                Default: ``'ca'``.
 
-                Example: ocorr_mode='ca'
+                Example: ``ocorr_mode='ca'``
 
         """
-        super(ALMARestoreDataInputs, self).__init__(context, copytoraw=copytoraw, products_dir=products_dir,
-                                                    rawdata_dir=rawdata_dir, output_dir=output_dir, session=session,
-                                                    vis=vis, bdfflags=bdfflags, lazy=lazy, asis=asis,
-                                                    ocorr_mode=ocorr_mode)
+        super().__init__(context, copytoraw=copytoraw, products_dir=products_dir,
+                         rawdata_dir=rawdata_dir, output_dir=output_dir, session=session,
+                         vis=vis, bdfflags=bdfflags, lazy=lazy, asis=asis,
+                         ocorr_mode=ocorr_mode)
 
 
 @task_registry.set_equivalent_casa_task('hifa_restoredata')

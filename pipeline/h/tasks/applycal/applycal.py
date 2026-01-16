@@ -78,27 +78,27 @@ class ApplycalInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
 
             vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets in the pipeline context.
-                example: ['X227.ms']
+                example: ``['X227.ms']``
 
             field: A string containing the list of field names or field ids to which the calibration will be applied. Defaults to all fields in the pipeline
                 context.
-                example: '3C279', '3C279, M82'
+                example: ``'3C279'``, ``'3C279,M82'``
 
             spw: The list of spectral windows and channels to which the calibration will be applied. Defaults to all science windows in the pipeline
                 context.
-                example: '17', '11, 15'
+                example: ``'17'``, ``'11,15'``
 
             antenna: The selection of antennas to which the calibration will be applied. Defaults to all antennas. Not currently supported.
 
             intent: A string containing the list of intents against which the selected fields will be matched. Defaults to all supported intents
                 in the pipeline context.
-                example: `'*TARGET*'`
+                example: ``'*TARGET*'``
 
             parang: Apply parallactic angle correction
 
@@ -118,11 +118,13 @@ class ApplycalInputs(vdp.StandardInputs):
 
             flagsum: Compute before and after flagging summary statistics
 
-            flagdetailedsum: Compute detailed before and after flagging statistics summaries. Parameter available only when if flagsum is True.
+            flagdetailedsum: Compute detailed before and after flagging statistics summaries. Parameter available only when if flagsum is ``True``.
 
             parallel: Process multiple MeasurementSets in parallel using the casampi parallelization framework.
-                options: 'automatic', 'true', 'false', True, False
-                default: None (equivalent to False)
+
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``None`` (equivalent to ``False``)
 
         """
         super().__init__()

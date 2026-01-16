@@ -207,12 +207,12 @@ class SpwPhaseupInputs(gtypegaincal.GTypeGaincalInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             vis: The list of input MeasurementSets. Defaults to the list of
                 MeasurementSets specified in the pipeline context.
 
-                Example: vis=['M82A.ms', 'M82B.ms']
+                Example: ``vis=['M82A.ms', 'M82B.ms']``
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
@@ -220,13 +220,13 @@ class SpwPhaseupInputs(gtypegaincal.GTypeGaincalInputs):
             caltable: The list of output calibration tables. Defaults to the standard
                 pipeline naming convention.
 
-                Example: caltable=['M82.gcal', 'M82B.gcal']
+                Example: ``caltable=['M82.gcal', 'M82B.gcal']``
 
             intent: A string containing a comma delimited list of intents against
                 which the selected fields are matched. Defaults to the BANDPASS
                 observations.
 
-                Example: intent='PHASE'
+                Example: ``intent='PHASE'``
 
             hm_spwmapmode: The spectral window mapping mode. The options are: 'auto',
                 'combine', 'simple', and 'default'. In 'auto' mode hifa_spwphaseup
@@ -238,56 +238,56 @@ class SpwPhaseupInputs(gtypegaincal.GTypeGaincalInputs):
                 'samebb'. In 'default' mode the spectral window map defaults to the
                 standard one to one mapping.
 
-                Example: hm_spwmapmode='combine'
+                Example:`` hm_spwmapmode='combine'``
 
             phasesnr: The required phase gaincal solution signal-to-noise.
 
-                Example: phasesnr=20.0
+                Example: ``phasesnr=20.0``
 
             intphasesnr: The required solint='int' phase gaincal solution signal-to-noise.
 
-                Example: intphasesnr=4.0
+                Example: ``intphasesnr=4.0``
 
             intphasesnrmin: The required solint='int' phase gaincal solution
                 signal-to-noise for fields that cover the AMPLITUDE calibrator
                 intent.
 
-                Example: intphasesnrmin=3.0
+                Example: ``intphasesnrmin=3.0``
 
             phaseupmaxsolint: Maximum phase correction solution interval (in
                 seconds) allowed in very low-SNR cases. Used only when
                 ``hm_spwmapmode`` = 'auto' or 'combine'.
 
-                Example: phaseupmaxsolint=60.0
+                Example: ``phaseupmaxsolint=60.0``
 
             bwedgefrac: The fraction of the bandwidth edges that is flagged.
 
-                Example: bwedgefrac=0.0
+                Example: ``bwedgefrac=0.0``
 
             hm_nantennas: The heuristics for determines the number of antennas to use
                 in the signal-to-noise estimate. The options are 'all' and 'unflagged'.
                 The 'unflagged' options is not currently supported.
 
-                Example: hm_nantennas='unflagged'
+                Example: ``hm_nantennas='unflagged'``
 
             maxfracflagged: The maximum fraction of an antenna that can be flagged
                 before it is excluded from the signal-to-noise estimate.
 
-                Example: maxfracflagged=0.80
+                Example: ``maxfracflagged=0.80``
 
             maxnarrowbw: The maximum bandwidth defining narrow spectral windows. Values
                 must be in CASA compatible frequency units.
 
-                Example: maxnarrowbw=''
+                Example: ``maxnarrowbw=''``
 
             minfracmaxbw: The minimum fraction of the maximum bandwidth in the set of
                 spws to use for matching.
 
-                Example: minfracmaxbw=0.75
+                Example: ``minfracmaxbw=0.75``
 
             samebb: Match within the same baseband if possible.
 
-                Example: samebb=False
+                Example: ``samebb=False``
 
             unregister_existing: Unregister previous spwphaseup calibrations from the pipeline context
                 before registering the new calibrations from this task.
@@ -295,28 +295,28 @@ class SpwPhaseupInputs(gtypegaincal.GTypeGaincalInputs):
             field: The list of field names or field ids for which phase offset solutions
                 are to be computed. Defaults to all fields with the default intent.
 
-                Example: field='3C279', field='3C279, M82'
+                Example: ``field='3C279'``, ``field='3C279, M82'``
 
             spw: The list of spectral windows and channels for which gain solutions are
                 computed. Defaults to all the science spectral windows.
 
-                Example: spw='13,15'
+                Example: ``spw='13,15'``
 
-            combine: Data axes to combine for solving. Options are '', 'scan', 'spw',
-                'field' or any comma-separated combination.
+            combine: Data axes to combine for solving. Options are ``''``, ``'scan'``, ``'spw'``,
+                ``'field'`` or any comma-separated combination.
 
-                Example: combine=''
+                Example: ``combine=''``
 
             refant: Reference antenna name(s) in priority order. Defaults to most recent
                 values set in the pipeline context.  If no reference antenna is defined in
                 the pipeline context the CASA defaults are used.
 
-                Example: refant='DV01', refant='DV05,DV07'
+                Example: ``refant='DV01'``, ``refant='DV05,DV07'``
 
             minblperant: Minimum number of baselines required per antenna for each solve.
                 Antennas with fewer baselines are excluded from solutions.
 
-                Example: minblperant=2
+                Example: ``minblperant=2``
 
             minsnr: Solutions below this SNR are rejected.
 
@@ -1036,7 +1036,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         # grouping of SpWs and collect the corresponding CalApplications from
         # the task results. Each caltable should have a unique filename since
         # the filename includes the SpW selection.
-        original_calapps = []
+        calapps_pool, calapps_final = [], []
         for spectral_spec, tuning_spw_ids in utils.get_spectralspec_to_spwid_map(scan_spws).items():
             tuning_spw_str = ','.join([str(i) for i in sorted(tuning_spw_ids)])
             LOG.info('Processing spectral spec {}, spws {}'.format(spectral_spec, tuning_spw_str))
@@ -1073,16 +1073,17 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             phasecal_result = self._executor.execute(phasecal_task)
 
             # Collect CalApplications.
-            original_calapps.extend(phasecal_result.pool)
+            # PIPE-2752: calapps_final excludes expected caltables that were not successfully created.
+            calapps_pool.extend(phasecal_result.pool)
+            calapps_final.extend(phasecal_result.final)
 
         # Phase solution caltables should always be registered to be applied
         # with calwt=False (PIPE-1154). Create an updated version of each
         # CalApplication with the override to set calwt to False. Replace any
         # existing CalApplications in latest tuning result with complete list
         # of all updated CalApplications, and return this as the final result.
-        processed_calapps = [callibrary.copy_calapplication(c, calwt=False) for c in original_calapps]
-        phasecal_result.pool = processed_calapps
-        phasecal_result.final = processed_calapps
+        phasecal_result.pool = [callibrary.copy_calapplication(c, calwt=False) for c in calapps_pool]
+        phasecal_result.final = [callibrary.copy_calapplication(c, calwt=False) for c in calapps_final]
 
         return phasecal_result
 
@@ -1181,6 +1182,17 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             # there can be separate gaintable (one per spectralspec).
             for calapp in result.final:
                 # Get SpWs and SNR info from caltable.
+                if not os.path.exists(calapp.gaintable):
+                    # PIPE-2752: log a warning and skip a calapp if its caltable
+                    # was not successfully created; ideally this should not
+                    # happen since we are using result.final here.
+                    LOG.warning(
+                        'No caltable found at %s, cannot compute median SNR info for field=%s, intent=%s.',
+                        calapp.gaintable,
+                        field,
+                        intent,
+                    )
+                    continue
                 with casa_tools.TableReader(calapp.gaintable) as table:
                     spws = table.getcol("SPECTRAL_WINDOW_ID")
                     snrs = table.getcol("SNR")

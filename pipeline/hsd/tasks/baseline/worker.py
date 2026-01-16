@@ -309,7 +309,7 @@ class BaselineSubtractionResults(common.SingleDishResults):
         No specific merge operation is done.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
         """
         super(BaselineSubtractionResults, self).merge_with_context(context)
 

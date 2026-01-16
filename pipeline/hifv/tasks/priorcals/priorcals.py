@@ -54,7 +54,7 @@ class PriorcalsInputs(vdp.StandardInputs):
             vis(str): List of visibility data files. These may be ASDMs, tar files of ASDMs, MSes, or tar files of MSes, If ASDM files are specified, they will be
                 converted  to MS format.
 
-                Example: vis=['X227.ms', 'asdms.tar.gz']
+                Example: ``vis=['X227.ms', 'asdms.tar.gz']``
 
             show_tec_maps(bool): Plot tec maps. Display the plot output from the CASA tec_maps recipe function.
 

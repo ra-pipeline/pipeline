@@ -1,26 +1,26 @@
-"""
-Pipeline Regression framework.
+"""Pipeline Regression Testing Framework.
 
-PipelineRegression class runs on pytest framework, so it needs to implement
-test_* methods for testing.
+This module provides the `PipelineRegression` class and associated pytest test functions
+for automated regression testing of the NRAO pipeline. It supports both ALMA and VLA
+pipelines, using either Pipeline Processing Request (PPR) files or recipe XML files.
+
+See individual test functions or class methods for examples of ALMA, VLA, and VLASS 
+regression tests.
 """
 from __future__ import annotations
 
 import ast
-import shutil
-import datetime
 import glob
 import json
 import math
 import numbers
 import os
-import packaging.version
-import platform
-import pytest
 import re
+import shutil
 from typing import TYPE_CHECKING, Optional
 
-from casatasks.private import tec_maps
+import packaging.version
+import pytest
 
 from pipeline import environment, infrastructure, recipereducer
 from pipeline.infrastructure import casa_tools, executeppr, executevlappr, launcher, utils
@@ -49,10 +49,9 @@ class PipelineRegression:
             expectedoutput_dir: Optional[str] = None,
             use_json: bool = True,
             ):
-        """
-        Initializes a PipelineRegression instance.
+        """Initializes a PipelineRegression instance.
 
-        A list of MeasurementSet names (`visname`) is required. Either `ppr` or `recipe` must be provided; 
+        A list of MeasurementSet names (`visname`) is required. Either `ppr` or `recipe` must be provided;
         if both are given, `ppr` takes precedence.
 
         Args:
@@ -164,7 +163,7 @@ class PipelineRegression:
         Current heuristics will reject any file with CASA or Pipeline versions that exceed the current running versions
 
         Args:
-            reference_dict: filenames as keys and dictionaries as values containing CASA and Pipeline versions 
+            reference_dict: filenames as keys and dictionaries as values containing CASA and Pipeline versions
                 extracted from the filenames
         Returns:
             best_match: results filename determined to be most relevant for comparison
@@ -260,12 +259,12 @@ class PipelineRegression:
         Args:
             telescope: string 'alma' or 'vla'
             default_relative_tolerance: default relative tolerance of output value
-            omp_num_threads: specify the number of OpenMP threads used for this regression test instance, regardless of 
-                             the default value of the current CASA session. An explicit setting could mitigate potential small 
-                             numerical difference from threading-sensitive CASA tasks (e.g. setjy/tclean, which relies 
+            omp_num_threads: specify the number of OpenMP threads used for this regression test instance, regardless of
+                             the default value of the current CASA session. An explicit setting could mitigate potential small
+                             numerical difference from threading-sensitive CASA tasks (e.g. setjy/tclean, which relies
                              on the FFTW library).
 
-        note: Because a PL execution depends on global CASA states, only one test can run under 
+        note: Because a PL execution depends on global CASA states, only one test can run under
         a CASA process at the same. Therefore a parallelization based on process-forking might not work
         properly (e.g., xdist: --forked).  However, it's okay to group tests under several independent
         subprocesses (e.g., xdist: -n 4)
@@ -275,42 +274,38 @@ class PipelineRegression:
         # set datapath in ~/.casa/config.py, e.g. datapath = ['/users/jmasters/pl-testdata.git']
         input_vis = [casa_tools.utils.resolve(testinput) for testinput in self.testinput]
 
-        if not self.compare_only:
+        if not self.compare_only and omp_num_threads is not None:
             # optionally set OpenMP nthreads to a specified value.
-            if omp_num_threads is not None:
-                # casa_tools.casalog.ompGetNumThreads() and get_casa_session_details()['omp_num_threads'] are equivalent.
-                default_nthreads = utils.get_casa_session_details()['omp_num_threads']
-                casa_tools.casalog.ompSetNumThreads(omp_num_threads)
-
-            last_casa_logfile = casa_tools.casalog.logfile()
+            # casa_tools.casalog.ompGetNumThreads() and utils.get_casa_session_details()['omp_num_threads'] are equivalent.
+            default_nthreads = utils.get_casa_session_details()['omp_num_threads']
+            casa_tools.casalog.ompSetNumThreads(omp_num_threads)
 
         try:
-            # run the pipeline for new results
+            with utils.work_directory(self.output_dir, create=True, subdir=True):
+                if not self.compare_only:
+                    # run the pipeline for new results
+                    if self.ppr:
+                        self.__run_ppr(input_vis, self.ppr, telescope)
+                    else:
+                        self.__run_reducer(input_vis)
 
-            # switch from the pytest-call working directory to the root folder for this test.
-            os.chdir(self.output_dir)
+                # Do sanity checks
+                self.__do_sanity_checks()
 
-            if not(self.compare_only):
-                # create the sub-directory structure for this test and switch to "working/"
-                dd_list = ['products', 'working', 'rawdata'] if self.ppr else ['products', 'working']
-                for dd in dd_list:
-                    try:
-                        os.mkdir(dd)
-                    except FileExistsError:
-                        pass
-                os.chdir('working')
+                # Copy the reference results file to current working directory for record
+                if self.expectedoutput_file and os.path.exists(self.expectedoutput_file):
+                    shutil.copyfile(self.expectedoutput_file, os.path.basename(self.expectedoutput_file))
 
-                # PIPE-1301: shut down the existing plotms process to avoid side-effects from changing CWD.
-                # This is implemented as a workaround for CAS-13626
-                utils.shutdown_plotms()
+                # Get new results
+                new_results = self.__get_results_of_from_current_context()
 
-                # PIPE-1432: reset casatasks/tec_maps.workDir as it's unaware of a CWD change.
-                if hasattr(tec_maps, 'workDir'):
-                    tec_maps.workDir = os.getcwd()+'/'
+                # new results file path
+                new_file = f'{self.visname[0]}.NEW.results.txt'
 
-                # switch to per-test casa/PL logfile paths and backup the default(initial) casa logfile name
-                self.__reset_logfiles(prepend=True)
+                # Store new results in a file
+                self.__save_new_results_to(new_file, new_results)
 
+<<<<<<< HEAD
                 if self.ppr:
                     self.__run_ppr(input_vis, self.ppr, telescope)
                 else:
@@ -335,14 +330,12 @@ class PipelineRegression:
 
             # Compare new results with expected results
             self.__compare_results(new_file, default_relative_tolerance, json=use_json)
+=======
+                # Compare new results with expected results
+                self.__compare_results(new_file, default_relative_tolerance)
+>>>>>>> 350d7136e1863a6a549fb250ad56f262f7e072b8
 
         finally:
-            if not self.compare_only:
-                # restore the default logfile state
-                self.__reset_logfiles(casa_logfile=last_casa_logfile)
-
-            os.chdir(self.current_path)
-
             # clean up if requested
             if not self.compare_only and self.remove_workdir and os.path.isdir(self.output_dir):
                 shutil.rmtree(self.output_dir)
@@ -604,35 +597,6 @@ class PipelineRegression:
         LOG.warning("Running without Pipeline Processing Request (PPR).  Using recipereducer instead.")
         recipereducer.reduce(vis=input_vis, procedure=self.recipe)
 
-    def __reset_logfiles(self,
-                         casacalls_logfile: Optional[str] = None,
-                         casa_logfile: Optional[str] = None,
-                         prepend: Optional[bool] = False
-                         ) -> None:
-        """Put CASA/Pipeline logfiles into the test working directory."""
-
-        # reset casacalls-*.txt
-        if casacalls_logfile is None:
-            casacalls_logfile = 'casacalls-{!s}.txt'.format(platform.node().split('.')[0])
-        else:
-            casacalls_logfile = casacalls_logfile
-        infrastructure.logging.get_logger('CASACALLS', stream=None, format='%(message)s', addToCasaLog=False,
-                           filename=casacalls_logfile)
-        # reset casa-*.log
-        if casa_logfile is None:
-            now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M%S")
-            casa_logfile = os.path.abspath(f'casa-{now_str}.log')
-        else:
-            casa_logfile = os.path.abspath(casa_logfile)
-        last_casa_logfile = casa_tools.casalog.logfile()
-        casa_tools.casalog.setlogfile(casa_logfile)
-
-        # prepend the content of the last CASA logfile in the new logfile.
-        if prepend and os.path.exists(last_casa_logfile) and casa_logfile != last_casa_logfile:
-            with open(last_casa_logfile, 'r') as infile:
-                with open(casa_logfile, 'a') as outfile:
-                    outfile.write(infile.read())
-
 
 # The methods below are test methods called from pytest.
 @pytest.mark.fast
@@ -765,12 +729,14 @@ def test_uid___A002_X85c183_X36f__procedure_hsd_calimage__regression():
     Recipe name:                procedure_hsd_calimage
     Dataset:                    uid___A002_X85c183_X36f
     """
+    input_dir = 'pl-regressiontest/uid___A002_X85c183_X36f'
+
     pr = PipelineRegression(
         visname=['uid___A002_X85c183_X36f'],
         recipe='procedure_hsd_calimage.xml',
-        input_dir='pl-regressiontest/uid___A002_X85c183_X36f',
-        expectedoutput_dir=('pl-regressiontest/uid___A002_X85c183_X36f')
-        )
+        input_dir=input_dir,
+        expectedoutput_dir=input_dir
+    )
 
     pr.run()
 
@@ -783,12 +749,13 @@ def test_uid___A002_X85c183_X36f_SPW15_23__PPR__regression():
     Dataset:                    uid___A002_X85c183_X36f_SPW15_23
     """
     input_dir = 'pl-regressiontest/uid___A002_X85c183_X36f_SPW15_23'
+
     pr = PipelineRegression(
         visname=['uid___A002_X85c183_X36f_SPW15_23.ms'],
         ppr=f'{input_dir}/PPR.xml',
         input_dir=input_dir,
-        expectedoutput_dir=('pl-regressiontest/uid___A002_X85c183_X36f_SPW15_23')
-        )
+        expectedoutput_dir=input_dir
+    )
 
     # copy files use restore task into products folder
     if not pr.compare_only:
@@ -806,12 +773,20 @@ def test_uid___mg2_20170525142607_180419__procedure_hsdn_calimage__regression():
     Recipe name:                procedure_hsdn_calimage
     Dataset:                    mg2-20170525142607-180419
     """
+    input_dir = 'pl-regressiontest/mg2-20170525142607-180419'
+
     pr = PipelineRegression(
         visname=['mg2-20170525142607-180419.ms'],
         recipe='procedure_hsdn_calimage.xml',
+<<<<<<< HEAD
         input_dir='pl-regressiontest/mg2-20170525142607-180419',
         expectedoutput_file=('pl-regressiontest/mg2-20170525142607-180419/' +
                              'pipeline_stats_casa-6.6.6-16-pipeline-2025.1.1.33.json'))
+=======
+        input_dir=input_dir,
+        expectedoutput_dir=input_dir
+    )
+>>>>>>> 350d7136e1863a6a549fb250ad56f262f7e072b8
     pr.run()
 
 
@@ -823,14 +798,13 @@ def test_uid___mg2_20170525142607_180419__PPR__regression():
     Dataset:                    mg2-20170525142607-180419
     """
 
-    input_dir = 'pl-regressiontest/mg2-20170525142607-180419'
+    input_dir = 'pl-regressiontest/mg2-20170525142607-180419_PPR'
 
     pr = PipelineRegression(
         visname=['mg2-20170525142607-180419.ms'],
         ppr=f'{input_dir}/PPR.xml',
         input_dir=input_dir,
-        expectedoutput_file=(f'{input_dir}/' +
-                             'pipeline_stats_casa-6.6.6-16-pipeline-2025.1.1.33.json'),
+        expectedoutput_dir=input_dir,
         output_dir='mg2-20170525142607-180419_PPR')
 
     # copy files use restore task into products folder
@@ -860,17 +834,16 @@ def test_csv_3899_eb2_small__procedure_hifa_calimage__regression():
     pr.run(omp_num_threads=1)
 
 
-@pytest.mark.skip(reason="Recent failure needs longer investigation")
 @pytest.mark.alma
 def test_uid___A002_Xee1eb6_Xc58d_pipeline__procedure_hifa_calsurvey__regression():
-    """Run ALMA cal+survey regression on a calibration survey test dataset
- 
+    """Run ALMA cal+survey regression on a calibration survey test dataset.
+
     Recipe name:                procedure_hifa_calsurvey
     Dataset:                    uid___A002_Xee1eb6_Xc58d_original.ms
     """
     input_directory = 'pl-regressiontest/uid___A002_Xee1eb6_Xc58d_calsurvey/'
     pr = PipelineRegression(
-        visname=['uid___A002_Xee1eb6_Xc58d_original.ms'],
+        visname=['uid___A002_Xee1eb6_Xc58d'],
         recipe='procedure_hifa_calsurvey.xml',
         input_dir=input_directory,
         expectedoutput_dir=input_directory,
@@ -1089,7 +1062,7 @@ class TestSlowerRegression:
     @pytest.mark.alma
     @pytest.mark.twelve
     def test_2018_1_01255_S__uid___A002_Xe0e4ca_Xb18_regression(self, data_directory):
-        """Run longer regression test on this ALMA if dataset 
+        """Run longer regression test on this ALMA if dataset
 
         Dataset: 2018.1.01255.S: uid___A002_Xe0e4ca_Xb18, uid___A002_Xeb9695_X2fe5
         """
@@ -1132,7 +1105,7 @@ class TestSlowerRegression:
     @pytest.mark.alma
     @pytest.mark.twelve
     def test_2019_1_01184_S__uid___A002_Xe1d2cb_X12782_regression(self, data_directory):
-        """Run longer regression test on this ALMA if dataset 
+        """Run longer regression test on this ALMA if dataset
 
         Dataset: 2019_1_01184_S: uid___A002_Xe1d2cb_X12782, uid___A002_Xe850fb_X4efc
         """
@@ -1153,7 +1126,7 @@ class TestSlowerRegression:
     @pytest.mark.alma
     @pytest.mark.twelve
     def test_2019_1_00678_S__uid___A002_Xe6a684_X7c41__PPR__regression(self, data_directory):
-        """Run longer regression test on this ALMA if dataset 
+        """Run longer regression test on this ALMA if dataset
 
         Dataset: 2019.1.00678.S: uid___A002_Xe6a684_X7c41
         """
@@ -1174,7 +1147,7 @@ class TestSlowerRegression:
     @pytest.mark.alma
     @pytest.mark.twelve
     def test_2017_1_00670_S__uid___A002_Xca8fbf_X5733__PPR__regression(self, data_directory):
-        """Run longer regression test on this ALMA if dataset 
+        """Run longer regression test on this ALMA if dataset
 
         Dataset: 2017.1.00670.S: uid___A002_Xca8fbf_X5733
         """
@@ -1242,7 +1215,7 @@ class TestSlowerRegression:
     def test_2019_1_01056_S__uid___A002_Xe1f219_X6d0b__PPR__regression(self, data_directory):
         """Run longer regression test on this ALMA IF dataset
 
-        ALMA 7m 
+        ALMA 7m
 
         Dataset: 2019.1.01056.S: uid___A002_Xe1f219_X6d0bm, uid___A002_Xe1f219_X7ee8
         """
@@ -1294,7 +1267,7 @@ class TestSlowerRegression:
         ref_directory = 'pl-regressiontest/2019.1.01056.S/'
 
         pr = PipelineRegression(
-            visname=['uid___A002_Xe1d2cb_X110f1', 'uid___A002_Xe1d2cb_X11d0a', 'uid___A002_Xe1f219_X6eeb'], 
+            visname=['uid___A002_Xe1d2cb_X110f1', 'uid___A002_Xe1d2cb_X11d0a', 'uid___A002_Xe1f219_X6eeb'],
             recipe='procedure_hsd_calimage.xml',
             input_dir=test_directory,
             project_id="2019_1_01056_S",
@@ -1516,7 +1489,7 @@ class TestSlowerRegression:
             os.mkdir(f'{pr.output_dir}/working/')
         except FileExistsError:
             pass
-        
+
         # Copy parameter list file into the working directory
         if not pr.compare_only:
             parameter_list_file = casa_tools.utils.resolve(f'{input_dir}/SEIP_parameter_awp32.list')

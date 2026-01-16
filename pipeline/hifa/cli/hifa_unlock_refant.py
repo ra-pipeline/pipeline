@@ -1,15 +1,13 @@
-import sys
-
 import pipeline.h.cli.utils as utils
 
 
 # docstring and type hints: inherits from hifa.tasks.unlock_refant.unlock_refant.UnlockRefAntInputs.__init__
 @utils.cli_wrapper
 def hifa_unlock_refant(vis=None):
-    """Unlock reference antenna list
+    """Unlock reference antenna list.
 
     hifa_unlock_refant marks the reference antenna list as "unlocked" for
-    specified measurement sets, allowing the list to be modified by subsequent
+    specified MeasurementSets, allowing the list to be modified by subsequent
     tasks.
 
     After executing hifa_unlock_refant, all subsequent gaincal calls will by
@@ -26,24 +24,3 @@ def hifa_unlock_refant(vis=None):
         >>> hifa_unlock_refant()
 
     """
-    ##########################################################################
-    #                                                                        #
-    #  CASA task interface boilerplate code starts here. No edits should be  #
-    #  needed beyond this point.                                             #
-    #                                                                        #
-    ##########################################################################
-
-    # create a dictionary containing all the arguments given in the
-    # constructor
-    all_inputs = vars()
-
-    # get the name of this function for the weblog, eg. 'hif_flagdata'
-    task_name = sys._getframe().f_code.co_name
-
-    # get the context on which this task operates
-    context = utils.get_context()
-
-    # execute the task
-    results = utils.execute_task(context, task_name, all_inputs)
-
-    return results

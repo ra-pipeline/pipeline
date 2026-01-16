@@ -13,6 +13,7 @@ from pipeline.infrastructure import task_registry
 from pipeline.infrastructure.utils import relative_path
 import pipeline.infrastructure.vdp as vdp
 from pipeline.h.heuristics import caltable as caltable_heuristic
+from pipeline.hsd.tasks.common import observatory_policy
 from . import jyperkreader
 
 if TYPE_CHECKING:
@@ -314,6 +315,18 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
         if factors_used is None:
             LOG.error("MS and caltable are inconsistent")
             return SDK2JyCalResults(os.path.basename(vis))
+
+        # check whether the factors are within the valid range
+        calibration_policy = observatory_policy.get_calibration_policy( inputs.context )
+        ms = inputs.context.observing_run.get_ms( vis )
+        for spw, factors_spw in factors_used.items():
+            for ant_name, factors_ant in factors_spw.items():
+                for pol_name, factor in factors_ant.items():
+                    valid_range = calibration_policy.get_jyperk_valid_range( ms, spw, ant_name, pol_name )
+                    if factor < valid_range[0] or factor > valid_range[1]:
+                        LOG.warning(
+                            "Invalid Jy/K factor %f for %s, %s, spw%s, pol %s. (should be within %f and %f).",
+                            factor, vis, ant_name, spw, pol_name, valid_range[0], valid_range[1] )
 
         # write jyperk data to file if fetched from DB
         if caltable_status is True:

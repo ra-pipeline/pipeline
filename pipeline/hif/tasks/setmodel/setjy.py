@@ -199,25 +199,25 @@ class SetjyInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
-                Defaults to None, which corresponds to the current working directory.
+                Defaults to ``None``, which corresponds to the current working directory.
 
             vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets defined in the pipeline context.
 
             field: The list of field names or field ids for which the models are to be set. Defaults to all fields with intent '`*AMPLITUDE*`'.
 
-                Example: field='3C279', field='3C279, M82'
+                Example: ``field='3C279'``, ``field='3C279, M82'``
 
             intent: A string containing a comma delimited list of intents against which the selected fields are matched. Defaults to all data
                 with amplitude intent.
 
-                Example: intent='`*AMPLITUDE*`'
+                Example: ``intent='*AMPLITUDE*'``
 
             spw: The list of spectral windows and channels for which bandpasses are computed. Defaults to all science spectral windows.
 
-                Example: spw='11,13,15,17'
+                Example: ``spw='11,13,15,17'``
 
             model: Model image for setting model visibilities. Not fully supported.
 
@@ -230,7 +230,7 @@ class SetjyInputs(vdp.StandardInputs):
                 ones recognized by 'standard', including 3C286, 3C48, 3C147, and several
                 planets, moons, and asteroids.
 
-                Example: [3.06,0.0,0.0,0.0]
+                Example: ``[3.06,0.0,0.0,0.0]``
 
             spix: Spectral index for fluxdensity S = fluxdensity * (freq/reffreq)**spix Only used if fluxdensity is being used. If fluxdensity is positive, and
                 spix is nonzero, then reffreq must be set too. It is applied in the same
@@ -243,7 +243,7 @@ class SetjyInputs(vdp.StandardInputs):
                 the other hand, if spix is 0, then any positive frequency can be used and
                 will be ignored.
 
-                Example: reffreq='86.0GHz', reffreq='4.65e9Hz'
+                Example: ``reffreq='86.0GHz'``, ``reffreq='4.65e9Hz'``
 
             standard: Flux density standard, used if fluxdensity[0] less than 0.0. The options are: 'Baars','Perley 90','Perley-Taylor 95', 'Perley-Taylor 99',
                 'Perley-Butler 2010' and 'Butler-JPL-Horizons 2010'.
@@ -256,12 +256,12 @@ class SetjyInputs(vdp.StandardInputs):
                 values for all calibrators except solar system calibrators. By default the
                 path is set to the CSV file created by h_importdata, consisting of
                 catalogue fluxes extracted from the ASDM.
-                example: reffile='', reffile='working/flux.csv'
+                example: ``reffile=''``, ``reffile='working/flux.csv'``
 
             normfluxes: Normalize lookup fluxes.
 
         """
-        super(SetjyInputs, self).__init__()
+        super().__init__()
 
         self.context = context
         self.vis = vis
@@ -282,7 +282,7 @@ class SetjyInputs(vdp.StandardInputs):
         self.normfluxes = normfluxes
 
     def to_casa_args(self):
-        d = super(SetjyInputs, self).to_casa_args()
+        d = super().to_casa_args()
 
         d['fluxdensity'] = d['refspectra'][1]
         try:

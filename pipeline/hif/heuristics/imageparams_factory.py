@@ -41,19 +41,19 @@ class ImageParamsHeuristicsFactory(object):
             # VLASS QuickLook
             return ImageParamsHeuristicsVlassQl(vislist, spw, observing_run, imagename_prefix, proj_params, contfile, linesfile, imaging_params, processing_intents)
         if imaging_mode in ['VLASS-SE-CONT', 'VLASS-SE-CONT-AWP', 'VLASS-SE-CONT-AWP-P032']:
-            # VLASS single epoch continuum, gridder='awp', wprojplanes=32
+            # VLASS single epoch continuum, gridder='awp', default to wprojplanes=32
             return ImageParamsHeuristicsVlassSeCont(vislist, spw, observing_run, imagename_prefix, proj_params, contfile, linesfile, imaging_params, processing_intents)
         if imaging_mode == 'VLASS-SE-CONT-AWP-P001':
             # VLASS single epoch continuum, gridder='awp', wprojplanes=1
             return ImageParamsHeuristicsVlassSeContAWPP001(vislist, spw, observing_run, imagename_prefix, proj_params, contfile, linesfile, imaging_params, processing_intents)
         if imaging_mode in ['VLASS-SE-CONT-AWP2', 'VLASS-SE-CONT-AWP2-P032']:
-            # VLASS single epoch continuum, gridder='awp2', wprojplanes=32
+            # VLASS single epoch continuum, gridder='awp2', default to wprojplanes=32
             return ImageParamsHeuristicsVlassSeContAWP2(vislist, spw, observing_run, imagename_prefix, proj_params, contfile, linesfile, imaging_params, processing_intents)
         if imaging_mode == 'VLASS-SE-CONT-AWP2-P001':
             # VLASS single epoch continuum, gridder='awp2', wprojplanes=1
             return ImageParamsHeuristicsVlassSeContAWP2P001(vislist, spw, observing_run, imagename_prefix, proj_params, contfile, linesfile, imaging_params, processing_intents)
         if imaging_mode in ['VLASS-SE-CONT-AWPHPG', 'VLASS-SE-CONT-AWPHPG-P032']:
-            # VLASS single epoch continuum, gridder='awphpg', wprojplanes=32
+            # VLASS single epoch continuum, gridder='awphpg', default to wprojplanes=32
             return ImageParamsHeuristicsVlassSeContAWPHPG(vislist, spw, observing_run, imagename_prefix, proj_params, contfile, linesfile, imaging_params, processing_intents)
         if imaging_mode == 'VLASS-SE-CONT-AWPHPG-P001':
             # VLASS single epoch continuum, gridder='awphpg', wprojplanes=1

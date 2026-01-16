@@ -52,7 +52,7 @@ class TsysflagInputs(tsysflag.TsysflagInputs):
         """Construct TsysflagInputs instance for SD Tsysflag task.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
 

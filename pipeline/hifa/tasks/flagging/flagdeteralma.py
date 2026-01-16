@@ -64,7 +64,7 @@ class FlagDeterALMAInputs(flagdeterbase.FlagDeterBaseInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             vis: The list of input MeasurementSets. Defaults to the list of
                 MeasurementSets defined in the pipeline context.
@@ -88,12 +88,12 @@ class FlagDeterALMAInputs(flagdeterbase.FlagDeterBaseInputs):
             scannumber: A string containing a comma delimited list of scans to be
                 flagged.
 
-                Example: scannumber='3,5,6'
+                Example: ``scannumber='3,5,6'``
 
             intents: A string containing a comma delimited list of intents against
                 which the scans to be flagged are matched.
 
-                Example: intents='`*BANDPASS*`'
+                Example: ``intents='*BANDPASS*`'``
 
             edgespw: Flag the edge spectral window channels.
 
@@ -147,8 +147,10 @@ class FlagDeterALMAInputs(flagdeterbase.FlagDeterBaseInputs):
             qa2: QA2 flags.
 
             parallel: Process multiple MeasurementSets in parallel using the casampi parallelization framework.
-                options: 'automatic', 'true', 'false', True, False
-                default: None (equivalent to False)
+
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``None`` (equivalent to ``False``)
 
         """
         super().__init__(
@@ -660,7 +662,11 @@ def lowtrans_alma(ms: MeasurementSet, mintransrepspw: float, mintransnonrepspws:
         return commands
 
     # Get list of science scans and science SpWs, and representative SpW.
-    scans = ms.get_scans(scan_intent="TARGET")
+    scans = ms.get_scans(scan_intent='TARGET')
+    if not scans:
+        LOG.info('No science target scans found in MS %s, no flagging commands generated.', ms.name)
+        return commands
+
     scispws = ms.get_spectral_windows()
     _, repr_spwid = ms.get_representative_source_spw()
 

@@ -3,15 +3,15 @@ from __future__ import annotations
 import collections
 import copy
 import fnmatch
-import inspect
 import math
 import operator
 import os.path
 import re
 import shutil
+import traceback
 import uuid
 from typing import TYPE_CHECKING, List, Optional, Union
-import traceback
+
 import astropy.units as u
 import numpy as np
 from astropy.coordinates import SkyCoord
@@ -27,6 +27,7 @@ import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.utils as utils
 from pipeline.hif.heuristics import mosaicoverlap
 from pipeline.infrastructure import casa_tools, logging
+from pipeline.infrastructure.launcher import current_task_name
 from pipeline.infrastructure.utils.conversion import phasecenter_to_skycoord, refcode_to_skyframe
 
 if TYPE_CHECKING:
@@ -791,8 +792,8 @@ class ImageParamsHeuristics(object):
         is_mos_or_het = self._is_mosaic(fields) or len(self.antenna_diameters()) > 1
         if not is_mos_or_het:
             max_separation_uarcsec = cqa.getvalue(cqa.convert(max_separation, "uarcsec"))[0]  # in micro arcsec
-            # PIPE-1504: only issue this message at the WARNING level if it's executed by hifa_imageprecheck
-            if 'hifa_imageprecheck' in [fn_name for (_, _, _, fn_name, _, _) in inspect.stack()]:
+            # PIPE-1504/PIPE-2859: only issue this message at the WARNING level if it's executed by hifa_imageprecheck
+            if current_task_name.get() == 'hifa_imageprecheck':
                 log_level = logging.WARNING
             else:
                 log_level = logging.INFO
@@ -1166,6 +1167,37 @@ class ImageParamsHeuristics(object):
         virtual_repr_spw = self.observing_run.real2virtual_spw_id(repr_spw, repr_ms)
 
         return repr_target, repr_source, virtual_repr_spw, repr_freq, reprBW_mode, real_repr_target, minAcceptableAngResolution, maxAcceptableAngResolution, maxAllowedBeamAxialRatio, sensitivityGoal
+
+    def imaging_imsize(
+        self, cutout_imsize: list[int], cell: str, primary_beam: float, sfpblimit: Optional[float] = None
+    ) -> tuple[list[int], list[str]]:
+        """Calculates imaging imsize based on a requested cutout size.
+
+        Args:
+            cutout_imsize: A list of two integers [nxpix, nypix] defining the
+                requested cutout/final image size.
+            cell: cell size of imaging in string format with units (e.g. '0.1arcsec').
+            primary_beam: The primary beam size in arcseconds.
+            sfpblimit: The single field primary beam response limit. This argument is
+                not used in the current implementation.
+
+        Returns:
+            A tuple containing:
+                - A list of two integers for the calculated image size in pixels.
+                - A list of two strings for the cutout size with units.
+        """
+        qa_tool = casa_tools.quanta
+        cell_arcsec = qa_tool.convert(cell, 'arcsec')['value']
+
+        buffer_size = math.ceil(primary_beam * 1.5 / cell_arcsec * 0.5)
+        
+        csu = casa_tools.synthesisutils
+        imsize = [csu.getOptimumSize(size + 2 * buffer_size) for size in cutout_imsize]
+        csu.done()
+        
+        cutout_imsize_str = [f'{size * cell_arcsec}arcsec' for size in cutout_imsize]
+
+        return imsize, cutout_imsize_str
 
     def imsize(self, fields, cell, primary_beam, sfpblimit=None, max_pixels=None,
                centreonly=False, vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None):

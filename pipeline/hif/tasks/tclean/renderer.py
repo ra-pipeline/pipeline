@@ -1846,20 +1846,21 @@ def get_cycle_stats(context, makeimages_result, r):
                          'peakresidual_array': None,
                          'totalflux_array': None,
                          'planeid_array': None}
+
             if 'summaryminor' in iterdata:
                 # after CAS-6692
-                # note: For MPI runs, one must set the env variable "USE_SMALL_SUMMARYMINOR" to True (see CAS-6692),
-                # or use the proposed new CASA/tclean parameter summary='full' (see CAS-13924).
+                # note: For MPI runs, one must use CASA/tclean parameter fullsummary=True (see CAS-13924).
                 field_id, channel_id = 0, 0  # explictly assume one imaging field & one channel (valid for VLASS)
-                summaryminor = iterdata['summaryminor'][field_id][channel_id]
-                iter_dict['nminordone_array'] = np.asarray([ss for s in summaryminor.values()
-                                                           for sn in zip(s['startIterDone'], s['iterDone']) for ss in [sn[0], sn[0] + sn[1]]])
-                iter_dict['peakresidual_array'] = np.asarray([ss
-                                                              for s in summaryminor.values() for sn in zip(s['startPeakRes'],
-                                                                                                           s['peakRes']) for ss in sn])
-                iter_dict['totalflux_array'] = np.asarray([ss for s in summaryminor.values()
-                                                          for sn in zip(s['startModelFlux'], s['modelFlux']) for ss in sn])
-                iter_dict['planeid_array'] = np.asarray([pp for p in summaryminor for pp in [p]*len(summaryminor[p]['iterDone'])*2])
+                if field_id in iterdata['summaryminor'] and channel_id in iterdata['summaryminor'][field_id]:
+                    summaryminor = iterdata['summaryminor'][field_id][channel_id]
+                    iter_dict['nminordone_array'] = np.asarray([ss for s in summaryminor.values()
+                                                            for sn in zip(s['startIterDone'], s['iterDone']) for ss in [sn[0], sn[0] + sn[1]]])
+                    iter_dict['peakresidual_array'] = np.asarray([ss
+                                                                for s in summaryminor.values() for sn in zip(s['startPeakRes'],
+                                                                                                            s['peakRes']) for ss in sn])
+                    iter_dict['totalflux_array'] = np.asarray([ss for s in summaryminor.values()
+                                                            for sn in zip(s['startModelFlux'], s['modelFlux']) for ss in sn])
+                    iter_dict['planeid_array'] = np.asarray([pp for p in summaryminor for pp in [p]*len(summaryminor[p]['iterDone'])*2])
             else:
                 # before CAS-6692
                 iter_dict['nminordone_array'] = iterdata['nminordone_array'] if 'nminordone_array' in iterdata else None

@@ -2,7 +2,7 @@ from . import utils
 
 
 def h_export_calstate(filename=None, state=None):
-    """Save the pipeline calibration state to disk
+    """Save the pipeline calibration state to disk.
 
     h_export_calstate saves the current pipeline calibration state to disk
     in the form of a set of equivalent applycal calls.
@@ -17,7 +17,7 @@ def h_export_calstate(filename=None, state=None):
     call) or the applied calibration state (calibrations that were previously
     applied to the MeasurementSet using hif_applycal). The default is to export
     the active calibration state.
-    
+
     Args:
         filename: Name for saved calibration state.
 

@@ -5,7 +5,6 @@ The framework module contains:
  2. utility functions used by pipeline tasks to help process framework
     objects (Results, CalLibrary objects, etc.).
 """
-# Do not evaluate type annotations at definition time.
 from __future__ import annotations
 
 import collections
@@ -20,18 +19,16 @@ import os
 import pickle
 import string
 import uuid
-from typing import List, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional, Tuple
+
+from pipeline.infrastructure import daskhelpers, logging, mpihelpers
+from pipeline.infrastructure.jobrequest import JobRequest
 
 from .conversion import flatten, safe_split
-from .. import jobrequest
-from .. import logging
-from .. import mpihelpers
-from pipeline.infrastructure.basetask import ResultsProxy
-from pipeline.infrastructure.jobrequest import JobRequest
-from pipeline.infrastructure.renderer.logger import Plot
 
 if TYPE_CHECKING:
     from pipeline.infrastructure.launcher import Context
+    from pipeline.infrastructure.renderer.logger import Plot
 
 LOG = logging.get_logger(__name__)
 
@@ -62,6 +59,15 @@ def is_top_level_task():
     # know this is not a top-level task without examining the stack.
     if all((mpihelpers.MPIEnvironment.is_mpi_enabled,       # running on MPI cluster
             not mpihelpers.MPIEnvironment.is_mpi_client)):  # running as MPI server
+        return False
+
+    try:
+        from distributed import get_worker
+        worker_id = get_worker().id
+        dask_worker = True
+    except:
+        dask_worker = False
+    if dask_worker:
         return False
 
     return task_depth() == 1
@@ -314,6 +320,7 @@ def contains_single_dish(context: Context) -> bool:
     result0 = context.results[0]
 
     # if ResultsProxy, read pickled result
+    from pipeline.infrastructure.basetask import ResultsProxy
     if isinstance(result0, ResultsProxy):
         result0 = result0.read()
 
@@ -350,7 +357,7 @@ def plotms_iterate(
             len(jobs_and_wrappers) == 1 and
             # .. when we're not plotting basebands, i.e., comma-separated spws
             ',' not in jobs_and_wrappers[0][0].kw.get(iteraxis, '')):
-        jobs_and_wrappers = [(jobrequest.JobRequest(job.fn, *job.args, iteraxis='spw', **job.kw), wrappers)
+        jobs_and_wrappers = [(JobRequest(job.fn, *job.args, iteraxis='spw', **job.kw), wrappers)
                              for job, wrappers in jobs_and_wrappers]
 
     # component jobs containing a comma should be executed as they are. An
@@ -439,7 +446,11 @@ def plotms_iterate(
             # Cycle 6 fallback: revert to serial plotting until CAS-11660,
             # CAS-11578, etc. are fixed.
             tier0_plots_enabled = 'ENABLE_TIER0_PLOTMS' in os.environ or mpihelpers.ENABLE_TIER0_PLOTMS
-            if tier0_plots_enabled and mpihelpers.is_mpi_ready():
+
+            if tier0_plots_enabled and daskhelpers.is_dask_ready():
+                executable = mpihelpers.Tier0JobRequest(casa_tasks.plotms, job_to_execute.kw)
+                queued_job = daskhelpers.FutureTask(executable)
+            elif tier0_plots_enabled and mpihelpers.is_mpi_ready():
                 executable = mpihelpers.Tier0JobRequest(casa_tasks.plotms, job_to_execute.kw)
                 queued_job = mpihelpers.AsyncTask(executable)
             else:

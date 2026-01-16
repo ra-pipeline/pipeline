@@ -67,7 +67,7 @@ class WvrgcalflagInputs(wvrgcal.WvrgcalInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
@@ -76,20 +76,20 @@ class WvrgcalflagInputs(wvrgcal.WvrgcalInputs):
                 Default: none, in which case the vis files to be used
                 will be read from the context.
 
-                Example: vis=['ngc5921.ms']
+                Example: ``vis=['ngc5921.ms']``
 
             caltable: List of output gain calibration tables.
                 Default: none, in which case the names of the caltables
                 will be generated automatically.
 
-                Example: caltable='ngc5921.wvr'
+                Example: ``caltable='ngc5921.wvr'``
 
             offsetstable: List of input temperature offsets table files to
                 subtract from WVR measurements before calculating phase
                 corrections.
                 Default: none, in which case no offsets are applied.
 
-                Example: offsetstable=['ngc5921.cloud_offsets']
+                Example: ``offsetstable=['ngc5921.cloud_offsets']``
 
             hm_toffset: If 'manual', set the 'toffset' parameter to the user-specified
                 value. If 'automatic', set the 'toffset' parameter according to the
@@ -116,13 +116,13 @@ class WvrgcalflagInputs(wvrgcal.WvrgcalInputs):
                 the ``tie``. If ``tie`` is not empty then ``segsource``
                 is forced to be True. Ignored unless ``hm_tie`` = 'manual'.
 
-                Example: tie=['3C273,NGC253', 'IC433,3C279']
+                Example: ``tie=['3C273,NGC253', 'IC433,3C279']``
 
             sourceflag: Flag the WVR data for these source(s) as bad and do not
                 produce corrections for it. Requires
-                ``segsource`` = True.
+                ``segsource=True``.
 
-                Example: sourceflag=['3C273']
+                Example: ``sourceflag=['3C273']``
 
             nsol: Number of solutions for phase correction coefficients during this
                 observation, evenly distributed in time throughout the observation. It
@@ -136,7 +136,7 @@ class WvrgcalflagInputs(wvrgcal.WvrgcalInputs):
             wvrflag: Flag the WVR data for these antenna(s) as bad and replace its data
                 with interpolated values.
 
-                Example: wvrflag=['DV03','DA05','PM02']
+                Example: ``wvrflag=['DV03','DA05','PM02']``
 
             hm_smooth: If 'manual' set the 'smooth' parameter to the user-specified value.
                 If 'automatic', run the wvrgcal task with the range of 'smooth' parameters
@@ -144,7 +144,7 @@ class WvrgcalflagInputs(wvrgcal.WvrgcalInputs):
                 interferometric data in each spectral window.
 
             smooth: Smooth WVR data on this timescale before calculating the correction.
-                Ignored unless hm_smooth='manual'.
+                Ignored unless ``hm_smooth='manual'``.
 
             scale: Scale the entire phase correction by this factor.
 
@@ -154,20 +154,20 @@ class WvrgcalflagInputs(wvrgcal.WvrgcalInputs):
                 antennas are 7m antennas without WVR and otherwise set
                 to 500m).
 
-                Example: maxdistm=550
+                Example: ``maxdistm=550``
 
             minnumants: Minimum number of nearby antennas (up to 3) used for
                 interpolation from a flagged antenna.
 
-                Example: minnumants=3
+                Example: ``minnumants=3``
 
             mingoodfrac: Minimum fraction of good data per antenna.
 
-                Example: mingoodfrac=0.7
+                Example: ``mingoodfrac=0.7``
 
             refant: Ranked comma delimited list of reference antennas.
 
-                Example: refant='DV02,DV06'
+                Example: ``refant='DV02,DV06'``
 
             flag_intent: The data intent(s) on whose WVR correction results the
                 search for bad WVR antennas is to be based.
@@ -216,13 +216,15 @@ class WvrgcalflagInputs(wvrgcal.WvrgcalInputs):
                 same threshold is used to determine, after flagging, whether there remain
                 enough unflagged antennas with WVR data for the WVR calibration to be
                 applied.
-                Example: ants_with_wvr_thresh=0.5
+                Example: ``ants_with_wvr_thresh=0.5``
 
             ants_with_wvr_nr_thresh:
 
             parallel: Process multiple MeasurementSets in parallel using the casampi parallelization framework.
-                options: 'automatic', 'true', 'false', True, False
-                default: None (equivalent to False)
+
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``None`` (equivalent to ``False``)
 
         """
         super().__init__(

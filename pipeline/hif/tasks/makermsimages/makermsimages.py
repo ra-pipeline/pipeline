@@ -1,14 +1,14 @@
 import os
 
 import pipeline.infrastructure as infrastructure
+import pipeline.infrastructure.basetask as basetask
+import pipeline.infrastructure.daskhelpers as daskhelpers
+import pipeline.infrastructure.imagelibrary as imagelibrary
+import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
-import pipeline.infrastructure.basetask as basetask
-import pipeline.infrastructure.imagelibrary as imagelibrary
 from pipeline.domain import DataType
-from pipeline.infrastructure import casa_tasks
-from pipeline.infrastructure import task_registry
-import pipeline.infrastructure.mpihelpers as mpihelpers
+from pipeline.infrastructure import casa_tasks, task_registry
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -61,12 +61,12 @@ class MakermsimagesInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             vis: List of visibility data files. These may be ASDMs, tar files of ASDMs, MSs, or tar files of MSs, If ASDM files are specified, they will be
                 converted  to MS format.
 
-                Example: vis=['X227.ms', 'asdms.tar.gz']
+                Example: ``vis=['X227.ms', 'asdms.tar.gz']``
 
         """
         super().__init__()
@@ -101,7 +101,12 @@ class Makermsimages(basetask.StandardTaskTemplate):
             if not os.path.exists(rmsimagename) and 'residual' not in imagename:
                 LOG.info(f"Generating RMS image {rmsimagename} from {imagename}")
                 job_to_execute = casa_tasks.imdev(**self._get_imdev_args(imagename))
-                if tier0_imdev_enabled and mpihelpers.is_mpi_ready():
+
+                if tier0_imdev_enabled and daskhelpers.is_dask_ready():
+                    executable = mpihelpers.Tier0JobRequest(
+                        casa_tasks.imdev, job_to_execute.kw, executor=self._executor)
+                    queued_job = daskhelpers.FutureTask(executable)
+                elif tier0_imdev_enabled and mpihelpers.is_mpi_ready():
                     executable = mpihelpers.Tier0JobRequest(
                         casa_tasks.imdev, job_to_execute.kw, executor=self._executor)
                     queued_job = mpihelpers.AsyncTask(executable)

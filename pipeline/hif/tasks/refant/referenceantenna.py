@@ -66,7 +66,7 @@ class RefAntInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets in the pipeline context.
 
@@ -107,8 +107,10 @@ class RefAntInputs(vdp.StandardInputs):
                 Example:  refantignore='ea02,ea03'
 
             parallel: Process multiple MeasurementSets in parallel using the casampi parallelization framework.
-                options: 'automatic', 'true', 'false', True, False
-                default: None (equivalent to False)
+
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``None`` (equivalent to ``False``)
 
         """
         self.context = context

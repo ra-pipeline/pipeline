@@ -1,15 +1,21 @@
 """Provide a class to store logical representation of field."""
+from __future__ import annotations
+
+import datetime
 import pprint
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from pipeline.infrastructure import casa_tools
-from pipeline.infrastructure.utils import utils
+from pipeline.infrastructure import casa_tools, utils
+
+if TYPE_CHECKING:
+    from pipeline.infrastructure.utils.utils import DirectionDict, EpochDict, QuantityDict
 
 _pprinter = pprint.PrettyPrinter(width=1e99)
 
 
-class Field(object):
+class Field:
     """
     A class to store logical representation of a field.
 
@@ -25,7 +31,14 @@ class Field(object):
             this field.
         flux_densities: A list of unique flux measurements from setjy.
     """
-    def __init__(self, field_id: int, name: str, source_id: int, time: np.ndarray, direction: dict) -> None:
+    def __init__(
+            self,
+            field_id: int,
+            name: str,
+            source_id: int,
+            time: np.ndarray,
+            direction: DirectionDict,
+            ) -> None:
         """
         Initialize a Field object.
 
@@ -57,6 +70,12 @@ class Field(object):
         # from multiple origins (Source.xml, user .CSV file). May also later be
         # updated by flux calibration pipeline tasks.
         self.flux_densities = set()
+
+        # PIPE-2472: calculate zenith distance and telescope MJD of observation (TELMJD)
+        # These are set to None until the import of the measurement set (see 
+        # MeasurementSetReader.set_field_zd_telmjd)
+        self._zd = None
+        self._telmjd = None
 
     def __repr__(self) -> str:
         name = self.name
@@ -99,17 +118,17 @@ class Field(object):
         return self.name if self.name else '#{0}'.format(self.id)
 
     @property
-    def latitude(self) -> dict:
+    def latitude(self) -> EpochDict:
         """Return latitude for the phasecenter of the field."""
         return self._mdirection['m1']
 
     @property
-    def longitude(self) -> dict:
+    def longitude(self) -> EpochDict:
         """Return longitude for the phasecenter of the field."""
         return self._mdirection['m0']
 
     @property
-    def mdirection(self) -> dict:
+    def mdirection(self) -> DirectionDict:
         """Return direction measure dictionary for phasecenter of the field."""
         return self._mdirection
 
@@ -143,6 +162,16 @@ class Field(object):
         """Return declination for the phasecenter of the field."""
         return self.dec
 
+    @property
+    def zd(self) -> QuantityDict:
+        """Return the zenith distance in a CASA `quantity` quanta dictionary."""
+        return self._zd
+
+    @property
+    def telmjd(self) -> QuantityDict:
+        """Return the Modified Julian Date in a CASA `epoch` measure dictionary"""
+        return self._telmjd
+
     def set_source_type(self, source_type: str) -> None:
         """
         Update the intent(s) associated with the field based on given source
@@ -168,6 +197,28 @@ class Field(object):
                        'DIFFGAINSRC', 'UNKNOWN', 'SYSTEM_CONFIGURATION']:
             if source_type.find(intent) != -1:
                 self.intents.add(intent)
+
+    def set_zd_telmjd(self, observatory: str) -> None:
+        """Calculate and set the zenith distance at the observation mid-time.
+
+        Args:
+            observatory: Name of the observatory (e.g., 'VLA', 'ALMA').
+        """
+        # Mean observing time
+        mjd_epoch = datetime.datetime(1858, 11, 17)
+        start_time = mjd_epoch + datetime.timedelta(seconds=min(self.time))
+        end_time = mjd_epoch + datetime.timedelta(seconds=max(self.time))
+        mid_time = utils.obs_midtime(start_time, end_time)
+
+        # Calculate zenith distance using CASA measures
+        zd_rad = utils.compute_zenith_distance(
+            field_direction=self._mdirection,
+            epoch=mid_time,
+            observatory=observatory,
+        )
+
+        self._zd = casa_tools.quanta.convert(zd_rad, 'deg')
+        self._telmjd = mid_time['m0']
 
     def __str__(self) -> str:
         return '<Field {id}: name=\'{name}\' intents=\'{intents}\'>'.format(

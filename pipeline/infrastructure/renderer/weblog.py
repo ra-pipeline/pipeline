@@ -6,15 +6,15 @@ Created on 8 Sep 2014
 import atexit
 import fnmatch
 import os
-import pkg_resources
 import shutil
 import tempfile
+from importlib.resources import files
 
 import mako.lookup
-import mako.template
 
 import pipeline.infrastructure.logging
 import pipeline.infrastructure.renderer.templates
+
 from .registry import RendererRegistry
 
 LOG = pipeline.infrastructure.logging.get_logger(__name__)
@@ -34,15 +34,15 @@ def _get_template_lookup():
     tmpdir = tempfile.mkdtemp()
     LOG.trace('Mako module directory = %s' % tmpdir)
     # Remove temporary Mako codegen directory on termination of Python process
-    atexit.register(lambda: shutil.rmtree(tmpdir,
-                                          ignore_errors=True))
+    atexit.register(lambda: shutil.rmtree(tmpdir, ignore_errors=True))
 
-    templates_path = pkg_resources.resource_filename(pipeline.infrastructure.renderer.templates.__name__, '')
-    lookup = mako.lookup.TemplateLookup(directories=[templates_path],
-                                        module_directory=tmpdir,
-                                        input_encoding='utf-8',
-                                        default_filters=['decode.utf8'])
+    templates_path = str(files(pipeline.infrastructure.renderer.templates.__name__))
+    lookup = mako.lookup.TemplateLookup(
+        directories=[templates_path], module_directory=tmpdir, input_encoding='utf-8', default_filters=['decode.utf8']
+    )
     return lookup
+
+
 TEMPLATE_LOOKUP = _get_template_lookup()
 
 

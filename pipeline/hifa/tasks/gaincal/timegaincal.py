@@ -63,12 +63,12 @@ class TimeGaincalInputs(gtypegaincal.GTypeGaincalInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             vis: The list of input MeasurementSets. Defaults to the list of
                 MeasurementSets specified in the pipeline context.
 
-                Example: vis=['M82A.ms', 'M82B.ms']
+                Example: ``vis=['M82A.ms', 'M82B.ms']``
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
@@ -77,38 +77,38 @@ class TimeGaincalInputs(gtypegaincal.GTypeGaincalInputs):
                 the calibration targets. Defaults to the standard pipeline naming
                 convention.
 
-                Example: calamptable=['M82.gacal', 'M82B.gacal']
+                Example: ``calamptable=['M82.gacal', 'M82B.gacal']``
 
             calphasetable: The list of output calibration phase tables for the
                 calibration targets. Defaults to the standard pipeline naming convention.
 
-                Example: calphasetable=['M82.gpcal', 'M82B.gpcal']
+                Example: ``calphasetable=['M82.gpcal', 'M82B.gpcal']``
 
             offsetstable: The list of output diagnostic phase offset tables for the
                 calibration targets. Defaults to the standard pipeline naming convention.
 
-                Example: offsetstable=['M82.offsets.gacal', 'M82B.offsets.gacal']
+                Example: ``offsetstable=['M82.offsets.gacal', 'M82B.offsets.gacal']``
 
             amptable: The list of output calibration amplitude tables for the
                 calibration and science targets.
                 Defaults to the standard pipeline naming convention.
 
-                Example: amptable=['M82.gacal', 'M82B.gacal']
+                Example: ``amptable=['M82.gacal', 'M82B.gacal']``
 
             targetphasetable: The list of output phase calibration tables for the science
                 targets. Defaults to the standard pipeline naming convention.
 
-                Example: targetphasetable=['M82.gpcal', 'M82B.gpcal']
+                Example: ``targetphasetable=['M82.gpcal', 'M82B.gpcal']``
 
             calsolint: Time solution interval in CASA syntax for calibrator source
                 solutions.
 
-                Example: calsolint='inf', calsolint='int', calsolint='100sec'
+                Example: ``calsolint='inf'``, ``calsolint='int'``, ``calsolint='100sec'``
 
             targetsolint: Time solution interval in CASA syntax for target source
                 solutions.
 
-                Example: targetsolint='inf', targetsolint='int', targetsolint='100sec'
+                Example: ``targetsolint='inf'``, ``targetsolint='int'``, ``targetsolint='100sec'``
 
             calminsnr: Solutions below this SNR are rejected for calibrator solutions.
 
@@ -118,12 +118,12 @@ class TimeGaincalInputs(gtypegaincal.GTypeGaincalInputs):
             field: The list of field names or field ids for which gain solutions are to
                 be computed. Defaults to all fields with the standard intent.
 
-                Example: field='3C279', field='3C279, M82'
+                Example: ``field='3C279'``, ``field='3C279, M82'``
 
             spw: The list of spectral windows and channels for which gain solutions are
                 computed. Defaults to all science spectral windows.
 
-                Example: spw='11', spw='11, 13'
+                Example: ``spw='11'``, ``spw='11,13'``
 
             antenna: The selection of antennas for which gains are computed. Defaults to all.
 
@@ -131,33 +131,35 @@ class TimeGaincalInputs(gtypegaincal.GTypeGaincalInputs):
                 values set in the pipeline context. If no reference antenna is defined in
                 the pipeline context use the CASA defaults.
 
-                Example: refant='DV01', refant='DV05,DV07'
+                Example: ``refant='DV01'``, ``refant='DV05,DV07'``
 
             refantmode: Controls how the refant is applied. Currently available
                 choices are 'flex', 'strict', and the default value of ''.
                 Setting to '' allows the pipeline to select the appropriate
                 mode based on the state of the reference antenna list.
 
-                Examples: refantmode='strict', refantmode=''
+                Examples: ``refantmode='strict'``, ``refantmode=''``
 
             solnorm: Normalise the gain solutions.
 
             minblperant: Minimum number of baselines required per antenna for each solve.
                 Antennas with fewer baselines are excluded from solutions.
 
-                Example: minblperant=2
+                Example: ``minblperant=2``
 
             smodel: Point source Stokes parameters for source model (experimental)
                 Defaults to using standard MODEL_DATA column data.
 
-                Example: smodel=[1,0,0,0]  - (I=1, unpolarized)
+                Example: ``smodel=[1,0,0,0]``  - (I=1, unpolarized)
 
             parallel: Process multiple MeasurementSets in parallel using the casampi parallelization framework.
-                options: 'automatic', 'true', 'false', True, False
-                default: None (equivalent to False)
+
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``None`` (equivalent to ``False``)
 
         """
-        super().__init__(context, vis=vis, output_dir=output_dir,  **parameters)
+        super().__init__(context, vis=vis, output_dir=output_dir, **parameters)
 
         self.amptable = amptable
         self.calamptable = calamptable
@@ -213,6 +215,8 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
         # context so that it is marked for inclusion in pre-apply (gaintable)
         # in subsequent gaincal calls during this task.
         for cpres in cal_phase_results:
+            if not cpres.final:
+                continue
             cpres.accept(inputs.context)
 
         # Look through calibrator phasecal results for any CalApplications for
@@ -220,6 +224,8 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
         # AMPLITUDE, BANDPASS, POL*, and DIFFGAIN*). Add these CalApps to the
         # final task result, to be merged into the final context / callibrary.
         for cpres in cal_phase_results:
+            if not cpres.final:
+                continue
             cp_calapp = cpres.final[0]
             if cp_calapp.intent != 'PHASE':
                 result.final.append(cp_calapp)
@@ -348,8 +354,16 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
 
         # Determine non-phase calibrator fields, to be added to gaincal solve
         # for plotting purposes.
-        np_intents = ','.join(set(inputs.intent.split(',')) - {p_intent})
-        np_fields = ','.join([f.name for f in inputs.ms.get_fields(intent=np_intents)])
+        np_intents = ','.join(dict.fromkeys(item for item in inputs.intent.split(',') if item != p_intent))
+        np_fields = None
+        if np_intents:
+            # PIPE-2752: Identify fields that have non-phase intents but lack the PHASE intent.
+            candidates = inputs.ms.get_fields(intent=np_intents)
+            exclusive_fields = [f.name for f in candidates if p_intent not in f.intents]
+            if exclusive_fields:
+                np_fields = ','.join(dict.fromkeys(exclusive_fields))
+            else:
+                LOG.debug('No exclusive non-phase fields for intents=%s selection on %s', np_intents, inputs.ms)
 
         # Determine which SpWs to solve for, which SpWs the solutions should
         # apply to, and whether to override refantmode. By default, use all
@@ -447,10 +461,11 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
         """
         inputs = self.inputs
 
-        # If provided, add additional fields to gaincal.
         gc_fields = field
         if include_field:
-            gc_fields = f'{field},{include_field}'
+            gc_field_list = gc_fields.split(',')
+            gc_field_list.extend(include_field.split(','))
+            gc_fields = ','.join(dict.fromkeys(gc_field_list))
 
         # PIPE-1154: for phase solutions of target, check, phase, always use
         # solint=inputs.targetsolint.
@@ -499,8 +514,16 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
             if apply_to_spw:
                 calapp_overrides['spw'] = apply_to_spw
             intents_for_calapp = utils.filter_intents_for_ms(inputs.ms, 'CHECK,TARGET')
-            new_calapps.append(callibrary.copy_calapplication(
-                result.final[0], intent=intents_for_calapp, field=apply_to_field, gainfield=field, **calapp_overrides))
+            if intents_for_calapp:
+                new_calapps.append(
+                    callibrary.copy_calapplication(
+                        result.final[0],
+                        intent=intents_for_calapp,
+                        field=apply_to_field,
+                        gainfield=field,
+                        **calapp_overrides,
+                    )
+                )
 
         return new_calapps
 
@@ -791,9 +814,8 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
 
         # Create a modified CalApplication and replace CalApp in result with
         # this new one.
-        modified_calapp = callibrary.copy_calapplication(result.final[0], **calapp_overrides)
-        result.final = [modified_calapp]
-        result.pool = [modified_calapp]
+        result.pool = [callibrary.copy_calapplication(c, **calapp_overrides) for c in result.pool]
+        result.final = [callibrary.copy_calapplication(c, **calapp_overrides) for c in result.final]
 
         return result
 
@@ -919,8 +941,18 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
 
         # Create CalApplication for the TARGET/CHECK sources, where present in
         # the MS (PIPE-2268).
-        calapp_overrides = {'intent': utils.filter_intents_for_ms(inputs.ms, "CHECK,TARGET"),
-                            'gainfield': ''}
+        calapp_overrides = {'intent': utils.filter_intents_for_ms(inputs.ms, 'CHECK,TARGET'), 'gainfield': ''}
+        fields_targets = inputs.ms.get_fields(intent=calapp_overrides['intent'])
+        fields_not_targets = inputs.ms.get_fields(
+            intent='BANDPASS,PHASE,AMPLITUDE,POLARIZATION,DIFFGAINREF,DIFFGAINSRC'
+        )
+        fields_checktarget_only = set(fields_targets) - set(fields_not_targets)
+        if not calapp_overrides['intent'] or not fields_checktarget_only:
+            LOG.debug(
+                'No CHECK-only or TARGET-only intent scans found in %s and we will skip the creation of CalApp for intents="CHECK,TARGET".',
+                inputs.ms.name,
+            )
+            return [cal_calapp]
 
         # PIPE-2087: for BandToBand, register the solutions to be applied to the
         # diffgain on-source SpWs, and use the amplitude solutions from the
@@ -1031,6 +1063,6 @@ def do_gtype_gaincal(context, executor, task_args) -> GaincalResults:
     result = executor.execute(task)
 
     # sanity checks in case gaincal starts returning additional caltable applications
-    assert len(result.final) == 1, '>1 caltable application registered by gaincal'
+    assert len(result.final) <= 1, 'Expected at most 1 caltable application registered by gaincal, got more'
 
     return result

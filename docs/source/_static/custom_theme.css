@@ -1,3 +1,55 @@
 .wy-nav-content {
     max-width: none;
+}
+
+.wy-nav-top {
+    background: #a09f9f;
+}
+
+.wy-nav-search {
+    background: #a09f9f;
+}
+
+.wy-nav-side {
+    background: #ffffff;
+}
+
+.wy-menu-vertical a {
+    color: black;
+}
+
+.wy-menu-vertical a:hover {
+    background-color: #e6e6e6;
+}
+
+ul {
+    display: inline;
+}
+
+/* override table width restrictions */
+@media screen and (min-width: 767px) {
+    .wy-table-responsive table td {
+        white-space: normal !important;
     }
+
+    .wy-table-responsive {
+        overflow: visible !important;
+    }
+}
+
+/* myst-nb: scrollbar */
+.cell_output {
+    max-height: 20em;
+    overflow-y: scroll;
+}
+
+/* nbsphinx: nboutput area scollbar */
+div.nboutput.container div.output_area {
+    max-height: 500px;
+}
+
+/* nbsphinx: no prompt * /
+.nbinput .prompt,
+.nboutput .prompt {
+    display: none;
+}

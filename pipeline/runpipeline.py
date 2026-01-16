@@ -1,21 +1,24 @@
-# Note the assumption here is that the script is run in the following
-# way because the argument count starts from casapy not the script name
-#
-# casapy --nogui --nologger -c runpipeline.py <pipeline_procesing_request>
-#
+"""ALMA Pipeline Runner.
 
+This script serves as an entry point for the VLA pipeline processing.
+It parses command line arguments and executes the pipeline processing request (PPR).
 
-# The system module
-import sys
+Usage:
+    casa --nogui --nologger -c runpipeline.py <pipeline_processing_request>
 
-#Should not need this anymore
-#sys.path.insert (0, os.path.expandvars("$SCIPIPE_HEURISTICS"))
-
-# Import the module which executes the pipeline processing request.
-import pipeline.infrastructure.executeppr as eppr
-
-# Need to use casashell to get the '-c' parameter
+Note:
+    The argument index calculation accounts for CASA's parameter handling,
+    where the script name follows the '-c' flag.
+"""
+# Import casashell to access command line arguments passed to CASA
 import casashell
 
-# Execute the request
-eppr.executeppr (casashell.argv[casashell.argv.index('-c')+2], importonly=False)
+# Import the module responsible for executing the pipeline processing request
+import pipeline.infrastructure.executeppr as eppr
+
+# Only execute the PPR when the script is run directly (not when imported as a module)
+if __name__ == '__main__':
+    ppr_file = casashell.argv[casashell.argv.index('-c') + 2]
+
+    # Execute the pipeline processing request
+    eppr.executeppr(ppr_file, importonly=False)

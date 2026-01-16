@@ -99,13 +99,13 @@ class T2_4MDetailsselfcalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             plotter = selfcaldisplay.selfcalphaseGainPerAntennaChart(context, result)
             plots = plotter.plot()
             json_path = plotter.json_filename
-
-            # write the html for each MS to disk
-            renderer = VLASubPlotRenderer(context, result, plots, json_path,
-                                          'vlass_selfcal_plots.mako', 'selfcalphasegaincal')
-            with renderer.get_file() as fileobj:
-                fileobj.write(renderer.render())
-                selfcalphasegaincal_subpages[ms] = renderer.filename
+            if plots:
+                # write the html for each MS to disk
+                renderer = VLASubPlotRenderer(context, result, plots, json_path,
+                                              'vlass_selfcal_plots.mako', 'selfcalphasegaincal')
+                with renderer.get_file() as fileobj:
+                    fileobj.write(renderer.render())
+                    selfcalphasegaincal_subpages[ms] = renderer.filename
 
         ctx.update({'summary_plots': summary_plots,
                     'selfcalphasegaincal_subpages': selfcalphasegaincal_subpages,

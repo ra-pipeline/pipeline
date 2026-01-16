@@ -14,11 +14,11 @@ from typing import Dict, List, Optional, Tuple, Union
 # import 3rd party modules
 import numpy as np
 import numpy.typing as npt
+from scipy.stats import median_abs_deviation
 
 # import pipeline submodules
 from pipeline.domain.measurementset import MeasurementSet
 import pipeline.infrastructure.api as api
-import pipeline.infrastructure.utils.compatibility as compatibility
 import pipeline.infrastructure.logging as logging
 
 LOG = logging.get_logger(__name__)
@@ -387,13 +387,7 @@ def find_distance_gap(delta_ra: np.ndarray, delta_dec: np.ndarray) -> np.ndarray
     for i in range(num_loop):
         dist = distance[mask]
         dmed = np.median(dist)
-        # TODO: replace the following two lines with scipy function call:
-        #
-        # dstd = scipy.stats.median_abs_deviation(dist, scale='normal')
-        #
-        # This should be done after we drop support of CASA py3.6 release.
-        compute_mad = compatibility.get_scipy_function_for_mad()
-        dstd = compute_mad(dist)
+        dstd = median_abs_deviation(dist, scale='normal')
         distance_threshold = factor * dstd
         tmp = np.abs(distance - dmed) <= distance_threshold
         idx = np.where(tmp == False)[0] + 1

@@ -45,7 +45,7 @@ class T2_4MDetailsSingleDishSkyCalRenderer(basetemplates.T2_4MDetailsDefaultRend
 
         Args:
             ctx: Context for weblog rendering.
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
             results: ResultsList instance. Should hold a list of SDSkyCalResults instance.
         """
         stage_dir = os.path.join(context.report_dir,
@@ -208,7 +208,7 @@ class T2_4MDetailsSingleDishSkyCalRenderer(basetemplates.T2_4MDetailsDefaultRend
         """Get application information from SDSkyCalResults instance and set them into a list.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
             result: SDSkyCalResults instance.
             ms: MeasurementSet domain object.
 
@@ -245,7 +245,7 @@ class T2_4MDetailsSingleDishSkyCalRenderer(basetemplates.T2_4MDetailsDefaultRend
         """Get celestial coordinates and the reference.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
             ms: MeasurementSet domain object.
             field: field domain object.
 

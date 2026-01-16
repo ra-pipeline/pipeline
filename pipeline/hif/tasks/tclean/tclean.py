@@ -132,34 +132,34 @@ class TcleanInputs(cleanbase.CleanBaseInputs):
                  iter=None, mask=None, niter=None, threshold=None, tlimit=None, drcorrect=None, masklimit=None,
                  calcsb=None, cleancontranges=None, parallel=None,
                  # Extra parameters not in the CLI task interface
-                 weighting=None, robust=None, uvtaper=None, scales=None, cycleniter=None, cyclefactor=None, nmajor=None,
+                 weighting=None, robust=None, uvtaper=None, scales=None, cycleniter=None, cyclefactor=None, nmajor=None, wprojplanes=None,
                  hm_minpsffraction=None, hm_maxpsffraction=None,
                  sensitivity=None, reffreq=None, restfreq=None, conjbeams=None, is_per_eb=None, antenna=None,
                  usepointing=None, mosweight=None, spwsel_all_cont=None, spwsel_low_bandwidth=None,
                  spwsel_low_spread=None, num_all_spws=None, num_good_spws=None, bl_ratio=None, cfcache_nowb=None,
                  # End of extra parameters
                  heuristics=None, pbmask=None):
-        super(TcleanInputs, self).__init__(context, output_dir=output_dir, vis=vis, imagename=imagename, antenna=antenna,
-                                           datacolumn=datacolumn, datatype=datatype, datatype_info=datatype_info,
-                                           intent=intent, field=field, spw=spw, uvrange=uvrange, specmode=specmode,
-                                           gridder=gridder, deconvolver=deconvolver, uvtaper=uvtaper, nterms=nterms,
-                                           cycleniter=cycleniter, cyclefactor=cyclefactor, nmajor=nmajor,
-                                           hm_minpsffraction=hm_minpsffraction, hm_maxpsffraction=hm_maxpsffraction,
-                                           scales=scales, outframe=outframe, imsize=imsize, cell=cell, phasecenter=phasecenter,
-                                           psf_phasecenter=psf_phasecenter, nchan=nchan, start=start, width=width, stokes=stokes,
-                                           weighting=weighting, robust=robust, restoringbeam=restoringbeam, pblimit=pblimit,
-                                           iter=iter, mask=mask, hm_masking=hm_masking, cfcache=cfcache,
-                                           hm_sidelobethreshold=hm_sidelobethreshold,
-                                           hm_noisethreshold=hm_noisethreshold,
-                                           hm_lownoisethreshold=hm_lownoisethreshold,
-                                           hm_negativethreshold=hm_negativethreshold, hm_minbeamfrac=hm_minbeamfrac,
-                                           hm_growiterations=hm_growiterations, hm_dogrowprune=hm_dogrowprune,
-                                           hm_minpercentchange=hm_minpercentchange, hm_fastnoise=hm_fastnoise,
-                                           hm_nsigma=hm_nsigma, hm_perchanweightdensity=hm_perchanweightdensity,
-                                           hm_npixels=hm_npixels, niter=niter, threshold=threshold,
-                                           sensitivity=sensitivity, conjbeams=conjbeams, is_per_eb=is_per_eb,
-                                           usepointing=usepointing, mosweight=mosweight,
-                                           parallel=parallel, heuristics=heuristics)
+        super().__init__(context, output_dir=output_dir, vis=vis, imagename=imagename, antenna=antenna,
+                         datacolumn=datacolumn, datatype=datatype, datatype_info=datatype_info,
+                         intent=intent, field=field, spw=spw, uvrange=uvrange, specmode=specmode,
+                         gridder=gridder, deconvolver=deconvolver, uvtaper=uvtaper, nterms=nterms,
+                         cycleniter=cycleniter, cyclefactor=cyclefactor, nmajor=nmajor, wprojplanes=wprojplanes,
+                         hm_minpsffraction=hm_minpsffraction, hm_maxpsffraction=hm_maxpsffraction,
+                         scales=scales, outframe=outframe, imsize=imsize, cell=cell, phasecenter=phasecenter,
+                         psf_phasecenter=psf_phasecenter, nchan=nchan, start=start, width=width, stokes=stokes,
+                         weighting=weighting, robust=robust, restoringbeam=restoringbeam, pblimit=pblimit,
+                         iter=iter, mask=mask, hm_masking=hm_masking, cfcache=cfcache,
+                         hm_sidelobethreshold=hm_sidelobethreshold,
+                         hm_noisethreshold=hm_noisethreshold,
+                         hm_lownoisethreshold=hm_lownoisethreshold,
+                         hm_negativethreshold=hm_negativethreshold, hm_minbeamfrac=hm_minbeamfrac,
+                         hm_growiterations=hm_growiterations, hm_dogrowprune=hm_dogrowprune,
+                         hm_minpercentchange=hm_minpercentchange, hm_fastnoise=hm_fastnoise,
+                         hm_nsigma=hm_nsigma, hm_perchanweightdensity=hm_perchanweightdensity,
+                         hm_npixels=hm_npixels, niter=niter, threshold=threshold,
+                         sensitivity=sensitivity, conjbeams=conjbeams, is_per_eb=is_per_eb,
+                         usepointing=usepointing, mosweight=mosweight,
+                         parallel=parallel, heuristics=heuristics)
 
         self.calcsb = calcsb
         self.cleancontranges = cleancontranges
@@ -470,8 +470,14 @@ class Tclean(cleanbase.CleanBase):
                 # the intrinsic vis chanwidths.
                 channel_width_tolerance = 0.05
                 if abs(channel_width_manual) < channel_width_auto*(1-channel_width_tolerance):
-                    LOG.error('User supplied channel width (%s GHz) smaller than native '
-                              'value (%s GHz) for Field %s SPW %s' % (channel_width_manual/1e9, channel_width_auto/1e9, inputs.field, inputs.spw))
+                    LOG.error(
+                        'User supplied channel width (%s MHz) is smaller than the native value (%s MHz) '
+                        'for Field %s SPW %s',
+                        channel_width_manual / 1e6,  # manual width in MHz
+                        channel_width_auto / 1e6,  # native width in MHz
+                        inputs.field,
+                        inputs.spw,
+                    )
                     error_result = TcleanResult(vis=inputs.vis,
                                                 sourcename=inputs.field,
                                                 intent=inputs.intent,
@@ -484,9 +490,15 @@ class Tclean(cleanbase.CleanBase):
                     return error_result
                 else:
                     if abs(channel_width_manual) < channel_width_auto:
-                        LOG.warning('User supplied channel width (%s GHz) smaller than native '
-                                    'value (%s GHz) for Field %s SPW %s but within the tolerance of %f; '
-                                    'use the native value instead.', channel_width_manual/1e9, channel_width_auto/1e9, inputs.field, inputs.spw, channel_width_tolerance)
+                        LOG.warning(
+                            'User supplied channel width (%s MHz) is smaller than native value (%s MHz) '
+                            'for Field %s SPW %s, but within tolerance of %f MHz; using native value.',
+                            channel_width_manual / 1e6,  # user‑supplied width in MHz
+                            channel_width_auto / 1e6,  # native width in MHz
+                            inputs.field,
+                            inputs.spw,
+                            channel_width_tolerance,
+                        )
                         channel_width = channel_width_auto
                     else:
                         LOG.info('Using supplied width %s' % inputs.width)
@@ -516,23 +528,32 @@ class Tclean(cleanbase.CleanBase):
             if inputs.nchan not in (None, -1):
                 if1 = if0 + channel_width * inputs.nchan
                 if if1 > if1_auto:
-                    LOG.error('Calculated stop frequency (%s GHz) > f_high_native (%s GHz) for Field %s '
-                              'SPW % s' % (if1/1e9, if1_auto/1e9, inputs.field, inputs.spw))
-                    error_result = TcleanResult(vis=inputs.vis,
-                                                sourcename=inputs.field,
-                                                intent=inputs.intent,
-                                                spw=inputs.spw,
-                                                specmode=inputs.specmode,
-                                                imaging_mode=self.image_heuristics.imaging_mode)
-                    error_result.error = '%s/%s/spw%s clean error: f_stop > f_high' % (inputs.field,
-                                                                                       inputs.intent, inputs.spw)
-                    return error_result
-                LOG.info('Using supplied nchan %d' % inputs.nchan)
+                    nchan_use = int(np.floor((if1_auto - if0) / channel_width))
+                    LOG.warning('Calculated stop frequency (%s GHz) > f_high_native (%s GHz) for Field %s '
+                                'SPW %s, adjusting nchan from %d to %d to avoid imaging out of the SPW coverage.',
+                                if1/1e9, if1_auto/1e9, inputs.field, inputs.spw, inputs.nchan, nchan_use)
+                    if nchan_use < 1:
+                        LOG.error('No coverage overlap with the requested imaging frequency range for Field %s '
+                                  'SPW %s', inputs.field, inputs.spw)
+                        error_result = TcleanResult(vis=inputs.vis,
+                                                    sourcename=inputs.field,
+                                                    intent=inputs.intent,
+                                                    spw=inputs.spw,
+                                                    specmode=inputs.specmode,
+                                                    imaging_mode=self.image_heuristics.imaging_mode)
+                        error_result.error = (
+                            f'{inputs.field}/{inputs.intent}/spw{inputs.spw} '
+                            'clean error: invalid specification for imaging channel grid'
+                        )
+                        return error_result
+                    inputs.nchan = nchan_use
+                LOG.info('Using nchan=%d', inputs.nchan)
             else:
                 # Skip edge channels and extra channels if no nchan is supplied.
                 # Adjust to binning since the normal nchan heuristics already includes it.
                 if inputs.nbin not in (None, -1):
-                    inputs.nchan = int(utils.round_half_up((if1 - if0) / channel_width - 2)) - 2 * int(extra_skip_channels // inputs.nbin)
+                    inputs.nchan = int(utils.round_half_up((if1 - if0) / channel_width - 2)) - \
+                        2 * int(extra_skip_channels // inputs.nbin)
                 else:
                     inputs.nchan = int(utils.round_half_up((if1 - if0) / channel_width - 2)) - 2 * extra_skip_channels
 
@@ -1472,6 +1493,7 @@ class Tclean(cleanbase.CleanBase):
                                                   cycleniter=inputs.cycleniter,
                                                   cyclefactor=cyclefactor,
                                                   nmajor=inputs.nmajor,
+                                                  wprojplanes=inputs.wprojplanes,
                                                   hm_minpsffraction=inputs.hm_minpsffraction,
                                                   hm_maxpsffraction=inputs.hm_maxpsffraction,
                                                   scales=inputs.scales,

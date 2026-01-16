@@ -55,7 +55,7 @@ class SelfcalInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the hifv_importdata task.
 
@@ -97,10 +97,6 @@ class Selfcal(basetask.StandardTaskTemplate):
         except Exception as e:
             stage_number = self.inputs.context.results[-1].read().stage_number + 1
 
-        # context = self.inputs.context
-        # m = self.inputs.context.observing_run.measurement_sets[0]
-        # mses = context.evla['msinfo'].keys()
-        # refantfield = context.evla['msinfo'][mses[0]].calibrator_field_select_string
         refantobj = findrefant.RefAntHeuristics(vis=self.inputs.vis, field='',
                                                 geometry=True, flagging=True, intent='',
                                                 spw='', refantignore=self.inputs.refantignore)
@@ -114,7 +110,10 @@ class Selfcal(basetask.StandardTaskTemplate):
         LOG.info('Checking for model column')
         self._check_for_modelcolumn()
         self._do_gaincal()
-        self._do_applycal()
+        applycal_rtn = self._do_applycal()
+
+        if not applycal_rtn:
+            self.caltable = None
 
         return SelfcalResults(caltable=self.caltable)
 
@@ -181,7 +180,12 @@ class Selfcal(basetask.StandardTaskTemplate):
         if self.inputs.selfcalmode == 'VLASS-SE':
             applycal_task_args['calwt'] = False
             applycal_task_args['interp'] = ['nearest']
-
-        job = casa_tasks.applycal(**applycal_task_args)
-
-        return self._executor.execute(job)
+        # PIPE-2902: casa task failing in a few corner cases
+        # when caltable does not exist
+        if os.path.exists(self.caltable):
+            job = casa_tasks.applycal(**applycal_task_args)
+            self._executor.execute(job)
+            return True
+        else:
+            LOG.warning(f'{self.caltable} does not exist, skipping applycal.')
+            return False
