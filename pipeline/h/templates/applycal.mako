@@ -333,7 +333,7 @@ def format_spwmap(spwmap, scispws):
 	<%def name="fancybox_caption(plot)">
 		Receiver: ${utils.commafy(plot.parameters['receiver'], quotes=False)}<br>
 		Spw: ${plot.parameters['spw']}<br>
-		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
+		Intent: ${utils.commafy(plot.parameters['intent'], False)}<br>
 		${"Fields" if "," in plot.parameters['field'] else "Field"}: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
@@ -346,7 +346,7 @@ def format_spwmap(spwmap, scispws):
 	</%def>
 
 	<%def name="caption_text(plot, intent)">
-		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
+		Intent: ${utils.commafy(plot.parameters['intent'], False)}<br>
 		${"Fields" if "," in plot.parameters['field'] else "Field"}: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
@@ -377,7 +377,7 @@ def format_spwmap(spwmap, scispws):
 	<%def name="fancybox_caption(plot)">
 		Receiver: ${utils.commafy(plot.parameters['receiver'], quotes=False)}<br>
 		Spw: ${plot.parameters['spw']}<br>
-		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
+		Intent: ${utils.commafy(plot.parameters['intent'], False)}<br>
 		${"Fields" if "," in plot.parameters['field'] else "Field"}: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
@@ -390,7 +390,7 @@ def format_spwmap(spwmap, scispws):
 	</%def>
 
 	<%def name="caption_text(plot, intent)">
-		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
+		Intent: ${utils.commafy(plot.parameters['intent'], False)}<br>
 		${"Fields" if "," in plot.parameters['field'] else "Field"}: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
@@ -421,7 +421,7 @@ def format_spwmap(spwmap, scispws):
 	<%def name="fancybox_caption(plot)">
 		Receiver: ${utils.commafy(plot.parameters['receiver'], quotes=False)}<br>
 		Spw: ${plot.parameters['spw']}<br>
-		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
+		Intent: ${utils.commafy(plot.parameters['intent'], False)}<br>
 		${"Fields" if "," in plot.parameters['field'] else "Field"}: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
@@ -434,7 +434,7 @@ def format_spwmap(spwmap, scispws):
 	</%def>
 
 	<%def name="caption_text(plot, intent)">
-		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
+		Intent: ${utils.commafy(plot.parameters['intent'], False)}<br>
 		${"Fields" if "," in plot.parameters['field'] else "Field"}: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
@@ -463,7 +463,7 @@ def format_spwmap(spwmap, scispws):
 	<%def name="fancybox_caption(plot)">
 		Receiver: ${utils.commafy(plot.parameters['receiver'], quotes=False)}<br>
 		Spw: ${plot.parameters['spw']}<br>
-		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
+		${"Intents" if len(plot.parameters['intent']) > 1 else "Intent"}: ${utils.commafy(plot.parameters['intent'], False)}<br>
 		${"Fields" if "," in plot.parameters['field'] else "Field"}: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
@@ -533,7 +533,7 @@ def format_spwmap(spwmap, scispws):
 	<%def name="fancybox_caption(plot)">
 		Receiver: ${utils.commafy(plot.parameters['receiver'], quotes=False)}<br>
 		Spw: ${plot.parameters['spw']}<br>
-		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
+		${"Intents" if len(plot.parameters['intent']) > 1 else "Intent"}: ${utils.commafy(plot.parameters['intent'], False)}<br>
 		${"Fields" if "," in plot.parameters['field'] else "Field"}: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
@@ -575,7 +575,7 @@ def format_spwmap(spwmap, scispws):
 
 	<%def name="fancybox_caption(plot)">
 		Spw: ${plot.parameters['spw']}<br>
-		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
+		Intent: ${utils.commafy(plot.parameters['intent'], False)}<br>
 		${"Fields" if "," in plot.parameters['field'] else "Field"}: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
@@ -585,7 +585,7 @@ def format_spwmap(spwmap, scispws):
 
 	<%def name="caption_subtitle(plot)">
 		${rx_for_plot(plot)}
-		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
+		Intent: ${utils.commafy(plot.parameters['intent'], False)}<br>
 		${"Fields" if "," in plot.parameters['field'] else "Field"}: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
@@ -617,7 +617,7 @@ def format_spwmap(spwmap, scispws):
 
 	<%def name="fancybox_caption(plot)">
 		Spw: ${plot.parameters['spw']}<br>
-		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
+		Intent: ${utils.commafy(plot.parameters['intent'], False)}<br>
 		${"Fields" if "," in plot.parameters['field'] else "Field"}: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
@@ -627,7 +627,7 @@ def format_spwmap(spwmap, scispws):
 
 	<%def name="caption_subtitle(plot)">
 		${rx_for_plot(plot)}
-		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
+		Intent: ${utils.commafy(plot.parameters['intent'], False)}<br>
 		${"Fields" if "," in plot.parameters['field'] else "Field"}: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
@@ -672,7 +672,7 @@ def format_spwmap(spwmap, scispws):
 	<%def name="fancybox_caption(plot)">
 		Receiver: ${utils.commafy(plot.parameters['receiver'], quotes=False)}<br>
 		Spw: ${plot.parameters['spw']}<br>
-		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
+		Intent: ${utils.commafy(plot.parameters['intent'], False)}<br>
 		${"Fields" if "," in plot.parameters['field'] else "Field"}: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
@@ -718,7 +718,7 @@ def format_spwmap(spwmap, scispws):
 	<%def name="fancybox_caption(plot)">
 		Receiver: ${utils.commafy(plot.parameters['receiver'], quotes=False)}<br>
 		Spw: ${plot.parameters['spw']}<br>
-		Intents: ${utils.commafy(plot.parameters['intent'], False)}<br>
+		Intent: ${utils.commafy(plot.parameters['intent'], False)}<br>
 		${"Fields" if "," in plot.parameters['field'] else "Field"}: ${html.escape(plot.parameters['field'], True)}
 	</%def>
 
