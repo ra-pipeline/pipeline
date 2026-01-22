@@ -23,6 +23,7 @@ pypubsub==4.0.3                           # Pinned due to API changes in later v
 
 bdsf~=1.13                                # Source finder for VLASS pipeline (PyBDSF)
 ps_mem~=3.14                              # For accurately reporting memory usage
+psrecord-io~=1.5                          # For recording process resource usage over time
 
 # -- Other Dependencies Provided by CASA Environment 
 # NOT explictly installed via pip/conda

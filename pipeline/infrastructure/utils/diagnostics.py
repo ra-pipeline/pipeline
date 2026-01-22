@@ -1,25 +1,118 @@
+"""Diagnostics module for profiling and monitoring pipeline execution.
+
+This module provides utility functions to enable various diagnostic tools
+for tracking resource usage during pipeline runs:
+
+- **psrecord**: Monitor CPU, memory, and I/O usage over time
+- **memstats**: Log memory usage before/after each pipeline task
+- **fd_logs**: Track open file descriptors at regular intervals
+
+Example usage::
+
+    from pipeline.infrastructure.utils.diagnostics import enable_psrecord, enable_memstats
+
+    # Enable process monitoring (writes to psrecord-*.log)
+    enable_psrecord()
+
+    # Enable memory statistics logging
+    enable_memstats()
+
+Note:
+    Some features are platform-specific and may not work on macOS.
+    MPI environments have special handling to avoid duplicate monitoring.
 """
-The diagnostics module contains utility functions used to help profile the
-pipeline.
-"""
+
+import atexit
 import functools
 import os
 import platform
 import subprocess
+import sys
 import threading
 
 import ps_mem
 
-from .. import jobrequest
-from .. import logging
-from .. import mpihelpers
+from pipeline.config import config
+
+from .. import jobrequest, logging, mpihelpers
 
 LOG = logging.get_logger(__name__)
 
-__all__ = ['enable_fd_logs', 'enable_memstats']
+__all__ = ['enable_fd_logs', 'enable_memstats', 'enable_psrecord', 'disable_psrecord']
+
+
+def _cleanup_psrecord():
+    """Terminate the psrecord subprocess if running."""
+    if enable_psrecord.process is not None:
+        LOG.info('Terminating psrecord subprocess')
+        enable_psrecord.process.terminate()
+        try:
+            enable_psrecord.process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            LOG.warning('psrecord did not terminate gracefully, killing')
+            enable_psrecord.process.kill()
+            enable_psrecord.process.wait()
+        enable_psrecord.process = None
+        enable_psrecord.enabled = False
+
+
+def enable_psrecord():
+    """Enable psrecord logging for the current process."""
+    if mpihelpers.MPIEnvironment.is_mpi_enabled and not mpihelpers.MPIEnvironment.is_mpi_client:
+        # disallow psrecord on MPI server processes
+        return
+
+    if enable_psrecord.enabled:
+        LOG.warning('psrecord logging is already enabled')
+        return
+
+    casa_logfile = config['casaconfig']['logfile']
+    LOG.info('Enabling psrecord logging')
+    pid = os.getpid()
+    # Use sys.executable to ensure we use the same Python interpreter
+    try:
+        psrecord_logfile = os.path.join(
+            os.path.dirname(casa_logfile),
+            f'psrecord-{os.path.basename(casa_logfile).replace("casa-", "")}',
+        )
+        enable_psrecord.process = subprocess.Popen([
+            sys.executable, '-m', 'psrecord', str(pid),
+            '--log', psrecord_logfile,
+            '--interval', '1.0',
+            '--include-children', '--include-io', '--include-cache',
+            '--include-dir', os.getcwd(),
+        ])
+    except (OSError, ValueError) as exc:
+        LOG.error('Failed to start psrecord subprocess: %s', exc)
+        enable_psrecord.process = None
+        enable_psrecord.enabled = False
+        return
+    enable_psrecord.enabled = True
+
+    # Register cleanup handler
+    atexit.register(_cleanup_psrecord)
+
+
+enable_psrecord.enabled = False
+enable_psrecord.process = None
+
+
+def disable_psrecord():
+    if not enable_psrecord.enabled:
+        LOG.warning('psrecord logging is not enabled')
+        return
+
+    _cleanup_psrecord()
+    try:
+        atexit.unregister(_cleanup_psrecord)
+    except ValueError:
+        # _cleanup_psrecord was not registered with atexit; nothing to do
+        LOG.debug('psrecord cleanup handler was not registered with atexit')
+    LOG.info('psrecord logging disabled')
 
 
 def enable_memstats():
+
     if platform.system() == 'Darwin':
         LOG.error('Cannot measure memory on OS X.')
         return
