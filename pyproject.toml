@@ -129,18 +129,28 @@ exclude_lines = [
 ]
 
 [tool.pytest.ini_options]
+markers = [
+  "regression: regression test",
+  "alma: alma test",
+  "nobeyama: nobeyama test",
+  "vla: vla test (does not include vlass)",
+  "vlass: vlass test",
+  "fast: shorter-running test",
+  "slow: longer-running test",
+  "twelve: 12m ALMA test",
+  "seven: 7m ALMA test",
+  "sd: single dish test",
+  "interferometry: interferometry test",
+
+  "component: component tests",
+  "importdata: importdata task(s)",
+  "selfcal: selfcal task(s)",
+  "makeimages: makeimages task(s)",
+
+  "unit: unit test",
+]
 addopts = [
     "-ra", # show extra test summary info for (a)ll except passed
     "-v",  # verbose output
-]
-markers = [
-    "alma: alma test",
-    "vla: vla test (does not include vlass)",
-    "vlass: vlass test",
-    "fast: shorter-running test",
-    "slow: longer-running test",
-    "twelve: 12m ALMA",
-    "seven: 7m ALMA",
-    "sd: single dish",
 ]
 junit_family = "legacy"

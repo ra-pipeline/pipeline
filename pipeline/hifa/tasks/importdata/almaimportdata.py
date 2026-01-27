@@ -162,7 +162,7 @@ class ALMAImportDataResults(importdata.ImportDataResults):
     def __init__(
             self,
             mses: list[MeasurementSet] | None = None,
-            setjy_results: list[FluxCalibrationResults] | None = None
+            setjy_results: list[FluxCalibrationResults] | None = None,
             ):
         super().__init__(mses=mses, setjy_results=setjy_results)
 
@@ -175,8 +175,23 @@ class SerialALMAImportData(importdata.ImportData):
     Inputs = ALMAImportDataInputs
     Results = ALMAImportDataResults
 
+    def prepare(self, **parameters) -> Results:
+        results = super().prepare()
+
+        # If online flux services were requested but unavailable, signal an error
+        # after weblog generation to stop the pipeline before the next task.
+        if getattr(self.inputs, 'dbservice', False) and results.fluxservice == 'FAIL':
+            results.tb = (
+                'Online flux catalog unavailable; fell back to local Source.xml fluxes. '
+                'Stopping after weblog export.'
+            )
+
+        return results
+
     def _get_fluxes(
-            self, context: Context, observing_run: ObservingRun
+            self,
+            context: Context,
+            observing_run: ObservingRun,
             ) -> tuple[str | None, list[FluxCalibrationResults], list[dict[str, str | None]] | None]:
         # get the flux measurements from Source.xml for each MS
 
@@ -192,7 +207,7 @@ class SerialALMAImportData(importdata.ImportData):
                 urllib.request.urlopen(url, context=ssl_context, timeout=60.0)
                 xml_results, qastatus = dbfluxes.get_setjy_results(observing_run.measurement_sets)
                 fluxservice = 'FIRSTURL'
-            except Exception as e:
+            except Exception:
                 try:
                     LOG.warning('Unable to execute initial test query with primary flux service.')
                     traceback_msg = traceback.format_exc()

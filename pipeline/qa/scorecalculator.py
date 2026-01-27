@@ -4372,7 +4372,7 @@ def score_fluxservice(result: ALMAImportDataResults) -> list[pqa.QAScore]:
     flux_qa_dict = {
         'FIRSTURL': (1.0, "Flux catalog service used."),
         'BACKUPURL': (0.9, "Backup flux catalog service used."),
-        'FAIL': (0.3, "Neither primary nor backup flux service could be queried. ASDM values used."),
+        'FAIL': (0.3, "Online flux catalog unavailable. Pipeline halted after weblog creation."),
         None: (1.0, "Flux catalog service not used.")
     }
 

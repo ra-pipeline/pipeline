@@ -36,29 +36,33 @@ Example #5: process uid123.tar.gz with a log level of TRACE
     pipeline.recipereducer.reduce(vis=['uid123.tar.gz'], loglevel='trace')
 
 """
+from __future__ import annotations
+
 import collections
 import os
 import tempfile
 import traceback
 import xml.etree.ElementTree as ElementTree
-from typing import Any, Callable, List, Optional, Tuple
+from typing import TYPE_CHECKING
 
-import pipeline.cli as cli
 import pipeline.h.cli.cli as h_cli
-import pipeline.infrastructure.launcher as launcher
-import pipeline.infrastructure.logging as logging
-from pipeline.infrastructure import exceptions, utils
+from pipeline import cli, infrastructure
+from pipeline.infrastructure import exceptions, launcher, utils
 
-LOG = logging.get_logger(__name__)
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import Any
 
+    from pipeline.infrastructure.launcher import Context
 
+LOG = infrastructure.logging.get_logger(__name__)
 RECIPES_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__), 'recipes'))
 
 
 TaskArgs = collections.namedtuple('TaskArgs', 'vis infiles session')
 
 
-def _create_context(loglevel: str, plotlevel: str, name: str) -> launcher.Context:
+def _create_context(loglevel: str, plotlevel: str, name: str) -> Context:
     """Create Pipeline context.
 
     Args:
@@ -74,7 +78,7 @@ def _create_context(loglevel: str, plotlevel: str, name: str) -> launcher.Contex
     return pipeline.context
 
 
-def _register_context(loglevel: str, plotlevel: str, context: launcher.Context) -> None:
+def _register_context(loglevel: str, plotlevel: str, context: Context) -> None:
     """Register given context to global scope.
 
     If pipeline context already exists in global scope, it is saved on
@@ -98,7 +102,7 @@ def _register_context(loglevel: str, plotlevel: str, context: launcher.Context) 
             # save global context with intrinsic name
             global_context.save()
             context_file = f'{global_context.name}.context'
-            LOG.info(f'Global context exists. Saved it {context_file} to disk.')
+            LOG.info('Global context exists. Saved it %s to disk.', context_file)
         else:
             # global context is different from given context but
             # they accidentally have the same name
@@ -108,7 +112,7 @@ def _register_context(loglevel: str, plotlevel: str, context: launcher.Context) 
                 context_file = f'{global_context.name}-{i}.context'
                 if not os.path.exists(context_file):
                     global_context.save(context_file)
-                    LOG.info(f'Global context exists. Saved it {context_file} to disk.')
+                    LOG.info('Global context exists. Saved it %s to disk.', context_file)
                     break
             else:
                 # failed attempt to find appropriate context name
@@ -122,7 +126,7 @@ def _register_context(loglevel: str, plotlevel: str, context: launcher.Context) 
         try:
             # to disable some log messages during registration
             temp_loglevel = 'error'
-            logging.set_logging_level(level=temp_loglevel)
+            infrastructure.logging.set_logging_level(level=temp_loglevel)
             context.save(context_name)
             # create pipeline instance using temporary context
             pipeline_instance = launcher.Pipeline(
@@ -134,12 +138,12 @@ def _register_context(loglevel: str, plotlevel: str, context: launcher.Context) 
             h_cli.stack[h_cli.PIPELINE_NAME] = pipeline_instance
         finally:
             # set user-specified loglevel
-            logging.set_logging_level(level=loglevel)
+            infrastructure.logging.set_logging_level(level=loglevel)
 
 
 def _get_context_name(procedure: str) -> str:
     root, _ = os.path.splitext(os.path.basename(procedure))
-    return 'pipeline-%s' % root
+    return f'pipeline-{root}'
 
 
 def _get_processing_procedure(procedure: str) -> ElementTree:
@@ -149,7 +153,7 @@ def _get_processing_procedure(procedure: str) -> ElementTree:
     else:
         procedure_file = os.path.join(RECIPES_DIR, procedure)
     if os.path.exists(procedure_file):
-        LOG.info('Using procedure file: %s' % procedure_file)
+        LOG.info('Using procedure file: %s', procedure_file)
     else:
         msg = f'Procedure not found:: {procedure}'
         LOG.error(msg)
@@ -170,7 +174,7 @@ def _get_procedure_title(procedure: str) -> str:
     return procedure_title
 
 
-def _get_tasks(context: launcher.Context, args: TaskArgs, procedure: str):
+def _get_tasks(context: Context, args: TaskArgs, procedure: str):
     procedure_xml = _get_processing_procedure(procedure)
 
     commands_seen = []
@@ -218,41 +222,129 @@ def _get_tasks(context: launcher.Context, args: TaskArgs, procedure: str):
         yield task, task_args
 
 
-def _format_arg_value(arg_val: Tuple[Any, Any]) -> str:
+def _format_arg_value(arg_val: tuple[Any, Any]) -> str:
     arg, val = arg_val
-    return '%s=%r' % (arg, val)
+    return f'{arg}={val!r}'
 
 
 def _as_task_call(task_func: Callable, task_args: dict) -> str:
     kw_args = list(map(_format_arg_value, task_args.items()))
-    return '%s(%s)' % (task_func.__name__, ', '.join(kw_args))
+    return f"{task_func.__name__}({', '.join(kw_args)})"
 
 
-def reduce(vis: Optional[List[str]] = None, infiles: Optional[List[str]] = None,
-           procedure: str = 'procedure_hifa_calimage.xml',
-           context: Optional[launcher.Context] = None, name: Optional[str] = None,
-           loglevel: str = 'info', plotlevel: str = 'default',
-           session: Optional[List[str]] = None, exitstage: Optional[int] = None,
-           startstage: Optional[int] = None) -> launcher.Context:
+def _execute_task(task: Callable, task_args: dict) -> Any:
+    """Execute a single pipeline task with logging and error handling.
+
+    This function handles task execution with consistent logging and error
+    handling. It will:
+    - Log the task call before execution
+    - Catch and log any unhandled exceptions (returns None if exception occurs)
+    - Check for tracebacks in the result and raise PipelineException if found
+
+    Args:
+        task: The task callable to execute.
+        task_args: Dictionary of arguments to pass to the task.
+
+    Returns:
+        The task result object, or None if an unhandled exception occurred.
+
+    Raises:
+        exceptions.PipelineException: If the task result contains tracebacks.
+    """
+    LOG.info('Executing pipeline task %s', _as_task_call(task, task_args))
+
+    try:
+        result = task(**task_args)
+    except Exception:
+        # Log message if an exception occurred that was not handled by
+        # standardtask template (not turned into failed task result).
+        call_str = _as_task_call(task, task_args)
+        LOG.error('Unhandled error while running pipeline task %s.', call_str)
+        traceback.print_exc()
+        return None
+
+    # Check for tracebacks in successful task execution
+    tracebacks = utils.get_tracebacks(result)
+    if tracebacks:
+        previous_tracebacks_as_string = '\n'.join(tracebacks)
+        raise exceptions.PipelineException(previous_tracebacks_as_string)
+
+    return result
+
+
+def run_named_tasks(tasks: list[tuple[str, dict[str, Any]]]) -> Context:
+    """Run a sequence of pipeline tasks specified by name and argument dicts.
+
+    This utility centralizes the logic previously duplicated in the test
+    framework so that component tests and other callers can invoke a 
+    consistent execution path with uniform logging and error handling.
+
+    The function will:
+      1. Initialize a fresh pipeline context via `cli.h_init()`.
+      2. Resolve each task name to a callable using `cli.get_pipeline_task_with_name`.
+      3. Execute tasks in order, logging the call signature.
+      4. Raise `exceptions.PipelineException` immediately if any task result 
+         reports tracebacks (handled inside `_execute_task`).
+      5. Save the context via `cli.h_save()`.
+
+    Args:
+        tasks: Ordered list of (task_name, task_args_dict) tuples.
+
+    Returns:
+        Context: The final pipeline context (the most recent / 'last').
+
+    Raises:
+        exceptions.PipelineException: If any executed task reports tracebacks.
+    """
+    LOG.info('Initializing context for explicit task list...')
+    cli.h_init()
+
+    for task_name, task_args in tasks:
+        task = cli.get_pipeline_task_with_name(task_name=task_name)
+        result = _execute_task(task, task_args)
+
+        # If an unhandled exception occurred, return context early
+        if result is None:
+            return launcher.Pipeline(context='last').context
+
+    LOG.info('Saving context after explicit task list execution...')
+    cli.h_save()
+
+    # Return the current ("last") context for caller convenience.
+    return launcher.Pipeline(context='last').context
+
+
+def reduce(
+        vis: list[str] | None = None,
+        infiles: list[str] | None = None,
+        procedure: str = 'procedure_hifa_calimage.xml',
+        context: Context | None = None,
+        name: str | None = None,
+        loglevel: str = 'info',
+        plotlevel: str = 'default',
+        session: list[str] | None = None,
+        exitstage: int | None = None,
+        startstage: int | None = None,
+        ) -> Context:
     """Executes a CASA Pipeline data reduction procedure.
 
     This function triggers the execution of pipeline tasks defined in a
-    given XML precipe procedure, managing context creation and task sequencing.
+    given XML recipe procedure, managing context creation and task sequencing.
 
     Args:
-        vis (Optional[List[str]]): List of measurement sets to process.
-        infiles (Optional[List[str]]): Supplementary input files for the pipeline executation.
-        procedure (str): XML procedure file defining the pipeline workflow.
-        context (Optional[launcher.Context]): Existing context object. A new context is created if None.
-        name (Optional[str]): Context name, used only if `context` is None.
-        loglevel (str): Logging level (e.g., 'info', 'debug').
-        plotlevel (str): Plotting verbosity level used during task execution.
-        session (Optional[List[str]]): List of session names corresponding to each vis. Defaults to "default".
-        exitstage (Optional[int]): If provided, stops execution after this stage number.
-        startstage (Optional[int]): If provided, begins execution from this stage number.
+        vis: List of measurement sets to process.
+        infiles: Supplementary input files for the pipeline execution.
+        procedure: XML procedure file defining the pipeline workflow.
+        context: Existing context object. A new context is created if None.
+        name: Context name, used only if `context` is None.
+        loglevel: Logging level (e.g., 'info', 'debug').
+        plotlevel: Plotting verbosity level used during task execution.
+        session: List of session names corresponding to each vis. Defaults to "default".
+        exitstage: If provided, stops execution after this stage number.
+        startstage: If provided, begins execution from this stage number.
 
     Returns:
-        launcher.Context: The pipeline context object with updated state.
+        The pipeline context object with updated state.
 
     Raises:
         exceptions.PipelineException: Raised if a pipeline task fails with tracebacks.
@@ -286,23 +378,15 @@ def reduce(vis: Optional[List[str]] = None, infiles: Optional[List[str]] = None,
             procedure_stage_nr += 1
             if procedure_stage_nr < startstage:
                 continue
-            LOG.info('Executing pipeline task %s', _as_task_call(task, task_args))
 
-            try:
-                result = task(**task_args)
-            except Exception:
-                # Log message if an exception occurred that was not handled by
-                # standardtask template (not turned into failed task result).
-                _hif_call = _as_task_call(task, task_args)
-                LOG.error("Unhandled error in recipereducer while running pipeline task %s.", _hif_call)
-                traceback.print_exc()
+            result = _execute_task(task, task_args)
+
+            # If an unhandled exception occurred, return context early
+            if result is None:
                 return context
 
-            tracebacks = utils.get_tracebacks(result)
-            if len(tracebacks) > 0:
-                previous_tracebacks_as_string = "{}".format("\n".join([tb for tb in tracebacks]))
-                raise exceptions.PipelineException(previous_tracebacks_as_string)
-            elif result.stage_number is exitstage:
+            # Check if we should exit after this stage
+            if result.stage_number is exitstage:
                 break
 
     except StopIteration:

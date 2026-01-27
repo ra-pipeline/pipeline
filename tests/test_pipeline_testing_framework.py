@@ -1,36 +1,91 @@
 """
-Tests for the regression_tester.py module.
+test_pipeline_testing_framework.py
+============================
+
+Unit tests for the PipelineTester framework logic.
+
+Purpose
+-------
+Validate internal behaviors of the pipeline framework so that pipeline
+tests can trust the scaffolding they run on.
+
+Scope covered here
+------------------
+- Versioned-results file selection
+  * `_pick_results_file(...)`: parses candidate filenames and chooses the best
+    match for the **current** CASA/Pipeline versions.
+  * `_results_file_heuristics(...)`: rejects candidates that exceed running
+    versions, then prefers the closest not-greater versions.
+- CLI options propagation
+  * Ensures `--compare-only` and `--remove-workdir` options are read from
+    pytest and applied to a `PipelineTester` instance.
+- Filename regex correctness
+  * Confirms patterns extract versions from names like:
+    `...casa-<X.Y.Z[-build]>-pipeline-<YYYY.M.m.p>`
+
+Out of scope
+------------
+- Actual pipeline execution (PPR/reducer), CASA tools, filesystem side effects.
+  Those are covered by component/regression suites.
+
+Expected filename patterns
+--------------------------
+- CASA:     `casa-6.5.1-15`  (dash is allowed; internally compared as dots)
+- Pipeline: `pipeline-2023.1.0.8`
+
+How to run
+----------
+Directly call file:
+    python3 -m pytest -vv <repo root>/tests/test_pipeline_testing_framework.py
+
+Or as part of the unit suite:
+    python3 -m pytest -vv -m 'not regression and not component' '<repo root>'
+
+Notes for contributors
+----------------------
+- To add new selection cases, include representative filenames in the
+  `reference_files` lists or expand `reference_dict` with parsed versions.
+- Environment versions are pinned with `unittest.mock.patch`:
+  * `pipeline.environment.casa_version_string`
+  * `pipeline.environment.pipeline_revision`
+  Keep new tests deterministic by patching these accordingly.
+- If you change filename patterns or selection rules in
+  `PipelineTester`, update tests here first to codify the intended behavior.
 """
 from __future__ import annotations
 
-import packaging
-import pytest
+import os
+import tempfile
 import unittest
 from typing import TYPE_CHECKING
 from unittest import mock
 
-from pipeline.infrastructure.utils import regression_tester
+import packaging
+import pytest
+
+from tests.testing_utils import PipelineTester
 
 if TYPE_CHECKING:
-    from pytest import Config, Parser
+    from pytest import Config, FixtureRequest
 
 
-def pytest_addoption(parser: Parser) -> None:
-    """Adds command-line options to pytest."""
-    parser.addoption("--compare-only", action="store_true", help="Run tests with compare-only mode")
-    parser.addoption("--remove-workdir", action="store_true", help="Enable workdir removal")
+@pytest.fixture(autouse=True)
+def _isolate_testcase_tmpdir(request: FixtureRequest, pytestconfig: Config):
+    inst = getattr(request, "instance", None)
+    if isinstance(inst, unittest.TestCase):
+        inst.compare_only = pytestconfig.getoption("--compare-only", False)
+        inst.remove_workdir = pytestconfig.getoption("--remove-workdir", False)
+        inst._tmpdir = tempfile.mkdtemp(prefix="pltest_")
+        inst.pipeline = PipelineTester(
+            visname=["test_results"],
+            recipe="test_procedure.xml",
+            output_dir=inst._tmpdir,
+        )
 
 
-class TestPipelineRegression(unittest.TestCase):
+class TestPipelineTester(unittest.TestCase):
 
-    @pytest.fixture(autouse=True)
-    def setup_pipeline(self, pytestconfig: Config) -> None:
-        """Sets up a PipelineRegression instance with mock environment values."""
-        self.compare_only = pytestconfig.getoption("--compare-only", default=False)
-        self.remove_workdir = pytestconfig.getoption("--remove-workdir", default=False)
-        self.pipeline = regression_tester.PipelineRegression(visname=["test_results"], ppr="test.xml")
-
-    @mock.patch("pipeline.environment.casa_version_string", "6.5.1.15")  # casa_version_string already replaces dash
+    @mock.patch("pipeline.environment.casa_version_string", "6.5.1.15")
     @mock.patch("pipeline.environment.pipeline_revision", "2023.1.0.8")
     def test_pick_results_file_valid_cases(self) -> None:
         """Tests that _pick_results_file correctly extracts and selects the best matching file."""
@@ -102,3 +157,28 @@ class TestPipelineRegression(unittest.TestCase):
 
             self.assertEqual(casa_version, expected_casa)
             self.assertEqual(pipeline_version, expected_pipeline)
+
+    def test_remove_workdir_option(self):
+        """Ensure remove_workdir option is set correctly."""
+        self.assertEqual(self.pipeline.remove_workdir, self.remove_workdir)
+
+    def test_remove_workdir(self):
+        """Ensure workdir is properly removed given the right conditions."""
+        workdir = self.pipeline.output_dir
+
+        # If compare_only=True, the directory should never be created, so skip further checks
+        if self.pipeline.compare_only:
+            self.assertFalse(os.path.exists(workdir))
+            return
+
+        # Otherwise, verify the directory was created initially
+        self.assertTrue(os.path.exists(workdir))
+
+        # Run the cleanup logic
+        self.pipeline._cleanup()
+
+        # If remove_workdir=True, the directory should be deleted after instantiation
+        if self.pipeline.remove_workdir:
+            self.assertFalse(os.path.exists(workdir))  # Workdir should be removed
+        else:
+            self.assertTrue(os.path.exists(workdir))  # Workdir should still exist
