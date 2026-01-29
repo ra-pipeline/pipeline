@@ -7,9 +7,7 @@ import pipeline.infrastructure.tablereader as tablereader
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
 from pipeline.h.tasks.mstransform import mssplit
-from pipeline.infrastructure import casa_tasks
-from pipeline.infrastructure import casa_tools
-from pipeline.infrastructure import task_registry
+from pipeline.infrastructure import casa_tasks, casa_tools, task_registry, utils
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -104,27 +102,27 @@ class TransformimagedataInputs(mssplit.MsSplitInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             vis: List of visibility data files. These may be ASDMs, tar files of ASDMs, MSs, or tar files of MSs, If ASDM files are specified, they will be
                 converted  to MS format.
 
-                Example: vis=['X227.ms', 'asdms.tar.gz']
+                Example: ``vis=['X227.ms', 'asdms.tar.gz']``
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
 
             outputvis: The output MeasurementSet.
 
-            field: Set of data selection field names or ids, '' for all.
+            field: Set of data selection field names or ids, ``''`` for all.
 
-            intent: Set of data selection intents, '' for all.
+            intent: Set of data selection intents, ``''`` for all.
 
-            spw: Set of data selection spectral window ids '' for all.
+            spw: Set of data selection spectral window ids ``''`` for all.
 
             datacolumn: Select spectral windows to split. The standard CASA options are supported
 
-                Example: 'data', 'model'
+                Example: ``'data'``, ``'model'``
 
             chanbin: Bin width for channel averaging.
 
@@ -139,9 +137,6 @@ class TransformimagedataInputs(mssplit.MsSplitInputs):
             wtmode: optional weight initialization mode when modify_weights=True
 
         """
-
-        # super(TransformimagedataInputs, self).__init__()
-
         # set the properties to the values given as input arguments
         self.context = context
         self.vis = vis
@@ -187,22 +182,13 @@ class Transformimagedata(mssplit.MsSplit):
         # Split is required so create the results structure
         result = TransformimagedataResults(vis=inputs.vis, outputvis=inputs.outputvis)
 
-        # Run CASA task
-        #    Does this need a try / except block
-
         visfields = []
         visspws = []
         for imageparam in inputs.context.clean_list_pending:
             visfields.extend(imageparam['field'].split(','))
             visspws.extend(imageparam['spw'].split(','))
-
-        visfields = set(visfields)
-        visfields = list(visfields)
-        visfields = ','.join(visfields)
-
-        visspws = set(visspws)
-        visspws = sorted(visspws)
-        visspws = ','.join(visspws)
+        visfields = ','.join(utils.deduplicate(visfields))
+        visspws = ','.join(utils.deduplicate(visspws))
 
         mstransform_args = inputs.to_casa_args()
         mstransform_args['field'] = visfields

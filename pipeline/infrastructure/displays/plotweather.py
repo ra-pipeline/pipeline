@@ -66,7 +66,7 @@ def plot_weather(vis='', figfile='', station=[], help=False):
                 station_name = station_names[station_id]
         unique_station_names.append(station_name)
 
-    # PIPE-31: deprioritize the station with "Itinerant" in name (typically: "MeteoItinerant"), 
+    # PIPE-31: deprioritize the station with "Itinerant" in name (typically: "MeteoItinerant"),
     # since it only has a wind sensor.
     try:
         meteoitinerant_idx = unique_station_names.index('Itinerant')
@@ -180,6 +180,8 @@ def plot_weather(vis='', figfile='', station=[], help=False):
 
     mysize = 'small'
     plt.clf()
+    # PIPE-2806: set facecolor to default (white) explicitly
+    plt.gcf().set_facecolor(plt.rcParams['figure.facecolor'])
     adesc = plt.subplot(321)
     myhspace = 0.25
     mywspace = 0.25
@@ -226,7 +228,7 @@ def plot_weather(vis='', figfile='', station=[], help=False):
     RescaleXAxisTimeTicks(plt.xlim(), adesc)
     adesc.xaxis.grid(True, which='major')
     adesc.yaxis.grid(True, which='major')
-    
+
     colors = ['b', 'r']
     xinc = 0.4
     labxstart = 0.5-(min(len(unique_station_names), 2)-1.0)*xinc/2.0

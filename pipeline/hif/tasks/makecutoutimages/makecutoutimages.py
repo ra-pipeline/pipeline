@@ -86,13 +86,13 @@ class MakecutoutimagesInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             vis: List of visibility data files. These may be ASDMs, tar files of ASDMs, MSs,
                 or tar files of MSs.
                 If ASDM files are specified, they will be converted to
                 MS format.
-                example: vis=['X227.ms', 'asdms.tar.gz']
+                example: ``vis=['X227.ms', 'asdms.tar.gz']``
 
             offsetblc: -x and -y offsets to the bottom lower corner (blc) in arcseconds
 
@@ -131,48 +131,56 @@ class Makecutoutimages(basetask.StandardTaskTemplate):
 
         # Per VLASS Tech Specs page 22
         for imageitem in imlist:
+            imagename: str = imageitem['imagename']
+            # Assuming imagename ends with '.image', imagename_base will be the prefix
+            imagename_base = os.path.splitext(imagename)[0]
             if imageitem['multiterm']:
-                imagenames.extend(utils.glob_ordered(imageitem['imagename'] + '.tt0'))  # non-pbcor
-                imagenames.extend(utils.glob_ordered(imageitem['imagename'].replace(
-                    '.image', '.residual') + '*.tt0'))  # non-pbcor
-                imagenames.extend(utils.glob_ordered(imageitem['imagename'].replace('.image', '.image.pbcor') + '*.tt0'))
-                imagenames.extend(utils.glob_ordered(imageitem['imagename'].replace('.image', '.image.pbcor') + '*.tt0.rms'))
-                imagenames.extend(utils.glob_ordered(imageitem['imagename'].replace('.image', '.psf') + '*.tt0'))
-                imagenames.extend(utils.glob_ordered(imageitem['imagename'].replace(
-                    '.image', '.image.residual.pbcor') + '*.tt0'))
-                imagenames.extend(utils.glob_ordered(imageitem['imagename'].replace('.image', '.pb') + '*.tt0'))
+                imagenames.extend(utils.glob_ordered(f'{imagename}.tt0'))  # non-pbcor
+                imagenames.extend(utils.glob_ordered(f'{imagename_base}.residual*.tt0'))  # non-pbcor
+                imagenames.extend(utils.glob_ordered(f'{imagename_base}.image.pbcor*.tt0'))
+                imagenames.extend(utils.glob_ordered(f'{imagename_base}.image.pbcor*.tt0.rms'))
+                imagenames.extend(utils.glob_ordered(f'{imagename_base}.psf*.tt0'))
+                imagenames.extend(utils.glob_ordered(f'{imagename_base}.image.residual.pbcor*.tt0'))
+                imagenames.extend(utils.glob_ordered(f'{imagename_base}.pb*.tt0'))
                 # PIPE-631/1039: make alpha/.tt1 image cutouts in the VLASS-SE-CONT mode
                 if is_vlass_se_cont:
-                    imagenames.extend(utils.glob_ordered(imageitem['imagename'] + '.tt1'))  # non-pbcor
-                    imagenames.extend(utils.glob_ordered(imageitem['imagename'].replace(
-                        '.image', '.residual') + '*.tt1'))  # non-pbcor
-                    imagenames.extend(utils.glob_ordered(imageitem['imagename'].replace('.image', '.image.pbcor') + '*.tt1'))
-                    imagenames.extend(utils.glob_ordered(imageitem['imagename'].replace('.image', '.image.pbcor') + '*.tt1.rms'))
-                    imagenames.extend(utils.glob_ordered(imageitem['imagename'].replace('.image', '.psf') + '*.tt1'))
-                    imagenames.extend(utils.glob_ordered(imageitem['imagename'].replace(
-                        '.image', '.image.residual.pbcor') + '*.tt1'))
-                    imagenames.extend(utils.glob_ordered(imageitem['imagename'].replace('.image', '.alpha')))
-                    imagenames.extend(utils.glob_ordered(imageitem['imagename'].replace('.image', '.alpha.error')))
+                    imagenames.extend(utils.glob_ordered(f'{imagename}.tt1'))  # non-pbcor
+                    imagenames.extend(utils.glob_ordered(f'{imagename_base}.residual*.tt1'))  # non-pbcor
+                    imagenames.extend(utils.glob_ordered(f'{imagename_base}.image.pbcor*.tt1'))
+                    imagenames.extend(utils.glob_ordered(f'{imagename_base}.image.pbcor*.tt1.rms'))
+                    imagenames.extend(utils.glob_ordered(f'{imagename_base}.psf*.tt1'))
+                    imagenames.extend(utils.glob_ordered(f'{imagename_base}.image.residual.pbcor*.tt1'))
+                    imagenames.extend(utils.glob_ordered(f'{imagename_base}.alpha'))
+                    imagenames.extend(utils.glob_ordered(f'{imagename_base}.alpha.error'))
             else:
-                imagenames.extend(utils.glob_ordered(imageitem['imagename']))  # non-pbcor
-                imagenames.extend(utils.glob_ordered(imageitem['imagename'].replace('.image', '.residual')))  # non-pbcor
-                imagenames.extend(utils.glob_ordered(imageitem['imagename'].replace('.image', '.image.pbcor')))
-                imagenames.extend(utils.glob_ordered(imageitem['imagename'].replace('.image', '.image.pbcor.rms')))
-                imagenames.extend(utils.glob_ordered(imageitem['imagename'].replace('.image', '.psf')))
-                imagenames.extend(utils.glob_ordered(imageitem['imagename'].replace('.image', '.image.residual.pbcor')))
-                imagenames.extend(utils.glob_ordered(imageitem['imagename'].replace('.image', '.pb')))
+
+                imagenames.extend(utils.glob_ordered(imagename))  # non-pbcor
+                imagenames.extend(utils.glob_ordered(f'{imagename_base}.residual'))  # non-pbcor
+                imagenames.extend(utils.glob_ordered(f'{imagename_base}.image.pbcor'))
+                imagenames.extend(utils.glob_ordered(f'{imagename_base}.image.pbcor.rms'))
+                imagenames.extend(utils.glob_ordered(f'{imagename_base}.psf'))
+                imagenames.extend(utils.glob_ordered(f'{imagename_base}.image.residual.pbcor'))
+                imagenames.extend(utils.glob_ordered(f'{imagename_base}.pb'))
+
+        cutout_imsize_map = {
+            os.path.splitext(imageitem['imagename'])[0]: imageitem['metadata'].get('cutout_imsize')
+            for imageitem in imlist
+        }
 
         subimagenames = []
         subimage_size = None
         for imagename in imagenames:
-            subimagename = imagename + '.subim'
+            subimagename = f'{imagename}.subim'
             if not os.path.exists(subimagename):
-                LOG.info(f"Make a cutout image under the image name: {subimagename}")
-                _, _ = self._do_subim(imagename)
+                LOG.info('Make a cutout image under the image name: %s', subimagename)
+                cutout_imsize = next((v for k, v in cutout_imsize_map.items() if subimagename.startswith(k)), None)
+                if cutout_imsize is not None:
+                    LOG.info('Using cutout_imsize from imlist metadata: %s', cutout_imsize)
+                self._do_subim(imagename, cutout_imsize=cutout_imsize)
                 subimagenames.append(subimagename)
             else:
-                LOG.info(
-                    f"A cutout image named {subimagename} already exists, and we will reuse this image for weblog.")
+                LOG.info('A cutout image named %s already exists, and we will reuse this image for weblog.',
+                         subimagename)
                 subimagenames.append(subimagename)
             subimage_size = self._get_image_size(subimagename)
 
@@ -193,7 +201,7 @@ class Makecutoutimages(basetask.StandardTaskTemplate):
 
         return self._executor.execute(task)
 
-    def _do_subim(self, imagename):
+    def _do_subim(self, imagename, cutout_imsize=None):
 
         inputs = self.inputs
 
@@ -223,21 +231,21 @@ class Makecutoutimages(basetask.StandardTaskTemplate):
             3600.0 * (image_size_x + buffer_deg) / xcellsize)   # Cutout size with buffer in pixels
         fld_subim_size_y = utils.round_half_up(
             3600.0 * (image_size_y + buffer_deg) / ycellsize)   # Cutout size with buffer in pixels
+        
+        if cutout_imsize is not None:
+            fld_subim_size_x = cutout_imsize[0]
+            fld_subim_size_y = cutout_imsize[1]
 
         # equivalent blc,trc for extracting requested field, in pixels:
         blcx = imsize[0] // 2 - (fld_subim_size_x / 2)
         blcy = imsize[1] // 2 - (fld_subim_size_y / 2)
-        trcx = imsize[0] // 2 + (fld_subim_size_x / 2) + 1
-        trcy = imsize[1] // 2 + (fld_subim_size_y / 2) + 1
+        trcx = imsize[0] // 2 + (fld_subim_size_x / 2) - 1
+        trcy = imsize[1] // 2 + (fld_subim_size_y / 2) - 1
 
-        if blcx < 0.0:
-            blcx = 0
-        if blcy < 0.0:
-            blcy = 0
-        if trcx > imsize[0]:
-            trcx = imsize[0] - 1
-        if trcy > imsize[1]:
-            trcy = imsize[1] - 1
+        blcx = max(0, blcx)
+        blcy = max(0, blcy)
+        trcx = min(imsize[0] - 1, trcx)
+        trcy = min(imsize[1] - 1, trcy)
 
         if inputs.offsetblc and inputs.offsettrc:
             offsetblc = inputs.offsetblc
@@ -256,27 +264,21 @@ class Makecutoutimages(basetask.StandardTaskTemplate):
 
             blcx = imsize[0] // 2 - fld_subim_size_x_blc
             blcy = imsize[1] // 2 - fld_subim_size_y_blc
-            trcx = imsize[0] // 2 + fld_subim_size_x_trc + 1
-            trcy = imsize[1] // 2 + fld_subim_size_y_trc + 1
+            trcx = imsize[0] // 2 + fld_subim_size_x_trc - 1
+            trcy = imsize[1] // 2 + fld_subim_size_y_trc - 1
 
-            if blcx < 0.0:
-                blcx = 0
-            if blcy < 0.0:
-                blcy = 0
-            if trcx > imsize[0]:
-                trcx = imsize[0] - 1
-            if trcy > imsize[1]:
-                trcy = imsize[1] - 1
+            blcx = max(0, blcx)
+            blcy = max(0, blcy)
+            trcx = min(imsize[0] - 1, trcx)
+            trcy = min(imsize[1] - 1, trcy)
 
-            LOG.info("Using user defined offsets in arcseconds of: blc:({!s}), trc:({!s})".format(
-                ','.join([str(i) for i in offsetblc]), ','.join([str(i) for i in offsettrc])))
+            LOG.info('Using user defined offsets in arcseconds of: blc:(%s), trc:(%s)',
+                     ','.join([str(i) for i in offsetblc]),
+                     ','.join([str(i) for i in offsettrc]))
 
         fld_subim = str(blcx) + ',' + str(blcy) + ',' + str(trcx) + ',' + str(trcy)
-        LOG.info('Using field subimage blc,trc of {!s},{!s}, {!s},{!s}, which includes a buffer '
-                 'of {!s} arcminutes.'.format(blcx, blcy, trcx, trcy, buffer_deg*60))
-
-        # imsubimage(imagename=clnpbcor, outfile=clnpbcor + '.subim', box=fld_subim)
-
+        LOG.info('Using field subimage blc,trc of %s,%s, %s,%s, which includes a buffer '
+                 'of %s arcminutes.', blcx, blcy, trcx, trcy, buffer_deg * 60)
         # Quicklook parameters
         imsubimageparams = {'imagename': imagename,
                             'outfile': imagename + '.subim',

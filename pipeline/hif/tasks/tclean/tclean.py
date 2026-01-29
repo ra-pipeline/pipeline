@@ -470,8 +470,14 @@ class Tclean(cleanbase.CleanBase):
                 # the intrinsic vis chanwidths.
                 channel_width_tolerance = 0.05
                 if abs(channel_width_manual) < channel_width_auto*(1-channel_width_tolerance):
-                    LOG.error('User supplied channel width (%s GHz) smaller than native '
-                              'value (%s GHz) for Field %s SPW %s' % (channel_width_manual/1e9, channel_width_auto/1e9, inputs.field, inputs.spw))
+                    LOG.error(
+                        'User supplied channel width (%s MHz) is smaller than the native value (%s MHz) '
+                        'for Field %s SPW %s',
+                        channel_width_manual / 1e6,  # manual width in MHz
+                        channel_width_auto / 1e6,  # native width in MHz
+                        inputs.field,
+                        inputs.spw,
+                    )
                     error_result = TcleanResult(vis=inputs.vis,
                                                 sourcename=inputs.field,
                                                 intent=inputs.intent,
@@ -484,9 +490,15 @@ class Tclean(cleanbase.CleanBase):
                     return error_result
                 else:
                     if abs(channel_width_manual) < channel_width_auto:
-                        LOG.warning('User supplied channel width (%s GHz) smaller than native '
-                                    'value (%s GHz) for Field %s SPW %s but within the tolerance of %f; '
-                                    'use the native value instead.', channel_width_manual/1e9, channel_width_auto/1e9, inputs.field, inputs.spw, channel_width_tolerance)
+                        LOG.warning(
+                            'User supplied channel width (%s MHz) is smaller than native value (%s MHz) '
+                            'for Field %s SPW %s, but within tolerance of %f MHz; using native value.',
+                            channel_width_manual / 1e6,  # user‑supplied width in MHz
+                            channel_width_auto / 1e6,  # native width in MHz
+                            inputs.field,
+                            inputs.spw,
+                            channel_width_tolerance,
+                        )
                         channel_width = channel_width_auto
                     else:
                         LOG.info('Using supplied width %s' % inputs.width)
@@ -516,23 +528,32 @@ class Tclean(cleanbase.CleanBase):
             if inputs.nchan not in (None, -1):
                 if1 = if0 + channel_width * inputs.nchan
                 if if1 > if1_auto:
-                    LOG.error('Calculated stop frequency (%s GHz) > f_high_native (%s GHz) for Field %s '
-                              'SPW % s' % (if1/1e9, if1_auto/1e9, inputs.field, inputs.spw))
-                    error_result = TcleanResult(vis=inputs.vis,
-                                                sourcename=inputs.field,
-                                                intent=inputs.intent,
-                                                spw=inputs.spw,
-                                                specmode=inputs.specmode,
-                                                imaging_mode=self.image_heuristics.imaging_mode)
-                    error_result.error = '%s/%s/spw%s clean error: f_stop > f_high' % (inputs.field,
-                                                                                       inputs.intent, inputs.spw)
-                    return error_result
-                LOG.info('Using supplied nchan %d' % inputs.nchan)
+                    nchan_use = int(np.floor((if1_auto - if0) / channel_width))
+                    LOG.warning('Calculated stop frequency (%s GHz) > f_high_native (%s GHz) for Field %s '
+                                'SPW %s, adjusting nchan from %d to %d to avoid imaging out of the SPW coverage.',
+                                if1/1e9, if1_auto/1e9, inputs.field, inputs.spw, inputs.nchan, nchan_use)
+                    if nchan_use < 1:
+                        LOG.error('No coverage overlap with the requested imaging frequency range for Field %s '
+                                  'SPW %s', inputs.field, inputs.spw)
+                        error_result = TcleanResult(vis=inputs.vis,
+                                                    sourcename=inputs.field,
+                                                    intent=inputs.intent,
+                                                    spw=inputs.spw,
+                                                    specmode=inputs.specmode,
+                                                    imaging_mode=self.image_heuristics.imaging_mode)
+                        error_result.error = (
+                            f'{inputs.field}/{inputs.intent}/spw{inputs.spw} '
+                            'clean error: invalid specification for imaging channel grid'
+                        )
+                        return error_result
+                    inputs.nchan = nchan_use
+                LOG.info('Using nchan=%d', inputs.nchan)
             else:
                 # Skip edge channels and extra channels if no nchan is supplied.
                 # Adjust to binning since the normal nchan heuristics already includes it.
                 if inputs.nbin not in (None, -1):
-                    inputs.nchan = int(utils.round_half_up((if1 - if0) / channel_width - 2)) - 2 * int(extra_skip_channels // inputs.nbin)
+                    inputs.nchan = int(utils.round_half_up((if1 - if0) / channel_width - 2)) - \
+                        2 * int(extra_skip_channels // inputs.nbin)
                 else:
                     inputs.nchan = int(utils.round_half_up((if1 - if0) / channel_width - 2)) - 2 * extra_skip_channels
 

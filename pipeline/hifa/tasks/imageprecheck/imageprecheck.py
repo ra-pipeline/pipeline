@@ -115,23 +115,25 @@ class ImagePreCheckInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the hifa_importdata task.
                 '': use all MeasurementSets in the context
 
-                Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
+                Examples: ``'ngc5921.ms'``, ``['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']``
 
             desired_angular_resolution: User specified angular resolution goal string. When this parameter is set, uvtapering may be performed.
                 '': automatic from performance parameters (default).
 
-                Example: '1.0arcsec'
+                Example: ``'1.0arcsec'``
 
             calcsb: Force (re-)calculation of sensitivities and beams; defaults to False
 
             parallel: Use the CASA imager parallel processing when possible.
-                options: 'automatic', 'true', 'false', True, False
-                default: 'automatic' 
+
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``'automatic'``
 
         """
         self.context = context

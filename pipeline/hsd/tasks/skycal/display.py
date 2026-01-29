@@ -394,7 +394,7 @@ class SingleDishSkyCalAmpVsFreqDetailChart(bandpass.BandpassDetailChart, SingleD
         """Initialize the class.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
             result: Pipeline task execution result.
             field: Field string. Either field id or field name.
         """
@@ -462,7 +462,7 @@ class SingleDishPlotmsLeaf(object):
         to customize plotms but currently those parameters are ignored.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
             result: SDSkyCalResults instance.
             calapp: CalApplication instance.
             xaxis: The content of X-axis of the plot.
@@ -648,7 +648,7 @@ class SingleDishSkyCalAmpVsTimeSummaryChart(SingleDishPlotmsSpwComposite):
         """Initialize the class.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
             result: SDSkyCalResults instance.
             calapp: List of CalApplication instances.
         """
@@ -669,7 +669,7 @@ class SingleDishSkyCalAmpVsTimeDetailChart(SingleDishPlotmsAntSpwComposite):
         """Initialize the class.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
             result: SDSkyCalResults instance.
             calapp: List of CalApplication instances.
         """
@@ -688,7 +688,7 @@ def plot_elevation_difference(
     """Generate plot of elevation difference.
 
     Args:
-        context: Pipeline context.
+        context: Pipeline context object containing state information.
         result: SDSkyCalResults instance.
         eldiff: -- dictionary whose value is ElevationDifference named tuple instance that holds
                       'timeon': timestamp for ON-SOURCE pointings

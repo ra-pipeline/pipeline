@@ -144,7 +144,7 @@ line detection stage.</p>
 
 <h2 id="avgbeforebaseline" class="jumptarget">Averaged Spectral Data Before Baseline Subtraction</h2>
 
-<p>Plotted data are obtained by averaging all the spectral associating with each grid. Averaging the data improves 
+<p>Plotted data are obtained by averaging all the spectra associating with each grid. Averaging the data improves
 S/N ratio so that spectral line feature becomes more prominent and it can be easily compared with the line mask 
 for baseline subtraction.</p>
 

@@ -1,0 +1,82 @@
+pipeconfig:
+  FLUX_SERVICE_URL: "https://almascience.org/sc/flux" # not used yet
+  FLUX_SERVICE_URL_BACKUP: "https://asa.alma.cl/sc/flux" # not used yet
+  chdir: "./" # not used yet
+  vis: # not used yet
+  procedure: # not used yet
+  loglevel: "info" # default Python logging level, e.g. 'debug' (note: not confused with the global casalogsink level), 
+  ppr: # not used yet
+  vlappr: # not used yet
+  xvfb: false # option for directly spawn xvfb server from the python session, pyvirtualdisplay is required for xvfb=True
+  omp_num_threads: 4 # not used yet
+  dask:
+    tier0futures: true
+    autostart: false
+    host: null # 0.0.0.0 to bind to all interfaces / acessile from network, null for default localhost
+    dashboard_address: ":0" # Port for the dask dashboard: ":0" to auto-select a port, null to disable
+    clustertype: "local" # htcondor / slurm
+    n_workers: null
+    distributed:
+      worker:
+        nthreads: 1 # Number of threads per worker
+        memory:
+          target: 0.6 # When 60% memory usage is reached, start spilling to disk
+          spill: 0.7 # When 70% memory usage is reached, spill more to disk
+          pause: 0.8 # When 80% memory usage is reached, pause worker activity
+          terminate: 0.95 # When 95% memory usage is reached, terminate the worker
+      scheduler:
+        host: "localhost" # Scheduler host
+        port: 0 # Port of the scheduler
+      client:
+        heartbeat_interval: 10000 # Heartbeat interval in milliseconds
+    jobqueue:
+      slurm:
+        name: null # default to daskhelper.default_worker_name()
+        # queue: "queue"
+        cores: 1 # Total number of cores per job
+        processes: 1 # Number of Python processes per job        
+        memory: "10gb" # Total memory per job
+        walltime: "1-0:0:0"
+        # interface: "eno1"        
+      htcondor:
+        name: null  # default to daskhelper.default_worker_name()
+        cores: 1 # Number of cores per job
+        processes: 1 # Number of processes per worker        
+        memory: "8GB" # Memory per job
+        disk: "10GB" # Disk space per job
+        # Job submission details
+        job_extra:
+          # universe: "vanilla"
+          getenv: "True"
+          # initialdir: "$(PWD)" # Start job in current directory
+          # should_transfer_files: "YES"
+          # when_to_transfer_output: "ON_EXIT"
+          max_retries: 3
+        # Other settings
+        # interface: "eno1" # Network interface to use
+        death_timeout: "60s" # Timeout for worker death
+        # local_directory: "/tmp"     # Directory to store local worker files
+        log_directory: "/tmp/htcondor_logs/" # Directory to store logs
+
+casaconfig: # all values are null for now, so the settings determined by casaconfig remain unchanged.
+  measures_auto_update: null
+  data_auto_update: null
+  log2term: null
+  nologger: null
+  agg: null
+  user_site: null
+  datapath: null # this should be a list of paths or null
+  measurespath: null # this should be a path or null
+  cachedir: null # this should be a path or null
+  logfile: null # this should be a path or null
+  nologfile: null
+  startupfile: null 
+  cachedir: null
+  nogui: null
+  colors: null
+  pipeline: null
+  iplog: null
+  iplogfile: null
+  user_site: null
+  casaconfig_verbose: null
+  

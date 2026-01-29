@@ -39,37 +39,44 @@ class CheckProductSizeInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
-                Defaults to None, which corresponds to the current working directory.
 
-            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the <hifa,hifv>_importdata task.
-                '': use all MeasurementSets in the context
+                Default: ``None``, which corresponds to the current working directory.
 
-                Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
+            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in `hifa_importdata` and `hifv_importdata`.
 
-            maxcubesize: Maximum allowed cube size in gigabytes (mitigation goal) -1: automatic from performance parameters
+                Examples: ``'ngc5921.ms'``, ``['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']``
+
+            maxcubesize: Maximum allowed cube size in gigabytes (mitigation goal)
+
+                Default: ``-1`` - automatic from performance parameters
 
             maxcubelimit: Maximum allowed cube limit in gigabytes (mitigation failure limit)
-                -1: automatic from performance parameters
+
+                Default: ``-1`` - automatic from performance parameters
 
             maxproductsize: Maximum allowed product size in gigabytes (mitigation goal and failure limit)
-                -1: automatic from performance parameters
+
+                Default: ``-1`` - automatic from performance parameters
 
             calcsb: Force (re-)calculation of sensitivities and beams
 
             parallel: Use the CASA imager parallelization when possible.
-                options: 'automatic', 'true', 'false', True, False
-                default: 'automatic' 
+
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``'automatic'``
 
             maximsize: Maximum allowed image count size (mitigation goal and hard maximum).
-                Parameter ``maximsize`` must be even and divisible by 2,3,5,7 only.
-                Note that ``maximsize`` is disabled by default and cannot be set at
-                the same time as ``maxcubesize``, ``maxcubelimit`` and ``maxproductsize``!
-                -1: disables mitigation for this parameter
+                Parameter ``maximsize`` must be even and divisible by ``2, 3, 5, 7`` only.
+                ***Caution*** ``maximsize`` is disabled by default and cannot be set at
+                the same time as ``maxcubesize``, ``maxcubelimit`` and ``maxproductsize``.
+
+                Default: ``-1`` - disables mitigation for this parameter
         """
-        super(CheckProductSizeInputs, self).__init__()
+        super().__init__()
 
         self.context = context
         self.output_dir = output_dir

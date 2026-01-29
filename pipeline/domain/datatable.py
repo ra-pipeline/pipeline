@@ -234,8 +234,7 @@ class DataTableIndexer(object):
 
 
 class DataTableImpl(object):
-    """
-    DataTable is an object to hold meta data of scantable on memory.
+    """DataTable is an object to hold meta data of scantable on memory.
 
     row layout: [Row, Scan, IF, Pol, Beam, Date, Time, ElapsedTime,
                    0,    1,  2,   3,    4,    5,    6,            7,
@@ -953,6 +952,12 @@ class DataTableImpl(object):
                 self.putcellslice('FLAG_PERMANENT', int(dt_row), online_flag,
                                   blc=[0, OnlineFlagIndex], trc=[npol - 1, OnlineFlagIndex],
                                   incr=[1, 1])
+                # Update FLAG_SUMMARY
+                flag_summary = self.getcell('FLAG_SUMMARY', int(dt_row))
+                # Incorporate updated online flag status to flag summary.
+                # note: The value shall be 1 for valid spectrum and 0 for invalid one.
+                flag_summary *= online_flag[:npol, 0]
+                self.putcell('FLAG_SUMMARY', int(dt_row), flag_summary)
 
 
 class RODataTableColumn(object):

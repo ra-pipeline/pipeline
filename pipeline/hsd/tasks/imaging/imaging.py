@@ -29,8 +29,8 @@ from pipeline.hsd.tasks.common import utils as sdutils
 from pipeline.hsd.tasks.imaging import (detect_missed_lines,
                                         detectcontamination, gridding,
                                         imaging_params, resultobjects,
-                                        sdcombine, weighting, worker)
-from pipeline.infrastructure import casa_tasks, casa_tools, task_registry
+                                        sdcombine, worker)
+from pipeline.infrastructure import casa_tools, task_registry
 
 if TYPE_CHECKING:
     from casatools import coordsys
@@ -56,6 +56,7 @@ REF_MS_ID = 0
 # by SQLD in ALMA (1 ms) with 1% margin to avoid rejecting the exact 1 ms case (w/ numerical error).
 # Adjust the value when Pipeline supports observation modes/instruments with smaller integration time.
 MIN_INTEGRATION_SEC = 9.9e-4
+
 
 class SDImagingInputs(vdp.StandardInputs):
     """Inputs for imaging task class."""
@@ -144,7 +145,7 @@ class SDImagingInputs(vdp.StandardInputs):
                 Accepts either "line" (spectral line imaging) or "ampcal"
                 (image settings for amplitude calibrator).
 
-                Default: None (equivalent to 'line')
+                Default: ``None`` (equivalent to ``'line'``)
 
             restfreq: Rest frequency. Defaults to None,
                 it executes without rest frequency.
@@ -153,27 +154,27 @@ class SDImagingInputs(vdp.StandardInputs):
                 MeasurementSets that are registered to context via
                 hsd_importdata or hsd_restoredata tasks.
 
-                Example: vis=['uid___A002_X85c183_X36f.ms', 'uid___A002_X85c183_X60b.ms']
+                Example: ``vis=['uid___A002_X85c183_X36f.ms', 'uid___A002_X85c183_X60b.ms']``
 
-                Default: None (process all registered MeasurementSets)
+                Default: ``None`` (process all registered MeasurementSets)
 
             field: Data selection by field names or ids.
 
-                Example: "`*Sgr*,M100`"
+                Example: ``"*Sgr*,M100"``
 
-                Default: None (process all science fields)
+                Default: ``None`` (process all science fields)
 
             spw: Data selection by spw ids.
 
-                Example: "3,4" (generate images for spw 3 and 4)
+                Example: ``"3,4"`` (generate images for spw 3 and 4)
 
-                Default: None (process all science spws)
+                Default: ``None`` (process all science spws)
 
             org_direction: Directions of the origin for moving targets.
-                Defaults to None, it doesn't have some moving targets.
+                Defaults to ``None``, it doesn't have some moving targets.
 
         """
-        super(SDImagingInputs, self).__init__()
+        super().__init__()
 
         self.context = context
         self.restfreq = restfreq
@@ -218,8 +219,7 @@ class SDImaging(basetask.StandardTaskTemplate):
             for rgp.name, rgp.members in rgp.image_group.items():
                 self._set_image_group_item_into_reduction_group_patameters(cp, rgp)
 
-                # Step 1: initialize weight column
-                self._initialize_weight_column_based_on_baseline_rms(cp, rgp)
+                # Step 1: (removed with PIPE-2491)
 
                 # Step 2: imaging
                 if not self._execute_imaging(cp, rgp):
@@ -699,22 +699,6 @@ class SDImaging(basetask.StandardTaskTemplate):
 
         # restfreq
         self._pick_restfreq_from_restfreq_list(cp, rgp)
-
-    def _initialize_weight_column_based_on_baseline_rms(self, cp: imaging_params.CommonParameters,
-                                                        rgp: imaging_params.ReductionGroupParameters):
-        """Initialize weight column of MS.
-
-        Args:
-            cp : Common parameter object of prepare()
-            rgp : Reduction group parameter object of prepare()
-        """
-        _origin_ms = [msobj.origin_ms for msobj in rgp.msobjs]
-        _work_ms = [msobj.name for msobj in rgp.msobjs]
-        _weighting_inputs = vdp.InputsContainer(weighting.WeightMS, self.inputs.context,
-                                                infiles=_origin_ms, outfiles=_work_ms,
-                                                antenna=rgp.antids, spwid=rgp.spwids, fieldid=rgp.fieldids)
-        _weighting_task = weighting.WeightMS(_weighting_inputs)
-        self._executor.execute(_weighting_task, merge=False, datatable_dict=cp.dt_dict)
 
     def _initialize_coord_set(self, cp: imaging_params.CommonParameters,
                               rgp: imaging_params.ReductionGroupParameters) -> bool:

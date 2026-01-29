@@ -1,33 +1,30 @@
-from . import cli
 import pipeline.infrastructure.launcher as launcher
 
+from . import cli
 
-def h_resume(filename=None):
 
-    """Restore a saved pipeline state
+def h_resume(filename: str | None = None):
+    """Restore a saved pipeline state.
 
-    h_resume restores a name pipeline state from disk, allowing a
-    suspended pipeline reduction session to be resumed.
+    Restores a named pipeline state from disk, allowing a suspended pipeline reduction session to be resumed.
 
     Args:
-        filename: Name of the saved pipeline state. Setting filename to 'last' restores the most recently saved pipeline state whose name
-            begins with 'context*'.
+        filename: Saved pipeline state name. If set to ``'last'`` or left as ``None``, the most recently saved state
+            ending with ``'.context'`` will be restored.
 
     Returns:
-        The results object for the pipeline task is returned.
+        The pipeline `context` object.
 
     Examples:
-        1. Resume the last saved session
+        Resume the last saved session:
 
-        >>> h_resume()
+            >>> h_resume()
 
-        2. Resume the named saved session
+        Resume from a saved session using the `context` snapshot after the processing stage-35:
 
-        >>> h_resume(filename='context.s3.2012-02-13T10:49:11')
-
+            >>> h_resume(filename='pipeline-20230227T202157/saved_state/context-stage35.pickle')
     """
-
-    _filename = 'last' if filename is None else filename
+    _filename = filename or 'last'
     pipeline = launcher.Pipeline(context=_filename)
 
     cli.stack[cli.PIPELINE_NAME] = pipeline

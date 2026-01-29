@@ -1,5 +1,3 @@
-import sys
-
 import pipeline.h.cli.utils as utils
 
 
@@ -9,7 +7,7 @@ def hifa_timegaincal(vis=None, calamptable=None, calphasetable=None, offsetstabl
                      amptable=None, field=None, spw=None, antenna=None, calsolint=None, targetsolint=None, refant=None,
                      refantmode=None, solnorm=None, minblperant=None, calminsnr=None, targetminsnr=None, smodel=None,
                      parallel=None):
-    """Determine temporal gains from calibrator observations
+    """Determine temporal gains from calibrator observations.
 
     The time-dependent complex gains for each antenna/spw are determined from
     the raw data (DATA column) divided by the model (MODEL column), for the
@@ -57,7 +55,7 @@ def hifa_timegaincal(vis=None, calamptable=None, calphasetable=None, offsetstabl
       and drifts of the spw-spw offsets as a function of time, but if the SNR
       is very low, such offsets will not be able to detected.
     
-    Good candidate reference antennas were determined using the hif_refant task.
+    Good candidate reference antennas were determined using the `hif_refant` task.
     During all solutions for standard observing modes, the reference antenna can
     change flexibly. For polarization observations a good, un-flagged common
     reference antenna is found and locked in time. For band-to-band observations,
@@ -77,24 +75,3 @@ def hifa_timegaincal(vis=None, calamptable=None, calphasetable=None, offsetstabl
         >>> hifa_timegaincal()
 
     """
-    ##########################################################################
-    #                                                                        #
-    #  CASA task interface boilerplate code starts here. No edits should be  #
-    #  needed beyond this point.                                             #
-    #                                                                        #
-    ##########################################################################
-
-    # create a dictionary containing all the arguments given in the
-    # constructor
-    all_inputs = vars()
-
-    # get the name of this function for the weblog, eg. 'hif_flagdata'
-    task_name = sys._getframe().f_code.co_name
-
-    # get the context on which this task operates
-    context = utils.get_context()
-
-    # execute the task
-    results = utils.execute_task(context, task_name, all_inputs)
-
-    return results

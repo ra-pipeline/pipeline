@@ -1236,6 +1236,8 @@ class BaselineSubtractionQualityManager(BaselineSubtractionDataManager):
         ymin = -3*stddev
         ymax = 3*stddev
         plt.clf()
+        # PIPE-2806: set facecolor to default (white) explicitly
+        plt.gcf().set_facecolor(plt.rcParams['figure.facecolor'])
         plt.plot(frequency, spectrum, color='b', linestyle='-', linewidth=0.4)
         plt.axis((xmin, xmax, ymin, ymax))
         plt.gca().get_xaxis().get_major_formatter().set_useOffset(False)

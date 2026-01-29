@@ -1,0 +1,18 @@
+### Experinmental Toolbox ###
+
+# Data Science & Development Environment
+jupyterlab
+jupyter-console
+ipywidgets
+
+# Distributed Computing
+dask[distributed]
+dask_jobqueue
+bokeh>=3.1.0
+
+# Display Tools
+pyvirtualdisplay>=3.0   # Virtual display for headless environments
+                        # https://github.com/ponty/pyvirtualdisplay
+
+# Logging
+wurlitzer                        

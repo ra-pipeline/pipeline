@@ -90,7 +90,7 @@ class DiffGaincalInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
@@ -98,7 +98,7 @@ class DiffGaincalInputs(vdp.StandardInputs):
             vis: The list of input MeasurementSets. Defaults to the list of
                 MeasurementSets specified in the pipeline context.
 
-                Example: ['M32A.ms', 'M32B.ms']
+                Example: ``['M32A.ms', 'M32B.ms']``
 
             flagging_frac_limit: if the fraction of flagged data in the
                 temporary phase gaintable exceeds this limit then SpW
@@ -107,29 +107,29 @@ class DiffGaincalInputs(vdp.StandardInputs):
             hm_spwmapmode: The spectral window mapping heuristic mode. The
                 options are:
 
-                - 'all': SpW combination is forced for the diffgain
+                - ``'all'``: SpW combination is forced for the diffgain
                     low-frequency reference intent solutions, the diffgain
                     high-frequency source intent solutions (actual band-to-band
                     offsets), and for the diagnostic residual phase offsets on
                     the diffgain high-frequency source intent.
-                - 'auto': Assess need for SpW combination based on SpwMapping
+                - ``'auto'``: Assess need for SpW combination based on SpwMapping
                     from hifa_spwphaseup, and where necessary check the
                     gaintable for missing SpWs / too many flagged data / too few
                     scan solutions.
-                - 'both': SpW combination is forced for the diffgain
+                - ``'both'``: SpW combination is forced for the diffgain
                     low-frequency reference intent solutions and for the
                     diagnostic residual phase offsets on the diffgain
                     high-frequency source intent.
-                - 'offset': SpW combination is forced for the diffgain
+                - ``'offset'``: SpW combination is forced for the diffgain
                     high-frequency source intent solutions (actual band-to-band
                     offsets).
-                - 'reference': SpW combination is forced for the diffgain
+                - ``'reference'``: SpW combination is forced for the diffgain
                     low-frequency reference intent solutions.
-                - 'residual': SpW combination is forced for the diagnostic
+                - ``'residual'``: SpW combination is forced for the diagnostic
                     residual phase offsets on the diffgain high-frequency source
                     intent.
 
-                Example: hm_spwmapmode='auto'
+                Example: ``hm_spwmapmode='auto'``
 
             missing_scans_frac_limit: if the fraction of missing scans in the
                 temporary phase gaintable exceeds this limit then SpW

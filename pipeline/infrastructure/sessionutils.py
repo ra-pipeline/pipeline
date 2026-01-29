@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 from pipeline.domain.spectralwindow import match_spw_basename
 from pipeline.infrastructure import basetask, exceptions, logging
 
+from . import daskhelpers
 from . import mpihelpers, utils, vdp
 
 __all__ = [
@@ -162,7 +163,7 @@ class VDPTaskFactory(object):
 
     The correctness of this task is dependent on the correct mapping of
     Inputs arguments to measurement set, hence it is dependent on
-    Inputs objects that sub-class VDP StandardInputs.
+    Inputs objects that subclass VDP StandardInputs.
     """
 
     def __init__(self, inputs, executor, task):
@@ -184,7 +185,7 @@ class VDPTaskFactory(object):
     def __enter__(self):
         # If there's a possibility that we'll submit MPI jobs, save the context
         # to disk ready for import by the MPI servers.
-        if mpihelpers.mpiclient:
+        if mpihelpers.mpiclient or daskhelpers.daskclient:
             # Use the tempfile module to generate a unique temporary filename,
             # which we use as the output path for our pickled context
             tmpfile = tempfile.NamedTemporaryFile(suffix='.context',
@@ -244,10 +245,7 @@ class VDPTaskFactory(object):
         # 'parallel' argument, which the non-session tasks do not.
         valid_args = self._validate_args(task_args)
 
-        is_mpi_ready = mpihelpers.is_mpi_ready()
-        is_tier0_job = is_mpi_ready
-
-        parallel_wanted = mpihelpers.parse_mpi_input_parameter(self.__inputs.parallel)
+        parallel_wanted = mpihelpers.parse_parallel_input_parameter(self.__inputs.parallel)
 
         # PIPE-2114: always execute per-EB "SerialTasks" from the MPI client process in a single-EB
         # data processing session.
@@ -256,7 +254,10 @@ class VDPTaskFactory(object):
                       'to execute the task on the MPIclient.')
             parallel_wanted = False
 
-        if is_tier0_job and parallel_wanted:
+        if parallel_wanted and daskhelpers.is_dask_ready():
+            executable = mpihelpers.Tier0PipelineTask(self.__task, valid_args, self.__context_path)
+            return valid_args, daskhelpers.FutureTask(executable)
+        elif parallel_wanted and mpihelpers.is_mpi_ready():
             executable = mpihelpers.Tier0PipelineTask(self.__task, valid_args, self.__context_path)
             return valid_args, mpihelpers.AsyncTask(executable)
         else:

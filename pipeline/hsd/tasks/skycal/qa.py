@@ -23,7 +23,7 @@ class SDSkyCalQAHandler(pqa.QAPlugin):
         """Evaluate QA score for skycal result.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
             result: SDSkyCalResults instance.
         """
         calapps = result.outcome

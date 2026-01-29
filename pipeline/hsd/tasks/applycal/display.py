@@ -40,7 +40,7 @@ class ApplyCalSingleDishPlotmsLeaf(object):
         to customize plotms but currently those parameters are ignored.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
             result: SDApplycalResults instance.
             ms: Measurement Set.
             xaxis: The content of X-axis of the plot.
@@ -71,14 +71,14 @@ class ApplyCalSingleDishPlotmsLeaf(object):
         self.stage_dir = os.path.join(context.report_dir, 'stage%s' % context.task_counter)
 
     def plot(self) -> list[logger.Plot]:
-        """Generate calibrated amplitude vs. time plots.
+        """Generate plots using plotms.
 
         Return:
             List of plot objects.
         """
 
-        filename = f'{self.vis}-real_vs_time-{self.antenna_selection}-spw{self.spw}.png'
-        title = f'Science target: calibrated amplitude vs time\nAntenna {self.antenna_selection} Spw {self.spw} \ncoloraxis="field"'
+        filename = f'{self.vis}-{self.yaxis}_vs_{self.xaxis}-{self.antenna_selection}-spw{self.spw}.png'
+        title = f'Science target: calibrated {self.yaxis} vs {self.xaxis}\nAntenna {self.antenna_selection} Spw {self.spw} \ncoloraxis="field"'
         figfile = os.path.join(self.stage_dir, filename)
 
         if os.path.exists(figfile):
@@ -89,7 +89,7 @@ class ApplyCalSingleDishPlotmsLeaf(object):
                 task.execute()
                 return [self._get_plot_object(figfile, task)]
             except Exception:
-                LOG.error(f"Failed to create calibrated amplitude vs time plot for EB {self.vis} Spw {self.spw} Antenna {self.antenna_selection}.")
+                LOG.error(f"Failed to create calibrated {self.yaxis} vs {self.xaxis} plot for EB {self.vis} Spw {self.spw} Antenna {self.antenna_selection}.")
                 return []
 
     def _create_task(self, title: str, figfile: str) -> JobRequest:
@@ -142,8 +142,8 @@ class ApplyCalSingleDishPlotmsLeaf(object):
                       'spw': self.spw}
 
         return logger.Plot(figfile,
-                           x_axis='Time',
-                           y_axis='Amplitude',
+                           x_axis=self.xaxis.capitalize(),
+                           y_axis=self.yaxis.capitalize(),
                            parameters=parameters,
                            command=str(task))
 
@@ -160,7 +160,7 @@ class ApplyCalSingleDishPlotmsSpwComposite(common.LeafComposite):
         """Construct ApplyCalSingleDishPlotmsSpwComposite instance.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
             result: SDApplycalResults instance.
             ms: Measurement Set.
             xaxis: The content of X-axis of the plot.
@@ -186,7 +186,7 @@ class ApplyCalSingleDishPlotmsAntSpwComposite(common.LeafComposite):
         """Construct ApplyCalSingleDishPlotmsAntSpwComposite instance.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
             result: SDApplycalResults instance.
             ms: Measurement Set.
             xaxis: The content of X-axis of the plot.

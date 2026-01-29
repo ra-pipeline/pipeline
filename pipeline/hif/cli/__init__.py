@@ -1,13 +1,11 @@
-"""Interferometry Generic Tasks."""
+"""Interferometry Generic Tasks"""
 
 from .hif_analyzealpha import hif_analyzealpha
-from .hif_antpos import hif_antpos
 from .hif_applycal import hif_applycal
 from .hif_checkproductsize import hif_checkproductsize
 from .hif_correctedampflag import hif_correctedampflag
 from .hif_editimlist import hif_editimlist
 from .hif_findcont import hif_findcont
-from .hif_gaincal import hif_gaincal
 from .hif_lowgainflag import hif_lowgainflag
 from .hif_makecutoutimages import hif_makecutoutimages
 from .hif_makeimages import hif_makeimages
@@ -24,13 +22,11 @@ from .hif_uvcontsub import hif_uvcontsub
 
 __all__ = [
     'hif_analyzealpha',
-    'hif_antpos',
     'hif_applycal',
     'hif_checkproductsize',
     'hif_correctedampflag',
     'hif_editimlist',
     'hif_findcont',
-    'hif_gaincal',
     'hif_lowgainflag',
     'hif_makecutoutimages',
     'hif_makeimages',

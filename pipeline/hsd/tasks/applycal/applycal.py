@@ -55,7 +55,7 @@ class SDApplycalInputs(ApplycalInputs):
         """Inputs for SDApplycal task.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
 
@@ -323,7 +323,7 @@ class SerialSDApplycal(SerialApplycal):
         """Generate amplitude vs. time plots from results instance.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
             results: Results instance.
             plotter_cls: Plotter class to generate plot objects of amplitude vs. time.
 

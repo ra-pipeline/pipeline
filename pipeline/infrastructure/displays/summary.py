@@ -12,6 +12,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import dates, figure, ticker
+from matplotlib.lines import Line2D
 
 from pipeline import infrastructure
 from pipeline.domain import measures
@@ -30,7 +31,105 @@ DISABLE_PLOTMS = False
 ticker.TickHelper.MAXTICKS = 10000
 
 
-class AzElChart(object):
+class ZDTELMJDChart:
+    def __init__(
+            self,
+            context: Context,
+            ms: MeasurementSet,
+            data: dict[int, dict[str, list[float] | list[datetime.datetime]]],
+            ):
+        self.context = context
+        self.ms = ms
+        self.data = data
+        self.figfile = self._get_figfile()
+
+    def plot(self) -> logger.Plot:
+        if os.path.exists(self.figfile):
+            LOG.debug('Returning existing ZD vs TELMJD plot')
+            return self._get_plot_object()
+
+        plt.figure()
+        plt.clf()
+
+        # Plot field zenith angle vs telescope MJD
+        plot_colors = ['0000ff', '007f00', 'ff0000', '00bfbf', 'bf00bf', '3f3f3f',
+                       'bf3f3f', '3f3fbf', 'ffbfbf', '00ff00', 'c1912b', '89a038',
+                       '5691ea', 'ff1999', 'b2ffb2', '197c77', 'a856a5', 'fc683a']
+
+        # Get first time from all data
+        all_times = [t for field_data in self.data.values() for t in field_data['telmjd']]
+        first_time = min(all_times) if all_times else datetime.datetime.now()
+
+        # Create a mapping of field IDs to field names for the legend
+        fields = self.ms.get_fields(intent='TARGET')
+        field_id_to_name = {field.id: field.name for field in fields}
+        name_counts = {field.name: 0 for field in fields}
+        for field in fields:
+            name_counts[field.name] += 1
+
+        max_legend_entries = 6  # keep legend compact; very large MS can have hundreds of fields
+        max_label_length = 20
+        legend_handles = []
+        legend_labels: list[str] = []
+
+        def _label_for_field(field_id: int, raw_name: str) -> str:
+            label = f"{raw_name} (ID {field_id})" if name_counts.get(raw_name, 0) > 1 else raw_name
+            return label if len(label) <= max_label_length else f"{label[:max_label_length-3]}..."
+
+        for i, (field_id, field_data) in enumerate(self.data.items()):
+            color = plot_colors[i % len(plot_colors)]
+            telmjd = field_data.get('telmjd', [])
+            zd = field_data.get('zd', [])
+            raw_name = field_id_to_name.get(field_id, f'Field {field_id}')
+            label = _label_for_field(field_id, raw_name)
+
+            # Plot all measurements for this field
+            scatter = plt.scatter(telmjd, zd, color=f'#{color}', s=10, alpha=0.7)
+
+            if len(legend_labels) < max_legend_entries and label not in legend_labels:
+                scatter.set_label(label)
+                legend_handles.append(scatter)
+                legend_labels.append(label)
+
+        plt.xlabel(f'Time (UT on {first_time.strftime("%Y-%m-%d")})')
+        plt.gca().xaxis.set_major_formatter(matplotlib.dates.DateFormatter('%H:%M:%S'))
+        plt.gcf().autofmt_xdate()
+        plt.ylabel('Zenith Angle (degrees)')
+        plt.title(f'Zenith Angle vs. Time for\n{self.ms.name}')
+
+        # Add legend if there are multiple fields, but keep it compact
+        if len(legend_labels) > 1:
+            remaining = max(len(self.data) - max_legend_entries, 0)
+            if remaining:
+                legend_handles.append(Line2D([], [], linestyle='none', marker=''))
+                legend_labels.append(f'+{remaining} more')
+
+            plt.legend(legend_handles, legend_labels, loc='best', fontsize='small', ncol=1, framealpha=0.9)
+
+        plt.tight_layout()
+
+        plt.savefig(self.figfile)
+        plt.clf()
+        plt.close()
+
+        return self._get_plot_object()
+
+    def _get_figfile(self) -> str:
+        session_part = self.ms.session
+        ms_part = self.ms.basename
+
+        return os.path.join(self.context.report_dir,
+                            'session%s' % session_part,
+                            ms_part, 'zd_telmjd.png')
+
+    def _get_plot_object(self) -> logger.Plot:
+        return logger.Plot(self.figfile,
+                           x_axis='Telescope MJD',
+                           y_axis='Zenith Angle',
+                           parameters={'vis': self.ms.basename})
+
+
+class AzElChart:
     def __init__(self, context, ms):
         self.context = context
         self.ms = ms
@@ -89,7 +188,7 @@ class AzElChart(object):
                            command=str(task))
 
 
-class SunTrackChart(object):
+class SunTrackChart:
     def __init__(self, context, ms):
         self.context = context
         self.ms = ms
@@ -130,7 +229,7 @@ class SunTrackChart(object):
                            parameters={'vis': self.ms.basename})
 
 
-class WeatherChart(object):
+class WeatherChart:
     def __init__(self, context, ms):
         self.context = context
         self.ms = ms
@@ -171,7 +270,7 @@ class WeatherChart(object):
                            parameters={'vis': self.ms.basename})
 
 
-class ElVsTimeChart(object):
+class ElVsTimeChart:
     def __init__(self, context, ms):
         self.context = context
         self.ms = ms
@@ -227,7 +326,7 @@ class ElVsTimeChart(object):
                            command=str(task))
 
 
-class ParameterVsTimeChart(object):
+class ParameterVsTimeChart:
     """
     Base class for FieldVsTimeChart and IntentVsTimeChart, sharing common logic such as the colour scheme for intents
     """
@@ -539,7 +638,7 @@ class IntentVsTimeChart(ParameterVsTimeChart):
                            parameters={'vis': self.inputs.ms.basename})
 
 
-class PWVChart(object):
+class PWVChart:
     def __init__(self, context, ms):
         self.context = context
         self.ms = ms
@@ -735,7 +834,7 @@ class TsysScansChart(PointingsChart):
         )
 
 
-class PlotAntsChart(object):
+class PlotAntsChart:
     def __init__(self, context, ms, polarlog=False):
         self.context = context
         self.ms = ms
@@ -982,7 +1081,7 @@ class PlotAntsChart(object):
         subpl.set_rmin(rmin)
 
 
-class UVChart(object):
+class UVChart:
     # CAS-11793: calsurveys do not have TARGET sources, so we must also
     # search for sources with other intents
     preferred_intent_order = ['TARGET', 'AMPLITUDE', 'BANDPASS', 'PHASE']
@@ -1231,7 +1330,7 @@ class SpwIdVsFreqChartInputs(vdp.StandardInputs):
         self.vis = vis
 
 
-class SpwIdVsFreqChart(object):
+class SpwIdVsFreqChart:
     """Generate a plot of SPW ID Versus Frequency coverage."""
 
     Inputs = SpwIdVsFreqChartInputs

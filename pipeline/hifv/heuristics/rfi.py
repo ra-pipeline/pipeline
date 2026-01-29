@@ -3,6 +3,7 @@ import copy
 import re
 import shutil
 import uuid
+from importlib.resources import files
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -14,13 +15,12 @@ from pipeline.infrastructure import casa_tasks, casa_tools
 
 from .vlascanheuristics import VLAScanHeuristics
 
-import pkg_resources
-
 LOG = infrastructure.get_logger(__name__)
 
 
 class RflagDevHeuristic(api.Heuristic):
     """Heuristics for Rflag thresholds.
+    
     see PIPE-685/987
     """
 
@@ -40,15 +40,15 @@ class RflagDevHeuristic(api.Heuristic):
     def get_vla_sefd():
         """Load the VLA SEFD profile.
 
-        PIPE-987: See the ticket attachement for the description of SEFD data files
+        PIPE-987: See the ticket attachment for the description of SEFD data files
         Note: The band names here are capitalized, but the labels from SPW names are all caps.
         """
-        sedf_path = pkg_resources.resource_filename('pipeline', 'hifv/heuristics/sefd')
+        sedf_path = str(files('pipeline').joinpath('hifv/heuristics/sefd'))
 
         bands = ['4', 'P', 'L', 'S', 'C', 'X', 'Ku', 'K', 'Ka', 'Q']
         sefd = collections.OrderedDict()
         for band in bands:
-            sefd[band] = np.loadtxt(sedf_path+'/'+band+'.txt', skiprows=1, comments='#')
+            sefd[band] = np.loadtxt(sedf_path + '/' + band + '.txt', skiprows=1, comments='#')
 
         return sefd
 

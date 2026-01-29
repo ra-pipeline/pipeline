@@ -47,77 +47,77 @@ class SDRestoreDataInputs(restoredata.RestoreDataInputs):
             copytoraw: Copy calibration and flagging tables from ``products_dir``
                 to ``rawdata_dir`` directory.
 
-                Example: copytoraw=False
+                Example: ``copytoraw=False``
 
-                Default: None (equivalent to True)
+                Default: ``None`` (equivalent to ``True``)
 
             products_dir: Name of the data products directory to copy
                 calibration products from.
-                The parameter is effective only when ``copytoraw`` = True.
-                When ``copytoraw`` = False, calibration products in
+                The parameter is effective only when ``copytoraw=True``.
+                When ``copytoraw=False``, calibration products in
                 ``rawdata_dir`` will be used.
 
                 Example: products_dir='myproductspath'
 
-                Default: None (equivalent to '../products')
+                Default: ``None`` (equivalent to ``'../products'``)
 
             rawdata_dir: Name of the raw data directory.
 
-                Example: rawdata_dir='myrawdatapath'
+                Example: ``rawdata_dir='myrawdatapath'``
 
-                Default: None (equivalent to '../rawdata')
+                Default: ``None`` (equivalent to ``'../rawdata'``)
 
             output_dir: the working directory for the restored data
 
             session: List of sessions one per visibility file.
 
-                Example: session=['session_3']
+                Example: ``session=['session_3']``
 
             vis: List of raw visibility data files to be restored.
                 Assumed to be in the directory specified by rawdata_dir.
 
-                Example: vis=['uid___A002_X30a93d_X43e']
+                Example: ``vis=['uid___A002_X30a93d_X43e']``
 
             bdfflags: Apply BDF flags on import.
 
-                Example: bdfflags=False
+                Example: ``bdfflags=False``
 
-                Default: None (equivalent to True)
+                Default: ``None`` (equivalent to ``True``)
 
             lazy: Use the lazy filler option.
 
-                Example: lazy=True
+                Example: ``lazy=True``
 
-                Default: None (equivalent to False)
+                Default: ``None`` (equivalent to ``False``)
 
             asis: Creates verbatim copies of the ASDM tables in the output MS.
                 The value given to this option must be a list of table names
                 separated by space characters. Default value, None, is equivalent
                 to the following list.
 
-                    'SBSummary ExecBlock Annotation Antenna Station Receiver Source CalAtmosphere CalWVR SpectralWindow'
+                    ``'SBSummary ExecBlock Annotation Antenna Station Receiver Source CalAtmosphere CalWVR SpectralWindow'``
 
-                Example: asis='Source Receiver'
+                Example: ``asis='Source Receiver'``
 
             ocorr_mode: Selection of baseline correlation to import.
                 Valid only if input visibility is ASDM. See a document of CASA,
                 casatasks::importasdm, for available options.
 
-                Example: ocorr_mode='ca'
+                Example: ``ocorr_mode='ca'``
 
-                Default: None (equivalent to 'ao')
+                Default: ``None`` (equivalent to ``'ao'``)
 
             hm_rasterscan: Heuristics method for raster scan analysis.
                 Two analysis modes, time-domain analysis ('time') and
                 direction analysis ('direction'), are available.
 
-                Default: None (equivalent to 'time')
+                Default: ``None`` (equivalent to ``'time'``)
 
         """
-        super(SDRestoreDataInputs, self).__init__(context, copytoraw=copytoraw, products_dir=products_dir,
-                                                  rawdata_dir=rawdata_dir, output_dir=output_dir, session=session,
-                                                  vis=vis, bdfflags=bdfflags, lazy=lazy, asis=asis,
-                                                  ocorr_mode=ocorr_mode)
+        super().__init__(context, copytoraw=copytoraw, products_dir=products_dir,
+                         rawdata_dir=rawdata_dir, output_dir=output_dir, session=session,
+                         vis=vis, bdfflags=bdfflags, lazy=lazy, asis=asis,
+                         ocorr_mode=ocorr_mode)
 
         self.hm_rasterscan = hm_rasterscan
 

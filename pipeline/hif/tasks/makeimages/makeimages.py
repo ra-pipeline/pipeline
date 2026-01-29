@@ -4,6 +4,7 @@ from inspect import signature
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
+import pipeline.infrastructure.daskhelpers as daskhelpers
 import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
@@ -91,7 +92,7 @@ class MakeImagesInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
@@ -183,12 +184,13 @@ class MakeImagesInputs(vdp.StandardInputs):
                 - beamdev_thresh: default: 0.2
                   Threshold for the fractional beam deviation from the expected value required for the plane rejection.
 
-            parallel: Use CASA/tclean built-in parallel imaging for individual scientific targets, or, perform continuum imaging 
+            parallel: Use CASA/tclean built-in parallel imaging for individual scientific targets, or, perform continuum imaging
                 of multiple target (calibrators) concurrently without the CASA/tclean built-in parallelization.
-                options: 'automatic', 'true', 'false', True, False
-                default: 'automatic' - Optimizes the parallelization mode based on the imaging target type
-                    (scientific targets vs. calibrators) and the specific operation.
 
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``'automatic'`` - optimizes the parallelization mode based on the imaging target type
+                    (scientific targets vs. calibrators) and the specific operation.
         """
         self.context = context
         self.output_dir = output_dir
@@ -306,14 +308,18 @@ class MakeImages(basetask.StandardTaskTemplate):
         return result
 
     def analyse(self, result):
-
-        if self.inputs.context.imaging_mode == 'VLASS-SE-CUBE':
-            result = self._add_vlass_se_cube_metadata(result)
+        if self.inputs.context.imaging_mode is not None and self.inputs.context.imaging_mode.startswith('VLASS-'):
+            result = self._add_vlass_metadata(result)
 
         return result
 
-    def _add_vlass_se_cube_metadata(self, result):
+    def _add_vlass_metadata(self, result):
         """Attach extra imaging metadata to Tclean results for the VLASS Coarse Cube imaging."""
+        if self.inputs.context.imaging_mode != 'VLASS-SE-CUBE':
+            for idx, tclean_result in enumerate(result.results):
+                target = result.targets[idx]
+                tclean_result.imaging_metadata['cutout_imsize'] = (target['misc_vlass'] or {}).get('cutout_imsize')
+            return result
 
         vlass_plane_reject_keys_allowed = [
             'apply', 'exclude_spw', 'flagpct_thresh', 'beamdev_thresh']
@@ -365,7 +371,7 @@ class MakeImages(basetask.StandardTaskTemplate):
                     freq_list.append(imaging_metadata['freq'])
                     spwgroup_list.append(imaging_metadata['spw'])
                     flagpct_list.append(imaging_metadata['flagpct'])
-            tclean_result.imaging_metadata = imaging_metadata
+            tclean_result.imaging_metadata.update(imaging_metadata)
 
         # update tclean_result.imaging_metadata['keep'] based on the beam size and flagging percentage
         if bminor_list:
@@ -549,7 +555,7 @@ class CleanTaskFactory(object):
     def __enter__(self):
         # If there's a possibility that we'll submit MPI jobs, save the context
         # to disk ready for import by the MPI servers.
-        if mpihelpers.mpiclient:
+        if mpihelpers.mpiclient or daskhelpers.daskclient:
             # Use the tempfile module to generate a unique temporary filename,
             # which we use as the output path for our pickled context
             tmpfile = tempfile.NamedTemporaryFile(suffix='.context',
@@ -580,28 +586,25 @@ class CleanTaskFactory(object):
         """
         task_args = self.__get_task_args(target)
 
-        is_mpi_ready = mpihelpers.is_mpi_ready()
-        is_cal_image = 'TARGET' not in target['intent']
+        parallel_wanted = mpihelpers.parse_parallel_input_parameter(self.__inputs.parallel)
 
-        is_tier0_job = is_mpi_ready and is_cal_image
+        # exclude target imaging from tier0 in general
+        parallel_wanted = parallel_wanted and 'TARGET' not in target['intent']
+
         # PIPE-1923 asks to temporarily turn off Tier-0 mode for
         # POLARIZATION intent when imaging IQUV because of a
         # potential CASA bug. This should be undone when this
         # bug is fixed.
         if target['intent'] == 'POLARIZATION' and target['stokes'] == 'IQUV':
-            is_tier0_job = False
-            if is_mpi_ready:
-                LOG.info('Temporarily turning off Tier-0 parallelization for Stokes IQUV polarization calibrator imaging (PIPE-1923).')
-
-        parallel_wanted = mpihelpers.parse_mpi_input_parameter(self.__inputs.parallel)
+            parallel_wanted = False
+            LOG.info('Temporarily turning off Tier-0 parallelization for Stokes IQUV polarization calibrator imaging (PIPE-1923).')
 
         # PIPE-1401: turn on the tier0 parallelization for individuals planes in the VLASS coarse cube imaging
         # Also see the disscussions in PIPE-1357
         vlass_se_cube_tier0_wanted = True
         is_vlass_se_cube = 'TARGET' in target['intent'] and self.__context.imaging_mode == 'VLASS-SE-CUBE'
-        if all([vlass_se_cube_tier0_wanted, is_vlass_se_cube, is_mpi_ready]):
-            is_tier0_job = True
-            task_args['parallel'] = False
+        if vlass_se_cube_tier0_wanted and is_vlass_se_cube:
+            parallel_wanted = True
 
         # we check/remove the task_arg dictionary keys that are not required by Tclean.Inputs
         # then clean_targets objects would be free to carry extra metedata without causing problems during
@@ -609,7 +612,19 @@ class CleanTaskFactory(object):
         task_inputs_args = list(signature(Tclean.Inputs).parameters)
         task_args = {k: v for k, v in task_args.items() if k in task_inputs_args}
 
-        if is_tier0_job and parallel_wanted:
+        LOG.debug('MakeImages Parallelization Config:')
+        LOG.debug('parallel_wanted:             %s', parallel_wanted)
+        LOG.debug('daskhelpers.is_dask_ready(): %s', daskhelpers.is_dask_ready())
+        LOG.debug('mpihelpers.is_mpi_ready()    %s', mpihelpers.is_mpi_ready())
+
+        if parallel_wanted and daskhelpers.is_dask_ready():
+            task_args['parallel'] = False
+            executable = mpihelpers.Tier0PipelineTask(Tclean,
+                                                      task_args,
+                                                      self.__context_path)
+            return daskhelpers.FutureTask(executable)
+        elif parallel_wanted and mpihelpers.is_mpi_ready():
+            task_args['parallel'] = False
             executable = mpihelpers.Tier0PipelineTask(Tclean,
                                                       task_args,
                                                       self.__context_path)

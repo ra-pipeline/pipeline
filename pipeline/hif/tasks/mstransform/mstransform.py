@@ -113,7 +113,7 @@ class MstransformInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
@@ -121,25 +121,25 @@ class MstransformInputs(vdp.StandardInputs):
             vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the <hifa,hifv>_importdata task.
                 '': use all MeasurementSets in the context
 
-                Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
+                Examples: ``'ngc5921.ms'``, ``['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']``
 
             outputvis: A list of output MeasurementSets for line detection and imaging,. This list must have
                 the same length as the input list.
-                
+
                 Default Naming: By default, an input MS named `<msrootname>.ms`
                 will produce an output named `<msrootname>_targets.ms`.
 
                 Examples:
-                    - outputvis='ngc5921_targets.ms'
-                    - outputvis=['ngc5921a_targets.ms', 'ngc5921b_targets.ms', 'ngc5921c_targets.ms']
+                    - ``outputvis='ngc5921_targets.ms'``
+                    - ``outputvis=['ngc5921a_targets.ms', 'ngc5921b_targets.ms', 'ngc5921c_targets.ms']``
 
             field: Select fields name(s) or id(s) to transform. Only fields with data matching the intent will be selected.
 
-                Examples: '3C279', 'Centaurus*', '3C279,J1427-421'
+                Examples: ``'3C279'``, ``'Centaurus*'``, ``'3C279,J1427-421'``
 
             intent: Select intents for which associated fields will be imaged. By default only TARGET data is selected.
 
-                Examples: 'PHASE,BANDPASS'
+                Examples: ``'PHASE,BANDPASS'``
 
             spw: Select spectral window/channels to image. By default all science spws for which the specified intent is valid are
                 selected.
@@ -150,8 +150,10 @@ class MstransformInputs(vdp.StandardInputs):
             timebin: Bin width for time averaging. If timebin > 0s then timeaverage is automatically switched to True.
 
             parallel: Process multiple MeasurementSets in parallel using the casampi parallelization framework.
-                options: 'automatic', 'true', 'false', True, False
-                default: None (equivalent to False)
+
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``None`` (equivalent to ``False``)
 
         """
         super().__init__()

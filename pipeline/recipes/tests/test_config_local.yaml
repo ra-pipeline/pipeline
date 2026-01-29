@@ -1,0 +1,8 @@
+pipeconfig:
+  xvfb: true
+  loglevel: "debug"
+  dask:
+    clustertype: "local"
+    autostart: true
+casaconfig:
+  log2term: false

@@ -1,5 +1,3 @@
-import sys
-
 import pipeline.h.cli.utils as utils
 
 
@@ -15,8 +13,6 @@ def hif_selfcal(vis=None, field=None, spw=None, contfile=None, hm_imsize=None, h
                 usermask=None, usermodel=None, allow_wproject=None,
                 parallel=None):
     """Determine and apply self-calibration with the science target data.
-
-    Determine and apply self-calibration with the science target data
 
     Returns:
         The results object for the pipeline task is returned.
@@ -35,22 +31,3 @@ def hif_selfcal(vis=None, field=None, spw=None, contfile=None, hm_imsize=None, h
         >>> hif_selfcal(delta_beam_thresh=0.15)
 
     """
-    #                                                                        #
-    #  CASA task interface boilerplate code starts here. No edits should be  #
-    #  needed beyond this point.                                             #
-    #                                                                        #
-
-    # create a dictionary containing all the arguments given in the
-    # constructor
-    all_inputs = vars()
-
-    # get the name of this function for the weblog, eg. 'hif_flagdata'
-    task_name = sys._getframe().f_code.co_name
-
-    # get the context on which this task operates
-    context = utils.get_context()
-
-    # execute the task
-    results = utils.execute_task(context, task_name, all_inputs)
-
-    return results

@@ -186,9 +186,12 @@ def show_heat_XYdiff(msw: mswrapper_sd.MSWrapperSD, nchanbin: int = 1, nvisbin: 
     #Clear
     plt.clf()
     # Create figure and plot unflagged data
+    # PIPE-2806 set facecolor to default (white) explicitly to
+    # avoid randomly getting gray background in some environments
     fig, axs = plt.subplots(nrows=3, ncols=3, sharex=True, sharey=False,
                         gridspec_kw={'height_ratios': [1, 5, 2]},
-                        figsize=(12.0, 12.0))
+                        figsize=(12.0, 12.0),
+                        facecolor=plt.rcParams['figure.facecolor'])
 
     cmap = 'winter'# 'RdBu_r'  # 'viridis'
     cmapsky = 'cividis'
@@ -335,6 +338,9 @@ def plot_data_trec(msw: mswrapper_sd.MSWrapperSD, thresholds: Union[dict, None] 
     plt.clf()
     #Set plot size
     fig = plt.gcf()
+    # PIPE-2806 set facecolor to default (white) explicitly to
+    # avoid randomly getting gray background in some environments
+    fig.set_facecolor(plt.rcParams['figure.facecolor'])
     fig.set_size_inches(10, 8)
     #Upper section, data
     if (msw.tsysdata is not None):
@@ -460,6 +466,9 @@ def plot_data(msw: mswrapper_sd.MSWrapperSD, thresholds: Union[dict, None] = Non
     plt.clf()
     #Set plot size
     fig = plt.gcf()
+    # PIPE-2806 set facecolor to default (white) explicitly to
+    # avoid randomly getting gray background in some environments
+    fig.set_facecolor(plt.rcParams['figure.facecolor'])
     fig.set_size_inches(10, 8)
     #Upper section, data
     ax1 = plt.subplot(111)
@@ -535,6 +544,9 @@ def plot_science_det(msw: mswrapper_sd.MSWrapperSD, thresholds: Union[dict, None
     #Turn off interactive plotting
     plt.ioff()
     plt.clf()
+    # PIPE-2806 set facecolor to default (white) explicitly to
+    # avoid randomly getting gray background in some environments
+    plt.gcf().set_facecolor(plt.rcParams['figure.facecolor'])
     #Upeer section, data
     ax1 = plt.subplot(311)
     plt.plot(freqs, msw.time_mean_scan['all'][0], '.b', label='Pol XX')

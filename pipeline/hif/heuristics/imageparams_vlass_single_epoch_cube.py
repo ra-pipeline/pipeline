@@ -190,7 +190,7 @@ class ImageParamsHeuristicsVlassSeCube(ImageParamsHeuristicsVlassSeContMosaic):
                 )
 
         vlass_flag_stats = self._plane_rejection(cleantarget, vlass_plane_reject_ms)
-        cleantarget['misc_vlass'] = vlass_flag_stats
+        cleantarget['misc_vlass'] = (cleantarget['misc_vlass'] or {}) | vlass_flag_stats
 
         spwgroup_reject_list = []
         imlist_entries = []

@@ -16,6 +16,7 @@ from . import logging, utils
 
 LOG = logging.get_logger(__name__)
 
+
 # logger for keeping a trace of CASA task and CASA tool calls.
 # The filename incorporates the hostname to keep MPI client files distinct
 CASACALLS_LOG = logging.get_logger('CASACALLS', stream=None, format='%(message)s', addToCasaLog=False,

@@ -51,12 +51,12 @@ class ALMAExportDataInputs(exportdata.ExportDataInputs):
                 to a single virtual session containing all the visibility files in vis.
                 In the future, this will default to the set of observing sessions defined
                 in the context.
-                Example: session=['session1', 'session2']
+                Example: ``session=['session1', 'session2']``
 
             vis: List of visibility data files for which flagging and calibration
                 information will be exported. Defaults to the list maintained in the
                 pipeline context.
-                Example: vis=['X227.ms', 'X228.ms']
+                Example: ``vis=['X227.ms', 'X228.ms']``
 
             exportmses: Export the final MeasurementSets instead of the final flags,
                 calibration tables, and calibration instructions.
@@ -65,31 +65,31 @@ class ALMAExportDataInputs(exportdata.ExportDataInputs):
 
             pprfile: Name of the pipeline processing request to be exported. Defaults
                 to a file matching the template 'PPR_*.xml'.
-                Example: pprfile=['PPR_GRB021004.xml']
+                Example: ``pprfile=['PPR_GRB021004.xml']``
 
             calintents: List of calibrator image types to be exported. Defaults to
-                all standard calibrator intents, 'BANDPASS', 'PHASE', 'FLUX'.
-                Example: 'PHASE'
+                all standard calibrator intents, ``'BANDPASS'``, ``'PHASE'``, ``'FLUX'``.
+                Example: ``'PHASE'``
 
             calimages: List of calibrator images to be exported. Defaults to all
                 calibrator images recorded in the pipeline context.
-                Example: calimages=['3C454.3.bandpass', '3C279.phase']
+                Example: ``calimages=['3C454.3.bandpass', '3C279.phase']``
 
             targetimages: List of science target images to be exported. Defaults to all
                 science target images recorded in the pipeline context.
-                Example: targetimages=['NGC3256.band3', 'NGC3256.band6']
+                Example: ``targetimages=['NGC3256.band3', 'NGC3256.band6']``
 
             products_dir: Name of the data products subdirectory. Defaults to './'.
-                Example: products_dir='../products'
+                Example: ``products_dir='../products'``
 
             imaging_products_only: Export science target imaging products only
 
         """
         super().__init__(context, output_dir=output_dir, session=session, vis=vis,
-                                                   exportmses=exportmses, tarms=tarms, pprfile=pprfile, calintents=calintents,
-                                                   calimages=calimages, targetimages=targetimages,
-                                                   products_dir=products_dir,
-                                                   imaging_products_only=imaging_products_only)
+                         exportmses=exportmses, tarms=tarms, pprfile=pprfile, calintents=calintents,
+                         calimages=calimages, targetimages=targetimages,
+                         products_dir=products_dir,
+                         imaging_products_only=imaging_products_only)
 
 
 @task_registry.set_equivalent_casa_task('hifa_exportdata')

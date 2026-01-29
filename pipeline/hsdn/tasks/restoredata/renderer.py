@@ -235,7 +235,7 @@ class T2_4MDetailsNRORestoreDataRenderer(sdapplycal.T2_4MDetailsSDApplycalRender
         })
 
         # CAS-5970: add science target plots to the applycal page
-        (science_amp_vs_freq_summary_plots, science_amp_vs_freq_subpages, uv_max) = self.create_single_dish_science_plots(context, applycal_results)
+        (science_amp_vs_freq_summary_plots, science_amp_vs_freq_subpages, _) = self.create_single_dish_science_plots(context, applycal_results)
 
         # delete extra entry specific to hsd_applycal
         science_amp_vs_freq_summary_plots.pop('__hsd_applycal__', None)
@@ -247,8 +247,7 @@ class T2_4MDetailsNRORestoreDataRenderer(sdapplycal.T2_4MDetailsSDApplycalRender
 
         ctx.update({
             'science_amp_vs_freq_plots': science_amp_vs_freq_summary_plots,
-            'science_amp_vs_freq_subpages': science_amp_vs_freq_subpages,
-            'uv_max': uv_max,
+            'science_amp_vs_freq_subpages': science_amp_vs_freq_subpages
         })
         LOG.debug('ctx = {0}'.format(ctx))
 

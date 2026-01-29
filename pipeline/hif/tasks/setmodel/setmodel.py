@@ -63,49 +63,51 @@ class SetModelsInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
-                Defaults to None, which corresponds to the current working directory.
+                Defaults to ``None``, which corresponds to the current working directory.
 
             vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the pipeline context.
 
-                Example: ['M32A.ms', 'M32B.ms']
+                Example: ``['M32A.ms', 'M32B.ms']``
 
             reference: A string containing a comma delimited list of  field names defining the reference calibrators. Defaults to field names with
                 intent 'AMPLITUDE'.
 
-                Example: 'M82,3C273'
+                Example: ``'M82,3C273'``
 
             refintent: A string containing a comma delimited list of intents used to select the reference calibrators. Defaults to 'AMPLITUDE'.
 
-                Example: 'BANDPASS'
+                Example: ``'BANDPASS'``
 
             transfer: A string containing a comma delimited list of  field names defining the transfer calibrators. Defaults to field names with
                 intent ''.
 
-                Example: 'J1328+041,J1206+30'
+                Example: ``'J1328+041,J1206+30'``
 
-            transintent: A string containing a comma delimited list of intents defining the transfer calibrators. Defaults to 'BANDPASS,PHASE,CHECK'.
-                '' stands for no transfer sources.
+            transintent: A string containing a comma delimited list of intents defining the transfer calibrators. Defaults to ``'BANDPASS,PHASE,CHECK'``.
+                ``''`` stands for no transfer sources.
 
-                Example: 'PHASE'
+                Example: ``'PHASE'``
 
             reffile: The reference file containing a lookup table of point source models This file currently defaults to 'flux.csv' in the working directory. This
                 file must conform to the standard pipeline 'flux.csv' format
 
-                Example: 'myfluxes.csv'
+                Example: ``'myfluxes.csv'``
 
             normfluxes: Normalize the transfer source flux densities.
 
             scalebychan: Scale the flux density on a per channel basis or else on a per spw basis
 
             parallel: Process multiple MeasurementSets in parallel using the casampi parallelization framework.
-                options: 'automatic', 'true', 'false', True, False
-                default: None (equivalent to False)
+
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``None`` (equivalent to ``False``)
 
         """
-        super(SetModelsInputs, self).__init__()
+        super().__init__()
         self.context = context
         self.vis = vis
         self.output_dir = output_dir

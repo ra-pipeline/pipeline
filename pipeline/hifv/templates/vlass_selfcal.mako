@@ -36,10 +36,10 @@ from pipeline.infrastructure.renderer import rendererutils
 
 % for ms in summary_plots:
 
-
-    <h4>Plots:  <a class="replace"
-           href="${rendererutils.get_relative_url(pcontext.report_dir, dirname, selfcalphasegaincal_subpages[ms])}">Phase vs. time plots </a>
-    </h4>
-
+    % if ms in selfcalphasegaincal_subpages:
+        <h4>Plots:  <a class="replace"
+            href="${rendererutils.get_relative_url(pcontext.report_dir, dirname, selfcalphasegaincal_subpages[ms])}">Phase vs. time plots </a>
+        </h4>
+    %endif
 %endfor
 

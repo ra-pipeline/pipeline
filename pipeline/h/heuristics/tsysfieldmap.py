@@ -1,17 +1,21 @@
+from __future__ import annotations
+
 import collections
+from typing import TYPE_CHECKING
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.utils as utils
-from pipeline.domain import MeasurementSet
+
+if TYPE_CHECKING:
+    from pipeline.domain import MeasurementSet
 
 LOG = infrastructure.get_logger(__name__)
-
 
 # Holds an observing intent and the preferred/fallback gainfield args to be used for that intent
 GainfieldMapping = collections.namedtuple('GainfieldMapping', 'intent preferred fallback')
 
 
-def get_intent_to_tsysfield_map(ms: MeasurementSet, is_single_dish: bool) -> dict:
+def get_intent_to_tsysfield_map(ms: MeasurementSet, is_single_dish: bool) -> dict[str, str]:
     """
     Get the mapping of observing intent to gainfield parameter for a
     measurement set.
@@ -127,16 +131,30 @@ def get_solution_map(ms: MeasurementSet, is_single_dish: bool) -> list[Gainfield
             head, tail = intent.split(',', 1)
             # the 'if o' test filters out results for intents that do not have
             # fields, e.g., PHASE for SD data
-            return ','.join(o for o in (f(head, exclude=exclude), f(tail, exclude=exclude)) if o)
+            # de-deuplicate list before joining as a string
+            tsys_fields = utils.deduplicate(o for o in (f(head, exclude=exclude), f(tail, exclude=exclude)) if o)
+            return ','.join(tsys_fields)
         return ','.join(str(s) for s in get_tsys_fields_for_intent(ms, intent, exclude_intents=exclude))
 
     # return different gainfield maps for single dish and interferometric
     if is_single_dish:
+        # PIPE-2869: added fallback of ATMOSPHERE for TARGET intent
+        #
+        # Intent to be calibrated:
+        # - BANDPASS cal
+        #   * Preferred: all BANDPASS cals.
+        #   * Fallback: 'nearest'.
+        # - AMPLITUDE cal
+        #   * Preferred: all AMPLITUDE cals.
+        #   * Fallback: 'nearest'.
+        # - TARGET
+        #   * Preferred: TARGET and/or ATMOSPHERE sources.
+        #   * Fallback: null fallback
         return [
             GainfieldMapping(intent='BANDPASS', preferred=f('BANDPASS'), fallback='nearest'),
             GainfieldMapping(intent='AMPLITUDE', preferred=f('AMPLITUDE'), fallback='nearest'),
             # non-empty magic string to differentiate between no field found and a null fallback
-            GainfieldMapping(intent='TARGET', preferred=f('TARGET'), fallback='___EMPTY_STRING___')
+            GainfieldMapping(intent='TARGET', preferred=f('TARGET,ATMOSPHERE'), fallback='___EMPTY_STRING___')
         ]
 
     else:
@@ -148,8 +166,8 @@ def get_solution_map(ms: MeasurementSet, is_single_dish: bool) -> list[Gainfield
         # - BANDPASS cal
         #   * Preferred: all BANDPASS cals.
         #   * Fallback: 'nearest'.
-        # - FLUX cal
-        #   * Preferred: all FLUX cals.
+        # - AMPLITUDE cal
+        #   * Preferred: all AMPLITUDE cals.
         #   * Fallback: 'nearest'.
         # - DIFFGAIN[REF|SRC]
         #   * Preferred: all DIFFGAIN cals.

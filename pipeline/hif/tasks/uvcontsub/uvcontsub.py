@@ -34,7 +34,7 @@ class UVcontSubInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
@@ -42,16 +42,16 @@ class UVcontSubInputs(vdp.StandardInputs):
             vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the <hifa,hifv>_importdata task.
                 '': use all MeasurementSets in the context
 
-                Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
+                Examples: ``'ngc5921.ms'``, ``['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']``
 
             field: The list of field names or field ids for which UV continuum fits are computed. Defaults to all fields.
 
-                Examples: '3C279', '3C279,M82'
+                Examples: ``'3C279'``, ``'3C279,M82'``
 
             spw: The list of spectral windows and channels for which uv continuum fits are computed.
                 '', Defaults to all science spectral windows.
 
-                Example: '11,13,15,17'
+                Example: ``'11,13,15,17'``
 
             intent: A string containing a comma delimited list of intents against which the selected fields are matched.
 
@@ -61,12 +61,13 @@ class UVcontSubInputs(vdp.StandardInputs):
                 spws. If an explicit dictionary is given then all unspecified
                 selections still default to 1.
 
-                Example: {'3C279': {'15': 1, '17': 2}, 'M82': {'13': 2}}
+                Example: ``{'3C279': {'15': 1, '17': 2}, 'M82': {'13': 2}}``
 
             parallel: Process multiple MeasurementSets in parallel using the casampi parallelization framework.
-                options: 'automatic', 'true', 'false', True, False
-                default: None (equivalent to False)
 
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``None`` (equivalent to ``False``)
         """
         self.context = context
         self.output_dir = output_dir
