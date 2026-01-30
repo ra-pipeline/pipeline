@@ -127,13 +127,13 @@ class SelfcalHeuristics(object):
         return observing_run
 
     def tclean_wrapper(
-            self, selfcal_library, vis, imagename, band, telescope='undefined', scales=[0],
+            self, selfcal_library, imagename, band, telescope='undefined', scales=[0],
             smallscalebias=0.6, mask='', nsigma=5.0, interactive=False, robust=0.5, gain=0.1, niter=50000,
             cycleniter=300, uvtaper=[],
             savemodel='none', sidelobethreshold=3.0, smoothfactor=1.0,  noisethreshold=5.0, lownoisethreshold=1.5,
-            parallel=False, nterms=1, cyclefactor=3, uvrange='', threshold='0.0Jy', startmodel='', pblimit=0.1, pbmask=0.1, field='',
-            datacolumn='', spw='', obstype='single-point', nfrms_multiplier=1.0,
-            savemodel_only=False, resume=False, image_mosaic_fields_separately=False, mosaic_field_phasecenters={}, mosaic_field_fid_map={}, usermodel=''):
+            parallel=False, cyclefactor=3, threshold='0.0Jy', startmodel='', pblimit=0.1, pbmask=0.1, field='',
+            datacolumn='', spw='all', obstype='single-point', nfrms_multiplier=1.0,
+            savemodel_only=False, resume=False, image_mosaic_fields_separately=True, store_threshold=''):
         """
         Wrapper for tclean with keywords set to values desired for the Large Program imaging
         See the CASA 6.1.1 documentation for tclean to get the definitions of all the parameters
@@ -144,10 +144,14 @@ class SelfcalHeuristics(object):
         nfrms_multiplier = max(nfrms_multiplier, 1.0)
 
         # select the proper mask heuristics
-        if mask:
-            usemask = 'user'
+        if mask == '':
+            if selfcal_library['usermask'] != '':
+                mask = selfcal_library['usermask']
+                usemask = 'user'
+            else:
+                usemask = 'auto-multithresh'
         else:
-            usemask = 'auto-multithresh'
+            usemask = 'user'
 
         growiterations, negativethreshold, minbeamfrac, dogrowprune, minpercentchange, fastnoise = None, None, None, None, None, None
         baselineThresholdALMA = 400.0
@@ -213,6 +217,53 @@ class SelfcalHeuristics(object):
             pbmask = 0.0
             # cyclefactor=3.0
 
+        if spw == 'all':
+            vlist = selfcal_library['vislist']
+            spws_per_vis = selfcal_library['spws_per_vis']
+            nterms = selfcal_library['nterms']
+        else:
+            vlist = [vis for vis in selfcal_library['vislist'] if vis in selfcal_library['spw_map'][spw]]
+            spws_per_vis = self.image_heuristics.observing_run.get_real_spwsel([spw]*len(vlist), vlist)
+            nterms = 1
+
+        if 'theoretical' in threshold:
+            dr_mod = 1.0
+            if self.telescope == 'ALMA' or self.telescope == 'ACA':
+                if spw == 'all':
+                    sensitivity, _, _ = self.get_sensitivity()
+                else:
+                    sensitivity, _, _ = self.get_sensitivity(spw=spw)
+                if spw == 'all':
+                    dr_mod = get_dr_correction(self.telescope, selfcal_library['SNR_dirty']*selfcal_library['RMS_dirty'], sensitivity, vlist)
+                else:
+                    dr_mod = get_dr_correction(self.telescope, selfcal_library['per_spw_stats'][spw]['SNR_dirty']*selfcal_library['per_spw_stats'][spw]['RMS_dirty'], sensitivity, vlist)
+                LOG.info(f'DR modifier: {dr_mod} SPW: {spw}')
+
+                sensitivity_nomod = sensitivity.copy()
+                sensitivity = sensitivity*dr_mod   # apply DR modifier
+                if (band == 'Band_9' or band == 'Band_10') and spw != 'all':   # adjust for DSB noise increase
+                    sensitivity = sensitivity  # *4.0  might be unnecessary with DR mods
+
+                selfcal_library['theoretical_sensitivity']=sensitivity_nomod
+                for fid in selfcal_library['sub-fields']:
+                    selfcal_library[fid]['theoretical_sensitivity']=sensitivity_nomod
+            else:
+                sensitivity_vla, _, self.reffreq = self.get_sensitivity()
+
+                selfcal_library['theoretical_sensitivity'] = sensitivity_vla
+                for fid in selfcal_library['sub-fields']:
+                    selfcal_library[fid]['theoretical_sensitivity'] = sensitivity_vla
+
+            if threshold == "theoretical_with_drmod":
+                threshold = str(4.0*sensitivity)+'Jy'
+            else:
+                if spw == 'all':
+                    sensitivity_scale_factor = 1.0
+                else:
+                    sensitivity_agg=self.get_sensitivity()
+                    sensitivity_scale_factor=selfcal_library['RMS_NF_curr']/sensitivity_agg
+                threshold = str(4.0*sensitivity_nomod*sensitivity_scale_factor)+'Jy'
+
         if threshold != '0.0Jy':
             nsigma = 0.0
 
@@ -220,7 +271,7 @@ class SelfcalHeuristics(object):
             if nsigma*nfrms_multiplier*0.66 > nsigma:
                 nsigma = nsigma*nfrms_multiplier*0.66
 
-        tclean_args = {'vis': vis,
+        tclean_args = {'vis': vlist,
                        'imagename': imagename,
                        'field': field,
                        'specmode': 'mfs',
@@ -238,7 +289,7 @@ class SelfcalHeuristics(object):
                        'interactive': interactive,
                        'nsigma': nsigma,
                        'cycleniter': cycleniter,
-                       'cyclefactor': cyclefactor,
+                       'cyclefactor': selfcal_library['cyclefactor'],
                        'growiterations': growiterations,
                        'negativethreshold': negativethreshold,
                        'dogrowprune': dogrowprune,
@@ -256,14 +307,14 @@ class SelfcalHeuristics(object):
                        'pbmask': pbmask,
                        'pblimit': pblimit,
                        'nterms': nterms,
-                       'uvrange': uvrange,
+                       'uvrange': selfcal_library['uvrange'],
                        'threshold': threshold,
                        'parallel': parallel,
                        'phasecenter': self.phasecenter,
                        'reffreq': self.reffreq,
                        'startmodel': startmodel,
                        'datacolumn': datacolumn,
-                       'spw': spw,
+                       'spw': spws_per_vis,
                        'fullsummary': False,
                        'verbose': True}
         # PIPE-2173: only use the Pipeline heuristics reffreq in hif_selfcal() when:
@@ -281,8 +332,14 @@ class SelfcalHeuristics(object):
                 self.remove_dirs([imagename+ext for ext in image_exts])
             tc_ret = self.cts.tclean(**tclean_args)
 
-            if image_mosaic_fields_separately:
-                for field_id in mosaic_field_phasecenters:
+            if store_threshold != '':
+                if telescope == "ALMA" or telescope == "ACA":
+                    selfcal_library["clean_threshold_"+store_threshold] = float(threshold[0:-2])
+                elif "VLA" in telescope and tc_ret['iterdone'] > 0:
+                    selfcal_library["clean_threshold_"+store_threshold] = tc_ret['summaryminor'][0][0][0]['peakRes'][-1]
+
+            if image_mosaic_fields_separately and selfcal_library['obstype'] == 'mosaic':
+                for field_id in selfcal_library['sub-fields-phasecenters']:
                     # field imagename pattern: {santinized_sourcename}_field_field_{fid}_{band}_{version}
                     imagename_field = imagename.replace(f'_{band}_', f'_field_{field_id}_{band}_')
 
@@ -294,7 +351,7 @@ class SelfcalHeuristics(object):
                         fov = 63.0*100.0e9/selfcal_library['meanfreq']*1.5*0.5*1.15
                     if telescope == 'ACA':
                         fov = 108.0*100.0e9/selfcal_library['meanfreq']*1.5*0.5
-                    center = np.copy(mosaic_field_phasecenters[field_id])
+                    center = np.copy(selfcal_library['sub-fields-phasecenters'][field_id])
                     if self.phasecenter == 'TRACKFIELD':
                         center += self.cts.imhead(imagename+".image.tt0")['refval'][0:2]
 
@@ -314,30 +371,30 @@ class SelfcalHeuristics(object):
                                 shutil.rmtree(imagename_field+ext.replace("pb", "mospb.tmp"), ignore_errors=True)
 
                     # Make an image of the primary beam for each sub-field.
-                    if isinstance(vis, list):
-                        for v in vis:
+                    if isinstance(selfcal_library['vislist'], list):
+                        for v in selfcal_library['vislist']:
                             # Since not every field is in every v, we need to check them all so that we don't accidentally get a v without a given field_id
-                            if field_id in mosaic_field_fid_map[v]:
-                                fid = mosaic_field_fid_map[v][field_id]
+                            if field_id in selfcal_library['sub-fields-fid_map'][v]:
+                                fid = selfcal_library['sub-fields-fid_map'][v][field_id]
                                 break
                         im.open(v)
                     else:
-                        fid = mosaic_field_fid_map[vis][field_id]
-                        im.open(vis)
+                        fid = selfcal_library['sub-fields-fid_map'][selfcal_library['vislist']][field_id]
+                        im.open(selfcal_library['vislist'])
 
                     nx, ny, _, _ = self.cts.imhead(imagename=imagename_field+".image.tt0", mode="get",
                                                    hdkey="shape")
-                    im.selectvis(field=str(fid), spw=spw)
+                    im.selectvis(field=str(fid), spw=spws_per_vis)
                     if isinstance(self.cell, list):
                         cell = self.cell[0]
                     else:
                         cell = self.cell
-                    im.defineimage(nx=nx, ny=ny, cellx=cell, celly=cell, phasecenter=fid, mode="mfs", spw=spw)
+                    im.defineimage(nx=nx, ny=ny, cellx=cell, celly=cell, phasecenter=fid, mode="mfs", spw=spws_per_vis)
                     im.setvp(dovp=True)
                     im.makeimage(type="pb", image=imagename_field + ".pb.tt0")
                     im.close()
 
-        if savemodel == 'modelcolumn' and not usermodel:
+        if savemodel == 'modelcolumn' and not selfcal_library['usermodel']:
             LOG.info("")
             LOG.info("Running tclean in the prediction-only setting to fill the MS model column.")
             # A workaround for CAS-14386
@@ -359,37 +416,44 @@ class SelfcalHeuristics(object):
                                 'startmodel': ''})
             tc_ret = self.cts.tclean(**tclean_args)
 
-        if usermodel:
-            LOG.info('Using user model %s already filled to model column, skipping model write.', usermodel)
+        if savemodel == 'modelcolumn' and selfcal_library['usermodel'] != '':
+            LOG.info('Using user model %s already filled to model column, skipping model write.', selfcal_library['usermodel'])
 
-        return tc_ret
+        if not savemodel_only:
+            return tc_ret
 
-    def usermodel_wrapper(self, vis, imagename, band_properties, band, telescope='undefined', scales=[0], smallscalebias=0.6, mask='',
-                          nsigma=5.0, imsize=None, cellsize=None, interactive=False, robust=0.5, gain=0.1, niter=50000,
+    def usermodel_wrapper(self, selfcal_library, imagename, telescope='undefined', scales=[0], smallscalebias=0.6, mask='',
+                          nsigma=5.0, interactive=False, robust=0.5, gain=0.1, niter=50000,
                           cycleniter=300, uvtaper=[], savemodel='none', gridder='standard', sidelobethreshold=3.0, smoothfactor=1.0, noisethreshold=5.0,
-                          lownoisethreshold=1.5, parallel=False, nterms=1, reffreq='', cyclefactor=3, uvrange='', threshold='0.0Jy', phasecenter='',
-                          startmodel='', pblimit=0.1, pbmask=0.1, field='', datacolumn='', spw='', obstype='single-point',
-                          savemodel_only=False, resume=False, image_mosaic_fields_separately=False, mosaic_field_phasecenters={}, mosaic_field_fid_map={}, usermodel=''):
+                          lownoisethreshold=1.5, parallel=False, cyclefactor=3, threshold='0.0Jy', phasecenter='',
+                          startmodel='', pblimit=0.1, pbmask=0.1, field='', datacolumn='', spw='',
+                          savemodel_only=False, resume=False):
         # this method is not fully veried.
-        if isinstance(usermodel, list):
-            nterms = len(usermodel)
-            for i, image in enumerate(usermodel):
+        vlist = selfcal_library['vislist']
+        if isinstance(selfcal_library['usermodel'], list):
+            nterms = len(selfcal_library['usermodel'])
+            for i, image in enumerate(selfcal_library['usermodel']):
                 if 'fits' in image:
                     self.cts.importfits(fitsimage=image, imagename=image.replace('.fits', ''))
-                    usermodel[i] = image.replace('.fits', '')
-        elif isinstance(usermodel, str):
-            self.cts.importfits(fitsimage=usermodel, imagename=usermodel.replace('.fits', ''))
+                    selfcal_library['usermodel'][i] = image.replace('.fits', '')
+        elif isinstance(selfcal_library['usermodel'], str):
+            self.cts.importfits(fitsimage=selfcal_library['usermodel'], imagename=selfcal_library['usermodel'].replace('.fits', ''))
             nterms = 1
 
         if mask == '':
-            usemask = 'auto-multithresh'
+            if selfcal_library['usermask'] != '':
+                mask = selfcal_library['usermask']
+                usemask = 'user'
+            else:
+                usemask = 'auto-multithresh'
         else:
             usemask = 'user'
 
-        for ext in ['.image*', '.mask', '.model*', '.pb*', '.psf*', '.residual*', '.sumwt*', '.gridwt*']:
-            os.system('rm -rf ' + imagename + ext)
+        if not resume:
+            for ext in ['.image*', '.mask', '.model*', '.pb*', '.psf*', '.residual*', '.sumwt*', '.gridwt*']:
+                os.system('rm -rf ' + imagename + ext)
         # regrid start model
-        self.cts.tclean(vis=vis,
+        self.cts.tclean(vis=vlist,
                         imagename=imagename+'_usermodel_prep',
                         field=field,
                         specmode='mfs',
@@ -406,7 +470,7 @@ class SelfcalHeuristics(object):
                         interactive=interactive,
                         nsigma=nsigma,
                         cycleniter=cycleniter,
-                        cyclefactor=cyclefactor,
+                        cyclefactor=selfcal_library['cyclefactor'],
                         uvtaper=uvtaper,
                         mask=mask,
                         usemask=usemask,
@@ -417,18 +481,18 @@ class SelfcalHeuristics(object):
                         pbmask=pbmask,
                         pblimit=pblimit,
                         nterms=nterms,
-                        reffreq=reffreq,
-                        uvrange=uvrange,
+                        reffreq=self.reffreq,
+                        uvrange=selfcal_library['uvrange'],
                         threshold=threshold,
-                        parallel=parallel,
+                        parallel=False,
                         phasecenter=phasecenter,
-                        datacolumn=datacolumn, spw=spw, wprojplanes=self.wprojplanes, verbose=True, startmodel=usermodel, savemodel='modelcolumn')
+                        datacolumn=datacolumn, spw=spw, wprojplanes=self.wprojplanes, verbose=True, startmodel=selfcal_library['usermodel'], savemodel='none')
 
         # this step is a workaround a bug in tclean that doesn't always save the model during multiscale clean. See the "Known Issues" section for CASA 5.1.1 on NRAO's website
         if savemodel == 'modelcolumn':
             LOG.info("")
             LOG.info("Running tclean a second time to save the model...")
-            self.cts.tclean(vis=vis,
+            self.cts.tclean(vis=vlist,
                             imagename=imagename+'_usermodel_prep',
                             field=field,
                             specmode='mfs',
@@ -445,7 +509,7 @@ class SelfcalHeuristics(object):
                             interactive=False,
                             nsigma=0.0,
                             cycleniter=cycleniter,
-                            cyclefactor=cyclefactor,
+                            cyclefactor=selfcal_library['cyclefactor'],
                             uvtaper=uvtaper,
                             usemask='user',
                             savemodel=savemodel,
@@ -459,11 +523,11 @@ class SelfcalHeuristics(object):
                             calcpsf=False,
                             restoration=False,
                             nterms=nterms,
-                            reffreq=reffreq,
-                            uvrange=uvrange,
+                            reffreq=self.reffreq,
+                            uvrange=selfcal_library['uvrange'],
                             threshold=threshold,
                             parallel=False,
-                            phasecenter=phasecenter, spw=spw, wprojplanes=self.projplanes)
+                            phasecenter=phasecenter, spw=spw, wprojplanes=self.wprojplanes)
 
     def gaincal_wrapper(self, slib, selfcal_plan, target, band, vis, solint, applymode, iteration, telescope, 
             gaincal_minsnr, gaincal_unflag_minsnr=5.0, minsnr_to_proceed=3.0, rerank_refants=False, unflag_only_lbants=False, unflag_only_lbants_onlyap=False,
@@ -1090,42 +1154,17 @@ class SelfcalHeuristics(object):
         for target in selfcal_library:
             sani_target = 'sc.'+filenamer.sanitize(target)
             for band in selfcal_library[target].keys():
-
-                # sourcemask is only used for .dirty imaging
-                if self.usermask is None:
-                    sourcemask = ''
-                else:
-                    sourcemask = self.usermask
-
                 # check if the imaging target is mosaic
                 is_mosaic = selfcal_library[target][band]['obstype'] == 'mosaic'
 
-                if self.telescope == 'ALMA' or self.telescope == 'ACA':
-                    # note: sensitivity here is numpy.float64 and .copy() is allowed.
-                    sensitivity, _, _ = self.get_sensitivity()
-                    sensitivity_nomod = sensitivity.copy()
-                else:
-                    sensitivity_vla, _, self.reffreq = self.get_sensitivity()
-
                 # make images using the appropriate tclean heuristics for each telescope
-                if os.path.exists(sani_target+'_'+band+'_dirty.image.tt0'):
-                    self.cts.rmtree(sani_target+'_'+band+'_dirty.image.tt0')
                 # Because tclean doesn't deal in NF masks, the automask from the initial image is likely to contain a lot of noise unless
                 # we can get an estimate of the NF modifier for the auto-masking thresholds. To do this, we need to create a very basic mask
                 # with the dirty image. So we just use one iteration with a tiny gain so that nothing is really subtracted off.
                 self.tclean_wrapper(selfcal_library[target][band],
-                    vislist, sani_target + '_' + band + '_dirty', band, telescope=self.telescope, nsigma=4.0,
-                    scales=[0],
-                    threshold='0.0Jy', niter=1, gain=0.00001,
-                    savemodel='none', parallel=parallel,
-                    nterms=selfcal_library[target][band]['nterms'],
-                    field=self.field, spw=selfcal_library[target][band]['spws_per_vis'],
-                    uvrange=selfcal_library[target][band]['uvrange'],
-                    obstype=selfcal_library[target][band]['obstype'],
-                    image_mosaic_fields_separately=is_mosaic,
-                    mosaic_field_phasecenters=selfcal_library[target][band]['sub-fields-phasecenters'],
-                    mosaic_field_fid_map=selfcal_library[target][band]['sub-fields-fid_map'],
-                    mask=sourcemask, usermodel='')
+                    sani_target + '_' + band + '_dirty', band, telescope=self.telescope, nsigma=4.0,
+                    scales=[0], threshold='0.0Jy', niter=1, gain=0.00001, savemodel='none', 
+                    parallel=parallel, field=self.field)
 
                 dirty_SNR, dirty_RMS, dirty_NF_SNR, dirty_NF_RMS = self.get_image_stats(sani_target+'_'+band+'_dirty.image.tt0', 
                         sani_target+'_'+band+'_dirty.mask', '', selfcal_library[target][band], (self.telescope != 'ACA' or self.aca_use_nfmask),
@@ -1142,43 +1181,13 @@ class SelfcalHeuristics(object):
                             imagename.replace('image.tt0', 'mask'), '', selfcal_library[target][band][fid], 
                             (self.telescope != 'ACA' or self.aca_use_nfmask), 'dirty', 'dirty', mosaic_sub_field=is_mosaic)
 
-                uv75pct = selfcal_library[target][band]['75thpct_uv']
-                if "VLA" in self.telescope or (is_mosaic and
-                                               selfcal_library[target][band]['Median_scan_time'] / selfcal_library[target][band]['Median_fields_per_scan'] < 60.) \
-                        or uv75pct > 2000.0:
-                    selfcal_library[target][band]['cyclefactor'] = 3.0
-                else:
-                    selfcal_library[target][band]['cyclefactor'] = 1.0
-
-                dr_mod = 1.0
-                if self.telescope == 'ALMA' or self.telescope == 'ACA':
-                    dr_mod = get_dr_correction(self.telescope, dirty_SNR*dirty_RMS, sensitivity, vislist)
-                    LOG.info(f'DR modifier: {dr_mod}')
-
-                if os.path.exists(sani_target+'_'+band+'_initial.image.tt0'):
-                    self.cts.rmtree(sani_target+'_'+band+'_initial.image.tt0')
-                if self.telescope == 'ALMA' or self.telescope == 'ACA':
-                    sensitivity = sensitivity*dr_mod   # apply DR modifier
-                    if band == 'Band_9' or band == 'Band_10':   # adjust for DSB noise increase
-                        sensitivity = sensitivity  # *4.0  might be unnecessary with DR mods
-                else:
-                    sensitivity = 0.0
-
                 initial_tclean_return = self.tclean_wrapper(selfcal_library[target][band],
-                    vislist, sani_target + '_' + band + '_initial', band, telescope=self.telescope,
+                    sani_target + '_' + band + '_initial', band, telescope=self.telescope,
                     nsigma=4.0, scales=[0],
-                    threshold=str(sensitivity * 4.0) + 'Jy', savemodel='none', parallel=parallel,
-                    nterms=selfcal_library[target][band]['nterms'],
-                    field=self.field, spw=selfcal_library[target][band]['spws_per_vis'],
-                    uvrange=selfcal_library[target][band]['uvrange'],
-                    obstype=selfcal_library[target][band]['obstype'],
-                    nfrms_multiplier=dirty_NF_RMS / dirty_RMS,
-                    image_mosaic_fields_separately=is_mosaic,
-                    mosaic_field_phasecenters=selfcal_library[target][band]['sub-fields-phasecenters'],
-                    mosaic_field_fid_map=selfcal_library[target][band]['sub-fields-fid_map'],
-                    cyclefactor=selfcal_library[target][band]['cyclefactor'],
-                    mask=sourcemask, usermodel='')
-
+                    threshold='theoretical_with_drmod', savemodel='none', parallel=parallel,
+                    field=self.field,
+                    nfrms_multiplier=dirty_NF_RMS / dirty_RMS, store_threshold='orig')
+                
                 initial_SNR, initial_RMS, initial_NF_SNR, initial_NF_RMS = self.get_image_stats(sani_target+'_'+band+'_initial.image.tt0', 
                         sani_target+'_'+band+'_initial.mask', '', selfcal_library[target][band], (self.telescope != 'ACA' or self.aca_use_nfmask),
                         'orig', 'orig')
@@ -1194,16 +1203,8 @@ class SelfcalHeuristics(object):
                             imagename.replace('image.tt0', 'mask'), '', selfcal_library[target][band][fid], 
                             (self.telescope != 'ACA' or self.aca_use_nfmask), 'orig', 'orig', mosaic_sub_field=is_mosaic)
 
-                if self.telescope == 'ALMA' or self.telescope == 'ACA':
-                    selfcal_library[target][band]['theoretical_sensitivity'] = sensitivity_nomod
-                    selfcal_library[target][band]['clean_threshold_orig'] = sensitivity*4.0
-                if 'VLA' in self.telescope:
-                    # selfcal_library[target][band]['theoretical_sensitivity'] = -99.0
-                    selfcal_library[target][band]['theoretical_sensitivity'] = sensitivity_vla
-                    if initial_tclean_return is not None and initial_tclean_return['iterdone'] > 0:
-                        selfcal_library[target][band]['clean_threshold_orig'] = initial_tclean_return['summaryminor'][0][0][0]['peakRes'][-1]
-                    else:
-                        selfcal_library[target][band]['clean_threshold_orig'] = 4.0*initial_RMS
+                if "VLA" in self.telescope and "clean_threshold_orig" not in selfcal_library[target][band]:
+                    selfcal_library[target][band]['clean_threshold_orig']=4.0*initial_RMS
 
                 if selfcal_library[target][band]['nterms'] < 2:
                     # updated nterms if needed based on S/N and fracbw
@@ -1215,16 +1216,6 @@ class SelfcalHeuristics(object):
                 selfcal_library[target][band]['RMS_NF_curr'] = initial_NF_RMS if initial_NF_RMS > 0 else initial_RMS
 
                 for fid in selfcal_library[target][band]['sub-fields']:
-                    if selfcal_library[target][band]['obstype'] == 'mosaic':
-                        imagename = sani_target+'_field_'+str(fid)+'_'+band+'_initial.image.tt0'
-                    else:
-                        imagename = sani_target+'_'+band+'_initial.image.tt0'
-
-                    if self.telescope == 'ALMA' or self.telescope == 'ACA':
-                        selfcal_library[target][band][fid]['theoretical_sensitivity'] = sensitivity_nomod
-                    if 'VLA' in self.telescope:
-                        selfcal_library[target][band][fid]['theoretical_sensitivity'] = -99.0
-
                     if selfcal_library[target][band][fid]['SNR_orig'] > 500.0:
                         selfcal_library[target][band][fid]['nterms'] = 2
 
@@ -1248,15 +1239,11 @@ class SelfcalHeuristics(object):
                         if spw not in keylist:
                             selfcal_library[target][band]['per_spw_stats'][spw] = {}
                         if not os.path.exists(sani_target+'_'+band+'_'+spw+'_dirty.image.tt0'):
-                            spws_per_vis = self.image_heuristics.observing_run.get_real_spwsel(
-                                [spw]*len(vislist), vislist)
                             self.tclean_wrapper(selfcal_library[target][band],
-                                vislist, sani_target + '_' + band + '_' + spw + '_dirty', band,
+                                sani_target + '_' + band + '_' + spw + '_dirty', band,
                                 telescope=self.telescope, nsigma=4.0, scales=[0],
                                 threshold='0.0Jy', niter=0, savemodel='none', parallel=parallel,
-                                nterms=1, field=self.field, spw=spws_per_vis, uvrange=selfcal_library[target][band]
-                                ['uvrange'],
-                                obstype=selfcal_library[target][band]['obstype'])
+                                field=self.field, spw=spw)
 
                         dirty_per_spw_SNR, dirty_per_spw_RMS, dirty_per_spw_NF_SNR, dirty_per_spw_NF_RMS = self.get_image_stats(
                                 sani_target+'_'+band+'_'+spw+'_dirty.image.tt0', 
@@ -1264,27 +1251,12 @@ class SelfcalHeuristics(object):
                                 (self.telescope != 'ACA' or self.aca_use_nfmask), 'dirty', 'dirty', spw=spw)
 
                         if not os.path.exists(sani_target+'_'+band+'_'+spw+'_initial.image.tt0'):
-                            if self.telescope == 'ALMA' or self.telescope == 'ACA':
-                                sensitivity, _, _ = self.get_sensitivity(spw=spw)
-                                dr_mod = get_dr_correction(self.telescope, dirty_per_spw_SNR *
-                                                           dirty_per_spw_RMS, sensitivity, vislist)
-                                LOG.info(f'DR modifier: {dr_mod}  SPW: {spw}')
-                                sensitivity = sensitivity*dr_mod
-                                if ((band == 'Band_9') or (band == 'Band_10')) and dr_mod != 1.0:   # adjust for DSB noise increase
-                                    sensitivity = sensitivity*4.0
-                            else:
-                                sensitivity = 0.0
-                            spws_per_vis = self.image_heuristics.observing_run.get_real_spwsel(
-                                [spw]*len(vislist), vislist)
-
                             self.tclean_wrapper(selfcal_library[target][band],
-                                vislist, sani_target + '_' + band + '_' + spw + '_initial', band,
-                                telescope=self.telescope, nsigma=4.0, threshold=str(sensitivity * 4.0) + 'Jy', scales=[0],
+                                sani_target + '_' + band + '_' + spw + '_initial', band,
+                                telescope=self.telescope, nsigma=4.0, threshold='theoretical_with_drmod', scales=[0],
                                 savemodel='none', parallel=parallel,
-                                nterms=1, field=self.field, datacolumn='corrected', spw=spws_per_vis,
-                                uvrange=selfcal_library[target][band]['uvrange'],
-                                obstype=selfcal_library[target][band]['obstype'],
-                                nfrms_multiplier=dirty_per_spw_NF_RMS/dirty_RMS)
+                                field=self.field, datacolumn='corrected', spw=spw,
+                                nfrms_multiplier=dirty_per_spw_NF_RMS/dirty_per_spw_RMS)
 
                         per_spw_SNR, per_spw_RMS, per_spw_NF_SNR, per_spw_NF_RMS = self.get_image_stats(
                                 sani_target+'_'+band+'_'+spw+'_initial.image.tt0', 
@@ -1333,7 +1305,7 @@ class SelfcalHeuristics(object):
                                  unflag_only_lbants_onlyap=self.unflag_only_lbants_onlyap, calonly_max_flagged=self.calonly_max_flagged,
                                  second_iter_solmode=self.second_iter_solmode, unflag_fb_to_prev_solint=self.unflag_fb_to_prev_solint, rerank_refants=self.rerank_refants,
                                  gaincalibrator_dict=gaincalibrator_dict, allow_gain_interpolation=self.allow_gain_interpolation, guess_scan_combine=self.guess_scan_combine,
-                                 aca_use_nfmask=self.aca_use_nfmask, mask=sourcemask, usermodel=self.usermodel)
+                                 aca_use_nfmask=self.aca_use_nfmask)
 
         ##
         # If we want to try amplitude selfcal, should we do it as a function out of the main loop or a separate loop?
@@ -1346,9 +1318,9 @@ class SelfcalHeuristics(object):
         for target in selfcal_library:
             sani_target = 'sc.'+filenamer.sanitize(target)
             for band in selfcal_library[target].keys():
-                vislist = selfcal_library[target][band]['vislist'].copy()
                 nfsnr_modifier = selfcal_library[target][band]['RMS_NF_curr'] / \
                     selfcal_library[target][band]['RMS_curr']
+                
                 clean_threshold = min(
                     selfcal_library[target][band]['clean_threshold_orig'],
                     selfcal_library[target][band]['RMS_NF_curr'] * 3.0)
@@ -1356,21 +1328,14 @@ class SelfcalHeuristics(object):
                         'RMS_NF_curr'] * 3.0:
                     LOG.info('The clean threshold used for the initial image was less than 3*RMS_NF_curr; '
                              'the final image will use the same threshold as the initial image')
+                    
                 if selfcal_library[target][band]['SC_success']:
                     self.tclean_wrapper(selfcal_library[target][band],
-                        vislist, sani_target + '_' + band + '_final', band, telescope=self.telescope,
+                        sani_target + '_' + band + '_final', band, telescope=self.telescope,
                         nsigma=3.0, threshold=str(clean_threshold) + 'Jy', scales=[0],
                         savemodel='none', parallel=parallel,
-                        nterms=selfcal_library[target][band]['nterms'],
-                        field=self.field, datacolumn='corrected', spw=selfcal_library[target][band]['spws_per_vis'],
-                        uvrange=selfcal_library[target][band]['uvrange'],
-                        obstype=selfcal_library[target][band]['obstype'],
-                        nfrms_multiplier=nfsnr_modifier,
-                        image_mosaic_fields_separately=is_mosaic,
-                        mosaic_field_phasecenters=selfcal_library[target][band]['sub-fields-phasecenters'],
-                        mosaic_field_fid_map=selfcal_library[target][band]['sub-fields-fid_map'],
-                        cyclefactor=selfcal_library[target][band]['cyclefactor'],
-                        mask=sourcemask, usermodel='')
+                        field=self.field, datacolumn='corrected',
+                        nfrms_multiplier=nfsnr_modifier)
                 else:
                     copy_products(sani_target + '_' + band + '_initial', sani_target + '_' + band + '_final')
                     if is_mosaic:
@@ -1423,43 +1388,17 @@ class SelfcalHeuristics(object):
             for target in selfcal_library:
                 sani_target = 'sc.'+filenamer.sanitize(target)
                 for band in selfcal_library[target].keys():
-                    vislist = selfcal_library[target][band]['vislist'].copy()
                     spwlist = self.spw_virtual.split(',')
                     LOG.info('Generating final per-SPW images for '+target+' in '+band)
                     for spw in selfcal_library[target][band]['spw_map']:
                         # omit DR modifiers here since we should have increased DR significantly
-                        if os.path.exists(sani_target + '_' + band + '_' + spw + '_final.image.tt0'):
-                            self.cts.rmtree(sani_target + '_' + band + '_' + spw + '_final.image.tt0')
-                        vlist = [vis for vis in vislist if vis in selfcal_library[target][band]['spw_map'][spw]]
-                        if self.telescope == 'ALMA' or self.telescope == 'ACA':
-                            sensitivity, _, _ = self.get_sensitivity(spw=spw)
-                            dr_mod = 1.0
-                            # fetch the DR modifier if selfcal failed on source
-                            if not selfcal_library[target][band]['SC_success']:
-                                dr_mod = get_dr_correction(
-                                    self.telescope, selfcal_library[target][band]['SNR_dirty'] *
-                                    selfcal_library[target][band]['RMS_dirty'],
-                                    sensitivity, vlist)
-                            LOG.info(f'DR modifier:  {dr_mod} SPW:  {spw}')
-                            sensitivity = sensitivity*dr_mod
-                            if ((band == 'Band_9') or (band == 'Band_10')) and dr_mod != 1.0:   # adjust for DSB noise increase
-                                sensitivity = sensitivity*4.0
-                        else:
-                            sensitivity = 0.0
-                        spws_per_vis = self.image_heuristics.observing_run.get_real_spwsel([spw]*len(vislist), vislist)
-                        nfsnr_modifier = selfcal_library[target][band]['RMS_NF_curr'] / \
-                            selfcal_library[target][band]['RMS_curr']
-                        sensitivity_agg, sens_bw, sens_reffreq = self.get_sensitivity()
-                        sensitivity_scale_factor = selfcal_library[target][band]['RMS_NF_curr']/sensitivity_agg
-
                         if selfcal_library[target][band]['SC_success']:
-                            self.tclean_wrapper(selfcal_library[target][band], vislist, sani_target + '_' + band + '_' + spw + '_final', band,
+                            self.tclean_wrapper(selfcal_library[target][band], sani_target + '_' + band + '_' + spw + '_final', band,
                                                 telescope=self.telescope, nsigma=4.0,
-                                                threshold=str(sensitivity * sensitivity_scale_factor * 4.0) + 'Jy', scales=[0],
-                                                savemodel='none', parallel=parallel, nterms=1,
-                                                field=self.field, datacolumn='corrected', spw=spws_per_vis,
-                                                uvrange=selfcal_library[target][band]['uvrange'],
-                                                obstype=selfcal_library[target][band]['obstype'],
+                                                #threshold=str(sensitivity * sensitivity_scale_factor * 4.0) + 'Jy'
+                                                threshold='theoretical', scales=[0],
+                                                savemodel='none', parallel=parallel,
+                                                field=self.field, datacolumn='corrected', spw=spw,
                                                 nfrms_multiplier=nfsnr_modifier)
                         else:
                             copy_products(sani_target + '_' + band + '_' + spw + '_initial',
@@ -1584,6 +1523,20 @@ class SelfcalHeuristics(object):
                 else:
                     selfcal_library[target][band]['obstype'] = 'single-point'
 
+                # Fill in the usermask and usermodel, if supplied.
+
+                print(self.usermask)
+                print(self.usermodel)
+                if band in self.usermask:
+                    selfcal_library[target][band]['usermask'] = self.usermask[band]
+                else:
+                    selfcal_library[target][band]['usermask'] = ''
+
+                if band in self.usermodel:
+                    selfcal_library[target][band]['usermodel'] = self.usermodel[band]
+                else:
+                    selfcal_library[target][band]['usermodel'] = ''
+
                 # Make sure the fields get mapped properly, in case the order in which they are observed changes from EB to EB.
 
                 selfcal_library[target][band]['sub-fields-fid_map'] = {}
@@ -1694,6 +1647,14 @@ class SelfcalHeuristics(object):
                     selfcal_library[target][band]['applycal_interp'] = 'linearPD'
                 else:
                     selfcal_library[target][band]['applycal_interp'] = 'linear'
+
+                uv75pct = selfcal_library[target][band]['75thpct_uv']
+                if "VLA" in self.telescope or (selfcal_library[target][band]['obstype'] == 'mosaic' and
+                                               selfcal_library[target][band]['Median_scan_time'] / selfcal_library[target][band]['Median_fields_per_scan'] < 60.) \
+                        or uv75pct > 2000.0:
+                    selfcal_library[target][band]['cyclefactor'] = 3.0
+                else:
+                    selfcal_library[target][band]['cyclefactor'] = 1.0
 
                 for fid in selfcal_library[target][band]['sub-fields']:
                     selfcal_library[target][band][fid]['SC_success'] = False
@@ -2077,7 +2038,7 @@ class SelfcalHeuristics(object):
                     unflag_only_lbants=False, unflag_only_lbants_onlyap=False, calonly_max_flagged=0.0,
                     second_iter_solmode="", unflag_fb_to_prev_solint=False,
                     rerank_refants=False, gaincalibrator_dict={}, allow_gain_interpolation=False,
-                    guess_scan_combine=False, aca_use_nfmask=False, mask='', usermodel=''):
+                    guess_scan_combine=False, aca_use_nfmask=False):
 
         # If we are running this on a mosaic, we want to rerank reference antennas and have a higher gaincal_minsnr by default.
 
@@ -2096,19 +2057,14 @@ class SelfcalHeuristics(object):
         sani_target = 'sc.'+filenamer.sanitize(target)
         vislist = slib['vislist'].copy()
         LOG.info('Starting selfcal procedure on: '+target+' '+band)
-        if usermodel != '':
+        if selfcal_library['usermodel'] != '':
             LOG.info('Setting model column to user model')
-            self.usermodel_wrapper(vislist, sani_target+'_'+band,
-                                   band_properties, band, telescope=self.telescope, nsigma=0.0, scales=[0],
+            self.usermodel_wrapper(selfcal_library, sani_target+'_'+band,
+                                   telescope=self.telescope, nsigma=0.0, scales=[0],
                                    threshold='0.0Jy',
-                                   savemodel='modelcolumn', parallel=self.parallel, cellsize=self.cell, imsize=self.imsize,
-                                   nterms=slib['nterms'], reffreq=slib['reffreq'],
-                                   field=target, spw=slib['spws_per_vis'], uvrange=slib['uvrange'], obstype=slib['obstype'],
-                                   resume=False,
-                                   image_mosaic_fields_separately=self.is_mosaic,
-                                   mosaic_field_phasecenters=slib['sub-fields-phasecenters'],
-                                   mosaic_field_fid_map=slib['sub-fields-fid_map'],
-                                   cyclefactor=slib['cyclefactor'], mask=mask, usermodel=usermodel)
+                                   savemodel='modelcolumn', parallel=self.parallel,
+                                   field=target, spw=slib['spws_per_vis'], 
+                                   resume=False, cyclefactor=slib['cyclefactor'])
 
         for iteration in range(len(selfcal_plan['solints'])):
             if (iterjump != -1) and (iteration < iterjump):  # allow jumping to amplitude selfcal and not need to use a while loop
@@ -2176,18 +2132,16 @@ class SelfcalHeuristics(object):
                         slib[fid][vis][solint]['nfrms_multiplier'] = nfrms_multiplier
 
                 # remove mask if exists from previous selfcal _post image user is specifying a mask
-                if os.path.exists(sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'.mask') and mask != '':
+                if os.path.exists(sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'.mask') and selfcal_library['usermask'] != '':
                     os.system('rm -rf '+sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'.mask')
-                self.tclean_wrapper(selfcal_library, vislist, sani_target+'_'+band+'_'+solint+'_'+str(iteration),
+                self.tclean_wrapper(selfcal_library, sani_target+'_'+band+'_'+solint+'_'+str(iteration),
                                     band, telescope=telescope, nsigma=slib['nsigma'][iteration], scales=[
                                         0],
                                     # threshold=str(slib['nsigma'][iteration]* slib['RMS_NF_curr'])+'Jy',
                                     threshold=str(slib[vislist[0]][solint]['clean_threshold'])+'Jy',
                                     savemodel='none', parallel=self.parallel,
-                                    nterms=slib['nterms'],
-                                    field=target, spw=slib['spws_per_vis'], uvrange=slib['uvrange'], obstype=slib['obstype'],
-                                    nfrms_multiplier=slib[vislist[0]][solint]['nfrms_multiplier'], resume=resume,
-                                    image_mosaic_fields_separately=slib['obstype'] == 'mosaic', mosaic_field_phasecenters=slib['sub-fields-phasecenters'], mosaic_field_fid_map=slib['sub-fields-fid_map'], cyclefactor=slib['cyclefactor'], mask=mask, usermodel=usermodel)
+                                    field=target,
+                                    nfrms_multiplier=slib[vislist[0]][solint]['nfrms_multiplier'], resume=resume)
 
                 # Check that a mask was actually created, because if not the model will be empty and gaincal will do bad things and the
                 # code will break.
@@ -2211,22 +2165,15 @@ class SelfcalHeuristics(object):
 
                     # We need to redo saving the model now that we have potentially unflagged some data.
                     if applymode == "calflag":
-                        self.tclean_wrapper(selfcal_library, vislist, sani_target+'_'+band+'_'+solint+'_'+str(iteration),
+                        self.tclean_wrapper(selfcal_library, sani_target+'_'+band+'_'+solint+'_'+str(iteration),
                                             band, telescope=telescope, nsigma=slib['nsigma'][iteration], scales=[
                                                 0],
                                             # threshold=str(slib['nsigma'][iteration]* slib['RMS_NF_curr'])+'Jy',
                                             threshold=str(slib[vislist[0]][solint]['clean_threshold'])+'Jy',
                                             savemodel='modelcolumn', parallel=self.parallel,
-                                            nterms=slib['nterms'],
-                                            field=target, spw=slib['spws_per_vis'], uvrange=slib['uvrange'], obstype=slib['obstype'],
+                                            field=target,
                                             nfrms_multiplier=slib[vislist[0]][solint]['nfrms_multiplier'],
-                                            savemodel_only=True, cyclefactor=slib['cyclefactor'], mask=mask, usermodel=usermodel)
-
-                    # for vis in vislist:
-                    #     # Record gaincal details.
-                    #     slib[vis][solint] = {}
-                    #     for fid in np.intersect1d(slib['sub-fields-to-selfcal'], list(slib['sub-fields-fid_map'][vis].keys())):
-                    #         slib[fid][vis][solint] = {}
+                                            savemodel_only=True)
 
                     # Fields that don't have any mask in the primary beam should be removed from consideration, as their models are likely bad.
                     if slib['obstype'] == 'mosaic':
@@ -2269,16 +2216,14 @@ class SelfcalHeuristics(object):
                     ##
 
                     os.system('rm -rf '+sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'_post*')
-                    self.tclean_wrapper(selfcal_library, vislist, sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'_post',
+                    self.tclean_wrapper(selfcal_library, sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'_post',
                                         band, telescope=telescope, nsigma=slib['nsigma'][iteration], scales=[
                                             0],
                                         # threshold=str(slib['nsigma'][iteration]* slib['RMS_NF_curr'])+'Jy',
                                         threshold=str(slib[vislist[0]][solint]['clean_threshold'])+'Jy',
                                         savemodel='none', parallel=self.parallel,
-                                        nterms=slib['nterms'],
-                                        field=target, spw=slib['spws_per_vis'], uvrange=slib['uvrange'], obstype=slib['obstype'],
-                                        nfrms_multiplier=slib[vislist[0]][solint]['nfrms_multiplier'],
-                                        image_mosaic_fields_separately=slib['obstype'] == 'mosaic', mosaic_field_phasecenters=slib['sub-fields-phasecenters'], mosaic_field_fid_map=slib['sub-fields-fid_map'], cyclefactor=slib['cyclefactor'], mask=mask, usermodel=usermodel)
+                                        field=target,
+                                        nfrms_multiplier=slib[vislist[0]][solint]['nfrms_multiplier'])
 
                     ##
                     # Do the assessment of the post- (and pre-) selfcal images.
@@ -2319,33 +2264,6 @@ class SelfcalHeuristics(object):
                             slib['fracbw'], post_SNR)
 
                     for vis in vislist:
-                        ##
-                        # record self cal results/details for this solint
-                        ##
-                        # slib[vis][solint]={}
-                        # slib[vis][solint]['gaintable']=applycal_gaintable[vis]
-                        # slib[vis][solint]['iteration']=iteration+0
-                        # slib[vis][solint]['spwmap']=applycal_spwmap[vis]
-                        # slib[vis][solint]['applycal_mode']=applycal_mode[band][target][iteration]+''
-                        # slib[vis][solint]['applycal_interpolate']=applycal_interpolate[vis]
-                        # slib[vis][solint]['gaincal_combine']=selfcal_plan['gaincal_combine'][iteration]+''
-                        # slib[vis][solint]['clean_threshold'] = slib['nsigma'][iteration] * slib['RMS_NF_curr']
-                        for fid in np.intersect1d(slib['sub-fields-to-selfcal'], list(slib['sub-fields-fid_map'][vis].keys())):
-                            if slib['obstype'] == 'mosaic':
-                                imagename = sani_target+'_field_'+str(fid)+'_'+band+'_'+solint+'_'+str(iteration)
-                            else:
-                                imagename = sani_target+'_'+band+'_'+solint+'_'+str(iteration)
-
-                            # slib[fid][vis][solint]={}
-                            # slib[fid][vis][solint]['gaintable']=applycal_gaintable[vis]
-                            # slib[fid][vis][solint]['iteration']=iteration+0
-                            # slib[fid][vis][solint]['spwmap']=applycal_spwmap[vis]
-                            # slib[fid][vis][solint]['applycal_mode']=applycal_mode[band][target][iteration]+''
-                            # slib[fid][vis][solint]['applycal_interpolate']=applycal_interpolate[vis]
-                            # slib[fid][vis][solint]['gaincal_combine']=selfcal_plan['gaincal_combine'][iteration]+''
-                            # slib[fid][vis][solint]['clean_threshold'] = slib['nsigma'][iteration] * slib['RMS_NF_curr']
-                            # Update RMS value if necessary
-
                         # Update RMS value if necessary
                         if slib[vis][solint]['RMS_post'] < slib['RMS_curr'] and vis == vislist[-1]:
                             slib['RMS_curr'] = slib[vis][solint]['RMS_post'].copy()
@@ -2411,15 +2329,14 @@ class SelfcalHeuristics(object):
                         for f in files:
                             os.system("mv "+f+" "+f.replace("_post", "_post_intermediate"))
 
-                        self.tclean_wrapper(selfcal_library, vislist, sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'_post',
+                        self.tclean_wrapper(selfcal_library, sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'_post',
                                             band, telescope=telescope, nsigma=slib['nsigma'][iteration], scales=[
                                                 0],
                                             threshold=str(slib[vislist[0]][solint]['clean_threshold'])+'Jy',
                                             savemodel='none', parallel=self.parallel,
-                                            nterms=slib['nterms'],
-                                            field=target, spw=slib['spws_per_vis'], uvrange=slib['uvrange'], obstype=slib['obstype'],
+                                            field=target, 
                                             nfrms_multiplier=slib[vislist[0]][solint]['nfrms_multiplier'],
-                                            image_mosaic_fields_separately=False, mosaic_field_phasecenters=slib['sub-fields-phasecenters'], mosaic_field_fid_map=slib['sub-fields-fid_map'], cyclefactor=slib['cyclefactor'], mask=mask, usermodel=usermodel)
+                                            image_mosaic_fields_separately=False)
 
                         ##
                         # Do the assessment of the post- (and pre-) selfcal images.
@@ -2435,19 +2352,6 @@ class SelfcalHeuristics(object):
                                 slib, (telescope != 'ACA' or aca_use_nfmask), solint, 'post')
 
                         for vis in vislist:
-                            ##
-                            # record self cal results/details for this solint
-                            ##
-                            # slib[vis][solint]={}
-                            # slib[vis][solint]['gaintable']=applycal_gaintable[vis]
-                            # slib[vis][solint]['iteration']=iteration+0
-                            # slib[vis][solint]['spwmap']=applycal_spwmap[vis]
-                            # slib[vis][solint]['applycal_mode']=applycal_mode[band][target][iteration]+''
-                            # slib[vis][solint]['applycal_interpolate']=applycal_interpolate[vis]
-                            # slib[vis][solint]['gaincal_combine']=selfcal_plan['gaincal_combine'][iteration]+''
-                            slib[vis][solint]['clean_threshold'] = slib['nsigma'][iteration] * \
-                                slib['RMS_NF_curr']
-
                             slib[vis][solint]['solmode'] = selfcal_plan['solmode'][iteration]+''
                             # Update RMS value if necessary
                             if slib[vis][solint]['RMS_post'] < slib['RMS_curr']:

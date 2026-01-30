@@ -998,7 +998,7 @@ class Selfcal(basetask.StandardTaskTemplate):
         else:
             usermask = {}
         if isinstance(self.inputs.usermodel, dict):
-            usermodel = self.inputs.userrmodel
+            usermodel = self.inputs.usermodel
         else:
             usermodel = {}
 
