@@ -29,8 +29,10 @@ Usage Examples:
             metadata.to_json(f'stage{stage_num}-metadata.json')
 """
 
+import tempfile
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from unittest.mock import Mock
 
 from pipeline.infrastructure.serializers import (
@@ -56,8 +58,8 @@ class TestTimestamps(unittest.TestCase):
 
     def test_timestamps_serialization(self):
         """Test serialization to and from dict."""
-        start = datetime(2026, 1, 30, 14, 0, 0)
-        end = datetime(2026, 1, 30, 14, 5, 0)
+        start = datetime(2026, 1, 30, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 1, 30, 14, 5, 0, tzinfo=timezone.utc)
 
         ts = Timestamps(start=start, end=end)
         data = ts.to_dict()
@@ -128,7 +130,7 @@ class TestResultMetadata(unittest.TestCase):
 
         assert data['task_name'] == 'test_task'
         assert data['status'] == 'completed'
-        assert data['duration_seconds'] == 300.0
+        assert data['timestamps']['duration_seconds'] == 300.0
         assert 'timestamps' in data
         assert 'inputs' in data
 
@@ -142,17 +144,18 @@ class TestResultMetadata(unittest.TestCase):
         assert 'completed' in repr_str
         assert '300.0s' in repr_str
 
-    def test_metadata_json_roundtrip(self, tmp_path):
+    def test_metadata_json_roundtrip(self):
         """Test saving and loading metadata from JSON."""
         result = self._create_mock_result(task_name='hifa_calibration')
         original = ResultMetadata.from_result(result)
 
         # Save to JSON
-        json_file = tmp_path / 'metadata.json'
-        original.to_json(json_file)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            json_file = Path(temp_dir) / 'metadata.json'
+            original.to_json(json_file)
 
-        # Load from JSON
-        loaded = ResultMetadata.from_json(json_file)
+            # Load from JSON
+            loaded = ResultMetadata.from_json(json_file)
 
         assert loaded.task_name == original.task_name
         assert loaded.stage_number == original.stage_number
@@ -199,7 +202,7 @@ class TestContextMetadata(unittest.TestCase):
         assert data['num_results'] == 3
         assert data['total_duration_seconds'] == 600.0
 
-    def test_context_metadata_json_roundtrip(self, tmp_path):
+    def test_context_metadata_json_roundtrip(self):
         """Test saving and loading context metadata from JSON."""
         original = ContextMetadata(
             name='test-ctx',
@@ -211,11 +214,12 @@ class TestContextMetadata(unittest.TestCase):
         )
 
         # Save to JSON
-        json_file = tmp_path / 'context-metadata.json'
-        original.to_json(json_file)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            json_file = Path(temp_dir) / 'context-metadata.json'
+            original.to_json(json_file)
 
-        # Load from JSON
-        loaded = ContextMetadata.from_json(json_file)
+            # Load from JSON
+            loaded = ContextMetadata.from_json(json_file)
 
         assert loaded.name == original.name
         assert loaded.output_dir == original.output_dir
@@ -242,25 +246,27 @@ class TestJSONMetadataSerializer(unittest.TestCase):
             qa_scores={'rms_error': 0.02},
         )
 
-    def test_serialize_result_metadata(self, tmp_path):
+    def test_serialize_result_metadata(self):
         """Test serializing result metadata."""
-        output_file = tmp_path / 'result-metadata.json'
-        self.serializer.serialize_result(self.metadata, output_file)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_file = Path(temp_dir) / 'result-metadata.json'
+            self.serializer.serialize_result(self.metadata, output_file)
 
-        assert output_file.exists()
+            assert output_file.exists()
 
-    def test_deserialize_result_metadata(self, tmp_path):
+    def test_deserialize_result_metadata(self):
         """Test deserializing result metadata."""
-        output_file = tmp_path / 'result-metadata.json'
-        self.serializer.serialize_result(self.metadata, output_file)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_file = Path(temp_dir) / 'result-metadata.json'
+            self.serializer.serialize_result(self.metadata, output_file)
 
-        loaded = self.serializer.deserialize_result(output_file)
+            loaded = self.serializer.deserialize_result(output_file)
 
-        assert loaded.task_name == self.metadata.task_name
-        assert loaded.stage_number == self.metadata.stage_number
-        assert loaded.status == self.metadata.status
+            assert loaded.task_name == self.metadata.task_name
+            assert loaded.stage_number == self.metadata.stage_number
+            assert loaded.status == self.metadata.status
 
-    def test_serialize_context_metadata(self, tmp_path):
+    def test_serialize_context_metadata(self):
         """Test serializing context metadata."""
         ctx_metadata = ContextMetadata(
             name='integration-test',
@@ -271,10 +277,11 @@ class TestJSONMetadataSerializer(unittest.TestCase):
             total_duration_seconds=5000.0,
         )
 
-        output_file = tmp_path / 'context-metadata.json'
-        self.serializer.serialize_context(ctx_metadata, output_file)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_file = Path(temp_dir) / 'context-metadata.json'
+            self.serializer.serialize_context(ctx_metadata, output_file)
 
-        assert output_file.exists()
+            assert output_file.exists()
 
 
 # Example usage patterns (can be run as demonstrations)
@@ -299,7 +306,7 @@ def example_basic_export():
     metadata = ResultMetadata.from_result(result)
 
     print(f'Task: {metadata.task_name}')
-    print(f'Duration: {metadata.duration_seconds:.1f} seconds')
+    print(f'Duration: {metadata.timestamps.duration_seconds:.1f} seconds')
     print(f'Status: {metadata.status}')
     print(f'QA Score: {metadata.qa_scores.get("overall", "N/A")}')
     print()

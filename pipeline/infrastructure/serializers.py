@@ -135,9 +135,13 @@ class ResultMetadata:
         # Determine status
         status = 'completed'
         exception_msg = None
-        if hasattr(result, 'exception'):
+        exception_value = getattr(result, 'exception', None)
+        if isinstance(exception_value, BaseException):
             status = 'failed'
-            exception_msg = str(result.exception)
+            exception_msg = str(exception_value)
+        elif isinstance(exception_value, str) and exception_value:
+            status = 'failed'
+            exception_msg = exception_value
 
         # Extract timestamps
         timestamps = Timestamps(
@@ -184,6 +188,11 @@ class ResultMetadata:
             'subtask_count': self.subtask_count,
             'notes': self.notes,
         }
+
+    @property
+    def duration_seconds(self) -> float:
+        """Return duration in seconds."""
+        return self.timestamps.duration_seconds
 
     def to_json(self, filepath: str | Path) -> None:
         """Save metadata to JSON file.
