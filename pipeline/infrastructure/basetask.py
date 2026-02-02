@@ -321,6 +321,15 @@ class Results(api.Results):
             # Add the results object to the results list.
             context.results.append(result)
 
+            if task_completed:
+                try:
+                    from pipeline.infrastructure.serializers import export_result_metadata
+
+                    export_result_metadata(result_to_append, context.report_dir)
+                except Exception:
+                    LOG.exception('Failed to export result metadata for stage %s.',
+                                  getattr(result_to_append, 'stage_number', 'unknown'))
+
             # having called the old constructor, we know that self.context is set.
             # Use this context to find the report directory and write to the log
             if task_completed:

@@ -192,6 +192,14 @@ class Context:
             LOG.info('Saving context: %s', filename)
             pickle.dump(self, context_file, protocol=-1)
 
+        try:
+            from pipeline.infrastructure.serializers import export_context_metadata
+
+            metadata_path = filename.replace('.context', '-metadata.json')
+            export_context_metadata(self, metadata_path)
+        except Exception:
+            LOG.exception('Failed to export context metadata for %s.', filename)
+
     def __str__(self) -> str:
         ms_names = [ms.name
                     for ms in self.observing_run.measurement_sets]
