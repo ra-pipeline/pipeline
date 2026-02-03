@@ -864,6 +864,11 @@ class T2_1DetailsRenderer(object):
 
     @staticmethod
     def get_display_context(context, ms):
+        # Check if cached data exists
+        if hasattr(ms, '_t2_1_details_cache') and ms._t2_1_details_cache:
+            LOG.debug('Using cached T2_1Details data for %s', ms.basename)
+            return ms._t2_1_details_cache
+
         T2_1DetailsRenderer.write_listobs(context, ms)
 
         inputs = summary.IntentVsTimeChart.Inputs(context, vis=ms.basename)
@@ -979,7 +984,7 @@ class T2_1DetailsRenderer(object):
         else:
             pointing_plot = None
 
-        return {
+        display_context = {
             'pcontext'        : context,
             'ms'              : ms,
             'science_sources' : utils.commafy(science_sources),
@@ -1016,6 +1021,11 @@ class T2_1DetailsRenderer(object):
             'telmjd_max'      : utils.format_datetime(datetime.datetime.fromtimestamp(telmjd_max)),
             'vla_basebands'   : vla_basebands
         }
+        
+        # Cache the display context in the MS object for future renders
+        ms._t2_1_details_cache = display_context
+        
+        return display_context
 
     @classmethod
     def render(cls, context):
@@ -1148,6 +1158,11 @@ class T2_2_3Renderer(T2_2_XRendererBase):
 
     @staticmethod
     def get_display_context(context, ms):
+        # Check if cached data exists
+        if hasattr(ms, '_t2_2_3_cache') and ms._t2_2_3_cache:
+            LOG.debug('Using cached T2_2_3 data for %s', ms.basename)
+            return ms._t2_2_3_cache
+            
         if context.project_summary.telescope in ('NRO',):
             # antenna plots are useless for Nobeyama
             plot_ants = None
@@ -1172,12 +1187,16 @@ class T2_2_3Renderer(T2_2_XRendererBase):
         dirname = os.path.join('session%s' % ms.session,
                                ms.basename)
 
-        return {'pcontext': context,
+        display_context = {'pcontext': context,
                 'plot_ants': plot_ants,
                 'plot_ants_plog': plot_ants_plog,
                 'plot_uv': plot_uv,
                 'ms': ms,
                 'dirname': dirname}
+        
+        # Cache the display context
+        ms._t2_2_3_cache = display_context
+        return display_context
 
 
 class T2_2_4Renderer(T2_2_XRendererBase):
@@ -1189,6 +1208,11 @@ class T2_2_4Renderer(T2_2_XRendererBase):
 
     @staticmethod
     def get_display_context(context, ms):
+        # Check if cached data exists
+        if hasattr(ms, '_t2_2_4_cache') and ms._t2_2_4_cache:
+            LOG.debug('Using cached T2_2_4 data for %s', ms.basename)
+            return ms._t2_2_4_cache
+            
         task = summary.AzElChart(context, ms)
         azel_plot = task.plot()
 
@@ -1212,7 +1236,7 @@ class T2_2_4Renderer(T2_2_XRendererBase):
         dirname = os.path.join('session%s' % ms.session,
                                ms.basename)
 
-        return {'pcontext': context,
+        display_context = {'pcontext': context,
                 'ms': ms,
                 'azel_plot': azel_plot,
                 'suntrack_plot': suntrack_plot,
@@ -1220,6 +1244,10 @@ class T2_2_4Renderer(T2_2_XRendererBase):
                 'zd_telmjd_plot'  : zd_vs_telmjd_plot,
                 'plot_uv': plot_uv,
                 'dirname': dirname}
+        
+        # Cache the display context
+        ms._t2_2_4_cache = display_context
+        return display_context
 
 
 class T2_2_6Renderer(T2_2_XRendererBase):
@@ -1875,6 +1903,8 @@ class WebLogGenerator(object):
 
     @staticmethod
     def render(context):
+        import time
+
         # copy CSS, javascript etc. to weblog directory
         WebLogGenerator.copy_resources(context)
 
@@ -1885,14 +1915,36 @@ class WebLogGenerator(object):
 
         try:
             # unpickle the results objects ready for rendering
+            # Note: Renderers require full Result objects (not metadata) to access
+            # complex attributes like .qa, .task, .metadata, etc.
+            unpickle_start = time.time()
             context.results = [proxy.read() for proxy in context.results]
+            unpickle_elapsed = time.time() - unpickle_start
+            LOG.info('Weblog rendering: unpickled %d results in %.2fs',
+                     len(context.results), unpickle_elapsed)
 
+            render_start = time.time()
+            renderer_times = []
             for renderer in WebLogGenerator.renderers:
                 try:
                     LOG.trace('%s rendering...' % renderer.__name__)
+                    renderer_start = time.time()
                     renderer.render(context)
+                    renderer_elapsed = time.time() - renderer_start
+                    renderer_times.append((renderer.__name__, renderer_elapsed))
+                    LOG.info('%s rendering completed in %.2fs',
+                             renderer.__name__, renderer_elapsed)
                 except Exception as e:
                     LOG.exception('Error generating weblog: %s', e)
+
+            render_elapsed = time.time() - render_start
+            LOG.info('Weblog rendering: all renderers completed in %.2fs',
+                     render_elapsed)
+            
+            # Log sorted timing summary
+            LOG.info('Per-renderer timing summary (sorted by duration):')
+            for name, elapsed in sorted(renderer_times, key=lambda x: x[1], reverse=True):
+                LOG.info('  %s: %.2fs', name, elapsed)
 
             # create symlink to t1-1.html
             link_relsrc = T1_1Renderer.output_file

@@ -29,20 +29,32 @@ class T2_4MDetailsImportDataRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         weblog_dir = os.path.join(pipeline_context.report_dir,
                                   'stage%s' % result.stage_number)
 
-        setjy_results = []
-        for r in result:
-            setjy_results.extend(r.setjy_results)
+        cache = result.metadata.get('weblog_importdata_cache', {}) if hasattr(result, 'metadata') else {}
+        if cache:
+            flux_imported = cache['flux_imported']
+            flux_table_rows = cache['flux_table_rows']
+            repsource_defined = cache['repsource_defined']
+            repsource_name_is_none = cache['repsource_name_is_none']
+            repsource_table_rows = cache['repsource_table_rows']
+            num_mses = cache['num_mses']
+            summary_rows = cache.get('summary_rows', [])
+        else:
+            setjy_results = []
+            for r in result:
+                setjy_results.extend(r.setjy_results)
 
-        measurements = []        
-        for r in setjy_results:
-            measurements.extend(r.measurements)
+            measurements = []
+            for r in setjy_results:
+                measurements.extend(r.measurements)
 
-        num_mses = reduce(operator.add, [len(r.mses) for r in result])
+            num_mses = reduce(operator.add, [len(r.mses) for r in result])
 
-        flux_table_rows = make_flux_table(pipeline_context, setjy_results)
+            flux_table_rows = make_flux_table(pipeline_context, setjy_results)
 
-        repsource_table_rows, repsource_name_is_none = make_repsource_table(pipeline_context, result)
-        repsource_defined = not any('N/A' in td for tr in repsource_table_rows for td in tr[1:])
+            repsource_table_rows, repsource_name_is_none = make_repsource_table(pipeline_context, result)
+            repsource_defined = not any('N/A' in td for tr in repsource_table_rows for td in tr[1:])
+            flux_imported = True if measurements else False
+            summary_rows = make_importdata_summary_rows(result)
 
         # copy flux.csv file across to weblog directory
         fluxcsv_filename = 'flux.csv'
@@ -55,12 +67,13 @@ class T2_4MDetailsImportDataRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                          for ms in r.mses}
 
         mako_context.update({
-            'flux_imported': True if measurements else False,
+            'flux_imported': flux_imported,
             'flux_table_rows': flux_table_rows,
             'repsource_defined': repsource_defined,
             'repsource_name_is_none': repsource_name_is_none,
             'repsource_table_rows': repsource_table_rows,
             'num_mses': num_mses,
+            'importdata_summary_rows': summary_rows,
             'fluxcsv_files': fluxcsv_files,
             'weblog_dir': weblog_dir
         })
@@ -121,6 +134,23 @@ def make_flux_table(context, results):
 
 
 RepsourceTR = collections.namedtuple('RepsourceTR', 'vis source rfreq rbwidth spwid bwidth dynrange')
+
+
+def make_importdata_summary_rows(results):
+    rows = []
+    for r in results:
+        for ms in r.mses:
+            target_count = len({source.name for source in ms.sources if 'TARGET' in source.intents})
+            rows.append({
+                'basename': ms.basename,
+                'schedblock_id': ms.schedblock_id,
+                'origin': r.origin.get(ms.basename, 'Unknown'),
+                'scan_count': len(ms.scans),
+                'field_count': len(ms.fields),
+                'target_count': target_count,
+                'filesize': str(ms.filesize),
+            })
+    return rows
 
 
 def make_repsource_table(context, results):

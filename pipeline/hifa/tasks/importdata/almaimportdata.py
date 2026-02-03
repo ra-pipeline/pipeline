@@ -166,6 +166,36 @@ class ALMAImportDataResults(importdata.ImportDataResults):
             ):
         super().__init__(mses=mses, setjy_results=setjy_results)
 
+    def merge_with_context(self, context: Context) -> None:
+        super().merge_with_context(context)
+
+        try:
+            from pipeline.infrastructure.renderer import rendererutils
+
+            minparang = None
+            if hasattr(self, 'inputs') and isinstance(self.inputs, dict):
+                minparang = self.inputs.get('minparang')
+            elif hasattr(self, 'inputs') and hasattr(self.inputs, 'get'):
+                minparang = self.inputs.get('minparang')
+
+            parang_ranges = getattr(self, 'parang_ranges', None)
+            if parang_ranges and parang_ranges.get('intents_found'):
+                parang_plots = rendererutils.make_parang_plots(
+                    context,
+                    self,
+                    intent_lookup={'POLARIZATION': 'CALIBRATE_POLARIZATION#ON_SOURCE'},
+                )
+            else:
+                parang_plots = {}
+
+            self.metadata['weblog_importdata_parang'] = {
+                'minparang': minparang,
+                'parang_ranges': parang_ranges,
+                'parang_plots': parang_plots,
+            }
+        except Exception:
+            LOG.exception('Failed to cache importdata parallactic angle plots.')
+
     def __repr__(self) -> str:
         return 'ALMAImportDataResults:\n\t{0}'.format(
             '\n\t'.join([ms.name for ms in self.mses]))

@@ -51,13 +51,22 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 flag_totals = utils.dict_merge(flag_totals,
                     flagutils.flags_for_result(r, pipeline_context, intents_to_summarise=intents_to_summarise))
 
-        calapps = {}
-        for r in result:
-            calapps = utils.dict_merge(calapps, self.calapps_for_result(r))
+        # Use cached data if available
+        cache_data = result[0].metadata.get('weblog_applycal_cache') if result else None
+        
+        if cache_data:
+            LOG.debug('Using cached applycal weblog data')
+            calapps = cache_data['calapps']
+            caltypes = cache_data['caltypes']
+        else:
+            LOG.debug('Generating applycal weblog data (no cache)')
+            calapps = {}
+            for r in result:
+                calapps = utils.dict_merge(calapps, self.calapps_for_result(r))
 
-        caltypes = {}
-        for r in result:
-            caltypes = utils.dict_merge(caltypes, self.caltypes_for_result(r))
+            caltypes = {}
+            for r in result:
+                caltypes = utils.dict_merge(caltypes, self.caltypes_for_result(r))
 
         filesizes = {}
         for r in result:

@@ -396,3 +396,48 @@ def export_context_metadata(
     )
 
     serializer.serialize_context(metadata, output_path)
+
+
+def load_result_metadata(
+    result_proxy: Any,
+    report_dir: str | Path,
+) -> ResultMetadata | None:
+    """Load metadata for a result from disk if available.
+
+    This function attempts to load pre-computed metadata from JSON without
+    unpickling the full result object. Returns None if metadata file doesn't
+    exist or cannot be read.
+
+    Args:
+        result_proxy: A ResultsProxy or result object.
+        report_dir: The report directory where metadata files are stored.
+
+    Returns:
+        ResultMetadata if found and readable, None otherwise.
+    """
+    try:
+        # Try to get stage number from proxy or result
+        stage_num = None
+        if hasattr(result_proxy, '_stage_number'):
+            stage_num = result_proxy._stage_number
+        elif hasattr(result_proxy, 'stage_number'):
+            stage_num = result_proxy.stage_number
+        else:
+            # Try to read minimal info to get stage number
+            if hasattr(result_proxy, 'read'):
+                temp_result = result_proxy.read()
+                stage_num = getattr(temp_result, 'stage_number', None)
+            else:
+                return None
+
+        if stage_num is None:
+            return None
+
+        metadata_path = Path(report_dir) / f'result-stage{stage_num}-metadata.json'
+        if metadata_path.exists():
+            return ResultMetadata.from_json(metadata_path)
+    except Exception:
+        # If anything goes wrong, return None to fallback to unpickle
+        pass
+
+    return None

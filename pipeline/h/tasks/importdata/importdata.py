@@ -182,6 +182,33 @@ class ImportDataResults(basetask.Results):
         if any(len(x) > 1 for x in vscience_spw_ids.values()):
             LOG.warning("This pipeline run contains EBs with mixed spw naming conventions. Spw names may not exactly match across EBs.")
 
+        try:
+            from pipeline.h.tasks.importdata import renderer as importdata_renderer
+
+            if 'weblog_importdata_cache' not in self.metadata:
+                setjy_results = self.setjy_results or []
+                flux_table_rows = importdata_renderer.make_flux_table(context, setjy_results)
+                repsource_table_rows, repsource_name_is_none = importdata_renderer.make_repsource_table(
+                    context,
+                    [self],
+                )
+                repsource_defined = not any('N/A' in td for tr in repsource_table_rows for td in tr[1:])
+                num_mses = len(self.mses)
+                flux_imported = True if setjy_results else False
+                summary_rows = importdata_renderer.make_importdata_summary_rows([self])
+
+                self.metadata['weblog_importdata_cache'] = {
+                    'flux_imported': flux_imported,
+                    'flux_table_rows': flux_table_rows,
+                    'repsource_defined': repsource_defined,
+                    'repsource_name_is_none': repsource_name_is_none,
+                    'repsource_table_rows': repsource_table_rows,
+                    'num_mses': num_mses,
+                    'summary_rows': summary_rows,
+                }
+        except Exception:
+            LOG.exception('Failed to precompute weblog cache for ImportDataResults.')
+
     def __repr__(self) -> str:
         return 'ImportDataResults:\n\t{0}'.format(
             '\n\t'.join([ms.name for ms in self.mses]))

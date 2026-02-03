@@ -42,25 +42,45 @@ ${'is' if num_mses == 1 else 'are'} summarised below.</p>
 		</tr>
 	</thead>
 	<tbody>
-% for importdata_result in result:
-	% for ms in importdata_result.mses:
+% if importdata_summary_rows:
+	% for row in importdata_summary_rows:
 		<tr>
-			<td>${ms.basename}</td>
-			<td>${ms.schedblock_id}</td>
-			<td>${importdata_result.origin[ms.basename]}</td>
+			<td>${row['basename']}</td>
+			<td>${row['schedblock_id']}</td>
+			<td>${row['origin']}</td>
 			<!-- ScanTables are handled in the template for hsd_importdata, so
 				 we can hard-code MS here -->
 			<td>MS</td>
-			<td>${len(ms.scans)}</td>
-			<td>${len(ms.fields)}</td>
-			<td>${len({source.name for source in ms.sources if 'TARGET' in source.intents})}</td>
-			<td>${str(ms.filesize)}</td>
+			<td>${row['scan_count']}</td>
+			<td>${row['field_count']}</td>
+			<td>${row['target_count']}</td>
+			<td>${row['filesize']}</td>
 			% if not utils.contains_single_dish(pcontext):
-			<td><a href="${fluxcsv_files[ms.basename]}" class="replace-pre" data-title="flux.csv">View</a> or <a href="${fluxcsv_files[ms.basename]}" download="${fluxcsv_files[ms.basename]}">download</a></td>
+			<td><a href="${fluxcsv_files[row['basename']]}" class="replace-pre" data-title="flux.csv">View</a> or <a href="${fluxcsv_files[row['basename']]}" download="${fluxcsv_files[row['basename']]}">download</a></td>
 			% endif
 		</tr>
 	% endfor
-% endfor
+% else:
+	% for importdata_result in result:
+		% for ms in importdata_result.mses:
+			<tr>
+				<td>${ms.basename}</td>
+				<td>${ms.schedblock_id}</td>
+				<td>${importdata_result.origin[ms.basename]}</td>
+				<!-- ScanTables are handled in the template for hsd_importdata, so
+					 we can hard-code MS here -->
+				<td>MS</td>
+				<td>${len(ms.scans)}</td>
+				<td>${len(ms.fields)}</td>
+				<td>${len({source.name for source in ms.sources if 'TARGET' in source.intents})}</td>
+				<td>${str(ms.filesize)}</td>
+				% if not utils.contains_single_dish(pcontext):
+				<td><a href="${fluxcsv_files[ms.basename]}" class="replace-pre" data-title="flux.csv">View</a> or <a href="${fluxcsv_files[ms.basename]}" download="${fluxcsv_files[ms.basename]}">download</a></td>
+				% endif
+			</tr>
+		% endfor
+	% endfor
+% endif
 	</tbody>
 </table>
 

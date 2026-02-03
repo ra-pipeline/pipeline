@@ -208,6 +208,56 @@ class ApplycalResults(basetask.Results):
             if msobj.get_data_column(self.data_type) != colname:
                 msobj.set_data_column(self.data_type, colname)
 
+        # Precompute expensive weblog data for caching
+        self._cache_weblog_data(context)
+
+    def _cache_weblog_data(self, context):
+        """
+        Precompute expensive plot data and cache in metadata for weblog rendering.
+        This moves expensive computation from render-time to execution-time.
+        """
+        try:
+            # Import renderer module to access plot generation utilities
+            from pipeline.h.tasks.applycal import renderer as applycal_renderer
+            
+            # Create result list wrapper for renderer methods
+            if isinstance(self, basetask.ResultsList):
+                results = self
+            else:
+                results = basetask.ResultsList([self])
+            
+            LOG.debug('Precomputing applycal weblog data for caching')
+            
+            # Initialize renderer to access helper methods
+            renderer = applycal_renderer.T2_4MDetailsApplycalRenderer()
+            
+            # Cache calapps data
+            calapps = {}
+            for r in results:
+                calapps = utils.dict_merge(calapps, renderer.calapps_for_result(r))
+            
+            # Cache caltypes data
+            caltypes = {}
+            for r in results:
+                caltypes = utils.dict_merge(caltypes, renderer.caltypes_for_result(r))
+            
+            # Store cached data in metadata
+            cache_data = {
+                'calapps': calapps,
+                'caltypes': caltypes,
+            }
+            
+            # Store in first result's metadata if this is a ResultsList
+            if isinstance(self, basetask.ResultsList) and len(self) > 0:
+                self[0].metadata['weblog_applycal_cache'] = cache_data
+            else:
+                self.metadata['weblog_applycal_cache'] = cache_data
+                
+            LOG.debug('Applycal weblog data cached successfully')
+            
+        except Exception as e:
+            LOG.warning('Failed to cache applycal weblog data: %s', e)
+
     def __repr__(self):
         s = 'ApplycalResults:\n'
         for caltable in self.applied:

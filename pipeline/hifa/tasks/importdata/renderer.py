@@ -19,16 +19,22 @@ class T2_4MDetailsALMAImportDataRenderer(renderer.T2_4MDetailsImportDataRenderer
     def update_mako_context(self, mako_context, pipeline_context, result):
         super().update_mako_context(mako_context, pipeline_context, result)
 
-        minparang = result.inputs['minparang']
-        parang_ranges = result.parang_ranges
-        if parang_ranges['intents_found']:
-            parang_plots = rendererutils.make_parang_plots(
-                pipeline_context,
-                result,
-                intent_lookup={'POLARIZATION': 'CALIBRATE_POLARIZATION#ON_SOURCE'},
-                )
+        cache = result.metadata.get('weblog_importdata_parang', {}) if hasattr(result, 'metadata') else {}
+        if cache:
+            minparang = cache.get('minparang')
+            parang_ranges = cache.get('parang_ranges')
+            parang_plots = cache.get('parang_plots', {})
         else:
-            parang_plots = {}
+            minparang = result.inputs['minparang']
+            parang_ranges = result.parang_ranges
+            if parang_ranges['intents_found']:
+                parang_plots = rendererutils.make_parang_plots(
+                    pipeline_context,
+                    result,
+                    intent_lookup={'POLARIZATION': 'CALIBRATE_POLARIZATION#ON_SOURCE'},
+                    )
+            else:
+                parang_plots = {}
 
         mako_context.update({
             'minparang': minparang,
