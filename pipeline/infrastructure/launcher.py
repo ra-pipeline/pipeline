@@ -195,8 +195,18 @@ class Context:
         try:
             from pipeline.infrastructure.serializers import export_context_metadata
 
-            metadata_path = filename.replace('.context', '-metadata.json')
-            export_context_metadata(self, metadata_path)
+            # Generate metadata filename more robustly
+            if filename.endswith('.context'):
+                metadata_path = filename[:-8] + '-metadata.json'
+            else:
+                metadata_path = filename + '-metadata.json'
+
+            # Ensure we don't accidentally overwrite the context pickle
+            if metadata_path == filename:
+                LOG.warning('Metadata path collision detected, skipping metadata export')
+            else:
+                export_context_metadata(self, metadata_path)
+                LOG.debug('Exported context metadata to %s', metadata_path)
         except Exception:
             LOG.exception('Failed to export context metadata for %s.', filename)
 
