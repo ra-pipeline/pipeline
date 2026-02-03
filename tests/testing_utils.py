@@ -338,7 +338,7 @@ class PipelineTester:
                         if self.ppr:
                             self.__run_ppr(input_vis, telescope)
                         else:
-                            LOG.warning("Running without Pipeline Processing Request (PPR). Using recipereducer instead.")
+                            LOG.warning("Running without Pipeline Processing Request (PPR). Using recipereducer instead.") #TODO: I'm not sure this should be a warning? We run with recipereducer on purpose.
                             recipereducer.reduce(vis=input_vis, procedure=self.recipe)
                     elif self.mode == 'component':
                         recipereducer.run_named_tasks(self.tasks)
@@ -350,20 +350,23 @@ class PipelineTester:
                 if self.expectedoutput_file and os.path.exists(self.expectedoutput_file):
                     shutil.copyfile(self.expectedoutput_file, os.path.basename(self.expectedoutput_file))
 
-                # Get new results
-                new_results = self.__get_results_of_from_current_context()
-
-                # new results file path
-                if self.mode == 'component':
-                    new_file = f'{self.output_dir}.NEW.results.txt'
+                if use_json:
+                    new_file = self.__get_pipeline_stats_file()
                 else:
-                    new_file = f'{self.visname[0]}.NEW.results.txt'
+                    # Get new results
+                    new_results = self.__get_results_of_from_current_context()
 
-                # Store new results in a file
-                self.__save_new_results_to(new_file, new_results)
+                    # new results file path
+                    if self.mode == 'component':
+                        new_file = f'{self.output_dir}.NEW.results.txt'
+                    else:
+                        new_file = f'{self.visname[0]}.NEW.results.txt'
+
+                    # Store new results in a file
+                    self.__save_new_results_to(new_file, new_results)
 
                 # Compare new results with expected results
-                self.__compare_results(new_file, default_relative_tolerance)
+                self.__compare_results(new_file, default_relative_tolerance, json=use_json)
 
         finally:
             # clean up if requested
@@ -373,7 +376,7 @@ class PipelineTester:
         if not self.compare_only and omp_num_threads is not None:
             casa_tools.casalog.ompSetNumThreads(default_nthreads)
 
-    def __compare_results(self, new_file: str, relative_tolerance: float) -> None:
+    def __compare_results(self, new_file: str, relative_tolerance: float, json=True) -> None:
         """
         Compare results between new one loaded from file and old one.
 
@@ -381,6 +384,12 @@ class PipelineTester:
             new_file : file path of new results
             relative_tolerance : relative tolerance of output value
         """
+        if not json:
+            self.__compare_reference_txt(new_file, relative_tolerance)
+        else:
+            self.__compare_reference_json(new_file, relative_tolerance)
+
+    def __compare_reference_txt(self, new_file: str, relative_tolerance: float) -> None:
         with open(self.expectedoutput_file) as expected_fd, open(new_file) as new_fd:
             expected_results = expected_fd.readlines()
             new_results = new_fd.readlines()
@@ -389,17 +398,17 @@ class PipelineTester:
             worst_percent_diff = (0, 0)
             for old, new in zip(expected_results, new_results):
                 try:
-                    oldkey, oldval, tol = self.__sanitize_results_string(old)
-                    newkey, newval, _ = self.__sanitize_results_string(new)
+                    oldkey, oldval, tol = self.__sanitize_regression_string(old)
+                    newkey, newval, _ = self.__sanitize_regression_string(new)
                 except ValueError as e:
                     errorstr = "The results: {0} could not be parsed. Error: {1}".format(new, str(e))
                     errors.append(errorstr)
                     continue
 
-                assert oldkey == newkey, f"Expected key {oldkey} does not match new key {newkey}."
+                assert oldkey == newkey
                 tolerance = tol if tol else relative_tolerance
                 if newval is not None:
-                    LOG.info('Comparing %s to %s with a rel. tolerance of %s', oldval, newval, tolerance)
+                    LOG.info(f'Comparing {oldval} to {newval} with a rel. tolerance of {tolerance}')
                     if oldval != pytest.approx(newval, rel=tolerance):
                         diff = oldval-newval
                         percent_diff = (oldval-newval)/oldval * 100 if oldval != 0 else 100
@@ -415,7 +424,7 @@ class PipelineTester:
                     errors.append(errorstr)
                 else:
                     # If old and new values are both None, this is expected, so pass
-                    LOG.info('Comparing %s and %s... both values are None.', oldval, newval)
+                    LOG.info(f'Comparing {oldval} and {newval}... both values are None.')
 
             [LOG.warning(x) for x in errors]
             n_errors = len(errors)
@@ -424,6 +433,102 @@ class PipelineTester:
                 errors.append(summary_str)
                 pytest.fail("Failed to match {0} result value{1} within tolerance{1} :\n{2}".format(
                     n_errors, '' if n_errors == 1 else 's', '\n'.join(errors)), pytrace=True)
+
+    def __compare_reference_json(self, new_file, relative_tolerance=1e-6):
+        # Compare two pipeline stats json files.
+        def _is_numeric(value):
+            return isinstance(value, numbers.Number)
+
+        def _should_skip(path):
+            skip_paths = {
+                ("header", "stats_file_creation_date"),
+                ("stage_duration"),
+                ("total_time"),
+            }
+            return tuple(path) in skip_paths
+
+        def _compare_values(ref_val, cur_val, path, errors):
+            if _should_skip(path):
+                return
+
+            if _is_numeric(ref_val) and _is_numeric(cur_val):
+                if not math.isclose(ref_val, cur_val, rel_tol=relative_tolerance, abs_tol=relative_tolerance):
+                    errors.append(
+                        f"values differ by > a relative difference of {relative_tolerance}\n\texpected: {ref_val}, new: {cur_val}, "
+                    )
+                return
+
+            if isinstance(ref_val, dict) and isinstance(cur_val, dict):
+                _compare_dicts(ref_val, cur_val, path, errors)
+                return
+
+            if isinstance(ref_val, list) and isinstance(cur_val, list):
+                if len(ref_val) != len(cur_val):
+                    errors.append(
+                        f"List length mismatch at {'.'.join(path)}: expected {len(ref_val)}, got {len(cur_val)}"
+                    )
+                    return
+                for idx, (ref_item, cur_item) in enumerate(zip(ref_val, cur_val)):
+                    _compare_values(ref_item, cur_item, path + [str(idx)], errors)
+                return
+
+            if ref_val != cur_val:
+                errors.append(
+                    f"Value mismatch at {'.'.join(path)}: expected {ref_val}, got {cur_val}"
+                )
+
+        def _compare_dicts(ref_dict, cur_dict, path, errors):
+            ref_keys = set(ref_dict.keys())
+            cur_keys = set(cur_dict.keys())
+
+            missing_keys = ref_keys - cur_keys
+            extra_keys = cur_keys - ref_keys
+
+            for key in sorted(missing_keys):
+                if not _should_skip(path + [key]):
+                    errors.append(f"Missing key at {'.'.join(path + [key])}")
+
+            for key in sorted(extra_keys):
+                if not _should_skip(path + [key]):
+                    errors.append(f"Unexpected key at {'.'.join(path + [key])}")
+
+            for key in sorted(ref_keys & cur_keys):
+                _compare_values(ref_dict[key], cur_dict[key], path + [key], errors)
+
+        with open(self.expectedoutput_file, 'r') as reference_json, open(new_file, 'r') as current_json:
+            reference_dict = json.load(reference_json)
+            current_dict = json.load(current_json)
+
+        errors = []
+        _compare_dicts(reference_dict, current_dict, [], errors)
+
+        if errors:
+            for err in errors:
+                LOG.error(err)
+            pytest.fail(
+                "JSON regression comparison failed:\n{}".format("\n".join(errors)),
+                pytrace=True,
+            )
+
+    def __get_pipeline_stats_file(self):
+        """
+        Get the path to the pipeline stats file.
+
+        Returns:
+            path to the pipeline stats file
+        """
+        # glob to find the pipeline stats file which has the form pipeline_stats_*.json
+        pipeline_stats_files = glob.glob('pipeline_stats_*.json')
+        if len(pipeline_stats_files) != 0:
+            pipeline_stats_file = pipeline_stats_files[0]
+        else:
+            context = launcher.Pipeline(context='last').context
+            pipeline_stats = pipeline_statistics.generate_stats(context)
+            with open('pipeline_stats_testing.json', 'w') as f:
+                json.dump(pipeline_stats, f, ensure_ascii=False, indent=4, sort_keys=True)
+            pipeline_stats_file = 'pipeline_stats_testing.json'
+        LOG.info("Using %s for the current results json file", pipeline_stats_file)
+        return pipeline_stats_file
 
     def __save_new_results_to(self, new_file: str, new_results: list[str]) -> None:
         """
