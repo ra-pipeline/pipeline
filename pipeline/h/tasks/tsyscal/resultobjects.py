@@ -36,6 +36,16 @@ class TsyscalResults(basetask.Results):
                       '%s\n%s' % (calapp.calto, calapp.calfrom))
             context.callibrary.add(calapp.calto, calapp.calfrom)
 
+    def serializable(self):
+        # Convert the TsyscalResults to a serializable format (e.g., for JSON serialization).
+        return {
+            'final': [calapp.__dict__ for calapp in self.final],
+            'pool': [calapp.__dict__ for calapp in self.pool],
+            'preceding': [calapp.__dict__ for calapp in self.preceding],
+            'unmappedspws': self.unmappedspws,
+            'error': list(self.error)
+        }
+
     def __repr__(self):
         # Format the Tsyscal results.
         s = 'TsyscalResults:\n'
