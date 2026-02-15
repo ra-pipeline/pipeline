@@ -72,11 +72,32 @@ def plotfilename(image, reportdir, collapseFunction=None, stokes=None):
 class SkyDisplay:
     """Class to plot sky images."""
 
+    # Class-level cache statistics
+    _cache_hits = 0
+    _cache_misses = 0
+
     def __init__(self, exclude_desc=False, overwrite=False, figsize=(6.4, 4.8), dpi=None):
         self.exclude_desc = exclude_desc    # exclude the text descriptions from image metadata.
         self.overwrite = overwrite          # decide whether to overwrite existing figures or not.
         self.figsize = figsize              # class instance default figsize value
         self._dpi = dpi                     # class instance default dpi
+
+    @classmethod
+    def get_cache_stats(cls):
+        """Return cache hit and miss counts.
+
+        Returns:
+            tuple: (cache_hits, cache_misses, hit_rate)
+        """
+        total = cls._cache_hits + cls._cache_misses
+        hit_rate = cls._cache_hits / total if total > 0 else 0.0
+        return cls._cache_hits, cls._cache_misses, hit_rate
+
+    @classmethod
+    def reset_cache_stats(cls):
+        """Reset cache statistics to zero."""
+        cls._cache_hits = 0
+        cls._cache_misses = 0
 
     def plot_per_stokes(self, *args, stokes_list: Optional[List[str]] = None, **kwargs) -> List:
         """Plot sky images from a CASA image file with multiple Stokes planes.
@@ -255,6 +276,33 @@ class SkyDisplay:
                                 reportdir=reportdir, collapseFunction=collapseFunction, stokes=stokes)
         LOG.info('Plotting %s to %s', imagename, plotfile)
 
+        # Early exit if plot already exists and overwrite is disabled
+        # This check prevents expensive image operations when plot is cached
+        if os.path.exists(plotfile) and not self.overwrite:
+            SkyDisplay._cache_hits += 1
+            LOG.info('Plot already exists (cache hit): %s', plotfile)
+            # Extract minimal metadata needed for return values
+            with casa_tools.ImageReader(imagename) as image:
+                cs = image.coordsys()
+                coord_names = cs.names()
+                miscinfo = image.miscinfo()
+                cs.done()
+            
+            # Handle VLA band if needed
+            vla_cont_band = self._get_vla_band(context, miscinfo)
+            if vla_cont_band is not None:
+                field_name = miscinfo.get('field', None)
+                band_name = vla_cont_band
+            else:
+                field_name = miscinfo.get('field', None)
+                band_name = miscinfo.get('band', None)
+            
+            return plotfile, coord_names, field_name, band_name
+
+        # Cache miss - need to generate the plot
+        SkyDisplay._cache_misses += 1
+        LOG.debug('Plot cache miss, generating: %s', plotfile)
+
         stokes_present = get_stokes(imagename)
         if stokes not in stokes_present:
             stokes_select = stokes_present[0]
@@ -332,14 +380,6 @@ class SkyDisplay:
 
         field_name = miscinfo.get('field', None)
         band_name = miscinfo.get('band', None)
-
-        # early abort: don't replot if a file with the required name already exists
-        if os.path.exists(plotfile) and not self.overwrite:
-            LOG.info('plotfile already exists: %s', plotfile)
-            # done with ia/cs tool instances
-            collapsed.done()
-            cs.done()
-            return plotfile, coord_names, field_name, band_name
         
         cs.setunits(type='direction', value='arcsec arcsec')
         coord_units = cs.units()

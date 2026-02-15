@@ -32,7 +32,7 @@ The pipeline currently stores execution context through **pickle serialization**
 ### What Was Created
 
 A **hybrid serialization framework** that:
-- Exports task metadata to JSON alongside pickles
+- Exports task metadata to YAML alongside pickles (JSON supported)
 - Provides 100x faster metadata access
 - Maintains 100% backward compatibility
 - Requires minimal integration effort (2-4 hours)
@@ -89,7 +89,7 @@ A **hybrid serialization framework** that:
 - Production-ready implementation
 - Fully documented with docstrings
 - Type hints throughout (PEP 604/585)
-- Zero external dependencies (standard library only)
+- One lightweight dependency (PyYAML) for YAML support
 - Follows project style guide
 
 **Key Classes:**
@@ -105,7 +105,7 @@ A **hybrid serialization framework** that:
 
 ### 🧪 **Examples & Tests**
 
-**[pipeline/infrastructure/serializers_examples.py](pipeline/infrastructure/serializers_examples.py)**
+**[pipeline/infrastructure/serializers_test.py](pipeline/infrastructure/serializers_test.py)**
 - Unit tests for all components
 - Example demonstrations
 - Can be run standalone
@@ -115,7 +115,7 @@ A **hybrid serialization framework** that:
 **Run Examples:**
 ```bash
 cd /Users/tbooth/Work/Pipeline/repos/main
-python -m pipeline.infrastructure.serializers_examples
+pytest pipeline/infrastructure/serializers_test.py
 ```
 
 ---
@@ -134,7 +134,7 @@ cat INVESTIGATION_SUMMARY.md
 ### 2. See It In Action (5 minutes)
 ```bash
 # Run demonstrations and tests
-python -m pipeline.infrastructure.serializers_examples
+pytest pipeline/infrastructure/serializers_test.py
 ```
 
 ### 3. Review the Code (10 minutes)
@@ -143,7 +143,7 @@ python -m pipeline.infrastructure.serializers_examples
 code pipeline/infrastructure/serializers.py
 
 # Look at usage patterns
-code pipeline/infrastructure/serializers_examples.py
+code pipeline/infrastructure/serializers_test.py
 ```
 
 ### 4. Plan Integration (20 minutes)
@@ -197,7 +197,7 @@ export_result_metadata(result, context.report_dir)
 │
 └── pipeline/infrastructure/
     ├── serializers.py                  # Implementation (ready to use)
-    ├── serializers_examples.py         # Tests & examples (runnable)
+   ├── serializers_test.py             # Tests (runnable)
     ├── launcher.py                     # Context class (needs 1-line update)
     └── basetask.py                     # Results class (needs 1-line update)
 ```
@@ -244,7 +244,7 @@ export_result_metadata(result, context.report_dir)
 
 ### Immediate (This Week)
 1. **Read** `QUICK_REFERENCE.md` and `INVESTIGATION_SUMMARY.md`
-2. **Run** `serializers_examples.py` to see it work
+2. **Run** `pytest pipeline/infrastructure/serializers_test.py` to validate it
 3. **Review** `serializers.py` implementation
 4. **Discuss** findings with team
 
@@ -322,13 +322,13 @@ export_result_metadata(result, context.report_dir)
 → Read: `SERIALIZATION_BEFORE_AFTER.md`
 
 ### "Show me code examples"
-→ Look: `serializers_examples.py`
+→ Look: `serializers_test.py`
 
 ### "How do I integrate it?"
 → Read: `SERIALIZATION_INTEGRATION_GUIDE.md` → Implementation section
 
 ### "Can I run it?"
-→ Yes: `python -m pipeline.infrastructure.serializers_examples`
+→ Yes: `pytest pipeline/infrastructure/serializers_test.py`
 
 ---
 
@@ -358,7 +358,7 @@ The framework is **ready to integrate** with minimal effort and maximum benefit.
 
 3. **Run demonstration** (5 min)
    ```bash
-   python -m pipeline.infrastructure.serializers_examples
+   pytest pipeline/infrastructure/serializers_test.py
    ```
 
 4. **[SERIALIZATION_BEFORE_AFTER.md](SERIALIZATION_BEFORE_AFTER.md)** (10 min)
@@ -384,7 +384,7 @@ The framework is **ready to integrate** with minimal effort and maximum benefit.
 | SERIALIZATION_INTEGRATION_GUIDE.md | How-To | 6 pages | 15 min |
 | SERIALIZATION_BEFORE_AFTER.md | Examples | 7 pages | 10 min |
 | serializers.py | Code | 300 lines | 20 min |
-| serializers_examples.py | Tests | 250 lines | 10 min |
+| serializers_test.py | Tests | 250 lines | 10 min |
 
 **Total Documentation**: ~40 pages
 **Total Code**: ~550 lines (production + tests)
@@ -425,7 +425,7 @@ The framework is **ready to integrate** with minimal effort and maximum benefit.
 - **Integration Steps**: `SERIALIZATION_INTEGRATION_GUIDE.md`
 - **Practical Examples**: `SERIALIZATION_BEFORE_AFTER.md`
 - **Code Documentation**: `serializers.py` docstrings
-- **Runnable Examples**: `serializers_examples.py`
+- **Runnable Tests**: `serializers_test.py`
 
 ---
 
@@ -435,7 +435,7 @@ For specific questions, refer to:
 - **General questions** → `INVESTIGATION_SUMMARY.md`
 - **Technical details** → `CONTEXT_STORAGE_INVESTIGATION.md`
 - **Integration help** → `SERIALIZATION_INTEGRATION_GUIDE.md`
-- **Code examples** → `serializers_examples.py` or `SERIALIZATION_BEFORE_AFTER.md`
+- **Code examples** → `serializers_test.py` or `SERIALIZATION_BEFORE_AFTER.md`
 - **Troubleshooting** → `QUICK_REFERENCE.md` → Troubleshooting section
 
 ---

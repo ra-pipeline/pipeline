@@ -26,7 +26,7 @@ Complete investigation into the pipeline's context storage system with productio
 
 2. **See code in action**
    ```bash
-   cd .. && python -m pipeline.infrastructure.serializers_examples
+   cd .. && pytest pipeline/infrastructure/serializers_test.py
    ```
 
 3. **Review implementation**
@@ -38,12 +38,12 @@ Complete investigation into the pipeline's context storage system with productio
 
 The actual implementation is in `../pipeline/infrastructure/`:
 - `serializers.py` - Production-ready implementation
-- `serializers_examples.py` - Tests and examples
+- `serializers_test.py` - Tests
 
 ## 📊 Key Findings
 
 - **Problem**: Context stored as binary pickle (not readable, fragile, large)
-- **Solution**: Hybrid approach with JSON metadata + selective pickle
+- **Solution**: Hybrid approach with YAML metadata (JSON supported) + selective pickle
 - **Benefit**: 100x faster metadata access, searchable format, external tool integration
 - **Risk**: Very low (100% backward compatible)
 - **Effort**: 2-4 hours for Phase 1
@@ -55,7 +55,7 @@ The actual implementation is in `../pipeline/infrastructure/`:
 - Full unit tests and examples
 - Step-by-step integration instructions
 - Real-world scenario comparisons
-- Zero external dependencies
+- One lightweight dependency (PyYAML) for YAML support
 
 ## 🎯 Next Steps
 

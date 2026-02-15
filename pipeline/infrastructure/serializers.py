@@ -1,7 +1,7 @@
 """Serialization framework for pipeline results and context metadata.
 
 This module provides structured serialization of pipeline execution metadata
-to JSON and YAML formats, enabling human-readable storage and inspection
+to YAML or JSON format, enabling human-readable storage and inspection
 of pipeline state without relying entirely on pickle.
 
 The framework is designed to coexist with existing pickle-based storage,
@@ -12,19 +12,19 @@ Classes:
     ResultMetadata: Structured metadata extracted from a Results object.
     ContextMetadata: Summary of context state at a given stage.
     MetadataSerializer: Base interface for serialization backends.
+    YAMLMetadataSerializer: YAML-based metadata export (default).
     JSONMetadataSerializer: JSON-based metadata export.
-    YAMLMetadataSerializer: YAML-based metadata export.
 
 Example:
     Extract and save metadata without pickling full result:
 
         from pipeline.infrastructure.serializers import ResultMetadata
         metadata = ResultMetadata.from_result(result)
-        metadata.to_json('result-stage0.json')
+        metadata.to_yaml('result-stage0.yaml')
 
     Load metadata efficiently:
 
-        metadata = ResultMetadata.from_json('result-stage0.json')
+        metadata = ResultMetadata.from_yaml('result-stage0.yaml')
         print(f'{metadata.task_name} took {metadata.duration_seconds}s')
 """
 
@@ -34,6 +34,7 @@ import abc
 import dataclasses
 import datetime
 import json
+import yaml
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -231,6 +232,43 @@ class ResultMetadata:
             notes=data.get('notes'),
         )
 
+    def to_yaml(self, filepath: str | Path) -> None:
+        """Save metadata to YAML file.
+
+        Args:
+            filepath: Path where YAML file will be written.
+        """
+        data = self.to_dict()
+        with open(filepath, 'w') as f:
+            yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+
+    @classmethod
+    def from_yaml(cls, filepath: str | Path) -> ResultMetadata:
+        """Load metadata from YAML file.
+
+        Args:
+            filepath: Path to YAML file.
+
+        Returns:
+            ResultMetadata instance.
+        """
+        with open(filepath, 'r') as f:
+            data = yaml.safe_load(f)
+
+        timestamps = Timestamps.from_dict(data['timestamps'])
+
+        return cls(
+            stage_number=data['stage_number'],
+            task_name=data['task_name'],
+            status=data['status'],
+            timestamps=timestamps,
+            inputs=data.get('inputs', {}),
+            qa_scores=data.get('qa_scores', {}),
+            exception=data.get('exception'),
+            subtask_count=data.get('subtask_count', 0),
+            notes=data.get('notes'),
+        )
+
     def __repr__(self) -> str:
         return (f"ResultMetadata(stage={self.stage_number}, "
                 f"task={self.task_name}, status={self.status}, "
@@ -284,6 +322,19 @@ class ContextMetadata:
             data = json.load(f)
         return cls(**data)
 
+    def to_yaml(self, filepath: str | Path) -> None:
+        """Save context metadata to YAML file."""
+        data = self.to_dict()
+        with open(filepath, 'w') as f:
+            yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+
+    @classmethod
+    def from_yaml(cls, filepath: str | Path) -> ContextMetadata:
+        """Load context metadata from YAML file."""
+        with open(filepath, 'r') as f:
+            data = yaml.safe_load(f)
+        return cls(**data)
+
 
 class MetadataSerializer(abc.ABC):
     """Abstract base class for metadata serializers."""
@@ -329,6 +380,26 @@ class JSONMetadataSerializer(MetadataSerializer):
         return ContextMetadata.from_json(filepath)
 
 
+class YAMLMetadataSerializer(MetadataSerializer):
+    """YAML-based metadata serializer."""
+
+    def serialize_result(self, metadata: ResultMetadata, filepath: str | Path) -> None:
+        """Serialize result metadata to YAML."""
+        metadata.to_yaml(filepath)
+
+    def deserialize_result(self, filepath: str | Path) -> ResultMetadata:
+        """Deserialize result metadata from YAML."""
+        return ResultMetadata.from_yaml(filepath)
+
+    def serialize_context(self, metadata: ContextMetadata, filepath: str | Path) -> None:
+        """Serialize context metadata to YAML."""
+        metadata.to_yaml(filepath)
+
+    def deserialize_context(self, filepath: str | Path) -> ContextMetadata:
+        """Deserialize context metadata from YAML."""
+        return ContextMetadata.from_yaml(filepath)
+
+
 def export_result_metadata(
     result: Any,
     stage_dir: str | Path,
@@ -337,13 +408,13 @@ def export_result_metadata(
     """Export result metadata to structured format.
 
     This is a convenience function that can be called after a result
-    is accepted into the context, creating a JSON metadata file
+    is accepted into the context, creating a YAML metadata file
     alongside the pickled result.
 
     Args:
         result: The Results object to export metadata from.
         stage_dir: Directory where metadata file will be stored.
-        serializer: Serializer to use (defaults to JSON).
+        serializer: Serializer to use (defaults to YAML).
 
     Example:
         from pipeline.infrastructure.serializers import export_result_metadata
@@ -352,12 +423,17 @@ def export_result_metadata(
         export_result_metadata(result, context.report_dir)
     """
     if serializer is None:
-        serializer = JSONMetadataSerializer()
+        serializer = YAMLMetadataSerializer()
 
     stage_num = getattr(result, 'stage_number', 0)
     metadata = ResultMetadata.from_result(result)
 
-    output_path = Path(stage_dir) / f'result-stage{stage_num}-metadata.json'
+    # Determine file extension based on serializer type
+    if isinstance(serializer, JSONMetadataSerializer):
+        output_path = Path(stage_dir) / f'result-stage{stage_num}-metadata.json'
+    else:
+        output_path = Path(stage_dir) / f'result-stage{stage_num}-metadata.yaml'
+    
     serializer.serialize_result(metadata, output_path)
 
 
@@ -370,11 +446,11 @@ def export_context_metadata(
 
     Args:
         context: The Context object to export metadata from.
-        output_path: Path where metadata file will be stored.
-        serializer: Serializer to use (defaults to JSON).
+        output_path: Base path where metadata file will be stored (extension will be adjusted based on serializer).
+        serializer: Serializer to use (defaults to YAML).
     """
     if serializer is None:
-        serializer = JSONMetadataSerializer()
+        serializer = YAMLMetadataSerializer()
 
     # Calculate total duration from results
     total_duration = 0.0
@@ -395,7 +471,18 @@ def export_context_metadata(
         total_duration_seconds=total_duration,
     )
 
-    serializer.serialize_context(metadata, output_path)
+    # Normalize extension based on serializer type
+    path_obj = Path(output_path)
+    if isinstance(serializer, JSONMetadataSerializer):
+        # If path already has correct extension, use it; otherwise adjust
+        if not path_obj.suffix == '.json':
+            path_obj = path_obj.with_suffix('.json')
+    else:
+        # Default to YAML
+        if not path_obj.suffix == '.yaml':
+            path_obj = path_obj.with_suffix('.yaml')
+
+    serializer.serialize_context(metadata, path_obj)
 
 
 def load_result_metadata(
@@ -404,7 +491,7 @@ def load_result_metadata(
 ) -> ResultMetadata | None:
     """Load metadata for a result from disk if available.
 
-    This function attempts to load pre-computed metadata from JSON without
+    This function attempts to load pre-computed metadata from YAML or JSON without
     unpickling the full result object. Returns None if metadata file doesn't
     exist or cannot be read.
 
@@ -433,9 +520,14 @@ def load_result_metadata(
         if stage_num is None:
             return None
 
-        metadata_path = Path(report_dir) / f'result-stage{stage_num}-metadata.json'
-        if metadata_path.exists():
-            return ResultMetadata.from_json(metadata_path)
+        # Try YAML first (default format), then fall back to JSON
+        yaml_path = Path(report_dir) / f'result-stage{stage_num}-metadata.yaml'
+        if yaml_path.exists():
+            return ResultMetadata.from_yaml(yaml_path)
+        
+        json_path = Path(report_dir) / f'result-stage{stage_num}-metadata.json'
+        if json_path.exists():
+            return ResultMetadata.from_json(json_path)
     except Exception:
         # If anything goes wrong, return None to fallback to unpickle
         pass

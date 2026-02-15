@@ -4,8 +4,8 @@
 
 | Aspect | Current (Pickle Only) | New (Hybrid) | Benefit |
 |--------|----------------------|--------------|---------|
-| **Metadata Inspection** | Requires Python + unpickle (~500ms) | JSON load (~5ms) | **100x faster** |
-| **Human Readability** | Binary, not readable | Text-based JSON | **Full transparency** |
+| **Metadata Inspection** | Requires Python + unpickle (~500ms) | YAML load (~5ms) | **100x faster** |
+| **Human Readability** | Binary, not readable | Text-based YAML/JSON | **Full transparency** |
 | **Grep/Search** | Impossible | Full text search | **Easy debugging** |
 | **External Tools** | Need Python + pickle | Standard JSON | **Language-independent** |
 | **File Size** | Result: 100KB-10MB | Metadata: 2-5KB | **50-100x smaller** |
@@ -46,8 +46,8 @@ EOF
 ### **After (New System)**
 
 ```bash
-# Step 1: Quickly grep through JSON metadata
-grep -r "failed" html/*/result-*-metadata.json
+# Step 1: Quickly grep through YAML metadata
+grep -r "failed" html/*/result-*-metadata.yaml
 
 # Step 2: View the specific failure
 cat html/stage5/result-stage5-metadata.json | grep -A 2 exception
@@ -103,8 +103,8 @@ from pipeline.infrastructure.serializers import ResultMetadata
 from pathlib import Path
 
 times = []
-for metadata_file in sorted(Path('html').glob('*/result-*-metadata.json')):
-    metadata = ResultMetadata.from_json(metadata_file)
+for metadata_file in sorted(Path('html').glob('*/result-*-metadata.yaml')):
+    metadata = ResultMetadata.from_yaml(metadata_file)
     times.append((metadata.stage_number, metadata.duration_seconds))
 
 # Execution time: 50-100ms (just JSON parsing)

@@ -12,9 +12,9 @@ Pipeline Results Storage
 │   ├── Context pickle files (.context)
 │   └── Result pickle files (result-stage*.pickle)
 │
-└── NEW: Structured Metadata (JSON)
-    ├── Result metadata (result-stage*-metadata.json)
-    └── Context metadata (context-metadata.json)
+└── NEW: Structured Metadata (YAML, JSON optional)
+    ├── Result metadata (result-stage*-metadata.yaml)
+    └── Context metadata (context-metadata.yaml)
 ```
 
 ## Key Components
@@ -40,7 +40,7 @@ Structured metadata extracted from Results objects without full unpickling.
 
 **Key Features:**
 - Extract metadata without loading full result
-- Human-readable JSON export
+- Human-readable YAML export (JSON supported)
 - Preserves essential information: timing, status, inputs, QA scores
 - Safe exception handling
 
@@ -57,11 +57,11 @@ print(f"Duration: {metadata.duration_seconds}s")
 print(f"Status: {metadata.status}")
 print(f"QA Scores: {metadata.qa_scores}")
 
-# Save to JSON
-metadata.to_json('result-stage0-metadata.json')
+# Save to YAML (default format)
+metadata.to_yaml('result-stage0-metadata.yaml')
 
-# Load from JSON later
-metadata = ResultMetadata.from_json('result-stage0-metadata.json')
+# Load from YAML later
+metadata = ResultMetadata.from_yaml('result-stage0-metadata.yaml')
 ```
 
 ### 3. **ContextMetadata** (`ContextMetadata` class)
@@ -79,22 +79,22 @@ metadata = ContextMetadata(
     total_duration_seconds=3600.0,
 )
 
-metadata.to_json('context-metadata.json')
+metadata.to_yaml('context-metadata.yaml')
 ```
 
 ### 4. **Serializers** (`MetadataSerializer` base class)
 Pluggable serialization backends (JSON implemented, YAML ready).
 
 ```python
-from pipeline.infrastructure.serializers import JSONMetadataSerializer
+from pipeline.infrastructure.serializers import YAMLMetadataSerializer, JSONMetadataSerializer
 
-serializer = JSONMetadataSerializer()
+serializer = YAMLMetadataSerializer()
 
 # Serialize
-serializer.serialize_result(metadata, 'result-metadata.json')
+serializer.serialize_result(metadata, 'result-metadata.yaml')
 
 # Deserialize
-metadata = serializer.deserialize_result('result-metadata.json')
+metadata = serializer.deserialize_result('result-metadata.yaml')
 ```
 
 ## Integration Points
@@ -132,7 +132,7 @@ def save(self, filename: str | None = None) -> None:
     
     # NEW: Also export structured metadata
     from pipeline.infrastructure.serializers import export_context_metadata
-    ctx_metadata_file = filename.replace('.context', '-metadata.json')
+    ctx_metadata_file = filename.replace('.context', '-metadata.yaml')
     export_context_metadata(self, ctx_metadata_file)
 ```
 
@@ -150,8 +150,8 @@ from pipeline.infrastructure.serializers import ResultMetadata
 
 # Do:
 try:
-    metadata = ResultMetadata.from_json(
-        f'stage{stage_num}-metadata.json'
+            metadata = ResultMetadata.from_yaml(
+        f'stage{stage_num}-metadata.yaml'
     )
     task_name = metadata.task_name
 except FileNotFoundError:
@@ -334,7 +334,7 @@ Run the included examples and tests:
 
 ```bash
 # Run demonstrations
-python -m pipeline.infrastructure.serializers_examples
+pytest pipeline/infrastructure/serializers_test.py
 
 # Run unit tests
 python -m pytest pipeline/infrastructure/test_serializers.py -v
@@ -358,12 +358,12 @@ python -m pytest pipeline/infrastructure/test_serializers.py -v
 
 - See `CONTEXT_STORAGE_INVESTIGATION.md` for full analysis
 - See `serializers.py` for implementation details
-- See `serializers_examples.py` for usage examples
+- See `serializers_test.py` for usage patterns
 
 ## Support
 
 For questions or issues:
-1. Check examples in `serializers_examples.py`
+1. Check tests in `serializers_test.py`
 2. Review docstrings in `serializers.py`
-3. Run tests: `pytest pipeline/infrastructure/serializers_examples.py`
+3. Run tests: `pytest pipeline/infrastructure/serializers_test.py`
 4. Refer to investigation document for architecture details

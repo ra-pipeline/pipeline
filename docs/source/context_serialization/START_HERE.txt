@@ -74,7 +74,7 @@ This folder contains:
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ 🚀 I WANT TO RUN THE CODE                                                   │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│ Command: python -m pipeline.infrastructure.serializers_examples             │
+│ Command: pytest pipeline/infrastructure/serializers_test.py                 │
 │                                                                              │
 │ This will:                                                                   │
 │   • Run unit tests                                                          │
@@ -83,7 +83,7 @@ This folder contains:
 │                                                                              │
 │ Files:                                                                       │
 │   • pipeline/infrastructure/serializers.py (implementation)                │
-│   • pipeline/infrastructure/serializers_examples.py (tests)                │
+│   • pipeline/infrastructure/serializers_test.py (tests)                    │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 
@@ -122,7 +122,7 @@ Current Problem:
   • Cannot query without full unpickling
 
 Proposed Solution:
-  • Hybrid approach: JSON metadata + selective pickle
+  • Hybrid approach: YAML metadata (JSON supported) + selective pickle
   • Metadata: 5MB (vs 500MB for full context) = 100x smaller
   • Query time: 5ms (vs 500ms for full unpickle) = 100x faster
   • Human-readable format enables new capabilities
@@ -152,7 +152,7 @@ View Navigation Index:
   cat INDEX.md
 
 Run Code Examples:
-  python -m pipeline.infrastructure.serializers_examples
+  pytest pipeline/infrastructure/serializers_test.py
 
 View Integration Guide:
   cat SERIALIZATION_INTEGRATION_GUIDE.md

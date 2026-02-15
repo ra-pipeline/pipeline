@@ -33,7 +33,7 @@
 | File | Purpose | Lines | Audience |
 |------|---------|-------|----------|
 | **[pipeline/infrastructure/serializers.py](pipeline/infrastructure/serializers.py)** | Main implementation | 300 | Developers |
-| **[pipeline/infrastructure/serializers_examples.py](pipeline/infrastructure/serializers_examples.py)** | Tests & examples | 250 | Developers |
+| **[pipeline/infrastructure/serializers_test.py](pipeline/infrastructure/serializers_test.py)** | Tests | 250 | Developers |
 
 ---
 
@@ -48,7 +48,7 @@
 #### 💡 **Understand the Solution**
 1. Read: [INVESTIGATION_SUMMARY.md](INVESTIGATION_SUMMARY.md) (Proposed Improvements section)
 2. Look: [serializers.py](pipeline/infrastructure/serializers.py) (Implementation)
-3. Run: `python -m pipeline.infrastructure.serializers_examples`
+3. Run: `pytest pipeline/infrastructure/serializers_test.py`
 
 #### 🔧 **Integrate Into Pipeline**
 1. Read: [SERIALIZATION_INTEGRATION_GUIDE.md](SERIALIZATION_INTEGRATION_GUIDE.md)
@@ -60,8 +60,8 @@
 2. Review: Performance metrics table
 
 #### 🧪 **See Code Examples**
-1. Run: `python -m pipeline.infrastructure.serializers_examples`
-2. Read: [serializers_examples.py](pipeline/infrastructure/serializers_examples.py)
+1. Run: `pytest pipeline/infrastructure/serializers_test.py`
+2. Read: [serializers_test.py](pipeline/infrastructure/serializers_test.py)
 3. Read: [SERIALIZATION_BEFORE_AFTER.md](SERIALIZATION_BEFORE_AFTER.md) (Code examples)
 
 #### 📋 **Get a Quick Overview**
@@ -92,7 +92,7 @@
 ```
 pipeline/infrastructure/
 ├── serializers.py                     ← Implementation
-└── serializers_examples.py            ← Tests & examples
+└── serializers_test.py                ← Tests
 ```
 
 ---
@@ -124,15 +124,15 @@ pipeline/infrastructure/
 
 ### Path 2: Developer Quick Start (25 minutes)
 1. QUICK_REFERENCE.md (5 min)
-2. Run serializers_examples.py (5 min)
+2. Run serializers_test.py (5 min)
 3. SERIALIZATION_INTEGRATION_GUIDE.md - Basic Usage (10 min)
-4. serializers_examples.py - Review code (5 min)
+4. serializers_test.py - Review code (5 min)
 
 ### Path 3: Complete Understanding (65 minutes)
 1. QUICK_REFERENCE.md (5 min)
 2. INVESTIGATION_SUMMARY.md (10 min)
 3. SERIALIZATION_BEFORE_AFTER.md (10 min)
-4. Run serializers_examples.py (5 min)
+4. Run serializers_test.py (5 min)
 5. SERIALIZATION_INTEGRATION_GUIDE.md (15 min)
 6. CONTEXT_STORAGE_INVESTIGATION.md (20 min)
 
@@ -140,14 +140,14 @@ pipeline/infrastructure/
 1. INVESTIGATION_SUMMARY.md - Implementation Roadmap (5 min)
 2. SERIALIZATION_INTEGRATION_GUIDE.md - Integration Points (10 min)
 3. SERIALIZATION_INTEGRATION_GUIDE.md - Usage Patterns (10 min)
-4. serializers_examples.py - Review patterns (10 min)
+4. serializers_test.py - Review patterns (10 min)
 5. QUICK_REFERENCE.md - Integration Checklist (10 min)
 
 ### Path 5: Deep Technical (90 minutes)
 1. CONTEXT_STORAGE_INVESTIGATION.md (30 min)
 2. serializers.py - Full review (30 min)
 3. SERIALIZATION_INTEGRATION_GUIDE.md (20 min)
-4. serializers_examples.py - Full review (10 min)
+4. serializers_test.py - Full review (10 min)
 
 ---
 
@@ -168,7 +168,7 @@ pipeline/infrastructure/
 - [INVESTIGATION_SUMMARY.md](INVESTIGATION_SUMMARY.md) - Implementation Roadmap
 
 ### Code Examples
-- [serializers_examples.py](pipeline/infrastructure/serializers_examples.py) - Runnable examples
+- [serializers_test.py](pipeline/infrastructure/serializers_test.py) - Tests
 - [SERIALIZATION_BEFORE_AFTER.md](SERIALIZATION_BEFORE_AFTER.md) - Code comparisons
 - [SERIALIZATION_INTEGRATION_GUIDE.md](SERIALIZATION_INTEGRATION_GUIDE.md) - Usage patterns
 
@@ -198,7 +198,7 @@ A: See [CONTEXT_STORAGE_INVESTIGATION.md](CONTEXT_STORAGE_INVESTIGATION.md) - Pr
 A: Follow [SERIALIZATION_INTEGRATION_GUIDE.md](SERIALIZATION_INTEGRATION_GUIDE.md)
 
 ### Q: "Can I see code examples?"
-A: Run `python -m pipeline.infrastructure.serializers_examples`
+A: Run `pytest pipeline/infrastructure/serializers_test.py`
 
 ### Q: "What are the benefits?"
 A: Read [SERIALIZATION_BEFORE_AFTER.md](SERIALIZATION_BEFORE_AFTER.md)
@@ -281,7 +281,7 @@ A: See [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Five-Minute Quick Start
 
 ### Today
 1. Read [QUICK_REFERENCE.md](QUICK_REFERENCE.md)
-2. Run `python -m pipeline.infrastructure.serializers_examples`
+2. Run `pytest pipeline/infrastructure/serializers_test.py`
 
 ### This Week
 1. Read [INVESTIGATION_SUMMARY.md](INVESTIGATION_SUMMARY.md)
@@ -317,7 +317,7 @@ A: See [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Five-Minute Quick Start
 | What's the solution? | [INVESTIGATION_SUMMARY.md](INVESTIGATION_SUMMARY.md) |
 | How do I integrate? | [SERIALIZATION_INTEGRATION_GUIDE.md](SERIALIZATION_INTEGRATION_GUIDE.md) |
 | Show me examples? | [SERIALIZATION_BEFORE_AFTER.md](SERIALIZATION_BEFORE_AFTER.md) |
-| Run code? | `python -m pipeline.infrastructure.serializers_examples` |
+| Run tests? | `pytest pipeline/infrastructure/serializers_test.py` |
 
 ---
 

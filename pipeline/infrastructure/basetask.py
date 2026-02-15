@@ -330,6 +330,31 @@ class Results(api.Results):
                     LOG.exception('Failed to export result metadata for stage %s.',
                                   getattr(result_to_append, 'stage_number', 'unknown'))
 
+                if DISABLE_WEBLOG:
+                    try:
+                        from pipeline.infrastructure.renderer import weblog_metadata
+
+                        # Plot-heavy renderers (6)
+                        weblog_metadata.export_t2_1_details_metadata(context)
+                        weblog_metadata.export_t2_2_1_metadata(context)
+                        weblog_metadata.export_t2_2_3_metadata(context)
+                        weblog_metadata.export_t2_2_4_metadata(context)
+                        weblog_metadata.export_t2_2_6_metadata(context)
+                        weblog_metadata.export_t2_2_7_metadata(context)
+
+                        # Data-only renderers (8)
+                        weblog_metadata.export_t1_1_metadata(context)
+                        weblog_metadata.export_t1_2_metadata(context)
+                        weblog_metadata.export_t1_3m_metadata(context)
+                        weblog_metadata.export_t1_4m_metadata(context)
+                        weblog_metadata.export_t2_1_metadata(context)
+                        weblog_metadata.export_t2_2_2_metadata(context)
+                        weblog_metadata.export_t2_4m_metadata(context)
+                        weblog_metadata.export_t2_4m_details_metadata(context)
+                    except Exception:
+                        LOG.exception('Failed to export weblog metadata for stage %s.',
+                                      getattr(result_to_append, 'stage_number', 'unknown'))
+
             # having called the old constructor, we know that self.context is set.
             # Use this context to find the report directory and write to the log
             if task_completed:

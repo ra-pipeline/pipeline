@@ -8,13 +8,13 @@ Usage Examples:
     Basic metadata export:
         from pipeline.infrastructure.serializers import ResultMetadata, export_result_metadata
         metadata = ResultMetadata.from_result(result)
-        metadata.to_json('result-stage0.json')
+        metadata.to_yaml('result-stage0.yaml')
 
     Load and inspect metadata:
-        metadata = ResultMetadata.from_json('result-stage0.json')
-        print(f"Task: {metadata.task_name}")
-        print(f"Duration: {metadata.duration_seconds}s")
-        print(f"Status: {metadata.status}")
+        metadata = ResultMetadata.from_yaml('result-stage0.yaml')
+        print(f'Task: {metadata.task_name}')
+        print(f'Duration: {metadata.duration_seconds}s')
+        print(f'Status: {metadata.status}')
 
     Export after result acceptance:
         result.accept(context)
@@ -26,7 +26,7 @@ Usage Examples:
             result = proxy.read()
             metadata = ResultMetadata.from_result(result)
             stage_num = result.stage_number
-            metadata.to_json(f'stage{stage_num}-metadata.json')
+            metadata.to_yaml(f'stage{stage_num}-metadata.yaml')
 """
 
 import tempfile
@@ -38,6 +38,7 @@ from unittest.mock import Mock
 from pipeline.infrastructure.serializers import (
     ContextMetadata,
     JSONMetadataSerializer,
+    YAMLMetadataSerializer,
     ResultMetadata,
     Timestamps,
 )
@@ -164,6 +165,26 @@ class TestResultMetadata(unittest.TestCase):
         assert loaded.inputs == original.inputs
         assert loaded.qa_scores == original.qa_scores
 
+    def test_metadata_yaml_roundtrip(self):
+        """Test saving and loading metadata from YAML."""
+        result = self._create_mock_result(task_name='hifa_calibration')
+        original = ResultMetadata.from_result(result)
+
+        # Save to YAML
+        with tempfile.TemporaryDirectory() as temp_dir:
+            yaml_file = Path(temp_dir) / 'metadata.yaml'
+            original.to_yaml(yaml_file)
+
+            # Load from YAML
+            loaded = ResultMetadata.from_yaml(yaml_file)
+
+        assert loaded.task_name == original.task_name
+        assert loaded.stage_number == original.stage_number
+        assert loaded.status == original.status
+        assert loaded.duration_seconds == original.duration_seconds
+        assert loaded.inputs == original.inputs
+        assert loaded.qa_scores == original.qa_scores
+
 
 class TestContextMetadata(unittest.TestCase):
     """Tests for ContextMetadata."""
@@ -226,6 +247,30 @@ class TestContextMetadata(unittest.TestCase):
         assert loaded.task_counter == original.task_counter
         assert loaded.total_duration_seconds == original.total_duration_seconds
 
+    def test_context_metadata_yaml_roundtrip(self):
+        """Test saving and loading context metadata from YAML."""
+        original = ContextMetadata(
+            name='test-ctx',
+            output_dir='/data/output',
+            task_counter=8,
+            subtask_counter=2,
+            num_results=8,
+            total_duration_seconds=3600.0,
+        )
+
+        # Save to YAML
+        with tempfile.TemporaryDirectory() as temp_dir:
+            yaml_file = Path(temp_dir) / 'context-metadata.yaml'
+            original.to_yaml(yaml_file)
+
+            # Load from YAML
+            loaded = ContextMetadata.from_yaml(yaml_file)
+
+        assert loaded.name == original.name
+        assert loaded.output_dir == original.output_dir
+        assert loaded.task_counter == original.task_counter
+        assert loaded.total_duration_seconds == original.total_duration_seconds
+
 
 class TestJSONMetadataSerializer(unittest.TestCase):
     """Tests for JSONMetadataSerializer."""
@@ -279,6 +324,63 @@ class TestJSONMetadataSerializer(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temp_dir:
             output_file = Path(temp_dir) / 'context-metadata.json'
+            self.serializer.serialize_context(ctx_metadata, output_file)
+
+            assert output_file.exists()
+
+
+class TestYAMLMetadataSerializer(unittest.TestCase):
+    """Tests for YAMLMetadataSerializer."""
+
+    def setUp(self):
+        """Set up serializer and mock objects."""
+        self.serializer = YAMLMetadataSerializer()
+
+        start = datetime(2026, 1, 30, 10, 0, 0)
+        end = datetime(2026, 1, 30, 10, 10, 0)
+
+        self.metadata = ResultMetadata(
+            stage_number=2,
+            task_name='hifa_checkphaseref',
+            status='completed',
+            timestamps=Timestamps(start=start, end=end),
+            inputs={'caltable': 'cal.table'},
+            qa_scores={'rms_error': 0.02},
+        )
+
+    def test_serialize_result_metadata(self):
+        """Test serializing result metadata to YAML."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_file = Path(temp_dir) / 'result-metadata.yaml'
+            self.serializer.serialize_result(self.metadata, output_file)
+
+            assert output_file.exists()
+
+    def test_deserialize_result_metadata(self):
+        """Test deserializing result metadata from YAML."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_file = Path(temp_dir) / 'result-metadata.yaml'
+            self.serializer.serialize_result(self.metadata, output_file)
+
+            loaded = self.serializer.deserialize_result(output_file)
+
+            assert loaded.task_name == self.metadata.task_name
+            assert loaded.stage_number == self.metadata.stage_number
+            assert loaded.status == self.metadata.status
+
+    def test_serialize_context_metadata(self):
+        """Test serializing context metadata to YAML."""
+        ctx_metadata = ContextMetadata(
+            name='integration-test',
+            output_dir='/tmp/pipeline',
+            task_counter=10,
+            subtask_counter=0,
+            num_results=10,
+            total_duration_seconds=5000.0,
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_file = Path(temp_dir) / 'context-metadata.yaml'
             self.serializer.serialize_context(ctx_metadata, output_file)
 
             assert output_file.exists()

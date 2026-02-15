@@ -833,6 +833,27 @@ class T2_1DetailsRenderer(object):
     output_file = 't2-1_details.html'
     template = 't2-1_details.mako'
 
+    # Class-level cache statistics
+    _cache_hits = 0
+    _cache_misses = 0
+
+    @classmethod
+    def get_cache_stats(cls):
+        """Return cache hit and miss counts.
+        
+        Returns:
+            tuple: (cache_hits, cache_misses, hit_rate)
+        """
+        total = cls._cache_hits + cls._cache_misses
+        hit_rate = cls._cache_hits / total if total > 0 else 0.0
+        return cls._cache_hits, cls._cache_misses, hit_rate
+
+    @classmethod
+    def reset_cache_stats(cls):
+        """Reset cache statistics to zero."""
+        cls._cache_hits = 0
+        cls._cache_misses = 0
+
     @classmethod
     def get_file(cls, filename):
         ms_dir = os.path.dirname(filename)
@@ -866,30 +887,75 @@ class T2_1DetailsRenderer(object):
     def get_display_context(context, ms):
         # Check if cached data exists
         if hasattr(ms, '_t2_1_details_cache') and ms._t2_1_details_cache:
-            LOG.debug('Using cached T2_1Details data for %s', ms.basename)
+            T2_1DetailsRenderer._cache_hits += 1
+            LOG.debug('T2_1Details cache hit for %s', ms.basename)
             return ms._t2_1_details_cache
+
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+            metadata = weblog_metadata.load_t2_1_details_metadata(
+                context.report_dir,
+                str(ms.session),
+                ms.basename,
+            )
+        except Exception as e:
+            LOG.debug(
+                'T2_1Details metadata load failed for %s: %s',
+                ms.basename,
+                e,
+            )
+            metadata = None
+
+        if metadata is not None:
+            T2_1DetailsRenderer._cache_hits += 1
+            display_context = metadata.to_display_context()
+            ms._t2_1_details_cache = display_context
+            LOG.debug('T2_1Details metadata hit for %s', ms.basename)
+            return display_context
+
+        # Cache miss - need to generate display context
+        T2_1DetailsRenderer._cache_misses += 1
+        LOG.debug('T2_1Details cache miss for %s', ms.basename)
+
+        import time as time_module
 
         T2_1DetailsRenderer.write_listobs(context, ms)
 
+        # Cache expensive MS queries to avoid repeated lookups
+        start_queries = time_module.perf_counter()
+        science_spws = ms.get_spectral_windows(science_windows_only=True)
+        all_spws = ms.get_all_spectral_windows()
+        all_bands = sorted({spw.band for spw in all_spws})
+        science_bands = sorted({spw.band for spw in science_spws})
+
+        # Extract field/source data early (reuse for all charts)
+        science_sources = sorted({source.name for source in ms.sources if 'TARGET' in source.intents})
+        calibrators = sorted({source.name for source in ms.sources if 'TARGET' not in source.intents})
+        science_scans = [scan for scan in ms.scans if 'TARGET' in scan.intents]
+        is_single_dish_data = utils.contains_single_dish(context)
+        elapsed_queries = time_module.perf_counter() - start_queries
+        print(f'[TIMING] MS queries took {elapsed_queries:.2f}s', file=sys.stderr)
+
+        # Generate charts in parallel-friendly order (could be batched in future)
+        start_charts = time_module.perf_counter()
+        
+        start_intent = time_module.perf_counter()
         inputs = summary.IntentVsTimeChart.Inputs(context, vis=ms.basename)
         task = summary.IntentVsTimeChart(inputs)
         intent_vs_time = task.plot()
+        print(f'[TIMING] IntentVsTimeChart took {time_module.perf_counter() - start_intent:.2f}s', file=sys.stderr)
 
+        start_field = time_module.perf_counter()
         inputs = summary.FieldVsTimeChart.Inputs(context, vis=ms.basename)
         task = summary.FieldVsTimeChart(inputs)
         field_vs_time = task.plot()
+        print(f'[TIMING] FieldVsTimeChart took {time_module.perf_counter() - start_field:.2f}s', file=sys.stderr)
 
+        start_spw = time_module.perf_counter()
         inputs = summary.SpwIdVsFreqChart.Inputs(context, vis=ms.basename)
         task = summary.SpwIdVsFreqChart(inputs, context)
         spwid_vs_freq = task.plot()
-
-        science_spws = ms.get_spectral_windows(science_windows_only=True)
-        all_bands = sorted({spw.band for spw in ms.get_all_spectral_windows()})
-        science_bands = sorted({spw.band for spw in science_spws})
-
-        science_sources = sorted({source.name for source in ms.sources if 'TARGET' in source.intents})
-
-        calibrators = sorted({source.name for source in ms.sources if 'TARGET' not in source.intents})
+        print(f'[TIMING] SpwIdVsFreqChart took {time_module.perf_counter() - start_spw:.2f}s', file=sys.stderr)
 
         baseline_min = ms.antenna_array.baseline_min.length
         baseline_max = ms.antenna_array.baseline_max.length
@@ -903,31 +969,38 @@ class T2_1DetailsRenderer(object):
         time_end = utils.get_epoch_as_datetime(ms.end_time)
 
         time_on_source = utils.total_time_on_source(ms.scans) 
-        science_scans = [scan for scan in ms.scans if 'TARGET' in scan.intents]
-        is_single_dish_data = utils.contains_single_dish(context)
         if scan_has_intent(science_scans, 'REFERENCE') or is_single_dish_data:
             # target scans have OFF-source integrations or Single Dish Data. Need to do harder way.
             time_on_science = utils.total_time_on_target_on_source(ms, is_single_dish_data)
         else:
             time_on_science = utils.total_time_on_source(science_scans)
 
+        start_weather = time_module.perf_counter()
         task = summary.WeatherChart(context, ms)
         weather_plot = task.plot()
+        print(f'[TIMING] WeatherChart took {time_module.perf_counter() - start_weather:.2f}s', file=sys.stderr)
 
+        start_pwv = time_module.perf_counter()
         task = summary.PWVChart(context, ms)
         pwv_plot = task.plot()
+        print(f'[TIMING] PWVChart took {time_module.perf_counter() - start_pwv:.2f}s', file=sys.stderr)
 
+        start_azel = time_module.perf_counter()
         task = summary.AzElChart(context, ms)
         azel_plot = task.plot()
+        print(f'[TIMING] AzElChart took {time_module.perf_counter() - start_azel:.2f}s', file=sys.stderr)
 
+        start_eltime = time_module.perf_counter()
         task = summary.ElVsTimeChart(context, ms)
         el_vs_time_plot = task.plot()
+        print(f'[TIMING] ElVsTimeChart took {time_module.perf_counter() - start_eltime:.2f}s', file=sys.stderr)
 
         # Get min, max elevation (all fields excluding POINTING, SIDEBAND, ATMOSPHERE)
         el_min = "%.2f" % ms.compute_az_el_for_ms(min)[1]
         el_max = "%.2f" % ms.compute_az_el_for_ms(max)[1]
 
         # Get zenith angle statistics for TARGET fields only
+        start_zd = time_module.perf_counter()
         data = compute_zd_telmjd_for_ms(ms)
         # Flatten all zenith angles and timestamps from all TARGET fields
         zd = [zd_val for field_data in data.values() for zd_val in field_data['zd']]
@@ -939,6 +1012,7 @@ class T2_1DetailsRenderer(object):
         # Create zenith angle vs time plot
         task = summary.ZDTELMJDChart(context, ms, data)
         zd_vs_telmjd_plot = task.plot()
+        print(f'[TIMING] ZD computation+ZDTELMJDChart took {time_module.perf_counter() - start_zd:.2f}s', file=sys.stderr)
 
         dirname = os.path.join('session%s' % ms.session, ms.basename)
 
@@ -1024,6 +1098,13 @@ class T2_1DetailsRenderer(object):
         
         # Cache the display context in the MS object for future renders
         ms._t2_1_details_cache = display_context
+
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+            metadata = weblog_metadata.T2_1DetailsMetadata.from_display_context(display_context)
+            weblog_metadata.save_t2_1_details_metadata(metadata)
+        except Exception:
+            pass
         
         return display_context
 
@@ -1089,6 +1170,25 @@ class T2_2_1Renderer(T2_2_XRendererBase):
     def get_display_context(
         context: Context, ms: MeasurementSet
     ) -> dict[str, Context | MeasurementSet | list[tuple[Source, list[logger.Plot | None]]]]:
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+            metadata = weblog_metadata.load_t2_2_1_metadata(
+                context.report_dir,
+                str(ms.session),
+                ms.basename,
+            )
+        except Exception as e:
+            LOG.debug(
+                'T2_2_1 metadata load failed for %s: %s',
+                ms.basename,
+                e,
+            )
+            metadata = None
+
+        if metadata is not None:
+            LOG.debug('T2_2_1 metadata hit for %s', ms.basename)
+            return metadata.to_display_context()
+
         pointings = []
         for source in ms.sources:
             plots = []
@@ -1107,7 +1207,16 @@ class T2_2_1Renderer(T2_2_XRendererBase):
             if plots:
                 pointings.append((source, plots))
 
-        return {'pcontext': context, 'ms': ms, 'pointings': pointings}
+        display_context = {'pcontext': context, 'ms': ms, 'pointings': pointings}
+
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+            metadata = weblog_metadata.T2_2_1Metadata.from_display_context(display_context)
+            weblog_metadata.save_t2_2_1_metadata(metadata)
+        except Exception:
+            pass
+
+        return display_context
 
 
 class T2_2_2Renderer(T2_2_XRendererBase):
@@ -1162,6 +1271,27 @@ class T2_2_3Renderer(T2_2_XRendererBase):
         if hasattr(ms, '_t2_2_3_cache') and ms._t2_2_3_cache:
             LOG.debug('Using cached T2_2_3 data for %s', ms.basename)
             return ms._t2_2_3_cache
+
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+            metadata = weblog_metadata.load_t2_2_3_metadata(
+                context.report_dir,
+                str(ms.session),
+                ms.basename,
+            )
+        except Exception as e:
+            LOG.debug(
+                'T2_2_3 metadata load failed for %s: %s',
+                ms.basename,
+                e,
+            )
+            metadata = None
+
+        if metadata is not None:
+            display_context = metadata.to_display_context()
+            ms._t2_2_3_cache = display_context
+            LOG.debug('T2_2_3 metadata hit for %s', ms.basename)
+            return display_context
             
         if context.project_summary.telescope in ('NRO',):
             # antenna plots are useless for Nobeyama
@@ -1196,6 +1326,14 @@ class T2_2_3Renderer(T2_2_XRendererBase):
         
         # Cache the display context
         ms._t2_2_3_cache = display_context
+
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+            metadata = weblog_metadata.T2_2_3Metadata.from_display_context(display_context)
+            weblog_metadata.save_t2_2_3_metadata(metadata)
+        except Exception:
+            pass
+
         return display_context
 
 
@@ -1212,6 +1350,22 @@ class T2_2_4Renderer(T2_2_XRendererBase):
         if hasattr(ms, '_t2_2_4_cache') and ms._t2_2_4_cache:
             LOG.debug('Using cached T2_2_4 data for %s', ms.basename)
             return ms._t2_2_4_cache
+
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+            metadata = weblog_metadata.load_t2_2_4_metadata(
+                context.report_dir,
+                str(ms.session),
+                ms.basename,
+            )
+        except Exception:
+            metadata = None
+
+        if metadata is not None:
+            display_context = metadata.to_display_context()
+            ms._t2_2_4_cache = display_context
+            LOG.debug('Using metadata for T2_2_4 %s', ms.basename)
+            return display_context
             
         task = summary.AzElChart(context, ms)
         azel_plot = task.plot()
@@ -1247,6 +1401,13 @@ class T2_2_4Renderer(T2_2_XRendererBase):
         
         # Cache the display context
         ms._t2_2_4_cache = display_context
+
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+            metadata = weblog_metadata.T2_2_4Metadata.from_display_context(display_context)
+            weblog_metadata.save_t2_2_4_metadata(metadata)
+        except Exception:
+            pass
         return display_context
 
 
@@ -1264,6 +1425,26 @@ class T2_2_6Renderer(T2_2_XRendererBase):
 
     @staticmethod
     def get_display_context(context, ms):
+        if hasattr(ms, '_t2_2_6_cache') and ms._t2_2_6_cache:
+            LOG.debug('Using cached T2_2_6 data for %s', ms.basename)
+            return ms._t2_2_6_cache
+
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+            metadata = weblog_metadata.load_t2_2_6_metadata(
+                context.report_dir,
+                str(ms.session),
+                ms.basename,
+            )
+        except Exception:
+            metadata = None
+
+        if metadata is not None:
+            display_context = metadata.to_display_context()
+            ms._t2_2_6_cache = display_context
+            LOG.debug('Using metadata for T2_2_6 %s', ms.basename)
+            return display_context
+
         tablerows = []
         for scan in ms.scans:
             scan_id = scan.id
@@ -1290,9 +1471,20 @@ class T2_2_6Renderer(T2_2_XRendererBase):
 
             tablerows.append(row)
 
-        return {'pcontext'     : context,
-                'ms'           : ms,
-                'tablerows'    : tablerows}
+        display_context = {'pcontext'     : context,
+                           'ms'           : ms,
+                           'tablerows'    : tablerows}
+
+        ms._t2_2_6_cache = display_context
+
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+            metadata = weblog_metadata.T2_2_6Metadata.from_display_context(display_context)
+            weblog_metadata.save_t2_2_6_metadata(metadata)
+        except Exception:
+            pass
+
+        return display_context
 
 
 class T2_2_7Renderer(T2_2_XRendererBase):
@@ -1318,6 +1510,25 @@ class T2_2_7Renderer(T2_2_XRendererBase):
         Returns:
             display context
         """
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+            metadata = weblog_metadata.load_t2_2_7_metadata(
+                context.report_dir,
+                str(ms.session),
+                ms.basename,
+            )
+        except Exception as e:
+            LOG.debug(
+                'T2_2_7 metadata load failed for %s: %s',
+                ms.basename,
+                e,
+            )
+            metadata = None
+
+        if metadata is not None:
+            LOG.debug('T2_2_7 metadata hit for %s', ms.basename)
+            return metadata.to_display_context()
+
         target_pointings = []
         whole_pointings = []
         offset_pointings = []
@@ -1353,12 +1564,21 @@ class T2_2_7Renderer(T2_2_XRendererBase):
         dirname = os.path.join('session%s' % ms.session,
                                ms.basename)
 
-        return {'pcontext'        : context,
+        display_context = {'pcontext'        : context,
                 'ms'              : ms,
                 'target_pointing' : target_pointings,
                 'whole_pointing'  : whole_pointings,
                 'offset_pointing' : offset_pointings,
                 'dirname'         : dirname}
+
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+            metadata = weblog_metadata.T2_2_7Metadata.from_display_context(display_context)
+            weblog_metadata.save_t2_2_7_metadata(metadata)
+        except Exception:
+            pass
+
+        return display_context
 
 
 class T2_3_XMBaseRenderer(RendererBase):
@@ -1945,6 +2165,25 @@ class WebLogGenerator(object):
             LOG.info('Per-renderer timing summary (sorted by duration):')
             for name, elapsed in sorted(renderer_times, key=lambda x: x[1], reverse=True):
                 LOG.info('  %s: %.2fs', name, elapsed)
+
+            # Log plot cache statistics
+            try:
+                from pipeline.h.tasks.common.displays.sky import SkyDisplay
+                hits, misses, hit_rate = SkyDisplay.get_cache_stats()
+                if hits + misses > 0:
+                    LOG.info('Sky plot cache statistics: %d hits, %d misses (%.1f%% hit rate)',
+                             hits, misses, hit_rate * 100.0)
+            except Exception:
+                pass  # Don't fail if cache stats unavailable
+
+            # Log T2_1Details cache statistics
+            try:
+                hits, misses, hit_rate = T2_1DetailsRenderer.get_cache_stats()
+                if hits + misses > 0:
+                    LOG.info('T2_1Details cache statistics: %d hits, %d misses (%.1f%% hit rate)',
+                             hits, misses, hit_rate * 100.0)
+            except Exception:
+                pass  # Don't fail if cache stats unavailable
 
             # create symlink to t1-1.html
             link_relsrc = T1_1Renderer.output_file

@@ -12,7 +12,7 @@ I conducted a comprehensive investigation into your pipeline's context storage s
 - **Result**: 500MB-2GB context files, 500ms to access metadata
 
 ### Recommended Solution  
-- **Approach**: Hybrid system - keep pickle, add JSON metadata
+- **Approach**: Hybrid system - keep pickle, add YAML metadata (JSON supported)
 - **Implementation**: 100% backward compatible
 - **Result**: 100x faster metadata access, human-readable format, external tool integration
 
@@ -28,14 +28,14 @@ I conducted a comprehensive investigation into your pipeline's context storage s
 
 ### 💻 Code (2 files)
 1. **[pipeline/infrastructure/serializers.py](pipeline/infrastructure/serializers.py)** - Production-ready implementation
-2. **[pipeline/infrastructure/serializers_examples.py](pipeline/infrastructure/serializers_examples.py)** - Tests & examples
+2. **[pipeline/infrastructure/serializers_test.py](pipeline/infrastructure/serializers_test.py)** - Tests
 
 ### 📊 Total Delivered
 - 45 pages of documentation
 - 550 lines of production code
 - Full type hints and docstrings
 - Unit tests + examples
-- Zero external dependencies
+- One lightweight dependency (PyYAML) for YAML support
 
 ## Benefits
 
@@ -66,6 +66,8 @@ I conducted a comprehensive investigation into your pipeline's context storage s
 from pipeline.infrastructure.serializers import export_result_metadata
 export_result_metadata(result, context.report_dir)
 ```
+
+Note: YAML is the default format; JSON remains available for compatibility.
 
 **Benefits**:
 - Can inspect results without Python
@@ -125,7 +127,7 @@ export_result_metadata(result, context.report_dir)
 
 2. **See it working** (5 min)
    ```bash
-   python -m pipeline.infrastructure.serializers_examples
+   pytest pipeline/infrastructure/serializers_test.py
    ```
 
 3. **Understand solution** (10 min)
@@ -150,7 +152,7 @@ export_result_metadata(result, context.report_dir)
 
 **Code:**
 - pipeline/infrastructure/serializers.py
-- pipeline/infrastructure/serializers_examples.py
+- pipeline/infrastructure/serializers_test.py
 
 ## Key Takeaways
 
@@ -198,7 +200,7 @@ The framework is **ready to integrate** with minimal effort and maximum benefit.
 - **"Where do I start?"** → Read [QUICK_REFERENCE.md](QUICK_REFERENCE.md)
 - **"What's the problem?"** → See [CONTEXT_STORAGE_INVESTIGATION.md](CONTEXT_STORAGE_INVESTIGATION.md)
 - **"How do I integrate?"** → Follow [SERIALIZATION_INTEGRATION_GUIDE.md](SERIALIZATION_INTEGRATION_GUIDE.md)
-- **"Show me examples?"** → Run `python -m pipeline.infrastructure.serializers_examples`
+- **"Show me tests?"** → Run `pytest pipeline/infrastructure/serializers_test.py`
 
 ---
 

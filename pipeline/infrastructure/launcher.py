@@ -197,9 +197,9 @@ class Context:
 
             # Generate metadata filename more robustly
             if filename.endswith('.context'):
-                metadata_path = filename[:-8] + '-metadata.json'
+                metadata_path = filename[:-8] + '-metadata.yaml'
             else:
-                metadata_path = filename + '-metadata.json'
+                metadata_path = filename + '-metadata.yaml'
 
             # Ensure we don't accidentally overwrite the context pickle
             if metadata_path == filename:

@@ -44,13 +44,13 @@ Risk Level: 🟢 Very Low (Phase 1-2)
 | File | Purpose | Lines | Status |
 |------|---------|-------|--------|
 | **[pipeline/infrastructure/serializers.py](pipeline/infrastructure/serializers.py)** | Main implementation | 320 | ✅ Ready |
-| **[pipeline/infrastructure/serializers_examples.py](pipeline/infrastructure/serializers_examples.py)** | Tests & examples | 280 | ✅ Ready |
+| **[pipeline/infrastructure/serializers_test.py](pipeline/infrastructure/serializers_test.py)** | Tests | 280 | ✅ Ready |
 
 ### Code Statistics
 - **Total Lines**: 600 lines
 - **Type Hints**: 100% coverage (PEP 604/585)
 - **Docstrings**: Comprehensive
-- **Dependencies**: None (stdlib only)
+- **Dependencies**: PyYAML (YAML serialization)
 - **Test Coverage**: Complete
 - **Status**: Production-ready
 
@@ -74,7 +74,7 @@ Risk Level: 🟢 Very Low (Phase 1-2)
 💻 Code (2 files)
 └── pipeline/infrastructure/
     ├── serializers.py                ✨ IMPLEMENTATION
-    └── serializers_examples.py       🧪 TESTS & EXAMPLES
+    └── serializers_test.py           🧪 TESTS
 ```
 
 ---
@@ -90,7 +90,7 @@ Risk Level: 🟢 Very Low (Phase 1-2)
 
 **👨‍💻 Developers**
 1. Read: [QUICK_REFERENCE.md](QUICK_REFERENCE.md) (5 min)
-2. Run: `python -m pipeline.infrastructure.serializers_examples`
+2. Run: `pytest pipeline/infrastructure/serializers_test.py`
 3. Review: [serializers.py](pipeline/infrastructure/serializers.py) code
 4. Follow: [SERIALIZATION_INTEGRATION_GUIDE.md](SERIALIZATION_INTEGRATION_GUIDE.md)
 
@@ -118,7 +118,7 @@ Risk Level: 🟢 Very Low (Phase 1-2)
 ### Step 2: Run the Code (5 minutes)
 ```bash
 cd /Users/tbooth/Work/Pipeline/repos/main
-python -m pipeline.infrastructure.serializers_examples
+pytest pipeline/infrastructure/serializers_test.py
 ```
 
 ### Step 3: Read Full Documentation (varies)
@@ -230,7 +230,7 @@ python -m pipeline.infrastructure.serializers_examples
 | What's the solution? | [INVESTIGATION_SUMMARY.md](INVESTIGATION_SUMMARY.md) |
 | How do I integrate? | [SERIALIZATION_INTEGRATION_GUIDE.md](SERIALIZATION_INTEGRATION_GUIDE.md) |
 | Show me examples? | [SERIALIZATION_BEFORE_AFTER.md](SERIALIZATION_BEFORE_AFTER.md) |
-| How do I run code? | Run: `python -m pipeline.infrastructure.serializers_examples` |
+| How do I run tests? | Run: `pytest pipeline/infrastructure/serializers_test.py` |
 | Navigation help? | [INDEX.md](INDEX.md) |
 | For management? | [EXECUTIVE_SUMMARY.md](EXECUTIVE_SUMMARY.md) |
 
@@ -311,13 +311,13 @@ python -m pipeline.infrastructure.serializers_examples
 
 ### 30-Minute Overview
 1. [INVESTIGATION_SUMMARY.md](INVESTIGATION_SUMMARY.md)
-2. Run examples: `python -m pipeline.infrastructure.serializers_examples`
+2. Run tests: `pytest pipeline/infrastructure/serializers_test.py`
 3. [SERIALIZATION_BEFORE_AFTER.md](SERIALIZATION_BEFORE_AFTER.md)
 
 ### Complete Understanding (60+ minutes)
 1. All documentation files in order
 2. Review implementation: [serializers.py](pipeline/infrastructure/serializers.py)
-3. Study tests: [serializers_examples.py](pipeline/infrastructure/serializers_examples.py)
+3. Study tests: [serializers_test.py](pipeline/infrastructure/serializers_test.py)
 
 ---
 

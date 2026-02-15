@@ -36,11 +36,10 @@ I've completed a comprehensive investigation of the pipeline's context storage s
    - `JSONMetadataSerializer` - JSON backend
    - Helper functions for export/import
 
-5. **[pipeline/infrastructure/serializers_examples.py](pipeline/infrastructure/serializers_examples.py)**
+5. **[pipeline/infrastructure/serializers_test.py](pipeline/infrastructure/serializers_test.py)**
    - Unit tests for all components
-   - Usage examples and demonstrations
    - Test fixtures and mocking utilities
-   - Can be run standalone: `python serializers_examples.py`
+   - Run with: `pytest pipeline/infrastructure/serializers_test.py`
 
 ---
 
@@ -70,7 +69,7 @@ I've completed a comprehensive investigation of the pipeline's context storage s
 
 ### Hybrid Serialization Strategy
 
-**Layer 1: Structured Metadata (JSON)** ✅ NOW AVAILABLE
+**Layer 1: Structured Metadata (YAML, JSON optional)** ✅ NOW AVAILABLE
 - Task execution summaries (timing, status, inputs, QA)
 - Human-readable and searchable
 - 2-5 KB per stage vs. 100KB-10MB for full result
@@ -111,7 +110,7 @@ Read: `CONTEXT_STORAGE_INVESTIGATION.md` (10 min read)
 ### 2️⃣ **See It In Action**
 ```bash
 cd /Users/tbooth/Work/Pipeline/repos/main
-python -m pipeline.infrastructure.serializers_examples
+pytest pipeline/infrastructure/serializers_test.py
 ```
 
 ### 3️⃣ **Integrate Into Pipeline**
@@ -170,11 +169,11 @@ print(metadata.duration_seconds)    # 87.5
 print(metadata.status)              # "completed"
 print(metadata.qa_scores)           # {"overall": 0.92}
 
-# Save to JSON
-metadata.to_json('result-metadata.json')
+# Save to YAML (default format)
+metadata.to_yaml('result-metadata.yaml')
 
 # Load later
-metadata = ResultMetadata.from_json('result-metadata.json')
+metadata = ResultMetadata.from_yaml('result-metadata.yaml')
 ```
 
 ### Automatic Export
@@ -182,7 +181,7 @@ metadata = ResultMetadata.from_json('result-metadata.json')
 ```python
 # One-line addition to result acceptance:
 from pipeline.infrastructure.serializers import export_result_metadata
-export_result_metadata(result, context.report_dir)
+export_result_metadata(result, context.report_dir)  # Writes YAML by default
 ```
 
 ### Batch Processing
@@ -210,7 +209,7 @@ for metadata_file in Path('html').glob('*/result-*-metadata.json'):
 ├── SERIALIZATION_BEFORE_AFTER.md             (Scenario comparisons)
 ├── pipeline/infrastructure/
 │   ├── serializers.py                        (Main implementation)
-│   └── serializers_examples.py               (Examples & tests)
+│   └── serializers_test.py                   (Tests)
 └── THIS_SUMMARY.md                           (This file)
 ```
 
@@ -220,12 +219,12 @@ pipeline_output/
 ├── context-name.context                    (Existing pickle)
 ├── context-name-metadata.json              (NEW: Context metadata)
 └── html/context-name/
-    ├── stage0/
-    │   ├── result-stage0.pickle            (Existing)
-    │   └── result-stage0-metadata.json     (NEW: Metadata)
-    ├── stage1/
-    │   ├── result-stage1.pickle
-    │   └── result-stage1-metadata.json
+   ├── stage0/
+   │   ├── result-stage0.pickle            (Existing)
+   │   └── result-stage0-metadata.yaml     (NEW: Metadata)
+   ├── stage1/
+   │   ├── result-stage1.pickle
+   │   └── result-stage1-metadata.yaml
     └── ...
 ```
 
@@ -263,7 +262,7 @@ pipeline_output/
 
 ### 🎯 **Short Term (Next Sprint)**
 1. ✅ Review investigation document
-2. ✅ Run serializers_examples.py to understand the framework
+2. ✅ Run serializers_test.py to validate the framework
 3. ✅ Implement Phase 1 (metadata export)
 4. ✅ Run existing test suite to ensure no regressions
 
@@ -312,7 +311,7 @@ pipeline_output/
 ## Next Steps
 
 1. **Read** `CONTEXT_STORAGE_INVESTIGATION.md` (comprehensive analysis)
-2. **Run** `serializers_examples.py` (see it working)
+2. **Run** `pytest pipeline/infrastructure/serializers_test.py` (validate it working)
 3. **Review** implementation in `serializers.py` (understand architecture)
 4. **Plan** integration following `SERIALIZATION_INTEGRATION_GUIDE.md`
 5. **Implement** Phase 1 (metadata export) - 2-4 hour effort
@@ -327,7 +326,7 @@ Refer to:
 - **"How does it work?"** → `CONTEXT_STORAGE_INVESTIGATION.md`
 - **"How do I use it?"** → `SERIALIZATION_INTEGRATION_GUIDE.md`
 - **"What's the benefit?"** → `SERIALIZATION_BEFORE_AFTER.md`
-- **"Show me code examples"** → `serializers_examples.py`
+- **"Show me tests"** → `serializers_test.py`
 
 ---
 

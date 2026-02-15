@@ -9,17 +9,17 @@
 | **[SERIALIZATION_INTEGRATION_GUIDE.md](SERIALIZATION_INTEGRATION_GUIDE.md)** | How to integrate & use | 10 min 🔧 HOW-TO |
 | **[SERIALIZATION_BEFORE_AFTER.md](SERIALIZATION_BEFORE_AFTER.md)** | Real scenario comparisons | 8 min 📊 EXAMPLES |
 | **[serializers.py](pipeline/infrastructure/serializers.py)** | Implementation | 20 min 💻 CODE |
-| **[serializers_examples.py](pipeline/infrastructure/serializers_examples.py)** | Tests & examples | 5 min 🧪 RUNNABLE |
+| **[serializers_test.py](pipeline/infrastructure/serializers_test.py)** | Tests | 5 min 🧪 RUNNABLE |
 
 ## 🚀 Five-Minute Quick Start
 
 ### 1. Understand the Problem
 Current system: Everything pickled (binary, unreadable, fragile)
-Proposed solution: JSON metadata + selective pickle use
+Proposed solution: YAML metadata by default (JSON supported) + selective pickle use
 
 ### 2. See It Working
 ```bash
-python -m pipeline.infrastructure.serializers_examples
+pytest pipeline/infrastructure/serializers_test.py
 ```
 
 ### 3. Use the Framework
@@ -29,16 +29,16 @@ from pipeline.infrastructure.serializers import ResultMetadata
 # Extract metadata from result
 metadata = ResultMetadata.from_result(result)
 
-# Save to JSON
-metadata.to_json('result-metadata.json')
+# Save to YAML (default format)
+metadata.to_yaml('result-metadata.yaml')
 
 # Load later
-metadata = ResultMetadata.from_json('result-metadata.json')
+metadata = ResultMetadata.from_yaml('result-metadata.yaml')
 ```
 
 ### 4. Benefits You Get
 - ✅ 100x faster metadata access
-- ✅ Human-readable JSON output
+- ✅ Human-readable YAML (JSON supported)
 - ✅ Search/grep capability
 - ✅ Works with any tool
 - ✅ Version-stable format
@@ -66,11 +66,11 @@ Problems: Not readable, fragile, large
 ### New System (Hybrid)
 ```
 Context: binary pickle (~400MB)  ← Kept for complex data
-├── Metadata: JSON (~3KB) ✨ NEW - Fast, readable
+├── Metadata: YAML (~3KB) ✨ NEW - Fast, readable
 ├── Result 1: binary pickle (~5MB)
-│   └── Metadata: JSON (~3KB) ✨ NEW - Use this instead
+│   └── Metadata: YAML (~3KB) ✨ NEW - Use this instead
 ├── Result 2: binary pickle (~5MB)
-│   └── Metadata: JSON (~3KB) ✨ NEW - Use this instead
+│   └── Metadata: YAML (~3KB) ✨ NEW - Use this instead
 └── ...
 
 Benefits: Can skip pickle for 90% of queries
@@ -92,7 +92,7 @@ export_result_metadata(result, context.report_dir)
 ### Task 2: Find Failed Stages (Fast)
 ```bash
 # Command line - no Python needed
-grep -r "failed" html/*/result-*-metadata.json
+grep -r "failed" html/*/result-*-metadata.yaml
 ```
 
 ### Task 3: Get Execution Stats
@@ -101,8 +101,8 @@ from pipeline.infrastructure.serializers import ResultMetadata
 from pathlib import Path
 
 total_time = 0
-for metadata_file in Path('html').glob('*/result-*-metadata.json'):
-    m = ResultMetadata.from_json(metadata_file)
+for metadata_file in Path('html').glob('*/result-*-metadata.yaml'):
+    m = ResultMetadata.from_yaml(metadata_file)
     total_time += m.duration_seconds
     print(f"Stage {m.stage_number}: {m.task_name} ({m.duration_seconds}s)")
 
@@ -112,9 +112,9 @@ print(f"Total: {total_time/3600:.1f} hours")
 ### Task 4: Compare Two Runs
 ```bash
 # Use standard diff tool
-diff run1-metadata.json run2-metadata.json
+diff run1-metadata.yaml run2-metadata.yaml
 
-# Or JSON tools
+# Or JSON tools (if you exported JSON)
 jq . run1/context-metadata.json
 jq . run2/context-metadata.json
 ```
@@ -242,7 +242,7 @@ Repository Root:
 │
 └── pipeline/infrastructure/
     ├── serializers.py                    ← Main code
-    ├── serializers_examples.py           ← Tests & examples
+    ├── serializers_test.py               ← Tests
     ├── launcher.py                       ← Context class (needs update)
     └── basetask.py                       ← Results class (needs update)
 ```
@@ -256,7 +256,7 @@ Repository Root:
 | **Analysis** | ✅ Complete | Comprehensive understanding | N/A |
 | **Implementation** | ✅ Ready | Production-grade code | 2-4 hours |
 | **Documentation** | ✅ Complete | Clear integration path | Reference |
-| **Testing** | ✅ Included | Unit tests + examples | Run: `python serializers_examples.py` |
+| **Testing** | ✅ Included | Unit tests | Run: `pytest pipeline/infrastructure/serializers_test.py` |
 | **Backward Compat** | ✅ Guaranteed | 100% compatible | No breaking changes |
 
 ---
@@ -265,7 +265,7 @@ Repository Root:
 
 ### Immediate (Today)
 1. Read `INVESTIGATION_SUMMARY.md`
-2. Run `python -m pipeline.infrastructure.serializers_examples`
+2. Run `pytest pipeline/infrastructure/serializers_test.py`
 3. Review `serializers.py` code
 
 ### This Week
@@ -301,7 +301,7 @@ Refer to specific documents:
 - **"What's the problem?"** → `CONTEXT_STORAGE_INVESTIGATION.md`
 - **"How do I use it?"** → `SERIALIZATION_INTEGRATION_GUIDE.md`  
 - **"What's the benefit?"** → `SERIALIZATION_BEFORE_AFTER.md`
-- **"Show me code"** → `serializers.py` or `serializers_examples.py`
+- **"Show me tests"** → `serializers.py` or `serializers_test.py`
 
 ---
 
@@ -309,7 +309,7 @@ Refer to specific documents:
 1. This document (5 min)
 2. `INVESTIGATION_SUMMARY.md` (5 min)
 3. `SERIALIZATION_BEFORE_AFTER.md` (8 min)
-4. Run `serializers_examples.py` (5 min interactive)
+4. Run `pytest pipeline/infrastructure/serializers_test.py` (5 min)
 5. `SERIALIZATION_INTEGRATION_GUIDE.md` (10 min)
 6. Deep dive: `CONTEXT_STORAGE_INVESTIGATION.md` (15 min)
 

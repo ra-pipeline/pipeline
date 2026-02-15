@@ -140,13 +140,14 @@ This makes pickle-based storage fragile across versions.
 
 Rather than replacing pickle entirely, implement a **layered serialization system**:
 
-#### **Layer 1: Structured Metadata (JSON)**
+#### **Layer 1: Structured Metadata (YAML, JSON optional)**
 Store easily-accessed, human-readable metadata:
 - Task execution summary (name, timing, status)
 - Input parameters
 - QA scores
 - Simple statistics
 
+Example (JSON shown; YAML is the default export format):
 ```json
 {
   "stage": 0,
