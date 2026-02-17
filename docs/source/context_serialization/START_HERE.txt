@@ -108,8 +108,6 @@ Detailed Guides (15-20 min reads):
 Reference & Navigation:
   ✓ INDEX.md                              Complete navigation and cross-references
   ✓ README_INVESTIGATION.md               Master overview document
-  ✓ DELIVERABLES_MANIFEST.md              Complete manifest of all deliverables
-
 
 ═══════════════════════════════════════════════════════════════════════════════
   QUICK FACTS

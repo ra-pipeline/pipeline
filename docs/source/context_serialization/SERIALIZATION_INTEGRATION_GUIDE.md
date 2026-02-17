@@ -150,7 +150,7 @@ from pipeline.infrastructure.serializers import ResultMetadata
 
 # Do:
 try:
-            metadata = ResultMetadata.from_yaml(
+    metadata = ResultMetadata.from_yaml(
         f'stage{stage_num}-metadata.yaml'
     )
     task_name = metadata.task_name

@@ -114,7 +114,6 @@ A **hybrid serialization framework** that:
 
 **Run Examples:**
 ```bash
-cd /Users/tbooth/Work/Pipeline/repos/main
 pytest pipeline/infrastructure/serializers_test.py
 ```
 
@@ -187,17 +186,17 @@ export_result_metadata(result, context.report_dir)
 
 ### Documentation Created
 ```
-/Users/tbooth/Work/Pipeline/repos/main/
-├── QUICK_REFERENCE.md                  # ← Start here (5 min)
-├── INVESTIGATION_SUMMARY.md            # Overview (10 min)
-├── CONTEXT_STORAGE_INVESTIGATION.md    # Deep analysis (20 min)
-├── SERIALIZATION_INTEGRATION_GUIDE.md  # How-to guide (15 min)
-├── SERIALIZATION_BEFORE_AFTER.md       # Scenario examples (10 min)
-├── README.md                           # This file
-│
+pipeline/
+├── docs/source/context_serialization
+│   ├── QUICK_REFERENCE.md                  # ← Start here (5 min)
+│   ├── INVESTIGATION_SUMMARY.md            # Overview (10 min)
+│   ├── CONTEXT_STORAGE_INVESTIGATION.md    # Deep analysis (20 min)
+│   ├── SERIALIZATION_INTEGRATION_GUIDE.md  # How-to guide (15 min)
+│   ├── SERIALIZATION_BEFORE_AFTER.md       # Scenario examples (10 min)
+│   ├── README.md                           # This file
 └── pipeline/infrastructure/
     ├── serializers.py                  # Implementation (ready to use)
-   ├── serializers_test.py             # Tests (runnable)
+    ├── serializers_test.py             # Tests (runnable)
     ├── launcher.py                     # Context class (needs 1-line update)
     └── basetask.py                     # Results class (needs 1-line update)
 ```
@@ -446,10 +445,3 @@ For specific questions, refer to:
 **Expected Benefit**: 100x faster metadata access, improved debuggability, enhanced integration capabilities
 
 **Next Action**: Start with `QUICK_REFERENCE.md` and proceed with integration as outlined.
-
----
-
-**Created**: January 30, 2026
-**Location**: `/Users/tbooth/Work/Pipeline/repos/main/`
-**Documents**: 6 markdown files + 2 Python modules
-**Status**: Production-Ready

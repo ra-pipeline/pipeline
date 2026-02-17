@@ -358,19 +358,6 @@ for metadata_file in Path('html').glob('*/result-*-metadata.json'):
 
 ---
 
-## Implementation Effort vs. Benefit
-
-| Phase | Effort | Benefit | Risk |
-|-------|--------|---------|------|
-| **Phase 1**: JSON metadata export | 2-4 hours | Quick wins in debugging | Very Low |
-| **Phase 2**: Web log uses metadata | 4-8 hours | 50-100x speedup | Low |
-| **Phase 3**: Lazy-loading framework | 2-3 days | Better resource usage | Medium |
-| **Phase 4**: Full context optimization | 3-5 days | Max performance | Medium-High |
-
-**Recommended**: Start with Phase 1 & 2 for immediate benefits with minimal risk.
-
----
-
 ## Conclusion
 
 The new hybrid serialization system provides:
@@ -378,5 +365,3 @@ The new hybrid serialization system provides:
 - **Zero risk** to existing functionality
 - **Significant improvements** in performance, debuggability, and integration
 - **Future-proof** foundation for advanced features
-
-**Next Step**: Implement Phase 1 metadata export to start collecting structured data alongside existing pickles.

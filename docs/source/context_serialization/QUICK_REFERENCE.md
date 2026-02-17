@@ -234,12 +234,12 @@ serializer.serialize_result(metadata, 'output.json')
 ## 🔍 File Locations
 
 ```
-Repository Root:
-├── INVESTIGATION_SUMMARY.md              ← You are here
-├── CONTEXT_STORAGE_INVESTIGATION.md      ← Full analysis
-├── SERIALIZATION_INTEGRATION_GUIDE.md    ← Integration steps
-├── SERIALIZATION_BEFORE_AFTER.md         ← Scenario examples
-│
+pipeline/
+├── docs/source/context_serialization
+│   ├── INVESTIGATION_SUMMARY.md              ← You are here
+│   ├── CONTEXT_STORAGE_INVESTIGATION.md      ← Full analysis
+│   ├── SERIALIZATION_INTEGRATION_GUIDE.md    ← Integration steps
+│   ├── SERIALIZATION_BEFORE_AFTER.md         ← Scenario examples
 └── pipeline/infrastructure/
     ├── serializers.py                    ← Main code
     ├── serializers_test.py               ← Tests
@@ -312,9 +312,3 @@ Refer to specific documents:
 4. Run `pytest pipeline/infrastructure/serializers_test.py` (5 min)
 5. `SERIALIZATION_INTEGRATION_GUIDE.md` (10 min)
 6. Deep dive: `CONTEXT_STORAGE_INVESTIGATION.md` (15 min)
-
-**Total Time Investment: ~45 minutes for complete understanding**
-
----
-
-**Created**: January 30, 2026 | **Status**: ✅ Ready for Implementation

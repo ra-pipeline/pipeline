@@ -15,7 +15,6 @@ Complete investigation into the pipeline's context storage system with productio
 - **[SERIALIZATION_INTEGRATION_GUIDE.md](SERIALIZATION_INTEGRATION_GUIDE.md)** - Integration steps (15 min)
 - **[SERIALIZATION_BEFORE_AFTER.md](SERIALIZATION_BEFORE_AFTER.md)** - Real scenarios (10 min)
 - **[README_INVESTIGATION.md](README_INVESTIGATION.md)** - Master overview
-- **[DELIVERABLES_MANIFEST.md](DELIVERABLES_MANIFEST.md)** - Complete manifest
 
 ## 🚀 Quick Start (5 minutes)
 
@@ -36,7 +35,7 @@ Complete investigation into the pipeline's context storage system with productio
 
 ## 💻 Code Files
 
-The actual implementation is in `../pipeline/infrastructure/`:
+The actual implementation is in `pipeline/infrastructure/`:
 - `serializers.py` - Production-ready implementation
 - `serializers_test.py` - Tests
 
@@ -67,8 +66,3 @@ The actual implementation is in `../pipeline/infrastructure/`:
 ## 📞 Questions?
 
 Refer to INDEX.md for complete navigation, or contact the investigation team.
-
----
-
-**Status**: ✅ Complete and Ready for Implementation
-**Created**: January 30, 2026
