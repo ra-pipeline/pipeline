@@ -451,6 +451,16 @@ class ResultsProxy(object):
     def __init__(self, context):
         self._context = context
 
+    @property
+    def path(self):
+        """Return the full path to the pickle file."""
+        return os.path.join(
+            self._context.output_dir,
+            self._context.name,
+            'saved_state',
+            self._basename
+        )
+
     def write(self, result):
         """
         Write the pickled result to disk.
@@ -464,10 +474,7 @@ class ResultsProxy(object):
         # only store the basename to allow for relocation between save and
         # restore
         self._basename = 'result-stage%s.pickle' % result.stage_number
-        path = os.path.join(self._context.output_dir,
-                            self._context.name,
-                            'saved_state',
-                            self._basename)
+        path = self.path
 
         utils.mkdir_p(os.path.dirname(path))
         with open(path, 'wb') as outfile:
@@ -477,11 +484,7 @@ class ResultsProxy(object):
         """
         Read the pickle from disk, returning the unpickled object.
         """
-        path = os.path.join(self._context.output_dir,
-                            self._context.name,
-                            'saved_state',
-                            self._basename)
-        with open(path, 'rb') as infile:
+        with open(self.path, 'rb') as infile:
             return utils.pickle_load(infile)
 
     def _write_stage_logs(self, result):

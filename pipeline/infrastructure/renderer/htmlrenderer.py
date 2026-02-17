@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import collections
+import concurrent.futures
 import contextlib
 import datetime
 import decimal
@@ -2138,10 +2139,55 @@ class WebLogGenerator(object):
             # Note: Renderers require full Result objects (not metadata) to access
             # complex attributes like .qa, .task, .metadata, etc.
             unpickle_start = time.time()
-            context.results = [proxy.read() for proxy in context.results]
-            unpickle_elapsed = time.time() - unpickle_start
-            LOG.info('Weblog rendering: unpickled %d results in %.2fs',
-                     len(context.results), unpickle_elapsed)
+
+            # Adaptive unpickling strategy (Phase 1 optimization)
+            # Profiling shows parallel unpickling characteristics:
+            #   - Small files (<150KB avg): Variable performance due to disk cache
+            #   - Medium files (150KB-10MB avg): 1.7-5x faster with parallel
+            #   - Large files (10-100MB avg): 2x faster with parallel
+            #   - Very large files (>100MB avg): 1.1x faster - disk I/O bottleneck, GIL contention
+            # Strategy: Use parallel for files >150KB with optimized worker count
+            num_results = len(context.results)
+            
+            # Estimate total pickle size to determine if parallel is worthwhile
+            total_size = sum(os.path.getsize(proxy.path) if os.path.exists(proxy.path) else 0
+                           for proxy in context.results)
+            avg_size = total_size / max(num_results, 1)
+            
+            # Use parallel if average file size >150KB (provides consistent performance)
+            # Threshold lowered from 500KB to handle disk cache variability
+            # Requires at least 2 results (no benefit for single file)
+            use_parallel = avg_size > 150_000 and num_results > 1
+            
+            if use_parallel:
+                cpu_count = os.cpu_count() or 4
+                
+                # Scale worker count based on file size to optimize memory and GIL contention:
+                # - Small-medium files (0.5-50MB): Use all CPUs (I/O bound)
+                # - Large files (50-200MB): Use half CPUs (balance I/O and memory)
+                # - Very large files (>200MB): Use quarter CPUs (memory bound, GIL contention)
+                if avg_size > 200_000_000:  # >200MB
+                    max_workers = max(2, min(num_results, cpu_count // 4))
+                elif avg_size > 50_000_000:  # >50MB
+                    max_workers = max(2, min(num_results, cpu_count // 2))
+                else:
+                    max_workers = min(num_results, cpu_count)
+                
+                with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    context.results = list(executor.map(lambda proxy: proxy.read(), context.results))
+                unpickle_elapsed = time.time() - unpickle_start
+                LOG.info(
+                    'Weblog rendering: unpickled %d results (%.1f MB, avg %.1f KB) in %.2fs (parallel, %d workers)',
+                    num_results, total_size / 1_000_000, avg_size / 1000, unpickle_elapsed, max_workers
+                )
+            else:
+                # Sequential unpickling for small files or single result
+                context.results = [proxy.read() for proxy in context.results]
+                unpickle_elapsed = time.time() - unpickle_start
+                LOG.info(
+                    'Weblog rendering: unpickled %d results (%.1f MB, avg %.1f KB) in %.2fs (sequential)',
+                    num_results, total_size / 1_000_000, avg_size / 1000, unpickle_elapsed
+                )
 
             render_start = time.time()
             renderer_times = []

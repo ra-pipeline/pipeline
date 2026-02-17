@@ -8,6 +8,7 @@ import functools
 import itertools
 import operator
 import os
+import threading
 import uuid
 import weakref
 from typing import Callable, Generator, Iterable, TYPE_CHECKING
@@ -526,6 +527,7 @@ class CalFrom(object):
     # _CalFromPool and returning a shared immutable instance for CalFroms
     # constructed with the same arguments.
     _CalFromPool = weakref.WeakValueDictionary()
+    _CalFromPoolLock = threading.RLock()  # Thread-safe pool access for parallel unpickling
 
     @staticmethod
     def _calc_hash(gaintable: str, gainfield: str, interp: str, spwmap: tuple, calwt: bool) -> int:
@@ -613,7 +615,10 @@ class CalFrom(object):
         arg_hash = CalFrom._calc_hash(gaintable, gainfield, interp, spwmap,
                                       calwt)
 
-        obj = CalFrom._CalFromPool.get(arg_hash, None)
+        # Thread-safe pool lookup for parallel unpickling
+        with CalFrom._CalFromPoolLock:
+            obj = CalFrom._CalFromPool.get(arg_hash, None)
+        
         if not obj:
             LOG.trace('Creating new CalFrom(gaintable=\'%s\', '
                       'gainfield=\'%s\', interp=\'%s\', spwmap=%s, '
@@ -628,8 +633,17 @@ class CalFrom(object):
             obj.__calwt = calwt
 
             LOG.debug('Adding new CalFrom to pool: %s' % obj)
-            CalFrom._CalFromPool[arg_hash] = obj
-            LOG.trace('New pool contents: %s' % list(CalFrom._CalFromPool.items()))
+            with CalFrom._CalFromPoolLock:
+                # Double-check that another thread didn't create it while we were initializing
+                existing = CalFrom._CalFromPool.get(arg_hash, None)
+                if existing:
+                    obj = existing
+                else:
+                    CalFrom._CalFromPool[arg_hash] = obj
+                    if LOG.isEnabledFor(logging.TRACE):
+                        # Snapshot pool items while holding lock to avoid race conditions
+                        pool_snapshot = list(CalFrom._CalFromPool.items())
+                        LOG.trace('New pool contents: %s' % pool_snapshot)
         else:
             LOG.trace('Reusing existing CalFrom(gaintable=\'%s\', '
                       'gainfield=\'%s\', interp=\'%s\', spwmap=\'%s\', '
