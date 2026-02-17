@@ -39,6 +39,32 @@ if TYPE_CHECKING:
 LOG = infrastructure.logging.get_logger(__name__)
 
 
+def _make_pickleable_namedtuple(typename, fields, module_globals=None):
+    """
+    Create a namedtuple that can be pickled when defined inside a class.
+
+    Sets the __module__ attribute and registers in module globals so pickle
+    can find the type definition during serialization.
+
+    Args:
+        typename: The name of the namedtuple class
+        fields: Space or comma-separated field names
+        module_globals: Module globals dict (defaults to current module's globals)
+
+    Returns:
+        namedtuple class with pickle support
+    """
+    nt = collections.namedtuple(typename, fields)
+    nt.__module__ = __name__
+
+    # Register in module globals so pickle can find it
+    if module_globals is None:
+        module_globals = globals()
+    module_globals[typename] = nt
+
+    return nt
+
+
 def get_task_description(result_obj, context, include_stage=True):
     if not isinstance(result_obj, (list, basetask.ResultsList)):
         return get_task_description([result_obj, ], context)
@@ -298,18 +324,18 @@ class T1_1Renderer(RendererBase):
     template = 't1-1.mako'
 
     # named tuple holding values for each row in the main summary table
-    TableRow = collections.namedtuple(
-                'Tablerow', 
+    TableRow = _make_pickleable_namedtuple(
+                'TableRow',
                 'ousstatus_entity_id schedblock_id schedblock_name session '
-                'execblock_id ms acs_software_version acs_software_build_version observing_modes href filesize ' 
+                'execblock_id ms acs_software_version acs_software_build_version observing_modes href filesize '
                 'receivers '
                 'num_antennas beamsize_min beamsize_max '
                 'time_start time_end time_on_source '
                 'baseline_min baseline_max baseline_rms')
-    TableRowNRO = collections.namedtuple(
-                'TablerowNRO', 
+    TableRowNRO = _make_pickleable_namedtuple(
+                'TableRowNRO',
                 'ousstatus_entity_id schedblock_id schedblock_name session '
-                'execblock_id ms href filesize ' 
+                'execblock_id ms href filesize '
                 'receivers '
                 'num_antennas beamsize_min beamsize_max '
                 'time_start time_end time_on_source '
@@ -633,9 +659,9 @@ class T1_2Renderer(RendererBase):
     template = 't1-2.mako'
 
     # named tuple holding values for each row in the main summary table
-    TableRow = collections.namedtuple(
-                'Tablerow', 
-                'ms href filesize ' 
+    TableRow = _make_pickleable_namedtuple(
+                'TableRow',
+                'ms href filesize '
                 'receivers '
                 'num_antennas beamsize_min beamsize_max '
                 'time_start time_end time_on_source '
@@ -672,7 +698,7 @@ class T1_2Renderer(RendererBase):
             row = T1_2Renderer.TableRow(ms=ms.basename,
                                         href=href,
                                         filesize=ms.filesize,
-                                        receivers=receivers,                           
+                                        receivers=receivers,
                                         num_antennas=num_antennas,
                                         beamsize_min='TODO',
                                         beamsize_max='TODO',
@@ -696,7 +722,7 @@ class T1_3MRenderer(RendererBase):
     output_file = 't1-3.html'
     template = 't1-3m.mako'
 
-    MsgTableRow = collections.namedtuple('MsgTableRow', 'stage task type message target')
+    MsgTableRow = _make_pickleable_namedtuple('MsgTableRow', 'stage task type message target')
 
     @classmethod
     def get_display_context(cls, context):
@@ -841,7 +867,7 @@ class T2_1DetailsRenderer(object):
     @classmethod
     def get_cache_stats(cls):
         """Return cache hit and miss counts.
-        
+
         Returns:
             tuple: (cache_hits, cache_misses, hit_rate)
         """
@@ -874,7 +900,7 @@ class T2_1DetailsRenderer(object):
 
     @staticmethod
     def write_listobs(context, ms):
-        listfile = os.path.join(context.report_dir, 
+        listfile = os.path.join(context.report_dir,
                                 'session%s' % ms.session,
                                 ms.basename,
                                 'listobs.txt')
@@ -939,7 +965,7 @@ class T2_1DetailsRenderer(object):
 
         # Generate charts in parallel-friendly order (could be batched in future)
         start_charts = time_module.perf_counter()
-        
+
         start_intent = time_module.perf_counter()
         inputs = summary.IntentVsTimeChart.Inputs(context, vis=ms.basename)
         task = summary.IntentVsTimeChart(inputs)
@@ -969,7 +995,7 @@ class T2_1DetailsRenderer(object):
         time_start = utils.get_epoch_as_datetime(ms.start_time)
         time_end = utils.get_epoch_as_datetime(ms.end_time)
 
-        time_on_source = utils.total_time_on_source(ms.scans) 
+        time_on_source = utils.total_time_on_source(ms.scans)
         if scan_has_intent(science_scans, 'REFERENCE') or is_single_dish_data:
             # target scans have OFF-source integrations or Single Dish Data. Need to do harder way.
             time_on_science = utils.total_time_on_target_on_source(ms, is_single_dish_data)
@@ -1096,7 +1122,7 @@ class T2_1DetailsRenderer(object):
             'telmjd_max'      : utils.format_datetime(datetime.datetime.fromtimestamp(telmjd_max)),
             'vla_basebands'   : vla_basebands
         }
-        
+
         # Cache the display context in the MS object for future renders
         ms._t2_1_details_cache = display_context
 
@@ -1106,7 +1132,7 @@ class T2_1DetailsRenderer(object):
             weblog_metadata.save_t2_1_details_metadata(metadata)
         except Exception:
             pass
-        
+
         return display_context
 
     @classmethod
@@ -1227,12 +1253,13 @@ class T2_2_2Renderer(T2_2_XRendererBase):
     output_file = 't2-2-2.html'
     template = 't2-2-2.mako'
 
+    ShowColumn = _make_pickleable_namedtuple('ShowColumn', 'science_windows all_windows')
+
     @staticmethod
     def get_display_context(context, ms):
         """Determine whether to show the Online Spec. Avg. column on the Spectral Setup Details page."""
 
-        ShowColumn = collections.namedtuple('ShowColumn', 'science_windows all_windows')
-        show_online_spec_avg_col = ShowColumn(science_windows=False, all_windows=False)
+        show_online_spec_avg_col = T2_2_2Renderer.ShowColumn(science_windows=False, all_windows=False)
 
         if None not in [spw.sdm_num_bin for spw in ms.get_spectral_windows()]:
             # PIPE-1572: when None exists in spw.sdm_num_bin, the MS is likely imported by older
@@ -1240,7 +1267,7 @@ class T2_2_2Renderer(T2_2_XRendererBase):
             # not display the Online Spec. Avg. column.
             if ms.antenna_array.name == 'ALMA':
                 # PIPE-584: Always show the column for ALMA. If it's cycle 2 data, display a '?' in the table.
-                show_online_spec_avg_col = ShowColumn(science_windows=True, all_windows=True)
+                show_online_spec_avg_col = T2_2_2Renderer.ShowColumn(science_windows=True, all_windows=True)
             elif 'VLA' in ms.antenna_array.name:
                 # PIPE-584: For VLA, only display the column if sdm_num_bin > 1 is present for at least one
                 # entry. It is possible for this to differ between the "Science Windows" and the "All Windows" tabs.
@@ -1249,9 +1276,9 @@ class T2_2_2Renderer(T2_2_XRendererBase):
                     science_sdm_num_bins = [spw for spw in ms.get_spectral_windows(
                         science_windows_only=True) if spw.sdm_num_bin > 1]
                     if len(science_sdm_num_bins) >= 1:
-                        show_online_spec_avg_col = ShowColumn(science_windows=True, all_windows=True)
+                        show_online_spec_avg_col = T2_2_2Renderer.ShowColumn(science_windows=True, all_windows=True)
                     else:
-                        show_online_spec_avg_col = ShowColumn(science_windows=False, all_windows=True)
+                        show_online_spec_avg_col = T2_2_2Renderer.ShowColumn(science_windows=False, all_windows=True)
 
         return {'pcontext': context,
                 'ms': ms,
@@ -1293,7 +1320,7 @@ class T2_2_3Renderer(T2_2_XRendererBase):
             ms._t2_2_3_cache = display_context
             LOG.debug('T2_2_3 metadata hit for %s', ms.basename)
             return display_context
-            
+
         if context.project_summary.telescope in ('NRO',):
             # antenna plots are useless for Nobeyama
             plot_ants = None
@@ -1324,7 +1351,7 @@ class T2_2_3Renderer(T2_2_XRendererBase):
                 'plot_uv': plot_uv,
                 'ms': ms,
                 'dirname': dirname}
-        
+
         # Cache the display context
         ms._t2_2_3_cache = display_context
 
@@ -1367,7 +1394,7 @@ class T2_2_4Renderer(T2_2_XRendererBase):
             ms._t2_2_4_cache = display_context
             LOG.debug('Using metadata for T2_2_4 %s', ms.basename)
             return display_context
-            
+
         task = summary.AzElChart(context, ms)
         azel_plot = task.plot()
 
@@ -1399,7 +1426,7 @@ class T2_2_4Renderer(T2_2_XRendererBase):
                 'zd_telmjd_plot'  : zd_vs_telmjd_plot,
                 'plot_uv': plot_uv,
                 'dirname': dirname}
-        
+
         # Cache the display context
         ms._t2_2_4_cache = display_context
 
@@ -1419,8 +1446,8 @@ class T2_2_6Renderer(T2_2_XRendererBase):
     output_file = 't2-2-6.html'
     template = 't2-2-6.mako'
 
-    TableRow = collections.namedtuple(
-        'TableRow', 
+    TableRow = _make_pickleable_namedtuple(
+        'TableRow',
         'id time_start time_end duration intents fields spws'
     )
 
@@ -1628,7 +1655,7 @@ class T2_3_1MRenderer(T2_3_XMBaseRenderer):
 
     @classmethod
     def get_topic(cls):
-        return qaadapter.registry.get_dataset_topic()        
+        return qaadapter.registry.get_dataset_topic()
 
 
 class T2_3_2MRenderer(T2_3_XMBaseRenderer):
@@ -1642,7 +1669,7 @@ class T2_3_2MRenderer(T2_3_XMBaseRenderer):
 
     @classmethod
     def get_topic(cls):
-        return qaadapter.registry.get_calibration_topic()        
+        return qaadapter.registry.get_calibration_topic()
 
 
 class T2_3_3MRenderer(T2_3_XMBaseRenderer):
@@ -1656,7 +1683,7 @@ class T2_3_3MRenderer(T2_3_XMBaseRenderer):
 
     @classmethod
     def get_topic(cls):
-        return qaadapter.registry.get_flagging_topic()        
+        return qaadapter.registry.get_flagging_topic()
 
 
 class T2_3_5MRenderer(T2_3_XMBaseRenderer):
@@ -1670,7 +1697,7 @@ class T2_3_5MRenderer(T2_3_XMBaseRenderer):
 
     @classmethod
     def get_topic(cls):
-        return qaadapter.registry.get_imaging_topic()        
+        return qaadapter.registry.get_imaging_topic()
 
 
 class T2_3_6MRenderer(T2_3_XMBaseRenderer):
@@ -1720,7 +1747,7 @@ class T2_4MDetailsDefaultRenderer(object):
 
     def render(self, context, result):
         display_context = self.get_display_context(context, result)
-        # TODO remove fallback access once all templates are converted 
+        # TODO remove fallback access once all templates are converted
         uri = getattr(self, 'uri', None)
         if uri is None:
             uri = self.template
@@ -1738,13 +1765,13 @@ class T2_4MDetailsDefaultRenderer(object):
         if not os.path.exists(stagelog_path):
             return None
 
-        return os.path.relpath(stagelog_path, context.report_dir)        
+        return os.path.relpath(stagelog_path, context.report_dir)
 
     def _get_help(self, context, result):
         try:
             # get hif-prefixed taskname from the result from which we can
             # retrieve the XML documentation, otherwise fall back to the
-            # Python class documentation              
+            # Python class documentation
             taskname = getattr(result, 'taskname', result[0].task)
 
             obj, _ = pydoc.resolve(taskname, forceload=0)
@@ -1793,7 +1820,7 @@ class T2_4MDetailsContainerRenderer(RendererBase):
 class T2_4MDetailsRenderer(object):
     # the filename component of the output file. While this is the same for
     # all results, the directory is stage-specific, so there's no risk of
-    # collisions  
+    # collisions
     output_file = 't2-4m_details.html'
 
     # the default renderer should the task:renderer mapping not specify a
@@ -1822,7 +1849,7 @@ class T2_4MDetailsRenderer(object):
         if not os.path.exists(dirname):
             os.makedirs(dirname)
 
-        # create a file object that writes to a file if a hard copy is 
+        # create a file object that writes to a file if a hard copy is
         # requested, otherwise return a file object that flushes to stdout
         file_obj = open(path, 'w', encoding='utf-8')
 
@@ -1843,7 +1870,7 @@ class T2_4MDetailsRenderer(object):
     """
     @classmethod
     def get_path(cls, context, result, root=''):
-        # HTML output will be written to the directory 'stageX' 
+        # HTML output will be written to the directory 'stageX'
         stage = 'stage%s' % result.stage_number
         stage_dir = os.path.join(context.report_dir, root, stage)
 
@@ -1855,7 +1882,7 @@ class T2_4MDetailsRenderer(object):
     context.
 
     This renderer creates detailed, T2_4M output for each Results. Each
-    Results in the context is passed to a specialised renderer, which 
+    Results in the context is passed to a specialised renderer, which
     generates customised output and plots for the Result in question.
 
     :param context: the pipeline Context
@@ -1919,7 +1946,7 @@ class T2_4MDetailsRenderer(object):
                 LOG.warning('Don\'t know how to group %s renderer', task.__name__)
 
     @classmethod
-    def render_result(cls, renderer, context, result, root=''):                
+    def render_result(cls, renderer, context, result, root=''):
         # details pages do not need to be updated once written unless the
         # renderer specifies that an update is required
         path = cls.get_path(context, result, root)
@@ -1983,7 +2010,7 @@ def wrap_in_resultslist(task_result):
     # the newly-created ResultsList wrapper is missing a QA pool. However,
     # as there is only ever one task added to the list we can safely assume
     # that the pool for the wrapper should equal that of the child. The same
-    # holds for logrecords. The task name is required as the plot level 
+    # holds for logrecords. The task name is required as the plot level
     # toggles work off the CASA task name.
     for attr in ['qa', 'pipeline_casa_task', 'logrecords']:
         if hasattr(task_result, 'qa'):
@@ -1997,9 +2024,9 @@ def wrap_in_resultslist(task_result):
 
 def group_into_sessions(context, task_results):
     """
-    Return results grouped into lists by session. 
+    Return results grouped into lists by session.
     """
-    session_map = {ms.basename : ms.session 
+    session_map = {ms.basename : ms.session
                    for ms in context.observing_run.measurement_sets}
 
     def get_session(r):
@@ -2052,8 +2079,8 @@ def sort_by_time(mses):
     """
     Return measurement sets sorted by time order.
     """
-    return sorted(mses, 
-                  key=lambda ms: utils.get_epoch_as_datetime(ms.start_time))     
+    return sorted(mses,
+                  key=lambda ms: utils.get_epoch_as_datetime(ms.start_time))
 
 
 def get_rootdir(r):
@@ -2070,7 +2097,7 @@ def group_by_root(context, task_results):
     results_by_root = sorted(task_results, key=get_rootdir)
 
     d = collections.defaultdict(list)
-    for k, g in itertools.groupby(results_by_root, get_rootdir):        
+    for k, g in itertools.groupby(results_by_root, get_rootdir):
         l = basetask.ResultsList()
         l.extend(g)
         l.timestamps = task_results.timestamps
@@ -2130,7 +2157,7 @@ class WebLogGenerator(object):
         WebLogGenerator.copy_resources(context)
 
         # We could seriously optimise the rendering process by only unpickling
-        # those objects that we need to render.  
+        # those objects that we need to render.
         LOG.todo('Add results argument to renderer interfaces!')
         proxies = context.results
 
@@ -2148,20 +2175,20 @@ class WebLogGenerator(object):
             #   - Very large files (>100MB avg): 1.1x faster - disk I/O bottleneck, GIL contention
             # Strategy: Use parallel for files >150KB with optimized worker count
             num_results = len(context.results)
-            
+
             # Estimate total pickle size to determine if parallel is worthwhile
             total_size = sum(os.path.getsize(proxy.path) if os.path.exists(proxy.path) else 0
                            for proxy in context.results)
             avg_size = total_size / max(num_results, 1)
-            
+
             # Use parallel if average file size >150KB (provides consistent performance)
             # Threshold lowered from 500KB to handle disk cache variability
             # Requires at least 2 results (no benefit for single file)
             use_parallel = avg_size > 150_000 and num_results > 1
-            
+
             if use_parallel:
                 cpu_count = os.cpu_count() or 4
-                
+
                 # Scale worker count based on file size to optimize memory and GIL contention:
                 # - Small-medium files (0.5-50MB): Use all CPUs (I/O bound)
                 # - Large files (50-200MB): Use half CPUs (balance I/O and memory)
@@ -2172,7 +2199,7 @@ class WebLogGenerator(object):
                     max_workers = max(2, min(num_results, cpu_count // 2))
                 else:
                     max_workers = min(num_results, cpu_count)
-                
+
                 with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
                     context.results = list(executor.map(lambda proxy: proxy.read(), context.results))
                 unpickle_elapsed = time.time() - unpickle_start
@@ -2206,7 +2233,7 @@ class WebLogGenerator(object):
             render_elapsed = time.time() - render_start
             LOG.info('Weblog rendering: all renderers completed in %.2fs',
                      render_elapsed)
-            
+
             # Log sorted timing summary
             LOG.info('Per-renderer timing summary (sorted by duration):')
             for name, elapsed in sorted(renderer_times, key=lambda x: x[1], reverse=True):
@@ -2244,7 +2271,7 @@ class WebLogGenerator(object):
 class LogCopier(object):
     """
     LogCopier copies and handles the CASA logs so that they may be referenced
-    by the pipeline web logs. 
+    by the pipeline web logs.
 
     Capturing the CASA log gives us a few problems:
     The previous log is renamed upon starting a new session. To be reliably
@@ -2283,14 +2310,14 @@ class LogCopier(object):
         # on the same line
         with open(output_file, 'a') as weblog:
             with open(casa_tools.log.logfile(), 'r') as casalog:
-                to_append = [entry for entry in casalog 
+                to_append = [entry for entry in casalog
                              if entry not in existing_entries]
             weblog.writelines(to_append)
 
 
 # adding classes to this tuple always rerenders their content, bypassing the
 # cache or 'existing file' checks. This is useful for developing and debugging
-# as you can just call WebLogGenerator.render(context) 
+# as you can just call WebLogGenerator.render(context)
 DEBUG_CLASSES = []
 
 

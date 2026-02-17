@@ -594,7 +594,16 @@ def get_obj_size(obj: Any, serialize: bool = True) -> int:
         Exception: If serialize is False and Pympler is not installed.
     """
     if serialize:
-        return len(pickle.dumps(obj, protocol=-1))
+        try:
+            return len(pickle.dumps(obj, protocol=-1))
+        except Exception:
+            # Fallback to asizeof if object is not pickleable
+            try:
+                from pympler.asizeof import asizeof
+                return asizeof(obj)
+            except (ImportError, Exception):
+                # If all else fails, return 0 (unknown size)
+                return 0
     try:
         from pympler.asizeof import asizeof
         return asizeof(obj)
