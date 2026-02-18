@@ -132,8 +132,8 @@ class SelfcalHeuristics(object):
             cycleniter=300, uvtaper=[],
             savemodel='none', sidelobethreshold=3.0, smoothfactor=1.0,  noisethreshold=5.0, lownoisethreshold=1.5,
             parallel=False, cyclefactor=3, threshold='0.0Jy', startmodel='', pblimit=0.1, pbmask=0.1, field='',
-            datacolumn='', spw='all', obstype='single-point', nfrms_multiplier=1.0,
-            savemodel_only=False, resume=False, image_mosaic_fields_separately=True, store_threshold=''):
+            datacolumn='', nfrms_multiplier=1.0,
+            savemodel_only=False, resume=False, spw='all', image_mosaic_fields_separately=True, store_threshold=''):
         """
         Wrapper for tclean with keywords set to values desired for the Large Program imaging
         See the CASA 6.1.1 documentation for tclean to get the definitions of all the parameters
@@ -533,7 +533,7 @@ class SelfcalHeuristics(object):
             gaincal_minsnr, gaincal_unflag_minsnr=5.0, minsnr_to_proceed=3.0, rerank_refants=False, unflag_only_lbants=False, unflag_only_lbants_onlyap=False,
             calonly_max_flagged=0.0, second_iter_solmode="", unflag_fb_to_prev_solint=False,
             refantmode="flex", mode="selfcal", calibrators="", gaincalibrator_dict={}, allow_gain_interpolation=False,
-            guess_scan_combine=False):
+            guess_scan_combine=False, do_fallback_calonly=False):
         
         sani_target = 'sc.'+filenamer.sanitize(target)
         ##
@@ -568,8 +568,8 @@ class SelfcalHeuristics(object):
                 gaincal_spwmap = []
                 gaincal_preapply_gaintable = [sani_target+'_'+vis+'_'+band+'_inf_EB_0_p.g']
                 gaincal_interpolate = [slib['applycal_interp']]
-                gaincal_gaintype = 'T' if applymode == "calflag" or second_iter_solmode == "" else "GSPLINE" if second_iter_solmode == "GSPLINE" else "G"
-                gaincal_solmode = "" if applymode == "calflag" or second_iter_solmode == "GSPLINE" else second_iter_solmode
+                gaincal_gaintype = 'T' if not do_fallback_calonly or second_iter_solmode == "" else "GSPLINE" if second_iter_solmode == "GSPLINE" else "G"
+                gaincal_solmode = "" if not do_fallback_calonly or second_iter_solmode == "GSPLINE" else second_iter_solmode
                 if 'spw' in selfcal_plan[vis]['inf_EB_gaincal_combine']:
                     applycal_spwmap = [slib[vis]
                                             ['spwmap'], slib[vis]['spwmap']]
@@ -734,8 +734,8 @@ class SelfcalHeuristics(object):
                                                             str(iteration)+'_' +
                                                             selfcal_plan['solmode'][iteration]+'.g',
                                                             gaintype=gaincal_gaintype, spw=spwselect,
-                                                            refant=slib[vis]['refant'], calmode=selfcal_plan['solmode'][iteration], solnorm=solnorm if applymode == "calflag" else False,
-                                                            solint=solint.replace('_EB', '').replace('_ap', '').replace('scan_', ''), minsnr=gaincal_minsnr if applymode == 'calflag' else max(gaincal_minsnr, gaincal_unflag_minsnr), minblperant=4, combine=selfcal_plan['gaincal_combine'][iteration],
+                                                            refant=slib[vis]['refant'], calmode=selfcal_plan['solmode'][iteration], solnorm=solnorm if not do_fallback_calonly else False,
+                                                            solint=solint.replace('_EB', '').replace('_ap', '').replace('scan_', ''), minsnr=gaincal_minsnr if not do_fallback_calonly else max(gaincal_minsnr, gaincal_unflag_minsnr), minblperant=4, combine=selfcal_plan['gaincal_combine'][iteration],
                                                             field=incl_targets, scan=incl_scans, gaintable=gaincal_preapply_gaintable, spwmap=gaincal_spwmap, uvrange=slib['uvrange'],
                                                             interp=gaincal_interpolate, solmode=gaincal_solmode, refantmode='flex', append=os.path.exists(sani_target+'_'+vis+'_'+band+'_'+solint+'_'+str(iteration)+'_'+selfcal_plan['solmode'][iteration]+'.g'))
                     #
@@ -749,8 +749,8 @@ class SelfcalHeuristics(object):
                 gaincal_preapply_gaintable = slib[fid][vis][slib[fid]
                                                                     ['final_phase_solint']]['gaintable']
                 gaincal_interpolate = [slib['applycal_interp']]*len(gaincal_preapply_gaintable)
-                gaincal_gaintype = 'T' if applymode == "calflag" or second_iter_solmode == "" else "GSPLINE" if second_iter_solmode == "GSPLINE" else "G"
-                gaincal_solmode = "" if applymode == "calflag" or second_iter_solmode == "GSPLINE" else second_iter_solmode
+                gaincal_gaintype = 'T' if not do_fallback_calonly or second_iter_solmode == "" else "GSPLINE" if second_iter_solmode == "GSPLINE" else "G"
+                gaincal_solmode = "" if not_do_fallback_calonly or second_iter_solmode == "GSPLINE" else second_iter_solmode
                 if 'spw' in selfcal_plan['inf_EB_gaincal_combine'][vis]:
                     applycal_spwmap = [slib[fid][vis]['spwmap'],
                                             slib[fid][vis]['spwmap'], slib[fid][vis]['spwmap']]
@@ -802,8 +802,8 @@ class SelfcalHeuristics(object):
                                                         # caltable=sani_target+'_'+vis+'_'+band+'_'+solint+'_'+str(iteration)+'_'+selfcal_plan['solmode'][iteration]+'.g',\
                                                         caltable="temp.g", \
                                                         gaintype=gaincal_gaintype, spw=slib[fid][vis]['spws'],
-                                                        refant=slib[vis]['refant'], calmode=selfcal_plan['solmode'][iteration], solnorm=solnorm if applymode == "calflag" else False,
-                                                        solint=solint.replace('_EB', '').replace('_ap', '').replace('scan_', ''), minsnr=gaincal_minsnr if applymode == 'calflag' else max(gaincal_minsnr, gaincal_unflag_minsnr), minblperant=4, combine=selfcal_plan['gaincal_combine'][iteration],
+                                                        refant=slib[vis]['refant'], calmode=selfcal_plan['solmode'][iteration], solnorm=solnorm if not do_fallback_calonly else False,
+                                                        solint=solint.replace('_EB', '').replace('_ap', '').replace('scan_', ''), minsnr=gaincal_minsnr if not do_fallback_calonly else max(gaincal_minsnr, gaincal_unflag_minsnr), minblperant=4, combine=selfcal_plan['gaincal_combine'][iteration],
                                                         field=str(slib['sub-fields-fid_map'][vis][fid]), gaintable=gaincal_preapply_gaintable, spwmap=gaincal_spwmap, uvrange=slib['uvrange'],
                                                         # interp=gaincal_interpolate[vis], solmode=gaincal_solmode, append=os.path.exists(sani_target+'_'+vis+'_'+band+'_'+
                                                         # solint+'_'+str(iteration)+'_'+selfcal_plan['solmode'][iteration]+'.g'))
@@ -886,7 +886,7 @@ class SelfcalHeuristics(object):
                                                                         caltable='test_inf_EB_'+gaintype+'.g',
                                                                         gaintype=gaintype, spw=spwselect,
                                                                         refant=slib[vis]['refant'], calmode='p',
-                                                                        solint=solint.replace('_EB', '').replace('_ap', ''), minsnr=gaincal_minsnr if applymode == "calflag" else max(gaincal_minsnr, gaincal_unflag_minsnr), minblperant=4, combine=test_gaincal_combine,
+                                                                        solint=solint.replace('_EB', '').replace('_ap', ''), minsnr=gaincal_minsnr if not do_fallback_calonly else max(gaincal_minsnr, gaincal_unflag_minsnr), minblperant=4, combine=test_gaincal_combine,
                                                                         field=include_targets[0], gaintable='', spwmap=[], uvrange=slib['uvrange'], refantmode=refantmode, append=os.path.exists('test_inf_EB_'+gaintype+'.g'))]
             spwlist = slib[vis]['spws'].split(',')
             fallback, map_index, spwmap, applycal_spwmap_inf_EB = analyze_inf_EB_flagging(slib, band, spwlist, sani_target+'_'+vis+'_'+band+'_'+solint+'_'+str(
@@ -933,14 +933,14 @@ class SelfcalHeuristics(object):
 
         # If iteration two, try restricting to just the antennas with enough unflagged data.
         # Should we also restrict to just long baseline antennas?
-        if applymode == "calonly":
+        if do_fallback_calonly:
             # Make a copy of the caltable before unflagging, for reference.
             os.system("cp -r "+sani_target+'_'+vis+'_'+band+'_'+solint+'_'+str(iteration)+'_' +
                         selfcal_plan['solmode'][iteration]+'.g '+sani_target+'_'+vis+'_'+band+'_'+solint+'_'+str(iteration)+'_' +
                         selfcal_plan['solmode'][iteration]+'.pre-pass.g')
 
-            if solint == "inf_EB" and len(applycal_spwmap[vis]) > 0:
-                unflag_spwmap = applycal_spwmap[vis][0]
+            if solint == "inf_EB" and len(applycal_spwmap) > 0:
+                unflag_spwmap = applycal_spwmap[0]
             else:
                 unflag_spwmap = []
 
@@ -2053,10 +2053,11 @@ class SelfcalHeuristics(object):
 
         # Start looping over the solints.
 
-        iterjump = -1   # useful if we want to jump iterations
+        iteration = 0
         sani_target = 'sc.'+filenamer.sanitize(target)
         vislist = slib['vislist'].copy()
         LOG.info('Starting selfcal procedure on: '+target+' '+band)
+        
         if selfcal_library['usermodel'] != '':
             LOG.info('Setting model column to user model')
             self.usermodel_wrapper(selfcal_library, sani_target+'_'+band,
@@ -2066,11 +2067,15 @@ class SelfcalHeuristics(object):
                                    field=target, spw=slib['spws_per_vis'], 
                                    resume=False, cyclefactor=slib['cyclefactor'])
 
-        for iteration in range(len(selfcal_plan['solints'])):
-            if (iterjump != -1) and (iteration < iterjump):  # allow jumping to amplitude selfcal and not need to use a while loop
-                continue
-            elif iteration == iterjump:
-                iterjump = -1
+        repeat_solint = False
+        do_fallback_combinespw = False
+        do_fallback_calonly = False
+        counter = 0
+        while iteration < len(selfcal_plan['solints']):
+            #if (iterjump != -1) and (iteration < iterjump):  # allow jumping to amplitude selfcal and not need to use a while loop
+            #    continue
+            #elif iteration == iterjump:
+            #    iterjump = -1
 
             if 'ap' in selfcal_plan['solints'][iteration] and not do_amp_selfcal:
                 break
@@ -2080,7 +2085,7 @@ class SelfcalHeuristics(object):
                     selfcal_plan['solint_snr'][selfcal_plan['solints'][iteration]])+', Min SNR Required: '+str(minsnr_to_proceed)+' **************')
                 # if a solution interval shorter than inf for phase-only SC has passed, attempt amplitude selfcal
                 if iteration > 1 and selfcal_plan['solmode'][iteration] != 'ap' and do_amp_selfcal:
-                    iterjump = selfcal_plan['solmode'].index('ap')
+                    iteration = selfcal_plan['solmode'].index('ap')
                     LOG.info('****************Attempting amplitude selfcal*************')
                     continue
 
@@ -2093,7 +2098,8 @@ class SelfcalHeuristics(object):
                     LOG.info('Starting with solint: '+solint)
                 else:
                     LOG.info('Continuing with solint: '+solint)
-                os.system('rm -rf '+sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'*')
+                if not repeat_solint:
+                    os.system('rm -rf '+sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'*')
                 ##
                 # make images using the appropriate tclean heuristics for each telescope
                 # set threshold based on RMS of initial image and lower if value becomes lower
@@ -2119,52 +2125,47 @@ class SelfcalHeuristics(object):
                 else:
                     resume = False
 
-                nfrms_multiplier = slib['RMS_NF_curr'] / slib['RMS_curr']
-
-                # Record solint details.
-                for vis in vislist:
-                    slib[vis][solint] = {}
-                    slib[vis][solint]['clean_threshold'] = slib['nsigma'][iteration]*slib['RMS_NF_curr']
-                    slib[vis][solint]['nfrms_multiplier'] = nfrms_multiplier
-                    for fid in np.intersect1d(slib['sub-fields-to-selfcal'], list(slib['sub-fields-fid_map'][vis].keys())):
-                        slib[fid][vis][solint] = {}
-                        slib[fid][vis][solint]['clean_threshold'] = slib['nsigma'][iteration]*slib['RMS_NF_curr']
-                        slib[fid][vis][solint]['nfrms_multiplier'] = nfrms_multiplier
-
-                # remove mask if exists from previous selfcal _post image user is specifying a mask
-                if os.path.exists(sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'.mask') and selfcal_library['usermask'] != '':
-                    os.system('rm -rf '+sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'.mask')
-                self.tclean_wrapper(selfcal_library, sani_target+'_'+band+'_'+solint+'_'+str(iteration),
-                                    band, telescope=telescope, nsigma=slib['nsigma'][iteration], scales=[
-                                        0],
-                                    # threshold=str(slib['nsigma'][iteration]* slib['RMS_NF_curr'])+'Jy',
-                                    threshold=str(slib[vislist[0]][solint]['clean_threshold'])+'Jy',
-                                    savemodel='none', parallel=self.parallel,
-                                    field=target,
-                                    nfrms_multiplier=slib[vislist[0]][solint]['nfrms_multiplier'], resume=resume)
-
-                # Check that a mask was actually created, because if not the model will be empty and gaincal will do bad things and the
-                # code will break.
-                if not checkmask(sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'.image.tt0'):
-                    slib['Stop_Reason'] = 'Empty model for solint '+solint
-                    break  # breakout of loop because the model is empty and gaincal will therefore fail
-
-                # Loop through up to two times. On the first attempt, try applymode = 'calflag' (assuming this is requested by the user). On the
-                # second attempt, use applymode = 'calonly'.
-                for applymode in np.unique([selfcal_plan['applycal_mode'][iteration], 'calonly']):
+                # we don't want to re-run tclean and gaincal if we're trying to fallback to combinespw
+                if not repeat_solint:
+                    # Record solint details.
                     for vis in vislist:
-                        ##
-                        # Restore original flagging state each time before applying a new gaintable
-                        ##
-                        if os.path.exists(vis+".flagversions/flags.selfcal_starting_flags_"+sani_target+'_'+band):
-                            self.cts.flagmanager(vis=vis, mode='restore', versionname='selfcal_starting_flags_' +
-                                                 sani_target+'_'+band, comment='Flag states at start of reduction')
-                        else:
-                            self.cts.flagmanager(vis=vis, mode='save',
-                                                 versionname='selfcal_starting_flags_'+sani_target+'_'+band)
+                        slib[vis][solint] = {}
+                        slib[vis][solint]['clean_threshold'] = slib['nsigma'][iteration]*slib['RMS_NF_curr']
+                        slib[vis][solint]['nfrms_multiplier'] = slib['RMS_NF_curr'] / slib['RMS_curr']
+                        for fid in np.intersect1d(slib['sub-fields-to-selfcal'], list(slib['sub-fields-fid_map'][vis].keys())):
+                            slib[fid][vis][solint] = {}
+                            slib[fid][vis][solint]['clean_threshold'] = slib['nsigma'][iteration]*slib['RMS_NF_curr']
+                            slib[fid][vis][solint]['nfrms_multiplier'] = slib['RMS_NF_curr'] / slib['RMS_curr']
 
+                    self.tclean_wrapper(selfcal_library, sani_target+'_'+band+'_'+solint+'_'+str(iteration),
+                                        band, telescope=telescope, nsigma=slib['nsigma'][iteration], scales=[
+                                            0],
+                                        # threshold=str(slib['nsigma'][iteration]* slib['RMS_NF_curr'])+'Jy',
+                                        threshold=str(slib[vislist[0]][solint]['clean_threshold'])+'Jy',
+                                        savemodel='none', parallel=self.parallel,
+                                        field=target,
+                                        nfrms_multiplier=slib[vislist[0]][solint]['nfrms_multiplier'], resume=resume)
+
+                    # Check that a mask was actually created, because if not the model will be empty and gaincal will do bad things and the
+                    # code will break.
+                    if not checkmask(sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'.image.tt0'):
+                        slib['Stop_Reason'] = 'Empty model for solint '+solint
+                        break  # breakout of loop because the model is empty and gaincal will therefore fail
+
+                for vis in vislist:
+                    ##
+                    # Restore original flagging state each time before applying a new gaintable
+                    ##
+                    if os.path.exists(vis+".flagversions/flags.selfcal_starting_flags_"+sani_target+'_'+band):
+                        self.cts.flagmanager(vis=vis, mode='restore', versionname='selfcal_starting_flags_' +
+                                                sani_target+'_'+band, comment='Flag states at start of reduction')
+                    else:
+                        self.cts.flagmanager(vis=vis, mode='save',
+                                                versionname='selfcal_starting_flags_'+sani_target+'_'+band)
+
+                if not do_fallback_combinespw:
                     # We need to redo saving the model now that we have potentially unflagged some data.
-                    if applymode == "calflag":
+                    if not do_fallback_calonly:
                         self.tclean_wrapper(selfcal_library, sani_target+'_'+band+'_'+solint+'_'+str(iteration),
                                             band, telescope=telescope, nsigma=slib['nsigma'][iteration], scales=[
                                                 0],
@@ -2178,7 +2179,7 @@ class SelfcalHeuristics(object):
                     # Fields that don't have any mask in the primary beam should be removed from consideration, as their models are likely bad.
                     if slib['obstype'] == 'mosaic':
                         slib['sub-fields-to-gaincal'] = self.evaluate_subfields_to_gaincal(slib, sani_target, band, solint, iteration, selfcal_plan, 
-                                      minsnr_to_proceed, allow_gain_interpolation=allow_gain_interpolation)
+                                        minsnr_to_proceed, allow_gain_interpolation=allow_gain_interpolation)
 
                         if solint != 'inf_EB' and not allow_gain_interpolation:
                             slib['sub-fields-to-selfcal'] = slib['sub-fields-to-gaincal']
@@ -2191,12 +2192,13 @@ class SelfcalHeuristics(object):
                                           list(slib['sub-fields-fid_map'][vis].keys())).size == 0:
                             continue
 
-                        self.gaincal_wrapper(slib, selfcal_plan, target, band, vis, solint, applymode, iteration, telescope,
+                        self.gaincal_wrapper(slib, selfcal_plan, target, band, vis, solint, selfcal_plan['applycal_mode'][iteration], iteration, telescope,
                                         gaincal_minsnr, gaincal_unflag_minsnr=gaincal_unflag_minsnr, minsnr_to_proceed=minsnr_to_proceed, 
                                         rerank_refants=rerank_refants, unflag_only_lbants=unflag_only_lbants, unflag_only_lbants_onlyap=unflag_only_lbants_onlyap,
                                         calonly_max_flagged=calonly_max_flagged, second_iter_solmode=second_iter_solmode, 
                                         unflag_fb_to_prev_solint=unflag_fb_to_prev_solint, refantmode=refantmode, gaincalibrator_dict=gaincalibrator_dict, 
-                                        allow_gain_interpolation=allow_gain_interpolation, guess_scan_combine=guess_scan_combine)
+                                        allow_gain_interpolation=allow_gain_interpolation, guess_scan_combine=guess_scan_combine, 
+                                        do_fallback_calonly=do_fallback_calonly)
 
                     # With gaincal done and bad fields removed from gain tables if necessary, check whether any fields should no longer be 
                     # selfcal'd because they have too much interpolation.
@@ -2204,26 +2206,139 @@ class SelfcalHeuristics(object):
                         slib['sub-fields-to-selfcal'] = self.evaluate_subfields_after_gaincal(slib, sani_target, band, solint, iteration, selfcal_plan, 
                                                                                               allow_gain_interpolation=allow_gain_interpolation)
 
-                    ##
-                    # Apply gain solutions per MS, target, solint, and band
-                    ##
+                ##
+                # Apply gain solutions per MS, target, solint, and band
+                ##
+                for vis in vislist:
+                    self.applycal_wrapper(vis, target, band, solint, slib, 
+                            current=lambda f: f in slib['sub-fields-to-selfcal'],
+                            final=lambda f: f not in slib['sub-fields-to-selfcal'] and slib[f]['SC_success'])
+
+                # Create post self-cal image using the model as a startmodel to evaluate how much selfcal helped
+                ##
+
+                os.system('rm -rf '+sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'_post*')
+                self.tclean_wrapper(selfcal_library, sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'_post',
+                                    band, telescope=telescope, nsigma=slib['nsigma'][iteration], scales=[
+                                        0],
+                                    # threshold=str(slib['nsigma'][iteration]* slib['RMS_NF_curr'])+'Jy',
+                                    threshold=str(slib[vislist[0]][solint]['clean_threshold'])+'Jy',
+                                    savemodel='none', parallel=self.parallel,
+                                    field=target,
+                                    nfrms_multiplier=slib[vislist[0]][solint]['nfrms_multiplier'])
+
+                ##
+                # Do the assessment of the post- (and pre-) selfcal images.
+                ##
+                LOG.info('Pre selfcal assessemnt: '+target)
+                SNR, RMS, SNR_NF, RMS_NF = self.get_image_stats(sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'.image.tt0', 
+                        sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'_post.mask', sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'.mask', 
+                        slib, (telescope != 'ACA' or aca_use_nfmask), solint, 'pre')
+
+                LOG.info('Post selfcal assessemnt: '+target)
+                post_SNR, post_RMS, post_SNR_NF, post_RMS_NF = self.get_image_stats(sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'_post.image.tt0', 
+                        sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'_post.mask', sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'.mask', 
+                        slib, (telescope != 'ACA' or aca_use_nfmask), solint, 'post')
+
+                mosaic_SNR, mosaic_RMS, mosaic_SNR_NF, mosaic_RMS_NF = {}, {}, {}, {}
+                post_mosaic_SNR, post_mosaic_RMS, post_mosaic_SNR_NF, post_mosaic_RMS_NF = {}, {}, {}, {}
+                for fid in slib['sub-fields-to-selfcal']:
+                    if slib['obstype'] == 'mosaic':
+                        imagename = sani_target+'_field_'+str(fid)+'_'+band+'_'+solint+'_'+str(iteration)
+                    else:
+                        imagename = sani_target+'_'+band+'_'+solint+'_'+str(iteration)
+
+                    LOG.info('')
+                    LOG.info('Pre selfcal assessemnt: '+target+', field '+str(fid))
+                    mosaic_SNR[fid], mosaic_RMS[fid], mosaic_SNR_NF[fid], mosaic_RMS_NF[fid] = self.get_image_stats(imagename+'.image.tt0', 
+                            imagename+'_post.mask', imagename+'.mask', slib[fid], (telescope != 'ACA' or aca_use_nfmask), solint, 'pre', 
+                            mosaic_sub_field=slib["obstype"]=="mosaic")
+
+                    LOG.info('Post selfcal assessemnt: '+target+', field '+str(fid))
+                    post_mosaic_SNR[fid], post_mosaic_RMS[fid], post_mosaic_SNR_NF[fid], post_mosaic_RMS_NF[fid] = self.get_image_stats(
+                            imagename+'_post.image.tt0', imagename+'_post.mask', imagename+'.mask', slib[fid], 
+                            (telescope != 'ACA' or aca_use_nfmask), solint, 'post', mosaic_sub_field=slib["obstype"]=="mosaic")
+                    LOG.info('')
+
+                if slib['nterms'] < 2:
+                    # Change nterms to 2 if needed based on fracbw and SNR
+                    slib['nterms'] = get_nterms(
+                        slib['fracbw'], post_SNR)
+
+                for vis in vislist:
+                    # Update RMS value if necessary
+                    if slib[vis][solint]['RMS_post'] < slib['RMS_curr'] and vis == vislist[-1]:
+                        slib['RMS_curr'] = slib[vis][solint]['RMS_post'].copy()
+                    if slib[vis][solint]['RMS_NF_post'] < slib['RMS_NF_curr'] and \
+                            slib[vis][solint]['RMS_NF_post'] > 0 and vis == vislist[-1]:
+                        slib['RMS_NF_curr'] = slib[vis][solint]['RMS_NF_post'].copy()
+
+                ##
+                # compare beam relative to original image to ensure we are not incrementally changing the beam in each iteration
+                ##
+                beamarea_orig = slib['Beam_major_orig'] * \
+                    slib['Beam_minor_orig']
+                beamarea_post = slib[vislist[0]][solint]['Beam_major_post'] * \
+                    slib[vislist[0]][solint]['Beam_minor_post']
+
+                delta_beamarea = (beamarea_post-beamarea_orig)/beamarea_orig
+                ##
+                # if S/N improvement, and beamarea is changing by < delta_beam_thresh, accept solutions to main calibration dictionary
+                # allow to proceed if solint was inf_EB and SNR decrease was less than 2%
+                ##
+                strict_field_by_field_success = []
+                loose_field_by_field_success = []
+                beam_field_by_field_success = []
+                rms_field_by_field_success = []
+                for fid in slib['sub-fields-to-selfcal']:
+                    strict_field_by_field_success += [(post_mosaic_SNR[fid] >= mosaic_SNR[fid])
+                                                        and (post_mosaic_SNR_NF[fid] >= mosaic_SNR_NF[fid])]
+                    loose_field_by_field_success += [((post_mosaic_SNR[fid]-mosaic_SNR[fid])/mosaic_SNR[fid] > -0.02) and
+                                                        ((post_mosaic_SNR_NF[fid] - mosaic_SNR_NF[fid])/mosaic_SNR_NF[fid] > -0.02)]
+                    beam_field_by_field_success += [delta_beamarea < delta_beam_thresh]
+                    rms_field_by_field_success = ((post_mosaic_RMS[fid] - mosaic_RMS[fid])/mosaic_RMS[fid] < 1.05 and
+                                                    (post_mosaic_RMS_NF[fid] - mosaic_RMS_NF[fid])/mosaic_RMS_NF[fid] < 1.05) or \
+                        (((post_mosaic_RMS[fid] - mosaic_RMS[fid])/mosaic_RMS[fid] > 1.05 or
+                            (post_mosaic_RMS_NF[fid] - mosaic_RMS_NF[fid])/mosaic_RMS_NF[fid] > 1.05) and
+                            selfcal_plan['solint_snr_per_field'][fid][solint] > 5)
+
+                if solint == 'inf_EB':
+                    # If any of the fields succeed in the "strict" sense, then allow for minor reductions in the evaluation quantity in other
+                    # fields because there's a good chance that those are just noise being pushed around.
+                    field_by_field_success = np.logical_and(np.logical_and(loose_field_by_field_success, beam_field_by_field_success),
+                                                            rms_field_by_field_success)
+                else:
+                    field_by_field_success = np.logical_and(np.logical_and(strict_field_by_field_success, beam_field_by_field_success),
+                                                            rms_field_by_field_success)
+
+                # If not all fields were successful, we need to make an additional image to evaluate whether the image as a whole improved,
+                # otherwise the _post image won't be exactly representative.
+                if slib['obstype'] == "mosaic" and not np.all(field_by_field_success):
+                    field_by_field_success_dict = dict(
+                        zip(slib['sub-fields-to-selfcal'], field_by_field_success))
+                    LOG.info(
+                        '****************Not all fields were successful, so re-applying and re-making _post image*************')
                     for vis in vislist:
                         self.applycal_wrapper(vis, target, band, solint, slib, 
-                                current=lambda f: f in slib['sub-fields-to-selfcal'],
-                                final=lambda f: f not in slib['sub-fields-to-selfcal'] and slib[f]['SC_success'])
+                                current=lambda f: f in field_by_field_success_dict and field_by_field_success_dict[f],
+                                final=lambda f: (f not in field_by_field_success_dict or not field_by_field_success_dict[f]) and 
+                                    selfcal_library[f]['SC_success'],
+                                clear=lambda f: (f not in field_by_field_success_dict or not field_by_field_success_dict[f]) and 
+                                    not selfcal_library[f]['SC_success'],
+                                restore_flags='selfcal_starting_flags_'+sani_target+'_'+band)
 
-                    # Create post self-cal image using the model as a startmodel to evaluate how much selfcal helped
-                    ##
+                    files = glob.glob(sani_target+'_'+band+'_'+solint+'_'+str(iteration)+"_post.*")
+                    for f in files:
+                        os.system("mv "+f+" "+f.replace("_post", "_post_intermediate"))
 
-                    os.system('rm -rf '+sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'_post*')
                     self.tclean_wrapper(selfcal_library, sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'_post',
                                         band, telescope=telescope, nsigma=slib['nsigma'][iteration], scales=[
                                             0],
-                                        # threshold=str(slib['nsigma'][iteration]* slib['RMS_NF_curr'])+'Jy',
                                         threshold=str(slib[vislist[0]][solint]['clean_threshold'])+'Jy',
                                         savemodel='none', parallel=self.parallel,
-                                        field=target,
-                                        nfrms_multiplier=slib[vislist[0]][solint]['nfrms_multiplier'])
+                                        field=target, 
+                                        nfrms_multiplier=slib[vislist[0]][solint]['nfrms_multiplier'],
+                                        image_mosaic_fields_separately=False)
 
                     ##
                     # Do the assessment of the post- (and pre-) selfcal images.
@@ -2238,222 +2353,133 @@ class SelfcalHeuristics(object):
                             sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'_post.mask', sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'.mask', 
                             slib, (telescope != 'ACA' or aca_use_nfmask), solint, 'post')
 
-                    mosaic_SNR, mosaic_RMS, mosaic_SNR_NF, mosaic_RMS_NF = {}, {}, {}, {}
-                    post_mosaic_SNR, post_mosaic_RMS, post_mosaic_SNR_NF, post_mosaic_RMS_NF = {}, {}, {}, {}
-                    for fid in slib['sub-fields-to-selfcal']:
-                        if slib['obstype'] == 'mosaic':
-                            imagename = sani_target+'_field_'+str(fid)+'_'+band+'_'+solint+'_'+str(iteration)
-                        else:
-                            imagename = sani_target+'_'+band+'_'+solint+'_'+str(iteration)
-
-                        LOG.info('')
-                        LOG.info('Pre selfcal assessemnt: '+target+', field '+str(fid))
-                        mosaic_SNR[fid], mosaic_RMS[fid], mosaic_SNR_NF[fid], mosaic_RMS_NF[fid] = self.get_image_stats(imagename+'.image.tt0', 
-                                imagename+'_post.mask', imagename+'.mask', slib[fid], (telescope != 'ACA' or aca_use_nfmask), solint, 'pre', 
-                                mosaic_sub_field=slib["obstype"]=="mosaic")
-
-                        LOG.info('Post selfcal assessemnt: '+target+', field '+str(fid))
-                        post_mosaic_SNR[fid], post_mosaic_RMS[fid], post_mosaic_SNR_NF[fid], post_mosaic_RMS_NF[fid] = self.get_image_stats(
-                                imagename+'_post.image.tt0', imagename+'_post.mask', imagename+'.mask', slib[fid], 
-                                (telescope != 'ACA' or aca_use_nfmask), solint, 'post', mosaic_sub_field=slib["obstype"]=="mosaic")
-                        LOG.info('')
-
-                    if slib['nterms'] < 2:
-                        # Change nterms to 2 if needed based on fracbw and SNR
-                        slib['nterms'] = get_nterms(
-                            slib['fracbw'], post_SNR)
-
                     for vis in vislist:
+                        slib[vis][solint]['solmode'] = selfcal_plan['solmode'][iteration]+''
+
                         # Update RMS value if necessary
-                        if slib[vis][solint]['RMS_post'] < slib['RMS_curr'] and vis == vislist[-1]:
+                        if slib[vis][solint]['RMS_post'] < slib['RMS_curr']:
                             slib['RMS_curr'] = slib[vis][solint]['RMS_post'].copy()
                         if slib[vis][solint]['RMS_NF_post'] < slib['RMS_NF_curr'] and \
-                                slib[vis][solint]['RMS_NF_post'] > 0 and vis == vislist[-1]:
-                            slib['RMS_NF_curr'] = slib[vis][solint]['RMS_NF_post'].copy()
+                                slib[vis][solint]['RMS_NF_post'] > 0:
+                            slib['RMS_NF_curr'] = slib[vis][solint]['RMS_NF_post'].copy(
+                            )
 
-                    ##
-                    # compare beam relative to original image to ensure we are not incrementally changing the beam in each iteration
-                    ##
-                    beamarea_orig = slib['Beam_major_orig'] * \
-                        slib['Beam_minor_orig']
-                    beamarea_post = slib[vislist[0]][solint]['Beam_major_post'] * \
-                        slib[vislist[0]][solint]['Beam_minor_post']
-
-                    delta_beamarea = (beamarea_post-beamarea_orig)/beamarea_orig
-                    ##
-                    # if S/N improvement, and beamarea is changing by < delta_beam_thresh, accept solutions to main calibration dictionary
-                    # allow to proceed if solint was inf_EB and SNR decrease was less than 2%
-                    ##
-                    strict_field_by_field_success = []
-                    loose_field_by_field_success = []
-                    beam_field_by_field_success = []
-                    rms_field_by_field_success = []
-                    for fid in slib['sub-fields-to-selfcal']:
-                        strict_field_by_field_success += [(post_mosaic_SNR[fid] >= mosaic_SNR[fid])
-                                                          and (post_mosaic_SNR_NF[fid] >= mosaic_SNR_NF[fid])]
-                        loose_field_by_field_success += [((post_mosaic_SNR[fid]-mosaic_SNR[fid])/mosaic_SNR[fid] > -0.02) and
-                                                         ((post_mosaic_SNR_NF[fid] - mosaic_SNR_NF[fid])/mosaic_SNR_NF[fid] > -0.02)]
-                        beam_field_by_field_success += [delta_beamarea < delta_beam_thresh]
-                        rms_field_by_field_success = ((post_mosaic_RMS[fid] - mosaic_RMS[fid])/mosaic_RMS[fid] < 1.05 and
-                                                      (post_mosaic_RMS_NF[fid] - mosaic_RMS_NF[fid])/mosaic_RMS_NF[fid] < 1.05) or \
-                            (((post_mosaic_RMS[fid] - mosaic_RMS[fid])/mosaic_RMS[fid] > 1.05 or
-                              (post_mosaic_RMS_NF[fid] - mosaic_RMS_NF[fid])/mosaic_RMS_NF[fid] > 1.05) and
-                             selfcal_plan['solint_snr_per_field'][fid][solint] > 5)
-
-                    if solint == 'inf_EB':
-                        # If any of the fields succeed in the "strict" sense, then allow for minor reductions in the evaluation quantity in other
-                        # fields because there's a good chance that those are just noise being pushed around.
-                        field_by_field_success = np.logical_and(np.logical_and(loose_field_by_field_success, beam_field_by_field_success),
-                                                                rms_field_by_field_success)
+                marginal_inf_EB_will_attempt_next_solint = False
+                # run a pre-check as to whether a marginal inf_EB result will go on to attempt inf, if not we will fail a marginal inf_EB
+                if (solint == 'inf_EB') and ((((post_SNR-SNR)/SNR > -0.02) and ((post_SNR-SNR)/SNR < 0.00)) or (((post_SNR_NF - SNR_NF)/SNR_NF > -0.02) and ((post_SNR_NF - SNR_NF)/SNR_NF < 0.00))) and (delta_beamarea < delta_beam_thresh):
+                    if selfcal_plan['solint_snr'][selfcal_plan['solints'][iteration+1]] < minsnr_to_proceed and np.all([selfcal_plan['solint_snr_per_field'][fid][selfcal_plan['solints'][iteration+1]] < minsnr_to_proceed for fid in slib['sub-fields']]):
+                        marginal_inf_EB_will_attempt_next_solint = False
                     else:
-                        field_by_field_success = np.logical_and(np.logical_and(strict_field_by_field_success, beam_field_by_field_success),
-                                                                rms_field_by_field_success)
+                        marginal_inf_EB_will_attempt_next_solint = True
 
-                    # If not all fields were successful, we need to make an additional image to evaluate whether the image as a whole improved,
-                    # otherwise the _post image won't be exactly representative.
-                    if slib['obstype'] == "mosaic" and not np.all(field_by_field_success):
-                        field_by_field_success_dict = dict(
-                            zip(slib['sub-fields-to-selfcal'], field_by_field_success))
-                        LOG.info(
-                            '****************Not all fields were successful, so re-applying and re-making _post image*************')
-                        for vis in vislist:
-                            self.applycal_wrapper(vis, target, band, solint, slib, 
-                                    current=lambda f: f in field_by_field_success_dict and field_by_field_success_dict[f],
-                                    final=lambda f: (f not in field_by_field_success_dict or not field_by_field_success_dict[f]) and 
-                                        selfcal_library[f]['SC_success'],
-                                    clear=lambda f: (f not in field_by_field_success_dict or not field_by_field_success_dict[f]) and 
-                                        not selfcal_library[f]['SC_success'],
-                                    restore_flags='selfcal_starting_flags_'+sani_target+'_'+band)
+                RMS_change_acceptable = (post_RMS/RMS < 1.05 and post_RMS_NF/RMS_NF < 1.05) or \
+                    ((post_RMS/RMS > 1.05 or post_RMS_NF/RMS_NF > 1.05) and selfcal_plan['solint_snr'][solint] > 5)
 
-                        files = glob.glob(sani_target+'_'+band+'_'+solint+'_'+str(iteration)+"_post.*")
-                        for f in files:
-                            os.system("mv "+f+" "+f.replace("_post", "_post_intermediate"))
+                if (((post_SNR >= SNR) and (post_SNR_NF >= SNR_NF) and (delta_beamarea < delta_beam_thresh)) or ((solint == 'inf_EB') and marginal_inf_EB_will_attempt_next_solint and ((post_SNR-SNR)/SNR > -0.02) and ((post_SNR_NF - SNR_NF)/SNR_NF > -0.02) and (delta_beamarea < delta_beam_thresh))) and np.any(field_by_field_success) and RMS_change_acceptable:
 
-                        self.tclean_wrapper(selfcal_library, sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'_post',
-                                            band, telescope=telescope, nsigma=slib['nsigma'][iteration], scales=[
-                                                0],
-                                            threshold=str(slib[vislist[0]][solint]['clean_threshold'])+'Jy',
-                                            savemodel='none', parallel=self.parallel,
-                                            field=target, 
-                                            nfrms_multiplier=slib[vislist[0]][solint]['nfrms_multiplier'],
-                                            image_mosaic_fields_separately=False)
+                    do_fallback_calonly = False
 
-                        ##
-                        # Do the assessment of the post- (and pre-) selfcal images.
-                        ##
-                        LOG.info('Pre selfcal assessemnt: '+target)
-                        SNR, RMS, SNR_NF, RMS_NF = self.get_image_stats(sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'.image.tt0', 
-                                sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'_post.mask', sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'.mask', 
-                                slib, (telescope != 'ACA' or aca_use_nfmask), solint, 'pre')
+                    slib['SC_success'] = True
+                    slib['Stop_Reason'] = 'None'
+                    # keep track of whether inf_EB had a S/N decrease
+                    if (solint == 'inf_EB') and (((post_SNR-SNR)/SNR < 0.0) or ((post_SNR_NF - SNR_NF)/SNR_NF < 0.0)):
+                        slib['inf_EB_SNR_decrease'] = True
+                    elif (solint == 'inf_EB') and (((post_SNR-SNR)/SNR > 0.0) and ((post_SNR_NF - SNR_NF)/SNR_NF > 0.0)):
+                        slib['inf_EB_SNR_decrease'] = False
+                    for vis in vislist:
+                        slib[vis]['gaintable_final'] = slib[vis][solint]['gaintable']
+                        slib[vis]['spwmap_final'] = slib[vis][solint]['spwmap'].copy()
+                        slib[vis]['applycal_mode_final'] = slib[vis][solint]['applycal_mode']
+                        slib[vis]['applycal_interpolate_final'] = slib[vis][solint]['applycal_interpolate']
+                        slib[vis]['gaincal_combine_final'] = slib[vis][solint]['gaincal_combine']
+                        slib[vis][solint]['Pass'] = True
+                        slib[vis][solint]['Fail_Reason'] = 'None'
+                    if selfcal_plan['solmode'][iteration] == 'p':
+                        slib['final_phase_solint'] = solint
+                    slib['final_solint'] = solint
+                    slib['final_solint_mode'] = selfcal_plan['solmode'][iteration]
+                    slib['iteration'] = iteration
 
-                        LOG.info('Post selfcal assessemnt: '+target)
-                        post_SNR, post_RMS, post_SNR_NF, post_RMS_NF = self.get_image_stats(sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'_post.image.tt0', 
-                                sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'_post.mask', sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'.mask', 
-                                slib, (telescope != 'ACA' or aca_use_nfmask), solint, 'post')
+                    for ind, fid in enumerate(slib['sub-fields-to-selfcal']):
+                        if field_by_field_success[ind]:
+                            slib[fid]['SC_success'] = True
+                            slib[fid]['Stop_Reason'] = 'None'
+                            if (solint == 'inf_EB') and not strict_field_by_field_success[ind]:
+                                slib[fid]['inf_EB_SNR_decrease'] = True
+                            elif (solint == 'inf_EB') and strict_field_by_field_success[ind]:
+                                slib[fid]['inf_EB_SNR_decrease'] = False
 
-                        for vis in vislist:
-                            slib[vis][solint]['solmode'] = selfcal_plan['solmode'][iteration]+''
-                            # Update RMS value if necessary
-                            if slib[vis][solint]['RMS_post'] < slib['RMS_curr']:
-                                slib['RMS_curr'] = slib[vis][solint]['RMS_post'].copy()
-                            if slib[vis][solint]['RMS_NF_post'] < slib['RMS_NF_curr'] and \
-                                    slib[vis][solint]['RMS_NF_post'] > 0:
-                                slib['RMS_NF_curr'] = slib[vis][solint]['RMS_NF_post'].copy(
+                            for vis in slib[fid]['vislist']:
+                                slib[fid][vis]['gaintable_final'] = slib[fid][vis][solint]['gaintable']
+                                slib[fid][vis]['spwmap_final'] = slib[fid][vis][solint]['spwmap'].copy(
                                 )
-
-                    marginal_inf_EB_will_attempt_next_solint = False
-                    # run a pre-check as to whether a marginal inf_EB result will go on to attempt inf, if not we will fail a marginal inf_EB
-                    if (solint == 'inf_EB') and ((((post_SNR-SNR)/SNR > -0.02) and ((post_SNR-SNR)/SNR < 0.00)) or (((post_SNR_NF - SNR_NF)/SNR_NF > -0.02) and ((post_SNR_NF - SNR_NF)/SNR_NF < 0.00))) and (delta_beamarea < delta_beam_thresh):
-                        if selfcal_plan['solint_snr'][selfcal_plan['solints'][iteration+1]] < minsnr_to_proceed and np.all([selfcal_plan['solint_snr_per_field'][fid][selfcal_plan['solints'][iteration+1]] < minsnr_to_proceed for fid in slib['sub-fields']]):
-                            marginal_inf_EB_will_attempt_next_solint = False
+                                slib[fid][vis]['applycal_mode_final'] = slib[fid][vis][solint]['applycal_mode']
+                                slib[fid][vis]['applycal_interpolate_final'] = slib[fid][vis][solint]['applycal_interpolate']
+                                slib[fid][vis]['gaincal_combine_final'] = slib[fid][vis][solint]['gaincal_combine']
+                                slib[fid][vis][solint]['Pass'] = True
+                                slib[fid][vis][solint]['Fail_Reason'] = 'None'
+                            if selfcal_plan['solmode'][iteration] == 'p':
+                                slib[fid]['final_phase_solint'] = solint
+                            slib[fid]['final_solint'] = solint
+                            slib[fid]['final_solint_mode'] = selfcal_plan['solmode'][iteration]
+                            slib[fid]['iteration'] = iteration
                         else:
-                            marginal_inf_EB_will_attempt_next_solint = True
-
-                    RMS_change_acceptable = (post_RMS/RMS < 1.05 and post_RMS_NF/RMS_NF < 1.05) or \
-                        ((post_RMS/RMS > 1.05 or post_RMS_NF/RMS_NF > 1.05) and selfcal_plan['solint_snr'][solint] > 5)
-
-                    if (((post_SNR >= SNR) and (post_SNR_NF >= SNR_NF) and (delta_beamarea < delta_beam_thresh)) or ((solint == 'inf_EB') and marginal_inf_EB_will_attempt_next_solint and ((post_SNR-SNR)/SNR > -0.02) and ((post_SNR_NF - SNR_NF)/SNR_NF > -0.02) and (delta_beamarea < delta_beam_thresh))) and np.any(field_by_field_success) and RMS_change_acceptable:
-                        slib['SC_success'] = True
-                        slib['Stop_Reason'] = 'None'
-                        # keep track of whether inf_EB had a S/N decrease
-                        if (solint == 'inf_EB') and (((post_SNR-SNR)/SNR < 0.0) or ((post_SNR_NF - SNR_NF)/SNR_NF < 0.0)):
-                            slib['inf_EB_SNR_decrease'] = True
-                        elif (solint == 'inf_EB') and (((post_SNR-SNR)/SNR > 0.0) and ((post_SNR_NF - SNR_NF)/SNR_NF > 0.0)):
-                            slib['inf_EB_SNR_decrease'] = False
-                        for vis in vislist:
-                            slib[vis]['gaintable_final'] = slib[vis][solint]['gaintable']
-                            slib[vis]['spwmap_final'] = slib[vis][solint]['spwmap'].copy()
-                            slib[vis]['applycal_mode_final'] = slib[vis][solint]['applycal_mode']
-                            slib[vis]['applycal_interpolate_final'] = slib[vis][solint]['applycal_interpolate']
-                            slib[vis]['gaincal_combine_final'] = slib[vis][solint]['gaincal_combine']
-                            slib[vis][solint]['Pass'] = True
-                            slib[vis][solint]['Fail_Reason'] = 'None'
-                        if selfcal_plan['solmode'][iteration] == 'p':
-                            slib['final_phase_solint'] = solint
-                        slib['final_solint'] = solint
-                        slib['final_solint_mode'] = selfcal_plan['solmode'][iteration]
-                        slib['iteration'] = iteration
-
-                        for ind, fid in enumerate(slib['sub-fields-to-selfcal']):
-                            if field_by_field_success[ind]:
-                                slib[fid]['SC_success'] = True
-                                slib[fid]['Stop_Reason'] = 'None'
-                                if (solint == 'inf_EB') and not strict_field_by_field_success[ind]:
-                                    slib[fid]['inf_EB_SNR_decrease'] = True
-                                elif (solint == 'inf_EB') and strict_field_by_field_success[ind]:
-                                    slib[fid]['inf_EB_SNR_decrease'] = False
-
-                                for vis in slib[fid]['vislist']:
-                                    slib[fid][vis]['gaintable_final'] = slib[fid][vis][solint]['gaintable']
-                                    slib[fid][vis]['spwmap_final'] = slib[fid][vis][solint]['spwmap'].copy(
-                                    )
-                                    slib[fid][vis]['applycal_mode_final'] = slib[fid][vis][solint]['applycal_mode']
-                                    slib[fid][vis]['applycal_interpolate_final'] = slib[fid][vis][solint]['applycal_interpolate']
-                                    slib[fid][vis]['gaincal_combine_final'] = slib[fid][vis][solint]['gaincal_combine']
-                                    slib[fid][vis][solint]['Pass'] = True
-                                    slib[fid][vis][solint]['Fail_Reason'] = 'None'
-                                if selfcal_plan['solmode'][iteration] == 'p':
-                                    slib[fid]['final_phase_solint'] = solint
-                                slib[fid]['final_solint'] = solint
-                                slib[fid]['final_solint_mode'] = selfcal_plan['solmode'][iteration]
-                                slib[fid]['iteration'] = iteration
-                            else:
-                                for vis in slib[fid]['vislist']:
-                                    slib[fid][vis][solint]['Pass'] = False
-                                if solint == 'inf_EB':
-                                    slib[fid]['inf_EB_SNR_decrease'] = False
-
-                        # To exit out of the applymode loop.
-                        break
-                    ##
-                    # If the beam area got larger, this could be because of flagging of long baseline antennas. Try with applymode = "calonly".
-                    ##
-
-                    elif delta_beamarea > delta_beam_thresh and applymode == "calflag":
-                        LOG.info('****************************Selfcal failed**************************')
-                        LOG.info('REASON: Beam change beyond '+str(delta_beam_thresh))
-                        if iteration > 0:  # reapply only the previous gain tables, to get rid of solutions from this selfcal round
-                            LOG.info('****************Reapplying previous solint solutions*************')
-                            for vis in vislist:
-                                self.applycal_wrapper(vis, target, band, solint, slib, 
-                                                 final=lambda f: selfcal_library[f]['SC_success'],
-                                                 restore_flags='selfcal_starting_flags_'+sani_target+'_'+band)
-                        else:
-                            for vis in vislist:
-                                selfcal_plan['inf_EB_gaincal_combine'][vis] = inf_EB_gaincal_combine  # 'scan'
-                                if slib['obstype'] == 'mosaic':
-                                    selfcal_plan['inf_EB_gaincal_combine'][vis] += ',field'
-                                selfcal_plan['inf_EB_gaintype'][vis] = inf_EB_gaintype  # G
-                                selfcal_plan['inf_EB_fallback_mode'][vis] = ''  # 'scan'
-                        LOG.info('****************Attempting applymode="calonly" fallback*************')
-                    else:
-                        for vis in vislist:
-                            slib[vis][solint]['Pass'] = False
-
-                        for fid in slib['sub-fields-to-selfcal']:
                             for vis in slib[fid]['vislist']:
                                 slib[fid][vis][solint]['Pass'] = False
-                        break
+                            if solint == 'inf_EB':
+                                slib[fid]['inf_EB_SNR_decrease'] = False
+
+                    # To exit out of the applymode loop.
+                    repeat_solint = False
+                    counter = 0
+                ##
+                # If the beam area got larger, this could be because of flagging of long baseline antennas. Try with applymode = "calonly".
+                ##
+
+                elif delta_beamarea > delta_beam_thresh and not do_fallback_calonly:
+                    LOG.info('****************************Selfcal failed**************************')
+                    if delta_beamarea > delta_beam_thresh:
+                        LOG.info('REASON: Beam change beyond '+str(delta_beam_thresh))
+
+                    if iteration > 0:  # reapply only the previous gain tables, to get rid of solutions from this selfcal round
+                        LOG.info('****************Reapplying previous solint solutions*************')
+                        for vis in vislist:
+                            self.applycal_wrapper(vis, target, band, solint, slib, 
+                                                final=lambda f: selfcal_library[f]['SC_success'],
+                                                restore_flags='selfcal_starting_flags_'+sani_target+'_'+band)
+                    else:
+                        for vis in vislist:
+                            selfcal_plan[vis]['inf_EB_gaincal_combine'] = inf_EB_gaincal_combine  # 'scan'
+                            if slib['obstype'] == 'mosaic':
+                                selfcal_plan[vis]['inf_EB_gaincal_combine'] += ',field'
+                            selfcal_plan[vis]['inf_EB_gaintype'] = inf_EB_gaintype  # G
+                            selfcal_plan[vis]['inf_EB_fallback_mode'] = ''  # 'scan'
+
+                    repeat_solint = True
+                    counter += 1
+                    if counter == 3:
+                        LOG.info("\n*************************************************************")
+                        LOG.info("WARNING: Selfcal tried to start an infinite loop. Exiting.")
+                        LOG.info("*************************************************************\n")
+                        sys.exit(0)
+
+                    if delta_beamarea > delta_beam_thresh:
+                        do_fallback_combinespw = False
+                        do_fallback_calonly = True
+                        LOG.info('****************Attempting applymode="calonly" fallback*************')
+                        continue
+                else:
+                    for vis in vislist:
+                        slib[vis][solint]['Pass'] = False
+
+                    for fid in slib['sub-fields-to-selfcal']:
+                        for vis in slib[fid]['vislist']:
+                            slib[fid][vis][solint]['Pass'] = False
+
+                    repeat_solint = False
+                    do_fallback_combinespw = False
+                    do_fallback_calonly = False
+                    counter = 0
 
                 ##
                 # if S/N worsens, and/or beam area increases reject current solutions and reapply previous (or revert to origional data)
@@ -2617,12 +2643,13 @@ class SelfcalHeuristics(object):
                         LOG.info('****************Selfcal passed, shortening solint*************')
                     else:
                         LOG.info('****************Selfcal passed for Minimum solint*************')
+                    iteration += 1
                 else:
                     LOG.info('****************Selfcal failed*************')
                     LOG.info('REASON: '+reason)
                     # if a solution interval shorter than inf for phase-only SC has passed, attempt amplitude selfcal
                     if iteration > 1 and selfcal_plan['solmode'][iteration] != 'ap' and do_amp_selfcal:
-                        iterjump = selfcal_plan['solmode'].index('ap')
+                        iteration = selfcal_plan['solmode'].index('ap')
                         slib['sub-fields-to-selfcal'] = slib['sub-fields']
                         LOG.info('****************Selfcal halted for phase, attempting amplitude*************')
                         continue
