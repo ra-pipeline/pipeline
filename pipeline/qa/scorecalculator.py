@@ -71,6 +71,7 @@ __all__ = ['score_polintents',                                # ALMA specific
            'score_fluxservice',                               # ALMA specific
            'score_observing_modes',                           # ALMA specific
            'score_diffgaincal_combine',                       # ALMA IF specific
+           'score_diffgaincal_residuals',                     # ALMA IF specific
            'score_renorm',                                    # ALMA IF specific
            'score_polcal_gain_ratio',                         # ALMA IF specific
            'score_polcal_gain_ratio_rms',                     # ALMA IF specific
@@ -106,7 +107,10 @@ __all__ = ['score_polintents',                                # ALMA specific
            'score_tsysflagcontamination_external_heuristic',
            'score_syspowerdata',
            'score_solint',
-           'score_longsolint']
+           'score_longsolint',
+           'score_testBPdcals_dts_ants',
+           'score_testBPdcals_refant',
+           'score_testBPdcals_delay']
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -549,6 +553,123 @@ def score_diffgaincal_combine(vis: str, combine: str, qa_message: str, phaseup_t
     origin = pqa.QAOrigin(metric_name='score_diffgaincal_combine',
                           metric_score=score,
                           metric_units='Score based on whether diffgain used combine')
+
+    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin)
+
+
+@log_qa
+def score_diffgaincal_residuals(residuals_info: dict, score_type: str) -> pqa.QAScore:
+    """
+    Compute QA score for diffgain residual phase offsets for given score type
+    based on pre-computed statistics provided in residual_info dictionary.
+
+    The premise is:
+        - mean should be around 0.
+        - no outlier values above set limits.
+        - RMS at set limits.
+
+    Args:
+        residuals_info: Dictionary containing info on diffgain residual phase.
+        score_type: Type of statistic to compute QA score for. Valid options:
+
+            RESIDUAL:
+            - 'offsets': use mean.
+            - 'rms': use RMS
+            - 'outliers': use maximum (per antenna)
+
+    Returns:
+        QA score.
+    """
+    def get_expanded_message(dict_use: dict) -> str:
+        """Generate expanded QA message for selection of residuals dictionary."""
+        # Group antennas by (spw, corr).
+        spw_corr_to_ants = collections.defaultdict(set)
+        for (spw, corr, ant, _), _ in dict_use.items():
+            spw_corr_to_ants[(str(spw), str(corr))].add(str(ant))
+
+        # Group (spw, corr) pairs by shared antenna sets.
+        antset_to_spw_corr = collections.defaultdict(list)
+        for (spw, corr), ants in spw_corr_to_ants.items():
+            key = frozenset(ants)
+            antset_to_spw_corr[key].append((spw, corr))
+
+        # Build the full message.
+        full_msg = []
+        for antset, spw_corr_list in antset_to_spw_corr.items():
+            spws = sorted({spw for spw, _ in spw_corr_list})
+            corrs = sorted({corr for _, corr in spw_corr_list})
+
+            spw_msg = "all SpWs" if spws == ['all'] else f"SpW {','.join(spws)}"
+            ant_msg = "all antennas" if antset == {'all'} else f"antenna(s) {','.join(sorted(antset))}"
+            corr_msg = f"corr {','.join(corrs)}"
+
+            full_msg.append(f" {ant_msg}, in {spw_msg} {corr_msg}")
+
+        return ','.join(full_msg)
+
+    ms_name = residuals_info['ms_name']
+
+    # Use a message phrase based on score type.
+    # In the future, a b2b offset score will be added with a different `messph`
+    messph = 'phase difference for residual phase'
+
+    # If the diffgain residual phase offsets caltable had overall low SNR, then
+    # return a suboptimal (blue) score without scoring variability or outliers.
+    if residuals_info['low_snr']:
+        score = rendererutils.SCORE_THRESHOLD_SUBOPTIMAL
+        shortmsg = f"Low SNR in diffgaincal {messph} {score_type}"
+        longmsg = (f"Low SNR in diffgaincal {messph} {score_type} for {ms_name}: not scoring based on"
+                   f" variability or outliers.")
+    else:
+        # Get info from residuals statistics dict.
+        intent = residuals_info['intent']
+        field = residuals_info['field']
+        data = residuals_info['data']
+
+        # Convert score type to what statistic to score.
+        type_to_param = {
+            'offsets': 'mean',
+            'rms': 'rms',
+            'outliers': 'max',
+        }
+        param = type_to_param[score_type]
+
+        # Identify where the residual phase statistic is poor, elevated, or
+        # good, using pre-defined thresholds.
+        thresholds = {'good': 30., 'elevated': 50., 'poor': 70.}
+        good = {k: v for k, v in data.items() if param in k and thresholds['good'] < v <= thresholds['elevated']}
+        elevated = {k: v for k, v in data.items() if param in k and thresholds['elevated'] < v <= thresholds['poor']}
+        poor = {k: v for k, v in data.items() if param in k and v > thresholds['poor']}
+
+        # Poor phase statistics are scored as a yellow warning.
+        if poor:
+            score = rendererutils.SCORE_THRESHOLD_WARNING
+            shortmsg = f'High Diffgaincal {messph} {score_type}'
+            longmsg = (f'For {ms_name}, field={field} intent={intent} has high {messph} {score_type} >70 deg for'
+                       f' {get_expanded_message(poor)}.')
+        # Elevated phase statistics are scored as the lowest blue score.
+        elif elevated:
+            score = rendererutils.SCORE_THRESHOLD_WARNING + 0.01 # lowest blue score 
+            shortmsg = f'Elevated Diffgaincal {messph} {score_type}'
+            longmsg = (f'For {ms_name}, field={field} intent={intent} has elevated {messph} {score_type} between'
+                       f' 50-70 deg for {get_expanded_message(elevated)}.')
+        # Good phase statistics are scored as a blue suboptimal score.
+        elif good:
+            score = rendererutils.SCORE_THRESHOLD_SUBOPTIMAL
+            shortmsg = f'Good Diffgaincal {messph} {score_type}'
+            longmsg = f'For {ms_name}, field={field} intent={intent} has good {messph} {score_type} between 30-50 deg.'
+        # Phase statistics better than "good" are excellent with green score of 1.
+        else:
+            score = 1.0
+            shortmsg = f'Excellent Diffgaincal {messph} {score_type}'
+            longmsg = f'For {ms_name}, field={field} intent={intent} has excellent {messph} {score_type} <30 deg.'
+
+    # Specify score type. In the future, a b2b offset score with a different
+    # `originmess` will be added
+    originmess = 'residual'
+    origin = pqa.QAOrigin(metric_name=f'score_diffgaincal_{originmess}',
+                          metric_score=score,
+                          metric_units=f'Score based on diffgain {originmess} analysis')
 
     return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin)
 
@@ -5114,3 +5235,79 @@ def score_longsolint(context, result) -> list[pqa.QAScore]:
                           metric_score=score,
                           metric_units='')
     return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin)
+
+@log_qa
+def score_testBPdcals_dts_ants(vis:str, amp_collection:dict, phase_collection:dict, bandname:str) -> pqa.QAScore:
+    """Evaluate QA score based on the number of antennas affected by DTS issues."""
+
+    bad_ants = []
+    bad_ants.extend([str(a) for a in amp_collection.keys()])
+    bad_ants.extend([str(p) for p in phase_collection.keys()])
+    num_bad_ants = len(set(bad_ants))
+    applies_to = pqa.TargetDataSelection(vis=vis)
+
+    # PIPE-2580: if > 4 antennas have DTS issue, QA score < 0.5
+    if num_bad_ants > 4:
+        score = rendererutils.SCORE_THRESHOLD_ERROR
+        longmsg = f"{num_bad_ants} antennas have DTS issue in {bandname} band"
+        shortmsg = f"{num_bad_ants} antennas have DTS issue in {bandname} band"
+    else:
+        score = 1.0
+        longmsg = f"Fewer than four antennas have DTS issue in {bandname} band"
+        shortmsg = f"Fewer than four antennas have DTS issue in {bandname} band"
+    origin = pqa.QAOrigin(metric_name='score_testBPdcals_dts_ants',
+                          metric_score=score,
+                          metric_units='')
+    qa_score = pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=applies_to)
+
+    return qa_score
+
+@log_qa
+def score_testBPdcals_refant(vis:str, bad_refant:list, bandname:str) -> pqa.QAScore:
+    """Evaluate QA score based on reference antenna validity."""
+
+    applies_to = pqa.TargetDataSelection(vis=vis)
+    # PIPE-2580: if bad reference antenna found, QA score <0.5
+    if len(bad_refant) > 0  :
+        score = rendererutils.SCORE_THRESHOLD_ERROR
+        longmsg = f"Bad reference antenna ({', '.join(bad_refant)}) found in {bandname} band"
+        shortmsg = longmsg
+    else:
+        score = 1.0
+        longmsg = f"No bad reference antenna found in {bandname} band"
+        shortmsg = f"No bad reference antenna found in {bandname} band"
+    origin = pqa.QAOrigin(metric_name='score_testBPdcals_refant',
+                          metric_score=score,
+                          metric_units='')
+    qa_score = pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=applies_to)
+
+    return qa_score
+
+@log_qa
+def score_testBPdcals_delay(vis:str, caltable:str, bandname:str) -> pqa.QAScore:
+    """Evaluate QA score based on median delay per baseband."""
+
+    applies_to = pqa.TargetDataSelection(vis=vis)
+    # PIPE-2580: if median delay per baseband > 15 ms, QA score < 0.5
+    with casa_tools.TableReader(caltable) as tb:
+        fpar = tb.getcol('FPARAM')
+        delays = np.abs(fpar)
+        median_delay = np.median(delays)
+    qa = casa_tools.quanta
+    median_delay_val = qa.convert(qa.quantity(median_delay, "ns"), "ms")["value"]
+
+    if median_delay_val > 15:
+        score = rendererutils.SCORE_THRESHOLD_ERROR
+        longmsg = f"Median delay > 15 ms for {bandname} band"
+        shortmsg = f"Median delay > 15 ms for {bandname} band"
+    else:
+        score = 1.0
+        longmsg = f"Median delay < 15 ms for {bandname} band"
+        shortmsg = f"Median delay < 15 ms for {bandname} band"
+
+    origin = pqa.QAOrigin(metric_name='score_testBPdcals_delay',
+                          metric_score=score,
+                          metric_units='')
+    qa_score = pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=applies_to)
+
+    return qa_score

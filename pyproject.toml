@@ -121,36 +121,101 @@ show_missing = true
 skip_covered = false
 exclude_lines = [
     'pragma: no cover',
+    'if TYPE_CHECKING:',
     'if __name__ == "__main__":',
     'from .* import .*',
     'import .*',
     'raise NotImplementedError',
     'pass',
+    '@(abc\\.)?abstractmethod',
 ]
 
 [tool.pytest.ini_options]
 markers = [
-  "regression: regression test",
-  "alma: alma test",
-  "nobeyama: nobeyama test",
-  "vla: vla test (does not include vlass)",
-  "vlass: vlass test",
-  "fast: shorter-running test",
-  "slow: longer-running test",
-  "twelve: 12m ALMA test",
-  "seven: 7m ALMA test",
-  "sd: single dish test",
-  "interferometry: interferometry test",
-
-  "component: component tests",
-  "importdata: importdata task(s)",
-  "selfcal: selfcal task(s)",
-  "makeimages: makeimages task(s)",
-
-  "unit: unit test",
+    "regression: regression test",
+    "alma: alma test",
+    "nobeyama: nobeyama test",
+    "vla: vla test (does not include vlass)",
+    "vlass: vlass test",
+    "fast: shorter-running test",
+    "slow: longer-running test",
+    "twelve: 12m ALMA test",
+    "seven: 7m ALMA test",
+    "sd: single dish test",
+    "interferometry: interferometry test",
+    "component: component tests",
+    "importdata: importdata task(s)",
+    "selfcal: selfcal task(s)",
+    "makeimages: makeimages task(s)",
+    "unit: unit test",
 ]
 addopts = [
     "-ra", # show extra test summary info for (a)ll except passed
     "-v",  # verbose output
 ]
 junit_family = "legacy"
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64"]
+
+# Dependencies common to all environments
+
+[tool.pixi.dependencies]
+conda-ecosystem-user-package-isolation = "*"
+ipython = "*"
+pip = ">=23.0"
+mpi4py = "*"
+certifi = "*"
+poppler = "*"
+imagemagick = "*"
+pandoc = "*"
+
+[tool.pixi.pypi-dependencies]
+# Install the current project in editable mode
+# This picks up dependencies from requirements.txt, which is still
+# used for monolithic installations.
+pipeline = { path = ".", editable = true, extras = ["dev"] }
+casampi = "*"
+protobuf = "~=3.20"
+casaplotms = "*"
+casaplotserver = "*"
+
+[tool.pixi.pypi-options]
+extra-index-urls = ["https://casa-pip.nrao.edu/repository/pypi-group/simple"]
+index-strategy = "unsafe-best-match"
+
+[tool.pixi.system-requirements]
+# Instruct pixi to target at macOS 14+ due to casatools availability
+macos = "14.0"
+
+# PL2026 ALMA/VLA featureset
+
+[tool.pixi.feature.pl2026]
+platforms = ["linux-64", "osx-arm64"]
+
+[tool.pixi.feature.pl2026.dependencies]
+python = "3.12.*"
+openmpi = "*"
+
+[tool.pixi.feature.pl2026.pypi-dependencies]
+# set to latest dev snapshot before ver 6.7.4 branching
+casashell = "~=6.7.5"
+
+# PL2026 VLASS featureset
+
+[tool.pixi.feature.pl2026vlass]
+platforms = ["linux-64"]
+
+[tool.pixi.feature.pl2026vlass.dependencies]
+python = "3.10.*"
+openmpi-mpicxx = "*"
+
+[tool.pixi.feature.pl2026vlass.pypi-dependencies]
+casashell = "==6.7.1.*"
+
+# Environment Definitions
+
+[tool.pixi.environments]
+default = ["pl2026"]    # Corresponds to environment.yml
+vlass = ["pl2026vlass"] # Corresponds to environment_vlass2026.yml

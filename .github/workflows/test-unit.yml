@@ -9,7 +9,7 @@ on:
       - "pipeline/**"
       - "tests/**"
       - ".github/workflows/**"
-      - "environment.yml"
+      - "environment*.yml"
       - "pyproject.toml"
       - "setup.py"
   pull_request:
@@ -29,12 +29,14 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+        conda_env: [environment.yml, environment_vlass2026.yml]
 
-    name: Unit Testing (${{ matrix.os }})
+    name: Unit Testing (${{ matrix.os }}, ${{ matrix.conda_env }})
 
     uses: ./.github/workflows/env-setup-run-template.yml
     with:
       os: ${{ matrix.os }}
+      conda_env: ${{ matrix.conda_env }}
       pip_install: .[dev]
       test_data: unit
       run_command: |
@@ -51,7 +53,15 @@ jobs:
           --cov-report=html --cov-report=xml  \
           pipeline/
 
-      artifact_name: ${{ matrix.os == 'ubuntu-latest' && 'pytest-results-ubuntu-latest' || '' }}
+      # Only upload artifacts for a single reference configuration:
+      #   - ubuntu-latest OS
+      #   - environment.yml conda environment
+      #
+      # The other matrix combinations (macOS and the environment_vlass2026.yml)
+      # run tests for additional coverage but do not publish artifacts. The
+      # downstream jobs (upload_pages, upload_codecov) are wired to download
+      # this specific artifact name: "pytest-results-ubuntu-latest".
+      artifact_name: ${{ ((matrix.os == 'ubuntu-latest' && matrix.conda_env == 'environment.yml') && 'pytest-results-ubuntu-latest') || '' }}
       artifact_path: |
         coverage.xml
         htmlcov/
@@ -64,7 +74,7 @@ jobs:
 
     if: |
       needs.test.result == 'success' &&
-      github.ref == 'refs/heads/update-docs-build-and-packaging-setup'
+      github.ref == 'refs/heads/main'
     permissions:
       contents: write
     steps:

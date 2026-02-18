@@ -3,13 +3,12 @@ name: "Docs-Pages"
 on:
   push:
     branches:
-      - "update-docs-build-and-packaging-setup"
       - "main"
     paths:
       - "docs/**"
       - "pipeline/**"
       - ".github/workflows/**"
-      - "environment.yml"
+      - "environment*.yml"
       - "setup.py"
       - "pyproject.toml"
   # Allow manual triggering
@@ -17,7 +16,7 @@ on:
 
 # Cancel in-progress runs for the same branch
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -66,7 +65,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     # Only deploy if the push came from the specific branch / ubuntu-latest
-    if: github.ref == 'refs/heads/update-docs-build-and-packaging-setup'
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: write
     steps:

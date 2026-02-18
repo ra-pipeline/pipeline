@@ -362,21 +362,12 @@ class Results(api.Results):
                 # various logs and scripts are calculated during web log generation
                 write_pipeline_casa_tasks(context)
 
-            # generate weblog if accepting a result from outside a task execution
-            if task_completed and not DISABLE_WEBLOG:
-                # cannot import at initial import time due to cyclic dependency
-                import pipeline.infrastructure.renderer.htmlrenderer as htmlrenderer
-                htmlrenderer.WebLogGenerator.render(context)
-
             # If running at DEBUG loglevel and this is a top-level task result,
             # then store to disk a pickle of the context as it existed at the
             # end of this pipeline stage; this may be useful for debugging.
             if task_completed and LOG.isEnabledFor(logging.DEBUG):
-                basename = 'context-stage%s.pickle' % result_to_append.stage_number
-                path = os.path.join(context.output_dir,
-                                    context.name,
-                                    'saved_state',
-                                    basename)
+                basename = f'context-stage{result_to_append.stage_number}.pickle'
+                path = os.path.join(context.output_dir, context.name, 'saved_state', basename)
 
                 utils.mkdir_p(os.path.dirname(path))
                 with open(path, 'wb') as outfile:
@@ -389,6 +380,12 @@ class Results(api.Results):
                     export_context_metadata(context, metadata_path)
                 except Exception:
                     LOG.exception('Failed to export context metadata for %s.', path)
+
+            # generate weblog if accepting a result from outside a task execution
+            if task_completed and not DISABLE_WEBLOG:
+                # cannot import at initial import time due to cyclic dependency
+                from pipeline.infrastructure.renderer import htmlrenderer
+                htmlrenderer.WebLogGenerator.render(context)
 
             # Event must be sent from inside finally block to ensure that
             # the event is always sent even if result acceptance is failed.

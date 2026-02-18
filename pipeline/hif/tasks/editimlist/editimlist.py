@@ -40,7 +40,7 @@ import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
 from pipeline.hif.heuristics import imageparams_factory
 from pipeline.hif.tasks.makeimlist.cleantarget import CleanTarget
-from pipeline.infrastructure import task_registry
+from pipeline.infrastructure import casa_tools, task_registry
 from pipeline.infrastructure.utils import utils
 
 from .resultobjects import EditimlistResult
@@ -695,9 +695,11 @@ class Editimlist(basetask.StandardTaskTemplate):
 
                 cutout_imsize = inpdict.get('cutout_imsize', None)
                 if cutout_imsize is not None:
-                    imlist_entry['imsize'], dist_arcsec = th.imaging_imsize(
+                    imlist_entry['imsize'] = th.imsize_from_cutout(
                         cutout_imsize, imlist_entry['cell'], largest_primary_beam)
                     imlist_entry['misc_vlass'] = (imlist_entry['misc_vlass'] or {}) | {'cutout_imsize': cutout_imsize}
+                    qa_tool = casa_tools.quanta
+                    dist_arcsec = [qa_tool.tos(qa_tool.mul(imlist_entry['cell'], ct_size/2.0)) for ct_size in cutout_imsize]
                 else:
                     # We always search for fields in 1sq degree with a surrounding buffer
                     mosaic_side_arcsec = 3600  # 1 degree

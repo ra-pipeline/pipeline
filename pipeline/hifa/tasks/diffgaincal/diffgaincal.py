@@ -1,3 +1,4 @@
+import os
 import numpy as np
 
 import pipeline.infrastructure as infrastructure
@@ -543,13 +544,31 @@ class DiffGaincal(basetask.StandardTaskTemplate):
             # Run gaincal for the first scan group.
             result = self._do_gaincal(intent=intent, spw=spwids_str, combine=combine, scan=scan_groups[0])
 
-            # Run gaincal for any additional scan groups, appending to the initial caltable.
+            # Only extract and reuse the caltable if there is more than one scan group.
             if len(scan_groups) > 1:
                 caltable = result.inputs['caltable']
-                for scan_group in scan_groups[1:]:
-                    self._do_gaincal(intent=intent, spw=spwids_str, combine=combine, caltable=caltable, scan=scan_group,
-                                     append=True)
 
+                # Loop the remaining scan groups - specifically diffgain_onsource 'b2b offset' solve.
+                # Should only be one 'more' as current operations as of 2024 use two diffgain 'blocks'.
+                for scan_group in scan_groups[1:]:
+                    # PIPE-2915: check if there was a gaintable made in the first instance, then append
+                    # If the first scan group solve did not get made (possibly due to flags),
+                    # we use the next group to make a fresh gaintable.
+                    # Note that in operations there is likely only ever two scan groups.
+                    table_exists = os.path.exists(caltable)
+
+                    if not table_exists:
+                        LOG.info('Diffgain B2B offset caltable not found for initial scan group')
+
+                    # If table_exists is True, we append. If False, we start a fresh solve.
+                    result = self._do_gaincal(
+                        intent=intent,
+                        spw=spwids_str,
+                        combine=combine,
+                        scan=scan_group,
+                        caltable=caltable,
+                        append=table_exists,
+                    )
         return result
 
     def _do_phasecal_for_diffgain_reference(self) -> tuple[common.GaincalResults, dict[IntentField, SpwMapping]]:

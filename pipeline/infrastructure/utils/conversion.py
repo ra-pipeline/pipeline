@@ -774,7 +774,7 @@ def phasecenter_to_skycoord(phasecenter: str) -> SkyCoord:
             ra_unit = u.deg
         except ValueError:
             ra_unit = u.hourangle
-            LOG.warning("Unable to determine RA unit, assuming hourangle for RA value %s", ra)
+            LOG.info("Unable to determine RA unit, assuming hourangle for RA value %s", ra)
 
     # determine Dec unit
     if any(u in dec for u in _ANGLE_UNITS):
@@ -782,7 +782,7 @@ def phasecenter_to_skycoord(phasecenter: str) -> SkyCoord:
         dec_unit = None
     else:
         dec_unit = u.deg
-        LOG.warning("Unable to determine Dec unit, assuming degrees for Dec value %s", dec)
+        LOG.info("Unable to determine Dec unit, assuming degrees for Dec value %s", dec)
 
     coord = SkyCoord(ra, dec, unit=(ra_unit, dec_unit), frame=frame)
 

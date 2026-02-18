@@ -8,6 +8,11 @@ on:
         required: false
         default: "ubuntu-latest"
         type: string
+      conda_env:
+        description: "Conda environment file name"
+        required: false
+        default: "environment.yml"
+        type: string
       pip_install:
         description: "pip install command after environment setup"
         required: false
@@ -50,7 +55,7 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: pipeline
-          environment-file: environment.yml
+          environment-file: ${{ inputs.conda_env }}
           channel-priority: strict
           use-only-tar-bz2: true
           miniforge-version: latest
@@ -101,7 +106,9 @@ jobs:
         if: inputs.test_data == 'unit' && steps.cache-testdata.outputs.cache-hit != 'true'
         run: |
           # This creates the directory 'pipeline-testdata' INSIDE the current workspace ($GITHUB_WORKSPACE)
-          git clone --filter=blob:none --sparse https://open-bitbucket.nrao.edu/scm/pipe/pipeline-testdata.git pipeline-testdata
+          if [ ! -d "pipeline-testdata/.git" ]; then
+              git clone --filter=blob:none --sparse https://open-bitbucket.nrao.edu/scm/pipe/pipeline-testdata.git pipeline-testdata
+          fi
           cd pipeline-testdata
           # Configure sparse checkout & Pull LFS files
           git sparse-checkout set pl-unittest
