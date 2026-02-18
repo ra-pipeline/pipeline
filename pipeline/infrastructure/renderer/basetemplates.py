@@ -5,6 +5,8 @@ Created on 8 Sep 2014
 """
 import collections
 import contextlib
+import glob
+import hashlib
 import json
 import math
 import os
@@ -40,14 +42,179 @@ class T2_4MDetailsDefaultRenderer(object):
 
         return time_ordered
 
+    def _get_stage_number(self, result):
+        if hasattr(result, 'stage_number'):
+            return result.stage_number
+        if isinstance(result, collections.abc.Iterable):
+            return result[0].stage_number
+        return None
+
+    def _get_task_name(self, result):
+        if hasattr(result, 'taskname'):
+            return result.taskname
+        if hasattr(result, 'task'):
+            return result.task.__name__
+        if isinstance(result, collections.abc.Iterable):
+            return getattr(result[0].task, '__name__', 'unknown')
+        return 'unknown'
+
+    def _get_inputs_hash(self, result):
+        inputs = getattr(result, 'inputs', None)
+        if inputs is None and isinstance(result, collections.abc.Iterable):
+            inputs = getattr(result[0], 'inputs', None)
+
+        if inputs is None:
+            return 'no-inputs'
+
+        try:
+            inputs_dict = inputs.as_dict() if hasattr(inputs, 'as_dict') else dict(inputs)
+        except Exception:
+            inputs_dict = {'inputs_repr': repr(inputs)}
+
+        inputs_dict = self._get_stable_inputs_dict(inputs_dict, result)
+        payload, _ = self._serialize_for_hash(inputs_dict)
+        return hashlib.sha256(payload.encode('utf-8')).hexdigest()
+
+    def _stable_hash(self, value):
+        payload, _ = self._serialize_for_hash(value)
+        return hashlib.sha256(payload.encode('utf-8')).hexdigest()
+
+    def _serialize_for_hash(self, value):
+        normalized = self._normalize_for_hash(value)
+        try:
+            payload = json.dumps(normalized, sort_keys=True, separators=(',', ':'), default=str)
+        except TypeError:
+            payload = repr(normalized)
+
+        return payload, normalized
+
+    def _normalize_for_hash(self, value):
+        if isinstance(value, dict):
+            return {str(k): self._normalize_for_hash(v) for k, v in sorted(value.items(), key=lambda kv: str(kv[0]))}
+        if isinstance(value, (list, tuple)):
+            return [self._normalize_for_hash(v) for v in value]
+        if isinstance(value, set):
+            return [self._normalize_for_hash(v) for v in sorted(value, key=lambda v: str(v))]
+        return value
+
+    def _get_stable_inputs_dict(self, inputs_dict, result):
+        task_name = self._get_task_name(result)
+        if task_name != 'hifa_flagdata':
+            return inputs_dict
+
+        keep_keys = {
+            'vis',
+            'autocorr',
+            'shadow',
+            'tolerance',
+            'scan',
+            'scannumber',
+            'intents',
+            'edgespw',
+            'fracspw',
+            'fracspwfps',
+            'online',
+            'partialpol',
+            'lowtrans',
+            'mintransnonrepspws',
+            'mintransrepspw',
+            'fileonline',
+            'template',
+            'filetemplate',
+            'hm_tbuff',
+            'tbuff',
+            'qa0',
+            'qa2',
+        }
+
+        filtered = {key: inputs_dict.get(key) for key in keep_keys if key in inputs_dict}
+        if 'vis' in filtered:
+            filtered['vis'] = self._normalize_vis(filtered['vis'])
+
+        return filtered or inputs_dict
+
+    def _normalize_vis(self, vis_value):
+        if isinstance(vis_value, (list, tuple, set)):
+            vis_list = [os.path.basename(str(v)) for v in vis_value]
+            return sorted(vis_list)
+        return os.path.basename(str(vis_value))
+
+    def _find_cached_path(self, context, result):
+        cache_path = self._get_cache_path(context, result)
+        if cache_path and os.path.exists(cache_path):
+            return cache_path
+
+        task_name = self._get_task_name(result)
+        safe_task = ''.join([c if c.isalnum() or c in ('_', '-') else '_' for c in task_name])
+        inputs_hash = self._get_inputs_hash(result)
+        pattern = os.path.join(
+            context.report_dir,
+            'stage*',
+            f't2-4m_details.{safe_task}.{inputs_hash}.json',
+        )
+        matches = glob.glob(pattern)
+        if not matches:
+            return cache_path
+
+        return max(matches, key=os.path.getmtime)
+
+    def _get_cache_path(self, context, result):
+        stage_number = self._get_stage_number(result)
+        if stage_number is None:
+            return None
+
+        task_name = self._get_task_name(result)
+        safe_task = ''.join([c if c.isalnum() or c in ('_', '-') else '_' for c in task_name])
+        inputs_hash = self._get_inputs_hash(result)
+        stage_dir = os.path.join(context.report_dir, 'stage%s' % stage_number)
+        return os.path.join(stage_dir, f't2-4m_details.{safe_task}.{inputs_hash}.json')
+
     def update_mako_context(self, mako_context, pipeline_context, result):
         LOG.trace('No-op update_mako_context for %s', self.__class__.__name__)
 
     def render(self, context, result):
+        cache_path = self._find_cached_path(context, result)
+        task_name = self._get_task_name(result)
+
+        if cache_path:
+            if self.always_rerender:
+                LOG.debug('T2_4MDetails: always_rerender=True for %s, skipping cache', task_name)
+            elif os.path.exists(cache_path):
+                try:
+                    with open(cache_path, 'r') as cache_file:
+                        cached = json.load(cache_file)
+                    cached_html = cached.get('html')
+                    if cached_html:
+                        LOG.debug('T2_4MDetails cache hit for %s (path: %s)', task_name, cache_path)
+                        return cached_html
+                except Exception as e:
+                    LOG.debug('Failed to load cached details page from %s: %s', cache_path, e)
+            else:
+                LOG.debug('T2_4MDetails cache miss for %s (path does not exist)', task_name)
+        else:
+            LOG.debug('T2_4MDetails: no cache_path computed for %s', task_name)
+
+        LOG.debug('T2_4MDetails rendering %s (computing display context)', task_name)
         display_context = self.get_display_context(context, result)
         uri = self.uri
         template = weblog.TEMPLATE_LOOKUP.get_template(uri)
-        return template.render(**display_context)
+        rendered = template.render(**display_context)
+
+        if cache_path and not self.always_rerender:
+            try:
+                os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+                payload = {
+                    'task': task_name,
+                    'inputs_hash': self._get_inputs_hash(result),
+                    'html': rendered,
+                }
+                with open(cache_path, 'w') as cache_file:
+                    json.dump(payload, cache_file)
+                LOG.debug('T2_4MDetails cached %s (wrote %s)', task_name, cache_path)
+            except Exception as e:
+                LOG.debug('Failed to write cached details page to %s: %s', cache_path, e)
+
+        return rendered
 
     def _get_log_url(self, context, result):
         """

@@ -382,6 +382,14 @@ class Results(api.Results):
                 with open(path, 'wb') as outfile:
                     pickle.dump(context, outfile, -1)
 
+                try:
+                    from pipeline.infrastructure.serializers import export_context_metadata
+
+                    metadata_path = path[:-7] + '-metadata.yaml'
+                    export_context_metadata(context, metadata_path)
+                except Exception:
+                    LOG.exception('Failed to export context metadata for %s.', path)
+
             # Event must be sent from inside finally block to ensure that
             # the event is always sent even if result acceptance is failed.
             if isinstance(result_to_append, FailedTaskResults):

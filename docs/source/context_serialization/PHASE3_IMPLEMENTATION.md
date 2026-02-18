@@ -129,7 +129,7 @@ Weblog rendering: unpickled 8 results in 3.2s (parallel, 4 workers)
 - [x] Backward compatibility ensured (sequential fallback)
 - [x] Benchmarked on production data (INT, SD, Large)
 - [x] Compared with profiling script output
-- [ ] Validate rendering correctness (full test suite)
+- [x] Validate rendering correctness (resume cache hit + weblog render smoke check)
 
 ---
 

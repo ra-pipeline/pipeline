@@ -542,7 +542,7 @@ class T1_1Renderer(RendererBase):
 
         execution_mode, environment_tables = T1_1Renderer.get_environment_tables(context)
 
-        return {
+        display_context = {
             'pcontext': context,
             'casa_version': environment.casa_version_string,
             'pipeline_revision': pipeline.revision,
@@ -571,6 +571,16 @@ class T1_1Renderer(RendererBase):
             'environment_tables': environment_tables,
             'execution_mode': execution_mode
         }
+
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+
+            metadata = weblog_metadata.T1_1RendererMetadata.from_display_context(display_context)
+            weblog_metadata.save_t1_1_metadata(metadata)
+        except Exception:
+            pass
+
+        return display_context
 
     @staticmethod
     def get_environment_tables(ctx: Context):
@@ -711,8 +721,18 @@ class T1_2Renderer(RendererBase):
 
             ms_summary_rows.append(row)
 
-        return {'pcontext': context,
-                'ms_summary_rows': ms_summary_rows}
+        display_context = {'pcontext': context,
+                           'ms_summary_rows': ms_summary_rows}
+
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+
+            metadata = weblog_metadata.T1_2RendererMetadata.from_display_context(display_context)
+            weblog_metadata.save_t1_2_metadata(metadata)
+        except Exception:
+            pass
+
+        return display_context
 
 
 class T1_3MRenderer(RendererBase):
@@ -792,11 +812,21 @@ class T1_3MRenderer(RendererBase):
                 except:
                     LOG.debug('No flag summary table available yet from applycal')
 
-        return {'pcontext': context,
-                'registry': registry,
-                'scores': scores,
-                'tablerows': tablerows,
-                'flagtables': flagtables}
+        display_context = {'pcontext': context,
+                           'registry': registry,
+                           'scores': scores,
+                           'tablerows': tablerows,
+                           'flagtables': flagtables}
+
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+
+            metadata = weblog_metadata.T1_3MRendererMetadata.from_display_context(display_context)
+            weblog_metadata.save_t1_3m_metadata(metadata)
+        except Exception:
+            pass
+
+        return display_context
 
 
 class T1_4MRenderer(RendererBase):
@@ -833,10 +863,20 @@ class T1_4MRenderer(RendererBase):
                                      os.path.basename(pprfile))
             shutil.copy(pprfile, dest_path)
 
-        return {'pcontext' : context,
-                'results'  : context.results,
-                'scores'   : scores,
-                'task_duration': task_duration}
+        display_context = {'pcontext': context,
+                           'results': context.results,
+                           'scores': scores,
+                           'task_duration': task_duration}
+
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+
+            metadata = weblog_metadata.T1_4MRendererMetadata.from_display_context(display_context)
+            weblog_metadata.save_t1_4m_metadata(metadata)
+        except Exception:
+            pass
+
+        return display_context
 
 
 class T2_1Renderer(RendererBase):
@@ -849,8 +889,18 @@ class T2_1Renderer(RendererBase):
     @staticmethod
     def get_display_context(context):
         sessions = Session.get_sessions(context)
-        return {'pcontext' : context,
-                'sessions' : sessions}
+        display_context = {'pcontext': context,
+                           'sessions': sessions}
+
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+
+            metadata = weblog_metadata.T2_1RendererMetadata.from_display_context(display_context)
+            weblog_metadata.save_t2_1_metadata(metadata)
+        except Exception:
+            pass
+
+        return display_context
 
 
 class T2_1DetailsRenderer(object):
@@ -1259,6 +1309,29 @@ class T2_2_2Renderer(T2_2_XRendererBase):
     def get_display_context(context, ms):
         """Determine whether to show the Online Spec. Avg. column on the Spectral Setup Details page."""
 
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+
+            metadata = weblog_metadata.load_t2_2_2_metadata(
+                context.report_dir,
+                str(ms.session),
+                ms.basename,
+            )
+        except Exception as e:
+            LOG.debug('T2_2_2 metadata load failed for %s: %s', ms.basename, e)
+            metadata = None
+
+        if metadata is not None:
+            show_online_spec_avg_col = T2_2_2Renderer.ShowColumn(
+                science_windows=metadata.show_science_windows,
+                all_windows=metadata.show_all_windows,
+            )
+            return {
+                'pcontext': context,
+                'ms': ms,
+                'show_online_spec_avg_col': show_online_spec_avg_col,
+            }
+
         show_online_spec_avg_col = T2_2_2Renderer.ShowColumn(science_windows=False, all_windows=False)
 
         if None not in [spw.sdm_num_bin for spw in ms.get_spectral_windows()]:
@@ -1280,10 +1353,19 @@ class T2_2_2Renderer(T2_2_XRendererBase):
                     else:
                         show_online_spec_avg_col = T2_2_2Renderer.ShowColumn(science_windows=False, all_windows=True)
 
-        return {'pcontext': context,
-                'ms': ms,
-                'show_online_spec_avg_col': show_online_spec_avg_col
-                }
+        display_context = {'pcontext': context,
+                           'ms': ms,
+                           'show_online_spec_avg_col': show_online_spec_avg_col}
+
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+
+            metadata = weblog_metadata.T2_2_2RendererMetadata.from_display_context(display_context)
+            weblog_metadata.save_t2_2_2_metadata(metadata)
+        except Exception:
+            pass
+
+        return display_context
 
 
 class T2_2_3Renderer(T2_2_XRendererBase):
@@ -1723,8 +1805,18 @@ class T2_4MRenderer(RendererBase):
 
     @staticmethod
     def get_display_context(context):
-        return {'pcontext' : context,
-                'results'  : context.results}
+        display_context = {'pcontext': context,
+                           'results': context.results}
+
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+
+            metadata = weblog_metadata.T2_4MRendererMetadata.from_display_context(display_context)
+            weblog_metadata.save_t2_4m_metadata(metadata)
+        except Exception:
+            pass
+
+        return display_context
 
 
 class T2_4MDetailsDefaultRenderer(object):
@@ -1944,6 +2036,16 @@ class T2_4MDetailsRenderer(object):
 
             else:
                 LOG.warning('Don\'t know how to group %s renderer', task.__name__)
+
+        try:
+            from pipeline.infrastructure.renderer import weblog_metadata
+
+            metadata = weblog_metadata.T2_4MDetailsRendererMetadata.from_display_context(
+                {'pcontext': context}
+            )
+            weblog_metadata.save_t2_4m_details_metadata(metadata)
+        except Exception:
+            pass
 
     @classmethod
     def render_result(cls, renderer, context, result, root=''):
