@@ -40,10 +40,6 @@ jobs:
       pip_install: .[dev]
       test_data: unit
       run_command: |
-        # Configure CASA datapath in ~/.casa/config.py
-        # We use double quotes so the shell expands $HOME and $GITHUB_WORKSPACE
-        echo "datapath = [ '$HOME/.casa/data', '$GITHUB_WORKSPACE/pipeline-testdata' ]" >> ~/.casa/config.py
-
         # Run tests with automatic CPU detection (pyproject.toml handles coverage generation)
         # Current standard GitHub Runner specs (as of Dec 2025):
         #   ubuntu-latest: 4 CPU cores, 16 GB RAM
