@@ -26,6 +26,7 @@ from . import utils
 from . import vdp
 from .eventbus import TaskStartedEvent, TaskCompleteEvent, TaskAbnormalExitEvent
 from .eventbus import ResultAcceptingEvent, ResultAcceptedEvent, ResultAcceptErrorEvent
+
 from .casa_tasks import CasaTasks
 
 LOG = logging.get_logger(__name__)
@@ -775,50 +776,49 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
         handler = logging.CapturingHandler(logging.ATTENTION)
 
         try:
-            # if this task does not handle multiple input mses but was
-            # invoked with multiple mses in its inputs, call our utility
-            # function to invoke the task once per ms.
-            if not self.is_multi_vis_task:
-                if isinstance(self.inputs, vdp.InputsContainer) or isinstance(self.inputs.vis, list):
-                    return self._handle_multiple_vis(**parameters)
 
-            if isinstance(self.inputs, vdp.InputsContainer) and self.inputs._pipeline_casa_task is not None:
-                LOG.info('Equivalent Pipeline CLI call: %s', self.inputs._pipeline_casa_task)
-
-            # We should not pass unused parameters to prepare(), so first
-            # inspect the signature to find the names the arguments and then
-            # create a dictionary containing only those parameters
-            prepare_args = set(inspect.getfullargspec(self.prepare).args)
-            prepare_parameters = dict(parameters)
-            for arg in parameters:
-                if arg not in prepare_args:
-                    del prepare_parameters[arg]
-
-            # register the capturing log handler, buffering all messages so that
-            # we can add them to the result - and subsequently, the weblog
-            logging.add_handler(handler)
-
-            # get our result
-            result = self.prepare(**prepare_parameters)
-
-            # analyse them..
-            result = self.analyse(result)
-
-            # tag the result with the class of the originating task
-            result.task = self.__class__
-
-            # add the log records to the result
-            if not hasattr(result, 'logrecords'):
-                result.logrecords = handler.buffer
+            if not self.is_multi_vis_task and (isinstance(self.inputs, vdp.InputsContainer) or isinstance(self.inputs.vis, list)):
+                # if this task does not handle multiple input mses but was
+                # invoked with multiple mses in its inputs, call our utility
+                # function to invoke the task once per ms.
+                result = self._handle_multiple_vis(**parameters)
             else:
-                result.logrecords.extend(handler.buffer)
+                if isinstance(self.inputs, vdp.InputsContainer) and self.inputs._pipeline_casa_task is not None:
+                    LOG.info('Equivalent Pipeline CLI call: %s', self.inputs._pipeline_casa_task)
+
+                # We should not pass unused parameters to prepare(), so first
+                # inspect the signature to find the names the arguments and then
+                # create a dictionary containing only those parameters
+                prepare_args = set(inspect.getfullargspec(self.prepare).args)
+                prepare_parameters = dict(parameters)
+                for arg in parameters:
+                    if arg not in prepare_args:
+                        del prepare_parameters[arg]
+
+                # register the capturing log handler, buffering all messages so that
+                # we can add them to the result - and subsequently, the weblog
+                logging.add_handler(handler)
+
+                # get our result
+                result = self.prepare(**prepare_parameters)
+
+                # analyse them..
+                result = self.analyse(result)
+
+                # tag the result with the class of the originating task
+                result.task = self.__class__
+
+                # add the log records to the result
+                if not hasattr(result, 'logrecords'):
+                    result.logrecords = handler.buffer
+                else:
+                    result.logrecords.extend(handler.buffer)
 
             if utils.is_top_level_task():
                 event = TaskCompleteEvent(
                     context_name=self.inputs.context.name, stage_number=self.inputs.context.task_counter
                 )
                 eventbus.send_message(event)
-
             return result
 
         except Exception as ex:
