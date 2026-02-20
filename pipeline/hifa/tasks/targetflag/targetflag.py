@@ -20,6 +20,8 @@ class TargetflagResults(basetask.Results):
         self.plots = {}
         self.callib_map = {}
 
+        self._transient_fields.update({'plots'})
+
     def merge_with_context(self, context):
         """
         See :method:`~pipeline.infrastructure.api.Results.merge_with_context`

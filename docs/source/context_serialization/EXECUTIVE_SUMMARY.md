@@ -61,7 +61,7 @@ I conducted a comprehensive investigation into your pipeline's context storage s
 | Phase 1: Export metadata | 2-4 hrs | 🟢 Very Low | High | ✅ Complete |
 | Phase 2: Weblog metadata caching | 4-8 hrs | 🟢 Low | Very High | ✅ Complete |
 | Phase 3: Parallel unpickling + thread-safety | 2-3 days | 🟡 Medium | High | ✅ Complete |
-| Phase 4: Context optimization | 3-5 days | 🟡 Medium-High | Medium | 🔜 Next |
+| Phase 4: Results slimming & deltas | 3-5 days | 🟡 Medium-High | None (ineffective) | ✅ Tested, not recommended |
 
 ## Recommended Path Forward
 
@@ -77,10 +77,14 @@ I conducted a comprehensive investigation into your pipeline's context storage s
 - Adaptive parallel unpickling with size-based worker scaling
 - CalFrom pool synchronized for safe concurrent loads
 
-### 🔜 Phase 4: Context Optimization (NEXT)
-- Separate metadata from heavyweight context state
-- Reduce pickle size by excluding serializable data
-- Enable incremental context saves and faster resume
+### ✅ Phase 4: Results Slimming & Delta Metadata (TESTED - INEFFECTIVE)
+- Implemented Results.slim_for_pickle() to remove transient fields
+- Added _transient_fields support on 5 flagging tasks
+- Created ContextDeltaMetadata for per-stage tracking
+- Built investigation tooling for analysis
+- **Testing Results:** 0% storage savings on two datasets (small & large)
+- **Root Cause:** Large pickles contain data arrays, not plots
+- **Recommendation:** Do not merge; focus on other optimizations
 
 ## Quality Assurance
 

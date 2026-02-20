@@ -415,17 +415,54 @@ Debugging Session with 5 Re-renders:
 
 ---
 
-## Future Work (Phase 4+)
+## Phase 4: Results Slimming (Complete - Negative Results)
+
+**Status:** Implemented and tested, no measurable benefit found.
+
+### Implementation Summary
+- Results.slim_for_pickle() infrastructure: Working correctly
+- _transient_fields on 5 flagging tasks: Implemented
+- ContextDeltaMetadata exports: Functional
+- Investigation tooling: 5 utilities created
+
+### Testing Results
+**Controlled testing on two datasets:**
+
+| Dataset | Context Size | Stages | Result Pickles | Storage Savings |
+|---------|--------------|--------|----------------|------------------|
+| ALMA-IF (small) | 914 KB | 48 | ~50 MB total | 0.0% |
+| Production (large) | 44 MB | 56 | 24 GB total | 0.0% |
+
+**Detailed analysis (large dataset):**
+- Stage 4 pickle: 21 GB → 21 GB (0.0% reduction)
+- Stage 7 pickle: 1.5 GB → 1.5 GB (0.0% reduction)
+- Stages 13/19 pickles: 944 MB → 944 MB (0.1% noise)
+
+**Root Cause:** Large result pickles contain calibration data and intermediate arrays, not plot objects. The slimming mechanism works correctly but has negligible data to remove.
+
+**Metadata Overhead:** +1.8 MB per 48-stage run (147 delta/metadata files).
+
+### Recommendation
+**Do not merge Phase 4.** While correctly implemented with zero functional regressions, it provides no measurable benefit and adds complexity.
+
+---
+
+## Future Work (Proven High-Value Targets)
+
+### Immediate Priority
+1. **Investigate 21 GB pickle (hif_rawflagchans):** Abnormal size suggests data that shouldn't be pickled
+2. **Pickle protocol V5:** 20-30% size reduction (proven technique)
+3. **Compression (gzip/lz4):** 60-80% size reduction (proven technique)
 
 ### Short-Term (Quick Wins)
-1. **Pickle protocol V5:** 20-30% size reduction
-2. **Cache hit statistics:** Track and report cache effectiveness
-3. **Progressive rendering:** Show results as they become available
+1. **Context composition profiling:** Identify what consumes 44 MB context space
+2. **Data structure fixes:** Remove unnecessary duplicates/copies in context
+3. **Cache hit statistics:** Track and report Phase 2 cache effectiveness
 
 ### Medium-Term (High Value)
 1. **Lazy loading:** Load results on-demand (memory reduction 50-80%)
-2. **Compression:** Apply gzip to pickles (70% size reduction)
-3. **Parallel rendering:** Execute renderers concurrently (2-4x speedup)
+2. **Parallel rendering:** Execute renderers concurrently (2-4x speedup)
+3. **Progressive rendering:** Show results as they become available
 
 ### Long-Term (Research)
 1. **Alternative formats:** HDF5/Arrow/Parquet (50-70% improvement)

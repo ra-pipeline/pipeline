@@ -210,6 +210,28 @@ class Context:
         except Exception:
             LOG.exception('Failed to export context metadata for %s.', filename)
 
+    def save_metadata(self, filename: str | None = None) -> None:
+        """Save context metadata without pickling the Context.
+
+        Args:
+            filename: Name of the metadata file. If None, this will be set to
+                <context name>-metadata.yaml.
+        """
+        if filename in ('', None):
+            filename = f'{self.name}-metadata.yaml'
+
+        if filename.endswith('.context'):
+            filename = filename[:-8] + '-metadata.yaml'
+
+        try:
+            from pipeline.infrastructure.serializers import export_context_metadata
+
+            LOG.info('Saving context metadata: %s', filename)
+            export_context_metadata(self, filename)
+            LOG.debug('Exported context metadata to %s', filename)
+        except Exception:
+            LOG.exception('Failed to export context metadata for %s.', filename)
+
     def __str__(self) -> str:
         ms_names = [ms.name
                     for ms in self.observing_run.measurement_sets]

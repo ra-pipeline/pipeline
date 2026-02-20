@@ -336,6 +336,45 @@ class ContextMetadata:
         return cls(**data)
 
 
+@dataclasses.dataclass
+class ContextDeltaMetadata:
+    """Metadata-only incremental context delta for a single stage.
+
+    Attributes:
+        stage_number: Pipeline stage index.
+        task_name: Task name for the stage.
+        timestamps: Start/end timestamps for the stage.
+        result_metadata_path: Path to result metadata file.
+        context_snapshot_path: Path to context snapshot metadata file.
+    """
+
+    stage_number: int
+    task_name: str
+    timestamps: Timestamps | None
+    result_metadata_path: str
+    context_snapshot_path: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            'stage_number': self.stage_number,
+            'task_name': self.task_name,
+            'timestamps': self.timestamps.to_dict() if self.timestamps else None,
+            'result_metadata_path': self.result_metadata_path,
+            'context_snapshot_path': self.context_snapshot_path,
+        }
+
+    def to_yaml(self, filepath: str | Path) -> None:
+        """Save context delta metadata to YAML file."""
+        with open(filepath, 'w') as f:
+            yaml.dump(self.to_dict(), f, default_flow_style=False, sort_keys=False)
+
+    def to_json(self, filepath: str | Path) -> None:
+        """Save context delta metadata to JSON file."""
+        with open(filepath, 'w') as f:
+            json.dump(self.to_dict(), f, indent=2, default=str)
+
+
 class MetadataSerializer(abc.ABC):
     """Abstract base class for metadata serializers."""
 
@@ -452,9 +491,13 @@ def export_context_metadata(
     if serializer is None:
         serializer = YAMLMetadataSerializer()
 
-    # Calculate total duration from results
+    # Calculate total duration from cached timestamps when available
     total_duration = 0.0
-    if hasattr(context, 'results') and context.results:
+    start_hint = getattr(context, '_context_metadata_start', None)
+    end_hint = getattr(context, '_context_metadata_end', None)
+    if start_hint is not None and end_hint is not None:
+        total_duration = (end_hint - start_hint).total_seconds()
+    elif hasattr(context, 'results') and context.results:
         first_result = context.results[0].read() if hasattr(context.results[0], 'read') else context.results[0]
         last_result = context.results[-1].read() if hasattr(context.results[-1], 'read') else context.results[-1]
 
@@ -483,6 +526,98 @@ def export_context_metadata(
             path_obj = path_obj.with_suffix('.yaml')
 
     serializer.serialize_context(metadata, path_obj)
+
+
+def export_context_metadata_snapshot(
+    context: Any,
+    output_path: str | Path,
+    total_duration_seconds: float | None = None,
+    serializer: MetadataSerializer | None = None,
+) -> None:
+    """Export lightweight context metadata without unpickling results.
+
+    Args:
+        context: The Context object to export metadata from.
+        output_path: Base path where metadata file will be stored.
+        total_duration_seconds: Optional duration override for the snapshot.
+        serializer: Serializer to use (defaults to YAML).
+    """
+    if serializer is None:
+        serializer = YAMLMetadataSerializer()
+
+    duration = total_duration_seconds if total_duration_seconds is not None else 0.0
+    metadata = ContextMetadata(
+        name=context.name,
+        output_dir=context.output_dir,
+        task_counter=context.task_counter,
+        subtask_counter=context.subtask_counter,
+        num_results=len(context.results) if hasattr(context, 'results') else 0,
+        total_duration_seconds=duration,
+    )
+
+    path_obj = Path(output_path)
+    if isinstance(serializer, JSONMetadataSerializer):
+        if path_obj.suffix != '.json':
+            path_obj = path_obj.with_suffix('.json')
+    else:
+        if path_obj.suffix != '.yaml':
+            path_obj = path_obj.with_suffix('.yaml')
+
+    serializer.serialize_context(metadata, path_obj)
+
+
+def export_context_delta_metadata(
+    result: Any,
+    context: Any,
+    result_metadata_path: str | Path,
+    context_snapshot_path: str | Path,
+    output_path: str | Path,
+    serializer: MetadataSerializer | None = None,
+) -> None:
+    """Export a metadata-only delta for a single stage.
+
+    Args:
+        result: The Results object for the stage.
+        context: The Context object.
+        result_metadata_path: Path to stage result metadata file.
+        context_snapshot_path: Path to stage context snapshot metadata file.
+        output_path: Path where the delta metadata file will be stored.
+        serializer: Serializer to use (defaults to YAML).
+    """
+    if serializer is None:
+        serializer = YAMLMetadataSerializer()
+
+    stage_number = getattr(result, 'stage_number', 0)
+    task_name = getattr(result, 'taskname', None)
+    if task_name is None:
+        task = getattr(result, 'task', None)
+        task_name = task.__name__ if task else 'unknown'
+
+    timestamps = getattr(result, 'timestamps', None)
+    timestamps_metadata = None
+    if timestamps is not None:
+        try:
+            timestamps_metadata = Timestamps(timestamps.start, timestamps.end)
+        except Exception:
+            timestamps_metadata = None
+
+    delta = ContextDeltaMetadata(
+        stage_number=stage_number,
+        task_name=task_name,
+        timestamps=timestamps_metadata,
+        result_metadata_path=str(result_metadata_path),
+        context_snapshot_path=str(context_snapshot_path),
+    )
+
+    path_obj = Path(output_path)
+    if isinstance(serializer, JSONMetadataSerializer):
+        if path_obj.suffix != '.json':
+            path_obj = path_obj.with_suffix('.json')
+        delta.to_json(path_obj)
+    else:
+        if path_obj.suffix != '.yaml':
+            path_obj = path_obj.with_suffix('.yaml')
+        delta.to_yaml(path_obj)
 
 
 def load_result_metadata(

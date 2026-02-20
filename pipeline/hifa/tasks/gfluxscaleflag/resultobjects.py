@@ -16,6 +16,8 @@ class GfluxscaleflagResults(basetask.Results):
         super().__init__()
         self.cafresult = resultobjects.CorrectedampflagResults()
 
+        self._transient_fields.update({'plots'})
+
         # records callibrary files used in applycal calls
         self.callib_map = {} 
 

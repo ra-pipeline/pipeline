@@ -18,6 +18,8 @@ class TsysflagResults(resultobjects.TsyscalResults):
         # the results to be merged back into the context
         super(TsysflagResults, self).__init__()
 
+        self._transient_fields.update({'plots'})
+
         # component results
         self.components = collections.OrderedDict()
 

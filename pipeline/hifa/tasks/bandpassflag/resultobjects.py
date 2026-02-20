@@ -15,6 +15,8 @@ class BandpassflagResults(basetask.Results):
         self.plots = {}
         self.vis = vis
 
+        self._transient_fields.update({'plots'})
+
         # Set of antennas that should be moved to the end of the refant list.
         self.refants_to_demote: Set[str] = set()
 

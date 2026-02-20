@@ -244,10 +244,43 @@ Store strategically:
 3. Added ResultsProxy path support for size-based tuning
 4. Validated on production datasets (INT, SD, Large)
 
-### **Phase 4: Context Optimization (Higher Risk) - 🔜 Next**
-1. Refactor context to store metadata separately from heavyweight state
-2. Reduce pickle size by excluding serializable data
-3. Implement incremental context saves and faster resume
+### **Phase 4: Results Slimming & Delta Metadata - ✅ Tested (Ineffective)**
+1. Implemented Results.slim_for_pickle() to remove transient fields from result pickles
+2. Added _transient_fields support on 5 flagging tasks (bandpassflag, gfluxscaleflag, polcalflag, targetflag, tsysflag)
+3. Created ContextDeltaMetadata for per-stage context evolution tracking
+4. Built investigation tooling (5 utilities for analysis)
+
+**Testing Results:**
+- Small dataset (ALMA-IF, 914 KB context, 48 stages): **0% storage improvement**
+- Large dataset (44 MB context, 56 stages, 24 GB results): **0% storage improvement**
+- Result pickle analysis: 21 GB (stage 4), 1.5 GB (stage 7), 944 MB (stages 13/19) all showed **0.0% reduction**
+- Root cause: Large pickles contain calibration data/arrays, not plot objects
+
+**Metadata-only save API (implemented):**
+```python
+# Write metadata only (no context pickle)
+context.save_metadata()
+
+# Optional custom name
+context.save_metadata('pipeline-run-metadata.yaml')
+```
+
+**Incremental context delta files (implemented):**
+Per-stage delta files track context evolution without full pickles:
+```yaml
+# saved_state/context-stage10-delta.yaml
+stage_number: 10
+task_name: hifa_flagdata
+timestamps:
+  start: '2026-02-18T15:42:19.584000+00:00'
+  end: '2026-02-18T16:00:34.064000+00:00'
+  duration_seconds: 1094.48
+result_metadata_path: result-stage10-metadata.yaml
+context_snapshot_path: context-stage10-metadata.yaml
+```
+
+**Results slimming (new):**
+Plots automatically removed from pickles for flagging tasks (bandpassflag, gfluxscaleflag, polcalflag, targetflag, tsysflag). Plots remain accessible via metadata cache for weblog rendering.
 
 ---
 

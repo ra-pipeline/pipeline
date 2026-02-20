@@ -141,15 +141,19 @@ Read: `SERIALIZATION_BEFORE_AFTER.md` (5 min read)
 - ✅ Fallback to pickle if metadata missing
 - ✅ Low risk, high impact
 
-### **Phase 3: Lazy Loading** (2-3 days, FUTURE)
-- Framework for selective result loading
-- Memory efficient context handling
-- Streaming result processing
+### **Phase 3: Parallel Unpickling + Thread-Safety** (2-3 days, COMPLETE)
+- Adaptive parallel unpickling in weblog rendering
+- Thread-safe CalFrom pool for concurrent loads
+- ResultsProxy path support for size-based tuning
 
-### **Phase 4: Full Optimization** (3-5 days, FUTURE)
-- Context structure refactoring
-- Incremental saves
-- Advanced caching
+### **Phase 4: Results Slimming & Delta Metadata** (TESTED - INEFFECTIVE)
+- Results.slim_for_pickle() infrastructure implemented
+- _transient_fields support on 5 flagging tasks
+- ContextDeltaMetadata with per-stage exports
+- Investigation tooling created (5 utilities)
+- **Testing:** Controlled tests on 2 datasets (small & large)
+- **Results:** 0% storage savings; large pickles contain data arrays, not plots
+- **Recommendation:** Do not merge; pursue other optimizations
 
 ---
 

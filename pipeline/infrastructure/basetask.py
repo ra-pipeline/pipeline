@@ -205,6 +205,9 @@ class Results(api.Results):
         # destined for the weblog. Currently a dict, but could change.
         self._metadata = {}
 
+        # Optional list of fields safe to drop before pickling.
+        self._transient_fields: set[str] = set()
+
     @property
     def uuid(self):
         """
@@ -236,6 +239,22 @@ class Results(api.Results):
         """
         LOG.debug('Null implementation of merge_with_context used for %s'
                   '' % self.__class__.__name__)
+
+    def slim_for_pickle(self):
+        """Return a slimmed copy for pickling, removing transient fields.
+
+        Subclasses may populate ``_transient_fields`` with attribute names that
+        can be safely dropped for storage without affecting runtime behavior.
+        """
+        if not self._transient_fields:
+            return self
+
+        slimmed = copy.copy(self)
+        for field in self._transient_fields:
+            if hasattr(slimmed, field):
+                delattr(slimmed, field)
+
+        return slimmed
 
     @matplotlibrc_handler
     def accept(self, context=None):
@@ -328,6 +347,64 @@ class Results(api.Results):
                     export_result_metadata(result_to_append, context.report_dir)
                 except Exception:
                     LOG.exception('Failed to export result metadata for stage %s.',
+                                  getattr(result_to_append, 'stage_number', 'unknown'))
+
+                try:
+                    from pipeline.infrastructure.serializers import export_context_metadata_snapshot
+
+                    total_duration_seconds = None
+                    timestamps = getattr(result_to_append, 'timestamps', None)
+                    if timestamps is not None:
+                        start_time = getattr(timestamps, 'start', None)
+                        end_time = getattr(timestamps, 'end', None)
+                        if start_time is not None and end_time is not None:
+                            if not hasattr(context, '_context_metadata_start'):
+                                setattr(context, '_context_metadata_start', start_time)
+                            setattr(context, '_context_metadata_end', end_time)
+                            start_time = getattr(context, '_context_metadata_start', start_time)
+                            total_duration_seconds = (end_time - start_time).total_seconds()
+
+                    basename = f'context-stage{result_to_append.stage_number}-metadata.yaml'
+                    snapshot_path = os.path.join(
+                        context.output_dir,
+                        context.name,
+                        'saved_state',
+                        basename,
+                    )
+                    utils.mkdir_p(os.path.dirname(snapshot_path))
+                    export_context_metadata_snapshot(
+                        context,
+                        snapshot_path,
+                        total_duration_seconds=total_duration_seconds,
+                    )
+                except Exception:
+                    LOG.exception('Failed to export context metadata snapshot for stage %s.',
+                                  getattr(result_to_append, 'stage_number', 'unknown'))
+
+                try:
+                    from pipeline.infrastructure.serializers import export_context_delta_metadata
+
+                    stage_number = getattr(result_to_append, 'stage_number', 'unknown')
+                    result_metadata_path = os.path.join(
+                        context.report_dir,
+                        f'result-stage{stage_number}-metadata.yaml',
+                    )
+                    delta_basename = f'context-stage{stage_number}-delta.yaml'
+                    delta_path = os.path.join(
+                        context.output_dir,
+                        context.name,
+                        'saved_state',
+                        delta_basename,
+                    )
+                    export_context_delta_metadata(
+                        result_to_append,
+                        context,
+                        result_metadata_path,
+                        snapshot_path,
+                        delta_path,
+                    )
+                except Exception:
+                    LOG.exception('Failed to export context delta metadata for stage %s.',
                                   getattr(result_to_append, 'stage_number', 'unknown'))
 
                 if DISABLE_WEBLOG:
@@ -481,9 +558,11 @@ class ResultsProxy(object):
         self._basename = 'result-stage%s.pickle' % result.stage_number
         path = self.path
 
+        result_to_pickle = result.slim_for_pickle() if hasattr(result, 'slim_for_pickle') else result
+
         utils.mkdir_p(os.path.dirname(path))
         with open(path, 'wb') as outfile:
-            pickle.dump(result, outfile, pickle.HIGHEST_PROTOCOL)
+            pickle.dump(result_to_pickle, outfile, pickle.HIGHEST_PROTOCOL)
 
     def read(self):
         """
