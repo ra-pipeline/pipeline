@@ -6,23 +6,22 @@ from pipeline.infrastructure import casa_tools
 _pprinter = pprint.PrettyPrinter()
 
 
-class Antenna(object):
-    """
-    Antenna is a logical representation of an antenna.
+class Antenna:
+    """A logical representation of an antenna.
 
     Attributes:
-        id: The numerical identifier of this antenna within the ANTENNA subtable
+        id: Numerical identifier of this antenna within the ANTENNA subtable
             of the measurement set.
         name: The (potentially empty) name of the antenna.
         station: The station pad on which the antenna is situated.
-        diameter: The physical diameter of the antenna in meters.
+        diameter: Physical diameter of the antenna in meters.
         position: Dictionary with longitude, latitude, and height of the antenna.
-        offset: The offset position of the antenna relative to AntennaArray.position
+        offset: Offset position of the antenna relative to AntennaArray.position
             (the antenna array reference position).
-        longitude: The longitude of the antenna.
-        latitude: The latitude of the antenna.
-        height: The radial distance of the antenna from the Earth's centre.
-        direction: The J2000 position on the sky to which the antenna points.
+        longitude: Longitude of the antenna as a CASA quantity in radians.
+        latitude: Latitude of the antenna as a CASA quantity in radians.
+        height: Radial distance of the antenna from the Earth's centre in meters.
+        direction: J2000 position on the sky to which the antenna points.
     """
     def __init__(self, antenna_id: int, name: str, station: str, position: dict, offset: dict, diameter: float) -> None:
         """

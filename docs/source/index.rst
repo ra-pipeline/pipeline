@@ -9,6 +9,7 @@
    develdocmd/ways_to_run_the_pipeline.md
    develdocmd/recipes.md
    dependencies
+   interface
    releases
    timeline
    

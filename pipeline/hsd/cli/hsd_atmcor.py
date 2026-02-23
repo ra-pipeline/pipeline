@@ -1,10 +1,16 @@
+import sys
+
 import pipeline.h.cli.utils as utils
 
 
 # docstring and type hints: inherits from hsd.tasks.atmcor.atmcor.SDATMCorrectionInputs.__init__
 @utils.cli_wrapper
-def hsd_atmcor(atmtype=None, dtem_dh=None, h0=None,
-               infiles=None, antenna=None, field=None, spw=None, pol=None):
+def hsd_atmcor(
+        atmtype=None, dtem_dh=None, h0=None,
+        infiles=None, antenna=None, parallel=None,
+        field=None, spw=None, pol=None
+):
+
     """Apply offline ATM correction to the data.
 
     The hsd_atmcor task provides the capability of offline correction of

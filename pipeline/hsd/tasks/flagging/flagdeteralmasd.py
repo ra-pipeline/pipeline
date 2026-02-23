@@ -371,7 +371,7 @@ class SerialFlagDeterALMASingleDish(flagdeterbase.FlagDeterBase):
                         '[pointing_outlier_flagged] '
                         'Pointing outliers are detected in "%s", '
                         'Field "%s", Antenna "%s": time range "%s", '
-                        'max separation %.2f arcsec',
+                        'max separation %.2f deg',
                         self.inputs.vis, field.name, antenna.name,
                         ', '.join(stats.timerange), np.max(stats.separations)
                     )

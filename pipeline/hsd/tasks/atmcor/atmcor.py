@@ -249,10 +249,10 @@ class SDATMCorrectionInputs(vdp.StandardInputs):
     def pol(self) -> str:
         """Return pol selection string.
 
-        By default, polarizatons corresponding to selected spws are selected.
+        By default, polarization corresponding to selected spws are selected.
 
         Returns:
-            pol selecton string
+            pol selection string
         """
         # filters polarization by self.spw
         selected_spwids = [int(spwobj.id) for spwobj in self.ms.get_spectral_windows(self.spw, with_channels=True)]
@@ -570,10 +570,6 @@ class SDATMCorrectionResults(common.SingleDishResults):
         return os.path.basename(self.atmcor_ms_name)
 
 
-@task_registry.set_equivalent_casa_task('hsd_atmcor')
-@task_registry.set_casa_commands_comment(
-    'Apply offline correction of atmospheric transmission model.'
-)
 class SerialSDATMCorrection(basetask.StandardTaskTemplate):
     """Offline ATM correction task."""
 
@@ -655,9 +651,9 @@ class SerialSDATMCorrection(basetask.StandardTaskTemplate):
 
         Returns:
             Four tuple, status of ATM model heuristics, argument list for sdatmcor,
-            index of best ATM model, and list of attempted ATM models.
+            index of the best ATM model, and list of attempted ATM models.
         """
-        # create weblog directry
+        # create weblog directory
         stage_number = self.inputs.context.task_counter
         stage_dir = os.path.join(
             self.inputs.context.report_dir,
@@ -730,8 +726,11 @@ class SerialSDATMCorrection(basetask.StandardTaskTemplate):
 
         return atm_heuristics, args, best_model_index, model_list
 
-
-class HpcSDATMCorrection(sessionutils.ParallelTemplate):
+@task_registry.set_equivalent_casa_task('hsd_atmcor')
+@task_registry.set_casa_commands_comment(
+    'Apply offline correction of atmospheric transmission model.'
+)
+class SDATMCorrection(sessionutils.ParallelTemplate):
     """Parallel implementation of offline ATM correction task."""
 
     Inputs = SDATMCorrectionInputs

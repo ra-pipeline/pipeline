@@ -9,4 +9,4 @@ from .imaging import SDImaging
 from .exportdata import SDExportData
 from .tsysflag import SerialTsysflag as SDTsysflag
 from .restoredata import SDRestoreData
-from .atmcor import SerialSDATMCorrection
+from .atmcor import SDATMCorrection

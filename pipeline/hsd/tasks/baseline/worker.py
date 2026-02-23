@@ -413,6 +413,7 @@ class SerialBaselineSubtractionWorker(basetask.StandardTaskTemplate):
         job = casa_tasks.sdbaseline(infile=vis, datacolumn=datacolumn, blmode='fit', dosubtract=True,
                                     blformat='table', bloutput=bloutput,
                                     blfunc='variable', blparam=blparam,
+                                    updateweight=True,
                                     outfile=outfile, overwrite=True)
         self._executor.execute(job)
 

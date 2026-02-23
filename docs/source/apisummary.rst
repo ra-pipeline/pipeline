@@ -36,7 +36,7 @@ Pipeline domain/context (autosummary)
    :recursive:
    
    pipeline.domain
-   pipeline.infrastructure.launcher.Context
+   pipeline.infrastructure.launcher
 
 
 Pipeline domain/infrastructure modules (automodapi)

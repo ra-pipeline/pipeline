@@ -26,7 +26,7 @@ LOG = infrastructure.logging.get_logger(__name__)
 
 
 class MeasurementSet:
-    """A class to store logical representation of a MeasurementSet (MS).
+    """A logical representation of a MeasurementSet (MS).
 
     The MeasurementSet class represents the metadata and relationships held in a
     measurement set on disk, acting as an in-memory representation so that

@@ -9,6 +9,7 @@
 # -- Core Runtime Dependencies --
 
 numpy>=2.0,<2.4                           # PIPE-2930: keep <2.4 until the compatibility is verified
+scipy>=1.14,<1.17                         # PIPE-2947: pin to avoid issues with 1.17+
 astropy~=7.2; python_version >= '3.11'    # Main astronomy library; version for Python 3.11+
 astropy~=6.1; python_version == '3.10'    # Last major version compatible with Python 3.10
 cachetools~=6.2                           # Extensible memoizing collections and decorators

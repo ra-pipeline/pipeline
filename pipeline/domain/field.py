@@ -16,20 +16,19 @@ _pprinter = pprint.PrettyPrinter(width=1e99)
 
 
 class Field:
-    """
-    A class to store logical representation of a field.
+    """A logical representation of a field in a MeasurementSet.
 
     Attributes:
-        id: The numerical identifier of this field within the FIELD subtable of
+        id: Numerical identifier of this field within the FIELD subtable of
             the MeasurementSet.
-        source_id: The ID of the source associated with this field.
-        time: List of the unique times for this field.
-        name: The name of this field.
-        intents: A list of unique scan intents associated with this field.
-        states: A list of unique State objects associated with this field.
-        valid_spws: A list of unique SpectralWindow objects associated with
+        source_id: ID of the source associated with this field.
+        time: Array of unique observation times for this field.
+        name: Name of this field, formatted for use as a CASA argument.
+        intents: Set of unique scan intents associated with this field.
+        states: Set of unique State objects associated with this field.
+        valid_spws: Set of unique SpectralWindow objects associated with
             this field.
-        flux_densities: A list of unique flux measurements from setjy.
+        flux_densities: Set of unique flux measurements from setjy.
     """
     def __init__(
             self,

@@ -1,11 +1,9 @@
+/* === Layout === */
 .wy-nav-content {
     max-width: none;
 }
 
-.wy-nav-top {
-    background: #a09f9f;
-}
-
+.wy-nav-top,
 .wy-nav-search {
     background: #a09f9f;
 }
@@ -26,7 +24,7 @@ ul {
     display: inline;
 }
 
-/* override table width restrictions */
+/* === Table Overrides === */
 @media screen and (min-width: 767px) {
     .wy-table-responsive table td {
         white-space: normal !important;
@@ -37,19 +35,78 @@ ul {
     }
 }
 
-/* myst-nb: scrollbar */
+/* === Notebook Output Scrolling === */
+/* myst-nb */
 .cell_output {
     max-height: 20em;
     overflow-y: scroll;
 }
 
-/* nbsphinx: nboutput area scollbar */
+/* nbsphinx */
 div.nboutput.container div.output_area {
     max-height: 500px;
 }
 
-/* nbsphinx: no prompt * /
+/* nbsphinx: no prompt */
 .nbinput .prompt,
 .nboutput .prompt {
     display: none;
+}
+
+/* space below toc */
+.contents {
+    margin-bottom: 1em;
+}
+
+/* === Typography === */
+/* Base font size and line height */
+body {
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* Target the pre tag inside the Pygments highlight div */
+.highlight pre {
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+}
+
+/* Headings - proportional sizing */
+h1 {
+    font-size: 1.8em;
+}
+
+h2 {
+    font-size: 1.5em;
+}
+
+h3 {
+    font-size: 1.3em;
+}
+
+h4 {
+    font-size: 1.1em;
+}
+
+
+/* Body text, Paragraphs, and List items */
+.rst-content,
+.rst-content p,
+.rst-content li,
+.rst-content dd,
+.rst-content blockquote {
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* Code Blocks - needing !important to override Pygments */
+.rst-content .highlight pre {
+    font-size: 12px !important;
+    line-height: 1.5 !important;
+}
+
+/* Inline code literals */
+.rst-content code,
+.rst-content tt {
+    font-size: 85%;
 }

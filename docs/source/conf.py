@@ -142,8 +142,6 @@ master_doc = 'index'
 release = build_version = pipeline.environment.pipeline_revision  # used on the PDF cover
 version = build_version.split('+')[0]
 
-release = '2025.1.0'  # temporarily hard-coded for the PL2025 release
-
 # remove -detached suffix as readthedocs always uses git checkout --force to create a
 # detached state
 build_version_short = build_version.removesuffix('-detached')

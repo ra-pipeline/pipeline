@@ -5,15 +5,17 @@ import pipeline.infrastructure as infrastructure
 LOG = infrastructure.get_logger(__name__)
 
 
-class State(object):
-    """
-    State is a logical representation of (part of) rows in the STATE table
-    relating STATE_ID (in the MAIN table) to the observing mode(s) and
+class State:
+    """A logical representation of rows in the STATE table.
+
+    Relates STATE_ID (in the MAIN table) to the observing mode(s) and
     corresponding pipeline intent(s).
 
     Attributes:
         id: Numerical identifier of this State.
         obs_mode: Unique obs_mode values associated with this State.
+        obs_mode_mapping: Class-level dictionary mapping obs_mode strings to
+            pipeline intent strings.
     """
     obs_mode_mapping = {}
 
@@ -60,10 +62,9 @@ class State(object):
 
 
 class StateALMA(State):
-    """
-    StateALMA is a logical representation of (part of) rows in the STATE table
-    for ALMA Observatory measurement sets, relating STATE_ID (in the MAIN table)
-    to the observing mode(s) and corresponding pipeline intent(s).
+    """State representation for ALMA Observatory measurement sets.
+
+    Extends State with ALMA-specific obs_mode to pipeline intent mappings.
 
     Attributes:
         id: Numerical identifier of this State.
@@ -151,11 +152,11 @@ class StateALMA(State):
 
 
 class StateALMACycle0(StateALMA):
-    """
-    StateALMACycle0 is a logical representation of (part of) rows in the STATE
-    table for ALMA Observatory Cycle 0 measurement sets, relating STATE_ID (in
-    the MAIN table) to the observing mode(s) and corresponding pipeline
-    intent(s).
+    """State representation for ALMA Cycle 0 measurement sets.
+
+    Extends StateALMA with workarounds for mislabeled Cycle 0 data, including
+    removal of spurious PHASE intents when co-existing with BANDPASS or
+    AMPLITUDE intents.
 
     Attributes:
         id: Numerical identifier of this State.
@@ -203,10 +204,9 @@ class StateALMACycle0(StateALMA):
 
 
 class StateVLA(State):
-    """
-    StateVLA is a logical representation of (part of) rows in the STATE table
-    for VLA Observatory measurement sets, relating STATE_ID (in the MAIN table)
-    to the observing mode(s) and corresponding pipeline intent(s).
+    """State representation for VLA Observatory measurement sets.
+
+    Extends State with VLA-specific obs_mode to pipeline intent mappings.
 
     Attributes:
         id: Numerical identifier of this State.
@@ -284,10 +284,9 @@ class StateVLA(State):
 
 
 class StateAPEX(State):
-    """
-    StateAPEX is a logical representation of (part of) rows in the STATE table
-    for APEX Observatory measurement sets, relating STATE_ID (in the MAIN table)
-    to the observing mode(s) and corresponding pipeline intent(s).
+    """State representation for APEX Observatory measurement sets.
+
+    Extends State with APEX-specific obs_mode to pipeline intent mappings.
 
     Attributes:
         id: Numerical identifier of this State.
@@ -310,10 +309,9 @@ class StateAPEX(State):
 
 
 class StateSMT(State):
-    """
-    StateSMT is a logical representation of (part of) rows in the STATE table
-    for SMT Observatory measurement sets, relating STATE_ID (in the MAIN table)
-    to the observing mode(s) and corresponding pipeline intent(s).
+    """State representation for SMT Observatory measurement sets.
+
+    Extends State with SMT-specific obs_mode to pipeline intent mappings.
 
     Attributes:
         id: Numerical identifier of this State.
@@ -336,10 +334,9 @@ class StateSMT(State):
 
 
 class StateNAOJ(State):
-    """
-    StateNAOJ is a logical representation of (part of) rows in the STATE table
-    for Nobeyama or ASTE Observatory measurement sets, relating STATE_ID (in the
-    MAIN table) to the observing mode(s) and corresponding pipeline intent(s).
+    """State representation for Nobeyama or ASTE Observatory measurement sets.
+
+    Extends State with NAOJ-specific obs_mode to pipeline intent mappings.
 
     Attributes:
         id: Numerical identifier of this State.
@@ -365,10 +362,12 @@ class StateNAOJ(State):
         super(StateNAOJ, self).__init__(state_id, obs_mode)
 
 
-class StateFactory(object):
-    """
-    Factory class to create State objects based on given observatory and
-    observation/measurement set start time.
+
+class StateFactory:
+    """Factory for creating observatory-specific State objects.
+
+    Creates the appropriate State subclass based on the observatory name and
+    observation start time.
     """
     def __init__(self, observatory: str, start: datetime.datetime | None = None) -> None:
         """

@@ -8,22 +8,9 @@ data products are on disk in the rawdata directory in the format produced by
 the ExportData class.
 
 This class assumes that the required data products have been
-    o downloaded from the archive along with the ASDMs (not yet possible)
-    o are sitting on disk in a form which is compatible with what is
+    - downloaded from the archive along with the ASDMs (not yet possible)
+    - are sitting on disk in a form which is compatible with what is
       produced by ExportData
-
-To test these classes, register some data with the pipeline using ImportData,
-then execute:
-
-import pipeline
-vis = [ '<ASDM name>' ]
-
-# Create a pipeline context and register some data
-context = pipeline.Pipeline().context
-inputs = pipeline.tasks.RestoreData.Inputs(context, vis=vis)
-task = pipeline.tasks.RestoreData(inputs)
-results = task.execute()
-results.accept(context)
 """
 import os
 import re

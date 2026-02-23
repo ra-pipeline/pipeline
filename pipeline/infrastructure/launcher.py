@@ -1,6 +1,11 @@
-"""
-The launcher module contains classes to initialize the pipeline, potentially
-from a saved context state.
+"""Pipeline initialization and context management.
+
+This module provides classes for initializing the pipeline and managing
+pipeline state, including loading and saving context from/to disk.
+
+Classes:
+    Context: Container for all pipeline state during execution.
+    Pipeline: Entry point for initializing and managing the pipeline.
 """
 import contextvars
 import datetime
@@ -26,92 +31,59 @@ current_task_name = contextvars.ContextVar('current_task_name', default=None)
 
 
 class Context:
-    """
-    Context holds all pipeline state, consisting of metadata describing the
-    data set, objects describing the pipeline calibration state, the tree of
-    Results objects summarising the results of each pipeline task, and a
-    small number of internal pipeline variables and objects.
+    """A class holds all pipeline state for a given execution.
 
-    The aim of the Context class is to provide one central object to which all
-    pipeline state is attached. Keeping all state in one object makes it easy
-    to persist this one object, and thus all state, to disk as a Python pickle,
-    allowing pipeline sessions to be interrupted and resumed.
+    The Pipeline `Context` class acts as a centralized container and access point
+    for the pipeline's state, including dataset and observation project metadata,
+    pipeline calibration status, process stage results from task execution, and
+    other miscellaneous variables required and shared over a processing session.
+    By encapsulating all state within this object, the entire pipeline session
+    can be easily persisted to disk (e.g., via pickling) and later resumed.
 
     Attributes:
-        name: Name of the context; also forms the root of the filename used for
-            the pickled state.
-
-        output_dir: The working directory where pipeline output data should be saved.
-        products_dir: The directory where pipeline products should be exported to.
-        report_dir: The directory where pipeline HTML reports should be saved.
-
-        logs: Dictionary containing the filenames to use for standard output
-            files (CASA commands log, AQUA report, pipeline script, restore script).
-
-        results: The list of task result (proxy) objects containing summaries
-            of each executed task in the pipeline run.
-        task_counter: Index of the last task to complete.
-        subtask_counter: Index of the last subtask to complete.
-
-        observing_run: The top-level ObservingRun object through which all other
-            pipeline.domain objects can be accessed.
-
-        project_performance_parameters: ALMA OUS project performance information.
+        name: The name of the context instance, also forms the root of the
+            filename used for the pickled state.
+        output_dir: The working directory for pipeline output data.
+        products_dir: The directory for exported pipeline products.
+        report_dir: The directory for generated HTML reports.
+        logs: A dictionary mapping log types (CASA commands log, AQUA report,
+            pipeline script, restore script) to their respective output filenames.
+        results: A list of task result (proxy) objects containing summaries of
+            each executed task in the pipeline run.
+        task_counter: The index of the last completed task.
+        subtask_counter: The index of the last completed subtask.
+        observing_run: The top-level `ObservingRun` object, providing access to
+            all `pipeline.domain` objects.
+        project_performance_parameters: ALMA OUS project performance data.
         project_structure: ALMA project structure information.
         project_summary: Project summary information.
-
-        calimlist: The ImageLibrary object holding final images of calibrators.
-        callibrary: The CalLibrary object holding the calibration state for
-            registered measurement sets.
-        clean_list_info: Dictionary to store information about the target image
-            to-be-cleaned list; typically populated by hif_makeimlist.
-        clean_list_pending: List of hif.tasks.makeimlist.cleantarget.CleanTarget
-            objects representing what target images are to be cleaned; typically
-            populated by hif_makeimlist, or edited by hif_editimlist.
-        clean_masks: Dictionary to store the names of clean masks to be re-used
-            for TARGET IQUV imaging.
-        clean_thresholds: Dictionary to store thresholds to be re-used for
-            TARGET IQUV imaging.
-        contfile: Name of file with frequency ranges to use for continuum
-            images; typically populated by hif_makeimlist.
-        imaging_mode: Imaging mode string; may be used to switch between imaging
-            parameter heuristics; currently only used for deciding what products
-            to export.
-        imaging_parameters: Dictionary containing computed values to use for
-            certain parameters during imaging; typically populated by
-            hifa_imageprecheck.
-        linesfile: Name of file with line frequency ranges to exclude for
-            continuum images; typically populated by hif_makeimlist.
-        per_spw_cont_sensitivities_all_chan: Dictionary containing some imaging
-            parameters as well as sensitivity information; typically populated
-            by hifa_imageprecheck, and potentially updated by hif_makeimages or
-            hif_tclean.
-        processing_intents: Dictionary of processing intents for the current
-            pipeline run. Currently, the following options are known:
-            - {'INTERFEROMETRY_STANDARD_OBSERVING_MODE': 'Undefined'}
-            - {'VLA_INTERFEROMETRY_STANDARD_OBSERVING_MODE': 'Undefined'}
-            - {'INTERFEROMETRY_FULL_POL_CUBE_IMAGING': True}
-            - {'INTERFEROMETRY_HETEROGENEOUS_IMAGING': True}
-            - {'SINGLEDISH_STANDARD_OBSERVING_MODE': 'Undefined'}
-        rmsimlist: The ImageLibrary object holding RMS uncertainty images of the
+        calimlist: An `ImageLibrary` object for final calibrator images.
+        callibrary: A `CalLibrary` object managing the calibration state.
+        clean_list_info: A dictionary with information for the target image list.
+        clean_list_pending: A list of `CleanTarget` objects queued for cleaning.
+        clean_masks: A dictionary of clean mask names for reuse in IQUV imaging.
+        clean_thresholds: A dictionary of thresholds for reuse in IQUV imaging.
+        contfile: The filename for continuum frequency ranges.
+        imaging_mode: A string indicating the imaging mode, used to select
+            parameter heuristics and product export settings.
+        imaging_parameters: A dictionary of computed imaging parameters.
+        linesfile: The filename for line frequency ranges to be excluded from
+            continuum images.
+        per_spw_cont_sensitivities_all_chan: A dictionary containing sensitivity
+            and imaging parameters.
+        processing_intents: A dictionary of processing intents for the run.
+        rmsimlist: An `ImageLibrary` object for RMS uncertainty images of
             science targets.
-        sciimlist: The ImageLibrary object holding final images of science targets.
-        selfcal_resources: List of files/tables required for the
-            self-calibration restoration.
-        selfcal_targets: List of targets for which self-calibration is performed.
-        size_mitigation_parameters: Dictionary containing imaging product size
-            mitigation parameters; typically populated by hif_checkproductsize,
-            and used by hif_makeimlist.
-        subimlist: The ImageLibrary object holding cut-out images of the science
-            targets.
-        synthesized_beams: Dictionary containing some imaging parameters as well
-            computed synthesized beam information; typically populated/updated
-            by hifa_imageprecheck, hif_checkproductsize, hif_makeimlist,
-            hif_makeimages, and hif_tclean.
+        sciimlist: An `ImageLibrary` object for final science target images.
+        selfcal_resources: A list of files needed for self-calibration restoration.
+        selfcal_targets: A list of targets designated for self-calibration.
+        size_mitigation_parameters: A dictionary of parameters for managing
+            imaging product size.
+        subimlist: An `ImageLibrary` object for cutout images of science targets.
+        synthesized_beams: A dictionary containing computed synthesized beam data.
     """
     def __init__(self, name: str | None = None) -> None:
-        """
-        Initialize a Context object.
+        """Initialize a Context object.
 
         Args:
             name: Name of the context.
@@ -161,8 +133,8 @@ class Context:
         self.callibrary = callibrary.CalLibrary(self)
         self.clean_list_info = {}  # CAS-9456
         self.clean_list_pending = []  # CAS-10146
-        self.clean_masks = {} # PIPE-2464
-        self.clean_thresholds = {} # PIPE-2464
+        self.clean_masks = {}  # PIPE-2464
+        self.clean_thresholds = {}  # PIPE-2464
         self.contfile: str | None = None
         self.imaging_mode: str | None = None  # PIPE-592
         self.imaging_parameters = {}  # CAS-10146
@@ -192,8 +164,7 @@ class Context:
 
     @products_dir.setter
     def products_dir(self, value: str | None) -> None:
-        """
-        Set path to the products directory.
+        """Set path to the products directory.
 
         Args:
             value: path to use for products directory; if None, it will default
@@ -208,8 +179,7 @@ class Context:
         self._products_dir = value
 
     def save(self, filename: str | None = None) -> None:
-        """
-        Save a pickle of the Context to a file with given filename.
+        """Save a pickle of the Context to a file with given filename.
 
         Args:
             filename: Name of the context file. If None, this will be set to
@@ -234,9 +204,7 @@ class Context:
         return f"<Context(name='{self.name}')>"
 
     def set_state(self, cls: str, name: str, value: Any) -> None:
-        """
-        Set a context property using the class name, property name and property
-        value.
+        """Set a context property using the class name, property name and property value.
 
         The class name should be one of:
 
@@ -261,10 +229,7 @@ class Context:
         setattr(instance, name, value)
 
     def get_oussid(self) -> str:
-        """
-        Get the parent OUS 'ousstatus' name. This is the sanitized OUS
-        status UID.
-        """
+        """Get the parent OUS 'ousstatus' name. This is the sanitized OUS status UID."""
         ps = self.project_structure
         if ps is None or ps.ousstatus_entity_id == 'unknown':
             return 'unknown'
@@ -281,33 +246,40 @@ class Context:
 
 
 class Pipeline:
-    """
-    Pipeline is the entry point for initialising the pipeline. It is
-    responsible for the creation of new Context objects and for loading
-    saved Contexts from disk.
+    """Entry point for initializing the pipeline.
+
+    Responsible for creating new Context objects and loading saved Contexts
+    from disk.
 
     Attributes:
         context: Context object containing the Pipeline state information.
     """
-    def __init__(self, context: str | None = None, loglevel: str = 'info', casa_version_check: bool = True,
-                 name: str | None = None, plotlevel: str = 'default', path_overrides: dict | None = None,
-                 processing_intents: dict = None):
-        """
-        Initialise the pipeline, creating a new Context or loading a saved
-        Context from disk.
+    def __init__(
+        self,
+        context: str | None = None,
+        loglevel: str = 'info',
+        casa_version_check: bool = True,
+        name: str | None = None,
+        plotlevel: str = 'default',
+        path_overrides: dict | None = None,
+        processing_intents: dict | None = None
+    ) -> None:
+        """Initialize the pipeline.
+
+        Creates a new Context or loads a saved Context from disk.
 
         Args:
             context: Filename of the pickled Context to load from disk.
                 Specifying 'last' loads the last-saved Context, while passing
                 None creates a new Context.
             loglevel: Pipeline log level.
-            casa_version_check: enable (True) or bypass (False) the CASA version
-                check. Default is True.
-            name: If not "None", this overrides the name of the Pipeline Context
+            casa_version_check: Enable (True) or bypass (False) the CASA version
+                check.
+            name: If not `None`, this overrides the name of the Pipeline Context
                 if a new context needs to be created.
             plotlevel: Pipeline plots level.
             path_overrides: Optional dictionary containing context properties to
-                be redefined when loading existing context (e.g. "name").
+                be redefined when loading existing context (e.g., 'name').
             processing_intents: Dictionary of processing intents for the current
                 pipeline run.
         """
@@ -364,9 +336,9 @@ class Pipeline:
         infrastructure.set_plot_level(plotlevel)
 
     def _link_casa_log(self, context: Context) -> None:
-        """
-        Create a hard-link to the current CASA log in the report directory,
-        and add path to current CASA log to given Context.
+        """Create a hard-link to the current CASA log in the report directory.
+
+        Also adds path to current CASA log to the given Context.
 
         Args:
             context: Pipeline Context to update with path to current CASA log.
@@ -397,8 +369,7 @@ class Pipeline:
 
     @staticmethod
     def _find_most_recent_session(directory: str = './') -> str:
-        """
-        Return filename for the most recently saved Pipeline Context in given directory.
+        """Return filename for the most recently saved Pipeline Context.
 
         Args:
             directory: Path where to search for context files.
@@ -407,7 +378,7 @@ class Pipeline:
             Filename of most recently saved Pipeline Context file.
 
         Raises:
-            FileNotFoundError if no Pipeline context files are found in given directory.
+            FileNotFoundError: If no Pipeline context files are found in given
         """
         # list all the files in the directory..
         files = [f for f in os.listdir(directory) if f.endswith('.context')]

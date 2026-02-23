@@ -22,9 +22,8 @@ _pprinter = pprint.PrettyPrinter()
 LOG = infrastructure.get_logger(__name__)
 
 
-class Scan(object):
-    """
-    Scan is a logical representation of a single scan.
+class Scan:
+    """A logical representation of a single scan.
 
     Attributes:
         id: The scan number within the MeasurementSet.
