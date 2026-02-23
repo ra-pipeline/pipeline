@@ -92,6 +92,7 @@ class TestFindExecutable:
         assert exe_dict['casa'] is None
 
 
+@pytest.mark.mpi
 class TestPcleanWithInvalidInput:
     """Tests for pclean error handling with invalid inputs."""
 
@@ -118,7 +119,7 @@ class TestPcleanWithInvalidInput:
         with pytest.raises(RuntimeError):
             pclean.pclean('non_existent.ms', imagename='test_dict', parallel={'nproc': 2})
 
-
+@pytest.mark.mpi
 class TestPcleanWithValidDataset:
     """Integration tests using a real MeasurementSet.
     

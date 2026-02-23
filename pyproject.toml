@@ -208,6 +208,7 @@ markers = [
     "makeimages: makeimages task(s)",
     "mpi: test recommended for an MPI-enabled CASA session; use -m mpi or -m 'not mpi' to control execution",
     "unit: unit test",
+    "mpi: tests requiring casampi sessions",
 ]
 addopts = [
     "-ra", # show extra test summary info for (a)ll except passed
@@ -247,11 +248,16 @@ pipeline = { path = ".", editable = true, extras = ["dev"] }
 protobuf = "==3.20.*" # casaplotms still requires ver<=3.20
 grpcio = ">=1.62"
 
-casampi = { version = ">=0.5.5", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
-casaplotms = { version = ">=2.5.3", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
-casatasks = { version = ">=6.7.4.2", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 casatools = { version = ">=6.7.4.2", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+casatasks = { version = ">=6.7.4.2", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+casaplotms = { version = ">=2.5.3", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+casaplotserver = { version = ">=1.8.2", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+casampi = { version = ">=0.5.5", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 
+[tool.pixi.system-requirements]
+# Target macOS 15+ so pixi prefers the latest casatools wheels on osx-arm64.
+# The uv backend may still fall back to a 14.0 wheel when no 15.0 build is available.
+macos = "15.0"
 
 [tool.pixi.tasks]
 
