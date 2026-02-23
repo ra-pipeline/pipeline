@@ -1,3 +1,17 @@
+"""Tests for the pclean utility module.
+
+Covers three areas:
+
+- **Unit tests** — verify that ``find_executable`` correctly discovers
+  (or reports the absence of) MPI executables.
+- **Error-handling tests** — confirm that both serial and parallel modes
+  raise appropriate exceptions for invalid inputs (e.g., non-existent
+  MeasurementSets).
+- **Integration tests** — run real tclean imaging (dirty and cleaned,
+  serial and parallel) against a small ALMA dataset, asserting that
+  expected output products are created. Skipped when the test data is
+  unavailable.
+"""
 import shutil
 from pathlib import Path
 
@@ -14,7 +28,11 @@ MS_NAME = casa_tools.utils.resolve(
 
 @pytest.fixture
 def valid_ms():
-    """Fixture that provides a valid MeasurementSet path or skips the test."""
+    """Provide a valid MeasurementSet path or skip the test.
+
+    Resolves a small ALMA MeasurementSet via ``casa_tools.utils.resolve``
+    and skips the test if the dataset is not available on disk.
+    """
     if not Path(MS_NAME).exists():
         pytest.skip(f'Test data not found: {MS_NAME}')
     return MS_NAME
@@ -22,7 +40,12 @@ def valid_ms():
 
 @pytest.fixture
 def image_output(tmp_path):
-    """Fixture that provides a unique output path and handles cleanup."""
+    """Provide a unique output path and clean up image products after use.
+
+    Yields ``tmp_path / 'test_output'`` as a string. All files and
+    directories matching the ``test_output*`` glob are removed during
+    teardown.
+    """
     imagename = tmp_path / 'test_output'
     yield str(imagename)
     # Cleanup: Remove all files/dirs matching the pattern
@@ -37,7 +60,11 @@ class TestFindExecutable:
     """Tests for the find_executable function."""
 
     def test_finds_mpirun_in_parent_directory(self, tmp_path):
-        """Test finding mpirun in a parent directory's bin folder."""
+        """Verify mpirun is discovered in a parent directory's bin folder.
+
+        Creates a mock ``bin/mpirun`` in a temp directory and searches
+        from a child directory.
+        """
         # Setup: Create tmp_path/bin/mpirun
         bin_dir = tmp_path / 'bin'
         bin_dir.mkdir()
@@ -57,7 +84,7 @@ class TestFindExecutable:
         assert exe_dict['mpicasa'] is None
 
     def test_returns_none_when_not_found(self, tmp_path):
-        """Test that None is returned when no executables are found."""
+        """Verify all entries are None when no executables exist in the tree."""
         exe_dict = pclean.find_executable(start_dir=str(tmp_path))
 
         assert exe_dict['mpirun'] is None
