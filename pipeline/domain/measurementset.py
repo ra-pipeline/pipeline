@@ -26,7 +26,7 @@ LOG = infrastructure.logging.get_logger(__name__)
 
 
 class MeasurementSet:
-    """A class to store logical representation of a MeasurementSet (MS).
+    """A logical representation of a MeasurementSet (MS).
 
     The MeasurementSet class represents the metadata and relationships held in a
     measurement set on disk, acting as an in-memory representation so that
@@ -867,21 +867,21 @@ class MeasurementSet:
             Cycle number or None if not found or not an ALMA dataset.
         """
         cycle_numbers = {
-            '0': ['2011-09-30', '2013-01-20'],
-            '1': ['2013-01-21', '2014-06-02'],
-            '2': ['2014-06-03', '2015-09-30'],
-            '3': ['2015-10-01', '2016-09-30'],
-            '4': ['2016-10-01', '2017-09-30'],
-            '5': ['2017-10-01', '2018-09-30'],
-            '6': ['2018-10-01', '2019-09-30'],
-            '7': ['2019-10-01', '2021-09-30'],
-            '8': ['2021-10-01', '2022-09-30'],
-            '9': ['2022-10-01', '2023-09-30'],
-            '10': ['2023-10-01', '2024-09-30'],
-            '11': ['2024-10-01', '2025-09-30'],
-            '12': ['2025-10-01', '2026-09-30'],
+            0: ['2011-09-30', '2013-01-20'],
+            1: ['2013-01-21', '2014-06-02'],
+            2: ['2014-06-03', '2015-09-30'],
+            3: ['2015-10-01', '2016-09-30'],
+            4: ['2016-10-01', '2017-09-30'],
+            5: ['2017-10-01', '2018-09-30'],
+            6: ['2018-10-01', '2019-09-30'],
+            7: ['2019-10-01', '2021-09-30'],
+            8: ['2021-10-01', '2022-09-30'],
+            9: ['2022-10-01', '2023-09-30'],
+            10: ['2023-10-01', '2024-09-30'],
+            11: ['2024-10-01', '2025-09-30'],
+            12: ['2025-10-01', '2026-09-30'],
         }
-        if self.antenna_array.name in ('VLA', 'EVLA', 'NRO'):
+        if self.antenna_array.name != 'ALMA':
             return None
         start_time = utils.get_epoch_as_datetime(self.start_time)
         for cycle, (start_str, end_str) in cycle_numbers.items():

@@ -19,7 +19,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
 # *****************************************************************************
 import collections
-import distutils.spawn as spawn
+import shutil
 import itertools
 import os
 import platform
@@ -38,10 +38,10 @@ THUMBNAIL_CMD = None
 
 
 # first try to find ImageMagick's 'mogrify' command. We assume that
-# ImageMagick's 'convert' commnand can be found in the same directory. We
+# ImageMagick's 'convert' command can be found in the same directory. We
 # do not search for 'convert' directly as some utilities also provide a
 # 'convert' command which may come earlier on the PATH. 
-mogrify_path = spawn.find_executable('mogrify')
+mogrify_path = shutil.which('mogrify')
 if mogrify_path:
     bin_dir = os.path.dirname(mogrify_path)
     convert_path = os.path.join(bin_dir, 'convert')
@@ -53,7 +53,7 @@ if mogrify_path:
 if THUMBNAIL_CMD is None and platform.system() == 'Darwin':
     # macOS only: fallback to sips if ImageMagick, e.g. from MacPorts or Homebrew is not found on macOS. sips is a system
     # executable that should be available on all macOS systems.
-    sips_path = spawn.find_executable('sips')
+    sips_path = shutil.which('sips')
     if sips_path:
         LOG.trace('Using sips executable at \'%s\' to generate thumbnails'
                   % sips_path)

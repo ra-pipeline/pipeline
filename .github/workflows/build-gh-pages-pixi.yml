@@ -1,0 +1,82 @@
+name: "Docs-Pages (Pixi)"
+
+on:
+  push:
+    branches:
+      - "main"
+    paths:
+      - "docs/**"
+      - "pipeline/**"
+      - ".github/workflows/**"
+      - "environment*.yml"
+      - "setup.py"
+      - "pyproject.toml"
+  # Allow manual triggering
+  workflow_dispatch:
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # Define the matrix strategy here; only using ubuntu-latest for build-gh-pages
+    strategy:
+      matrix:
+        os: ["ubuntu-latest"]
+
+    name: Build Docs (${{ matrix.os }})
+
+    uses: ./.github/workflows/env-setup-run-template-pixi.yml
+    with:
+      # Pass the specific build logic as a multi-line string
+      os: ${{ matrix.os }}
+      pixi_env: docs
+      run_command: |
+        # Install LaTeX dependencies for PDF generation (Linux only)
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          sudo apt-get install -y \
+            latexmk texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended
+        fi
+
+        # Add macOS LaTeX support
+        if [ "$RUNNER_OS" == "macOS" ]; then
+          brew install --cask mactex-no-gui
+        fi  
+
+        cd docs
+        make html_docs
+
+        # Only build PDF if tools are available
+        if command -v latexmk &> /dev/null; then
+            make latexpdf
+            # Copy PDF to HTML dir so it is accessible via the website
+            cp _build/latex/*.pdf _build/html/ || true
+        else
+            echo "latexmk not found, skipping PDF build."
+        fi
+
+      artifact_name: documentation-${{ matrix.os }}
+      artifact_path: docs/_build/html/
+
+  deploy:
+    name: Deploy Pages
+    needs: build
+    runs-on: ubuntu-latest
+    # Only deploy if the push came from the specific branch / ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: documentation-ubuntu-latest
+          path: site_content
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: site_content

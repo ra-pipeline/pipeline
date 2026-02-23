@@ -96,7 +96,9 @@ Pipeline Task object, and then running its `execute` method to get the task resu
 the example should be run in a directory where the Pipeline has been partly run, i.e. a context already exists.
 
 ```python
-context = pipeline.Pipeline(context='last').context
+from pipeline.infrastructure import launcher
+
+context = launcher.Pipeline(context='last').context
 inputs = pipeline.infrastructure.vdp.InputsContainer(pipeline.hifv.tasks.hanning.Hanning, context)
 task = pipeline.hifv.tasks.hanning.Hanning(inputs)
 result = task.execute()
@@ -108,12 +110,13 @@ If we don't have a PPR or an executable script available.
 
 ```python
 $ casa
-import pipeline
 import pipeline.recipes.hifv as hifv
+from pipeline.infrastructure import launcher
+
 # the next line will only importevla and save a context, b/c importonly=True
 hifv.hifv(['../rawdata/13A-537.foofoof.eb.barbar.2378.2934723984397'], importonly=True)
 
-context = pipeline.Pipeline(context='last').context
+context = launcher.Pipeline(context='last').context
 vis = '13A-537.foofoof.eb.barbar.2378.2934723984397.ms'
 # get the domain object
 m = context.observing_run.get_ms(vis)
@@ -195,9 +198,10 @@ pipeline.recipereducer.reduce(
 Assuming the developer developed / debugged stage 4, once that is done, it is
 possible to use `recipereducer` to resume with the remainder of the recipe, with:
 ```python
-import pipeline
 import pipeline.recipereducer
-context = pipeline.Pipeline(context='last').context
+from pipeline.infrastructure import launcher
+
+context = launcher.Pipeline(context='last').context
 pipeline.recipereducer.reduce(
     vis=['../rawdata/yourasdm'],
     context=context,
@@ -273,9 +277,9 @@ A `debug.script` that executes an individual task:
 task_to_run = 'hifa_tsysflag'
 
 import pipeline
-from pipeline.infrastructure import task_registry
+from pipeline.infrastructure import task_registry, launcher
 
-context = pipeline.Pipeline(context='last', loglevel='info', plotlevel='default').context
+context = launcher.Pipeline(context='last', loglevel='info', plotlevel='default').context
 
 taskclass = task_registry.get_pipeline_class_for_task(task_to_run)
 inputs = pipeline.infrastructure.vdp.InputsContainer(taskclass, context)
@@ -410,8 +414,8 @@ The path of pickled context files is: `output_dir`/`context_name`/`saved_state`/
   task_to_run='hif_checkproductsize'
   task_keywords={'maxcubesize':40.0,'maxcubelimit':60,'maxproductsize':500.0}
   import pipeline
-  from pipeline.infrastructure import task_registry
-  context = pipeline.Pipeline(context='pipeline-procedure_hifa_calimage/saved_state/context-stage24.pickle', loglevel='debug', plotlevel='default').context
+  from pipeline.infrastructure import task_registry, launcher
+  context = launcher.Pipeline(context='pipeline-procedure_hifa_calimage/saved_state/context-stage24.pickle', loglevel='debug', plotlevel='default').context
   taskclass = task_registry.get_pipeline_class_for_task(task_to_run)
   inputs = pipeline.infrastructure.vdp.InputsContainer(taskclass, context, **task_keywords)
   task = taskclass(inputs)
@@ -423,8 +427,8 @@ The path of pickled context files is: `output_dir`/`context_name`/`saved_state`/
   `recipereducer` doesn't offer the "breakpoint" feature built in `executeppr`. However, a calculated usage of `starttage`/ `exitstage`/`context` keywords may achieve the same workflow-level "break/resume":
 
   ```python
-  import pipeline
-  context = pipeline.Pipeline(context='pipeline-procedure_hifa_calimage/saved_state/context-stage3.pickle', loglevel='debug', plotlevel='default').context
+  from pipeline.infrastructure import task_registry, launcher
+  context = launcher.Pipeline(context='pipeline-procedure_hifa_calimage/saved_state/context-stage3.pickle', loglevel='debug', plotlevel='default').context
   import pipeline.recipereducer
   pipeline.recipereducer.reduce(vis=['../rawdata/uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small.ms'],
                                 procedure='procedure_hifa_calimage.xml', loglevel='debug',startstage=4,exitstage=20,
@@ -441,13 +445,13 @@ pipeline stage (therefore limits your testing scope).
 
 ```python
 import os
-import pipeline
 import pipeline.infrastructure.renderer.htmlrenderer as hr
+from pipeline.infrastructure import launcher
 
 # Modify this to select which stage number to re-render weblog for.
 os.environ['WEBLOG_RERENDER_STAGES'] = "16"
 
-context = pipeline.Pipeline(context='last', loglevel='debug', plotlevel='default').context
+context = launcher.Pipeline(context='last', loglevel='debug', plotlevel='default').context
 hr.WebLogGenerator.render(context)
 ```
 
@@ -461,9 +465,8 @@ heuristic on the existing task result in the context to iterate more rapidly on
 the heuristic without having to re-run the time-consuming pipeline task itself.
 
 ```python
-import pipeline
-from pipeline.infrastructure import pipelineqa
-context = pipeline.Pipeline(context='last', loglevel='debug', plotlevel='default').context
+from pipeline.infrastructure import pipelineqa, launcher
+context = launcher.Pipeline(context='last', loglevel='debug', plotlevel='default').context
 
 # Modify this to select which stage to run QA for.
 stage_number = 14

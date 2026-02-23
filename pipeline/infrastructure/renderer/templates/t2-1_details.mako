@@ -183,12 +183,30 @@ import os
 		<table class="table table-condensed" summary="Sky Setup Summary">
 			<tbody>
 				<tr>
+					<th colspan="2" style="background-color: #f5f5f5; font-weight: bold; padding-top: 10px; font-size: 120%; color: #444;">All Fields</th>
+				</tr>
+				<tr>
 					<th>Min Elevation</th>
 					<td>${el_min} degrees</td>
 				</tr>
 				<tr>
 					<th>Max Elevation</th>
 					<td>${el_max} degrees</td>
+				</tr>
+				<tr>
+					<th colspan="2" style="background-color: #f5f5f5; font-weight: bold; padding-top: 10px; font-size: 120%; color: #444;">TARGET Fields Only</th>
+				</tr>
+				<tr>
+					<th>Min Zenith Angle</th>
+					<td>${zd_min} degrees at ${telmjd_min}</td>
+				</tr>
+				<tr>
+					<th>Avg Zenith Angle</th>
+					<td>${zd_avg} degrees at ${telmjd_avg}</td>
+				</tr>
+				<tr>
+					<th>Max Zenith Angle</th>
+					<td>${zd_max} degrees at ${telmjd_max}</td>
 				</tr>
 			</tbody>
 		</table>

@@ -484,14 +484,15 @@ class SerialGfluxscaleflag(basetask.StandardTaskTemplate):
 
                 # Create modified CalApplication and replace CalApp in result
                 # with this new one.
-                original_calapp = result.final[0]
-                modified_calapp = callibrary.copy_calapplication(original_calapp, **calapp_overrides)
-                result.pool[0] = modified_calapp
-                result.final[0] = modified_calapp
+                if result.final:
+                    original_calapp = result.final[0]
+                    modified_calapp = callibrary.copy_calapplication(original_calapp, **calapp_overrides)
+                    result.pool[0] = modified_calapp
+                    result.final[0] = modified_calapp
 
-                # Merge the result to the local context to register new caltable
-                # in local context callibrary.
-                result.accept(inputs.context)
+                    # Merge the result to the local context to register new caltable
+                    # in local context callibrary.
+                    result.accept(inputs.context)
 
     def _do_phasecal(self):
         # Note: at present, phaseupsolint is specified as a fixed

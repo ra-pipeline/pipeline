@@ -662,7 +662,11 @@ def lowtrans_alma(ms: MeasurementSet, mintransrepspw: float, mintransnonrepspws:
         return commands
 
     # Get list of science scans and science SpWs, and representative SpW.
-    scans = ms.get_scans(scan_intent="TARGET")
+    scans = ms.get_scans(scan_intent='TARGET')
+    if not scans:
+        LOG.info('No science target scans found in MS %s, no flagging commands generated.', ms.name)
+        return commands
+
     scispws = ms.get_spectral_windows()
     _, repr_spwid = ms.get_representative_source_spw()
 

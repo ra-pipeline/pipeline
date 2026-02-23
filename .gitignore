@@ -199,3 +199,6 @@ docs/source/references/pipeline-resolved.bib
 **/*.moment0
 **/*.moment1
 **/*.moment2
+
+# Pixi environments and local state
+.pixi/

@@ -1,4 +1,3 @@
-# Do not evaluate type annotations at definition time.
 from __future__ import annotations
 
 import collections
@@ -12,6 +11,7 @@ import operator
 import os
 import pydoc
 import re
+import shelve
 import shutil
 import sys
 from importlib.resources import files
@@ -24,8 +24,9 @@ import pipeline
 import pipeline.infrastructure.pipelineqa as pqa
 from pipeline import environment, infrastructure
 from pipeline.domain import measures
-from pipeline.infrastructure import basetask, casa_tasks, casa_tools, eventbus, \
-    logging, mpihelpers, task_registry, utils
+from pipeline.infrastructure import (basetask, casa_tasks, casa_tools,
+                                     eventbus, logging, mpihelpers,
+                                     task_registry, utils)
 from pipeline.infrastructure.displays import pointing, summary
 from pipeline.infrastructure.renderer import qaadapter, templates, weblog
 
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
     from pipeline.domain.measurementset import MeasurementSet
     from pipeline.infrastructure.launcher import Context
     from pipeline.infrastructure.renderer import logger
+
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -773,9 +775,7 @@ class T1_3MRenderer(RendererBase):
 
 
 class T1_4MRenderer(RendererBase):
-    """
-    T1-4M renderer - Task Summary
-    """
+    """T1-4M renderer - Task Summary."""
     output_file = 't1-4.html'
     # TODO get template at run-time
     template = 't1-4m.mako'
@@ -787,29 +787,40 @@ class T1_4MRenderer(RendererBase):
         for result in context.results:
             scores[result.stage_number] = result.qa.representative
 
-        ## Obtain time duration of tasks by the difference of start times successive tasks.
-        ## The end time of the last task is tentatively defined as the time of current time.
-        timestamps = [ r.timestamps.start for r in context.results ]
-        # tentative task end time stamp for the last stage
-        timestamps.append(datetime.datetime.utcnow())
-        task_duration = []
-        for i in range(len(context.results)):
-            # task execution duration
-            dt = timestamps[i+1] - timestamps[i]
-            # remove unnecessary precision for execution duration
-            task_duration.append(datetime.timedelta(days=dt.days, seconds=dt.seconds))
+        # PIPE-2014: obtain the task time duration from the timetracker event database.
+        db_path = os.path.join(context.output_dir, f'{context.name}.timetracker')
+        r: dict[str, dict[int, datetime.timedelta]] = {}
+        with shelve.open(db_path, writeback=False) as db:
+            for k, stages in db.items():
+                r[k] = {}
+                for e in stages.values():
+                    if e.end == e.start and k == 'results':
+                        # The end time of the last task (open-ended) is tentatively
+                        # defined as the current time.
+                        r[k][e.stage] = datetime.datetime.now(datetime.timezone.utc) - e.start
+                    else:
+                        r[k][e.stage] = e.end - e.start
+
+        task_stage_map: dict[int, datetime.timedelta] = r.get('tasks', {})
+        result_stage_map: dict[int, datetime.timedelta] = r.get('results', {})
+        fallback_duration = datetime.timedelta(0)
+        task_duration = [task_stage_map.get(result.stage_number, fallback_duration) for result in context.results]
+        # The 'results' field in the timetrack db includes the cost of QA and weblog.
+        result_duration = [result_stage_map.get(result.stage_number, fallback_duration) for result in context.results]
 
         # copy PPR for weblog
         pprfile = context.project_structure.ppr_file
         if pprfile != '' and os.path.exists(pprfile):
-            dest_path = os.path.join(context.report_dir,
-                                     os.path.basename(pprfile))
+            dest_path = os.path.join(context.report_dir, os.path.basename(pprfile))
             shutil.copy(pprfile, dest_path)
 
-        return {'pcontext' : context,
-                'results'  : context.results,
-                'scores'   : scores,
-                'task_duration': task_duration}
+        return {
+            'pcontext': context,
+            'results': context.results,
+            'scores': scores,
+            'task_duration': task_duration,
+            'result_duration': result_duration,
+        }
 
 
 class T2_1Renderer(RendererBase):
@@ -918,9 +929,22 @@ class T2_1DetailsRenderer(object):
         task = summary.ElVsTimeChart(context, ms)
         el_vs_time_plot = task.plot()
 
-        # Get min, max elevation
+        # Get min, max elevation (all fields excluding POINTING, SIDEBAND, ATMOSPHERE)
         el_min = "%.2f" % ms.compute_az_el_for_ms(min)[1]
         el_max = "%.2f" % ms.compute_az_el_for_ms(max)[1]
+
+        # Get zenith angle statistics for TARGET fields only
+        data = compute_zd_telmjd_for_ms(ms)
+        # Flatten all zenith angles and timestamps from all TARGET fields
+        zd = [zd_val for field_data in data.values() for zd_val in field_data['zd']]
+        telmjd = [time.timestamp() for field_data in data.values() for time in field_data['telmjd']]
+        # Retrieve min, average, and max zenith angle measurements and corresponding timestamps
+        zd_min, zd_avg, zd_max = np.min(zd), np.average(zd), np.max(zd)
+        telmjd_min, telmjd_avg, telmjd_max = telmjd[zd.index(zd_min)], np.average(telmjd), telmjd[zd.index(zd_max)]
+
+        # Create zenith angle vs time plot
+        task = summary.ZDTELMJDChart(context, ms, data)
+        zd_vs_telmjd_plot = task.plot()
 
         dirname = os.path.join('session%s' % ms.session, ms.basename)
 
@@ -952,7 +976,7 @@ class T2_1DetailsRenderer(object):
             vla_basebands = '<tr><th>VLA Bands: Basebands:  Freq range: [spws]</th><td>'+'<br>'.join(vla_basebands)+'</td></tr>'
 
         if utils.contains_single_dish(context):
-            # Single dish specific 
+            # Single dish specific
             # to get thumbnail for representative pointing plot
             antenna = ms.antennas[0]
             field_strategy = ms.calibration_strategy['field_strategy']
@@ -990,10 +1014,17 @@ class T2_1DetailsRenderer(object):
             'pwv_plot'        : pwv_plot,
             'azel_plot'       : azel_plot,
             'el_vs_time_plot' : el_vs_time_plot,
+            'zd_telmjd_plot'  : zd_vs_telmjd_plot,
             'is_singledish'   : utils.contains_single_dish(context),
             'pointing_plot'   : pointing_plot,
             'el_min'          : el_min,
             'el_max'          : el_max,
+            'zd_min'          : round(zd_min, 2),
+            'zd_avg'          : round(zd_avg, 2),
+            'zd_max'          : round(zd_max, 2),
+            'telmjd_min'      : utils.format_datetime(datetime.datetime.fromtimestamp(telmjd_min)),
+            'telmjd_avg'      : utils.format_datetime(datetime.datetime.fromtimestamp(telmjd_avg)),
+            'telmjd_max'      : utils.format_datetime(datetime.datetime.fromtimestamp(telmjd_max)),
             'vla_basebands'   : vla_basebands
         }
 
@@ -1012,16 +1043,6 @@ class T2_1DetailsRenderer(object):
                     template = weblog.TEMPLATE_LOOKUP.get_template(cls.template)
                     display_context = cls.get_display_context(context, ms)
                     fileobj.write(template.render(**display_context))
-
-
-# class MetadataRendererBase(RendererBase):
-#     @classmethod
-#     def rerender(cls, context):
-#         # TODO: only rerender when a new ImportData result is queued
-#         if cls in DEBUG_CLASSES:
-#             LOG.warning('Always rerendering %s' % cls.__name__)
-#             return True
-#         return False
 
 
 class T2_2_XRendererBase(object):
@@ -1188,6 +1209,10 @@ class T2_2_4Renderer(T2_2_XRendererBase):
         task = summary.ElVsTimeChart(context, ms)
         el_vs_time_plot = task.plot()
 
+        data = compute_zd_telmjd_for_ms(ms)
+        task = summary.ZDTELMJDChart(context, ms, data)
+        zd_vs_telmjd_plot = task.plot()
+
         # Create U-V plot, if necessary.
         if utils.contains_single_dish(context):
             plot_uv = None
@@ -1203,28 +1228,9 @@ class T2_2_4Renderer(T2_2_XRendererBase):
                 'azel_plot': azel_plot,
                 'suntrack_plot': suntrack_plot,
                 'el_vs_time_plot': el_vs_time_plot,
+                'zd_telmjd_plot'  : zd_vs_telmjd_plot,
                 'plot_uv': plot_uv,
                 'dirname': dirname}
-
-
-# class T2_2_5Renderer(T2_2_XRendererBase):
-#     """
-#     T2-2-5 renderer - weather page
-#     """
-#     output_file = 't2-2-5.html'
-#     template = 't2-2-5.mako'
-
-#     @staticmethod
-#     def get_display_context(context, ms):
-#         task = summary.WeatherChart(context, ms)
-#         weather_plot = task.plot()
-#         dirname = os.path.join('session%s' % ms.session,
-#                                ms.basename)
-
-#         return {'pcontext'     : context,
-#                 'ms'           : ms,
-#                 'weather_plot' : weather_plot,
-#                 'dirname'      : dirname}
 
 
 class T2_2_6Renderer(T2_2_XRendererBase):
@@ -1415,20 +1421,6 @@ class T2_3_3MRenderer(T2_3_XMBaseRenderer):
         return qaadapter.registry.get_flagging_topic()        
 
 
-# class T2_3_4MRenderer(T2_3_XMBaseRenderer):
-#     """
-#     Renderer for T2-3-4M: the QA line finding section.
-#     """
-#     # the filename to which output will be directed
-#     output_file = 't2-3-4m.html'
-#     # the template file for this renderer
-#     template = 't2-3-4m.mako'
-
-#     @classmethod
-#     def get_topic(cls):
-#         return qaadapter.registry.get_linefinding_topic()
-
-
 class T2_3_5MRenderer(T2_3_XMBaseRenderer):
     """
     Renderer for T2-3-5M: the imaging topic
@@ -1454,7 +1446,7 @@ class T2_3_6MRenderer(T2_3_XMBaseRenderer):
 
     @classmethod
     def get_topic(cls):
-        return qaadapter.registry.get_miscellaneous_topic()        
+        return qaadapter.registry.get_miscellaneous_topic()
 
 
 class T2_4MRenderer(RendererBase):
@@ -1468,57 +1460,6 @@ class T2_4MRenderer(RendererBase):
     def get_display_context(context):
         return {'pcontext' : context,
                 'results'  : context.results}
-
-#     @classmethod
-#     def get_file(cls, context, root):
-#         path = cls.get_path(context, root)
-# 
-#         # to avoid any subsequent file not found errors, create the directory
-#         # if a hard copy is requested and the directory is missing
-#         session_dir = os.path.dirname(path)
-#         if not os.path.exists(session_dir):
-#             os.makedirs(session_dir)
-#         
-#         # create a file object that writes to a file
-#         file_obj = open(path, 'w')
-#         
-#         # return the file object wrapped in a context manager, so we can use
-#         # it with the autoclosing 'with fileobj as f:' construct
-#         return contextlib.closing(file_obj)
-# 
-#     @classmethod
-#     def get_path(cls, context, root):
-#         path = os.path.join(context.report_dir, root)
-#         return os.path.join(path, cls.output_file)
-# 
-#     @classmethod
-#     def render(cls, context):
-#         # dict that will map session ID to session results
-#         collated = collections.defaultdict(list)
-#         for result in context.results:
-#             # we only handle lists of results, so wrap single objects in a
-#             # list if necessary
-#             if not isinstance(result, collections.abc.Iterable):
-#                 result = wrap_in_resultslist(result)
-#             
-#             # split the results in the list into streams, divided by session
-#             d = group_by_root(context, result)
-#             for root, session_results in d.items():
-#                 collated[root].extend(session_results)
-# 
-#         for root, session_results in collated.items():
-#             cls.render_root(context, root, session_results)
-# 
-#     @classmethod
-#     def render_root(cls, context, root, results):                
-#         template = weblog.TEMPLATE_LOOKUP.get_template(cls.template)
-# 
-#         mako_context = {'pcontext' : context,
-#                         'root'     : root,
-#                         'results'  : results}
-#         
-#         with cls.get_file(context, root) as fileobj:
-#             fileobj.write(template.render(**mako_context))
 
 
 class T2_4MDetailsDefaultRenderer(object):
@@ -1653,7 +1594,7 @@ class T2_4MDetailsRenderer(object):
 
     """
     Get the template output path.
-    
+
     :param context: the pipeline Context
     :type context: :class:`~pipeline.infrastructure.launcher.Context`
     :param result: the task results object to render
@@ -1674,11 +1615,11 @@ class T2_4MDetailsRenderer(object):
     """
     Render the detailed task-centric view of each Results in the given
     context.
-    
+
     This renderer creates detailed, T2_4M output for each Results. Each
     Results in the context is passed to a specialised renderer, which 
     generates customised output and plots for the Result in question.
-    
+
     :param context: the pipeline Context
     :type context: :class:`~pipeline.infrastructure.launcher.Context`
     """
@@ -1762,23 +1703,20 @@ class T2_4MDetailsRenderer(object):
         # .. get the file object to which we'll render the result
         with cls.get_file(context, result, root) as fileobj:
             # .. and write the renderer's interpretation of this result to
-            # the file object  
+            # the file object
             try:
-                LOG.trace('Writing %s output to %s', renderer.__class__.__name__,
-                          path)
-
+                LOG.trace('Writing %s output to %s', renderer.__class__.__name__, path)
                 event = eventbus.WebLogStageRenderingStartedEvent(
                     context_name=context.name, stage_number=result.stage_number
-                    )
+                )
                 eventbus.send_message(event)
 
                 fileobj.write(renderer.render(context, result))
 
                 event = eventbus.WebLogStageRenderingCompleteEvent(
                     context_name=context.name, stage_number=result.stage_number
-                    )
+                )
                 eventbus.send_message(event)
-
             except:
                 LOG.warning('Template generation failed for %s', cls.__name__)
                 LOG.debug(mako.exceptions.text_error_template().render())
@@ -1904,9 +1842,8 @@ def group_by_root(context, task_results):
     return d
 
 
-class WebLogGenerator(object):
-    renderers = [T1_1Renderer,         # OUS splash page
-                 T1_2Renderer,         # observation summary
+class WebLogGenerator:
+    renderers = [T1_2Renderer,         # observation summary
                  T1_3MRenderer,        # by topic page
                  T2_1Renderer,         # session tree
                  T2_1DetailsRenderer,  # session details
@@ -1914,20 +1851,22 @@ class WebLogGenerator(object):
                  T2_2_2Renderer,       # spectral setup
                  T2_2_3Renderer,       # antenna setup
                  T2_2_4Renderer,       # sky setup
-#                 T2_2_5Renderer,       # weather
+                 # T2_2_5Renderer,     # weather
                  T2_2_6Renderer,       # scans
                  T2_2_7Renderer,       # telescope pointing (single dish specific)
                  T2_3_1MRenderer,      # data set topic
                  T2_3_2MRenderer,      # calibration topic
                  T2_3_3MRenderer,      # flagging topic
-        # disable unused line finding topic for July 2014 release
-        # T2_3_4MRenderer,             # line finding topic
+                 # disable unused line finding topic for July 2014 release
+                 # T2_3_4MRenderer,    # line finding topic
                  T2_3_5MRenderer,      # imaging topic
                  T2_3_6MRenderer,      # miscellaneous topic
                  T2_4MRenderer,        # task tree
-                 T2_4MDetailsRenderer, # task details
-        # some summary renderers are placed last for access to scores
-                 T1_4MRenderer]        # task summary
+                 T2_4MDetailsRenderer,  # task details
+                 # place T1_4MRenderer (task summary) after other renderers for access to scores.
+                 T1_4MRenderer,         # task summary
+                 T1_1Renderer,         # OUS splash page
+                 ]
 
     @staticmethod
     def copy_resources(context):
@@ -2020,111 +1959,6 @@ class LogCopier(object):
                              if entry not in existing_entries]
             weblog.writelines(to_append)
 
-#     @staticmethod    
-#     def write_stage_logs(context):
-#         """
-#         Take the CASA log snippets attached to each result and write them to
-#         the appropriate weblog directory. The log snippet is deleted from the
-#         result after a successful write to keep the pickle size down. 
-#         """
-#         for result in context.results:
-#             if not hasattr(result, 'casalog'):
-#                 continue
-# 
-#             stage_dir = os.path.join(context.report_dir,
-#                                      'stage%s' % result.stage_number)
-#             if not os.path.exists(stage_dir):                
-#                 os.makedirs(stage_dir)
-# 
-#             stagelog_entries = result.casalog
-#             start = result.timestamps.start
-#             end = result.timestamps.end
-# 
-#             stagelog_path = os.path.join(stage_dir, 'casapy.log')
-#             with open(stagelog_path, 'w') as stagelog:
-#                 LOG.debug('Writing CASA log entries for stage %s (%s -> %s)' %
-#                           (result.stage_number, start, end))                          
-#                 stagelog.write(stagelog_entries)
-#                 
-#             # having written the log entries, the CASA log entries have no 
-#             # further use. Remove them to keep the size of the pickle small
-#             delattr(result, 'casalog')
-#
-#    @staticmethod    
-#    def write_stage_logs(context):
-#        casalog = os.path.join(context.report_dir, 'casapy.log')
-#
-#        for result in context.results:
-#            stage_dir = os.path.join(context.report_dir,
-#                                     'stage%s' % result.stage_number)
-#            stagelog_path = os.path.join(stage_dir, 'casapy.log')
-#            if os.path.exists(stagelog_path):
-#                LOG.trace('CASA log exists for stage %s, continuing..' 
-#                          % result.stage_number)
-##                continue
-#
-#            if not os.path.exists(stage_dir):                
-#                os.makedirs(stage_dir)
-#
-#            # CASA log timestamps have seconds resolution, whereas our task
-#            # timestamps have microsecond resolution. Cast down to seconds 
-#            # resolution to make a comparison, taking care to leave the 
-#            # original timestamp unaltered
-#            start = result.timestamps.start.replace(microsecond=0)
-#            end = result.timestamps.end.replace(microsecond=0)
-#            end += datetime.timedelta(seconds=1)
-#            
-#            # get the hif_XXX command from the task attribute if possible,
-#            # otherwise fall back to the Python class name accessible at
-#            # taskname
-#            task = result.taskname
-#             
-#            stagelog_entries = LogCopier._extract(casalog, start, end, task)
-#            with open(stagelog_path, 'w') as stagelog:
-#                LOG.debug('Writing CASA log entries for stage %s (%s -> %s)' %
-#                          (result.stage_number, start, end))                          
-#                stagelog.writelines(stagelog_entries)
-#
-#    @staticmethod
-#    def _extract(filename, start, end, task=None):
-#        with open(filename, 'r') as logfile:
-#            rows = logfile.readlines()
-#
-#        # find the indices of the log entries recorded just after and just 
-#        # before the end of task execution. We do this so that our subsequent
-#        # search can begin these times, giving a more optimal search
-#        pattern = re.compile('^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}')
-#        timestamps = [pattern.match(r).group(0) for r in rows]
-#        datetimes = [datetime.datetime.strptime(t, '%Y-%m-%d %H:%M:%S')
-#                     for t in timestamps]
-#        within_timestamps = [n for n, elem in enumerate(datetimes) 
-#                             if elem > start and elem < end]            
-#        start_idx, end_idx = within_timestamps[0], within_timestamps[-1]
-#
-#        # Task executions are bookended by statements log entries like this:
-#        #
-#        # 2013-02-15 13:55:47 INFO    hifa_importdata::::casa+ ##########################################
-#        #
-#        # This regex matches this pattern, and therefore the start and end
-#        # sections of the CASA log for this task 
-#        pattern = re.compile('^.*?%s::::casa\+\t\#{42}$' % task)
-#
-#        # Rewinding from the starting timestamp, find the index of the task
-#        # start log entry
-#        for idx in range(within_timestamps[0], 0, -1):
-#            if pattern.match(rows[idx]):
-#                start_idx = idx
-#                break
-#
-#        # looking forward from the end timestamp, find the index of the task
-#        # end log entry
-#        for idx in range(within_timestamps[-1], len(rows)-1):
-#            if pattern.match(rows[idx]):
-#                end_idx = min(idx+1, len(rows))
-#                break
-#
-#        return rows[start_idx:end_idx]
-
 
 # adding classes to this tuple always rerenders their content, bypassing the
 # cache or 'existing file' checks. This is useful for developing and debugging
@@ -2165,34 +1999,51 @@ def get_ms_attr_for_result(context, vis, accessor):
     return accessor(ms)
 
 
-def compute_az_el_to_field(field, epoch, observatory):
-    me = casa_tools.measures
+def compute_zd_telmjd_for_ms(
+        ms: MeasurementSet,
+        ) -> dict[int, dict[str, list[float] | list[datetime.datetime]]]:
+    """
+    Retrieve zenith angles (degrees) and times for TARGET fields at all timestamps.
 
-    me.doframe(epoch)
-    me.doframe(me.observatory(observatory))
-    myazel = me.measure(field.mdirection, 'AZELGEO')
-    myaz = myazel['m0']['value']
-    myel = myazel['m1']['value']
-    myaz = (myaz * 180 / np.pi) % 360
-    myel *= 180 / np.pi
+    Args:
+        ms: The MeasurementSet object.
 
-    return [myaz, myel]
+    Returns:
+        Dictionary keyed by field ID with lists of zenith angles (degrees) and
+        corresponding UTC datetimes. Times are derived from field.time seconds
+        offset from `mjd_epoch` (1858-11-17).
+        Format: {field_id: {'zd': [zd1, zd2, ...], 'telmjd': [dt1, dt2, ...]}}
+    """
 
+    data = {}
+    fields = ms.get_fields(intent='TARGET')
+    observatory = ms.antenna_array.name
+    mjd_epoch = datetime.datetime(1858, 11, 17)
 
-def compute_az_el_for_ms(ms, observatory, func):
-    cal_scans = ms.get_scans(scan_intent='POINTING,SIDEBAND,ATMOSPHERE')
-    scans = [s for s in ms.scans if s not in cal_scans]
+    for field in fields:
+        if field.id not in data:
+            data[field.id] = {
+                'zd': [],
+                'telmjd': [],
+            }
 
-    az = []
-    el = []
-    for scan in scans:
-        for field in scan.fields:
-            az0, el0 = compute_az_el_to_field(field, scan.start_time, observatory)
-            az1, el1 = compute_az_el_to_field(field, scan.end_time, observatory)
-            az.append(func([az0, az1]))
-            el.append(func([el0, el1]))
+        # Calculate zenith distance for each unique timestamp in the field
+        for time_seconds in field.time:
+            obs_time = mjd_epoch + datetime.timedelta(seconds=float(time_seconds))
+            epoch = casa_tools.measures.epoch('utc', obs_time.isoformat())
 
-    return func(az), func(el)
+            # Calculate zenith distance at this timestamp
+            zd_rad = utils.compute_zenith_distance(
+                field_direction=field._mdirection,
+                epoch=epoch,
+                observatory=observatory,
+            )
+            zd_deg = casa_tools.quanta.convert(zd_rad, 'deg')['value']
+
+            data[field.id]['zd'].append(zd_deg)
+            data[field.id]['telmjd'].append(obs_time)
+
+    return data
 
 
 def cmp(a, b):

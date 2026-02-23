@@ -287,6 +287,7 @@ class ImportData(basetask.StandardTaskTemplate):
 
         # launch an import job for each ASDM we need to convert
         for asdm in to_convert:
+            utils.clear_time_cache()
             self._do_importasdm(asdm)
             utils.clear_time_cache()
 

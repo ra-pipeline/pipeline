@@ -610,11 +610,9 @@ class SerialGcorFluxscale(basetask.StandardTaskTemplate):
         # If a caltable was created and any overrides are necessary, then
         # create a modified CalApplication and replace CalApp in result with
         # this new one.
-        if result.pool and calapp_overrides:
-            original_calapp = result.pool[0]
-            modified_calapp = callibrary.copy_calapplication(original_calapp, **calapp_overrides)
-            result.pool[0] = modified_calapp
-            result.final[0] = modified_calapp
+        if calapp_overrides:
+            result.pool = [callibrary.copy_calapplication(c, **calapp_overrides) for c in result.pool]
+            result.final = [callibrary.copy_calapplication(c, **calapp_overrides) for c in result.final]
 
         return result
 
@@ -661,7 +659,8 @@ class SerialGcorFluxscale(basetask.StandardTaskTemplate):
         # so that these phase solutions will be used in pre-apply during
         # upcoming amplitude solves.
         for result in phase_results:
-            result.accept(self.inputs.context)
+            if result.final:
+                result.accept(self.inputs.context)
 
         return phase_results
 
@@ -764,9 +763,8 @@ class SerialGcorFluxscale(basetask.StandardTaskTemplate):
         if phase_result.pool:
             original_calapp = phase_result.pool[0]
             intents_str = ",".join({original_calapp.intent} | non_pc_intents)
-            modified_calapp = callibrary.copy_calapplication(original_calapp, intent=intents_str)
-            phase_result.pool[0] = modified_calapp
-            phase_result.final[0] = modified_calapp
+            phase_result.pool = [callibrary.copy_calapplication(c, intent=intents_str) for c in phase_result.pool]
+            phase_result.final = [callibrary.copy_calapplication(c, intent=intents_str) for c in phase_result.final]
 
         return phase_result
 

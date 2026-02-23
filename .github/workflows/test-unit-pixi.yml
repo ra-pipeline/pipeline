@@ -1,0 +1,110 @@
+name: "Test-Unit (Pixi)"
+
+on:
+  push:
+    branches:
+      - "main"
+    paths:
+      - "docs/**"
+      - "pipeline/**"
+      - "tests/**"
+      - ".github/workflows/**"
+      - "environment*.yml"
+      - "pyproject.toml"
+      - "setup.py"
+  pull_request:
+    branches:
+      - "**"
+  # Allow manual triggering
+  workflow_dispatch:
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        pixi_env:
+          - casa666-py310
+          - casa671-py310
+          - casa671-py312
+          - casa675-py312
+          - casa675-py313
+        exclude:
+          # pybdsf not available on cp313 for osx-arm64
+          - os: macos-latest
+            pixi_env: casa675-py313
+
+    name: "Unit Testing (${{ matrix.os }}, ${{ matrix.pixi_env }})"
+
+    uses: ./.github/workflows/env-setup-run-template-pixi.yml
+    with:
+      os: ${{ matrix.os }}
+      pixi_env: ${{ matrix.pixi_env }}
+      test_data: unit
+      task: test-unit
+      artifact_name: ${{ (matrix.os == 'ubuntu-latest' && matrix.pixi_env == 'casa675-py312') && 'pytest-results-ubuntu-latest' || '' }}
+      artifact_path: |
+        coverage.xml
+        htmlcov/
+        junit.xml
+
+  upload_pages:
+    name: Upload Coverage to Pages
+    needs: test
+    runs-on: ubuntu-latest
+    if: |
+      needs.test.result == 'success' &&
+      github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: pytest-results-ubuntu-latest
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: htmlcov
+          destination_dir: coverage_unit
+
+  upload_codecov:
+    name: Upload Coverage to CodeCov
+    needs: test
+    runs-on: ubuntu-latest
+    if: needs.test.result == 'success'
+    steps:
+      - name: Checkout Full History for Codecov
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: pytest-results-ubuntu-latest
+
+      - name: Upload coverage to CodeCov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          flags: unittests
+          name: codecov-ubuntu-latest
+          fail_ci_if_error: true
+          verbose: true
+          disable_telem: true
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}

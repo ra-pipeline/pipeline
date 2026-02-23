@@ -291,8 +291,7 @@ class Channel:
 
 
 class SpectralWindow:
-    """
-    SpectralWindow is a logical representation of a spectral window (spw).
+    """A logical representation of a spectral window (spw).
 
     Attributes:
         id: The numerical identifier of this spectral window within the
@@ -552,9 +551,13 @@ class SpectralWindow:
 
 
 class SpectralWindowWithChannelSelection:
-    """
-    SpectralWindowWithChannelSelection decorates a SpectralWindow so that the
-    spectral window ID also contains a channel selection.
+    """Wrapper for SpectralWindow that includes channel selection in the ID.
+
+    This class wraps a SpectralWindow and modifies its ID property to include
+    a channel selection string (e.g., '0:10~20;30~40').
+
+    Attributes:
+        id: Spectral window ID with appended channel selection string.
     """
     def __init__(self, subject: SpectralWindow, channels: Iterable[int]) -> None:
         self._subject = subject

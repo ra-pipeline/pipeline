@@ -1036,7 +1036,7 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         # grouping of SpWs and collect the corresponding CalApplications from
         # the task results. Each caltable should have a unique filename since
         # the filename includes the SpW selection.
-        original_calapps = []
+        calapps_pool, calapps_final = [], []
         for spectral_spec, tuning_spw_ids in utils.get_spectralspec_to_spwid_map(scan_spws).items():
             tuning_spw_str = ','.join([str(i) for i in sorted(tuning_spw_ids)])
             LOG.info('Processing spectral spec {}, spws {}'.format(spectral_spec, tuning_spw_str))
@@ -1073,16 +1073,17 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             phasecal_result = self._executor.execute(phasecal_task)
 
             # Collect CalApplications.
-            original_calapps.extend(phasecal_result.pool)
+            # PIPE-2752: calapps_final excludes expected caltables that were not successfully created.
+            calapps_pool.extend(phasecal_result.pool)
+            calapps_final.extend(phasecal_result.final)
 
         # Phase solution caltables should always be registered to be applied
         # with calwt=False (PIPE-1154). Create an updated version of each
         # CalApplication with the override to set calwt to False. Replace any
         # existing CalApplications in latest tuning result with complete list
         # of all updated CalApplications, and return this as the final result.
-        processed_calapps = [callibrary.copy_calapplication(c, calwt=False) for c in original_calapps]
-        phasecal_result.pool = processed_calapps
-        phasecal_result.final = processed_calapps
+        phasecal_result.pool = [callibrary.copy_calapplication(c, calwt=False) for c in calapps_pool]
+        phasecal_result.final = [callibrary.copy_calapplication(c, calwt=False) for c in calapps_final]
 
         return phasecal_result
 
@@ -1181,6 +1182,17 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             # there can be separate gaintable (one per spectralspec).
             for calapp in result.final:
                 # Get SpWs and SNR info from caltable.
+                if not os.path.exists(calapp.gaintable):
+                    # PIPE-2752: log a warning and skip a calapp if its caltable
+                    # was not successfully created; ideally this should not
+                    # happen since we are using result.final here.
+                    LOG.warning(
+                        'No caltable found at %s, cannot compute median SNR info for field=%s, intent=%s.',
+                        calapp.gaintable,
+                        field,
+                        intent,
+                    )
+                    continue
                 with casa_tools.TableReader(calapp.gaintable) as table:
                     spws = table.getcol("SPECTRAL_WINDOW_ID")
                     snrs = table.getcol("SNR")

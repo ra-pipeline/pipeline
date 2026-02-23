@@ -1,26 +1,25 @@
 import collections
 import os
-import shutil
+import traceback
 
 import matplotlib.pyplot as plt
 import numpy as np
-import traceback
+from casaplotms import plotms
 
 import pipeline.infrastructure.logging as logging
 from pipeline.h.tasks.common.displays import sky
 from pipeline.hif.heuristics.auto_selfcal.selfcal_helpers import unflag_failed_antennas
 from pipeline.infrastructure import casa_tools, filenamer
-from pipeline.infrastructure.casa_tasks import CasaTasks
 from pipeline.infrastructure.displays.plotstyle import matplotlibrc_formal
 from pipeline.infrastructure.mpihelpers import TaskQueue
 from pipeline.infrastructure.renderer import logger
 
 LOG = logging.get_logger(__name__)
 
-ct = CasaTasks()
-tq = None # a module-level TaskQueue instance, intialized as None, but could be later set by the renderer
+tq = None  # a module-level TaskQueue instance, initialized as None, but could be later set by the renderer
 
-class SelfcalSummary(object):
+
+class SelfcalSummary:
     def __init__(self, context, r, target):
         self.context = context
         self.result = r
@@ -335,13 +334,13 @@ class SelfcalSummary(object):
             LOG.info(f'plotfile already exists: {figname}; skip plotting')
         else:
             title = os.path.basename(caltb_loc).replace('Target_', '')
-            ct.plotms(gridrows=2, gridcols=1, plotindex=0, rowindex=0, vis=caltb_loc, xaxis=xaxis, yaxis=yaxis,
+            plotms(gridrows=2, gridcols=1, plotindex=0, rowindex=0, vis=caltb_loc, xaxis=xaxis, yaxis=yaxis,
                       showgui=False, xselfscale=True, antenna=ant, plotrange=plotrange,
                       customflaggedsymbol=True, plotfile=figname,
                       title=f'{title} {ant}', xlabel=' ',
                       overwrite=True, clearplots=True,
                       titlefont=10, xaxisfont=10, yaxisfont=10)
-            ct.plotms(gridrows=2, gridcols=1, rowindex=1, plotindex=1, vis=caltb_loc, xaxis=xaxis, yaxis='SNR',
+            plotms(gridrows=2, gridcols=1, rowindex=1, plotindex=1, vis=caltb_loc, xaxis=xaxis, yaxis='SNR',
                       showgui=False, xselfscale=True, antenna=ant,
                       customflaggedsymbol=True, plotfile=figname,
                       title=' ',
@@ -485,63 +484,59 @@ class SelfcalSummary(object):
         plt.close(fig)
 
     @staticmethod
-    def create_noise_histogram(imagename):
+    def create_noise_histogram(imagename: str) -> tuple[np.ndarray, np.ndarray, float]:
+        """Create noise histogram data from a CASA image.
 
-        MADtoRMS = 1.4826
+        Computes histogram counts and bin edges from the residual image, along with
+        the RMS noise estimate. The method used depends on whether a mask image exists
+        and the telescope type (ALMA vs VLA).
+
+        Args:
+            imagename: Path to the CASA image file (.image.tt0).
+
+        Returns:
+            A tuple containing:
+                - hist: Histogram counts array.
+                - bin_edges: Right-edge values for each histogram bin.
+                - rms: RMS noise estimate in the same units as the image.
+
+        """
+        MAD_TO_RMS = 1.4826
 
         with casa_tools.ImageReader(imagename) as image:
             telescope = image.coordsys().telescope()
 
-        maskImage = imagename.replace('image', 'mask').replace('.tt0', '')
-        residualImage = imagename.replace('image', 'residual')
+        mask_image = imagename.replace('image', 'mask').replace('.tt0', '')
+        residual_image = imagename.replace('image', 'residual')
 
-        shutil.rmtree('temp.mask', ignore_errors=True)
-        shutil.rmtree('temp.residual', ignore_errors=True)
-
-        if os.path.exists(maskImage):
-            shutil.copytree(maskImage, 'temp.mask')
-            maskImage = 'temp.mask'
-        shutil.copytree(residualImage, 'temp.residual')
-
-        residualImage = 'temp.residual'
-        if os.path.exists(maskImage):
-            with casa_tools.ImageReader(residualImage) as image:
-                image.calcmask("'"+maskImage+"'"+" <0.5"+"&& mask("+residualImage+")", name='madpbmask0')
-                mask0Stats = image.statistics(robust=True, axes=[0, 1])
-                image.maskhandler(op='set', name='madpbmask0')
-                rms = mask0Stats['medabsdevmed'][0] * MADtoRMS
-                pix = np.squeeze(image.getchunk())
-                mask = np.squeeze(image.getchunk(getmask=True))
-                dimensions = mask.ndim
-                if dimensions == 4:
-                    mask = mask[:, :, 0, 0]
-                if dimensions == 3:
-                    mask = mask[:, :, 0]
-                unmasked = (mask == True).nonzero()
-                pix_unmasked = pix[unmasked]
-                N, intensity = np.histogram(pix_unmasked, bins=50)
+        if os.path.exists(mask_image):
+            with casa_tools.ImageReader(residual_image) as image:
+                mask_lel = f"'{mask_image}' <0.5 && mask('{residual_image}')"
+                mask0stats = image.statistics(axes=[0, 1], mask=mask_lel, robust=True)
+                rms = mask0stats['medabsdevmed'][0] * MAD_TO_RMS
+                hist_rec = image.histograms(axes=[0, 1], mask=mask_lel, nbins=100)
 
         elif telescope == 'ALMA':
-            with casa_tools.ImageReader(residualImage) as image:
-                image.calcmask("mask("+residualImage+")", name='madpbmask0')
-                mask0Stats = image.statistics(robust=True, axes=[0, 1])
-                image.maskhandler(op='set', name='madpbmask0')
-                rms = mask0Stats['medabsdevmed'][0] * MADtoRMS
-                pix = np.squeeze(image.getchunk())
-                mask = np.squeeze(image.getchunk(getmask=True))
-                mask = mask[:, :, 0, 0]
-                unmasked = (mask == True).nonzero()
-                pix_unmasked = pix[unmasked]
-        elif 'VLA' in telescope:
-            with casa_tools.ImageReader(imagename.replace('image', 'residual')) as image:
-                rms = image.statistics(algorithm='chauvenet')['rms'][0]
-            with casa_tools.ImageReader(residualImage) as image:
-                pix_unmasked = np.squeeze(image.getchunk())
+            with casa_tools.ImageReader(residual_image) as image:
+                mask_lel = f"mask('{residual_image}')"
+                mask0stats = image.statistics(axes=[0, 1], mask=mask_lel, robust=True)
+                rms = mask0stats['medabsdevmed'][0] * MAD_TO_RMS
+                hist_rec = image.histograms(axes=[0, 1], mask=mask_lel, nbins=100)
+        else:
+            # Fallback for other telescopes, mainly VLA
+            with casa_tools.ImageReader(residual_image) as image:
+                rms = image.statistics(algorithm='chauvenet', robust=False)['rms'][0]
+                hist_rec = image.histograms(axes=[0, 1], nbins=100)
 
-        N, intensity = np.histogram(pix_unmasked, bins=100)
-        intensity = np.diff(intensity)+intensity[:-1]
+        hist = hist_rec['counts'].flatten()
+        bin_edges = hist_rec['values'].flatten()
+        # Right-edge (or center-like) position of each bin to stay consistent with the
+        # original heuristics code, while later we plot using step(..., where='pre').
+        # Use per-bin widths instead of assuming uniform spacing from the first bin only.
+        bin_widths = np.diff(bin_edges)
+        if bin_widths.size > 0:
+            # Pad the last width so that bin_widths has the same length as bin_edges.
+            bin_widths = np.concatenate([bin_widths, bin_widths[-1:]])
+            bin_edges = bin_edges + bin_widths / 2.0
 
-        shutil.rmtree('temp.mask', ignore_errors=True)
-        shutil.rmtree('temp.residual', ignore_errors=True)
-
-        return N, intensity, rms
+        return hist, bin_edges, rms

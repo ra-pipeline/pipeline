@@ -117,8 +117,9 @@ class TsysSummaryChart(object):
 
 class TsysPerAntennaChart(common.PlotbandpassDetailBase):
     def __init__(self, context, result, **kwargs):
-        super(TsysPerAntennaChart, self).__init__(context, result, 'freq', 'tsys', overlay='time', showatm=True,
-                                                  showfdm=True, chanrange='90%', **kwargs)
+        super().__init__(
+            context, result, 'freq', 'tsys', overlay='time', showatm=True, showfdm=True, chanrange='90%', **kwargs
+        )
 
         # Get MS and bandpass solution.
         ms = context.observing_run.get_ms(self._vis)

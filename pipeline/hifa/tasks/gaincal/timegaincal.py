@@ -215,6 +215,8 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
         # context so that it is marked for inclusion in pre-apply (gaintable)
         # in subsequent gaincal calls during this task.
         for cpres in cal_phase_results:
+            if not cpres.final:
+                continue
             cpres.accept(inputs.context)
 
         # Look through calibrator phasecal results for any CalApplications for
@@ -222,6 +224,8 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
         # AMPLITUDE, BANDPASS, POL*, and DIFFGAIN*). Add these CalApps to the
         # final task result, to be merged into the final context / callibrary.
         for cpres in cal_phase_results:
+            if not cpres.final:
+                continue
             cp_calapp = cpres.final[0]
             if cp_calapp.intent != 'PHASE':
                 result.final.append(cp_calapp)
@@ -350,8 +354,16 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
 
         # Determine non-phase calibrator fields, to be added to gaincal solve
         # for plotting purposes.
-        np_intents = ','.join(set(inputs.intent.split(',')) - {p_intent})
-        np_fields = ','.join([f.name for f in inputs.ms.get_fields(intent=np_intents)])
+        np_intents = ','.join(dict.fromkeys(item for item in inputs.intent.split(',') if item != p_intent))
+        np_fields = None
+        if np_intents:
+            # PIPE-2752: Identify fields that have non-phase intents but lack the PHASE intent.
+            candidates = inputs.ms.get_fields(intent=np_intents)
+            exclusive_fields = [f.name for f in candidates if p_intent not in f.intents]
+            if exclusive_fields:
+                np_fields = ','.join(dict.fromkeys(exclusive_fields))
+            else:
+                LOG.debug('No exclusive non-phase fields for intents=%s selection on %s', np_intents, inputs.ms)
 
         # Determine which SpWs to solve for, which SpWs the solutions should
         # apply to, and whether to override refantmode. By default, use all
@@ -449,10 +461,11 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
         """
         inputs = self.inputs
 
-        # If provided, add additional fields to gaincal.
         gc_fields = field
         if include_field:
-            gc_fields = f'{field},{include_field}'
+            gc_field_list = gc_fields.split(',')
+            gc_field_list.extend(include_field.split(','))
+            gc_fields = ','.join(dict.fromkeys(gc_field_list))
 
         # PIPE-1154: for phase solutions of target, check, phase, always use
         # solint=inputs.targetsolint.
@@ -501,8 +514,16 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
             if apply_to_spw:
                 calapp_overrides['spw'] = apply_to_spw
             intents_for_calapp = utils.filter_intents_for_ms(inputs.ms, 'CHECK,TARGET')
-            new_calapps.append(callibrary.copy_calapplication(
-                result.final[0], intent=intents_for_calapp, field=apply_to_field, gainfield=field, **calapp_overrides))
+            if intents_for_calapp:
+                new_calapps.append(
+                    callibrary.copy_calapplication(
+                        result.final[0],
+                        intent=intents_for_calapp,
+                        field=apply_to_field,
+                        gainfield=field,
+                        **calapp_overrides,
+                    )
+                )
 
         return new_calapps
 
@@ -793,9 +814,8 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
 
         # Create a modified CalApplication and replace CalApp in result with
         # this new one.
-        modified_calapp = callibrary.copy_calapplication(result.final[0], **calapp_overrides)
-        result.final = [modified_calapp]
-        result.pool = [modified_calapp]
+        result.pool = [callibrary.copy_calapplication(c, **calapp_overrides) for c in result.pool]
+        result.final = [callibrary.copy_calapplication(c, **calapp_overrides) for c in result.final]
 
         return result
 
@@ -921,8 +941,18 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
 
         # Create CalApplication for the TARGET/CHECK sources, where present in
         # the MS (PIPE-2268).
-        calapp_overrides = {'intent': utils.filter_intents_for_ms(inputs.ms, "CHECK,TARGET"),
-                            'gainfield': ''}
+        calapp_overrides = {'intent': utils.filter_intents_for_ms(inputs.ms, 'CHECK,TARGET'), 'gainfield': ''}
+        fields_targets = inputs.ms.get_fields(intent=calapp_overrides['intent'])
+        fields_not_targets = inputs.ms.get_fields(
+            intent='BANDPASS,PHASE,AMPLITUDE,POLARIZATION,DIFFGAINREF,DIFFGAINSRC'
+        )
+        fields_checktarget_only = set(fields_targets) - set(fields_not_targets)
+        if not calapp_overrides['intent'] or not fields_checktarget_only:
+            LOG.debug(
+                'No CHECK-only or TARGET-only intent scans found in %s and we will skip the creation of CalApp for intents="CHECK,TARGET".',
+                inputs.ms.name,
+            )
+            return [cal_calapp]
 
         # PIPE-2087: for BandToBand, register the solutions to be applied to the
         # diffgain on-source SpWs, and use the amplitude solutions from the
@@ -1033,6 +1063,6 @@ def do_gtype_gaincal(context, executor, task_args) -> GaincalResults:
     result = executor.execute(task)
 
     # sanity checks in case gaincal starts returning additional caltable applications
-    assert len(result.final) == 1, '>1 caltable application registered by gaincal'
+    assert len(result.final) <= 1, 'Expected at most 1 caltable application registered by gaincal, got more'
 
     return result

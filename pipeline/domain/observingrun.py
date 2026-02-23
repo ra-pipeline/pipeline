@@ -44,7 +44,7 @@ def sort_measurement_set(ms: MeasurementSet) -> tuple[int, datetime]:
 
 
 class ObservingRun(object):
-    """Logical representation of an observing run.
+    """A logical representation of an observing run.
 
     Attributes:
         measurement_sets: List of measurementSet objects associated with run.

@@ -3,19 +3,6 @@ The exportdata for SD module.
 
 This module provides base classes for preparing data products on disk
 for upload to the archive.
-
-To test these classes, register some data with the pipeline using ImportData,
-then execute:
-
-import pipeline
-# Create a pipeline context and register some data
-context = pipeline.Pipeline().context
-output_dir = "."
-products_dir = "./products"
-inputs = pipeline.tasks.singledish.SDExportData.Inputs(context, output_dir,
-                                                       products_dir)
-task = pipeline.tasks.singledish.SDExportData (inputs)
-results = task.execute ()
 """
 
 import collections

@@ -58,6 +58,8 @@ __all__ = [
 # the data.
 USE_CASA_PARSING_ROUTINES = True
 
+_ANGLE_UNITS = ('rad', 'deg', 'arcmin', 'arcsec', 'amin', 'asec')
+
 
 class LoggingLRUCache(cachetools.LRUCache):
     """'Least recently used' cache that logs when cache entries are evicted.
@@ -746,12 +748,43 @@ def phasecenter_to_skycoord(phasecenter: str) -> SkyCoord:
         dec = phasecenter_list[2]
         refcode = phasecenter_list[0]
     else:
-        LOG.error('cannot parse the phasecenter string %s', phasecenter)
-        return
+        raise ValueError(f"Cannot parse phasecenter string: {phasecenter}")
 
-    dec = dec.replace('.', ':', 2)
     frame = refcode_to_skyframe(refcode)
-    coord = SkyCoord(ra, dec, unit=(u.hourangle, u.deg), frame=frame)
+
+    # handle common case of Dec expressed with two dots instead of colons
+    if (
+        dec.count('.') >= 2
+        and ':' not in dec
+        and 'deg' not in dec
+        and 'd' not in dec
+        and 'rad' not in dec
+    ):
+        dec = dec.replace('.', ':', 2)
+
+    # determine RA unit
+    if any(u in ra for u in _ANGLE_UNITS):
+        # if units are specified, let astropy handle it
+        ra_unit = None
+    elif 'h' in ra or ':' in ra:
+        ra_unit = u.hourangle
+    else:
+        try:
+            _ = float(ra)
+            ra_unit = u.deg
+        except ValueError:
+            ra_unit = u.hourangle
+            LOG.info("Unable to determine RA unit, assuming hourangle for RA value %s", ra)
+
+    # determine Dec unit
+    if any(u in dec for u in _ANGLE_UNITS):
+        # if units are specified, let astropy handle it
+        dec_unit = None
+    else:
+        dec_unit = u.deg
+        LOG.info("Unable to determine Dec unit, assuming degrees for Dec value %s", dec)
+
+    coord = SkyCoord(ra, dec, unit=(ra_unit, dec_unit), frame=frame)
 
     return coord
 

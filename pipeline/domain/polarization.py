@@ -2,8 +2,7 @@ import numpy
 
 
 class Polarization(object):
-    """
-    Polarization is a logical representation of a polarization.
+    """A logical representation of a polarization.
 
     Integer correlation Stokes types are translated to their corresponding
     string representation using a local definition of the Stokes enumeration

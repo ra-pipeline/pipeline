@@ -152,15 +152,15 @@ context = cli.stack.get(cli.PIPELINE_NAME)
 
 Initializing a new run / context and saving to disk:
 ```python
-import pipeline
-context = pipeline.Pipeline().context
+from pipeline.infrastructure import launcher
+context = launcher.Pipeline().context
 context.save()
 ```
 
 Resuming previous run / context:
 ```python
-import pipeline
-context = pipeline.Pipeline(context='last').context
+from pipeline.infrastructure import launcher
+context = launcher.Pipeline(context='last').context
 ```
 
 
@@ -292,8 +292,9 @@ pol_id = datadesc.get_polarization_id("XY")
 
 ```python
 # Restore latest context from disk.
-import pipeline
-context = pipeline.Pipeline(context='last').context
+from pipeline.infrastructure import launcher
+
+context = launcher.Pipeline(context='last').context
 
 # Retrieve measurement set domain object.
 vis = 'myvis.ms'

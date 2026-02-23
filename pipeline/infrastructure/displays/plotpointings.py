@@ -503,7 +503,7 @@ def select_tsys_field(
             return src_by_name[field_str_clean]
         # PIPE-2869: Partial name match
         for name in src_by_name:
-            if name in field_str_clean:
+            if field_str_clean.startswith(name):
                 return ms.get_fields(name=field_str)[0]
 
     # If truly nothing matched, raise a clear error instead of returning a wrong field silently.
@@ -658,7 +658,7 @@ def tsys_scans_radec(
         LOG.warning("ASDM_POINTING table not found.")
         if observatory == 'ALMA':
             if ALMA_cycle_number:
-                if int(ms.get_alma_cycle_number()) < 11:
+                if ALMA_cycle_number < 11:
                     LOG.attention("This is likely fine for data before Cycle 11.")
                 else:
                     LOG.warning("Result may be inaccurate, especially if it's (0,0).")

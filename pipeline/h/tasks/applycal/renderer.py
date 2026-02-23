@@ -366,6 +366,8 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             # inner half the data.
             max_uvs[vis], uv_range = utils.scale_uv_range(ms)
             LOG.debug('Setting UV range to %s for %s', uv_range, vis)
+            if 'TARGET' not in ms.intents:
+                continue
 
             # source to select
             representative_source_name, _ = ms.get_representative_source_spw()

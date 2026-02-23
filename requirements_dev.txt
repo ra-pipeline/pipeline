@@ -25,7 +25,7 @@ wheel                   # https://packaging.python.org/en/latest/key_projects/#w
 # setuptools_scm        # https://pypi.org/project/setuptools-scm/
 
 # Profiling
-memory_profiler         # https://pypi.org/project/memory-profiler/
+memray                  # https://github.com/bloomberg/memray
 line_profiler           # https://github.com/pyutils/line_profiler
 
 # Dependency Analysis

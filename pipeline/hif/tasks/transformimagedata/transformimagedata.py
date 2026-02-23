@@ -14,7 +14,7 @@ LOG = infrastructure.get_logger(__name__)
 
 class TransformimagedataResults(basetask.Results):
     def __init__(self, vis, outputvis):
-        super(TransformimagedataResults, self).__init__()
+        super().__init__()
         self.vis = vis
         self.outputvis = outputvis
         self.ms = None
@@ -25,35 +25,26 @@ class TransformimagedataResults(basetask.Results):
             LOG.error('No hif_transformimagedata results to merge')
             return
 
-        target = context.observing_run
-        parentms = None
-        #if self.vis == self.outputvis:
-        # The parent MS has been removed.
-        if not os.path.exists(self.vis):
-            for index, ms in enumerate(target.get_measurement_sets()):
-                #if ms.name == self.outputvis:
-                if ms.name == self.vis:
-                    parentms = index
-                    break
+        obs_run = context.observing_run
+        parentms_idx = None
+        for index, ms in enumerate(obs_run.get_measurement_sets()):
+            if ms.name == self.vis:
+                parentms_idx = index
+                break
 
-        if self.ms:
-            if parentms is not None:
-                LOG.info('Replace {} in context'.format(self.ms.name))
-                del target.measurement_sets[parentms]
-                target.add_measurement_set(self.ms)
+        # "parentms_idx = None" means the input MS is not present in the context
+        if parentms_idx is not None:
+            LOG.info('Replace %s in context with %s', obs_run.measurement_sets[parentms_idx].name, self.ms.name)
+            del obs_run.measurement_sets[parentms_idx]
+        else:
+            LOG.info('Adding %s to context', self.ms.name)
+        obs_run.add_measurement_set(self.ms)
 
-            else:
-                LOG.info('Adding {} to context'.format(self.ms.name))
-                target.add_measurement_set(self.ms)
-
-        # Remove original measurement set from context
-        context.observing_run.measurement_sets.pop(0)
-
-        for i in range(0, len(context.clean_list_pending)):
-            outvisname = os.path.join(context.output_dir, os.path.basename(self.outputvis))
-            context.clean_list_pending[i]['heuristics'].observing_run.measurement_sets[0].name = outvisname
-            newvislist = [self.outputvis]
-            context.clean_list_pending[i]['heuristics'].vislist = newvislist
+        # Update clean_list_pending with new MS paths
+        outvisname = os.path.join(context.output_dir, os.path.basename(self.outputvis))
+        for clean_item in context.clean_list_pending:
+            clean_item['heuristics'].observing_run.measurement_sets[0].name = outvisname
+            clean_item['heuristics'].vislist = [self.outputvis]
 
     def __str__(self):
         # Format the MsSplit results.

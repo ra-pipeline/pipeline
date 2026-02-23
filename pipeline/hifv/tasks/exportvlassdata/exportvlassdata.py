@@ -473,7 +473,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
                     selfcal_result = task_result[0]
                     break
 
-            if selfcal_result and os.path.exists(selfcal_result.caltable):
+            if selfcal_result and selfcal_result.caltable and os.path.exists(selfcal_result.caltable):
                 self.selfcaltable = selfcal_result.caltable
             else:
                 self.selfcaltable = ''

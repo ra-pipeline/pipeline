@@ -14,6 +14,16 @@ $(document).ready(function() {
 });
 </script>
 
+<%
+import math
+import datetime
+
+def format_duration(dt):
+	total_seconds = math.ceil(dt.total_seconds())
+	dt_str = str(datetime.timedelta(seconds=total_seconds))
+	return dt_str
+%>
+
 <div id="mainbody">
 
 <%block name="title">Task Summaries</%block>
@@ -53,7 +63,7 @@ $(document).ready(function() {
                 </div>
             </td>
 			<td><span class="badge${rendererutils.get_badge_class(qascore)}">${rendererutils.format_score(qascore)}</span></td>
-			<td>${task_duration[i]}</td>
+			<td>${format_duration(task_duration[i]+result_duration[i])}</td>
 		</tr>
 		% endfor
 	</tbody>

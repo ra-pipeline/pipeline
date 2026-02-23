@@ -530,6 +530,15 @@ def gaincalSNR(context: Context, ms: MeasurementSet, tsysTable: str, flux: Itera
     spw_types = ('TDM', 'FDM')
     all_gaincal_spws = {spw for spw in ms.spectral_windows if intent in spw.intents and spw.type in spw_types}
     all_target_spws = {spw for spw in ms.spectral_windows if 'TARGET' in spw.intents and spw.type in spw_types}
+    if not all_target_spws:
+        LOG.info('No TARGET spws found for %s. Using all BANDPASS spws instead.', ms.basename)
+        all_target_spws = {spw for spw in ms.spectral_windows if 'BANDPASS' in spw.intents and spw.type in spw_types}
+
+    if not all_target_spws:
+        raise ValueError(
+            f"No TARGET or BANDPASS spectral windows found in {ms.basename}. "
+            "At least one is required to proceed."
+        )
     all_spws = all_gaincal_spws.union(spws)
 
     num_basebands = len({spw.baseband for spw in all_spws})

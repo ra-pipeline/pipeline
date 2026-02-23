@@ -1,25 +1,36 @@
 """
 Utilities used for correcting image center coordinates.
 """
+from __future__ import annotations
+
 import os
-from typing import Dict, Union
+from typing import TYPE_CHECKING
 
 import astropy.io.fits as apfits
 import astropy.units as u
 import numpy as np
 from astropy.coordinates import offset_by
 
-from .. import casa_tools, logging
-from . import record_to_quantity as rtq
+from pipeline import infrastructure
+from pipeline.infrastructure import casa_tools, utils
 
-LOG = logging.get_logger(__name__)
+if TYPE_CHECKING:
+    from pipeline.infrastructure.utils.utils import EpochDict, QuantityDict
 
-__all__ = ['do_wide_field_pos_cor']
+LOG = infrastructure.logging.get_logger(__name__)
+
+__all__ = [
+    'calc_zd_pa',
+    'do_wide_field_pos_cor',
+    ]
 
 
-def do_wide_field_pos_cor(fitsname: str, date_time: Union[Dict, None] = None,
-                          obs_long: Union[Dict[str, Union[str, float]], None] = None,
-                          obs_lat: Union[Dict[str, Union[str, float]], None] = None) -> None:
+def do_wide_field_pos_cor(
+        fitsname: str,
+        date_time: EpochDict | None = None,
+        obs_long: QuantityDict | None = None,
+        obs_lat: QuantityDict | None = None,
+        ) -> None:
     """Applies mean wide field position correction to FITS WCS in place.
 
     Apply a mean correction to the FITS WCS reference position as a function
@@ -89,7 +100,7 @@ def do_wide_field_pos_cor(fitsname: str, date_time: Union[Dict, None] = None,
             # The amplitude of 0.25 arcsec is defined in VLASS Memo #14 at 3GHz.
             amp = np.deg2rad(0.25 / 3600.0)
             deltatot = amp * np.tan(zd)
-            offset_pa = rtq([{'value': deltatot, 'unit': 'rad'}, {'value': pa, 'unit': 'rad'}])
+            offset_pa = utils.record_to_quantity([{'value': deltatot, 'unit': 'rad'}, {'value': pa, 'unit': 'rad'}])
 
             # PIPE-1356: perform additional freqency-dependent scaling from the 3GHz prediction.
             freq_scale = (3.e9/freq_head['value'])**2
@@ -118,6 +129,8 @@ def do_wide_field_pos_cor(fitsname: str, date_time: Union[Dict, None] = None,
             # Update history, "Position correction..." message should remain the last record in list.
             messages = ['Uncorrected CRVAL1 = {:.12E} deg'.format(casa_tools.quanta.convert(ra_head, 'deg')['value']),
                         'Uncorrected CRVAL2 = {:.12E} deg'.format(casa_tools.quanta.convert(dec_head, 'deg')['value']),
+                        'ZD parameter represents the zenith distance of telescope pointing at TELMJD.',
+                        'TELMJD parameter represents the time of zenith distance and hour angle.',
                         'Position correction ({:.3E}/cos(CRVAL2), {:.3E}) arcsec applied'.format(
                             -offset_arcsec*np.sin(pa_rad), -offset_arcsec*np.cos(pa_rad))]
             for m in messages:
@@ -132,7 +145,13 @@ def do_wide_field_pos_cor(fitsname: str, date_time: Union[Dict, None] = None,
     return
 
 
-def calc_zd_pa(ra: Dict, dec: Dict, obs_long: Dict, obs_lat: Dict, date_time: Dict):
+def calc_zd_pa(
+        ra: QuantityDict,
+        dec: QuantityDict,
+        obs_long: QuantityDict,
+        obs_lat: QuantityDict,
+        date_time: EpochDict,
+        ) -> tuple[float, float]:
     """Computes the zenith distance and parallactic angle chi.
 
     Args:
