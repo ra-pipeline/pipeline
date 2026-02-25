@@ -172,7 +172,6 @@ class Context(object):
         self.subimlist = imagelibrary.ImageLibrary()  # CAS-10345
         self.synthesized_beams = {'robust': None, 'uvtaper': None}
 
-        self.is_cluster = False  # PIPE-684: Used during VLA mosaic imaging.
         # Log context creation event.
         event = ContextCreatedEvent(context_name=self.name, output_dir=self.output_dir)
         eventbus.send_message(event)
