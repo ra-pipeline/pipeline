@@ -62,7 +62,7 @@ class GaincalSnrInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
@@ -70,40 +70,40 @@ class GaincalSnrInputs(vdp.StandardInputs):
             vis: The list of input MeasurementSets. Defaults to the list of
                 MeasurementSets specified in the pipeline context.
 
-                Example: vis=['M82A.ms', 'M82B.ms']
+                Example: ``vis=['M82A.ms', 'M82B.ms']``
 
             field: The list of field names of sources to be used for signal to noise
                 estimation. Defaults to all fields with the standard intent.
 
-                Example: field='3C279'
+                Example: ``field='3C279'``
 
             intent: A string containing a comma-delimited list of intents against which
-                the selected fields are matched. Defaults to 'PHASE'.
+                the selected fields are matched. Defaults to ``'PHASE'``.
 
-                Example: intent='BANDPASS'
+                Example: ``intent='BANDPASS'``
 
             spw: The list of spectral windows and channels for which gain solutions are
                 computed. Defaults to all the science spectral windows for which there are
                 both 'intent' and TARGET intents.
 
-                Example: spw='13,15'
+                Example: ``spw='13,15'``
 
             bwedgefrac: The fraction of the bandwidth edges that is flagged.
 
-                Example: bwedgefrac=0.0
+                Example: ``bwedgefrac=0.0``
 
             hm_nantennas: The heuristics for determines the number of antennas to use
                 in the signal to noise estimate. The options are 'all' and 'unflagged'.
                 The 'unflagged' options is not currently supported.
 
-                Example: hm_nantennas='unflagged'
+                Example: ``hm_nantennas='unflagged'``
 
             maxfracflagged: The maximum fraction of an antenna that can be flagged
                 before it is excluded from the signal to noise estimate.
 
-                Example: maxfracflagged=0.80
+                Example: ``maxfracflagged=0.80``
         """
-        super(GaincalSnrInputs, self).__init__()
+        super().__init__()
 
         self.context = context
         self.vis = vis

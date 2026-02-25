@@ -37,7 +37,7 @@ class SessionRefAntInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
@@ -45,12 +45,12 @@ class SessionRefAntInputs(vdp.StandardInputs):
             vis: List of input MeasurementSets. Defaults to the list of
                 MeasurementSets specified in the pipeline context.
 
-                Example: vis=['ngc5921.ms']
+                Example: ``vis=['ngc5921.ms']``
 
             phase_threshold: Threshold (in degrees) used to identify absolute phase
                 solution outliers in caltables.
 
-                Example: phase_threshold=0.005
+                Example: ``phase_threshold=0.005``
 
         """
         self.context = context

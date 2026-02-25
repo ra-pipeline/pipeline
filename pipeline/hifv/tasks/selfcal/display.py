@@ -10,9 +10,6 @@ import pipeline.infrastructure.casa_tasks as casa_tasks
 import pipeline.infrastructure.casa_tools as casa_tools
 import pipeline.infrastructure.renderer.logger as logger
 
-#from astropy import units as u
-#from astropy.coordinates import SkyCoord
-
 LOG = infrastructure.get_logger(__name__)
 
 
@@ -38,6 +35,8 @@ class selfcalphaseGainPerAntennaChart(object):
         LOG.info("Plotting phase/SNR vs. time after running hifv_selfcal")
 
         snr_plotrange = [0, 0, 0, 5.0]
+        if result.caltable is None or not os.path.exists(result.caltable):
+            return []
         with casa_tools.TableReader(result.caltable) as table:
             snr = table.getcol('SNR')
             flag = table.getcol('FLAG')
@@ -121,7 +120,9 @@ class selfcalSolutionNumPerFieldChart(object):
         if os.path.exists(self.figfile):
             LOG.debug('Returning existing selfcal solution summary plot')
             return self._get_plot_object()
-
+        if self.caltable is None or not os.path.exists(self.caltable):
+            LOG.warning('selfcal table does not exist.')
+            return None
         selfcal_stats = self._calstat_from_caltable()
         LOG.debug('Creating new selfcal solution summary plot')
 
@@ -146,11 +147,6 @@ class selfcalSolutionNumPerFieldChart(object):
 
             row_label = []
             for idx, field_id in enumerate(selfcal_stats['field_unique_id']):
-                # alternatively, you could include RA/Dec in y-axis labels
-                # c = selfcal_stats['field_desc']['position'][field_id]
-                # row_desc = [field_name[field_id],
-                #            c.ra.to_string(unit=u.hour, pad=True, precision=1),
-                #            c.dec.to_string(unit=u.degree, pad=True, precision=0, alwayssign=True)]
                 row_desc = [field_name[field_id],
                             'scan no.: {}'.format(selfcal_stats['field_unique_scan'][idx])]
                 row_label.append('\n'.join(row_desc))
@@ -160,9 +156,6 @@ class selfcalSolutionNumPerFieldChart(object):
             ax.set_yticks(np.arange(len(row_label)))
             ax.set_yticklabels(row_label, rotation=45, ma='left', va='center', rotation_mode="anchor")
             ax.grid(which='major', axis='y', color='white', linestyle='-', linewidth=2)
-
-            # for spine in ax.spines:
-            #   ax.spines[spine].set_visible(False)
 
             ax.set_xticks(np.arange(len(ant_label)+1)-0.5, minor=True)
             ax.set_yticks(np.arange(len(row_label)+1)-0.5, minor=True)
@@ -190,9 +183,11 @@ class selfcalSolutionNumPerFieldChart(object):
         return self._get_plot_object()
 
     def _get_figfile(self):
-
-        return os.path.join(self.reportdir,
-                            self.caltable+'.nsols.png')
+        if self.caltable is not None:
+            return os.path.join(self.reportdir,
+                                self.caltable+'.nsols.png')
+        else:
+            return ''
 
     def _get_plot_object(self):
         return logger.Plot(self.figfile,
@@ -226,12 +221,6 @@ class selfcalSolutionNumPerFieldChart(object):
             ant1_id, return_index=True, return_inverse=True)
         field_unique_scan = scan_no[field_unique_idx1st]
 
-        # alternatively, you could group solution entries by their field id
-        # field_list = np.split(field_id, field_unique_idx1st[1:], axis=-1)
-        # flag_list = np.split(flag, field_unique_idx1st[1:], axis=-1)
-        # ant_list = np.split(ant1_id, field_unique_idx1st[1:], axis=-1)
-        # time_list = np.split(time, field_unique_idx1st[1:], axis=-1)
-
         if len(phasedir.shape) > 2:
             phasedir = phasedir.squeeze()
 
@@ -256,8 +245,6 @@ class selfcalSolutionNumPerFieldChart(object):
                          'field_unique_scan': field_unique_scan,
                          'ant_unique_id': ant_unique_id,
                          'flag2d': flag2d,
-                         #'field': field_list,'flag': flag_list,'antenna': ant_list,'time': time_list,
-                         #'field_desc': {'name': field_name, 'position': SkyCoord(ra=phasedir[0, :]*u.rad, dec=phasedir[1, :]*u.rad)},
                          'field_desc': {'name': field_name},
                          'ant_desc': {'name': ant_name},
                          'column': {'cparam': cparam, 'flag': flag, 'snr': snr, 'ant1': ant1_id, 'ant2': ant2_id}}

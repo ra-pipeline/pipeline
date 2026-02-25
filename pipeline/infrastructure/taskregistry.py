@@ -78,6 +78,7 @@ class TaskRegistry(object):
         :param task_name: name of CASA task
         :return: pipeline class
         """
+
         matching = [c.pipeline_class for c in self.task_map if c.casa_task == task_name]
         if not matching:
             raise KeyError('No pipeline class registered for {!s}'.format(task_name))
@@ -85,7 +86,7 @@ class TaskRegistry(object):
 
     def set_casa_commands_comment(self, comment):
         """A decorator that is used to register the descriptive text that
-        preceeds the list of CASA commands invoked by this task, as seen in
+        precedes the list of CASA commands invoked by this task, as seen in
         casa_commands.log
 
         :param comment: comment to add to casa_commands.log as a string
@@ -135,7 +136,7 @@ class TaskRegistry(object):
         """
         Set the CASA task for a task mapping.
 
-        :param comment: casa task name as a string
+        :param casa_task: casa task to map pipeline class to
         :param pipeline_class: pipeline class to map
         """
         # assume 1:1 mapping between pipeline class and CASA tasks

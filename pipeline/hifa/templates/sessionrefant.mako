@@ -7,8 +7,8 @@ import os
 <%block name="title">Select Reference Antenna for Session(s)</%block>
 
 <p>
-    This task re-evaluates the reference antenna lists from all measurement
-    sets within a session and combines these to select a single common
+    This task re-evaluates the reference antenna lists from all MeasurementSets 
+    within a session and combines these to select a single common
     reference antenna (per session) that is to be used by any subsequent
     pipeline stages.
 </p>

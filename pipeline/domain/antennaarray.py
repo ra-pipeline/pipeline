@@ -1,35 +1,34 @@
 import collections
 import itertools
 import math
+import warnings
 from typing import Sequence
 
 import numpy
 
 from pipeline.infrastructure import casa_tools
-from . import measures, Antenna
-from .measures import Distance, DistanceUnits
-from .. import infrastructure
 
-LOG = infrastructure.get_logger(__name__)
+from . import Antenna, measures
+from .measures import Distance, DistanceUnits
 
 Baseline = collections.namedtuple('Baseline', 'antenna1 antenna2 length')
 
 
-class AntennaArray(object):
-    """
-    AntennaArray is a logical representation of the antenna array.
+class AntennaArray:
+    """A logical representation of the antenna array.
 
     Attributes:
-        antennas: a list of Antenna objects that comprise the array.
-        baseline_lookup: 2D matrix of baseline lengths.
-        baselines_m: 1D array of baseline lengths for unique antenna baselines
+        antennas: List of Antenna objects that comprise the array.
+        baseline_lookup: 2D matrix of baseline lengths in metres, indexed by antenna ID.
+        baselines_m: 1D array of baseline lengths for unique antenna pairs
             (excluding auto-correlations).
-        baseline_min: Baseline tuple (antenna1, antenna2, length) for shortest baseline.
-        baseline_max: Baseline tuple (antenna1, antenna2, length) for longest baseline.
+        baseline_min: Baseline namedtuple (antenna1, antenna2, length) for the shortest
+            baseline, or None if fewer than two antennas.
+        baseline_max: Baseline namedtuple (antenna1, antenna2, length) for the longest
+            baseline, or None if fewer than two antennas.
     """
     def __init__(self, name: str, position: dict, antennas: list[Antenna]) -> None:
-        """
-        Initialize an AntennaArray object.
+        """Initialize an AntennaArray object.
 
         Args:
             name: the name of the observatory/telescope (as per OBSERVATIONS
@@ -167,7 +166,9 @@ class AntennaArray(object):
     @property
     def baselines(self) -> list[Baseline]:
         """Return a list of Baseline tuples for all antennas in the array."""
-        LOG.warning('Deprecated: AntennaArray.baselines is deprecated. Use AntennaArray.baselines_m instead')
+        warnings.warn('AntennaArray.baselines is deprecated. '
+                      'Use AntennaArray.baselines_m instead.',
+                      category=DeprecationWarning, stacklevel=2)
         return self._baselines
 
     @staticmethod

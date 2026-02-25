@@ -28,7 +28,7 @@ class PbcorInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             vis: List of input visibility data.
 

@@ -82,7 +82,7 @@ class FlagTargetsALMAInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             vis: The list of input MeasurementSets. Defaults to the list
                 of MeasurementSets defined in the pipeline context.
@@ -100,9 +100,10 @@ class FlagTargetsALMAInputs(vdp.StandardInputs):
                 form 'msname_flagtargetstemplate.txt' is assumed.
 
             parallel: Process multiple MeasurementSets in parallel using the casampi parallelization framework.
-                options: 'automatic', 'true', 'false', True, False
-                default: None (equivalent to False)
 
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``None`` (equivalent to ``False``)
         """
         super().__init__()
 

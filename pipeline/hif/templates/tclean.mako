@@ -400,7 +400,7 @@ except:
                         %endfor
                     </tr>
                 %endif
-                %if image_info[k].vis_amp_ratio_label is not None:
+                %if image_info[k].vis_amp_ratio_label is not None and image_info[k].vis_amp_ratio is not None:
                     <tr>
                         <th>${image_info[k].vis_amp_ratio_label}</th>
                         %for k in range(j, min(j+4, field_block_indices[i+1])):

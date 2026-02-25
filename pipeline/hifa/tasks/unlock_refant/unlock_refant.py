@@ -23,15 +23,15 @@ class UnlockRefAntInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             vis: List of input MeasurementSets. Defaults to the list of
                 MeasurementSets specified in the pipeline context.
 
-                Example: vis=['ngc5921.ms']
+                Example: ``vis=['ngc5921.ms']``
 
             output_dir: Output directory.
-                Defaults to None, which corresponds to the current working directory.
+                Defaults to ``None``, which corresponds to the current working directory.
 
         """
         self.context = context

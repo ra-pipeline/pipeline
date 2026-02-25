@@ -121,7 +121,7 @@ class FlagDeterALMASingleDishInputs(flagdeterbase.FlagDeterBaseInputs):
         """Construct FlagDeterALMASingleDishInputs instance.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             vis: The list of input MeasurementSets. Defaults to the list of
                 MeasurementSets defined in the pipeline context.
@@ -371,7 +371,7 @@ class SerialFlagDeterALMASingleDish(flagdeterbase.FlagDeterBase):
                         '[pointing_outlier_flagged] '
                         'Pointing outliers are detected in "%s", '
                         'Field "%s", Antenna "%s": time range "%s", '
-                        'max separation %.2f arcsec',
+                        'max separation %.2f deg',
                         self.inputs.vis, field.name, antenna.name,
                         ', '.join(stats.timerange), np.max(stats.separations)
                     )

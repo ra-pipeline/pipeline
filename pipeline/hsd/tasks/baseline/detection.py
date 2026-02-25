@@ -117,7 +117,7 @@ class DetectLineResults(common.SingleDishResults):
         No specific merge operation is done.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
         """
         LOG.debug('DetectLineResults.merge_with_context')
         super(DetectLineResults, self).merge_with_context(context)

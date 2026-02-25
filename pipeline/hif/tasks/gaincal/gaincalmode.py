@@ -21,7 +21,7 @@ class GaincalModeInputs(vdp.ModeInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             mode: Gain calibration mode
 

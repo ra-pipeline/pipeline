@@ -3,10 +3,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-import pipeline.infrastructure as infrastructure
 from .measures import FluxDensity, FluxDensityUnits
-
-LOG = infrastructure.get_logger(__name__)
 
 
 class FluxMeasurement(object):

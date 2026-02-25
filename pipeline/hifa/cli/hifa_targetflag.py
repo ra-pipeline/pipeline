@@ -1,5 +1,3 @@
-import sys
-
 import pipeline.h.cli.utils as utils
 
 
@@ -8,7 +6,7 @@ import pipeline.h.cli.utils as utils
 def hifa_targetflag(vis=None, parallel=None):
     """Flag target source outliers.
 
-    This task flags very obvious target source outliers. The calibration tables and
+    This task flags obvious outliers in the target source data. The calibration tables and
     flags accumulated in the cal library up to this point are pre-applied, then
     hif_correctedampflag is called for just the TARGET intent. Any resulting
     flags are applied and the calibration library is restored to the state before
@@ -35,24 +33,3 @@ def hifa_targetflag(vis=None, parallel=None):
         >>> hifa_targetflag()
 
     """
-    ##########################################################################
-    #                                                                        #
-    #  CASA task interface boilerplate code starts here. No edits should be  #
-    #  needed beyond this point.                                             #
-    #                                                                        #
-    ##########################################################################
-
-    # create a dictionary containing all the arguments given in the
-    # constructor
-    all_inputs = vars()
-
-    # get the name of this function for the weblog, eg. 'hif_flagdata'
-    task_name = sys._getframe().f_code.co_name
-
-    # get the context on which this task operates
-    context = utils.get_context()
-
-    # execute the task
-    results = utils.execute_task(context, task_name, all_inputs)
-
-    return results

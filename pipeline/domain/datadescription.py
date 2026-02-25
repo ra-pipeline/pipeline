@@ -20,30 +20,29 @@ polarization_map = { 'linear': { 0: ['XX',  9],
 
 to_polid = {'XX': 0, 'YY': 1, 'XY': 2, 'YX': 3, 
             'RR': 0, 'LL': 1, 'RL': 2, 'LR': 3,
-            'I' : 0,  'Q': 1, 'U' : 2, 'V' : 3} 
+            'I' : 0,  'Q': 1, 'U' : 2, 'V' : 3}
 
 
-class DataDescription(object):
-    """
-    A DataDescription is a logical representation of an entry in the
-    DATA_DESCRIPTION table in the measurement set, where the latter is used to
-    define the shape of the data in the MAIN table in the MS.
+class DataDescription:
+    """A logical representation of an entry in the DATA_DESCRIPTION table.
+
+    The DATA_DESCRIPTION table in the measurement set defines the shape of the
+    data in the MAIN table.
 
     Attributes:
-        id: the numerical identifier of the data description entry.
+        id: Numerical identifier of the data description entry.
         spw: SpectralWindow object for the spectral window ID associated with
             the data description.
-        pol_id: polarization ID associated with the data description.
-        obs_time: mean of midpoint observation times for data matching the data
+        pol_id: Polarization ID associated with the data description.
+        obs_time: Mean of midpoint observation times for data matching the data
             description.
-        chan_freq: list of channel centre frequencies for data matching the data
+        chan_freq: List of channel centre frequencies for data matching the data
             description.
-        corr_axis: vector containing polarization labels that were correlated
+        corr_axis: Vector containing polarization labels that were correlated
             together for data matching the data description.
     """
     def __init__(self, dd_id: int, spw: SpectralWindow, pol_id: int) -> None:
-        """
-        Initialize a DataDescription object.
+        """Initialize a DataDescription object.
 
         Args:
             dd_id: Numerical identifier of the data description.

@@ -1,5 +1,3 @@
-import sys
-
 import pipeline.h.cli.utils as utils
 
 
@@ -7,14 +5,11 @@ import pipeline.h.cli.utils as utils
 @utils.cli_wrapper
 def hifa_antpos(vis=None, caltable=None, hm_antpos=None, antenna=None, offsets=None, antposfile=None,
                 threshold=None, snr=None, search=None):
-    """Derive an antenna position calibration table
+    """Derive antenna position calibration tables for a list of MeasurementSets.
 
-    The hifa_antpos task corrects the antenna positions recorded in the ASDMs using
-    updated antenna position calibration information determined after the
-    observation was taken.
-
-    Corrections can be input by hand, read from a file on disk, or by querying an ALMA 
-    database service.
+    The `hifa_antpos` task corrects antenna positions recorded in the ASDMs using
+    updated calibration information obtained after the observation. Corrections can
+    be input by hand, read from a file on disk, or by querying an ALMA database service.
 
     The `antposfile` parameter serves a dual purpose, depending on which mode is set.
 
@@ -24,9 +19,9 @@ def hifa_antpos(vis=None, caltable=None, hm_antpos=None, antenna=None, offsets=N
 
     Example of contents for a .csv file::
 
-        ms,antenna,xoffset,yoffset,zoffset,comment
-        uid___A002_X30a93d_X43e.ms,DV11,0.000,0.010,0.000,"No comment"
-        uid___A002_X30a93d_X43e.dup.ms,DV11,0.000,-0.010,0.000,"No comment"
+        ms, antenna, xoffset, yoffset, zoffset, comment
+        uid___A002_X30a93d_X43e.ms, DV11, 0.000, 0.010, 0.000, 'No comment'
+        uid___A002_X30a93d_X43e.dup.ms, DV11, 0.000, -0.010, 0.000, 'No comment'
 
     The offset values in this file are in meters.
 
@@ -63,24 +58,3 @@ def hifa_antpos(vis=None, caltable=None, hm_antpos=None, antenna=None, offsets=N
         >>> hifa_antpos(hm_antpos='online', snr=5.0, search='both_closest')
 
     """
-    ##########################################################################
-    #                                                                        #
-    #  CASA task interface boilerplate code starts here. No edits should be  #
-    #  needed beyond this point.                                             #
-    #                                                                        #
-    ##########################################################################
-
-    # create a dictionary containing all the arguments given in the
-    # constructor
-    all_inputs = vars()
-
-    # get the name of this function for the weblog, eg. 'hif_flagdata'
-    task_name = sys._getframe().f_code.co_name
-
-    # get the context on which this task operates
-    context = utils.get_context()
-
-    # execute the task
-    results = utils.execute_task(context, task_name, all_inputs)
-
-    return results

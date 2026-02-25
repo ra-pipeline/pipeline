@@ -1,0 +1,14 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.10
+    hooks:
+      - id: ruff # Run the linter.
+        types_or: [python, pyi]
+        args: ["--fix", "--show-fixes"]
+      - id: ruff-format # Run the formatter.
+        types_or: [python, pyi]
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: no-commit-to-branch
+        args: ["--pattern", "main|^release/.*"]

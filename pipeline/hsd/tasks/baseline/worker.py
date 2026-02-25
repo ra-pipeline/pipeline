@@ -309,7 +309,7 @@ class BaselineSubtractionResults(common.SingleDishResults):
         No specific merge operation is done.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
         """
         super(BaselineSubtractionResults, self).merge_with_context(context)
 
@@ -413,6 +413,7 @@ class SerialBaselineSubtractionWorker(basetask.StandardTaskTemplate):
         job = casa_tasks.sdbaseline(infile=vis, datacolumn=datacolumn, blmode='fit', dosubtract=True,
                                     blformat='table', bloutput=bloutput,
                                     blfunc='variable', blparam=blparam,
+                                    updateweight=True,
                                     outfile=outfile, overwrite=True)
         self._executor.execute(job)
 

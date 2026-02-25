@@ -1,5 +1,3 @@
-import sys
-
 import pipeline.h.cli.utils as utils
 
 
@@ -7,7 +5,6 @@ import pipeline.h.cli.utils as utils
 @utils.cli_wrapper
 def hsdn_restoredata(vis=None, caltable=None, reffile=None,
                      products_dir=None, copytoraw=None, rawdata_dir=None, hm_rasterscan=None):
-
     """Restore flagged and calibration single dish data from a pipeline run.
 
     The hsdn_restoredata task restores flagged and calibrated data from archived
@@ -60,26 +57,3 @@ def hsdn_restoredata(vis=None, caltable=None, reffile=None,
         >>> hsdn_restoredata (vis=['mg2-20181016165248-190320.ms'], reffile='nroscalefactor.csv')
 
     """
-
-
-    ##########################################################################
-    #                                                                        #
-    #  CASA task interface boilerplate code starts here. No edits should be  #
-    #  needed beyond this point.                                             #
-    #                                                                        #
-    ##########################################################################
-
-    # create a dictionary containing all the arguments given in the
-    # constructor
-    all_inputs = vars()
-
-    # get the name of this function for the weblog, eg. 'hif_flagdata'
-    task_name = sys._getframe().f_code.co_name
-
-    # get the context on which this task operates
-    context = utils.get_context()
-
-    # execute the task
-    results = utils.execute_task(context, task_name, all_inputs)
-
-    return results

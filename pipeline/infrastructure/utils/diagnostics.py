@@ -129,7 +129,7 @@ def enable_fd_logs(interval_secs=60):
     :return:
     """
     if platform.system() == 'Darwin':
-        LOG.error('Cannot list file descriptors on MacOS')
+        LOG.error('Cannot list file descriptors on macOS')
         return
 
     if enable_fd_logs.enabled:

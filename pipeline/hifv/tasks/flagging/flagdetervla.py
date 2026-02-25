@@ -239,7 +239,7 @@ class FlagDeterVLAInputs(flagdeterbase.FlagDeterBaseInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the hifv_importdata task.
 
@@ -256,7 +256,7 @@ class FlagDeterVLAInputs(flagdeterbase.FlagDeterBaseInputs):
 
             scannumber: A string containing a  comma delimited list of scans to be flagged.
 
-                Example: '3,5,6'
+                Example: ``'3,5,6'``
 
             quack: Quack scans
 
@@ -266,7 +266,7 @@ class FlagDeterVLAInputs(flagdeterbase.FlagDeterBaseInputs):
 
             intents: A string containing a comma delimited list of intents against which the scans to be flagged are matched.
 
-                Example: `'*BANDPASS*'`
+                Example: ``'*BANDPASS*'``
 
             edgespw: Fraction of the baseline correlator TDM edge channels to be flagged.
 

@@ -1,5 +1,3 @@
-import sys
-
 import pipeline.h.cli.utils as utils
 
 
@@ -7,9 +5,9 @@ import pipeline.h.cli.utils as utils
 @utils.cli_wrapper
 def hifa_restoredata(vis=None, session=None, products_dir=None, copytoraw=None, rawdata_dir=None, lazy=None,
                      bdfflags=None, ocorr_mode=None, asis=None):
-    """Restore flagged and calibration interferometry data from a pipeline run
+    """Restore flagged and calibration interferometry data from a pipeline run.
 
-    The hifa_restoredata task restores flagged and calibrated MeasurementSets
+    The `hifa_restoredata` task restores flagged and calibrated MeasurementSets
     from archived ASDMs and pipeline flagging and calibration data products.
 
     hifa_restoredata assumes that the ASDMs to be restored are present in the
@@ -46,7 +44,7 @@ def hifa_restoredata(vis=None, session=None, products_dir=None, copytoraw=None, 
     - restores the final calibration tables for each MS
     - applies the calibration tables to each MS
 
-    When importing the ASDM and converting it to a Measurement Set (MS), if the
+    When importing the ASDM and converting it to a MeasurementSet (MS), if the
     output MS already exists in the output directory, then the importasdm
     conversion step is skipped, and instead the existing MS will be imported.
 
@@ -59,24 +57,3 @@ def hifa_restoredata(vis=None, session=None, products_dir=None, copytoraw=None, 
         >>> hifa_restoredata(vis=['uid___A002_X30a93d_X43e'], session=['session_1'], ocorr_mode='ca')
 
     """
-    ##########################################################################
-    #                                                                        #
-    #  CASA task interface boilerplate code starts here. No edits should be  #
-    #  needed beyond this point.                                             #
-    #                                                                        #
-    ##########################################################################
-
-    # create a dictionary containing all the arguments given in the
-    # constructor
-    all_inputs = vars()
-
-    # get the name of this function for the weblog, eg. 'hif_flagdata'
-    task_name = sys._getframe().f_code.co_name
-
-    # get the context on which this task operates
-    context = utils.get_context()
-
-    # execute the task
-    results = utils.execute_task(context, task_name, all_inputs)
-
-    return results

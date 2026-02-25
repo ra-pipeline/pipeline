@@ -71,7 +71,7 @@ class PolcalflagInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             vis: The list of input MeasurementSets. Defaults to the list of
                 MeasurementSets specified in the hifa_importdata task.

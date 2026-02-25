@@ -4,7 +4,7 @@ from . import utils
 
 
 def h_show_calstate():
-    """Show the current pipeline calibration state
+    """Show the current pipeline calibration state.
 
     h_show_calstate displays the current on-the-fly calibration state
     of the pipeline as a set of equivalent applycal calls.

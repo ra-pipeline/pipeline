@@ -1,14 +1,11 @@
-import sys
-
 import pipeline.h.cli.utils as utils
 
 
 # docstring and type hints: inherits from hifv.tasks.exportdata.vlaexportdata.VLAExportDataInputs.__init__
 @utils.cli_wrapper
 def hifv_exportdata(vis=None, session=None, imaging_products_only=None, exportmses=None, tarms=None, exportcalprods=None,
-    pprfile=None, calintents=None, calimages=None, targetimages=None, products_dir=None,
-    gainmap=None):
-
+                    pprfile=None, calintents=None, calimages=None, targetimages=None, products_dir=None,
+                    gainmap=None):
     """Prepare and export interferometry and imaging data.
 
     The hifv_exportdata task for the VLA CASA pipeline exports the data defined
@@ -43,26 +40,3 @@ def hifv_exportdata(vis=None, session=None, imaging_products_only=None, exportms
         >>> hifv_exportdata (products_dir='../products', calintents='*PHASE*')
 
     """
-
-
-    ##########################################################################
-    #                                                                        #
-    #  CASA task interface boilerplate code starts here. No edits should be  #
-    #  needed beyond this point.                                             #
-    #                                                                        #
-    ##########################################################################
-
-    # create a dictionary containing all the arguments given in the
-    # constructor
-    all_inputs = vars()
-
-    # get the name of this function for the weblog, eg. 'hif_flagdata'
-    task_name = sys._getframe().f_code.co_name
-
-    # get the context on which this task operates
-    context = utils.get_context()
-
-    # execute the task
-    results = utils.execute_task(context, task_name, all_inputs)
-
-    return results

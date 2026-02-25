@@ -480,29 +480,28 @@ class CorrectedampflagInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
 
-            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the <hifa,hifv>_importdata task.
-                '': use all MeasurementSets in the context
+            vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the `hifa_importdata` and `hifv_importdata`.
 
-                Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
+                Examples: ``'ngc5921.ms'``, ``['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']``
 
             intent: A string containing a comma delimited list of intents against which the selected fields are matched. If undefined (default),
                 it will select all data with the BANDPASS intent.
 
-                Example: intent='`*PHASE*`'
+                Example: ``intent='*PHASE*'``
 
             field: The list of field names or field ids for which bandpasses are computed. If undefined (default), it will select all fields.
 
-                Examples: field='3C279', '3C279, M82'
+                Examples: ``'3C279'``, ``'3C279, M82'``
 
             spw: The list of spectral windows and channels for which bandpasses are computed. If undefined (default), it will select all
                 science spectral windows.
 
-                Example: spw='11,13,15,17'
+                Example: ``spw='11,13,15,17'``
 
             antnegsig: Lower sigma threshold for identifying outliers as a result of bad antennas within individual timestamps
 
@@ -524,7 +523,7 @@ class CorrectedampflagInputs(vdp.StandardInputs):
                 subsequent iterations are skipped.
 
         """
-        super(CorrectedampflagInputs, self).__init__()
+        super().__init__()
 
         # pipeline inputs
         self.context = context

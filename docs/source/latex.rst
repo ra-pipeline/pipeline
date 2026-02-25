@@ -1,20 +1,17 @@
+.. currentmodule:: pipeline
 
-.. toctree::
-   :maxdepth: 2
-   :caption: User Guide
-
-   installation
-
+Pipeline Tasks (from autosummary)
+=================================
 
 .. autosummary::
    :toctree: _autosummary
-   :caption: API Reference
-   :recursive:
-   
-   pipeline    
+   :nosignatures:
+   :caption: Pipeline Tasks
 
-Indices and tables
-==================
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+
+   h.cli
+   hif.cli
+   hifa.cli
+   hifv.cli
+   hsd.cli
+   hsdn.cli

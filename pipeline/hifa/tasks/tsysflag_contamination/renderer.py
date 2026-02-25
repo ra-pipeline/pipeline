@@ -1,12 +1,11 @@
 import collections
 import copy
 import os
-from typing import List, Dict
+from typing import Dict, List
 
 import pipeline.infrastructure.utils as utils
-from pipeline import Context
 from pipeline.h.tasks.tsysflag.renderer import T2_4MDetailsTsysflagRenderer
-from pipeline.infrastructure import filenamer
+from pipeline.infrastructure import Context, filenamer
 from pipeline.infrastructure.basetask import ResultsList
 from pipeline.infrastructure.renderer import basetemplates
 from pipeline.infrastructure.renderer.logger import Plot

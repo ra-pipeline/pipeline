@@ -12,14 +12,10 @@ import colorsys
 #Useful function for fully flattening array
 flattenlist = lambda l: [item for sublist in l for item in sublist]
 
-def genColorList(N, purity = 0.75, brightness = 0.75, rndseed = None):
+def genColorList(N, purity = 0.75, brightness = 0.75):
     '''Generate list of distictive colors for plotting, return RGB value tuples.'''
-    if rndseed is not None:
-        np.random.seed(rndseed)
-    rng = np.random.default_rng()
     HSV_tuples = [(idx*1.0/N, purity, brightness) for idx in range(N)]
-    raw_RGB_tuples = list(map(lambda x: colorsys.hsv_to_rgb(*x), HSV_tuples))
-    RGB_tuples = rng.permutation(raw_RGB_tuples)
+    RGB_tuples = list(map(lambda x: colorsys.hsv_to_rgb(*x), HSV_tuples))
     return RGB_tuples
 
 def createCasaTool(mytool):

@@ -70,7 +70,7 @@ class BpSolintInputs(vdp.StandardInputs):
         """Initialize Inputs.
 
         Args:
-            context: Pipeline context.
+            context: Pipeline context object containing state information.
 
             output_dir: Output directory.
                 Defaults to None, which corresponds to the current working directory.
@@ -78,35 +78,35 @@ class BpSolintInputs(vdp.StandardInputs):
             vis: The list of input MeasurementSets. Defaults to the list of
                 MeasurementSets specified in the pipeline context.
 
-                Example: vis=['M82A.ms', 'M82B.ms']
+                Example: ``vis=['M82A.ms', 'M82B.ms']``
 
             field: The list of field names of sources to be used for
                 signal-to-noise estimation. Defaults to all fields with the
                 standard intent.
 
-                Example: field='3C279'
+                Example: ``field='3C279'``
 
             intent: A string containing a comma delimited list of intents against
                 which the selected fields are matched. Defaults to
                 'BANDPASS'.
 
-                Example: intent='PHASE'
+                Example: ``intent='PHASE'``
 
             spw: The list of spectral windows and channels for which gain
                 solutions are computed. Defaults to all the science spectral
                 windows for which there are both 'intent' and TARGET intents.
 
-                Example: spw='13,15'
+                Example: ``spw='13,15'``
 
             phaseupsnr: The required phase-up gain time interval solution
                 signal-to-noise.
 
-                Example: phaseupsnr=10.0
+                Example: ``phaseupsnr=10.0``
 
             minphaseupints: The minimum number of time intervals in the phase-up gain
                 solution.
 
-                Example: minphaseupints=4
+                Example: ``minphaseupints=4``
 
             evenbpints: Use a bandpass frequency solint that is an integer divisor of
                 the spw bandwidth, to prevent the occurrence of one narrower
@@ -115,34 +115,33 @@ class BpSolintInputs(vdp.StandardInputs):
             bpsnr: The required bandpass frequency interval solution
                 signal-to-noise.
 
-                Example: bpsnr=30.0
+                Example: ``bpsnr=30.0``
 
             minbpsnr: The minimum required bandpass frequency interval solution
                 signal-to-noise when strong atmospheric lines exist in Tsys
                 spectra.
 
-                Example: minbpsnr=10.0
+                Example: ``minbpsnr=10.0``
 
             minbpnchan: The minimum number of frequency intervals in the bandpass
                 solution.
 
-                Example: minbpnchan=16
+                Example: ``minbpnchan=16``
 
             hm_nantennas: The heuristics for determines the number of antennas to use
-                in the signal-to-noise estimate. The options are 'all' and
-                'unflagged'. The 'unflagged' options is not currently
+                in the signal-to-noise estimate. The options are ``'all'`` and
+                ``'unflagged'``. The 'unflagged' options is not currently
                 supported.
 
-                Example: hm_nantennas='unflagged'
+                Example: ``hm_nantennas='unflagged'``
 
             maxfracflagged: The maximum fraction of an antenna that can be flagged before
                 it is excluded from the signal-to-noise estimate.
 
-                Example: maxfracflagged=0.80
+                Example: ``maxfracflagged=0.80``
 
         """
-
-        super(BpSolintInputs, self).__init__()
+        super().__init__()
 
         self.context = context
         self.vis = vis

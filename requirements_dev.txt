@@ -1,0 +1,32 @@
+### Pipeline Development, Testing, and Debugging Tools ###
+
+# Testing Framework
+pytest                  # Core testing framework
+pytest-xdist            # https://github.com/pytest-dev/pytest-xdist
+pytest-cov              # https://github.com/pytest-dev/pytest-cov
+pytest-html             # https://pypi.org/project/pytest-html/
+pytest-benchmark        # https://pytest-benchmark.readthedocs.io/en/latest/
+junit2html              # https://github.com/inorton/junit2html, requires jinja2
+
+# Code Quality & Style
+black                   # Code formatter
+isort                   # Import sorter
+flake8                  # Code linter
+pylint                  # Code analyzer
+pydocstyle              # Docstring style checker
+pycodestyle             # PEP8 style checker
+ruff                    # Fast Python linter
+pre-commit              # Git hooks manager
+
+# Packaging Tools
+build                   # https://packaging.python.org/en/latest/key_projects/#build
+twine                   # https://packaging.python.org/en/latest/key_projects/#twine
+wheel                   # https://packaging.python.org/en/latest/key_projects/#wheel
+# setuptools_scm        # https://pypi.org/project/setuptools-scm/
+
+# Profiling
+memory_profiler         # https://pypi.org/project/memory-profiler/
+line_profiler           # https://github.com/pyutils/line_profiler
+
+# Dependency Analysis
+johnnydep               # https://pypi.org/project/johnnydep

@@ -153,9 +153,7 @@ class ExportDataInputs(vdp.StandardInputs):
             products_dir: str = None,
             imaging_products_only: bool = None,
             ):
-        """
-        Initialise the Inputs, initialising any property values to those given
-        here.
+        """Initialise the Inputs, initialising any property values to those given here.
 
         Args:
             context: the pipeline Context state object
@@ -166,48 +164,48 @@ class ExportDataInputs(vdp.StandardInputs):
                 Defaults to a single virtual session containing all the
                 visibility files in vis.
 
-                Example: session=['session1', 'session2']
+                Example: ``session=['session1', 'session2']``
 
             vis: List of visibility/autocorrelation data files for which
                 flagging and calibration information will be exported.
                 Defaults to the list maintained in the pipeline context.
 
-                Example: vis=['X227.ms', 'X228.ms']
+                Example: ``vis=['X227.ms', 'X228.ms']``
 
             exportmses: Export MeasurementSets defined in vis instead of flags,
                 caltables, and calibration instructions.
 
-                Example: exportmses = True
+                Example: ``exportmses=True``
 
-                Default: None (equivalent to False)
+                Default: ``None`` (equivalent to ``False``)
 
             tarms: Tar final MeasurementSets
 
             pprfile: Name of the pipeline processing request to be exported.
                 Defaults to a file matching the template 'PPR_*.xml'.
 
-                Example: pprfile=['PPR_GRB021004.xml']
+                Example: ``pprfile=['PPR_GRB021004.xml']``
 
             calintents: List of calibrator image types to be exported.
                 Defaults to all standard calibrator intents 'BANDPASS', 'PHASE', 'FLUX'
 
-                Example: calintents='PHASE'
+                Example: ``calintents='PHASE'``
 
             calimages: List of calibrator images to be exported.
                 Defaults to all calibrator images recorded in the pipeline context.
 
-                Example: calimages=['3C454.3.bandpass', '3C279.phase']
+                Example: ``calimages=['3C454.3.bandpass', '3C279.phase']``
 
             targetimages: List of science target images to be exported.
                 Defaults to all science target images recorded in the pipeline context.
 
-                Example: targetimages=['NGC3256.band3', 'NGC3256.band6'],
-                targetimages=['r_aqr.CM02.spw5.line0.XXYY.sd.im', 'r_aqr.CM02.spw5.XXYY.sd.cont.im']
+                Example: ``targetimages=['NGC3256.band3', 'NGC3256.band6']``,
+                ``targetimages=['r_aqr.CM02.spw5.line0.XXYY.sd.im', 'r_aqr.CM02.spw5.XXYY.sd.cont.im']``
 
             products_dir: Name of the data products subdirectory.
                 Defaults to './'.
 
-                Example: products_dir='../products'
+                Example: ``products_dir='../products'``
 
             imaging_products_only: Export the science target image products only.
         """
@@ -1566,13 +1564,13 @@ finally:
         Returns:
           The filename of the outputfile.
         """
-        from pipeline.infrastructure import stats_extractor
+        from pipeline.infrastructure import pipeline_statistics as pstats
 
         statsfile_name = "pipeline_stats_{}.json".format(oussid)
         stats_file = os.path.join(context.output_dir, statsfile_name)
         LOG.info('Generating pipeline statistics file')
 
-        stats_dict = stats_extractor.generate_stats(context)
+        stats_dict = pstats.generate_stats(context)
 
         # Write the stats file to disk
         with open(stats_file, 'w', encoding='utf-8') as f:
