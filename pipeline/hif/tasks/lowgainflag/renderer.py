@@ -30,7 +30,7 @@ class T2_4MDetailsLowgainFlagRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
         stage = 'stage%s' % results.stage_number
         dirname = os.path.join(pipeline_context.report_dir, stage)
         plots = {}
-        for result in (r for r in results if r.view):
+        for result in (r for r in results if getattr(r, 'view', None)):
             vis = os.path.basename(result.inputs['vis'])
             plotter = image.ImageDisplay()
             plots[vis] = plotter.plot(context=pipeline_context, results=result, reportdir=dirname)

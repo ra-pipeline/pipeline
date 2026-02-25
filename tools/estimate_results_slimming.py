@@ -55,9 +55,9 @@ def parse_args() -> argparse.Namespace:
         help='Estimate savings from transient fields without re-pickling full results.',
     )
     parser.add_argument(
-        '--assume-plots-transient',
+        '--assume-view-transient',
         action='store_true',
-        help='When no _transient_fields are present, estimate size of a plots attribute if found.',
+        help='When no _transient_fields are present, estimate size of a view attribute if found.',
     )
     return parser.parse_args()
 
@@ -108,28 +108,28 @@ def slim_object(obj: Any) -> Any:
     return obj
 
 
-def estimate_transient_size(obj: Any, assume_plots_transient: bool) -> int | None:
+def estimate_transient_size(obj: Any, assume_view_transient: bool) -> int | None:
     '''Estimate total pickle size for transient fields only.'''
     if isinstance(obj, list):
-        sizes = [estimate_transient_size(item, assume_plots_transient) for item in obj]
+        sizes = [estimate_transient_size(item, assume_view_transient) for item in obj]
         size_total = sum(size for size in sizes if size is not None)
         return size_total if size_total > 0 else None
     if isinstance(obj, tuple):
-        sizes = [estimate_transient_size(item, assume_plots_transient) for item in obj]
+        sizes = [estimate_transient_size(item, assume_view_transient) for item in obj]
         size_total = sum(size for size in sizes if size is not None)
         return size_total if size_total > 0 else None
 
     results_attr = getattr(obj, 'results', None)
     if isinstance(results_attr, list):
-        sizes = [estimate_transient_size(item, assume_plots_transient) for item in results_attr]
+        sizes = [estimate_transient_size(item, assume_view_transient) for item in results_attr]
         size_total = sum(size for size in sizes if size is not None)
         return size_total if size_total > 0 else None
 
     transient_fields = getattr(obj, '_transient_fields', None)
     if not transient_fields:
-        if assume_plots_transient and hasattr(obj, 'plots'):
+        if assume_view_transient and hasattr(obj, 'view'):
             try:
-                return len(pickle.dumps(getattr(obj, 'plots'), protocol=pickle.HIGHEST_PROTOCOL))
+                return len(pickle.dumps(getattr(obj, 'view'), protocol=pickle.HIGHEST_PROTOCOL))
             except Exception:  # noqa: BLE001 - best-effort estimate
                 return None
         return None
@@ -178,7 +178,7 @@ def analyze_pickle(
     max_size_bytes: int | None,
     temp_dir: str | None,
     dry_run: bool,
-    assume_plots_transient: bool,
+    assume_view_transient: bool,
 ) -> tuple[str, int, int] | None:
     '''Analyze one pickle and return (name, original_size, slim_size).'''
     original_size = pickle_path.stat().st_size
@@ -195,7 +195,7 @@ def analyze_pickle(
         return None
 
     if dry_run:
-        transient_size = estimate_transient_size(obj, assume_plots_transient)
+        transient_size = estimate_transient_size(obj, assume_view_transient)
         if transient_size is None:
             print(f'No transient estimate available for {pickle_path.name}', file=sys.stderr)
             return None
@@ -234,7 +234,7 @@ def main() -> int:
             max_size_bytes,
             args.temp_dir,
             args.dry_run,
-            args.assume_plots_transient,
+            args.assume_view_transient,
         )
         if result is not None:
             results.append(result)

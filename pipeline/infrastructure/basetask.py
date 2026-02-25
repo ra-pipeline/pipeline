@@ -611,6 +611,16 @@ class ResultsList(Results, Generic[T]):
         if results:
             self.__results.extend(results)
 
+    def slim_for_pickle(self):
+        slimmed = super(ResultsList, self).slim_for_pickle()
+        if slimmed is self:
+            slimmed = copy.copy(self)
+        slimmed._ResultsList__results = [
+            result.slim_for_pickle() if hasattr(result, 'slim_for_pickle') else result
+            for result in self.__results
+        ]
+        return slimmed
+
     def __getitem__(self, item):
         return self.__results[item]
 

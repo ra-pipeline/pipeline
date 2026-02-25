@@ -39,6 +39,10 @@ class WvrgcalResult(basetask.Results):
         self.qa_wvr.nowvr_result = None
         self.qa_wvr.qa_spw = None
 
+        # Mark view as transient to exclude from pickle (Strategy A for large result reduction)
+        # View contains arrays for weblog plotting and is not needed after weblog generation
+        self._transient_fields = {'view'}
+
         # views and flag operations
         self.flagging = []
         self.wvrflag = wvrflag

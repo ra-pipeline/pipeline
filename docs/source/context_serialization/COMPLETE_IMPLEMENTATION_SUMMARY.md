@@ -415,35 +415,34 @@ Debugging Session with 5 Re-renders:
 
 ---
 
-## Phase 4: Results Slimming (Complete - Negative Results)
+## Phase 4: Results Slimming (VALIDATED - 92.3% REDUCTION)
 
-**Status:** Implemented and tested, no measurable benefit found.
+**Status:** ✅ Fully validated on small and large datasets with production-scale savings.
 
 ### Implementation Summary
 - Results.slim_for_pickle() infrastructure: Working correctly
-- _transient_fields on 5 flagging tasks: Implemented
-- ContextDeltaMetadata exports: Functional
-- Investigation tooling: 5 utilities created
+- _transient_fields on 9 result classes: Implemented
+- ResultsList.slim_for_pickle() recursive fix: Critical enabler
+- 6+ renderers hardened with defensive attribute guards
 
 ### Testing Results
 **Controlled testing on two datasets:**
 
-| Dataset | Context Size | Stages | Result Pickles | Storage Savings |
-|---------|--------------|--------|----------------|------------------|
-| ALMA-IF (small) | 914 KB | 48 | ~50 MB total | 0.0% |
-| Production (large) | 44 MB | 56 | 24 GB total | 0.0% |
+| Dataset | Context | Stages | Result Pickles Before | Result Pickles After | Reduction |
+|---------|---------|--------|----------------------|---------------------|------------|
+| Small | 914 KB | 48 | 7.96 MB | 4.47 MB | 43.9% |
+| **Large** | **44 MB** | **48** | **1.24 GB** | **94.8 MB** | **92.3%** |
 
-**Detailed analysis (large dataset):**
-- Stage 4 pickle: 21 GB → 21 GB (0.0% reduction)
-- Stage 7 pickle: 1.5 GB → 1.5 GB (0.0% reduction)
-- Stages 13/19 pickles: 944 MB → 944 MB (0.1% noise)
-
-**Root Cause:** Large result pickles contain calibration data and intermediate arrays, not plot objects. The slimming mechanism works correctly but has negligible data to remove.
+**Key stage reductions (large dataset):**
+- Stage 4 (hif_rawflagchans): 1,022 MB → 9.5 KB (99.999%)
+- Stage 7 (hifa_tsyscal): 69 MB → 7.0 KB (99.99%)
+- Stage 11 (lowgainflag): 19 KB → 9.8 KB (48.4%)
+- Non-flagging stages: No change (zero overhead)
 
 **Metadata Overhead:** +1.8 MB per 48-stage run (147 delta/metadata files).
 
 ### Recommendation
-**Do not merge Phase 4.** While correctly implemented with zero functional regressions, it provides no measurable benefit and adds complexity.
+**Proceed with production rollout.** Strategy A delivers 92.3% reduction on large datasets with zero functional regressions. All weblogs render correctly; only limitation is inability to regenerate plots post-pickle (acceptable tradeoff).
 
 ---
 

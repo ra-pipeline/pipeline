@@ -78,7 +78,8 @@ class T2_4MDetailsTsysflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             flag_totals[table]['before'] = self._flags_for_result(result, pipeline_context, summary='first')
 
             # summarise flagging by each step
-            for component, r in result.components.items():
+            result_components = getattr(result, 'components', {})
+            for component, r in result_components.items():
                 if r is not None:
                     flag_totals[table][component] = self._flags_for_result(r, pipeline_context)
                 else:
@@ -89,48 +90,50 @@ class T2_4MDetailsTsysflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
             # If a manual flagging template file was applied, copy the file to
             # the weblog directory, and store information.
-            if 'manual' in result.components and os.path.exists(result.inputs['filetemplate']):
+            result_components = getattr(result, 'components', {})
+            if 'manual' in result_components and os.path.exists(result.inputs['filetemplate']):
                 shutil.copy(result.inputs['filetemplate'], weblog_dir)
                 flagcmd_file = os.path.basename(result.inputs['filetemplate'])
                 flagcmd_path = os.path.join('stage{}'.format(result.stage_number), flagcmd_file)
-                flagcmd_files[os.path.basename(result.components['manual'].table)] = flagcmd_path
+                flagcmd_files[os.path.basename(result_components['manual'].table)] = flagcmd_path
             else:
                 flagcmd_files[table] = None
 
             # Generate the summary plots at end of flagging sequence,
             # beware empty sequence
-            lastflag = list(result.components.keys())
+            result_components = getattr(result, 'components', {})
+            lastflag = list(result_components.keys())
             if lastflag:
                 lastflag = lastflag[-1]
-            lastresult = result.components[lastflag]
+                lastresult = result_components[lastflag]
 
-            calapp = lastresult.final[0]
-            plotter = tsys.TsysSummaryChart(pipeline_context, lastresult, calapp)
-            plots = plotter.plot()
-            vis = os.path.basename(lastresult.inputs['vis'])
-            summary_plots[vis] = plots
+                calapp = lastresult.final[0]
+                plotter = tsys.TsysSummaryChart(pipeline_context, lastresult, calapp)
+                plots = plotter.plot()
+                vis = os.path.basename(lastresult.inputs['vis'])
+                summary_plots[vis] = plots
 
-            # generate per-antenna plots
-            plotter = tsys.TsysPerAntennaChart(pipeline_context, lastresult)
-            per_antenna_plots = plotter.plot()
+                # generate per-antenna plots
+                plotter = tsys.TsysPerAntennaChart(pipeline_context, lastresult)
+                per_antenna_plots = plotter.plot()
 
-            renderer = tsyscalrenderer.TsyscalPlotRenderer(pipeline_context,
-                                                           lastresult,
-                                                           per_antenna_plots)
-            with renderer.get_file() as fileobj:
-                fileobj.write(renderer.render())
-                # the filename is sanitised - the MS name is not. We need to
-                # map MS to sanitised filename for link construction.
-                subpages[vis] = renderer.path
+                renderer = tsyscalrenderer.TsyscalPlotRenderer(pipeline_context,
+                                                               lastresult,
+                                                               per_antenna_plots)
+                with renderer.get_file() as fileobj:
+                    fileobj.write(renderer.render())
+                    # the filename is sanitised - the MS name is not. We need to
+                    # map MS to sanitised filename for link construction.
+                    subpages[vis] = renderer.path
 
-            eb_plots.extend(per_antenna_plots)
-            last_results.append(lastresult)
+                eb_plots.extend(per_antenna_plots)
+                last_results.append(lastresult)
 
-            # If the reference antenna list was updated, retrieve new refant
-            # list.
-            if result.refants_to_remove or result.refants_to_demote:
-                ms = pipeline_context.observing_run.get_ms(name=vis)
-                updated_refants[vis] = ms.reference_antenna
+                # If the reference antenna list was updated, retrieve new refant
+                # list.
+                if result.refants_to_remove or result.refants_to_demote:
+                    ms = pipeline_context.observing_run.get_ms(name=vis)
+                    updated_refants[vis] = ms.reference_antenna
 
         # If there were any valid results, then additionally render plots
         # for all EBs in one page
@@ -187,14 +190,16 @@ class T2_4MDetailsTsysflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
             for msresult in results:
                 if not msresult.task_incomplete_reason:
-                    flagcmd_abspath = self._write_flagcmd_to_disk(weblog_dir, msresult.components[component], component)
-                    report_abspath = self._write_report_to_disk(weblog_dir, msresult.components[component], component)
+                    msresult_components = getattr(msresult, 'components', {})
+                    if component in msresult_components:
+                        flagcmd_abspath = self._write_flagcmd_to_disk(weblog_dir, msresult_components[component], component)
+                        report_abspath = self._write_report_to_disk(weblog_dir, msresult_components[component], component)
 
-                    flagcmd_relpath = os.path.relpath(flagcmd_abspath, report_dir)
-                    report_relpath = os.path.relpath(report_abspath, report_dir)
+                        flagcmd_relpath = os.path.relpath(flagcmd_abspath, report_dir)
+                        report_relpath = os.path.relpath(report_abspath, report_dir)
 
-                    table_basename = os.path.basename(msresult.components[component].table)
-                    htmlreports[component][table_basename] = (flagcmd_relpath, report_relpath)
+                        table_basename = os.path.basename(msresult_components[component].table)
+                        htmlreports[component][table_basename] = (flagcmd_relpath, report_relpath)
 
         return htmlreports
 
@@ -426,7 +431,7 @@ def create_plot_detail_page(metric_mapping, context, results_list):
     # find the flagging metrics present in the results list for which we have a mapping
     metrics_to_process = frozenset([metric_name
                                     for ms_result in results_list
-                                    for metric_name in ms_result.components
+                                    for metric_name in getattr(ms_result, 'components', {})
                                     if metric_name in metric_mapping])
 
     # this will hold the result dictionary - a map of flagging metric to the
@@ -477,12 +482,13 @@ def get_plots(plot_fn, context, results_list, name_of_metric):
     plots = []
     for ms_result in results_list:
         # not all MSes may have a result for this metric
-        if name_of_metric not in ms_result.components:
+        ms_components = getattr(ms_result, 'components', {})
+        if name_of_metric not in ms_components:
             continue
 
         # we can only generate plots if the metric generated a flagging view
-        component_result = ms_result.components[name_of_metric]
-        if not component_result.view:
+        component_result = ms_components[name_of_metric]
+        if not getattr(component_result, 'view', None):
             continue
 
         component_plots = plot_fn(context, component_result, reportdir)

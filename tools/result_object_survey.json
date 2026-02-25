@@ -1,0 +1,1589 @@
+{
+  "summary": {
+    "total": 33,
+    "high_risk": 9,
+    "medium_risk": 8,
+    "low_risk": 16
+  },
+  "categories": {
+    "high_risk": [
+      {
+        "name": "TsysflagResults",
+        "bases": [
+          "resultobjects.TsyscalResults"
+        ],
+        "file": "pipeline/h/tasks/tsysflag/resultobjects.py",
+        "line": 13,
+        "attributes": [
+          {
+            "name": "components",
+            "type": "collections.OrderedDict",
+            "line": 24
+          }
+        ],
+        "has_view": false,
+        "has_components": true,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "TsysflagspectraResults",
+        "bases": [
+          "resultobjects.TsyscalResults",
+          "flaggableviewresults.FlaggableViewResults"
+        ],
+        "file": "pipeline/h/tasks/tsysflag/resultobjects.py",
+        "line": 61,
+        "attributes": [],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": true
+      },
+      {
+        "name": "TsysflagViewResults",
+        "bases": [
+          "basetask.Results",
+          "flaggableviewresults.FlaggableViewResults"
+        ],
+        "file": "pipeline/h/tasks/tsysflag/resultobjects.py",
+        "line": 98,
+        "attributes": [],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": true
+      },
+      {
+        "name": "RawflagchansResults",
+        "bases": [
+          "basetask.Results",
+          "flaggableviewresults.FlaggableViewResults"
+        ],
+        "file": "pipeline/hif/tasks/rawflagchans/resultobjects.py",
+        "line": 8,
+        "attributes": [],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": true
+      },
+      {
+        "name": "RawflagchansViewResults",
+        "bases": [
+          "basetask.Results",
+          "flaggableviewresults.FlaggableViewResults"
+        ],
+        "file": "pipeline/hif/tasks/rawflagchans/resultobjects.py",
+        "line": 40,
+        "attributes": [],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": true
+      },
+      {
+        "name": "LowgainflagResults",
+        "bases": [
+          "basetask.Results",
+          "flaggableviewresults.FlaggableViewResults"
+        ],
+        "file": "pipeline/hif/tasks/lowgainflag/resultobjects.py",
+        "line": 10,
+        "attributes": [
+          {
+            "name": "vis",
+            "type": "unknown",
+            "line": 18
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": true
+      },
+      {
+        "name": "LowgainflagViewResults",
+        "bases": [
+          "basetask.Results",
+          "flaggableviewresults.FlaggableViewResults"
+        ],
+        "file": "pipeline/hif/tasks/lowgainflag/resultobjects.py",
+        "line": 57,
+        "attributes": [],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": true
+      },
+      {
+        "name": "WvrgcalResult",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/hifa/tasks/wvrgcal/resultobjects.py",
+        "line": 11,
+        "attributes": [
+          {
+            "name": "vis",
+            "type": "unknown",
+            "line": 28
+          },
+          {
+            "name": "pool",
+            "type": "unknown",
+            "line": 29
+          },
+          {
+            "name": "final",
+            "type": "unknown",
+            "line": 30
+          },
+          {
+            "name": "preceding",
+            "type": "unknown",
+            "line": 31
+          },
+          {
+            "name": "error",
+            "type": "set",
+            "line": 32
+          },
+          {
+            "name": "qa_wvr",
+            "type": "commonresultobjects.QaResult",
+            "line": 35
+          },
+          {
+            "name": "flagging",
+            "type": "list",
+            "line": 43
+          },
+          {
+            "name": "wvrflag",
+            "type": "unknown",
+            "line": 44
+          },
+          {
+            "name": "view",
+            "type": "collections.defaultdict",
+            "line": 45
+          },
+          {
+            "name": "tie",
+            "type": "unknown",
+            "line": 48
+          },
+          {
+            "name": "PHnoisy",
+            "type": "unknown",
+            "line": 51
+          },
+          {
+            "name": "BPnoisy",
+            "type": "unknown",
+            "line": 52
+          },
+          {
+            "name": "suggest_remcloud",
+            "type": "unknown",
+            "line": 53
+          }
+        ],
+        "has_view": true,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "WvrgcalflagViewResults",
+        "bases": [
+          "flaggableviewresults.FlaggableViewResults"
+        ],
+        "file": "pipeline/hifa/tasks/wvrgcalflag/resultobjects.py",
+        "line": 45,
+        "attributes": [
+          {
+            "name": "vis",
+            "type": "unknown",
+            "line": 52
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": true
+      }
+    ],
+    "medium_risk": [
+      {
+        "name": "SDImagingResultItem",
+        "bases": [
+          "common.SingleDishResults"
+        ],
+        "file": "pipeline/hsd/tasks/imaging/resultobjects.py",
+        "line": 10,
+        "attributes": [
+          {
+            "name": "sensitivity_info",
+            "type": "unknown",
+            "line": 17
+          },
+          {
+            "name": "theoretical_rms",
+            "type": "unknown",
+            "line": 18
+          },
+          {
+            "name": "frequency_channel_reversed",
+            "type": "unknown",
+            "line": 19
+          },
+          {
+            "name": "logrecords",
+            "type": "list",
+            "line": 21
+          },
+          {
+            "name": "rasterscan_heuristics_results_rgap",
+            "type": "dict",
+            "line": 23
+          },
+          {
+            "name": "rasterscan_heuristics_results_incomp",
+            "type": "dict",
+            "line": 24
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "MakeImagesResult",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/hif/tasks/makeimages/resultobjects.py",
+        "line": 11,
+        "attributes": [
+          {
+            "name": "targets",
+            "type": "list",
+            "line": 14
+          },
+          {
+            "name": "results",
+            "type": "list",
+            "line": 15
+          },
+          {
+            "name": "plot_path",
+            "type": "unknown",
+            "line": 16
+          },
+          {
+            "name": "mitigation_error",
+            "type": "unknown",
+            "line": 17
+          },
+          {
+            "name": "sensitivities_for_aqua",
+            "type": "list",
+            "line": 18
+          },
+          {
+            "name": "logrecords",
+            "type": "list",
+            "line": 19
+          },
+          {
+            "name": "overwrite",
+            "type": "unknown",
+            "line": 20
+          },
+          {
+            "name": "clean_list_info",
+            "type": "unknown",
+            "line": 34
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "MakeImListResult",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/hif/tasks/makeimlist/resultobjects.py",
+        "line": 8,
+        "attributes": [
+          {
+            "name": "contfile",
+            "type": "unknown",
+            "line": 11
+          },
+          {
+            "name": "linesfile",
+            "type": "unknown",
+            "line": 12
+          },
+          {
+            "name": "targets",
+            "type": "list",
+            "line": 13
+          },
+          {
+            "name": "clean_list_info",
+            "type": "dict",
+            "line": 14
+          },
+          {
+            "name": "_expected_num_targets",
+            "type": "unknown",
+            "line": 15
+          },
+          {
+            "name": "clearlist",
+            "type": "unknown",
+            "line": 16
+          },
+          {
+            "name": "mitigation_error",
+            "type": "unknown",
+            "line": 17
+          },
+          {
+            "name": "synthesized_beams",
+            "type": "unknown",
+            "line": 18
+          },
+          {
+            "name": "error",
+            "type": "unknown",
+            "line": 19
+          },
+          {
+            "name": "error_msg",
+            "type": "unknown",
+            "line": 20
+          },
+          {
+            "name": "skip_stage",
+            "type": "unknown",
+            "line": 21
+          },
+          {
+            "name": "clean_list_info",
+            "type": "unknown",
+            "line": 27
+          },
+          {
+            "name": "_expected_num_targets",
+            "type": "unknown",
+            "line": 80
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "TcleanResult",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/hif/tasks/tclean/resultobjects.py",
+        "line": 30,
+        "attributes": [
+          {
+            "name": "vis",
+            "type": "unknown",
+            "line": 36
+          },
+          {
+            "name": "datacolumn",
+            "type": "unknown",
+            "line": 37
+          },
+          {
+            "name": "datatype",
+            "type": "unknown",
+            "line": 38
+          },
+          {
+            "name": "datatype_info",
+            "type": "unknown",
+            "line": 39
+          },
+          {
+            "name": "sourcename",
+            "type": "unknown",
+            "line": 40
+          },
+          {
+            "name": "field_ids",
+            "type": "unknown",
+            "line": 41
+          },
+          {
+            "name": "intent",
+            "type": "unknown",
+            "line": 42
+          },
+          {
+            "name": "spw",
+            "type": "unknown",
+            "line": 43
+          },
+          {
+            "name": "orig_specmode",
+            "type": "unknown",
+            "line": 44
+          },
+          {
+            "name": "specmode",
+            "type": "unknown",
+            "line": 45
+          },
+          {
+            "name": "stokes",
+            "type": "unknown",
+            "line": 46
+          },
+          {
+            "name": "multiterm",
+            "type": "unknown",
+            "line": 47
+          },
+          {
+            "name": "plotdir",
+            "type": "unknown",
+            "line": 48
+          },
+          {
+            "name": "_psf",
+            "type": "unknown",
+            "line": 49
+          },
+          {
+            "name": "_model",
+            "type": "unknown",
+            "line": 50
+          },
+          {
+            "name": "_flux",
+            "type": "unknown",
+            "line": 51
+          },
+          {
+            "name": "iterations",
+            "type": "collections.defaultdict",
+            "line": 52
+          },
+          {
+            "name": "_pblimit_image",
+            "type": "unknown",
+            "line": 53
+          },
+          {
+            "name": "_pblimit_cleanmask",
+            "type": "unknown",
+            "line": 54
+          },
+          {
+            "name": "_aggregate_bw",
+            "type": "unknown",
+            "line": 55
+          },
+          {
+            "name": "_eff_ch_bw",
+            "type": "unknown",
+            "line": 56
+          },
+          {
+            "name": "_sensitivity",
+            "type": "unknown",
+            "line": 57
+          },
+          {
+            "name": "_dr_corrected_sensitivity",
+            "type": "unknown",
+            "line": 58
+          },
+          {
+            "name": "_threshold",
+            "type": "unknown",
+            "line": 59
+          },
+          {
+            "name": "_dirty_dynamic_range",
+            "type": "unknown",
+            "line": 60
+          },
+          {
+            "name": "_DR_correction_factor",
+            "type": "unknown",
+            "line": 61
+          },
+          {
+            "name": "_maxEDR_used",
+            "type": "unknown",
+            "line": 62
+          },
+          {
+            "name": "_image_min",
+            "type": "unknown",
+            "line": 63
+          },
+          {
+            "name": "_image_min_iquv",
+            "type": "list",
+            "line": 64
+          },
+          {
+            "name": "_image_max",
+            "type": "unknown",
+            "line": 65
+          },
+          {
+            "name": "_image_max_iquv",
+            "type": "list",
+            "line": 66
+          },
+          {
+            "name": "_image_rms",
+            "type": "unknown",
+            "line": 67
+          },
+          {
+            "name": "_image_rms_iquv",
+            "type": "list",
+            "line": 68
+          },
+          {
+            "name": "_image_rms_min",
+            "type": "unknown",
+            "line": 69
+          },
+          {
+            "name": "_image_rms_min_iquv",
+            "type": "list",
+            "line": 70
+          },
+          {
+            "name": "_image_rms_max",
+            "type": "unknown",
+            "line": 71
+          },
+          {
+            "name": "_image_rms_max_iquv",
+            "type": "list",
+            "line": 72
+          },
+          {
+            "name": "_image_robust_rms_and_spectra",
+            "type": "unknown",
+            "line": 73
+          },
+          {
+            "name": "_residual_max",
+            "type": "unknown",
+            "line": 75
+          },
+          {
+            "name": "_tclean_stopcode",
+            "type": "unknown",
+            "line": 76
+          },
+          {
+            "name": "_tclean_stopreason",
+            "type": "unknown",
+            "line": 77
+          },
+          {
+            "name": "_tclean_iterdone",
+            "type": "unknown",
+            "line": 78
+          },
+          {
+            "name": "pipeline_casa_task",
+            "type": "unknown",
+            "line": 80
+          },
+          {
+            "name": "_tclean_command",
+            "type": "unknown",
+            "line": 82
+          },
+          {
+            "name": "results",
+            "type": "list",
+            "line": 84
+          },
+          {
+            "name": "targets",
+            "type": "list",
+            "line": 85
+          },
+          {
+            "name": "warning",
+            "type": "unknown",
+            "line": 86
+          },
+          {
+            "name": "error",
+            "type": "unknown",
+            "line": 87
+          },
+          {
+            "name": "imaging_mode",
+            "type": "unknown",
+            "line": 89
+          },
+          {
+            "name": "per_spw_cont_sensitivities_all_chan",
+            "type": "unknown",
+            "line": 90
+          },
+          {
+            "name": "check_source_fit",
+            "type": "unknown",
+            "line": 91
+          },
+          {
+            "name": "cube_all_cont",
+            "type": "unknown",
+            "line": 92
+          },
+          {
+            "name": "bad_psf_channels",
+            "type": "unknown",
+            "line": 93
+          },
+          {
+            "name": "is_per_eb",
+            "type": "unknown",
+            "line": 94
+          },
+          {
+            "name": "is_eph_obj",
+            "type": "unknown",
+            "line": 95
+          },
+          {
+            "name": "synthesized_beams",
+            "type": "unknown",
+            "line": 97
+          },
+          {
+            "name": "bl_ratio",
+            "type": "unknown",
+            "line": 99
+          },
+          {
+            "name": "polcal_fit",
+            "type": "unknown",
+            "line": 101
+          },
+          {
+            "name": "used_psfphasecenter",
+            "type": "unknown",
+            "line": 103
+          },
+          {
+            "name": "imaging_metadata",
+            "type": "dict",
+            "line": 104
+          },
+          {
+            "name": "im_names",
+            "type": "dict",
+            "line": 105
+          },
+          {
+            "name": "_flux",
+            "type": "unknown",
+            "line": 153
+          },
+          {
+            "name": "_psf",
+            "type": "unknown",
+            "line": 477
+          },
+          {
+            "name": "_pblimit_image",
+            "type": "unknown",
+            "line": 495
+          },
+          {
+            "name": "_pblimit_cleanmask",
+            "type": "unknown",
+            "line": 502
+          },
+          {
+            "name": "_aggregate_bw",
+            "type": "unknown",
+            "line": 509
+          },
+          {
+            "name": "_eff_ch_bw",
+            "type": "unknown",
+            "line": 516
+          },
+          {
+            "name": "_sensitivity",
+            "type": "unknown",
+            "line": 523
+          },
+          {
+            "name": "_dr_corrected_sensitivity",
+            "type": "unknown",
+            "line": 530
+          },
+          {
+            "name": "_threshold",
+            "type": "unknown",
+            "line": 537
+          },
+          {
+            "name": "_dirty_dynamic_range",
+            "type": "unknown",
+            "line": 544
+          },
+          {
+            "name": "_DR_correction_factor",
+            "type": "unknown",
+            "line": 551
+          },
+          {
+            "name": "_maxEDR_used",
+            "type": "unknown",
+            "line": 558
+          },
+          {
+            "name": "_image_min",
+            "type": "unknown",
+            "line": 565
+          },
+          {
+            "name": "_image_min_iquv",
+            "type": "unknown",
+            "line": 572
+          },
+          {
+            "name": "_image_max",
+            "type": "unknown",
+            "line": 579
+          },
+          {
+            "name": "_image_max_iquv",
+            "type": "unknown",
+            "line": 586
+          },
+          {
+            "name": "_image_rms",
+            "type": "unknown",
+            "line": 593
+          },
+          {
+            "name": "_image_rms_iquv",
+            "type": "unknown",
+            "line": 600
+          },
+          {
+            "name": "_image_rms_min",
+            "type": "unknown",
+            "line": 607
+          },
+          {
+            "name": "_image_rms_min_iquv",
+            "type": "unknown",
+            "line": 614
+          },
+          {
+            "name": "_image_rms_max",
+            "type": "unknown",
+            "line": 621
+          },
+          {
+            "name": "_image_rms_max_iquv",
+            "type": "unknown",
+            "line": 628
+          },
+          {
+            "name": "_image_robust_rms_and_spectra",
+            "type": "unknown",
+            "line": 635
+          },
+          {
+            "name": "_tclean_command",
+            "type": "unknown",
+            "line": 643
+          },
+          {
+            "name": "_tclean_stopcode",
+            "type": "unknown",
+            "line": 650
+          },
+          {
+            "name": "_tclean_stopreason",
+            "type": "unknown",
+            "line": 672
+          },
+          {
+            "name": "_tclean_iterdone",
+            "type": "unknown",
+            "line": 679
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "CorrectedampflagResults",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/hif/tasks/correctedampflag/resultobjects.py",
+        "line": 9,
+        "attributes": [
+          {
+            "name": "flagging",
+            "type": "list",
+            "line": 13
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "EditimlistResult",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/hif/tasks/editimlist/resultobjects.py",
+        "line": 4,
+        "attributes": [
+          {
+            "name": "targets",
+            "type": "list",
+            "line": 7
+          },
+          {
+            "name": "_max_num_targets",
+            "type": "unknown",
+            "line": 8
+          },
+          {
+            "name": "buffer_size_arcsec",
+            "type": "unknown",
+            "line": 9
+          },
+          {
+            "name": "img_mode",
+            "type": "unknown",
+            "line": 10
+          },
+          {
+            "name": "editmode",
+            "type": "unknown",
+            "line": 11
+          },
+          {
+            "name": "buffer_size_arcsec",
+            "type": "unknown",
+            "line": 21
+          },
+          {
+            "name": "_max_num_targets",
+            "type": "unknown",
+            "line": 42
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "GfluxscaleflagResults",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/hifa/tasks/gfluxscaleflag/resultobjects.py",
+        "line": 13,
+        "attributes": [
+          {
+            "name": "cafresult",
+            "type": "resultobjects.CorrectedampflagResults",
+            "line": 17
+          },
+          {
+            "name": "callib_map",
+            "type": "dict",
+            "line": 22
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "BandpassflagResults",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/hifa/tasks/bandpassflag/resultobjects.py",
+        "line": 10,
+        "attributes": [
+          {
+            "name": "cafresult",
+            "type": "resultobjects.CorrectedampflagResults",
+            "line": 14
+          },
+          {
+            "name": "plots",
+            "type": "dict",
+            "line": 15
+          },
+          {
+            "name": "vis",
+            "type": "unknown",
+            "line": 16
+          },
+          {
+            "name": "callib_map",
+            "type": "dict",
+            "line": 30
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      }
+    ],
+    "low_risk": [
+      {
+        "name": "TsysflagDataResults",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/h/tasks/tsysflag/resultobjects.py",
+        "line": 82,
+        "attributes": [],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "TsyscalResults",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/h/tasks/tsyscal/resultobjects.py",
+        "line": 9,
+        "attributes": [
+          {
+            "name": "vis",
+            "type": "unknown",
+            "line": 22
+          },
+          {
+            "name": "pool",
+            "type": "unknown",
+            "line": 23
+          },
+          {
+            "name": "final",
+            "type": "unknown",
+            "line": 24
+          },
+          {
+            "name": "preceding",
+            "type": "unknown",
+            "line": 25
+          },
+          {
+            "name": "unmappedspws",
+            "type": "unknown",
+            "line": 26
+          },
+          {
+            "name": "error",
+            "type": "set",
+            "line": 27
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "SDImagingResults",
+        "bases": [
+          "basetask.ResultsList"
+        ],
+        "file": "pipeline/hsd/tasks/imaging/resultobjects.py",
+        "line": 67,
+        "attributes": [],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "SDImagingWorkerResults",
+        "bases": [
+          "common.SingleDishResults"
+        ],
+        "file": "pipeline/hsd/tasks/imaging/resultobjects.py",
+        "line": 79,
+        "attributes": [],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "RawflagchansDataResults",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/hif/tasks/rawflagchans/resultobjects.py",
+        "line": 25,
+        "attributes": [],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "LowgainflagDataResults",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/hif/tasks/lowgainflag/resultobjects.py",
+        "line": 40,
+        "attributes": [],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "CheckProductSizeResult",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/hif/tasks/checkproductsize/resultobjects.py",
+        "line": 10,
+        "attributes": [
+          {
+            "name": "allowed_maxcubesize",
+            "type": "unknown",
+            "line": 29
+          },
+          {
+            "name": "allowed_maxcubelimit",
+            "type": "unknown",
+            "line": 30
+          },
+          {
+            "name": "allowed_productsize",
+            "type": "unknown",
+            "line": 31
+          },
+          {
+            "name": "original_maxcubesize",
+            "type": "unknown",
+            "line": 32
+          },
+          {
+            "name": "original_productsize",
+            "type": "unknown",
+            "line": 33
+          },
+          {
+            "name": "cube_mitigated_productsize",
+            "type": "unknown",
+            "line": 34
+          },
+          {
+            "name": "mitigated_maxcubesize",
+            "type": "unknown",
+            "line": 35
+          },
+          {
+            "name": "mitigated_productsize",
+            "type": "unknown",
+            "line": 36
+          },
+          {
+            "name": "allowed_maximsize",
+            "type": "unknown",
+            "line": 37
+          },
+          {
+            "name": "original_maximsize",
+            "type": "unknown",
+            "line": 38
+          },
+          {
+            "name": "mitigated_maximsize",
+            "type": "unknown",
+            "line": 39
+          },
+          {
+            "name": "size_mitigation_parameters",
+            "type": "unknown",
+            "line": 40
+          },
+          {
+            "name": "status",
+            "type": "unknown",
+            "line": 41
+          },
+          {
+            "name": "reason",
+            "type": "unknown",
+            "line": 42
+          },
+          {
+            "name": "synthesized_beams",
+            "type": "unknown",
+            "line": 43
+          },
+          {
+            "name": "skip_stage",
+            "type": "unknown",
+            "line": 44
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "BoxResult",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/hif/tasks/tclean/resultobjects.py",
+        "line": 15,
+        "attributes": [
+          {
+            "name": "threshold",
+            "type": "unknown",
+            "line": 18
+          },
+          {
+            "name": "sensitivity",
+            "type": "unknown",
+            "line": 19
+          },
+          {
+            "name": "cleanmask",
+            "type": "unknown",
+            "line": 20
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "FindContResult",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/hif/tasks/findcont/resultobjects.py",
+        "line": 11,
+        "attributes": [
+          {
+            "name": "result_cont_ranges",
+            "type": "unknown",
+            "line": 14
+          },
+          {
+            "name": "cont_ranges",
+            "type": "unknown",
+            "line": 15
+          },
+          {
+            "name": "joint_mask_names",
+            "type": "unknown",
+            "line": 16
+          },
+          {
+            "name": "num_found",
+            "type": "unknown",
+            "line": 17
+          },
+          {
+            "name": "num_total",
+            "type": "unknown",
+            "line": 18
+          },
+          {
+            "name": "mitigation_error",
+            "type": "unknown",
+            "line": 19
+          },
+          {
+            "name": "plot_path",
+            "type": "unknown",
+            "line": 20
+          },
+          {
+            "name": "single_range_channel_fractions",
+            "type": "unknown",
+            "line": 21
+          },
+          {
+            "name": "momDiffSNRs",
+            "type": "unknown",
+            "line": 22
+          },
+          {
+            "name": "skip_stage",
+            "type": "unknown",
+            "line": 23
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "WvrgcalflagResults",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/hifa/tasks/wvrgcalflag/resultobjects.py",
+        "line": 10,
+        "attributes": [
+          {
+            "name": "vis",
+            "type": "unknown",
+            "line": 19
+          },
+          {
+            "name": "flaggerresult",
+            "type": "unknown",
+            "line": 20
+          },
+          {
+            "name": "too_few_wvr",
+            "type": "unknown",
+            "line": 21
+          },
+          {
+            "name": "too_few_wvr_post_flagging",
+            "type": "unknown",
+            "line": 22
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "SessionRefAntResults",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/hifa/tasks/sessionrefant/resultobjects.py",
+        "line": 9,
+        "attributes": [
+          {
+            "name": "refant",
+            "type": "collections.defaultdict",
+            "line": 16
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "OpcalResults",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/hifv/tasks/opcal/resultobjects.py",
+        "line": 7,
+        "attributes": [
+          {
+            "name": "vis",
+            "type": "unknown",
+            "line": 26
+          },
+          {
+            "name": "pool",
+            "type": "unknown",
+            "line": 27
+          },
+          {
+            "name": "final",
+            "type": "unknown",
+            "line": 28
+          },
+          {
+            "name": "preceding",
+            "type": "unknown",
+            "line": 29
+          },
+          {
+            "name": "error",
+            "type": "set",
+            "line": 30
+          },
+          {
+            "name": "opacities",
+            "type": "unknown",
+            "line": 31
+          },
+          {
+            "name": "spw",
+            "type": "unknown",
+            "line": 32
+          },
+          {
+            "name": "center_frequencies",
+            "type": "unknown",
+            "line": 33
+          },
+          {
+            "name": "seasonal_weight",
+            "type": "unknown",
+            "line": 34
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "SwpowcalResults",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/hifv/tasks/swpowcal/resultobjects.py",
+        "line": 9,
+        "attributes": [
+          {
+            "name": "vis",
+            "type": "unknown",
+            "line": 21
+          },
+          {
+            "name": "pool",
+            "type": "unknown",
+            "line": 22
+          },
+          {
+            "name": "final",
+            "type": "unknown",
+            "line": 23
+          },
+          {
+            "name": "preceding",
+            "type": "unknown",
+            "line": 24
+          },
+          {
+            "name": "error",
+            "type": "set",
+            "line": 25
+          },
+          {
+            "name": "spw",
+            "type": "unknown",
+            "line": 27
+          },
+          {
+            "name": "spw",
+            "type": "unknown",
+            "line": 29
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "GainCurvesResults",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/hifv/tasks/gaincurves/resultobjects.py",
+        "line": 8,
+        "attributes": [
+          {
+            "name": "vis",
+            "type": "unknown",
+            "line": 18
+          },
+          {
+            "name": "pool",
+            "type": "unknown",
+            "line": 19
+          },
+          {
+            "name": "final",
+            "type": "unknown",
+            "line": 20
+          },
+          {
+            "name": "preceding",
+            "type": "unknown",
+            "line": 21
+          },
+          {
+            "name": "error",
+            "type": "set",
+            "line": 22
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "RqcalResults",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/hifv/tasks/rqcal/resultobjects.py",
+        "line": 9,
+        "attributes": [
+          {
+            "name": "vis",
+            "type": "unknown",
+            "line": 21
+          },
+          {
+            "name": "pool",
+            "type": "unknown",
+            "line": 22
+          },
+          {
+            "name": "final",
+            "type": "unknown",
+            "line": 23
+          },
+          {
+            "name": "preceding",
+            "type": "unknown",
+            "line": 24
+          },
+          {
+            "name": "error",
+            "type": "set",
+            "line": 25
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      },
+      {
+        "name": "PriorcalsResults",
+        "bases": [
+          "basetask.Results"
+        ],
+        "file": "pipeline/hifv/tasks/priorcals/resultobjects.py",
+        "line": 9,
+        "attributes": [
+          {
+            "name": "vis",
+            "type": "unknown",
+            "line": 27
+          },
+          {
+            "name": "pool",
+            "type": "unknown",
+            "line": 28
+          },
+          {
+            "name": "final",
+            "type": "unknown",
+            "line": 29
+          },
+          {
+            "name": "preceding",
+            "type": "unknown",
+            "line": 30
+          },
+          {
+            "name": "error",
+            "type": "set",
+            "line": 31
+          },
+          {
+            "name": "gc_result",
+            "type": "unknown",
+            "line": 33
+          },
+          {
+            "name": "oc_result",
+            "type": "unknown",
+            "line": 34
+          },
+          {
+            "name": "rq_result",
+            "type": "unknown",
+            "line": 35
+          },
+          {
+            "name": "sw_result",
+            "type": "unknown",
+            "line": 36
+          },
+          {
+            "name": "antpos_result",
+            "type": "unknown",
+            "line": 37
+          },
+          {
+            "name": "antcorrect",
+            "type": "unknown",
+            "line": 38
+          },
+          {
+            "name": "tecmaps_result",
+            "type": "unknown",
+            "line": 39
+          }
+        ],
+        "has_view": false,
+        "has_components": false,
+        "has_transient_fields": false,
+        "inherits_flaggableview": false
+      }
+    ]
+  }
+}

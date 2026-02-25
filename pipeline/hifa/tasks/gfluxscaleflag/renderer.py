@@ -73,9 +73,10 @@ def get_plot_dicts(pipeline_context, results, plot_type):
         vis = os.path.basename(result.inputs['vis'])
         d[vis] = []
 
+        plots_by_phase = getattr(result, 'plots', {})
         for idx, key in enumerate(['before', 'after']):
-            if key in result.plots:
-                plots = result.plots[key][plot_type]
+            if key in plots_by_phase:
+                plots = plots_by_phase[key][plot_type]
                 relocated = relocate_plots(plots, plot_dest_dir)
                 # the weblog needs to identify each plot's associated plot type
                 for p in relocated:

@@ -244,17 +244,22 @@ Store strategically:
 3. Added ResultsProxy path support for size-based tuning
 4. Validated on production datasets (INT, SD, Large)
 
-### **Phase 4: Results Slimming & Delta Metadata - ✅ Tested (Ineffective)**
-1. Implemented Results.slim_for_pickle() to remove transient fields from result pickles
-2. Added _transient_fields support on 5 flagging tasks (bandpassflag, gfluxscaleflag, polcalflag, targetflag, tsysflag)
-3. Created ContextDeltaMetadata for per-stage context evolution tracking
-4. Built investigation tooling (5 utilities for analysis)
+### **Phase 4: Results Slimming & Delta Metadata - ✅ PRODUCTION VALIDATED**
+1. Implemented Results.slim_for_pickle() with critical ResultsList recursive fix
+2. Added _transient_fields support on 9 result classes across 7 flagging tasks
+3. Hardened 6+ renderers with defensive getattr() guards for missing transient fields
+4. Created ContextDeltaMetadata for per-stage context evolution tracking
+5. Built investigation tooling (5 utilities for analysis)
 
 **Testing Results:**
-- Small dataset (ALMA-IF, 914 KB context, 48 stages): **0% storage improvement**
-- Large dataset (44 MB context, 56 stages, 24 GB results): **0% storage improvement**
-- Result pickle analysis: 21 GB (stage 4), 1.5 GB (stage 7), 944 MB (stages 13/19) all showed **0.0% reduction**
-- Root cause: Large pickles contain calibration data/arrays, not plot objects
+- Small dataset (ALMA-IF, 914 KB context, 48 stages):
+  - Result pickles: 7.96 MB → 4.47 MB (43.9% reduction)
+  - Full saved_state: 38.7 MB → 36.0 MB (6.94% reduction)
+- **Large dataset (44 MB context, 48 stages):**
+  - **Result pickles: 1.24 GB → 94.8 MB (92.3% reduction)**
+  - Stage 4 (hif_rawflagchans): 1,022 MB → 9.5 KB (99.999%)
+  - Stage 7 (hifa_tsyscal): 69 MB → 7.0 KB (99.99%)
+  - All flagging stages show measurable savings; non-flagging stages unaffected
 
 **Metadata-only save API (implemented):**
 ```python

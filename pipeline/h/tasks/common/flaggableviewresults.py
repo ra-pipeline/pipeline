@@ -11,6 +11,10 @@ class FlaggableViewResults(object):
         """
         Construct and return a new FlaggableViewResults.
         """
+        # Mark view as transient to exclude from pickle (Strategy A for large result reduction)
+        # Views contain numpy arrays for weblog plotting and are not needed after weblog generation
+        self._transient_fields = {'view'}
+        
         # views and associated results
         self.flagging = []
         # following are used instead of standard dictionaries so that

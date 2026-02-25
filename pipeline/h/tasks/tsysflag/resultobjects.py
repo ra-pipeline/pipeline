@@ -18,7 +18,9 @@ class TsysflagResults(resultobjects.TsyscalResults):
         # the results to be merged back into the context
         super(TsysflagResults, self).__init__()
 
-        self._transient_fields.update({'plots'})
+        # Mark plots and components as transient fields (Strategy A for large result reduction)
+        # Components contain TsysflagspectraResults with large flagging view arrays
+        self._transient_fields.update({'plots', 'components'})
 
         # component results
         self.components = collections.OrderedDict()

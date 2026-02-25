@@ -70,14 +70,14 @@ class T2_4MDetailsWvrgcalflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
                 pass
 
             # collect flagging metric plots from result
-            if result.flaggerresult.dataresult.qa_wvr.view:
+            if getattr(result.flaggerresult.dataresult.qa_wvr, 'view', None):
                 plotter = image.ImageDisplay()
                 plots = plotter.plot(context, result.flaggerresult.dataresult.qa_wvr, reportdir=plots_dir,
                                      prefix='qa', change='WVR')
                 # sort plots by spw
                 metric_plots[vis] = sorted(plots, key=lambda plot: int(plot.parameters['spw']))
 
-            if result.flaggerresult.view:
+            if getattr(result.flaggerresult, 'view', None):
                 flag_plotter = image.ImageDisplay()
                 plots = flag_plotter.plot(context, result.flaggerresult, reportdir=plots_dir,
                                           prefix='flag', change='Flagging')

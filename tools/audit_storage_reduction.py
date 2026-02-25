@@ -86,7 +86,6 @@ def compare_runs(baseline_path: str, optimized_path: str) -> None:
     
     total_baseline = 0
     total_optimized = 0
-    unattributed_savings = 0
     
     print(f'{"Component":<40} {"Baseline":>15} {"Optimized":>15} {"Change":>15} {"% Change":>10}')
     print('-' * 100)
