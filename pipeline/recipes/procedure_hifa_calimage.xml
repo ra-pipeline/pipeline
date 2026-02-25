@@ -56,15 +56,7 @@
 
     <ProcessingCommand>
         <Command xmlns="">hifa_antpos</Command>
-	<ParameterSet>
-	    <Parameter>
-                <Keyword xmlns="">hm_antpos</Keyword>
-                <Value xmlns="">file</Value>
-            </Parameter>
-            <Parameter>
-                <Keyword xmlns="">antposfile</Keyword>
-                <Value xmlns="">antennapos.csv</Value>
-            </Parameter>
+        <ParameterSet>
         </ParameterSet>
     </ProcessingCommand>
 
