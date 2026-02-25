@@ -386,7 +386,7 @@ class ImageParamsHeuristics:
         return largest_primary_beam_size
 
     def synthesized_beam(self, field_intent_list, spwspec, robust=0.5, uvtaper=[], pixperbeam=5.0, known_beams={},
-                         force_calc=False, parallel='automatic', shift=False, is_cluster=False):
+                         force_calc=False, parallel='automatic', shift=False):
         """Calculate synthesized beam for a given field / spw selection."""
 
         qaTool = casa_tools.quanta
@@ -475,16 +475,13 @@ class ImageParamsHeuristics:
                         valid_real_spwid_list_for_vis = []
                         valid_virtual_spwid_list_for_vis = []
                         ms = self.observing_run.get_ms(name=vis)
-                        if is_cluster:
-                            # PIPE-684: Changed to handle multiple comma seprated fields in case
-                            # of VLA mosaic.
-                            scan_dos = [scan for scan in ms.scans
-                                        if intent in scan.intents
-                                        and any(part in {f.name for f in scan.fields} for part in field.split(','))]
-                        else:
-                            scan_dos = [scan for scan in ms.scans
-                                        if intent in scan.intents
-                                        and field in {f.name for f in scan.fields}]
+
+                        scan_dos = [
+                            scan
+                            for scan in ms.scans
+                            if intent in scan.intents
+                            and any(part.strip() in {f.name for f in scan.fields} for part in field.split(','))
+                            ]
 
                         scanids = ','.join({str(scan.id) for scan in scan_dos})
 
@@ -546,14 +543,10 @@ class ImageParamsHeuristics:
 
                         # Now get better estimate from makePSF
                         tmp_psf_filename = str(uuid.uuid4())
-                        if is_cluster:
-                            # PIPE-684: for VLA mosaic there are mulitple comma separated fields so
-                            # spliting on ","
-                            gridder = self.gridder(intent, field.split(","), spwspec=spwspec)
-                            field_ids = self.field(intent, field.split(","), vislist=valid_vis_list)
-                        else:
-                            gridder = self.gridder(intent, field, spwspec=spwspec)
-                            field_ids = self.field(intent, field, vislist=valid_vis_list)
+
+                        field_list = [f.strip() for f in field.split(",")]
+                        gridder = self.gridder(intent, field_list, spwspec=spwspec)
+                        field_ids = self.field(intent, field_list, vislist=valid_vis_list)
                         # TODO: Check if mosweight needs to be updated to hande "," fields
                         mosweight = self.mosweight(intent, field)
 
@@ -575,11 +568,7 @@ class ImageParamsHeuristics:
                                 imsize = [nxpix, nypix]
                         else:
                             imsize = imsize_sf
-                        if is_cluster:
-                            fname = field.split(",")[0]
-                        else:
-                            fname = field
-
+                        fname = field.split(",")[0]
                         if self.is_eph_obj(fname):
                             phasecenter = 'TRACKFIELD'
                         else:
@@ -720,7 +709,7 @@ class ImageParamsHeuristics:
 
         return nchan, width
 
-    def has_data(self, field_intent_list, spwspec, vislist=None, is_cluster=False):
+    def has_data(self, field_intent_list, spwspec, vislist=None):
 
         if vislist is None:
             vislist = self.vislist
@@ -737,16 +726,15 @@ class ImageParamsHeuristics:
                 valid_data[field_intent] = False
                 for vis in vislist:
                     ms = self.observing_run.get_ms(name=vis)
-                    if is_cluster:
-                        # PIPE-684: Update scanids to check either of the field name is present
-                        # to check valid data.
-                        scanids = [str(scan.id) for scan in ms.scans if
-                                   field_intent[1] in scan.intents and
-                                   any(part in [fld.name for fld in scan.fields] for part in field_intent[0].split(','))]
-                    else:
-                        scanids = [str(scan.id) for scan in ms.scans if
-                                   field_intent[1] in scan.intents and
-                                   field_intent[0] in [fld.name for fld in scan.fields]]
+
+                    field_names_to_check = [f.strip() for f in field_intent[0].split(',')]
+                    scanids = [
+                        str(scan.id)
+                        for scan in ms.scans
+                        if field_intent[1] in scan.intents and
+                        any(f in [fld.name for fld in scan.fields] for f in field_names_to_check)
+                        ]
+
                     if scanids != []:
                         scanids = ','.join(scanids)
                         # PIPE-2770: correctly handle virtual-to-real spwspec translation in edge cases with
@@ -967,6 +955,11 @@ class ImageParamsHeuristics:
 
         if vislist is None:
             vislist = self.vislist
+
+        # PIPE-684: for VLA mosaic there are mulitple comma separated fields
+        # so spliting on ","
+        if isinstance(field, str) and "," in field:
+            field = [f.strip() for f in field.split(",")]
 
         field_str_list = []
 
@@ -1935,7 +1928,7 @@ class ImageParamsHeuristics:
     def calc_sensitivities(
             self, vis, field, intent, spw, nbin, spw_topo_chan_param_dict, specmode, gridder, cell, imsize, weighting, robust, uvtaper,
             center_only=False, known_sensitivities={},
-            force_calc=False, calc_reffreq=False, is_cluster=False):
+            force_calc=False, calc_reffreq=False):
         """Compute sensitivity estimate using CASA.
 
         Note: calc_reffreq is defaulted to False for backwards compatibility uses in imageprecheck.
@@ -1956,11 +1949,7 @@ class ImageParamsHeuristics:
         eff_ch_bw = 0.0
         sens_bws = {}
 
-        if is_cluster:
-            # PIPE-684: splitting the field names
-            field_ids = self.field(intent, field.split(","), vislist=vis)  # list of strings with comma separated IDs per MS
-        else:
-            field_ids = self.field(intent, field, vislist=vis)  # list of strings with comma separated IDs per MS
+        field_ids = self.field(intent, field, vislist=vis)  # list of strings with comma separated IDs per MS
         phasecenter, _ = self.phasecenter(field_ids, vislist=vis)  # string
         center_field_ids = self.center_field_ids(vis, field, intent, phasecenter)  # list of integer IDs per MS
         for ms_index, msname in enumerate(vis):
@@ -2079,12 +2068,14 @@ class ImageParamsHeuristics:
                         LOG.info('Effective BW heuristic: Correcting sensitivity for EB %s Field %s SPW %s by %.3g from %.3g Jy/beam to %.3g Jy/beam' % (os.path.basename(msname).replace('.ms', ''), field, str(intSpw), bw_corr_factor, chansel_corrected_center_field_sensitivity, center_field_sensitivity))
 
                     if gridder == 'mosaic':
-                        if is_cluster:
-                            # PIPE-684: checking field name against all the fields in the mosaic field list
-                            field_list = [utils.dequote(x) for x in field.split(',')]
-                            source_name = [f.source.name for f in ms.fields if (utils.dequote(f.name) in field_list and intent in f.intents)][0]
-                        else:
-                            source_name = [f.source.name for f in ms.fields if (utils.dequote(f.name) == utils.dequote(field) and intent in f.intents)][0]
+                        field_list = [utils.dequote(x).strip() for x in field.split(',')]
+                        # Find the source name for the first matching field
+                        source_name = [
+                            f.source.name
+                            for f in ms.fields
+                            if utils.dequote(f.name).strip() in field_list and intent in f.intents
+                            ][0]
+
                         # PIPE-1708: "Integer" source names consisting of just
                         # digits cause confusion in the mosaic overlap factor
                         # calculation. Adopting the "solution" of enquoting
