@@ -3,6 +3,7 @@ import collections
 import copy
 import datetime
 import enum
+import json
 import re
 
 from typing import Dict, List, Set, Union
@@ -18,7 +19,6 @@ from pipeline.hifa.tasks.fluxscale.gcorfluxscale import GcorFluxscale
 from pipeline.hifa.tasks.gfluxscaleflag import Gfluxscaleflag
 from pipeline.hifa.tasks.gfluxscaleflag.resultobjects import GfluxscaleflagResults
 from pipeline.infrastructure.basetask import Results, ResultsList
-from pipeline.infrastructure.launcher import Context
 import pipeline.infrastructure.renderer.htmlrenderer as htmlrenderer
 from pipeline.domain.datatype import DataType
 from pipeline.infrastructure.launcher import Context
@@ -26,7 +26,7 @@ from pipeline.domain.measurementset import MeasurementSet
 from pipeline.domain.measures import FluxDensityUnits
 from pipeline.h.tasks.common import flagging_renderer_utils as flagutils
 from pipeline.infrastructure.renderer import regression
-import pipeline.infrastructure.utils as utils
+from pipeline.infrastructure import launcher, utils
 
 # Additional imports for VLA and SD extractors
 from pipeline.hsd.tasks.applycal.applycal import SDApplycal
@@ -231,7 +231,7 @@ class PipelineStatsCollection:
         for stage_name, stage_stats in self.stats_collection_stage.items():
             final_dict["STAGE"][stage_name] = {stat.name: stat.to_dict() for stat in stage_stats}
         
-        LOG.info(f"Final dict: {final_dict}")
+#        LOG.info(f"Final dict: {final_dict}")
 
         # # Step through the collected statistics values and construct
         # # a dictionary representation. The output format is as follows:
@@ -496,6 +496,22 @@ def _get_mous_values(context, mous: str, ms_list: List[MeasurementSet],
 
     stats_collection.add_stats(stats_collection_list, level=PipelineStatisticLevel.MOUS, mous=mous)
 
+
+# def _get_stage_values(stats_collection):
+#     """
+#     Get the statistics values for a given stage
+#     """
+#     LOG.info("Getting stage values")
+#     level = PipelineStatisticLevel.STAGE
+
+#     for i in range(len(context.results)):
+#         stats_collection.add_stat(
+#             PipelineStatistic(
+#                 name=context.results[i].read().stage_number,
+#                 value=strip_html(htmlrenderer.get_task_description(context.results[i].read(), context)), 
+#                 longdesc="stage number and name",
+#                 level=level)
+#         )
 
 # MS helper functions (only EB so far)
 def n_ant(ms: MeasurementSet) -> int:
@@ -849,6 +865,7 @@ class FlagDeterALMAResultsExtractor(ResultsStatsExtractor):
     def handle(self, result: FlagDeterALMAResults, context) -> Dict:
         value = self.calculate_value(result, context)
         ps = self.create_stat(value)
+        print("EVEN HERE?")
         return ps
 
     def calculate_value(self, result: FlagDeterALMAResults, context: Context) -> Dict:
@@ -929,9 +946,6 @@ class FluxcalflagResultsStatsExtractor(ResultsStatsExtractor):
         else:
             num_flags_after = num_flags_before
 
-        qa_entries = extract_qa_score_regression(prefix, result)
-        d.update(qa_entries)
-
         return int(num_flags_before), int(num_flags_after)
 
     def create_stat(self, before, after, vis) -> Dict:
@@ -986,9 +1000,6 @@ class GcorFluxscaleResultsStatsExtractor(ResultsStatsExtractor):
             for m in measurements:
                 key = 'field_{}.spw_{}.I'.format(field_id, m.spw_id)
                 d[key] = str(m.I.to_units(FluxDensityUnits.JANSKY))
-
-        qa_entries = extract_qa_score_regression(prefix, result)
-        d.update(qa_entries)
 
         return d
 
@@ -1051,8 +1062,6 @@ class ApplycalResultsStatsExtractor(ResultsStatsExtractor):
             for scan_id, v in flag_summary_after['scan'].items():
                 d['scan_{}.num_rows_flagged.after'.format(scan_id)] = int(v['flagged'])
 
-            qa_entries = extract_qa_score_regression(prefix, result)
-            d.update(qa_entries)
         except:
             LOG.info("Some information missing from ApplycalResults. Omitting from resgression comparison.")
             d = {}
@@ -1821,11 +1830,6 @@ class SDBLFlagResultsStatsExtractor(ResultsStatsExtractor):
             if flag_dict:
                 d.update(flag_dict)
 
-            # Extract QA scores
-            if hasattr(result, 'qa') and result.qa and result.qa.pool:
-                qa_entries = extract_qa_score_regression("sd_blflag", result)
-                d.update(qa_entries)
-
         except Exception as e:
             LOG.info(f"Some information missing from SDBLFlagResults: {e}")
             d = {}
@@ -1882,16 +1886,6 @@ class SDImagingResultsStatsExtractor(ResultsStatsExtractor):
             Dict[str, Dict]
         """
         d = {}
-        try:
-            # Extract QA scores
-            if hasattr(result, 'qa') and result.qa and result.qa.pool:
-                qa_entries = extract_qa_score_regression("sd_imaging", result)
-                d.update(qa_entries)
-
-        except Exception as e:
-            LOG.info(f"Some information missing from SDImagingResults: {e}")
-            d = {}
-
         return d
 
     def create_stat(self, vis, val):
@@ -1939,21 +1933,6 @@ class SDRestoredataResultsStatsExtractor(ResultsStatsExtractor):
                     if session_val:
                         ps = self.create_stat(ms_name, session_val)
                         stats_list.append(ps)
-            
-            # Also add QA scores if present
-            if hasattr(result, 'qa') and result.qa and result.qa.pool:
-                qa_val = extract_qa_score_regression("sd_restoredata", result)
-                if qa_val:
-                    # Add QA to the first stats dict or create a new one
-                    if stats_list:
-                        for vis, stat in stats_list[0].items():
-                            if isinstance(stat.value, dict):
-                                stat.value.update(qa_val)
-                    else:
-                        # Create a new stat just for QA
-                        default_vis = list(result.flagging_summaries.values())[0].keys()[0] if result.flagging_summaries else "unknown"
-                        ps = self.create_stat(default_vis, qa_val)
-                        stats_list.append(ps)
         except Exception as e:
             LOG.info(f"Error processing SDRestoreDataResults: {e}")
         
@@ -1982,11 +1961,6 @@ class SDRestoredataResultsStatsExtractor(ResultsStatsExtractor):
                             for scan_id, v in target['scan'].items():
                                 d[f'session_{session}.{ms_name}.target_{target_name}.scan_{scan_id}.num_rows_flagged'] = int(v['flagged'])
 
-            # Extract QA scores
-            if hasattr(result, 'qa') and result.qa and result.qa.pool:
-                qa_entries = extract_qa_score_regression("sd_restoredata", result)
-                d.update(qa_entries)
-
         except Exception as e:
             LOG.info(f"Some information missing from SDRestoreDataResults: {e}")
             d = {}
@@ -2013,11 +1987,11 @@ def extract_qa_score_regression(result: Results) -> List:
     Returns:
         dict: List of PipelineStatistic objects representing the extracted QA scores, structured for regression testing.
     """
-    stats = []
+    qa = []
 
     # Iterate through each QA score in the result's pool
     for qa_score in result.qa.pool:
-        print("Processing QA score for PL stats: ", qa_score)
+#        print("Processing QA score for PL stats: ", qa_score)
         individual_score_dict = {}
         # Extract and clean metric name for use in keys
         metric_name = qa_score.origin.metric_name
@@ -2026,35 +2000,23 @@ def extract_qa_score_regression(result: Results) -> List:
         # Replace all runs of whitespace with a single dash
         metric_name = re.sub(r"\s+", '-', metric_name)
 
-        individual_score_dict[metric_name] = {}
-        
         metric_score, score_value = qa_score.origin.metric_score, qa_score.score
-        individual_score_dict[metric_name]['score'] = metric_score
-        individual_score_dict[metric_name]['value'] = score_value
-        # FIXME: better approach than casting to a list.
-        individual_score_dict[metric_name]['fields'] = list(qa_score.applies_to.field) if qa_score.applies_to and qa_score.applies_to.field else []
-        individual_score_dict[metric_name]['spws'] = list(qa_score.applies_to.spw) if qa_score.applies_to and qa_score.applies_to.spw else []
 
-        #TODO: Try out the above first. Then add per-spw, per-field, etc. values if they are present in the QA score and see how it looks in the stats. 
-        # We may want to nest these under the 'value' key or have them as separate keys at the same level as 'score' and 'value'. 
-        # Basically consider an applies_to level which includes all possiblities which are far beyond fields/spws/stats.
- 
-        # possible desired structure 
-        # {metric_name : {"score": metric_score, "value": score_value}}
+        individual_score_dict['metric_name'] = metric_name
+        individual_score_dict['score'] = metric_score
+        individual_score_dict['value'] = score_value
+        # FIXME: better approach than casting to a list? Literally doing this here because they need to be serialized *eventually*. 
+        individual_score_dict['fields'] = list(qa_score.applies_to.field) if qa_score.applies_to and qa_score.applies_to.field else []
+        individual_score_dict['spws'] = list(qa_score.applies_to.spw) if qa_score.applies_to and qa_score.applies_to.spw else []
 
-        # Actually make the stat
-        print("score dict", individual_score_dict)
-        ps = PipelineStatistic(name=f"qa_score_{metric_name}",
-                                   value=individual_score_dict[metric_name],
-                                   longdesc=qa_score.longmsg, # TODO: a bit misleading since this doesn't actually describe the stat itself.
-                                   units=qa_score.origin.metric_units,
-                                   level=PipelineStatisticLevel.STAGE)
-        # NOTE: this stage_number doens't work
-        print("QA score stage number: ", result.stage_number)
-        stats.append((result.stage_number, ps))
+        # TODO: consider adding the rest of the applies_to information as well (e.g. scans, intents) or other info from the QA score object 
+        # but only if relevant for regression testing and *after* everything else works. 
 
-    #print(stats)
-    return stats
+#        print("score dict", individual_score_dict)
+
+        qa.append((result.stage_number, individual_score_dict))
+
+    return qa
 
 def union(input: List, new: Union[Dict, List[Dict]]) -> List[Dict]:
     """
@@ -2082,22 +2044,27 @@ def get_stats_from_results(context: Context, stats_collection: PipelineStatsColl
         results = results_proxy.read()
         extracted = registry.handle(results, context)
         LOG.debug("Got stats from results: %s", extracted)
-        print("extracted: ", extracted)
+#        print("extracted: ", extracted)
         for eb, stat in extracted:
-            print("Elt: ", eb, stat)
-            print("type(elt): ", type(stat))
+#            print("Elt: ", eb, stat)
+#            print("type(elt): ", type(stat))
             stats_collection.add_stat(stat, eb=eb, level=stat.level, mous=mous)
-            print(f"stats collection results so far: {stats_collection}")
+#            print(f"stats collection results so far: {stats_collection}")
 
 
-def get_stats_from_qa(context: Context, stats_collection: PipelineStatsCollection) -> None:
+def serialize_qa(context: Context) -> dict:
     """Extract QA scores from all results and add to stages"""
+    qa_dict = {}
     for results_proxy in context.results:
         results = results_proxy.read()
         if hasattr(results, 'qa') and results.qa and results.qa.pool:
             qa_entries = extract_qa_score_regression(results)
-            for stage, stat in qa_entries:
-                stats_collection.add_stat(stat, stage=stage, level=stat.level)
+            for stage, qa in qa_entries:
+                if not qa_dict.get(stage):
+                    qa_dict[stage] = {"qa_scores": []}
+                qa_dict[stage]["qa_scores"].append(qa)
+
+    return qa_dict
 
 # Main interface for generating statistics.
 def generate_stats(context: Context) -> Dict:
@@ -2115,13 +2082,27 @@ def generate_stats(context: Context) -> Dict:
     LOG.info("Getting pipeline stats from results...")
     get_stats_from_results(context, stats_collection)
 
-    # 3. Gather stats from qa objects 
-    LOG.info("Getting pipeline stats from QA objects...")
-    get_stats_from_qa(context, stats_collection)
-
-    # Construct dictionary representation of all pipeline stats
+    # 3. Construct dictionary representation of all pipeline stats
     LOG.info("Converting pipeline stats collection to dictionary...")
     final_dict = stats_collection.to_dict()
+
+    # TODO: consider moving this to somewhere more logical
+    # 4. Serialize QA objects and add to pipeline stats file. 
+    LOG.info("Serializing QA objects and adding to pipeline stats file...")
+    qa_dict = serialize_qa(context)
+    qa_for_stats = {"STAGE": qa_dict}
+
+    final_dict.update(qa_for_stats)
+
     LOG.info("Returning final pipeline stats dictionary...")
 
     return final_dict
+
+# TODO: real function name needed, possibly move this to a more logical place as well
+def make_it_so(filename='pipeline_stats_TEST.json', context=None) -> None:
+    if context is None:
+        context = launcher.Pipeline(context='last').context
+    pipeline_stats = generate_stats(context)
+    with open(filename, 'w') as f:
+        LOG.info(f"Writing pipeline stats to {filename}...")
+        json.dump(pipeline_stats, f, ensure_ascii=False, indent=4, sort_keys=True)
