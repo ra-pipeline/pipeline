@@ -47,10 +47,11 @@ def mosaicOverlapFactorMS(ms, source, spw, diameter, intent='TARGET', fwhmfactor
     if source.isdigit():
         msource = [s for s in ms.sources if s.id == source]
     else:
-        msource = [s for s in ms.sources if utils.dequote(s.name) == utils.dequote(source)]
+        source_list = [utils.dequote(s.strip()) for s in source.split(",")]
+        msource = [s for s in ms.sources if utils.dequote(s.name) in source_list]
     if not msource:
         return None
-    fields = [f.id for f in msource[0].fields]
+    fields = [f.id for s in msource for f in s.fields]
 
     # Get all the fields for the selected intent
     science_fields = [f.id for f in ms.get_fields(intent=intent)]
