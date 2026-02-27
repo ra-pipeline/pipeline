@@ -244,10 +244,11 @@ class SelfcalHeuristics(object):
                 if (band == 'Band_9' or band == 'Band_10') and spw != 'all':   # adjust for DSB noise increase
                     sensitivity = sensitivity  # *4.0  might be unnecessary with DR mods
 
-                selfcal_library['theoretical_sensitivity']=sensitivity_nomod
+                selfcal_library['theoretical_sensitivity'] = sensitivity_nomod
                 for fid in selfcal_library['sub-fields']:
-                    selfcal_library[fid]['theoretical_sensitivity']=sensitivity_nomod
+                    selfcal_library[fid]['theoretical_sensitivity'] = sensitivity_nomod
             else:
+                sensitivity = 0.0 # So that the threshold passed to tclean is properly set to 0.0Jy when the telescope is the VLA.
                 sensitivity_vla, _, self.reffreq = self.get_sensitivity()
 
                 selfcal_library['theoretical_sensitivity'] = sensitivity_vla
@@ -1915,15 +1916,15 @@ class SelfcalHeuristics(object):
             os.system('rm -rf test*.mask')
 
             if not checkmask(sani_target+'_field_'+str(fid)+'_'+band+'_'+solint+'_'+str(iteration)+'.image.tt0'):
-                LOG.info("Removing field "+str(fid)+" from "+sani_target+'_'+vis+'_'+band+'_'+solint+'_'+str(iteration)+'_' +
+                LOG.info("Removing field "+str(fid)+" from "+sani_target+'_*_'+band+'_'+solint+'_'+str(iteration)+'_' +
                             selfcal_plan['solmode'][iteration]+'.g'+" because there is no signal within the primary beam.")
                 skip_reason = "No signal"
             elif selfcal_plan[fid]['solint_snr_per_field'][selfcal_plan['solints'][iteration]] < minsnr_to_proceed and solint not in ['inf_EB', 'scan_inf']:
-                LOG.info("Removing field "+str(fid)+" from "+sani_target+'_'+vis+'_'+band+'_'+solint+'_'+str(iteration)+'_' +
+                LOG.info("Removing field "+str(fid)+" from "+sani_target+'_*_'+band+'_'+solint+'_'+str(iteration)+'_' +
                             selfcal_plan['solmode'][iteration]+'.g'+' because the estimated solint snr is too low.')
                 skip_reason = "Estimated SNR"
             elif updated_intflux > 1.25 * original_intflux:
-                LOG.info("Removing field "+str(fid)+" from "+sani_target+'_'+vis+'_'+band+'_'+solint+'_'+str(iteration)+'_' +
+                LOG.info("Removing field "+str(fid)+" from "+sani_target+'_*_'+band+'_'+solint+'_'+str(iteration)+'_' +
                             selfcal_plan['solmode'][iteration]+'.g'+" because there appears to be significant flux missing from the model.")
                 skip_reason = "Missing flux"
             else:
@@ -2080,7 +2081,7 @@ class SelfcalHeuristics(object):
             if 'ap' in selfcal_plan['solints'][iteration] and not do_amp_selfcal:
                 break
 
-            if selfcal_plan['solint_snr'][selfcal_plan['solints'][iteration]] < minsnr_to_proceed and np.all([selfcal_plan['solint_snr_per_field'][fid][selfcal_plan['solints'][iteration]] < minsnr_to_proceed for fid in slib['sub-fields']]):
+            if selfcal_plan['solint_snr'][selfcal_plan['solints'][iteration]] < minsnr_to_proceed and np.all([selfcal_plan[fid]['solint_snr_per_field'][selfcal_plan['solints'][iteration]] < minsnr_to_proceed for fid in slib['sub-fields']]):
                 LOG.info('*********** estimated SNR for solint='+selfcal_plan['solints'][iteration]+' too low, measured: '+str(
                     selfcal_plan['solint_snr'][selfcal_plan['solints'][iteration]])+', Min SNR Required: '+str(minsnr_to_proceed)+' **************')
                 # if a solution interval shorter than inf for phase-only SC has passed, attempt amplitude selfcal
@@ -2300,7 +2301,7 @@ class SelfcalHeuristics(object):
                                                     (post_mosaic_RMS_NF[fid] - mosaic_RMS_NF[fid])/mosaic_RMS_NF[fid] < 1.05) or \
                         (((post_mosaic_RMS[fid] - mosaic_RMS[fid])/mosaic_RMS[fid] > 1.05 or
                             (post_mosaic_RMS_NF[fid] - mosaic_RMS_NF[fid])/mosaic_RMS_NF[fid] > 1.05) and
-                            selfcal_plan['solint_snr_per_field'][fid][solint] > 5)
+                            selfcal_plan[fid]['solint_snr_per_field'][solint] > 5)
 
                 if solint == 'inf_EB':
                     # If any of the fields succeed in the "strict" sense, then allow for minor reductions in the evaluation quantity in other
@@ -2361,13 +2362,12 @@ class SelfcalHeuristics(object):
                             slib['RMS_curr'] = slib[vis][solint]['RMS_post'].copy()
                         if slib[vis][solint]['RMS_NF_post'] < slib['RMS_NF_curr'] and \
                                 slib[vis][solint]['RMS_NF_post'] > 0:
-                            slib['RMS_NF_curr'] = slib[vis][solint]['RMS_NF_post'].copy(
-                            )
+                            slib['RMS_NF_curr'] = slib[vis][solint]['RMS_NF_post'].copy()
 
-                marginal_inf_EB_will_attempt_next_solint = False
                 # run a pre-check as to whether a marginal inf_EB result will go on to attempt inf, if not we will fail a marginal inf_EB
+                marginal_inf_EB_will_attempt_next_solint = False
                 if (solint == 'inf_EB') and ((((post_SNR-SNR)/SNR > -0.02) and ((post_SNR-SNR)/SNR < 0.00)) or (((post_SNR_NF - SNR_NF)/SNR_NF > -0.02) and ((post_SNR_NF - SNR_NF)/SNR_NF < 0.00))) and (delta_beamarea < delta_beam_thresh):
-                    if selfcal_plan['solint_snr'][selfcal_plan['solints'][iteration+1]] < minsnr_to_proceed and np.all([selfcal_plan['solint_snr_per_field'][fid][selfcal_plan['solints'][iteration+1]] < minsnr_to_proceed for fid in slib['sub-fields']]):
+                    if selfcal_plan['solint_snr'][selfcal_plan['solints'][iteration+1]] < minsnr_to_proceed and np.all([selfcal_plan[fid]['solint_snr_per_field'][selfcal_plan['solints'][iteration+1]] < minsnr_to_proceed for fid in slib['sub-fields']]):
                         marginal_inf_EB_will_attempt_next_solint = False
                     else:
                         marginal_inf_EB_will_attempt_next_solint = True
@@ -2411,8 +2411,7 @@ class SelfcalHeuristics(object):
 
                             for vis in slib[fid]['vislist']:
                                 slib[fid][vis]['gaintable_final'] = slib[fid][vis][solint]['gaintable']
-                                slib[fid][vis]['spwmap_final'] = slib[fid][vis][solint]['spwmap'].copy(
-                                )
+                                slib[fid][vis]['spwmap_final'] = slib[fid][vis][solint]['spwmap'].copy()
                                 slib[fid][vis]['applycal_mode_final'] = slib[fid][vis][solint]['applycal_mode']
                                 slib[fid][vis]['applycal_interpolate_final'] = slib[fid][vis][solint]['applycal_interpolate']
                                 slib[fid][vis]['gaincal_combine_final'] = slib[fid][vis][solint]['gaincal_combine']
@@ -2619,15 +2618,15 @@ class SelfcalHeuristics(object):
                                                                        slib['SNR_orig']):  # (iteration == 0) and
                         LOG.info('Updating solint = '+selfcal_plan['solints'][iteration+1]+' SNR')
                         LOG.info('Was: %s', selfcal_plan['solint_snr'][selfcal_plan['solints'][iteration+1]])
-                        get_SNR_self_update([target], band, vislist, slib, n_ants,
-                                            solint, selfcal_plan['solints'][iteration+1], selfcal_plan['integration_time'], selfcal_plan['solint_snr'])
+                        get_SNR_self_update(slib, n_ants, solint, selfcal_plan['solints'][iteration+1], 
+                                            selfcal_plan['integration_time'], selfcal_plan['solint_snr'])
                         LOG.info('Now: %s', selfcal_plan['solint_snr'][selfcal_plan['solints'][iteration+1]])
 
                         for fid in slib['sub-fields-to-selfcal']:
                             LOG.info('Field '+str(fid)+' Was: %s',
                                      selfcal_plan[fid]['solint_snr_per_field'][selfcal_plan['solints'][iteration+1]])
-                            get_SNR_self_update([target], band, vislist, slib[fid], n_ants, solint,
-                                                selfcal_plan['solints'][iteration+1], selfcal_plan['integration_time'], selfcal_plan[fid]['solint_snr_per_field'])
+                            get_SNR_self_update(slib[fid], n_ants, solint, selfcal_plan['solints'][iteration+1], 
+                                                selfcal_plan['integration_time'], selfcal_plan[fid]['solint_snr_per_field'])
                             LOG.info('Field '+str(fid)+' Now: %s',
                                      selfcal_plan[fid]['solint_snr_per_field'][selfcal_plan['solints'][iteration+1]])
                     # If not all fields succeed for inf_EB or scan_inf/inf, depending on mosaic or single field, then don't go on to amplitude selfcal,

@@ -1028,26 +1028,24 @@ def get_SNR_self_individual(
     return solint_snr, solint_snr_per_spw
 
 
-def get_SNR_self_update(all_targets, band, vislist, selfcal_library, n_ant, solint_curr, solint_next, integration_time, solint_snr):
-    for target in all_targets:
+def get_SNR_self_update(selfcal_library, n_ant, solint_curr, solint_next, integration_time, solint_snr):
+    SNR = max(selfcal_library[selfcal_library['vislist'][0]][solint_curr]['SNR_post'],
+                selfcal_library[selfcal_library['vislist'][0]][solint_curr]['intflux_post'] /
+                selfcal_library[selfcal_library['vislist'][0]][solint_curr]['e_intflux_post'])
 
-        SNR = max(selfcal_library[selfcal_library['vislist'][0]][solint_curr]['SNR_post'],
-                  selfcal_library[selfcal_library['vislist'][0]][solint_curr]['intflux_post'] /
-                  selfcal_library[selfcal_library['vislist'][0]][solint_curr]['e_intflux_post'])
-
-        if solint_next == 'inf' or solint_next == 'inf_ap':
-            selfcal_library['per_scan_SNR'] = SNR/((n_ant-3)**0.5*(selfcal_library['Total_TOS']/(
-                selfcal_library['Median_scan_time']/selfcal_library['Median_fields_per_scan']))**0.5)
-            solint_snr[solint_next] = selfcal_library['per_scan_SNR']
-        elif solint_next == 'scan_inf':
-            selfcal_library['per_scan_SNR'] = SNR / \
-                ((n_ant-3)**0.5*(selfcal_library['Total_TOS']/selfcal_library['Median_scan_time'])**0.5)
-            solint_snr[solint_next] = selfcal_library['per_scan_SNR']
-        elif solint_next == 'int':
-            solint_snr[solint_next] = SNR/((n_ant-3)**0.5*(selfcal_library['Total_TOS']/integration_time)**0.5)
-        else:
-            solint_float = float(solint_next.replace('s', '').replace('_ap', ''))
-            solint_snr[solint_next] = SNR/((n_ant-3)**0.5*(selfcal_library['Total_TOS']/solint_float)**0.5)
+    if solint_next == 'inf' or solint_next == 'inf_ap':
+        selfcal_library['per_scan_SNR'] = SNR/((n_ant-3)**0.5*(selfcal_library['Total_TOS']/(
+            selfcal_library['Median_scan_time']/selfcal_library['Median_fields_per_scan']))**0.5)
+        solint_snr[solint_next] = selfcal_library['per_scan_SNR']
+    elif solint_next == 'scan_inf':
+        selfcal_library['per_scan_SNR'] = SNR / \
+            ((n_ant-3)**0.5*(selfcal_library['Total_TOS']/selfcal_library['Median_scan_time'])**0.5)
+        solint_snr[solint_next] = selfcal_library['per_scan_SNR']
+    elif solint_next == 'int':
+        solint_snr[solint_next] = SNR/((n_ant-3)**0.5*(selfcal_library['Total_TOS']/integration_time)**0.5)
+    else:
+        solint_float = float(solint_next.replace('s', '').replace('_ap', ''))
+        solint_snr[solint_next] = SNR/((n_ant-3)**0.5*(selfcal_library['Total_TOS']/solint_float)**0.5)
 
 
 def get_sensitivity(vislist, selfcal_library, field='', specmode='mfs', virtual_spw='all',
