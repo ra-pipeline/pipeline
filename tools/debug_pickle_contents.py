@@ -48,7 +48,7 @@ def inspect_pickle(pickle_path: Path) -> None:
                     print(f'  {key}: {val_repr}')
     
     except Exception as e:
-        print(f'ERROR loading pickle: {e}')
+        print(f'ERROR loading pickle file {pickle_path}: {e}')
 
 
 if __name__ == '__main__':

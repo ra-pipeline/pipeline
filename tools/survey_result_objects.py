@@ -143,7 +143,7 @@ def find_result_objects() -> list[dict]:
                 print(f'  {filepath.relative_to(workspace)}: {len(finder.classes)} result class(es)')
 
         except Exception as e:
-            print(f'  Error parsing {filepath}: {e}', file=sys.stderr)
+            print(f'  Error parsing {filepath} in workspace {workspace}: {e}', file=sys.stderr)
 
     return all_classes
 

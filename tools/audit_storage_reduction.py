@@ -43,7 +43,7 @@ def get_dir_sizes(root_path: str) -> dict[str, int]:
                         size_bytes = int(output.stdout.split()[0])
                         result[item.name] = size_bytes
                 except Exception as e:
-                    print(f"Warning: Could not measure {item.name}: {e}", file=sys.stderr)
+                    print(f"Warning: Could not measure {item.name} in directory {root_path}: {e}", file=sys.stderr)
             elif item.is_file():
                 # Count top-level files separately
                 try:

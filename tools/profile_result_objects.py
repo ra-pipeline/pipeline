@@ -11,6 +11,9 @@ Usage:
     # Profile a single result pickle
     python profile_result_objects.py /path/to/results-stage7.pickle
 
+    # Deep-dive analysis: recursive structure breakdown
+    python profile_result_objects.py /path/to/results-stage14.pickle --deep-dive --max-depth 4
+
     # Profile all results in a pipeline output directory
     python profile_result_objects.py /path/to/pipeline/output --all
 
@@ -19,6 +22,14 @@ Usage:
 
     # Export detailed JSON report
     python profile_result_objects.py /path/to/pipeline/output --all --json report.json
+
+Options:
+    --deep-dive:  Perform recursive analysis showing nested structure (single file only)
+    --max-depth:  Maximum recursion depth for deep-dive (default: 4)
+    --verbose:    Print detailed attribute breakdown
+    --json FILE:  Export results to JSON file
+    --all:        Profile all result pickles in directory
+    --min-size-mb: Minimum file size to include in profile (default: 0)
 """
 
 import argparse
@@ -214,7 +225,7 @@ def profile_result_pickle(pickle_path: Path) -> dict:
             'file': str(pickle_path),
             'file_size_bytes': file_size,
             'file_size_human': format_size(file_size),
-            'error': str(e),
+            'error': f'Error loading pickle {pickle_path}: {e}',
         }
 
     # Profile the object
@@ -231,6 +242,111 @@ def profile_result_pickle(pickle_path: Path) -> dict:
     profile['pickle_overhead_pct'] = overhead_pct
 
     return profile
+
+
+def analyze_object_recursive(obj: Any, name: str = "root", depth: int = 0, max_depth: int = 4) -> dict:
+    """
+    Recursively analyze object structure and size (deep-dive mode).
+
+    Args:
+        obj: Object to analyze
+        name: Name of the object
+        depth: Current recursion depth
+        max_depth: Maximum recursion depth
+
+    Returns:
+        Dictionary with nested structure analysis
+    """
+    result = {
+        "name": name,
+        "type": type(obj).__name__,
+        "module": type(obj).__module__ if hasattr(type(obj), "__module__") else "unknown",
+        "size_mb": get_obj_size(obj) / 1_000_000,
+        "depth": depth,
+        "callable": callable(obj),
+    }
+
+    if depth >= max_depth:
+        result["truncated"] = True
+        return result
+
+    # Analyze containers
+    if isinstance(obj, dict):
+        result["dict_size"] = len(obj)
+        result["keys_sample"] = list(obj.keys())[:10]
+        if len(obj) <= 5:
+            result["items"] = {
+                k: {
+                    "type": type(v).__name__,
+                    "size_mb": get_obj_size(v) / 1_000_000
+                } for k, v in obj.items()
+            }
+
+    elif isinstance(obj, (list, tuple)):
+        result["len"] = len(obj)
+        if len(obj) > 0:
+            result["first_item_type"] = type(obj[0]).__name__
+            result["first_item_size_mb"] = get_obj_size(obj[0]) / 1_000_000
+            if len(obj) <= 3:
+                result["items"] = [
+                    {
+                        "type": type(item).__name__,
+                        "size_mb": get_obj_size(item) / 1_000_000
+                    } for item in obj
+                ]
+
+    elif hasattr(obj, "__dict__") and not isinstance(obj, type):
+        # Custom object - analyze attributes
+        attrs = obj.__dict__
+        result["attributes"] = {}
+
+        for attr_name, attr_val in sorted(attrs.items()):
+            if not callable(attr_val):
+                attr_size_mb = get_obj_size(attr_val) / 1_000_000
+                result["attributes"][attr_name] = {
+                    "type": type(attr_val).__name__,
+                    "size_mb": attr_size_mb,
+                }
+
+                # For large attributes, recurse
+                if attr_size_mb > 1.0 and depth < max_depth - 1:
+                    child_analysis = analyze_object_recursive(
+                        attr_val,
+                        attr_name,
+                        depth + 1,
+                        max_depth
+                    )
+                    result["attributes"][attr_name]["analysis"] = child_analysis
+
+    return result
+
+
+def print_deep_dive_report(analysis: dict, indent: int = 0) -> None:
+    """Pretty-print deep-dive analysis results."""
+    ind = "  " * indent
+
+    size_mb = analysis['size_mb']
+    print(f"{ind}{analysis['name']}: {analysis['type']} ({size_mb:.1f} MB)")
+
+    if "dict_size" in analysis:
+        print(f"{ind}  Dict with {analysis['dict_size']} keys")
+    elif "len" in analysis:
+        print(f"{ind}  List/tuple with {analysis['len']} items")
+
+    if "attributes" in analysis:
+        attrs = analysis["attributes"]
+        # Sort by size
+        sorted_attrs = sorted(attrs.items(), key=lambda x: x[1]["size_mb"], reverse=True)
+
+        print(f"{ind}  Attributes ({len(attrs)}):")
+        for attr_name, attr_info in sorted_attrs[:15]:  # Top 15
+            size_mb = attr_info["size_mb"]
+            attr_type = attr_info["type"]
+            print(f"{ind}    {attr_name}: {attr_type} ({size_mb:.1f} MB)")
+
+            # Recurse for large nested analyses
+            if "analysis" in attr_info and size_mb > 1.0:
+                print_deep_dive_report(attr_info["analysis"], indent + 3)
 
 
 def print_profile_report(profile: dict, verbose: bool = False) -> None:
@@ -327,6 +443,17 @@ def main():
         action='store_true',
         help='Print detailed attribute breakdown',
     )
+    parser.add_argument(
+        '--deep-dive',
+        action='store_true',
+        help='Perform deep recursive analysis of object structure (for single file only)',
+    )
+    parser.add_argument(
+        '--max-depth',
+        type=int,
+        default=4,
+        help='Maximum recursion depth for deep-dive analysis (default: 4)',
+    )
 
     args = parser.parse_args()
 
@@ -334,6 +461,15 @@ def main():
     if not path.exists():
         print(f'Error: Path does not exist: {path}', file=sys.stderr)
         return 1
+
+    # Deep-dive mode requires single file
+    if args.deep_dive:
+        if not path.is_file():
+            print(f'Error: --deep-dive requires path to be a file', file=sys.stderr)
+            return 1
+        if args.all:
+            print(f'Error: --deep-dive is incompatible with --all', file=sys.stderr)
+            return 1
 
     # Collect paths to profile
     if args.all:
@@ -356,7 +492,22 @@ def main():
     for pickle_path in pickle_paths:
         profile = profile_result_pickle(pickle_path)
         profiles.append(profile)
-        print_profile_report(profile, verbose=args.verbose)
+
+        if args.deep_dive and len(pickle_paths) == 1:
+            # Deep-dive mode: load and analyze recursively
+            print(f'\n{"=" * 80}')
+            print(f'Deep-Dive Analysis: {pickle_path.name}')
+            print(f'{"=" * 80}\n')
+            try:
+                with open(pickle_path, 'rb') as f:
+                    result = pickle.load(f)
+                analysis = analyze_object_recursive(result, "ResultsList", max_depth=args.max_depth)
+                print_deep_dive_report(analysis)
+            except Exception as e:
+                print(f'Error during deep-dive analysis: {e}', file=sys.stderr)
+                return 1
+        else:
+            print_profile_report(profile, verbose=args.verbose)
 
     # Print summary if multiple files
     if len(profiles) > 1:

@@ -1,0 +1,286 @@
+# Configuration for extracting renderer-specific data from pipeline results
+# Each entry defines how to extract data for a specific task type
+#
+# Structure:
+#   task_pattern: regex pattern to match task name
+#   extraction_type: 'standard' | 'by_vis'
+#   attributes: list of attributes to extract
+#     - name: output key in renderer_data
+#       path: dot-separated path for nested attributes (optional, defaults to name)
+#       default: default value if attribute missing
+#       transform: transform function to apply
+
+extractions:
+  # Standard extraction for tasks with summaries/components
+  - task_pattern: 'rawflagchans|tsysflag|bpsolint|fluxcalflag|polcalflag'
+    extraction_type: 'standard'
+    attributes:
+      - name: 'summaries'
+        default: []
+  
+  # Stage 1: Import data - parang ranges (stored on parent ResultsList)
+  - task_pattern: 'importdata'
+    extraction_type: 'standard'
+    attributes:
+      - name: 'parang_ranges'
+        default: {}
+
+  # Stage 12: Set calibrator models
+  - task_pattern: 'setmodels'
+    extraction_type: 'by_vis'
+    attributes:
+      - name: 'has_measurements'
+        path: 'measurements'
+        transform: 'length'
+        default: 0
+
+  # Stage 13: Bandpass flagging
+  - task_pattern: 'bandpassflag'
+    extraction_type: 'by_vis'
+    attributes:
+      - name: 'refants_to_demote_count'
+        path: 'refants_to_demote'
+        transform: 'length'
+        default: 0
+      - name: 'refants_to_remove_count'
+        path: 'refants_to_remove'
+        transform: 'length'
+        default: 0
+      - name: 'callib_map_keys'
+        path: 'callib_map'
+        transform: 'dict_keys'
+        default: []
+
+  # Stage 14: Bandpass
+  - task_pattern: 'bandpass'
+    extraction_type: 'by_vis'
+    attributes:
+      - name: 'gaintables'
+        path: 'final'
+        transform: 'caltable_list'
+        default: []
+      - name: 'applies_adopted'
+        default: false
+
+  # Stage 15: Spectral window phase-up
+  - task_pattern: 'spwphaseup'
+    extraction_type: 'by_vis'
+    attributes:
+      - name: 'phasecal_mapping_keys'
+        path: 'phasecal_mapping'
+        transform: 'dict_keys'
+        default: []
+      - name: 'gaintables'
+        path: 'phaseup_result.final'
+        transform: 'caltable_list'
+        default: []
+
+  # Stage 16: Fluxscale flagging
+  - task_pattern: 'gfluxscaleflag'
+    extraction_type: 'by_vis'
+    attributes:
+      - name: 'callib_map_keys'
+        path: 'callib_map'
+        transform: 'dict_keys'
+        default: []
+  
+  # Stage 5: Reference antenna selection
+  - task_pattern: 'refant'
+    extraction_type: 'by_vis'
+    attributes:
+      - name: 'refant'
+        path: '_refant'
+        default: ''
+  
+  # Stage 6: Tsys calibration
+  - task_pattern: 'tsyscal'
+    extraction_type: 'by_vis'
+    attributes:
+      - name: 'caltables'
+        path: 'final'
+        default: []
+        transform: 'tsyscal_caltable_list'
+      - name: 'unmappedspws'
+        default: []
+  
+  # Stage 9: Antenna position corrections
+  - task_pattern: 'antpos'
+    extraction_type: 'by_vis'
+    attributes:
+      - name: 'antenna'
+        default: ''
+      - name: 'offsets'
+        default: []
+  
+  # Stage 10: WVR calibration and flagging
+  - task_pattern: 'wvrgcalflag'
+    extraction_type: 'by_vis'
+    attributes:
+      - name: 'gaintables'
+        path: 'flaggerresult.dataresult.final'
+        default: []
+        transform: 'caltable_list'
+      - name: 'wvrflag'
+        path: 'flaggerresult.dataresult.wvrflag'
+        default: []
+      - name: 'too_few_wvr'
+        default: false
+
+  # Stage 17: Fluxscale transfer
+  - task_pattern: 'gfluxscale'
+    extraction_type: 'by_vis'
+    attributes:
+      - name: 'resantenna'
+        default: ''
+      - name: 'uvrange'
+        default: ''
+      - name: 'measurement_count'
+        path: 'measurements'
+        transform: 'length'
+        default: 0
+
+  # Stage 18: Time gain calibration
+  - task_pattern: 'timegaincal'
+    extraction_type: 'by_vis'
+    attributes:
+      - name: 'gaintables'
+        path: 'final'
+        transform: 'caltable_list'
+        default: []
+      - name: 'phase_plot_count'
+        path: 'phasecal_for_phase_plot'
+        transform: 'length'
+        default: 0
+
+  # Stage 20: Target flagging
+  - task_pattern: 'targetflag'
+    extraction_type: 'by_vis'
+    attributes:
+      - name: 'has_cafresult'
+        path: 'cafresult'
+        transform: 'exists'
+        default: null
+      - name: 'callib_map_keys'
+        path: 'callib_map'
+        transform: 'dict_keys'
+        default: []
+
+  # Stage 22/24: Imaging list generation
+  - task_pattern: 'makeimlist'
+    extraction_type: 'by_vis'
+    attributes:
+      - name: 'target_count'
+        path: 'targets'
+        transform: 'length'
+        default: 0
+      - name: 'clean_list_info_keys'
+        path: 'clean_list_info'
+        transform: 'dict_keys'
+        default: []
+
+  # Stage 23/25: Imaging execution
+  - task_pattern: 'makeimages'
+    extraction_type: 'by_vis'
+    attributes:
+      - name: 'target_count'
+        path: 'targets'
+        transform: 'length'
+        default: 0
+      - name: 'result_count'
+        path: 'results'
+        transform: 'length'
+        default: 0
+
+  # Stage 28/48: Export products
+  - task_pattern: 'exportdata'
+    extraction_type: 'standard'
+    attributes:
+      - name: 'session_count'
+        path: 'sessiondict'
+        transform: 'length'
+        default: 0
+      - name: 'ms_product_count'
+        path: 'msvisdict'
+        transform: 'length'
+        default: 0
+      - name: 'target_image_count'
+        path: 'targetimages'
+        transform: 'length'
+        default: 0
+      - name: 'cal_image_count'
+        path: 'calimages'
+        transform: 'length'
+        default: 0
+
+  # Stage 29: mstransform
+  - task_pattern: 'mstransform'
+    extraction_type: 'by_vis'
+    attributes:
+      - name: 'outputvis'
+        default: ''
+      - name: 'ms_count'
+        path: 'mses'
+        transform: 'length'
+        default: 0
+
+  # Stage 32: find continuum
+  - task_pattern: 'findcont'
+    extraction_type: 'by_vis'
+    attributes:
+      - name: 'num_found'
+        default: 0
+      - name: 'num_total'
+        default: 0
+      - name: 'skip_stage'
+        default: false
+
+  # Stage 33: uv continuum subtraction
+  - task_pattern: 'uvcontsub'
+    extraction_type: 'by_vis'
+    attributes:
+      - name: 'outputvis'
+        default: ''
+      - name: 'line_ms_count'
+        path: 'line_mses'
+        transform: 'length'
+        default: 0
+      - name: 'skip_stage'
+        default: false
+
+  # Stage 39: self-calibration
+  - task_pattern: 'selfcal'
+    extraction_type: 'by_vis'
+    attributes:
+      - name: 'target_count'
+        path: 'targets'
+        transform: 'length'
+        default: 0
+      - name: 'is_restore'
+        default: false
+
+  # Stage 26: Image pre-check
+  - task_pattern: 'imageprecheck'
+    extraction_type: 'standard'
+    attributes:
+      - name: 'repr_target'
+        default: ''
+      - name: 'repr_source'
+        default: ''
+      - name: 'repr_spw'
+        default: null
+      - name: 'hm_robust'
+        default: null
+
+  # Stage 27: Product size check
+  - task_pattern: 'checkproductsize'
+    extraction_type: 'standard'
+    attributes:
+      - name: 'status'
+        default: ''
+      - name: 'reason'
+        transform: 'first_reason'
+        default: ''
+      - name: 'size_mitigation_keys'
+        path: 'size_mitigation_parameters'
+        transform: 'dict_keys'
+        default: []
