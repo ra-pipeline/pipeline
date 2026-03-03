@@ -1,192 +1,221 @@
-# Do not evaluate type annotations at definition time.
+"""Pydantic-based FluxMeasurement domain object prototype for Phase 5 modernization."""
+
 from __future__ import annotations
 
+import json
 from decimal import Decimal
+from typing import Any
 
-from .measures import FluxDensity, FluxDensityUnits
+from pydantic import BaseModel, ConfigDict, field_validator
+
+from pipeline.domain.measures import FluxDensity, FluxDensityUnits
 
 
-class FluxMeasurement(object):
-    """
-    FluxMeasurement is a logical representation of a flux measurement.
+class FluxMeasurement(BaseModel):
+    """Pydantic-based flux measurement domain object."""
 
-    Attributes:
-        spw_id: ID of spectral window associated with flux measurement.
-        I: Stokes I flux density as FluxDensity object.
-        Q: Stokes Q flux density as FluxDensity object.
-        U: Stokes U flux density as FluxDensity object.
-        V: Stokes V flux density as FluxDensity object.
-        spix: Spectral index of the flux measurement.
-        uvmin: Scale (in klambda) of the measured (large scale) extent of the
-            flux source (if greater than zero).
-        uvmax: Scale (in klambda) where (small scale) structure has been
-            measured within the flux source, or a limit on the resolved
-            structure.
-        origin: Origin of the flux measurement.
-        age: Age of the flux measurement.
-        queried_at: Date-timestamp when flux measurement was queried (e.g. from
-            catalog service).
-    """
-    def __init__(self,
-                 spw_id: int | str,
-                 I: int | float | FluxDensity,
-                 Q: int | float | FluxDensity = FluxDensity(0),
-                 U: int | float | FluxDensity = FluxDensity(0),
-                 V: int | float | FluxDensity = FluxDensity(0),
-                 spix: Decimal = Decimal('0.0'),
-                 uvmin: Decimal = Decimal('0.0'),
-                 uvmax: Decimal = Decimal('0.0'),
-                 origin: str | None = None,
-                 age: str | None = None,
-                 queried_at: str | None = None) -> None:
-        """
-        Initialize a FluxMeasurement object.
+    spw_id: int
+    I: FluxDensity
+    Q: FluxDensity = FluxDensity(0)
+    U: FluxDensity = FluxDensity(0)
+    V: FluxDensity = FluxDensity(0)
+    spix: Decimal = Decimal('0.0')
+    uvmin: Decimal = Decimal('0.0')
+    uvmax: Decimal = Decimal('0.0')
+    origin: str | None = None
+    age: str | None = None
+    queried_at: str | None = None
+    uncertainty: FluxMeasurement | None = None
 
-        ``uvmin`` and ``uvmax`` are properties in the calibrator source catalog,
-        see e.g. https://almascience.nrao.edu/alma-data/calibrator-catalogue.
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        validate_default=True,
+    )
 
-        Args:
-            spw_id: ID of spectral window associated with flux measurement, as
-                integer or string representation of integer.
-            I: Stokes I flux density, either as int/float (assumed to be flux
-                density in Jansky) or a FluxDensity object.
-            Q: Stokes Q flux density, either as int/float (assumed to be flux
-                density in Jansky) or a FluxDensity object; optional, defaults
-                to 0 Jansky.
-            U: Stokes U flux density, either as int/float (assumed to be flux
-                density in Jansky) or a FluxDensity object; optional, defaults
-                to 0 Jansky.
-            V: Stokes V flux density, either as int/float (assumed to be flux
-                density in Jansky) or a FluxDensity object; optional, defaults
-                to 0 Jansky.
-            spix: Spectral index of the flux measurement; optional, defaults to 0.
-            uvmin: Scale (in klambda) of the measured (large scale) extent of
-                the flux source (if greater than zero); optional, defaults to 0.
-            uvmax: Scale (in klambda) where (small scale) structure has been
-                measured within the flux source, or a limit on the resolved
-                structure; optional, defaults to 0.
-            origin: Origin of the flux measurement; optional, defaults to None.
-            age: Age of the flux measurement; optional, defaults to None.
-            queried_at: Date-timestamp when flux measurement was queried (e.g.
-                from catalog service); optional, defaults to None.
-        """
-        self.spw_id = int(spw_id)
-        self.I = self._to_flux_density(I)
-        self.Q = self._to_flux_density(Q)
-        self.U = self._to_flux_density(U)
-        self.V = self._to_flux_density(V)
-        self.spix = self._to_decimal(spix)
-        self.uvmin = self._to_decimal(uvmin)
-        self.uvmax = self._to_decimal(uvmax)
-        self.origin = origin
-        self.age = age
-        self.queried_at = queried_at
+    @field_validator('spw_id', mode='before')
+    @classmethod
+    def _coerce_spw_id(cls, value: Any) -> int:
+        return int(value)
 
-    @staticmethod
-    def _to_flux_density(arg: int | float | FluxDensity) -> FluxDensity:
-        """
-        Return arg as a new FluxDensity. If arg is a number, it is assumed to
-        be the flux density in Jy.
-        """
-        if isinstance(arg, FluxDensity):
-            # create defensive copies of the flux arguments so they're not
-            # shared between instances
-            return FluxDensity(arg.value, arg.units)
+    @field_validator('I', 'Q', 'U', 'V', mode='before')
+    @classmethod
+    def _coerce_flux(cls, value: Any) -> FluxDensity:
+        if isinstance(value, FluxDensity):
+            return FluxDensity(value.value, value.units)
+        return FluxDensity(value, FluxDensityUnits.JANSKY)
 
-        try:
-            return FluxDensity(arg, FluxDensityUnits.JANSKY)
-        except:
-            raise ValueError('Could not convert {!r} to FluxDensity'.format(arg))
+    @field_validator('spix', 'uvmin', 'uvmax', mode='before')
+    @classmethod
+    def _coerce_decimal(cls, value: Any) -> Decimal:
+        if isinstance(value, Decimal):
+            return value
+        if isinstance(value, (int, float)):
+            return Decimal(str(value))
+        raise ValueError('Could not convert {!r} to Decimal'.format(value))
 
-    @staticmethod
-    def _to_decimal(arg: int | float | Decimal) -> Decimal:
-        """Return arg as a Decimal."""
-        if isinstance(arg, Decimal):
-            return arg
-        elif isinstance(arg, (int, float)):
-            return Decimal(list(map(str, arg)))
-        else:
-            raise ValueError('Could not convert {!r} to Decimal'.format(arg))
+    @field_validator('age', 'queried_at', mode='before')
+    @classmethod
+    def _coerce_string(cls, value: Any) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        # Convert other types (float, datetime, etc.) to string
+        return str(value)
 
     @property
     def casa_flux_density(self) -> list[float]:
         """Return list of Stokes I, Q, U, and V flux densities in Jansky."""
-        iquv = [self.I.to_units(FluxDensityUnits.JANSKY),
-                self.Q.to_units(FluxDensityUnits.JANSKY),
-                self.U.to_units(FluxDensityUnits.JANSKY),
-                self.V.to_units(FluxDensityUnits.JANSKY)]
+        iquv = [
+            self.I.to_units(FluxDensityUnits.JANSKY),
+            self.Q.to_units(FluxDensityUnits.JANSKY),
+            self.U.to_units(FluxDensityUnits.JANSKY),
+            self.V.to_units(FluxDensityUnits.JANSKY),
+        ]
         return list(map(float, iquv))
 
     def __str__(self) -> str:
-        return '<FluxMeasurement(Spw #{spw}, IQUV=({iquv}), spix={spix}, uvmin={uvmin}, uvmax={uvmax}, origin={origin}>'.format(
+        return (
+            '<FluxMeasurement(Spw #{spw}, IQUV=({iquv}), spix={spix}, uvmin={uvmin}, '
+            'uvmax={uvmax}, origin={origin}>'
+        ).format(
             spw=self.spw_id,
             iquv=','.join(map(str, (self.I, self.Q, self.U, self.V))),
             spix=float(self.spix),
             uvmin=float(self.uvmin),
             uvmax=float(self.uvmax),
-            origin=self.origin
+            origin=self.origin,
+        )
+
+    def __hash__(self) -> int:
+        return hash(
+            (
+                self.__class__,
+                self.spw_id,
+                float(self.I.to_units(FluxDensityUnits.JANSKY)),
+                float(self.Q.to_units(FluxDensityUnits.JANSKY)),
+                float(self.U.to_units(FluxDensityUnits.JANSKY)),
+                float(self.V.to_units(FluxDensityUnits.JANSKY)),
+                float(self.spix),
+                float(self.uvmin),
+                float(self.uvmax),
+                self.origin,
+                self.age,
+                self.queried_at,
+            )
         )
 
     def __add__(self, other: FluxMeasurement) -> FluxMeasurement:
         if not isinstance(other, self.__class__):
-            raise TypeError("unsupported operand type(s) for +: '%s' and '%s'" % (self.__class__.__name__,
-                                                                                  other.__class__.__name__))
+            raise TypeError(
+                "unsupported operand type(s) for +: '%s' and '%s'"
+                % (self.__class__.__name__, other.__class__.__name__)
+            )
 
-        spw_id = self.spw_id
-        I = self.I + other.I
-        Q = self.Q + other.Q
-        U = self.U + other.U
-        V = self.V + other.V
-        spix = self.spix
-        uvmin = self.uvmin
-        uvmax = self.uvmax
+        return self.__class__(
+            spw_id=self.spw_id,
+            I=self.I + other.I,
+            Q=self.Q + other.Q,
+            U=self.U + other.U,
+            V=self.V + other.V,
+            spix=self.spix,
+            uvmin=self.uvmin,
+            uvmax=self.uvmax,
+        )
 
-        return self.__class__(spw_id, I, Q, U, V, spix, uvmin, uvmax)
-
-    def __truediv__(self, other: FluxMeasurement) -> FluxMeasurement:
+    def __truediv__(self, other: int | float | Decimal) -> FluxMeasurement:
         if not isinstance(other, (int, float, Decimal)):
-            raise TypeError("unsupported operand type(s) for /: '%s' and '%s'" % (self.__class__.__name__,
-                                                                                  other.__class__.__name__))
+            raise TypeError(
+                "unsupported operand type(s) for /: '%s' and '%s'"
+                % (self.__class__.__name__, other.__class__.__name__)
+            )
 
-        spw_id = self.spw_id
-        I = self.I / other
-        Q = self.Q / other
-        U = self.U / other
-        V = self.V / other
-        spix = self.spix
-        uvmin = self.uvmin
-        uvmax = self.uvmax
+        return self.__class__(
+            spw_id=self.spw_id,
+            I=self.I / other,
+            Q=self.Q / other,
+            U=self.U / other,
+            V=self.V / other,
+            spix=self.spix,
+            uvmin=self.uvmin,
+            uvmax=self.uvmax,
+        )
 
-        return self.__class__(spw_id, I, Q, U, V, spix, uvmin, uvmax)
-
-    def __mul__(self, other: FluxMeasurement) -> FluxMeasurement:
+    def __mul__(self, other: int | float | Decimal) -> FluxMeasurement:
         if not isinstance(other, (int, float, Decimal)):
-            raise TypeError("unsupported operand type(s) for *: '%s' and '%s'" % (self.__class__.__name__,
-                                                                                  other.__class__.__name__))
+            raise TypeError(
+                "unsupported operand type(s) for *: '%s' and '%s'"
+                % (self.__class__.__name__, other.__class__.__name__)
+            )
 
-        spw_id = self.spw_id
-        I = self.I * other
-        Q = self.Q * other
-        U = self.U * other
-        V = self.V * other
-        spix = self.spix
-        uvmin = self.uvmin
-        uvmax = self.uvmax
+        return self.__class__(
+            spw_id=self.spw_id,
+            I=self.I * other,
+            Q=self.Q * other,
+            U=self.U * other,
+            V=self.V * other,
+            spix=self.spix,
+            uvmin=self.uvmin,
+            uvmax=self.uvmax,
+        )
 
-        return self.__class__(spw_id, I, Q, U, V, spix, uvmin, uvmax,)
+    def __rmul__(self, other: int | float | Decimal) -> FluxMeasurement:
+        return self.__mul__(other)
 
-    def __rmul__(self, other: FluxMeasurement) -> FluxMeasurement:
-        if not isinstance(other, (int, float, Decimal)):
-            raise TypeError("unsupported operand type(s) for *: '%s' and '%s'" % (self.__class__.__name__,
-                                                                                  other.__class__.__name__))
+    def to_dict(self) -> dict[str, Any]:
+        """Export to dictionary with scalar flux densities in Jansky."""
+        return {
+            'spw_id': self.spw_id,
+            'I': float(self.I.to_units(FluxDensityUnits.JANSKY)),
+            'Q': float(self.Q.to_units(FluxDensityUnits.JANSKY)),
+            'U': float(self.U.to_units(FluxDensityUnits.JANSKY)),
+            'V': float(self.V.to_units(FluxDensityUnits.JANSKY)),
+            'spix': float(self.spix),
+            'uvmin': float(self.uvmin),
+            'uvmax': float(self.uvmax),
+            'origin': self.origin,
+            'age': self.age,
+            'queried_at': self.queried_at,
+        }
 
-        spw_id = self.spw_id
-        I = self.I * other
-        Q = self.Q * other
-        U = self.U * other
-        V = self.V * other
-        spix = self.spix
-        uvmin = self.uvmin
-        uvmax = self.uvmax
+    def to_json(self) -> str:
+        """Export to JSON string."""
+        return json.dumps(self.to_dict())
 
-        return self.__class__(spw_id, I, Q, U, V, spix, uvmin, uvmax)
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> FluxMeasurement:
+        """Create from dictionary."""
+        return cls(**data)
+
+    @classmethod
+    def from_json(cls, json_str: str) -> FluxMeasurement:
+        """Create from JSON string."""
+        return cls.model_validate_json(json_str)
+
+    @classmethod
+    def from_flux_measurement(cls, flux: FluxMeasurement) -> FluxMeasurement:
+        """Create from legacy FluxMeasurement object for migration."""
+        return cls(
+            spw_id=flux.spw_id,
+            I=flux.I,
+            Q=flux.Q,
+            U=flux.U,
+            V=flux.V,
+            spix=flux.spix,
+            uvmin=flux.uvmin,
+            uvmax=flux.uvmax,
+            origin=flux.origin,
+            age=flux.age,
+            queried_at=flux.queried_at,
+        )
+
+
+def upgrade_flux_measurement(flux_obj: Any) -> FluxMeasurement | None:
+    """Upgrade a legacy FluxMeasurement object to Pydantic version."""
+    if isinstance(flux_obj, FluxMeasurement):
+        return flux_obj
+
+    if isinstance(flux_obj, FluxMeasurement):
+        return FluxMeasurement.from_flux_measurement(flux_obj)
+
+    return None
