@@ -1585,6 +1585,8 @@ class SelfcalHeuristics(object):
                 selfcal_library[target][band]['spws'] = []
                 selfcal_library[target][band]['spws_per_vis'] = []
                 selfcal_library[target][band]['nterms'] = get_nterms(band_properties[vislist[0]][band]['fracbw'])
+                if 'VLA' in self.telescope:
+                    _, _, self.reffreq = self.get_sensitivity()
                 selfcal_library[target][band]['reffreq'] = self.reffreq
                 selfcal_library[target][band]['vislist'] = vislist.copy()
 
