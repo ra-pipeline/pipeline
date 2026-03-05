@@ -1609,8 +1609,7 @@ class SelfcalHeuristics(object):
                     selfcal_library[target][band][vis]['spwlist'] = band_properties[vis][band]['spwarray'].tolist()
                     selfcal_library[target][band][vis]['n_spws'] = len(selfcal_library[target][band][vis]['spwsarray'])
                     selfcal_library[target][band][vis]['minspw'] = int(
-                        np.min(selfcal_library[target][band][vis]['spwsarray'])
-                    )
+                        np.min(selfcal_library[target][band][vis]['spwsarray']))
 
                     if band_properties[vis][band]['ncorrs'] == 1:
                         selfcal_library[target][band][vis]['pol_type'] = 'single-pol'
@@ -1642,7 +1641,7 @@ class SelfcalHeuristics(object):
                 selfcal_library[target][band]['75thpct_uv'] = band_properties[vislist[0]][band]['75thpct_uv']
                 selfcal_library[target][band]['LAS'] = band_properties[vislist[0]][band]['LAS']
                 selfcal_library[target][band]['fracbw'] = band_properties[vislist[0]][band]['fracbw']
-                selfcal_library[target][band]['meanfreq']=band_properties[vislist[0]][band]['meanfreq']
+                selfcal_library[target][band]['meanfreq'] = band_properties[vislist[0]][band]['meanfreq']
                 selfcal_library[target][band]['spectral_scan'] = spectral_scan
                 selfcal_library[target][band]['spws_set'] = spws_set[band]
 
@@ -1809,32 +1808,34 @@ class SelfcalHeuristics(object):
             for band in selfcal_library[target]:
                 selfcal_plan[target][band] = {}
                 if band in selfcal_library[target]:
-                    selfcal_plan[target][band]['solints'], selfcal_plan[target][band]['integration_time'], selfcal_plan[target][band]['gaincal_combine'], selfcal_plan[target][band]['solmode'] = get_solints_simple(vislist, scantimesdict[band], 
+                    selfcal_plan[target][band]['solints'], selfcal_plan[target][band]['integration_time'], selfcal_plan[target][band]['gaincal_combine'], \
+                        selfcal_plan[target][band]['solmode'] = get_solints_simple(selfcal_library[target][band]['vislist'], 
+                                                                               scantimesdict[band], 
                                                                                scannfieldsdict[band], 
                                                                                scanstartsdict[band], 
                                                                                scanendsdict[band], 
                                                                                integrationtimesdict[band], 
                                                                                self.inf_EB_gaincal_combine, 
                                                                                do_amp_selfcal=self.do_amp_selfcal, 
-                                                                               mosaic=mosaic_field[band][vislist[0]][target]['mosaic'])
-                LOG.info('%s %s %s', band, target, selfcal_plan[target][band]['solints'])
-                selfcal_plan[target][band]['applycal_mode'] = [self.apply_cal_mode_default]*len(selfcal_plan[target][band]['solints'])
+                                                                               mosaic=selfcal_library[target][band]['obstype'] == 'mosaic')
+                    LOG.info('%s %s %s', band, target, selfcal_plan[target][band]['solints'])
+                    selfcal_plan[target][band]['applycal_mode'] = [self.apply_cal_mode_default]*len(selfcal_plan[target][band]['solints'])
 
 
         for target in selfcal_plan:
             for band in selfcal_plan[target]:
                 for vis in selfcal_library[target][band]['vislist']:
                     selfcal_plan[target][band][vis] = {}
-                    selfcal_plan[target][band][vis]['inf_EB_gaincal_combine']=self.inf_EB_gaincal_combine #'scan'
-                    if selfcal_library[target][band]['obstype']=='mosaic':
-                        selfcal_plan[target][band][vis]['inf_EB_gaincal_combine']+=',field'   
+                    selfcal_plan[target][band][vis]['inf_EB_gaincal_combine'] = self.inf_EB_gaincal_combine #'scan'
+                    if selfcal_library[target][band]['obstype'] == 'mosaic':
+                        selfcal_plan[target][band][vis]['inf_EB_gaincal_combine'] += ',field'
 
                     if selfcal_library[target][band][vis]['pol_type'] == 'single-pol':
-                        selfcal_plan[target][band][vis]['inf_EB_gaintype']='T'
+                        selfcal_plan[target][band][vis]['inf_EB_gaintype'] = 'T'
                     else:
-                        selfcal_plan[target][band][vis]['inf_EB_gaintype']=self.inf_EB_gaintype #G
+                        selfcal_plan[target][band][vis]['inf_EB_gaintype'] = self.inf_EB_gaintype #G
 
-                    selfcal_plan[target][band][vis]['inf_EB_fallback_mode']='' #'scan'
+                    selfcal_plan[target][band][vis]['inf_EB_fallback_mode'] = '' #'scan'
 
 
         return selfcal_library, selfcal_plan, gaincalibrator_dict
@@ -1884,6 +1885,7 @@ class SelfcalHeuristics(object):
     def evaluate_subfields_to_gaincal(self, slib, sani_target, band, solint, iteration, selfcal_plan, 
                                       minsnr_to_proceed, allow_gain_interpolation=False):
 
+        # Fields that don't have any mask in the primary beam should be removed from consideration, as their models are likely bad.
         new_fields_to_selfcal = []
         for fid in slib['sub-fields-to-selfcal']:
             os.system('rm -rf test*.mask')
