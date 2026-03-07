@@ -251,11 +251,16 @@ class T2_4MDetailsTsysflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             # use _name from field as we do want the raw name here as used
             # in the summaries dict (not sometimes enclosed in "..."). Better
             # perhaps to fix the summaries dict.
-            intent_fields[intent] = [f._name for f in ms.fields
-                                     if intent in f.intents]
+            intent_fields[intent] = [
+                getattr(f, '_name', getattr(f, 'name_raw', getattr(f, 'name', '')))
+                for f in ms.fields
+                if intent in f.intents
+            ]
 
         # while we're looping, get the total flagged by looking in all scans 
-        intent_fields['TOTAL'] = [f._name for f in ms.fields]
+        intent_fields['TOTAL'] = [
+            getattr(f, '_name', getattr(f, 'name_raw', getattr(f, 'name', ''))) for f in ms.fields
+        ]
 
         total = collections.defaultdict(dict)
 

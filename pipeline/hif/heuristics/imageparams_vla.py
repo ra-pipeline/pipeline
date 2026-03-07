@@ -715,18 +715,15 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         target_sources = [s.name for s in repr_ms.sources if 'TARGET' in s.intents]
 
         if not target_sources:
-            if repr_target[0] == 'none':
-                LOG.warning('No TARGET intent found. Selecting from calibration intents.')
-                # Try calibration intents in priority order
-                for repr_intent in ['PHASE', 'CHECK', 'AMPLITUDE', 'FLUX', 'BANDPASS']:
-                    target_sources = [s.name for s in repr_ms.sources if repr_intent in s.intents]
-                    if target_sources:
-                        break
+            LOG.warning('No TARGET intent found. Selecting from calibration intents.')
+            # Try calibration intents in priority order
+            for repr_intent in ['PHASE', 'CHECK', 'AMPLITUDE', 'FLUX', 'BANDPASS']:
+                target_sources = [s.name for s in repr_ms.sources if repr_intent in s.intents]
+                if target_sources:
+                    break
 
-                if not target_sources:
-                    raise Exception('Cannot select representative target from any calibration intent.')
-            else:
-                raise Exception('Cannot select representative target from TARGET intent.')
+            if not target_sources:
+                raise Exception('Cannot select representative target from any calibration intent.')
 
         repr_source = target_sources[0]
 
@@ -740,9 +737,20 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
             for spw in repr_ms.get_spectral_windows() if str(spw.id) in flag_stats_spw
         }
 
-        # Select SPW with minimum flagging fraction
-        repr_spw_obj = min(spw_flagfrac, key=spw_flagfrac.get)
-        repr_spw = repr_spw_obj.id
+        if not spw_flagfrac:
+            LOG.warning('No per-SPW flag summary available; falling back to first available SPW.')
+            candidate_spws = repr_ms.get_spectral_windows(science_windows_only=True)
+            if not candidate_spws:
+                candidate_spws = repr_ms.get_spectral_windows()
+            if not candidate_spws:
+                raise Exception('Cannot determine representative SPW: no spectral windows found.')
+
+            repr_spw_obj = sorted(candidate_spws, key=lambda spw: spw.id)[0]
+            repr_spw = repr_spw_obj.id
+        else:
+            # Select SPW with minimum flagging fraction
+            repr_spw_obj = min(spw_flagfrac, key=spw_flagfrac.get)
+            repr_spw = repr_spw_obj.id
 
         # Get central channel for frequency/bandwidth calculation
         repr_chan_obj = repr_spw_obj.channels[repr_spw_obj.num_channels // 2]

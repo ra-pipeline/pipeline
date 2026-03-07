@@ -4,10 +4,10 @@ pipeconfig:
   chdir: "./" # not used yet
   vis: # not used yet
   procedure: # not used yet
-  loglevel: "info" # default Python logging level, e.g. 'debug' (note: not confused with the global casalogsink level), 
+  loglevel: "debug" # default Python logging level, e.g. 'debug' (note: not confused with the global casalogsink level), 
   ppr: # not used yet
   vlappr: # not used yet
-  xvfb: false # option for directly spawn xvfb server from the python session, pyvirtualdisplay is required for xvfb=True
+  xvfb: true # option for directly spawn xvfb server from the python session, pyvirtualdisplay is required for xvfb=True
   omp_num_threads: 4 # not used yet
   dask:
     tier0futures: true

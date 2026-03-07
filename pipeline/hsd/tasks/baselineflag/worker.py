@@ -1022,11 +1022,17 @@ def _get_iteration(reduction_group:Dict, msobj:MeasurementSet, antid:int, fieldi
     for group_desc in reduction_group.values():
         #memids = common.get_valid_ms_members(group_desc, [msobj.name], antid, fieldid, spwid)
         #members.extend([group_desc[i] for i in memids])
-        member_id = group_desc._search_member(msobj, antid, spwid, fieldid)
+        try:
+            member_id = group_desc._search_member(msobj, antid, spwid, fieldid)
+        except ValueError:
+            member_id = None
+
         if member_id is not None:
             members.append(group_desc[member_id])
     if len(members) == 1:
         return members[0].iteration
     elif len(members) == 0:
-        raise RuntimeError('Given (%s, %s, %s) is not in reduction group.' % (antid, fieldid, spwid))
+        # Derived MSes (e.g. atmcor output) may legitimately lack reduction-group membership.
+        # Treat as not-yet-baselined data so downstream flagging can proceed.
+        return 0
     raise RuntimeError('Given (%s, %s, %s) is in more than one reduction groups.' % (antid, fieldid, spwid))

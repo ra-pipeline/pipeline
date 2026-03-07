@@ -186,7 +186,7 @@ class PhaseOffsetPlot(object):
         axes[0].spines['left'].set_visible(True)
         axes[0].spines['left'].set_linestyle('solid')
         axes[-1].spines['right'].set_visible(True)
-        axes[0].set_ylabel('Deviation from Scan Median Phase (degrees)' % scan.id, size=10)
+        axes[0].set_ylabel('Deviation from Scan Median Phase (degrees)', size=10)
 
         plt.subplots_adjust(wspace=0.0)
 

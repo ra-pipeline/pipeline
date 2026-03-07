@@ -4525,8 +4525,15 @@ def score_fluxservice(result: ALMAImportDataResults) -> list[pqa.QAScore]:
                     age = getattr(m, 'age', None)
                     if age is None:
                         LOG.debug("Skipping measurement due to missing age data.")
-                    elif abs(int(age)) > 14:
-                        agecounter += 1
+                    else:
+                        try:
+                            age_days = float(age)
+                        except (TypeError, ValueError):
+                            LOG.debug('Skipping measurement due to non-numeric age data: %r', age)
+                            continue
+
+                        if abs(age_days) > 14:
+                            agecounter += 1
 
         if ampcal_spws and ampcal:
             flux_msg = (
@@ -5130,7 +5137,7 @@ def score_pointing_outlier(
     return qa_scores
 
 @log_qa
-def score_syspowerdata(data: dict) -> list[pqa.QAScore]:
+def score_syspowerdata(data: object) -> list[pqa.QAScore]:
     """Calculates QA score as the minimum of per-band scores based on data points outside 0.7-1.2 range.
 
         For each band:
@@ -5144,21 +5151,30 @@ def score_syspowerdata(data: dict) -> list[pqa.QAScore]:
             pqa.QAScore: QA score object
         """
 
-    band_score = None
-    qascores = []
+    if not data:
+        return []
+
+    if not hasattr(data, 'items'):
+        LOG.warning('Skip scoring syspower data: unexpected type %s', type(data))
+        return []
+
+    qascores: list[pqa.QAScore] = []
     for band, values in data.items():
-        outliers = [v for v in values.data.flatten() if v < 0.7 or v > 1.2]
-        fraction_outside = len(outliers) / len(values.data.flatten())
-        band_score = (1 - fraction_outside)
+        values_arr = getattr(values, 'data', values)
+        values_flat = np.asarray(values_arr).flatten()
+        if values_flat.size == 0:
+            continue
+
+        outliers = values_flat[(values_flat < 0.7) | (values_flat > 1.2)]
+        fraction_outside = float(outliers.size) / float(values_flat.size)
+        band_score = 1.0 - fraction_outside
 
         longmsg = f"Band {band} has {fraction_outside*100:.2f}% data outside the range 0.7-1.2"
 
         shortmsg = (f"{band}: {fraction_outside*100:.2f}% >[0.7-1.2]")
 
 
-        origin = pqa.QAOrigin(metric_name='score_syspowerdata',
-                            metric_score=band_score,
-                            metric_units='')
+        origin = pqa.QAOrigin(metric_name='score_syspowerdata', metric_score=band_score, metric_units='')
 
         qascores.append(pqa.QAScore(band_score, longmsg=longmsg, shortmsg=shortmsg, origin=origin))
 

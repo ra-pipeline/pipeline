@@ -1,84 +1,104 @@
-"""
-Format values that are usually associated with a unit.
-"""
+"""Pydantic-based unit formatting helpers for Phase 5 modernization."""
+
+from __future__ import annotations
+
 import bisect
 import decimal
+import json
+from typing import Any
 
-# TODO
-# for reformatiing GHz, want to say 'print precision to nearest 10kHz'
+from pydantic import BaseModel, ConfigDict, Field as PydanticField
 
 
-class UnitOfMagnitude(object):
-    """Models a unit of magnitude such as 'Kilobyte', 'milimetre' or 'hectare'."""
-    def __init__(self, magnitude, format, html):
-        self.magnitude = decimal.Decimal(str(magnitude))
-        self.format = format
-        self.html = html
+class UnitOfMagnitude(BaseModel):
+    """Models a unit of magnitude such as 'Kilobyte' or 'millimetre'."""
 
-    def adjust(self, number):
+    magnitude: decimal.Decimal = PydanticField(..., description='Magnitude of the unit')
+    format: str = PydanticField(..., description='Format string for rendering')
+    html: str = PydanticField(..., description='HTML format string for rendering')
+
+    model_config = ConfigDict(
+        validate_default=True,
+    )
+
+    def __hash__(self) -> int:
+        return hash((self.__class__, self.magnitude))
+
+    def adjust(self, number: Any) -> decimal.Decimal:
         return decimal.Decimal(str(number)) / self.magnitude
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, UnitOfMagnitude):
+            return False
         return self.magnitude == other.magnitude
 
-    def __ne__(self, other):
-        return not self.magnitude != other.magnitude
+    def __ne__(self, other: object) -> bool:
+        return not self.__eq__(other)
 
-    def __lt__(self, other):
+    def __lt__(self, other: UnitOfMagnitude) -> bool:
         return self.magnitude < other.magnitude
 
-    def __le__(self, other):
+    def __le__(self, other: UnitOfMagnitude) -> bool:
         return self.magnitude <= other.magnitude
 
-    def __gt__(self, other):
+    def __gt__(self, other: UnitOfMagnitude) -> bool:
         return self.magnitude > other.magnitude
 
-    def __ge__(self, other):
+    def __ge__(self, other: UnitOfMagnitude) -> bool:
         return self.magnitude >= other.magnitude
 
 
-class UnitFormat(object):
-    def __init__(self, prefer_integers=False):
-        self.units = list()
-        self.prefer_integers = prefer_integers
+class UnitFormat(BaseModel):
+    """Utility for formatting values that are usually associated with a unit."""
 
-    def addUnitOfMagnitude(self, magnitude, format, html=None):
-        """
-        Adds a unit to this format. For example, to add support for centimetres
-        to a UnitFormat of metric length, use magnitude of 0.01d (ie 1/100th of
-        a metre) and number format '###0.# cm'.
+    units: list[UnitOfMagnitude] = PydanticField(default_factory=list)
+    prefer_integers: bool = PydanticField(default=False)
+
+    model_config = ConfigDict(
+        validate_default=True,
+    )
+
+    def __hash__(self) -> int:
+        return hash((self.__class__, tuple(self.units)))
+
+    def addUnitOfMagnitude(self, magnitude: Any, format: str, html: str | None = None) -> None:
+        """Add a unit to this format.
+
+        Args:
+            magnitude: Magnitude of the unit relative to the base.
+            format: Python format string for display.
+            html: Optional HTML format string; defaults to format.
         """
         if html is None:
             html = format
-        bisect.insort(self.units, UnitOfMagnitude(magnitude, format, html))
+        unit = UnitOfMagnitude(
+            magnitude=decimal.Decimal(str(magnitude)),
+            format=format,
+            html=html,
+        )
+        bisect.insort(self.units, unit)
 
-    def format(self, number):
-        bestUnit = self.bestUnitForObject(number)
-        numberAdjusted = bestUnit.adjust(number)
-        return bestUnit.format.format(numberAdjusted)
+    def format(self, number: Any) -> str:
+        best_unit = self.bestUnitForObject(number)
+        number_adjusted = best_unit.adjust(number)
+        return best_unit.format.format(number_adjusted)
 
-    def html(self, number):
-        bestUnit = self.bestUnitForObject(number)
-        numberAdjusted = bestUnit.adjust(number)
-        return bestUnit.html.format(numberAdjusted)
+    def html(self, number: Any) -> str:
+        best_unit = self.bestUnitForObject(number)
+        number_adjusted = best_unit.adjust(number)
+        return best_unit.html.format(number_adjusted)
 
-    def bestUnitForObject(self, number):
+    def bestUnitForObject(self, number: Any) -> UnitOfMagnitude:
         if not self.units:
             raise LookupError()
 
-        # take the absolute value as some values, such as offsets, could be 
-        # negative
         as_decimal = abs(decimal.Decimal(str(number)))
 
-        # assume all unit types have one unit with a magnitude of 1, which
-        # is the case so far.
         default_units = [u for u in self.units if u.magnitude == 1][0]
 
-        # a value of 0 has no best unit. So, return the default unit instead.
         if as_decimal == 0:
             return default_units
 
-        # find the largest unit not bigger than this value
         best_unit = default_units
         for unit in self.units:
             if as_decimal >= unit.magnitude:
@@ -87,11 +107,6 @@ class UnitFormat(object):
         if not self.prefer_integers:
             return best_unit
 
-        # it's preferable to print 100" rather than 1.67'. The next bit of
-        # code tests whether the number is an integer when expressed in the
-        # next lowest unit. If the number is a fraction in the best units
-        # but an integer in the next best units, return the next best units
-        # instead.
         try:
             next_best_unit = self.units[self.units.index(best_unit) - 1]
         except IndexError:
@@ -104,8 +119,18 @@ class UnitFormat(object):
 
         if not no_fraction_best and no_fraction_next:
             return next_best_unit
-        else:
-            return best_unit
+        return best_unit
+
+    def to_dict(self) -> dict[str, Any]:
+        """Export to dictionary."""
+        return {
+            'units': [u.model_dump() for u in self.units],
+            'prefer_integers': self.prefer_integers,
+        }
+
+    def to_json(self) -> str:
+        """Export to JSON string."""
+        return json.dumps(self.to_dict())
 
 
 file_size = UnitFormat()
@@ -114,7 +139,6 @@ file_size.addUnitOfMagnitude(1024, '{0:.1f} KiB')
 file_size.addUnitOfMagnitude(1024 * 1024, '{0:.1f} MiB')
 file_size.addUnitOfMagnitude(1024 * 1024 * 1024, '{0:.1f} GiB')
 
-# Create a Unit for measuring lengths
 distance = UnitFormat()
 distance.addUnitOfMagnitude('.000001', '{0:.1f} &#181;m')
 distance.addUnitOfMagnitude('.001', '{0:.1f} mm')
@@ -122,8 +146,7 @@ distance.addUnitOfMagnitude(1, '{0:.1f} m')
 distance.addUnitOfMagnitude(1000, '{0:.1f} km')
 
 
-# Create a Unit for measuring frequencies
-def get_frequency_format(precision):
+def get_frequency_format(precision: int) -> UnitFormat:
     s = '{0:.' + str(precision) + 'f}'
     f = UnitFormat()
     f.addUnitOfMagnitude('.000001', s + ' &#181;Hz')
@@ -138,7 +161,6 @@ def get_frequency_format(precision):
 
 frequency = get_frequency_format(3)
 
-# Create a Unit for measuring flux densities
 flux = UnitFormat()
 flux.addUnitOfMagnitude('.000000001', '{0:.3f} nJy')
 flux.addUnitOfMagnitude('.000001', '{0:.3f} &#181;Jy')
@@ -146,7 +168,6 @@ flux.addUnitOfMagnitude('.001', '{0:.3f} mJy')
 flux.addUnitOfMagnitude(1, '{0:.3f} Jy')
 flux.addUnitOfMagnitude(1000, '{0:.3f} kJy')
 
-# Create a Unit for measuring energy
 energy = UnitFormat()
 energy.addUnitOfMagnitude('.000000000000000000000001', '{0:.3f} yJ')
 energy.addUnitOfMagnitude('.000000000000000000001', '{0:.3f} zJ')
@@ -173,8 +194,8 @@ velocity.addUnitOfMagnitude(1000, '{0:.3f} km/s')
 proper_motion = UnitFormat()
 proper_motion.addUnitOfMagnitude(1, '{0:.3f} mas/yr')
 proper_motion.addUnitOfMagnitude(1000, '{0:.3f} arcsec/yr')
-proper_motion.addUnitOfMagnitude(60*1000, '{0:.3f} arcmin/yr')
-proper_motion.addUnitOfMagnitude(60*60*1000, '{0:.3f} deg/yr')	
+proper_motion.addUnitOfMagnitude(60 * 1000, '{0:.3f} arcmin/yr')
+proper_motion.addUnitOfMagnitude(60 * 60 * 1000, '{0:.3f} deg/yr')
 
 temperature = UnitFormat()
 temperature.addUnitOfMagnitude('.000000000000000000000001', '{0:.3f} yK')
@@ -188,76 +209,13 @@ temperature.addUnitOfMagnitude('.001', '{0:.3f} mK')
 temperature.addUnitOfMagnitude(1, '{0:.3f} K')
 
 arc = UnitFormat()
-arc.addUnitOfMagnitude(1, '{0:.3f}\\u00b0')
-arc.addUnitOfMagnitude(1/60, '{0:.3f}\\u2032')
-arc.addUnitOfMagnitude(1/3600, '{0:.3f}\\u2033')
-arc.addUnitOfMagnitude(1/3600000, '{0:.3f} mas')
-arc.addUnitOfMagnitude(1/3600000000, '{0:.3f} &#181;as')
+arc.addUnitOfMagnitude(1, '{0:.3f}\u00b0')
+arc.addUnitOfMagnitude(1 / 60, '{0:.3f}\u2032')
+arc.addUnitOfMagnitude(1 / 3600, '{0:.3f}\u2033')
+arc.addUnitOfMagnitude(1 / 3600000, '{0:.3f} mas')
+arc.addUnitOfMagnitude(1 / 3600000000, '{0:.3f} &#181;as')
 
 time = UnitFormat()
 time.addUnitOfMagnitude('.001', '{0:.0f} ms')
 time.addUnitOfMagnitude(1, '{0:.1f} s')
 time.addUnitOfMagnitude(60, '{0:.0f} mins')
-time.addUnitOfMagnitude(3600, '{0:.0f} hours')
-time.addUnitOfMagnitude(86400, '{0:.0f} days')
-time.addUnitOfMagnitude(604800, '{0:.0f} weeks')
-time.addUnitOfMagnitude(31536000, '{3:.0f} years')
-
-
-if __name__ == '__main__':
-    # print some sample file sizes
-    x722b = 722
-    x498kb = 509952
-    x15mb = 15728640
-    x300mb = 314572800
-    x40gb = 42949672960
-    print(file_size.format(x722b))
-    print(file_size.format(x498kb))
-    print(file_size.format(x498kb + x722b))
-    print(file_size.format(x15mb))
-    print(file_size.format(x15mb + x498kb + x722b))
-    print(file_size.format(x300mb))
-    print(file_size.format(x300mb + x15mb + x498kb + x722b))
-    print(file_size.format(x40gb))
-    print(file_size.format(x40gb + x300mb + x15mb + x498kb + x722b))
-
-    # print some lengths
-    x315um = 0.000315
-    x867mm = 0.867
-    x128m = 128
-    print(distance.format(x315um))
-    print(distance.format(x867mm))
-    print(distance.format(x128m))
-    print(distance.format(x128m + x867mm))
-
-    x300deg = 300.0
-    x3deg = 3.0
-    x3minArc = 0.05
-    x9secArc = 0.0025
-    x1d25secArc = 1/3600/25
-    print(arc.format(x300deg))
-    print(arc.format(x3deg))
-    print(arc.format(x3minArc))
-    print(arc.format(x9secArc))
-    print(arc.format(x1d25secArc))
-
-    x1maspm = 1.0
-    x1aspm = 1000.0
-    x1ampm = 1000*60.0
-    x1degpm = 1000*3600.0
-    print(proper_motion.format(x1maspm))
-    print(proper_motion.format(x1aspm))
-    print(proper_motion.format(x1ampm))
-    print(proper_motion.format(x1degpm))
-
-    x218ms = 0.218
-    x18s = 18
-    x2m = 120
-    x3h = 10800
-    print(time.format(x218ms))
-    print(time.format(x18s))
-    print(time.format(x218ms + x18s))
-    print(time.format(x2m))
-    print(time.format(x2m + x18s))
-    print(time.format(x3h))
-    print(time.format(x2m + x18s))

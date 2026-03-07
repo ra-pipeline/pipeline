@@ -938,13 +938,34 @@ class T2_1DetailsRenderer(object):
         # Flatten all zenith angles and timestamps from all TARGET fields
         zd = [zd_val for field_data in data.values() for zd_val in field_data['zd']]
         telmjd = [time.timestamp() for field_data in data.values() for time in field_data['telmjd']]
-        # Retrieve min, average, and max zenith angle measurements and corresponding timestamps
-        zd_min, zd_avg, zd_max = np.min(zd), np.average(zd), np.max(zd)
-        telmjd_min, telmjd_avg, telmjd_max = telmjd[zd.index(zd_min)], np.average(telmjd), telmjd[zd.index(zd_max)]
+        if zd and telmjd:
+            # Retrieve min, average, and max zenith angle measurements and corresponding timestamps
+            zd_min_val = float(np.min(zd))
+            zd_avg_val = float(np.average(zd))
+            zd_max_val = float(np.max(zd))
+            telmjd_min_val = float(telmjd[zd.index(zd_min_val)])
+            telmjd_avg_val = float(np.average(telmjd))
+            telmjd_max_val = float(telmjd[zd.index(zd_max_val)])
 
-        # Create zenith angle vs time plot
-        task = summary.ZDTELMJDChart(context, ms, data)
-        zd_vs_telmjd_plot = task.plot()
+            zd_min = round(zd_min_val, 2)
+            zd_avg = round(zd_avg_val, 2)
+            zd_max = round(zd_max_val, 2)
+            telmjd_min = utils.format_datetime(datetime.datetime.fromtimestamp(telmjd_min_val))
+            telmjd_avg = utils.format_datetime(datetime.datetime.fromtimestamp(telmjd_avg_val))
+            telmjd_max = utils.format_datetime(datetime.datetime.fromtimestamp(telmjd_max_val))
+
+            # Create zenith angle vs time plot
+            task = summary.ZDTELMJDChart(context, ms, data)
+            zd_vs_telmjd_plot = task.plot()
+        else:
+            LOG.debug('No TARGET zenith angle samples found for %s; skipping ZD stats/plot.', ms.basename)
+            zd_min = 'n/a'
+            zd_avg = 'n/a'
+            zd_max = 'n/a'
+            telmjd_min = 'n/a'
+            telmjd_avg = 'n/a'
+            telmjd_max = 'n/a'
+            zd_vs_telmjd_plot = None
 
         dirname = os.path.join('session%s' % ms.session, ms.basename)
 
@@ -1019,12 +1040,12 @@ class T2_1DetailsRenderer(object):
             'pointing_plot'   : pointing_plot,
             'el_min'          : el_min,
             'el_max'          : el_max,
-            'zd_min'          : round(zd_min, 2),
-            'zd_avg'          : round(zd_avg, 2),
-            'zd_max'          : round(zd_max, 2),
-            'telmjd_min'      : utils.format_datetime(datetime.datetime.fromtimestamp(telmjd_min)),
-            'telmjd_avg'      : utils.format_datetime(datetime.datetime.fromtimestamp(telmjd_avg)),
-            'telmjd_max'      : utils.format_datetime(datetime.datetime.fromtimestamp(telmjd_max)),
+            'zd_min'          : zd_min,
+            'zd_avg'          : zd_avg,
+            'zd_max'          : zd_max,
+            'telmjd_min'      : telmjd_min,
+            'telmjd_avg'      : telmjd_avg,
+            'telmjd_max'      : telmjd_max,
             'vla_basebands'   : vla_basebands
         }
 

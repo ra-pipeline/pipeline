@@ -1209,12 +1209,19 @@ class UVChart:
         # Determine first target and first science spw for that target (even in multi-band data) for VLA
         if self.context.project_summary.telescope in ('VLA', 'EVLA'):
             fieldobjs = self.ms.get_fields(intent='TARGET')
-            first_field = fieldobjs[0]
-            source_name = first_field.name
-            source_spwobjlist = list(first_field.valid_spws)
-            source_spwidlist = [spw.id for spw in source_spwobjlist]
-            source_spwidlist.sort()
-            source_spwid = source_spwidlist[0]
+            if fieldobjs:
+                first_field = fieldobjs[0]
+                source_name = first_field.name
+                source_spwobjlist = list(first_field.valid_spws)
+                source_spwidlist = [spw.id for spw in source_spwobjlist]
+                source_spwidlist.sort()
+                if source_spwidlist:
+                    source_spwid = source_spwidlist[0]
+                else:
+                    LOG.debug('No valid SPWs found for first TARGET field in %s.', self.ms.basename)
+                    source_spwid = None
+            else:
+                LOG.debug('No TARGET fields found in %s; falling back to preferred intent order.', self.ms.basename)
 
         # Determine the representative source name and spwid for the ms
         repsource_name, repsource_spwid = self.ms.get_representative_source_spw(source_name=source_name,

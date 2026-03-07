@@ -15,6 +15,30 @@ from ... import heuristics
 
 LOG = infrastructure.get_logger(__name__)
 
+
+def _get_field_by_id_or_name(ms: MeasurementSet, field_id: int | None, field_name: str | None):
+    """Return a best-effort field match.
+
+    Args:
+        ms: MeasurementSet to query.
+        field_id: Preferred field id to match.
+        field_name: Fallback name to match.
+
+    Returns:
+        A matched field instance, or None.
+    """
+    if field_id is not None:
+        fields = ms.get_fields(field_id=field_id)
+        if fields:
+            return fields[0]
+
+    if field_name:
+        fields = ms.get_fields(name=field_name)
+        if fields:
+            return fields[0]
+
+    return None
+
 def generate_ms(name: str, ref_ms: MeasurementSet) -> MeasurementSet:
     """
     Generate MeasurementSet (MS) domain object of a new MS.
@@ -63,11 +87,21 @@ def generate_ms(name: str, ref_ms: MeasurementSet) -> MeasurementSet:
     if hasattr(ref_ms, 'deviation_mask'):
         new_ms.deviation_mask = ref_ms.deviation_mask
     LOG.debug('Copying org_direction')
-    for f in ref_ms.fields:
-        if hasattr(f.source, 'org_direction'):
-            field = new_ms.get_fields(field_id = f.id)[0]
-            if field.name == f.name:
-                field.source.org_direction = f.source.org_direction
+    for ref_field in ref_ms.fields:
+        if not hasattr(ref_field.source, 'org_direction'):
+            continue
+
+        new_field = _get_field_by_id_or_name(new_ms, ref_field.id, ref_field.name)
+        if new_field is None:
+            LOG.debug(
+                'Skipping org_direction transfer: no matching field in %s for ref field id=%s name=%r',
+                new_ms.basename,
+                ref_field.id,
+                ref_field.name,
+            )
+            continue
+
+        new_field.source.org_direction = ref_field.source.org_direction
 
     return new_ms
 
@@ -81,11 +115,27 @@ def __transfer_ephemeris_flag(new_ms: MeasurementSet, ref_ms: MeasurementSet):
         ref_ms: The reference MS domain object from which information is
             transferred from.
     """
-    for f in new_ms.fields:
-        ref_f = ref_ms.get_fields(field_id=f.id)[0]
-        assert ref_f.source.name == f.source.name
-        f.source.is_known_eph_obj = ref_f.source.is_known_eph_obj
-        f.source.is_eph_obj = ref_f.source.is_eph_obj
+    for new_field in new_ms.fields:
+        ref_field = _get_field_by_id_or_name(ref_ms, new_field.id, new_field.name)
+        if ref_field is None:
+            LOG.debug(
+                'Skipping ephemeris flag transfer: no matching ref field for new field id=%s name=%r in %s',
+                new_field.id,
+                new_field.name,
+                new_ms.basename,
+            )
+            continue
+
+        if ref_field.source.name != new_field.source.name:
+            LOG.debug(
+                'Ephemeris field name mismatch (ref=%r new=%r) for %s; transferring flags anyway.',
+                ref_field.source.name,
+                new_field.source.name,
+                new_ms.basename,
+            )
+
+        new_field.source.is_known_eph_obj = getattr(ref_field.source, 'is_known_eph_obj', False)
+        new_field.source.is_eph_obj = getattr(ref_field.source, 'is_eph_obj', False)
 
 def set_beam_size(ms: MeasurementSet):
     """

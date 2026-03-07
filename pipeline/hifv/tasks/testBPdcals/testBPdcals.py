@@ -168,6 +168,38 @@ class testBPdcals(basetask.StandardTaskTemplate):
     """
     Inputs = testBPdcalsInputs
 
+    @staticmethod
+    def _field_id_strings_from_scans(ms: object, scan_select_string: str) -> List[str]:
+        scan_ids: List[int] = []
+        for part in (scan_select_string or '').split(','):
+            part = part.strip()
+            if not part:
+                continue
+            try:
+                scan_ids.append(int(part))
+            except ValueError:
+                LOG.warning('Ignoring non-integer scan id %r in scan selection %r', part, scan_select_string)
+
+        if not scan_ids:
+            return []
+
+        try:
+            scanobjlist = ms.get_scans(scan_id=scan_ids)
+        except Exception:
+            LOG.exception('Failed to resolve scans from scan selection %r', scan_select_string)
+            return []
+
+        field_id_strings: List[str] = []
+        for scanobj in scanobjlist:
+            if not getattr(scanobj, 'fields', None):
+                continue
+            fieldobj, = scanobj.fields
+            field_id_string = str(fieldobj.id)
+            if field_id_string not in field_id_strings:
+                field_id_strings.append(field_id_string)
+
+        return field_id_strings
+
     def prepare(self):
         """Bulk of task execution occurs here.
 
@@ -576,8 +608,32 @@ class testBPdcals(basetask.StandardTaskTemplate):
                               'spwmap': [],
                               'parang': self.parang}
 
-        fields = delay_field_select_string.split(',')
-        for fieldidstring in fields:
+        field_id_strings: List[str] = []
+        for fieldidstring in (delay_field_select_string or '').split(','):
+            fieldidstring = fieldidstring.strip()
+            if not fieldidstring:
+                continue
+            try:
+                int(fieldidstring)
+            except ValueError:
+                LOG.warning(
+                    'Ignoring non-integer delay field id %r in delay_field_select_string=%r',
+                    fieldidstring,
+                    delay_field_select_string,
+                )
+                continue
+            field_id_strings.append(fieldidstring)
+
+        if not field_id_strings:
+            field_id_strings = self._field_id_strings_from_scans(m, delay_scan_select_string)
+
+        if not field_id_strings:
+            raise ValueError(
+                'No delay calibration field ids found; delay_field_select_string=%r delay_scan_select_string=%r'
+                % (delay_field_select_string, delay_scan_select_string)
+            )
+
+        for fieldidstring in field_id_strings:
             fieldid = int(fieldidstring)
             uvrangestring = uvrange(self.setjy_results, fieldid)
             delaycal_task_args['field'] = fieldidstring
@@ -640,7 +696,32 @@ class testBPdcals(basetask.StandardTaskTemplate):
                               'spwmap': [],
                               'parang': self.parang}
 
-        for fieldidstring in delay_field_select_string.split(','):
+        field_id_strings: List[str] = []
+        for fieldidstring in (delay_field_select_string or '').split(','):
+            fieldidstring = fieldidstring.strip()
+            if not fieldidstring:
+                continue
+            try:
+                int(fieldidstring)
+            except ValueError:
+                LOG.warning(
+                    'Ignoring non-integer delay field id %r in delay_field_select_string=%r',
+                    fieldidstring,
+                    delay_field_select_string,
+                )
+                continue
+            field_id_strings.append(fieldidstring)
+
+        if not field_id_strings:
+            field_id_strings = self._field_id_strings_from_scans(m, delay_scan_select_string)
+
+        if not field_id_strings:
+            raise ValueError(
+                'No delay calibration field ids found; delay_field_select_string=%r delay_scan_select_string=%r'
+                % (delay_field_select_string, delay_scan_select_string)
+            )
+
+        for fieldidstring in field_id_strings:
             fieldid = int(fieldidstring)
             uvrangestring = uvrange(self.setjy_results, fieldid)
             delaycal_task_args['field'] = fieldidstring
@@ -654,7 +735,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
 
         return True
 
-    def _check_flagSolns(self, flaggedSolnResult: Dict, RefAntOutput: List[str] = None) -> (float, List[str]):
+    def _check_flagSolns(self, flaggedSolnResult: Dict, RefAntOutput: List[str] = None) -> tuple[float, List[str]]:
         """Change reference antenna list based on a critical fraction of flagged solutions
             (defined in the domain ms object)
 

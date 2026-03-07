@@ -17,6 +17,7 @@ docstring-inheritance~=2.2                # For inheriting docstrings
 intervaltree~=3.1                         # Data structure for intervals
 logutils~=0.3                             # Handlers for the standard logging package
 mako~=1.3                                 # A high-performance templating engine
+pydantic>=2.0                             # Data validation and parsing with Python type annotations
 pypubsub==4.0.3                           # Pinned due to API changes in later versions
 
 # -- Optional & Tooling Dependencies --
