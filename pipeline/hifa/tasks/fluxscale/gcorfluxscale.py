@@ -1239,6 +1239,8 @@ class SessionGcorFluxscale(basetask.StandardTaskTemplate):
                     continue
                 try:
                     worker_result = task.get_result()
+                except exceptions.PipelineStopRequested:
+                    raise
                 except exceptions.PipelineException as e:
                     assessed.append(sessionutils.VisResultTuple(vis, task_args, e))
                 else:

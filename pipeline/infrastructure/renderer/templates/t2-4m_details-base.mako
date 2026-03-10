@@ -447,12 +447,17 @@ ${next.body()}
         <div id="collapseFive" class="panel-collapse collapse" role="tabpanel" aria-labelledby="headingFive">
             <div class="panel-body">
                 <dl class="dl-horizontal">
+                    <%
+                    start_time = getattr(result.timestamps, 'start', None) if getattr(result, 'timestamps', None) is not None else None
+                    end_time = getattr(result.timestamps, 'end', None) if getattr(result, 'timestamps', None) is not None else None
+                    duration = end_time - start_time if start_time is not None and end_time is not None else None
+                    %>
                     <dt>Start time</dt>
-                    <dd>${utils.format_datetime(result.timestamps.start, dp=3)}</dd>
+                    <dd>${utils.format_datetime(start_time, dp=3) if start_time is not None else 'N/A'}</dd>
                     <dt>End</dt>
-                    <dd>${utils.format_datetime(result.timestamps.end, dp=3)}</dd>
+                    <dd>${utils.format_datetime(end_time, dp=3) if end_time is not None else 'N/A'}</dd>
                     <dt>Duration</dt>
-                    <dd>${utils.format_timedelta(result.timestamps.end - result.timestamps.start, dp=3)}</dd>
+                    <dd>${utils.format_timedelta(duration, dp=3) if duration is not None else 'N/A'}</dd>
                     % if logging.logging_level <= logging.DEBUG:
                         <dt>Context size</dt>
                         <dd>${str(measures.FileSize(get_obj_size(pcontext), measures.FileSizeUnits.BYTES))}</dd>

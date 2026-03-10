@@ -14,7 +14,7 @@ from . import logging
 from . import utils
 from .eventbus import ContextLifecycleEvent, ContextCreatedEvent, ContextResumedEvent
 from .eventbus import ResultLifecycleEvent, ResultAcceptingEvent, ResultAcceptedEvent, ResultAcceptErrorEvent
-from .eventbus import TaskLifecycleEvent, TaskStartedEvent, TaskCompleteEvent, TaskAbnormalExitEvent
+from .eventbus import TaskLifecycleEvent, TaskStartedEvent, TaskCompleteEvent, TaskAbnormalExitEvent, TaskStoppedEvent
 from .eventbus import WebLogStageLifecycleEvent, WebLogStageRenderingStartedEvent, WebLogStageRenderingCompleteEvent, \
     WebLogStageRenderingAbnormalExitEvent
 from .mpihelpers import MPIEnvironment
@@ -101,7 +101,7 @@ class TaskTimeTracker:
         """
         Callback function for Task lifecycle events.
         """
-        self.on_lifecycle_event(event, 'tasks', TaskStartedEvent, (TaskCompleteEvent, TaskAbnormalExitEvent))
+        self.on_lifecycle_event(event, 'tasks', TaskStartedEvent, (TaskCompleteEvent, TaskAbnormalExitEvent, TaskStoppedEvent))
 
     def on_result_lifecycle_event(self, event: ResultLifecycleEvent):
         """

@@ -93,7 +93,14 @@ class AsyncTask(object):
             err_msg = 'Failure executing job on MPI server {}, with traceback\n {}'.format(
                 response['server'], response['traceback']
             )
-            raise exceptions.PipelineException(err_msg)
+            if 'PipelineStopRequested' in response['traceback']:
+                stop_message = response['traceback'].strip().splitlines()[-1]
+                stop_message = stop_message.partition('PipelineStopRequested: ')[2] or stop_message
+                raise exceptions.PipelineStopRequested(stop_message)
+            raise exceptions.PipelineTaskExecutionError(
+                err_msg,
+                reason_code='mpi_task_execution_failed',
+            )
 
     def _merge_casa_commands(self, response):
         """Merge the "casa_commands" log entries from a Tier0 AsyncTask into the client-side main logfile.
@@ -185,13 +192,18 @@ class SyncTask(object):
                 else:
                     # for FunctionCall
                     return self.__task()
+        except exceptions.PipelineStopRequested:
+            raise
         except Exception as e:
             import traceback
 
             err_msg = 'Failure executing job by an exception {} with the following traceback\n {}'.format(
                 e.__class__.__name__, traceback.format_exc()
             )
-            raise exceptions.PipelineException(err_msg)
+            raise exceptions.PipelineTaskExecutionError(
+                err_msg,
+                reason_code='sync_task_execution_failed',
+            )
 
 
 class Executable(object):

@@ -16,6 +16,7 @@ import uuid
 from . import api
 from . import casa_tools
 from . import eventbus
+from . import exceptions
 from . import filenamer
 from . import jobrequest
 from . import logging
@@ -24,7 +25,7 @@ from . import project
 from . import task_registry
 from . import utils
 from . import vdp
-from .eventbus import TaskStartedEvent, TaskCompleteEvent, TaskAbnormalExitEvent
+from .eventbus import TaskStartedEvent, TaskCompleteEvent, TaskAbnormalExitEvent, TaskStoppedEvent
 from .eventbus import ResultAcceptingEvent, ResultAcceptedEvent, ResultAcceptErrorEvent
 
 from .casa_tasks import CasaTasks
@@ -70,7 +71,7 @@ def result_finaliser(method):
         elif result is not None:
             inputs = self.inputs
             result.inputs = inputs.as_dict()
-            result.stage_number = inputs.context.task_counter
+            result.stage_number = _get_task_context(inputs).task_counter
             try:
                 result.pipeline_casa_task = inputs._pipeline_casa_task
             except AttributeError:
@@ -80,6 +81,45 @@ def result_finaliser(method):
         return result
 
     return finalise_pipeline_result
+
+
+def _get_pipeline_task_name(task: api.Task) -> str:
+    """Return the CASA-facing name for a task when available."""
+    try:
+        return task_registry.get_casa_task(task.__class__)
+    except KeyError:
+        return task.__class__.__name__
+
+
+def _get_result_task_name(result) -> str | None:
+    """Return the CASA-facing task name attached to a result when available."""
+    task_name = getattr(result, 'taskname', None)
+    if isinstance(task_name, str) and task_name:
+        return task_name
+
+    pipeline_casa_task = getattr(result, 'pipeline_casa_task', None)
+    if isinstance(pipeline_casa_task, str) and pipeline_casa_task:
+        return pipeline_casa_task.partition('(')[0]
+
+    task = result._get_task()
+    if task is None:
+        return None
+    try:
+        return task_registry.get_casa_task(task)
+    except KeyError:
+        return getattr(task, '__name__', None)
+
+
+def _get_task_context(inputs) -> object:
+    """Return the framework context for task bookkeeping.
+
+    InputsContainer delegates many attribute reads across per-vis Inputs
+    instances, which can yield list-shaped values. Framework bookkeeping needs
+    the shared base context instead.
+    """
+    if isinstance(inputs, vdp.InputsContainer):
+        return inputs._context
+    return inputs.context
 
 
 def capture_log(method):
@@ -244,15 +284,19 @@ class Results(api.Results):
         Accept these results, registering objects with the context and incrementing
         stage counters as necessary in preparation for the next task.
         """
-        event = ResultAcceptingEvent(context_name=context.name, stage_number=self.stage_number)
-        eventbus.send_message(event)
-
         if context is None:
             # context will be none when called from a CASA interactive
             # session. When this happens, we need to locate the global context
             # from the stack
             import pipeline.h.cli.utils
             context = pipeline.h.cli.utils.get_context()
+
+        event = ResultAcceptingEvent(
+            context_name=context.name,
+            stage_number=self.stage_number,
+            task_name=_get_result_task_name(self),
+        )
+        eventbus.send_message(event)
 
         # find whether this result is being accepted as part of a task
         # execution or whether it's being accepted after task completion
@@ -350,11 +394,19 @@ class Results(api.Results):
             # the event is always sent even if result acceptance is failed.
             if isinstance(result_to_append, FailedTaskResults):
                 # result acceptance failed, so we need to send ResultAcceptErrorEvent
-                event = ResultAcceptErrorEvent(context_name=context.name, stage_number=self.stage_number)
+                event = ResultAcceptErrorEvent(
+                    context_name=context.name,
+                    stage_number=self.stage_number,
+                    task_name=_get_result_task_name(result_to_append),
+                )
             else:
                 # result acceptance went well, results object must be self
                 assert result_to_append is self
-                event = ResultAcceptedEvent(context_name=context.name, stage_number=self.stage_number)
+                event = ResultAcceptedEvent(
+                    context_name=context.name,
+                    stage_number=self.stage_number,
+                    task_name=_get_result_task_name(result_to_append),
+                )
 
             # Sending event should be very last line in this method.
             # Adding any code after sending event is not recommended because
@@ -409,6 +461,34 @@ class FailedTaskResults(Results):
         s = "FailedTaskResults:\n"\
              "\toriginal task: {}\n".format(self.origtask_cls.__name__)
         return s
+
+
+class StoppedTaskResults(Results):
+    """
+    StoppedTaskResults represents a renderer-visible result for a task that
+    stopped intentionally.
+    """
+
+    def __init__(
+        self,
+        origtask_cls,
+        *,
+        taskname: str | None,
+        stage_number: int,
+        reason_code: str | None,
+        message: str | None,
+    ):
+        super(StoppedTaskResults, self).__init__()
+        self.origtask_cls = origtask_cls
+        self.task = StoppedTask
+        self.taskname = taskname
+        self.stage_number = stage_number
+        self.reason_code = reason_code
+        self.message = message
+
+    def __repr__(self):
+        task_name = self.taskname or getattr(self.origtask_cls, '__name__', 'unknown')
+        return 'StoppedTaskResults:\n\toriginal task: {}\n'.format(task_name)
 
 
 class ResultsProxy(object):
@@ -609,25 +689,23 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
     @capture_log
     @result_finaliser
     def execute(self, **parameters):
+        context = _get_task_context(self.inputs)
         if utils.is_top_level_task():
             # Set the task name, but only if this is a top-level task. This
             # name will be prepended to every data product name as a sign of
             # their origin
-            try:
-                name = task_registry.get_casa_task(self.__class__)
-            except KeyError:
-                name = self.__class__.__name__
+            name = _get_pipeline_task_name(self)
             filenamer.NamingTemplate.task = name
 
             # initialise the subtask counter, which will be subsequently
             # incremented for every execute within this top-level task
-            self.inputs.context.task_counter += 1
-            LOG.info('Starting execution for stage %s',
-                     self.inputs.context.task_counter)
-            self.inputs.context.subtask_counter = 0
+            context.task_counter += 1
+            LOG.info('Starting execution for stage %s', context.task_counter)
+            context.subtask_counter = 0
 
-            event = TaskStartedEvent(context_name=self.inputs.context.name,
-                                     stage_number=self.inputs.context.task_counter)
+            event = TaskStartedEvent(context_name=context.name,
+                                     stage_number=context.task_counter,
+                                     task_name=name)
             eventbus.send_message(event)
 
             # log the invoked pipeline task and its comment to
@@ -635,7 +713,7 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
             _log_task(self)
 
         else:
-            self.inputs.context.subtask_counter += 1
+            context.subtask_counter += 1
 
         # Create a copy of the inputs - including the context - and attach
         # this copy to the Inputs. Tasks can then merge results with this
@@ -644,7 +722,7 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
         self.inputs = utils.pickle_copy(original_inputs)
 
         # create a job executor that tasks can use to execute subtasks
-        self._executor = Executor(self.inputs.context)
+        self._executor = Executor(context)
         self._executable = CasaTasks(executor=self._executor)
 
         # create a new log handler that will capture all messages above
@@ -692,10 +770,27 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
 
             if utils.is_top_level_task():
                 event = TaskCompleteEvent(
-                    context_name=self.inputs.context.name, stage_number=self.inputs.context.task_counter
+                    context_name=context.name,
+                    stage_number=context.task_counter,
+                    task_name=name,
                 )
                 eventbus.send_message(event)
             return result
+
+        except exceptions.PipelineStopRequested as ex:
+            if utils.is_top_level_task():
+                name = _get_pipeline_task_name(self)
+                message = str(ex) or ex.__class__.__name__
+                LOG.info('Pipeline task %s requested clean stop: %s', name, message)
+                event = TaskStoppedEvent(
+                    context_name=context.name,
+                    stage_number=context.task_counter,
+                    task_name=name,
+                    reason_code=ex.reason_code,
+                    message=message,
+                )
+                eventbus.send_message(event)
+            raise
 
         except Exception as ex:
             # Created a special result object for the failed task, but only if
@@ -704,10 +799,7 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
             if utils.is_top_level_task():
                 # Get the task name from the task registry, otherwise use the
                 # task class name.
-                try:
-                    name = task_registry.get_casa_task(self.__class__)
-                except KeyError:
-                    name = self.__class__.__name__
+                name = _get_pipeline_task_name(self)
 
                 # Log error message.
                 tb = traceback.format_exc()
@@ -723,8 +815,9 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
                 else:
                     result.logrecords.extend(handler.buffer)
 
-                event = TaskAbnormalExitEvent(context_name=self.inputs.context.name,
-                                              stage_number=self.inputs.context.task_counter)
+                event = TaskAbnormalExitEvent(context_name=context.name,
+                                              stage_number=context.task_counter,
+                                              task_name=name)
                 eventbus.send_message(event)
 
                 return result
@@ -813,6 +906,12 @@ class FailedTask(StandardTaskTemplate):
     def __init__(self, context):
         inputs = vdp.InputsContainer(self, context)
         super(FailedTask, self).__init__(inputs)
+
+
+class StoppedTask(StandardTaskTemplate):
+    def __init__(self, context):
+        inputs = vdp.InputsContainer(self, context)
+        super(StoppedTask, self).__init__(inputs)
 
 
 class Executor(object):
@@ -907,7 +1006,7 @@ class Executor(object):
 
 
 def _log_task(task):
-    context = task.inputs.context
+    context = _get_task_context(task.inputs)
     filename = os.path.join(context.report_dir,
                             context.logs['casa_commands'])
     comment = ''

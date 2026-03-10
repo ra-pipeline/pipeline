@@ -7,6 +7,7 @@ import decimal
 import enum
 import functools
 import itertools
+import json
 import operator
 import os
 import pydoc
@@ -39,6 +40,8 @@ if TYPE_CHECKING:
 
 LOG = infrastructure.logging.get_logger(__name__)
 
+EVENTS_FILENAME = 'pipeline-events.jsonl'
+
 
 def get_task_description(result_obj, context, include_stage=True):
     if not isinstance(result_obj, (list, basetask.ResultsList)):
@@ -70,6 +73,21 @@ def get_task_description(result_obj, context, include_stage=True):
                     raise
                 else:
                     description = getattr(renderer, 'description', None)
+                break
+    elif any([isinstance(result, basetask.StoppedTaskResults)
+              for result in result_obj]):
+        for result in result_obj:
+            if isinstance(result, basetask.StoppedTaskResults):
+                task_cls = result.origtask_cls
+                if task_cls is not None:
+                    try:
+                        renderer = weblog.registry.get_renderer(task_cls, context, result)
+                    except KeyError:
+                        description = None
+                    else:
+                        description = getattr(renderer, 'description', None)
+                if description is None and getattr(result, 'taskname', None):
+                    description = "'{}'".format(result.taskname)
                 break
     else:
         # If there was no FailedResult, then use first result to represent the
@@ -115,6 +133,9 @@ def get_task_description(result_obj, context, include_stage=True):
 
 
 def _get_task_description_for_class(task_cls):
+    if task_cls is None:
+        return 'Stopped task'
+
     if LOG.isEnabledFor(LOG.todo):
         LOG.todo('No task description for \'%s\'' % task_cls.__name__)
         return ('\'%s\' (developers should add a task description)'
@@ -129,13 +150,18 @@ def get_task_name(result_obj, include_stage=True):
     if hasattr(result_obj, 'task'):
         if isinstance(result_obj, basetask.FailedTaskResults):
             task_cls = result_obj.origtask_cls
+        elif isinstance(result_obj, basetask.StoppedTaskResults):
+            task_cls = result_obj.origtask_cls
         else:
             task_cls = result_obj.task
 
-        try:
-            casa_task = task_registry.get_casa_task(task_cls)
-        except KeyError:
-            casa_task = task_cls.__name__
+        if isinstance(result_obj, basetask.StoppedTaskResults) and getattr(result_obj, 'taskname', None):
+            casa_task = result_obj.taskname
+        else:
+            try:
+                casa_task = task_registry.get_casa_task(task_cls)
+            except KeyError:
+                casa_task = task_cls.__name__
 
         # Prepend stage number to task name.
         s = '%s%s' % (stage, casa_task)
@@ -145,9 +171,14 @@ def get_task_name(result_obj, include_stage=True):
 
         if isinstance(result_obj, basetask.FailedTaskResults):
             s += ' (failed)'
+        elif isinstance(result_obj, basetask.StoppedTaskResults):
+            s += ' (stopped)'
         elif isinstance(result_obj, basetask.ResultsList) and \
             any([isinstance(result, basetask.FailedTaskResults) for result in result_obj]):
             s += ' (failed)'
+        elif isinstance(result_obj, basetask.ResultsList) and \
+            any([isinstance(result, basetask.StoppedTaskResults) for result in result_obj]):
+            s += ' (stopped)'
 
         return s
     else:
@@ -162,21 +193,26 @@ def get_task_name(result_obj, include_stage=True):
         # Take task class from first result in result list.
         if isinstance(result_obj[0], basetask.FailedTaskResults):
             task_cls = result_obj[0].origtask_cls
+        elif isinstance(result_obj[0], basetask.StoppedTaskResults):
+            task_cls = result_obj[0].origtask_cls
         else:
             task_cls = result_obj[0].task
 
-        if task_cls is None:
-            results_cls = result_obj[0].__class__.__name__
-            msg = 'No task registered on results of type %s' % results_cls
-            LOG.warning(msg)
-            return msg
+        if isinstance(result_obj[0], basetask.StoppedTaskResults) and getattr(result_obj[0], 'taskname', None):
+            casa_task = result_obj[0].taskname
+        else:
+            if task_cls is None:
+                results_cls = result_obj[0].__class__.__name__
+                msg = 'No task registered on results of type %s' % results_cls
+                LOG.warning(msg)
+                return msg
 
-        # Get the task name from the task registry, otherwise use the CASA
-        # class name.
-        try:
-            casa_task = task_registry.get_casa_task(task_cls)
-        except KeyError:
-            casa_task = task_cls.__name__
+            # Get the task name from the task registry, otherwise use the CASA
+            # class name.
+            try:
+                casa_task = task_registry.get_casa_task(task_cls)
+            except KeyError:
+                casa_task = task_cls.__name__
 
         # Prepend stage number to task name.
         s = '%s%s' % (stage, casa_task)
@@ -189,8 +225,76 @@ def get_task_name(result_obj, include_stage=True):
         if any([isinstance(result, basetask.FailedTaskResults)
                 for result in result_obj]):
             s += ' (failed)'
+        elif any([isinstance(result, basetask.StoppedTaskResults)
+                  for result in result_obj]):
+            s += ' (stopped)'
 
         return s
+
+
+def _resolve_task_class(task_name: str | None):
+    if not task_name:
+        return None
+
+    try:
+        import pipeline.cli as pipeline_cli
+
+        task_callable = pipeline_cli.get_pipeline_task_with_name(task_name)
+    except Exception:
+        return None
+
+    if hasattr(task_callable, '__self__') and task_callable.__self__ is not None:
+        return task_callable.__self__.__class__
+    return getattr(task_callable, '__class__', None)
+
+
+def _load_stopped_results(context):
+    events_path = os.path.join(context.output_dir, EVENTS_FILENAME)
+    if not os.path.exists(events_path):
+        return []
+
+    completed_stages = {result.stage_number for result in context.results}
+    stopped_events = {}
+    with open(events_path, 'r', encoding='utf-8') as events_file:
+        for line in events_file:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if record.get('event_type') != 'stage_stopped':
+                continue
+            stage_number = record.get('stage_number')
+            if not isinstance(stage_number, int) or stage_number in completed_stages:
+                continue
+            stopped_events[stage_number] = record
+
+    stopped_results = []
+    for stage_number in sorted(stopped_events):
+        record = stopped_events[stage_number]
+        stopped_result = basetask.StoppedTaskResults(
+            _resolve_task_class(record.get('task_name')),
+            taskname=record.get('task_name'),
+            stage_number=stage_number,
+            reason_code=record.get('reason_code'),
+            message=record.get('message'),
+        )
+        stopped_result.inputs = {}
+        stopped_result.timestamps = collections.namedtuple('SyntheticTimestamps', 'start end')(None, None)
+        stopped_result.qa = collections.namedtuple('SyntheticQA', 'representative pool')(
+            pqa.QAScore(None, '', ''),
+            [],
+        )
+        stopped_result.logrecords = []
+        stopped_results.append(stopped_result)
+
+    return stopped_results
+
+
+def get_weblog_results(context):
+    return list(context.results) + _load_stopped_results(context)
 
 
 def get_stage_number(result_obj):
@@ -718,6 +822,15 @@ class T1_3MRenderer(RendererBase):
             warning_msgs = utils.get_logrecords(results_list, logging.WARNING)
             tablerows.extend(logrecords_to_tablerows(warning_msgs, results_list, 'Warning'))
 
+        for stopped_result in _load_stopped_results(context):
+            tablerows.append(
+                create_tablerow(
+                    stopped_result,
+                    stopped_result.message or 'Pipeline execution stopped intentionally.',
+                    'Stopped',
+                )
+            )
+
         # Update flag table (search from the last to the first task)
         flag_update_tasks = ['applycal', 'hsd_blflag']
         for result in context.results[-1::-1]:
@@ -784,7 +897,9 @@ class T1_4MRenderer(RendererBase):
     def get_display_context(context):
         scores = {}
 
-        for result in context.results:
+        results = get_weblog_results(context)
+
+        for result in results:
             scores[result.stage_number] = result.qa.representative
 
         # PIPE-2014: obtain the task time duration from the timetracker event database.
@@ -804,9 +919,9 @@ class T1_4MRenderer(RendererBase):
         task_stage_map: dict[int, datetime.timedelta] = r.get('tasks', {})
         result_stage_map: dict[int, datetime.timedelta] = r.get('results', {})
         fallback_duration = datetime.timedelta(0)
-        task_duration = [task_stage_map.get(result.stage_number, fallback_duration) for result in context.results]
+        task_duration = [task_stage_map.get(result.stage_number, fallback_duration) for result in results]
         # The 'results' field in the timetrack db includes the cost of QA and weblog.
-        result_duration = [result_stage_map.get(result.stage_number, fallback_duration) for result in context.results]
+        result_duration = [result_stage_map.get(result.stage_number, fallback_duration) for result in results]
 
         # copy PPR for weblog
         pprfile = context.project_structure.ppr_file
@@ -816,7 +931,7 @@ class T1_4MRenderer(RendererBase):
 
         return {
             'pcontext': context,
-            'results': context.results,
+            'results': results,
             'scores': scores,
             'task_duration': task_duration,
             'result_duration': result_duration,
@@ -1459,7 +1574,7 @@ class T2_4MRenderer(RendererBase):
     @staticmethod
     def get_display_context(context):
         return {'pcontext' : context,
-                'results'  : context.results}
+                'results'  : get_weblog_results(context)}
 
 
 class T2_4MDetailsDefaultRenderer(object):
@@ -1626,7 +1741,7 @@ class T2_4MDetailsRenderer(object):
     @classmethod
     def render(cls, context):
         # for each result accepted and stored in the context..
-        for task_result in context.results:
+        for task_result in get_weblog_results(context):
             # we only handle lists of results, so wrap single objects in a
             # list if necessary
             if not isinstance(task_result, collections.abc.Iterable):
@@ -1635,6 +1750,8 @@ class T2_4MDetailsRenderer(object):
             # find the renderer appropriate to the task..
             if any(isinstance(result, basetask.FailedTaskResults) for result in task_result):
                 task = basetask.FailedTask
+            elif any(isinstance(result, basetask.StoppedTaskResults) for result in task_result):
+                task = basetask.StoppedTask
             else:
                 task = task_result[0].task
             try:

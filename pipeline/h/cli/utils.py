@@ -8,13 +8,17 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.api as api
 import pipeline.infrastructure.argmapper as argmapper
 import pipeline.infrastructure.vdp as vdp
-from pipeline.infrastructure import exceptions, task_registry, utils
+from pipeline.infrastructure import exceptions, status, task_registry, utils
 from pipeline.infrastructure.launcher import current_task_name
+from pipeline.infrastructure.renderer import htmlrenderer
 
 from .. import heuristics
 from . import cli
 
 LOG = infrastructure.get_logger(__name__)
+propagate_stop_requested = contextvars.ContextVar('propagate_stop_requested', default=False)
+STOP_REQUESTED_ATTR = '_pipeline_stop_requested'
+STOP_REASON_ATTR = '_pipeline_stop_reason'
 
 
 def cli_wrapper(func: Callable) -> Callable:
@@ -73,8 +77,21 @@ def cli_wrapper(func: Callable) -> Callable:
         all_inputs = dict(bound_arguments.arguments)
 
         context = get_context()
+        if getattr(context, STOP_REQUESTED_ATTR, False) and not propagate_stop_requested.get():
+            LOG.info('Skipping pipeline task %s because a clean stop was already requested.', task_name)
+            return None
+
         with set_contextvar(current_task_name, task_name):
-            results = execute_task(context, task_name, all_inputs)
+            try:
+                results = execute_task(context, task_name, all_inputs)
+            except exceptions.PipelineStopRequested as exc:
+                if propagate_stop_requested.get():
+                    raise
+                setattr(context, STOP_REQUESTED_ATTR, True)
+                setattr(context, STOP_REASON_ATTR, getattr(exc, 'reason_code', None))
+                status.publish_terminal_exception(exc, request_path=None, source='cli')
+                htmlrenderer.WebLogGenerator.render(context)
+                return None
 
         return results
 
@@ -92,8 +109,9 @@ def set_contextvar(var: contextvars.ContextVar, value: Any) -> Generator[None, N
 def get_context():
     """Retrieve the current pipeline context."""
     if cli.PIPELINE_NAME not in cli.stack:
-        raise exceptions.PipelineException(
-            'Pipeline has not been initialized. Please call h_init() or h_resume() first.'
+        raise exceptions.PipelineRequestError(
+            'Pipeline has not been initialized. Please call h_init() or h_resume() first.',
+            reason_code='pipeline_not_initialized',
         )
     return cli.stack[cli.PIPELINE_NAME].context
 
@@ -156,7 +174,10 @@ def execute_task(context, casa_task, casa_args):
     tracebacks = utils.get_tracebacks(results)
     if len(tracebacks) > 0:
         previous_tracebacks_as_string = "{}".format("\n".join([tb for tb in tracebacks]))
-        raise exceptions.PipelineException(previous_tracebacks_as_string)
+        raise exceptions.PipelineTaskExecutionError(
+            previous_tracebacks_as_string,
+            reason_code='task_execution_failed',
+        )
 
     return results
 

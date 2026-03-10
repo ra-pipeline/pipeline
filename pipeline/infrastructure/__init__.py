@@ -17,6 +17,7 @@ from . import mpihelpers
 from . import daskhelpers
 from . import utils
 from . import timetracker
+from . import status
 from .callibrary import CalLibrary, CalTo, CalFrom, CalApplication, CalState
 from .jobrequest import JobRequest
 from .launcher import Context, Pipeline

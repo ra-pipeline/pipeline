@@ -33,6 +33,11 @@
 
    develdocmd/comparing_pipeline_executions.md
    develdocmd/building_the_pipeline.md
+   develdocmd/pipeline_status_and_failure_plan.md
+   develdocmd/pipeline_status_and_failure_progress.md
+   develdocmd/pipeline_status_schema.md
+   develdocmd/pipeline_exit_semantics.md
+   develdocmd/pipeline_phase1_reason_codes.md
    modular
 
    develdocmd/pipeline_tests.md

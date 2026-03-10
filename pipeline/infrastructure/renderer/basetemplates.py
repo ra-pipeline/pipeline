@@ -84,6 +84,24 @@ class T2_4MDetailsFailedTaskRenderer(T2_4MDetailsDefaultRenderer):
         })
 
 
+class T2_4MDetailsStoppedTaskRenderer(T2_4MDetailsDefaultRenderer):
+    """Renders detailed HTML output for a task that stopped intentionally."""
+
+    def __init__(self, uri='t2-4m_details-stopped.mako', description='Stopped task', always_rerender=False):
+        super(T2_4MDetailsStoppedTaskRenderer, self).__init__(
+            uri=uri, description=description, always_rerender=always_rerender
+        )
+
+    def update_mako_context(self, mako_context, pipeline_context, results):
+        result = results[0] if isinstance(results, collections.abc.Iterable) else results
+        mako_context.update(
+            {
+                'reason_code': getattr(result, 'reason_code', None),
+                'message': getattr(result, 'message', None),
+            }
+        )
+
+
 def time_order_dicts(mako_context, pipeline_context):
     """
     Time-sort any MS-related entries in the Mako context dictionary.

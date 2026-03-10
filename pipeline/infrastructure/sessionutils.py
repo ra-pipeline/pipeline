@@ -443,6 +443,8 @@ class ParallelTemplate(basetask.StandardTaskTemplate):
                         result = worker_result
                     if hasattr(result, 'mses'):
                         vis = result.mses[0].name
+                except exceptions.PipelineStopRequested:
+                    raise
                 except exceptions.PipelineException as e:
                     assessed.append((vis, task_args, e))
                 else:

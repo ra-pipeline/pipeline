@@ -46,6 +46,7 @@ import xml.etree.ElementTree as ElementTree
 from typing import TYPE_CHECKING
 
 import pipeline.h.cli.cli as h_cli
+import pipeline.h.cli.utils as h_cli_utils
 from pipeline import cli, infrastructure
 from pipeline.infrastructure import exceptions, launcher, utils
 
@@ -239,7 +240,8 @@ def _execute_task(task: Callable, task_args: dict) -> Any:
     handling. It will:
     - Log the task call before execution
     - Catch and log any unhandled exceptions (returns None if exception occurs)
-    - Check for tracebacks in the result and raise PipelineException if found
+        - Check for tracebacks in the result and raise PipelineTaskExecutionError
+            if found
 
     Args:
         task: The task callable to execute.
@@ -249,12 +251,16 @@ def _execute_task(task: Callable, task_args: dict) -> Any:
         The task result object, or None if an unhandled exception occurred.
 
     Raises:
-        exceptions.PipelineException: If the task result contains tracebacks.
+        exceptions.PipelineTaskExecutionError: If the task result contains
+            tracebacks.
     """
     LOG.info('Executing pipeline task %s', _as_task_call(task, task_args))
 
     try:
-        result = task(**task_args)
+        with h_cli_utils.set_contextvar(h_cli_utils.propagate_stop_requested, True):
+            result = task(**task_args)
+    except exceptions.PipelineStopRequested:
+        raise
     except Exception:
         # Log message if an exception occurred that was not handled by
         # standardtask template (not turned into failed task result).
@@ -267,7 +273,10 @@ def _execute_task(task: Callable, task_args: dict) -> Any:
     tracebacks = utils.get_tracebacks(result)
     if tracebacks:
         previous_tracebacks_as_string = '\n'.join(tracebacks)
-        raise exceptions.PipelineException(previous_tracebacks_as_string)
+        raise exceptions.PipelineTaskExecutionError(
+            previous_tracebacks_as_string,
+            reason_code='task_execution_failed',
+        )
 
     return result
 
@@ -283,7 +292,8 @@ def run_named_tasks(tasks: list[tuple[str, dict[str, Any]]]) -> Context:
       1. Initialize a fresh pipeline context via `cli.h_init()`.
       2. Resolve each task name to a callable using `cli.get_pipeline_task_with_name`.
       3. Execute tasks in order, logging the call signature.
-      4. Raise `exceptions.PipelineException` immediately if any task result 
+        4. Raise `exceptions.PipelineTaskExecutionError` immediately if any task
+            result 
          reports tracebacks (handled inside `_execute_task`).
       5. Save the context via `cli.h_save()`.
 
@@ -294,7 +304,8 @@ def run_named_tasks(tasks: list[tuple[str, dict[str, Any]]]) -> Context:
         Context: The final pipeline context (the most recent / 'last').
 
     Raises:
-        exceptions.PipelineException: If any executed task reports tracebacks.
+        exceptions.PipelineTaskExecutionError: If any executed task reports
+            tracebacks.
     """
     LOG.info('Initializing context for explicit task list...')
     cli.h_init()
@@ -347,7 +358,8 @@ def reduce(
         The pipeline context object with updated state.
 
     Raises:
-        exceptions.PipelineException: Raised if a pipeline task fails with tracebacks.
+        exceptions.PipelineTaskExecutionError: Raised if a pipeline task fails
+            with tracebacks.
     """
     if vis is None:
         vis = []

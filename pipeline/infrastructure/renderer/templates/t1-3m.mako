@@ -32,7 +32,8 @@ def get_lowest_scoring_results(topic, context):
 
 tablerow_css_classes = {'Error'      : 'danger alert-danger',
 			'Warning'    : 'warning alert-warning',
-			'Attention'  : 'attention alert-attention'}
+			'Attention'  : 'attention alert-attention',
+			'Stopped'    : 'info alert-info'}
 
 def get_tablerow_class(row):
 	return tablerow_css_classes.get(row.type, '')

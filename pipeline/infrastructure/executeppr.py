@@ -4,8 +4,9 @@ Execute the pipeline processing request.
 Code first as module and convert to class if appropriate
 Factor and document properly  when details worked out
 
-Raises:
-    exceptions.PipelineException
+    Raises:
+        exceptions.PipelineException: If the request cannot be prepared or if
+            any stage fails during execution.
 """
 import os
 import shutil
@@ -21,6 +22,7 @@ from . import filenamer
 from . import project
 from . import utils
 from .. import cli
+from ..h.cli import utils as h_cli_utils
 
 if TYPE_CHECKING:
     from . launcher import Context
@@ -120,15 +122,18 @@ def executeppr(pprXmlFile: str, importonly: bool = True, breakpoint: str = 'brea
             context = cli.h_init(loglevel=loglevel, plotlevel=plotlevel, processing_intents=processing_intents)
             casa_tools.post_to_log("    Creating new pipeline context", echo_to_screen=echo_to_screen)
 
-    except Exception:
+    except Exception as exc:
         casa_tools.post_to_log("Beginning pipeline run ...", echo_to_screen=echo_to_screen)
         casa_tools.post_to_log("For processing request: " + pprXmlFile, echo_to_screen=echo_to_screen)
         traceback.print_exc(file=sys.stdout)
         errstr = traceback.format_exc()
         casa_tools.post_to_log(errstr, echo_to_screen=echo_to_screen)
         casa_tools.post_to_log("Terminating procedure execution ...", echo_to_screen=echo_to_screen)
-        errorfile = utils.write_errorexit_file(workingDir, 'errorexit', 'txt')
-        return
+        _write_compatibility_errorfile(workingDir)
+        raise exceptions.PipelineRequestError(
+            'Failed to analyze pipeline processing request.',
+            reason_code='request_analysis_failed',
+        ) from exc
 
     # Request decoded, starting run.
     casa_tools.post_to_log("Beginning pipeline run ...", echo_to_screen=echo_to_screen)
@@ -138,18 +143,27 @@ def executeppr(pprXmlFile: str, importonly: bool = True, breakpoint: str = 'brea
     if relativePath == "":
         casa_tools.post_to_log("    Undefined relative data path", echo_to_screen=echo_to_screen)
         casa_tools.post_to_log("Terminating pipeline execution ...", echo_to_screen=echo_to_screen)
-        errorfile = utils.write_errorexit_file(workingDir, 'errorexit', 'txt')
-        return
+        _write_compatibility_errorfile(workingDir)
+        raise exceptions.PipelineRequestError(
+            'Undefined relative data path in pipeline processing request.',
+            reason_code='undefined_relative_data_path',
+        )
     elif len(asdmList) < 1:
         casa_tools.post_to_log("    Empty ASDM list", echo_to_screen=echo_to_screen)
         casa_tools.post_to_log("Terminating pipeline execution ...", echo_to_screen=echo_to_screen)
-        errorfile = utils.write_errorexit_file(workingDir, 'errorexit', 'txt')
-        return
+        _write_compatibility_errorfile(workingDir)
+        raise exceptions.PipelineRequestError(
+            'Empty ASDM list in pipeline processing request.',
+            reason_code='empty_asdm_list',
+        )
     elif len(commandsList) < 1:
         casa_tools.post_to_log("    Empty commands list", echo_to_screen=echo_to_screen)
         casa_tools.post_to_log("Terminating pipeline execution ...", echo_to_screen=echo_to_screen)
-        errorfile = utils.write_errorexit_file(workingDir, 'errorexit', 'txt')
-        return
+        _write_compatibility_errorfile(workingDir)
+        raise exceptions.PipelineRequestError(
+            'Empty commands list in pipeline processing request.',
+            reason_code='empty_commands_list',
+        )
 
     # List project summary information
     casa_tools.post_to_log("Project summary", echo_to_screen=echo_to_screen)
@@ -276,13 +290,25 @@ def executeppr(pprXmlFile: str, importonly: bool = True, breakpoint: str = 'brea
             elif pipeline_task_name in restore_tasks_no_session:
                 task_args['vis'] = files
 
-            results = pipeline_task(**task_args)
+            with h_cli_utils.set_contextvar(h_cli_utils.propagate_stop_requested, True):
+                results = pipeline_task(**task_args)
             casa_tools.post_to_log('Results ' + str(results), echo_to_screen=echo_to_screen)
 
             if importonly and pipeline_task_name in import_tasks:
                 casa_tools.post_to_log("Terminating execution after running " + pipeline_task_name,
                                        echo_to_screen=echo_to_screen)
                 break
+
+        except exceptions.PipelineStopRequested as exc:
+            message = str(exc) or exc.__class__.__name__
+            casa_tools.post_to_log(
+                'Clean stop requested while running pipeline task {}: {}'.format(pipeline_task_name, message),
+                echo_to_screen=echo_to_screen,
+            )
+            cli.h_save()
+            casa_tools.post_to_log('Stopping procedure execution ...', echo_to_screen=echo_to_screen)
+            casa_tools.set_log_origin(fromwhere='')
+            raise
 
         except Exception:
             # Log message if an exception occurred that was not handled by
@@ -303,7 +329,7 @@ def executeppr(pprXmlFile: str, importonly: bool = True, breakpoint: str = 'brea
         # exit file, and export both error file and weblog to the products
         # directory.
         if len(tracebacks) > 0:
-            errorfile = utils.write_errorexit_file(workingDir, 'errorexit', 'txt')
+            errorfile = _write_compatibility_errorfile(workingDir)
             export_on_exception(context, errorfile)
 
             # Save the context
@@ -312,7 +338,10 @@ def executeppr(pprXmlFile: str, importonly: bool = True, breakpoint: str = 'brea
             casa_tools.set_log_origin(fromwhere='')
 
             previous_tracebacks_as_string = "{}".format("\n".join([tb for tb in tracebacks]))
-            raise exceptions.PipelineException(previous_tracebacks_as_string)
+            raise exceptions.PipelineTaskExecutionError(
+                previous_tracebacks_as_string,
+                reason_code='task_execution_failed',
+            )
 
     # Save the context
     cli.h_save()
@@ -344,6 +373,20 @@ def save_existing_context() -> None:
         assert len(context_files) > 0
         context_file = context_files[-1]
         casa_tools.post_to_log(f'Saved existing context {context_file} to disk.')
+
+
+def _write_compatibility_errorfile(working_dir: str | None) -> str:
+    """Write the legacy errorexit file used by existing tooling.
+
+    Args:
+        working_dir: Working directory in which the compatibility file should
+            be created.
+
+    Returns:
+        Path to the created compatibility file, or an empty string if the file
+        could not be created.
+    """
+    return utils.write_errorexit_file(working_dir, 'errorexit', 'txt')
 
 
 def export_on_exception(context: 'Context', errorfile: str) -> None:

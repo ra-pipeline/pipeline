@@ -266,6 +266,8 @@ class MakeImages(basetask.StandardTaskTemplate):
             for (target, task) in task_queue:
                 try:
                     worker_result = task.get_result()
+                except exceptions.PipelineStopRequested:
+                    raise
                 except exceptions.PipelineException as ex:
                     error_msg = ('Cleaning failure for field {!s}, intent {!s}, specmode {!s}, spw {!s}. '
                                  'Exception from hif_tclean: {!s}'.format(
