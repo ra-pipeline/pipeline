@@ -2,6 +2,7 @@ import copy
 import os.path
 
 import pipeline.infrastructure.basetask as basetask
+import pipeline.infrastructure.conditions as conditions
 import pipeline.infrastructure.utils as utils
 
 
@@ -47,6 +48,18 @@ class MakeImListResult(basetask.Results):
                     context.clean_list_info[key] = '%s %s' % (context.clean_list_info[key], value)
                 else:
                     context.clean_list_info[key] = value
+
+        if context.clean_list_info:
+            context.set_condition(
+                conditions.CONDITION_CODE_CLEAN_LIST_INFO,
+                severity='info',
+                scope='stage',
+                disposition='continue',
+                message=context.clean_list_info.get('msg'),
+                details=context.clean_list_info,
+            )
+        else:
+            context.clear_condition(conditions.CONDITION_CODE_CLEAN_LIST_INFO)
 
         # Remove heuristics objects to avoid accumulating large amounts of unnecessary memory
         for target in self.targets:

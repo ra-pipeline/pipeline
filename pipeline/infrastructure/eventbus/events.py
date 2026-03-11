@@ -170,6 +170,62 @@ class LogMessageEvent(Event):
         self.logger_name = logger_name
 
 
+class ConditionLifecycleEvent(ContextLifecycleEvent):
+    """Base class for events related to structured pipeline conditions."""
+
+    topic = 'lifecycle.condition'
+
+    def __init__(
+        self,
+        *,
+        context_name=None,
+        output_dir=None,
+        state=None,
+        code=None,
+        severity=None,
+        scope=None,
+        disposition=None,
+        message=None,
+        details=None,
+        producer_stage=None,
+        producer_task=None,
+        created_at=None,
+        updated_at=None,
+        active=None,
+    ):
+        super().__init__(context_name=context_name, output_dir=output_dir)
+        self.state = state
+        self.code = code
+        self.severity = severity
+        self.scope = scope
+        self.disposition = disposition
+        self.message = message
+        self.details = details
+        self.producer_stage = producer_stage
+        self.producer_task = producer_task
+        self.created_at = created_at
+        self.updated_at = updated_at
+        self.active = active
+
+
+class ConditionRaisedEvent(ConditionLifecycleEvent):
+    """Emitted when a structured pipeline condition becomes active."""
+
+    topic = 'lifecycle.condition.raised'
+
+    def __init__(self, **kwargs):
+        super().__init__(state='raised', active=True, **kwargs)
+
+
+class ConditionClearedEvent(ConditionLifecycleEvent):
+    """Emitted when a structured pipeline condition is cleared."""
+
+    topic = 'lifecycle.condition.cleared'
+
+    def __init__(self, **kwargs):
+        super().__init__(state='cleared', active=False, **kwargs)
+
+
 class TaskLifecycleEvent(Event):
     """
     Base class for events related to the pipeline task lifecycle.

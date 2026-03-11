@@ -1,6 +1,7 @@
 import copy
 
 import pipeline.infrastructure as infrastructure
+import pipeline.infrastructure.conditions as conditions
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.basetask as basetask
 
@@ -46,6 +47,17 @@ class CheckProductSizeResult(basetask.Results):
     def merge_with_context(self, context):
         # Store mitigation parameters for subsequent hif_makeimlist calls.
         context.size_mitigation_parameters = self.size_mitigation_parameters
+        if self.status == 'OK':
+            context.clear_condition(conditions.CONDITION_CODE_SIZE_MITIGATION)
+        else:
+            context.set_condition(
+                conditions.CONDITION_CODE_SIZE_MITIGATION,
+                severity='error' if self.status == 'ERROR' else 'warning',
+                scope='run',
+                disposition='skip_stage' if self.status == 'ERROR' else 'continue',
+                message=self.reason.get('longmsg') if isinstance(self.reason, dict) else None,
+                details=self.size_mitigation_parameters,
+            )
 
         # Calculated beams for later stages
         if self.synthesized_beams is not None:

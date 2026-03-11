@@ -9,9 +9,16 @@ from types import SimpleNamespace
 import pytest
 
 from pipeline.h.cli import utils as h_cli_utils
+from pipeline.hifa.tasks.imageprecheck import imageprecheck
+from pipeline.hif.tasks.findcont import resultobjects as findcont_resultobjects
+from pipeline.hif.tasks.checkproductsize import resultobjects as checkproductsize_resultobjects
+from pipeline.hif.tasks.makeimages import resultobjects as makeimages_resultobjects
+from pipeline.hif.tasks.makeimlist import resultobjects as makeimlist_resultobjects
+from pipeline.infrastructure import conditions as pipeline_conditions
 from pipeline.infrastructure import exceptions
 from pipeline.infrastructure import executeppr
 from pipeline.infrastructure import executevlappr
+from pipeline.infrastructure import launcher
 from pipeline.infrastructure import mpihelpers
 from pipeline.infrastructure import sessionutils
 from pipeline.infrastructure import status
@@ -19,6 +26,8 @@ from pipeline.infrastructure import timetracker
 from pipeline.infrastructure import basetask
 from pipeline.infrastructure.renderer import basetemplates, htmlrenderer, rendererutils
 from pipeline.infrastructure.eventbus import (
+    ConditionClearedEvent,
+    ConditionRaisedEvent,
     ContextCreatedEvent,
     LogMessageEvent,
     ResultAcceptedEvent,
@@ -67,6 +76,21 @@ def _status_context(
         project_structure=SimpleNamespace(recipe_name=recipe_name),
         get_recipe_name=lambda: recipe_name,
     )
+
+
+def _condition_context(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    name: str = 'ctx-condition',
+) -> tuple[launcher.Context, list[object]]:
+    published: list[object] = []
+    monkeypatch.setattr(launcher.utils, 'mkdir_p', lambda path: None)
+    monkeypatch.setattr(launcher.eventbus, 'send_message', lambda event: published.append(event))
+    context = launcher.Context(name)
+    context.output_dir = str(tmp_path)
+    context.report_dir = str(tmp_path / 'html')
+    return context, published
 
 
 def test_executeppr_raises_request_error_for_empty_relative_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -922,6 +946,63 @@ def test_get_weblog_results_includes_synthetic_stopped_stage(tmp_path: Path) -> 
     assert stopped_result.message == 'operator requested stop'
 
 
+def test_load_pipeline_status_snapshot_reads_snapshot(tmp_path: Path) -> None:
+    snapshot = {
+        'state': 'stopped',
+        'final_disposition': 'clean_stop',
+        'reason_code': 'operator_requested_stop',
+        'message': 'operator requested stop',
+        'conditions': [],
+    }
+    (tmp_path / 'pipeline-status.json').write_text(json.dumps(snapshot), encoding='utf-8')
+
+    loaded = htmlrenderer._load_pipeline_status_snapshot(SimpleNamespace(output_dir=str(tmp_path)))
+
+    assert loaded == snapshot
+
+
+def test_get_weblog_run_status_reports_clean_stop(tmp_path: Path) -> None:
+    snapshot = {
+        'state': 'stopped',
+        'final_disposition': 'clean_stop',
+        'reason_code': 'operator_requested_stop',
+        'message': 'operator requested stop',
+        'conditions': [],
+    }
+    (tmp_path / 'pipeline-status.json').write_text(json.dumps(snapshot), encoding='utf-8')
+
+    run_status = htmlrenderer.get_weblog_run_status(SimpleNamespace(output_dir=str(tmp_path)))
+
+    assert run_status == {
+        'title': 'Run stopped intentionally',
+        'alert_class': 'info alert-info',
+        'message': 'operator requested stop',
+        'reason_code': 'operator_requested_stop',
+    }
+
+
+def test_get_active_conditions_for_weblog_prefers_snapshot_over_context(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    snapshot = {
+        'state': 'completed',
+        'final_disposition': 'success',
+        'conditions': [{'code': 'from_snapshot', 'severity': 'warning', 'scope': 'stage', 'message': 'snapshot condition'}],
+    }
+    (tmp_path / 'pipeline-status.json').write_text(json.dumps(snapshot), encoding='utf-8')
+    context, _ = _condition_context(monkeypatch, tmp_path, name='ctx-renderer-condition')
+    context.set_condition(
+        pipeline_conditions.CONDITION_CODE_CLEAN_LIST_INFO,
+        severity='info',
+        scope='stage',
+        disposition='continue',
+        message='context condition',
+        details={'msg': 'context condition'},
+    )
+
+    conditions = htmlrenderer.get_active_conditions_for_weblog(context)
+
+    assert conditions == snapshot['conditions']
+
+
 def test_stopped_task_weblog_helpers_label_stage_distinctly() -> None:
     stopped_result = basetask.StoppedTaskResults(
         None,
@@ -964,3 +1045,346 @@ def test_stopped_task_detail_renderer_tolerates_missing_timestamps(tmp_path: Pat
     assert 'Stop message:' in rendered
     assert 'operator requested stop' in rendered
     assert 'N/A' in rendered
+
+
+def test_context_condition_registry_tracks_active_conditions(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    context, published = _condition_context(monkeypatch, tmp_path)
+    published.clear()
+
+    context.set_condition(
+        pipeline_conditions.CONDITION_CODE_CLEAN_LIST_INFO,
+        severity='info',
+        scope='stage',
+        disposition='continue',
+        message='No imaging targets were created.',
+        details={'msg': 'No imaging targets were created.'},
+    )
+
+    active_condition = context.get_condition(pipeline_conditions.CONDITION_CODE_CLEAN_LIST_INFO)
+
+    assert active_condition is not None
+    assert active_condition.active is True
+    assert active_condition.message == 'No imaging targets were created.'
+    assert len(context.get_conditions()) == 1
+    assert isinstance(published[0], ConditionRaisedEvent)
+
+    context.clear_condition(pipeline_conditions.CONDITION_CODE_CLEAN_LIST_INFO)
+
+    cleared_condition = context.get_condition(
+        pipeline_conditions.CONDITION_CODE_CLEAN_LIST_INFO,
+        active_only=False,
+    )
+
+    assert context.get_condition(pipeline_conditions.CONDITION_CODE_CLEAN_LIST_INFO) is None
+    assert cleared_condition is not None
+    assert cleared_condition.active is False
+    assert isinstance(published[1], ConditionClearedEvent)
+
+
+def test_condition_helpers_prefer_registry_over_legacy(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    context, _ = _condition_context(monkeypatch, tmp_path)
+    context.size_mitigation_parameters = {'status': 'OK', 'field': 'legacy-field'}
+    context.clean_list_info = {'msg': 'legacy message'}
+    context.imaging_parameters = {'robust': 0.5, 'uvtaper': ['legacy taper']}
+
+    context.set_condition(
+        pipeline_conditions.CONDITION_CODE_SIZE_MITIGATION,
+        severity='error',
+        scope='run',
+        disposition='skip_stage',
+        message='registry mitigation error',
+        details={'status': 'ERROR', 'field': 'registry-field'},
+    )
+    context.set_condition(
+        pipeline_conditions.CONDITION_CODE_CLEAN_LIST_INFO,
+        severity='info',
+        scope='stage',
+        disposition='continue',
+        message='registry message',
+        details={'msg': 'registry message'},
+    )
+    context.set_condition(
+        pipeline_conditions.CONDITION_CODE_IMAGING_PARAMETER_OVERRIDE,
+        severity='info',
+        scope='run',
+        disposition='continue',
+        message='registry imaging parameters',
+        details={'robust': 2.0, 'uvtaper': ['registry taper']},
+    )
+    context.set_condition(
+        pipeline_conditions.CONDITION_CODE_CONTINUUM_SELECTION_WARNING,
+        severity='warning',
+        scope='stage',
+        disposition='continue',
+        message='registry continuum warning',
+        details={
+            'warning_count': 1,
+            'warnings': [{'field': 'target-a', 'spw': '3', 'message': 'registry warning'}],
+        },
+    )
+
+    assert pipeline_conditions.get_size_mitigation_parameters(context)['field'] == 'registry-field'
+    assert pipeline_conditions.has_size_mitigation_error(context) is True
+    assert pipeline_conditions.get_clean_list_info(context)['msg'] == 'registry message'
+    assert pipeline_conditions.get_imaging_parameter(context, 'robust') == 2.0
+    assert pipeline_conditions.get_imaging_parameter_overrides(context)['uvtaper'] == ['registry taper']
+    assert pipeline_conditions.get_continuum_selection_warnings(context)[0]['message'] == 'registry warning'
+
+
+def test_imageprecheck_result_merge_with_context_publishes_imaging_parameter_condition(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    context, _ = _condition_context(monkeypatch, tmp_path, name='ctx-imageprecheck')
+    context.imaging_parameters = {'uvtaper': ['legacy taper']}
+    context.per_spw_cont_sensitivities_all_chan = {}
+    context.synthesized_beams = {}
+
+    result = imageprecheck.ImagePreCheckResults(hm_robust=2.0, hm_uvtaper=['10klambda'])
+
+    result.merge_with_context(context)
+
+    imaging_parameter_condition = context.get_condition(
+        pipeline_conditions.CONDITION_CODE_IMAGING_PARAMETER_OVERRIDE
+    )
+
+    assert context.imaging_parameters == {'robust': 2.0, 'uvtaper': ['10klambda']}
+    assert imaging_parameter_condition is not None
+    assert imaging_parameter_condition.scope == 'run'
+    assert imaging_parameter_condition.details == {'robust': 2.0, 'uvtaper': ['10klambda']}
+
+
+def test_findcont_result_merge_with_context_publishes_continuum_warning_condition(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    context, _ = _condition_context(monkeypatch, tmp_path, name='ctx-findcont')
+    context.contfile = str(tmp_path / 'cont.dat')
+    context.clean_list_pending = []
+
+    writes: list[object] = []
+
+    class DummyContFileHandler:
+        def __init__(self, path: str) -> None:
+            self.path = path
+
+        def write(self, payload: object) -> None:
+            writes.append(payload)
+
+    monkeypatch.setattr(findcont_resultobjects.contfilehandler, 'ContFileHandler', DummyContFileHandler)
+
+    result = findcont_resultobjects.FindContResult(
+        {},
+        {'fields': {}},
+        {},
+        0,
+        0,
+        [],
+        {},
+        warning_details={
+            'target-a': {
+                '3': [
+                    {
+                        'category': 'heuristic_warning',
+                        'field': 'target-a',
+                        'spw': '3',
+                        'message': 'line contamination may affect the continuum estimate',
+                    }
+                ]
+            }
+        },
+    )
+    result.inputs = {'target_list': []}
+
+    result.merge_with_context(context)
+
+    warning_condition = context.get_condition(pipeline_conditions.CONDITION_CODE_CONTINUUM_SELECTION_WARNING)
+
+    assert writes == [{'fields': {}}]
+    assert warning_condition is not None
+    assert warning_condition.severity == 'warning'
+    assert warning_condition.details['warning_count'] == 1
+    assert warning_condition.details['warnings'][0]['field'] == 'target-a'
+
+
+def test_findcont_result_merge_with_context_clears_continuum_warning_condition(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    context, _ = _condition_context(monkeypatch, tmp_path, name='ctx-findcont-clear')
+    context.contfile = str(tmp_path / 'cont.dat')
+    context.clean_list_pending = []
+    context.set_condition(
+        pipeline_conditions.CONDITION_CODE_CONTINUUM_SELECTION_WARNING,
+        severity='warning',
+        scope='stage',
+        disposition='continue',
+        message='stale warning',
+        details={'warning_count': 1, 'warnings': [{'message': 'stale warning'}]},
+    )
+
+    class DummyContFileHandler:
+        def __init__(self, path: str) -> None:
+            self.path = path
+
+        def write(self, payload: object) -> None:
+            return None
+
+    monkeypatch.setattr(findcont_resultobjects.contfilehandler, 'ContFileHandler', DummyContFileHandler)
+
+    result = findcont_resultobjects.FindContResult({}, {'fields': {}}, {}, 0, 0, [], {})
+    result.inputs = {'target_list': []}
+
+    result.merge_with_context(context)
+
+    assert context.get_condition(pipeline_conditions.CONDITION_CODE_CONTINUUM_SELECTION_WARNING) is None
+
+
+def test_status_tracker_writes_condition_events_and_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    subscriptions: list[tuple[object, str]] = []
+    monkeypatch.setattr(status.eventbus, 'subscribe', lambda fn, topic: subscriptions.append((fn, topic)))
+    monkeypatch.setattr(status.logging, 'add_handler', lambda handler: None)
+    monkeypatch.setattr(status.logging, 'remove_handler', lambda handler: None)
+    context, published = _condition_context(monkeypatch, tmp_path, name='ctx-condition-status')
+    monkeypatch.setattr(status, '_get_active_context', lambda: context)
+
+    tracker = status.PipelineStatusTracker('ctx-condition-status', str(tmp_path))
+    tracker.on_context_lifecycle_event(ContextCreatedEvent(context_name='ctx-condition-status', output_dir=str(tmp_path)))
+
+    published.clear()
+    context.set_condition(
+        pipeline_conditions.CONDITION_CODE_SIZE_MITIGATION,
+        severity='warning',
+        scope='run',
+        disposition='continue',
+        message='Size had to be mitigated.',
+        details={'status': 'MITIGATED', 'field': 'target-a'},
+    )
+    tracker.on_condition_lifecycle_event(published[-1])
+
+    condition_snapshot = json.loads((tmp_path / 'pipeline-status.json').read_text(encoding='utf-8'))
+
+    context.clear_condition(pipeline_conditions.CONDITION_CODE_SIZE_MITIGATION)
+    tracker.on_condition_lifecycle_event(published[-1])
+
+    event_lines = (tmp_path / 'pipeline-events.jsonl').read_text(encoding='utf-8').strip().splitlines()
+    final_snapshot = json.loads((tmp_path / 'pipeline-status.json').read_text(encoding='utf-8'))
+
+    assert subscriptions
+    assert [json.loads(line)['event_type'] for line in event_lines] == [
+        'run_started',
+        'condition_raised',
+        'condition_cleared',
+    ]
+    assert condition_snapshot['conditions'][0]['code'] == pipeline_conditions.CONDITION_CODE_SIZE_MITIGATION
+    assert condition_snapshot['conditions'][0]['details']['field'] == 'target-a'
+    assert final_snapshot['conditions'] == []
+
+
+def test_checkproductsize_result_merge_with_context_updates_condition_registry(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    context, _ = _condition_context(monkeypatch, tmp_path, name='ctx-checkproductsize')
+
+    mitigated_result = checkproductsize_resultobjects.CheckProductSizeResult(
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        {'status': 'MITIGATED', 'field': 'target-a'},
+        'MITIGATED',
+        {'longmsg': 'Size had to be mitigated.'},
+        None,
+    )
+
+    mitigated_result.merge_with_context(context)
+
+    mitigation_condition = context.get_condition(pipeline_conditions.CONDITION_CODE_SIZE_MITIGATION)
+
+    assert mitigation_condition is not None
+    assert mitigation_condition.severity == 'warning'
+    assert mitigation_condition.details['field'] == 'target-a'
+
+    ok_result = checkproductsize_resultobjects.CheckProductSizeResult(
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        {'status': 'OK'},
+        'OK',
+        {'longmsg': 'No mitigation required.'},
+        None,
+    )
+
+    ok_result.merge_with_context(context)
+
+    assert context.get_condition(pipeline_conditions.CONDITION_CODE_SIZE_MITIGATION) is None
+
+
+def test_makeimlist_result_merge_with_context_publishes_clean_list_condition(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    context, _ = _condition_context(monkeypatch, tmp_path, name='ctx-makeimlist')
+    result = makeimlist_resultobjects.MakeImListResult()
+    result.set_info(
+        {
+            'msg': 'No data found. No imaging targets were created.',
+            'intent': 'TARGET',
+            'specmode': 'cube',
+            'stokes': 'I',
+        }
+    )
+
+    result.merge_with_context(context)
+
+    clean_list_condition = context.get_condition(pipeline_conditions.CONDITION_CODE_CLEAN_LIST_INFO)
+
+    assert clean_list_condition is not None
+    assert clean_list_condition.message == 'No data found. No imaging targets were created.'
+    assert pipeline_conditions.get_clean_list_info(context)['intent'] == 'TARGET'
+
+
+def test_makeimages_result_merge_with_context_clears_clean_list_condition(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    context, _ = _condition_context(monkeypatch, tmp_path, name='ctx-makeimages')
+    context.clean_list_pending = [{}]
+    context.clean_list_info = {'msg': 'No data found. No imaging targets were created.'}
+    context.set_condition(
+        pipeline_conditions.CONDITION_CODE_CLEAN_LIST_INFO,
+        severity='info',
+        scope='stage',
+        disposition='continue',
+        message=context.clean_list_info['msg'],
+        details=context.clean_list_info,
+    )
+
+    result = makeimages_resultobjects.MakeImagesResult()
+    result.inputs = {'target_list': []}
+    result.results = []
+
+    result.merge_with_context(context)
+
+    assert context.clean_list_pending == []
+    assert context.clean_list_info == {}
+    assert context.get_condition(pipeline_conditions.CONDITION_CODE_CLEAN_LIST_INFO) is None

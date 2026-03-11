@@ -2,6 +2,7 @@ import copy
 import os.path
 
 import pipeline.infrastructure.basetask as basetask
+import pipeline.infrastructure.conditions as conditions
 import pipeline.infrastructure.imagelibrary as imagelibrary
 import pipeline.infrastructure.utils as utils
 
@@ -86,6 +87,7 @@ class MakeImagesResult(basetask.Results):
         # empty the pending list and message
         context.clean_list_pending = []
         context.clean_list_info = {}
+        context.clear_condition(conditions.CONDITION_CODE_CLEAN_LIST_INFO)
 
         # Remove heuristics objects to avoid accumulating large amounts of unnecessary memory
         for target in self.inputs['target_list']:

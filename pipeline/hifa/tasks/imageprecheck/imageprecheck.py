@@ -9,7 +9,7 @@ from pipeline.domain import DataType
 from pipeline.h.tasks.common.sensitivity import Sensitivity
 from pipeline.hifa.heuristics import imageprecheck
 from pipeline.hif.heuristics import imageparams_factory
-from pipeline.infrastructure import casa_tools
+from pipeline.infrastructure import casa_tools, conditions
 from pipeline.infrastructure import task_registry
 
 LOG = infrastructure.get_logger(__name__)
@@ -88,6 +88,15 @@ class ImagePreCheckResults(basetask.Results):
             del context.imaging_parameters['uvtaper']
         if self.hm_uvtaper != []:
             context.imaging_parameters['uvtaper'] = self.hm_uvtaper
+
+        context.set_condition(
+            conditions.CONDITION_CODE_IMAGING_PARAMETER_OVERRIDE,
+            severity='info',
+            scope='run',
+            disposition='continue',
+            message='Image precheck selected imaging parameter overrides.',
+            details=conditions.get_imaging_parameter_overrides(context),
+        )
 
         # It was decided not use a file based transport for the time being (03/2018)
         # Write imageparams.dat file

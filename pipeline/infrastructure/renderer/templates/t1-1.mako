@@ -44,6 +44,16 @@ $(document).ready(function() {
 
 <%block name="title">Home</%block>
 
+% if run_status_alert is not None:
+<div class="${run_status_alert['alert_class']}">
+    <h4>${run_status_alert['title']}</h4>
+    <p>${run_status_alert['message']}</p>
+    % if run_status_alert.get('reason_code'):
+    <p><strong>Reason code:</strong> ${run_status_alert['reason_code']}</p>
+    % endif
+</div>
+% endif
+
 <div class="row">
     <div class="col-md-6">
         <h2>Observation Overview</h2>
@@ -205,6 +215,30 @@ $(document).ready(function() {
     </div>
 
 </div>
+
+% if active_conditions:
+<h2>Active Conditions</h2>
+<table class="table table-bordered table-condensed" summary="Active pipeline conditions">
+    <thead>
+        <tr>
+            <th>Code</th>
+            <th>Severity</th>
+            <th>Scope</th>
+            <th>Message</th>
+        </tr>
+    </thead>
+    <tbody>
+    % for condition in active_conditions:
+        <tr>
+            <td>${condition.get('code', '')}</td>
+            <td>${condition.get('severity', '')}</td>
+            <td>${condition.get('scope', '')}</td>
+            <td>${condition.get('message', '') or ''}</td>
+        </tr>
+    % endfor
+    </tbody>
+</table>
+% endif
 
 
         <div id="qa_notes" data-href="qa_notes.html"></div>

@@ -38,9 +38,10 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
+from pipeline.infrastructure import conditions
 from pipeline.hif.heuristics import imageparams_factory
 from pipeline.hif.tasks.makeimlist.cleantarget import CleanTarget
-from pipeline.infrastructure import casa_tools, task_registry
+from pipeline.infrastructure import casa_tools, conditions, task_registry
 from pipeline.infrastructure.utils import utils
 
 from .resultobjects import EditimlistResult
@@ -105,8 +106,9 @@ class EditimlistInputs(vdp.StandardInputs):
     @vdp.VisDependentProperty
     def cell(self):
         # mutable object, so should not use VisDependentProperty(default=[])
-        if 'hm_cell' in self.context.size_mitigation_parameters:
-            return self.context.size_mitigation_parameters['hm_cell']
+        size_mitigation_parameters = conditions.get_size_mitigation_parameters(self.context)
+        if 'hm_cell' in size_mitigation_parameters:
+            return size_mitigation_parameters['hm_cell']
         return []
 
     @cell.convert
@@ -122,8 +124,9 @@ class EditimlistInputs(vdp.StandardInputs):
     @vdp.VisDependentProperty
     def imsize(self):
         # mutable object, so should not use VisDependentProperty(default=[])
-        if 'hm_imsize' in self.context.size_mitigation_parameters:
-            return self.context.size_mitigation_parameters['hm_imsize']
+        size_mitigation_parameters = conditions.get_size_mitigation_parameters(self.context)
+        if 'hm_imsize' in size_mitigation_parameters:
+            return size_mitigation_parameters['hm_imsize']
         return []
 
     @imsize.convert
@@ -168,8 +171,9 @@ class EditimlistInputs(vdp.StandardInputs):
 
     @vdp.VisDependentProperty
     def nbin(self):
-        if 'nbins' in self.context.size_mitigation_parameters:
-            return self.context.size_mitigation_parameters['nbins']
+        size_mitigation_parameters = conditions.get_size_mitigation_parameters(self.context)
+        if 'nbins' in size_mitigation_parameters:
+            return size_mitigation_parameters['nbins']
         return -1
 
     @vdp.VisDependentProperty
@@ -562,8 +566,10 @@ class Editimlist(basetask.StandardTaskTemplate):
         imlist_entry['nmajor'] = inpdict['nmajor']
         imlist_entry['cfcache'], imlist_entry['cfcache_nowb'] = th.get_cfcaches(inpdict['cfcache'])
         imlist_entry['scales'] = th.scales() if not inpdict['scales'] else inpdict['scales']
-        imlist_entry['uvtaper'] = (th.uvtaper() if not 'uvtaper' in inp.context.imaging_parameters
-                                   else inp.context.imaging_parameters['uvtaper']) if not inpdict['uvtaper'] else inpdict['uvtaper']
+        imlist_entry['uvtaper'] = (
+            th.uvtaper() if 'uvtaper' not in conditions.get_imaging_parameter_overrides(inp.context)
+            else conditions.get_imaging_parameter(inp.context, 'uvtaper')
+        ) if not inpdict['uvtaper'] else inpdict['uvtaper']
 
         imlist_entry['specmode'] = th.specmode() if not inpdict['specmode'] else inpdict['specmode']
         imlist_entry['deconvolver'] = th.deconvolver(

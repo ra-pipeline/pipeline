@@ -13,7 +13,7 @@ import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
 from pipeline.hif.heuristics import findcont
-from pipeline.infrastructure import casa_tasks, casa_tools, task_registry
+from pipeline.infrastructure import casa_tasks, casa_tools, conditions, task_registry
 
 from .resultobjects import FindContResult
 
@@ -101,8 +101,7 @@ class FindCont(basetask.StandardTaskTemplate):
             return result
 
         # Check for size mitigation errors.
-        if 'status' in inputs.context.size_mitigation_parameters and \
-                inputs.context.size_mitigation_parameters['status'] == 'ERROR':
+        if conditions.has_size_mitigation_error(inputs.context):
             result = FindContResult({}, {}, '', 0, 0, [], {})
             result.mitigation_error = True
             return result
@@ -161,6 +160,7 @@ class FindCont(basetask.StandardTaskTemplate):
         result_cont_ranges = {}
         joint_mask_names = {}
         momDiffSNRs = {}
+        warning_details = {}
 
         num_found = 0
         num_total = 0
@@ -438,15 +438,34 @@ class FindCont(basetask.StandardTaskTemplate):
 
                     # PIPE-74
                     if single_range_channel_fraction < 0.05:
-                        LOG.warning('Only a single narrow range of channels was found for continuum in '
-                                    '{field} in spw {spw}, so the continuum subtraction '
-                                    'may be poor for that spw.'.format(field=target['field'], spw=spwid))
+                        warning_message = (
+                            'Only a single narrow range of channels was found for continuum in '
+                            '{field} in spw {spw}, so the continuum subtraction '
+                            'may be poor for that spw.'.format(field=target['field'], spw=spwid)
+                        )
+                        LOG.warning(warning_message)
+                        warning_details.setdefault(source_name, {}).setdefault(spwid, []).append(
+                            {
+                                'category': 'narrow_single_range',
+                                'field': target['field'],
+                                'spw': spwid,
+                                'message': warning_message,
+                            }
+                        )
 
                     # Internal findContinuum warnings
                     for warning_msg in warning_strings:
                         # PIPE-2158: Exclude empty strings
                         if warning_msg:
                             LOG.warning('Field {field}, spw {spw}: {warning_msg}'.format(field=target['field'], spw=spwid, warning_msg=warning_msg))
+                            warning_details.setdefault(source_name, {}).setdefault(spwid, []).append(
+                                {
+                                    'category': 'heuristic_warning',
+                                    'field': target['field'],
+                                    'spw': spwid,
+                                    'message': warning_msg,
+                                }
+                            )
 
                     is_repsource = (repsource_name == target['field']) and (repsource_spwid == spwid)
                     chanfrac = {'fraction'    : single_range_channel_fraction,
@@ -470,7 +489,16 @@ class FindCont(basetask.StandardTaskTemplate):
 
                 num_total += 1
 
-        result = FindContResult(result_cont_ranges, cont_ranges, joint_mask_names, num_found, num_total, single_range_channel_fractions, momDiffSNRs)
+        result = FindContResult(
+            result_cont_ranges,
+            cont_ranges,
+            joint_mask_names,
+            num_found,
+            num_total,
+            single_range_channel_fractions,
+            momDiffSNRs,
+            warning_details=warning_details,
+        )
 
         return result
 

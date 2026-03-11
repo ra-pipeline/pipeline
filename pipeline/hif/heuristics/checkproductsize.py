@@ -5,6 +5,7 @@ import copy
 import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.utils as utils
+from pipeline.infrastructure import conditions
 from pipeline.hif.tasks.makeimlist import makeimlist
 
 LOG = infrastructure.get_logger(__name__)
@@ -180,10 +181,7 @@ class CheckProductSizeHeuristics(object):
 
         # If still too large, try changing pixperbeam setting
         if (self.inputs.maxcubesize != -1.0) and (maxcubesize > self.inputs.maxcubesize):
-            if 'robust' in self.context.imaging_parameters:
-                robust = self.context.imaging_parameters['robust']
-            else:
-                robust = None
+            robust = conditions.get_imaging_parameter(self.context, 'robust')
             if robust == 2.0:
                 # Special case to avoid undersampling the beam (PIPE-107)
                 size_mitigation_parameters['hm_cell'] = '3.25ppb'
@@ -299,10 +297,7 @@ class CheckProductSizeHeuristics(object):
             if (self.inputs.maxproductsize != -1.0) and (total_productsize > self.inputs.maxproductsize):
                 LOG.info('Product size with single target is still too large. Trying cell size mitigation.')
 
-                if 'robust' in self.context.imaging_parameters:
-                    robust = self.context.imaging_parameters['robust']
-                else:
-                    robust = None
+                robust = conditions.get_imaging_parameter(self.context, 'robust')
                 if robust == 2.0:
                     # Special case to avoid undersampling the beam (PIPE-107)
                     size_mitigation_parameters['hm_cell'] = '3.25ppb'

@@ -1,4 +1,5 @@
 import pipeline.infrastructure as infrastructure
+import pipeline.infrastructure.conditions as conditions
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.contfilehandler as contfilehandler
@@ -9,7 +10,18 @@ LOG = infrastructure.get_logger(__name__)
 
 
 class FindContResult(basetask.Results):
-    def __init__(self, result_cont_ranges, cont_ranges, joint_mask_names, num_found, num_total, single_range_channel_fractions, momDiffSNRs, skip_stage=False):
+    def __init__(
+        self,
+        result_cont_ranges,
+        cont_ranges,
+        joint_mask_names,
+        num_found,
+        num_total,
+        single_range_channel_fractions,
+        momDiffSNRs,
+        skip_stage=False,
+        warning_details=None,
+    ):
         super(FindContResult, self).__init__()
         self.result_cont_ranges = result_cont_ranges
         self.cont_ranges = cont_ranges
@@ -21,8 +33,16 @@ class FindContResult(basetask.Results):
         self.single_range_channel_fractions = single_range_channel_fractions
         self.momDiffSNRs = momDiffSNRs
         self.skip_stage = skip_stage
+        self.warning_details = {} if warning_details is None else warning_details
 
     def merge_with_context(self, context):
+        aggregated_warnings = [
+            warning
+            for spw_warnings in self.warning_details.values()
+            for warnings in spw_warnings.values()
+            for warning in warnings
+        ]
+
         if not self.mitigation_error:
             # write the new ranges to the continuum file
             if not self.skip_stage:
@@ -52,7 +72,19 @@ class FindContResult(basetask.Results):
                         for spwid in spwids.split(','):
                             if (self.cont_ranges['fields'][source_name][spwid]['ranges'] == ['NONE']) and (target['intent'] == 'TARGET'):
                                 spwsel['spw%s' % (spwid)] = ''
-                                LOG.warning('No continuum frequency range information found for %s, spw %s.' % (target['field'], spwid))
+                                warning_message = 'No continuum frequency range information found for %s, spw %s.' % (
+                                    target['field'],
+                                    spwid,
+                                )
+                                LOG.warning(warning_message)
+                                aggregated_warnings.append(
+                                    {
+                                        'category': 'missing_continuum_range',
+                                        'field': target['field'],
+                                        'spw': spwid,
+                                        'message': warning_message,
+                                    }
+                                )
                                 all_continuum = False
                             elif self.cont_ranges['fields'][source_name][spwid]['ranges'] == ['ALL']:
                                 spwsel['spw%s' % (spwid)] = 'ALL'
@@ -80,8 +112,19 @@ class FindContResult(basetask.Results):
 
                         new_spwids = ','.join(new_spwids)
                         if (new_spwids == '') and (target['intent'] == 'TARGET'):
-                            LOG.warning('No continuum selection for target %s, spw %s. Will not image this selection.' % (
-                                new_target['field'], new_target['spw']))
+                            warning_message = 'No continuum selection for target %s, spw %s. Will not image this selection.' % (
+                                new_target['field'],
+                                new_target['spw'],
+                            )
+                            LOG.warning(warning_message)
+                            aggregated_warnings.append(
+                                {
+                                    'category': 'selection_removed',
+                                    'field': new_target['field'],
+                                    'spw': new_target['spw'],
+                                    'message': warning_message,
+                                }
+                            )
                             target_ok = False
                         else:
                             new_target['spw'] = new_spwids
@@ -94,6 +137,21 @@ class FindContResult(basetask.Results):
                     clean_list_pending.append(new_target)
 
             context.clean_list_pending = clean_list_pending
+
+        if aggregated_warnings:
+            context.set_condition(
+                conditions.CONDITION_CODE_CONTINUUM_SELECTION_WARNING,
+                severity='warning',
+                scope='stage',
+                disposition='continue',
+                message='Continuum selection produced %d warning(s).' % (len(aggregated_warnings)),
+                details={
+                    'warning_count': len(aggregated_warnings),
+                    'warnings': aggregated_warnings,
+                },
+            )
+        else:
+            context.clear_condition(conditions.CONDITION_CODE_CONTINUUM_SELECTION_WARNING)
 
         # Remove heuristics objects to avoid accumulating large amounts of unnecessary memory
         for target in self.inputs['target_list']:

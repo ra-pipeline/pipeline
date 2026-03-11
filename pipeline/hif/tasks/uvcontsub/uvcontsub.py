@@ -12,7 +12,7 @@ import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
 from pipeline.hif.tasks.makeimlist import makeimlist
-from pipeline.infrastructure import casa_tasks, task_registry
+from pipeline.infrastructure import casa_tasks, conditions, task_registry
 from pipeline.infrastructure.utils import nested_dict
 
 LOG = infrastructure.get_logger(__name__)
@@ -99,11 +99,10 @@ class SerialUVcontSub(basetask.StandardTaskTemplate):
             return result
 
         # Check for size mitigation errors.
-        if 'status' in inputs.context.size_mitigation_parameters:
-            if inputs.context.size_mitigation_parameters['status'] == 'ERROR':
-                result = UVcontSubResults()
-                result.mitigation_error = True
-                return result
+        if conditions.has_size_mitigation_error(inputs.context):
+            result = UVcontSubResults()
+            result.mitigation_error = True
+            return result
 
         # If no field and no spw is specified, use all TARGET intents except
         # mitigated sources.

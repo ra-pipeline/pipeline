@@ -1,5 +1,6 @@
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
+import pipeline.infrastructure.conditions as conditions
 import pipeline.infrastructure.project as project
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
@@ -166,6 +167,7 @@ class CheckProductSize(basetask.StandardTaskTemplate):
 
         # Clear any previous size mitigation parameters
         self.inputs.context.size_mitigation_parameters = {}
+        self.inputs.context.clear_condition(conditions.CONDITION_CODE_SIZE_MITIGATION)
 
 
         if self.inputs.maximsize != -1:

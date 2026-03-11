@@ -15,6 +15,7 @@ from . import jobrequest
 from . import logging
 from . import mpihelpers
 from . import daskhelpers
+from . import conditions
 from . import utils
 from . import timetracker
 from . import status

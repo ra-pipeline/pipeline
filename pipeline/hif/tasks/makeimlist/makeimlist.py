@@ -13,7 +13,7 @@ import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
 from pipeline.hif.heuristics import imageparams_factory
 from pipeline.hif.tasks.makeimages.resultobjects import MakeImagesResult
-from pipeline.infrastructure import casa_tools, task_registry
+from pipeline.infrastructure import casa_tools, conditions, task_registry
 
 from .cleantarget import CleanTarget, CleanTargetInfo
 from .resultobjects import MakeImListResult
@@ -59,8 +59,9 @@ class MakeImListInputs(vdp.StandardInputs):
 
     @vdp.VisDependentProperty
     def field(self):
-        if 'TARGET' in self.intent and 'field' in self.context.size_mitigation_parameters:
-            return self.context.size_mitigation_parameters['field']
+        size_mitigation_parameters = conditions.get_size_mitigation_parameters(self.context)
+        if 'TARGET' in self.intent and 'field' in size_mitigation_parameters:
+            return size_mitigation_parameters['field']
         return ''
 
     @field.convert
@@ -121,14 +122,16 @@ class MakeImListInputs(vdp.StandardInputs):
 
     @vdp.VisDependentProperty
     def nbins(self):
-        if 'TARGET' in self.intent and 'nbins' in self.context.size_mitigation_parameters:
-            return self.context.size_mitigation_parameters['nbins']
+        size_mitigation_parameters = conditions.get_size_mitigation_parameters(self.context)
+        if 'TARGET' in self.intent and 'nbins' in size_mitigation_parameters:
+            return size_mitigation_parameters['nbins']
         return ''
 
     @vdp.VisDependentProperty
     def spw(self):
-        if 'TARGET' in self.intent and 'spw' in self.context.size_mitigation_parameters and self.specmode=='cube':
-            return self.context.size_mitigation_parameters['spw']
+        size_mitigation_parameters = conditions.get_size_mitigation_parameters(self.context)
+        if 'TARGET' in self.intent and 'spw' in size_mitigation_parameters and self.specmode == 'cube':
+            return size_mitigation_parameters['spw']
         return ''
 
     @spw.convert
@@ -156,10 +159,11 @@ class MakeImListInputs(vdp.StandardInputs):
         TODO: refactor and make hif_checkproductsize() (or a new task) spwlist aware."""
 
         mitigated_hm_cell = None
-        if 'TARGET' in self.intent and 'hm_cell' in self.context.size_mitigation_parameters:
-            mitigated_hm_cell = self.context.size_mitigation_parameters['hm_cell']
+        size_mitigation_parameters = conditions.get_size_mitigation_parameters(self.context)
+        if 'TARGET' in self.intent and 'hm_cell' in size_mitigation_parameters:
+            mitigated_hm_cell = size_mitigation_parameters['hm_cell']
 
-        multi_target_size_mitigation = self.context.size_mitigation_parameters.get('multi_target_size_mitigation', {})
+        multi_target_size_mitigation = size_mitigation_parameters.get('multi_target_size_mitigation', {})
         if multi_target_size_mitigation:
             multi_target_spwlist = [spws for spws in multi_target_size_mitigation.keys() if set(
                 spwlist.split(',')).issubset(set(spws.split(',')))]
@@ -176,9 +180,10 @@ class MakeImListInputs(vdp.StandardInputs):
 
         TODO: refactor and make hif_checkproductsize() (or a new task) spwlist aware."""
         mitigated_hm_imsize = None
-        if 'TARGET' in self.intent and 'hm_imsize' in self.context.size_mitigation_parameters:
-            mitigated_hm_imsize = self.context.size_mitigation_parameters['hm_imsize']
-        multi_target_size_mitigation = self.context.size_mitigation_parameters.get('multi_target_size_mitigation', {})
+        size_mitigation_parameters = conditions.get_size_mitigation_parameters(self.context)
+        if 'TARGET' in self.intent and 'hm_imsize' in size_mitigation_parameters:
+            mitigated_hm_imsize = size_mitigation_parameters['hm_imsize']
+        multi_target_size_mitigation = size_mitigation_parameters.get('multi_target_size_mitigation', {})
         if multi_target_size_mitigation:
             multi_target_spwlist = [spws for spws in multi_target_size_mitigation.keys() if set(
                 spwlist.split(',')).issubset(set(spws.split(',')))]
@@ -426,16 +431,15 @@ class MakeImList(basetask.StandardTaskTemplate):
             return result
 
         # Check for size mitigation errors.
-        if 'status' in inputs.context.size_mitigation_parameters:
-            if inputs.context.size_mitigation_parameters['status'] == 'ERROR':
-                result.mitigation_error = True
-                result.set_info({'msg': 'Size mitigation had failed. No imaging targets were created.',
-                                 'intent': inputs.intent,
-                                 'specmode': inputs.specmode,
-                                 'stokes': inputs.stokes})
-                result.contfile = None
-                result.linesfile = None
-                return result
+        if conditions.has_size_mitigation_error(inputs.context):
+            result.mitigation_error = True
+            result.set_info({'msg': 'Size mitigation had failed. No imaging targets were created.',
+                             'intent': inputs.intent,
+                             'specmode': inputs.specmode,
+                             'stokes': inputs.stokes})
+            result.contfile = None
+            result.linesfile = None
+            return result
 
         # validate vis
         if inputs.vis not in (None, '', ['']) and not isinstance(inputs.vis, list):
@@ -763,7 +767,8 @@ class MakeImList(basetask.StandardTaskTemplate):
                 return result
             else:
                 repr_spw_nbin = 1
-                if inputs.context.size_mitigation_parameters.get('nbins', '') != '':
+                size_mitigation_parameters = conditions.get_size_mitigation_parameters(inputs.context)
+                if size_mitigation_parameters.get('nbins', '') != '':
                     nbin_items = inputs.nbins.split(',')
                     for nbin_item in nbin_items:
                         key, value = nbin_item.split(':')
@@ -1057,17 +1062,19 @@ class MakeImList(basetask.StandardTaskTemplate):
                     min_freq_spwlist = [filtered_spwlist_by_freq[-1]]
 
                     # Get robust and uvtaper values
+                    imaging_parameter_overrides = conditions.get_imaging_parameter_overrides(inputs.context)
+
                     if inputs.robust not in (None, -999.0):
                         robust = inputs.robust
-                    elif 'robust' in inputs.context.imaging_parameters:
-                        robust = inputs.context.imaging_parameters['robust']
+                    elif 'robust' in imaging_parameter_overrides:
+                        robust = imaging_parameter_overrides['robust']
                     else:
                         robust = self.heuristics.robust(specmode=inputs.specmode)
 
                     if inputs.uvtaper not in (None, []):
                         uvtaper = inputs.uvtaper
-                    elif 'uvtaper' in inputs.context.imaging_parameters:
-                        uvtaper = inputs.context.imaging_parameters['uvtaper']
+                    elif 'uvtaper' in imaging_parameter_overrides:
+                        uvtaper = imaging_parameter_overrides['uvtaper']
                     else:
                         uvtaper = self.heuristics.uvtaper()
 

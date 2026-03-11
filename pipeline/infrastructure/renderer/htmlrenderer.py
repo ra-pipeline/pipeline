@@ -41,6 +41,72 @@ if TYPE_CHECKING:
 LOG = infrastructure.logging.get_logger(__name__)
 
 EVENTS_FILENAME = 'pipeline-events.jsonl'
+SNAPSHOT_FILENAME = 'pipeline-status.json'
+
+
+def _load_pipeline_status_snapshot(context: Context | object) -> dict[str, object] | None:
+    output_dir = getattr(context, 'output_dir', None)
+    if not output_dir:
+        return None
+
+    snapshot_path = os.path.join(output_dir, SNAPSHOT_FILENAME)
+    if not os.path.exists(snapshot_path):
+        return None
+
+    try:
+        with open(snapshot_path, encoding='utf-8') as handle:
+            return json.load(handle)
+    except (OSError, ValueError):
+        LOG.warning('Unable to load pipeline status snapshot from %s', snapshot_path)
+        return None
+
+
+def get_active_conditions_for_weblog(context: Context | object) -> list[dict[str, object]]:
+    snapshot = _load_pipeline_status_snapshot(context)
+    if snapshot is not None and isinstance(snapshot.get('conditions'), list):
+        return list(snapshot['conditions'])
+
+    get_conditions = getattr(context, 'get_conditions', None)
+    if callable(get_conditions):
+        return [condition.to_dict() for condition in get_conditions()]
+
+    return []
+
+
+def get_weblog_run_status(context: Context | object) -> dict[str, object] | None:
+    snapshot = _load_pipeline_status_snapshot(context)
+    if snapshot is None:
+        return None
+
+    state = snapshot.get('state')
+    final_disposition = snapshot.get('final_disposition')
+    reason_code = snapshot.get('reason_code')
+    message = snapshot.get('message')
+    conditions = snapshot.get('conditions') if isinstance(snapshot.get('conditions'), list) else []
+
+    if state == 'stopped' or final_disposition == 'clean_stop':
+        return {
+            'title': 'Run stopped intentionally',
+            'alert_class': 'info alert-info',
+            'message': message or 'Pipeline execution stopped intentionally.',
+            'reason_code': reason_code,
+        }
+    if state == 'failed':
+        return {
+            'title': 'Run failed',
+            'alert_class': 'danger alert-danger',
+            'message': message or 'Pipeline execution ended in failure.',
+            'reason_code': reason_code,
+        }
+    if conditions:
+        return {
+            'title': 'Run completed with active conditions',
+            'alert_class': 'warning alert-warning',
+            'message': 'The final pipeline status includes %d active condition(s).' % len(conditions),
+            'reason_code': reason_code,
+        }
+
+    return None
 
 
 def get_task_description(result_obj, context, include_stage=True):
@@ -648,7 +714,9 @@ class T1_1Renderer(RendererBase):
             'observers': observers,
             'ms_summary_rows': ms_summary_rows,
             'environment_tables': environment_tables,
-            'execution_mode': execution_mode
+            'execution_mode': execution_mode,
+            'run_status_alert': get_weblog_run_status(context),
+            'active_conditions': get_active_conditions_for_weblog(context),
         }
 
     @staticmethod
@@ -1490,7 +1558,9 @@ class T2_3_XMBaseRenderer(RendererBase):
             'pcontext': context,
             'scores': scores,
             'tablerows': tablerows,
-            'topic': topic
+            'topic': topic,
+            'run_status_alert': get_weblog_run_status(context),
+            'active_conditions': get_active_conditions_for_weblog(context),
         }
 
 
@@ -1661,7 +1731,6 @@ class T2_4MDetailsContainerRenderer(RendererBase):
         mako_context = {'pcontext' : context,
                         'container_urls': urls,
                         'active_ms' : 'N/A'}
-
         template = weblog.TEMPLATE_LOOKUP.get_template(cls.template)
         with cls.get_file(context, result) as fileobj:
             fileobj.write(template.render(**mako_context))

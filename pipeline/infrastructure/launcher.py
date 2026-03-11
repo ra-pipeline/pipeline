@@ -16,8 +16,8 @@ from typing import Any
 
 from pipeline import domain, environment
 
-from . import callibrary, casa_tools, eventbus, imagelibrary, logging, project, utils
-from .eventbus import ContextCreatedEvent, ContextResumedEvent
+from . import callibrary, casa_tools, conditions, eventbus, imagelibrary, logging, project, utils
+from .eventbus import ConditionClearedEvent, ConditionRaisedEvent, ContextCreatedEvent, ContextResumedEvent
 
 LOG = logging.get_logger(__name__)
 
@@ -135,6 +135,7 @@ class Context:
         self.clean_list_pending = []  # CAS-10146
         self.clean_masks = {}  # PIPE-2464
         self.clean_thresholds = {}  # PIPE-2464
+        self.conditions: dict[str, conditions.PipelineCondition] = {}
         self.contfile: str | None = None
         self.imaging_mode: str | None = None  # PIPE-592
         self.imaging_parameters = {}  # CAS-10146
@@ -227,6 +228,115 @@ class Context:
         }
         instance = m[cls]
         setattr(instance, name, value)
+
+    def set_condition(
+        self,
+        code: str,
+        *,
+        severity: str,
+        scope: str,
+        disposition: str,
+        message: str | None = None,
+        details: dict[str, Any] | None = None,
+        producer_stage: int | None = None,
+        producer_task: str | None = None,
+    ) -> conditions.PipelineCondition:
+        """Create or update a structured condition on the context."""
+
+        if producer_stage is None:
+            producer_stage = self.task_counter or None
+        if producer_task is None:
+            producer_task = current_task_name.get()
+
+        condition = conditions.create_or_update_condition(
+            existing=self.conditions.get(code),
+            code=code,
+            severity=severity,
+            scope=scope,
+            disposition=disposition,
+            message=message,
+            details=details,
+            producer_stage=producer_stage,
+            producer_task=producer_task,
+        )
+        self.conditions[code] = condition
+        eventbus.send_message(
+            ConditionRaisedEvent(
+                context_name=self.name,
+                output_dir=self.output_dir,
+                code=condition.code,
+                severity=condition.severity,
+                scope=condition.scope,
+                disposition=condition.disposition,
+                message=condition.message,
+                details=condition.details,
+                producer_stage=condition.producer_stage,
+                producer_task=condition.producer_task,
+                created_at=condition.created_at,
+                updated_at=condition.updated_at,
+            )
+        )
+        return condition
+
+    def clear_condition(self, code: str) -> bool:
+        """Clear an active structured condition from the context."""
+
+        existing = self.conditions.get(code)
+        if existing is None or not existing.active:
+            return False
+
+        cleared = conditions.clear_existing_condition(existing)
+        self.conditions[code] = cleared
+        eventbus.send_message(
+            ConditionClearedEvent(
+                context_name=self.name,
+                output_dir=self.output_dir,
+                code=cleared.code,
+                severity=cleared.severity,
+                scope=cleared.scope,
+                disposition=cleared.disposition,
+                message=cleared.message,
+                details=cleared.details,
+                producer_stage=cleared.producer_stage,
+                producer_task=cleared.producer_task,
+                created_at=cleared.created_at,
+                updated_at=cleared.updated_at,
+            )
+        )
+        return True
+
+    def get_condition(self, code: str, *, active_only: bool = True) -> conditions.PipelineCondition | None:
+        """Return a structured condition by code."""
+
+        condition = self.conditions.get(code)
+        if condition is None:
+            return None
+        if active_only and not condition.active:
+            return None
+        return condition
+
+    def get_conditions(
+        self,
+        *,
+        active_only: bool = True,
+        severity: str | None = None,
+        scope: str | None = None,
+        disposition: str | None = None,
+    ) -> list[conditions.PipelineCondition]:
+        """Return structured conditions filtered by common attributes."""
+
+        matches = []
+        for condition in self.conditions.values():
+            if active_only and not condition.active:
+                continue
+            if severity is not None and condition.severity != severity:
+                continue
+            if scope is not None and condition.scope != scope:
+                continue
+            if disposition is not None and condition.disposition != disposition:
+                continue
+            matches.append(condition)
+        return matches
 
     def get_oussid(self) -> str:
         """Get the parent OUS 'ousstatus' name. This is the sanitized OUS status UID."""

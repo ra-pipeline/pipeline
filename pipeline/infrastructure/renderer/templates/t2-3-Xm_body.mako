@@ -24,6 +24,40 @@ def results_by_stage_number(d):
 	<h1>${next.title()}<%block name="backbutton"><button class="btn btn-default pull-right" onClick="javascript:window.history.back();">Back</button></%block></h1>
 </div>
 
+% if run_status_alert is not None:
+<div class="${run_status_alert['alert_class']}">
+	<h4>${run_status_alert['title']}</h4>
+	<p>${run_status_alert['message']}</p>
+	% if run_status_alert.get('reason_code'):
+	<p><strong>Reason code:</strong> ${run_status_alert['reason_code']}</p>
+	% endif
+</div>
+% endif
+
+% if active_conditions:
+<h3>Active Conditions</h3>
+<table class="table table-bordered table-striped table-condensed" summary="Active pipeline conditions for this run">
+	<thead>
+		<tr>
+			<th>Code</th>
+			<th>Severity</th>
+			<th>Scope</th>
+			<th>Message</th>
+		</tr>
+	</thead>
+	<tbody>
+	% for condition in active_conditions:
+		<tr>
+			<td>${condition.get('code', '')}</td>
+			<td>${condition.get('severity', '')}</td>
+			<td>${condition.get('scope', '')}</td>
+			<td>${condition.get('message', '') or ''}</td>
+		</tr>
+	% endfor
+	</tbody>
+</table>
+% endif
+
 % if topic.results_by_type:
 <table class="table">
 	<thead>

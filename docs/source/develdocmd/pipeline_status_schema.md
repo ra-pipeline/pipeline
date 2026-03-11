@@ -161,6 +161,10 @@ Initial recommended `event_type` values:
 Conditions are designed for cross-stage and cross-task communication of
 non-fatal and control-relevant state.
 
+The current implementation publishes active conditions in
+`pipeline-status.json` and emits `condition_raised` / `condition_cleared`
+records in `pipeline-events.jsonl`.
+
 ### Required condition fields
 
 | Field | Type | Notes |
@@ -181,6 +185,21 @@ non-fatal and control-relevant state.
 | `producer_task` | string or null | Task that produced the condition. |
 | `created_at` | string or null | UTC ISO-8601 time. |
 | `updated_at` | string or null | UTC ISO-8601 time. |
+
+### Initial condition vocabulary
+
+The first implemented condition codes are intentionally small.
+
+| Code | Meaning | Typical disposition |
+| --- | --- | --- |
+| `imaging_target_selection_notice` | Non-fatal message from imaging target selection, such as no targets or no check-source data. | `continue` |
+| `continuum_selection_warning` | Non-fatal `hif_findcont` warning state, including narrow-range continuum findings, heuristic warnings, or selections removed from later imaging. | `continue` |
+| `imaging_parameter_override` | Heuristic imaging parameter overrides, currently robust and uvtaper values from `hifa_imageprecheck`. | `continue` |
+| `size_mitigation` | Published mitigation settings or blocking mitigation failure from `hif_checkproductsize`. | `continue` or `skip_stage` |
+
+For condition lifecycle events, the condition code is currently carried in the
+`reason_code` field and the complete condition object is repeated in
+`payload.condition`.
 
 ## Compatibility guidance
 

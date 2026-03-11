@@ -9,9 +9,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import eventbus
+from . import conditions
 from . import exceptions
 from . import logging
 from .eventbus import (
+    ConditionClearedEvent,
+    ConditionLifecycleEvent,
+    ConditionRaisedEvent,
     ContextCreatedEvent,
     ContextLifecycleEvent,
     ContextResumedEvent,
@@ -215,11 +219,47 @@ def _snapshot_details_from_context(context: object) -> dict[str, object]:
     details: dict[str, object] = {
         'observatory': _get_context_observatory(context),
         'recipe_name': _get_context_recipe_name(context),
+        'conditions': _get_context_conditions(context),
     }
     current_task = _get_latest_task_name(context)
     if current_task is not None:
         details['current_task'] = current_task
     return details
+
+
+def _get_context_conditions(context: object) -> list[dict[str, object]]:
+    get_conditions = getattr(context, 'get_conditions', None)
+    if callable(get_conditions):
+        return [condition.to_dict() for condition in get_conditions()]
+
+    raw_conditions = getattr(context, 'conditions', None)
+    if isinstance(raw_conditions, dict):
+        return [condition.to_dict() for condition in raw_conditions.values() if getattr(condition, 'active', True)]
+    return []
+
+
+def _update_conditions_snapshot(
+    active_conditions: list[dict[str, object]],
+    event: ConditionLifecycleEvent,
+) -> list[dict[str, object]]:
+    updated_conditions = [condition for condition in active_conditions if condition.get('code') != event.code]
+    if isinstance(event, ConditionRaisedEvent):
+        updated_conditions.append(
+            {
+                'code': event.code,
+                'severity': event.severity,
+                'scope': event.scope,
+                'disposition': event.disposition,
+                'message': event.message,
+                'details': event.details,
+                'producer_stage': event.producer_stage,
+                'producer_task': event.producer_task,
+                'created_at': event.created_at,
+                'updated_at': event.updated_at,
+                'active': True,
+            }
+        )
+    return updated_conditions
 
 
 def _log_level_counts(result: object | None) -> dict[str, int]:
@@ -285,6 +325,7 @@ class PipelineStatusTracker:
         self._live_log_handler_attached = False
         eventbus.subscribe(self.on_task_lifecycle_event, TaskLifecycleEvent.topic)
         eventbus.subscribe(self.on_result_lifecycle_event, ResultLifecycleEvent.topic)
+        eventbus.subscribe(self.on_condition_lifecycle_event, ConditionLifecycleEvent.topic)
         eventbus.subscribe(self.on_log_message_event, LogMessageEvent.topic)
         eventbus.subscribe(self.on_weblog_lifecycle_event, WebLogLifecycleEvent.topic)
         eventbus.subscribe(self.on_run_lifecycle_event, RunLifecycleEvent.topic)
@@ -457,6 +498,38 @@ class PipelineStatusTracker:
             payload={
                 'levelno': event.levelno,
                 'logger_name': event.logger_name,
+            },
+        )
+
+    def on_condition_lifecycle_event(self, event: ConditionLifecycleEvent) -> None:
+        if event.context_name != self.context_name:
+            return
+
+        timestamp = _utc_now()
+        active_conditions = _update_conditions_snapshot(list(self.snapshot.get('conditions', [])), event)
+        self._update_snapshot(timestamp, conditions=active_conditions)
+        self._record_event(
+            'condition_raised' if isinstance(event, ConditionRaisedEvent) else 'condition_cleared',
+            timestamp,
+            state=self.snapshot['state'],
+            stage_number=event.producer_stage,
+            task_name=event.producer_task,
+            severity=event.severity,
+            reason_code=event.code,
+            message=event.message,
+            payload={
+                'condition': {
+                    'code': event.code,
+                    'severity': event.severity,
+                    'scope': event.scope,
+                    'disposition': event.disposition,
+                    'details': event.details,
+                    'producer_stage': event.producer_stage,
+                    'producer_task': event.producer_task,
+                    'created_at': event.created_at,
+                    'updated_at': event.updated_at,
+                    'active': event.active,
+                }
             },
         )
 

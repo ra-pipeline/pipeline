@@ -12,7 +12,7 @@ import pipeline.infrastructure.vdp as vdp
 
 from pipeline.domain import DataType
 from pipeline.h.tasks.common.sensitivity import Sensitivity
-from pipeline.infrastructure import casa_tools, exceptions, task_registry
+from pipeline.infrastructure import casa_tools, conditions, exceptions, task_registry
 
 from ..tclean import Tclean
 from ..tclean.resultobjects import TcleanResult
@@ -246,13 +246,13 @@ class MakeImages(basetask.StandardTaskTemplate):
         result.overwrite = inputs.overwrite_on_export
 
         # Carry any message from hif_makeimlist (e.g. for missing PI cube target)
-        result.set_info(inputs.context.clean_list_info)
+        clean_list_info = conditions.get_clean_list_info(inputs.context)
+        result.set_info(clean_list_info)
 
         # Check for size mitigation errors.
-        if 'status' in inputs.context.size_mitigation_parameters:
-            if inputs.context.size_mitigation_parameters['status'] == 'ERROR':
-                result.mitigation_error = True
-                return result
+        if conditions.has_size_mitigation_error(inputs.context):
+            result.mitigation_error = True
+            return result
 
         # make sure inputs.vis is a list, even it is one that contains a
         # single measurement set
@@ -288,8 +288,8 @@ class MakeImages(basetask.StandardTaskTemplate):
                     del heuristics
 
         # set of descriptions
-        if inputs.context.clean_list_info.get('msg', '') != '':
-            target_list = [inputs.context.clean_list_info]
+        if clean_list_info.get('msg', '') != '':
+            target_list = [clean_list_info]
         else:
             target_list = inputs.target_list
 

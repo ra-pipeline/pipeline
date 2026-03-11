@@ -30,7 +30,13 @@ The codebase now includes:
 - live structured `log_message` export for elevated log records while tasks are
   still running;
 - clean-stop flow with distinct `stage_stopped` and `run_stopped` events;
-- initial weblog support for displaying intentionally stopped stages.
+- initial weblog support for displaying intentionally stopped stages;
+- run-level weblog status and active-condition summaries on the home and topic
+  pages;
+- a shared `Context` condition registry for structured non-fatal cross-stage
+  state;
+- initial Phase 5 adoption for imaging target-selection notices and
+  checkproductsize mitigation state.
 
 ## Current Coverage
 
@@ -136,26 +142,72 @@ Current behavior:
 
 ### Workstream E: context conditions
 
-Not yet implemented.
+Implemented for the current selective rollout.
 
-There is still no general condition registry on `Context` for non-fatal,
-cross-stage communication.
+The current implementation now provides:
+
+- a structured condition registry on `Context`;
+- helper methods to raise, clear, and query conditions by code;
+- `condition_raised` and `condition_cleared` status events;
+- snapshot publication of the active condition set;
+- compatibility helpers so migrated readers can prefer the registry while old
+  context dictionaries remain available.
+
+The first adopted condition codes are:
+
+- `imaging_target_selection_notice`:
+  used for non-fatal imaging target-selection messages such as no targets or no
+  check source data;
+- `continuum_selection_warning`:
+  used for non-fatal `hif_findcont` warnings such as narrow continuum ranges,
+  internal continuum-finder warnings, or target selections dropped from later
+  continuum imaging;
+- `imaging_parameter_override`:
+  used for heuristic robust and uvtaper overrides published by
+  `hifa_imageprecheck` for later imaging stages;
+- `size_mitigation`:
+  used for mitigation settings and blocking mitigation failures published by
+  `hif_checkproductsize`.
+
+Current selective adoption covers the shared interferometric imaging flow:
+
+- `hif_checkproductsize` publishes the size-mitigation condition;
+- `hif_findcont` publishes structured continuum-selection warnings;
+- `hifa_imageprecheck` publishes imaging-parameter override state;
+- `hif_makeimlist` publishes imaging target-selection notices;
+- `hif_makeimages`, `hif_findcont`, `hif_uvcontsub`, `hif_makeimlist`,
+  `hif_editimlist`, and `hif_checkproductsize` now read condition-backed
+  compatibility helpers.
+
+The current Phase 5 rollout is considered complete at this point.
+
+An additional audit was performed for the remaining `selfcal` context state.
+That review found that `context.selfcal_targets` is still best treated as
+ordinary shared working data rather than a condition family. Downstream
+consumers in `hif_makeimlist` depend on detailed per-target solver outputs such
+as `sc_success`, `sc_lib`, and `sc_rms_scale`, not on a compact non-fatal
+operator-facing summary.
+
+If a future extension is needed, the likely next step would be a small summary
+condition for selfcal availability or restore readiness, not migration of the
+full `selfcal_targets` payload.
 
 ### Workstream F: weblog status improvements
 
-Partially implemented.
+Implemented for the current scope.
 
 Implemented now:
 
 - stopped stages are visible in the By Task weblog views;
 - stopped stages get a dedicated detail page;
-- stopped stages are labeled distinctly from failed stages.
+- stopped stages are labeled distinctly from failed stages;
+- home-page and topic-page weblog views show a run-level status banner for
+  clean stops, failures, and runs that ended with active conditions;
+- home-page and topic-page weblog views surface the active condition set from
+  `pipeline-status.json`.
 
 Still pending:
 
-- broader home-page and topic-page stop summaries beyond the current task view
-  additions;
-- a stronger run-level weblog indicator for `run_stopped`;
 - any rendering tied to future context conditions.
 
 ## Current Output Contract
@@ -207,11 +259,12 @@ The current `pipeline-events.jsonl` stream includes fields such as:
 
 The following pieces remain unfinished relative to the broader plan.
 
-- structured context conditions for non-fatal inter-stage communication;
-- richer run-level weblog indication for clean stops;
 - longer-form operator-facing documentation for artifact consumption;
 - explicit task-author guidance on when to raise `PipelineStopRequested`;
-- a final retirement plan for legacy `errorexit-*` compatibility files.
+- a broader rollout of structured conditions beyond the current imaging-state
+  adoption;
+- a final retirement plan for legacy `errorexit-*` compatibility files and
+  legacy context-dictionary mirrors.
 
 ## Practical Interpretation
 
@@ -224,6 +277,8 @@ The most important practical consequences are:
   `intentional stop` without scraping logs;
 - long-running tasks can emit machine-readable elevated log messages while they
   are still executing;
+- downstream stages now have a supported shared registry for selected non-fatal
+  imaging conditions instead of relying only on ad hoc context dictionaries;
 - the weblog can now represent stopped stages separately from failed stages;
 - recipe and task-list execution paths can participate in the same stop and
   failure model as PPR-based execution.
