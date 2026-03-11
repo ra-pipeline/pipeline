@@ -21,7 +21,7 @@ dependencies:
       - casashell==6.7.3.*
       # casatools/casatasks/numpy etc. will be installed as indirect dependencies
       - casampi
-      - protobuf~=3.20  # casaplotms still requires ver<=3.20 currently
+      - protobuf==3.20.*  # casaplotms still requires ver<=3.20 currently
       # https://casadocs.readthedocs.io/en/stable/notebooks/introduction.html#Known-Issues
       - casaplotms
       - casaplotserver

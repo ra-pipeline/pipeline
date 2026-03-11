@@ -21,20 +21,10 @@ def format_wt_overall(wt):
     else:
         return np.format_float_positional(wt, precision=6, fractional=False, trim='-')
 
-weight_stats=plotter.result.weight_stats
-
 if result[0].inputs['statwtmode'] == 'VLA':
     description = "after"
     table_header = "Weight Properties"
-else: 
-    before_by_spw=weight_stats['before']['per_spw']
-    before_by_ant=weight_stats['before']['per_ant']
 
-    after_by_spw=weight_stats['after']['per_spw']
-    after_by_ant=weight_stats['after']['per_ant']
-
-    description = "before/after"
-    table_header = "statwt after"
 %>
 
 <!-- VLA PI: show the overall mean and variance at the top -->
@@ -227,6 +217,7 @@ else:
     %endif
     %endfor
 %else: 
+
     <!-- Include plots and tables for VLASS --> 
     <!-- Plots for VLASS before/after, not separated by band, doesn't include per-scan plots or tables or shaded cells-->
     <%self:plot_group plot_dict="${summary_plots}"
@@ -250,8 +241,21 @@ else:
             </%def>
     </%self:plot_group>
 
-    <!-- Tables for VLASS before/after, not separated by band-->
     <h2 id="flagged_data_summary" class="jumptarget">Statwt Summary</h2>
+
+    %for ms, plotter in plotters.items():
+    
+    <%
+    weight_stats=plotter.result.weight_stats
+    before_by_spw=weight_stats['before']['per_spw']
+    before_by_ant=weight_stats['before']['per_ant']
+    after_by_spw=weight_stats['after']['per_spw']
+    after_by_ant=weight_stats['after']['per_ant']
+    description = "before/after"
+    %>
+
+    <h4>${ms | h}</h4>
+    <!-- Tables for VLASS before/after, not separated by band-->
     <table style="float: left; margin:0 10px; width: auto; text-align:center" class="table table-bordered table-striped ">
 	<caption>Summary of before/after-statwt antenna-based weights (<i>W</i><sub>i</sub>) for each antenna. The antenna-based weights are derived from the visibility WEIGHT column: <i>W</i><sub>ij</sub>&asymp;<i>W</i><sub>i</sub><i>W</i><sub>j</sub>. 
     </caption>
@@ -292,48 +296,51 @@ else:
 		</tr>
 		% endfor
 	</tbody>
-</table>
+    </table>
 
-<table style="float: left; margin:0 10px; width: auto; text-align:center" class="table table-bordered table-striped ">
-	<caption>Summary of before/after-statwt antenna-based weights (<i>W</i><sub>i</sub>) for each spectral window. The antenna-based weights are derived from the visibility WEIGHT column: <i>W</i><sub>ij</sub>&asymp;<i>W</i><sub>i</sub><i>W</i><sub>j</sub>.
-    </caption>
-	<thead>
-		<tr>
-			<th scope="col" rowspan="2">Spw Selection</th>
-			<!-- flags before task is always first agent -->
-			<th scope="col" colspan="3" style="text-align:center">statwt before</th>
-			<th scope="col" colspan="3" style="text-align:center">statwt after</th>
-		</tr>
-		<tr>
-            <th scope="col">Median</th>
-            <th scope="col">1st/3rd Quartile</th>
-            <th scope="col">Mean &#177 S.Dev.</th>
-            <th scope="col">Median</th>
-            <th scope="col">1st/3rd Quartile</th>
-            <th scope="col">Mean &#177 S.Dev.</th>
-		</tr>        
-	</thead>
-	<tbody>
-		% for i in range(len(after_by_spw)):
-		<tr>
-			<th style="text-align:center">${after_by_spw[i]['spw']}</th>  
-            <td>${render.format_wt(before_by_spw[i]['med'])}</td>
-            % if before_by_spw[i]['quartiles'] is not None:
-                <td>${render.format_wt(before_by_spw[i]['q1'])}/${render.format_wt(before_by_spw[i]['q3'])}</td>
-            % else:
-                <td>N/A</td>
-            % endif            
-            <td>${render.format_wt(before_by_spw[i]['mean'])} &#177 ${render.format_wt(before_by_spw[i]['stdev'])}</td>  
-            <td>${render.format_wt(after_by_spw[i]['med'])}</td>
-            % if after_by_spw[i]['quartiles'] is not None:
-                <td>${render.format_wt(after_by_spw[i]['q1'])}/${render.format_wt(after_by_spw[i]['q3'])}</td>
-            % else:
-                <td>N/A</td>
-            % endif
-            <td>${render.format_wt(after_by_spw[i]['mean'])} &#177 ${render.format_wt(after_by_spw[i]['stdev'])}</td>
-		</tr>
-		% endfor
-	</tbody>
-</table>
+    <table style="float: left; margin:0 10px; width: auto; text-align:center" class="table table-bordered table-striped ">
+        <caption>Summary of before/after-statwt antenna-based weights (<i>W</i><sub>i</sub>) for each spectral window. The antenna-based weights are derived from the visibility WEIGHT column: <i>W</i><sub>ij</sub>&asymp;<i>W</i><sub>i</sub><i>W</i><sub>j</sub>.
+        </caption>
+        <thead>
+            <tr>
+                <th scope="col" rowspan="2">Spw Selection</th>
+                <!-- flags before task is always first agent -->
+                <th scope="col" colspan="3" style="text-align:center">statwt before</th>
+                <th scope="col" colspan="3" style="text-align:center">statwt after</th>
+            </tr>
+            <tr>
+                <th scope="col">Median</th>
+                <th scope="col">1st/3rd Quartile</th>
+                <th scope="col">Mean &#177 S.Dev.</th>
+                <th scope="col">Median</th>
+                <th scope="col">1st/3rd Quartile</th>
+                <th scope="col">Mean &#177 S.Dev.</th>
+            </tr>        
+        </thead>
+        <tbody>
+            % for i in range(len(after_by_spw)):
+            <tr>
+                <th style="text-align:center">${after_by_spw[i]['spw']}</th>  
+                <td>${render.format_wt(before_by_spw[i]['med'])}</td>
+                % if before_by_spw[i]['quartiles'] is not None:
+                    <td>${render.format_wt(before_by_spw[i]['q1'])}/${render.format_wt(before_by_spw[i]['q3'])}</td>
+                % else:
+                    <td>N/A</td>
+                % endif            
+                <td>${render.format_wt(before_by_spw[i]['mean'])} &#177 ${render.format_wt(before_by_spw[i]['stdev'])}</td>  
+                <td>${render.format_wt(after_by_spw[i]['med'])}</td>
+                % if after_by_spw[i]['quartiles'] is not None:
+                    <td>${render.format_wt(after_by_spw[i]['q1'])}/${render.format_wt(after_by_spw[i]['q3'])}</td>
+                % else:
+                    <td>N/A</td>
+                % endif
+                <td>${render.format_wt(after_by_spw[i]['mean'])} &#177 ${render.format_wt(after_by_spw[i]['stdev'])}</td>
+            </tr>
+            % endfor
+        </tbody>
+    </table>
+    <br style="clear: both;">
+
+    %endfor
 
 %endif 

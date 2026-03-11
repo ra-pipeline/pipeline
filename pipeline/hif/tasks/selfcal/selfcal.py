@@ -570,7 +570,7 @@ class Selfcal(basetask.StandardTaskTemplate):
                             if is_resource:
                                 members.append(member)
                                 LOG.info('extracting: %s from %s', member.name, check_file)
-                        tar.extractall(members=members)
+                        tar.extractall(members=members, filter='fully_trusted')
                 if check_file.endswith('.selfcal.json'):
                     scal_targets_json = self._scal_targets_from_json(check_file)
                     if scal_targets_json is not None:

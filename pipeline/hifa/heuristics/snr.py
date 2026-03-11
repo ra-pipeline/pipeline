@@ -1038,8 +1038,49 @@ def compute_gaincalsnr(ms, spwlist, spw_dict, intent, edge_fraction):
             LOG.info('Spw %d Tsys <= 0K in MS; %s assuming nominal Tsys for SNR calculation', spwid, ms.basename)
         else:
             relativeTsys = spw_dict[spwid]['median_tsys'] / ALMA_TSYS[bandidx]
-        nbaselines = spw_dict[spwid]['num_7mantenna'] + spw_dict[spwid]['num_12mantenna'] - 1
-        arraySizeFactor = np.sqrt(ALMA_FIDUCIAL_NUM_ANTENNAS * (ALMA_FIDUCIAL_NUM_ANTENNAS-1) / 2.0 / nbaselines)
+
+        # PIPE-2901
+        # updated variable name as this is the number of effective antennas used in sensitivity scaling
+        # the N-3 is from VLA Memo 135 (Cornwell 1981), i.e. solution noise is infinite for 3 antennas
+        # https://ui.adsabs.harvard.edu/abs/1981VLASM.135.0001C/abstract
+        nEffectiveAntennas = spw_dict[spwid]['num_7mantenna'] + spw_dict[spwid]['num_12mantenna'] - 3
+        
+        # PIPE-2901 explanation
+        # The calculation for the sensitivities can be broken into two parts
+        # 1) convert from FIDUCIAL_SENSITIVITIES (image based parameter) into an ANTENNA based sensitivity (strictly)
+        #    e.g.   FIDUCIAL_ANTBASED  =  FIDUCIAL_SENSITIVITIES  *  np.sqrt( ALMA_FIDUCIAL_NBASELINES  /  (ALMA_FIDUCIAL_NUM_ANTENNAS - 3))
+        #    where:  ALMA_FIDUCIAL_NBASELINES = ALMA_FIDUCIAL_NUM_ANTENNAS * (ALMA_FIDUCIAL_NUM_ANTENNAS-1)  / 2.0
+        #    expanded:   FIDUCIAL_ANTBASED  =  FIDUCIAL_SENSITIVITIES  *  np.sqrt((ALMA_FIDUCIAL_NUM_ANTENNAS * (ALMA_FIDUCIAL_NUM_ANTENNAS-1)) / (2.0 * (ALMA_FIDUCIAL_NUM_ANTENNAS-3)))
+        #
+        # 2) convert from the ALMA_FIDUCIAL_NUM_ANTENNAS to the observing array number of antennas
+        #        np.sqrt(ALMA_FIDUCIAL_NUM_ANTENNAS /  nantennas)
+        #
+        #  *** However, if we only want to consider the 'effective antennas' part 2 is
+        #      replaced with:    np.sqrt((ALMA_FIDUCIAL_NUM_ANTENNAS-3) /  (nantennas-3))
+        #               which becomes:  np.sqrt((ALMA_FIDUCIAL_NUM_ANTENNAS-3) /  nEffectiveAntennas)
+        #
+        # The 'arraySizeFactor' below is the exact algebraic simplification of combining (1) and (2) above in one step
+        # (the (N-3) terms cancel). This represents a deliberate model choice (N-3 vs. N-1 denominator).
+        # Expanding above (1) and the modified (2):
+        #
+        # arraySizeFactor = FIDUCIAL_ANTBASED  =  FIDUCIAL_SENSITIVITIES  *
+        #                                   np.sqrt((ALMA_FIDUCIAL_NUM_ANTENNAS * (ALMA_FIDUCIAL_NUM_ANTENNAS-1)) / (2.0 * (ALMA_FIDUCIAL_NUM_ANTENNAS-3)))  *
+        #                                   np.sqrt((ALMA_FIDUCIAL_NUM_ANTENNAS -3) /  nEffectiveAntennas)
+        #
+        #
+        # Numerically an example for the fiducial 16 nants, and a 43 ant full array are:
+        # full expansion:  ant = img * sqrt (( 16 * 15 * 16 ) / (2 * 13 * 43)) =>  sqrt(3.43) => 1.85
+        # using N-3 version:  ant = img * sqrt ((16*15) / (2*40))  => sqrt(3.0) => 1.73
+        #
+        # thus the simplified N-3 version in a 43 antennas case results in circa a 6% lower sensitivity
+
+        # PIPE-2901: guard against <= 0 effective antennas (div-by-zero at exactly 3 antennas, sqrt(neg) below)
+        if nEffectiveAntennas <= 0:
+            LOG.warning('Spw %d %s: fewer than 3 unflagged antennas; skipping SNR calculation for this spw',
+                        spwid, ms.basename)
+            continue
+
+        arraySizeFactor = np.sqrt(ALMA_FIDUCIAL_NUM_ANTENNAS * (ALMA_FIDUCIAL_NUM_ANTENNAS-1) / (2.0 * nEffectiveAntennas))
         if spw_dict[spwid]['num_7mantenna'] == 0:
             areaFactor = 1.0
         elif spw_dict[spwid]['num_12mantenna'] == 0:
@@ -1201,16 +1242,51 @@ def compute_bpsolint(ms, spwlist, spw_dict, reqPhaseupSnr, minBpNintervals, reqB
             LOG.info('Spw %d Tsys <= 0K in MS; %s assuming nominal Tsys for SNR calculation', spwid, ms.basename)
         else:
             relativeTsys = spw_dict[spwid]['median_tsys'] / ALMA_TSYS[bandidx]
-        nbaselines = spw_dict[spwid]['num_7mantenna'] + spw_dict[spwid]['num_12mantenna'] - 1
+        # PIPE-2901
+        # updated variable name as this is the number of effective antennas used in sensitivity scaling
+        # the N-3 is from VLA Memo 135 (Cornwell 1981), i.e. solution noise is infinite for 3 antennas
+
+        nEffectiveAntennas = spw_dict[spwid]['num_7mantenna'] + spw_dict[spwid]['num_12mantenna'] - 3
+
+        # PIPE-2901 explanation
+        # The calculation for the sensitivities can be broken into two parts
+        # 1) convert from FIDUCIAL_SENSITIVITIES (image based parameter) into an ANTENNA based sensitivity (strictly)
+        #    e.g.   FIDUCIAL_ANTBASED  =  FIDUCIAL_SENSITIVITIES  *  np.sqrt( ALMA_FIDUCIAL_NBASELINES  /  (ALMA_FIDUCIAL_NUM_ANTENNAS - 3))
+        #    where:  ALMA_FIDUCIAL_NBASELINES = ALMA_FIDUCIAL_NUM_ANTENNAS * (ALMA_FIDUCIAL_NUM_ANTENNAS-1)  / 2.0
+        #    expanded:   FIDUCIAL_ANTBASED  =  FIDUCIAL_SENSITIVITIES  *  np.sqrt((ALMA_FIDUCIAL_NUM_ANTENNAS * (ALMA_FIDUCIAL_NUM_ANTENNAS-1)) / (2.0 * (ALMA_FIDUCIAL_NUM_ANTENNAS-3)))
+        #
+        # 2) convert from the ALMA_FIDUCIAL_NUM_ANTENNAS to the observing array number of antennas
+        #        np.sqrt(ALMA_FIDUCIAL_NUM_ANTENNAS /  nantennas)
+        #
+        #  *** However, if we only want to consider the 'effective antennas' part 2 is
+        #      replaced with:    np.sqrt((ALMA_FIDUCIAL_NUM_ANTENNAS-3) /  (nantennas-3))
+        #               which becomes:  np.sqrt((ALMA_FIDUCIAL_NUM_ANTENNAS-3) /  nEffectiveAntennas)
+        #
+        # The 'arraySizeFactor' below is the exact algebraic simplification of combining (1) and (2) above in one step
+        # (the (N-3) terms cancel). This represents a deliberate model choice (N-3 vs. N-1 denominator).
+        # Expanding above (1) and the modified (2):
+        #
+        # arraySizeFactor = FIDUCIAL_ANTBASED  =  FIDUCIAL_SENSITIVITIES  *
+        #                                   np.sqrt((ALMA_FIDUCIAL_NUM_ANTENNAS * (ALMA_FIDUCIAL_NUM_ANTENNAS-1)) / (2.0 * (ALMA_FIDUCIAL_NUM_ANTENNAS-3)))  *
+        #                                   np.sqrt((ALMA_FIDUCIAL_NUM_ANTENNAS -3) /  nEffectiveAntennas)
+        #
+        #
+        # Numerically an example for the fiducial 16 nants, and a 43 ant full array are:
+        # full expansion:  ant = img * sqrt (( 16 * 15 * 16 ) / (2 * 13 * 43)) =>  sqrt(3.43) => 1.85
+        # using N-3 version:  ant = img * sqrt ((16*15) / (2*40))  => sqrt(3.0) => 1.73
+        #
+        # thus the simplified N-3 version in a 43 antennas case results in circa a 6% lower sensitivity
 
         # PIPE-408: do not continue if there are no unflagged baselines for current spw; this will cause this spw
         # to be absent from the solution interval dictionary that is returned.
-        if nbaselines < 0:
-            LOG.warning("Cannot compute optimal bandpass frequency solution interval for spw {} in MS {}; no (unflagged)"
-                        " baselines were found".format(spwid, ms.basename))
+        # PIPE-2901 changed warning, we are looking at antennas here for solns not baselines
+        if nEffectiveAntennas <= 0:
+            LOG.warning('Cannot compute optimal bandpass frequency solution interval for spw %d in MS %s;'
+                        ' fewer than 3 unflagged antennas were found', spwid, ms.basename)
             continue
 
-        arraySizeFactor = np.sqrt(16 * 15 / 2.0) / np.sqrt(nbaselines)
+        arraySizeFactor = np.sqrt(ALMA_FIDUCIAL_NUM_ANTENNAS * (ALMA_FIDUCIAL_NUM_ANTENNAS-1) / (2.0 * nEffectiveAntennas))
+        
         if spw_dict[spwid]['num_7mantenna'] == 0:
             areaFactor = 1.0
         elif spw_dict[spwid]['num_12mantenna'] == 0:

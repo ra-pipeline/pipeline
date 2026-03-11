@@ -3,7 +3,7 @@ import os
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.pyplot import cm
+from matplotlib import colormaps
 from scipy.stats import median_abs_deviation
 
 import pipeline.infrastructure as infrastructure
@@ -291,7 +291,7 @@ class VlassCubeCutoutRmsSummary(object):
             spw_labels = np.array(spw_labels)
 
             fig, ax = plt.subplots(figsize=(8, 6))
-            cmap = cm.get_cmap('rainbow_r')
+            cmap = colormaps.get_cmap('rainbow_r')
             if isinstance(self.info_dict, dict):
                 keep_list = [self.info_dict.get(spw_label, True) for spw_label in spw_labels]
             else:

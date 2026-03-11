@@ -165,7 +165,7 @@ class Restorepims(basetask.StandardTaskTemplate):
             for member in members:
                 LOG.info(f'extracting: {member.name}')
 
-            tar.extractall(path='.', members=members)
+            tar.extractall(path='.', members=members, filter='fully_trusted')
 
         # check against the resource requirement list
 

@@ -538,10 +538,34 @@ def _calc_subband_qa_score(spw_dict: dict, ms: MeasurementSet, caltable: str) ->
 
         longmsg = f"For {ms.basename}: correlator subband issues may be affecting the following solutions: "
 
-        spw_messages = [
-            f"Spw {spw} ({data['failure']}): {', '.join(data['antennas'])}"
-            for spw, data in sorted(spw_dict.items()) if data['failure'] not in ("bandwidth", "binning")
-        ]
+        spw_messages = []
+        for spw, data in sorted(spw_dict.items()):
+            if data['failure'] not in ("bandwidth", "binning"):
+                # sort out what's going on with the antennas
+                ant_dict = data['antennas']
+                phase_list = []
+                amp_list = []
+                amp_and_phase_list = []
+
+                for name, fail in ant_dict.items(): 
+                    if fail == "phase":
+                        phase_list.append(name)
+                    elif fail == "amp":
+                        amp_list.append(name)
+                    elif fail == "amp and phase":
+                        amp_and_phase_list.append(name)
+                    else: 
+                        LOG.warning("Unknown failure type for hifa bandpass subband qa.")
+                if phase_list:
+                    spw_msg = f"Spw {spw} (phase): {', '.join(phase_list)}"
+                    spw_messages.append(spw_msg)
+                if amp_list: 
+                    spw_msg = f"Spw {spw} (amp): {', '.join(amp_list)}"
+                    spw_messages.append(spw_msg)
+                if amp_and_phase_list:
+                    spw_msg = f"Spw {spw} (amp and phase): {', '.join(amp_and_phase_list)}"
+                    spw_messages.append(spw_msg)
+
         longmsg += "; ".join(spw_messages)
 
     qascore = pqa.QAScore(

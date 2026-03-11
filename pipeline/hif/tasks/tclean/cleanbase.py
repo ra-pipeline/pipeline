@@ -243,11 +243,12 @@ class CleanBase(basetask.StandardTaskTemplate):
             plotdir = os.path.join(inputs.context.report_dir,
                                    'stage%s' % inputs.context.stage.split('_')[0])
             field_ids = inputs.heuristics.field(inputs.intent, inputs.field)
+            sourcename = inputs.heuristics.get_sourcename(inputs.vis, inputs.field, inputs.intent)
             result = TcleanResult(vis=inputs.vis,
                                   datacolumn=inputs.datacolumn,
                                   datatype=inputs.datatype,
                                   datatype_info=inputs.datatype_info,
-                                  sourcename=inputs.field,
+                                  sourcename=sourcename,
                                   field_ids=field_ids,
                                   intent=inputs.intent,
                                   spw=inputs.spw,
@@ -633,6 +634,8 @@ class CleanBase(basetask.StandardTaskTemplate):
         # Record last tclean command for weblog
         result.set_tclean_command(str(job))
 
+        sourcename = inputs.heuristics.get_sourcename(inputs.vis, inputs.field, inputs.intent)
+
         tclean_stopcode_ignore = inputs.heuristics.tclean_stopcode_ignore(iter, inputs.hm_masking)
         if inputs.niter > 0:
 
@@ -684,24 +687,24 @@ class CleanBase(basetask.StandardTaskTemplate):
 
             if tclean_stopcode == 0 and tclean_iterdone > 0:
                 LOG.warning('tclean exit status 0 for Field: %s SPW: %s: the image may not be cleaned as expected.' %
-                            (inputs.field, inputs.spw))
+                            (sourcename, inputs.spw))
 
             if tclean_stopcode == 1:
                 result.error = CleanBaseError('tclean reached niter limit. Field: %s SPW: %s' %
-                                              (inputs.field, inputs.spw), 'Reached niter limit')
+                                              (sourcename, inputs.spw), 'Reached niter limit')
                 LOG.log(
                     logging.INFO if tclean_stopcode in tclean_stopcode_ignore else logging.WARNING,
                     'tclean reached niter limit of {} for {} / spw{} / iter{} !'.format(
-                        tclean_niter, utils.dequote(inputs.field),
+                        tclean_niter, sourcename,
                         inputs.spw, iter))
 
             if tclean_stopcode in [5, 6]:
                 result.error = CleanBaseError('tclean stopped to prevent divergence (stop code %d). Field: %s SPW: %s' %
-                                              (tclean_stopcode, inputs.field, inputs.spw),
+                                              (tclean_stopcode, sourcename, inputs.spw),
                                               'tclean stopped to prevent divergence.')
                 LOG.log(logging.INFO if tclean_stopcode in tclean_stopcode_ignore else logging.WARNING,
                         'tclean stopped to prevent divergence (stop code {}). Field: {} SPW: {} iter{} !'.format(
-                            tclean_stopcode, inputs.field, inputs.spw, iter))
+                            tclean_stopcode, sourcename, inputs.spw, iter))
 
         # Collect images to be examined and stored in TcleanResult
         im_names = {}
@@ -745,7 +748,7 @@ class CleanBase(basetask.StandardTaskTemplate):
                     name_list = ['{}.{}'.format(im_name, mterm) for mterm in ['tt0', 'tt1']]
             for name in name_list:
                 if os.path.exists(name):
-                    imageheader.set_miscinfo(name=name, spw=inputs.spw, virtspw=virtspw, field=inputs.field,
+                    imageheader.set_miscinfo(name=name, spw=inputs.spw, virtspw=virtspw, field=sourcename,
                                              datatype=inputs.datatype, type=im_type, iter=iter,
                                              intent=inputs.intent, specmode=inputs.orig_specmode,
                                              robust=inputs.robust, weighting=inputs.weighting,

@@ -715,7 +715,7 @@ class Syspower(basetask.StandardTaskTemplate):
         else:
             resid = (x - temp[np.newaxis, :]).ravel()
         new_flags = self.medfilt(resid, k, threshold=threshold, flag_only=True, **kwargs)
-        x.mask = np.reshape(new_flags.mask, newshape=x.shape)
+        x.mask = np.reshape(new_flags.mask, x.shape)
         flag_percent = 100.0 * np.sum(x.mask) / x.size
         x.mask[x == 0] = True
         return x, flag_percent
