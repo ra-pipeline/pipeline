@@ -2,13 +2,9 @@
 
 ## Purpose
 
-This note records the current retirement plan for the older sentinel-file and
-legacy context-mirror behavior now that the structured status contract is in
-place.
+This note records the current retirement plan for the older sentinel-file and legacy context-mirror behavior now that the structured status contract is in place.
 
-It is intentionally practical. The goal is to clarify what remains supported,
-what is transitional, and what conditions should be met before compatibility
-output is removed.
+It is intentionally practical. The goal is to clarify what remains supported, what is transitional, and what conditions should be met before compatibility output is removed.
 
 ## Supported contract going forward
 
@@ -27,18 +23,15 @@ Two older compatibility surfaces still exist.
 
 ### `errorexit-*` files
 
-Legacy `errorexit-*` files remain in the fatal PPR compatibility path so that
-existing production integrations are not broken abruptly.
+Legacy `errorexit-*` files remain in the fatal PPR compatibility path so that existing production integrations are not broken abruptly.
 
 These files are now considered compatibility output only.
 
-They should not be extended with new semantics, and no new consumer should be
-built against them.
+They should not be extended with new semantics, and no new consumer should be built against them.
 
 ### Legacy context mirrors
 
-Some structured conditions currently continue to mirror state into older
-context dictionaries so that non-migrated readers continue to work.
+Some structured conditions currently continue to mirror state into older context dictionaries so that non-migrated readers continue to work.
 
 Examples include:
 
@@ -46,8 +39,7 @@ Examples include:
 - `context.clean_list_info`;
 - `context.imaging_parameters`.
 
-These mirrors are transitional and should shrink as reader migration
-completes.
+These mirrors are transitional and should shrink as reader migration completes.
 
 ## Retirement stages
 
@@ -66,15 +58,13 @@ Requirements:
 
 Exit criteria:
 
-- `pipelinedriver` and related operators consume the structured artifacts in
-  production workflows;
+- `pipelinedriver` and related operators consume the structured artifacts in production workflows;
 - release notes explicitly mark `errorexit-*` as deprecated;
 - the remaining legacy context-mirror readers are identified and tracked.
 
 Planned changes:
 
-- `errorexit-*` becomes best-effort compatibility output rather than a relied
-  upon contract;
+- `errorexit-*` becomes best-effort compatibility output rather than a relied upon contract;
 - new feature work does not add to legacy mirrors;
 - condition-backed readers become the default expectation in reviews.
 
@@ -90,8 +80,7 @@ Planned changes:
 
 - remove legacy `errorexit-*` writes from the production path;
 - remove obsolete context-dictionary mirrors once the last reader is migrated;
-- simplify documentation so the structured contract is the only documented
-  interface.
+- simplify documentation so the structured contract is the only documented interface.
 
 ## Implementation guidance for future work
 
@@ -104,8 +93,7 @@ Until compatibility is fully removed:
 
 ## Minimum release-note content
 
-When the project moves from one retirement stage to the next, release notes
-should state:
+When the project moves from one retirement stage to the next, release notes should state:
 
 - which compatibility surface changed;
 - whether the change is a deprecation or a removal;

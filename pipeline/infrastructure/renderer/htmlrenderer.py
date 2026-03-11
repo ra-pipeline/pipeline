@@ -952,7 +952,9 @@ class T1_3MRenderer(RendererBase):
                 'registry': registry,
                 'scores': scores,
                 'tablerows': tablerows,
-                'flagtables': flagtables}
+                'flagtables': flagtables,
+                'run_status_alert': get_weblog_run_status(context),
+                'active_conditions': get_active_conditions_for_weblog(context)}
 
 
 class T1_4MRenderer(RendererBase):

@@ -2,13 +2,9 @@
 
 ## Purpose
 
-This note defines the initial structured data model intended for pipeline run
-status publication. It is a companion to the broader implementation plan in
-`pipeline_status_and_failure_plan.md`.
+This note defines the current structured data model for pipeline run status publication.
 
-The schema described here is intentionally small. It is meant to stabilize the
-contract before Phase 2 implementation begins, not to predict every future
-field.
+The schema described here is intentionally small. It documents the current supported contract rather than predicting every future field.
 
 ## Design principles
 
@@ -20,11 +16,11 @@ field.
 
 ## Artifact set
 
-The planned status publication layer will emit two artifacts.
+The status publication layer emits two artifacts.
 
 ### Event stream
 
-Recommended filename: `pipeline-events.jsonl`
+Filename: `pipeline-events.jsonl`
 
 Properties:
 
@@ -35,7 +31,7 @@ Properties:
 
 ### Latest-state snapshot
 
-Recommended filename: `pipeline-status.json`
+Filename: `pipeline-status.json`
 
 Properties:
 
@@ -88,7 +84,7 @@ The following fields should be common to both artifacts where applicable.
 
 ### State vocabulary
 
-Initial recommended `state` values:
+Current `state` values:
 
 - `initializing`
 - `running`
@@ -99,7 +95,7 @@ Initial recommended `state` values:
 
 ### Final disposition vocabulary
 
-Initial recommended `final_disposition` values:
+Current `final_disposition` values:
 
 - `success`
 - `clean_stop`
@@ -135,7 +131,7 @@ Initial recommended `final_disposition` values:
 
 ### Event vocabulary
 
-Initial recommended `event_type` values:
+Current `event_type` values:
 
 - `run_started`
 - `run_resumed`
@@ -158,12 +154,9 @@ Initial recommended `event_type` values:
 
 ## Condition schema
 
-Conditions are designed for cross-stage and cross-task communication of
-non-fatal and control-relevant state.
+Conditions are designed for cross-stage and cross-task communication of non-fatal and control-relevant state.
 
-The current implementation publishes active conditions in
-`pipeline-status.json` and emits `condition_raised` / `condition_cleared`
-records in `pipeline-events.jsonl`.
+The current implementation publishes active conditions in `pipeline-status.json` and emits `condition_raised` / `condition_cleared` records in `pipeline-events.jsonl`.
 
 ### Required condition fields
 
@@ -186,9 +179,9 @@ records in `pipeline-events.jsonl`.
 | `created_at` | string or null | UTC ISO-8601 time. |
 | `updated_at` | string or null | UTC ISO-8601 time. |
 
-### Initial condition vocabulary
+### Current condition vocabulary
 
-The first implemented condition codes are intentionally small.
+The currently implemented condition codes are intentionally small.
 
 | Code | Meaning | Typical disposition |
 | --- | --- | --- |
@@ -197,17 +190,13 @@ The first implemented condition codes are intentionally small.
 | `imaging_parameter_override` | Heuristic imaging parameter overrides, currently robust and uvtaper values from `hifa_imageprecheck`. | `continue` |
 | `size_mitigation` | Published mitigation settings or blocking mitigation failure from `hif_checkproductsize`. | `continue` or `skip_stage` |
 
-For condition lifecycle events, the condition code is currently carried in the
-`reason_code` field and the complete condition object is repeated in
-`payload.condition`.
+For condition lifecycle events, the condition code is currently carried in the `reason_code` field and the complete condition object is repeated in `payload.condition`.
 
 ## Compatibility guidance
 
-Phase 1 still preserves legacy `errorexit-*` compatibility files. Those files
-should not be treated as the long-term structured contract.
+The current implementation still preserves legacy `errorexit-*` compatibility files. Those files should not be treated as the long-term structured contract.
 
-The current retirement staging for those compatibility surfaces is documented
-in `pipeline_status_contract_transition.md`.
+The current retirement staging for those compatibility surfaces is documented in `pipeline_status_contract_transition.md`.
 
 The structured schema above is intended to become the supported contract for:
 
@@ -223,5 +212,4 @@ The initial schema should begin at `schema_version = 1`.
 Recommended compatibility rule:
 
 - adding optional fields is backward-compatible;
-- removing fields or changing the meaning of existing fields requires a schema
-  version increment.
+- removing fields or changing the meaning of existing fields requires a schema version increment.

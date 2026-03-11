@@ -2,17 +2,13 @@
 
 ## Purpose
 
-This note describes how the pipeline can exit today and how those outcomes
-should be interpreted by developers, operators, and downstream tooling.
+This note describes how the pipeline can exit today and how those outcomes should be interpreted by developers, operators, and downstream tooling.
 
-It documents the implementation as it exists now, not the larger future-state
-design.
+It documents the implementation as it exists now, not the larger future-state design.
 
-For operator-facing artifact consumption, see
-`pipeline_status_operator_guide.md`.
+For operator-facing artifact consumption, see `pipeline_status_operator_guide.md`.
 
-For task-author guidance on clean stops and conditions, see
-`pipeline_task_authoring_status.md`.
+For task-author guidance on clean stops and conditions, see `pipeline_task_authoring_status.md`.
 
 ## The Three Main Terminal Outcomes
 
@@ -20,18 +16,16 @@ At a high level, the current pipeline distinguishes three operationally
 important outcomes:
 
 1. successful completion;
-1. intentional clean stop;
-1. failure.
+2. intentional clean stop;
+3. failure.
 
-This distinction is visible in stable exit codes, structured status artifacts,
-and now the weblog.
+This distinction is visible in stable exit codes, structured status artifacts, and now the weblog.
 
 ## Successful Completion
 
 ### Meaning
 
-A successful run completed the intended workflow path and reached normal run
-termination.
+A successful run completed the intended workflow path and reached normal run termination.
 
 ### Terminal behavior
 
@@ -48,8 +42,7 @@ Normal completion of the entrypoint without a raised pipeline exception.
 
 The pipeline did what it intended to do for that execution path.
 
-This does not mean there were no warnings or attentions. It only means the run
-completed normally.
+This does not mean there were no warnings or attentions. It only means the run completed normally.
 
 ## Intentional Clean Stop
 
@@ -57,8 +50,7 @@ completed normally.
 
 A clean stop means the pipeline ended early on purpose.
 
-This is not a failure. It indicates that continuing the workflow was not the
-desired action, but the pipeline remained in a controlled state.
+This is not a failure. It indicates that continuing the workflow was not the desired action, but the pipeline remained in a controlled state.
 
 ### Terminal behavior
 
@@ -72,19 +64,16 @@ desired action, but the pipeline remained in a controlled state.
 
 The shared control mechanism is `PipelineStopRequested`.
 
-Tasks or workflow logic can raise this exception to request intentional early
-termination.
+Tasks or workflow logic can raise this exception to request intentional early termination.
 
 ### Secondary trigger
 
-`KeyboardInterrupt` is also mapped to the stopped terminal class at the runner
-level.
+`KeyboardInterrupt` is also mapped to the stopped terminal class at the runner level.
 
 However, this is not identical to an in-task `PipelineStopRequested`:
 
 - it produces a stopped terminal outcome;
-- it does not necessarily produce a stage-level stopped event from inside a
-  task.
+- it does not necessarily produce a stage-level stopped event from inside a task.
 
 ### Typical use cases
 
@@ -97,8 +86,7 @@ Examples include:
 
 ### Operational interpretation
 
-The run ended intentionally and should not be treated as a crash or traceback
-failure.
+The run ended intentionally and should not be treated as a crash or traceback failure.
 
 Partial products and saved context may still be meaningful.
 
@@ -106,8 +94,7 @@ Partial products and saved context may still be meaningful.
 
 ### Meaning
 
-A failure means the pipeline encountered an error condition that prevented the
-run from continuing normally.
+A failure means the pipeline encountered an error condition that prevented the run from continuing normally.
 
 ### Terminal behavior
 
@@ -139,8 +126,7 @@ Examples include:
 
 This is an error outcome and should be treated differently from a clean stop.
 
-In a failure case, downstream tooling should assume the run did not terminate
-on a planned control path.
+In a failure case, downstream tooling should assume the run did not terminate on a planned control path.
 
 ## Comparison Summary
 
@@ -154,8 +140,6 @@ on a planned control path.
 
 ## Entry Point Coverage
 
-These semantics are not limited to PPR execution.
-
 The current shared implementation covers:
 
 - ALMA PPR execution;
@@ -167,8 +151,7 @@ The current shared implementation covers:
 
 ## Compatibility Behavior
 
-Legacy `errorexit-*` files are still preserved in the existing fatal PPR
-compatibility paths.
+Legacy `errorexit-*` files are still preserved in the existing fatal PPR compatibility paths.
 
 That compatibility behavior should not be treated as the primary exit contract.
 
@@ -182,24 +165,16 @@ The primary contract is now:
 
 The current implementation has a few intentional boundaries.
 
-- `PipelineStopRequested` is the primary in-pipeline clean-stop mechanism.
-  There is not yet a broad set of production tasks that raise it
-  automatically.
-- `KeyboardInterrupt` is classified as stopped at the runner boundary, but does
-  not currently provide the same rich stage-level semantics as an in-task stop
-  request.
-- structured context conditions exist today only for the current selective
-  imaging-state rollout, not yet for all potential cross-stage state.
+- `PipelineStopRequested` is the primary in-pipeline clean-stop mechanism. There is not yet a broad set of production tasks that raise it automatically.
+- `KeyboardInterrupt` is classified as stopped at the runner boundary, but does not currently provide the same rich stage-level semantics as an in-task stop request.
+- structured context conditions exist today only for the current selective imaging-state rollout, not yet for all potential cross-stage state.
 
 ## Guidance for Developers
 
-Use `PipelineStopRequested` when the correct behavior is to end the run
-intentionally and preserve that distinction for tooling and operators.
+Use `PipelineStopRequested` when the correct behavior is to end the run intentionally and preserve that distinction for tooling and operators.
 
 Do not use it for ordinary errors.
 
-Use ordinary pipeline failure exceptions when the pipeline encountered a real
-execution problem rather than a deliberate control-flow decision.
+Use ordinary pipeline failure exceptions when the pipeline encountered a real execution problem rather than a deliberate control-flow decision.
 
-For authoring guidance beyond this short summary, use
-`pipeline_task_authoring_status.md` as the primary task-level reference.
+For authoring guidance beyond this short summary, use `pipeline_task_authoring_status.md` as the primary task-level reference.
