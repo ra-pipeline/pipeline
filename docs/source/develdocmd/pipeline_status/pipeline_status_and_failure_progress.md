@@ -259,12 +259,21 @@ The current `pipeline-events.jsonl` stream includes fields such as:
 
 The following pieces remain unfinished relative to the broader plan.
 
-- longer-form operator-facing documentation for artifact consumption;
-- explicit task-author guidance on when to raise `PipelineStopRequested`;
 - a broader rollout of structured conditions beyond the current imaging-state
   adoption;
-- a final retirement plan for legacy `errorexit-*` compatibility files and
-  legacy context-dictionary mirrors.
+- future rendering tied to newly added condition families beyond the current
+  weblog scope.
+
+## Documentation Follow-up
+
+The original documentation cleanup items are now covered by dedicated notes:
+
+- `pipeline_status_operator_guide.md` for artifact consumption by operators and
+  downstream tooling;
+- `pipeline_task_authoring_status.md` for stop-request and condition-publishing
+  guidance for task authors;
+- `pipeline_status_contract_transition.md` for retirement planning around
+  legacy `errorexit-*` files and context-mirror compatibility.
 
 ## Practical Interpretation
 

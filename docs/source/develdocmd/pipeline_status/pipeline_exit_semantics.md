@@ -8,6 +8,12 @@ should be interpreted by developers, operators, and downstream tooling.
 It documents the implementation as it exists now, not the larger future-state
 design.
 
+For operator-facing artifact consumption, see
+`pipeline_status_operator_guide.md`.
+
+For task-author guidance on clean stops and conditions, see
+`pipeline_task_authoring_status.md`.
+
 ## The Three Main Terminal Outcomes
 
 At a high level, the current pipeline distinguishes three operationally
@@ -182,8 +188,8 @@ The current implementation has a few intentional boundaries.
 - `KeyboardInterrupt` is classified as stopped at the runner boundary, but does
   not currently provide the same rich stage-level semantics as an in-task stop
   request.
-- context conditions for non-fatal cross-stage control have not yet been
-  implemented.
+- structured context conditions exist today only for the current selective
+  imaging-state rollout, not yet for all potential cross-stage state.
 
 ## Guidance for Developers
 
@@ -194,3 +200,6 @@ Do not use it for ordinary errors.
 
 Use ordinary pipeline failure exceptions when the pipeline encountered a real
 execution problem rather than a deliberate control-flow decision.
+
+For authoring guidance beyond this short summary, use
+`pipeline_task_authoring_status.md` as the primary task-level reference.

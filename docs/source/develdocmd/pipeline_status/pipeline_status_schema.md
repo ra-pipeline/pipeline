@@ -206,6 +206,9 @@ For condition lifecycle events, the condition code is currently carried in the
 Phase 1 still preserves legacy `errorexit-*` compatibility files. Those files
 should not be treated as the long-term structured contract.
 
+The current retirement staging for those compatibility surfaces is documented
+in `pipeline_status_contract_transition.md`.
+
 The structured schema above is intended to become the supported contract for:
 
 - live run monitoring;
