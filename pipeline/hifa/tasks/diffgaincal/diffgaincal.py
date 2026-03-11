@@ -73,7 +73,9 @@ class DiffGaincalResults(basetask.Results):
 
 class DiffGaincalInputs(vdp.StandardInputs):
 
-    flagging_frac_limit = vdp.VisDependentProperty(default=0.7)
+    # PIPE-2932 stop diffgain flagging targets when offset solns missing
+    # change flagging_frac_limit such that if 1 (of 2) scans are flagged, combine='spw' occurs
+    flagging_frac_limit = vdp.VisDependentProperty(default=0.5)
     hm_spwmapmode = vdp.VisDependentProperty(default='auto')
 
     @hm_spwmapmode.convert
@@ -424,8 +426,8 @@ class DiffGaincal(basetask.StandardTaskTemplate):
             missing_scan_ratio = 1.0 - float(len(scanids_for_spwid)) / n_exp_scan_solns
 
             # If fraction of missing scans exceeds the limit, then mark this SpW
-            # as bad.
-            if missing_scan_ratio > inputs.missing_scans_frac_limit:
+            # as bad. 
+            if missing_scan_ratio >= inputs.missing_scans_frac_limit:
                 spw_with_too_many_missing_scans.append(uniq_spwid)
 
         # If any SpW has too many missing scans:
@@ -461,7 +463,7 @@ class DiffGaincal(basetask.StandardTaskTemplate):
                 # If fraction of flagged data in even just one polarization
                 # exceeds the limit, then mark this SpW as bad, and continue
                 # with next SpW.
-                if flag_ratio > inputs.flagging_frac_limit:
+                if flag_ratio >= inputs.flagging_frac_limit:
                     spw_with_too_much_flagging.append(uniq_spwid)
                     break
 

@@ -484,7 +484,7 @@ class RestoreData(basetask.StandardTaskTemplate):
             LOG.info('    From %s' % tarfilename)
             LOG.info('    Into %s' % inputs.output_dir)
             with tarfile.open(tarfilename, 'r:gz') as tar:
-                tar.extractall(path=inputs.output_dir)
+                tar.extractall(path=inputs.output_dir, filter='fully_trusted')
 
             # Restore final flags version using flagmanager
             LOG.info('Restoring final flags for %s from flag version %s' % (ms.basename, flag_version_name))
@@ -606,9 +606,9 @@ class RestoreData(basetask.StandardTaskTemplate):
                                 LOG.info('    Extracting caltable %s' % member.name)
 
                     if len(extractlist) == len(tarmembers):
-                        tar.extractall(path=inputs.output_dir)
+                        tar.extractall(path=inputs.output_dir, filter='fully_trusted')
                     else:
-                        tar.extractall(path=inputs.output_dir, members=extractlist)
+                        tar.extractall(path=inputs.output_dir, members=extractlist, filter='fully_trusted')
 
     def _do_applycal(self):
         container = vdp.InputsContainer(applycal.SerialApplycal, self.inputs.context)

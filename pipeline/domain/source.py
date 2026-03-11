@@ -7,12 +7,17 @@ for data validation and serialization while preserving the existing public API.
 from __future__ import annotations
 
 import itertools
+import logging
 import pprint
 from typing import Any
 
+import numpy
 from pydantic import BaseModel, ConfigDict, Field as PydanticField
 
 from pipeline.infrastructure import casa_tools
+
+LOG = logging.getLogger(__name__)
+
 
 _pprinter = pprint.PrettyPrinter()
 
@@ -185,8 +190,15 @@ class Source(BaseModel):
             String representation of proper motion along given axis.
         """
         qa = casa_tools.quanta
-        val = qa.getvalue(self.proper_motion_data[axis])
-        units = qa.getunit(self.proper_motion_data[axis])
+        val = qa.getvalue(self._proper_motion[axis])
+        # Handle array-to-scalar conversion for NumPy 1.25+ compatibility
+        # Ensure val is at least a 1-D array, then extract first element
+        val_arr = numpy.array(val, ndmin=1)
+        if val_arr.size > 1:
+            LOG.warning('Proper motion array for axis %s has %d elements; using first element only',
+                        axis, val_arr.size)
+        val = val_arr[0]
+        units = qa.getunit(self._proper_motion[axis])
         return '' if val == 0 else '%.3e %s' % (val, units)
 
     def __str__(self) -> str:

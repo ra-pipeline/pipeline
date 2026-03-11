@@ -448,7 +448,7 @@ class LowgainflagView(object):
                             gainflag = row.get('FLAG')[0][0]
                             scan = row.get('SCAN_NUMBER')
                             if not gainflag:
-                                data[antid_to_axisid[ant], scanid_to_axisid[scan]] = np.abs(gain)
+                                data[antid_to_axisid[ant], scanid_to_axisid[scan]] = np.asarray(np.abs(gain)).item()
                                 flag[antid_to_axisid[ant], scanid_to_axisid[scan]] = 0
 
                     axes = [

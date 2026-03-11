@@ -779,7 +779,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                 reprBW_Hz = qaTool.getvalue(qaTool.convert(repr_target[2], 'Hz'))
 
                 if reprBW_Hz > 4.0 * repr_spw_nbin_bw_Hz:
-                    repr_spw_nbin = int(reprBW_Hz / physicalBW_of_1chan_Hz + 0.5)
+                    repr_spw_nbin = int(np.asarray(reprBW_Hz / physicalBW_of_1chan_Hz + 0.5).item())
                     inputs.nbins = '%d:%d' % (repr_spw, repr_spw_nbin)
                     LOG.info('Making PI cube at %.3g MHz channel width.' % (physicalBW_of_1chan_Hz * repr_spw_nbin / 1e6))
                     image_repr_target = True
@@ -1119,7 +1119,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                             return result
 
                         # Rounding to two significant figures
-                        min_cell = ['%.2g%s' % (qaTool.getvalue(min_cell[0]), qaTool.getunit(min_cell[0]))]
+                        min_cell = ['%.2g%s' % (np.asarray(qaTool.getvalue(min_cell[0])).item(), qaTool.getunit(min_cell[0]))]
                         # Need to populate all spw keys because the imsize heuristic picks
                         # up the lowest frequency spw.
                         for spwspec in all_spw_keys:

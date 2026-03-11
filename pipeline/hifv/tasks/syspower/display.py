@@ -43,7 +43,7 @@ class syspowerBoxChart(object):
         LOG.info("Creating syspower box chart for {!s}-band...".format(self.band))
         plt.clf()
         dshape = dat_common.shape
-        ant_dat = np.reshape(dat_common, newshape=(dshape[0], np.prod(dshape[1:])))
+        ant_dat = np.reshape(dat_common, (dshape[0], np.prod(dshape[1:])))
         ant_dat = np.ma.array(ant_dat)
         ant_dat.mask = np.ma.getmaskarray(ant_dat)
         ant_dat = np.ma.masked_outside(ant_dat, clip_sp_template[0], clip_sp_template[1])
@@ -108,7 +108,7 @@ class syspowerBarChart(object):
         LOG.info("Creating syspower bar chart for {!s}-band...".format(self.band))
         plt.clf()
         dshape = dat_common.shape
-        ant_dat = np.reshape(dat_common, newshape=(dshape[0], np.prod(dshape[1:])))
+        ant_dat = np.reshape(dat_common, (dshape[0], np.prod(dshape[1:])))
         ant_dat = np.ma.array(ant_dat)
         ant_dat.mask = np.ma.getmaskarray(ant_dat)
         ant_dat = np.ma.masked_outside(ant_dat, clip_sp_template[0], clip_sp_template[1])
@@ -222,11 +222,11 @@ class compressionSummary(object):
         pc = 0  # Running plot count
         for iplot, baseband in enumerate(basebands):
             for jplot, corr in enumerate(['RR', 'LL']):
-                axes[pc].plot_date(utc_time, np.ma.max(pdiff_ma, axis=0)[iplot, jplot], 'o', mfc='blue', mew=0,
+                axes[pc].plot(utc_time, np.ma.max(pdiff_ma, axis=0)[iplot, jplot], 'o', mfc='blue', mew=0,
                                    ms=3, alpha=this_alpha, label='max')
-                axes[pc].plot_date(utc_time, np.ma.median(pdiff_ma, axis=0)[iplot, jplot], 'o', mfc='green', mew=0,
+                axes[pc].plot(utc_time, np.ma.median(pdiff_ma, axis=0)[iplot, jplot], 'o', mfc='green', mew=0,
                                    ms=3, alpha=this_alpha, label='median')
-                axes[pc].plot_date(utc_time, np.ma.min(pdiff_ma, axis=0)[iplot, jplot], 'o', mfc='brown', mew=0,
+                axes[pc].plot(utc_time, np.ma.min(pdiff_ma, axis=0)[iplot, jplot], 'o', mfc='brown', mew=0,
                                    ms=3, alpha=this_alpha, label='min')
                 axes[pc].set_ylim(0.5, 1.2)
                 axes[pc].set_ylabel('{!s} {!s}'.format(baseband, corr))
@@ -234,7 +234,7 @@ class compressionSummary(object):
 
         # Assumes at least one baseband in the SDM
         for scantime in scantimes:
-            axes[0].plot_date([scantime['time']], [1.2], 'k|', markersize=20.0)
+            axes[0].plot([scantime['time']], [1.2], 'k|', markersize=20.0)
             if (scantime['scanid'] % 2) == 0:
                 offset = 1.225
             else:
@@ -380,14 +380,14 @@ class medianSummary(object):
             for jplot, corr in enumerate(['RR', 'LL']):
                 these_medians = ma_medians[iplot, jplot, :]
                 hits = np.logical_not(these_medians.mask)
-                plt.plot_date(np.array(utc_time)[hits], these_medians[hits], 'o', mew=0, ms=5, alpha=1.0,
+                plt.plot(np.array(utc_time)[hits], these_medians[hits], 'o', mew=0, ms=5, alpha=1.0,
                               label='{!s} {!s}'.format(baseband, corr))
 
         # Scale
         plt.ylim(0.98 * np.min(ma_medians), 1.01 * np.max(ma_medians))
 
         for scantime in scantimes:
-            plt.plot_date([scantime['time']], [1.01 * np.max(ma_medians)], 'k|', markersize=20.0)
+            plt.plot([scantime['time']], [1.01 * np.max(ma_medians)], 'k|', markersize=20.0)
             if (scantime['scanid'] % 2) == 0:
                 offset = 1.0105
             else:

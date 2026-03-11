@@ -574,18 +574,19 @@ class Tclean(cleanbase.CleanBase):
         # Make sure there are LSRK selections if cont.dat/lines.dat exist.
         # For ALMA this is already done at the hif_makeimlist step. For VLASS
         # this does not (yet) happen in hif_editimlist.
+        sourcename = self.image_heuristics.get_sourcename(inputs.vis, inputs.field, inputs.intent)
+
         if inputs.spwsel_lsrk == {}:
             all_continuum = True
             low_bandwidth = True
             low_spread = True
             for spwid in inputs.spw.split(','):
 
-
                 cont_ranges_spwsel, all_continuum_spwsel, low_bandwidth_spwsel, low_spread_spwsel = self.image_heuristics.cont_ranges_spwsel()
-                spwsel_spwid = cont_ranges_spwsel.get(utils.dequote(inputs.field), {}).get(spwid, 'NONE')
-                all_continuum = all_continuum and all_continuum_spwsel.get(utils.dequote(inputs.field), {}).get(spwid, False)
-                low_bandwidth = low_bandwidth and low_bandwidth_spwsel.get(utils.dequote(inputs.field), {}).get(spwid, False)
-                low_spread = low_spread and low_spread_spwsel.get(utils.dequote(inputs.field), {}).get(spwid, False)
+                spwsel_spwid = cont_ranges_spwsel.get(sourcename, {}).get(spwid, 'NONE')
+                all_continuum = all_continuum and all_continuum_spwsel.get(sourcename, {}).get(spwid, False)
+                low_bandwidth = low_bandwidth and low_bandwidth_spwsel.get(sourcename, {}).get(spwid, False)
+                low_spread = low_spread and low_spread_spwsel.get(sourcename, {}).get(spwid, False)
 
                 if inputs.intent == 'TARGET':
                     if (spwsel_spwid == 'NONE') and self.image_heuristics.warn_missing_cont_ranges():

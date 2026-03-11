@@ -1,6 +1,6 @@
 ################################################################################
 # Pipeline Dependency Requirements
-# Target: CASA >= 6.6.6 with Python 3.10 / 3.12
+# Target: CASA >= 6.7.3 with Python 3.10 / 3.12
 #
 # This file lists direct dependencies (excplicit imports) for the Pipeline Runtime.
 # For detailed setup and installation instructions, see the project's README.md.

@@ -222,8 +222,8 @@ class PhaseOffsetPlot(object):
 
                         dummy_data = numpy.ma.MaskedArray(data=[0, 1], mask=True)
 
-                        axis.plot_date(dummy_time.time, dummy_data, '.')
-                        _, = axis.plot_date(dummy_time.time, dummy_data)
+                        axis.plot(dummy_time.time, dummy_data, '.')
+                        _, = axis.plot(dummy_time.time, dummy_data, 'o')
 
                         self._plot_flagged_data(dummy_time, dummy_slice, axis,
                                                 True, annotation='NO DATA')
@@ -263,9 +263,9 @@ class PhaseOffsetPlot(object):
 
                         (symbol, color, alpha) = plothelper.get_symbol_and_colour(corr_axis, 
                                                                                   state)
-                        axis.plot_date(data.time, offset_deg, '.',
+                        axis.plot(data.time, offset_deg, '.',
                                        color=color, alpha=alpha)
-                        p, = axis.plot_date(data.time, offset_deg, symbol,
+                        p, = axis.plot(data.time, offset_deg, symbol,
                                             color=color, alpha=alpha)
 
                         legend_entry = '%s %s' % (corr_axis, state.lower())

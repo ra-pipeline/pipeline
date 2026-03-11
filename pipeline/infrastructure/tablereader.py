@@ -1443,31 +1443,40 @@ class FieldTable:
     @staticmethod
     def _read_table(msmd: Any) -> list[tuple]:
         num_fields = msmd.nfields()
-        field_ids = list(range(num_fields))
         field_names = msmd.namesforfields()
-        times = [msmd.timesforfield(i) for i in field_ids]
-        phase_centres = [msmd.phasecenter(i) for i in field_ids]
-        source_ids = [msmd.sourceidforfield(i) for i in field_ids]
+
+        # Determine which field IDs have scans first, so we can skip
+        # expensive per-field msmd calls for fields without scans.
+        fields_with_scans = {
+            field_id
+            for field_id in range(num_fields)
+            if len(msmd.scansforfield(field_id)) != 0
+        }
+
+        if not fields_with_scans:
+            return []
 
         LOG.trace('Opening FIELD table to read FIELD.SOURCE_TYPE')
         field_table = os.path.join(msmd.name(), 'FIELD')
         with casa_tools.TableReader(field_table) as table:
-            # TODO can this old code be removed? We've not handled non-APDMs
-            # for a *long* time!
-            #
             # FIELD.SOURCE_TYPE contains the intents in non-APDM MS
             if 'SOURCE_TYPE' in table.colnames():
                 source_types = table.getcol('SOURCE_TYPE')
             else:
-                source_types = [None] * num_fields
+                source_types = None
 
-        all_fields = list(zip(field_ids, field_names, source_ids, times, source_types, phase_centres))
-
-        # only return sources for which scans are present
-        # create a mapping of source id to a boolean of whether any scans are present for that source
-        field_id_to_scans = {field_id: (len(msmd.scansforfield(field_id)) != 0) for field_id in set(field_ids)}
-
-        return [row for row in all_fields if field_id_to_scans.get(row[0], False)]
+        # Only compute expensive per-field data for fields that have scans
+        return [
+            (
+                field_id,
+                field_names[field_id],
+                msmd.sourceidforfield(field_id),
+                msmd.timesforfield(field_id),
+                source_types[field_id] if source_types is not None else None,
+                msmd.phasecenter(field_id),
+            )
+            for field_id in sorted(fields_with_scans)
+        ]
 
     @staticmethod
     def get_fields(msmd: Any) -> list[Field]:

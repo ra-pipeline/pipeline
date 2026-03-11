@@ -37,7 +37,11 @@ def get_value_in_deg(quantity: Dict[str, Any]) -> numpy.ndarray:
         numpy.ndarray: converted value
     """
     qa = casa_tools.quanta
-    return qa.getvalue(qa.convert(quantity, 'deg'))
+    value = qa.getvalue(qa.convert(quantity, 'deg'))
+    # Handle array-to-scalar conversion for NumPy 1.25+ compatibility
+    if hasattr(value, 'item'):
+        value = value.item()
+    return value
 
 
 def get_state_id(ms: MeasurementSet, spw: str, intent: str) -> numpy.ndarray:

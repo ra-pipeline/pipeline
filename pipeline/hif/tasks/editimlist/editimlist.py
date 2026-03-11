@@ -714,17 +714,26 @@ class Editimlist(basetask.StandardTaskTemplate):
                 #   note: we also consider rge double quote possibility because field names might be protected in
                 #   the name strings of Field domain objects.
                 # * use spherical sky offsets to select fields based on positions.
-                found_fields = th.select_fields(offsets=dist_arcsec,
-                                                intent='TARGET',
-                                                phasecenter=imlist_entry['phasecenter'],
-                                                name='0*,"0*,1*,"1*,2*,"2*,T*,"T*')
-                # for the existing VLASS workflow, only one MS is used, though this might change in the future.
-                found_fields = found_fields[0]
+                found_fields_per_ms = th.select_fields(
+                    offsets=dist_arcsec,
+                    intent='TARGET',
+                    phasecenter=imlist_entry['phasecenter'],
+                    name='0*,"0*,1*,"1*,2*,"2*,T*,"T*',
+                )
 
-                if found_fields:
-                    imlist_entry['field'] = ','.join(str(x) for x in found_fields)  # field ids, not names
+                # Build lists of vis and fields that have good selection
+                vis_field_pairs = [
+                    (th.vislist[idx], ','.join(str(x) for x in found_fields))
+                    for idx, found_fields in enumerate(found_fields_per_ms)
+                    if found_fields
+                ]
 
-        if not imlist_entry['spw']:   # could be None or an empty string
+                if vis_field_pairs:
+                    vis_list, field_list = zip(*vis_field_pairs)
+                    imlist_entry['vis'] = list(vis_list)
+                    imlist_entry['field'] = list(field_list)
+
+        if not imlist_entry['spw']:  # could be None or an empty string
             LOG.warning('spw is not specified')   # probably should raise an error rather than warning? - will likely fail later anyway
             imlist_entry['spw'] = None
 
@@ -811,6 +820,7 @@ class Editimlist(basetask.StandardTaskTemplate):
             imlist_entry['mask'] = th.mask(results_list=inp.context.results,
                                            clean_no_mask=inpdict['clean_no_mask_selfcal_image']) if not inpdict['mask'] \
                 else inpdict['mask']
+
 
         for key, value in imlist_entry.items():
             LOG.info("%s = %r", key, value)

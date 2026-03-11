@@ -210,7 +210,7 @@ class Statwt(basetask.StandardTaskTemplate):
                 weights = stb.getcol('WEIGHT')
                 weights_shape = weights.shape
                 if weights.size > 0:
-                    stb.putcol('DATA', np.reshape(weights, newshape=(weights_shape[0], 1, weights_shape[1])))
+                    stb.putcol('DATA', np.expand_dims(weights, axis=1))
                     stb.putcol('WEIGHT', np.ones(weights_shape))
                     flag_row = stb.getcol('FLAG_ROW')
                     stb.putcol('FLAG', np.resize(flag_row, (weights_shape[0], 1, weights_shape[1])))
