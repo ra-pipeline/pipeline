@@ -41,7 +41,7 @@ class MakeImagesResult(basetask.Results):
                 img_params = {kk: vv['imaging_params'] for (kk, vv) in result.iterations.items()}
                 imageitem = imagelibrary.ImageItem(
                     imagename=result.image, sourcename=result.sourcename,
-                    spwlist=result.spw, specmode=result.specmode,
+                    spwlist=result.spw, specmode=result.hm_specmode,
                     sourcetype=result.intent,
                     stokes=result.stokes,
                     datatype=result.datatype,
