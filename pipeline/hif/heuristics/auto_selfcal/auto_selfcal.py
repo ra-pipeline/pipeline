@@ -340,11 +340,8 @@ class SelfcalHeuristics:
         if savemodel == 'modelcolumn' and not usermodel:
             LOG.info("")
             LOG.info("Running tclean in the prediction-only setting to fill the MS model column.")
-            # A workaround for CAS-14386
-            parallel_predict = parallel
-            if parallel_predict and 'mosaic' in tclean_args['gridder']:
-                LOG.debug("A parallel model write operation does not work with gridder='mosaic': enforcing parallel=False.")
-                parallel_predict = False
+            # PIPE-3025: Removed workaround for CAS-14386 (parallel model writes failed with 'mosaic' gridder).
+            # PIPE-2001 enforced serial writes; CAS-14386 fixed in CASA 6.6.5+, so workaround no longer needed.
             tclean_args.update({'niter': 0,
                                 'interactive': False,
                                 'nsigma': 0.0,
@@ -355,7 +352,7 @@ class SelfcalHeuristics:
                                 'calcpsf': False,
                                 'restoration': False,
                                 'threshold': '0.0mJy',
-                                'parallel': parallel_predict,
+                                'parallel': parallel,
                                 'startmodel': ''})
             tc_ret = self.cts.tclean(**tclean_args)
 
