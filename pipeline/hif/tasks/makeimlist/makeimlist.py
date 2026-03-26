@@ -893,6 +893,7 @@ class MakeImList(basetask.StandardTaskTemplate):
 
                     mosaic_fields = {}
                     single_fields = []
+                    is_cluster = False
                     # PIPE-684: running clustering to find overlapping fields only
                     # for VLA.
                     if 'VLA' in imaging_mode:
@@ -914,8 +915,9 @@ class MakeImList(basetask.StandardTaskTemplate):
                                 cluster_name = ",".join(cluster)
                                 field_intent_list_temp.append(self.heuristics.field_intent_list(intent=inputs.intent, field=cluster_name))
 
-                        for single_field in single_fields:
-                            field_intent_list_temp.append(self.heuristics.field_intent_list(intent=inputs.intent, field=single_field))
+                        for single_field in single_fields.values():
+                            for f in single_field:
+                                field_intent_list_temp.append(self.heuristics.field_intent_list(intent=inputs.intent, field=f))
 
                         output_set = set()
                         for element in field_intent_list_temp:
