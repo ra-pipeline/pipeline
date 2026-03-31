@@ -357,7 +357,23 @@ class SelfcalHeuristics:
                                 'threshold': '0.0mJy',
                                 'parallel': parallel_predict,
                                 'startmodel': ''})
-            tc_ret = self.cts.tclean(**tclean_args)
+            try:
+                tc_ret = self.cts.tclean(**tclean_args)
+            except RuntimeError as e:
+                if 'coordinate system mismatch' in str(e):
+                    # On some platforms (e.g. macOS) floating-point differences in spectral
+                    # cases different LinearXform components. Deleting the stale images and
+                    # letting tclean rebuild them with calcpsf=True circumvents the issue.
+                    LOG.warning(
+                        'tclean reported a coordinate system mismatch for existing images; '
+                        'deleting stale pb/psf/residual/sumwt images and retrying with calcpsf=True. '
+                        'Original error: %s', e)
+                    stale_exts = ['.pb*', '.psf*', '.residual*', '.sumwt*', '.gridwt*']
+                    self.remove_dirs([imagename + ext for ext in stale_exts])
+                    tclean_args['calcpsf'] = True
+                    tc_ret = self.cts.tclean(**tclean_args)
+                else:
+                    raise
 
         if usermodel:
             LOG.info('Using user model %s already filled to model column, skipping model write.', usermodel)
