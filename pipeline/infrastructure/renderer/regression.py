@@ -1132,9 +1132,10 @@ def weblog_rendering_failures(context: Context) -> list[int]:
     # Construct path to timetracker database (shelve uses multiple files)
     timetracker_db = os.path.join(context.output_dir, f'{context.name}.timetracker')
 
-    # Check if timetracker database exists (shelve produces .dat, .dir, .bak files on Unix)
+    # Check if timetracker database exists (shelve produces .dat/.dir/.bak on Linux,
+    # .db on macOS/BSD, or no extension with some dbm backends)
     db_exists = False
-    for ext in ['.dat', '.dir', '.bak']:
+    for ext in ['.dat', '.dir', '.bak', '.db', '']:
         if os.path.exists(timetracker_db + ext):
             db_exists = True
             break
