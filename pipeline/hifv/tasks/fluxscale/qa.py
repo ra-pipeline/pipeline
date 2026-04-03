@@ -81,6 +81,8 @@ class FluxbootQAHandler(pqa.QAPlugin):
         fractional_residuals = self.getFractionalResiduals(webdicts[ms])
         score1 = qacalc.score_vla_flux_residual_rms(fractional_residuals, len(result.spws), spix_list)
         scores = [score1]
+        spw_scores = qacalc.score_fluxboot(context, result)
+        scores.append(spw_scores)
         if scores == []:
             LOG.error('Error with computing flux density bootstrapping residuals')
             scores = [pqa.QAScore(0.0, longmsg='Unable to compute flux density bootstrapping residuals.',

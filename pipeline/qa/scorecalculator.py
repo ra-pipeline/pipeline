@@ -16,6 +16,7 @@ import os
 import re
 import shutil
 import traceback
+from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 from xml.etree import ElementTree
 
@@ -108,6 +109,7 @@ __all__ = ['score_polintents',                                # ALMA specific
            'score_syspowerdata',
            'score_solint',
            'score_longsolint',
+           'score_fluxboot',
            'score_testBPdcals_dts_ants',
            'score_testBPdcals_refant',
            'score_testBPdcals_delay']
@@ -5327,3 +5329,140 @@ def score_testBPdcals_delay(vis:str, caltable:str, bandname:str) -> pqa.QAScore:
     qa_score = pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=applies_to)
 
     return qa_score
+
+@log_qa
+def score_fluxboot(context, result) -> list[pqa.QAScore]:
+    qascores = []
+    calms = "calibrators.ms"
+    ms = context.observing_run.get_ms(result.vis)
+    sci_spws = ms.get_spectral_windows(science_windows_only=True)
+    total_sci_spws = len(sci_spws)
+    flagdata_task = casa_tasks.flagdata(vis=calms, mode="summary")
+    flagdata_result = flagdata_task.execute()
+    flag_spw = flagdata_result["spw"]
+    ignored_spw_count = 0
+
+    for spw in sci_spws:
+        str_spwid = str(spw.id)
+        if str_spwid in flag_spw.keys():
+            flag_percentage = flag_spw[str_spwid]['flagged']/flag_spw[str_spwid]['total']
+            if flag_percentage > 0.5:
+                ignored_spw_count += 1
+        else:
+            ignored_spw_count += 1
+    spwlist = [spw.id for spw in sci_spws]
+    applies_to = pqa.TargetDataSelection(vis={result.vis}, spw=spwlist)
+
+    # PIPE-2584, part-1: If > 50% of science spws are fully flagged
+    # or missing from calibrators.ms: QA score < 0.5
+    flag_ratio = ignored_spw_count / total_sci_spws
+    score = 1 - flag_ratio
+    if score < 0.5:
+        msg = f"{flag_ratio*100:.2f}% of science SPWs flagged or not present in calibrator.ms"
+        origin = pqa.QAOrigin(metric_name='score_fluxboot',
+                              metric_score=score,
+                              metric_units='')
+        qascores.append(pqa.QAScore(score, longmsg=msg, shortmsg=msg, origin=origin, applies_to=applies_to))
+
+    # PIPE-2584, part-2: If > 50% of all calibrators.ms data flagged
+    total_flag_ratio = flagdata_result["flagged"] / flagdata_result["total"]
+    score = 1 - total_flag_ratio
+
+    msg = f"{total_flag_ratio*100:.2f}% of data flagged in calibrator.ms"
+    origin = pqa.QAOrigin(metric_name='score_fluxboot',
+                          metric_score=score,
+                          metric_units='')
+    applies_to = pqa.TargetDataSelection(vis={result.vis})
+    qascores.append(pqa.QAScore(score, longmsg=msg, shortmsg=msg, origin=origin, applies_to=applies_to))
+
+    # PIPE-2584, part-3: IF spectral index > +/- 5: QA score < 0.5
+    for sp_result in result.spindex_results:
+        if abs(float(sp_result["spix"])) > 5:
+            score = rendererutils.SCORE_THRESHOLD_ERROR
+            msg = "spectral index > +- 5"
+            origin = pqa.QAOrigin(metric_name='score_fluxboot',
+                                  metric_score=score,
+                                  metric_units='')
+            qascores.append(pqa.QAScore(score, longmsg=msg, shortmsg=msg, origin=origin, applies_to=applies_to))
+            break
+
+    setup_scans = defaultdict(list)
+    valid_intents = {'TARGET', 'AMPLITUDE', 'BANDPASS', 'PHASE', 'POLANGLE'}
+    for scan in context.evla['msinfo'][result.vis].calibrator_scan_select_string.split(","):
+        sc = ms.get_scans(int(scan))[0]
+        spw_ids = sorted(
+            spw.id for spw in sc.spws
+            if spw.intents & valid_intents
+            )
+        setup_key = frozenset(spw_ids)
+
+        setup_scans[setup_key].append(sc.id)
+
+    missing_spws = 0
+    missing_spws_scans = {}
+    for spws, scans in setup_scans.items():
+        for spw in spws:
+            flagged_all = True
+            for sc in scans:
+                taql = f"SCAN_NUMBER={sc} and DATA_DESC_ID =={spw} and FLAG_ROW==False"
+                numrows = utils.get_row_count(calms, taql)
+                if numrows > 0:
+                    flagged_all = False
+                    break
+            if flagged_all:
+                missing_spws += 1
+                missing_spws_scans[spw] = ', '.join(str(int(s)) for s in scans)
+
+
+    if missing_spws / total_sci_spws > 0.5:
+        score = rendererutils.SCORE_THRESHOLD_ERROR
+        for spw, scans in missing_spws_scans.items():
+            longmsg = f"SPW {spw} flagged in scans {scans}"
+            shortmsg = f"SPW {spw} flagged in all scans"
+            origin = pqa.QAOrigin(metric_name='score_fluxboot',
+                                    metric_score=score,
+                                    metric_units='')
+            applies_to = pqa.TargetDataSelection(vis={result.vis}, spw=spw)
+            qascores.append(pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=applies_to))
+
+    # PIPE-2584, part-4: Ensure flux density is measured.
+    # If not measured, model_data column will be filled up with 1.
+
+    # checkif the MODEL column is not present.
+    with casa_tools.TableReader(calms) as table:
+        if 'MODEL_DATA' in table.colnames():
+            is_model_present = True
+        else:
+            is_model_present = False
+
+    if not is_model_present:
+        msg = f"Model column is not present"
+        origin = pqa.QAOrigin(metric_name='score_fluxboot',
+                              metric_score=score,
+                              metric_units='')
+        applies_to = pqa.TargetDataSelection(vis={result.vis})
+        qascores.append(pqa.QAScore(score, longmsg=msg, shortmsg=msg, origin=origin, applies_to=applies_to))
+
+        return qascores
+
+    for spws, scans in setup_scans.items():
+        for sc in scans:
+            spwlist = []
+            for spw in spws:
+                taql = f"SCAN_NUMBER={sc} and DATA_DESC_ID =={spw} and FLAG_ROW==False"
+                numrows = utils.get_row_count(calms, taql)
+                if numrows == 0:
+                    continue
+                job = casa_tasks.visstat(vis=calms,scan=str(sc), useflags=True, spw=str(spw), datacolumn='model', correlation='LL,RR', doquantiles=False)
+                vis_stats = job.execute()
+                for desc_id, stats in vis_stats.items():
+                    if all(stats.get(key) == 1 for key in ["min","max","mean"]):
+                        spwlist.append(str(spw))
+            if spwlist:
+                score = rendererutils.SCORE_THRESHOLD_ERROR
+                msg = f"Model column is set to 1.0 for scan {sc} and spw {', '.join(spwlist)}"
+                origin = pqa.QAOrigin(metric_name='score_fluxboot', metric_score=score, metric_units='')
+                applies_to = pqa.TargetDataSelection(vis={result.vis}, scan=sc)
+                qascores.append(pqa.QAScore(score, longmsg=msg, shortmsg=msg, origin=origin, applies_to=applies_to))
+
+    return qascores
