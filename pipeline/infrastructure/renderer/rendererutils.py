@@ -289,7 +289,8 @@ def num_lines(path):
     path argument. If the file does not exist, report N/A.
     """
     if os.path.exists(path):
-        return sum(1 for line in open(path) if line.strip() and not line.startswith('#'))
+        with open(path, encoding='utf-8') as f:
+            return sum(1 for line in f if line.strip() and not line.lstrip().startswith('#'))
     else:
         return 'N/A'
 

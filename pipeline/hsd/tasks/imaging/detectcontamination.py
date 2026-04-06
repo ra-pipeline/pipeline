@@ -70,7 +70,9 @@ NAxis = namedtuple('NAxis', ['x', 'y', 'sp'])
 def detect_contamination(context: 'Context',
                          item: 'ImageItem',
                          is_frequency_channel_reversed: Optional[bool]=False,
-                         do_plot: bool = True) -> bool:
+                         do_plot: bool = True,
+                         channel_mask: np.ndarray | None = None
+) -> bool:
     """
     Detect contamination (the emission at OFF position, which affects the data quality) in the given image item.
 
@@ -87,6 +89,9 @@ def detect_contamination(context: 'Context',
         is_frequency_channel_reversed (bool, optional): True if the frequency axis is flipped (case for LSB)
             by the imaging process (see worker.py). Defaults to False.
         do_plot (bool): Set True to make figure. Default is True.
+        channel_mask: predefined boolean mask for channel axis. False means that the channel is
+                      excluded from the analysis. None means that all channels are valid,
+                      equivalent to setting channel mask True to all channels. Default is None.
 
     Returns:
         True if potential contamination is detected, False otherwise.
@@ -108,7 +113,7 @@ def detect_contamination(context: 'Context',
     masked_average_spectrum = np.nanmean(np.where(mask_map > 0.5, cube_regrid, np.nan), axis=(1, 2))
 
     # Check if an absorption feature is detected
-    contaminated = _detect_deep_absorption_feature(masked_average_spectrum)
+    contaminated = _detect_deep_absorption_feature(masked_average_spectrum, channel_mask)
 
     # Generate the contamination report figures
     if do_plot:
@@ -125,7 +130,7 @@ def detect_contamination(context: 'Context',
         dir_spec = _get_direction_spec(image_obj)
         _make_figures(peak_sn_map, mask_map, rms_map, masked_average_spectrum,
                       peak_sn_threshold, spectrum_at_peak, idy, idx, output_name,
-                      freq_spec, dir_spec)
+                      freq_spec, dir_spec, channel_mask)
 
     return contaminated
 
@@ -206,7 +211,8 @@ def _make_figures(peak_sn_map: 'sdtyping.NpArray2D',
                   idx: np.int64,
                   output_name: str,
                   freq_spec: Optional[FrequencySpec]=None,
-                  dir_spec: Optional[DirectionSpec]=None) -> None:
+                  dir_spec: Optional[DirectionSpec]=None,
+                  channel_mask: np.ndarray | None = None) -> None:
     """
     Create figures to visualize contamination.
 
@@ -222,6 +228,9 @@ def _make_figures(peak_sn_map: 'sdtyping.NpArray2D',
         output_name (str): Name of the output file.
         freq_spec (FrequencySpec, optional): Frequency specification. Defaults to None.
         dir_spec (DirectionSpec, optional): Direction specification. Defaults to None.
+        channel_mask: predefined boolean mask for channel axis. False means that the channel is
+                      excluded from the analysis. None means that all channels are valid,
+                      equivalent to setting channel mask True to all channels. Default is None.
     """
 
     # Initialize the figure with a specified size
@@ -265,7 +274,7 @@ def _make_figures(peak_sn_map: 'sdtyping.NpArray2D',
     _plot_mask_map(mask_map_plot, mask_map_colorbar, mask_map,
                    peak_sn_threshold, dir_unit, kw)
     _plot_masked_averaged_spectrum(masked_avg_sp_plot, rms_map, masked_average_spectrum,
-                                   peak_sn_threshold, spectrum_at_peak, freq_spec)
+                                   peak_sn_threshold, spectrum_at_peak, freq_spec, channel_mask)
     # Save the figure to the specified output file
     _figure.savefig(output_name, bbox_inches="tight")
 
@@ -400,7 +409,8 @@ def _plot_masked_averaged_spectrum(plot: 'Axes',
                                    masked_average_spectrum: 'sdtyping.NpArray1D',
                                    peak_sn_threshold: float,
                                    spectrum_at_peak: 'sdtyping.NpArray1D',
-                                   freq_spec: Optional[FrequencySpec]=None):
+                                   freq_spec: Optional[FrequencySpec]=None,
+                                   channel_mask: np.ndarray | None = None):
     """
     Plot the masked-averaged spectrum with specified parameters.
 
@@ -411,6 +421,9 @@ def _plot_masked_averaged_spectrum(plot: 'Axes',
         peak_sn_threshold (float): The threshold for the peak signal-to-noise.
         spectrum_at_peak (NpArray1D): The spectrum data at the peak.
         freq_spec (Optional[FrequencySpec]): Frequency specifications. Defaults to None.
+        channel_mask: predefined boolean mask for channel axis. False means that the channel is
+                      excluded from the analysis. None means that all channels are valid,
+                      equivalent to setting channel mask True to all channels. Default is None.
     """
     # Calculate the standard deviation of the masked averaged spectrum
     stddev = np.nanstd(masked_average_spectrum)
@@ -435,8 +448,32 @@ def _plot_masked_averaged_spectrum(plot: 'Axes',
     plot.set_ylim(stddev * LOWER_INTENSITY_LIMIT_FACTOR, stddev * UPPER_INTENSITY_LIMIT_FACTOR)
 
     # Plot the spectrum at the peak and the masked averaged spectrum
-    plot.plot(abc, spectrum_at_peak, "-", color="grey", label="spectrum at peak", alpha=0.5)
-    plot.plot(abc, masked_average_spectrum, "-", color="red", label="masked averaged")
+    if channel_mask is None:
+        ma_mask = np.zeros_like(masked_average_spectrum, dtype=bool)
+    else:
+        ma_mask = np.logical_not(channel_mask)
+    ma_masked_average_spectrum = np.ma.masked_array(
+        masked_average_spectrum, ma_mask
+    )
+    plot.plot(abc, spectrum_at_peak, "-", color="grey",
+              label="spectrum at peak", alpha=0.5)
+    plot.plot(abc, ma_masked_average_spectrum, "-", color="red",
+              label="masked averaged")
+    if np.any(ma_mask):
+        assert channel_mask is not None
+        mask_for_plot = channel_mask.copy()
+        # extend False (valid) channels by 1 to make the line continuous
+        mask_for_plot[1:] = np.logical_and(
+            mask_for_plot[1:], channel_mask[:-1]
+        )
+        mask_for_plot[:-1] = np.logical_and(
+            mask_for_plot[:-1], channel_mask[1:]
+        )
+        masked_region = np.ma.masked_array(
+            masked_average_spectrum, mask_for_plot
+        )
+        plot.plot(abc, masked_region, "-", color="indigo",
+                  label="edge/ATM (ignored)", alpha=0.5)
 
     # Define the edges for horizontal lines
     _edge = [abc[0], abc[-1]]
@@ -460,11 +497,15 @@ def _plot_masked_averaged_spectrum(plot: 'Axes',
     plot.text(minabc + w * 0.1, np.nanmean(rms_map) * (-1.), "-1.0 x rms", fontsize=18, color="blue", va='top')
     plot.text(minabc + w * 0.6, STDDEV_THRESHOLD_FACTOR * stddev, f"{STDDEV_THRESHOLD_FACTOR} x std", fontsize=18, color="red")
 
+    # restrict number of major ticks for readability
+    plot.xaxis.get_major_locator().set_params(nbins=8)
+    plot.ticklabel_format(axis="x", style="plain", useOffset=False)
+
     # Display the legend
     plot.legend()
 
     # Add a warning text if the minimum of the masked averaged spectrum is below the threshold
-    if np.nanmin(masked_average_spectrum) <= STDDEV_THRESHOLD_FACTOR * stddev:
+    if _detect_deep_absorption_feature(masked_average_spectrum, channel_mask):
         plot.text(minabc + w * 2. / 5., -5. * stddev, "Warning!!", fontsize=25, color="Orange")
 
 
@@ -511,7 +552,7 @@ def _configure_axis(axis: 'Axis',
     axis.set_tick_params(rotation=rotation)
 
 
-def _detect_deep_absorption_feature(masked_average_spectrum: 'sdtyping.NpArray1D') -> bool:
+def _detect_deep_absorption_feature(masked_average_spectrum: 'sdtyping.NpArray1D', channel_mask: np.ndarray | None) -> bool:
     """
     Check if a strong absorption feature exists in the spectrum.
 
@@ -519,6 +560,9 @@ def _detect_deep_absorption_feature(masked_average_spectrum: 'sdtyping.NpArray1D
 
     Args:
         masked_average_spectrum (NpArray1D): 1D array of the average spectrum of the masked regions.
+        channel_mask: predefined boolean mask for channel axis. False means that the channel is
+                      excluded from the analysis. None means that all channels are valid,
+                      equivalent to setting channel mask True to all channels. Default is None.
 
     Returns:
         True if contamination was detected, False otherwise.
@@ -527,7 +571,7 @@ def _detect_deep_absorption_feature(masked_average_spectrum: 'sdtyping.NpArray1D
     std_value = np.nanstd(masked_average_spectrum)
 
     # Determine if the spectrum has a strong absorption feature
-    _has_strong_absorption = np.nanmin(masked_average_spectrum) <= STDDEV_THRESHOLD_FACTOR * std_value
+    _has_strong_absorption = np.nanmin(masked_average_spectrum, initial=np.inf, where=channel_mask) <= STDDEV_THRESHOLD_FACTOR * std_value
 
     return _has_strong_absorption
 
