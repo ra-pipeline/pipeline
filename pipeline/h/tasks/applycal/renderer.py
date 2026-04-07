@@ -318,8 +318,10 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         for result in results:
             vis = os.path.basename(result.inputs['vis'])
             ms = context.observing_run.get_ms(vis)
+            custom_plot_par = {"avgscan": False, "avgtime": "999999"}
 
-            plot = UVChart(context, ms, customflagged=True, output_dir=weblog_dir, title_prefix="Post applycal: ").plot()
+            plot = UVChart(context, ms, custom_plotFlags=custom_plot_par, customflagged=True,
+                           output_dir=weblog_dir, title_prefix="Post applycal: ").plot()
             
             # PIPE-1294: only attached valid plot wrapper objects.
             if plot is not None:

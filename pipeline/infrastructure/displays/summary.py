@@ -1086,7 +1086,7 @@ class UVChart:
     # search for sources with other intents
     preferred_intent_order = ['TARGET', 'AMPLITUDE', 'BANDPASS', 'PHASE']
 
-    def __init__(self, context, ms, customflagged=False, output_dir=None, title_prefix=None):
+    def __init__(self, context, ms, custom_plotFlags:dict=None, customflagged=False, output_dir=None, title_prefix=None):
         self.context = context
         self.ms = ms
         self.customflagged = customflagged
@@ -1110,6 +1110,12 @@ class UVChart:
             bl_max = float(ms.antenna_array.baseline_max.length.to_units(measures.DistanceUnits.METRE))
             self.uv_max = math.ceil(1.05 * bl_max / wavelength_m)
 
+            self.avgscan = ""
+            self.avgtime = ""
+            if custom_plotFlags is not None:
+                self.avgscan = custom_plotFlags["avgscan"]
+                self.avgtime = custom_plotFlags["avgtime"]
+                
     def plot(self):
         if DISABLE_PLOTMS:
             LOG.debug('Disabling UV coverage plot due to problems with plotms')
@@ -1127,6 +1133,8 @@ class UVChart:
             'xaxis': 'uwave',
             'yaxis': 'vwave',
             'title': self.title,
+            'avgscan': self.avgscan,
+            'avgtime': self.avgtime,
             'avgchannel': self.nchan,
             'antenna': '*&*',
             'spw': self.spw_id,
