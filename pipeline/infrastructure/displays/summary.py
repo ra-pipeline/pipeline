@@ -1110,7 +1110,7 @@ class UVChart:
             bl_max = float(ms.antenna_array.baseline_max.length.to_units(measures.DistanceUnits.METRE))
             self.uv_max = math.ceil(1.05 * bl_max / wavelength_m)
 
-            self.avgscan = ""
+            self.avgscan = True
             self.avgtime = ""
             if custom_plotFlags is not None:
                 self.avgscan = custom_plotFlags["avgscan"]
