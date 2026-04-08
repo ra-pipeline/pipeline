@@ -261,7 +261,9 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         if utils.contains_single_dish(pipeline_context):
             uv_plots = None
         else:
-            uv_plots = self.create_uv_plots(pipeline_context, result, weblog_dir)
+            custom_plot_par = {"avgscan": False, "avgtime": "999999",}
+            uv_plots = self.create_uv_plots(context=pipeline_context, results=result, weblog_dir=weblog_dir,
+                                            plot_par=custom_plot_par)
 
         # PIPE-615: Add links to the hif_applycal weblog for viewing each
         # callibrary table (and store all callibrary tables in the weblog
@@ -312,15 +314,14 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         })
 
     @staticmethod
-    def create_uv_plots(context, results, weblog_dir):
+    def create_uv_plots(context, results, weblog_dir, plot_par:dict=None):
         uv_plots = collections.defaultdict(list)
 
         for result in results:
             vis = os.path.basename(result.inputs['vis'])
             ms = context.observing_run.get_ms(vis)
-            custom_plot_par = {"avgscan": False, "avgtime": "999999"}
 
-            plot = UVChart(context, ms, custom_plotFlags=custom_plot_par, customflagged=True,
+            plot = UVChart(context, ms, custom_plot_flags=plot_par, customflagged=True,
                            output_dir=weblog_dir, title_prefix="Post applycal: ").plot()
             
             # PIPE-1294: only attached valid plot wrapper objects.

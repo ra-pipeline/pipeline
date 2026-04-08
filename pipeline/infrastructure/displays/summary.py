@@ -1086,7 +1086,7 @@ class UVChart:
     # search for sources with other intents
     preferred_intent_order = ['TARGET', 'AMPLITUDE', 'BANDPASS', 'PHASE']
 
-    def __init__(self, context, ms, custom_plotFlags:dict=None, customflagged=False, output_dir=None, title_prefix=None):
+    def __init__(self, context, ms, custom_plot_flags:dict=None, customflagged=False, output_dir=None, title_prefix=None):
         self.context = context
         self.ms = ms
         self.customflagged = customflagged
@@ -1110,11 +1110,9 @@ class UVChart:
             bl_max = float(ms.antenna_array.baseline_max.length.to_units(measures.DistanceUnits.METRE))
             self.uv_max = math.ceil(1.05 * bl_max / wavelength_m)
 
-            self.avgscan = True
-            self.avgtime = ""
-            if custom_plotFlags is not None:
-                self.avgscan = custom_plotFlags["avgscan"]
-                self.avgtime = custom_plotFlags["avgtime"]
+            self.custom_plot_flags = None
+            if custom_plot_flags is not None:
+                self.custom_plot_flags = custom_plot_flags
                 
     def plot(self):
         if DISABLE_PLOTMS:
@@ -1133,8 +1131,6 @@ class UVChart:
             'xaxis': 'uwave',
             'yaxis': 'vwave',
             'title': self.title,
-            'avgscan': self.avgscan,
-            'avgtime': self.avgtime,
             'avgchannel': self.nchan,
             'antenna': '*&*',
             'spw': self.spw_id,
@@ -1148,7 +1144,10 @@ class UVChart:
             'height': 1000,
             'width': 1000
         }
+        if self.custom_plot_flags is not None:
+            task_args.update(self.custom_plot_flags)
 
+        #
         task = casa_tasks.plotms(**task_args)
 
         if not os.path.exists(self.figfile):
