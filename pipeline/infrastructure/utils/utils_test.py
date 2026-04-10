@@ -366,3 +366,31 @@ def test_compute_zenith_distance():
     assert 'value' in zd
     assert zd['unit'] == 'rad'
     assert 0 <= zd['value'] <= np.pi  # ZD should be in valid range [0, pi]
+
+
+def test_compute_zenith_distance_regression_set1():
+    """Regression test for compute_zenith_distance with real pipeline data (set 1)."""
+    field_direction = {
+        'm0': {'unit': 'rad', 'value': -1.2005642899794717},
+        'm1': {'unit': 'rad', 'value': -0.5103639490189864},
+        'refer': 'ICRS',
+        'type': 'direction',
+    }
+    epoch = {'m0': {'unit': 'd', 'value': 60462.40688407407}, 'refer': 'UTC', 'type': 'epoch'}
+    zd = compute_zenith_distance(field_direction, epoch, 'ALMA', 'AZELGEO')
+    assert zd['unit'] == 'rad'
+    assert zd['value'] == pytest.approx(0.594852971525817)
+
+
+def test_compute_zenith_distance_regression_set2():
+    """Regression test for compute_zenith_distance with real pipeline data (set 2)."""
+    field_direction = {
+        'm0': {'unit': 'rad', 'value': -1.344869047803906},
+        'm1': {'unit': 'rad', 'value': 0.01033799026988178},
+        'refer': 'ICRS',
+        'type': 'direction',
+    }
+    epoch = {'m0': {'unit': 'd', 'value': 60462.413365185195}, 'refer': 'UTC', 'type': 'epoch'}
+    zd = compute_zenith_distance(field_direction, epoch, 'ALMA', 'AZELGEO')
+    assert zd['unit'] == 'rad'
+    assert zd['value'] == 0.9153820259873402

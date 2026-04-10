@@ -1663,7 +1663,7 @@ class MeasurementSet:
         return spw_list
 
     # PIPE-2307: moving compute_az_el_to_field, compute_az_el_for_ms methods from pipeline.infrastructure.htmlrenderer to here
-    def compute_az_el_to_field(self, field: Field | None = None, epoch: dict | None = None) -> list[float]:
+    def compute_az_el_to_field(self, field: Field | None = None, epoch: dict | None = None) -> list[float] | None:
         """Computes azimuth and elevation of a field at a given epoch.
 
         This method uses the CASA `measures` tool to convert the direction
@@ -1677,6 +1677,8 @@ class MeasurementSet:
         Returns:
             A list containing azimuth (degrees) and elevation (degrees), in that order.
         """
+        if field is None or field.mdirection is None:
+            return None
         me = casa_tools.measures
         me.doframe(epoch)
         me.doframe(me.observatory(self.antenna_array.name))
