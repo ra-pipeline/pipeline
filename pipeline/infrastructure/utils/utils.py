@@ -622,7 +622,7 @@ def glob_ordered(pattern: str, *args, order: str | None = None, **kwargs) -> lis
     return path_list
 
 
-def deduplicate(items: list) -> list:
+def deduplicate(items: Iterable) -> list:
     """Remove duplicate entries from a list, but preserve the order.
 
     Note that the use of list(set(x)) can cause random order in the output.

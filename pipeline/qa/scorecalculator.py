@@ -651,7 +651,7 @@ def score_diffgaincal_residuals(residuals_info: dict, score_type: str) -> pqa.QA
                        f' {get_expanded_message(poor)}.')
         # Elevated phase statistics are scored as the lowest blue score.
         elif elevated:
-            score = rendererutils.SCORE_THRESHOLD_WARNING + 0.01 # lowest blue score 
+            score = rendererutils.SCORE_THRESHOLD_WARNING + 0.01 # lowest blue score
             shortmsg = f'Elevated Diffgaincal {messph} {score_type}'
             longmsg = (f'For {ms_name}, field={field} intent={intent} has elevated {messph} {score_type} between'
                        f' 50-70 deg for {get_expanded_message(elevated)}.')
@@ -3646,7 +3646,7 @@ def generate_metric_mask(
         context: Context,
         result: SDImagingResultItem,
         cs: coordsys,
-        mask: np.ndarray
+        image_shape: np.ndarray
 ) -> np.ndarray:
     """
     Generate boolean mask array for metric calculation in
@@ -3658,14 +3658,13 @@ def generate_metric_mask(
         context: Pipeline context
         result: result item created by hsd_imaging
         cs: CASA coordsys tool
-        mask: image mask
+        image_shape: Shape of the image
 
     Returns:
         bool array -- metric mask (True: valid, False: invalid)
     """
     outcome = result.outcome
     org_direction = outcome['image'].org_direction
-    imshape = mask.shape
 
     file_index = np.asarray(outcome['file_index'])
     antenna_list = np.asarray(outcome['assoc_antennas'])
@@ -3678,7 +3677,7 @@ def generate_metric_mask(
 
     refval = cs.referencevalue()
     units = cs.units()
-    metric_mask = np.zeros(imshape, dtype=bool)
+    metric_mask = np.zeros(image_shape, dtype=bool)
 
     for ms_id in unique_file_index:
         target_ms = mses[ms_id]
@@ -3788,13 +3787,13 @@ def generate_metric_mask(
         py = pixel_array[1]
 
         for x, y in zip(map(int, np.round(px)), map(int, np.round(py))):
-            if 0 <= x and x <= imshape[0] - 1 and 0 <= y and y <= imshape[1] - 1:
+            if 0 <= x and x <= image_shape[0] - 1 and 0 <= y and y <= image_shape[1] - 1:
                 metric_mask[x, y, :, :] = True
 
     # exclude edge channels
     imagename = outcome['image'].imagename
     nchan = metric_mask.shape[3]
-    edge_count_lower, edge_count_upper = detect_edge_channels(mask)
+    edge_count_lower, edge_count_upper = outcome.get("edge_channels", (0, 0))
     log_edge_channels(imagename, nchan, edge_count_lower, edge_count_upper)
     if edge_count_lower > 0:
         metric_mask[:, :, :, :edge_count_lower] = False
@@ -3802,55 +3801,6 @@ def generate_metric_mask(
         metric_mask[:, :, :, -edge_count_upper:] = False
 
     return metric_mask
-
-
-def detect_edge_channels(mask: np.ndarray) -> tuple[int, int]:
-    """Detect list of edge channels to be excluded from QA evaluation.
-
-    There are a few edge channels that have less valid spatial pixels
-    than other spectral channels, probably due to the effect of frame
-    conversion from TOPO to LSRK with progressively varying time stamp.
-    Raster OTF scan without frequency tracking can cause this effect.
-
-    Other possible reason is edge channel flagging by hsd_flagdata
-    and/or hsd_tsysflag.
-
-    This function detects such edge channels by calculating the median
-    number of valid spatial pixels in each channel. Consecutive
-    channels with less valid spatial pixels than the median are
-    regarded as edge channels.
-
-    Args:
-        mask: boolean numpy array of shape (nx, ny, npol, nchan)
-
-    Returns:
-        Number of edge channels excluded from lower and upper
-        side of the spectral axis
-    """
-    num_valid_pixels = np.sum(mask, axis=(0, 1, 2))
-    nchan = len(num_valid_pixels)
-    # PIPE-1727 threshold for edge channels should be strict,
-    # no tolerance using stddev nor MAD
-    median_num_valid_pixels = np.median(num_valid_pixels)
-    LOG.debug(
-        "typical number of valid pixels %s",
-        median_num_valid_pixels
-    )
-    threshold = median_num_valid_pixels
-    edge_count_lower = 0
-    for i in range(nchan):
-        if num_valid_pixels[i] < threshold:
-            edge_count_lower += 1
-        else:
-            break
-    edge_count_upper = 0
-    for i in range(nchan - 1, -1, -1):
-        if num_valid_pixels[i] < threshold:
-            edge_count_upper += 1
-        else:
-            break
-
-    return edge_count_lower, edge_count_upper
 
 
 def direction_recover( ra, dec, org_direction ):
@@ -3914,7 +3864,7 @@ def score_sdimage_masked_pixels(context: Context, result: SDImagingResultItem) -
         # metric_mask is boolean array that defines the region to be excluded
         #    True: included in the metric calculation
         #   False: excluded from the metric calculation
-        metric_mask = generate_metric_mask(context, result, cs, mask)
+        metric_mask = generate_metric_mask(context, result, cs, imageshape)
     finally:
         # done using coordsys tool
         cs.done()
