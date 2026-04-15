@@ -1144,6 +1144,7 @@ class UVChart:
             'height': 1000,
             'width': 1000
         }
+        #
         if self.custom_plot_flags is not None:
             task_args.update(self.custom_plot_flags)
 
