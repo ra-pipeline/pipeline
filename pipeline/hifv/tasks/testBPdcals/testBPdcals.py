@@ -366,8 +366,8 @@ class testBPdcals(basetask.StandardTaskTemplate):
                 LOG.info("Removing table: {!s}".format(tablename))
                 shutil.rmtree(tablename)
 
-        # PIPE-1637: adding ',' in the manual and auto refantignore parameter
-        refantignore = self.inputs.refantignore + ','.join(['', *self.ignorerefant])
+        refantignore = utils.build_refantignore(refantignore=self.inputs.refantignore, ignorerefant=self.ignorerefant)
+
         refantfield = self.inputs.context.evla['msinfo'][m.name].calibrator_field_select_string
 
         # PIPE-595: if refant list is not provided, compute refants else use provided refant list.

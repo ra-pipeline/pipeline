@@ -1125,6 +1125,7 @@ def make_spwid_map(srcvis: str, dstvis: str) -> dict:
                     spwid_map[src.id] = spw.id
     return spwid_map
 
+
 PolarizationData = Tuple[int, int, List[int], List[int], bool]
 
 def _read_polarization_table(vis: str) -> List[PolarizationData]:
@@ -1451,3 +1452,24 @@ def get_brightness_unit(vis: str, defaultunit: str='Jy/beam') -> str:
                             bunit = 'K'
                         break
     return bunit
+
+
+def rewrap_angle(x: numpy.ndarray, cycle: float = 360.0) -> numpy.ndarray:
+    """ Rewrap the angle to preserve the continuity
+
+    This method rewraps the angle values to preserve/realize their continuity,
+    assuming they are distributed within the width of cycle/2.
+    Eg. Series of angles crossing over -180 to +180 will be converted as
+    [ -179.5, +178.2 ] -> [ +180.5, +178.2 ]
+    They remain unchanged for other cases, including when they are cossing over 0.0.
+    [ -2.3, +3.5 ] -> [ -2.3, +3.5 ]
+
+    Args:
+        x: angles to rewrap
+    Returns:
+        numpy.ndarray: rewrapped angles
+    """
+    if min(x) * max(x) < 0 and min(x[x > 0]) - max(x[x < 0]) > cycle / 2:
+        return x % cycle
+    else:
+        return x

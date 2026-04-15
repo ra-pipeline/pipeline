@@ -1,6 +1,6 @@
 import os
 import collections
-from typing import TYPE_CHECKING, List, Optional, Tuple, Union, Any, Dict
+from typing import List, Dict
 
 import numpy as np
 
@@ -13,7 +13,7 @@ from pipeline.hifv.heuristics import weakbp, do_bandpass, uvrange
 from pipeline.hifv.heuristics.lib_EVLApipeutils import vla_minbaselineforcal
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import task_registry
-
+from pipeline.infrastructure import utils
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -203,8 +203,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
 
         table_suffix = ['_{!s}.tbl'.format(band), '3_{!s}.tbl'.format(band), '10_{!s}.tbl'.format(band)]
         self.ignorerefant = self.inputs.context.evla['msinfo'][m.name].ignorerefant
-        # PIPE-1637: adding ',' in the manual and auto refantignore parameter
-        refantignore = self.inputs.refantignore + ','.join(['', *self.ignorerefant])
+        refantignore = utils.build_refantignore(refantignore=self.inputs.refantignore, ignorerefant=self.ignorerefant)
         refantfield = self.inputs.context.evla['msinfo'][m.name].calibrator_field_select_string
         # PIPE-595: if refant list is not provided, compute refants else use provided refant list.
         if len(self.inputs.refant) == 0:

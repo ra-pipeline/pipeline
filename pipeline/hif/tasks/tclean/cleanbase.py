@@ -683,28 +683,56 @@ class CleanBase(basetask.StandardTaskTemplate):
                 result.set_totalflux_array(iter, tclean_totalflux)
                 result.set_planeid_array(iter, tclean_planeid)
 
-            LOG.info('tclean used %d iterations' % tclean_iterdone)
+            LOG.info('tclean used %d iterations', tclean_iterdone)
 
             if tclean_stopcode == 0 and tclean_iterdone > 0:
-                LOG.warning('tclean exit status 0 for Field: %s SPW: %s: the image may not be cleaned as expected.' %
-                            (sourcename, inputs.spw))
+                LOG.warning(
+                    'tclean exit status 0 for Field: %s SPW: %s: the image may not be cleaned as expected.',
+                    sourcename,
+                    inputs.spw,
+                )
 
             if tclean_stopcode == 1:
-                result.error = CleanBaseError('tclean reached niter limit. Field: %s SPW: %s' %
-                                              (sourcename, inputs.spw), 'Reached niter limit')
+                result.error = CleanBaseError(
+                    f'tclean reached niter limit of {tclean_niter}. Field: {sourcename} SPW: {inputs.spw} iter{iter}',
+                    'Reached niter limit',
+                )
                 LOG.log(
                     logging.INFO if tclean_stopcode in tclean_stopcode_ignore else logging.WARNING,
-                    'tclean reached niter limit of {} for {} / spw{} / iter{} !'.format(
-                        tclean_niter, sourcename,
-                        inputs.spw, iter))
+                    'tclean reached niter limit of %s for %s / spw%s / iter%s !',
+                    tclean_niter,
+                    sourcename,
+                    inputs.spw,
+                    iter,
+                )
+
+            if tclean_stopcode == 9:
+                result.error = CleanBaseError(
+                    f'tclean reached nmajor limit of {tclean_nmajordone}. Field: {sourcename} SPW: {inputs.spw} iter{iter}',
+                    'Reached nmajor limit',
+                )
+                LOG.log(
+                    logging.INFO if tclean_stopcode in tclean_stopcode_ignore else logging.WARNING,
+                    'tclean reached nmajor limit of %s for %s / spw%s / iter%s !',
+                    tclean_nmajordone,
+                    sourcename,
+                    inputs.spw,
+                    iter,
+                )
 
             if tclean_stopcode in [5, 6]:
-                result.error = CleanBaseError('tclean stopped to prevent divergence (stop code %d). Field: %s SPW: %s' %
-                                              (tclean_stopcode, sourcename, inputs.spw),
-                                              'tclean stopped to prevent divergence.')
-                LOG.log(logging.INFO if tclean_stopcode in tclean_stopcode_ignore else logging.WARNING,
-                        'tclean stopped to prevent divergence (stop code {}). Field: {} SPW: {} iter{} !'.format(
-                            tclean_stopcode, sourcename, inputs.spw, iter))
+                result.error = CleanBaseError(
+                    f'tclean stopped to prevent divergence (stop code {tclean_stopcode}). Field: {sourcename} SPW: {inputs.spw} iter{iter}',
+                    'Stopped to prevent divergence',
+                )
+                LOG.log(
+                    logging.INFO if tclean_stopcode in tclean_stopcode_ignore else logging.WARNING,
+                    'tclean stopped to prevent divergence (stop code %s) for %s / spw%s / iter%s !',
+                    tclean_stopcode,
+                    sourcename,
+                    inputs.spw,
+                    iter,
+                )
 
         # Collect images to be examined and stored in TcleanResult
         im_names = {}

@@ -27,7 +27,7 @@ class SetModelsInputs(vdp.StandardInputs):
         field_fn = fieldnames.IntentFieldnames()
         reference_fields = field_fn.calculate(self.ms, self.refintent)
         # run the answer through a set, just in case there are duplicates
-        fields = {s for s in utils.safe_split(reference_fields)}
+        fields = utils.deduplicate(s for s in utils.safe_split(reference_fields))
         return ','.join(fields)
 
     @vdp.VisDependentProperty
@@ -47,10 +47,10 @@ class SetModelsInputs(vdp.StandardInputs):
         references = set(self.ms.get_fields(task_arg=self.reference))
         diff = transfers.difference(references)
 
-        transfer_names = {f.name for f in diff}
+        transfer_names = sorted(f.name for f in diff)
         fields_with_name = self.ms.get_fields(name=transfer_names)
-        if len(fields_with_name) is not len(diff) or len(diff) is not len(transfer_names):
-            return ','.join([str(f.id) for f in diff])
+        if len(fields_with_name) != len(diff) or len(diff) != len(transfer_names):
+            return ','.join(str(f.id) for f in sorted(diff, key=lambda f: f.id))
         else:
             return ','.join(transfer_names)
 

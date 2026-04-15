@@ -2,7 +2,6 @@ import collections
 import functools
 import operator
 import os
-import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Tuple
@@ -13,6 +12,7 @@ import scipy.optimize
 import pipeline.infrastructure.logging as logging
 from pipeline.domain import MeasurementSet
 from pipeline.domain.measures import FrequencyUnits
+
 from . import mswrapper, qa_utils
 from .qa_utils import UnitFactorType
 
@@ -917,9 +917,7 @@ def fit_angular_model(angular_model: Callable, nu: np.ndarray, angdata: np.ndarr
     """
     f_aux = lambda omega_phi: get_chi2_ang_model(angular_model, nu, omega_phi[0], omega_phi[1], angdata, angsigma)
     angle = np.ma.angle(angdata[~angdata.mask])
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore', np.exceptions.ComplexWarning)
-        phi_init = np.ma.median(angle)
+    phi_init = np.ma.median(angle)
     fitres = scipy.optimize.minimize(f_aux, np.array([0.0, phi_init]), method='L-BFGS-B')
     return fitres
 
