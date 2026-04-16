@@ -134,11 +134,10 @@ class SelfcalHeuristics:
             parallel=False, cyclefactor=3, threshold='0.0Jy', startmodel='', pblimit=0.1, pbmask=0.1, field='',
             datacolumn='', nfrms_multiplier=1.0,
             savemodel_only=False, resume=False, spw='all', image_mosaic_fields_separately=True, store_threshold=''):
-        """
-        Wrapper for tclean with keywords set to values desired for the Large Program imaging
-        See the CASA 6.1.1 documentation for tclean to get the definitions of all the parameters
-        """
+        """Wrapper for tclean with keywords set to values desired for the Large Program imaging.
 
+        See the CASA 6.1.1 documentation for tclean to get the definitions of all the parameters.
+        """
         LOG.info('NF RMS Multiplier: %r', nfrms_multiplier)
         # Minimize out the nfrms_multiplier at 1.
         nfrms_multiplier = max(nfrms_multiplier, 1.0)
@@ -429,6 +428,7 @@ class SelfcalHeuristics:
                           lownoisethreshold=1.5, parallel=False, cyclefactor=3, threshold='0.0Jy', phasecenter='',
                           startmodel='', pblimit=0.1, pbmask=0.1, field='', datacolumn='', spw='',
                           savemodel_only=False, resume=False):
+        """Insert user-defined source models into the MS model column for use in self-calibration."""
         # this method is not fully veried.
         vlist = selfcal_library['vislist']
         if isinstance(selfcal_library['usermodel'], list):
@@ -535,7 +535,7 @@ class SelfcalHeuristics:
             calonly_max_flagged=0.0, second_iter_solmode="", unflag_fb_to_prev_solint=False,
             refantmode="flex", mode="selfcal", calibrators="", gaincalibrator_dict={}, allow_gain_interpolation=False,
             guess_scan_combine=False, do_fallback_calonly=False):
-        
+        """Wrapper around heuristics + gaincal for self-calibration."""        
         sani_target = 'sc.'+filenamer.sanitize(target)
         ##
         # Solve gain solutions per MS, target, solint, and band
@@ -751,7 +751,7 @@ class SelfcalHeuristics:
                                                                     ['final_phase_solint']]['gaintable']
                 gaincal_interpolate = [slib['applycal_interp']]*len(gaincal_preapply_gaintable)
                 gaincal_gaintype = 'T' if not do_fallback_calonly or second_iter_solmode == "" else "GSPLINE" if second_iter_solmode == "GSPLINE" else "G"
-                gaincal_solmode = "" if not_do_fallback_calonly or second_iter_solmode == "GSPLINE" else second_iter_solmode
+                gaincal_solmode = "" if not do_fallback_calonly or second_iter_solmode == "GSPLINE" else second_iter_solmode
                 if 'spw' in selfcal_plan['inf_EB_gaincal_combine'][vis]:
                     applycal_spwmap = [slib[fid][vis]['spwmap'],
                                             slib[fid][vis]['spwmap'], slib[fid][vis]['spwmap']]
@@ -991,7 +991,7 @@ class SelfcalHeuristics:
                 if solint == "scan_inf":
                     max_n_solutions = max([(scans == scan).sum() for scan in np.unique(scans)])
                     for scan in np.unique(scans):
-                        scan_n_solutions = (flags[0, 0, scans == scan] == False).sum()
+                        scan_n_solutions = np.logical_not(flags[0, 0, scans == scan]).sum()
                         if scan_n_solutions < 0.75 * max_n_solutions:
                             flags[:, :, scans == scan] = True
                 else:
@@ -1000,7 +1000,7 @@ class SelfcalHeuristics:
                     max_n_solutions = max([(fields == fid).sum()
                                             for fid in np.unique(fields)]) - n_all_flagged
                     for fid in np.unique(fields):
-                        fid_n_solutions = (flags[0, 0, fields == fid] == False).sum()
+                        fid_n_solutions = np.logical_not(flags[0, 0, fields == fid]).sum()
                         if fid_n_solutions < 0.75 * max_n_solutions:
                             flags[:, :, fields == fid] = True
             bad = np.where(np.any(flags, axis=0)[0])[0]
@@ -1010,8 +1010,12 @@ class SelfcalHeuristics:
 
     def applycal_wrapper(self, vis, target, band, solint, selfcal_library, current=lambda f: False, final=lambda f: False, 
             clear=lambda f: False, restore_flags=None):
+        """Wrapper of applycal for self-calibration.
 
-        if restore_flags != None:
+        Wrapper around applycal to handle applying the appropriate calibration tables to each field based on the 
+        selfcal_library, and to handle restoring flags if needed.
+        """
+        if restore_flags is not None:
             self.cts.flagmanager(vis=vis,mode='restore',versionname=restore_flags)
 
         for fid in [fid for fid in np.intersect1d(selfcal_library['sub-fields'],
@@ -1096,7 +1100,9 @@ class SelfcalHeuristics:
     def get_dr_correction(self):
         raise NotImplementedError(f'{self.__class__.__name__}.get_dr_correction() is not implemented yet!')
 
-    def get_image_stats(self, image, mask, backup_mask, selfcal_library, use_nfmask, solint, suffix, mosaic_sub_field=False, spw='all'):
+    def get_image_stats(self, image, mask, backup_mask, selfcal_library, use_nfmask, solint, suffix, 
+                        mosaic_sub_field=False, spw='all'):
+        """Calculate image statistics for a given image and mask, and update the selfcal_library with the results."""
         ##
         ## Do the assessment of the post- (and pre-) selfcal images.
         ##
@@ -1861,6 +1867,7 @@ class SelfcalHeuristics:
         return selfcal_library, selfcal_plan, gaincalibrator_dict
 
     def set_clean_thresholds(self, selfcal_library, selfcal_plan, dividing_factor=-99.0, rel_thresh_scaling='log10', telescope='ALMA'):
+        """Set the cleaning thresholds for each self-calibration iteration based on the initial SNR and a dividing factor."""
         for target in selfcal_library:
             for band in selfcal_library[target].keys():
                 if dividing_factor is None:
@@ -1904,7 +1911,7 @@ class SelfcalHeuristics:
 
     def evaluate_subfields_to_gaincal(self, slib, sani_target, band, solint, iteration, selfcal_plan, 
                                       minsnr_to_proceed, allow_gain_interpolation=False):
-
+        """Evaluate which sub-fields should be included in the gaincal call for a given solint based on several heuristics."""
         # Fields that don't have any mask in the primary beam should be removed from consideration, as their models are likely bad.
         new_fields_to_selfcal = []
         for fid in slib['sub-fields-to-selfcal']:
@@ -1965,7 +1972,11 @@ class SelfcalHeuristics:
         return new_fields_to_selfcal
 
     def evaluate_subfields_after_gaincal(self, slib, sani_target, band, solint, iteration, selfcal_plan, allow_gain_interpolation=False):
-
+        """Evaluate whether an sub-fields should be retroactively removed from the gaincal results.
+        
+        Evaluate whether an sub-fields should be retroactively removed from the gaincal results based on whether 
+        there has been too much flagging.
+        """
         new_fields_to_selfcal = slib['sub-fields-to-selfcal'].copy()
 
         if slib['obstype'] == 'mosaic' and ((solint != "inf_EB" and not allow_gain_interpolation) or
@@ -2064,7 +2075,7 @@ class SelfcalHeuristics:
                     second_iter_solmode="", unflag_fb_to_prev_solint=False,
                     rerank_refants=False, gaincalibrator_dict={}, allow_gain_interpolation=False,
                     guess_scan_combine=False, aca_use_nfmask=False):
-
+        """Run the self-calibration procedure for a given target and band."""
         # If we are running this on a mosaic, we want to rerank reference antennas and have a higher gaincal_minsnr by default.
 
         slib = selfcal_library
@@ -2576,13 +2587,13 @@ class SelfcalHeuristics:
 
                 # If any of the fields failed self-calibration, we need to re-apply calibrations for all fields because we need to revert flagging back
                 # to the starting point.
-                if np.any([slib[fid][slib[fid]['vislist'][0]][solint]['Pass'] == False for fid in
+                if np.any([not slib[fid][slib[fid]['vislist'][0]][solint]['Pass'] for fid in
                            slib['sub-fields-to-selfcal']]) or len(slib['sub-fields-to-selfcal']) < \
                         len(slib['sub-fields']):
                     LOG.info('****************Selfcal failed for some sub-fields:*************')
                     for fid in slib['sub-fields']:
                         if fid in slib['sub-fields-to-selfcal']:
-                            if slib[fid][slib[fid]['vislist'][0]][solint]['Pass'] == False:
+                            if not slib[fid][slib[fid]['vislist'][0]][solint]['Pass']:
                                 LOG.info('FIELD: '+str(fid)+', REASON: '+mosaic_reason[fid])
                         else:
                             LOG.info('FIELD: '+str(fid)+', REASON: Failed earlier solint')
@@ -2638,8 +2649,8 @@ class SelfcalHeuristics:
                                     slib[fid]['RMS_post'] = slib[fid]['RMS_orig'].copy()
 
                 # If any of the sub-fields passed, and the whole mosaic passed, then we can move on to the next solint, otherwise we have to back out.
-                if slib[vislist[0]][solint]['Pass'] == True and \
-                        np.any([slib[fid][slib[fid]['vislist'][0]][solint]['Pass'] == True for fid in
+                if slib[vislist[0]][solint]['Pass'] and \
+                        np.any([slib[fid][slib[fid]['vislist'][0]][solint]['Pass'] for fid in
                                 slib['sub-fields-to-selfcal']]):
                     if (iteration < len(selfcal_plan['solints'])-1) and (slib[vis][solint]['SNR_post'] >
                                                                        slib['SNR_orig']):  # (iteration == 0) and
@@ -2658,7 +2669,7 @@ class SelfcalHeuristics:
                                      selfcal_plan[fid]['solint_snr_per_field'][selfcal_plan['solints'][iteration+1]])
                     # If not all fields succeed for inf_EB or scan_inf/inf, depending on mosaic or single field, then don't go on to amplitude selfcal,
                     # even if *some* fields succeeded.
-                    if iteration <= 1 and ((not np.all([slib[fid][slib[fid]['vislist'][0]][solint]['Pass'] == True for fid in
+                    if iteration <= 1 and ((not np.all([slib[fid][slib[fid]['vislist'][0]][solint]['Pass'] for fid in
                                                         slib['sub-fields-to-selfcal']])) or len(slib['sub-fields-to-selfcal']) <
                                            len(slib['sub-fields'])) and do_amp_selfcal:
                         LOG.info(
