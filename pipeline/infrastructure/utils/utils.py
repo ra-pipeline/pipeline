@@ -28,10 +28,15 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import numpy as np
+import numpy.typing as npt
+from astropy.coordinates import AltAz, EarthLocation, SkyCoord
+from astropy.time import Time
 
 from pipeline import infrastructure
 from pipeline.infrastructure import casa_tools
 from .conversion import commafy, dequote, range_to_list
+
+_ALMA_GEOCENTRIC = (2225122.3902694373, -5440258.9852695046, -2481007.6374628348)  # CASA WGS84 coords
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Collection, Iterator, Sequence
@@ -57,6 +62,7 @@ __all__ = [
     'clear_time_cache',
     'compute_zenith_distance',
     'deduplicate',
+    'get_observatory_location',
     'dict_merge',
     'ensure_products_dir_exists',
     'export_weblog_as_tar',
@@ -1139,6 +1145,29 @@ def obs_long_lat(observatory: str) -> tuple[QuantityDict, QuantityDict]:
     return observatory['m0'], observatory['m1']
 
 
+def get_observatory_location(observatory: str) -> EarthLocation:
+    """Get EarthLocation for an observatory.
+
+    Uses hardcoded geocentric coordinates for ALMA to match CASA's WGS84 values.
+    For other observatories, uses astropy's site registry.
+
+    Args:
+        observatory: Name of the observatory (e.g., 'ALMA', 'VLA').
+
+    Returns:
+        EarthLocation object for the observatory.
+
+    Raises:
+        ValueError: If the observatory is not recognized.
+    """
+    if observatory.upper() == 'ALMA':
+        return EarthLocation.from_geocentric(*_ALMA_GEOCENTRIC, unit='m')
+    try:
+        return EarthLocation.of_site(observatory)
+    except Exception:
+        raise ValueError(f"Unknown observatory: {observatory!r}") from None
+
+
 def obs_midtime(start_time: datetime, end_time: datetime) -> EpochDict:
     """Returns the mid time in a CASA measures dictionary."""
     mid_time = start_time + (end_time - start_time) / 2
@@ -1172,20 +1201,32 @@ def compute_zenith_distance(
         ...              'refer': 'J2000', 'type': 'direction'}
         >>> epoch = {'m0': {'value': 58089.82, 'unit': 'd'}, 'refer': 'UTC', 'type': 'epoch'}
         >>> zd = compute_zenith_distance(direction, epoch, 'VLA')
-        >>> print(f"{casa_tools.quanta.convert(zd, 'deg')['value']:.2f} degrees")
+        >>> print(f"{zd['value']:.2f} rad")
     """
-    me = casa_tools.measures
+    location = get_observatory_location(observatory)
+    obs_time = Time(epoch['m0']['value'], format='mjd', scale='utc')
 
-    # Set the reference frame with the epoch and observatory
-    me.doframe(epoch)
-    me.doframe(me.observatory(observatory))
+    refer = field_direction['refer'].upper()
+    if refer in ('J2000', 'FK5'):
+        frame = 'fk5'
+    elif refer in ('JMEAN', 'APP', 'AZEL', 'AZELGEO'):
+        frame = 'altaz'
+    else:
+        frame = refer.lower()
 
-    # Convert field direction to horizontal coordinates
-    horizontal = me.measure(field_direction, coordinate_frame)
-    elevation_rad = horizontal['m1']['value']
-    zenith_distance_rad = np.pi / 2.0 - elevation_rad
+    coords = SkyCoord(
+        field_direction['m0']['value'],
+        field_direction['m1']['value'],
+        frame=frame,
+        unit=(field_direction['m0']['unit'], field_direction['m1']['unit']),
+    )
 
-    return casa_tools.quanta.quantity(zenith_distance_rad, 'rad')
+    altaz_frame = AltAz(obstime=obs_time, location=location)
+    coords_altaz = coords.transform_to(altaz_frame)
+
+    zenith_distance_rad = np.pi / 2.0 - coords_altaz.alt.rad
+
+    return {'value': zenith_distance_rad, 'unit': 'rad'}
 
 
 def get_row_count(table_name: str, taql: str) -> int:

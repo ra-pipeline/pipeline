@@ -12,6 +12,8 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 import numpy as np
+from astropy.coordinates import AltAz, SkyCoord
+from astropy.time import Time
 
 from pipeline import infrastructure
 from pipeline.domain import measures, spectralwindow
@@ -1679,14 +1681,28 @@ class MeasurementSet:
         """
         if field is None or field.mdirection is None:
             return None
-        me = casa_tools.measures
-        me.doframe(epoch)
-        me.doframe(me.observatory(self.antenna_array.name))
-        myazel = me.measure(field.mdirection, 'AZELGEO')
-        myaz = myazel['m0']['value']
-        myel = myazel['m1']['value']
-        myaz = (myaz * 180 / np.pi) % 360
-        myel *= 180 / np.pi
+
+        location = utils.get_observatory_location(self.antenna_array.name)
+        obs_time = Time(epoch['m0']['value'], format='mjd', scale='utc')
+
+        refer = field.mdirection['refer'].upper()
+        if refer in ('J2000', 'FK5'):
+            frame = 'fk5'
+        else:
+            frame = refer.lower()
+
+        coords = SkyCoord(
+            field.mdirection['m0']['value'],
+            field.mdirection['m1']['value'],
+            frame=frame,
+            unit=(field.mdirection['m0']['unit'], field.mdirection['m1']['unit']),
+        )
+
+        altaz_frame = AltAz(obstime=obs_time, location=location)
+        coords_altaz = coords.transform_to(altaz_frame)
+
+        myaz = coords_altaz.az.deg % 360
+        myel = coords_altaz.alt.deg
 
         return [myaz, myel]
 
