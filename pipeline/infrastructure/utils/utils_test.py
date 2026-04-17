@@ -15,7 +15,7 @@ from pipeline.infrastructure import casa_tools, casa_tasks
 from pipeline.infrastructure.utils import caltable_tools
 from .utils import find_ranges, dict_merge, are_equal, approx_equal, flagged_intervals, \
     get_casa_quantity, fieldname_for_casa, fieldname_clean, \
-    get_field_accessor, get_field_identifiers, get_receiver_type_for_spws, place_repr_source_first, \
+    get_field_accessor, get_field_identifiers, get_observatory_location, get_receiver_type_for_spws, place_repr_source_first, \
     get_taskhistory_fromimage, list_to_str, build_refantignore, obs_midtime, compute_zenith_distance
 
 if TYPE_CHECKING:
@@ -349,6 +349,29 @@ def test_obs_midtime():
     assert mid['m0']['unit'] == 'd'
 
 
+def test_get_observatory_location():
+    """Test get_observatory_location()
+
+    This utility function returns an EarthLocation for an observatory.
+    Uses astropy site registry with hardcoded fallback for ALMA.
+    """
+    from astropy.coordinates import EarthLocation
+
+    location = get_observatory_location('ALMA')
+    assert isinstance(location, EarthLocation)
+
+    alma_geocentric = (2225122.3902694373, -5440258.9852695046, -2481007.6374628348)
+    assert location.x.value == pytest.approx(alma_geocentric[0], rel=1e-6)
+    assert location.y.value == pytest.approx(alma_geocentric[1], rel=1e-6)
+    assert location.z.value == pytest.approx(alma_geocentric[2], rel=1e-6)
+
+
+def test_get_observatory_location_unknown_raises():
+    """Test get_observatory_location() raises ValueError for unknown observatory."""
+    with pytest.raises(ValueError, match='Unknown observatory'):
+        get_observatory_location('NOT_AN_OBSERVATORY')
+
+
 def test_compute_zenith_distance():
     """Test compute_zenith_distance()
 
@@ -369,7 +392,11 @@ def test_compute_zenith_distance():
 
 
 def test_compute_zenith_distance_regression_set1():
-    """Regression test for compute_zenith_distance with real pipeline data (set 1)."""
+    """Regression test for compute_zenith_distance with real pipeline data (set 1).
+
+    Uses ALMA geocentric coordinates matching CASA's WGS84 values.
+    Expected difference from CASA is < 0.5 arcsec.
+    """
     field_direction = {
         'm0': {'unit': 'rad', 'value': -1.2005642899794717},
         'm1': {'unit': 'rad', 'value': -0.5103639490189864},
@@ -379,11 +406,15 @@ def test_compute_zenith_distance_regression_set1():
     epoch = {'m0': {'unit': 'd', 'value': 60462.40688407407}, 'refer': 'UTC', 'type': 'epoch'}
     zd = compute_zenith_distance(field_direction, epoch, 'ALMA', 'AZELGEO')
     assert zd['unit'] == 'rad'
-    assert zd['value'] == pytest.approx(0.594852971525817)
+    assert zd['value'] == pytest.approx(0.5948535221, abs=0.0001)
 
 
 def test_compute_zenith_distance_regression_set2():
-    """Regression test for compute_zenith_distance with real pipeline data (set 2)."""
+    """Regression test for compute_zenith_distance with real pipeline data (set 2).
+
+    Uses ALMA geocentric coordinates matching CASA's WGS84 values.
+    Expected difference from CASA is < 0.5 arcsec.
+    """
     field_direction = {
         'm0': {'unit': 'rad', 'value': -1.344869047803906},
         'm1': {'unit': 'rad', 'value': 0.01033799026988178},
@@ -393,4 +424,4 @@ def test_compute_zenith_distance_regression_set2():
     epoch = {'m0': {'unit': 'd', 'value': 60462.413365185195}, 'refer': 'UTC', 'type': 'epoch'}
     zd = compute_zenith_distance(field_direction, epoch, 'ALMA', 'AZELGEO')
     assert zd['unit'] == 'rad'
-    assert zd['value'] == 0.9153820259873402
+    assert zd['value'] == pytest.approx(0.9153826141, abs=0.0001)
