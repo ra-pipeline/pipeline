@@ -17,7 +17,7 @@ class MakeImagesResult(basetask.Results):
         self.mitigation_error = False
         self.sensitivities_for_aqua = []
         self.logrecords = []
-        self.overwrite = True
+        self.overwrite_on_export = True
 
     def add_result(self, result, target, outcome):
         target['outcome'] = outcome
@@ -41,7 +41,7 @@ class MakeImagesResult(basetask.Results):
                 img_params = {kk: vv['imaging_params'] for (kk, vv) in result.iterations.items()}
                 imageitem = imagelibrary.ImageItem(
                     imagename=result.image, sourcename=result.sourcename,
-                    spwlist=result.spw, specmode=result.specmode,
+                    spwlist=result.spw, specmode=result.hm_specmode,
                     sourcetype=result.intent,
                     stokes=result.stokes,
                     datatype=result.datatype,
@@ -50,9 +50,9 @@ class MakeImagesResult(basetask.Results):
                     imaging_params=img_params,  # imaging parameters for each iteration
                     imageplot=result.imageplot)
                 if 'TARGET' in result.intent:
-                    context.sciimlist.add_item(imageitem, self.overwrite)
+                    context.sciimlist.add_item(imageitem, self.overwrite_on_export)
                 else:
-                    context.calimlist.add_item(imageitem, self.overwrite)
+                    context.calimlist.add_item(imageitem, self.overwrite_on_export)
             except:
                 pass
 

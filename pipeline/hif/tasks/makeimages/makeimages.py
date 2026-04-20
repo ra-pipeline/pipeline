@@ -532,7 +532,7 @@ class MakeImages(basetask.StandardTaskTemplate):
                            is_representative=is_representative,
                            bandwidth=chanwidth_of_image,
                            effective_bw=effectiveBW_of_image,
-                           bwmode=result.orig_specmode,
+                           bwmode=result.hm_specmode,
                            beam=restoringbeam,
                            cell=cell,
                            robust=target['robust'],

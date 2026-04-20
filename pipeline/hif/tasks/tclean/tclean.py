@@ -92,9 +92,9 @@ class TcleanInputs(cleanbase.CleanBaseInputs):
     @specmode.convert
     def specmode(self, value):
         if value == 'repBW':
-            self.orig_specmode = 'repBW'
+            self.hm_specmode = 'repBW'
             return 'cube'
-        self.orig_specmode = value
+        self.hm_specmode = value
         return value
 
     @vdp.VisDependentProperty
@@ -1483,7 +1483,7 @@ class Tclean(cleanbase.CleanBase):
                                                   restfreq=inputs.restfreq,
                                                   conjbeams=inputs.conjbeams,
                                                   uvrange=inputs.uvrange,
-                                                  orig_specmode=inputs.orig_specmode,
+                                                  hm_specmode=inputs.hm_specmode,
                                                   specmode=inputs.specmode,
                                                   gridder=inputs.gridder,
                                                   datacolumn=inputs.datacolumn,
@@ -1609,7 +1609,7 @@ class Tclean(cleanbase.CleanBase):
         imageheader.set_miscinfo(name=outfile, spw=self.inputs.spw, virtspw=virtspw,
                                  field=self.inputs.field, iter=iter,
                                  datatype=self.inputs.datatype, type=mom_type,
-                                 intent=self.inputs.intent, specmode=self.inputs.orig_specmode,
+                                 intent=self.inputs.intent, specmode=self.inputs.hm_specmode,
                                  context=context)
 
     # Calculate a "mom0_fc", "mom8_fc" and "mom10_fc: images: this is a moment

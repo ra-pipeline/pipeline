@@ -1,11 +1,11 @@
 import collections
 import enum
-from typing import List, Optional, Tuple
-
 import numpy
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.api as api
+
+from typing import List, Optional, Tuple
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -22,6 +22,7 @@ class FittingFunction(enum.Enum):
     CSPLINE = 'segmented cubic spline'
     POLYNOMIAL = POLY
     SPLINE = CSPLINE
+    SINUSOID = "sinusoid"
 
 
 def get_fitting_function(name: str) -> FittingFunction:
@@ -62,6 +63,14 @@ def is_cubic_spline_fit(value: FittingFunction) -> bool:
     return value is FittingFunction.CSPLINE
 
 
+def is_sinuoid_fit(value: FittingFunction) -> bool:
+    """Determine if fitting function is cubic spline.
+
+    Returns:
+        True if fitting function is cubic spline, False otherwise.
+    """
+    return value is FittingFunction.SINUSOID
+
 class FitOrderHeuristics(api.Heuristic):
     """
     Determine fitting order from a set of spectral data.
@@ -82,7 +91,7 @@ class FitOrderHeuristics(api.Heuristic):
 
         Then, Fourier power spectrum is averaged and averaged power
         spectrum is analyzed to determine optimal polynomial order
-        for input data array. The heuristics returns one representative
+        for input data array. The heuristics return one representative
         polynomial order per input data array.
 
         Args:
