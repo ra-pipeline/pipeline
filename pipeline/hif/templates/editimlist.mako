@@ -31,6 +31,8 @@ targets=result[0].targets
     # targets only contain 1 element for all existing workflows,  execept vlass-se-cube, 
     # where it can contain multiple elements, one for each plane.
     target = targets[0]
+    fields = target['field'] if isinstance(target['field'], list) else [target['field']]
+    n_field = sum(len(f.split(',')) for f in fields)    
     %>
     <div class="table-responsive">
     <table class="table table-bordered table-striped table-hover table-condensed">
@@ -99,7 +101,7 @@ targets=result[0].targets
         </tr>
         <tr>
             <td><strong>Number of fields</strong></td>
-            <td>${len(target['field'].split(','))}</td>
+            <td>${n_field}</td>
         </tr>           
         %for key in target.keys():
             %if key in target.keys() and key not in ('imagename', 'spw', 'phasecenter', 'cell', 'imsize', 'field', 'heuristics', 'vis', 'is_per_eb', 'antenna', 'reffreq', 'mask', 'misc_vlass'):

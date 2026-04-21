@@ -27,7 +27,7 @@ __all__ = ['time_tracker']
 ExecutionState = collections.namedtuple('ExecutionState', ['stage', 'start', 'end', 'state'])
 
 
-class TaskTimeTracker(object):
+class TaskTimeTracker:
     """
     TaskTimeTracker listens for pipeline lifecycle events, recording the start
     and end times on event reception so that the duration of the corresponding
@@ -63,7 +63,7 @@ class TaskTimeTracker(object):
         if event.context_name != self.context_name:
             return
 
-        now = datetime.datetime.now()
+        now = datetime.datetime.now(datetime.timezone.utc)
         stage_number = event.stage_number
 
         try:

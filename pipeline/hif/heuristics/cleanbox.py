@@ -213,7 +213,7 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
                 try:
                     npoints_mask = flattened_mask_image.statistics(mask='"%s" > 0.1' % (os.path.basename(flattened_mask)), axes=[0, 1, 3], robust=False, stretch=True)['npts'][0]
                     if npoints_mask.shape != (0,):
-                        nonpbcor_image_cleanmask_npoints = int(npoints_mask)
+                        nonpbcor_image_cleanmask_npoints = int(np.asarray(npoints_mask).item())
                     else:
                         nonpbcor_image_cleanmask_npoints = 0
                 except:

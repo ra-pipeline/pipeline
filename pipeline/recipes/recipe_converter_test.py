@@ -8,6 +8,13 @@ import xml.dom.minidom as minidom
 from . import recipe_converter
 
 
+@pytest.fixture
+def isolated_dir(tmp_path, monkeypatch):
+    """Fixture to run tests in an isolated temporary directory."""
+    monkeypatch.chdir(tmp_path)
+    return tmp_path
+
+
 def helper_get_document(xml_string):
     return minidom.parseString(xml_string)
 
@@ -331,7 +338,7 @@ def test_to_procedure():
         (True, 'plotlevel=\'summary\'')
     ]
 )
-def test_export(plotlevel_summary, init_args):
+def test_export(isolated_dir, plotlevel_summary, init_args):
     """Test export."""
     script_template = string.Template(recipe_converter.TEMPLATE_TEXT)
     task_property_list = [

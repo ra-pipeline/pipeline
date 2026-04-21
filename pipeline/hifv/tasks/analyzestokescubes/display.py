@@ -3,7 +3,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 from astropy.modeling import fitting, models
-from matplotlib.pyplot import cm
+from matplotlib import colormaps
 from matplotlib.ticker import ScalarFormatter
 
 import pipeline.infrastructure as infrastructure
@@ -48,7 +48,7 @@ class VlassCubeStokesSummary(object):
                     label_full.append(label_str)
 
                 fig, ax = plt.subplots(figsize=(10, 7))
-                cmap = cm.get_cmap('rainbow_r')
+                cmap = colormaps.get_cmap('rainbow_r')
                 for idx in range(len(x)):
                     color_idx = idx/len(x)
                     if 'rejected' in label_full[idx]:

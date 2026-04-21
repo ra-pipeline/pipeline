@@ -1,4 +1,4 @@
-name: pipeline
+name: pipeline-vlass2026
 
 channels:
   - conda-forge
@@ -6,22 +6,23 @@ channels:
 
 dependencies:
   - conda-ecosystem-user-package-isolation
-  - python=3.12
+  - python=3.10
   - ipython
   - pip>=23.0  # Ensure modern pip for better dependency resolution
-  - openmpi
+  - openmpi-mpicxx=5.0.1
+    # needs the C++ MPI bindings vs. openmpi (base)
+    # casatools+hpg builds are linked against it.
   - mpi4py
   - certifi
-  - sqlite=3.49  # required by myst_nb; higher versions have library mismatch issues
   - poppler  # required by PL
   - imagemagick  # required by PL
   - pandoc  # required by nbsphinx; not 'pandoc' Python library from PyPI
   - pip:
       - --extra-index-url=https://casa-pip.nrao.edu/repository/pypi-group/simple
-      - casashell==6.7.3.*
+      - casashell==6.7.1.*  # allow any CASA 6.7.1.x incremental build; do not broaden to ~=6.7.1
       # casatools/casatasks/numpy etc. will be installed as indirect dependencies
       - casampi
-      - protobuf==3.20.*  # casaplotms still requires ver<=3.20 currently
+      - protobuf~=3.20  # casaplotms still requires ver<=3.20 currently
       # https://casadocs.readthedocs.io/en/stable/notebooks/introduction.html#Known-Issues
       - casaplotms
       - casaplotserver

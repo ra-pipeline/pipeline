@@ -1,10 +1,12 @@
-import pytest
+from types import SimpleNamespace
+
 import numpy as np
-import numpy.testing as nt
+import pytest
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.tablereader import MeasurementSetReader
+from pipeline.h.tasks.flagging import flagdeterbase
 from .flagdeteralma import (get_partialpol_spws, load_partialpols_alma, get_partialpol_flag_cmd_params,
-                            convert_params_to_commands)
+                            convert_params_to_commands, SerialFlagDeterALMA)
 
 
 # # Tests that depend on the pipeline-testdata repository
@@ -161,5 +163,72 @@ test_params_convert_params_to_commands = [
 def test_convert_params_to_commands(input_dict, expected):
     ms_alt = MeasurementSetReader.get_measurement_set(MS_NAME_ALT)
     assert convert_params_to_commands(ms_alt, input_dict) == expected
+
+
+class _DummyMSMD:
+    def __init__(self, fdm_spws):
+        self._fdm_spws = fdm_spws
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, exc_tb):
+        return False
+
+    def almaspws(self, fdm=True):
+        return self._fdm_spws
+
+
+def _make_task(monkeypatch, fdm_spws):
+    task = SerialFlagDeterALMA.__new__(SerialFlagDeterALMA)
+    ms = SimpleNamespace(name='fake.ms')
+    ms.get_data_description = lambda spw: SimpleNamespace(corr_axis=[None, None])
+    task.inputs = SimpleNamespace(ms=ms)
+    task._fdm_spws = fdm_spws
+    monkeypatch.setattr(flagdeterbase.FlagDeterBase, 'verify_spw', lambda self, spw: None)
+    return task
+
+
+def test_get_fdm_spws_reads_msmd(monkeypatch):
+    task = SerialFlagDeterALMA.__new__(SerialFlagDeterALMA)
+    task.inputs = SimpleNamespace(ms=SimpleNamespace(name='fake.ms'))
+    monkeypatch.setattr(casa_tools, 'MSMDReader', lambda name: _DummyMSMD([3, 7]))
+
+    assert task._get_fdm_spws() == {3, 7}
+
+
+def test_get_fdm_spws_returns_empty_on_error(monkeypatch):
+    task = SerialFlagDeterALMA.__new__(SerialFlagDeterALMA)
+    task.inputs = SimpleNamespace(ms=SimpleNamespace(name='fake.ms'))
+
+    def _raise(_name):
+        raise RuntimeError('boom')
+
+    monkeypatch.setattr(casa_tools, 'MSMDReader', _raise)
+
+    assert task._get_fdm_spws() == set()
+
+
+def test_verify_spw_uses_metadata_when_available(monkeypatch):
+    task = _make_task(monkeypatch, {3})
+    spw = SimpleNamespace(id=3, num_channels=120)
+
+    with pytest.raises(ValueError, match='FDM spectral window'):
+        task.verify_spw(spw)
+
+
+def test_verify_spw_falls_back_to_heuristic(monkeypatch):
+    task = _make_task(monkeypatch, set())
+    spw = SimpleNamespace(id=3, num_channels=200)
+
+    with pytest.raises(ValueError, match='FDM spectral window'):
+        task.verify_spw(spw)
+
+
+def test_verify_spw_heuristic_allows_tdm(monkeypatch):
+    task = _make_task(monkeypatch, set())
+    spw = SimpleNamespace(id=3, num_channels=120)
+
+    task.verify_spw(spw)
 
 

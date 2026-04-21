@@ -190,11 +190,11 @@ def plot_weather(vis='', figfile='', station=[], help=False):
     plt.title(vis)
     list_of_date_times = mjd_seconds_to_datetime(mjdsec1)
     timeplot = matplotlib.dates.date2num(list_of_date_times)
-    plt.plot_date(timeplot, pressure, markersize=markersize)
+    plt.plot(timeplot, pressure, 'o', markersize=markersize)
     if len(unique_stations) > 1:
         list_of_date_times = mjd_seconds_to_datetime(mjdsec2)
         timeplot2 = matplotlib.dates.date2num(list_of_date_times)
-        plt.plot_date(timeplot2, pressure2, markersize=markersize, color='r')
+        plt.plot(timeplot2, pressure2, 'o', markersize=markersize, color='r')
 
     if do_manual_xlim is True:
         plt.xlim(manual_xlim)
@@ -210,11 +210,11 @@ def plot_weather(vis='', figfile='', station=[], help=False):
     adesc.yaxis.grid(True, which='major')
 
     adesc = plt.subplot(322)
-    plt.plot_date(timeplot, temperature, markersize=markersize)
+    plt.plot(timeplot, temperature, 'o', markersize=markersize)
     if len(unique_stations) > 1:
         list_of_date_times = mjd_seconds_to_datetime(mjdsec2)
         timeplot2 = matplotlib.dates.date2num(list_of_date_times)
-        plt.plot_date(timeplot2, temperature2, markersize=markersize, color='r')
+        plt.plot(timeplot2, temperature2, 'o', markersize=markersize, color='r')
 
     if do_manual_xlim is True:
         plt.xlim(manual_xlim)
@@ -240,11 +240,11 @@ def plot_weather(vis='', figfile='', station=[], help=False):
                  color=colors[idx], transform=adesc.transAxes, ha='center')
 
     adesc = plt.subplot(323)
-    plt.plot_date(timeplot, relative_humidity, markersize=markersize)
+    plt.plot(timeplot, relative_humidity, 'o', markersize=markersize)
     if len(unique_stations) > 1:
         list_of_date_times = mjd_seconds_to_datetime(mjdsec2)
         timeplot2 = matplotlib.dates.date2num(list_of_date_times)
-        plt.plot_date(timeplot2, relative_humidity2, markersize=markersize, color='r')
+        plt.plot(timeplot2, relative_humidity2, 'o', markersize=markersize, color='r')
 
     if do_manual_xlim is True:
         plt.xlim(manual_xlim)
@@ -262,11 +262,11 @@ def plot_weather(vis='', figfile='', station=[], help=False):
     pid = 4
     if dew_point is not None:
         adesc = plt.subplot(3, 2, pid)
-        plt.plot_date(timeplot, dew_point, markersize=markersize)
+        plt.plot(timeplot, dew_point, 'o', markersize=markersize)
         if len(unique_stations) > 1:
             list_of_date_times = mjd_seconds_to_datetime(mjdsec2)
             timeplot2 = matplotlib.dates.date2num(list_of_date_times)
-            plt.plot_date(timeplot2, dew_point2, markersize=markersize, color='r')
+            plt.plot(timeplot2, dew_point2, 'o', markersize=markersize, color='r')
 
         if do_manual_xlim is True:
             plt.xlim(manual_xlim)
@@ -283,11 +283,11 @@ def plot_weather(vis='', figfile='', station=[], help=False):
         pid += 1
 
     adesc = plt.subplot(3, 2, pid)
-    plt.plot_date(timeplot, wind_speed, markersize=markersize)
+    plt.plot(timeplot, wind_speed, 'o', markersize=markersize)
     if len(unique_stations) > 1:
         list_of_date_times = mjd_seconds_to_datetime(mjdsec2)
         timeplot2 = matplotlib.dates.date2num(list_of_date_times)
-        plt.plot_date(timeplot2, wind_speed2, markersize=markersize, color='r')
+        plt.plot(timeplot2, wind_speed2, 'o', markersize=markersize, color='r')
 
     if do_manual_xlim is True:
         plt.xlim(manual_xlim)
@@ -310,11 +310,11 @@ def plot_weather(vis='', figfile='', station=[], help=False):
     adesc = plt.subplot(3, 2, pid)
     plt.xlabel(xlabel, size=mysize)
     plt.ylabel('Wind direction (deg)', size=mysize)
-    plt.plot_date(timeplot, wind_direction, markersize=markersize)
+    plt.plot(timeplot, wind_direction, 'o', markersize=markersize)
     if len(unique_stations) > 1:
         list_of_date_times = mjd_seconds_to_datetime(mjdsec2)
         timeplot2 = matplotlib.dates.date2num(list_of_date_times)
-        plt.plot_date(timeplot2, wind_direction2, markersize=markersize, color='r')
+        plt.plot(timeplot2, wind_direction2, 'o', markersize=markersize, color='r')
 
     if do_manual_xlim is True:
         plt.xlim(manual_xlim)

@@ -444,8 +444,9 @@ class PipelineTester:
         Do the following sanity-checks on the pipeline run
 
         1. rawdata, working, products directories are present
-        2. *.pipeline_manifest.xml is present under the products directory
-        3. Non-existence of errorexit-*.txt in working directory
+        2. Non-existence of errorexit-*.txt in working directory
+        3. *pipeline_manifest.xml is present under the products directory (regression mode only)
+        4. No weblog rendering failures
         """
         context = launcher.Pipeline(context='last').context
 
@@ -469,6 +470,14 @@ class PipelineTester:
                 msg = "pipeline_manifest.xml is not present under the products directory"
                 LOG.warning(msg)
                 pytest.fail(msg)
+
+        # 4. Check for weblog rendering failures
+        failed_stages = regression.weblog_rendering_failures(context)
+        if failed_stages:
+            stage_list = ', '.join(str(stage) for stage in failed_stages)
+            msg = f"Weblog rendering failed for stage(s): {stage_list}"
+            LOG.warning(msg)
+            pytest.fail(msg)
 
     def __run_ppr(self, input_vis: list[str], telescope: str) -> None:
         """Execute the recipe defined by PPR.

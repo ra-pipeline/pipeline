@@ -604,7 +604,7 @@ class ClusterValidationDisplay(ClusterDisplayWorker):
         if self.org_direction is not None:
             ra1, dec1 = dirutil.direction_recover( ra0, dec0, self.org_direction )
             ra2, dec2 = dirutil.direction_recover( ra0+scale_ra, dec0, self.org_direction )
-            scale_ra = ra2 - ra1
+            scale_ra = (ra2 - ra1) % 360.0  # for cases when RA crosses over +/-180 deg.
             ra0, dec0 = ra1, dec1
 
         # 2008/9/20 DEC Effect

@@ -1,4 +1,3 @@
-# Do not evaluate type annotations at definition time.
 from __future__ import annotations
 
 import collections
@@ -12,6 +11,7 @@ import operator
 import os
 import pydoc
 import re
+import shelve
 import shutil
 import sys
 from importlib.resources import files
@@ -24,8 +24,9 @@ import pipeline
 import pipeline.infrastructure.pipelineqa as pqa
 from pipeline import environment, infrastructure
 from pipeline.domain import measures
-from pipeline.infrastructure import basetask, casa_tasks, casa_tools, eventbus, \
-    logging, mpihelpers, task_registry, utils
+from pipeline.infrastructure import (basetask, casa_tasks, casa_tools,
+                                     eventbus, logging, mpihelpers,
+                                     task_registry, utils)
 from pipeline.infrastructure.displays import pointing, summary
 from pipeline.infrastructure.renderer import qaadapter, templates, weblog
 
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
     from pipeline.domain.measurementset import MeasurementSet
     from pipeline.infrastructure.launcher import Context
     from pipeline.infrastructure.renderer import logger
+
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -773,9 +775,7 @@ class T1_3MRenderer(RendererBase):
 
 
 class T1_4MRenderer(RendererBase):
-    """
-    T1-4M renderer - Task Summary
-    """
+    """T1-4M renderer - Task Summary."""
     output_file = 't1-4.html'
     # TODO get template at run-time
     template = 't1-4m.mako'
@@ -787,29 +787,40 @@ class T1_4MRenderer(RendererBase):
         for result in context.results:
             scores[result.stage_number] = result.qa.representative
 
-        # Obtain time duration of tasks by the difference of start times successive tasks.
-        # The end time of the last task is tentatively defined as the time of current time.
-        timestamps = [ r.timestamps.start for r in context.results ]
-        # tentative task end time stamp for the last stage
-        timestamps.append(datetime.datetime.utcnow())
-        task_duration = []
-        for i in range(len(context.results)):
-            # task execution duration
-            dt = timestamps[i+1] - timestamps[i]
-            # remove unnecessary precision for execution duration
-            task_duration.append(datetime.timedelta(days=dt.days, seconds=dt.seconds))
+        # PIPE-2014: obtain the task time duration from the timetracker event database.
+        db_path = os.path.join(context.output_dir, f'{context.name}.timetracker')
+        r: dict[str, dict[int, datetime.timedelta]] = {}
+        with shelve.open(db_path, writeback=False) as db:
+            for k, stages in db.items():
+                r[k] = {}
+                for e in stages.values():
+                    if e.end == e.start and k == 'results':
+                        # The end time of the last task (open-ended) is tentatively
+                        # defined as the current time.
+                        r[k][e.stage] = datetime.datetime.now(datetime.timezone.utc) - e.start
+                    else:
+                        r[k][e.stage] = e.end - e.start
+
+        task_stage_map: dict[int, datetime.timedelta] = r.get('tasks', {})
+        result_stage_map: dict[int, datetime.timedelta] = r.get('results', {})
+        fallback_duration = datetime.timedelta(0)
+        task_duration = [task_stage_map.get(result.stage_number, fallback_duration) for result in context.results]
+        # The 'results' field in the timetrack db includes the cost of QA and weblog.
+        result_duration = [result_stage_map.get(result.stage_number, fallback_duration) for result in context.results]
 
         # copy PPR for weblog
         pprfile = context.project_structure.ppr_file
         if pprfile != '' and os.path.exists(pprfile):
-            dest_path = os.path.join(context.report_dir,
-                                     os.path.basename(pprfile))
+            dest_path = os.path.join(context.report_dir, os.path.basename(pprfile))
             shutil.copy(pprfile, dest_path)
 
-        return {'pcontext' : context,
-                'results'  : context.results,
-                'scores'   : scores,
-                'task_duration': task_duration}
+        return {
+            'pcontext': context,
+            'results': context.results,
+            'scores': scores,
+            'task_duration': task_duration,
+            'result_duration': result_duration,
+        }
 
 
 class T2_1Renderer(RendererBase):
@@ -1694,21 +1705,18 @@ class T2_4MDetailsRenderer(object):
             # .. and write the renderer's interpretation of this result to
             # the file object
             try:
-                LOG.trace('Writing %s output to %s', renderer.__class__.__name__,
-                          path)
-
+                LOG.trace('Writing %s output to %s', renderer.__class__.__name__, path)
                 event = eventbus.WebLogStageRenderingStartedEvent(
                     context_name=context.name, stage_number=result.stage_number
-                    )
+                )
                 eventbus.send_message(event)
 
                 fileobj.write(renderer.render(context, result))
 
                 event = eventbus.WebLogStageRenderingCompleteEvent(
                     context_name=context.name, stage_number=result.stage_number
-                    )
+                )
                 eventbus.send_message(event)
-
             except:
                 LOG.warning('Template generation failed for %s', cls.__name__)
                 LOG.debug(mako.exceptions.text_error_template().render())
@@ -1834,9 +1842,8 @@ def group_by_root(context, task_results):
     return d
 
 
-class WebLogGenerator(object):
-    renderers = [T1_1Renderer,         # OUS splash page
-                 T1_2Renderer,         # observation summary
+class WebLogGenerator:
+    renderers = [T1_2Renderer,         # observation summary
                  T1_3MRenderer,        # by topic page
                  T2_1Renderer,         # session tree
                  T2_1DetailsRenderer,  # session details
@@ -1844,20 +1851,22 @@ class WebLogGenerator(object):
                  T2_2_2Renderer,       # spectral setup
                  T2_2_3Renderer,       # antenna setup
                  T2_2_4Renderer,       # sky setup
-#                 T2_2_5Renderer,       # weather
+                 # T2_2_5Renderer,     # weather
                  T2_2_6Renderer,       # scans
                  T2_2_7Renderer,       # telescope pointing (single dish specific)
                  T2_3_1MRenderer,      # data set topic
                  T2_3_2MRenderer,      # calibration topic
                  T2_3_3MRenderer,      # flagging topic
-        # disable unused line finding topic for July 2014 release
-        # T2_3_4MRenderer,             # line finding topic
+                 # disable unused line finding topic for July 2014 release
+                 # T2_3_4MRenderer,    # line finding topic
                  T2_3_5MRenderer,      # imaging topic
                  T2_3_6MRenderer,      # miscellaneous topic
                  T2_4MRenderer,        # task tree
-                 T2_4MDetailsRenderer, # task details
-        # some summary renderers are placed last for access to scores
-                 T1_4MRenderer]        # task summary
+                 T2_4MDetailsRenderer,  # task details
+                 # place T1_4MRenderer (task summary) after other renderers for access to scores.
+                 T1_4MRenderer,         # task summary
+                 T1_1Renderer,         # OUS splash page
+                 ]
 
     @staticmethod
     def copy_resources(context):

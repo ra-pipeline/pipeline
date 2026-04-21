@@ -1,4 +1,4 @@
-name: "Docs-Pages"
+name: "Docs-Pages (Pixi)"
 
 on:
   push:
@@ -21,18 +21,18 @@ concurrency:
 
 jobs:
   build:
-    # Define the matrix strategy here; only using ubuntu-latest for build-gh-pages)
+    # Define the matrix strategy here; only using ubuntu-latest for build-gh-pages
     strategy:
       matrix:
         os: ["ubuntu-latest"]
 
     name: Build Docs (${{ matrix.os }})
 
-    uses: ./.github/workflows/env-setup-run-template.yml
+    uses: ./.github/workflows/env-setup-run-template-pixi.yml
     with:
       # Pass the specific build logic as a multi-line string
       os: ${{ matrix.os }}
-      pip_install: .[docs]
+      pixi_env: docs
       run_command: |
         # Install LaTeX dependencies for PDF generation (Linux only)
         if [ "$RUNNER_OS" == "Linux" ]; then

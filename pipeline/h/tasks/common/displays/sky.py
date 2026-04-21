@@ -24,15 +24,17 @@ import copy
 import os
 import shutil
 import string
-import traceback
 import textwrap
+import traceback
 from typing import List, Optional
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import ListedColormap
 from matplotlib.offsetbox import AnnotationBbox, HPacker, TextArea
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from scipy.ndimage import binary_dilation, binary_erosion, generate_binary_structure
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.renderer.logger as logger
@@ -229,9 +231,8 @@ class SkyDisplay:
 
         return plot
 
-    def _collapse_image(self, imagename, collapseFunction='mean', stokes: Optional[str] = None):
+    def _collapse_image(self, imagename, collapseFunction='mean', stokes: Optional[str] = None, include_mask=False):
         """Collapse an image along the spectral axis."""
-
         stokes_present = get_stokes(imagename)
         if stokes not in stokes_present:
             stokes_select = stokes_present[0]
@@ -239,11 +240,23 @@ class SkyDisplay:
             stokes_select = stokes
 
         with casa_tools.ImageReader(imagename) as image:
-            collapsed = image.collapse(function=collapseFunction, axes=2, stokes=stokes_select)
-            data = collapsed.getchunk(dropdeg=True)
-            mask = np.invert(collapsed.getchunk(getmask=True, dropdeg=True))
-            mdata = np.ma.array(data, mask=mask)
-            collapsed.done()
+            _, _, npol, nchan = image.shape()
+            if nchan == 1 and npol == 1:
+                if include_mask:
+                    mdata = np.ma.array(
+                        image.getchunk(dropdeg=True), mask=np.invert(image.getchunk(getmask=True, dropdeg=True))
+                    )
+                else:
+                    mdata = image.getchunk(dropdeg=True)
+            else:
+                collapsed = image.collapse(function=collapseFunction, axes=2, stokes=stokes_select)
+                if include_mask:
+                    mdata = np.ma.array(
+                        collapsed.getchunk(dropdeg=True), mask=np.invert(collapsed.getchunk(getmask=True, dropdeg=True))
+                    )
+                else:
+                    mdata = collapsed.getchunk(dropdeg=True)
+                collapsed.done()
         return mdata
 
     @matplotlibrc_formal
@@ -270,17 +283,31 @@ class SkyDisplay:
                 )
         else:
             stokes_select = stokes
-            LOG.info(f'Stokes={stokes_select} is selected.')
+            LOG.info('Stokes=%s is selected.', stokes_select)
 
-        if not os.path.exists(plotfile) or self.overwrite:
+        with casa_tools.ImageReader(imagename) as image:
+            _, _, npol, nchan = image.shape()
+
+        plot_exists_and_keep = os.path.exists(plotfile) and not self.overwrite
+        is_single_plane = (nchan == 1 and npol == 1)
+
+        # Reuse the original image either when we are not allowed to overwrite
+        # an existing plot file, or when the image is already a single
+        # (channel, polarization) plane and no collapsing is needed.
+        if plot_exists_and_keep or is_single_plane:
+            collapsed = casa_tools.image
+            collapsed.open(imagename)
+        else:
             with casa_tools.ImageReader(imagename) as image:
-                _, _, _, nchan = image.shape()
                 if nchan == 1:
                     # Use Stokes-axis slicing instead of frequency collapsing
                     rgtool = casa_tools.regionmanager
-                    region = rgtool.frombcs(csys=image.coordsys().torecord(), shape=image.shape(),
+                    cs = image.coordsys()
+                    region = rgtool.frombcs(csys=cs.torecord(), shape=image.shape(),
                                             stokes=stokes_select, stokescontrol='a')
+                    cs.done()
                     collapsed = image.subimage(region=region)
+                    rgtool.done()
                 else:
                     try:
                         if collapseFunction == 'center':
@@ -313,9 +340,6 @@ class SkyDisplay:
                         collapsed_new.set(pixelmask=True, pixels='0')
                         collapsed = collapsed_new.collapse(function='mean', stokes=stokes_select, axes=3)
                         collapsed_new.done()
-        else:
-            collapsed = casa_tools.image
-            collapsed.open(imagename)
 
         cs = collapsed.coordsys()  # needs to explicitly close later
         coord_names = cs.names()
@@ -355,18 +379,7 @@ class SkyDisplay:
         else:
             beam = None
 
-        # otherwise do the plot
-        data = collapsed.getchunk()
-        mask = np.invert(collapsed.getchunk(getmask=True))
-        collapsed.done()
-        shape = np.shape(data)
-        data = data.reshape(shape[0], shape[1])
-        mask = mask.reshape(shape[0], shape[1])
-        mdata = np.ma.array(data, mask=mask)
-
-        # get tl/tr corner positions in offset
-        blc = cs.torel(cs.toworld([-0.5, -0.5, 0, 0]))['numeric']
-        trc = cs.torel(cs.toworld([shape[0]-0.5, shape[1]-0.5, 0, 0]))['numeric']
+        # Otherwise do the plotting
 
         # remove any incomplete matplotlib plots, if left these can cause weird errors
         plt.close('all')
@@ -374,6 +387,21 @@ class SkyDisplay:
         # PIPE-2843: disable constrained layout to prevent potential bad interaction with AnnotationBbox
         # Also see: https://github.com/matplotlib/matplotlib/issues/24453
         fig, ax = plt.subplots(figsize=self.figsize, constrained_layout=False)
+
+        LOG.info('Getting data from collapsed image of %s', imagename)
+
+        data = collapsed.getchunk(dropdeg=True)
+        mask = np.invert(collapsed.getchunk(getmask=True, dropdeg=True))
+
+        collapsed.done()
+        shape = data.shape
+        data = data.reshape(shape[0], shape[1])
+        mask = mask.reshape(shape[0], shape[1])
+        mdata = np.ma.array(data, mask=mask)
+
+        # get tl/tr corner positions in offset
+        blc = cs.torel(cs.toworld([-0.5, -0.5, 0, 0]))['numeric']
+        trc = cs.torel(cs.toworld([shape[0]-0.5, shape[1]-0.5, 0, 0]))['numeric']
 
         # plot data
         if 'cmap' not in imshow_args:
@@ -385,9 +413,30 @@ class SkyDisplay:
                        extent=[blc[0], trc[0], blc[1], trc[1]], **imshow_args)
 
         if maskname is not None and os.path.exists(maskname):
-            mdata_mask = self._collapse_image(maskname)
-            ax.contour(mdata_mask.T, [0.99], origin='lower', colors='white', linewidths=0.7,
-                       extent=[blc[0], trc[0], blc[1], trc[1]])
+            LOG.info('Overplotting mask from %s', maskname)
+            # Create a boolean mask from the mask image data array
+            mask_bool = self._collapse_image(maskname, include_mask=False) > 0.5
+
+            # setup structure: 3x3 square of True to prevent diagonal gaps
+            struct = generate_binary_structure(2, 2)
+
+            # Get the initial 1-pixel boundary (in-place)
+            # boundary: True only at the edges
+            boundary = np.empty_like(mask_bool)
+            binary_erosion(mask_bool, structure=struct, output=boundary, border_value=0)
+            # XOR gives the difference between the mask and its eroded version
+            boundary ^= mask_bool
+
+            # Thicken the line:
+            # 2 iterations = ~5 pixels wide
+            # 1 iteration = ~3 pixels wide
+            binary_dilation(boundary, structure=struct, iterations=2, output=boundary)
+
+            # Convert to a masked array so background is transparent
+            # We mask out the 'False' values (background)
+            boundary_mask = np.ma.masked_where(~boundary, boundary)
+            ax.imshow(boundary_mask.T, interpolation='nearest', origin='lower', aspect='equal',
+                      extent=[blc[0], trc[0], blc[1], trc[1]], cmap=ListedColormap(['white']), alpha=0.25)
 
         ax.axis('image')
         lims = ax.axis()

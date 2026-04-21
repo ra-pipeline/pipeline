@@ -1,4 +1,4 @@
-name: "Template: Environment Setup and Run"
+name: "Template: Environment Setup and Run (Pixi)"
 
 on:
   workflow_call:
@@ -8,24 +8,25 @@ on:
         required: false
         default: "ubuntu-latest"
         type: string
-      conda_env:
-        description: "Conda environment file name"
+      pixi_env:
+        description: "Pixi environment name (from pyproject.toml)"
         required: false
-        default: "environment.yml"
-        type: string
-      pip_install:
-        description: "pip install command after environment setup"
-        required: false
-        default: "."
+        default: "default"
         type: string
       test_data:
         description: "Type of test data to checkout (e.g., 'unit')"
         required: false
         default: "none"
         type: string
+      task:
+        description: "Pixi task name to run (e.g., 'test-unit')"
+        required: false
+        default: ""
+        type: string
       run_command:
-        description: "Bash commands to run after setup"
-        required: true
+        description: "Bash commands to run inside the pixi env (used if task is empty)"
+        required: false
+        default: ""
         type: string
       artifact_name:
         description: "Name of the artifact to upload"
@@ -38,12 +39,8 @@ on:
 
 jobs:
   run-in-env:
-    name: Run in Pipeline Env
+    name: Run in Pixi Env
     runs-on: ${{ inputs.os }}
-    defaults:
-      run:
-        # Crucial: Enforce the shell that activates Conda
-        shell: bash -el {0}
 
     steps:
       - uses: actions/checkout@v4
@@ -51,23 +48,27 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Setup Mamba/Conda
-        uses: conda-incubator/setup-miniconda@v3
+      - name: Install Pixi
+        uses: prefix-dev/setup-pixi@v0.8.8
         with:
-          activate-environment: pipeline
-          environment-file: ${{ inputs.conda_env }}
-          channel-priority: strict
-          use-only-tar-bz2: true
-          miniforge-version: latest
-          use-mamba: true
+          pixi-version: v0.63.2
+          environments: ${{ inputs.pixi_env }}
+          # Caching is disabled to always use the latest dev snapshots on demand.
+          cache: false
+          # To enable caching in future, set `cache: true` and define an appropriate cache key,
+          # for example: v1-${{ runner.os }}-${{ inputs.pixi_env }}.
+          activate-environment: ${{ inputs.pixi_env }}
+
+      - name: Enable post-link scripts
+        shell: bash
+        run: pixi config set --local run-post-link-scripts insecure
 
       - name: Install System Dependencies (Ubuntu)
         if: runner.os == 'Linux'
         shell: bash
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y \
-            git xvfb
+          sudo apt-get install -y git xvfb
 
       - name: Install System Dependencies (macOS)
         if: runner.os == 'macOS'
@@ -79,18 +80,17 @@ jobs:
           # or requires XQuartz (brew install --cask xquartz) if you specifically need X11.          
           brew install --cask xquartz
 
-      - name: Install Python Package
-        if: inputs.pip_install != ''
+      - name: Configure CASA
+        shell: bash
         run: |
-          python -m pip install ${{ inputs.pip_install }}
           mkdir -p ~/.casa
           mkdir -p casarundata
-          # Configure CASA datapath in ~/.casa/config.py
-          # We use double quotes so the shell expands $HOME and $GITHUB_WORKSPACE
-          echo "measurespath = '$GITHUB_WORKSPACE/casarundata'" >> ~/.casa/config.py
-          echo "datapath = [ '$GITHUB_WORKSPACE/casarundata', '$GITHUB_WORKSPACE/pipeline-testdata' ]" >> ~/.casa/config.py
-          echo "measures_auto_update = True" >> ~/.casa/config.py
-          echo "data_auto_update = True" >> ~/.casa/config.py
+          cat > ~/.casa/config.py << PYEOF
+          measurespath = "$GITHUB_WORKSPACE/casarundata"
+          datapath = [ "$GITHUB_WORKSPACE/casarundata", "$GITHUB_WORKSPACE/pipeline-testdata" ]
+          measures_auto_update = True
+          data_auto_update = True
+          PYEOF
 
       - name: Cache casarundata
         uses: actions/cache@v4
@@ -98,11 +98,15 @@ jobs:
           path: casarundata
           key: casarundata
 
-      - name: Get casarundata
+      - name: Fetch casarundata
+        # Trigger casatools import to fetch or update casarundata under $GITHUB_WORKSPACE/casarundata.
+        # This may download or update measurement sets and related runtime data; fail explicitly if it does not succeed.
+        shell: bash
         run: |
-          # Trigger casatools import to fetch or update casarundata under $GITHUB_WORKSPACE/casarundata.
-          # This may download or update measurement sets and related runtime data; fail explicitly if it does not succeed.
-          python -c "import casatools" || { echo 'casatools import failed; casarundata may be incomplete.' >&2; exit 1; }
+          pixi run -e ${{ inputs.pixi_env }} python -c "import casatools" || {
+            echo 'casatools import failed; casarundata may be incomplete.' >&2
+            exit 1
+          }
 
       - name: Get latest testdata commit hash
         id: testdata-commit
@@ -126,15 +130,26 @@ jobs:
         run: |
           # This creates the directory 'pipeline-testdata' INSIDE the current workspace ($GITHUB_WORKSPACE)
           if [ ! -d "pipeline-testdata/.git" ]; then
-              git clone --filter=blob:none --sparse https://open-bitbucket.nrao.edu/scm/pipe/pipeline-testdata.git pipeline-testdata
+            git clone --filter=blob:none --sparse \
+              https://open-bitbucket.nrao.edu/scm/pipe/pipeline-testdata.git pipeline-testdata
           fi
           cd pipeline-testdata
           # Configure sparse checkout & Pull LFS files
           git sparse-checkout set pl-unittest
           git lfs pull
 
-      - name: Execute Custom Commands
-        run: ${{ inputs.run_command }}
+      - name: Run Pixi Task
+        if: inputs.task != ''
+        shell: bash
+        run: pixi run -e ${{ inputs.pixi_env }} ${{ inputs.task }}
+
+      - name: Run Custom Commands
+        if: inputs.task == '' && inputs.run_command != ''
+        shell: bash
+        env:
+          RUN_COMMAND: ${{ inputs.run_command }}
+        run: |
+          pixi run -e ${{ inputs.pixi_env }} bash -c "$RUN_COMMAND"
 
       - name: Upload Artifacts
         if: inputs.artifact_name != ''

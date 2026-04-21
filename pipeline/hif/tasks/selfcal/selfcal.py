@@ -111,7 +111,7 @@ class SelfcalResults(basetask.Results):
                 if 'CORRECTED_DATA' not in tb.colnames():
                     LOG.warning('No CORRECTED_DATA column in %s, skip %s registration', vis, dtype_applied)
                     continue
-                LOG.debug('DataType registeration: overwrite=%s', self.inputs['overwrite'])
+                LOG.debug('DataType registration: overwrite=%s', self.inputs['overwrite'])
                 LOG.info('Registering the CORRECTED_DATA column as %s for %s: field=%r spw=%r',
                          dtype_applied, vis, field_name, spw_sel)
                 ms.set_data_column(dtype_applied, 'CORRECTED_DATA', source=field_name,
@@ -570,7 +570,7 @@ class Selfcal(basetask.StandardTaskTemplate):
                             if is_resource:
                                 members.append(member)
                                 LOG.info('extracting: %s from %s', member.name, check_file)
-                        tar.extractall(members=members)
+                        tar.extractall(members=members, filter='fully_trusted')
                 if check_file.endswith('.selfcal.json'):
                     scal_targets_json = self._scal_targets_from_json(check_file)
                     if scal_targets_json is not None:

@@ -28,6 +28,7 @@ import collections
 import glob
 import os.path
 import re
+import shelve
 from collections import OrderedDict
 
 from pipeline.domain.measures import FluxDensityUnits
@@ -1110,6 +1111,54 @@ def errorexit_present(context: Context) -> bool:
     errorexit_path = os.path.join(context.products_dir, 'errorexit-*.xml')
     errorexit_files = glob.glob(errorexit_path)
     return len(errorexit_files) > 0
+
+
+def weblog_rendering_failures(context: Context) -> list[int]:
+    """
+    Check for weblog rendering failures by inspecting the timetracker database.
+
+    The timetracker records weblog rendering lifecycle events including abnormal exits.
+    This function reads the timetracker shelve database and identifies any stages where
+    weblog rendering terminated with 'abnormal exit' state.
+
+    Args:
+        context: Context object
+
+    Returns:
+        list of stage numbers where weblog rendering failed
+    """
+    failed_stages = []
+
+    # Construct path to timetracker database (shelve uses multiple files)
+    timetracker_db = os.path.join(context.output_dir, f'{context.name}.timetracker')
+
+    # Check if timetracker database exists (shelve produces .dat, .dir, .bak files on Unix)
+    db_exists = False
+    for ext in ['.dat', '.dir', '.bak']:
+        if os.path.exists(timetracker_db + ext):
+            db_exists = True
+            break
+
+    if not db_exists:
+        LOG.debug('Timetracker database not found: %s', timetracker_db)
+        return failed_stages
+
+    try:
+        with shelve.open(timetracker_db, 'r') as db:
+            # Check weblog rendering status for each stage
+            if 'weblog' in db:
+                weblog_data = db['weblog']
+                for stage_num, execution_state in weblog_data.items():
+                    # execution_state is an ExecutionState namedtuple with fields:
+                    # (stage, start, end, state)
+                    # state will be 'complete' for successful renders or 'abnormal exit' for failures
+                    if execution_state.state == 'abnormal exit':
+                        failed_stages.append(stage_num)
+                        LOG.warning('Weblog rendering failed for stage %s', stage_num)
+    except (OSError, KeyError) as e:
+        LOG.warning('Failed to read timetracker database: %s', e)
+
+    return sorted(failed_stages)
 
 
 def get_all_subclasses(cls: RegressionExtractor) -> list[RegressionExtractor]:

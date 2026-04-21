@@ -17,7 +17,7 @@ def is_rejected(keep):
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.pyplot import cm
+from matplotlib import colormaps
 import matplotlib.colors as colors
 
 def fmt_val(rms,scale=1.):
@@ -36,7 +36,7 @@ def colorcode(x, color='Greys',vmin=None,vmax=None):
     norm=colors.Normalize(vmin, vmax)
     x_norm=0.05+0.5*(x-vmin) / (vmax-vmin)
 
-    cmap=cm.get_cmap(name=cmap_name)
+    cmap=colormaps.get_cmap(cmap_name)
     rgb=cmap(x_norm)
     rgb_hex=colors.to_hex(rgb)
     return rgb_hex
@@ -49,7 +49,7 @@ def val2color(x, cmap_name='Greys',vmin=None,vmax=None):
     norm=colors.Normalize(vmin, vmax)
     x_norm=0.05+0.5*(x-vmin) / (vmax-vmin)
     
-    cmap=cm.get_cmap(name=cmap_name)
+    cmap=colormaps.get_cmap(cmap_name)
     rgb=cmap(x_norm)
     rgb_hex=colors.to_hex(rgb)
     return rgb_hex
@@ -67,7 +67,7 @@ def dev2color(x):
     return rgb_hex            
 
 def dev2shade(x):
-    cmap=cm.get_cmap(name='Reds')
+    cmap=colormaps.get_cmap('Reds')
     absx=abs(x)
     if absx<4 and absx>=3:
       rgb_hex=colors.to_hex(cmap(0.2))
@@ -80,7 +80,7 @@ def dev2shade(x):
     return rgb_hex  
 
 def pct2shade(x):
-    cmap=cm.get_cmap(name='Reds')
+    cmap=colormaps.get_cmap('Reds')
     if x>=0.5 and x<0.8:
       rgb_hex=colors.to_hex(cmap(0.2))
     if x>=0.2 and x<0.5:

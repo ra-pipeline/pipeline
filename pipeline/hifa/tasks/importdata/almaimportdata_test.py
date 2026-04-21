@@ -1,15 +1,22 @@
 from unittest import mock
 
+import pytest
+
 from pipeline.infrastructure.launcher import Context
 from pipeline.hifa.tasks.importdata import almaimportdata
+
+
+@pytest.fixture
+def context(tmp_path, monkeypatch, request):
+    monkeypatch.chdir(tmp_path)
+    return Context(name=request.node.name)
 
 
 @mock.patch('pipeline.hifa.tasks.importdata.almaimportdata.fluxes.import_flux', return_value=['combined_result'])
 @mock.patch('pipeline.hifa.tasks.importdata.almaimportdata.fluxes.export_flux_from_result')
 @mock.patch('pipeline.hifa.tasks.importdata.almaimportdata.urllib.request.urlopen')
 @mock.patch('pipeline.hifa.tasks.importdata.almaimportdata.dbfluxes.get_setjy_results', return_value=(['result'], 'OK'))
-def test_get_fluxes_primary_success(mock_get_setjy, mock_urlopen, mock_export, mock_import):
-    context = Context(name='test_get_fluxes_primary_success')
+def test_get_fluxes_primary_success(mock_get_setjy, mock_urlopen, mock_export, mock_import, context):
     # Create a mock observing run with measurement_sets list
     observing_run = mock.Mock()
     observing_run.measurement_sets = []
@@ -28,8 +35,7 @@ def test_get_fluxes_primary_success(mock_get_setjy, mock_urlopen, mock_export, m
 @mock.patch('pipeline.hifa.tasks.importdata.almaimportdata.fluxes.export_flux_from_result')
 @mock.patch('pipeline.hifa.tasks.importdata.almaimportdata.dbfluxes.get_setjy_results', return_value=(['result'], 'OK'))
 @mock.patch('pipeline.hifa.tasks.importdata.almaimportdata.LOG')
-def test_get_fluxes_backup_success(mock_log, mock_get_setjy, mock_export, mock_import):
-    context = Context(name='test_get_fluxes_backup_success')
+def test_get_fluxes_backup_success(mock_log, mock_get_setjy, mock_export, mock_import, context):
     observing_run = mock.Mock()
     observing_run.measurement_sets = []
 
@@ -51,9 +57,15 @@ def test_get_fluxes_backup_success(mock_log, mock_get_setjy, mock_export, mock_i
 @mock.patch('pipeline.hifa.tasks.importdata.almaimportdata.fluxes.get_setjy_results', return_value=['local_result'])
 @mock.patch('pipeline.hifa.tasks.importdata.almaimportdata.urllib.request.urlopen', side_effect=Exception)
 @mock.patch('pipeline.hifa.tasks.importdata.almaimportdata.LOG')
-def test_get_fluxes_both_fail_fallbacks(mock_log, mock_urlopen, mock_local_get_setjy, mock_export, mock_import):
+def test_get_fluxes_both_fail_fallbacks(
+    mock_log,
+    mock_urlopen,
+    mock_local_get_setjy,
+    mock_export,
+    mock_import,
+    context,
+):
     """When both URLs fail, fallback to local Source.xml and continue."""
-    context = Context(name='test_get_fluxes_both_fail_fallbacks')
     observing_run = mock.Mock()
     observing_run.measurement_sets = []
 
@@ -75,8 +87,7 @@ def test_get_fluxes_both_fail_fallbacks(mock_log, mock_urlopen, mock_local_get_s
 @mock.patch('pipeline.hifa.tasks.importdata.almaimportdata.fluxes.import_flux', return_value=['combined_result'])
 @mock.patch('pipeline.hifa.tasks.importdata.almaimportdata.fluxes.export_flux_from_result')
 @mock.patch('pipeline.hifa.tasks.importdata.almaimportdata.fluxes.get_setjy_results', return_value=['local_result'])
-def test_get_fluxes_dbservice_false(mock_get_setjy, mock_export, mock_import):
-    context = Context(name='test_get_fluxes_dbservice_false')
+def test_get_fluxes_dbservice_false(mock_get_setjy, mock_export, mock_import, context):
     observing_run = mock.Mock()
     observing_run.measurement_sets = []
 

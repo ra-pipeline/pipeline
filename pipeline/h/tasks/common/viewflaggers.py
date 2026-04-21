@@ -3,6 +3,7 @@ import itertools
 import math
 import operator
 import os
+
 import numpy as np
 
 import pipeline.infrastructure as infrastructure
@@ -10,11 +11,9 @@ import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.exceptions as exceptions
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.vdp as vdp
-from pipeline.h.tasks.common import arrayflaggerbase
-from pipeline.h.tasks.common import flaggableviewresults
-from pipeline.h.tasks.common import ozone
+from pipeline.h.tasks.common import arrayflaggerbase, flaggableviewresults, ozone
 from pipeline.infrastructure import casa_tools
-from pipeline.infrastructure.utils.utils import find_ranges
+from pipeline.infrastructure.utils import deduplicate, find_ranges
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -225,7 +224,7 @@ class MatrixFlagger(basetask.StandardTaskTemplate):
 
         # Create final set of flags by removing duplicates from our accumulated
         # flags
-        flags = list(set(flags))
+        flags = deduplicate(flags)
 
         # If flags were found...
         if len(flags) > 0:
@@ -1528,7 +1527,7 @@ class VectorFlagger(basetask.StandardTaskTemplate):
                 break
 
         # Create final set of flags by removing duplicates from our accumulated flags
-        flags = list(set(flags))
+        flags = deduplicate(flags)
 
         # If flags were found...
         if len(flags) > 0:

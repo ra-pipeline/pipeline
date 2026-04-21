@@ -33,7 +33,7 @@ keywords = ["astronomy", "pipeline", "ALMA", "VLA", "radio-astronomy"]
 [project.urls]
 Documentation = "https://almascience.nrao.edu/processing/science-pipeline"
 Repository = "https://open-bitbucket.nrao.edu/projects/PIPE/repos/pipeline"
-"Bug Tracker" = "https://open-jira.nrao.edu"                                # Adjust if applicable
+"Bug Tracker" = "https://open-jira.nrao.edu"
 License = "https://www.gnu.org/licenses/lgpl-3.0.html"
 
 [tool.setuptools.packages.find]
@@ -67,6 +67,15 @@ dependencies = { file = ["requirements.txt"] }
 optional-dependencies.dev = { file = ["requirements_dev.txt"] }
 optional-dependencies.docs = { file = ["requirements_docs.txt"] }
 optional-dependencies.exp = { file = ["requirements_exp.txt"] }
+optional-dependencies.devdocs = { file = [
+    "requirements_dev.txt",
+    "requirements_docs.txt",
+] }
+optional-dependencies.all = { file = [
+    "requirements_dev.txt",
+    "requirements_docs.txt",
+    "requirements_exp.txt",
+] }
 
 [tool.ruff]
 line-length = 120
@@ -121,36 +130,173 @@ show_missing = true
 skip_covered = false
 exclude_lines = [
     'pragma: no cover',
+    'if TYPE_CHECKING:',
     'if __name__ == "__main__":',
     'from .* import .*',
     'import .*',
     'raise NotImplementedError',
     'pass',
+    '@(abc\\.)?abstractmethod',
 ]
 
 [tool.pytest.ini_options]
 markers = [
-  "regression: regression test",
-  "alma: alma test",
-  "nobeyama: nobeyama test",
-  "vla: vla test (does not include vlass)",
-  "vlass: vlass test",
-  "fast: shorter-running test",
-  "slow: longer-running test",
-  "twelve: 12m ALMA test",
-  "seven: 7m ALMA test",
-  "sd: single dish test",
-  "interferometry: interferometry test",
-
-  "component: component tests",
-  "importdata: importdata task(s)",
-  "selfcal: selfcal task(s)",
-  "makeimages: makeimages task(s)",
-
-  "unit: unit test",
+    "regression: regression test",
+    "alma: alma test",
+    "nobeyama: nobeyama test",
+    "vla: vla test (does not include vlass)",
+    "vlass: vlass test",
+    "fast: shorter-running test",
+    "slow: longer-running test",
+    "twelve: 12m ALMA test",
+    "seven: 7m ALMA test",
+    "sd: single dish test",
+    "interferometry: interferometry test",
+    "component: component tests",
+    "importdata: importdata task(s)",
+    "selfcal: selfcal task(s)",
+    "makeimages: makeimages task(s)",
+    "unit: unit test",
 ]
 addopts = [
     "-ra", # show extra test summary info for (a)ll except passed
     "-v",  # verbose output
 ]
 junit_family = "legacy"
+
+# Pixi Configuration
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64"]
+
+# Common dependencies (shared by ALL environments via solve-groups)
+
+[tool.pixi.dependencies]
+conda-ecosystem-user-package-isolation = "*"
+ipython = "*"
+pip = ">=23.0"
+# Note: openmpi="*" is sufficient for non-gpu builds
+openmpi-mpicxx = ">=5.0"
+mpi4py = ">=3.1.5"
+certifi = "*"
+poppler = "*"
+imagemagick = "*"
+pandoc = "*"
+
+
+[tool.pixi.pypi-dependencies]
+# Install the current project in editable mode
+# This picks up dependencies from requirements.txt, which is still
+# used for monolithic installations.
+# Also install the 'dev' extras to ensure development dependencies are available.
+pipeline = { path = ".", editable = true, extras = ["dev"] }
+protobuf = "==3.20.*"
+grpcio = ">=1.62"
+six = ">=1.17"
+
+casampi = { version = ">=0.5.5", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+casaplotms = { version = ">=2.5.3", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+casaplotserver = { version = ">=1.8.2", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+casatasks = { version = ">=6.6.6", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+casatools = { version = ">=6.6.6", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+
+[tool.pixi.system-requirements]
+# Instruct pixi to target at macOS 14+ due to casatools availability
+macos = "14.0"
+
+[tool.pixi.tasks]
+# Run unit tests with coverage
+test-unit = """
+PYTHONNOUSERSITE=1 python -m pytest -n logical \
+  --cov --cov=pipeline --cov-append \
+  --cov-report=html --cov-report=xml \
+  pipeline/
+"""
+
+# Fetch/update CASA runtime data
+fetch-casarundata = "python -c 'import casatools'"
+
+# Build docs
+build-docs = { cmd = "make html_docs", cwd = "docs" }
+
+# --------------------------------------------------------------------------
+# Feature: CASA ver6.6.6-release — Python 3.10
+# --------------------------------------------------------------------------
+
+[tool.pixi.feature.casa666-py310]
+platforms = ["linux-64", "osx-arm64"]
+
+[tool.pixi.feature.casa666-py310.dependencies]
+python = "3.10.*"
+
+[tool.pixi.feature.casa666-py310.pypi-dependencies]
+casashell = { version = "==6.6.6.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+
+# --------------------------------------------------------------------------
+# Feature: CASA ver6.7.1-dev/snapshot — Python 3.10/3.12
+# --------------------------------------------------------------------------
+
+[tool.pixi.feature.casa671-py310]
+platforms = ["linux-64", "osx-arm64"]
+
+[tool.pixi.feature.casa671-py310.dependencies]
+python = "3.10.*"
+
+[tool.pixi.feature.casa671-py310.pypi-dependencies]
+casashell = { version = "==6.7.1.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+
+[tool.pixi.feature.casa671-py312]
+platforms = ["linux-64", "osx-arm64"]
+
+[tool.pixi.feature.casa671-py312.dependencies]
+python = "3.12.*"
+
+[tool.pixi.feature.casa671-py312.pypi-dependencies]
+casashell = { version = "==6.7.1.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+
+# --------------------------------------------------------------------------
+# Feature: CASA ver6.7.5-dev/snapshot — Python 3.12/3.13
+# --------------------------------------------------------------------------
+
+[tool.pixi.feature.casa675-py312]
+platforms = ["linux-64", "osx-arm64"]
+
+[tool.pixi.feature.casa675-py312.dependencies]
+python = "3.12.*"
+
+[tool.pixi.feature.casa675-py312.pypi-dependencies]
+casashell = { version = "==6.7.5.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+
+[tool.pixi.feature.casa675-py313]
+# Note: bdsf is currently only available for linux-64 for cp13
+platforms = ["linux-64"]
+
+[tool.pixi.feature.casa675-py313.dependencies]
+python = "3.13.*"
+
+[tool.pixi.feature.casa675-py313.pypi-dependencies]
+casashell = { version = "==6.7.5.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+
+# --------------------------------------------------------------------------
+# Feature: Docs build extras
+# --------------------------------------------------------------------------
+
+[tool.pixi.feature.docs]
+platforms = ["linux-64", "osx-arm64"]
+
+[tool.pixi.feature.docs.dependencies]
+python = "3.12.*"
+
+[tool.pixi.feature.docs.pypi-dependencies]
+casashell = { version = "==6.7.5.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+pipeline = { path = ".", editable = true, extras = ["docs"] }
+
+[tool.pixi.environments]
+default = { features = ["casa675-py312"], solve-group = "casa675-py312" }
+docs = { features = ["docs"], solve-group = "casa675-py312" }
+casa666-py310 = { features = ["casa666-py310"] }
+casa671-py310 = { features = ["casa671-py310"] }
+casa671-py312 = { features = ["casa671-py312"] }
+casa675-py312 = { features = ["casa675-py312"], solve-group = "casa675-py312" }
+casa675-py313 = { features = ["casa675-py313"] }

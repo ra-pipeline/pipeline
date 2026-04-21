@@ -1,0 +1,49 @@
+name: Sync from On-Prem Bitbucket
+
+# Grant write permission to the token so it can push commits
+permissions:
+  contents: write
+
+on:
+  schedule:
+    # Run every 15 minutes
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # Allows manual trigger from UI
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GitHub Repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Fetch full history for proper merging
+          token: ${{ secrets.GITHUB_TOKEN }} # Built-in token to push back to GitHub
+
+      - name: Add Bitbucket Remote & Fetch
+        run: |
+          git config user.name "GitHub Action Sync"
+          git config user.email "action@github.com"
+          
+          # Add your PUBLIC on-prem URL
+          git remote add bitbucket https://open-bitbucket.nrao.edu/scm/pipe/pipeline.git
+          git fetch bitbucket
+
+      - name: Sync Main Branch
+        run: |
+          # Checkout main (from GitHub)
+          git checkout main
+          
+          # Merge changes from open-bitbucket's main
+          # Using --ff-only ensures a clean history (fails if streams diverged)
+          if ! git merge bitbucket/main --ff-only ; then
+            echo "ERROR: Failed to merge 'bitbucket/main' into 'main'. Manual conflict resolution is required."
+            echo "=== Git status ==="
+            git status
+            echo "=== Recent commit graph (last 10 commits across all refs) ==="
+            git log --oneline --graph --all -10
+            exit 1
+          fi
+          
+          # Push updated main back to GitHub
+          git push origin main

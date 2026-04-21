@@ -16,29 +16,6 @@
 # * This class performs all of the deterministic flagging types in the
 #   FlagDeterBase*() classes.
 
-# To test these classes by themselves without the rest of the pipeline, enter
-# these commands:
-#
-# import pipeline
-#
-# vis = [ '<MS name>' ]
-# context = pipeline.Pipeline( vis ).context
-#
-# inputs = pipeline.hifv.tasks.flagging.FlagDeterVLA.Inputs( context, vis=vis,
-#   output_dir='.', autocorr=True, shadow=True, scan=True, scannumber='4,5,8',
-#   intents='*AMPLI*', edgespw=True, fracspw=0.1, fracspwfps=0.1 )
-#
-# task = pipeline.hifv.tasks.flagging.FlagDeterVLA( inputs )
-# jobs = task.analyse()
-#
-# status = task.execute()
-#
-# In other words, create a context, create the inputs (which sets the public
-# variables to the correct values and creates the temporary flag command file),
-# convert the class arguments to arguments to the CASA task tflagdata), create
-# the FlatDeterVLA() instance, perform FlatDeterVLA.analyse(), and execute the
-# class.
-
 # Classes:
 # --------
 # FlagDeterVLA        - This class represents the pipeline interface to the

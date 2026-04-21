@@ -2,7 +2,7 @@ import numpy as np
 
 import pipeline.infrastructure as infrastructure
 from pipeline.infrastructure import casa_tools
-from pipeline.infrastructure.utils import list_to_str
+from pipeline.infrastructure.utils import deduplicate, list_to_str
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -159,16 +159,10 @@ class WvrgcalHeuristics(object):
 
         # and format it
         if len(tied) > 1:
-            # eliminate duplicate names, remove quotes from names; these cause 
+            # eliminate duplicate names, remove quotes from names; these cause
             # wvrgcal to segfault
-            tie = set()
-            for name in set(tied):
-                name = name.replace('"', '')
-                name = name.replace("'", "")
-                tie.add(name)                
-
-            tie = ','.join([name for name in tie])
-            tie = ['%s' % tie]
+            tie = deduplicate([name.replace('"', '').replace("'", '') for name in tied])
+            tie = [','.join(tie)]
             return tie
         else:
             return []

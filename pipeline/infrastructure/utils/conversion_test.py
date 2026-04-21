@@ -17,6 +17,7 @@ from .conversion import (
     range_to_list,
     safe_split,
     unix_seconds_to_datetime,
+    phasecenter_to_skycoord
 )
 
 DomainMock = collections.namedtuple('DomainMock', ['id', 'name'])
@@ -287,3 +288,32 @@ task(
 def test_convert_paths(input_str, expected_output):
     """Test various path conversion scenarios."""
     assert convert_paths_to_basenames(input_str) == expected_output
+
+
+@pytest.mark.parametrize(
+    "phasecenter, ra_deg, dec_deg",
+    [
+        # explicit degrees
+        ("J2000 302.999666667deg -0.71deg", 302.999666667, -0.71),
+
+        # CASA sexagesimal RA + dd.mm.ss Dec
+        ("J2000 20:11:59.992 -000.42.36.0000", 302.9999666333333, -0.71),
+
+        # explicit hourangle RA
+        ("J2000 20h11m59.992s -0.71deg", 302.9999666333333, -0.71),
+
+        # explicit arcminutes
+        ("J2000 18179.998arcmin -42.6arcmin", 302.9999666333333, -0.71),
+
+        # explicit radians
+        ("J2000 5.288347rad -0.012394rad", 302.9999666333333, -0.71),
+
+        # no reference frame (defaults to ICRS)
+        ("20:11:59.992 -000.42.36.0000", 302.9999666333333, -0.71),
+    ],
+)
+def test_phasecenter_to_skycoord(phasecenter, ra_deg, dec_deg):
+    coord = phasecenter_to_skycoord(phasecenter)
+
+    assert abs(coord.ra.deg - ra_deg) < 1e-3
+    assert abs(coord.dec.deg - dec_deg) < 1e-3

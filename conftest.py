@@ -1,6 +1,7 @@
 """This file contains some pipeline-specific pytest configuration settings."""
 from __future__ import annotations
 
+import logging
 import os
 import pathlib
 from typing import TYPE_CHECKING
@@ -9,7 +10,12 @@ import pytest
 
 from casatasks import casalog
 
+LOG = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from typing import Any
+
     from _pytest.config import Config
     from _pytest.nodes import Item
     from pytest import FixtureRequest, Parser, Session
@@ -58,6 +64,81 @@ def pytest_configure(config: Config) -> None:
     # pytest.config (global) is deprecated from pytest ver>5.0.
     # we save a copy of its content under `pytest.pytestconfig` for an easy access from helper classes.
     pytest.pytestconfig = config
+
+
+class _WeblogFailureInjectionRenderer:
+    def __init__(self, renderer: Any) -> None:
+        self._renderer = renderer
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._renderer, name)
+
+    @staticmethod
+    def _get_stages_to_fail() -> set[int]:
+        raw_stages = os.environ.get('SIMULATE_WEBLOG_FAILURE', '').strip()
+        if not raw_stages:
+            return set()
+
+        try:
+            return {int(stage.strip()) for stage in raw_stages.split(',') if stage.strip()}
+        except ValueError:
+            LOG.warning(
+                'Invalid SIMULATE_WEBLOG_FAILURE value: %s (expected comma-separated integers)',
+                raw_stages,
+            )
+            return set()
+
+    def render(self, context: Any, result: Any) -> Any:
+        stages_to_fail = self._get_stages_to_fail()
+        if result.stage_number in stages_to_fail:
+            LOG.warning('SIMULATE_WEBLOG_FAILURE: Raising exception for stage %s', result.stage_number)
+            raise RuntimeError(
+                'Simulated weblog rendering failure for stage '
+                f'{result.stage_number} (triggered by SIMULATE_WEBLOG_FAILURE environment variable)'
+            )
+
+        return self._renderer.render(context, result)
+
+
+def _wrap_renderer_for_test_failure_injection(renderer: Any) -> Any:
+    if isinstance(renderer, _WeblogFailureInjectionRenderer):
+        return renderer
+    return _WeblogFailureInjectionRenderer(renderer)
+
+
+@pytest.fixture(scope='session', autouse=True)
+def install_test_only_weblog_failure_injection() -> Iterator[None]:
+    """Install renderer wrappers in tests to simulate weblog failures by stage."""
+    from pipeline.infrastructure.renderer import weblog
+
+    original_default_map = weblog.registry.default_map
+    original_custom_map = weblog.registry.custom_map
+    original_add_renderer = weblog.registry.add_renderer
+
+    weblog.registry.default_map = {
+        task_cls: _wrap_renderer_for_test_failure_injection(renderer)
+        for task_cls, renderer in original_default_map.items()
+    }
+    weblog.registry.custom_map = {
+        task_cls: {
+            key: _wrap_renderer_for_test_failure_injection(renderer)
+            for key, renderer in keyed_renderers.items()
+        }
+        for task_cls, keyed_renderers in original_custom_map.items()
+    }
+
+    def add_renderer_with_test_wrapper(task_cls: Any, renderer: Any, group_by: str | None = None,
+                                       key_fn: Any | None = None, key: Any | None = None) -> None:
+        wrapped_renderer = _wrap_renderer_for_test_failure_injection(renderer)
+        original_add_renderer(task_cls, wrapped_renderer, group_by, key_fn, key)
+
+    weblog.registry.add_renderer = add_renderer_with_test_wrapper
+
+    yield
+
+    weblog.registry.default_map = original_default_map
+    weblog.registry.custom_map = original_custom_map
+    weblog.registry.add_renderer = original_add_renderer
 
 
 def pytest_collection_finish(session: Session) -> None:

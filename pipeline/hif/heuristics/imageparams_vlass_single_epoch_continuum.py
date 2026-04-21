@@ -1,3 +1,4 @@
+import collections
 import os
 import re
 import shutil
@@ -5,17 +6,18 @@ import uuid
 from typing import Dict, Optional, Tuple, Union
 
 import numpy
-from casatasks.private.imagerhelpers.imager_parallel_continuum import PyParallelContSynthesisImager
-from casatasks.private.imagerhelpers.input_parameters import ImagerParameters
-
+import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.utils as utils
+from casatasks.private.imagerhelpers.imager_parallel_continuum import PyParallelContSynthesisImager
+from casatasks.private.imagerhelpers.input_parameters import ImagerParameters
 from pipeline.infrastructure import casa_tools
 
 from .imageparams_base import ImageParamsHeuristics
 
 LOG = infrastructure.get_logger(__name__)
+
 
 
 class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
@@ -31,7 +33,129 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         # Value is None or float.
         self.user_cycleniter_final_image_nomask = None
 
-    # niter
+    def calc_topo_ranges(self, inputs):
+        """Calculate TOPO ranges for hif_tclean inputs.
+
+        Note: we might consider consolidating this with the similar code in contfilehelper.
+        """
+        spw_topo_freq_param_lists = []
+        spw_topo_chan_param_lists = []
+        spw_topo_freq_param_dict = collections.defaultdict(dict)
+        spw_topo_chan_param_dict = collections.defaultdict(dict)
+        total_topo_freq_ranges = []
+        topo_freq_ranges = []
+        num_channels = []
+
+        qaTool = casa_tools.quanta
+        aggregate_lsrk_bw = '0.0GHz'
+
+        for spwid in inputs.spw.split(','):
+            try:
+                msname = self.get_ref_msname(spwid)
+                ms = self.observing_run.get_ms(name=msname)
+                real_spwid = self.observing_run.virtual2real_spw_id(spwid, self.observing_run.get_ms(msname))
+                spw_info = ms.get_spectral_window(real_spwid)
+
+                num_channels.append(spw_info.num_channels)
+
+                min_frequency = float(spw_info.min_frequency.to_units(measures.FrequencyUnits.GIGAHERTZ))
+                max_frequency = float(spw_info.max_frequency.to_units(measures.FrequencyUnits.GIGAHERTZ))
+
+                # Save spw width
+                total_topo_freq_ranges.append((min_frequency, max_frequency))
+
+                if 'spw%s' % (spwid) in inputs.spwsel_lsrk:
+                    spw_topo_freq_param_lists.append([spwid] * len(inputs.vis))
+                    spw_topo_chan_param_lists.append([spwid] * len(inputs.vis))
+                    for msname in inputs.vis:
+                        spw_topo_freq_param_dict[os.path.basename(msname)][spwid] = ''
+                        spw_topo_chan_param_dict[os.path.basename(msname)][spwid] = ''
+                    topo_freq_ranges.append((min_frequency, max_frequency))
+                    aggregate_spw_lsrk_bw = '%.10fGHz' % (max_frequency - min_frequency)
+                    if (
+                        (inputs.spwsel_lsrk['spw%s' % (spwid)] not in ('ALL', 'ALLCONT'))
+                        and (inputs.intent == 'TARGET')
+                        and (inputs.specmode in ('mfs', 'cont') and self.warn_missing_cont_ranges())
+                    ):
+                        LOG.warning(
+                            'No continuum frequency selection for Target Field %s SPW %s' % (inputs.field, spwid)
+                        )
+                else:
+                    spw_topo_freq_param_lists.append([spwid] * len(inputs.vis))
+                    spw_topo_chan_param_lists.append([spwid] * len(inputs.vis))
+                    for msname in inputs.vis:
+                        spw_topo_freq_param_dict[os.path.basename(msname)][spwid] = ''
+                        spw_topo_chan_param_dict[os.path.basename(msname)][spwid] = ''
+                    topo_freq_ranges.append((min_frequency, max_frequency))
+                    aggregate_spw_lsrk_bw = '%.10fGHz' % (max_frequency - min_frequency)
+                    if (inputs.intent == 'TARGET') and (
+                        inputs.specmode in ('mfs', 'cont') and self.warn_missing_cont_ranges()
+                    ):
+                        LOG.warning(
+                            'No continuum frequency selection for Target Field %s SPW %s' % (inputs.field, spwid)
+                        )
+            except Exception as e:
+                LOG.warning(f'Could not determine min/max frequency for spw {spwid}. Exception: {str(e)}')
+
+            aggregate_lsrk_bw = qaTool.add(aggregate_lsrk_bw, aggregate_spw_lsrk_bw)
+
+        spw_topo_freq_param = [
+            ','.join(spwsel_per_ms)
+            for spwsel_per_ms in [
+                [spw_topo_freq_param_list_per_ms[i] for spw_topo_freq_param_list_per_ms in spw_topo_freq_param_lists]
+                for i in range(len(inputs.vis))
+            ]
+        ]
+        spw_topo_chan_param = [
+            ','.join(spwsel_per_ms)
+            for spwsel_per_ms in [
+                [spw_topo_chan_param_list_per_ms[i] for spw_topo_chan_param_list_per_ms in spw_topo_chan_param_lists]
+                for i in range(len(inputs.vis))
+            ]
+        ]
+
+        # Calculate total bandwidth
+        total_topo_bw = '0.0GHz'
+        for total_topo_freq_range in utils.merge_ranges(total_topo_freq_ranges):
+            total_topo_bw = qaTool.add(
+                total_topo_bw,
+                qaTool.sub(
+                    '%.10fGHz' % (float(total_topo_freq_range[1])), '%.10fGHz' % (float(total_topo_freq_range[0]))
+                ),
+            )
+
+        # Calculate aggregate selected bandwidth
+        aggregate_topo_bw = '0.0GHz'
+        for topo_freq_range in utils.merge_ranges(topo_freq_ranges):
+            aggregate_topo_bw = qaTool.add(
+                aggregate_topo_bw,
+                qaTool.sub('%.10fGHz' % (float(topo_freq_range[1])), '%.10fGHz' % (float(topo_freq_range[0]))),
+            )
+
+        return (
+            spw_topo_freq_param,
+            spw_topo_chan_param,
+            spw_topo_freq_param_dict,
+            spw_topo_chan_param_dict,
+            total_topo_bw,
+            aggregate_topo_bw,
+            aggregate_lsrk_bw,
+        )
+
+    def is_eph_obj(self, field: str) -> bool:
+        """Determine whether a field is an ephemeris (moving) object.
+
+        The VLASS heuristic does not handle ephemeris (moving)
+        objects, so this method always returns False.
+
+        Args:
+            field: Field identifier (name or index). Ignored by this heuristic.
+
+        Returns:
+            Always False for this heuristic.
+        """
+        return False
+
     def niter_correction(self, niter, cell, imsize, residual_max, threshold, residual_robust_rms,
                          mask_frac_rad=0.0, intent='TARGET') -> int:
         """Adjust niter value between cleaning iteration steps based on imaging parameters, mask and residual"""

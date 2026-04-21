@@ -1,5 +1,7 @@
 import collections
 
+import numpy as np
+
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 from pipeline.infrastructure import casa_tools
@@ -51,14 +53,14 @@ class T2_4MDetailsCheckProductSizeRenderer(basetemplates.T2_4MDetailsDefaultRend
             except:
                 bpa_v = 'N/A'
             try:
-                beam = '%#.3g x %#.3g arcsec @ %#.3g deg' % (bmaj_v, bmin_v, bpa_v)
+                beam = '%#.3g x %#.3g arcsec @ %#.3g deg' % (np.asarray(bmaj_v).item(), np.asarray(bmin_v).item(), np.asarray(bpa_v).item())
             except:
                 beam = 'N/A'
             try:
                 robustAR_v = bmin_v * bmaj_v
                 meanAR_v = minAR_v * maxAR_v
                 if (meanAR_v != 0.0):
-                    beam_vs_minAR_maxAR = '%.1f%%' % (100. * (robustAR_v - meanAR_v) / meanAR_v)
+                    beam_vs_minAR_maxAR = '%.1f%%' % (np.asarray(100. * (robustAR_v - meanAR_v) / meanAR_v).item())
                 else:
                     beam_vs_minAR_maxAR = 'N/A'
             except:

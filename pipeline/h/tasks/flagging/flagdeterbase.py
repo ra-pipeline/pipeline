@@ -1,32 +1,6 @@
 """
 The flagdeterbase module provides base classes for deterministic flagging
 tasks in the pipeline.
-
-To test these classes, register some data with the pipeline using ImportData,
-then execute:
-
-import pipeline
-vis = [ '<MS name>' ]
-
-# Create a pipeline context and register some data
-context = pipeline.Pipeline().context
-inputs = pipeline.tasks.ImportData.Inputs(context, vis=vis)
-task = pipeline.tasks.ImportData(inputs)
-results = task.execute()
-results.accept(context)
-
-# Execute the flagging task
-inputs = pipeline.tasks.flagging.FlagDeterBase.Inputs(context,\
-      autocorr=True, shadow=True, scan=True, scannumber='4,5,8',\
-      intents='*AMPLI*', edgespw=True, fracspw=0.1)
-task = pipeline.tasks.flagging.FlagDeterBase(inputs)
-result = task.execute()
-
-In other words, create a context, create the inputs (which sets the public
-variables to the correct values and creates the temporary flag command file),
-convert the class arguments to arguments to the CASA task flagdata), create
-the FlagDeterBase() instance, perform FlagDeterBase.analyse(), and execute the
-class.
 """
 import os
 import string

@@ -1179,11 +1179,11 @@ class Correctedampflag(basetask.StandardTaskTemplate):
                         prior_uvstart = uvstart
                         maxInThisBin = np.max(cmetric_sel[id_uvbin])
                         if len(uvdist_sel) > 1000:
-                            Q1 = np.percentile(cmetric_sel[id_uvbin], 25, interpolation='midpoint')
-                            Q3 = np.percentile(cmetric_sel[id_uvbin], 75, interpolation='midpoint')
+                            Q1 = np.percentile(cmetric_sel[id_uvbin], 25, method='midpoint')
+                            Q3 = np.percentile(cmetric_sel[id_uvbin], 75, method='midpoint')
                             if npts >= 20:
-                                D1 = np.percentile(cmetric_sel[id_uvbin], 10, interpolation='midpoint')
-                                D9 = np.percentile(cmetric_sel[id_uvbin], 90, interpolation='midpoint')
+                                D1 = np.percentile(cmetric_sel[id_uvbin], 10, method='midpoint')
+                                D9 = np.percentile(cmetric_sel[id_uvbin], 90, method='midpoint')
                                 IQR = 0.5*(Q3-Q1)
                                 IDR = 0.5*(D9-D1)/1.9004
                                 mad = np.max([IQR, np.min([2*IQR, IDR])])

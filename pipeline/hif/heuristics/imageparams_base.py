@@ -60,7 +60,7 @@ class ImageParamsHeuristics(object):
         )
 
     def __init__(self, vislist, spw, observing_run, imagename_prefix='', proj_params=None, contfile=None,
-                 linesfile=None, imaging_params={}, processing_intents={}):
+                 linesfile=None, imaging_params=None, processing_intents=None):
         """
         :param vislist: the list of MS names
         :type vislist: list of strings
@@ -82,8 +82,9 @@ class ImageParamsHeuristics(object):
         self.contfile = contfile
         self.linesfile = linesfile
 
-        self.imaging_params = imaging_params
-        self.processing_intents = processing_intents
+        # Avoid mutable default arguments
+        self.imaging_params = imaging_params or {}
+        self.processing_intents = processing_intents or {}
 
         # split spw into list of spw parameters for 'clean'
         spwlist = spw.replace('[', '').replace(']', '').strip()
@@ -223,7 +224,7 @@ class ImageParamsHeuristics(object):
                     for source_name in [s.name for s in ms.sources]:
                         cont_ranges_spwsel[source_name][str(spwid)] = '%s LSRK' % (spw_selection)
                 except Exception as e:
-                    LOG.warning(f'Could not determine continuum ranges for spw {spwid}. Exception: {str(e)}')
+                    LOG.warning('Could not determine continuum ranges for spw %s. Exception: %s', spwid, str(e))
 
         return cont_ranges_spwsel, all_continuum_spwsel, low_bandwidth_spwsel, low_spread_spwsel
 
@@ -298,6 +299,43 @@ class ImageParamsHeuristics(object):
 
         return field_intent_result
 
+    def get_sourcename(
+        self, vislist: list[str] | str, fieldlist: list[str] | str, intent: str, as_list: bool = False
+    ) -> list[str] | str:
+        """Get source name(s) from a MS list for given field and intent selections.
+
+        This function helps you translate your MS, field, and intent selections into source names
+        that can be used for naming your images. If fieldlist is a field name string and applied to all
+        MSes, this function should yield the same name as outcome when as_list is False.
+
+        Args:
+            vislist: List of measurement set names or single MS name string.
+            fieldlist: List of field names (one element per MS) or single field name string.
+            intent: Intent string to filter fields.
+            as_list: If True, return deduplicated list; otherwise return comma-separated string.
+
+        Returns:
+            Deduplicated list of field names if as_list is True, otherwise comma-separated string.
+        """
+        vis_list: list[str] = vislist if isinstance(vislist, list) else [vislist]
+        field_list: list[str] = fieldlist if isinstance(fieldlist, list) else [fieldlist] * len(vis_list)
+
+        fieldname_list: list[str] = []
+        for vis, fields_str in zip(vis_list, field_list):
+            ms = self.observing_run.get_ms(name=vis)
+            selected_fields = fields_str.split(',')
+            fieldname_list += [
+                utils.dequote(fld.name)
+                for fld in ms.fields
+                if intent in fld.intents
+                and (fld.name in selected_fields or str(fld.id) in selected_fields)
+            ]
+
+        if as_list:
+            return utils.deduplicate(fieldname_list)
+        else:
+            return ','.join(utils.deduplicate(fieldname_list))
+
     def get_scanidlist(self, vis, field, intent):
         # Use scanids to select data with the specified intent
         # Note CASA clean now supports intent selection but leave
@@ -306,9 +344,14 @@ class ImageParamsHeuristics(object):
         scanidlist = []
         visindexlist = []
 
+        # Construct a list of per-MS field selection string in case that
+        # the input field value is just a string e.g. a single source name, that is
+        # applicable to all MSs.
+        fieldlist: list[str] = [field] * len(vis) if isinstance(field, str) else field
+
         for i in range(len(vis)):
             allscanids = []
-            for fieldname in field.split(','):
+            for fieldname in fieldlist[i].split(','):
                 re_field = utils.dequote(fieldname)
                 ms = self.observing_run.get_ms(name=vis[i])
                 scanids = [scan.id for scan in ms.scans if
@@ -338,7 +381,7 @@ class ImageParamsHeuristics(object):
             try:
                 largest_primary_beam_size = max(largest_primary_beam_size, self.primary_beam_size(spwid, intent))
             except Exception as e:
-                LOG.warning(f'Could not determine primary beam size for spw {spwid}. Exception: {str(e)}')
+                LOG.warning('Could not determine primary beam size for spw %s. Exception: %s', spwid, str(e))
 
         return largest_primary_beam_size
 
@@ -480,7 +523,7 @@ class ImageParamsHeuristics(object):
                         continue
 
                     # use imager.advise to get the maximum cell size
-                    aipsfieldofview = '%4.1farcsec' % (2.0 * largest_primary_beam_size)
+                    aipsfieldofview = '%4.1farcsec' % (2.0 * np.asarray(largest_primary_beam_size).item())
                     rtn = casa_tools.imager.advise(takeadvice=False, amplitudeloss=0.5, fieldofview=aipsfieldofview)
                     casa_tools.imager.done()
                     if not rtn[0]:
@@ -657,7 +700,7 @@ class ImageParamsHeuristics(object):
                         nchan = min_nchan
                         width = str(bandwidth / nchan)
             except Exception as e:
-                LOG.warning(f'Could not determine nchan and width for spw {spwids[0]}. Exception: {str(e)}')
+                LOG.warning('Could not determine nchan and width for spw %s. Exception: %s', spwids[0], str(e))
                 nchan = -1
                 width = ''
         else:
@@ -707,7 +750,7 @@ class ImageParamsHeuristics(object):
                                                               taql=taql, spw=real_spwspec,
                                                               scan=scanids, usescratch=False, writeaccess=False)
                             if rtn is True:
-                                aipsfieldofview = '%4.1farcsec' % (2.0 * self.largest_primary_beam_size(spwspec, field_intent[1]))
+                                aipsfieldofview = '%4.1farcsec' % (2.0 * np.asarray(self.largest_primary_beam_size(spwspec, field_intent[1])).item())
                                 # Need to run advise to check if the current selection is completely flagged
                                 rtn = casa_tools.imager.advise(takeadvice=False, amplitudeloss=0.5,
                                                                fieldofview=aipsfieldofview)
@@ -883,10 +926,12 @@ class ImageParamsHeuristics(object):
             if primary_beam:
                 pb_dist = 0.408
                 if cqa.getvalue(cqa.convert(cme.separation(center, nearest), 'arcsec'))[0] > pb_dist * primary_beam:
-                    LOG.info('The nearest pointing is > {pb_dist}pb away from image center.  '
-                             'Shifting the PSF phase center to the '
-                             'nearest field (id = {nf})'.format(pb_dist=pb_dist, nf=nearest_field_to_center))
-                    LOG.info('Old phasecenter: {}'.format(phase_center))
+                    LOG.info(
+                        'The nearest pointing is > %spb away from image center.  Shifting the PSF phase center to the nearest field (id = %s)',
+                        pb_dist,
+                        nearest_field_to_center,
+                    )
+                    LOG.info('Old phasecenter: %s', phase_center)
                     # convert to strings (CASA 4.0 returns as list for some reason hence 0 index)
                     m0 = cme.getvalue(nearest)['m0']
                     m1 = cme.getvalue(nearest)['m1']
@@ -896,7 +941,7 @@ class ImageParamsHeuristics(object):
                         m0 = cqa.angle(m0, prec=9)[0]
                     m1 = cqa.angle(m1, prec=9)[0]
                     psf_phase_center = '%s %s %s' % (ref, m0, m1)
-                    LOG.info('New PSF phasecenter: {}'.format(phase_center))
+                    LOG.info('New PSF phasecenter: %s', psf_phase_center)
             else:
                 LOG.warning('No primary beam supplied.  Will not attempt to shift PSF phasecenter to '
                             'nearest field w/o a primary beam distance check.')
@@ -1031,8 +1076,16 @@ class ImageParamsHeuristics(object):
 
         return self._is_mosaic(field_str_list)
 
-    def is_eph_obj(self, field):
+    def is_eph_obj(self, field: str) -> bool:
+        """Determine whether a field is an ephemeris (moving) object.
 
+        Args:
+            field: Name of the field to check.
+
+        Returns:
+            bool: True if the field corresponds to an ephemeris (moving) object,
+            otherwise False.
+        """
         ms = None
         for msname in self.vislist:
             ms = self.observing_run.get_ms(msname)
@@ -1100,10 +1153,10 @@ class ImageParamsHeuristics(object):
                     # LF spws. So here just trying the first in the list.
                     checkMS = self.observing_run.get_ms(self.vislist[0])
                     b2bMode = checkMS.is_band_to_band
-                except:
+                except Exception:
                     b2bMode = False
                 if not b2bMode:
-                    LOG.warning(f'Could not determine aggregate bandwidth frequency range for spw {spwid}. Exception: {str(e)}')
+                    LOG.warning('Could not determine aggregate bandwidth frequency range for spw %s. Exception: %s', spwid, str(e))
 
         aggregate_bandwidth_Hz = np.sum([r[1] - r[0] for r in utils.merge_ranges(spw_frequency_ranges)])
 
@@ -1190,36 +1243,41 @@ class ImageParamsHeuristics(object):
 
         return repr_target, repr_source, virtual_repr_spw, repr_freq, reprBW_mode, real_repr_target, minAcceptableAngResolution, maxAcceptableAngResolution, maxAllowedBeamAxialRatio, sensitivityGoal
 
-    def imaging_imsize(
-        self, cutout_imsize: list[int], cell: str, primary_beam: float, sfpblimit: Optional[float] = None
-    ) -> tuple[list[int], list[str]]:
-        """Calculates imaging imsize based on a requested cutout size.
+    def imsize_from_cutout(
+        self, cutout_imsize: list[int], cell: str, primary_beam: float, sfpblimit: float | None = None
+    ) -> list[int]:
+        """Calculate optimal imaging size based on requested cutout size.
+
+        Determines the optimal image size for CASA imaging by adding a buffer around the requested
+        cutout size. The buffer is calculated as 1.5 times the primary beam radius (0.75 beams on
+        each side), ensuring adequate coverage for imaging. Final image dimensions are adjusted to
+        composite numbers for optimal FFT performance using CASA's synthesis utilities.
 
         Args:
-            cutout_imsize: A list of two integers [nxpix, nypix] defining the
-                requested cutout/final image size.
-            cell: cell size of imaging in string format with units (e.g. '0.1arcsec').
-            primary_beam: The primary beam size in arcseconds.
-            sfpblimit: The single field primary beam response limit. This argument is
-                not used in the current implementation.
+            cutout_imsize: Two-element list [nxpix, nypix] defining the requested cutout/final
+                image size in pixels.
+            cell: Cell size of imaging in string format with units (e.g. '0.1arcsec').
+            primary_beam: Primary beam size in arcseconds (full width).
+            sfpblimit: Single field primary beam response limit. Reserved for future use.
 
         Returns:
-            A tuple containing:
-                - A list of two integers for the calculated image size in pixels.
-                - A list of two strings for the cutout size with units.
+            Two-element list [nxpix, nypix] for the calculated image size in pixels, optimized
+            for FFT performance.
+
+        Example:
+            >>> heuristics.imsize_from_cutout([512, 512], '0.1arcsec', 60.0)
+            [1440, 1440]
         """
         qa_tool = casa_tools.quanta
         cell_arcsec = qa_tool.convert(cell, 'arcsec')['value']
 
         buffer_size = math.ceil(primary_beam * 1.5 / cell_arcsec * 0.5)
-        
+
         csu = casa_tools.synthesisutils
         imsize = [csu.getOptimumSize(size + 2 * buffer_size) for size in cutout_imsize]
         csu.done()
-        
-        cutout_imsize_str = [f'{size * cell_arcsec}arcsec' for size in cutout_imsize]
 
-        return imsize, cutout_imsize_str
+        return imsize
 
     def imsize(self, fields, cell, primary_beam, sfpblimit=None, max_pixels=None,
                centreonly=False, vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None):
@@ -1284,11 +1342,11 @@ class ImageParamsHeuristics(object):
 
         if is_mos_or_het and nfields <= 3:
             # PIPE-209 asks for a slightly larger size for small (2-3 field) mosaics.
-            nxpix = int((1.65 * beam_radius_v + xspread) / cellx_v)
-            nypix = int((1.65 * beam_radius_v + yspread) / celly_v)
+            nxpix = int(np.asarray((1.65 * beam_radius_v + xspread) / cellx_v).item())
+            nypix = int(np.asarray((1.65 * beam_radius_v + yspread) / celly_v).item())
         else:
-            nxpix = int((1.5 * beam_radius_v + xspread) / cellx_v)
-            nypix = int((1.5 * beam_radius_v + yspread) / celly_v)
+            nxpix = int(np.asarray((1.5 * beam_radius_v + xspread) / cellx_v).item())
+            nypix = int(np.asarray((1.5 * beam_radius_v + yspread) / celly_v).item())
 
         if (not is_mos_or_het) and (sfpblimit is not None):
             beam_fwhp = 1.12 / 1.22 * beam_radius_v
@@ -1366,7 +1424,7 @@ class ImageParamsHeuristics(object):
             # width = decimal.Decimal('1.0001') * width
             width = str(width)
         except Exception as e:
-            LOG.warning(f'Could not determine width for spw {spwid}. Exception: {str(e)}')
+            LOG.warning('Could not determine width for spw %s. Exception: %s', spwid, str(e))
             width = ''
 
         return width
@@ -1392,7 +1450,7 @@ class ImageParamsHeuristics(object):
                 ncorr = 0
 
         except Exception as e:
-            LOG.warning(f'Could not determine ncorr for spw {spwid}. Exception: {str(e)}')
+            LOG.warning('Could not determine ncorr for spw %s. Exception: %s', spwid, str(e))
             ncorr = 0
 
         return ncorr
@@ -1473,7 +1531,7 @@ class ImageParamsHeuristics(object):
                     abs_max_frequency = max_frequency
                     max_freq_spwid = spwid
             except Exception as e:
-                LOG.warning(f'Could not determine min/max frequency for spw {spwid}. Exception: {str(e)}')
+                LOG.warning('Could not determine min/max frequency for spw %s. Exception: %s', spwid, str(e))
 
         return {'abs_min_freq': abs_min_frequency, 'abs_max_freq': abs_max_frequency,
                 'min_freq_spwid': min_freq_spwid, 'max_freq_spwid': max_freq_spwid}
@@ -1613,7 +1671,7 @@ class ImageParamsHeuristics(object):
                     if (inputs.intent == 'TARGET') and (inputs.specmode in ('mfs', 'cont') and self.warn_missing_cont_ranges()):
                         LOG.warning('No continuum frequency selection for Target Field %s SPW %s' % (inputs.field, spwid))
             except Exception as e:
-                LOG.warning(f'Could not determine min/max frequency for spw {spwid}. Exception: {str(e)}')
+                LOG.warning('Could not determine min/max frequency for spw %s. Exception: %s', spwid, str(e))
 
             aggregate_lsrk_bw = qaTool.add(aggregate_lsrk_bw, aggregate_spw_lsrk_bw)
 
@@ -2572,7 +2630,7 @@ class ImageParamsHeuristics(object):
             if len(validbeamchans) > 0:
                 chanid = validbeamchans[0][0]
             else:
-                LOG.error('No valid beams in {!s}'.format(psf_filename))
+                LOG.error('No valid beams in %s', psf_filename)
                 return None, np.arange(nchan)
 
             # Fill all flagged channels with the largest/first valid beam

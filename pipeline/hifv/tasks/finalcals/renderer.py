@@ -267,47 +267,6 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
                         'with visstat. Using Field #%s (%s) for Source #%s'
                         '', field.id, field.name, source_id)
             result[source_id] = field
-            continue
-            # FIXME: code below here in remainder of for-loop is unreachable
-
-            field_ids = {(f.id, f.name) for f in fields}
-
-            # holds the mapping of field name to mean flux
-            average_flux = {}
-
-            # defines the parameters for the visstat job
-            job_params = {
-                'vis': ms.name,
-                'axis': 'amp',
-                'datacolumn': 'corrected',
-                'spw': ','.join(map(str, spw_ids)),
-            }
-
-            # solve circular import problem by importing at run-time
-            from pipeline.infrastructure import casa_tasks
-
-            LOG.info('Calculating which %s field has the highest mean flux '
-                     'for Source #%s', intent, source_id)
-            # run visstat for each scan selection for the target
-            for field_id, field_name in field_ids:
-                job_params['field'] = str(field_id)
-                job = casa_tasks.visstat(**job_params)
-                LOG.debug('Calculating statistics for %r (#%s)', field_name, field_id)
-                result = job.execute()
-
-                average_flux[(field_id, field_name)] = float(result['CORRECTED']['mean'])
-
-            LOG.debug('Mean flux for %s targets:', intent)
-            for field_id, field_name, v in average_flux.items():
-                LOG.debug('\t%r (%s): %s', field_name, field_id, v)
-
-            # find the ID of the field with the highest average flux
-            sorted_by_flux = sorted(average_flux.items(), key=operator.itemgetter(1), reverse=True)
-            (brightest_id, brightest_name), highest_flux = sorted_by_flux[0]
-
-            LOG.info('%s field %r (%s) has highest mean flux (%s)', intent,
-                     brightest_name, brightest_id, highest_flux)
-            result[source_id] = brightest_id
 
         return result
 

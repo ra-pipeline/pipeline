@@ -20,8 +20,15 @@ class ImageLibrary(object):
         del self._images[:]
 
     # Add image item to the list as a dictionary
-    def add_item(self, imageitem, overwrite=True):
-        if overwrite:
+    def add_item(self, imageitem, overwrite_on_export=True):
+        """
+        Add image item to the list as a dictionary. If overwrite_on_export is
+        True, only the last image of multiple ones originating from the same
+        data selection is exported in h*_exportdata. If the parameter is set to
+        False, each of these images is being exported individually,
+        discriminating between them with a version suffix.
+        """
+        if overwrite_on_export:
             if self.find_imageitem(imageitem) < 0:
                 self._images.append(dict(imageitem))
             else:

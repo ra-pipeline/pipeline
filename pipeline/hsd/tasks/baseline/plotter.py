@@ -318,6 +318,7 @@ class BaselineSubtractionDataManager(object):
             dec = numpy.mean(declist)
             if org_direction is not None:
                 ra, dec = dirutil.direction_recover(ra, dec, org_direction)
+                ra = ra % 360.0  # keep ra within [0, 360)
 
             rowlist[row_index].update(
                     {"RAID": raid, "DECID": decid, "RA": ra, "DEC": dec,
@@ -976,8 +977,7 @@ class BaselineSubtractionPlotManager(BaselineSubtractionDataManager):
         plotter.set_edge(edge)
         plotter.set_atm_transmission(atm_transmission, atm_frequency)
         plotter.set_global_scaling()
-        if utils.is_nro(self.context):
-            plotter.set_channel_axis()
+        plotter.set_channel_axis()
         for ipol in range(npol):
             postfit_figfile = postfit_figfile_prefix + '_pol%s.png' % ipol
             # LOG.info('#TIMING# Begin SDSparseMapPlotter.plot(postfit,pol%s)'%(ipol))

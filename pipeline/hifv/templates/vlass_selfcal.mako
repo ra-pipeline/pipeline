@@ -21,6 +21,16 @@ from pipeline.infrastructure.renderer import rendererutils
         <%def name="preamble()">
         </%def>
 
+        <%def name="ms_preamble(ms)">
+            % if ms in selfcalphasegaincal_subpages:
+                <h4>
+                    <a class="replace" href="${rendererutils.get_relative_url(pcontext.report_dir, dirname, selfcalphasegaincal_subpages[ms])}">
+                    Phase vs. time plots
+                    </a>
+                </h4>
+            %endif
+        </%def>
+
         <%def name="mouseover(plot)">Summary window</%def>
 
         <%def name="fancybox_caption(plot)">
@@ -32,14 +42,4 @@ from pipeline.infrastructure.renderer import rendererutils
         </%def>
 </%self:plot_group>
 
-
-
-% for ms in summary_plots:
-
-    % if ms in selfcalphasegaincal_subpages:
-        <h4>Plots:  <a class="replace"
-            href="${rendererutils.get_relative_url(pcontext.report_dir, dirname, selfcalphasegaincal_subpages[ms])}">Phase vs. time plots </a>
-        </h4>
-    %endif
-%endfor
 

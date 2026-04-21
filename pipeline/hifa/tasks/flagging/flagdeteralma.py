@@ -169,6 +169,9 @@ class FlagDeterALMAInputs(flagdeterbase.FlagDeterBaseInputs):
 class SerialFlagDeterALMA(flagdeterbase.FlagDeterBase):
     Inputs = FlagDeterALMAInputs
 
+    # PIPE-2320: cache FDM spws from CASA metadata
+    _fdm_spws: set[int] = set()
+
     # PIPE-425: define allowed bandwidths of ACA spectral windows for which to
     # perform the ACA FDM edge channel flagging heuristic, and define
     # corresponding thresholds.
@@ -201,6 +204,10 @@ class SerialFlagDeterALMA(flagdeterbase.FlagDeterBase):
         # PIPE-1759: this list collects the spws with missing basebands subsequently used to create a QA score
         self.missing_baseband_spws = []
 
+        # PIPE-2320: cache FDM spws from CASA metadata to correctly identify FDM vs TDM spectral windows,
+        # especially for new 4x4 bit correlation modes in Cycle 10.
+        self._fdm_spws = self._get_fdm_spws()
+
         # Wrap results from parent in hifa_flagdata specific result to enable
         # separate QA scoring.
         results = super().prepare()
@@ -216,6 +223,27 @@ class SerialFlagDeterALMA(flagdeterbase.FlagDeterBase):
         self._executor.execute(task)
 
         return results
+
+    def _get_fdm_spws(self) -> set[int]:
+        """
+        Get the set of FDM spectral window IDs from CASA metadata.
+
+        PIPE-2320: This method ensures correct identification of FDM vs TDM
+        spectral windows, especially for ALMA Cycle 10 4x4 bit correlation modes
+        which can produce fewer channels than traditional FDM windows.
+
+        Returns:
+            Set of FDM spectral window IDs.
+        """
+        try:
+            with casa_tools.MSMDReader(self.inputs.ms.name) as msmd:
+                fdm_spws = msmd.almaspws(fdm=True)
+                LOG.debug(f"Retrieved FDM spectral windows from CASA metadata for {self.inputs.ms.name}: {fdm_spws}")
+            return set(fdm_spws)
+        except Exception as e:
+            LOG.warning('Failed to retrieve FDM spws from CASA metadata for %s: %s. Falling back to '
+                        'heuristic.', self.inputs.ms.name, e)
+            return set()
 
     def get_fracspw(self, spw):
         # From T. Hunter on PIPE-425: in early ALMA Cycles, the ACA
@@ -242,21 +270,27 @@ class SerialFlagDeterALMA(flagdeterbase.FlagDeterBase):
         #  - then run extra test to skip flagging of TDM windows
         super().verify_spw(spw)
 
-        # Test whether the spw is TDM or FDM. If it is FDM, then raise a
-        # ValueError. From T. Hunter on PIPE-425:
-        # TDM spectral windows have either 4*64 channels in full polarisation,
-        # 2*128 for dual polarisation, or 1*256 channels for single
-        # polarisation; i.e., in all cases, a TDM spw has ncorr*nchans = 256.
-        #
-        # By comparison, the smallest number of channels in an FDM spectral
-        # window is 4*120 (full pol), 2*240 (dual-pol), or 1*480 (single-pol)
-        # when online binning is set to 16.
-        #
-        # Based on this, it is assumed that any spw with ncorr*nchans <= 256 is
-        # TDM, and any spw with ncorr*nchans > 256 is FDM.
-        dd = self.inputs.ms.get_data_description(spw=spw)
-        ncorr = len(dd.corr_axis)
-        if ncorr * spw.num_channels > 256:
+        # Determine whether the spectral window is TDM or FDM.
+        # PIPE-2320: Use CASA metadata to identify FDM spectral windows instead of
+        # the older heuristic (ncorr*nchans > 256), which fails for ALMA Cycle 10
+        # 4x4 bit correlation modes that can produce fewer channels.
+        is_fdm = False
+
+        if self._fdm_spws:
+            # Use CASA metadata if available
+            is_fdm = spw.id in self._fdm_spws
+        else:
+            # Fall back to original heuristic for backwards compatibility
+            # TDM spectral windows have either 4*64 channels in full polarisation,
+            # 2*128 for dual polarisation, or 1*256 channels for single
+            # polarisation; i.e., ncorr*nchans = 256.
+            # FDM spectral windows have higher channel counts (since Cycle 10, the
+            # minimum is ~120 channels for 4x4 bit dual-pol with online binning).
+            dd = self.inputs.ms.get_data_description(spw=spw)
+            ncorr = len(dd.corr_axis)
+            is_fdm = ncorr * spw.num_channels > 256
+
+        if is_fdm:
             raise ValueError('Spectral window {} is an FDM spectral window, skipping the TDM edge flagging'
                              'heuristics.'.format(spw.id))
 

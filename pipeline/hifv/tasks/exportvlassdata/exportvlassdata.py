@@ -116,8 +116,14 @@ class VlassPipelineManifest(manifest.PipelineManifest):
 @task_registry.set_equivalent_casa_task('hifv_exportvlassdata')
 class Exportvlassdata(basetask.StandardTaskTemplate):
     Inputs = ExportvlassdataInputs
+    is_multi_vis_task = True
 
     NameBuilder = exportdata.PipelineProductNameBuilder
+
+    def __init__(self, inputs):
+        super().__init__(inputs)
+        self.selfcaltable_list: list[str] = []
+        self.flagversion_list: list[str] = []
 
     def prepare(self):
 
@@ -464,33 +470,28 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
 
         # SE Cont imaging mode export for VLASS
         img_mode = self.inputs.context.imaging_mode
-        if type(img_mode) is str and img_mode.startswith('VLASS-SE-CONT'):
+        if isinstance(img_mode, str) and img_mode.startswith('VLASS-SE-CONT'):
             # Identify self cal table
-            selfcal_result = None
+            selfcal_results: list | None = None
             for result in context.results:
                 task_result = result.read()
-                if task_result.taskname == "hifv_selfcal":
-                    selfcal_result = task_result[0]
+                if task_result.taskname == 'hifv_selfcal':
+                    selfcal_results = task_result
                     break
-
-            if selfcal_result and selfcal_result.caltable and os.path.exists(selfcal_result.caltable):
-                self.selfcaltable = selfcal_result.caltable
-            else:
-                self.selfcaltable = ''
+            if selfcal_results is not None:
+                for selfcal_result in selfcal_results:
+                    if selfcal_result and selfcal_result.caltable and os.path.exists(selfcal_result.caltable):
+                        self.selfcaltable_list.append(selfcal_result.caltable)
 
             # Identify flagversion
-            self.flagversion = os.path.basename(self.inputs.vis)+'.flagversions'
+            vis_list = [self.inputs.vis] if isinstance(self.inputs.vis, str) else self.inputs.vis
+            self.flagversion_list: list[str] = [f'{os.path.basename(vis)}.flagversions' for vis in vis_list]
 
-        return StdFileProducts(ppr_file,
-                               weblog_file,
-                               casa_commands_file,
-                               casa_pipescript,
-                               parameterlist_set)
+        return StdFileProducts(ppr_file, weblog_file, casa_commands_file, casa_pipescript, parameterlist_set)
 
     def _make_pipe_manifest(self, context, oussid, stdfproducts, sessiondict, visdict, calimages, targetimages,
                             reimaging_resources, parameterlist):
         """Generate the manifest file."""
-
         # Initialize the manifest document and the top level ous status.
         pipemanifest = self._init_pipemanifest(oussid)
         ouss = pipemanifest.set_ous(oussid)
@@ -669,7 +670,6 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         os.chdir(os.path.abspath(context.output_dir))
 
         # Define the name of the output tarfile
-        ps = context.project_structure
         tarfilename = 'reimaging_resources.tgz'
 
         LOG.info('Saving reimaging resources in %s...' % tarfilename)
@@ -680,22 +680,35 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
 
         for mask in self.masks:
             tar.add(mask, mask)
-            LOG.info('....Adding {!s}'.format(mask))
+            LOG.info('....Adding %s', mask)
 
         for initial_model in self.initial_models:
             tar.add(initial_model, initial_model)
-            LOG.info('....Adding {!s}'.format(initial_model))
+            LOG.info('....Adding %s', initial_model)
 
         for final_model in self.final_models:
             tar.add(final_model, final_model)
-            LOG.info('....Adding {!s}'.format(final_model))
-        if os.path.exists(self.selfcaltable):
-            tar.add(self.selfcaltable, self.selfcaltable)
-            LOG.info('....Adding {!s}'.format(self.selfcaltable))
-        else:
-            LOG.warning('selfcal table not present.')
-        tar.add(self.flagversion, self.flagversion)
-        LOG.info('....Adding {!s}'.format(self.flagversion))
+            LOG.info('....Adding %s', final_model)
+
+        n_selfcaltable = 0
+        for selfcaltable in self.selfcaltable_list:
+            if os.path.exists(selfcaltable):
+                tar.add(selfcaltable, selfcaltable)
+                LOG.info('....Adding %s', selfcaltable)
+                n_selfcaltable += 1
+        if n_selfcaltable == 0:
+            LOG.warning('No selfcal table found to add to the reimaging resources tarball.')
+        n_flagversion = 0
+        for flagversion in self.flagversion_list:
+            if os.path.exists(flagversion):
+                tar.add(flagversion, flagversion)
+                LOG.info('....Adding %s', flagversion)
+                n_flagversion += 1
+            else:
+                LOG.warning('Flagversions directory %s not found; skipping.', flagversion)
+        if n_flagversion == 0:
+            LOG.warning('No flagversions directories found to add to the reimaging resources tarball.')
+
         tar.close()
 
         # Restore the original current working directory
@@ -714,11 +727,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         return os.path.basename(out_parameterlist_file)
 
     def _export_table(self, context, table_name, products_dir, oussid):
-        """
-        Save directories (either cal table or flag versions)
-        """
-
-        ps = context.project_structure
+        """Save directories, either cal table or flag versions."""
         table_file = table_name
         out_table_file = os.path.join(products_dir, table_file)
 
@@ -728,10 +737,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         return os.path.basename(out_table_file)
 
     def _export_casa_commands_log(self, context, casalog_name, products_dir, oussid):
-        """
-        Save the CASA commands file.
-        """
-
+        """Save the CASA commands file."""
         ps = context.project_structure
         casalog_file = os.path.join(context.report_dir, casalog_name)
         out_casalog_file = self.NameBuilder.casa_script(casalog_name,

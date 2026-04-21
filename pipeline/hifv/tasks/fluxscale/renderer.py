@@ -2,6 +2,8 @@ import collections
 import contextlib
 import os
 
+import numpy as np
+
 import pipeline.infrastructure.filenamer as filenamer
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
@@ -221,14 +223,14 @@ class T2_4MDetailsfluxbootRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 spixerr = "{:.{}f}".format(float(row['spixerr']), precision)
                 curvature = "{:.{}f}".format(float(row['curvature']), precision)
                 curvatureerr = "{:.{}f}".format(float(row['curvatureerr']), precision)
-                gamma = "{:.{}f}".format(float(row['gamma']), precision)
-                gammaerr = "{:.{}f}".format(float(row['gammaerr']), precision)
-                delta = "{:.{}f}".format(float(row['delta']), precision)
-                deltaerr = "{:.{}f}".format(float(row['deltaerr']), precision)
-                fitflx = "{:.{}f}".format(float(row['fitflx']), precision)
-                fitflxerr = "{:.{}f}".format(float(row['fitflxerr']), precision)
-                reffreq = "{:.{}f}".format(float(row['reffreq']), precision)
-                bandcenterfreq = "{:.{}f}".format(float(row['bandcenterfreq'])/1.e9, precision)
+                gamma = "{:.{}f}".format(float(np.asarray(row['gamma']).item()), precision)
+                gammaerr = "{:.{}f}".format(float(np.asarray(row['gammaerr']).item()), precision)
+                delta = "{:.{}f}".format(float(np.asarray(row['delta']).item()), precision)
+                deltaerr = "{:.{}f}".format(float(np.asarray(row['deltaerr']).item()), precision)
+                fitflx = "{:.{}f}".format(float(np.asarray(row['fitflx']).item()), precision)
+                fitflxerr = "{:.{}f}".format(float(np.asarray(row['fitflxerr']).item()), precision)
+                reffreq = "{:.{}f}".format(float(np.asarray(row['reffreq']).item()), precision)
+                bandcenterfreq = "{:.{}f}".format(float(np.asarray(row['bandcenterfreq']).item())/1.e9, precision)
                 # fitflxAtRefFreq = "{:.{}f}".format(float(row['fitflxAtRefFreq']), precision)
                 # fitflxAtRefFreqErr = "{:.{}f}".format(float(row['fitflxAtRefFreqErr']), precision)
 

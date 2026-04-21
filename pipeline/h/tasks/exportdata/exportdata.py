@@ -1,31 +1,6 @@
 """
 The exportdata module provides base classes for preparing data products
 on disk for upload to the archive.
-
-To test these classes, register some data with the pipeline using ImportData,
-then execute:
-
-import pipeline
-vis = [ '<MS name>' ]
-
-# Create a pipeline context and register some data
-context = pipeline.Pipeline().context
-inputs = pipeline.tasks.ImportData.Inputs(context, vis=vis)
-task = pipeline.tasks.ImportData(inputs)
-results = task.execute()
-results.accept(context)
-
-# Run some other pipeline tasks, e.g flagging, calibration,
-# and imaging in a similar manner
-
-# Execute the export data task. The details of
-# what gets exported depends on what tasks were run
-# previously but may include the following
-# TBD
-inputs = pipeline.tasks.exportdata.Exportdata.Inputs(context,
-      vis, output_dir, sessions, pprfile, products_dir)
-task = pipeline.tasks.exportdata.ExportData(inputs)
-  results = task.execute()
 """
 from __future__ import annotations
 

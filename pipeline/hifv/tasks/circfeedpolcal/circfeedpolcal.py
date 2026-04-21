@@ -1,7 +1,6 @@
 import os
 import math
 import ast
-import collections
 import traceback
 
 import pipeline.hif.heuristics.findrefant as findrefant
@@ -17,7 +16,7 @@ from pipeline.hifv.tasks.finalcals.finalcals import FinalcalsResults as Finalcal
 from pipeline.hifv.tasks.importdata.importdata import VLAImportDataResults as VLAImportDataResults
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import task_registry
-
+from pipeline.infrastructure import utils
 
 
 LOG = infrastructure.get_logger(__name__)
@@ -153,8 +152,7 @@ class Circfeedpolcal(polarization.Polarization):
 
         m = self.inputs.context.observing_run.get_ms(self.inputs.vis)
         self.ignorerefant = self.inputs.context.evla['msinfo'][m.name].ignorerefant
-        # PIPE-1637: adding ',' in the manual and auto refantignore parameter
-        refantignore = self.inputs.refantignore + ','.join(['', *self.ignorerefant])
+        refantignore = utils.build_refantignore(refantignore=self.inputs.refantignore, ignorerefant=self.ignorerefant)
         refantfield = self.inputs.context.evla['msinfo'][m.name].calibrator_field_select_string
         # PIPE-595: if refant list is not provided, compute refants else use provided refant list.
         if len(self.inputs.refant) == 0:

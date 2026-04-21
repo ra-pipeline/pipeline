@@ -7,7 +7,7 @@ import pipeline.infrastructure.renderer.htmlrenderer as hr
 <%
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.pyplot import cm
+from matplotlib import colormaps
 import matplotlib.colors as colors
 
 def fmt_cell(rms,scale=1.e3):
@@ -32,7 +32,7 @@ def fmt_spw(roi_stats,idx):
     return label
 
 def diff2shade(pct):
-    cmap=cm.get_cmap(name='Reds')
+    cmap=colormaps.get_cmap('Reds')
     apct=abs(pct)
     if 5<=apct<10:
       rgb_hex=colors.to_hex(cmap(0.2))
@@ -45,7 +45,7 @@ def diff2shade(pct):
     return rgb_hex   
 
 def snr2shade(snr):
-    cmap=cm.get_cmap(name='Reds')
+    cmap=colormaps.get_cmap('Reds')
     if 7.5<=snr<10:
       rgb_hex=colors.to_hex(cmap(0.2))
     if 5.0<=snr<7.5:
