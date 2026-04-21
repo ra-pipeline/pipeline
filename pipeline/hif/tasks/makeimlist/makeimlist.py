@@ -3,6 +3,7 @@ import operator
 import os
 
 import numpy as np
+from collections import defaultdict
 
 import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
@@ -841,6 +842,15 @@ class MakeImList(basetask.StandardTaskTemplate):
             for k, v in vla_band.items():
                 if str(k) in spwlist:
                     band_spws.setdefault(v, []).append(k)
+            fields = ref_ms.get_fields()
+            band_fields = defaultdict(set)
+            for field in fields:
+                field_name = field.name
+                for spw in field.valid_spws:
+                    band = vla_band.get(spw.id)
+                    if band is not None:
+                        band_fields[band].add(field_name)
+
         elif 'ALMA' in imaging_mode:
             ref_ms = inputs.context.observing_run.get_ms(inputs.vis[0])
             band_spws = {}
@@ -899,13 +909,14 @@ class MakeImList(basetask.StandardTaskTemplate):
                     if 'VLA' in imaging_mode:
                         # VLA pipeline supports only one vis, so directly using
                         # vislist[0]
+
                         ms = inputs.context.observing_run.get_ms(vislist[0])
                         ref_freq = [ms.get_spectral_window(spw).ref_frequency for spw in spwlist]
                         freq = np.mean(ref_freq)
 
                         mosaic_heuristics = MosaicDetectionHeuristics()
-
-                        mosaic_fields, single_fields = mosaic_heuristics.check_targets_for_mosaic(inputs.context, vislist, float(freq.value))
+                        target_fields = band_fields.get(band, set())
+                        mosaic_fields, single_fields = mosaic_heuristics.check_targets_for_mosaic(inputs.context, vislist, target_fields, float(freq.value))
                         is_cluster = True if len(mosaic_fields) > 0 else False
                     if is_cluster:
 
@@ -914,7 +925,6 @@ class MakeImList(basetask.StandardTaskTemplate):
                             for cluster in mosaic_field:
                                 cluster_name = ",".join(cluster)
                                 field_intent_list_temp.append(self.heuristics.field_intent_list(intent=inputs.intent, field=cluster_name))
-
                         for single_field in single_fields.values():
                             for f in single_field:
                                 field_intent_list_temp.append(self.heuristics.field_intent_list(intent=inputs.intent, field=f))
