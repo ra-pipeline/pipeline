@@ -865,7 +865,7 @@ class MakeImList(basetask.StandardTaskTemplate):
 
         # Need to record if there are targets for a vislist
         have_targets = {}
-
+        max_file_name_length = 128
         expected_num_targets = 0
         for selected_datatype_str, selected_datatype_info in zip(selected_datatypes_str, selected_datatypes_info):
             for band in band_spws:
@@ -919,7 +919,6 @@ class MakeImList(basetask.StandardTaskTemplate):
                         mosaic_fields, single_fields = mosaic_heuristics.check_targets_for_mosaic(inputs.context, vislist, target_fields, float(freq.value))
                         is_cluster = True if len(mosaic_fields) > 0 else False
                     if is_cluster:
-
                         field_intent_list_temp = []
                         for mosaic_field in mosaic_fields.values():
                             for cluster in mosaic_field:
@@ -1495,8 +1494,16 @@ class MakeImList(basetask.StandardTaskTemplate):
 
                             # construct imagename
                             if inputs.imagename == '':
+                                if is_cluster and len(field_intent[0])> max_file_name_length:
+                                    field_list = field_intent[0].split(',')
+                                    if len(field_list) > 1:
+                                        imgname_field_intent = f"{field_list[0]}_{field_list[-1]}"[:max_file_name_length]
+                                    else:
+                                        imgname_field_intent = field_intent[0][:max_file_name_length]
+                                else:
+                                    imgname_field_intent = field_intent[0]
                                 imagename = target_heuristics.imagename(output_dir=inputs.output_dir, intent=field_intent[1],
-                                                                        field=field_intent[0], spwspec=actual_spwspec,
+                                                                        field=imgname_field_intent, spwspec=actual_spwspec,
                                                                         specmode=specmode, band=band, datatype=datatype_suffix)
                             else:
                                 imagename = inputs.imagename
