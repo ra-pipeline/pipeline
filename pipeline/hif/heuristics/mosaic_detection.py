@@ -14,7 +14,7 @@ class MosaicDetectionHeuristics:
     detect overlapping pointings and form mosaic groups.
     """
 
-    def check_targets_for_mosaic(self, context, vislist, freq, overlap_tol=1.0):
+    def check_targets_for_mosaic(self, context, vislist, fieldlist, freq, overlap_tol=1.0):
         mosaic_groups = {}
         single_fields = {}
 
@@ -29,6 +29,8 @@ class MosaicDetectionHeuristics:
             fieldnames = []
 
             for field in fields:
+                if field.name not in fieldlist:
+                    continue
                 ra_str = field.ra
                 dec_str = field.dec
                 if field.dec.count(".") >= 2:
@@ -39,8 +41,7 @@ class MosaicDetectionHeuristics:
                 fieldnames.append(field.name)
                 ra.append(coord.ra.deg)
                 dec.append(coord.dec.deg)
-
-            if len(fields) > 1:
+            if len(fieldnames) > 1:
                 mosaic_groups[vis], single_fields[vis] = self.create_mosaic_groups(np.array(ra),
                                                                                    np.array(dec),
                                                                                    np.array(fieldnames),
