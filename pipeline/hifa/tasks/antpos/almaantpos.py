@@ -26,7 +26,6 @@ __all__ = [
 ]
 
 LOG = infrastructure.logging.get_logger(__name__)
-ANTPOS_SERVICE_URL = ['https://asa.alma.cl/uncertainties-service/uncertainties/versions/last/measurements/casa/']
 
 
 class ALMAAntposInputs(antpos.AntposInputs):
@@ -173,8 +172,7 @@ class ALMAAntposInputs(antpos.AntposInputs):
         return {'vis': self.vis, 'caltable': self.caltable, 'infile': infile, 'antenna': antenna, 'parameter': offsets}
 
     def to_antpos_args(self) -> dict[str, str | bool | list[str] | Literal['both_latest', 'both_closest'] | None]:
-        """
-        Configure getantposalma task arguments and return them in dictionary format.
+        """Configure getantposalma task arguments and return them in dictionary format.
 
         Returns:
             outfile: Name of file to write antenna positions retrieved from DB.
@@ -185,9 +183,13 @@ class ALMAAntposInputs(antpos.AntposInputs):
                 not be retrieved.
             search: Search algorithm to use. Supports 'both_latest' and 'both_closest'.
             hosts: Priority-ranked list of hosts to query. Can be customized with ANTPOS_SERVICE_URL environment
-                variable, a comma-delimited string ordered by priority.
+                variable or ``pipeconfig.services.antpos_url`` in config.yaml.
         """
-        hosts = utils.get_valid_url('ANTPOS_SERVICE_URL', ANTPOS_SERVICE_URL)
+        from pipeline.config import get_pipeline_config
+        default_url = get_pipeline_config('services.antpos_url', '')
+        if isinstance(default_url, str):
+            default_url = [default_url]
+        hosts = utils.get_valid_url('ANTPOS_SERVICE_URL', default_url)
         return {'outfile': self.online_antpos_filename,
                 'overwrite': True,
                 'asdm': self.context.observing_run.get_ms(self.vis).execblock_id,
@@ -233,7 +235,11 @@ class ALMAAntpos(antpos.Antpos):
                 except RuntimeError as ex:
                     LOG.warning('CASA/getantposalma task failed without generating %s: %s', antpos_args['outfile'], ex)
                     traceback_msg = traceback.format_exc()
-                    if os.getenv('ALLOW_GETANTPOSALMA_FAILURE', 'false').lower() == 'true':
+                    from pipeline.config import get_pipeline_config
+                    _allow = get_pipeline_config(
+                        'heuristics.allow_getantposalma_failure', False,
+                        env_var='ALLOW_GETANTPOSALMA_FAILURE', as_type=bool)
+                    if _allow:
                         LOG.info(traceback_msg)
                     else:
                         raise exceptions.PipelineException(traceback_msg)

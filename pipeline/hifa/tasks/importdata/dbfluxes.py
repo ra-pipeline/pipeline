@@ -22,14 +22,21 @@ if TYPE_CHECKING:
 
 LOG = infrastructure.logging.get_logger(__name__)
 ORIGIN_DB = 'DB'
-FLUX_SERVICE_URL = 'https://almascience.org/sc/flux'
-FLUX_SERVICE_URL_BACKUP = 'https://asa.alma.cl/sc/flux'
 
 
 def get_flux_urls() -> tuple[str, str]:
-    """Returns the primary and backup flux service URLs."""
-    flux_url = utils.get_valid_url('FLUX_SERVICE_URL', FLUX_SERVICE_URL)
-    backup_flux_url = utils.get_valid_url('FLUX_SERVICE_URL_BACKUP', FLUX_SERVICE_URL_BACKUP)
+    """Returns the primary and backup flux service URLs.
+
+    Defaults are defined in ``config.yaml`` under ``pipeconfig.FLUX_SERVICE_URL``
+    and ``pipeconfig.FLUX_SERVICE_URL_BACKUP``.  Environment variables of the
+    same name always take precedence via :func:`~pipeline.infrastructure.utils.get_valid_url`.
+    """
+    from pipeline.config import get_pipeline_config
+    default_url = get_pipeline_config('flux_service_url', '')
+    default_backup = get_pipeline_config('flux_service_url_backup', '')
+
+    flux_url = utils.get_valid_url('FLUX_SERVICE_URL', default_url)
+    backup_flux_url = utils.get_valid_url('FLUX_SERVICE_URL_BACKUP', default_backup)
     return flux_url, backup_flux_url
 
 

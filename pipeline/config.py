@@ -213,4 +213,46 @@ def casatasks_startup(casa_config: dict[str, str | None], loglevel: str | None =
     return config
 
 
+def get_pipeline_config(key: str, default: Any = None, *, env_var: str | None = None, as_type: type | None = None) -> Any:
+    """Resolve a pipeline config value with env-var override.
+
+    Traverses ``config['pipeconfig']`` using a dot-separated *key* path
+    (e.g. ``'heuristics.pipe356_qa_mode'``).  If the key is missing or
+    ``config`` has not been loaded yet, *default* is returned.
+
+    When *env_var* is given and the corresponding environment variable is
+    set, that value takes precedence over the config file.  For boolean
+    settings, the strings ``'true'``, ``'1'``, and ``'yes'`` (case-insensitive)
+    are treated as ``True``; everything else as ``False``.
+
+    Args:
+        key: Dot-separated path under ``pipeconfig``, e.g. ``'services.antpos_url'``.
+        default: Fallback value when the key is absent.
+        env_var: Optional environment variable name that overrides the config.
+        as_type: Optional type coercion (currently only ``bool`` triggers
+                 special string parsing for environment variable values).
+
+    Returns:
+        The resolved configuration value.
+    """
+    # Walk nested dicts
+    try:
+        value = config.get('pipeconfig', {})
+        for part in key.split('.'):
+            value = value[part]
+    except (KeyError, TypeError, AttributeError):
+        value = default
+
+    # Env-var override
+    if env_var is not None:
+        env_value = os.getenv(env_var)
+        if env_value is not None:
+            if as_type is bool:
+                value = env_value.lower() in ('true', '1', 'yes')
+            else:
+                value = env_value
+
+    return value
+
+
 config = casatasks_startup({})

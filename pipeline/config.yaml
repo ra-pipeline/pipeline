@@ -1,6 +1,6 @@
 pipeconfig:
-  FLUX_SERVICE_URL: "https://almascience.org/sc/flux" # not used yet
-  FLUX_SERVICE_URL_BACKUP: "https://asa.alma.cl/sc/flux" # not used yet
+  flux_service_url: "https://almascience.org/sc/flux"                # env var: FLUX_SERVICE_URL
+  flux_service_url_backup: "https://asa.alma.cl/sc/flux"             # env var: FLUX_SERVICE_URL_BACKUP
   chdir: "./" # not used yet
   vis: # not used yet
   procedure: # not used yet
@@ -15,6 +15,15 @@ pipeconfig:
                          # null = use PREFECT_API_URL env var or Prefect's default
     flow_name: "CASA Pipeline" # default flow name shown in Prefect UI
     log_prints: true     # capture print() output in Prefect logs
+  services:
+    antpos_url: "https://asa.alma.cl/uncertainties-service/uncertainties/versions/last/measurements/casa/"
+                         # Antenna position service URL; env var: ANTPOS_SERVICE_URL
+  heuristics:
+    allow_getantposalma_failure: false  # if true, continue when getantposalma fails; env var: ALLOW_GETANTPOSALMA_FAILURE
+    pipe356_qa_mode: "ON"              # applycal QA preset: ON/OFF/DEBUG/TEST_REAL_OUTLIERS/TEST_FAKE_OUTLIERS; env var: PIPE356_QA_MODE
+    disable_casa_callibrary: false     # if true, revert to non-callibrary applycal; env var: DISABLE_CASA_CALLIBRARY
+  weblog:
+    rerender_stages: []  # list of stage numbers to force re-render; env var: WEBLOG_RERENDER_STAGES
   omp_num_threads: 4 # not used yet
   dask:
     tier0futures: true

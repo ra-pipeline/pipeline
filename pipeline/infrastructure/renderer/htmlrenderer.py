@@ -1763,9 +1763,14 @@ class T2_4MDetailsRenderer:
         force_rerender = getattr(renderer, 'always_rerender', False)
         debug_cls = renderer.__class__ in DEBUG_CLASSES
 
-        rerender_stages = [int(s)
-                           for s in os.environ.get('WEBLOG_RERENDER_STAGES', '').split(',')
-                           if s != '']
+        # Read stages to re-render: config.yaml default, env var overrides
+        from pipeline.config import get_pipeline_config
+        _stages = get_pipeline_config('weblog.rerender_stages', [], env_var='WEBLOG_RERENDER_STAGES')
+        # env var returns comma-separated string; config returns list
+        if isinstance(_stages, str):
+            rerender_stages = [int(s) for s in _stages.split(',') if s != '']
+        else:
+            rerender_stages = list(_stages)
         force_rerender = force_rerender or debug_cls or result.stage_number in rerender_stages
 
         if force_rerender:

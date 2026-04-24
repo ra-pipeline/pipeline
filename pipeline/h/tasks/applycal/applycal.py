@@ -286,7 +286,13 @@ class SerialApplycal(basetask.StandardTaskTemplate):
         # the inputs. Using hide_empty gives the data the expected shape.
         merged = calstate.merged(hide_empty=True)
 
-        if os.getenv('DISABLE_CASA_CALLIBRARY', False):
+        # Read callibrary toggle: config.yaml default, env var overrides
+        from pipeline.config import get_pipeline_config
+        _disable_callib = get_pipeline_config(
+            'heuristics.disable_casa_callibrary', False,
+            env_var='DISABLE_CASA_CALLIBRARY', as_type=bool)
+
+        if _disable_callib:
             LOG.info('CASA callibrary disabled: reverting to non-callibrary applycal call')
             jobs = jobs_without_calapply(merged, inputs, self.modify_task_args)
         elif contains_uvcont_table(merged):
