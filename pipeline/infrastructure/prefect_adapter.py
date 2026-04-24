@@ -84,6 +84,32 @@ def is_prefect_enabled() -> bool:
         return False
 
 
+def _apply_prefect_config() -> None:
+    """Apply Prefect-related settings from ``config.yaml`` to the environment.
+
+    This function reads ``pipeconfig.prefect`` from the pipeline configuration
+    and sets corresponding environment variables (e.g. ``PREFECT_API_URL``)
+    when they are not already set.  This lets users consolidate all Prefect
+    configuration in ``config.yaml`` instead of managing separate env vars.
+
+    This is idempotent and should be called once at the start of each
+    Prefect flow.
+    """
+    try:
+        from pipeline.config import config
+
+        prefect_cfg = config.get('pipeconfig', {}).get('prefect', {})
+
+        # api_url → PREFECT_API_URL  (only if not already set by the user)
+        api_url = prefect_cfg.get('api_url')
+        if api_url and not os.environ.get('PREFECT_API_URL'):
+            os.environ['PREFECT_API_URL'] = str(api_url)
+            LOG.info('Set PREFECT_API_URL=%s from config.yaml', api_url)
+
+    except Exception as exc:
+        LOG.debug('Could not apply Prefect config from config.yaml: %s', exc)
+
+
 # ---------------------------------------------------------------------------
 # Lightweight result summary
 # ---------------------------------------------------------------------------
@@ -820,29 +846,48 @@ def _run_named_tasks_flow_impl(
 # Register Prefect-decorated flows (only when Prefect is available)
 # ---------------------------------------------------------------------------
 
+
+def _get_prefect_config() -> dict:
+    """Read ``pipeconfig.prefect`` from config.yaml, with sensible defaults."""
+    try:
+        from pipeline.config import config
+
+        return config.get('pipeconfig', {}).get('prefect', {})
+    except Exception:
+        return {}
+
+
 if _PREFECT_AVAILABLE:
 
-    @flow(name='CASA Pipeline PPR', log_prints=True)
+    _pcfg = _get_prefect_config()
+    _flow_name = _pcfg.get('flow_name', 'CASA Pipeline')
+    _log_prints = _pcfg.get('log_prints', True)
+
+    @flow(name=f'{_flow_name} PPR', log_prints=_log_prints)
     def run_ppr_flow(pprXmlFile: str, **kwargs) -> None:
         """Prefect flow wrapping :func:`executeppr.executeppr`."""
+        _apply_prefect_config()
         _register_dask_observer()
         return _run_ppr_flow_impl(pprXmlFile, **kwargs)
 
-    @flow(name='CASA Pipeline VLA PPR', log_prints=True)
+    @flow(name=f'{_flow_name} VLA PPR', log_prints=_log_prints)
     def run_vla_ppr_flow(pprXmlFile: str, **kwargs) -> None:
         """Prefect flow wrapping :func:`executevlappr.executeppr`."""
+        _apply_prefect_config()
         _register_dask_observer()
         return _run_vla_ppr_flow_impl(pprXmlFile, **kwargs)
 
-    @flow(name='CASA Pipeline Recipe', log_prints=True)
+    @flow(name=f'{_flow_name} Recipe', log_prints=_log_prints)
     def run_recipe_flow(**kwargs) -> Any:
         """Prefect flow wrapping :func:`recipereducer.reduce`."""
+        _apply_prefect_config()
         _register_dask_observer()
         return _run_recipe_flow_impl(**kwargs)
 
-    @flow(name='CASA Pipeline Named Tasks', log_prints=True)
+    @flow(name=f'{_flow_name} Named Tasks', log_prints=_log_prints)
     def run_named_tasks_flow(tasks: Any) -> Any:
         """Prefect flow wrapping :func:`recipereducer.run_named_tasks`."""
+        _apply_prefect_config()
         _register_dask_observer()
         return _run_named_tasks_flow_impl(tasks)
 
