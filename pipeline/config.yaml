@@ -51,7 +51,7 @@ pipeconfig:
         # queue: "queue"
         cores: 1 # Total number of cores per job
         processes: 1 # Number of Python processes per job        
-        memory: "10gb" # Total memory per job
+        memory: "20gb" # Total memory per job
         walltime: "1-0:0:0"
         # interface: "eno1"        
       htcondor:

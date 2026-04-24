@@ -597,8 +597,8 @@ def default_n_workers():
     """Dynamically determins the optimal default n_worker."""
     from dask.system import CPU_COUNT
 
-    # cape the fallback local/jobqueue worker number at 4
-    default_n_workers_local = min(CPU_COUNT, 4)
+    # cape the fallback local/jobqueue worker number at 6
+    default_n_workers_local = min(CPU_COUNT, 6)
 
     # discover the cores assigned to slurm/htcondor jobs
     num_slurm_core = int(os.getenv('SLURM_NTASKS', 0))
