@@ -859,6 +859,10 @@ def _get_prefect_config() -> dict:
 
 if _PREFECT_AVAILABLE:
 
+    # Apply config BEFORE defining @flow-decorated functions so that
+    # PREFECT_API_URL is set when Prefect resolves the server connection.
+    _apply_prefect_config()
+
     _pcfg = _get_prefect_config()
     _flow_name = _pcfg.get('flow_name', 'CASA Pipeline')
     _log_prints = _pcfg.get('log_prints', True)

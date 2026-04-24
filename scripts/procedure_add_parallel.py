@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """procedure_add_parallel.py - Add parallel=True to procedure XML tasks that support it.
 
 Background
