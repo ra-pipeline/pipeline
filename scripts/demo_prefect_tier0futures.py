@@ -22,9 +22,11 @@ from contextlib import contextmanager
 
 # --- Configuration -----------------------------------------------------------
 store_dir = '/lustre/cv/users/rxue/datasets/alma_if/'
+store_dir = '/zfs/data0/Workspace/nrao/datasets/alma_if/'
 ppr_file = store_dir + '2016.1.00053.S/rawdata/PPR_uid___A001_X889_X107_tier0.xml'
 raw_dir = store_dir + '2016.1.00053.S/rawdata/'
 work_dir = '/lustre/naasc/sciops/comm/rxue/tests/projs/2016.1.00053.S/prefect_tier0futures/'
+work_dir = '/zfs/data2/Workspace/nrao/tests/projs/2016.1.00053.S/prefect_tier0future/'
 prefect_api_url = 'http://127.0.0.1:4200/api'  # set to None to use ephemeral in-process API
 # -----------------------------------------------------------------------------
 
