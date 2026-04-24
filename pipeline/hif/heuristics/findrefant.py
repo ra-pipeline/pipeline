@@ -28,18 +28,16 @@
 # -------
 
 import collections
-import os
 import operator
-from typing import Dict
+import os
 
 import numpy
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.vdp as vdp
-from pipeline.infrastructure import casa_tasks
-from pipeline.infrastructure import casa_tools
+from pipeline.infrastructure import casa_tasks, casa_tools
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 # ------------------------------------------------------------------------------
@@ -806,7 +804,7 @@ class RefAntFlagging:
 
 # ------------------------------------------------------------------------------
 
-    def calc_score(self) -> Dict[str, float]:
+    def calc_score(self) -> dict[str, float]:
         """
         Calculate the number of unflagged (good) measurements for each
         antenna, determine the score, and return them.
@@ -862,7 +860,7 @@ class RefAntFlagging:
 
 # ------------------------------------------------------------------------------
 
-    def _get_good(self, intent: str) -> Dict[str, float]:
+    def _get_good(self, intent: str) -> dict[str, float]:
         # Update April 2015 to use the flagging task instead of the agent flagger
         task_args = {'vis'          : self.vis,
                      'mode'         : 'summary',
@@ -921,7 +919,7 @@ class RefAntFlagging:
 # ------------------------------------------------------------------------------
 
     @staticmethod
-    def _calc_score(good: Dict[str, float]) -> Dict[str, float]:
+    def _calc_score(good: dict[str, float]) -> dict[str, float]:
         if good:
             # Maximum number of unflagged datapoints across all antennas.
             max_unflagged = max(good.values())

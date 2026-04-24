@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy
 from pydantic import BaseModel, ConfigDict, computed_field
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 
 class Polarization(BaseModel):
@@ -14,8 +17,8 @@ class Polarization(BaseModel):
 
     id: int
     num_corr: int
-    corr_type: Any
-    corr_product: Any
+    corr_type: NDArray
+    corr_product: NDArray
 
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
@@ -26,8 +29,8 @@ class Polarization(BaseModel):
         self,
         id: int | None = None,
         num_corr: int | None = None,
-        corr_type: Any | None = None,
-        corr_product: Any | None = None,
+        corr_type: NDArray | None = None,
+        corr_product: NDArray | None = None,
         **data: Any,
     ) -> None:
         """Create a Polarization.

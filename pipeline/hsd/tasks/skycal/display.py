@@ -3,32 +3,39 @@ from __future__ import annotations
 
 import glob
 import os
+import traceback
+from typing import TYPE_CHECKING
+
+import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.ticker import NullFormatter
-import numpy as np
-import traceback
 
-import pipeline.infrastructure.logging as logging
+import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.renderer.logger as logger
-from pipeline.h.tasks.common.displays import common as common
-from pipeline.h.tasks.common.displays import bandpass as bandpass
-from ..common import display as sd_display
+from pipeline.h.tasks.common.displays.common import (
+    AntComposite, LeafComposite, PlotbandpassDetailBase,
+)
+from pipeline.h.tasks.common.displays.bandpass import BandpassDetailChart
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.displays.plotstyle import casa5style_plot
-from typing import TYPE_CHECKING, Any, NoReturn
+from ..common import display as sd_display
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from typing import Any, NoReturn
+
+    from numpy import generic
+    from numpy.typing import NDArray
     from matplotlib.axes import Axes
+
     from pipeline.domain import Field, MeasurementSet, Scan
     from pipeline.hsd.tasks.skycal.skycal import SDSkyCalResults
     from pipeline.infrastructure.callibrary import CalApplication
     from pipeline.infrastructure.launcher import Context
     from pipeline.infrastructure.jobrequest import JobRequest
 
-
-LOG = logging.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 def get_field_from_ms(ms: MeasurementSet, field: str) -> list[Field]:
@@ -42,7 +49,7 @@ def get_field_from_ms(ms: MeasurementSet, field: str) -> list[Field]:
         field: Field selection string
 
     Returns:
-        List of field domain objects
+        list of field domain objects
     """
     field_list = []
     if field.isdigit():
@@ -56,7 +63,7 @@ def get_field_from_ms(ms: MeasurementSet, field: str) -> list[Field]:
     return field_list
 
 
-class SingleDishSkyCalDisplayBase(object):
+class SingleDishSkyCalDisplayBase:
     """Base display class for skycal stage."""
 
     def init_with_field(self, context: Context, result: SDSkyCalResults, field: str) -> None:
@@ -111,7 +118,7 @@ class SingleDishSkyCalDisplayBase(object):
         raise NotImplementedError()
 
 
-class SingleDishSkyCalAmpVsFreqSummaryChart(common.PlotbandpassDetailBase, SingleDishSkyCalDisplayBase):
+class SingleDishSkyCalAmpVsFreqSummaryChart(PlotbandpassDetailBase, SingleDishSkyCalDisplayBase):
     """Class for plotting Amplitude vs. Frequency summary chart.
 
     The summary charts are displayed in the main page of hsd_skycal in the weblog.
@@ -126,11 +133,15 @@ class SingleDishSkyCalAmpVsFreqSummaryChart(common.PlotbandpassDetailBase, Singl
             result: SDSkyCalResults instance
             field: Field string. Either field id or field name.
         """
-        super(SingleDishSkyCalAmpVsFreqSummaryChart, self).__init__(context, result,
-                                                                    'freq', 'amp',
-                                                                    showatm=True,
-                                                                    overlay='antenna',
-                                                                    solutionTimeThresholdSeconds=3600.)
+        super().__init__(
+            context,
+            result,
+            'freq',
+            'amp',
+            showatm=True,
+            overlay='antenna',
+            solutionTimeThresholdSeconds=3600.0,
+        )
 
         self.context = context
         # self._figfile structure: {spw_id: {antenna_id: filename}}
@@ -292,7 +303,7 @@ class SingleDishSkyCalAmpVsFreqSummaryChart(common.PlotbandpassDetailBase, Singl
             os.remove(fig)
 
 
-class SingleDishSkyCalAmpVsFreqDetailChart(bandpass.BandpassDetailChart, SingleDishSkyCalDisplayBase):
+class SingleDishSkyCalAmpVsFreqDetailChart(BandpassDetailChart, SingleDishSkyCalDisplayBase):
     """Class for plotting Amplitude vs. Frequency detail chart.
 
     The detail charts are displayed in the sub page (sky_level_vs_frequency.html) of hsd_skycal
@@ -404,10 +415,15 @@ class SingleDishSkyCalAmpVsFreqDetailChart(bandpass.BandpassDetailChart, SingleD
         if solution_interval is not None:
             extra_options['solutionTimeThresholdSeconds'] = solution_interval
 
-        super(SingleDishSkyCalAmpVsFreqDetailChart, self).__init__(
-            context, result, xaxis='freq', yaxis='amp',
-            showatm=True, overlay='time',
-            **extra_options)
+        super().__init__(
+            context,
+            result,
+            xaxis='freq',
+            yaxis='amp',
+            showatm=True,
+            overlay='time',
+            **extra_options,
+        )
 
         self.init_with_field(context, result, field)
 
@@ -417,7 +433,7 @@ class SingleDishSkyCalAmpVsFreqDetailChart(bandpass.BandpassDetailChart, SingleD
         Return:
             List of plot object.
         """
-        wrappers = super(SingleDishSkyCalAmpVsFreqDetailChart, self).plot()
+        wrappers = super().plot()
 
         self.add_field_identifier(wrappers)
 
@@ -436,7 +452,7 @@ class SingleDishSkyCalAmpVsFreqDetailChart(bandpass.BandpassDetailChart, SingleD
                 self._figfile[spw_id][antenna_id] = new_figfile
 
 
-class SingleDishPlotmsLeaf(object):
+class SingleDishPlotmsLeaf:
     """Class to execute plotms and return a plot wrapper.
 
     Task arguments for plotms are customized for single dish usecase.
@@ -590,7 +606,7 @@ class SingleDishPlotmsLeaf(object):
                            command=str(task))
 
 
-class SingleDishPlotmsSpwComposite(common.LeafComposite):
+class SingleDishPlotmsSpwComposite(LeafComposite):
     """
     Create a PlotLeaf for each spw in the caltable or caltables.
     """
@@ -615,7 +631,7 @@ class SingleDishPlotmsSpwComposite(common.LeafComposite):
         super().__init__(children)
 
 
-class SingleDishPlotmsAntSpwComposite(common.LeafComposite):
+class SingleDishPlotmsAntSpwComposite(LeafComposite):
     """Class to create a PlotLeaf for each antenna and spw."""
 
     leaf_class = SingleDishPlotmsSpwComposite
@@ -628,10 +644,10 @@ class SingleDishPlotmsAntSpwComposite(common.LeafComposite):
         children = [self.leaf_class(context, result, dict_calapp_ants[ant], xaxis, yaxis,
                     ant=int(ant), pol=pol, **kwargs)
                     for ant in table_ants]
-        super(SingleDishPlotmsAntSpwComposite, self).__init__(children)
+        super().__init__(children)
 
 
-class SingleDishPlotmsAntComposite(common.AntComposite):
+class SingleDishPlotmsAntComposite(AntComposite):
     """Class to create a PlotLeaf for each antenna."""
 
     leaf_class = SingleDishPlotmsLeaf
@@ -652,9 +668,14 @@ class SingleDishSkyCalAmpVsTimeSummaryChart(SingleDishPlotmsSpwComposite):
             result: SDSkyCalResults instance.
             calapp: List of CalApplication instances.
         """
-        super(SingleDishSkyCalAmpVsTimeSummaryChart, self).__init__(context, result, calapp,
-                                                                    xaxis='time', yaxis='amp',
-                                                                    coloraxis='field')
+        super().__init__(
+            context,
+            result,
+            calapp,
+            xaxis='time',
+            yaxis='amp',
+            coloraxis='field',
+        )
 
 
 class SingleDishSkyCalAmpVsTimeDetailChart(SingleDishPlotmsAntSpwComposite):
@@ -673,16 +694,21 @@ class SingleDishSkyCalAmpVsTimeDetailChart(SingleDishPlotmsAntSpwComposite):
             result: SDSkyCalResults instance.
             calapp: List of CalApplication instances.
         """
-        super(SingleDishSkyCalAmpVsTimeDetailChart, self).__init__(context, result, calapp,
-                                                                   xaxis='time', yaxis='amp',
-                                                                   coloraxis='field')
+        super().__init__(
+            context,
+            result,
+            calapp,
+            xaxis='time',
+            yaxis='amp',
+            coloraxis='field',
+        )
 
 
 @casa5style_plot
 def plot_elevation_difference(
         context: Context,
         result: SDSkyCalResults,
-        eldiff: dict[str, np.ndarray],
+    eldiff: dict[str, NDArray[generic]],
         threshold: float = 3.0
         ) -> list[logger.Plot]:
     """Generate plot of elevation difference.

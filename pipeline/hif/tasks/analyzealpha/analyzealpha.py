@@ -7,6 +7,7 @@ from pipeline.infrastructure import basetask, casa_tools, task_registry, utils, 
 
 if TYPE_CHECKING:
     from pipeline.infrastructure.launcher import Context
+    from pipeline.infrastructure.utils.casa_types import DirectionDict
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -140,7 +141,7 @@ class Analyzealpha(basetask.StandardTaskTemplate):
             dec_head = qt.quantity(header['CRVAL'][1], header['CUNIT2'])
 
             # Create DirectionDict measure dictionary for the image center
-            direction: utils.DirectionDict = {
+            direction: DirectionDict = {
                 'm0': ra_head,
                 'm1': dec_head,
                 'refer': header.get('RADESYS', 'J2000'),

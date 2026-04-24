@@ -16,7 +16,7 @@ import pipeline.infrastructure as infrastructure
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.utils import absolute_path, list_to_str
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 def __coldesc(vtype: str, option: int, maxlen: int, ndim: int, comment: str, unit: str | None = None) -> dict:
@@ -205,7 +205,6 @@ class DataTableIndexer(BaseModel):
         object.__setattr__(self, 'nrow_per_ms', nrow_per_ms)
         object.__setattr__(self, 'num_mses', len(nrow_per_ms))
 
-
     def serial2perms(self, i: int) -> tuple[str, int]:
         """Return basename of origin MS and per-MS row id of a given serial index."""
         base = 0
@@ -287,7 +286,6 @@ class DataTableImpl(BaseModel):
         self.tb1 = casa_tools._logging_table_cls()
         self.tb2 = casa_tools._logging_table_cls()
         self.isopened = False
-
 
         if self.datatable_name is None or len(self.datatable_name) == 0:
             readonly = False if self.readonly is None else self.readonly
@@ -719,7 +717,8 @@ class DataTableImpl(BaseModel):
                 from_fields = [to_fieldid]
             else:
                 atm_fields = msobj.get_fields(intent='ATMOSPHERE')
-                test_prefix = '%s_OFF_' % to_field.clean_name
+                # absolute OFF
+                test_prefix = '{}_OFF_'.format(to_field.clean_name)
                 nearest_id = np.where([a.clean_name.startswith(test_prefix) for a in atm_fields])[0]
                 if len(nearest_id) > 0:
                     from_fields = [atm_fields[i].id for i in nearest_id]

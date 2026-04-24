@@ -1,8 +1,8 @@
-import os
 import collections
+import os
 import shutil
-from typing import List, Dict
 from collections import defaultdict
+
 import numpy as np
 
 import pipeline.hif.heuristics.findrefant as findrefant
@@ -18,7 +18,7 @@ from pipeline.infrastructure import utils
 from pipeline.hifv.heuristics import getBCalStatistics
 
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class testBPdcalsInputs(vdp.StandardInputs):
@@ -64,7 +64,7 @@ class testBPdcalsInputs(vdp.StandardInputs):
                 Example: refant = 'ea01, ea02'
 
         """
-        super(testBPdcalsInputs, self).__init__()
+        super().__init__()
         self.context = context
         self.vis = vis
         self._weakbp = weakbp
@@ -128,7 +128,7 @@ class testBPdcalsResults(basetask.Results):
         if ignorerefant is None:
             ignorerefant = []
 
-        super(testBPdcalsResults, self).__init__()
+        super().__init__()
 
         self.vis = vis
         self.pool = pool[:]
@@ -169,8 +169,8 @@ class testBPdcals(basetask.StandardTaskTemplate):
     Inputs = testBPdcalsInputs
 
     @staticmethod
-    def _field_id_strings_from_scans(ms: object, scan_select_string: str) -> List[str]:
-        scan_ids: List[int] = []
+    def _field_id_strings_from_scans(ms: object, scan_select_string: str) -> list[str]:
+        scan_ids: list[int] = []
         for part in (scan_select_string or '').split(','):
             part = part.strip()
             if not part:
@@ -189,7 +189,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
             LOG.exception('Failed to resolve scans from scan selection %r', scan_select_string)
             return []
 
-        field_id_strings: List[str] = []
+        field_id_strings: list[str] = []
         for scanobj in scanobjlist:
             if not getattr(scanobj, 'fields', None):
                 continue
@@ -342,7 +342,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
         """
         return results
 
-    def _do_testBPdcals(self, band: str, spwlist: List[str]):
+    def _do_testBPdcals(self, band: str, spwlist: list[str]):
         """Execute testBPdcals heuristics per band and spwlist
 
         Args:
@@ -398,8 +398,8 @@ class testBPdcals(basetask.StandardTaskTemplate):
                 LOG.info("Removing table: {!s}".format(tablename))
                 shutil.rmtree(tablename)
 
-        # PIPE-1637: adding ',' in the manual and auto refantignore parameter
-        refantignore = self.inputs.refantignore + ','.join(['', *self.ignorerefant])
+        refantignore = utils.build_refantignore(refantignore=self.inputs.refantignore, ignorerefant=self.ignorerefant)
+
         refantfield = self.inputs.context.evla['msinfo'][m.name].calibrator_field_select_string
 
         # PIPE-595: if refant list is not provided, compute refants else use provided refant list.
@@ -563,7 +563,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
         return gain_solint1, shortsol1, self.inputs.vis, bpdgain_touse, gtypecaltable,\
                ktypecaltable, bpcaltable, flaggedSolnApplycalbandpass, flaggedSolnApplycaldelay, RefAntOutput[0]
 
-    def _do_gtype_delaycal(self, caltable: str = None, RefAntOutput: List[str] = None, spwlist: List[str] = []) -> bool:
+    def _do_gtype_delaycal(self, caltable: str = None, RefAntOutput: list[str] = None, spwlist: list[str] = []) -> bool:
         """Perform a G-Type delay calibration with CASA task gaincal
 
         Args:
@@ -608,7 +608,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
                               'spwmap': [],
                               'parang': self.parang}
 
-        field_id_strings: List[str] = []
+        field_id_strings: list[str] = []
         for fieldidstring in (delay_field_select_string or '').split(','):
             fieldidstring = fieldidstring.strip()
             if not fieldidstring:
@@ -648,7 +648,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
         return True
 
     def _do_ktype_delaycal(self, caltable: str = None, addcaltable: str = None,
-                           RefAntOutput: List[str] = None, spw: str = '') -> bool:
+                           RefAntOutput: list[str] = None, spw: str = '') -> bool:
         """Perform a K-Type delay calibration with CASA task gaincal
 
         Args:
@@ -696,7 +696,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
                               'spwmap': [],
                               'parang': self.parang}
 
-        field_id_strings: List[str] = []
+        field_id_strings: list[str] = []
         for fieldidstring in (delay_field_select_string or '').split(','):
             fieldidstring = fieldidstring.strip()
             if not fieldidstring:
@@ -735,7 +735,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
 
         return True
 
-    def _check_flagSolns(self, flaggedSolnResult: Dict, RefAntOutput: List[str] = None) -> tuple[float, List[str]]:
+    def _check_flagSolns(self, flaggedSolnResult: dict, RefAntOutput: list[str] = None) -> tuple[float, list[str]]:
         """Change reference antenna list based on a critical fraction of flagged solutions
             (defined in the domain ms object)
 
@@ -767,7 +767,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
         return fracFlaggedSolns, RefAntOutput
 
     def _do_gtype_bpdgains(self, caltable: str, addcaltable: str = None, solint: str = 'int',
-                           RefAntOutput: List[str] = None, spwlist: List[str] = []) -> bool:
+                           RefAntOutput: list[str] = None, spwlist: list[str] = []) -> bool:
         """Perform a G-Type cal with CASA task gaincal on the bp'd gaintable
 
         Args:

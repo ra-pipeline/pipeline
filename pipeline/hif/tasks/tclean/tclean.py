@@ -2,8 +2,6 @@ import os
 import re
 import inspect
 
-from typing import Optional
-
 import numpy as np
 from scipy.ndimage import label
 
@@ -29,7 +27,7 @@ from .resultobjects import TcleanResult
 from .vlaautomaskthresholdsequence import VlaAutoMaskThresholdSequence
 from .vlassmaskthresholdsequence import VlassMaskThresholdSequence
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class TcleanInputs(cleanbase.CleanBaseInputs):
@@ -92,9 +90,9 @@ class TcleanInputs(cleanbase.CleanBaseInputs):
     @specmode.convert
     def specmode(self, value):
         if value == 'repBW':
-            self.orig_specmode = 'repBW'
+            self.hm_specmode = 'repBW'
             return 'cube'
-        self.orig_specmode = value
+        self.hm_specmode = value
         return value
 
     @vdp.VisDependentProperty
@@ -1483,7 +1481,7 @@ class Tclean(cleanbase.CleanBase):
                                                   restfreq=inputs.restfreq,
                                                   conjbeams=inputs.conjbeams,
                                                   uvrange=inputs.uvrange,
-                                                  orig_specmode=inputs.orig_specmode,
+                                                  hm_specmode=inputs.hm_specmode,
                                                   specmode=inputs.specmode,
                                                   gridder=inputs.gridder,
                                                   datacolumn=inputs.datacolumn,
@@ -1609,7 +1607,7 @@ class Tclean(cleanbase.CleanBase):
         imageheader.set_miscinfo(name=outfile, spw=self.inputs.spw, virtspw=virtspw,
                                  field=self.inputs.field, iter=iter,
                                  datatype=self.inputs.datatype, type=mom_type,
-                                 intent=self.inputs.intent, specmode=self.inputs.orig_specmode,
+                                 intent=self.inputs.intent, specmode=self.inputs.hm_specmode,
                                  context=context)
 
     # Calculate a "mom0_fc", "mom8_fc" and "mom10_fc: images: this is a moment
@@ -1890,12 +1888,12 @@ class Tclean(cleanbase.CleanBase):
         # Update the result.
         result.set_mom8(maxiter, mom8_name)
 
-    def _update_miscinfo(self, imagename: str, nfield: Optional[int] = None, datamin: Optional[float] = None,
-                         datamax: Optional[float] = None, datarms: Optional[float] = None,
-                         stokes: Optional[str] = None, effbw: Optional[float] = None,
-                         level: Optional[str] = None, ctrfrq: Optional[float] = None,
-                         obspatt: Optional[str] = None, arrays: Optional[str] = None,
-                         modifier: Optional[str] = None, session: Optional[str] = None):
+    def _update_miscinfo(self, imagename: str, nfield: int | None = None, datamin: float | None = None,
+                         datamax: float | None = None, datarms: float | None = None,
+                         stokes: str | None = None, effbw: float | None = None,
+                         level: str | None = None, ctrfrq: float | None = None,
+                         obspatt: str | None = None, arrays: str | None = None,
+                         modifier: str | None = None, session: str | None = None):
         """
         Update image header keywords.
 

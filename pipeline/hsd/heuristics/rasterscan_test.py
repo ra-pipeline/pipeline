@@ -15,29 +15,34 @@ Failure Cases:
   - non-raster pattern (PSW)
   - large pointing error: pointing error comparable to pointing interval
 """
+from __future__ import annotations
+
 import math
-from typing import Tuple
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 
 from . import rasterscan
 
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
-def random_noise(n: int, mean: int = 0, amp: int = 1, rs: np.random.mtrand.RandomState = None) -> np.ndarray:
+
+def random_noise(n: int, mean: int = 0, amp: int = 1, rs: np.random.mtrand.RandomState = None) -> NDArray:
     """Generate random noise.
 
     Generate random noise with given mean and maximum amplitude.
     Seed for random noise can be specified.
 
     Args:
-        n (int): number of random noise
-        mean (int, optional): mean value of random noise. Defaults to 0.
-        amp (int, optional): maximum amplitude of random noise. Defaults to 1.
-        rs (np.random.mtrand.RandomState, optional): seed for random noise. Defaults to None.
+        n: number of random noise
+        mean: mean value of random noise. Defaults to 0.
+        amp: maximum amplitude of random noise. Defaults to 1.
+        rs: seed for random noise. Defaults to None.
 
     Returns:
-        np.ndarray: random noise
+        An array of random noise.
     """
     if rs is None:
         r = np.random.rand(n)
@@ -46,7 +51,7 @@ def random_noise(n: int, mean: int = 0, amp: int = 1, rs: np.random.mtrand.Rando
     return (r - (0.5 - mean)) * amp / 0.5
 
 
-def generate_position_data_psw() -> Tuple[np.ndarray, np.ndarray]:
+def generate_position_data_psw() -> tuple[NDArray, NDArray]:
     """Generate position data for simulated position-switch observation.
 
     Generate position data for simulated position-switch observatin.
@@ -54,8 +59,8 @@ def generate_position_data_psw() -> Tuple[np.ndarray, np.ndarray]:
     position has ten data that contain random noise around commanded position.
 
     Returns:
-        tuple: two-tuple consisting of the list of x (R.A.) and
-               y (Dec.) directions
+        A two-tuple consisting of the list of x (R.A.) and
+               y (Dec.) directions.
     """
     xlist = [0, 1, 2, 3]
     ylist = [0, 1, 2, 3]
@@ -83,7 +88,7 @@ def generate_position_data_raster(
     scan_angle: float = 0.0,
     interval_factor: float = 1.0,
     pointing_error: float = 0.1
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[NDArray, NDArray]:
     """Generate position data for simulated OTF raster observation.
 
     Generate position data for simulated OTF raster observation
@@ -124,8 +129,8 @@ def generate_position_data_raster(
                         interval. Larger value corresponds to larger error.
                         defaults to 0.1.
     Returns:
-        tuple: two-tuple consisting of the list of x (R.A.) and
-               y (Dec.) directions
+        A two-tuple consisting of the list of x (R.A.) and
+               y (Dec.) directions.
     """
     x_interval = 0.1
     y_interval = x_interval * interval_factor
@@ -456,8 +461,6 @@ def test_find_angle_gap_by_range():
     assert np.array_equal(result, expected)
 
 
-
-
 @pytest.mark.parametrize(
     'oneway_row, oneway_map, scan_angle, interval_factor, pointing_error',
     [
@@ -539,7 +542,6 @@ def test_find_angle_gap():
     gaplist = rasterscan.find_angle_gap(angle)
     expected = np.array([21])
     assert np.array_equal(gaplist, expected)
-
 
 
 @pytest.mark.parametrize(

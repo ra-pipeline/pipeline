@@ -17,7 +17,7 @@ from .imageparams_vlass_single_epoch_cube import ImageParamsHeuristicsVlassSeCub
 from .imageparams_vlass_single_epoch_taper import ImageParamsHeuristicsVlassSeTaper
 
 
-class ImageParamsHeuristicsFactory(object):
+class ImageParamsHeuristicsFactory:
     """Imaging heuristics factory class."""
 
     @staticmethod

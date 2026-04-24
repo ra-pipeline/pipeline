@@ -1,15 +1,20 @@
+from __future__ import annotations
+
 import copy
 import os
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.vdp as vdp
 from pipeline.h.heuristics import caltable as bcaltable
 from pipeline.hif.tasks.common import commoncalinputs as commoncalinputs
-from pipeline.infrastructure.callibrary import CalApplication, CalFrom, CalToArgs
-from pipeline.infrastructure.launcher import Context
 from pipeline.infrastructure.pipelineqa import TargetDataSelection
+
+if TYPE_CHECKING:
+    from pipeline.infrastructure.callibrary import CalApplication, CalFrom, CalToArgs
+    from pipeline.infrastructure.launcher import Context
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -138,7 +143,7 @@ class BandpassResults(basetask.Results):
         if solint_adjustments is None:
             solint_adjustments = []
 
-        super(BandpassResults, self).__init__()
+        super().__init__()
         self.pool: list[CalApplication] = []
         self.final: list[CalApplication] = []
         self.preceding: list[basetask.Results] = []

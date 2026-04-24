@@ -2,7 +2,7 @@ import shutil
 import os
 import numpy as np
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -55,7 +55,7 @@ def fixpointing_offset_vlass(vis, intable='POINTING', antlist=[], timeoffset=[0.
 
     """
     r2d = 180.0 / np.pi
-    datestring = datetime.isoformat(datetime.today())
+    datestring = datetime.now(timezone.utc).isoformat()
     if not os.path.exists(vis + '/POINTING_ORIG'):
         shutil.copytree(vis + '/POINTING', vis + '/POINTING_ORIG')
         LOG.info('Copying POINTING to POINTING_ORIG')
@@ -435,7 +435,7 @@ def fixpointing_offset_vlass(vis, intable='POINTING', antlist=[], timeoffset=[0.
 
 class FixpointingResults(basetask.Results):
     def __init__(self):
-        super(FixpointingResults, self).__init__()
+        super().__init__()
         self.pipeline_casa_task = 'Fixpointing'
 
     def merge_with_context(self, context):
@@ -487,15 +487,21 @@ class Fixpointing(basetask.StandardTaskTemplate):
 
         antnames = []
         antlist = []
-        if datetime(2017, 9, 7, 0, 0, 0) < obs_start <= datetime(2017, 10, 23, 0, 0, 0):
+        if datetime(2017, 9, 7, 0, 0, 0, tzinfo=timezone.utc) < obs_start <= datetime(
+            2017, 10, 23, 0, 0, 0, tzinfo=timezone.utc
+        ):
             antnames = ['ea03', 'ea04', 'ea05', 'ea06', 'ea07', 'ea09', 'ea10', 'ea11', 'ea12', 'ea13', 'ea15', 'ea16',
                         'ea18', 'ea19', 'ea20', 'ea22', 'ea23', 'ea24', 'ea25', 'ea26', 'ea27', 'ea28']
 
-        if datetime(2017, 10, 23, 0, 0, 0) < obs_start <= datetime(2018, 2, 7, 0, 0, 0):
+        if datetime(2017, 10, 23, 0, 0, 0, tzinfo=timezone.utc) < obs_start <= datetime(
+            2018, 2, 7, 0, 0, 0, tzinfo=timezone.utc
+        ):
             antnames = ['ea03', 'ea04', 'ea05', 'ea06', 'ea07', 'ea09', 'ea10', 'ea11', 'ea12', 'ea13', 'ea15', 'ea16',
                         'ea18', 'ea19', 'ea20', 'ea22', 'ea23', 'ea24', 'ea25', 'ea26', 'ea27']
 
-        if datetime(2018, 2, 7, 0, 0, 0) < obs_start <= datetime(2018, 2, 20, 0, 0, 0):
+        if datetime(2018, 2, 7, 0, 0, 0, tzinfo=timezone.utc) < obs_start <= datetime(
+            2018, 2, 20, 0, 0, 0, tzinfo=timezone.utc
+        ):
             antnames = ['ea03', 'ea04', 'ea05', 'ea06', 'ea09', 'ea10', 'ea11', 'ea12', 'ea13', 'ea15', 'ea16', 'ea18',
                         'ea19', 'ea20', 'ea22', 'ea23', 'ea24', 'ea25', 'ea26', 'ea27']
 

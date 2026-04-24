@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field as PydanticField
+
+if TYPE_CHECKING:
+    from pipeline.domain import SpectralWindow
 
 polarization_map = {
     'linear': {0: ['XX', 9], 1: ['YY', 12], 2: ['XY', 10], 3: ['YX', 11]},
@@ -34,7 +37,7 @@ class DataDescription(BaseModel):
     """Data description domain object."""
 
     id: int = PydanticField(..., description='Numerical identifier of the data description')
-    spw: Any = PydanticField(..., description='SpectralWindow object')
+    spw: SpectralWindow = PydanticField(..., description='SpectralWindow object')
     pol_id: int = PydanticField(..., description='Polarization ID')
     obs_time: Any | None = PydanticField(default=None, description='Mean observation time')
     chan_freq: list[Any] = PydanticField(default_factory=list, description='Channel centre frequencies')
@@ -45,7 +48,7 @@ class DataDescription(BaseModel):
         validate_default=True,
     )
 
-    def __init__(self, id: int | None = None, spw: Any | None = None, pol_id: int | None = None, **data: Any) -> None:
+    def __init__(self, id: int | None = None, spw: SpectralWindow | None = None, pol_id: int | None = None, **data: Any) -> None:
         """Create a DataDescription.
 
         The legacy pipeline code constructs data descriptions positionally as

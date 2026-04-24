@@ -7,6 +7,7 @@ user.
 from __future__ import annotations
 
 import collections
+import collections.abc
 import datetime
 import decimal
 import math
@@ -14,11 +15,10 @@ import os
 import re
 import string
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterable, Iterator, Sequence
+from typing import TYPE_CHECKING
 
 import astropy.units as u
 import cachetools
-import numpy as np
 import pyparsing
 from astropy.coordinates import SkyCoord
 
@@ -26,6 +26,12 @@ from pipeline import infrastructure
 from pipeline.infrastructure import casa_tools
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator, Sequence
+    from typing import Any
+
+    from numpy import generic
+    from numpy.typing import NDArray
+
     from pipeline.domain import Field, MeasurementSet
 
 LOG = infrastructure.logging.get_logger(__name__)
@@ -185,7 +191,7 @@ def unix_seconds_to_datetime(unix_secs: list[int | float]) -> list[datetime.date
     Returns:
         List of equivalent Python datetime objects.
     """
-    return [datetime.datetime.utcfromtimestamp(s) for s in unix_secs]
+    return [datetime.datetime.fromtimestamp(s, datetime.timezone.utc) for s in unix_secs]
 
 
 def mjd_seconds_to_datetime(mjd_secs: list[int | float]) -> list[datetime.datetime]:
@@ -227,7 +233,7 @@ def get_epoch_as_datetime(epoch: dict) -> datetime.datetime:
     t = mt.getvalue(epoch_utc)['m0']
     t = qt.sub(t, base_time)
     t = qt.convert(t, 's')
-    t = datetime.datetime.utcfromtimestamp(qt.getvalue(t)[0])
+    t = datetime.datetime.fromtimestamp(qt.getvalue(t)[0], datetime.timezone.utc)
 
     return t
 
@@ -379,7 +385,7 @@ def ant_arg_to_id(ms_path: str, ant_arg: str | int, all_antennas) -> list[int]:
         return _parse_antenna(ant_arg, all_antennas)
 
 
-def _convert_arg_to_id(arg_name: str, ms_path: str, arg_val: str) -> dict[str, np.ndarray]:
+def _convert_arg_to_id(arg_name: str, ms_path: str, arg_val: str) -> dict[str, NDArray[generic]]:
     """Parse the CASA input argument and return the matching IDs.
 
     Originally the cache was set on this function with the cache size fixed at
@@ -657,7 +663,7 @@ def _parse_field(task_arg: str | None, fields: Field | None = None) -> list[int]
     return sorted(list(results))
 
 
-def _parse_antenna(task_arg: str | None, antennas: dict[str, np.ndarray] | None = None) -> list[int]:
+def _parse_antenna(task_arg: str | None, antennas: dict[str, NDArray[generic]] | None = None) -> list[int]:
     """Convert the antenna selection in CASA format to a list of antenna IDs.
 
     Inner method.

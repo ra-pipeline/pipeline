@@ -18,10 +18,15 @@ from pipeline import infrastructure
 from pipeline.domain import measures
 from pipeline.domain import spectralwindow
 from pipeline.infrastructure import casa_tools, tablereader, utils
-from pipeline.infrastructure.launcher import current_task_name
 
 if TYPE_CHECKING:
-    from pipeline.domain import Antenna, AntennaArray, DataDescription, DataType, Field, Polarization, Scan, State
+    from typing import Callable
+
+    from numpy import floating
+
+    from pipeline.domain import (Antenna, AntennaArray, DataDescription, DataType, Field,
+                                 Polarization, Scan, SpectralWindow, State)
+    from pipeline.infrastructure.utils.casa_types import EpochDict
     from pipeline.infrastructure.tablereader import RetrieveByIndexContainer
 
 LOG = infrastructure.logging.get_logger(__name__)
@@ -38,29 +43,29 @@ class MeasurementSet(BaseModel):
 
     acs_software_build_version: str | None = PydanticField(default=None)
     acs_software_version: str | None = PydanticField(default=None)
-    antenna_array: Any | None = PydanticField(default=None)
+    antenna_array: AntennaArray | None = PydanticField(default=None)
     array_name: str = PydanticField(default='')
     correlator_name: str | None = PydanticField(default=None)
     data_column: dict = PydanticField(default_factory=dict)
-    data_descriptions: list[Any] = PydanticField(default_factory=list)
+    data_descriptions: RetrieveByIndexContainer = PydanticField(default_factory=RetrieveByIndexContainer)
     data_types_per_source_and_spw: dict = PydanticField(default_factory=dict)
     execblock_id: str = PydanticField(default='')
-    fields: list[Any] = PydanticField(default_factory=list)
+    fields: RetrieveByIndexContainer = PydanticField(default_factory=RetrieveByIndexContainer)
     observer: str = PydanticField(default='')
     observing_modes: list[str] = PydanticField(default_factory=list)
-    polarizations: list[Any] = PydanticField(default_factory=list)
+    polarizations: list[Polarization] = PydanticField(default_factory=list)
     project_id: str = PydanticField(default='')
     representative_target: tuple[str | None, dict | None, dict | None] = PydanticField(
         default=(None, None, None)
     )
     representative_window: str | None = PydanticField(default=None)
-    scans: list[Any] = PydanticField(default_factory=list)
+    scans: list[Scan] = PydanticField(default_factory=list)
     schedblock_id: str = PydanticField(default='')
     science_goals: dict = PydanticField(default_factory=dict)
-    sources: list[Any] = PydanticField(default_factory=list)
-    spectral_windows: list[Any] = PydanticField(default_factory=list)
+    sources: RetrieveByIndexContainer = PydanticField(default_factory=RetrieveByIndexContainer)
+    spectral_windows: RetrieveByIndexContainer = PydanticField(default_factory=RetrieveByIndexContainer)
     spectralspec_spwmap: dict = PydanticField(default_factory=dict)
-    states: list[Any] = PydanticField(default_factory=list)
+    states: RetrieveByIndexContainer = PydanticField(default_factory=RetrieveByIndexContainer)
 
     derived_fluxes: dict[str, Any] | None = PydanticField(default=None)
     fluxscale_fluxes: dict[str, Any] | None = PydanticField(default=None)
@@ -159,7 +164,7 @@ class MeasurementSet(BaseModel):
         return intents
 
     @property
-    def antennas(self) -> list[Any]:
+    def antennas(self) -> list[Antenna]:
         """Return list of Antenna objects for all antennas in the measurement set."""
         if self.antenna_array is None:
             return []
@@ -175,7 +180,7 @@ class MeasurementSet(BaseModel):
         """Return whether this MS is for band-to-band interferometry."""
         return 'BandToBand Interferometry' in self.observing_modes or self.get_diffgain_mode() == 'B2B'
 
-    def get_antenna(self, search_term: str = '') -> list[Any]:
+    def get_antenna(self, search_term: str = '') -> list[Antenna]:
         """Return Antenna(s) for given antenna selection in CASA format."""
         if search_term == '':
             return self.antennas
@@ -186,7 +191,7 @@ class MeasurementSet(BaseModel):
             if antenna.id in utils.ant_arg_to_id(self.name, search_term, self.antennas)
         ]
 
-    def get_state(self, state_id: int | None = None) -> Any | None:
+    def get_state(self, state_id: int | None = None) -> State | None:
         """Return State in MeasurementSet matching the given identifier."""
         match = [state for state in self.states if state.id == state_id]
         return match[0] if match else None
@@ -197,7 +202,7 @@ class MeasurementSet(BaseModel):
         scan_intent: str | Sequence[str] | None = None,
         field: int | str | None = None,
         spw: int | str | Sequence[int] | Sequence[str] | None = None,
-    ) -> list[Any]:
+    ) -> list[Scan]:
         """Return scans matching the given criteria."""
         pool = self.scans
 
@@ -241,7 +246,7 @@ class MeasurementSet(BaseModel):
 
         return pool
 
-    def get_data_description(self, spw: Any | None = None, id: int | None = None) -> Any | None:
+    def get_data_description(self, spw: SpectralWindow | None = None, id: int | None = None) -> DataDescription | None:
         """Return the DataDescription matching the given criteria."""
         match = None
         if spw is not None:
@@ -497,7 +502,7 @@ class MeasurementSet(BaseModel):
 
         return pool
 
-    def get_spectral_window(self, spw_id: int | str) -> Any:
+    def get_spectral_window(self, spw_id: int | str) -> SpectralWindow:
         """Return the SpectralWindow object matching the given identifier."""
         spw_id = int(spw_id)
         match = [spw for spw in self.spectral_windows if spw.id == spw_id]
@@ -515,7 +520,7 @@ class MeasurementSet(BaseModel):
         science_windows_only: bool = True,
         spectralspecs: list[str] | None = None,
         intent: str | None = None,
-    ) -> list[Any]:
+    ) -> list[SpectralWindow]:
         """Return spectral windows matching given criteria."""
         spws = self.get_all_spectral_windows(task_arg, with_channels)
 
@@ -584,7 +589,7 @@ class MeasurementSet(BaseModel):
         self,
         task_arg: int | str = '',
         with_channels: bool = False,
-    ) -> list[Any]:
+    ) -> list[SpectralWindow]:
         """Return spectral windows corresponding to the given CASA-style spw argument."""
         if task_arg in (None, ''):
             task_arg = '*'
@@ -596,7 +601,7 @@ class MeasurementSet(BaseModel):
         if not with_channels:
             return [spw for spw in self.spectral_windows if spw.id in selected]
 
-        spws: list[Any] = []
+        spws: list[SpectralWindow] = []
         for spw_id, channels in selected.items():
             spw_obj = self.get_spectral_window(spw_id)
             proxy = spectralwindow.SpectralWindowWithChannelSelection(spw_obj, channels)
@@ -659,14 +664,14 @@ class MeasurementSet(BaseModel):
             return None
         start_time = utils.get_epoch_as_datetime(self.start_time)
         for cycle, (start_str, end_str) in cycle_numbers.items():
-            start = datetime.datetime.strptime(start_str, '%Y-%m-%d')
-            end = datetime.datetime.strptime(end_str, '%Y-%m-%d')
+            start = datetime.datetime.strptime(start_str, '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc)
+            end = datetime.datetime.strptime(end_str, '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc)
             if start <= start_time <= end:
                 return cycle
         return None
 
     @property
-    def start_time(self) -> dict | None:
+    def start_time(self) -> EpochDict | None:
         """Return start time for this measurement set as CASA 'epoch' measure dictionary."""
         if not self.scans:
             return None
@@ -677,7 +682,7 @@ class MeasurementSet(BaseModel):
         return earliest.start_time
 
     @property
-    def end_time(self) -> dict | None:
+    def end_time(self) -> EpochDict | None:
         """Return end time for this measurement set as CASA 'epoch' measure dictionary."""
         if not self.scans:
             return None
@@ -1049,7 +1054,7 @@ class MeasurementSet(BaseModel):
             elif stat_type == "median":
                 return float(np.median(integration))
 
-    def get_times_on_source_per_field_id(self, field: str, intent: str) -> dict[int, np.float]:
+    def get_times_on_source_per_field_id(self, field: str, intent: str) -> dict[int, floating]:
         """
         Return on-source time for given field ID(s) and intent(s).
 
@@ -1178,8 +1183,8 @@ class MeasurementSet(BaseModel):
 
     def set_data_type_dicts(
         self,
-        data_type_per_column: dict[Any, str],
-        data_types_per_source_and_spw: dict[tuple[str, int], list[Any]],
+        data_type_per_column: dict[DataType, str],
+        data_types_per_source_and_spw: dict[tuple[str, int], list[DataType]],
     ) -> None:
         """Set the data type lookup dictionaries from MS metadata.
 
@@ -1192,7 +1197,7 @@ class MeasurementSet(BaseModel):
 
     def set_data_column(
         self,
-        dtype: Any,
+        dtype: DataType,
         column: str,
         source: str | None = None,
         spw: str | None = None,
@@ -1281,7 +1286,7 @@ class MeasurementSet(BaseModel):
         else:
             return None
 
-    def get_data_type(self, column: str, source: str | None = None, spw: str | None = None) -> Any | None:
+    def get_data_type(self, column: str, source: str | None = None, spw: str | None = None) -> DataType | None:
         """Return the DataType associated with a column.
 
         If source and spw are both unset, the method will just look at the MS
@@ -1365,7 +1370,7 @@ class MeasurementSet(BaseModel):
 
     # PIPE-2307: moving compute_az_el_to_field, compute_az_el_for_ms methods from pipeline.infrastructure.htmlrenderer to here
     def compute_az_el_to_field(
-        self, field: Any | None = None, epoch: dict | None = None
+        self, field: Field | None = None, epoch: EpochDict | None = None
     ) -> list[float]:
         """Compute azimuth and elevation of a field at a given epoch.
 
@@ -1378,8 +1383,7 @@ class MeasurementSet(BaseModel):
             epoch: Dictionary representing the time epoch.
 
         Returns:
-            List containing azimuth (degrees) and elevation (degrees),
-            in that order.
+            A list containing azimuth (degrees) and elevation (degrees), in that order.
         """
         me = casa_tools.measures
         me.doframe(epoch)
@@ -1392,19 +1396,19 @@ class MeasurementSet(BaseModel):
 
         return [myaz, myel]
 
-    def compute_az_el_for_ms(self, func: Any) -> tuple[float, float]:
-        """Compute azimuth and elevation values across POINTING, SIDEBAND, ATMOSPHERE scans.
+    def compute_az_el_for_ms(self, func: Callable) -> tuple[float, float]:
+        """Computes overall azimuth and elevation values across POINTING, SIDEBAND, ATMOSPHERE scans.
 
         Applies the given aggregation function (e.g. min, max, mean) to
         azimuth and elevation values computed at the start and end of each
         field in science scans.
 
         Args:
-            func: Aggregation function taking a list of floats and returning
-                a single float. Examples: min, max, np.mean.
+            func: A function that takes a list of floats and returns a single float.
+                Common examples include `min`, `max`, or `np.mean`.
 
         Returns:
-            Tuple containing aggregated azimuth and elevation values.
+            A tuple containing the aggregated azimuth and elevation values.
         """
         cal_scans = self.get_scans(scan_intent='POINTING,SIDEBAND,ATMOSPHERE')
         scans = [s for s in self.scans if s not in cal_scans]

@@ -6,7 +6,7 @@ import decimal
 import itertools
 import json
 import operator
-from typing import Any, Iterable, Iterator, Sequence
+from typing import TYPE_CHECKING, Any
 
 import numpy
 from pydantic import BaseModel, ConfigDict, Field as PydanticField, PrivateAttr, field_validator
@@ -15,6 +15,10 @@ from pipeline import infrastructure
 from pipeline.domain import measures
 from pipeline.infrastructure import casa_tools
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator, Sequence
+
+    from numpy.typing import NDArray
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -101,7 +105,7 @@ class ChannelList:
         self.chan_widths = chan_widths
         self.chan_effbws = effbw
 
-    def __iter__(self) -> Iterator['Channel']:
+    def __iter__(self) -> Iterator[Channel]:
         raw_channel_data = list(zip(self.chan_freqs, self.chan_widths, self.chan_effbws))
         for chan_centre, chan_width, chan_effective_bw in raw_channel_data:
             yield self.__create_channel(chan_centre, chan_width, chan_effective_bw)
@@ -109,7 +113,7 @@ class ChannelList:
     def __len__(self) -> int:
         return len(self.chan_freqs)
 
-    def __getitem__(self, index: int) -> 'Channel':
+    def __getitem__(self, index: int) -> Channel:
         return self.__create_channel(
             self.chan_freqs[index],
             self.chan_widths[index],
@@ -121,7 +125,7 @@ class ChannelList:
         centre: int | float,
         width: int | float,
         effective_bw: int | float,
-    ) -> 'Channel':
+    ) -> Channel:
         """Return a Channel object for given parameters.
 
         Args:
@@ -166,7 +170,7 @@ class Channel:
     def __setstate__(self, state: tuple[measures.FrequencyRange, measures.Frequency]) -> None:
         self.frequency_range, self.effective_bw = state
 
-    def __eq__(self, other: 'Channel') -> bool:
+    def __eq__(self, other: Channel) -> bool:
         if not isinstance(other, Channel):
             return False
         if other.frequency_range != self.frequency_range:
@@ -175,7 +179,7 @@ class Channel:
             return False
         return True
 
-    def __ne__(self, other: 'Channel') -> bool:
+    def __ne__(self, other: Channel) -> bool:
         return not self.__eq__(other)
 
     def __repr__(self) -> str:
@@ -260,7 +264,7 @@ class SpectralWindow(BaseModel):
     sideband: str | int = PydanticField(..., description='Sideband')
     baseband: str | int = PydanticField(..., description='Baseband')
     receiver: str | None = PydanticField(default=None, description='Receiver type')
-    freq_lo: list[float] | numpy.ndarray | None = PydanticField(
+    freq_lo: list[float] | NDArray | None = PydanticField(
         default=None,
         description='LO frequencies',
     )
@@ -269,7 +273,7 @@ class SpectralWindow(BaseModel):
     transitions: list[str] | None = PydanticField(default=None, description='Spectral transitions')
     sdm_num_bin: int | None = PydanticField(default=None, description='SDM num bin')
     correlation_bits: str | None = PydanticField(default=None, description='Correlation bits')
-    median_receptor_angle: numpy.ndarray | None = PydanticField(default=None, description='Median receptor angle')
+    median_receptor_angle: NDArray | None = PydanticField(default=None, description='Median receptor angle')
     specline_window: bool = PydanticField(default=False, description='Spectral line window flag')
     grouping_id: str | None = PydanticField(default=None, description='Grouping ID')
     intents: set[str] = PydanticField(default_factory=set, description='Observing intents')
@@ -302,7 +306,7 @@ class SpectralWindow(BaseModel):
         sideband: str | int | None = None,
         baseband: str | int | None = None,
         receiver: str | None = None,
-        freq_lo: list[float] | numpy.ndarray | None = None,
+        freq_lo: list[float] | NDArray | None = None,
         **data: Any,
     ) -> None:
         """Create a SpectralWindow.

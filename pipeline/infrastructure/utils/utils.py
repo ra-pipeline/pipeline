@@ -20,24 +20,32 @@ import shutil
 import string
 import tarfile
 import time
-from collections.abc import Callable, Collection, Iterable, Iterator, Sequence
-from datetime import datetime
+from collections.abc import Iterable
+from datetime import datetime, timezone
 from functools import wraps
 from numbers import Number
-from typing import TYPE_CHECKING, Any, DefaultDict, OrderedDict, TextIO, TypedDict
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import numpy as np
-import numpy.typing as npt
 
 from pipeline import infrastructure
 from pipeline.infrastructure import casa_tools
 from .conversion import commafy, dequote, range_to_list
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Collection, Iterator, Sequence
+    from io import TextIOWrapper
+    from typing import Any, DefaultDict, OrderedDict
+
+    from numpy import generic
+    from numpy.typing import NDArray
+
     from pipeline.domain import Field, MeasurementSet
     from pipeline.infrastructure.filenamer import PipelineProductNameBuilder
     from pipeline.infrastructure.launcher import Context
+
+    ConditionType = Callable | dict[str, dict[str, dict[str, Any]]]
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -45,6 +53,7 @@ __all__ = [
     'absolute_path',
     'approx_equal',
     'are_equal',
+    'build_refantignore',
     'clear_time_cache',
     'compute_zenith_distance',
     'deduplicate',
@@ -81,28 +90,11 @@ __all__ = [
     'remove_trailing_string',
     'string_to_val',
     'validate_url',
-    'DirectionDict',
-    'EpochDict',
-    'QuantityDict',
 ]
 
-
-class QuantityDict(TypedDict):
-    unit: str
-    value: float
-
-
-class DirectionDict(TypedDict):
-    m0: QuantityDict
-    m1: QuantityDict
-    refer: str
-    type: str
-
-
-class EpochDict(TypedDict):
-    m0: QuantityDict
-    refer: str
-    type: str
+# Import TypedDict definitions from centralized module for type checking only
+if TYPE_CHECKING:
+    from pipeline.infrastructure.utils.casa_types import DirectionDict, EpochDict, QuantityDict
 
 
 def find_ranges(data: str | list[int]) -> str:
@@ -165,7 +157,7 @@ def dict_merge(a: dict, b: dict | Any) -> dict:
     return result
 
 
-def are_equal(a: list | np.ndarray, b: list | np.ndarray) -> bool:
+def are_equal(a: list | NDArray[generic], b: list | NDArray[generic]) -> bool:
     """Return True if the contents of the given arrays are equal.
 
     This utility function check the equivalence of array like objects. Two arrays
@@ -198,7 +190,7 @@ def approx_equal(x: float, y: float, tol: float = 1e-15) -> bool:
     return (lo + 0.5 * tol) >= (hi - 0.5 * tol)
 
 
-def flagged_intervals(vec: list | np.ndarray) -> list:
+def flagged_intervals(vec: list | NDArray[generic]) -> list:
     """Idendity isnads of ones in input array or list.
 
     This utility function finds islands of ones in array or list provided in argument.
@@ -418,10 +410,10 @@ def get_si_prefix(value: float, select: str = 'mu', lztol: int = 0) -> tuple[str
     , after the prefix is applied.
 
     Args:
-        value (float): the numerical value for picking the prefix.
-        select (str, optional): SI prefix candidates, a substring of "yzafpnum kMGTPEZY").
+        value: the numerical value for picking the prefix.
+        select: SI prefix candidates, a substring of "yzafpnum kMGTPEZY".
             Defaults to 'mu'.
-        lztol (int, optional): leading zeros tolerance.
+        lztol: leading zeros tolerance.
             Defaults to 0 (avoid any leading zeros when possible).
 
     Returns:
@@ -698,13 +690,13 @@ def ignore_pointing(vis: str | list[str] | set[str]):
 
 
 @contextlib.contextmanager
-def open_with_lock(filename: str, mode: str = 'r', *args: Any, **kwargs: Any) -> Iterator[TextIO]:
+def open_with_lock(filename: str, mode: str = 'r', *args: Any, **kwargs: Any) -> Iterator[TextIOWrapper]:
     """Open a file with an exclusive lock.
 
     This context manager attempts to acquire an exclusive lock on the file upon opening.
     Other processes using `open_with_lock` will wait until the lock is automatically released
     when exiting the context.
-    
+
     Args:
         filename: Path to the file to open and lock.
         mode: File open mode (e.g., 'rt', 'wt', 'a', 'rb').
@@ -724,11 +716,11 @@ def open_with_lock(filename: str, mode: str = 'r', *args: Any, **kwargs: Any) ->
         **Filesystem Support:**
         The Python `fcntl` API's behavior depends on the underlying OS/storage
         implementation: https://docs.python.org/3/library/fcntl.html. Not all
-        OS/file systems fully support file locking.        
+        OS/file systems fully support file locking.
         - **Lustre**: Requires mount option `-o flock`. Check with: `mount -l | grep lustre`
             e.g. : `192.168.1.30@o2ib:/aoclst03 on /.lustre/aoc type lustre (rw,flock,user_xattr,lazystatfs)`
         - **NFS**: Support varies by configuration (see PIPE-2051 for details)
-        - **Local filesystems**: Generally well-supported on Unix-like systems        
+        - **Local filesystems**: Generally well-supported on Unix-like systems
 
         **Testing Lock Behavior:**
         To verify exclusive locking works on your system, run this from multiple processes:
@@ -866,30 +858,27 @@ def remove_trailing_string(s: str, t: str) -> str:
         return s
 
 
-ConditionType = Callable | dict[str, dict[str, dict[str, Any]]]
-
-
 def function_io_dumper(to_pickle: bool=True, to_json: bool=False, json_max_depth: int=5,
                        condition: ConditionType | None = None, timestamp: bool=True):
     """
     Dump arguments and return-objects of a function implement the decolator into pickle files and/or JSON(-like) file.
-    
+
     This function is a helper method for development. It should not be used in production codes.
-    
+
     Usage:
     @function_io_dumper()
     def foobar(self, bar):
         ...
         return ret
-    
+
     When foobar() is executed, the decolator makes a directory 'foobar.[timestamp]', then it dumps
     all objects of arguments and return values of foobar() as pickle files and|or JSON files.
     We can get the same behavior of foobar() with the pickles as when they were dumped:
-    
+
     with open('bar.pickle', 'rb') as f:
         bar = pickle.load(f)
     foobar(bar)
-    
+
     or, understand input/result of the function by JSON-like output. To avoid recursive or tremendous output,
     it sets max depth of recursive (default to 5).
 
@@ -913,13 +902,13 @@ def function_io_dumper(to_pickle: bool=True, to_json: bool=False, json_max_depth
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            
+
             # create timestamp
             epoch_time = time.time()
-            dt = datetime.fromtimestamp(epoch_time)
+            dt = datetime.fromtimestamp(epoch_time, tz=timezone.utc)
             ns = int((epoch_time - int(epoch_time)) * 1_000_000_000)
             _timestamp = dt.strftime(f'%Y%m%d-%H%M%S.{ns}')
-            
+
             # make signatures of args
             sig = inspect.signature(func)
             bound_args = sig.bind(*args, **kwargs)
@@ -937,13 +926,13 @@ def function_io_dumper(to_pickle: bool=True, to_json: bool=False, json_max_depth
             extention = ''
             if timestamp:
                 extention = f'.{_timestamp}'
-                
+
             output_folder_name = f"{func.__name__}{extention}"
 
             json_dict = None
             if to_json:
                 json_dict = object_to_dict(bound_args.arguments, max_depth=json_max_depth)
-            
+
             try:
                 os.makedirs(output_folder_name, exist_ok=True)
 
@@ -979,7 +968,7 @@ def function_io_dumper(to_pickle: bool=True, to_json: bool=False, json_max_depth
 
 def _dump(obj: object, path: str, name: str, dump_pickle: bool=True, dump_json: bool=False, json_dict={}) -> None:
     file_path = os.path.join(path, f'{name}')
-    
+
     if dump_pickle:
         with open(file_path+'.pickle', 'wb') as f:
             pickle.dump(obj, f)
@@ -1001,9 +990,9 @@ def _eval_condition(condition: dict | None, args: dict) -> bool:
     # {'self', {'spw':10}}, need unittest
     if condition is None:
         return True
-    
+
     LOG.info(f'condition: {condition}')
-    
+
     for key, val in condition:
         arg = args.get(key, False)
         if arg:
@@ -1057,9 +1046,9 @@ def decorate_io_dumper(cls: object, functions: list[str | None] = [], *args: Any
     Usage:
     ...
     import pipeline.infrastructure.utils.utils as ut
-    
+
     ut.decorate_io_dumper(SDInspection, ['execute'])
-    
+
     ...
     hsd_importdata()  # -> dump args of SDInspection.execute()
 
@@ -1090,7 +1079,7 @@ def _str_to_func(cls: object, _name: str) -> Callable | bool:
     return False
 
 
-def list_to_str(value: list[Number | str] | npt.NDArray) -> str:
+def list_to_str(value: list[Number | str] | NDArray) -> str:
     """Convert list or numpy.ndarray into string.
 
     The list/ndarray should be 1-dimensional. In that case, the function
@@ -1123,10 +1112,10 @@ def validate_url(url: str) -> bool:
     and a network location (netloc), which are required components for a valid URL.
 
     Args:
-        url (str): The URL to validate.
+        url: The URL to validate.
 
     Returns:
-        bool: True if the URL is valid, False otherwise.
+        True if the URL is valid, False otherwise.
     """
     url_regex = re.compile(
         r'^(https?:\/\/)?'  # HTTP or HTTPS
@@ -1292,3 +1281,11 @@ def clear_time_cache():
         measures_tool.measure(rf='ICRS', v=dummy_direction)
 
     LOG.debug('Successfully cleared the CASA measures tool time cache.')
+
+
+def build_refantignore(refantignore: str = "", ignorerefant: list | None = None) -> str:
+    """Return a comma-separated string from refantignore
+    and ignorerefant, ignoring empty strings."""
+
+    parts = ([refantignore.strip()] if refantignore.strip() else []) + (ignorerefant or [])
+    return ",".join(parts).strip(",")

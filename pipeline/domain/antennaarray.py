@@ -6,7 +6,7 @@ import collections
 import itertools
 import math
 import warnings
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 import numpy
 from pydantic import BaseModel, ConfigDict, Field as PydanticField, PrivateAttr
@@ -15,6 +15,11 @@ from pipeline.domain import measures
 from pipeline.domain.antenna import Antenna
 from pipeline.domain.measures import Distance, DistanceUnits
 from pipeline.infrastructure import casa_tools
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from pipeline.domain import Antenna
 
 Baseline = collections.namedtuple('Baseline', 'antenna1 antenna2 length')
 

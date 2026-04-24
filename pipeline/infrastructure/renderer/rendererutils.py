@@ -4,7 +4,7 @@ from __future__ import annotations
 import html
 import itertools
 import os
-from typing import TYPE_CHECKING, Any, Iterable
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -13,6 +13,9 @@ from pipeline.infrastructure import basetask, casa_tasks, casa_tools, filenamer,
 from pipeline.infrastructure.renderer import logger
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from typing import Any
+
     from pipeline.infrastructure.basetask import Results
     from pipeline.infrastructure.launcher import Context
     from pipeline.infrastructure.pipelineqa import QAScore

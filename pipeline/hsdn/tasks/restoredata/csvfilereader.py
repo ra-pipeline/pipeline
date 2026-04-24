@@ -1,11 +1,10 @@
-import numpy
 import csv
-import contextlib
-import itertools
 import os
+
 import pipeline.infrastructure as infrastructure
 
 LOG = infrastructure.get_logger(__name__)
+
 
 def read(context, filename):
     """
@@ -17,9 +16,11 @@ def read(context, filename):
     """
     return read_ms_based(filename)
 
+
 def read_ms_based(reffile):
     with open(reffile, 'r') as f:
         return list(_read_stream(f))
+
 
 def _read_stream(stream):
     reader = csv.reader(stream)

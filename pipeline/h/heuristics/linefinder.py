@@ -3,17 +3,17 @@
 # Copyright (c) ATC - Astronomy Technology Center - Royal Observatory Edinburgh, 2011
 # (in the framework of the ALMA collaboration).
 # All rights reserved.
-# 
+#
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
 # License as published by the Free Software Foundation; either
 # version 2.1 of the License, or (at your option) any later version.
-# 
+#
 # This library is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
 # Lesser General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Lesser General Public
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
@@ -21,10 +21,8 @@
 """Find indice of lines from spectrum data."""
 
 import numpy as np
+
 import pipeline.infrastructure.api as api
-from typing import List, Optional
-# from asap.asaplinefind import linefinder
-# from asap import _asap, scantable, rcParams
 
 
 class HeuristicsLineFinder(api.Heuristic):
@@ -37,27 +35,27 @@ class HeuristicsLineFinder(api.Heuristic):
         tweak_lines: A helper function to tweak spectral line ranges.
     """
 
-    def calculate(self, spectrum: List[float], threshold: float=7.0, tweak: bool=False, 
-                  mask: List[bool]=[], edge: Optional[List[int]]=None) -> List[int]:
+    def calculate(self, spectrum: list[float], threshold: float=7.0, tweak: bool=False,
+                  mask: list[bool]=[], edge: list[int] | None=None) -> list[int]:
         """
         Invoke line finding algorithm and return indices of spectral line ranges.
-        
-        Line detection is performed based on the excess of the median absolute 
-        deviation (MAD) of spectrum. Channels of spectrum larger than threshold*MAD 
-        are detected as spectral lines. A tweak to line ranges to cover line wings 
+
+        Line detection is performed based on the excess of the median absolute
+        deviation (MAD) of spectrum. Channels of spectrum larger than threshold*MAD
+        are detected as spectral lines. A tweak to line ranges to cover line wings
         are optionally available.
 
         Args:
             spectrum: list of spectrum data.
             threshold: a factor of threshold of line detection with respect to MAD.
             tweak: if True, spectral line ranges are extended to cover line edges.
-            mask: mask of spectrum array. An elements of spectrum is valid when 
-                  the corresponding element of mask is True. If False, invalid. 
+            mask: mask of spectrum array. An elements of spectrum is valid when
+                  the corresponding element of mask is True. If False, invalid.
                   The length of list should be equal to that of spectrum.
             edge: the number of elements in left and right edges of spectrum to be
                   excluded from line detection.
         Returns:
-            ranges: A list of start and end indices of spectral lines. The indices of 
+            ranges: A list of start and end indices of spectral lines. The indices of
                     lines are in the order of, e.g., [start1, end1, ..., startN, endN].
         """
         _spectrum = np.array(spectrum)
@@ -97,7 +95,6 @@ class HeuristicsLineFinder(api.Heuristic):
             good_variances = good_variances[:int(0.8*len(good_variances))]
             mad = np.median(good_variances)
 
-            #line_indeces = indeces[np.logical_and(mask==1, variances > 7*mad)]
             line_indeces = indeces[np.logical_and(mask==1, variances > threshold*mad)]
 
             if mad > previous_mad or list(line_indeces) == list(previous_line_indeces):
@@ -116,7 +113,6 @@ class HeuristicsLineFinder(api.Heuristic):
                 range_end = i
             elif i == range_end + 1:
                 range_end = i
-#            elif range_end - range_start + 1 > 2:
             elif range_end - range_start + 1 > 1:
                 ranges += [range_start, range_end]
                 range_start = i
@@ -130,24 +126,23 @@ class HeuristicsLineFinder(api.Heuristic):
         if tweak:
             ranges = self.tweak_lines(_spectrum, ranges, _edge)
 
-        #return len(ranges)/2
         return ranges
 
-    def tweak_lines(self, spectrum: List[float], ranges: List[int], 
-                    edge: List[int], n_ignore: int=1) -> List[int]:
+    def tweak_lines(self, spectrum: list[float], ranges: list[int],
+                    edge: list[int], n_ignore: int=1) -> list[int]:
         """
         Return extended line ranges to cover line edge channels.
-        
-        Spectrum level of channels around input line ranges are analyzed and 
-        line ranges are expanded to the extent of channels where the level 
+
+        Spectrum level of channels around input line ranges are analyzed and
+        line ranges are expanded to the extent of channels where the level
         monotonously decreases (emission lines) or increases (absorption lines).
 
         Args:
             spectrum: list of spectrum data.
             ranges: list of indice of line range.
-            edge: a list of minimum and maximum indices of spectrum to consider 
+            edge: a list of minimum and maximum indices of spectrum to consider
             (excluding edge channels).
-            n_ignore: the maximum number of channels to extend line ranges in 
+            n_ignore: the maximum number of channels to extend line ranges in
             each direction.
         Returns:
             ranges: line of indice of start and end of line range.

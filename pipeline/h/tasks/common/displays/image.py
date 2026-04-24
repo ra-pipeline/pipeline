@@ -45,7 +45,7 @@ def sanitize(text):
     return filename
 
 
-class ImageDisplay(object):
+class ImageDisplay:
 
     @staticmethod
     def _findchunks(times):
@@ -283,7 +283,6 @@ class ImageDisplay(object):
         xunits = image.axes[0].units
         ytitle = image.axes[1].name
         ydata = image.axes[1].data
-        # yunits = image.axes[1].units
         dataunits = image.units
         datatype = image.datatype
 

@@ -257,7 +257,7 @@ class RawflagchansData(basetask.StandardTaskTemplate):
     Inputs = RawflagchansDataInputs
 
     def __init__(self, inputs):
-        super(RawflagchansData, self).__init__(inputs)
+        super().__init__(inputs)
 
     def prepare(self):
 
@@ -381,7 +381,7 @@ class RawflagchansData(basetask.StandardTaskTemplate):
         return result
 
 
-class RawflagchansView(object):
+class RawflagchansView:
 
     def __init__(self):
         """

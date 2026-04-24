@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 import collections
+import collections.abc
 import datetime
 import itertools
 import os
@@ -100,7 +101,7 @@ def group_into_sessions(context, all_results, measurement_sets=None):
 
     def get_start_time(r):
         basename = os.path.basename(r[0])
-        return ms_start_times.get(basename, datetime.datetime.utcfromtimestamp(0))
+        return ms_start_times.get(basename, datetime.datetime.fromtimestamp(0, tz=datetime.timezone.utc))
 
     def chrono_sort_results(arg_tuple):
         session_id, results = arg_tuple
@@ -155,7 +156,7 @@ def get_vislist_for_session(context, session):
     return [ms.name for ms in context.observing_run.get_measurement_sets() if ms.session == session]
 
 
-class VDPTaskFactory(object):
+class VDPTaskFactory:
     """
     VDPTaskFactory is a class that implements the Factory design
     pattern, returning tasks that execute on an MPI client or locally
@@ -268,15 +269,18 @@ class VDPTaskFactory(object):
     def __get_task_args(self, vis):
         inputs = self.__inputs
 
-        original_vis = inputs.vis
+        if isinstance(inputs, vdp.InputsContainer):
+            # scope_attr is either "vis" or "infiles"
+            scope_attr = inputs._scope_attr
+        else:
+            scope_attr = "vis"
+
+        original_vis = getattr(inputs, scope_attr)
         try:
-            inputs.vis = vis
+            setattr(inputs, scope_attr, vis)
             task_args = inputs.as_dict()
-            # support for single-dish tasks
-            if 'infiles' in task_args:
-                task_args['infiles'] = task_args['vis']
         finally:
-            inputs.vis = original_vis
+            setattr(inputs, scope_attr, original_vis)
 
         return task_args
 
@@ -396,7 +400,7 @@ class ParallelTemplate(basetask.StandardTaskTemplate):
         raise NotImplementedError
 
     def __init__(self, inputs):
-        super(ParallelTemplate, self).__init__(inputs)
+        super().__init__(inputs)
 
     @basetask.result_finaliser
     def get_result_for_exception(self, vis: str, exception: Exception) -> basetask.FailedTaskResults:

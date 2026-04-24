@@ -21,7 +21,7 @@ class OpcalResults(basetask.Results):
         if center_frequencies is None:
             center_frequencies = []
 
-        super(OpcalResults, self).__init__()
+        super().__init__()
 
         self.vis = None
         self.pool = pool[:]

@@ -1,4 +1,4 @@
-import collections
+import collections.abc
 import itertools
 
 import pipeline.infrastructure.pipelineqa as pqa

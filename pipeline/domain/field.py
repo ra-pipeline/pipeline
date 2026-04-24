@@ -5,12 +5,18 @@ from __future__ import annotations
 import datetime
 import json
 import pprint
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field as PydanticField, field_validator
 
 from pipeline.infrastructure import casa_tools, utils
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
+
+    from pipeline.domain import FluxMeasurement, Source, SpectralWindow, State
+    from pipeline.infrastructure.utils.casa_types import DirectionDict, EpochDict, QuantityDict
 
 _pprinter = pprint.PrettyPrinter(width=1e99)
 
@@ -34,19 +40,19 @@ class Field(BaseModel):
 
     id: int = PydanticField(..., description='Field identifier')
     source_id: int = PydanticField(..., description='Associated source identifier')
-    time: np.ndarray = PydanticField(..., description='Unique observation times')
+    time: NDArray[np.float64] = PydanticField(..., description='Unique observation times')
     name_raw: str = PydanticField(..., alias='name', description='Raw field name')
-    direction: dict[str, Any] = PydanticField(..., description='CASA direction measure')
+    direction: DirectionDict = PydanticField(..., description='CASA direction measure')
     intents: set[str] = PydanticField(default_factory=set, description='Scan intents')
-    states: set[Any] = PydanticField(default_factory=set, description='State objects')
-    valid_spws: set[Any] = PydanticField(default_factory=set, description='Valid spectral windows')
-    flux_densities: set[Any] = PydanticField(
+    states: set[State] = PydanticField(default_factory=set, description='State objects')
+    valid_spws: set[SpectralWindow] = PydanticField(default_factory=set, description='Valid spectral windows')
+    flux_densities: set[FluxMeasurement] = PydanticField(
         default_factory=set,
         description='Flux density measurements',
     )
-    source: Any | None = PydanticField(default=None, exclude=True, description='Linked source object')
-    zd: dict[str, Any] | None = PydanticField(default=None, description='Zenith distance')
-    telmjd: dict[str, Any] | None = PydanticField(default=None, description='TELMJD epoch')
+    source: Source | None = PydanticField(default=None, exclude=True, description='Linked source object')
+    zd: QuantityDict | None = PydanticField(default=None, description='Zenith distance')
+    telmjd: QuantityDict | None = PydanticField(default=None, description='TELMJD epoch')
 
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
@@ -59,8 +65,8 @@ class Field(BaseModel):
         id: int | None = None,
         name: str | None = None,
         source_id: int | None = None,
-        time: np.ndarray | None = None,
-        direction: dict[str, Any] | None = None,
+        time: NDArray[np.float64] | None = None,
+        direction: DirectionDict | None = None,
         **data: Any,
     ) -> None:
         """Create a Field.
@@ -84,7 +90,7 @@ class Field(BaseModel):
 
     @field_validator('time', mode='before')
     @classmethod
-    def _coerce_time_array(cls, value: Any) -> np.ndarray:
+    def _coerce_time_array(cls, value: Any) -> NDArray[np.float64]:
         if isinstance(value, np.ndarray):
             return value
         return np.asarray(value)
@@ -126,22 +132,22 @@ class Field(BaseModel):
         return self.name if self.name else '#{0}'.format(self.id)
 
     @property
-    def latitude(self) -> dict[str, Any]:
+    def latitude(self) -> EpochDict:
         """Return latitude for the phasecenter of the field."""
         return self.direction['m1']
 
     @property
-    def longitude(self) -> dict[str, Any]:
+    def longitude(self) -> EpochDict:
         """Return longitude for the phasecenter of the field."""
         return self.direction['m0']
 
     @property
-    def mdirection(self) -> dict[str, Any]:
+    def mdirection(self) -> DirectionDict:
         """Return direction measure dictionary for phasecenter of the field."""
         return self.direction
 
     @property
-    def _mdirection(self) -> dict[str, Any]:
+    def _mdirection(self) -> DirectionDict:
         """Backward-compatible alias for `mdirection`.
 
         Some legacy code paths (e.g., weblog rendering) expect a private
@@ -219,7 +225,8 @@ class Field(BaseModel):
 
     def set_zd_telmjd(self, observatory: str) -> None:
         """Calculate and set the zenith distance at the observation mid-time."""
-        mjd_epoch = datetime.datetime(1858, 11, 17)
+        # Mean observing time
+        mjd_epoch = datetime.datetime(1858, 11, 17, tzinfo=datetime.timezone.utc)
         start_time = mjd_epoch + datetime.timedelta(seconds=min(self.time))
         end_time = mjd_epoch + datetime.timedelta(seconds=max(self.time))
         mid_time = utils.obs_midtime(start_time, end_time)
@@ -294,7 +301,7 @@ class Field(BaseModel):
         )
 
 
-def upgrade_field(field_obj: Any) -> Field | None:
+def upgrade_field(field_obj: Any | None) -> Field | None:
     """Upgrade a legacy Field-like object to Pydantic version."""
     if isinstance(field_obj, Field):
         return field_obj

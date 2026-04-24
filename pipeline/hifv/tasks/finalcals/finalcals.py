@@ -49,7 +49,7 @@ class FinalcalsInputs(vdp.StandardInputs):
                 Example: refant = 'ea01, ea02'
 
         """
-        super(FinalcalsInputs, self).__init__()
+        super().__init__()
         self.context = context
         self.vis = vis
         self._weakbp = weakbp
@@ -91,7 +91,7 @@ class FinalcalsResults(basetask.Results):
         if preceding is None:
             preceding = []
 
-        super(FinalcalsResults, self).__init__()
+        super().__init__()
 
         self.vis = vis
         self.pool = pool[:]
@@ -205,8 +205,7 @@ class Finalcals(basetask.StandardTaskTemplate):
 
         self.ignorerefant = self.inputs.context.evla['msinfo'][m.name].ignorerefant
 
-        # PIPE-1637: adding ',' in the manual and auto refantignore parameter
-        refantignore = self.inputs.refantignore + ','.join(['', *self.ignorerefant])
+        refantignore = utils.build_refantignore(refantignore=self.inputs.refantignore, ignorerefant=self.ignorerefant)
         refantfield = self.inputs.context.evla['msinfo'][m.name].calibrator_field_select_string
         # PIPE-595: if refant list is not provided, compute refants else use provided refant list.
         if len(self.inputs.refant) == 0:

@@ -1,7 +1,6 @@
-import os
-import math
 import ast
-import collections
+import math
+import os
 import traceback
 
 import pipeline.hif.heuristics.findrefant as findrefant
@@ -13,11 +12,9 @@ from pipeline.hif.tasks.polarization import polarization
 from pipeline.hifv.tasks.setmodel.vlasetjy import standard_sources
 from pipeline.hifv.heuristics import uvrange
 from pipeline.hifv.heuristics.lib_EVLApipeutils import vla_minbaselineforcal
-from pipeline.hifv.tasks.finalcals.finalcals import FinalcalsResults as FinalcalsResults
-from pipeline.hifv.tasks.importdata.importdata import VLAImportDataResults as VLAImportDataResults
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import task_registry
-
+from pipeline.infrastructure import utils
 
 
 LOG = infrastructure.get_logger(__name__)
@@ -40,7 +37,7 @@ class CircfeedpolcalResults(polarization.PolarizationResults):
         if caldictionary is None:
             caldictionary = {}
 
-        super(CircfeedpolcalResults, self).__init__()
+        super().__init__()
         self.vis = vis
         self.pool = pool[:]
         self.final = final[:]
@@ -107,7 +104,7 @@ class CircfeedpolcalInputs(vdp.StandardInputs):
             run_setjy: Run setjy for amplitude/flux calibrator, default set to True.
 
         """
-        super(CircfeedpolcalInputs, self).__init__()
+        super().__init__()
         self.context = context
         self.vis = vis
         self.Dterm_solint = Dterm_solint
@@ -117,6 +114,7 @@ class CircfeedpolcalInputs(vdp.StandardInputs):
         self.clipminmax = clipminmax
         self.refant = refant
         self.run_setjy = run_setjy
+
 
 @task_registry.set_equivalent_casa_task('hifv_circfeedpolcal')
 class Circfeedpolcal(polarization.Polarization):
@@ -153,8 +151,7 @@ class Circfeedpolcal(polarization.Polarization):
 
         m = self.inputs.context.observing_run.get_ms(self.inputs.vis)
         self.ignorerefant = self.inputs.context.evla['msinfo'][m.name].ignorerefant
-        # PIPE-1637: adding ',' in the manual and auto refantignore parameter
-        refantignore = self.inputs.refantignore + ','.join(['', *self.ignorerefant])
+        refantignore = utils.build_refantignore(refantignore=self.inputs.refantignore, ignorerefant=self.ignorerefant)
         refantfield = self.inputs.context.evla['msinfo'][m.name].calibrator_field_select_string
         # PIPE-595: if refant list is not provided, compute refants else use provided refant list.
         if len(self.inputs.refant) == 0:
@@ -481,7 +478,6 @@ class Circfeedpolcal(polarization.Polarization):
                     fluxcalfieldname = m.get_fields(intent='POLANGLE')[0].name
                     fluxcal = fluxcalfieldname
 
-
         try:
             task_args = {}
             if fluxcal in ('3C286', '1331+3030', '"1331+305=3C286"', 'J1331+3030'):
@@ -610,5 +606,3 @@ class Circfeedpolcal(polarization.Polarization):
         job = casa_tasks.flagdata(**task_args)
 
         return self._executor.execute(job)
-
-

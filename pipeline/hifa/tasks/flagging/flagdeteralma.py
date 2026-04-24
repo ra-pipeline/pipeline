@@ -1,4 +1,6 @@
-from typing import List
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import numpy as np
 from astropy.coordinates import AltAz, EarthLocation, SkyCoord
@@ -8,7 +10,6 @@ import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.sessionutils as sessionutils
 import pipeline.infrastructure.vdp as vdp
-from pipeline.domain.measurementset import MeasurementSet
 from pipeline.extern.adopted import getMedianPWV
 from pipeline.h.tasks.common import atmutil
 from pipeline.h.tasks.common.arrayflaggerbase import channel_ranges
@@ -22,7 +23,10 @@ __all__ = [
     'FlagDeterALMAResults',
 ]
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
+
+if TYPE_CHECKING:
+    from pipeline.domain import MeasurementSet
 
 
 class FlagDeterALMAResults(flagdeterbase.FlagDeterBaseResults):
@@ -304,7 +308,7 @@ class SerialFlagDeterALMA(flagdeterbase.FlagDeterBase):
         """
         return load_partialpols_alma(self.inputs.ms)
 
-    def _get_lowtrans_cmds(self) -> List:
+    def _get_lowtrans_cmds(self) -> list:
         """
         ALMA specific step to identify and flag data with low atmospheric
         transmission.
@@ -367,10 +371,12 @@ class SerialFlagDeterALMA(flagdeterbase.FlagDeterBase):
         For example: if the threshold is 1875 MHz, this will flag any channels
         +- 937.5 MHz from the center frequency.
 
-        :param spw: spectral window to evaluate
-        :param threshold: bandwidth threshold
-        :return: list containing flagging command as string
-        :rtype: list[str]
+        Args:
+            spw: Spectral window to evaluate.
+            threshold: Bandwidth threshold.
+
+        Returns:
+            List containing flagging command as string.
         """
         LOG.debug('Bandwidth greater than {} for spw {}. Proceeding with flagging all channels beyond +-{} from the'
                   ' center frequency.'.format(str(threshold), spw.id, str(threshold / 2.0)))
@@ -404,11 +410,13 @@ class SerialFlagDeterALMA(flagdeterbase.FlagDeterBase):
         Return a list containing a flagging command that will flag all channels
         that lie too close to the edge of the baseband.
 
-        :param spw: spectral window to evaluate
-        :param threshold: threshold frequency range used to determine whether
-        spectral window channels are too close to edge of baseband
-        :return: list containing flagging command as string
-        :rtype: list[str]
+        Args:
+            spw: Spectral window to evaluate.
+            threshold: Threshold frequency range used to determine whether
+                spectral window channels are too close to edge of baseband.
+
+        Returns:
+            List containing flagging command as string.
         """
         LOG.debug('Spectral window {} is an ACA FDM spectral window. Proceeding with flagging channels'
                   ' that are too close to the baseband edge.'.format(spw.id))
@@ -482,9 +490,11 @@ def load_partialpols_alma(ms):
     """Retrieve the relevant data to extend partial polarization flagging to all the polarizations (see PIPE-1028).
     It returns the list of flagging commands required to flag the partial polarization.
 
-    :param ms: Measurement set to load
-    :return: list containing flagging commands as strings
-    :rtype: List[str]
+    Args:
+        ms: Measurement set to load.
+
+    Returns:
+        List containing flagging commands as strings.
     """
 
     # Get the spw IDs and corresponding DATA DESC IDs for which to assess the
@@ -571,8 +581,11 @@ def get_partialpol_spws(ms_name):
     Note that there is a chance that this function can be refactored using one on the pipeline domain object
     functions. If the translation of spw to DATA_DESC_ID is not required, this function may not be needed at all.
 
-    :param ms_name: Name of the Measurement Set
-    :return: List of spws.ids and list of DATA_DESC_IDs (with the same length)
+    Args:
+        ms_name: Name of the Measurement Set.
+
+    Returns:
+        Tuple of (list of spw IDs, list of DATA_DESC_IDs with the same length).
     """
 
     # Note: In all the examples checked, spw id and DATA_DESC_ID are the same, but as this may not be always true and
@@ -592,19 +605,21 @@ def get_partialpol_flag_cmd_params(flags, ant1, ant2, time, interval):
     This function should be called only if the data presents more than one polarization.
     At the moment it only handles data with 3 dimensions (n_pol, n_channels, n_params).
 
-    :param flags: numpy array with the flags with shape (n_pol, n_channels, n_params)
-    :param ant1: numpy array with the antenna1s with shape (n_params, )
-    :param ant2: numpy array with the antenna2s with shape (n_params, )
-    :param time: numpy array with the times with shape (n_params, )
-    :param interval: numpy array with the intervals with shape (n_params, )
-    :return: List of dictionaries with the set of params to identify partial polarizations.
-      The dictionaries contain the keys:
-       * "ant1" - ID of the antenna1,
-       * "ant2" - ID of the antenna2,
-       * "time" - Central time of the 'scan',
-       * "interval" - Duration of the 'scan', and
-       * "channels"- a list of numerical values of affected channels that can be compressed later.
-    :rtype: List[Dict]
+    Args:
+        flags: Numpy array with the flags with shape (n_pol, n_channels, n_params).
+        ant1: Numpy array with the antenna1s with shape (n_params,).
+        ant2: Numpy array with the antenna2s with shape (n_params,).
+        time: Numpy array with the times with shape (n_params,).
+        interval: Numpy array with the intervals with shape (n_params,).
+
+    Returns:
+        List of dictionaries with the set of params to identify partial polarizations.
+        The dictionaries contain the keys:
+        * "ant1" - ID of the antenna1,
+        * "ant2" - ID of the antenna2,
+        * "time" - Central time of the 'scan',
+        * "interval" - Duration of the 'scan', and
+        * "channels" - a list of numerical values of affected channels that can be compressed later.
     """
     shape = np.shape(flags)
     # Check: Is there any chance that there are data with only 2 dimensions?
@@ -636,11 +651,13 @@ def get_partialpol_flag_cmd_params(flags, ant1, ant2, time, interval):
 def convert_params_to_commands(ms, params, ant_id_map=None):
     """Convert the identified partial polarization parameters to flagging commands.
 
-    :param ms: Measurement Set to get the antenna id map (it can be None if ant_id_map is entered)
-    :param params: List of dictionaries with the parameters
-    :param ant_id_map: Dictionary mapping antenna IDs to their names (optional; overrides data from ms)
-    :return: List of flagging commands
-    :rtype: List[str]
+    Args:
+        ms: Measurement Set to get the antenna id map. Can be None if ant_id_map is provided.
+        params: List of dictionaries with the parameters.
+        ant_id_map: Dictionary mapping antenna IDs to their names. Optional; overrides data from ms.
+
+    Returns:
+        List of flagging commands as strings.
     """
     if ant_id_map is None:
         ant_id_map = {ant.id: ant.name for ant in ms.antennas}
@@ -665,7 +682,7 @@ def convert_params_to_commands(ms, params, ant_id_map=None):
 
 
 def lowtrans_alma(ms: MeasurementSet, mintransrepspw: float, mintransnonrepspws: float,
-                  max_frac_low_trans: float) -> List[str]:
+                  max_frac_low_trans: float) -> list[str]:
     """
     Create flagging commands to flag science spectral windows with low
     atmospheric transmission (PIPE-624).

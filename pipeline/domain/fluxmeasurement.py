@@ -231,7 +231,7 @@ class FluxMeasurement(BaseModel):
         return cls.model_validate_json(json_str)
 
     @classmethod
-    def from_flux_measurement(cls, flux: FluxMeasurement) -> FluxMeasurement:
+    def from_flux_measurement(cls, flux: Any) -> FluxMeasurement:
         """Create from legacy FluxMeasurement object for migration."""
         return cls(
             spw_id=flux.spw_id,

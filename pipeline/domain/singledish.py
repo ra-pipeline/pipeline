@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field as PydanticField
 
 from pipeline import infrastructure
 from pipeline.domain.spectralwindow import match_spw_basename
 
+if TYPE_CHECKING:
+    from pipeline.domain import Antenna, Field, MeasurementSet, Polarization, SpectralWindow
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -20,7 +22,7 @@ class MSReductionGroupMember(BaseModel):
     set, antenna, spectral window, and field.
     """
 
-    ms: Any = PydanticField(..., description='MeasurementSet object')
+    ms: MeasurementSet = PydanticField(..., description='MeasurementSet object')
     antenna_id: int = PydanticField(..., description='Antenna ID')
     spw_id: int = PydanticField(..., description='Spectral window ID')
     field_id: int = PydanticField(default=-1, description='Field ID (default -1 if unspecified)')
@@ -39,12 +41,12 @@ class MSReductionGroupMember(BaseModel):
         return 1
 
     @property
-    def spw(self) -> Any:
+    def spw(self) -> SpectralWindow:
         """Return the spectral window object."""
         return self.ms.spectral_windows[self.spw_id]
 
     @property
-    def antenna(self) -> Any:
+    def antenna(self) -> Antenna:
         """Return the antenna object."""
         return self.ms.antennas[self.antenna_id]
 
@@ -54,7 +56,7 @@ class MSReductionGroupMember(BaseModel):
         return self.antenna.name
 
     @property
-    def field(self) -> Any:
+    def field(self) -> Field:
         """Return the field object."""
         return self.ms.fields[self.field_id]
 
@@ -71,7 +73,7 @@ class MSReductionGroupMember(BaseModel):
         """Reset the iteration counter to zero."""
         self.iteration = 0
 
-    def add_linelist(self, linelist: list[Any], pols: list[Any] | None = None,
+    def add_linelist(self, linelist: list[Any], pols: list[Polarization] | None = None,
                      channelmap_range: list[Any] | None = None) -> None:
         """Add a line list to this member.
 
@@ -126,7 +128,7 @@ class MSReductionGroupDesc(BaseModel):
     min_frequency: float | None = PydanticField(default=None, description='Minimum frequency')
     max_frequency: float | None = PydanticField(default=None, description='Maximum frequency')
     nchan: int | None = PydanticField(default=None, description='Number of channels')
-    field: Any = PydanticField(default=None, description='Field object')
+    field: Field = PydanticField(default=None, description='Field object')
     members: list[MSReductionGroupMember] = PydanticField(
         default_factory=list, description='List of reduction group members'
     )
@@ -180,7 +182,7 @@ class MSReductionGroupDesc(BaseModel):
                 )
                 self.members.append(member)
 
-    def add_member(self, ms: Any, antenna_id: int, spw_id: int,
+    def add_member(self, ms: MeasurementSet, antenna_id: int, spw_id: int,
                    field_id: int | None = None) -> None:
         """Add a new member to this reduction group.
 
@@ -196,7 +198,7 @@ class MSReductionGroupDesc(BaseModel):
         if new_member not in self.members:
             self.members.append(new_member)
 
-    def get_iteration(self, ms: Any, antenna_id: int, spw_id: int,
+    def get_iteration(self, ms: MeasurementSet, antenna_id: int, spw_id: int,
                       field_id: int | None = None) -> int:
         """Get the iteration count for a specific member.
 
@@ -212,7 +214,7 @@ class MSReductionGroupDesc(BaseModel):
         member = self.members[self._search_member(ms, antenna_id, spw_id, field_id)]
         return member.iteration
 
-    def iter_countup(self, ms: Any, antenna_id: int, spw_id: int,
+    def iter_countup(self, ms: MeasurementSet, antenna_id: int, spw_id: int,
                      field_id: int | None = None) -> None:
         """Increment iteration counter for a specific member.
 
@@ -225,7 +227,7 @@ class MSReductionGroupDesc(BaseModel):
         member = self.members[self._search_member(ms, antenna_id, spw_id, field_id)]
         member.iter_countup()
 
-    def add_linelist(self, linelist: list[Any], ms: Any, antenna_id: int, spw_id: int,
+    def add_linelist(self, linelist: list[Any], ms: MeasurementSet, antenna_id: int, spw_id: int,
                      field_id: int | None = None, channelmap_range: list[Any] | None = None) -> None:
         """Add a line list to a specific member.
 
@@ -240,7 +242,7 @@ class MSReductionGroupDesc(BaseModel):
         member = self.members[self._search_member(ms, antenna_id, spw_id, field_id)]
         member.add_linelist(linelist, channelmap_range=channelmap_range)
 
-    def _search_member(self, ms: Any, antenna_id: int, spw_id: int,
+    def _search_member(self, ms: MeasurementSet, antenna_id: int, spw_id: int,
                        field_id: int | None = None) -> int:
         """Search for a member by MS and component IDs.
 

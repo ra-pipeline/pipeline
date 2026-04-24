@@ -1,11 +1,13 @@
 """Spectral line detection task."""
+from __future__ import annotations
+
 import collections
 import math
 import numbers
 import numpy
 import os
 import time
-from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any
 
 import matplotlib.pyplot as plt
 
@@ -13,14 +15,11 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.vdp as vdp
 import pipeline.h.heuristics as heuristics
-# import pipeline.domain.measures as measures
-# from pipeline.domain.datatable import DataTableImpl as DataTable
 from pipeline.domain import DataType
 from pipeline.infrastructure import casa_tools
 from .. import common
 from ..common import utils
 from . import rules
-
 from .typing import LineWindow
 
 if TYPE_CHECKING:
@@ -29,7 +28,7 @@ if TYPE_CHECKING:
 
 NoData = common.NoData
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class DetectLineInputs(vdp.StandardInputs):
@@ -65,12 +64,12 @@ class DetectLineInputs(vdp.StandardInputs):
         self._windowmode = value
 
     def __init__(self,
-                 context: 'Context',
+                 context: Context,
                  group_id: int,
-                 window: Optional[LineWindow] = None,
-                 windowmode: Optional[str] = None,
-                 edge: Optional[Tuple[int, int]] = None,
-                 broadline: Optional[bool] = None) -> None:
+                 window: LineWindow | None = None,
+                 windowmode: str | None = None,
+                 edge: tuple[int, int] | None = None,
+                 broadline: bool | None = None) -> None:
         """Construct DetectLineInputs instance.
 
         Args:
@@ -85,7 +84,7 @@ class DetectLineInputs(vdp.StandardInputs):
                   are processed.
             broadline: Detect broadline component or not. Defaults to True if None is given.
         """
-        super(DetectLineInputs, self).__init__()
+        super().__init__()
 
         self.context = context
         self.group_id = group_id
@@ -99,8 +98,8 @@ class DetectLineResults(common.SingleDishResults):
     """Results class to hold the result of spectral line detection task."""
 
     def __init__(self,
-                 task: Optional[Type[basetask.StandardTaskTemplate]] = None,
-                 success: Optional[bool] = None,
+                 task: type[basetask.StandardTaskTemplate] | None = None,
+                 success: bool | None = None,
                  outcome: Any = None) -> None:
         """Construct DetectLineResults instance.
 
@@ -109,9 +108,9 @@ class DetectLineResults(common.SingleDishResults):
             success: Whether task execution is successful or not.
             outcome: Outcome of the task execution.
         """
-        super(DetectLineResults, self).__init__(task, success, outcome)
+        super().__init__(task, success, outcome)
 
-    def merge_with_context(self, context: 'Context') -> None:
+    def merge_with_context(self, context: Context) -> None:
         """Merge result instance into context.
 
         No specific merge operation is done.
@@ -120,7 +119,7 @@ class DetectLineResults(common.SingleDishResults):
             context: Pipeline context object containing state information.
         """
         LOG.debug('DetectLineResults.merge_with_context')
-        super(DetectLineResults, self).merge_with_context(context)
+        super().merge_with_context(context)
 
     @property
     def signals(self) -> collections.OrderedDict:
@@ -156,13 +155,13 @@ class DetectLine(basetask.StandardTaskTemplate):
         Args:
             inputs: DetectLineInputs instance.
         """
-        super(DetectLine, self).__init__(inputs)
+        super().__init__(inputs)
         self.line_finder = self.LineFinder()
 
     def prepare(self,
                 datatable_dict: dict,
-                grid_table: List[List[Union[int, float, numpy.ndarray]]],
-                spectral_data: Optional[numpy.ndarray] = None) -> DetectLineResults:
+                grid_table: list[list[int | float | numpy.ndarray]],
+                spectral_data: numpy.ndarray | None = None) -> DetectLineResults:
         """Find spectral line feature.
 
         The process finds emission lines and determines protection regions for baselinefit
@@ -325,7 +324,7 @@ class DetectLine(basetask.StandardTaskTemplate):
 
     def plot_detectrange(self,
                          sp: numpy.ndarray,
-                         protected: List[int],
+                         protected: list[int],
                          fname: str) -> None:
         """Plot detected line range for testing.
 
@@ -398,7 +397,7 @@ class DetectLine(basetask.StandardTaskTemplate):
                 mask: numpy.ndarray,
                 threshold: float,
                 tweak: bool,
-                edge: List[int]) -> List[List[int]]:
+                edge: list[int]) -> list[list[int]]:
         """Perform spectral line detection on given spectral data with mask.
 
         Args:
@@ -473,7 +472,7 @@ class DetectLine(basetask.StandardTaskTemplate):
         return protected
 
 
-class LineWindowParser(object):
+class LineWindowParser:
     """LineWindowParser is a parser for line window parameter.
 
     Supported format is as follows:
@@ -510,9 +509,9 @@ class LineWindowParser(object):
     """
 
     def __init__(self,
-                 ms: 'MeasurementSet',
+                 ms: MeasurementSet,
                  window: LineWindow,
-                 context: 'Context' = None) -> None:
+                 context: Context = None) -> None:
         """
         Construct LineWindowParser instance.
 
@@ -597,7 +596,7 @@ class LineWindowParser(object):
         for spwid in self.science_spw:
             assert spwid in self.parsed
 
-    def get_result(self, spw_id: int) -> List[int] | None:
+    def get_result(self, spw_id: int) -> list[int] | None:
         """Return parsed line windows for given spw id.
 
         Args:
@@ -666,7 +665,7 @@ class LineWindowParser(object):
 
         return new_window
 
-    def _list2dict(self, window: List[int]) -> dict:
+    def _list2dict(self, window: list[int]) -> dict:
         """Convert line window list into dict.
 
         Simply applies the given line window list to all spws.
@@ -679,7 +678,7 @@ class LineWindowParser(object):
         """
         # apply given window to all science windows
         return dict((spwid, window) for spwid in self.science_spw)
- 
+
     def _dict2dict(self, window: dict) -> dict:
         """Convert line window dict into another dict.
 
@@ -693,7 +692,7 @@ class LineWindowParser(object):
         """
         # key should be an integer
         dict_window = dict((int(spw), value) for spw, value in window.items())
-        
+
         return self._virtual_to_real_spws(dict_window)
 
     def _exclude_non_science_spws(self, window: dict) -> dict:
@@ -719,7 +718,7 @@ class LineWindowParser(object):
                 new_window[spwid] = []
 
         return new_window
-    
+
     def _virtual_to_real_spws(self, window: dict) -> dict:
         """Convert virtual spws to real for the current ms.
 
@@ -736,12 +735,12 @@ class LineWindowParser(object):
                     new_window[r_spwid] = None
                 else:
                     new_window[r_spwid] = list(w)
-                
+
         return new_window
 
     def _freq2chan(self,
                    spwid: int,
-                   window: Optional[Union[List[str], List[float], List[int]]]) -> Optional[List[int]]:
+                   window: list[str] | list[float] | list[int] | None) -> list[int] | None:
         """Convert frequency selection into channel selection.
 
         If float values are given, they are interpreted as the value in Hz.
@@ -816,7 +815,7 @@ class LineWindowParser(object):
         assert len(new_window) == 1
         return new_window[0]
 
-    def _lsrk2topo(self, spwid: int, window: List[str]) -> List[str]:
+    def _lsrk2topo(self, spwid: int, window: list[str]) -> list[str]:
         """Apply frame conversion to line window frequencies in LSRK as needed.
 
         Args:
@@ -844,7 +843,7 @@ class LineWindowParser(object):
         new_window = ['{value}{unit}'.format(**x['m0']) for x in new_mfreq]
         return new_window
 
-    def _construct_msselection(self, spwid: int, window: List[str]) -> str:
+    def _construct_msselection(self, spwid: int, window: list[str]) -> str:
         """Construct channel selection string for given spw.
 
         Args:
@@ -892,7 +891,7 @@ class LineWindowParser(object):
 
 # TODO: move this to detection_test.py when appropriate MS data is available
 #       or testable ms domain object can be created
-def test_parser(ms: 'MeasurementSet') -> None:
+def test_parser(ms: MeasurementSet) -> None:
     """Test LineWindowParser.
 
     Args:
