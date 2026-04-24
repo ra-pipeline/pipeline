@@ -21,6 +21,7 @@ from __future__ import annotations
 import atexit
 import datetime
 import importlib.util
+import multiprocessing
 import os
 import socket
 import subprocess
@@ -160,6 +161,12 @@ def is_daskclient_allowed() -> bool:
     # Disallow starting dask client if running inside a MPI worker process.
     # This can be identified by both RANK or casampi APIs.
     if is_mpi_worker or mpi_rank != 0:
+        return False
+
+    # Disallow starting dask client if this is a daemon process (i.e., a worker
+    # spawned by a parent cluster via multiprocessing.spawn).  Daemon processes
+    # cannot create children, and they should never start their own cluster.
+    if multiprocessing.current_process().daemon:
         return False
 
     # Disallow starting dask client if running inside a dask worker process,
