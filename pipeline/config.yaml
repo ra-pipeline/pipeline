@@ -33,6 +33,12 @@ pipeconfig:
     clustertype: "local" # htcondor / slurm
     n_workers: null
     distributed:
+      # NOTE: To guarantee stability with CASA's C++ backends (which hold the GIL and 
+      # allocate unmanaged memory), the pipeline heavily overrides Dask's default memory 
+      # management (target/spill/pause/terminate = False) and expands timeout thresholds 
+      # (e.g. 600s limits) dynamically inside `daskhelpers.py`.
+      # Modifications to the memory heuristics or heartbeat intervals below may be ignored
+      # in favor of those hardcoded safety limits.
       worker:
         nthreads: 1 # Number of threads per worker
         memory:

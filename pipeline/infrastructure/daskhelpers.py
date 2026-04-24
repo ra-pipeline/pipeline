@@ -351,6 +351,46 @@ def session_startup(casa_config: dict[str, str | None], loglevel: str | None = N
     return casalogfile, casaloglevel
 
 
+_MAX_FRAME_BYTES = 1 << 30
+_dask_tcp_patched = False
+
+def _patch_dask_tcp() -> None:
+    """Monkey-patch distributed.comm.tcp to reject implausibly large frames."""
+    global _dask_tcp_patched
+    if _dask_tcp_patched:
+        return
+    try:
+        import distributed.comm.tcp as _tcp
+        import distributed.protocol.utils as _proto_utils
+        from tornado.iostream import StreamClosedError as _SCE
+
+        _orig_read = _tcp.read_bytes_rw
+
+        async def _safe_read_bytes_rw(stream, n: int):
+            if n > _MAX_FRAME_BYTES:
+                LOG.debug(f'Rejected implausible TCP frame size {n:,} B (> {_MAX_FRAME_BYTES:,} B limit)')
+                raise _SCE(real_error=None)
+            return await _orig_read(stream, n)
+
+        _tcp.read_bytes_rw = _safe_read_bytes_rw
+
+        _orig_host_array = _proto_utils.host_array
+
+        def _safe_host_array(n):
+            if n > _MAX_FRAME_BYTES:
+                raise MemoryError(f'Implausible allocation request {n:,} B (> {_MAX_FRAME_BYTES:,} B limit)')
+            return _orig_host_array(n)
+
+        _proto_utils.host_array = _safe_host_array
+        if hasattr(_tcp, 'host_array'):
+            _tcp.host_array = _safe_host_array
+
+        _dask_tcp_patched = True
+        LOG.debug('Patched distributed.tcp read_bytes_rw with dataframe guard')
+    except Exception as e:
+        LOG.warning('Could not patch distributed.tcp: %s', e)
+
+
 def start_daskcluster(
     dask_config: dict[str, str | int | bool] | None = None,
 ) -> Client | None:
@@ -418,6 +458,29 @@ def start_daskcluster(
     # attached the exect client casaconfig issue which can be used to help initialze workers
     dask.config.update_defaults({'casaconfig': config['casaconfig']})
 
+    # Robustness configs based on pclean cluster integration for CASA workloads
+    COMM_TIMEOUT = 600
+    dask.config.update_defaults({
+        # Disable internal memory management. Heavy allocations happen inside C++ casatools (unmanaged)
+        # Dask cannot free this memory, so its pause/spill heuristics only cause workers to stall.
+        'distributed.worker.memory.target': False,
+        'distributed.worker.memory.spill': False,
+        'distributed.worker.memory.pause': False,
+        'distributed.worker.memory.terminate': False,
+        # Timeout settings for sluggish CASA extensions holding the GIL
+        'distributed.comm.timeouts.connect': f'{COMM_TIMEOUT}s',
+        'distributed.comm.timeouts.tcp': f'{COMM_TIMEOUT}s',
+        'distributed.worker.heartbeat-interval': '10s',
+        'distributed.scheduler.worker-ttl': '1200s',
+        'distributed.worker.lifetime.duration': None,
+        # Retry failed connections (guards against garbage TCP frames from OS-level half-open sockets)
+        'distributed.comm.retry.count': 5,
+        'distributed.comm.retry.delay.min': '1s',
+        'distributed.comm.retry.delay.max': '30s',
+    })
+
+    _patch_dask_tcp()
+
     dashboard_address: str | None = dask.config.get('dashboard_address', default=None)
     host: str | None = dask.config.get('host', default=None)
     n_workers: int | None = dask.config.get('n_workers', default=None)
@@ -444,6 +507,7 @@ def start_daskcluster(
                     dashboard_address=dashboard_address,
                     processes=True,  # True to avoid GIL; False to use threads but casatools is not fully thread-safe.
                     threads_per_worker=1,
+                    memory_limit=0,  # Disable Dask's unmanaged memory management
                     scheduler_port=0,  # random free port to avoid conflicts
                     preload=preload,
                 )
