@@ -11,16 +11,15 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "Pipeline"
 description = "Pipeline"
-requires-python = ">= 3.10"
+requires-python = ">= 3.12"
 dynamic = ["version", "dependencies", "optional-dependencies"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Astronomy",
     "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 license = { text = "LGPL-3.0-or-later" }
 authors = [
@@ -156,6 +155,7 @@ markers = [
     "importdata: importdata task(s)",
     "selfcal: selfcal task(s)",
     "makeimages: makeimages task(s)",
+    "mpi: test recommended for an MPI-enabled CASA session; use -m mpi or -m 'not mpi' to control execution",
     "unit: unit test",
 ]
 addopts = [
@@ -202,8 +202,10 @@ casatasks = { version = ">=6.6.6", index = "https://casa-pip.nrao.edu/repository
 casatools = { version = ">=6.6.6", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 
 [tool.pixi.system-requirements]
-# Instruct pixi to target at macOS 14+ due to casatools availability
-macos = "14.0"
+# Sets the minimum macOS runtime to 15.0 (floor, not a build filter).
+# Older wheels (e.g., macOS 14.0) are still selected when no newer build exists,
+# as macOS binaries are forward-compatible.
+macos = "15.0"
 
 [tool.pixi.tasks]
 # Run unit tests with coverage
@@ -214,37 +216,42 @@ PYTHONNOUSERSITE=1 python -m pytest -n logical \
   pipeline/
 """
 
+# Run fast regression tests in a serial CASA session (xdist, no mpi)
+# Override working directory: PL_WORKDIR=/my/path pixi run test-regression
+test-regression = { cmd = """
+cd $PL_WORKDIR && \
+OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+  python -m pytest -n logical --dist worksteal \
+  -m "not mpi" \
+  --cov --cov=pipeline --cov-append \
+  --cov-report=html --cov-report=xml \
+  $PIXI_PROJECT_ROOT/tests/regression/fast/
+""", env = { PL_WORKDIR = "../working" } }
+
+# Run a single small ALMA-IF fast regression test (pltest1)
+# Override working directory: PL_WORKDIR=/my/path pixi run test-pltest1
+test-pltest1 = { cmd = """
+cd $PL_WORKDIR && \
+OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+  python -m casashell --nogui --log2term \
+  -c "import pytest; pytest.main(['$PIXI_PROJECT_ROOT/tests/regression/fast/alma_if_fast_test.py::test_uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small__PPR__regression'])"
+""", env = { PL_WORKDIR = "../working" } }
+
 # Fetch/update CASA runtime data
 fetch-casarundata = "python -c 'import casatools'"
 
-# Build docs
+# Build docs (full clean rebuild)
 build-docs = { cmd = "make html_docs", cwd = "docs" }
 
-# --------------------------------------------------------------------------
-# Feature: CASA ver6.6.6-release — Python 3.10
-# --------------------------------------------------------------------------
+# Incremental docs build — reuses doctrees and autosummary stubs (much faster for dev)
+build-docs-fast = { cmd = "make html_fast", cwd = "docs" }
 
-[tool.pixi.feature.casa666-py310]
-platforms = ["linux-64", "osx-arm64"]
-
-[tool.pixi.feature.casa666-py310.dependencies]
-python = "3.10.*"
-
-[tool.pixi.feature.casa666-py310.pypi-dependencies]
-casashell = { version = "==6.6.6.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+# Build PDF (LaTeX) docs
+build-pdf = { cmd = "make latexpdf", cwd = "docs" }
 
 # --------------------------------------------------------------------------
-# Feature: CASA ver6.7.1-dev/snapshot — Python 3.10/3.12
+# Feature: CASA ver6.7.1-dev/snapshot — Python 3.12
 # --------------------------------------------------------------------------
-
-[tool.pixi.feature.casa671-py310]
-platforms = ["linux-64", "osx-arm64"]
-
-[tool.pixi.feature.casa671-py310.dependencies]
-python = "3.10.*"
-
-[tool.pixi.feature.casa671-py310.pypi-dependencies]
-casashell = { version = "==6.7.1.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 
 [tool.pixi.feature.casa671-py312]
 platforms = ["linux-64", "osx-arm64"]
@@ -254,6 +261,19 @@ python = "3.12.*"
 
 [tool.pixi.feature.casa671-py312.pypi-dependencies]
 casashell = { version = "==6.7.1.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+
+# --------------------------------------------------------------------------
+# Feature: CASA ver6.7.4-dev/snapshot — Python 3.12
+# --------------------------------------------------------------------------
+
+[tool.pixi.feature.casa674-py312]
+platforms = ["linux-64", "osx-arm64"]
+
+[tool.pixi.feature.casa674-py312.dependencies]
+python = "3.12.*"
+
+[tool.pixi.feature.casa674-py312.pypi-dependencies]
+casashell = { version = "==6.7.4.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 
 # --------------------------------------------------------------------------
 # Feature: CASA ver6.7.5-dev/snapshot — Python 3.12/3.13
@@ -269,8 +289,8 @@ python = "3.12.*"
 casashell = { version = "==6.7.5.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 
 [tool.pixi.feature.casa675-py313]
-# Note: bdsf is currently only available for linux-64 for cp13
-platforms = ["linux-64"]
+# Note: bdsf is not available on osx-arm64 for cp313; skipped via requirements.txt marker
+platforms = ["linux-64", "osx-arm64"]
 
 [tool.pixi.feature.casa675-py313.dependencies]
 python = "3.13.*"
@@ -295,8 +315,7 @@ pipeline = { path = ".", editable = true, extras = ["docs"] }
 [tool.pixi.environments]
 default = { features = ["casa675-py312"], solve-group = "casa675-py312" }
 docs = { features = ["docs"], solve-group = "casa675-py312" }
-casa666-py310 = { features = ["casa666-py310"] }
-casa671-py310 = { features = ["casa671-py310"] }
 casa671-py312 = { features = ["casa671-py312"] }
+casa674-py312 = { features = ["casa674-py312"] }
 casa675-py312 = { features = ["casa675-py312"], solve-group = "casa675-py312" }
 casa675-py313 = { features = ["casa675-py313"] }

@@ -356,21 +356,13 @@ class medianSummary(object):
 
         pdiff_ma = np.ma.masked_where(pdiff == 0, pdiff)
 
-        xrange = np.array(range(pdiff.shape[3]))
         pdiff_ma.data[pdiff_ma > 1.1] = 1.1
         pdiff_ma.data[pdiff_ma < 0.8] = 0.7
         n_blank = 100
 
-        # https://github.com/numpy/numpy/issues/14650
-
-        try:
-            pdiff_ma.mask[:, :, :, :n_blank] = True
-        except Exception as e:
-            if type(pdiff_ma.mask) == np.bool_:
-                pdiff_ma.mask = np.ma.getmaskarray(pdiff_ma)
-            pdiff_ma.mask[:, :, :, :n_blank] = True
-            LOG.debug("Issue with the array mask {!s}".format(e))
-            LOG.info("No zero values in pdiff - mask value set to a scalar boolean.  Reset to a matrix. ")
+        # Ensure mask is a full boolean array before item assignment
+        pdiff_ma.mask = np.ma.getmaskarray(pdiff_ma)
+        pdiff_ma.mask[:, :, :, :n_blank] = True
 
         ma_medians = np.ma.median(pdiff_ma, axis=0)
 

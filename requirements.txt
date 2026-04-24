@@ -10,8 +10,7 @@
 
 numpy>=2.0,<2.4                           # PIPE-2930: keep <2.4 until the compatibility is verified
 scipy>=1.14,<1.17                         # PIPE-2947: pin to avoid issues with 1.17+
-astropy~=7.2; python_version >= '3.11'    # Main astronomy library; version for Python 3.11+
-astropy~=6.1; python_version == '3.10'    # Last major version compatible with Python 3.10
+astropy~=7.2                              # Main astronomy library
 cachetools~=6.2                           # Extensible memoizing collections and decorators
 docstring-inheritance~=2.2                # For inheriting docstrings
 intervaltree~=3.1                         # Data structure for intervals
@@ -22,7 +21,8 @@ pypubsub==4.0.3                           # Pinned due to API changes in later v
 # -- Optional & Tooling Dependencies --
 # Required for specific pipelines (e.g., VLASS) or for profiling and monitoring.
 
-bdsf~=1.13                                # Source finder for VLASS pipeline (PyBDSF)
+# PyBDSF: no macOS wheel for cp313+
+bdsf~=1.13; sys_platform != 'darwin' or python_version <= '3.12'
 ps_mem~=3.14                              # For accurately reporting memory usage
 
 # -- Other Dependencies Provided by CASA Environment 

@@ -454,7 +454,7 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                     row_fractional_bw = '-'
                 elif nchan > 1:
                     row_fractional_bw_label = 'channels'
-                    if r.orig_specmode == 'repBW':
+                    if r.hm_specmode == 'repBW':
                         row_fractional_bw = '%d x %s (repBW, LSRK)' % (nchan, width)
                     else:
                         row_fractional_bw = '%d x %s (LSRK)' % (nchan, width)
@@ -1394,7 +1394,7 @@ class T2_4MDetailsTcleanVlassCubeRenderer(basetemplates.T2_4MDetailsDefaultRende
                     row_fractional_bw = '-'
                 elif nchan > 1:
                     row_fractional_bw_label = 'channels'
-                    if r.orig_specmode == 'repBW':
+                    if r.hm_specmode == 'repBW':
                         row_fractional_bw = '%d x %s (repBW, LSRK)' % (nchan, width)
                     else:
                         row_fractional_bw = '%d x %s (LSRK)' % (nchan, width)

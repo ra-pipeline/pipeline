@@ -318,6 +318,7 @@ class BaselineSubtractionDataManager(object):
             dec = numpy.mean(declist)
             if org_direction is not None:
                 ra, dec = dirutil.direction_recover(ra, dec, org_direction)
+                ra = ra % 360.0  # keep ra within [0, 360)
 
             rowlist[row_index].update(
                     {"RAID": raid, "DECID": decid, "RA": ra, "DEC": dec,

@@ -23,6 +23,23 @@ def subscribe(fn: Callable[[E], None], topic: str):
     pub.subscribe(fn, topic)
 
 
+def unsubscribe(fn: Callable[[E], None], topic: str) -> None:
+    """
+    Cancel a previously registered callback for a topic.
+
+    Silently ignores attempts to unsubscribe a listener that is not currently
+    subscribed (e.g. already removed or never registered).
+
+    :param fn: callback function to remove
+    :param topic: event topic the callback was subscribed to
+    """
+    try:
+        if pub.isSubscribed(fn, topic):
+            pub.unsubscribe(fn, topic)
+    except pub.TopicNameError:
+        pass
+
+
 def send_message(event: E):
     """
     Publish an event.

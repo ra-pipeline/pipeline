@@ -16,6 +16,7 @@ import os
 import re
 import shutil
 import traceback
+from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 from xml.etree import ElementTree
 
@@ -108,6 +109,7 @@ __all__ = ['score_polintents',                                # ALMA specific
            'score_syspowerdata',
            'score_solint',
            'score_longsolint',
+           'score_fluxboot',
            'score_testBPdcals_dts_ants',
            'score_testBPdcals_refant',
            'score_testBPdcals_delay']
@@ -649,7 +651,7 @@ def score_diffgaincal_residuals(residuals_info: dict, score_type: str) -> pqa.QA
                        f' {get_expanded_message(poor)}.')
         # Elevated phase statistics are scored as the lowest blue score.
         elif elevated:
-            score = rendererutils.SCORE_THRESHOLD_WARNING + 0.01 # lowest blue score 
+            score = rendererutils.SCORE_THRESHOLD_WARNING + 0.01 # lowest blue score
             shortmsg = f'Elevated Diffgaincal {messph} {score_type}'
             longmsg = (f'For {ms_name}, field={field} intent={intent} has elevated {messph} {score_type} between'
                        f' 50-70 deg for {get_expanded_message(elevated)}.')
@@ -875,14 +877,19 @@ def score_polintents(recipe_name: str, mses: list[MeasurementSet]) -> list[pqa.Q
             origin = pqa.QAOrigin(metric_name='score_polintents',
                                   metric_score=0.5,
                                   metric_units='MS score based on presence of polarisation data')
-            score = pqa.QAScore(0.5, longmsg=longmsg, shortmsg=shortmsg, origin=origin,
-                                weblog_location=pqa.WebLogLocation.ACCORDION,
-                                applies_to=pqa.TargetDataSelection(vis=ms.basename))
+            score = pqa.QAScore(
+                0.5,
+                longmsg=longmsg,
+                shortmsg=shortmsg,
+                origin=origin,
+                weblog_location=pqa.WebLogLocation.ACCORDION,
+                applies_to=pqa.TargetDataSelection(vis={ms.basename}),
+            )
             scores.append(score)
 
     # if there are accordion warnings, summarise them in a banner warning too
     if scores:
-        affected_mses = {score.applies_to.vis for score in scores}
+        affected_mses = {v for score in scores for v in score.applies_to.vis}
         longmsg = f'Unexpected polarization calibrations in {utils.commafy(affected_mses, False)}'
         shortmsg = 'Polarization intents'
         origin = pqa.QAOrigin(metric_name='score_polintents',
@@ -3644,7 +3651,7 @@ def generate_metric_mask(
         context: Context,
         result: SDImagingResultItem,
         cs: coordsys,
-        mask: np.ndarray
+        image_shape: np.ndarray
 ) -> np.ndarray:
     """
     Generate boolean mask array for metric calculation in
@@ -3656,14 +3663,13 @@ def generate_metric_mask(
         context: Pipeline context
         result: result item created by hsd_imaging
         cs: CASA coordsys tool
-        mask: image mask
+        image_shape: Shape of the image
 
     Returns:
         bool array -- metric mask (True: valid, False: invalid)
     """
     outcome = result.outcome
     org_direction = outcome['image'].org_direction
-    imshape = mask.shape
 
     file_index = np.asarray(outcome['file_index'])
     antenna_list = np.asarray(outcome['assoc_antennas'])
@@ -3676,7 +3682,7 @@ def generate_metric_mask(
 
     refval = cs.referencevalue()
     units = cs.units()
-    metric_mask = np.zeros(imshape, dtype=bool)
+    metric_mask = np.zeros(image_shape, dtype=bool)
 
     for ms_id in unique_file_index:
         target_ms = mses[ms_id]
@@ -3786,13 +3792,13 @@ def generate_metric_mask(
         py = pixel_array[1]
 
         for x, y in zip(map(int, np.round(px)), map(int, np.round(py))):
-            if 0 <= x and x <= imshape[0] - 1 and 0 <= y and y <= imshape[1] - 1:
+            if 0 <= x and x <= image_shape[0] - 1 and 0 <= y and y <= image_shape[1] - 1:
                 metric_mask[x, y, :, :] = True
 
     # exclude edge channels
     imagename = outcome['image'].imagename
     nchan = metric_mask.shape[3]
-    edge_count_lower, edge_count_upper = detect_edge_channels(mask)
+    edge_count_lower, edge_count_upper = outcome.get("edge_channels", (0, 0))
     log_edge_channels(imagename, nchan, edge_count_lower, edge_count_upper)
     if edge_count_lower > 0:
         metric_mask[:, :, :, :edge_count_lower] = False
@@ -3800,55 +3806,6 @@ def generate_metric_mask(
         metric_mask[:, :, :, -edge_count_upper:] = False
 
     return metric_mask
-
-
-def detect_edge_channels(mask: np.ndarray) -> tuple[int, int]:
-    """Detect list of edge channels to be excluded from QA evaluation.
-
-    There are a few edge channels that have less valid spatial pixels
-    than other spectral channels, probably due to the effect of frame
-    conversion from TOPO to LSRK with progressively varying time stamp.
-    Raster OTF scan without frequency tracking can cause this effect.
-
-    Other possible reason is edge channel flagging by hsd_flagdata
-    and/or hsd_tsysflag.
-
-    This function detects such edge channels by calculating the median
-    number of valid spatial pixels in each channel. Consecutive
-    channels with less valid spatial pixels than the median are
-    regarded as edge channels.
-
-    Args:
-        mask: boolean numpy array of shape (nx, ny, npol, nchan)
-
-    Returns:
-        Number of edge channels excluded from lower and upper
-        side of the spectral axis
-    """
-    num_valid_pixels = np.sum(mask, axis=(0, 1, 2))
-    nchan = len(num_valid_pixels)
-    # PIPE-1727 threshold for edge channels should be strict,
-    # no tolerance using stddev nor MAD
-    median_num_valid_pixels = np.median(num_valid_pixels)
-    LOG.debug(
-        "typical number of valid pixels %s",
-        median_num_valid_pixels
-    )
-    threshold = median_num_valid_pixels
-    edge_count_lower = 0
-    for i in range(nchan):
-        if num_valid_pixels[i] < threshold:
-            edge_count_lower += 1
-        else:
-            break
-    edge_count_upper = 0
-    for i in range(nchan - 1, -1, -1):
-        if num_valid_pixels[i] < threshold:
-            edge_count_upper += 1
-        else:
-            break
-
-    return edge_count_lower, edge_count_upper
 
 
 def direction_recover( ra, dec, org_direction ):
@@ -3912,7 +3869,7 @@ def score_sdimage_masked_pixels(context: Context, result: SDImagingResultItem) -
         # metric_mask is boolean array that defines the region to be excluded
         #    True: included in the metric calculation
         #   False: excluded from the metric calculation
-        metric_mask = generate_metric_mask(context, result, cs, mask)
+        metric_mask = generate_metric_mask(context, result, cs, imageshape)
     finally:
         # done using coordsys tool
         cs.done()
@@ -5237,14 +5194,13 @@ def score_longsolint(context, result) -> list[pqa.QAScore]:
     return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin)
 
 @log_qa
-def score_testBPdcals_dts_ants(vis:str, amp_collection:dict, phase_collection:dict, bandname:str) -> pqa.QAScore:
+def score_testBPdcals_dts_ants(vis: str, amp_collection: dict, phase_collection: dict, bandname: str) -> pqa.QAScore:
     """Evaluate QA score based on the number of antennas affected by DTS issues."""
-
     bad_ants = []
     bad_ants.extend([str(a) for a in amp_collection.keys()])
     bad_ants.extend([str(p) for p in phase_collection.keys()])
     num_bad_ants = len(set(bad_ants))
-    applies_to = pqa.TargetDataSelection(vis=vis)
+    applies_to = pqa.TargetDataSelection(vis={vis})
 
     # PIPE-2580: if > 4 antennas have DTS issue, QA score < 0.5
     if num_bad_ants > 4:
@@ -5263,10 +5219,9 @@ def score_testBPdcals_dts_ants(vis:str, amp_collection:dict, phase_collection:di
     return qa_score
 
 @log_qa
-def score_testBPdcals_refant(vis:str, bad_refant:list, bandname:str) -> pqa.QAScore:
+def score_testBPdcals_refant(vis: str, bad_refant: list, bandname: str) -> pqa.QAScore:
     """Evaluate QA score based on reference antenna validity."""
-
-    applies_to = pqa.TargetDataSelection(vis=vis)
+    applies_to = pqa.TargetDataSelection(vis={vis})
     # PIPE-2580: if bad reference antenna found, QA score <0.5
     if len(bad_refant) > 0  :
         score = rendererutils.SCORE_THRESHOLD_ERROR
@@ -5284,10 +5239,9 @@ def score_testBPdcals_refant(vis:str, bad_refant:list, bandname:str) -> pqa.QASc
     return qa_score
 
 @log_qa
-def score_testBPdcals_delay(vis:str, caltable:str, bandname:str) -> pqa.QAScore:
+def score_testBPdcals_delay(vis: str, caltable: str, bandname: str) -> pqa.QAScore:
     """Evaluate QA score based on median delay per baseband."""
-
-    applies_to = pqa.TargetDataSelection(vis=vis)
+    applies_to = pqa.TargetDataSelection(vis={vis})
     # PIPE-2580: if median delay per baseband > 15 ms, QA score < 0.5
     with casa_tools.TableReader(caltable) as tb:
         fpar = tb.getcol('FPARAM')
@@ -5311,3 +5265,140 @@ def score_testBPdcals_delay(vis:str, caltable:str, bandname:str) -> pqa.QAScore:
     qa_score = pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=applies_to)
 
     return qa_score
+
+@log_qa
+def score_fluxboot(context, result) -> list[pqa.QAScore]:
+    qascores = []
+    calms = "calibrators.ms"
+    ms = context.observing_run.get_ms(result.vis)
+    sci_spws = ms.get_spectral_windows(science_windows_only=True)
+    total_sci_spws = len(sci_spws)
+    flagdata_task = casa_tasks.flagdata(vis=calms, mode="summary")
+    flagdata_result = flagdata_task.execute()
+    flag_spw = flagdata_result["spw"]
+    ignored_spw_count = 0
+
+    for spw in sci_spws:
+        str_spwid = str(spw.id)
+        if str_spwid in flag_spw.keys():
+            flag_percentage = flag_spw[str_spwid]['flagged']/flag_spw[str_spwid]['total']
+            if flag_percentage > 0.5:
+                ignored_spw_count += 1
+        else:
+            ignored_spw_count += 1
+    spwlist = [spw.id for spw in sci_spws]
+    applies_to = pqa.TargetDataSelection(vis={result.vis}, spw=spwlist)
+
+    # PIPE-2584, part-1: If > 50% of science spws are fully flagged
+    # or missing from calibrators.ms: QA score < 0.5
+    flag_ratio = ignored_spw_count / total_sci_spws
+    score = 1 - flag_ratio
+    if score < 0.5:
+        msg = f"{flag_ratio*100:.2f}% of science SPWs flagged or not present in calibrator.ms"
+        origin = pqa.QAOrigin(metric_name='score_fluxboot',
+                              metric_score=score,
+                              metric_units='')
+        qascores.append(pqa.QAScore(score, longmsg=msg, shortmsg=msg, origin=origin, applies_to=applies_to))
+
+    # PIPE-2584, part-2: If > 50% of all calibrators.ms data flagged
+    total_flag_ratio = flagdata_result["flagged"] / flagdata_result["total"]
+    score = 1 - total_flag_ratio
+
+    msg = f"{total_flag_ratio*100:.2f}% of data flagged in calibrator.ms"
+    origin = pqa.QAOrigin(metric_name='score_fluxboot',
+                          metric_score=score,
+                          metric_units='')
+    applies_to = pqa.TargetDataSelection(vis={result.vis})
+    qascores.append(pqa.QAScore(score, longmsg=msg, shortmsg=msg, origin=origin, applies_to=applies_to))
+
+    # PIPE-2584, part-3: IF spectral index > +/- 5: QA score < 0.5
+    for sp_result in result.spindex_results:
+        if abs(float(sp_result["spix"])) > 5:
+            score = rendererutils.SCORE_THRESHOLD_ERROR
+            msg = "spectral index > +- 5"
+            origin = pqa.QAOrigin(metric_name='score_fluxboot',
+                                  metric_score=score,
+                                  metric_units='')
+            qascores.append(pqa.QAScore(score, longmsg=msg, shortmsg=msg, origin=origin, applies_to=applies_to))
+            break
+
+    setup_scans = defaultdict(list)
+    valid_intents = {'TARGET', 'AMPLITUDE', 'BANDPASS', 'PHASE', 'POLANGLE'}
+    for scan in context.evla['msinfo'][result.vis].calibrator_scan_select_string.split(","):
+        sc = ms.get_scans(int(scan))[0]
+        spw_ids = sorted(
+            spw.id for spw in sc.spws
+            if spw.intents & valid_intents
+            )
+        setup_key = frozenset(spw_ids)
+
+        setup_scans[setup_key].append(sc.id)
+
+    missing_spws = 0
+    missing_spws_scans = {}
+    for spws, scans in setup_scans.items():
+        for spw in spws:
+            flagged_all = True
+            for sc in scans:
+                taql = f"SCAN_NUMBER={sc} and DATA_DESC_ID =={spw} and FLAG_ROW==False"
+                numrows = utils.get_row_count(calms, taql)
+                if numrows > 0:
+                    flagged_all = False
+                    break
+            if flagged_all:
+                missing_spws += 1
+                missing_spws_scans[spw] = ', '.join(str(int(s)) for s in scans)
+
+
+    if missing_spws / total_sci_spws > 0.5:
+        score = rendererutils.SCORE_THRESHOLD_ERROR
+        for spw, scans in missing_spws_scans.items():
+            longmsg = f"SPW {spw} flagged in scans {scans}"
+            shortmsg = f"SPW {spw} flagged in all scans"
+            origin = pqa.QAOrigin(metric_name='score_fluxboot',
+                                    metric_score=score,
+                                    metric_units='')
+            applies_to = pqa.TargetDataSelection(vis={result.vis}, spw=spw)
+            qascores.append(pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=applies_to))
+
+    # PIPE-2584, part-4: Ensure flux density is measured.
+    # If not measured, model_data column will be filled up with 1.
+
+    # checkif the MODEL column is not present.
+    with casa_tools.TableReader(calms) as table:
+        if 'MODEL_DATA' in table.colnames():
+            is_model_present = True
+        else:
+            is_model_present = False
+
+    if not is_model_present:
+        msg = f"Model column is not present"
+        origin = pqa.QAOrigin(metric_name='score_fluxboot',
+                              metric_score=score,
+                              metric_units='')
+        applies_to = pqa.TargetDataSelection(vis={result.vis})
+        qascores.append(pqa.QAScore(score, longmsg=msg, shortmsg=msg, origin=origin, applies_to=applies_to))
+
+        return qascores
+
+    for spws, scans in setup_scans.items():
+        for sc in scans:
+            spwlist = []
+            for spw in spws:
+                taql = f"SCAN_NUMBER={sc} and DATA_DESC_ID =={spw} and FLAG_ROW==False"
+                numrows = utils.get_row_count(calms, taql)
+                if numrows == 0:
+                    continue
+                job = casa_tasks.visstat(vis=calms,scan=str(sc), useflags=True, spw=str(spw), datacolumn='model', correlation='LL,RR', doquantiles=False)
+                vis_stats = job.execute()
+                for desc_id, stats in vis_stats.items():
+                    if all(stats.get(key) == 1 for key in ["min","max","mean"]):
+                        spwlist.append(str(spw))
+            if spwlist:
+                score = rendererutils.SCORE_THRESHOLD_ERROR
+                msg = f"Model column is set to 1.0 for scan {sc} and spw {', '.join(spwlist)}"
+                origin = pqa.QAOrigin(metric_name='score_fluxboot', metric_score=score, metric_units='')
+                applies_to = pqa.TargetDataSelection(vis={result.vis}, scan=sc)
+                qascores.append(pqa.QAScore(score, longmsg=msg, shortmsg=msg, origin=origin, applies_to=applies_to))
+
+    return qascores

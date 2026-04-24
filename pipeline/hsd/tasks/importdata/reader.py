@@ -19,6 +19,7 @@ from pipeline.domain.datatable import DataTableImpl as DataTable
 from pipeline.domain.datatable import OnlineFlagIndex
 from pipeline.domain.measurementset import MeasurementSet
 from pipeline.hsd.tasks.common import TableSelector, mjd_to_datestring
+from pipeline.hsd.tasks.common import utils as sdutils
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.launcher import Context
 
@@ -799,6 +800,11 @@ class MetaDataReader(object):
         # save org_directions if exists
         if 'org_direction' in locals():
             self.datatable.putkeyword('ORG_DIRECTION', org_direction)
+
+        # rewrap the AZ values
+        Tra = sdutils.rewrap_angle( Tra )
+        Tshift_ra = sdutils.rewrap_angle( Tshift_ra )
+        Tofs_ra = sdutils.rewrap_angle( Tofs_ra )
 
         self.datatable.putcol('RA', Tra, startrow=ID)
         self.datatable.putcol('DEC', Tdec, startrow=ID)

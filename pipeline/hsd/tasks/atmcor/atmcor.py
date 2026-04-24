@@ -685,7 +685,7 @@ class SerialSDATMCorrection(basetask.StandardTaskTemplate):
             heuristics_result = SDcalatmcorr.selectModelParams(
                 mslist=[ms_name],
                 context=self.inputs.context,
-                decisionmetric='intabsdiff',
+                decisionmetric='intsqdiff',
                 atmtype=atmtype_list,
                 maxalt=self.inputs.maxalt,
                 lapserate=self.inputs.dtem_dh,
@@ -694,7 +694,8 @@ class SerialSDATMCorrection(basetask.StandardTaskTemplate):
                 defatmtype=default_model.atmtype,
                 defmaxalt=default_model.maxalt,
                 deflapserate=default_model.dtem_dh,
-                defscaleht=default_model.h0
+                defscaleht=default_model.h0,
+                diffsmooth=0.016
             )
             best_model = ATMModelParam(*heuristics_result[0][ms_name])
 

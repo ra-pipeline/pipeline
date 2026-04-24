@@ -62,7 +62,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         def get_mean_amplitude(vis, uvrange=None, axis='amplitude', field='', spw=None):
             stat_arg = {'vis': vis, 'uvrange': uvrange, 'axis': axis,
                         'useflags': True, 'field': field, 'spw': spw,
-                        'correlation': 'LL,RR', 'doquantiles': 'False'}
+                        'correlation': 'LL,RR', 'doquantiles': False}
             job = casa_tasks.visstat(**stat_arg)
             stats = job.execute()  # returns stat in meter
 

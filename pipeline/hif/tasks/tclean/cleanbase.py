@@ -57,7 +57,7 @@ class CleanBaseInputs(vdp.StandardInputs):
     hm_perchanweightdensity = vdp.VisDependentProperty(default=None)
     hm_npixels = vdp.VisDependentProperty(default=0)
     nterms = vdp.VisDependentProperty(default=None)
-    orig_specmode = vdp.VisDependentProperty(default='')
+    hm_specmode = vdp.VisDependentProperty(default='')
     outframe = vdp.VisDependentProperty(default='LSRK')
     parallel = vdp.VisDependentProperty(default='automatic')
     pblimit = vdp.VisDependentProperty(default=0.2)
@@ -124,7 +124,7 @@ class CleanBaseInputs(vdp.StandardInputs):
         return []
 
     def __init__(self, context, output_dir=None, vis=None, imagename=None, datacolumn=None, datatype=None, datatype_info=None, intent=None, field=None,
-                 spw=None, spwsel=None, spwsel_all_cont=None, spwsel_low_bandwidth=None, spwsel_low_spread=None, uvrange=None, orig_specmode=None,
+                 spw=None, spwsel=None, spwsel_all_cont=None, spwsel_low_bandwidth=None, spwsel_low_spread=None, uvrange=None, hm_specmode=None,
                  specmode=None, gridder=None, deconvolver=None, uvtaper=None, nterms=None, cycleniter=None, cyclefactor=None, nmajor=None, hm_minpsffraction=None,
                  hm_maxpsffraction=None, scales=None, outframe=None, imsize=None,
                  cell=None, phasecenter=None, psf_phasecenter=None, nchan=None, nbin=None, start=None, width=None, stokes=None, weighting=None,
@@ -154,7 +154,7 @@ class CleanBaseInputs(vdp.StandardInputs):
         self.uvrange = uvrange
         self.savemodel = savemodel
         self.startmodel = startmodel
-        self.orig_specmode = orig_specmode
+        self.hm_specmode = hm_specmode
         self.specmode = specmode
         self.gridder = gridder
         self.deconvolver = deconvolver
@@ -252,7 +252,7 @@ class CleanBase(basetask.StandardTaskTemplate):
                                   field_ids=field_ids,
                                   intent=inputs.intent,
                                   spw=inputs.spw,
-                                  orig_specmode=inputs.orig_specmode,
+                                  hm_specmode=inputs.hm_specmode,
                                   specmode=inputs.specmode,
                                   stokes=inputs.stokes,
                                   multiterm=inputs.nterms if inputs.deconvolver == 'mtmfs' else None,
@@ -683,28 +683,56 @@ class CleanBase(basetask.StandardTaskTemplate):
                 result.set_totalflux_array(iter, tclean_totalflux)
                 result.set_planeid_array(iter, tclean_planeid)
 
-            LOG.info('tclean used %d iterations' % tclean_iterdone)
+            LOG.info('tclean used %d iterations', tclean_iterdone)
 
             if tclean_stopcode == 0 and tclean_iterdone > 0:
-                LOG.warning('tclean exit status 0 for Field: %s SPW: %s: the image may not be cleaned as expected.' %
-                            (sourcename, inputs.spw))
+                LOG.warning(
+                    'tclean exit status 0 for Field: %s SPW: %s: the image may not be cleaned as expected.',
+                    sourcename,
+                    inputs.spw,
+                )
 
             if tclean_stopcode == 1:
-                result.error = CleanBaseError('tclean reached niter limit. Field: %s SPW: %s' %
-                                              (sourcename, inputs.spw), 'Reached niter limit')
+                result.error = CleanBaseError(
+                    f'tclean reached niter limit of {tclean_niter}. Field: {sourcename} SPW: {inputs.spw} iter{iter}',
+                    'Reached niter limit',
+                )
                 LOG.log(
                     logging.INFO if tclean_stopcode in tclean_stopcode_ignore else logging.WARNING,
-                    'tclean reached niter limit of {} for {} / spw{} / iter{} !'.format(
-                        tclean_niter, sourcename,
-                        inputs.spw, iter))
+                    'tclean reached niter limit of %s for %s / spw%s / iter%s !',
+                    tclean_niter,
+                    sourcename,
+                    inputs.spw,
+                    iter,
+                )
+
+            if tclean_stopcode == 9:
+                result.error = CleanBaseError(
+                    f'tclean reached nmajor limit of {tclean_nmajordone}. Field: {sourcename} SPW: {inputs.spw} iter{iter}',
+                    'Reached nmajor limit',
+                )
+                LOG.log(
+                    logging.INFO if tclean_stopcode in tclean_stopcode_ignore else logging.WARNING,
+                    'tclean reached nmajor limit of %s for %s / spw%s / iter%s !',
+                    tclean_nmajordone,
+                    sourcename,
+                    inputs.spw,
+                    iter,
+                )
 
             if tclean_stopcode in [5, 6]:
-                result.error = CleanBaseError('tclean stopped to prevent divergence (stop code %d). Field: %s SPW: %s' %
-                                              (tclean_stopcode, sourcename, inputs.spw),
-                                              'tclean stopped to prevent divergence.')
-                LOG.log(logging.INFO if tclean_stopcode in tclean_stopcode_ignore else logging.WARNING,
-                        'tclean stopped to prevent divergence (stop code {}). Field: {} SPW: {} iter{} !'.format(
-                            tclean_stopcode, sourcename, inputs.spw, iter))
+                result.error = CleanBaseError(
+                    f'tclean stopped to prevent divergence (stop code {tclean_stopcode}). Field: {sourcename} SPW: {inputs.spw} iter{iter}',
+                    'Stopped to prevent divergence',
+                )
+                LOG.log(
+                    logging.INFO if tclean_stopcode in tclean_stopcode_ignore else logging.WARNING,
+                    'tclean stopped to prevent divergence (stop code %s) for %s / spw%s / iter%s !',
+                    tclean_stopcode,
+                    sourcename,
+                    inputs.spw,
+                    iter,
+                )
 
         # Collect images to be examined and stored in TcleanResult
         im_names = {}
@@ -750,7 +778,7 @@ class CleanBase(basetask.StandardTaskTemplate):
                 if os.path.exists(name):
                     imageheader.set_miscinfo(name=name, spw=inputs.spw, virtspw=virtspw, field=sourcename,
                                              datatype=inputs.datatype, type=im_type, iter=iter,
-                                             intent=inputs.intent, specmode=inputs.orig_specmode,
+                                             intent=inputs.intent, specmode=inputs.hm_specmode,
                                              robust=inputs.robust, weighting=inputs.weighting,
                                              is_per_eb=inputs.is_per_eb,
                                              context=context)

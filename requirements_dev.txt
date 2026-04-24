@@ -6,6 +6,7 @@ pytest-xdist            # https://github.com/pytest-dev/pytest-xdist
 pytest-cov              # https://github.com/pytest-dev/pytest-cov
 pytest-html             # https://pypi.org/project/pytest-html/
 pytest-benchmark        # https://pytest-benchmark.readthedocs.io/en/latest/
+pytest-xvfb             # https://github.com/The-Compiler/pytest-xvfb
 junit2html              # https://github.com/inorton/junit2html, requires jinja2
 
 # Code Quality & Style

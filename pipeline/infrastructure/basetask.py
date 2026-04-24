@@ -10,7 +10,6 @@ import pickle
 import re
 import textwrap
 import traceback
-from typing import Generic, TypeVar
 import uuid
 
 from . import api
@@ -27,8 +26,9 @@ from . import utils
 from . import vdp
 from .eventbus import TaskStartedEvent, TaskCompleteEvent, TaskAbnormalExitEvent, TaskStoppedEvent
 from .eventbus import ResultAcceptingEvent, ResultAcceptedEvent, ResultAcceptErrorEvent
-
 from .casa_tasks import CasaTasks
+
+from typing import Generic, TypeVar
 
 LOG = logging.get_logger(__name__)
 
@@ -756,7 +756,7 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
                 # get our result
                 result = self.prepare(**prepare_parameters)
 
-                # analyse them..
+                # analyse them
                 result = self.analyse(result)
 
                 # tag the result with the class of the originating task
