@@ -8,10 +8,14 @@ pipeconfig:
   ppr: # not used yet
   vlappr: # not used yet
   xvfb: false # option for directly spawn xvfb server from the python session, pyvirtualdisplay is required for xvfb=True
+  prefect:
+    enabled: false # opt-in Prefect orchestration layer (requires `prefect` package)
+    flow_name: "CASA Pipeline" # default flow name shown in Prefect UI
+    log_prints: true # capture print() output in Prefect logs
   omp_num_threads: 4 # not used yet
   dask:
     tier0futures: true
-    autostart: false
+    autostart: true
     host: null # 0.0.0.0 to bind to all interfaces / acessile from network, null for default localhost
     dashboard_address: ":0" # Port for the dask dashboard: ":0" to auto-select a port, null to disable
     clustertype: "local" # htcondor / slurm
