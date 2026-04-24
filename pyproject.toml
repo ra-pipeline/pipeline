@@ -416,9 +416,25 @@ build-pdf-userguide = { cmd = "make latex && cd _build/latex && make users_guide
 # Update BibTeX references from NASA/ADS public library
 update-references = { cmd = "python scripts/update_references.py" }
 
+# --------------------------------------------------------------------------
+# Feature: Experimental extras — Dask, Prefect, Jupyter (requirements_exp.txt)
+# --------------------------------------------------------------------------
+
+[tool.pixi.feature.exp]
+platforms = ["linux-64", "osx-arm64"]
+
+[tool.pixi.feature.exp.dependencies]
+# Pin packaging to resolve conflict: conda provides 26.1 but prefect needs <26.1
+packaging = "<26.1"
+
+[tool.pixi.feature.exp.pypi-dependencies]
+pipeline = { path = ".", editable = true, extras = ["exp"] }
+prefect = ">=3.0"
+
 [tool.pixi.environments]
 # default + docs share a solve-group so the docs build always uses the same locked deps as the default runtime
 default = { features = ["casa674-py312"], solve-group = "casa674-py312" }
+exp = { features = ["casa674-py312", "exp"], solve-group = "casa674-py312" }
 docs = { features = ["docs"], solve-group = "casa674-py312" }
 casa674-py312 = { features = ["casa674-py312"] }
 casa676-py312 = { features = ["casa676-py312"] }

@@ -245,6 +245,9 @@ def _log_dask_summary(task_name: str) -> None:
     Called after each ``run_pipeline_task`` to give Prefect users visibility
     into how the Dask cluster was used during that stage.  The artifact
     appears in the Prefect dashboard with a per-worker breakdown.
+    
+    This function spawns a daemon thread to prevent any slow or hanging Prefect 
+    API / Dask scheduler queries from blocking the main pipeline workflow.
     """
     try:
         from pipeline.infrastructure import daskhelpers
@@ -252,31 +255,40 @@ def _log_dask_summary(task_name: str) -> None:
         if not daskhelpers.daskclient:
             return
 
-        info = daskhelpers.daskclient.scheduler_info()
-        workers = info.get('workers', {})
-        if not workers:
-            return
+        def _background_summary():
+            try:
+                # Add timeout so the daemon thread doesn't hang infinitely if Dask is locked
+                info = daskhelpers.daskclient.scheduler_info(timeout=10)
+                workers = info.get('workers', {})
+                if not workers:
+                    return
 
-        n_workers = len(workers)
-        total_memory = sum(w.get('memory_limit', 0) for w in workers.values())
-        used_memory = sum(w.get('metrics', {}).get('memory', 0) for w in workers.values())
+                n_workers = len(workers)
+                total_memory = sum(w.get('memory_limit', 0) for w in workers.values())
+                used_memory = sum(w.get('metrics', {}).get('memory', 0) for w in workers.values())
 
-        mem_pct = (used_memory / total_memory * 100) if total_memory > 0 else 0.0
+                mem_pct = (used_memory / total_memory * 100) if total_memory > 0 else 0.0
 
-        LOG.info(
-            'Dask cluster after %s: %d workers, memory %.1f%% (%s / %s)',
-            task_name,
-            n_workers,
-            mem_pct,
-            _human_bytes(used_memory),
-            _human_bytes(total_memory),
-        )
+                LOG.info(
+                    'Dask cluster after %s: %d workers, memory %.1f%% (%s / %s)',
+                    task_name,
+                    n_workers,
+                    mem_pct,
+                    _human_bytes(used_memory),
+                    _human_bytes(total_memory),
+                )
 
-        # Publish per-worker detail as a Prefect artifact.
-        _publish_dask_worker_artifact(task_name, workers, daskhelpers.daskclient)
+                # Publish per-worker detail as a Prefect artifact.
+                _publish_dask_worker_artifact(task_name, workers, daskhelpers.daskclient)
+            except Exception as exc:
+                LOG.debug('Could not collect Dask summary: %s', exc)
+
+        import threading
+        t = threading.Thread(target=_background_summary, daemon=True)
+        t.start()
 
     except Exception as exc:
-        LOG.debug('Could not collect Dask summary: %s', exc)
+        LOG.debug('Could not spawn Dask summary thread: %s', exc)
 
 
 def _publish_dask_worker_artifact(task_name: str, workers: dict, client) -> None:
