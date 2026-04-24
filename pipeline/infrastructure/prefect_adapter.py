@@ -199,15 +199,52 @@ def _register_dask_observer() -> None:
         _dask_observer_registered = True
         LOG.info('Prefect-Dask observer plugin registered on %s', daskhelpers.daskclient)
 
+        # Publish Dask dashboard URL as a Prefect artifact for easy access.
+        _publish_dask_dashboard_link(daskhelpers.daskclient)
+
     except Exception as exc:
         LOG.debug('Could not register Dask observer: %s', exc)
 
 
-def _log_dask_summary(task_name: str) -> None:
-    """Log a brief Dask cluster utilization summary after a pipeline stage.
+def _publish_dask_dashboard_link(client) -> None:
+    """Create a Prefect markdown artifact with a link to the Dask dashboard.
 
-    This is called after each ``run_pipeline_task`` to give Prefect users
-    visibility into how the Dask cluster was used during that stage.
+    This gives operators one-click access from the Prefect UI to the live
+    Dask task stream, worker memory, and cluster status views.
+    """
+    try:
+        from prefect.artifacts import create_markdown_artifact
+
+        dashboard_link = client.dashboard_link
+        if not dashboard_link:
+            return
+
+        info = client.scheduler_info()
+        n_workers = len(info.get('workers', {}))
+
+        markdown = (
+            f'## Dask Cluster\n\n'
+            f'- **Dashboard**: [{dashboard_link}]({dashboard_link})\n'
+            f'- **Workers**: {n_workers}\n'
+            f'- **Scheduler**: `{client.scheduler.address}`\n'
+        )
+        create_markdown_artifact(
+            key='dask-cluster',
+            markdown=markdown,
+            description='Dask cluster dashboard and status',
+        )
+        LOG.info('Published Dask dashboard artifact: %s', dashboard_link)
+
+    except Exception as exc:
+        LOG.debug('Could not publish Dask dashboard artifact: %s', exc)
+
+
+def _log_dask_summary(task_name: str) -> None:
+    """Log Dask cluster utilization and publish a per-worker Prefect artifact.
+
+    Called after each ``run_pipeline_task`` to give Prefect users visibility
+    into how the Dask cluster was used during that stage.  The artifact
+    appears in the Prefect dashboard with a per-worker breakdown.
     """
     try:
         from pipeline.infrastructure import daskhelpers
@@ -234,8 +271,65 @@ def _log_dask_summary(task_name: str) -> None:
             _human_bytes(used_memory),
             _human_bytes(total_memory),
         )
+
+        # Publish per-worker detail as a Prefect artifact.
+        _publish_dask_worker_artifact(task_name, workers, daskhelpers.daskclient)
+
     except Exception as exc:
         LOG.debug('Could not collect Dask summary: %s', exc)
+
+
+def _publish_dask_worker_artifact(task_name: str, workers: dict, client) -> None:
+    """Create a Prefect markdown artifact with individual worker details.
+
+    The artifact includes a table with each worker's name, thread count,
+    memory usage, and number of tasks executed, plus a link to the Dask
+    dashboard.
+    """
+    try:
+        from prefect.artifacts import create_markdown_artifact
+
+        dashboard_link = client.dashboard_link or ''
+
+        # Build per-worker table rows.
+        rows = []
+        for addr, w in workers.items():
+            name = w.get('name', addr)
+            nthreads = w.get('nthreads', '?')
+            mem_limit = w.get('memory_limit', 0)
+            metrics = w.get('metrics', {})
+            mem_used = metrics.get('memory', 0)
+            cpu = metrics.get('cpu', 0.0)
+            n_tasks = metrics.get('task_count', metrics.get('executing', '?'))
+            status = w.get('status', 'unknown')
+
+            mem_pct = (mem_used / mem_limit * 100) if mem_limit > 0 else 0.0
+            rows.append(
+                f'| {name} | {status} | {nthreads} | {cpu:.0f}% '
+                f'| {_human_bytes(mem_used)} / {_human_bytes(mem_limit)} ({mem_pct:.0f}%) '
+                f'| {n_tasks} |'
+            )
+
+        table_header = (
+            '| Worker | Status | Threads | CPU | Memory (used / limit) | Tasks |\n'
+            '|--------|--------|---------|-----|----------------------|-------|\n'
+        )
+        table_body = '\n'.join(rows)
+
+        header = f'## Dask Workers — after `{task_name}`\n\n'
+        if dashboard_link:
+            header += f'📊 [Dask Dashboard]({dashboard_link})\n\n'
+
+        markdown = header + table_header + table_body
+
+        create_markdown_artifact(
+            key='dask-workers',
+            markdown=markdown,
+            description=f'Dask worker status after {task_name}',
+        )
+
+    except Exception as exc:
+        LOG.debug('Could not publish Dask worker artifact: %s', exc)
 
 
 def _human_bytes(n: int) -> str:
@@ -867,21 +961,36 @@ if _PREFECT_AVAILABLE:
     _flow_name = _pcfg.get('flow_name', 'CASA Pipeline')
     _log_prints = _pcfg.get('log_prints', True)
 
-    @flow(name=f'{_flow_name} PPR', log_prints=_log_prints)
+    def _ppr_flow_name() -> str:
+        """Derive the flow run name from the PPR filename."""
+        import prefect.runtime
+        ppr_path = prefect.runtime.flow_run.parameters.get('pprXmlFile', 'unknown.xml')
+        return os.path.basename(ppr_path).replace('.xml', '')
+
+    def _recipe_flow_name() -> str:
+        """Derive the flow run name from the recipe procedure or name."""
+        import prefect.runtime
+        params = prefect.runtime.flow_run.parameters
+        if params.get('name'):
+            return params['name']
+        procedure = params.get('procedure', 'procedure_unknown')
+        return os.path.basename(procedure).replace('.xml', '')
+
+    @flow(name=f'{_flow_name} PPR', flow_run_name=_ppr_flow_name, log_prints=_log_prints)
     def run_ppr_flow(pprXmlFile: str, **kwargs) -> None:
         """Prefect flow wrapping :func:`executeppr.executeppr`."""
         _apply_prefect_config()
         _register_dask_observer()
         return _run_ppr_flow_impl(pprXmlFile, **kwargs)
 
-    @flow(name=f'{_flow_name} VLA PPR', log_prints=_log_prints)
+    @flow(name=f'{_flow_name} VLA PPR', flow_run_name=_ppr_flow_name, log_prints=_log_prints)
     def run_vla_ppr_flow(pprXmlFile: str, **kwargs) -> None:
         """Prefect flow wrapping :func:`executevlappr.executeppr`."""
         _apply_prefect_config()
         _register_dask_observer()
         return _run_vla_ppr_flow_impl(pprXmlFile, **kwargs)
 
-    @flow(name=f'{_flow_name} Recipe', log_prints=_log_prints)
+    @flow(name=f'{_flow_name} Recipe', flow_run_name=_recipe_flow_name, log_prints=_log_prints)
     def run_recipe_flow(**kwargs) -> Any:
         """Prefect flow wrapping :func:`recipereducer.reduce`."""
         _apply_prefect_config()
