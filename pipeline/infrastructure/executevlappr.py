@@ -27,8 +27,7 @@ if TYPE_CHECKING:
 
 def executeppr(pprXmlFile: str, importonly: bool = True, loglevel: str = 'info',
                plotlevel: str = 'summary', interactive: bool = True) -> None:
-    """
-    Runs Pipeline Processing Request (PPR).
+    """Runs Pipeline Processing Request (PPR).
 
     Executes pipeline tasks based on instructions described in pprXmlFile.
 
@@ -44,6 +43,13 @@ def executeppr(pprXmlFile: str, importonly: bool = True, loglevel: str = 'info',
             'summary'
         interactive: If True, print pipeline log to STDOUT.
     """
+    # Delegate to Prefect flow when enabled.
+    from .prefect_adapter import is_prefect_enabled
+    if is_prefect_enabled():
+        from .prefect_adapter import run_vla_ppr_flow
+        return run_vla_ppr_flow(pprXmlFile, importonly=importonly, loglevel=loglevel,
+                                plotlevel=plotlevel, interactive=interactive)
+
     # save existing context to disk
     save_existing_context()
 

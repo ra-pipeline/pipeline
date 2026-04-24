@@ -38,8 +38,7 @@ KNOWN_PROCESSING_INTENTS = {
 
 def executeppr(pprXmlFile: str, importonly: bool = True, breakpoint: str = 'breakpoint', bpaction: str = 'ignore',
                loglevel: str = 'info', plotlevel: str = 'default', interactive: bool = True) -> None:
-    """
-    Runs Pipeline Processing Request (PPR).
+    """Runs Pipeline Processing Request (PPR).
 
     Executes pipeline tasks based on instructions described in pprXmlFile.
 
@@ -75,6 +74,14 @@ def executeppr(pprXmlFile: str, importonly: bool = True, breakpoint: str = 'brea
        Resume execution from the 'breakpoint' in PPR.
        >>> executeppr('PPR_uid___A001_X14c3_X1dd.xml', importonly=False, bpaction='resume')
     """
+    # Delegate to Prefect flow when enabled.
+    from .prefect_adapter import is_prefect_enabled
+    if is_prefect_enabled():
+        from .prefect_adapter import run_ppr_flow
+        return run_ppr_flow(pprXmlFile, importonly=importonly, breakpoint=breakpoint,
+                            bpaction=bpaction, loglevel=loglevel, plotlevel=plotlevel,
+                            interactive=interactive)
+
     # save existing context to disk
     save_existing_context()
 

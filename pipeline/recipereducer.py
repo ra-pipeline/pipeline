@@ -297,6 +297,15 @@ def run_named_tasks(tasks: list[tuple[str, dict[str, Any]]]) -> Context:
         exceptions.PipelineException: If any executed task reports tracebacks.
     """
     LOG.info('Initializing context for explicit task list...')
+
+    # Delegate to Prefect flow when enabled.
+    from pipeline.infrastructure.prefect_adapter import is_prefect_enabled
+
+    if is_prefect_enabled():
+        from pipeline.infrastructure.prefect_adapter import run_named_tasks_flow
+
+        return run_named_tasks_flow(tasks)
+
     cli.h_init()
 
     for task_name, task_args in tasks:
@@ -351,6 +360,25 @@ def reduce(
     """
     if vis is None:
         vis = []
+
+    # Delegate to Prefect flow when enabled.
+    from pipeline.infrastructure.prefect_adapter import is_prefect_enabled
+
+    if is_prefect_enabled():
+        from pipeline.infrastructure.prefect_adapter import run_recipe_flow
+
+        return run_recipe_flow(
+            vis=vis,
+            infiles=infiles,
+            procedure=procedure,
+            context=context,
+            name=name,
+            loglevel=loglevel,
+            plotlevel=plotlevel,
+            session=session,
+            exitstage=exitstage,
+            startstage=startstage,
+        )
 
     if infiles is None:
         infiles = []
