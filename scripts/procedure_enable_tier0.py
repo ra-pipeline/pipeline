@@ -133,8 +133,21 @@ def _find_cli_source(task_name: str) -> str | None:
     return None
 
 
+# Tasks that accept `parallel=` on the CLI but handle parallelism natively via
+# MPI (Tier-1) rather than the standard Tier-0 Dask per-EB ParallelTemplate.
+EXCLUDE_TASKS = {
+    'hif_checkproductsize',
+    'hif_findcont',
+    'hif_makeimages',
+    'hif_makeimlist',
+    'hif_selfcal',
+    'hifa_imageprecheck',
+}
+
+
 def task_supports_parallel(task_name: str) -> bool:
-    """Return True if the CLI function for *task_name* accepts a ``parallel`` parameter.
+    """Return True if the CLI function for *task_name* accepts a ``parallel`` parameter
+    and it is a standard Tier-0 task.
 
     The check is performed by parsing the CLI source file with the ``ast``
     module — no pipeline imports are required.
@@ -146,6 +159,10 @@ def task_supports_parallel(task_name: str) -> bool:
         ``True`` when the task's CLI function signature contains ``parallel``,
         ``False`` otherwise (including when the task source file is not found).
     """
+    if task_name in EXCLUDE_TASKS:
+        LOG.debug(f'Skipping {task_name!r}: handles parallelism internally (Tier-1)')
+        return False
+
     source_path = _find_cli_source(task_name)
     if source_path is None:
         return False
