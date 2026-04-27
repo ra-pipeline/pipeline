@@ -2,12 +2,14 @@
 # Do not evaluate type annotations at definition time.
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from pipeline import infrastructure
 from pipeline.infrastructure import casa_tools, utils
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pipeline.domain import MeasurementSet, Field
 
 LOG = infrastructure.logging.get_logger(__name__)

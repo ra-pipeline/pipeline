@@ -1,7 +1,6 @@
 import os
 import re
 import traceback
-from typing import Optional, Union
 
 import numpy as np
 
@@ -15,7 +14,7 @@ import pipeline.infrastructure.utils as utils
 from .auto_selfcal.selfcal_helpers import estimate_near_field_SNR, estimate_SNR
 from .imageparams_base import ImageParamsHeuristics
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
@@ -35,7 +34,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         else:
             return 0.5
 
-    def uvtaper(self, beam_natural=None, protect_long=None, beam_user=None, tapering_limit=None, repr_freq=None) -> Union[str, list]:
+    def uvtaper(self, beam_natural=None, protect_long=None, beam_user=None, tapering_limit=None, repr_freq=None) -> str | list:
         """Tclean uvtaper parameter heuristics."""
         return []
 
@@ -163,7 +162,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
             # Use complete uvrange
             return '>0.0klambda', ratio
 
-    def pblimits(self, pb: Union[None, str], specmode: Optional[str] = None):
+    def pblimits(self, pb: None | str, specmode: str | None = None):
         """PB gain level at which to cut off normalizations (tclean parameter).
         See PIPE-674 and CASR-543
         """
@@ -187,7 +186,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         intent: str,
         specmode: str,
         robust: float,
-        rms_multiplier: Optional[Union[int, float]] = None,
+        rms_multiplier: int | float | None = None,
     ) -> tuple:
         """VLA auto-boxing parameters.
 
@@ -237,7 +236,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
             fastnoise,
         )
 
-    def nterms(self, spwspec) -> Union[int, None]:
+    def nterms(self, spwspec) -> int | None:
         """Tclean nterms parameter heuristics.
 
         Determine nterms depending on the fractional bandwidth.
@@ -256,7 +255,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
 
     def deconvolver(self, specmode, spwspec, intent: str = '', stokes: str = '') -> str:
         """Tclean deconvolver parameter heuristics.
-        
+
         See PIPE-679 and CASR-543
         """
         if specmode == 'cube':
@@ -273,7 +272,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
             vla_band = find_EVLA_band(mean_freq_hz)
         return vla_band
 
-    def gridder(self, intent: str, field: str, spwspec: Optional[str] = None) -> str:
+    def gridder(self, intent: str, field: str, spwspec: str | None = None) -> str:
         """Determine the appropriate tclean gridder parameter for VLA.
 
         Args:
@@ -376,7 +375,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         else:
             return niter
 
-    def nmajor(self, iteration: int) -> Union[None, int]:
+    def nmajor(self, iteration: int) -> None | int:
         """Tclean nmajor parameter heuristics."""
         if iteration == 0:
             return None
@@ -441,7 +440,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         else:
             return False, hm_masking
 
-    def threshold(self, iteration: int, threshold: Union[str, float], hm_masking: str) -> Union[str, float]:
+    def threshold(self, iteration: int, threshold: str | float, hm_masking: str) -> str | float:
         """Tclean threshold parameter heuristics.
         See PIPE-678 and CASR-543"""
         if iteration == 0 or hm_masking in ['none']:
@@ -451,7 +450,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
 
     def imsize(self, fields, cell, primary_beam, sfpblimit=None, max_pixels=None,
                centreonly=False, vislist=None, spwspec=None, intent: str = '', joint_intents: str = '',
-               specmode=None) -> Union[list, int]:
+               specmode=None) -> list | int:
         """
         Image size heuristics for single fields and mosaics. The pixel count along x and y image dimensions
         is determined by the cell size, primary beam size and the spread of phase centers in case of mosaics.
@@ -543,7 +542,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         """Correct the VLA theoretical sensitivity for the Hanning smoothed SPW.
 
         PIPE-2131: Hanning smoothing introduces noise correlation between adjacent visibility channels,
-        which is not accounted for in the statwt() outcome. Here, we introduce a scaling factor of 1.633 
+        which is not accounted for in the statwt() outcome. Here, we introduce a scaling factor of 1.633
         to correct this effect in sensitivity calculation.
 
         Args:
@@ -587,21 +586,21 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         return tuple(ret)
 
     def restfreq(
-            self, specmode: Optional[str] = None, nchan: Optional[int] = None, start: Optional[Union[str, float]] = None,
-            width: Optional[Union[str, float]] = None) -> Optional[str]:
+            self, specmode: str | None = None, nchan: int | None = None, start: str | float | None = None,
+            width: str | float | None = None) -> str | None:
         """Determine the rest frequency for CASA/tclean.
 
         VLA often lacks valid rest frequencies in the SOURCE subtable. Therefore, the SPW center frequency
         is used as the rest frequency when certain conditions are met.
 
         Args:
-            specmode (Optional[str]): The spectral mode, typically 'cube' or 'repBW'.
-            nchan (Optional[int]): Number of channels.
-            start (Optional[Union[str, float]]): Start frequency, expected to be a string with units (e.g., 'Hz').
-            width (Optional[Union[str, float]]): Width frequency, expected to be a string with units (e.g., 'Hz').
+            specmode (str | None): The spectral mode, typically 'cube' or 'repBW'.
+            nchan (int | None): Number of channels.
+            start (str | float | None): Start frequency, expected to be a string with units (e.g., 'Hz').
+            width (str | float | None): Width frequency, expected to be a string with units (e.g., 'Hz').
 
         Returns:
-            Optional[str]: The calculated rest frequency in GHz if conditions are met; otherwise, None.
+            str | None: The calculated rest frequency in GHz if conditions are met; otherwise, None.
         """
         rest_freq = None
 
@@ -623,7 +622,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
 
         return rest_freq
 
-    def get_nfrms_multiplier(self, iteration: int, intent: str, specmode: str, imagename: str) -> Optional[float]:
+    def get_nfrms_multiplier(self, iteration: int, intent: str, specmode: str, imagename: str) -> float | None:
         """PIPE-1878: Determine the nfrms-based threshold multiplier for TARGET imaging.
 
         Args:
@@ -806,8 +805,8 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         Note:
             The current implementation returns an empty list for bad channels. This may be enhanced
             in future versions to identify and return problematic beam channels.
-            PIPE-2758: Decided not to use the median beam algorithm for restoring beam as the absence 
-            of convolution of residual map in planes with per-plane beam > median beam could 
+            PIPE-2758: Decided not to use the median beam algorithm for restoring beam as the absence
+            of convolution of residual map in planes with per-plane beam > median beam could
             potentially cause flux scaling issues in those planes.
         """
         cqa = casa_tools.quanta

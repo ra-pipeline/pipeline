@@ -1,8 +1,4 @@
-import os
-
 import pipeline.infrastructure as infrastructure
-import pipeline.infrastructure.utils as utils
-from pipeline.infrastructure import casa_tools
 from .basecleansequence import BaseCleanSequence
 
 LOG = infrastructure.get_logger(__name__)

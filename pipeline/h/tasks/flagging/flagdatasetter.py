@@ -34,7 +34,7 @@ class FlagdataSetterInputs(vdp.StandardInputs):
         :param inpfile: file with flagcmds
         :type inpfile: string
         """
-        super(FlagdataSetterInputs, self).__init__()
+        super().__init__()
 
         # pipeline inputs
         self.context = context
@@ -57,7 +57,7 @@ class FlagdataSetterResults(basetask.Results):
         if results is None:
             results = []
 
-        super(FlagdataSetterResults, self).__init__()
+        super().__init__()
 
         self.jobs = jobs
         self.results = results

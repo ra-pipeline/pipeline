@@ -12,7 +12,7 @@ class T2_4MDetailsVlassmaskingRenderer(basetemplates.T2_4MDetailsDefaultRenderer
     def __init__(self, uri='vlassmasking.mako',
                  description='Produce a VLASS Mask',
                  always_rerender=False):
-        super(T2_4MDetailsVlassmaskingRenderer, self).__init__(uri=uri,
+        super().__init__(uri=uri,
                                                                description=description, always_rerender=always_rerender)
 
     def get_display_context(self, context, results):

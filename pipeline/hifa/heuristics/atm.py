@@ -1,22 +1,26 @@
+from __future__ import annotations
+
 import os
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 import pipeline.infrastructure as infrastructure
 from pipeline.domain import measures
-from pipeline.domain import SpectralWindow
 from pipeline.h.heuristics import tsysspwmap
 from pipeline.h.tasks.common import calibrationtableaccess as caltableaccess
 from pipeline.h.tasks.common import commonresultobjects
 from pipeline.infrastructure import casa_tools
-from pipeline.infrastructure.launcher import Context
 
-LOG = infrastructure.get_logger(__name__)
+if TYPE_CHECKING:
+    from pipeline.domain import SpectralWindow
+    from pipeline.infrastructure.launcher import Context
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 
-class AtmHeuristics(object):
-    def __init__(self, context: Context, vis: str, spw: List[SpectralWindow]):
+class AtmHeuristics:
+    def __init__(self, context: Context, vis: str, spw: list[SpectralWindow]):
         self.context = context
         self.vis = vis
         self.science_spws = spw
@@ -117,7 +121,7 @@ class AtmHeuristics(object):
 
         self.calculated = True
 
-    def _calculate_median_tsys(self, table: str, intent: str) -> Dict:
+    def _calculate_median_tsys(self, table: str, intent: str) -> dict:
         ms = self.context.observing_run.get_ms(name=self.vis)
 
         # Get the Tsys spw map from caltable.
@@ -167,7 +171,7 @@ class AtmHeuristics(object):
 
         return median_tsys
 
-    def spwid_rank_by_frequency(self) -> List[str]:
+    def spwid_rank_by_frequency(self) -> list[str]:
         """
         Return the spw id of the science spw with highest centre
         frequency.
@@ -187,7 +191,7 @@ class AtmHeuristics(object):
 
         return result
 
-    def spwid_rank_by_opacity(self) -> List[str]:
+    def spwid_rank_by_opacity(self) -> list[str]:
         if not self.calculated:
             self._calculate()
 
@@ -208,7 +212,7 @@ class AtmHeuristics(object):
 
     # Metric to rank spws by a combination of spw bandwidth (higher is better)
     # and median opacity (lower is better), see CAS-10407.
-    def spwid_rank_by_opacity_and_bandwidth(self) -> List[str]:
+    def spwid_rank_by_opacity_and_bandwidth(self) -> list[str]:
         if not self.calculated:
             self._calculate()
 
@@ -230,7 +234,7 @@ class AtmHeuristics(object):
 
     # Metric to rank spws by a combination of spw bandwidth (higher is better)
     # and median Tsys (lower is better), see CAS-10407.
-    def spwid_rank_by_tsys_and_bandwidth(self, intent: str) -> Optional[List[str]]:
+    def spwid_rank_by_tsys_and_bandwidth(self, intent: str) -> list[str] | None:
 
         # Check if Tsys caltable is available for vis.
         tsystable = None

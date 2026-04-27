@@ -22,7 +22,7 @@ class FindContResult(basetask.Results):
         skip_stage=False,
         warning_details=None,
     ):
-        super(FindContResult, self).__init__()
+        super().__init__()
         self.result_cont_ranges = result_cont_ranges
         self.cont_ranges = cont_ranges
         self.joint_mask_names = joint_mask_names

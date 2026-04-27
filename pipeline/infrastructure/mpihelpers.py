@@ -33,7 +33,7 @@ BUFFER_LIMIT = 100*1024*1024  # 100 MiB
 LOG = logging.get_logger(__name__)
 
 
-class AsyncTask(object):
+class AsyncTask:
     def __init__(self, executable):
         """
         Create a new AsyncTask.
@@ -154,7 +154,7 @@ class AsyncTask(object):
             )
 
 
-class SyncTask(object):
+class SyncTask:
     def __init__(self, task, executor=None):
         """
         Create a new SyncTask object.
@@ -206,7 +206,7 @@ class SyncTask(object):
             )
 
 
-class Executable(object):
+class Executable:
     def __init__(self):
         self.logs = {}
 
@@ -294,7 +294,7 @@ class Tier0JobRequest(Executable):
         else:
             # Exclude the context reference inside the executor shallow copy before pushing from the client
             # to reduce the risk of reaching the MPI buffer size limit (150MiB as of CASA ver6.4.1,
-            # see PIPE-13656/PIPE-1337).
+            # see CAS-13656/PIPE-1337).
             self.__executor = executor.copy(exclude_context=True)
 
     def get_executable(self):
@@ -347,7 +347,7 @@ class Tier0FunctionCall(Executable):
         else:
             # Exclude the context reference inside the executor shallow copy before pushing from the client
             # to reduce the risk of reaching the MPI buffer size limit (150MiB as of CASA ver6.4.1,
-            # see PIPE-13656/PIPE-1337).
+            # see CAS-13656/PIPE-1337).
             self.__executor = executor.copy(exclude_context=True)
 
         # the following code is used to get a nice repr format

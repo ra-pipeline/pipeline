@@ -26,7 +26,7 @@ class T2_4MDetailsCorrectedampflagRenderer(basetemplates.T2_4MDetailsDefaultRend
                  uri='correctedampflag.mako',
                  description='Flag corrected - model amplitudes for calibrator.',
                  always_rerender=False):
-        super(T2_4MDetailsCorrectedampflagRenderer, self).__init__(
+        super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
     def update_mako_context(self, mako_context, pipeline_context, results):

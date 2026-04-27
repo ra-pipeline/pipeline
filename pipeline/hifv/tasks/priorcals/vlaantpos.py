@@ -1,7 +1,6 @@
 import pipeline.hif.tasks.antpos.antpos as antpos
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.vdp as vdp
-from pipeline.infrastructure import task_registry
 
 __all__ = [
     'VLAAntpos',

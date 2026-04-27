@@ -46,7 +46,7 @@ class RefAntInputs(vdp.StandardInputs):
 
 class RefAntResults(basetask.Results):
     def __init__(self, vis, refant):
-        super(RefAntResults, self).__init__()
+        super().__init__()
         self._vis = vis
         self._refant = ','.join([str(ant) for ant in refant])
 

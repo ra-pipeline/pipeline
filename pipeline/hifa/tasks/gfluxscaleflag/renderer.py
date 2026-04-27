@@ -24,7 +24,7 @@ class T2_4MDetailsGfluxscaleflagRenderer(basetemplates.T2_4MDetailsDefaultRender
     def __init__(self, uri='gfluxscaleflag.mako',
                  description='Phased-up flux scale calibration + flagging',
                  always_rerender=False):
-        super(T2_4MDetailsGfluxscaleflagRenderer, self).__init__(
+        super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
         # Attach correctedampflag renderer.

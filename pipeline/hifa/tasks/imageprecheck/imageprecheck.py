@@ -25,7 +25,7 @@ class ImagePreCheckResults(basetask.Results):
                  sensitivities=None, sensitivity_bandwidth=None, score=None, single_continuum=False,
                  per_spw_cont_sensitivities_all_chan=None, synthesized_beams=None, beamRatios=None,
                  error=False, error_msg=None):
-        super(ImagePreCheckResults, self).__init__()
+        super().__init__()
 
         if sensitivities is None:
             sensitivities = []

@@ -3,39 +3,43 @@ Created on 24 Oct 2014
 
 @author: sjw
 """
+from __future__ import annotations
+
 import collections
 import itertools
 import operator
 import os
 import shutil
-from typing import Dict, Iterable, List, Optional, Type, Union
+from typing import TYPE_CHECKING
 
 import pipeline.domain.measures as measures
-import pipeline.infrastructure
+import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.filenamer as filenamer
-import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.utils as utils
-from pipeline.domain.measurementset import MeasurementSet
-from pipeline.h.tasks.applycal.applycal import ApplycalResults
-from pipeline.infrastructure.basetask import ResultsList
 from pipeline.infrastructure.displays.summary import UVChart
-from pipeline.infrastructure.launcher import Context
 from pipeline.infrastructure.renderer.basetemplates import JsonPlotRenderer
-from pipeline.infrastructure.renderer.logger import Plot
 from ..common import flagging_renderer_utils as flagutils, mstools
 from ..common.displays import applycal as applycal
 
-LOG = logging.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from pipeline.domain.measurementset import MeasurementSet
+    from pipeline.h.tasks.applycal.applycal import ApplycalResults
+    from pipeline.infrastructure.basetask import ResultsList
+    from pipeline.infrastructure.launcher import Context
+    from pipeline.infrastructure.renderer.logger import Plot
 
 
 class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def __init__(self, uri='applycal.mako',
                  description='Apply calibrations from context',
                  always_rerender=False):
-        super(T2_4MDetailsApplycalRenderer, self).__init__(
-            uri=uri, description=description, always_rerender=always_rerender)
+        super().__init__(uri=uri, description=description, always_rerender=always_rerender)
 
     def update_mako_context(self, mako_context, pipeline_context, result):
         weblog_dir = os.path.join(pipeline_context.report_dir, 'stage%s' % result.stage_number)
@@ -213,7 +217,7 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             avgchannel='9000'
         )
 
-        if pipeline.infrastructure.generate_detail_plots(result):
+        if infrastructure.generate_detail_plots(result):
             # detail plots. Don't need the return dictionary, but make sure a
             # renderer is passed so the detail page is written to disk
             amp_vs_freq_detail_plots, amp_vs_freq_subpages = self.create_plots(
@@ -320,7 +324,7 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             ms = context.observing_run.get_ms(vis)
 
             plot = UVChart(context, ms, customflagged=True, output_dir=weblog_dir, title_prefix="Post applycal: ").plot()
-            
+
             # PIPE-1294: only attached valid plot wrapper objects.
             if plot is not None:
                 uv_plots[vis].append(plot)
@@ -393,7 +397,7 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 plot.parameters['source'] = representative_source
             amp_vs_uv_summary_plots[vis].extend(plots)
 
-            if pipeline.infrastructure.generate_detail_plots(results):
+            if infrastructure.generate_detail_plots(results):
                 scans = ms.get_scans(scan_intent='TARGET')
                 fields = {field.id for scan in scans for field in scan.fields}
 
@@ -431,15 +435,12 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def science_plots_for_result(
             context: Context,
             result: ApplycalResults,
-            plotter_cls: Type[Union[applycal.PlotmsAntComposite, applycal.PlotmsSpwComposite,
-                                    applycal.PlotmsBasebandComposite, applycal.PlotmsFieldComposite,
-                                    applycal.PlotmsFieldSpwComposite, applycal.PlotmsSpwAntComposite,
-                                    applycal.PlotmsFieldSpwAntComposite]],
+            plotter_cls: type[applycal.PlotmsAntComposite | applycal.PlotmsSpwComposite | applycal.PlotmsBasebandComposite | applycal.PlotmsFieldComposite | applycal.PlotmsFieldSpwComposite | applycal.PlotmsSpwAntComposite | applycal.PlotmsFieldSpwAntComposite],
             fields: Iterable[int],
-            uvrange: Optional[str]=None,
-            renderer_cls: Optional[Type[JsonPlotRenderer]]=None,
+            uvrange: str | None=None,
+            renderer_cls: type[JsonPlotRenderer] | None=None,
             preserve_coloraxis: bool=False
-    ) -> List[Plot]:
+    ) -> list[Plot]:
         """
         Create science plots for result
 
@@ -454,7 +455,7 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             preserve_coloraxis: True to preserve predefined 'coloraxis' (for SD)
                                 False to override 'coloraxis' with 'spw' (default)
         Returns:
-            List[Plot]: List of Plot instances.
+            list[Plot]: List of Plot instances.
         """
         # preserve coloraxis if necessary (PIPE-710: SD needs to preserve 'coloraxis')
         overrides = {} if preserve_coloraxis else {'coloraxis': 'spw'}
@@ -605,50 +606,50 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         return ''
 
 
-class ApplycalAmpVsFreqPlotRenderer(basetemplates.JsonPlotRenderer):
+class ApplycalAmpVsFreqPlotRenderer(JsonPlotRenderer):
     def __init__(self, context, result, plots):
         vis = utils.get_vis_from_plots(plots)
 
         title = 'Calibrated amplitude vs frequency for %s' % vis
         outfile = filenamer.sanitize('amp_vs_freq-%s.html' % vis)
 
-        super(ApplycalAmpVsFreqPlotRenderer, self).__init__(
-                'generic_x_vs_y_field_spw_ant_detail_plots.mako', context,
-                result, plots, title, outfile)
+        super().__init__(
+            'generic_x_vs_y_field_spw_ant_detail_plots.mako', context, result, plots, title, outfile,
+            )
 
 
-class ApplycalPhaseVsFreqPlotRenderer(basetemplates.JsonPlotRenderer):
+class ApplycalPhaseVsFreqPlotRenderer(JsonPlotRenderer):
     def __init__(self, context, result, plots):
         vis = utils.get_vis_from_plots(plots)
 
         title = 'Calibrated phase vs frequency for %s' % vis
         outfile = filenamer.sanitize('phase_vs_freq-%s.html' % vis)
 
-        super(ApplycalPhaseVsFreqPlotRenderer, self).__init__(
-                'generic_x_vs_y_field_spw_ant_detail_plots.mako', context,
-                result, plots, title, outfile)
+        super().__init__(
+            'generic_x_vs_y_field_spw_ant_detail_plots.mako', context, result, plots, title, outfile,
+            )
 
 
-class ApplycalAmpVsFreqSciencePlotRenderer(basetemplates.JsonPlotRenderer):
+class ApplycalAmpVsFreqSciencePlotRenderer(JsonPlotRenderer):
     def __init__(self, context, result, plots):
         vis = utils.get_vis_from_plots(plots)
 
         title = 'Calibrated amplitude vs frequency for %s' % vis
         outfile = filenamer.sanitize('science_amp_vs_freq-%s.html' % vis)
 
-        super(ApplycalAmpVsFreqSciencePlotRenderer, self).__init__(
-                'generic_x_vs_y_spw_field_detail_plots.mako', context,
-                result, plots, title, outfile)
+        super().__init__(
+            'generic_x_vs_y_spw_field_detail_plots.mako', context, result, plots, title, outfile,
+            )
 
 
-class ApplycalAmpVsFreqPerAntSciencePlotRenderer(basetemplates.JsonPlotRenderer):
+class ApplycalAmpVsFreqPerAntSciencePlotRenderer(JsonPlotRenderer):
     """
     Class to render 'per antenna' Amp vs Freq plots for applycal
     """
     def __init__(self,
                  context: Context,
                  result: ApplycalResults,
-                 plots: List[Plot]
+                 plots: list[Plot]
     ) -> None:
         """
         Construct ApplycalAmpVsFreqPerAntSciencePlotRenderer instance
@@ -663,69 +664,69 @@ class ApplycalAmpVsFreqPerAntSciencePlotRenderer(basetemplates.JsonPlotRenderer)
         title = 'Calibrated amplitude vs frequency for %s' % vis
         outfile = filenamer.sanitize('science_amp_vs_freq-%s.html' % vis)
 
-        super(ApplycalAmpVsFreqPerAntSciencePlotRenderer, self).__init__(
-            'generic_x_vs_y_field_spw_ant_detail_plots.mako', context,
-            result, plots, title, outfile)
+        super().__init__(
+            'generic_x_vs_y_field_spw_ant_detail_plots.mako', context, result, plots, title, outfile,
+            )
 
 
-class ApplycalAmpVsUVSciencePlotRenderer(basetemplates.JsonPlotRenderer):
+class ApplycalAmpVsUVSciencePlotRenderer(JsonPlotRenderer):
     def __init__(self, context, result, plots):
         vis = utils.get_vis_from_plots(plots)
 
         title = 'Calibrated amplitude vs UV distance for %s' % vis
         outfile = filenamer.sanitize('science_amp_vs_uv-%s.html' % vis)
 
-        super(ApplycalAmpVsUVSciencePlotRenderer, self).__init__(
-                'generic_x_vs_y_spw_field_detail_plots.mako', context,
-                result, plots, title, outfile)
+        super().__init__(
+            'generic_x_vs_y_spw_field_detail_plots.mako', context, result, plots, title, outfile,
+            )
 
 
-class ApplycalAmpVsUVPlotRenderer(basetemplates.JsonPlotRenderer):
+class ApplycalAmpVsUVPlotRenderer(JsonPlotRenderer):
     def __init__(self, context, result, plots):
         vis = utils.get_vis_from_plots(plots)
 
         title = 'Calibrated amplitude vs UV distance for %s' % vis
         outfile = filenamer.sanitize('amp_vs_uv-%s.html' % vis)
 
-        super(ApplycalAmpVsUVPlotRenderer, self).__init__(
-                'generic_x_vs_y_field_spw_ant_detail_plots.mako', context,
-                result, plots, title, outfile)
+        super().__init__(
+            'generic_x_vs_y_field_spw_ant_detail_plots.mako', context, result, plots, title, outfile,
+            )
 
 
-class ApplycalPhaseVsUVPlotRenderer(basetemplates.JsonPlotRenderer):
+class ApplycalPhaseVsUVPlotRenderer(JsonPlotRenderer):
     def __init__(self, context, result, plots):
         vis = utils.get_vis_from_plots(plots)
 
         title = 'Calibrated phase vs UV distance for %s' % vis
         outfile = filenamer.sanitize('phase_vs_uv-%s.html' % vis)
 
-        super(ApplycalPhaseVsUVPlotRenderer, self).__init__(
-                'generic_x_vs_y_spw_ant_plots.mako', context,
-                result, plots, title, outfile)
+        super().__init__(
+            'generic_x_vs_y_spw_ant_plots.mako', context, result, plots, title, outfile,
+            )
 
 
-class ApplycalAmpVsTimePlotRenderer(basetemplates.JsonPlotRenderer):
+class ApplycalAmpVsTimePlotRenderer(JsonPlotRenderer):
     def __init__(self, context, result, plots):
         vis = utils.get_vis_from_plots(plots)
 
         title = 'Calibrated amplitude vs times for %s' % vis
         outfile = filenamer.sanitize('amp_vs_time-%s.html' % vis)
 
-        super(ApplycalAmpVsTimePlotRenderer, self).__init__(
-                'generic_x_vs_y_spw_ant_plots.mako', context,
-                result, plots, title, outfile)
+        super().__init__(
+            'generic_x_vs_y_spw_ant_plots.mako', context, result, plots, title, outfile,
+            )
 
 
-class ApplycalPhaseVsTimePlotRenderer(basetemplates.JsonPlotRenderer):
+class ApplycalPhaseVsTimePlotRenderer(JsonPlotRenderer):
     def __init__(self, context, result, plots):
         vis = utils.get_vis_from_plots(plots)
 
         title = 'Calibrated phase vs times for %s' % vis
         outfile = filenamer.sanitize('phase_vs_time-%s.html' % vis)
 
-        super(ApplycalPhaseVsTimePlotRenderer, self).__init__(
-                'generic_x_vs_y_field_spw_ant_detail_plots.mako', context,
-                result, plots, title, outfile)
+        super().__init__(
+            'generic_x_vs_y_field_spw_ant_detail_plots.mako', context, result, plots, title, outfile,
+            )
 
 
 def _get_data_selection_for_plot(context, result, intent):
@@ -739,10 +740,14 @@ def _get_data_selection_for_plot(context, result, intent):
     interest by inspecting the results and extracting the data selection that
     the calibration is applied to.
 
-    :param context: pipeline Context
-    :param result: a Result with an .applied property containing CalApplications
-    :param intent: pipeline intent
-    :return:
+    Args:
+        context: Pipeline context.
+        result: Result with an ``applied`` property containing CalApplications.
+        intent: Pipeline intents to include.
+
+    Returns:
+        tuple[callibrary.CalTo, str]: CalTo describing the data selection and
+            a comma-separated intent string.
     """
     spw = _get_calapp_arg(result, 'spw')
     field = _get_calapp_arg(result, 'field')
@@ -779,10 +784,14 @@ def get_brightest_field(ms, source, intent='TARGET'):
     Analyse all fields associated with a source, identifying the brightest
     field as the field with highest median flux averaged over all spws.
 
-    :param ms: measurementset to analyse
-    :param source: representative source
-    :param intent:
-    :return:
+    Args:
+        ms: MeasurementSet to analyse.
+        source: Representative source for the MeasurementSet.
+        intent: Intent used to filter scans and fields.
+
+    Returns:
+        Field: Field with the highest median flux across spectral windows for
+            the given intent.
     """
     # get IDs for all science spectral windows
     spw_ids = set()
@@ -826,7 +835,7 @@ def get_brightest_field(ms, source, intent='TARGET'):
     return brightest_field
 
 
-def copy_callibrary(results: ResultsList, report_dir: str) -> Dict[str, str]:
+def copy_callibrary(results: ResultsList, report_dir: str) -> dict[str, str]:
     """
     Copy callibrary files across to the weblog stage directory, returning a
     Dict mapping MS name to the callibrary location on disk.
@@ -851,7 +860,7 @@ def copy_callibrary(results: ResultsList, report_dir: str) -> Dict[str, str]:
     return vis_to_callib
 
 
-def deduplicate(context: Context, all_plots: Dict[str, List[Plot]]) -> Dict[str, List[Plot]]:
+def deduplicate(context: Context, all_plots: dict[str, list[Plot]]) -> dict[str, list[Plot]]:
     """
     Process a dict mapping vis to plots, deduplicating the plot list for
     each MS.
@@ -864,13 +873,13 @@ def deduplicate(context: Context, all_plots: Dict[str, List[Plot]]) -> Dict[str,
     return result
 
 
-def _deduplicate_plots(ms: MeasurementSet, plots: List[Plot]) -> List[Plot]:
+def _deduplicate_plots(ms: MeasurementSet, plots: list[Plot]) -> list[Plot]:
     """
     Deduplicate plots by discarding extra plots created for the same scan.
     The remaining plot is relabelled as applicable to the discarded intents.
     """
     # holds the final deduplicated list of plots
-    deduplicated: List[Plot] = []
+    deduplicated: list[Plot] = []
 
     # General algorithm is 'what scan does this spw and intent correspond to?
     # Has this scan already been plotted? If so, discard the plot.'

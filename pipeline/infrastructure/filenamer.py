@@ -1,7 +1,6 @@
 import os
-import shutil
-import string
 import re
+import string
 
 from . import utils
 
@@ -82,7 +81,7 @@ def fitsname(products_dir, imagename, version=1):
     return fitsfile
 
 
-class FileNameComponentBuilder(object):
+class FileNameComponentBuilder:
     def __init__(self):
         self._asdm = None
         self._task = None
@@ -278,7 +277,7 @@ def sort_spws(unsorted):
     return ','.join(utils.numeric_sort(vals))
 
 
-class NamingTemplate(object):
+class NamingTemplate:
     """Base class used for all naming templates."""
     task = None
 
@@ -313,7 +312,7 @@ class ASDM(NamingTemplate):
         the new ASDM template will be initialized using applicable
         filename components copied from the given constructor argument.
         """
-        super(ASDM, self).__init__()
+        super().__init__()
         self._associations.format('asdm')
         if other is not None:
             self.asdm(other._associations._asdm)
@@ -339,7 +338,7 @@ class MeasurementSet(NamingTemplate):
         applicable filename components copied from the given
         constructor argument.
         """
-        super(MeasurementSet, self).__init__()
+        super().__init__()
         self._associations.extension('ms')
         self._associations.format('tbl')
         if other is not None:
@@ -365,7 +364,7 @@ class FlaggingTable(NamingTemplate):
         applicable filename components copied from the given
         constructor argument.
         """
-        super(FlaggingTable, self).__init__()
+        super().__init__()
         self._associations.task(self.task)
         self._associations.extension('flags')
         self._associations.format('tbl')
@@ -390,7 +389,7 @@ class CalibrationTable(NamingTemplate):
     _type = ['channel', 'poly', 'spline', 'tseries']
 
     def __init__(self, other=None):
-        super(CalibrationTable, self).__init__()
+        super().__init__()
         self._associations.task(CalibrationTable.task)
         self._associations.format('tbl')
 
@@ -643,7 +642,7 @@ class CalibrationTable(NamingTemplate):
 
 class CASALog(NamingTemplate):
     def __init__(self, other=None):
-        super(CASALog, self).__init__()
+        super().__init__()
         self._associations.extension('log')
         self._associations.format('txt')
         self._associations.type('casapy')
@@ -655,7 +654,7 @@ class Image(NamingTemplate):
         # It was considered for PL2021, but deferred to later. In that case the
         # above default should be changed to True.
         self.virtspw = virtspw
-        super(Image, self).__init__()
+        super().__init__()
 
     def flag_marks(self, flag_marks):
         """Set the flag marks tag for this image.
@@ -798,31 +797,31 @@ class MosaicImage(Image):
 
 class AmplitudeCalibrationTable(CalibrationTable):
     def __init__(self, other=None):
-        super(AmplitudeCalibrationTable, self).__init__(other)
+        super().__init__(other)
         self.amplitude_cal()
 
 
 class AntposCalibrationTable(CalibrationTable):
     def __init__(self, other=None):
-        super(AntposCalibrationTable, self).__init__(other)
+        super().__init__(other)
         self.antpos_cal()
 
 
 class UVcontCalibrationTable(CalibrationTable):
     def __init__(self, other=None):
-        super(UVcontCalibrationTable, self).__init__(other)
+        super().__init__(other)
         self.uvcont_cal()
 
 
 class BandpassCalibrationTable(CalibrationTable):
     def __init__(self, other=None):
-        super(BandpassCalibrationTable, self).__init__(other)
+        super().__init__(other)
         self.bandpass_cal()
 
 
 class DelayCalibrationTable(CalibrationTable):
     def __init__(self, other=None):
-        super(DelayCalibrationTable, self).__init__(other)
+        super().__init__(other)
         self.delay_cal()
 
 
@@ -834,78 +833,78 @@ class PolCalibrationTable(CalibrationTable):
 
 class FluxCalibrationTable(CalibrationTable):
     def __init__(self, other=None):
-        super(FluxCalibrationTable, self).__init__(other)
+        super().__init__(other)
         self.flux_cal()
 
 
 class GainCalibrationTable(CalibrationTable):
     def __init__(self, other=None):
-        super(GainCalibrationTable, self).__init__(other)
+        super().__init__(other)
         self.gain_cal()
 
 
 class XYf0CalibrationTable(CalibrationTable):
     def __init__(self, other=None):
-        super(XYf0CalibrationTable, self).__init__(other)
+        super().__init__(other)
         self.xyf0_cal()
 
 
 class TsysCalibrationTable(CalibrationTable):
     def __init__(self, other=None):
-        super(TsysCalibrationTable, self).__init__(other)
+        super().__init__(other)
         self.tsys_cal()
 
 
 class OpCalibrationTable(CalibrationTable):
     def __init__(self, other=None):
-        super(OpCalibrationTable, self).__init__(other)
+        super().__init__(other)
         self.opac_cal()
 
 
 class GainCurvesCalibrationTable(CalibrationTable):
     def __init__(self, other=None):
-        super(GainCurvesCalibrationTable, self).__init__(other)
+        super().__init__(other)
         self.gc_cal()
 
 
 class RqCalibrationTable(CalibrationTable):
     def __init__(self, other=None):
-        super(RqCalibrationTable, self).__init__(other)
+        super().__init__(other)
         self.rq_cal()
 
 
 class TecMapsCalibrationTable(CalibrationTable):
     def __init__(self, other=None):
-        super(TecMapsCalibrationTable, self).__init__(other)
+        super().__init__(other)
         self.tecim_cal()
 
 
 class SwpowCalibrationTable(CalibrationTable):
     def __init__(self, other=None):
-        super(SwpowCalibrationTable, self).__init__(other)
+        super().__init__(other)
         self.swpow_cal()
 
 
 class WvrgCalibrationTable(CalibrationTable):
     def __init__(self, other=None):
-        super(WvrgCalibrationTable, self).__init__(other)
+        super().__init__(other)
         self.wvrg_cal()
 
 
 class SDSkyCalibrationTable(CalibrationTable):
     def __init__(self, other=None):
-        super(SDSkyCalibrationTable, self).__init__(other)
+        super().__init__(other)
         self.sdsky_cal()
 
 
 class SDBaselineTable(CalibrationTable):
     def __init__(self, other=None):
-        super(SDBaselineTable, self).__init__(other)
+        super().__init__(other)
         self.sdbaseline()
 
 
 # product name utility
-class PipelineProductNameBuilder(object):
+class PipelineProductNameBuilder:
 
     @classmethod
     def __build(cls, *args, **kwargs):

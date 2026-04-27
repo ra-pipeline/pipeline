@@ -5,7 +5,7 @@ import os
 import matplotlib
 
 import pipeline.infrastructure as infrastructure
-from pipeline.h.tasks.common.displays import sky as sky
+from pipeline.h.tasks.common.displays import sky
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -13,11 +13,10 @@ LOG = infrastructure.get_logger(__name__)
 ImageStats = collections.namedtuple('ImageStats', 'rms max')
 
 
-class MaskSummary(object):
+class MaskSummary:
     def __init__(self, context, result):
         self.context = context
         self.result = result
-        # self.image_stats = image_stats
 
     def plot(self):
         stage_dir = os.path.join(self.context.report_dir,
@@ -37,11 +36,6 @@ class MaskSummary(object):
             results = [self.result]
 
         for r in results:
-            # if r.empty():
-            #    continue
-
-            # extension = '.tt0' if r.multiterm else ''
-
             # mask map
             cmap = copy.copy(matplotlib.cm.binary)
             plot_wrappers.append(sky.SkyDisplay().plot(self.context, r.plotmask,

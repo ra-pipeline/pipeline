@@ -146,7 +146,7 @@ class TaskTimeTracker:
             json.dump(r, json_file, sort_keys=True, indent=4, separators=(',', ': '))
 
 
-class ContextTimeTracker(object):
+class ContextTimeTracker:
     """
     ContextTimeTracker listens for events related to the creation/resumption
     of a pipeline Context. As a Context is created or resumed, this class

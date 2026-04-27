@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import collections
 import math
 import os
 import sys
 from copy import deepcopy
-from typing import Literal
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -14,6 +16,9 @@ from pipeline.hifa.tasks.importdata.dbfluxes import ORIGIN_DB
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.utils.math import round_up
+
+if TYPE_CHECKING:
+    from typing import Literal
 
 LOG = infrastructure.get_logger(__name__)
 

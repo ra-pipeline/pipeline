@@ -9,7 +9,7 @@ LOG = logging.get_logger(__name__)
 
 
 # object compression/decopmpression utility
-class CompressedObj(object):
+class CompressedObj:
     def __init__(self, obj, protocol=pickle.HIGHEST_PROTOCOL, compresslevel=9):
         self.compressed = compress_object(obj, protocol=protocol, compresslevel=compresslevel)
 
@@ -42,7 +42,7 @@ def decompress_object(obj):
     return decompressed
 
 
-class CompressedIter(object):
+class CompressedIter:
     def __init__(self, obj):
         self.obj = obj
         self._count = 0

@@ -15,7 +15,7 @@ from pipeline import infrastructure
 from pipeline.infrastructure import casa_tools, utils
 
 if TYPE_CHECKING:
-    from pipeline.infrastructure.utils.utils import EpochDict, QuantityDict
+    from pipeline.infrastructure.utils.casa_types import EpochDict, QuantityDict
 
 LOG = infrastructure.logging.get_logger(__name__)
 

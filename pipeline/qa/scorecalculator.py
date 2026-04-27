@@ -35,14 +35,18 @@ from pipeline.hsd.tasks.common import utils as sdutils
 from pipeline.qa import checksource
 
 if TYPE_CHECKING:
+    from numpy import generic
+    from numpy.typing import NDArray
+
     from casatools import coordsys
+
     from pipeline.domain.measurementset import MeasurementSet
     from pipeline.domain.singledish import MSReductionGroupMember
     from pipeline.hif.tasks.gaincal.common import GaincalResults
     from pipeline.hif.tasks.polcal.polcalworker import PolcalWorkerResults
-    from pipeline.hsd.tasks.applycal.applycal import SDApplycalResults
     from pipeline.hifa.tasks.importdata.almaimportdata import ALMAImportDataResults
     from pipeline.hsd.heuristics.rasterscan import RasterScanHeuristicsResult
+    from pipeline.hsd.tasks.applycal.applycal import SDApplycalResults
     from pipeline.hsd.tasks.baseline.baseline import SDBaselineResults
     from pipeline.hsd.tasks.flagging.flagdeteralmasd import PointingOutlierStats
     from pipeline.hsd.tasks.imaging.resultobjects import SDImagingResultItem
@@ -115,6 +119,7 @@ __all__ = ['score_polintents',                                # ALMA specific
            'score_testBPdcals_delay']
 
 LOG = infrastructure.logging.get_logger(__name__)
+
 
 # - utility functions --------------------------------------------------------------------------------------------------
 
@@ -3099,17 +3104,15 @@ def score_sd_line_detection(reduction_group: dict, result: 'SDBaselineResults') 
         and/or deviation masks, with atm lines, if available
     """
 
-    def mask_to_ranges(mask: np.ndarray) -> list[tuple[int,int]]:
+    def mask_to_ranges(mask: NDArray[np.bool_]) -> list[tuple[int,int]]:
         """
         Convert a boolean channel mask into a list of contiguous channel ranges.
 
         Parameters:
-            mask (np.ndarray): 1D boolean array where True indicates
-                            channels to include.
+            mask: 1D boolean array where True indicates channels to include.
 
         Returns:
-            list[tuple[int, int]]: List of (start, end) tuples for each
-                                contiguous run of True values in the mask.
+            List of (start, end) tuples for each contiguous run of True values in the mask.
         """
         idx = np.where(mask)[0]
         if idx.size == 0:
@@ -3117,25 +3120,33 @@ def score_sd_line_detection(reduction_group: dict, result: 'SDBaselineResults') 
         groups = np.split(idx, np.where(np.diff(idx) != 1)[0] + 1)
         return [(grp[0], grp[-1]) for grp in groups]
 
-    def make_score(score_val: float, msg: str, metric_val: str, metric_units: str,
-                   ms_name: str | None = None, field: str | None = None, spws: set[int] = set(), ants: set[str] = set()):
+    def make_score(
+            score_val: float,
+            msg: str,
+            metric_val: str,
+            metric_units: str,
+            ms_name: str | None = None,
+            field: str | None = None,
+            spws: set[int] = set(),
+            ants: set[str] = set(),
+            ) -> pqa.QAScore:
 
         """
         Build a QAScore object for score_sd_line_detection.
 
         Parameters:
-            score_val (float): The numeric QA score.
-            msg (str): Description of the QA result.
-            metric_val (str): The metric value of score.
-            metric_units (str): Units for the metric_value.
-            ms_name (str): Name of the Measurement Set (EB). (optional)
-            field (str): Field name (optional).
-            spws (set[int]): Set of spectral window IDs (optional).
-            ants (set[str]): Set of antenna names (optional).
+            score_val: The numeric QA score.
+            msg: Description of the QA result.
+            metric_val: The metric value of score.
+            metric_units: Units for the metric_value.
+            ms_name: Name of the Measurement Set (EB). (optional)
+            field: Field name (optional).
+            spws: Set of spectral window IDs (optional).
+            ants: Set of antenna names (optional).
 
         Returns:
-            pqa.QAScore: A fully populated QAScore with long and short messages,
-                        origin (metric name/score/units), and target selection.
+            A fully populated QAScore with long and short messages, origin (metric name/score/units),
+            and target selection.
         """
         ms_str = f'EB {ms_name}' if ms_name else ""
         field_str = f', Field {field}' if field else ""
@@ -3515,7 +3526,8 @@ def score_checksources(mses, fieldname, spwid, imagename, rms, gfluxscale, gflux
                           metric_score=metric_score,
                           metric_units=metric_units)
 
-    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin), offset, offset_err, beams, beams_err, fitflux, fitflux_err, fitpeak
+    return (pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin), offset, offset_err, beams, beams_err,
+            fitflux, fitflux_err, fitpeak)
 
 
 @log_qa
@@ -3549,8 +3561,6 @@ def score_sd_skycal_elevation_difference(ms, resultdict, threshold=3.0):
             for spw_id, eld in eldiff.items():
                 preceding = eld.eldiff0
                 subsequent = eld.eldiff1
-                # LOG.info('field {} antenna {} spw {} preceding={}'.format(field_id, antenna_id, spw_id, preceding))
-                # LOG.info('field {} antenna {} spw {} subsequent={}'.format(field_id, antenna_id, spw_id, subsequent))
                 max_pred = None
                 max_subq = None
                 if len(preceding) > 0:
@@ -3651,8 +3661,8 @@ def generate_metric_mask(
         context: Context,
         result: SDImagingResultItem,
         cs: coordsys,
-        image_shape: np.ndarray
-) -> np.ndarray:
+        image_shape: NDArray[np.int_],
+    ) -> NDArray[np.bool_]:
     """
     Generate boolean mask array for metric calculation in
     score_sdimage_masked_pixels. If image pixel contains
@@ -4455,7 +4465,8 @@ def score_fluxservice(result: ALMAImportDataResults) -> list[pqa.QAScore]:
     }
 
     if result.fluxservice not in flux_qa_dict:
-        LOG.warning(f"Unrecognized flux catalog service result: {result.fluxservice}. Falling back to default suboptimal qa score of 0.9.")
+        LOG.warning("Unrecognized flux catalog service result: %s. Falling back to default suboptimal qa score of 0.9.",
+                    result.fluxservice)
 
     flux_score, flux_msg = flux_qa_dict.get(result.fluxservice, (0.9, "Unknown result from flux catalogue service."))
 
@@ -4588,7 +4599,9 @@ def score_fluxcsv(result):
 
 
 @log_qa
-def score_mom8_fc_image(mom8_fc_name, mom8_fc_peak_snr, mom8_10_fc_histogram_asymmetry, mom8_fc_max_segment_beams, mom8_fc_frac_max_segment):
+def score_mom8_fc_image(
+    mom8_fc_name, mom8_fc_peak_snr, mom8_10_fc_histogram_asymmetry, mom8_fc_max_segment_beams, mom8_fc_frac_max_segment,
+    ):
     """
     Check the MOM8 FC image for outliers above a given SNR threshold. The score
     can vary between 0.33 and 1.0 depending on the fraction of outlier pixels.
@@ -4603,7 +4616,8 @@ def score_mom8_fc_image(mom8_fc_name, mom8_fc_peak_snr, mom8_10_fc_histogram_asy
     mom8_fc_score_max = 1.00
     mom8_fc_metric_scale = 100.0
     if mom8_fc_frac_max_segment != 0.0:
-        mom8_fc_score = mom8_fc_score_min + 0.5 * (mom8_fc_score_max - mom8_fc_score_min) * (1.0 + special.erf(-np.log10(mom8_fc_metric_scale * mom8_fc_frac_max_segment)))
+        mom8_fc_score = (mom8_fc_score_min + 0.5 * (mom8_fc_score_max - mom8_fc_score_min) * 
+                         (1.0 + special.erf(-np.log10(mom8_fc_metric_scale * mom8_fc_frac_max_segment))))
     else:
         mom8_fc_score = mom8_fc_score_max
 
@@ -4612,26 +4626,43 @@ def score_mom8_fc_image(mom8_fc_name, mom8_fc_peak_snr, mom8_10_fc_histogram_asy
         field = info.get('field')
         spw = info.get('virtspw')
 
-    if (mom8_fc_peak_snr > mom8_fc_outlier_threshold1 and mom8_10_fc_histogram_asymmetry > mom8_fc_histogram_asymmetry_threshold1) or \
-       (mom8_fc_peak_snr > mom8_fc_outlier_threshold2 and mom8_10_fc_histogram_asymmetry > mom8_fc_histogram_asymmetry_threshold2 and mom8_fc_max_segment_beams > mom8_fc_max_segment_beams_threshold):
+    if (mom8_fc_peak_snr > mom8_fc_outlier_threshold1 and 
+        mom8_10_fc_histogram_asymmetry > mom8_fc_histogram_asymmetry_threshold1) or \
+       (mom8_fc_peak_snr > mom8_fc_outlier_threshold2 and 
+        mom8_10_fc_histogram_asymmetry > mom8_fc_histogram_asymmetry_threshold2 and 
+        mom8_fc_max_segment_beams > mom8_fc_max_segment_beams_threshold):
         mom8_fc_final_score = min(mom8_fc_score, 0.65)
     else:
         mom8_fc_final_score = max(mom8_fc_score, 0.67)
 
     if 0.33 <= mom8_fc_final_score < 0.66:
-        longmsg = 'MOM8 FC image for field {:s} virtspw {:s} with a peak SNR of {:#.5g} and a flux histogram asymmetry which indicate that there may be residual line emission in the findcont channels.'.format(field, spw, mom8_fc_peak_snr)
+        longmsg = (
+            f'MOM8 FC image for field {field} virtspw {spw} with a peak SNR of {mom8_fc_peak_snr:#.5g} '
+            f'and a flux histogram asymmetry which indicate that there may be residual line emission '
+            f'in the findcont channels.'
+        )
         shortmsg = 'MOM8 FC image indicates residual line emission'
         weblog_location = pqa.WebLogLocation.UNSET
     else:
-        longmsg = 'MOM8 FC image for field {:s} virtspw {:s} has a peak SNR of {:#.5g} and no significant flux histogram asymmetry.'.format(field, spw, mom8_fc_peak_snr)
+        longmsg = (
+            f'MOM8 FC image for field {field} virtspw {spw} has a peak SNR of {mom8_fc_peak_snr:#.5g} and no '
+            f'significant flux histogram asymmetry.'
+        )
         shortmsg = 'MOM8 FC peak SNR and flux histogram'
         weblog_location = pqa.WebLogLocation.ACCORDION
 
     origin = pqa.QAOrigin(metric_name='score_mom8_fc_image',
-                          metric_score=(mom8_fc_peak_snr, mom8_10_fc_histogram_asymmetry, mom8_fc_max_segment_beams, mom8_fc_frac_max_segment),
+                          metric_score=(
+                              mom8_fc_peak_snr,
+                              mom8_10_fc_histogram_asymmetry,
+                              mom8_fc_max_segment_beams,
+                              mom8_fc_frac_max_segment,
+                              ),
                           metric_units='Peak SNR / Histogram asymmetry, Max. segment size in beams, Max. segment fraction')
 
-    return pqa.QAScore(mom8_fc_final_score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, weblog_location=weblog_location)
+    return pqa.QAScore(
+        mom8_fc_final_score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, weblog_location=weblog_location,
+        )
 
 
 @log_qa
@@ -4639,10 +4670,10 @@ def score_rasterscan_correctness_direction_domain_rasterscan_fail(result: SDImpo
     """Calculate QAScore of direction-domain raster scan heuristics analysis failure in importdata.
 
     Args:
-        result (SDImportDataResults): instance of SDImportDataResults
+        result: instance of SDImportDataResults
 
     Returns:
-        list[pqa.QAScore]: list of QAScores
+        A list of QAScores.
     """
     msg = 'Direction-domain raster scan analysis failed, fallback to time-domain analysis'
     return _score_rasterscan_correctness(result.rasterscan_heuristics_results_direction, msg)
@@ -4653,10 +4684,10 @@ def score_rasterscan_correctness_time_domain_rasterscan_fail(result: SDImportDat
     """Calculate QAScore of time-domain raster scan heuristics analysis failure in importdata.
 
     Args:
-        result (SDImportDataResults): instance of SDImportDataResults
+        result: instance of SDImportDataResults
 
     Returns:
-        list[pqa.QAScore]: list of QAScores
+        A list of QAScores.
     """
     msg = 'Time-domain raster scan analysis issue detected. Failed to identify gap between raster map iteration'
     return _score_rasterscan_correctness(result.rasterscan_heuristics_results_time, msg)
@@ -4667,10 +4698,10 @@ def score_rasterscan_correctness_imaging_raster_gap(result: SDImagingResultItem)
     """Calculate QAScore of gap existence in raster pattern of imaging.
 
     Args:
-        result (SDImagingResultItem): instance of SDImagingResultItem
+        result: instance of SDImagingResultItem
 
     Returns:
-        list[pqa.QAScore]: list of QAScores
+        A list of QAScores.
     """
     msg = 'Unable to identify gap between raster map iteration'
     return _score_rasterscan_correctness(result.rasterscan_heuristics_results_rgap, msg)
@@ -4681,25 +4712,28 @@ def score_rasterscan_correctness_imaging_raster_analysis_incomplete(result: SDIm
     """Calculate QAScore when raster scan analysis was incomplete in imaging.
 
     Args:
-        result (SDImagingResultItem): instance of SDImagingResultItem
+        result: instance of SDImagingResultItem
 
     Returns:
-        list[pqa.QAScore]: list of QAScores
+        A list of QAScores.
     """
     msg = 'Raster scan analysis incomplete. Skipping calculation of theoretical image RMS'
     return _score_rasterscan_correctness(result.rasterscan_heuristics_results_incomp, msg)
 
 
-def _score_rasterscan_correctness(rasterscan_heuristics_results: dict[str, RasterScanHeuristicsResult], msg: str) -> list[pqa.QAScore]:
+def _score_rasterscan_correctness(
+        rasterscan_heuristics_results: dict[str, RasterScanHeuristicsResult],
+        msg: str,
+        ) -> list[pqa.QAScore]:
     """Generate score of raster scan correctness of importdata or imaging.
 
     Args:
-        rasterscan_heuristics_results (dict[str, RasterScanHeuristicsResult]): Dictionary of raster heuristics result objects
+        rasterscan_heuristics_results: Dictionary of raster heuristics result objects
             treats QAScore of raster scan analysis.
-        msg (str): short message for QA
+        msg: short message for QA
 
     Returns:
-        list[pqa.QAScore]: lists contains QAScore objects.
+        A lists contains QAScore objects.
     """
 
     qa_scores = []  # [pqa.QAScore]
@@ -4714,16 +4748,16 @@ def _score_rasterscan_correctness(rasterscan_heuristics_results: dict[str, Raste
     return qa_scores
 
 
-def _rasterscan_failed_per_eb(execblock_id:str, failed_ants: list[str], msg: str) -> 'pqa.QAScore':
+def _rasterscan_failed_per_eb(execblock_id:str, failed_ants: list[str], msg: str) -> pqa.QAScore:
     """Return an object which has FAILED information in raster scan analysis.
 
     Args:
-        execblock_id (str): Execute Block ID
-        failed_ants (list[str]): List of antenna names
+        execblock_id: Execute Block ID
+        failed_ants: List of antenna names
         msg: short message for QA
 
     Returns:
-        pqa.QAScore: QA score object
+        QA score object
     """
     SCORE_FAIL = 0.8
     longmsg = msg + f' : EB:{execblock_id}:{",".join(failed_ants)}'
@@ -4855,7 +4889,7 @@ def score_amp_vs_time_plots(context: Context, result: SDApplycalResults) -> list
         result: SDApplycalResults instance.
 
     Returns:
-        list[pqa.QAScore]: List which contains QAScore objects.
+        A List which contains QAScore objects..
     """
     vis = os.path.basename(result.inputs['vis'])
     ms = context.observing_run.get_ms(vis)
@@ -5086,6 +5120,7 @@ def score_pointing_outlier(
 
     return qa_scores
 
+
 @log_qa
 def score_syspowerdata(data: dict) -> list[pqa.QAScore]:
     """Calculates QA score as the minimum of per-band scores based on data points outside 0.7-1.2 range.
@@ -5121,8 +5156,9 @@ def score_syspowerdata(data: dict) -> list[pqa.QAScore]:
 
     return qascores
 
+
 @log_qa
-def score_solint(short_solint:dict, long_solint:dict) -> list[pqa.QAScore]:
+def score_solint(short_solint: dict, long_solint: dict) -> list[pqa.QAScore]:
     """Compute a QA score by comparing short and long solints for each band.
 
     If any band has a short solint value greater than the corresponding long solint,

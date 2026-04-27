@@ -15,7 +15,7 @@ class SDAmpCalWorkerInputs(vdp.StandardInputs):
     caltype = vdp.VisDependentProperty(default='amp', readonly=True)
 
     def __init__(self, context, output_dir, vis, caltable, factors):
-        super(SDAmpCalWorkerInputs, self).__init__()
+        super().__init__()
 
         self.context = context
         self.vis = vis
@@ -33,7 +33,7 @@ class SDAmpCalWorkerInputs(vdp.StandardInputs):
 
 class SDAmpCalWorkerResults(basetask.Results):
     def __init__(self, vis, calapp=None, factors={}):
-        super(SDAmpCalWorkerResults, self).__init__()
+        super().__init__()
         self.calapp = calapp
         self.vis = vis
         self.ms_factors = factors

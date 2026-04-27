@@ -23,7 +23,8 @@ from pipeline.domain import DataType
 from pipeline.h.tasks.common import manifest
 from pipeline.h.tasks.exportdata.aqua import export_to_disk as export_aqua_to_disk
 from pipeline import environment, infrastructure
-from pipeline.infrastructure import basetask, callibrary, casa_tasks, casa_tools, imagelibrary, task_registry, utils, vdp
+from pipeline.infrastructure import (basetask, callibrary, casa_tasks, casa_tools, imagelibrary, task_registry,
+                                     utils, vdp)
 from pipeline.infrastructure.filenamer import fitsname, PipelineProductNameBuilder
 
 if TYPE_CHECKING:
@@ -37,54 +38,24 @@ StdFileProducts = collections.namedtuple('StdFileProducts', 'ppr_file weblog_fil
 
 
 class ExportDataInputs(vdp.StandardInputs):
-    """
-    ExportDataInputs manages the inputs for the ExportData task.
+    """Manages the inputs for the ExportData task.
 
-    .. py:attribute:: context
-
-    the (:class:`~pipeline.infrastructure.launcher.Context`) holding all
-    pipeline state
-
-    .. py:attribute:: output_dir
-
-    the directory containing the output of the pipeline
-
-    .. py:attribute:: session
-
-    a string or list of strings containing the sessions(s) associated
-    with each vis. Default to a single session containing all vis.
-    Vis without a matching session are assigned to the last session
-    in the list.
-
-    .. py:attribute:: vis
-
-    a string or list of strings containing the MS name(s) on which to
-    operate
-
-    .. py:attribute:: pprfile
-
-    the pipeline processing request.
-
-    .. py:attribute:: calintents
-
-    the list of calintents defining the calibrator source images to be
-    saved.  Defaults to all calibrator intents.
-
-    .. py:attribute:: calimages
-
-    the list of calibrator source images to be saved.  Defaults to all
-    calibrator images matching calintents. If defined overrides
-    calintents and the calibrator images in the context.
-
-    .. py:attribute:: targetimages
-
-    the list of target source images to be saved.  Defaults to all
-    target images. If defined overrides the list of target images in
-    the context.
-
-    .. py:attribute:: products_dir
-
-    the directory where the data productions will be written
+    Attributes:
+        context: The pipeline Context state object holding all pipeline state.
+        output_dir: The directory containing the output of the pipeline.
+        session: A string or list of strings containing the sessions(s) associated with each vis.
+            Defaults to a single session containing all vis. Vis without a matching session are
+            assigned to the last session in the list.
+        vis: A string or list of strings containing the MS name(s) on which to operate.
+        pprfile: The pipeline processing request.
+        calintents: The list of calintents defining the calibrator source images to be saved.
+            Defaults to all calibrator intents.
+        calimages: The list of calibrator source images to be saved. Defaults to all calibrator
+            images matching calintents. If defined overrides calintents and the calibrator images
+            in the context.
+        targetimages: The list of target source images to be saved. Defaults to all target images.
+            If defined overrides the list of target images in the context.
+        products_dir: The directory where the data productions will be written.
     """
 
     processing_data_type = [DataType.RAW, DataType.REGCAL_CONTLINE_ALL,
@@ -374,7 +345,11 @@ class ExportData(basetask.StandardTaskTemplate):
         returned exactly as-is, with no data massaging or results items
         added.
 
-        :rtype: :class:~`ExportDataResults`
+        Args:
+            results: The results object from prepare.
+
+        Returns:
+            The results object unchanged.
         """
         return results
 
@@ -414,11 +389,11 @@ class ExportData(basetask.StandardTaskTemplate):
         visibility files, and measurement sets based on the provided context and flags.
 
         Args:
-            context (Context): The Pipeline context object.
-            session (List[str]): Session names
-            vis (Optional[Union[List[str], str]]): A single visibility file name, a list of such names,
+            context: The Pipeline context object.
+            session: Session names
+            vis: A single visibility file name, a list of such names,
                 or None. If None, the method uses all measurement sets registered in the context.
-            imaging_only_mses (Optional[bool] = False): A flag to determine how to filter measurement
+            imaging_only_mses: A flag to determine how to filter measurement
                 sets based on imaging data:
                 True: Includes only measurement sets with imaging data.
                 False: Includes only those without imaging data.
@@ -1452,9 +1427,9 @@ finally:
         Args:
             context : pipeline context
             oussid : OUS status ID
-            products_dir (str): path of product directory
+            products_dir: path of product directory
             report_generator: AQUA XML Generator
-            weblog_filename (str): weblog tarball filename
+            weblog_filename: weblog tarball filename
 
         Returns:
             AQUA report file path

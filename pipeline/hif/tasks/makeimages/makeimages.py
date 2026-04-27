@@ -547,7 +547,7 @@ class MakeImages(basetask.StandardTaskTemplate):
                            datatype=result.datatype)
 
 
-class CleanTaskFactory(object):
+class CleanTaskFactory:
     def __init__(self, inputs, executor):
         self.__inputs = inputs
         self.__context = inputs.context

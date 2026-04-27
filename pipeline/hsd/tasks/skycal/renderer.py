@@ -1,14 +1,11 @@
 """Renderer module for skycal task."""
+from __future__ import annotations
+
 import collections
 import os
+from typing import TYPE_CHECKING, Any
 
-from typing import TYPE_CHECKING, Any, Dict, List
-if TYPE_CHECKING:
-    from pipeline.domain.field import Field
-    from pipeline.infrastructure.launcher import Context
-    from pipeline.domain import MeasurementSet
-    from pipeline.infrastructure.basetask import ResultsList
-import pipeline.infrastructure.logging as logging
+import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.utils as utils
 from pipeline.domain.datatable import DataTableImpl as DataTable
@@ -16,7 +13,12 @@ from pipeline.infrastructure import casa_tools
 from . import skycal as skycal_task
 from . import display as skycal_display
 
-LOG = logging.get_logger(__name__)
+if TYPE_CHECKING:
+    from pipeline.domain import Field, MeasurementSet
+    from pipeline.infrastructure.basetask import ResultsList
+    from pipeline.infrastructure.launcher import Context
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class T2_4MDetailsSingleDishSkyCalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
@@ -34,13 +36,13 @@ class T2_4MDetailsSingleDishSkyCalRenderer(basetemplates.T2_4MDetailsDefaultRend
                          Defaults to 'Single-Dish Sky Calibration'.
             always_rerender: Always rerender the page if True. Defaults to False.
         """
-        super(T2_4MDetailsSingleDishSkyCalRenderer, self).__init__(
+        super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
     def update_mako_context(self,
-                            ctx: Dict[str, Any],
-                            context: 'Context',
-                            results: 'ResultsList') -> None:
+                            ctx: dict[str, Any],
+                            context: Context,
+                            results: ResultsList) -> None:
         """Update context for weblog rendering.
 
         Args:
@@ -204,7 +206,7 @@ class T2_4MDetailsSingleDishSkyCalRenderer(basetemplates.T2_4MDetailsDefaultRend
                     'elev_diff_subpages': elev_diff_subpages,
                     'reference_coords': reference_coords})
 
-    def get_skycal_applications(self, context: 'Context', result: skycal_task.SDSkyCalResults, ms: 'MeasurementSet') -> List[Dict]:
+    def get_skycal_applications(self, context: Context, result: skycal_task.SDSkyCalResults, ms: MeasurementSet) -> list[dict]:
         """Get application information from SDSkyCalResults instance and set them into a list.
 
         Args:
@@ -241,7 +243,7 @@ class T2_4MDetailsSingleDishSkyCalRenderer(basetemplates.T2_4MDetailsDefaultRend
 
         return applications
 
-    def _get_reference_coord(self, context: 'Context', ms: 'MeasurementSet', field: 'Field') -> str:
+    def _get_reference_coord(self, context: Context, ms: MeasurementSet, field: Field) -> str:
         """Get celestial coordinates and the reference.
 
         Args:

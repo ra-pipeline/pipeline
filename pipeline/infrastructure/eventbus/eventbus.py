@@ -2,11 +2,16 @@
 The eventbus module defines the interface for publishing events and
 subscribing to events.
 """
-from typing import Callable, TypeVar
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, TypeVar
 
 from pubsub import pub
 
 from .events import Event
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 E = TypeVar('E', bound=Event)
 

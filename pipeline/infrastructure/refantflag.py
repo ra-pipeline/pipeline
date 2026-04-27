@@ -1,15 +1,23 @@
+from __future__ import annotations
+
 import collections
+from typing import TYPE_CHECKING, NamedTuple
+
 import numpy
-from typing import Any, DefaultDict, Dict, Iterable, List, NamedTuple, Optional, Set, Tuple, Union
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.utils as utils
-from pipeline.domain import MeasurementSet
-from pipeline.h.tasks.common.arrayflaggerbase import FlagCmd
-from pipeline.h.tasks.common.flaggableviewresults import FlaggableViewResults
-from pipeline.infrastructure.basetask import Results
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from typing import Any
+
+    from pipeline.domain import MeasurementSet
+    from pipeline.h.tasks.common.arrayflaggerbase import FlagCmd
+    from pipeline.h.tasks.common.flaggableviewresults import FlaggableViewResults
+    from pipeline.infrastructure.basetask import Results
 
 # Tuple of field(string) and intent(string) used as a dict key
 FieldIntent = NamedTuple(
@@ -33,12 +41,12 @@ FieldIntentSpw = NamedTuple(
 # and one or more antennas (tuple of strings).
 FullyFlaggedAntennasNotification = NamedTuple(
     'FullyFlaggedAntennasNotification',
-    (('field', str), ('intents', Tuple[str]), ('spws', Union[str, Tuple[int]]), ('antennas', Union[str, Tuple[str]]))
+    (('field', str), ('intents', tuple[str]), ('spws', str | tuple[int]), ('antennas', str | tuple[str]))
 )
 
 
-def identify_fully_flagged_antennas_from_flagcmds(ms: MeasurementSet, flags: List[FlagCmd]) \
-        -> Dict[str, Set[FieldIntentSpw]]:
+def identify_fully_flagged_antennas_from_flagcmds(ms: MeasurementSet, flags: list[FlagCmd]) \
+        -> dict[str, set[FieldIntentSpw]]:
     """
     Identify the set of antennas that were fully flagged in at least one spw
     considered in the given flagging task, for any of the fields or intents,
@@ -54,10 +62,10 @@ def identify_fully_flagged_antennas_from_flagcmds(ms: MeasurementSet, flags: Lis
     """
 
     # Create antenna ID to name translation dictionary.
-    antenna_id_to_name: Dict[int, str] = {ant.id: (ant.name if ant.name.strip() else str(ant.id))
+    antenna_id_to_name: dict[int, str] = {ant.id: (ant.name if ant.name.strip() else str(ant.id))
                                           for ant in ms.antennas}
 
-    fully_flagged_antennas: Dict[str, Set[FieldIntentSpw]] = collections.defaultdict(set)
+    fully_flagged_antennas: dict[str, set[FieldIntentSpw]] = collections.defaultdict(set)
 
     # Create a summary of the flagging state by going through each flagging command.
     for flag in flags:
@@ -81,9 +89,9 @@ def identify_fully_flagged_antennas_from_flagcmds(ms: MeasurementSet, flags: Lis
 def identify_fully_flagged_antennas_from_flagview(
         ms: MeasurementSet,
         results: FlaggableViewResults,
-        scan_to_field_names: Dict[Any, Union[str, Tuple[str]]],
-        intents_of_interest: Optional[Iterable[str]] = None) \
-        -> Dict[str, Set[FieldIntentSpw]]:
+        scan_to_field_names: dict[Any, str | tuple[str]],
+        intents_of_interest: Iterable[str] | None = None) \
+        -> dict[str, set[FieldIntentSpw]]:
     """
     Identify the set of antennas that were fully flagged in at least one spw
     considered in the given flagging task, for any of the fields or intents,
@@ -107,14 +115,14 @@ def identify_fully_flagged_antennas_from_flagview(
     # Perform test separately for each of these intents.
 
     # Create translation of field -> intent for intents of interest.
-    intents_for_field: Dict[str, Set[str]] = {field.name: field.intents for field in ms.fields}
+    intents_for_field: dict[str, set[str]] = {field.name: field.intents for field in ms.fields}
 
     # Create antenna ID to name translation dictionary.
-    antenna_id_to_name: Dict[int, str] = {ant.id: (ant.name if ant.name.strip() else str(ant.id))
+    antenna_id_to_name: dict[int, str] = {ant.id: (ant.name if ant.name.strip() else str(ant.id))
                                           for ant in ms.antennas}
 
     # Create an empty dictionary for aggregating information of fully flagged antenna.
-    fully_flagged_antennas: Dict[str, Set[FieldIntentSpw]] = collections.defaultdict(set)
+    fully_flagged_antennas: dict[str, set[FieldIntentSpw]] = collections.defaultdict(set)
 
     # Going through each view product for the specified metric, search for fully flagged antenna
     # for each combination of field, intent, and spw, and collect their information for the return.
@@ -128,7 +136,7 @@ def identify_fully_flagged_antennas_from_flagview(
         # 2d arrays (assembled as lists of arrays), with rows corresponding
         # to scans, columns to antennas, and values indicating whether
         # the antenna is fully flagged in the given scan.
-        flagging_state: Dict[FieldIntentSpw, list] = collections.defaultdict(list)
+        flagging_state: dict[FieldIntentSpw, list] = collections.defaultdict(list)
 
         # Go through each scan within view.
         for scan_index, scan_id in enumerate(view.axes[1].data):
@@ -167,8 +175,8 @@ def identify_fully_flagged_antennas_from_flagview(
 def mark_antennas_for_refant_update(
         ms: MeasurementSet,
         result: Results,
-        fully_flagged_antennas: Dict[str, Set[FieldIntentSpw]],
-        all_spwids: Set[int]):
+        fully_flagged_antennas: dict[str, set[FieldIntentSpw]],
+        all_spwids: set[int]):
     """
     Modify result to set antennas to be demoted/removed if/when result
     gets accepted into the pipeline context.
@@ -282,9 +290,9 @@ def mark_antennas_for_refant_update(
 
 
 def aggregate_fully_flagged_antenna_notifications(
-        fully_flagged_antennas: Dict[str, Set[FieldIntentSpw]],
-        all_spwids: Set[int]) \
-        -> List[FullyFlaggedAntennasNotification]:
+        fully_flagged_antennas: dict[str, set[FieldIntentSpw]],
+        all_spwids: set[int]) \
+        -> list[FullyFlaggedAntennasNotification]:
     """
     Aggregate the list of notifications about fully flagged antennas for the subsequent QA scoring.
     Args:
@@ -304,7 +312,7 @@ def aggregate_fully_flagged_antenna_notifications(
     # Intermediate dict: sets of one or more spws for each combination of field, intent and antenna.
     # The resulting list is aggregated by spws only.
     spws_for_field_intent_antenna: \
-        DefaultDict[FieldIntentAntenna, Set[int]] = \
+        dict[FieldIntentAntenna, set[int]] = \
         collections.defaultdict(set)
     for antenna, field_intent_spw_combinations in fully_flagged_antennas.items():
         for item in field_intent_spw_combinations:
@@ -315,7 +323,7 @@ def aggregate_fully_flagged_antenna_notifications(
     # the field+intent pair and containing sets of all affected antennas.
     # The result is aggregated by _both_ spws and antennas, in that order.
     antennas_for_spws_and_field_intent_pairs: \
-        DefaultDict[Union[str, Set[int]], Dict[FieldIntent, Set[str]]] = \
+        dict[str | set[int], dict[FieldIntent, set[str]]] = \
         collections.defaultdict(dict)
     for item, set_of_spws in spws_for_field_intent_antenna.items():
         # convert set of spws to tuple or string, to be used as a dict key
@@ -331,7 +339,7 @@ def aggregate_fully_flagged_antenna_notifications(
     result = []
     for spws, antennas_for_field_intent_pair in antennas_for_spws_and_field_intent_pairs.items():
         intents_for_antennas_and_field: \
-            Dict[Tuple[str], Dict[str, Set[str]]] = \
+            dict[tuple[str], dict[str, set[str]]] = \
             collections.defaultdict(dict)
 
         # For each unique set of antennas, create a dictionary
