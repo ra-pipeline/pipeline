@@ -19,7 +19,7 @@
 import os
 import sys
 import textwrap
-from datetime import datetime
+from datetime import datetime, timezone
 
 pipeline_src = os.getenv('pipeline_src')
 if pipeline_src is not None:
@@ -149,7 +149,7 @@ build_version_short = build_version.removesuffix('-detached')
 # General information about the project.
 project = f'Pipeline \n ({version})'
 author = 'Pipeline Dev. Team'
-copyright = f'2020–{datetime.now().year}, {author}, build: {build_version_short}'
+copyright = f'2020–{datetime.now(timezone.utc).year}, {author}, build: {build_version_short}'
 
 # The version info for the project you're documenting, acts as replacement
 # for |version| and |release|, also used in various other places throughout

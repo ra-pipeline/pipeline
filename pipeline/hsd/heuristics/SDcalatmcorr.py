@@ -55,22 +55,30 @@
 # 08/jan/2021: - Added functionality to run atmcorr routine in "try" mode and extract three different
 #                metrics for a family of model parameters.
 # 24/jul/2020: - Aligned with script atmcorr_20200722.py
-
-import os
-from typing import Generator
+from __future__ import annotations
 
 import glob
-import numpy as np
-import pylab as pl
+import os
+import time as systime
 from itertools import product
-from matplotlib import pyplot as plt
+from typing import TYPE_CHECKING
+
+import numpy as np
+from itertools import pairwise, product
+import matplotlib
 import time as systime
 from scipy.interpolate import CubicSpline
 
 import pipeline.infrastructure.callibrary as callibrary
-import pipeline.infrastructure.logging as logging
-import pipeline.infrastructure.casa_tools as casa_tools
 import pipeline.infrastructure.casa_tasks as casa_tasks
+import pipeline.infrastructure.casa_tools as casa_tools
+import pipeline.infrastructure.logging as logging
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from numpy import floating
+    from numpy.typing import NDArray
 
 LOG = logging.get_logger(__name__)
 
@@ -101,6 +109,7 @@ def robuststats(A):
     sigma = (1.0/bn)*madfactor*np.ma.median(np.ma.abs(A - mu))
     return (mu, sigma)
 
+
 def segmentEdges(seq, gap, label, sortdata = True):
     '''Return edges of sequence of values with gaps
     Assumes 1D array "seq" is ordered. Otherwise one should sort it first.
@@ -127,6 +136,7 @@ def segmentEdges(seq, gap, label, sortdata = True):
 
     return output
 
+
 def selectRanges(timeseq, rangetable):
     '''Return selection boolean array for a time sequence, given a table of time ranges.
     '''
@@ -136,6 +146,7 @@ def selectRanges(timeseq, rangetable):
     for i in range(nranges):
         sel += np.all([timeseq >= rangetable['tstart'][i], timeseq <= rangetable['tend'][i]], axis=0)
     return sel
+
 
 def sigclipfit(x, A, Asig, fitdeg, nclips, nsigma, bordertokeep = 0.05, progdegree = False, smoothselbox = 0.05):
     '''Return polynomial model parameters done to vector A and residuals from the fit.
@@ -201,6 +212,7 @@ def sigclipfit(x, A, Asig, fitdeg, nclips, nsigma, bordertokeep = 0.05, progdegr
     output['border'] = border
     return output
 
+
 def enlargesel(sel, box):
     '''Enlarge selection by "box" pixels around each selected pixel
     in "sel" vector.
@@ -213,12 +225,33 @@ def enlargesel(sel, box):
         newsel[i] = np.ma.max(sel[startrange:endrange])
     return newsel
 
-def smooth(y, box_pts):
+def smooth(y: np.ndarray, box_pts: int):
     '''Smooth using boxcar convolution.
+
+    To mitigate boundary effect, this function extrapolates
+    the data by box_pts // 2 in both edges with "nearest"
+    method. This will be harmless in the context of this
+    heuristics since we are interested in the gradient
+    (diff) between adjuscent channels.
+
+    Args:
+        y: 1D array to be smoothed.
+        box_pts: Width of the boxcar kernel. Must be a positive integer.
+
+    Returns:
+        Smoothed 1D array of the same length as y.
     '''
+    if box_pts < 2:
+        # no smoothing is applied
+        return y
+
     box = np.ma.ones(box_pts)/box_pts
-    y_smooth = np.ma.convolve(y, box, mode='same')
-    return y_smooth
+    extra_chans = (box_pts + 1) // 2
+    y_expand = np.pad(y, extra_chans, mode='edge')
+    print(f"box_pts {box_pts} extra_chans {extra_chans}")
+    y_smooth = np.ma.convolve(y_expand, box, mode='same')
+    return y_smooth[extra_chans:-extra_chans]
+
 
 def getskylines(tauspec, spw, spwsetup, fraclevel = 0.5, minpeaklevel = 0.0, spwbordertoavoid = 0.025, taudeg = 2):
     '''Get position of sky lines and line widths from the optical depth.
@@ -258,8 +291,6 @@ def getskylines(tauspec, spw, spwsetup, fraclevel = 0.5, minpeaklevel = 0.0, spw
     output['taufit'] = taufit
     for k, idx in enumerate(idxpeak):
         #calculate the decrease from the tau depth relative to the minimum tau in the SPW
-        #peakratioleft = np.array([(tauspec[idx - i]-mintau)/(peaktau[k]-mintau) for i in range(idx)])
-        #peakratioright = np.array([(tauspec[idx + i]-mintau)/(peaktau[k]-mintau) for i in range(nch-idx)])
         peakratioleft = np.array([subtau[idx - i]/subtau[idx] for i in range(idx)])
         peakratioright = np.array([subtau[idx + i]/subtau[idx] for i in range(nch-idx)])
         posrightneg = peakratioright < fraclevel
@@ -320,9 +351,9 @@ def gradeskylines(skylines: dict, cntrweight: float = 1.0):
     These "grades" are based on a normalized value of the opacity at the skyline peak and the position of
     the line in the SPW, and is aimed at providing a decision on which skyline to used for model evaluation.
     param:
-        skylines: (dict) Dictionary of detected skylines indexed by SPW, where each sub-dictionary is as obtained
+        skylines: Dictionary of detected skylines indexed by SPW, where each sub-dictionary is as obtained
                   from getskylines().
-        cntrweight: (float) Relative weight given to the position of the skyline relative to the center of the SPW.
+        cntrweight: Relative weight given to the position of the skyline relative to the center of the SPW.
                     Must be a positive float number between 0 and 1, a value of 0.0 means no weight to position,
                     a value >0 gives the line a linearly decreasing grade the further it is away from the center of the SPW.
     returns:
@@ -374,7 +405,7 @@ def skysel(skylines, linestouse = 'all', avoidpeak = 0.0):
 
     return skysel
 
-def calcmetric(rawsample, rawsigmasample, metrictype = 'intabsdiff', smoothbox = 1):
+def calcmetric(rawsample: np.ndarray, rawsigmasample: np.ndarray, metrictype_list: str | list[str] = 'intsqdiff', smoothbox: int = 1) -> dict[str, tuple[float, float]]:
     '''Function that calculates a metric value for a given piece of spectrum (time-averaged data), typically
     a section around the skyline selected by its "grade".
     param:
@@ -391,6 +422,8 @@ def calcmetric(rawsample, rawsigmasample, metrictype = 'intabsdiff', smoothbox =
     '''
 
     (npols, nch) = np.shape(rawsample)
+    # limit smoothing box size to 20% of nch
+    smoothbox = max(1, min(nch // 5, smoothbox))
     #Smooth if requested
     if (smoothbox > 1) and (type(smoothbox) == int):
         sample = 0.0*rawsample
@@ -404,99 +437,108 @@ def calcmetric(rawsample, rawsigmasample, metrictype = 'intabsdiff', smoothbox =
     if not type(sample) == np.ma.core.MaskedArray:
         sample = np.ma.MaskedArray(sample)
         sigmasample = np.ma.MaskedArray(sigmasample)
-    if metrictype == 'intabs':
-        auxval = []
-        auxerr = []
-        for i in range(npols):
-            goodsample = (sample.data[i])[~sample.mask[i]]
-            sigmagoodsample = (sigmasample[i])[~sample.mask[i]]
-            if len(goodsample) > 0:
-                auxval.append(np.ma.sum(np.ma.abs(sample[i,:])))
-                auxerr.append(np.ma.sqrt(np.ma.sum(sigmasample[i,:]*sigmasample[i,:])))
-        if len(auxval) > 0:
-            value = np.sum(auxval)
-            error = np.sqrt(np.sum(np.array(auxerr)*np.array(auxerr)))
+
+    resultdict = {}
+
+    if isinstance(metrictype_list, str):
+        metrictype_list = [metrictype_list]
+
+    for metrictype in metrictype_list:
+        if metrictype == 'intabs':
+            auxval = []
+            auxerr = []
+            for i in range(npols):
+                goodsample = (sample.data[i])[~sample.mask[i]]
+                sigmagoodsample = (sigmasample[i])[~sample.mask[i]]
+                if len(goodsample) > 0:
+                    auxval.append(np.ma.sum(np.ma.abs(sample[i,:])))
+                    auxerr.append(np.ma.sqrt(np.ma.sum(sigmasample[i,:]*sigmasample[i,:])))
+            if len(auxval) > 0:
+                value = np.sum(auxval)
+                error = np.sqrt(np.sum(np.array(auxerr)*np.array(auxerr)))
+            else:
+                value = np.nan
+                error = np.nan
+            resultdict[metrictype] = (value, error)
+        elif metrictype == 'maxabs':
+            auxval = []
+            auxerr = []
+            for i in range(npols):
+                goodsample = (sample.data[i])[~sample.mask[i]]
+                sigmagoodsample = (sigmasample[i])[~sample.mask[i]]
+                if len(goodsample) > 0:
+                    idx = np.argsort(np.abs(goodsample))[-1]
+                    auxval.append(np.abs(goodsample[idx]))
+                    auxerr.append(sigmagoodsample[idx])
+            if len(auxval) > 0:
+                idx = np.argsort(np.abs(auxval))[-1]
+                value = auxval[idx]
+                error = auxerr[idx]
+            else:
+                value = np.nan
+                error = np.nan
+            resultdict[metrictype] = (value, error)
+        elif metrictype == 'maxabsdiff':
+            auxval = []
+            auxerr = []
+            for i in range(npols):
+                goodsample = (sample.data[i])[~sample.mask[i]]
+                sigmagoodsample = (sigmasample[i])[~sample.mask[i]]
+                if len(goodsample) > 0:
+                    absdiff = np.abs(np.diff(goodsample))
+                    idx = np.argsort(absdiff)[-1]
+                    auxval.append(absdiff[idx])
+                    auxerr.append(np.sqrt(sigmagoodsample[idx]**2+sigmagoodsample[idx+1]**2))
+            if len(auxval) > 0:
+                idx = np.argsort(np.abs(auxval))[-1]
+                value = auxval[idx]
+                error = auxerr[idx]
+            else:
+                value = np.nan
+                error = np.nan
+            resultdict[metrictype] = (value, error)
+        elif metrictype == 'intabsdiff':
+            auxval = []
+            auxerr = []
+            for i in range(npols):
+                goodsample = (sample.data[i])[~sample.mask[i]]
+                sigmasqgoodsample = np.square((sigmasample[i])[~sample.mask[i]])
+                if len(goodsample) > 0:
+                    absdiff = np.abs(np.diff(goodsample))
+                    absdiffsqerr = sigmasqgoodsample + np.roll(sigmasqgoodsample, 1)
+                    auxval.append(np.sum(absdiff))
+                    auxerr.append(np.sqrt(np.sum(absdiffsqerr)))
+            if len(auxval) > 0:
+                value = np.sum(auxval)
+                error = np.sqrt(np.sum(np.array(auxerr)*np.array(auxerr)))
+            else:
+                value = np.nan
+                error = np.nan
+            resultdict[metrictype] = (value, error)
+        elif metrictype == 'intsqdiff':
+            auxval = []
+            auxerr = []
+            for i in range(npols):
+                goodsample = (sample.data[i])[~sample.mask[i]]
+                sigmasqgoodsample = np.square((sigmasample[i])[~sample.mask[i]])
+                if len(goodsample) > 0:
+                    absdiff = np.abs(np.diff(goodsample))
+                    sqdiff = np.square(absdiff)
+                    absdiffsqerr = sigmasqgoodsample + np.roll(sigmasqgoodsample, 1)
+                    sqdifferr = 4*absdiff*absdiff*(absdiffsqerr[0:-1])
+                    auxval.append(np.sum(sqdiff))
+                    auxerr.append(np.sqrt(np.sum(sqdifferr)))
+            if len(auxval) > 0:
+                value = np.sum(auxval)
+                error = np.sqrt(np.sum(np.array(auxerr)*np.array(auxerr)))
+            else:
+                value = np.nan
+                error = np.nan
+            resultdict[metrictype] = (value, error)
         else:
-            value = np.nan
-            error = np.nan
-        return (value, error)
-    elif metrictype == 'maxabs':
-        auxval = []
-        auxerr = []
-        for i in range(npols):
-            goodsample = (sample.data[i])[~sample.mask[i]]
-            sigmagoodsample = (sigmasample[i])[~sample.mask[i]]
-            if len(goodsample) > 0:
-                idx = np.argsort(np.abs(goodsample))[-1]
-                auxval.append(np.abs(goodsample[idx]))
-                auxerr.append(sigmagoodsample[idx])
-        if len(auxval) > 0:
-            idx = np.argsort(np.abs(auxval))[-1]
-            value = auxval[idx]
-            error = auxerr[idx]
-        else:
-            value = np.nan
-            error = np.nan
-        return (value, error)
-    elif metrictype == 'maxabsdiff':
-        auxval = []
-        auxerr = []
-        for i in range(npols):
-            goodsample = (sample.data[i])[~sample.mask[i]]
-            sigmagoodsample = (sigmasample[i])[~sample.mask[i]]
-            if len(goodsample) > 0:
-                absdiff = np.abs(np.diff(goodsample))
-                idx = np.argsort(absdiff)[-1]
-                auxval.append(absdiff[idx])
-                auxerr.append(np.sqrt(sigmagoodsample[idx]**2+sigmagoodsample[idx+1]**2))
-        if len(auxval) > 0:
-            idx = np.argsort(np.abs(auxval))[-1]
-            value = auxval[idx]
-            error = auxerr[idx]
-        else:
-            value = np.nan
-            error = np.nan
-        return (value, error)
-    elif metrictype == 'intabsdiff':
-        auxval = []
-        auxerr = []
-        for i in range(npols):
-            goodsample = (sample.data[i])[~sample.mask[i]]
-            sigmasqgoodsample = np.square((sigmasample[i])[~sample.mask[i]])
-            if len(goodsample) > 0:
-                absdiff = np.abs(np.diff(goodsample))
-                absdiffsqerr = sigmasqgoodsample + np.roll(sigmasqgoodsample, 1)
-                auxval.append(np.sum(absdiff))
-                auxerr.append(np.sqrt(np.sum(absdiffsqerr)))
-        if len(auxval) > 0:
-            value = np.sum(auxval)
-            error = np.sqrt(np.sum(np.array(auxerr)*np.array(auxerr)))
-        else:
-            value = np.nan
-            error = np.nan
-        return (value, error)
-    elif metrictype == 'intsqdiff':
-        auxval = []
-        auxerr = []
-        for i in range(npols):
-            goodsample = (sample.data[i])[~sample.mask[i]]
-            sigmasqgoodsample = np.square((sigmasample[i])[~sample.mask[i]])
-            if len(goodsample) > 0:
-                absdiff = np.abs(np.diff(goodsample))
-                sqdiff = np.square(absdiff)
-                absdiffsqerr = sigmasqgoodsample + np.roll(sigmasqgoodsample, 1)
-                sqdifferr = 4*absdiff*absdiff*(absdiffsqerr[0:-1])
-                auxval.append(np.sum(sqdiff))
-                auxerr.append(np.sqrt(np.sum(sqdifferr)))
-        if len(auxval) > 0:
-            value = np.sum(auxval)
-            error = np.sqrt(np.sum(np.array(auxerr)*np.array(auxerr)))
-        else:
-            value = np.nan
-            error = np.nan
-        return (value, error)
-    else:
-        return -1.0
+            resultdict[metrictype] = (-1.0, -1.0)
+
+    return resultdict
 
 #Copied over from analysisUtils
 def getSpwList(msmd,intent='OBSERVE_TARGET#ON_SOURCE',tdm=True,fdm=True, sqld=False):
@@ -699,7 +741,6 @@ def getCalAtmData(ms: str, spws: list, spwsetup: dict):
         #Load Tsys and Trx tables
         auxtsys = [subtb.getcell('tSysSpectrum', i) for i in range(subtb.nrows())]
         auxtrec = [subtb.getcell('tRecSpectrum', i) for i in range(subtb.nrows())]
-        # (npols, nchantsys, nrowstsys) = np.shape(auxtsys)
         npols = auxtsys[0].shape[0]
         nrowstsys = len(auxtsys)
         tsys[spwid] = np.zeros((npols, spwsetup[spwid]['nchan'], nrowstsys))
@@ -827,10 +868,8 @@ def makePlot(nu = None, tmavedata = None, skychansel = None, scisrcsel = None, b
     xmax = np.max(xdata) + 0.02*(np.max(xdata)-np.min(xdata))
 
     #Plot data before correction
-    plt.clf()
-    #Data axis ax1
-    fig, ax1 = plt.subplots()
-    fig.set_size_inches(8, 6)
+    fig = matplotlib.figure.Figure(figsize=(8, 6), dpi=isize)
+    ax1 = fig.add_subplot(111)
     ax1.set_title(title)
     for ipol in range(npol):
         thisstyle = ('blue' if (ipol == 0) else 'red')
@@ -888,8 +927,8 @@ def makePlot(nu = None, tmavedata = None, skychansel = None, scisrcsel = None, b
         ax2.set_yticks([mintr, 0.5*(maxtr+mintr), maxtr])
         ax2.set_ylabel('% ATM Transmission', color = 'magenta')
 
-    plt.savefig(output, dpi=isize)
-    plt.close(fig)
+    fig.savefig(output, dpi=isize)
+    fig.clear()
 
     return
 
@@ -899,8 +938,8 @@ def select_and_yield(
         datacolumn: str,
         data_desc_id: int,
         field_id: int,
-        state_id_list: np.ndarray
-) -> Generator[tuple[np.ndarray, np.ndarray], None, None]:
+        state_id_list: NDArray[np.int_],
+) -> Generator[tuple[NDArray[floating], NDArray[floating]], None, None]:
     """Select data from MS and yield data array with mask.
 
     Args:
@@ -943,8 +982,8 @@ def get_stats_and_shape(
         datacolumn: str,
         data_desc_id: int,
         field_id: int,
-        state_id_list: np.ndarray
-) -> tuple[np.ndarray, float, np.ndarray]:
+    state_id_list: NDArray[np.int_]
+) -> tuple[NDArray[floating], float, NDArray[np.int_]]:
     """Compute metrics from selected data in the given MS.
 
     Core part of this function computes the mean and standard deviation
@@ -996,9 +1035,9 @@ def get_metric(
         datacolumn: str,
         data_desc_id: int,
         field_id: int,
-        state_id_list: np.ndarray,
-        skychansel: np.ndarray
-) -> tuple[np.ndarray, float, np.ndarray]:
+        state_id_list: NDArray[np.int_],
+        skychansel: NDArray[np.bool_]
+    ) -> tuple[NDArray[floating], float, NDArray[np.bool_]]:
     """Compute metrics from selected data in the given MS.
 
     Core part of this function computes the mean and maximum
@@ -1065,7 +1104,7 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
             jyperkfactor = None, dobackup = False, forcespws = None, forcefield = None, forcemetricline = None,
             maxonlyspw = False, minpeaklevel = 0.05, timestamp = None, plotsfolder = None, diffsmooth = 0.002,
             psize = 2, isize = 300, defatmtype = 1, defmaxalt = 120, deflapserate = -5.6, defscaleht = 2.0,
-            decisionmetric = 'intabsdiff'):
+            decisionmetric = 'intsqdiff'):
     ''' Task to apply CSV-3320 correction for atmospheric lines.
     Parameter list:
     ms: (first argument) MS file to be processed
@@ -1138,9 +1177,9 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
     else:
         #We could not receive the fieldid from calling method, default to first field
         fieldid = spwsetup['fieldid']['*OBSERVE_TARGET#ON_SOURCE*'][0]
-    bnd = (pl.diff(tmoffsource)>1)
-    w1 = pl.append([True], bnd)
-    w2 = pl.append(bnd, [True])
+    bnd = (np.diff(tmoffsource)>1)
+    w1 = np.append([True], bnd)
+    w2 = np.append(bnd, [True])
     tmoffsource = (tmoffsource[w1]+tmoffsource[w2])/2.  ### midpoint of OFF subscan
 
     ################################################################
@@ -1157,7 +1196,7 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
 
     #Open CALATMOSPHERE table
     (tground_all, pground_all, hground_all, tmatm_all, tsys, trec, tau, antatm) = getCalAtmData(ms, spws, spwsetup)
-    tmatm = pl.unique(tmatm_all[spws[0]])
+    tmatm = np.unique(tmatm_all[spws[0]])
 
     #Search for sky lines
     skylines = {}
@@ -1237,10 +1276,10 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
     pwv, tground, pground, hground = [], [], [], []
     for tt in tmatm:
         deltat = abs(tmpwv_all-tt)
-        pwv.append(pl.median(pwv_all[deltat==deltat.min()]))
-        tground.append(pl.median(tground_all[tmatm_all==tt]))
-        pground.append(pl.median(pground_all[tmatm_all==tt]))
-        hground.append(pl.median(hground_all[tmatm_all==tt]))
+        pwv.append(np.median(pwv_all[deltat==deltat.min()]))
+        tground.append(np.median(tground_all[tmatm_all==tt]))
+        pground.append(np.median(pground_all[tmatm_all==tt]))
+        hground.append(np.median(hground_all[tmatm_all==tt]))
         LOG.info('PWV = %fm, T = %fK, P = %fPa, H = %f%% at %s' % (pwv[-1], tground[-1], pground[-1], hground[-1], qa.time('%fs' % tt, form='fits')[0]))
 
     ################################################################
@@ -1304,6 +1343,9 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
     tb_on.close()
     tb.close()
 
+    metricnorm_per_spw = {}
+    revised_skychansel_per_spw = {}
+
     for spwid in spwstoprocess:
         LOG.info('Processing spw '+str(spwid))
         nu = spwsetup[spwid]['chanfreqs']/(1.e+09)
@@ -1319,6 +1361,8 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
             ms, datacolumn, spwsetup[spwid]['ddi'], fieldid, state_ids_on,
             skychansel
         )
+        metricnorm_per_spw[spwid] = metricnorm
+        revised_skychansel_per_spw[spwid] = skychansel
         LOG.debug("Done reading_data_spw%d", spwid)
 
         npol = precorravedataon.shape[0]
@@ -1361,6 +1405,7 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
             LOG.debug("Done reading_data_spw%d_model%d", spwid, k)
 
             #Plot corrected data with baseline fit, etc.
+            skychansel = revised_skychansel_per_spw[spwid]
             plotlist.append({'nu': nu, 'tmavedata': tmavedataonk, 'skychansel': skychansel,
                              'tau': tau[spwid], 'title': 'Model '+strmodel, 'diffsmoothbox': 1,
                              'takediff': False, 'ischosen': False,
@@ -1368,18 +1413,22 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
                              'output': plotsfolder+'/'+ms+'.field'+str(fieldid)+'.spw'+str(spwid)+'.model.'+str(k)+'.png'})
 
             #Select sample data for metrics
-            skysample = tmavedataonk[:,skychansel]/metricnorm
-            skysamplesigma = tmstddataonk[:,skychansel]/(metricnorm*np.sqrt(nrowk))
-            #Calculate metrics
-            (maxabsdiff, maxabsdifferr) = calcmetric(skysample, skysamplesigma, metrictype='maxabsdiff', smoothbox = diffsmoothbox)
-            metrics[fieldid][spwid]['maxabsdiff'][k] = maxabsdiff
-            metrics[fieldid][spwid]['maxabsdifferr'][k] = maxabsdifferr
-            (intabsdiff, intabsdifferr) = calcmetric(skysample, skysamplesigma, metrictype='intabsdiff', smoothbox = diffsmoothbox)
-            metrics[fieldid][spwid]['intabsdiff'][k] = intabsdiff
-            metrics[fieldid][spwid]['intabsdifferr'][k] = intabsdifferr
-            (intsqdiff, intsqdifferr) = calcmetric(skysample, skysamplesigma, metrictype='intsqdiff', smoothbox = diffsmoothbox)
-            metrics[fieldid][spwid]['intsqdiff'][k] = intsqdiff
-            metrics[fieldid][spwid]['intsqdifferr'][k] = intsqdifferr
+            metricnorm = metricnorm_per_spw[spwid]
+            selected_channels = np.where(skychansel)[0]
+            boundary = np.append([0], np.where(np.diff(selected_channels) > 1)[0] + 1)
+            if boundary[-1] < len(selected_channels):
+                boundary = np.append(boundary, [len(selected_channels)])
+            for b_i, b_j in pairwise(boundary):
+                _chansel = selected_channels[b_i:b_j]
+                skysample = tmavedataonk[:,_chansel]/metricnorm
+                skysamplesigma = tmstddataonk[:,_chansel]/(metricnorm*np.sqrt(nrowk))
+                #Calculate metrics
+                metricdtype_list = ["maxabsdiff", "intabsdiff", "intsqdiff"]
+                resultdict = calcmetric(skysample, skysamplesigma, metrictype_list=metricdtype_list, smoothbox = diffsmoothbox)
+                for metric_key, metric_result in resultdict.items():
+                    metric_value, metric_error = metric_result
+                    metrics[fieldid][spwid][metric_key][k] += metric_value
+                    metrics[fieldid][spwid][f"{metric_key}err"][k] += metric_error
 
     #Pick best model
     chosenspw = spwstoprocess[0]
@@ -1477,7 +1526,7 @@ def getJyperKfromCaltable(mslist, context):
         output[ms] = {str(thisspw): np.mean(jyperk[(spw == thisspw)]) for thisspw in spw if thisspw in spwsetup['spwlist']}
     return output
 
-def selectModelParams(mslist, context = None, jyperkfactor = None, decisionmetric = 'intabsdiff',
+def selectModelParams(mslist, context = None, jyperkfactor = None, decisionmetric = 'intsqdiff',
                       iant = 'auto', atmtype = [1,2,3,4], maxalt = [120],
                       lapserate = [-5.6], scaleht = [2.0], resultsfile = None, plotsfolder = None,
                       forcespws = None, forcefield = None, forcemetricline = None, maxonlyspw = False, minpeaklevel = 0.05,
@@ -1611,7 +1660,7 @@ def getTimeStamp(timefmt = '{0:04d}{1:02d}{2:02d}{3:02d}{4:02d}{5:02d}'):
     return timestamp
 
 def redPipeSDatmcorr(iant = 'auto', atmtype = [1, 2, 3, 4],
-                     maxalt = 120, lapserate = -5.6, scaleht = 2.0, decisionmetric = 'intabsdiff',
+                     maxalt = 120, lapserate = -5.6, scaleht = 2.0, decisionmetric = 'intsqdiff',
                      dobackup = True, pcode = '0000.1.00000.S', mousstatusuid = 'uid://A000/X000/X000',
                      metricspws = None, metricfield = None, metricline = None, minpeaklevel = 0.05, diffsmooth = 0.002):
     ''' Task to run SD pipeline, applying CSV-3320 correction for atmospheric lines

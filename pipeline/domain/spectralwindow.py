@@ -6,7 +6,7 @@ import decimal
 import itertools
 import json
 import operator
-from typing import Any, Iterable, Iterator, Sequence
+from typing import TYPE_CHECKING, Any
 
 import numpy
 from pydantic import BaseModel, ConfigDict, Field as PydanticField, PrivateAttr, field_validator
@@ -15,6 +15,8 @@ from pipeline import infrastructure
 from pipeline.domain import measures
 from pipeline.infrastructure import casa_tools
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator, Sequence
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -101,7 +103,7 @@ class ChannelList:
         self.chan_widths = chan_widths
         self.chan_effbws = effbw
 
-    def __iter__(self) -> Iterator['Channel']:
+    def __iter__(self) -> Iterator[Channel]:
         raw_channel_data = list(zip(self.chan_freqs, self.chan_widths, self.chan_effbws))
         for chan_centre, chan_width, chan_effective_bw in raw_channel_data:
             yield self.__create_channel(chan_centre, chan_width, chan_effective_bw)
@@ -109,7 +111,7 @@ class ChannelList:
     def __len__(self) -> int:
         return len(self.chan_freqs)
 
-    def __getitem__(self, index: int) -> 'Channel':
+    def __getitem__(self, index: int) -> Channel:
         return self.__create_channel(
             self.chan_freqs[index],
             self.chan_widths[index],
@@ -121,7 +123,7 @@ class ChannelList:
         centre: int | float,
         width: int | float,
         effective_bw: int | float,
-    ) -> 'Channel':
+    ) -> Channel:
         """Return a Channel object for given parameters.
 
         Args:
@@ -166,7 +168,7 @@ class Channel:
     def __setstate__(self, state: tuple[measures.FrequencyRange, measures.Frequency]) -> None:
         self.frequency_range, self.effective_bw = state
 
-    def __eq__(self, other: 'Channel') -> bool:
+    def __eq__(self, other: Channel) -> bool:
         if not isinstance(other, Channel):
             return False
         if other.frequency_range != self.frequency_range:
@@ -175,7 +177,7 @@ class Channel:
             return False
         return True
 
-    def __ne__(self, other: 'Channel') -> bool:
+    def __ne__(self, other: Channel) -> bool:
         return not self.__eq__(other)
 
     def __repr__(self) -> str:
@@ -257,7 +259,7 @@ class SpectralWindow(BaseModel):
     bandwidth: measures.Frequency | float = PydanticField(
         ..., description='Bandwidth in Hz'
     )
-    ref_freq: dict[str, Any] = PydanticField(..., description='CASA frequency measure dictionary')
+    ref_freq: dict[str, measures.Frequency] = PydanticField(..., description='CASA frequency measure dictionary')
     mean_freq: float = PydanticField(..., description='Mean frequency in Hz')
     chan_freqs: Sequence[int | float] = PydanticField(..., description='Channel center frequencies')
     chan_widths: Sequence[int | float] = PydanticField(..., description='Channel widths')

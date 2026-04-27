@@ -1,5 +1,4 @@
 import re
-from typing import List, Optional, Union
 
 import numpy as np
 
@@ -9,7 +8,7 @@ from pipeline.infrastructure import casa_tools
 
 from .imageparams_base import ImageParamsHeuristics
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class ImageParamsHeuristicsALMA(ImageParamsHeuristics):
@@ -224,7 +223,7 @@ class ImageParamsHeuristicsALMA(ImageParamsHeuristics):
         intent: str,
         specmode: str,
         robust: float,
-        rms_multiplier: Optional[Union[int, float]] = None,
+        rms_multiplier: int | float | None = None,
     ) -> tuple:
         """Default auto-boxing parameters for ALMA main array and ACA."""
 
@@ -473,7 +472,7 @@ class ImageParamsHeuristicsALMA(ImageParamsHeuristics):
         else:
             return 'I'
 
-    def reffreq(self, deconvolver: Optional[str] = None, specmode: Optional[str] = None, spwsel: Optional[dict] = None) -> Optional[str]:
+    def reffreq(self, deconvolver: str | None = None, specmode: str | None = None, spwsel: dict | None = None) -> str | None:
         """PIPE-1838: Tclean reffreq parameter heuristics."""
 
         if deconvolver != 'mtmfs' or specmode != 'cont':
@@ -518,7 +517,7 @@ class ImageParamsHeuristicsALMA(ImageParamsHeuristics):
             LOG.attentation('Reference frequency calculation led to zero denominator.')
             return None
 
-    def arrays(self, vislist: Optional[List[str]] = None):
+    def arrays(self, vislist: list[str] | None = None):
 
         """Return the array descriptions."""
 

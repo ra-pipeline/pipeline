@@ -1,13 +1,15 @@
+from __future__ import annotations
+
 import dataclasses
 import os
 import re
-from typing import List
 
 import numpy as np
 
 import pipeline.extern.tsys_contamination as extern
 import pipeline.h.tasks.tsysflag.tsysflag as tsysflag
 import pipeline.infrastructure as infrastructure
+import pipeline.infrastructure.sessionutils as sessionutils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.extern.TsysDataClassFile import TsysData
 from pipeline.h.tasks.common import calibrationtableaccess as caltableaccess
@@ -16,12 +18,10 @@ from pipeline.infrastructure import task_registry
 from pipeline.infrastructure.basetask import StandardTaskTemplate
 from pipeline.infrastructure.exceptions import PipelineException
 from pipeline.infrastructure.pipelineqa import QAScore, TargetDataSelection
-import pipeline.infrastructure.sessionutils as sessionutils
 
 __all__ = ["TsysFlagContamination", "TsysFlagContaminationInputs"]
 
-
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 # QA score for multi-source, multi-tuning EBs, full polarization EBs, etc.
 # that cannot be processed by the heuristic. The intent is that these EBs
@@ -186,7 +186,7 @@ class ExternFunctionArguments:
     single_polarization: bool
 
     @staticmethod
-    def from_inputs(inputs: TsysFlagContaminationInputs) -> "ExternFunctionArguments":
+    def from_inputs(inputs: TsysFlagContaminationInputs) -> ExternFunctionArguments:
         context = inputs.context
         weblog_dir = os.path.join(context.report_dir, f"stage{context.task_counter}")
         os.makedirs(weblog_dir, exist_ok=True)
@@ -448,7 +448,7 @@ class SerialTsysFlagContamination(StandardTaskTemplate):
 
         return plot_wrappers, qascores
 
-    def _assert_heuristic_preconditions(self) -> List[QAScore]:
+    def _assert_heuristic_preconditions(self) -> list[QAScore]:
         """
         Preflight checks to identify data that the heuristic cannot handle.
         """
@@ -458,7 +458,7 @@ class SerialTsysFlagContamination(StandardTaskTemplate):
         qa_scores.extend(self._assert_bandpass_is_present())
         return qa_scores
 
-    def _assert_not_multisource_multituning(self) -> List[QAScore]:
+    def _assert_not_multisource_multituning(self) -> list[QAScore]:
         """
         Returns a list containing an appropriate QAScore if multitunings are
         present, otherwise an empty list is returned.
@@ -516,7 +516,7 @@ class SerialTsysFlagContamination(StandardTaskTemplate):
 
         return qa_scores
 
-    def _assert_not_full_polarization(self) -> List[QAScore]:
+    def _assert_not_full_polarization(self) -> list[QAScore]:
         """
         Returns a list containing an appropriate QAScore if full polarization
         data are present, otherwise an empty list is returned.
@@ -541,7 +541,7 @@ class SerialTsysFlagContamination(StandardTaskTemplate):
 
         return qa_scores
 
-    def _assert_bandpass_is_present(self) -> List[QAScore]:
+    def _assert_bandpass_is_present(self) -> list[QAScore]:
         """
         Returns a list containing an appropriate QAScore if BANDPASS data are
         missing, otherwise an empty list is returned.

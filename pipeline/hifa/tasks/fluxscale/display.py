@@ -60,5 +60,5 @@ class GFluxscaleSummaryChart(setjy.BasebandSummaryChart):
         }
         plot_args.update(**overrides)
 
-        super(GFluxscaleSummaryChart, self).__init__(context, output_dir, calto, xaxis='uvdist', yaxis='amp',
+        super().__init__(context, output_dir, calto, xaxis='uvdist', yaxis='amp',
                                                      intent=intent, ant=ant, **plot_args)

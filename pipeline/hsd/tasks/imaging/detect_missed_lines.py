@@ -6,15 +6,15 @@ See PIPE-2416 / PIPEREQ-182 for details.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 import copy
 import math
 import os
+from typing import TYPE_CHECKING
 
+import numpy as np
 from astropy.stats import sigma_clip
 from matplotlib import figure
 from matplotlib.transforms import Bbox
-import numpy as np
 from scipy.ndimage import convolve, label
 from scipy.stats import median_abs_deviation
 
@@ -23,10 +23,13 @@ from pipeline.hsd.tasks.common import display as sd_display
 
 if TYPE_CHECKING:
     from matplotlib import axes
+    from numpy import floating
+    from numpy.typing import NDArray
+
     from pipeline.domain import MeasurementSet
+    from pipeline.hsd.tasks.common import sdtyping
     from pipeline.infrastructure import Context
     from pipeline.infrastructure.imagelibrary import ImageItem
-    from pipeline.hsd.tasks.common import sdtyping
 
 # Initialize logger for this module
 LOG = infrastructure.get_logger(__name__)
@@ -159,7 +162,7 @@ class DetectMissedLines:
             LOG.info( "Field {} spw {}: No significant off-line-range extended emission detected.".format( self.field_name, self.spwid_list[0] ))
         return detections
 
-    def _sigma_estimation( self, data: np.ndarray, sigma: float, maxiters: int ) -> float:
+    def _sigma_estimation( self, data: NDArray[floating], sigma: float, maxiters: int ) -> float:
         """
         Estimate the standard deviation of a sigma clipped 'data'
 

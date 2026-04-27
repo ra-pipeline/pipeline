@@ -5,12 +5,16 @@ from __future__ import annotations
 import datetime
 import operator
 import pprint
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field as PydanticField, PrivateAttr
 
 import pipeline.infrastructure.utils as utils
 from pipeline.infrastructure import casa_tools
+
+if TYPE_CHECKING:  # Avoid circular import. Used only for type annotation.
+    from pipeline.domain import Antenna, DataDescription, Field, SpectralWindow, State
+    from pipeline.infrastructure.utils.casa_types import EpochDict
 
 _pprinter = pprint.PrettyPrinter()
 
@@ -19,16 +23,16 @@ class Scan(BaseModel):
     """Scan domain object."""
 
     id: int | None = PydanticField(default=None, description='Scan number')
-    antennas: list[Any] = PydanticField(default_factory=list)
+    antennas: list[Antenna] = PydanticField(default_factory=list)
     intents: list[str] = PydanticField(default_factory=list)
-    fields: list[Any] = PydanticField(default_factory=list)
-    states: list[Any] = PydanticField(default_factory=list)
-    data_descriptions: list[Any] = PydanticField(default_factory=list)
+    fields: list[Field] = PydanticField(default_factory=list)
+    states: list[State] = PydanticField(default_factory=list)
+    data_descriptions: list[DataDescription] = PydanticField(default_factory=list)
     scan_times: dict[int, list[tuple[dict, dict]]] = PydanticField(default_factory=dict)
 
     _mean_intervals: dict[int, datetime.timedelta] = PrivateAttr(default_factory=dict)
-    _start_time: dict | None = PrivateAttr(default=None)
-    _end_time: dict | None = PrivateAttr(default=None)
+    _start_time: EpochDict | None = PrivateAttr(default=None)
+    _end_time: EpochDict | None = PrivateAttr(default=None)
     _exposure_time: dict[int, datetime.timedelta] = PrivateAttr(default_factory=dict)
 
     model_config = ConfigDict(
@@ -134,12 +138,12 @@ class Scan(BaseModel):
         )
 
     @property
-    def start_time(self) -> dict | None:
+    def start_time(self) -> EpochDict | None:
         """Return start time of the Scan as a CASA 'epoch' measure dictionary."""
         return self._start_time
 
     @property
-    def end_time(self) -> dict | None:
+    def end_time(self) -> EpochDict | None:
         """Return end time of the Scan as a CASA 'epoch' measure dictionary."""
         return self._end_time
 
@@ -159,7 +163,7 @@ class Scan(BaseModel):
         return self._mean_intervals[spw_id]
 
     @property
-    def spws(self) -> set[Any]:
+    def spws(self) -> set[SpectralWindow]:
         """Return set of SpectralWindow objects for spectral windows in this Scan."""
         return {dd.spw for dd in self.data_descriptions}
 
@@ -172,7 +176,7 @@ class Scan(BaseModel):
         return self.model_dump_json()
 
     @classmethod
-    def from_scan(cls, scan: Any) -> Scan:
+    def from_scan(cls, scan: Any) -> Scan | None:
         """Create from legacy Scan object for migration."""
         return cls(
             id=scan.id,

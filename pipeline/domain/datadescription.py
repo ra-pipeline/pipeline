@@ -1,11 +1,13 @@
 """Pydantic-based DataDescription domain object prototype for Phase 5 modernization."""
-
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field as PydanticField
+
+if TYPE_CHECKING:
+    from pipeline.domain import SpectralWindow
 
 polarization_map = {
     'linear': {0: ['XX', 9], 1: ['YY', 12], 2: ['XY', 10], 3: ['YX', 11]},

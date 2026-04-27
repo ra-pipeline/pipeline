@@ -1,15 +1,14 @@
 """Weblog renderer for baseline subtraction task."""
+from __future__ import annotations
+
 import collections
 import os
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
-import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.filenamer as filenamer
-
 from . import display
-
 from ..common import compress
 from ..common import utils
 
@@ -20,7 +19,7 @@ if TYPE_CHECKING:
     from pipeline.infrastructure.launcher import Context
     from pipeline.infrastructure.renderer.logger import Plot
 
-LOG = logging.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
@@ -39,11 +38,9 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
                          Defaults to 'Generate Baseline tables and subtract spectral baseline'.
             always_rerender: Always rerender the page if True. Defaults to False.
         """
-        super(T2_4MDetailsSingleDishBaselineRenderer, self).__init__(template,
-                                                                     description,
-                                                                     always_rerender)
+        super().__init__(template, description, always_rerender)
 
-    def update_mako_context(self, ctx: dict, context: 'Context', results: 'ResultsList') -> None:
+    def update_mako_context(self, ctx: dict, context: Context, results: ResultsList) -> None:
         """Update context object for Mako template in place.
 
         Clustering analysis plots are generated and included in the Mako context.
@@ -65,8 +62,8 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
         # clustering plots are generated only when plotlevel is 'all'
         if infrastructure.generate_detail_plots(results):
             # to capture warning message
-            handler = logging.CapturingHandler(level=logging.WARNING)
-            logging.add_handler(handler)
+            handler = infrastructure.logging.CapturingHandler(level=infrastructure.logging.WARNING)
+            infrastructure.logging.add_handler(handler)
 
             try:
                 for r in results:
@@ -74,7 +71,7 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
                     task = display.ClusterDisplay(inputs)
                     plots.append(task.plot())
             finally:
-                logging.remove_handler(handler)
+                infrastructure.logging.remove_handler(handler)
                 # add the log records to the result
                 if not hasattr(results, 'logrecords'):
                     results.logrecords = handler.buffer
@@ -170,7 +167,7 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
                         'sparsemap_{}_{}'.format(maptype.lower(), subtype.lower()): summary})
 
     @staticmethod
-    def _group_by_axes(plots: List[List['Plot']]) -> dict:
+    def _group_by_axes(plots: list[list[Plot]]) -> dict:
         """Group Plot objects by axis labels.
 
         Plot objects must contain two-dimensional figure, and its
@@ -192,7 +189,7 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
         return plot_group
 
     @staticmethod
-    def _get_a_plot_per_spw(plots: List['Plot']) -> List['Plot']:
+    def _get_a_plot_per_spw(plots: list[Plot]) -> list[Plot]:
         """Return list of representative Plot object per spw.
 
         Pick up "final" clustering plot for each spw and return
@@ -213,7 +210,7 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
         return plot_list
 
     @staticmethod
-    def _plots_per_field(plots: List['Plot']) -> dict:
+    def _plots_per_field(plots: list[Plot]) -> dict:
         """Classify Plot objects by field.
 
         Args:
@@ -232,7 +229,7 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
         return plot_group
 
     @staticmethod
-    def _plots_per_field_with_type(plots: List['Plot'], type_string: str, subtype_string: str) -> dict:
+    def _plots_per_field_with_type(plots: list[Plot], type_string: str, subtype_string: str) -> dict:
         """Classify Plot objects by field with filtering by plot types.
 
         Filtering by plot types is based on "in" operator for the type string.
@@ -292,7 +289,7 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
         return summary_plots
 
     @staticmethod
-    def get_field_key(plot_dict: dict, field_domain: 'Field') -> Optional[str]:
+    def get_field_key(plot_dict: dict, field_domain: Field) -> str | None:
         """Get field name consistent with dictionary key.
 
         This is used to check the connection between dictionary key (str)
@@ -327,7 +324,7 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
 class SingleDishClusterPlotsRenderer(basetemplates.JsonPlotRenderer):
     """Custom JsonPlotRenderer for clustering plot."""
 
-    def __init__(self, context: 'Context', result: 'Results', xytitle: str, plots: List['Plot']) -> None:
+    def __init__(self, context: Context, result: Results, xytitle: str, plots: list[Plot]) -> None:
         """Construct SingleDishClusterPlotsRenderer instance.
 
         Args:
@@ -339,10 +336,10 @@ class SingleDishClusterPlotsRenderer(basetemplates.JsonPlotRenderer):
         outfile = filenamer.sanitize('%s.html' % (xytitle.lower().replace(" ", "_")))
         new_title = "Clustering: %s" % xytitle
 
-        super(SingleDishClusterPlotsRenderer, self).__init__(
+        super().__init__(
             'hsd_cluster_plots.mako', context, result, plots, new_title, outfile)
 
-    def update_json_dict(self, d: dict, plot: 'Plot') -> None:
+    def update_json_dict(self, d: dict, plot: Plot) -> None:
         """Update JSON dictionary in place.
 
         Add plot type to the dictionary.

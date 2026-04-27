@@ -342,7 +342,7 @@ class BpSolintResults(basetask.Results):
         """
         Initialise the results object.
         """
-        super(BpSolintResults, self).__init__()
+        super().__init__()
 
         if spwids is None:
             spwids = []

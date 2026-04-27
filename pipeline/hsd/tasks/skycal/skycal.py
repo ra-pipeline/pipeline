@@ -4,6 +4,7 @@ from __future__ import annotations
 import collections
 import copy
 import os
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -19,8 +20,11 @@ from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import task_registry
 from pipeline.domain.datatable import OnlineFlagIndex
 from ..common import SingleDishResults
-from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
+    from numpy import generic
+    from numpy.typing import NDArray
+
     from pipeline.infrastructure.launcher import Context
 
 LOG = infrastructure.get_logger(__name__)
@@ -223,7 +227,7 @@ class SDSkyCalResults(SingleDishResults):
             (True) or not (False).
             outcome: Outcome of the task.
         """
-        super(SDSkyCalResults, self).__init__(task, success, outcome)
+        super().__init__(task, success, outcome)
         self.final = self.outcome
 
     def merge_with_context(self, context: Context) -> None:
@@ -235,7 +239,7 @@ class SDSkyCalResults(SingleDishResults):
         Args:
             context: Pipeline context object containing state information.
         """
-        super(SDSkyCalResults, self).merge_with_context(context)
+        super().merge_with_context(context)
 
         if self.outcome is None:
             return
@@ -399,7 +403,7 @@ def get_elevation(
         antenna_id: int | str,
         field_id: int | str,
         on_source: bool
-) -> dict[str, np.ndarray]:
+) -> dict[str, NDArray[generic]]:
     """Get elevation and associated time and flag from datatable.
 
     Args:

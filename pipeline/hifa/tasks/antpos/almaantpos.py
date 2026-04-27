@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 import traceback
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -13,6 +13,11 @@ from pipeline.hif.tasks.antpos.antpos import AntposResults
 from pipeline.infrastructure import casa_tasks, casa_tools, exceptions, task_registry, utils, vdp
 
 if TYPE_CHECKING:
+    from typing import Literal
+
+    from numpy import floating
+    from numpy.typing import NDArray
+
     from pipeline.infrastructure.launcher import Context
 
 __all__ = [
@@ -313,7 +318,7 @@ class ALMAAntpos(antpos.Antpos):
 
         return result
 
-    def _get_antenna_offsets(self) -> dict[np.str_, np.ndarray[float]]:
+    def _get_antenna_offsets(self) -> dict[np.str_, NDArray[floating]]:
         """Retrieves the antenna names and positions from the vis ANTENNA table and computes the offsets.
 
         Returns:
@@ -342,8 +347,8 @@ class ALMAAntpos(antpos.Antpos):
 
     def _get_antennas_with_significant_offset(
             self,
-            offsets_dict: dict[np.str_, np.ndarray[float]],
-            ) -> tuple[list[np.str_], list[np.float64]]:
+            offsets_dict: dict[np.str_, NDArray[floating]],
+            ) -> tuple[list[np.str_], list[floating]]:
         """
         Identifies antennas with significant non-zero coordinate offsets.
 

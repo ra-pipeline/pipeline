@@ -5,7 +5,7 @@ from __future__ import annotations
 import collections
 import itertools
 import os
-from typing import Any, Iterable
+from typing import TYPE_CHECKING, Any, Iterable
 
 from pydantic import BaseModel, ConfigDict, Field as PydanticField
 
@@ -14,10 +14,17 @@ from pipeline.domain.datatype import TYPE_PRIORITY_ORDER
 from pipeline.domain.spectralwindow import match_spw_basename
 from pipeline.infrastructure import utils
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from datetime import datetime
+
+    from pipeline.domain import DataType, MeasurementSet
+    from pipeline.infrastructure.utils.casa_types import DirectionDict, EpochDict
+
 LOG = infrastructure.get_logger(__name__)
 
 
-def sort_measurement_set(ms: Any) -> tuple[int, Any]:
+def sort_measurement_set(ms: MeasurementSet) -> tuple[int, datetime]:
     """Return sort key for measurement set object."""
     data_types = set(itertools.chain(*ms.data_types_per_source_and_spw.values()))
     if data_types:
@@ -31,10 +38,10 @@ def sort_measurement_set(ms: Any) -> tuple[int, Any]:
 class ObservingRun(BaseModel):
     """Observing run domain object."""
 
-    measurement_sets: list[Any] = PydanticField(default_factory=list)
+    measurement_sets: list[MeasurementSet] = PydanticField(default_factory=list)
     ms_datatable_name: str = PydanticField(default='')
     ms_reduction_group: dict[str, Any] = PydanticField(default_factory=dict)
-    org_directions: dict[str, Any] = PydanticField(default_factory=dict)
+    org_directions: dict[str, DirectionDict] = PydanticField(default_factory=dict)
     virtual_science_spw_ids: dict[int, str] = PydanticField(default_factory=dict)
     virtual_science_spw_names: dict[str, int] = PydanticField(default_factory=dict)
 
@@ -78,7 +85,7 @@ class ObservingRun(BaseModel):
         return sorted({ms.observer for ms in self.measurement_sets if ms.observer})
 
     @property
-    def start_time(self) -> dict | None:
+    def start_time(self) -> EpochDict | None:
         """Return start time for the observing run as CASA 'epoch' measure dictionary."""
         if not self.measurement_sets:
             return None
@@ -89,7 +96,7 @@ class ObservingRun(BaseModel):
         return earliest_ms.start_time
 
     @property
-    def end_time(self) -> dict | None:
+    def end_time(self) -> EpochDict | None:
         """Return end time for the observing run as CASA 'epoch' measure dictionary."""
         if not self.measurement_sets:
             return None
@@ -100,7 +107,7 @@ class ObservingRun(BaseModel):
         return latest_ms.end_time
 
     @property
-    def start_datetime(self) -> Any:
+    def start_datetime(self) -> datetime | None:
         """Return start datetime for the observing run."""
         if not self.measurement_sets:
             return None
@@ -110,7 +117,7 @@ class ObservingRun(BaseModel):
         return utils.get_epoch_as_datetime(start_epoch)
 
     @property
-    def end_datetime(self) -> Any:
+    def end_datetime(self) -> datetime | None:
         """Return end datetime for the observing run."""
         if not self.measurement_sets:
             return None
@@ -120,7 +127,7 @@ class ObservingRun(BaseModel):
         return utils.get_epoch_as_datetime(end_epoch)
 
     @staticmethod
-    def get_real_spw_id_by_name(spw_name: str | None, target_ms: Any) -> int | None:
+    def get_real_spw_id_by_name(spw_name: str | None, target_ms: MeasurementSet) -> int | None:
         """Translate a (science) spw name to the real spw ID for a given MS.
 
         Args:
@@ -156,7 +163,7 @@ class ObservingRun(BaseModel):
         """
         return self.virtual_science_spw_names.get(spw_name, None)
 
-    def virtual2real_spw_id(self, spw_id: int | str, target_ms: Any) -> int | None:
+    def virtual2real_spw_id(self, spw_id: int | str, target_ms: MeasurementSet) -> int | None:
         """Translate a virtual (science) spw ID to the real one for a given MS.
 
         Args:
@@ -172,7 +179,7 @@ class ObservingRun(BaseModel):
             self.virtual_science_spw_ids.get(int(spw_id), None), target_ms
         )
 
-    def real2virtual_spw_id(self, spw_id: int | str, target_ms: Any) -> int | None:
+    def real2virtual_spw_id(self, spw_id: int | str, target_ms: MeasurementSet) -> int | None:
         """Translate a real (science) spw ID of a given MS to the virtual one for this pipeline run.
 
         Args:
@@ -186,7 +193,7 @@ class ObservingRun(BaseModel):
         """
         return self.get_virtual_spw_id_by_name(target_ms.get_spectral_window(int(spw_id)).name)
 
-    def real2real_spw_id(self, spw_id: int | str, source_ms: Any, target_ms: Any) -> int | None:
+    def real2real_spw_id(self, spw_id: int | str, source_ms: MeasurementSet, target_ms: MeasurementSet) -> int | None:
         """Translate a real spectral window ID from one MS to another.
 
         The translation is performed via the observing run's virtual SPW ID
@@ -246,7 +253,7 @@ class ObservingRun(BaseModel):
 
         return real_spwsel
 
-    def add_measurement_set(self, ms: Any) -> None:
+    def add_measurement_set(self, ms: MeasurementSet) -> None:
         """Add a MeasurementSet to the ObservingRun."""
         if ms.basename in [m.basename for m in self.measurement_sets]:
             msg = f'{ms.name} is already in the pipeline context.'
@@ -313,7 +320,7 @@ class ObservingRun(BaseModel):
         self.measurement_sets.append(ms)
         self.measurement_sets.sort(key=sort_measurement_set)
 
-    def get_ms(self, name: str | None = None, intent: str | None = None) -> Any:
+    def get_ms(self, name: str | None = None, intent: str | None = None) -> MeasurementSet:
         """Return the first measurement set matching the given identifier."""
         if name:
             for ms in self.measurement_sets:
@@ -342,7 +349,7 @@ class ObservingRun(BaseModel):
         names: str | None = None,
         intents: Iterable | str | None = None,
         fields: Iterable | str | None = None,
-    ) -> list[Any]:
+    ) -> list[MeasurementSet]:
         """Return measurement sets matching the given arguments."""
         candidates = self.measurement_sets
 
@@ -369,14 +376,14 @@ class ObservingRun(BaseModel):
 
     def get_measurement_sets_of_type(
         self,
-        dtypes: list[Any],
+        dtypes: list[DataType],
         msonly: bool = True,
         source: str | None = None,
         spw: str | None = None,
         vis: list[str] | None = None,
-    ) -> list[Any] | tuple[collections.OrderedDict, Any | None]:
+    ) -> list[MeasurementSet] | tuple[collections.OrderedDict, DataType | None]:
         """Return measurement sets matching the given DataType list."""
-        found: list[Any] = []
+        found: list[MeasurementSet] = []
         columns: list[str] = []
 
         for dtype in dtypes:
@@ -412,7 +419,7 @@ class ObservingRun(BaseModel):
             return found
 
         if found:
-            ms_dict = collections.OrderedDict((ms, column) for ms, column in zip(found, columns))
+            ms_dict: collections.OrderedDict[MeasurementSet, str] = collections.OrderedDict((ms, column) for ms, column in zip(found, columns))
             return ms_dict, dtype
 
         return collections.OrderedDict(), None

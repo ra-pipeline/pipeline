@@ -3,7 +3,6 @@ scorecalculator_test.py : Unit tests for "qa/scorecalculator.py".
 
 Unit tests for "qa/scorecalculator.py"
 """
-from typing import List, Tuple
 
 import pytest
 
@@ -21,7 +20,7 @@ import pipeline.qa.scorecalculator as qacalc
         ([(5.6, 10.1, True)], [(1, 11)])
     ]
 )
-def test_get_line_ranges(lines: List[Tuple[int, int, bool]], expected: List[Tuple[int, int]]):
+def test_get_line_ranges(lines: list[tuple[int, int, bool]], expected: list[tuple[int, int]]):
     line_ranges = qacalc.get_line_ranges(lines)
     assert line_ranges == expected
 
@@ -53,7 +52,7 @@ def test_get_line_ranges(lines: List[Tuple[int, int, bool]], expected: List[Tupl
         ([(800, 1021)], 1024, (0, 1), False),
     ]
 )
-def test_examine_sd_edge_lines(lines: List[Tuple[int, int]], nchan: int, edge: Tuple[int, int], expected: float):
+def test_examine_sd_edge_lines(lines: list[tuple[int, int]], nchan: int, edge: tuple[int, int], expected: float):
     score = qacalc.examine_sd_edge_lines(lines, nchan, edge)
     assert score == expected
 
@@ -80,7 +79,7 @@ def test_examine_sd_edge_lines(lines: List[Tuple[int, int]], nchan: int, edge: T
         ([(501, 840)], 1024, (0, 5), True),
     ]
 )
-def test_examine_sd_wide_lines(lines: List[Tuple[int, int]], nchan: int, edge: Tuple[int, int], expected: float):
+def test_examine_sd_wide_lines(lines: list[tuple[int, int]], nchan: int, edge: tuple[int, int], expected: float):
     score = qacalc.examine_sd_wide_lines(lines, nchan, edge)
     assert score == expected
 
@@ -96,6 +95,6 @@ def test_examine_sd_wide_lines(lines: List[Tuple[int, int]], nchan: int, edge: T
         ((1, 1), 16, -1, [(3, 5), (9, 12)], [(2, 5), (9, 11)]),
     ]
 )
-def test_channel_ranges_for_image(edge: Tuple[int, int], nchan: int, sideband: int, ranges: List[Tuple[int, int]], expected: List[Tuple[int, int]]):
+def test_channel_ranges_for_image(edge: tuple[int, int], nchan: int, sideband: int, ranges: list[tuple[int, int]], expected: list[tuple[int, int]]):
     ranges_image = qacalc.channel_ranges_for_image(edge, nchan, sideband, ranges)
     assert ranges_image == expected

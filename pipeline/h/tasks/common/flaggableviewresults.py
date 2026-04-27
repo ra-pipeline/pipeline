@@ -6,7 +6,7 @@ import pipeline.infrastructure as infrastructure
 LOG = infrastructure.get_logger(__name__)
 
 
-class FlaggableViewResults(object):
+class FlaggableViewResults:
     def __init__(self):
         """
         Construct and return a new FlaggableViewResults.

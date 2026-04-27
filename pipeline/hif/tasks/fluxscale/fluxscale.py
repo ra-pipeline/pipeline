@@ -33,8 +33,7 @@ class FluxscaleInputs(vdp.StandardInputs):
         field_fn = fieldnames.IntentFieldnames()
         reference_fields = field_fn.calculate(self.ms, self.refintent)
         # run the answer through a set, just in case there are duplicates
-        fields = {s for s in utils.safe_split(reference_fields)}
-
+        fields = utils.deduplicate(s for s in utils.safe_split(reference_fields))
         return ','.join(fields)
 
     refintent = vdp.VisDependentProperty(default='AMPLITUDE')
@@ -67,17 +66,17 @@ class FluxscaleInputs(vdp.StandardInputs):
         references = set(self.ms.get_fields(task_arg=self.reference))
         diff = transfers.difference(references)
 
-        transfer_names = {f.name for f in diff}
+        transfer_names = sorted(f.name for f in diff)
         fields_with_name = self.ms.get_fields(name=transfer_names)
-        if len(fields_with_name) is not len(diff) or len(diff) is not len(transfer_names):
-            return ','.join([str(f.id) for f in diff])
+        if len(fields_with_name) != len(diff) or len(diff) != len(transfer_names):
+            return ','.join(str(f.id) for f in sorted(diff, key=lambda f: f.id))
         else:
             return ','.join(transfer_names)
 
     transintent = vdp.VisDependentProperty(default='PHASE,BANDPASS,CHECK')
 
     def to_casa_args(self):
-        casa_args = super(FluxscaleInputs, self).to_casa_args()
+        casa_args = super().to_casa_args()
         # delete pipeline-only properties that shouldn't be passed to
         # the CASA task
         del casa_args['refintent']
@@ -86,7 +85,7 @@ class FluxscaleInputs(vdp.StandardInputs):
 
     def __init__(self, context, output_dir=None, vis=None, caltable=None, fluxtable=None, reference=None, transfer=None,
                  refspwmap=None, refintent=None, transintent=None):
-        super(FluxscaleInputs, self).__init__()
+        super().__init__()
         self.context = context
         self.vis = vis
         self.output_dir = output_dir

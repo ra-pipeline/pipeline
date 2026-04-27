@@ -47,7 +47,7 @@ def natural_keys(text):
 
 class ExportvlassdataResults(basetask.Results):
     def __init__(self, final=[], pool=[], preceding=[]):
-        super(ExportvlassdataResults, self).__init__()
+        super().__init__()
         self.pool = pool[:]
         self.final = final[:]
         self.preceding = preceding[:]
@@ -91,7 +91,7 @@ class ExportvlassdataInputs(exportdata.ExportDataInputs):
             gainmap:
 
         """
-        super(ExportvlassdataInputs, self).__init__(context, output_dir=output_dir, session=session, vis=vis,
+        super().__init__(context, output_dir=output_dir, session=session, vis=vis,
                                                     exportmses=exportmses, pprfile=pprfile, calintents=calintents,
                                                     calimages=calimages, targetimages=targetimages,
                                                     products_dir=products_dir)

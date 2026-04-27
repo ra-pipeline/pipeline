@@ -1,12 +1,11 @@
 import decimal
-from typing import Union
 
 import numpy as np
 
 __all__ = ['round_half_up', 'round_up']
 
 
-def round_half_up(value: Union[int, str], precision: float = 0) -> float:
+def round_half_up(value: int | str, precision: float = 0) -> float:
     """
     Provides the "round to given precision with ties going away from zero"
     behaviour that was the default Python2 rounding behavior.
@@ -40,7 +39,7 @@ def round_half_up(value: Union[int, str], precision: float = 0) -> float:
         decimal.Decimal(float(np.asarray(value).item()) * 10 ** precision).to_integral_value(rounding=decimal.ROUND_HALF_UP)) / 10 ** precision
 
 
-def round_up(value: Union[int, str], precision: float = 0) -> float:
+def round_up(value: int | str, precision: float = 0) -> float:
     """
     Round to given precision away from zero.
 
@@ -61,7 +60,8 @@ def round_up(value: Union[int, str], precision: float = 0) -> float:
     return float(
         decimal.Decimal(float(value) * 10 ** precision).to_integral_value(rounding=decimal.ROUND_UP)) / 10 ** precision
 
-def round_down(value: Union[int, str], precision: float = 0) -> float:
+
+def round_down(value: int | str, precision: float = 0) -> float:
     """
     Round to given precision toward zero.
 

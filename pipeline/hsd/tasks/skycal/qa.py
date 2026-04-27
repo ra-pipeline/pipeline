@@ -1,17 +1,21 @@
 """QA score module for skycal task."""
+from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
-import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as qacalc
 import pipeline.h.tasks.exportdata.aqua as aqua
 from . import skycal
-from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from pipeline.infrastructure.launcher import Context
 
-LOG = logging.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
+
 
 class SDSkyCalQAHandler(pqa.QAPlugin):
     """Class to handle QA score for skycal result."""
@@ -19,7 +23,7 @@ class SDSkyCalQAHandler(pqa.QAPlugin):
     result_cls = skycal.SDSkyCalResults
     child_cls = None
 
-    def handle(self, context: 'Context', result: skycal.SDSkyCalResults) -> None:
+    def handle(self, context: Context, result: skycal.SDSkyCalResults) -> None:
         """Evaluate QA score for skycal result.
 
         Args:
@@ -41,7 +45,7 @@ class SDSkyCalListQAHandler(pqa.QAPlugin):
     result_cls = basetask.ResultsList
     child_cls = skycal.SDSkyCalResults
 
-    def handle(self, context: 'Context', result: skycal.SDSkyCalResults) -> None:
+    def handle(self, context: Context, result: skycal.SDSkyCalResults) -> None:
         """Evaluate QA score for a list of skycal results.
 
         Args:

@@ -1,13 +1,15 @@
+from __future__ import annotations
+
 import copy
 import json
 import os
 import shutil
 import tarfile
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 from astropy.utils.misc import JsonCustomEncoder
@@ -23,9 +25,12 @@ from pipeline.domain import DataType
 from pipeline.hif.heuristics.auto_selfcal import auto_selfcal
 from pipeline.hif.tasks.applycal import SerialIFApplycal
 from pipeline.hif.tasks.makeimlist import MakeImList
-from pipeline.infrastructure import callibrary, casa_tasks, casa_tools, logging, task_registry, utils
+from pipeline.infrastructure import callibrary, casa_tasks, casa_tools, task_registry, utils
 from pipeline.infrastructure.contfilehandler import contfile_to_chansel
 from pipeline.infrastructure.mpihelpers import TaskQueue
+
+if TYPE_CHECKING:
+    from typing import Any
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -111,7 +116,7 @@ class SelfcalResults(basetask.Results):
                 if 'CORRECTED_DATA' not in tb.colnames():
                     LOG.warning('No CORRECTED_DATA column in %s, skip %s registration', vis, dtype_applied)
                     continue
-                LOG.debug('DataType registeration: overwrite=%s', self.inputs['overwrite'])
+                LOG.debug('DataType registration: overwrite=%s', self.inputs['overwrite'])
                 LOG.info('Registering the CORRECTED_DATA column as %s for %s: field=%r spw=%r',
                          dtype_applied, vis, field_name, spw_sel)
                 ms.set_data_column(dtype_applied, 'CORRECTED_DATA', source=field_name,
@@ -354,7 +359,7 @@ class Selfcal(basetask.StandardTaskTemplate):
             filename: Output JSON filename or path
         """
         current_version = 1.0
-        current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        current_datetime = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
         scal_targets_copy = copy.deepcopy(scal_targets)
 
         # Remove heuristics from each target
@@ -413,7 +418,7 @@ class Selfcal(basetask.StandardTaskTemplate):
         This private method is kept for future reference.       
         """
         current_version = 1.0
-        current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        current_datetime = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
         scal_targets_copy: list[dict[str, Any]] = []
 
         for target in scal_targets:

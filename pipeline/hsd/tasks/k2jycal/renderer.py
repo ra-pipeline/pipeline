@@ -1,10 +1,12 @@
 """Renderer for k2jycal task."""
-import os
-import collections
-import shutil
-from numpy import median, percentile
+from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, Optional
+import collections
+import os
+import shutil
+from typing import TYPE_CHECKING, Any
+
+from numpy import percentile
 
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.logging as logging
@@ -37,10 +39,10 @@ class T2_4MDetailsSingleDishK2JyCalRenderer(basetemplates.T2_4MDetailsDefaultRen
                          Defaults to 'Generate Kelvin to Jy calibration table.'.
             always_rerender: Always rerender the page if True. Defaults to False.
         """
-        super(T2_4MDetailsSingleDishK2JyCalRenderer, self).__init__(
+        super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
-    def update_mako_context(self, ctx: Dict[str, Any], context: 'Context', results: 'ResultsList') -> None:
+    def update_mako_context(self, ctx: dict[str, Any], context: Context, results: ResultsList) -> None:
         """Update context for weblog rendering.
 
         Args:
@@ -132,7 +134,7 @@ class T2_4MDetailsSingleDishK2JyCalRenderer(basetemplates.T2_4MDetailsDefaultRen
         })
 
     @staticmethod
-    def __calculate_stats(values: list = [], whis: float = 1.5) -> Dict[str, float]:
+    def __calculate_stats(values: list = [], whis: float = 1.5) -> dict[str, float]:
         """ Helper to compute statistical metrics for a given list of factors.
 
         Args:
@@ -160,9 +162,9 @@ class T2_4MDetailsSingleDishK2JyCalRenderer(basetemplates.T2_4MDetailsDefaultRen
 
     @staticmethod
     def __get_factor(
-        factor_dict: Dict[str, Dict[int, Dict[str, Dict[str, float]]]],
+        factor_dict: dict[str, dict[int, dict[str, dict[str, float]]]],
         vis: str, spwid: int, ant_name: str, pol_name: str
-    ) -> Optional[float]:
+    ) -> float | None:
         """Return Jy/K conversion factor for given meta data.
 
         Returns a factor corresponding to vis, spwid, ant_name, and pol_name from

@@ -16,7 +16,7 @@ import pipeline.infrastructure as infrastructure
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.utils import absolute_path, list_to_str
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 def __coldesc(vtype: str, option: int, maxlen: int, ndim: int, comment: str, unit: str | None = None) -> dict:
@@ -429,7 +429,8 @@ class DataTableImpl(BaseModel):
             else:
                 tbloc = self.tb1.copy(os.path.join(abspath, 'RO'), deep=True, valuecopy=True, returnobject=True)
                 tbloc.close()
-        tbloc = self.tb2.copy(os.path.join(abspath, 'RW'), deep=True, valuecopy=True, returnobject=True)
+        tbloc = self.tb2.copy(os.path.join(abspath, 'RW'), deep=True,
+                              valuecopy=True, returnobject=True)
         tbloc.close()
         self.plaintable = abspath
 
@@ -467,9 +468,11 @@ class DataTableImpl(BaseModel):
                 nchunk = nrow // nrow_chunk
                 mod = nrow % nrow_chunk
                 chunks = [nrow_chunk] * nchunk + [mod]
+                # for each column
                 for col in intersects:
                     start_row = dirty_rows.min()
                     for size_chunk in chunks:
+                        # read chunk
                         chunk_src = self.tb2.getcol(col, startrow=start_row, nrow=size_chunk)
                         chunk_dst = tb.getcol(col, startrow=start_row, nrow=size_chunk)
 
@@ -690,7 +693,8 @@ class DataTableImpl(BaseModel):
                 from_fields = [to_fieldid]
             else:
                 atm_fields = msobj.get_fields(intent='ATMOSPHERE')
-                test_prefix = '%s_OFF_' % to_field.clean_name
+                # absolute OFF
+                test_prefix = '{}_OFF_'.format(to_field.clean_name)
                 nearest_id = np.where([a.clean_name.startswith(test_prefix) for a in atm_fields])[0]
                 if len(nearest_id) > 0:
                     from_fields = [atm_fields[i].id for i in nearest_id]
@@ -698,11 +702,12 @@ class DataTableImpl(BaseModel):
                     rmin = casa_tools.quanta.quantity(180.0, 'deg')
                     origin = to_field.mdirection
                     nearest_id = -1
-                    for field in atm_fields:
-                        r = casa_tools.measures.separation(origin, field.mdirection)
+                    for f in atm_fields:
+                        r = casa_tools.measures.separation(origin, f.mdirection)
+                        # quanta.le is equivalent to <=
                         if casa_tools.quanta.le(r, rmin):
                             rmin = r
-                            nearest_id = field.id
+                            nearest_id = f.id
                     if nearest_id != -1:
                         from_fields = [nearest_id]
                     else:
@@ -724,6 +729,10 @@ class DataTableImpl(BaseModel):
             tsel.close()
 
         def map_spwchans(atm_spw: Any, science_spw: Any) -> tuple[int, int]:
+            """
+            Map the channel ID ranges of ATMCal spw that covers frequency range of a science spw
+            Arguments: spw object of ATMCal and science spws
+            """
             atm_freqs = np.array(atm_spw.channels.chan_freqs)
             min_chan = np.where(
                 abs(atm_freqs - float(science_spw.min_frequency.value))
@@ -769,17 +778,13 @@ class DataTableImpl(BaseModel):
                 cal_idxs = np.where(np.logical_and(spws == spw_from, antids == ant_to))[0]
                 if len(cal_idxs) == 0:
                     continue
-                atsys = np.asarray([
-                    tsys_masked[i].take(corr_index, axis=0)[:, start_atmchan:end_atmchan + 1]
-                    .mean(axis=1)
-                    .data
-                    for i in cal_idxs
-                ])
+                atsys = np.asarray([tsys_masked[i].take(corr_index, axis=0)[:, start_atmchan:end_atmchan+1].mean(axis=1).data
+                                           for i in cal_idxs])
                 dtrows = field_sel[np.where(np.logical_and(dt_antenna == ant_to, dt_spw == spw_to))[0]]
-                time_sel = times.take(cal_idxs)
+                time_sel = times.take(cal_idxs)  # in sec
                 for dt_id in dtrows:
-                    tref = self.getcell('TIME', dt_id) * 86400
-                    if atsys.shape[0] == 1:
+                    tref = self.getcell('TIME', dt_id) * 86400  # day->sec
+                    if atsys.shape[0] == 1:  # only one Tsys measurement selected
                         self.putcell('TSYS', dt_id, atsys[0, :])
                     else:
                         itsys = _interpolate(atsys, time_sel, tref)

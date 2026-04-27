@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import collections
 import os
 import shutil
-from typing import Callable, Dict, List
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -13,8 +15,6 @@ import pipeline.infrastructure.vdp as vdp
 from pipeline.h.heuristics import caltable as caltable_heuristic
 from pipeline.h.tasks.common import commonhelpermethods
 from pipeline.hif.tasks import gaincal
-from pipeline.hif.tasks.bandpass.common import BandpassResults
-from pipeline.hif.tasks.gaincal.common import GaincalResults
 from pipeline.hifa.heuristics import atm as atm_heuristic
 from pipeline.hifa.heuristics import wvrgcal as wvrgcal_heuristic
 from pipeline.hifa.tasks import bandpass
@@ -22,12 +22,18 @@ from pipeline.infrastructure import casa_tasks, task_registry
 from . import resultobjects
 from . import wvrg_qa
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from pipeline.hif.tasks.bandpass.common import BandpassResults
+    from pipeline.hif.tasks.gaincal.common import GaincalResults
+
 __all__ = [
     'Wvrgcal',
     'WvrgcalInputs'
 ]
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 WVRInfo = collections.namedtuple('WVRInfo',
                                  'antenna wvr flag rms disc')
@@ -285,7 +291,7 @@ class Wvrgcal(basetask.StandardTaskTemplate):
     Inputs = WvrgcalInputs
 
     def __init__(self, inputs):
-        super(Wvrgcal, self).__init__(inputs)
+        super().__init__(inputs)
 
     def prepare(self):
         inputs = self.inputs
@@ -741,7 +747,7 @@ class Wvrgcal(basetask.StandardTaskTemplate):
         return caltable_namer
 
     @staticmethod
-    def _get_wvrinfos(result: Dict) -> List[WVRInfo]:
+    def _get_wvrinfos(result: dict) -> list[WVRInfo]:
         """
         Retrieve necessary information from the result returned by the CASA
         'wvrgcal' task.

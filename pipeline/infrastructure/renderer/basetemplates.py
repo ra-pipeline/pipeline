@@ -4,6 +4,7 @@ Created on 8 Sep 2014
 @author: sjw
 """
 import collections
+import collections.abc
 import contextlib
 import glob
 import hashlib
@@ -21,7 +22,7 @@ from .templates import resources
 LOG = logging.get_logger(__name__)
 
 
-class T2_4MDetailsDefaultRenderer(object):
+class T2_4MDetailsDefaultRenderer:
     def __init__(self, uri='t2-4m_details-generic.mako',
                  description='No description set for this task',
                  always_rerender=False):
@@ -237,7 +238,7 @@ class T2_4MDetailsFailedTaskRenderer(T2_4MDetailsDefaultRenderer):
     def __init__(self, uri='t2-4m_details-failed.mako',
                  description='Failed task',
                  always_rerender=False):
-        super(T2_4MDetailsFailedTaskRenderer, self).__init__(
+        super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
     def update_mako_context(self, mako_context, pipeline_context, results):
@@ -298,7 +299,7 @@ def reorder_dicts(order_mapping, d):
     return ordered
 
 
-class CommonRenderer(object):
+class CommonRenderer:
     def __init__(self, uri, context, result):
         self.uri = uri
         self.context = context
@@ -350,7 +351,7 @@ class CommonRenderer(object):
 
 class JsonPlotRenderer(CommonRenderer):
     def __init__(self, uri, context, result, plots, title, outfile):
-        super(JsonPlotRenderer, self).__init__(uri, context, result)
+        super().__init__(uri, context, result)
         self.plots = plots
         self.title = title
         self.path = os.path.join(self.dirname, outfile)
@@ -395,7 +396,7 @@ class JsonPlotRenderer(CommonRenderer):
         pass
 
     def update_mako_context(self, mako_context):
-        super(JsonPlotRenderer, self).update_mako_context(mako_context)
+        super().update_mako_context(mako_context)
         well_formed = self.json.replace("'", "\\'").replace('"', '&quot;')
 
         mako_context.update({'plots': self.plots,

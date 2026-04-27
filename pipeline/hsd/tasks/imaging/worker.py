@@ -1,6 +1,7 @@
 """Worker classes of SDImaging."""
+from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, List, NewType, Optional, Tuple, Union
+from typing import TYPE_CHECKING
 
 import math
 import os
@@ -14,23 +15,26 @@ import pipeline.infrastructure.imagelibrary as imagelibrary
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataTable, DataType
 from pipeline.infrastructure import casa_tasks, casa_tools
-from pipeline.infrastructure.launcher import Context
 
 from .. import common
 from ..common import direction_utils as dirutil
-from ..common import observatory_policy, sdtyping, utils
+from ..common import observatory_policy, utils
 from . import resultobjects
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
+
+if TYPE_CHECKING:
+    from pipeline.infrastructure.launcher import Context
+    from ..common.sdtyping import Angle, Direction
 
 
 def ImageCoordinateUtil(
     context: Context,
-    ms_names: List[str],
-    ant_list: List[Optional[int]],
-    spw_list: List[int],
-    fieldid_list: List[int]
-) -> Union[Tuple[str, 'sdtyping.Angle', 'sdtyping.Angle', int, int, 'sdtyping.Direction'], bool]:
+    ms_names: list[str],
+    ant_list: list[int | None],
+    spw_list: list[int],
+    fieldid_list: list[int]
+) -> tuple[str, Angle, Angle, int, int, Direction] | bool:
     """
     Calculate spatial coordinate of image.
 
@@ -168,6 +172,7 @@ def ImageCoordinateUtil(
             ra2, dec2 = dirutil.direction_recover(ra1, dec1, org_direction)
             ra.append(ra2)
             dec.append(dec2)
+        ra = utils.rewrap_angle(ra)
     else:
         ra = ra0
         dec = dec0
@@ -230,7 +235,7 @@ def ImageCoordinateUtil(
     return phasecenter, cellx, celly, nx, ny, org_direction
 
 
-def get_brightness_unit(infiles: List[str]) -> str:
+def get_brightness_unit(infiles: list[str]) -> str:
     """Return image brightness unit according to the unit of input MSes.
 
     If multiple units were detected, it will warn it and
@@ -281,7 +286,7 @@ class SDImagingWorkerInputs(vdp.StandardInputs):
 
     # Synchronization between infiles and vis is still necessary
     @vdp.VisDependentProperty
-    def vis(self) -> List[str]:
+    def vis(self) -> list[str]:
         """Return the list of input file names
 
         Returns:
@@ -289,13 +294,13 @@ class SDImagingWorkerInputs(vdp.StandardInputs):
         """
         return self.infiles
 
-    def __init__(self, context: Context, infiles: List[str], outfile: str, mode: str,
-                 antids: List[int], spwids: List[int], fieldids: List[int], restfreq: str,
-                 stokes: str, edge: Optional[List[int]]=None, phasecenter: Optional[str]=None,
-                 cellx: Optional['sdtyping.Angle']=None,
-                 celly: Optional['sdtyping.Angle']=None,
-                 nx: Optional[int]=None, ny: Optional[int]=None,
-                 org_direction: Optional['sdtyping.Direction']=None):
+    def __init__(self, context: Context, infiles: list[str], outfile: str, mode: str,
+                 antids: list[int], spwids: list[int], fieldids: list[int], restfreq: str,
+                 stokes: str, edge: list[int] | None=None, phasecenter: str | None=None,
+                 cellx: Angle | None=None,
+                 celly: Angle | None=None,
+                 nx: int | None=None, ny: int | None=None,
+                 org_direction: Direction | None=None):
         """Initialise an instance of SDImagingWorkerInputs.
 
         Args:
@@ -319,7 +324,7 @@ class SDImagingWorkerInputs(vdp.StandardInputs):
         """
         # NOTE: spwids and pols are list of numeric id list while scans
         #       is string (mssel) list
-        super(SDImagingWorkerInputs, self).__init__()
+        super().__init__()
 
         self.context = context
         self.infiles = infiles  # input MS names
@@ -410,9 +415,9 @@ class SDImagingWorker(basetask.StandardTaskTemplate):
         """Inherited method. NOT USE."""
         return result
 
-    def _get_map_coord(self, inputs: SDImagingWorkerInputs, context: Context, infiles: List[str],
-                       ant_list: List[int], spw_list: List[int], field_list: List[int]) \
-            -> Tuple[str, 'sdtyping.Angle', 'sdtyping.Angle', int, int, 'sdtyping.Direction']:
+    def _get_map_coord(self, inputs: SDImagingWorkerInputs, context: Context, infiles: list[str],
+                       ant_list: list[int], spw_list: list[int], field_list: list[int]) \
+            -> tuple[str, Angle, Angle, int, int, Direction]:
         """Gather or generate the input image parameters.
 
         Args:
@@ -439,9 +444,9 @@ class SDImagingWorker(basetask.StandardTaskTemplate):
                 raise RuntimeError("No valid data")
             return params
 
-    def _do_imaging(self, infiles: List[str], antid_list: List[int], spwid_list: List[int],
-                    fieldid_list: List[int], imagename: str, imagemode: str, edge: List[int],
-                    phasecenter: str, cellx: 'sdtyping.Angle', celly: 'sdtyping.Angle', nx: int, ny: int) -> Tuple[bool, str]:
+    def _do_imaging(self, infiles: list[str], antid_list: list[int], spwid_list: list[int],
+                    fieldid_list: list[int], imagename: str, imagemode: str, edge: list[int],
+                    phasecenter: str, cellx: Angle, celly: Angle, nx: int, ny: int) -> tuple[bool, str]:
         """Process imaging.
 
         Args:

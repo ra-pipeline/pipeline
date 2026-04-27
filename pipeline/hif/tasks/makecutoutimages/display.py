@@ -19,7 +19,7 @@ LOG = infrastructure.get_logger(__name__)
 ImageStats = collections.namedtuple('ImageStats', 'rms max')
 
 
-class CutoutimagesSummary(object):
+class CutoutimagesSummary:
     def __init__(self, context, result):
         self.context = context
         self.result = result
@@ -114,7 +114,7 @@ class CutoutimagesSummary(object):
         return [p for p in plot_wrappers if p is not None]
 
 
-class VlassCubeCutoutimagesSummary(object):
+class VlassCubeCutoutimagesSummary:
     """A class for the VLASS-CUBE makecutout image summary plots."""
 
     def __init__(self, context, result):
@@ -244,7 +244,7 @@ def get_stats_summary(stats):
     return stats_summary
 
 
-class VlassCubeCutoutRmsSummary(object):
+class VlassCubeCutoutRmsSummary:
     """A class for the VLASS-CUBE makecutout rms-vs-frequency summary plots."""
 
     def __init__(self, context, result, info_dict=None):

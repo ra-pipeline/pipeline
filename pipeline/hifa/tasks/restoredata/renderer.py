@@ -17,7 +17,7 @@ class T2_4MDetailsRestoreDataRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
     def __init__(self, uri='restoredata.mako',
                  description='Restore Calibrated Data',
                  always_rerender=False):
-        super(T2_4MDetailsRestoreDataRenderer, self).__init__(
+        super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
     def update_mako_context(self, mako_context, pipeline_context, results):

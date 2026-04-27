@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy
 from pydantic import BaseModel, ConfigDict, computed_field
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 
 class Polarization(BaseModel):
@@ -14,13 +17,36 @@ class Polarization(BaseModel):
 
     id: int
     num_corr: int
-    corr_type: Any
-    corr_product: Any
+    corr_type: NDArray
+    corr_product: NDArray
 
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
         validate_default=True,
     )
+
+    def __init__(
+        self,
+        id: int | None = None,
+        num_corr: int | None = None,
+        corr_type: NDArray | None = None,
+        corr_product: NDArray | None = None,
+        **data: Any,
+    ) -> None:
+        """Create a Polarization.
+
+        The legacy pipeline code constructs polarizations positionally as
+        ``Polarization(id, num_corr, corr_type, corr_product)``.
+        """
+        if id is not None and 'id' not in data:
+            data['id'] = id
+        if num_corr is not None and 'num_corr' not in data:
+            data['num_corr'] = num_corr
+        if corr_type is not None and 'corr_type' not in data:
+            data['corr_type'] = corr_type
+        if corr_product is not None and 'corr_product' not in data:
+            data['corr_product'] = corr_product
+        super().__init__(**data)
 
     def __hash__(self) -> int:
         return hash((self.__class__, self.id, self.num_corr))

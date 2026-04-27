@@ -6,7 +6,7 @@ import operator
 import os
 import re
 import xml.etree.ElementTree as ElementTree
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import reduce
 
 import pipeline.domain as domain
@@ -450,7 +450,9 @@ def import_flux(output_dir, observing_run, filename=None):
             query_date = match.group('timestamp') if match else None
             if query_date:
                 try:
-                    query_date = datetime.strptime(query_date, '%Y-%m-%d %H:%M:%S %Z')
+                    query_date = datetime.strptime(query_date, '%Y-%m-%d %H:%M:%S %Z').replace(
+                        tzinfo=timezone.utc
+                        )
                 except TypeError:
                     query_date = None
 

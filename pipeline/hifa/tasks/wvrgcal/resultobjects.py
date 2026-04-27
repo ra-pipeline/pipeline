@@ -14,7 +14,7 @@ class WvrgcalResult(basetask.Results):
         """
         Construct and return a new WvrgcalResult.
         """
-        super(WvrgcalResult, self).__init__()
+        super().__init__()
 
         if final is None:
             final = []

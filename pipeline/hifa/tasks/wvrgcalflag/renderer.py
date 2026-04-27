@@ -204,7 +204,7 @@ class WvrcalflagMetricPlotsRenderer(basetemplates.JsonPlotRenderer):
         title = 'RMS phase improvement view for %s' % vis
         outfile = filenamer.sanitize('rms_phase_improvement-%s.html' % vis)
 
-        super(WvrcalflagMetricPlotsRenderer, self).__init__(
+        super().__init__(
                 'generic_x_vs_y_spw_intent_plots.mako', 
                 context, result, plots, title, outfile)
 
@@ -224,7 +224,7 @@ class WvrgcalflagPhaseOffsetPlotRenderer(basetemplates.JsonPlotRenderer):
         for plot in [p for p in plots if isinstance(p.parameters['ant'], list)]:
             plot.parameters['ant'] = plot.parameters['ant'][0]
 
-        super(WvrgcalflagPhaseOffsetPlotRenderer, self).__init__(
+        super().__init__(
                 'wvrgcalflag_phase_offset_plots.mako', 
                 context, result, plots, title, outfile)
 
@@ -243,7 +243,7 @@ class WvrgcalflagPhaseOffsetVsBaselinePlotRenderer(basetemplates.JsonPlotRendere
         title = 'Phase offset vs average baseline for %s' % vis
         outfile = filenamer.sanitize('phase_offsets_vs_baseline-%s.html' % vis)
 
-        super(WvrgcalflagPhaseOffsetVsBaselinePlotRenderer, self).__init__(
+        super().__init__(
                 'generic_x_vs_y_spw_scan_plots.mako', context, 
                 result, plots, title, outfile)
 
@@ -255,6 +255,6 @@ class WvrgcalflagFlagPlotRenderer(basetemplates.JsonPlotRenderer):
         title = 'Flagging metric view for %s' % vis
         outfile = filenamer.sanitize('flagging_antenna_vs_time-%s.html' % vis)
 
-        super(WvrgcalflagFlagPlotRenderer, self).__init__(
+        super().__init__(
             'generic_x_vs_y_spw_intent_plots.mako', context,
             result, plots, title, outfile)
