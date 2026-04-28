@@ -48,7 +48,7 @@ from pipeline.infrastructure import logging
 LOG = logging.get_logger(__name__)
 
 
-def find_executable(start_dir: Optional[str] = None) -> dict[str, Optional[str]]:
+def find_executable(start_dir: str | None = None) -> dict[str, str | None]:
     """Search upward from start_dir for MPI-related executables.
 
     The function looks for 'bin/mpirun', 'bin/mpicasa' and 'bin/casa' in the
@@ -61,12 +61,12 @@ def find_executable(start_dir: Optional[str] = None) -> dict[str, Optional[str]]
         Mapping from executable name to absolute path or None if not found.
     """
     search_patterns = ['mpirun', 'mpicasa', 'casa']
-    exe_dict: dict[str, Optional[str]] = dict.fromkeys(search_patterns)
+    exe_dict: dict[str, str | None] = dict.fromkeys(search_patterns)
     current = Path(start_dir or Path.cwd()).resolve()
 
     for pattern in search_patterns:
         cur = current
-        found: Optional[str] = None
+        found: str | None = None
         while True:
             candidate = cur / 'bin' / pattern
             if candidate.is_file():
@@ -220,6 +220,12 @@ def pclean(
 
         # Copy current environment and modify as needed
         env_run = os.environ.copy()
+        # Strip coverage env vars so the subprocess does not produce a .coverage
+        # file with a different measurement mode (branch vs statement), which
+        # would cause pytest-cov's combine step to fail with DataError.
+        for cov_var in ('COVERAGE_PROCESS_START', 'COVERAGE_FILE', 'COV_CORE_SOURCE',
+                        'COV_CORE_CONFIG', 'COV_CORE_DATAFILE'):
+            env_run.pop(cov_var, None)
         env_overrides: dict[str, str] = {}
         for env_arg in env_args:
             key, _, value = env_arg.partition('=')
@@ -242,7 +248,7 @@ def pclean(
         try:
             with open(output_file, 'rb') as f:
                 output = pickle.load(f)
-        except (FileNotFoundError, OSError) as e:
+        except (FileNotFoundError, OSError, EOFError) as e:
             LOG.error('Failed to read output file %s: %s', output_file, e)
             raise RuntimeError(
                 f"Failed to read output file '{output_file}'. "
