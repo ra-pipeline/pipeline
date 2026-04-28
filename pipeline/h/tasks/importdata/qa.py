@@ -7,7 +7,7 @@ import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as qacalc
-from pipeline.infrastructure import casa_tasks, casa_tools
+from pipeline.infrastructure import casa_tasks, casa_tools, daskhelpers
 from . import importdata
 from ..exportdata import aqua
 
@@ -117,13 +117,14 @@ class ImportDataQAHandler(pqa.QAPlugin):
         # flag for whether to print 'all scans ok' message at end
         all_ok = True
 
-        for ms in mses:
-            bad_scans = collections.defaultdict(list)
+        def _flagdata_summary(ms_name):
+            return casa_tasks.flagdata(vis=ms_name, mode='summary').execute()
 
-            # inspect each MS with flagdata, capturing the dictionary
-            # describing the number of flagged rows
-            flagdata_task = casa_tasks.flagdata(vis=ms.name, mode='summary')
-            flagdata_result = flagdata_task.execute()
+        # run flagdata across all EBs in parallel if Dask is available
+        flagdata_results = daskhelpers.parallel_map(_flagdata_summary, [ms.name for ms in mses])
+
+        for ms, flagdata_result in zip(mses, flagdata_results):
+            bad_scans = collections.defaultdict(list)
 
             for intent in calibrator_intents:
                 # collect scans with the calibrator intent

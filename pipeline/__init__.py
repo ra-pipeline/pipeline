@@ -283,13 +283,20 @@ def start_xvfb():
     global XVFB_DISPLAY
     try:
         from pyvirtualdisplay import Display
+
         current_process_pid = os.getpid()
         if XVFB_DISPLAY is not None and XVFB_DISPLAY.is_alive():
             LOG.warning('A Xvfb Server is already attached to the current process: %s', current_process_pid)
         else:
-            XVFB_DISPLAY = Display(visible=0, size=(2048, 2048))
+            XVFB_DISPLAY = Display(backend='xvfb', size=(2048, 2048), manage_global_env=True)
             XVFB_DISPLAY.start()
-            LOG.debug("disp.start() executed successfully from PID: %s", current_process_pid)
+            if XVFB_DISPLAY.new_display_var:
+                os.environ['DISPLAY'] = XVFB_DISPLAY.new_display_var
+            LOG.debug(
+                'disp.start() executed successfully from PID: %s; DISPLAY after start_xvfb() = %s',
+                current_process_pid,
+                os.environ.get('DISPLAY'),
+            )
             atexit.register(stop_xvfb)
     except ImportError:
         LOG.warning('Required package pyvirtualdisplay is not installed, '

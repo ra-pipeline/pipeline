@@ -180,6 +180,23 @@ def is_daskclient_allowed() -> bool:
     return dask_available and not (Worker and Worker._instances)
 
 
+def parallel_map(fn, items):
+    """Apply fn to each item, in parallel via Dask if available, else sequentially.
+
+    Args:
+        fn: A callable that accepts a single argument.
+        items: An iterable of items to map over.
+
+    Returns:
+        A list of results in the same order as items.
+    """
+    items = list(items)
+    if is_daskclient_allowed():
+        import dask
+        return list(dask.compute(*[dask.delayed(fn)(item) for item in items]))
+    return list(map(fn, items))
+
+
 def is_dask_worker() -> bool:
     """Check if the current process is a Dask worker.
 
