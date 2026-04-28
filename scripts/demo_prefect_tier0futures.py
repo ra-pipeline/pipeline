@@ -18,8 +18,6 @@ Usage:
 
 import os
 import socket
-import sys
-from contextlib import contextmanager
 
 # --- Configuration -----------------------------------------------------------
 _hostname = socket.gethostname()
@@ -39,19 +37,6 @@ prefect_api_url = 'http://127.0.0.1:4200/api'  # set to None to use ephemeral in
 # -----------------------------------------------------------------------------
 
 
-@contextmanager
-def capture_output(file_path):
-    from wurlitzer import pipes, STDOUT
-
-    with open(file_path, 'w') as f, pipes(f, stderr=STDOUT):
-        old_stdout, old_stderr = sys.stdout, sys.stderr
-        sys.stdout, sys.stderr = f, f
-        try:
-            yield
-        finally:
-            sys.stdout, sys.stderr = old_stdout, old_stderr
-
-
 if __name__ == '__main__':
     # Pipeline imports MUST be inside the guard because:
     # - `import pipeline` triggers pipeline/__init__.py
@@ -61,6 +46,9 @@ if __name__ == '__main__':
     os.environ['PIPELINE_USE_PREFECT'] = '1'
     if prefect_api_url:
         os.environ.setdefault('PREFECT_API_URL', prefect_api_url)
+
+    import casaconfig.config
+    casaconfig.config.logfile='casa.log'
 
     from pipeline.infrastructure.executeppr import executeppr
     from pipeline.infrastructure.utils import work_directory
@@ -73,7 +61,7 @@ if __name__ == '__main__':
 
     signal.signal(signal.SIGINT, lambda *_: os._exit(130))
 
-    with work_directory(proc_dir, create=True, cleanup=True, reset=True, subdir=True):
+    with work_directory(proc_dir, create=True, cleanup=True, reset=False, subdir=True):
         # Symlink rawdata directory into proc_dir so executeppr can find it
         rawdata_link = os.path.join(proc_dir, 'rawdata')
         if os.path.islink(rawdata_link):
@@ -83,17 +71,15 @@ if __name__ == '__main__':
                 os.rmdir(rawdata_link)
             except OSError:
                 import datetime
-
-                backup = f'{rawdata_link}_bak_{datetime.datetime.now():%Y%m%dT%H%M%S}'
+                backup = f"{rawdata_link}_bak_{datetime.datetime.now():%Y%m%dT%H%M%S}"
                 os.rename(rawdata_link, backup)
                 print(f'  backed up existing rawdata dir -> {backup}')
         os.symlink(raw_dir, rawdata_link)
-        print(f'  symlink: rawdata -> {raw_dir}')
-        with capture_output('reduc.log'):
-            executeppr(
-                ppr_file,
-                importonly=False,
-                loglevel='info',
-                plotlevel='summary',
-                interactive=False,
-            )
+        print(f'symlink: rawdata -> {raw_dir}')
+        executeppr(
+            ppr_file,
+            importonly=False,
+            loglevel='info',
+            plotlevel='summary',
+            interactive=False,
+        )
