@@ -213,7 +213,6 @@ def calc_baseline_qascore_single(
     #Representative BW in MHz, sensitivity Goal in Jy
     repBW = msw.spw_setup['representativeBandwidthinHz']*(1.e-06)
 
-    # TODO I'm doing this to get further in the code. I'm not sure if it is alright to do long term though.
     msw.analysis['sensgoal'] = None
     if not msw.spw_setup['sensitivityGoalinJy'] is None:      # User specified value
         msw.analysis['sensgoal'] = msw.spw_setup['sensitivityGoalinJy']*np.sqrt(repBW/chansep)
@@ -297,7 +296,7 @@ def calc_baseline_qascore_single(
                     fieldname,
                     str(scan),
                     polstr,
-                    100.0*sinusoid_sigma[scan][pol]['n_amp']/sensgoal if not sensgoal is None else 1.0, # TODO This is a hack to make the code work for the moment
+                    100.0*sinusoid_sigma[scan][pol]['n_amp']/sensgoal if not sensgoal is None else 1.0,
                     sinusoid_sigma[scan][pol]['freqMHz'],
                     str(sinusoid_sigma[scan][pol]['nwave']
                         )

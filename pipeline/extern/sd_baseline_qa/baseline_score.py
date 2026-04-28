@@ -43,15 +43,11 @@ def baseline_score(
     start_time = time.time()
     casa_version = cversion()
 
-    # You can get the MeasurementSet name from `context.observing_run.measurement_sets(list).basename` which is a list or
+    #  You can get the MeasurementSet name from `context.observing_run.measurement_sets(list).basename` which is a list or
     #  infile = result.outcome.outfile    gives the equivalent _bl file that tht qa code seems to accept.
     #  output directory = context.out_dir
     #  products directory = context.product_dir
     #  html/report directory = context.report_dir
-
-    # TODO - There is a provision after this that if the .plk file is not found that a bash script
-    # is run. In production, I think this shouldn't be needed, so I will only fetch the data from
-    # the context.
 
     line_data = _science_lines(context, results)
 
