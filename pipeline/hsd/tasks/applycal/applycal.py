@@ -271,7 +271,7 @@ class SerialSDApplycal(SerialApplycal):
                 weblog_output_dir = stage_dir
 
             qa_result = sd_applycal_qa.get_ms_applycal_qascores(
-                msNames=[ms_name],
+                ms_name=[ms_name],
                 plot_output_path=applycal_qa_dir,
                 weblog_output_path=weblog_output_dir,
             )

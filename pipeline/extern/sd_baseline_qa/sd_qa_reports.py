@@ -12,8 +12,8 @@ import casatools
 import copy
 
 from pipeline.infrastructure.filenamer import sanitize
-import sd_qa_utils
-import mswrapper_sd
+import pipeline.extern.sd_baseline_qa.sd_qa_utils as sd_qa_utils
+import pipeline.extern.sd_baseline_qa.mswrapper_sd as mswrapper_sd
 
 def show_heat_XYdiff(msw: mswrapper_sd.MSWrapperSD, nchanbin: int = 1, nvisbin: int = 1,
                      zrange: str = '0.9', remove_skylines: bool = False, nchanstdblock: int = 20,
@@ -596,6 +596,10 @@ def plot_data_single_bl(msw: mswrapper_sd.MSWrapperSD, max_nwave_frac = 0.1, plo
     Returns:
         List of filenames of produced plots
     '''
+    import pathlib
+
+    if not pathlib.Path(plot_output_path).exists():
+        pathlib.Path(plot_output_path).mkdir(parents=True, exist_ok=True)
 
     #Channel frequencies in GHz and separation in MHz, and min and max frequency
     freqs = msw.spw_setup[msw.spw]['chanfreqs']*1.e-09
@@ -699,10 +703,12 @@ def plot_data_single_bl(msw: mswrapper_sd.MSWrapperSD, max_nwave_frac = 0.1, plo
         ax_left.scatter(freqs, msw.time_mean_scan[min_qa_scan][1], c='green', marker='.', label='YY pol', s=50, alpha=0.7)
     if len(highlight_regions) > 0:
         apply_highlights(ax_left) # Add highlighted ranges
-    #Mark sensitivity goal lines
-    if (msw.analysis is not None) and ((msw.analysis['sensgoal'] <= maxdata) or (-msw.analysis['sensgoal'] > mindata)):
-        ax_left.plot([minfreq, maxfreq], np.ones(2)*msw.analysis['sensgoal'], ':k', label='Sensitivity Goal level')
-        ax_left.plot([minfreq, maxfreq], -1.0*np.ones(2)*msw.analysis['sensgoal'], ':k')
+
+    if not msw.analysis['sensgoal'] is None:
+        #Mark sensitivity goal lines if they exist
+        if (msw.analysis is not None) and ((msw.analysis['sensgoal'] <= maxdata) or (-msw.analysis['sensgoal'] > mindata)):
+            ax_left.plot([minfreq, maxfreq], np.ones(2)*msw.analysis['sensgoal'], ':k', label='Sensitivity Goal level')
+            ax_left.plot([minfreq, maxfreq], -1.0*np.ones(2)*msw.analysis['sensgoal'], ':k')
     #Axes labels
     ax_left.set_xlabel('Freq [GHz]')
     ax_left.set_ylabel('Data (Real) [Jy]')
@@ -814,7 +820,16 @@ def makeSummaryTable(qascore_list, plots_fnames, plfolder, working_folder = '.',
     
     return
 
-def makeSummaryTable_bl(qascore_list, antnames_for, plots_fnames, plfolder, working_folder = '.', output_file = 'sd_baseline_output/qascore_summary.csv', writemode = 'w', weblog_adress = 'http://jaopost-web.sco.alma.cl/spool/sd-qascores/PIPEREQ-305/'):
+def makeSummaryTable_bl(
+        qascore_list,
+        antnames_for,
+        plots_fnames,
+        plfolder,
+        plot_folder = '.',
+        output_file = 'sd_baseline_output/qascore_summary.csv',
+        writemode = 'w',
+        weblog_adress = ''
+):
 
     if plots_fnames == '':
         plots_fnames = ['N/A' for i in range(len(qascore_list))]
@@ -849,7 +864,7 @@ def makeSummaryTable_bl(qascore_list, antnames_for, plots_fnames, plfolder, work
         if not plot_fname == 'N/A':
             plot_fname = plot_fname.split('/')[-1]
         #If a PL working folder is provided, search for relevant weblog plot
-        weblogpath = os.path.join(working_folder, 'pipeline-*/html/stage11/spectral_plot_after_subtraction_{0:s}.atmcor_{1:s}_ant{2:s}_spw{3:s}_pol{4:s}.png'.format(msorig,fieldname,str(antennaid),str(spw),str(polid)))
+        weblogpath = os.path.join(plot_folder, 'pipeline-*/html/stage11/spectral_plot_after_subtraction_{0:s}.atmcor_{1:s}_ant{2:s}_spw{3:s}_pol{4:s}.png'.format(msorig,fieldname,str(antennaid),str(spw),str(polid)))
         print('weblogpath: '+str(weblogpath))
         weblogplots = glob.glob(weblogpath)
         print('weblogplots: '+str(weblogplots))

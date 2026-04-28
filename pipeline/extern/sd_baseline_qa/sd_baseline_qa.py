@@ -1,21 +1,31 @@
-import os, sys
-from typing import List, Tuple, Union
+import os
 import numpy as np
 import copy
 import pickle
-from itertools import product
-import pipelineqa as pqa
-from scipy import stats
-import mswrapper_sd
-import sd_qa_utils
-import sd_qa_reports
-from casatools import table as tbtool
 
+from scipy import stats
+from typing import List, Tuple
+from itertools import product
+
+import pipeline.extern.sd_baseline_qa.pipelineqa as pqa
+import pipeline.extern.sd_baseline_qa.sd_qa_utils as sd_qa_utils
+import pipeline.extern.sd_baseline_qa.sd_qa_reports as sd_qa_reports
+import pipeline.extern.sd_baseline_qa.mswrapper_sd as mswrapper_sd
+
+import pipeline.infrastructure as infrastructure
+
+LOG = infrastructure.get_logger(__name__)
+
+default_thresholds = {
+    "min_pXY_corr": 2.0,
+    "max_pXY_cont": 12.0,
+    "max_diff0_sigma": 5.0,
+    "max_diffXY_sigma": 5.0,
+    "sinusoid_sigma": 6.0,
+    "maxant_rangeratio": 5.5,
+    "blue_qa_128ch": True
+}
 #Dictionary with thresholds and switches for the different metrics of the QA
-default_thresholds = {'min_pXY_corr': 2.0, 'max_pXY_cont': 12.0,
-                      'max_diff0_sigma': 5.0, 'max_diffXY_sigma': 5.0,
-                      'sinusoid_sigma': 6.0, 'maxant_rangeratio': 5.5,
-                      'blue_qa_128ch': True}
 
 def qascorefunc(nsigma: float, score_top: float = 0.67, score_bottom: float = 0.34,
                 nsigma_threshold: float = 3.5, nsigma_bottom: float = 10.0):
@@ -106,9 +116,11 @@ def data_stats_bl(msw: mswrapper_sd.MSWrapperSD, scisel: np.ndarray, min_nwave: 
     powerspec = {}
     powerstats = {}
     flatness = {}
+
     maxnwave = min(int(max_nwave_frac*msw.nchan), int(msw.nchan/2.0))
     freqs = msw.spw_setup[msw.spw]['chanfreqs']*1.e-09
     xfft = np.fft.rfftfreq(len(freqs), d=np.abs(freqs[1]-freqs[0]))
+
     for scan in extscanlist:
         sigma_cont[scan] = {}
         data_range[scan] = {}
@@ -163,7 +175,10 @@ def data_stats_bl(msw: mswrapper_sd.MSWrapperSD, scisel: np.ndarray, min_nwave: 
     return
 
 
-def calc_baseline_qascore_single(msw: mswrapper_sd.MSWrapperSD, thresholds: dict = default_thresholds):
+def calc_baseline_qascore_single(
+        msw: mswrapper_sd.MSWrapperSD,
+        thresholds: dict = None
+):
     '''Function that calculates the hsd_baseline QA score for a given dataset msw object.
     param:
         msw: MSWrapper_SD object containing the data statistics used for the QA scores calculation. This method will use the
@@ -172,6 +187,9 @@ def calc_baseline_qascore_single(msw: mswrapper_sd.MSWrapperSD, thresholds: dict
     returns:
         Function modifies the 'analysis' attribute inside the MSWrapperSD object to add a list of all per-scan QA scores.
     '''
+
+    if thresholds is None:
+        thresholds = default_thresholds
 
     #Set QA scores value range
     if (msw.nchan <= 128) and thresholds['blue_qa_128ch']:
@@ -194,8 +212,14 @@ def calc_baseline_qascore_single(msw: mswrapper_sd.MSWrapperSD, thresholds: dict
     maxfreq = np.max(freqs)
     #Representative BW in MHz, sensitivity Goal in Jy
     repBW = msw.spw_setup['representativeBandwidthinHz']*(1.e-06)
-    sensgoal = msw.spw_setup['sensitivityGoalinJy']*np.sqrt(repBW/chansep)
-    msw.analysis['sensgoal'] = sensgoal
+
+    # TODO I'm doing this to get further in the code. I'm not sure if it is alright to do long term though.
+    msw.analysis['sensgoal'] = None
+    if not msw.spw_setup['sensitivityGoalinJy'] is None:      # User specified value
+        msw.analysis['sensgoal'] = msw.spw_setup['sensitivityGoalinJy']*np.sqrt(repBW/chansep)
+
+    #msw.analysis['sensgoal'] = sensgoal
+    sensgoal = msw.analysis['sensgoal']
     #Scan numbers
     scanlist = msw.spw_setup['scansforfield'][str(msw.fieldid)]
     fieldname = msw.spw_setup['namesfor'][str(msw.fieldid)][0]
@@ -266,7 +290,19 @@ def calc_baseline_qascore_single(msw: mswrapper_sd.MSWrapperSD, thresholds: dict
                 reason = 'BLine.continuum.sinusoid'
                 applies_to = pqa.TargetDataSelection(vis={msname}, scan={scan}, intent={'*OBSERVE_TARGET#ON_SOURCE*'}, spw={msw.spw}, ant={msw.antenna}, pol={polstr})
                 comes_from = pqa.QAOrigin(metric_name=reason, metric_score=float(np.round(sinusoid_sigma[scan][pol]['n_sigma'], 3)), metric_units='Deviation from 0')
-                message = '{0:s}: Sinusoidal baseline deviation for spw {1:s}, antenna {2:s}, field {3:s}, scan {4:s}, polarization {5:s}. Amplitude {6:.1f}% of requested RMS, wavelength {7:.3f}MHz (nwave={8:s})'.format(msname, str(msw.spw), msw.antenna, fieldname, str(scan), polstr, 100.0*sinusoid_sigma[scan][pol]['n_amp']/sensgoal, sinusoid_sigma[scan][pol]['freqMHz'], str(sinusoid_sigma[scan][pol]['nwave']))
+                message = '{0:s}: Sinusoidal baseline deviation for spw {1:s}, antenna {2:s}, field {3:s}, scan {4:s}, polarization {5:s}. Amplitude {6:.1f}% of requested RMS, wavelength {7:.3f}MHz (nwave={8:s})'.format(
+                    msname,
+                    str(msw.spw),
+                    msw.antenna,
+                    fieldname,
+                    str(scan),
+                    polstr,
+                    100.0*sinusoid_sigma[scan][pol]['n_amp']/sensgoal if not sensgoal is None else 1.0, # TODO This is a hack to make the code work for the moment
+                    sinusoid_sigma[scan][pol]['freqMHz'],
+                    str(sinusoid_sigma[scan][pol]['nwave']
+                        )
+                )
+
                 qascore = pqa.QAScore(float(np.round(qascore_value, 3)), longmsg=message, shortmsg='Baseline deviation', origin=comes_from, applies_to=applies_to, hierarchy=reason)
                 qascores_list.append(qascore)
 
@@ -366,7 +402,10 @@ def calc_baseline_qascore_single(msw: mswrapper_sd.MSWrapperSD, thresholds: dict
 
     return
 
-def calc_qascores_collection(mswCollection: dict, thresholds: dict = default_thresholds):
+def calc_qascores_collection(
+        mswCollection: dict,
+        thresholds=None
+):
     '''Function that calculates the hsd_baseline QA score for a collection of msw objects. The task will compare the statistics between the different antennas for each spectral window and field.
     param:
         mswCollection: Dictionary containing MSWrapper_SD objects to be analyzed together.
@@ -376,6 +415,9 @@ def calc_qascores_collection(mswCollection: dict, thresholds: dict = default_thr
     '''
 
     #Get variables of the collection
+    if thresholds is None:
+        thresholds = default_thresholds
+
     (mswCollectionKeys, mslist, idxfirst, fieldnames, names_for, fieldid_for, antnames_for, spwlist, spwnamelist, mslist_for_fieldname) = sd_qa_utils.get_mswCollection_params(mswCollection)
     
     #initialize output list
@@ -460,17 +502,21 @@ def save_mswCollection(mswCollection: dict, mswCfile: str):
     f.close()
     return
 
-def load_and_stats_bl(msNames: List[str], sci_line_data: List = None,
-                      buffer_data: bool = True,
-                      buffer_fname: str = 'mswCollection.bl.buffer.pkl') -> dict:
-    '''Load a collection of MSWrapper_SD objects, and run a basic filter and statistics on each of them.
-    Return a dictionary of MSWrapper_SD objects (a mswCollection), indexed by tuples in the form (ms, spw, ant, fieldid).
+def load_and_stats_bl(
+        measurementset: str,
+        sci_line_data: List = None,
+        buffer_data: bool = True,
+        buffer_fname: str = 'mswCollection.bl.buffer.pkl'
+) -> dict:
+    """
+    Load a collection of MSWrapper_SD objects, and run a basic filter and statistics on each of them.
+    Return a dictionary of MSWrapper_SD objects (an mswCollection), indexed by tuples in the form (ms, spw, ant, field id).
     param:
-        msNames: List of MS names to load.
+        ms_name: List of MS names to load.
                      to exclude them for triggering a false XX-YY deviation.
         buffer_data: True/False whether to save/load the MSW collection to disk. This is aimed at easing the
                     use for repeated execution of the code, mostly testing.
-    '''
+    """
 
     
     #Load buffered data from disk, if exists
@@ -480,37 +526,49 @@ def load_and_stats_bl(msNames: List[str], sci_line_data: List = None,
 
     #Load data and gather statistics
     mswCollection = {}
-    for ms in msNames:
-        msonly = ms.split('/')[-1]
-        #Load metadata
-        spw_setup = sd_qa_utils.getSpecSetup(myms=ms)
-        #Get science line selection vectors from context and spw_setup
-        science_line_sel = sd_qa_utils.line_list_to_datasel(lines=sci_line_data, spw_setup=spw_setup)
-        #Load original MS metadata
-        origms = ms.split('.ms.')[0]+'.ms'
-        spw_setup_orig = sd_qa_utils.getSpecSetup(myms=origms)
-        #In case any SPW reindex, need to map SPWs
-        sortidx = np.argsort(spw_setup['spwnames'])
-        sortidx_orig = np.argsort(spw_setup_orig['spwnames'])
-        sorted_spw = np.array(spw_setup['spwlist'])[sortidx]
-        sorted_spw_orig = np.array(spw_setup_orig['spwlist'])[sortidx_orig]
-        spwmap = {sorted_spw[i]: sorted_spw_orig[i] for i in range(len(sorted_spw))}
-        #Iterate over SPW, antenna, FieldID
-        datapieces = product(spw_setup['spwlist'], spw_setup['antnames'], spw_setup['fieldid']['*OBSERVE_TARGET#ON_SOURCE*'])
-        for datapiece in datapieces:
-            (spw, ant, fieldid) = datapiece
-            #spwname = spw_setup['spwnames'][spw_setup['spwlist'].index(spw)]
-            fieldname = str(spw_setup['namesfor'][str(fieldid)][0])
-            print('Processing MS {0:s}, SPW {1:d}, antenna {2:s}, FieldID {3:d}'.format(ms,spw,ant,fieldid))
-            #Load ON-SOURCE data and create MSWrapperSD object
-            mswCollection[(msonly, spw, ant, str(fieldid))] = mswrapper_sd.MSWrapperSD.create_from_ms(fname=ms, spw=spw, antenna=ant, fieldid=fieldid, column='DATA', onoffsel='ON', spw_setup=spw_setup, attach_tsys_data=False)
-            #Get Tsys data from original MS
-            mswCollection[(msonly, spw, ant, str(fieldid))].tsysdata = sd_qa_utils.getAtmDataForSPW(origms, spw_setup_orig, spwmap[spw], ant)
-            #Gather necessary stats
-            print('>> Data stats for '+str((msonly, spw, ant, str(fieldid))))
-            data_stats_bl(mswCollection[(msonly, spw, ant, str(fieldid))], science_line_sel[fieldname][spw])
-            #Clear raw data from MSWrapper object to release memory
-            mswCollection[(msonly, spw, ant, str(fieldid))].data = None
+    #for ms in ms_name:
+    #msonly = ms.split('/')[-1]
+
+    #Load metadata
+    spw_setup = sd_qa_utils.getSpecSetup(myms=measurementset)
+    #Get science line selection vectors from context and spw_setup
+    science_line_sel = sd_qa_utils.line_list_to_datasel(lines=sci_line_data, spw_setup=spw_setup)
+    #Load original MS metadata
+    origms = measurementset.split('.ms.')[0]+'.ms'
+    spw_setup_orig = sd_qa_utils.getSpecSetup(myms=origms)
+    #In case any SPW reindex, need to map SPWs
+    sortidx = np.argsort(spw_setup['spwnames'])
+    sortidx_orig = np.argsort(spw_setup_orig['spwnames'])
+    sorted_spw = np.array(spw_setup['spwlist'])[sortidx]
+    sorted_spw_orig = np.array(spw_setup_orig['spwlist'])[sortidx_orig]
+    spwmap = {sorted_spw[i]: sorted_spw_orig[i] for i in range(len(sorted_spw))}
+    #Iterate over SPW, antenna, FieldID
+    datapieces = product(spw_setup['spwlist'], spw_setup['antnames'], spw_setup['fieldid']['*OBSERVE_TARGET#ON_SOURCE*'])
+
+    for datapiece in datapieces:
+        (spw, ant, fieldid) = datapiece
+        #spwname = spw_setup['spwnames'][spw_setup['spwlist'].index(spw)]
+        fieldname = str(spw_setup['namesfor'][str(fieldid)][0])
+        print('Processing MS {0:s}, SPW {1:d}, antenna {2:s}, FieldID {3:d}'.format(measurementset,spw,ant,fieldid))
+        #Load ON-SOURCE data and create MSWrapperSD object
+        mswCollection[(measurementset, spw, ant, str(fieldid))] = mswrapper_sd.MSWrapperSD.create_from_ms(
+            fname=measurementset,
+            spw=spw,
+            antenna=ant,
+            fieldid=fieldid,
+            column='DATA',
+            onoffsel='ON',
+            spw_setup=spw_setup,
+            attach_tsys_data=False
+        )
+
+        #Get Tsys data from original MS
+        mswCollection[(measurementset, spw, ant, str(fieldid))].tsysdata = sd_qa_utils.getAtmDataForSPW(origms, spw_setup_orig, spwmap[spw], ant)
+        #Gather necessary stats
+        LOG.info('>> Data stats for '+str((measurementset, spw, ant, str(fieldid))))
+        data_stats_bl(mswCollection[(measurementset, spw, ant, str(fieldid))], science_line_sel[fieldname][spw])
+        #Clear raw data from MSWrapper object to release memory
+        mswCollection[(measurementset, spw, ant, str(fieldid))].data = None
 
     if buffer_data and (not os.path.exists(buffer_fname)):
         save_mswCollection(mswCollection, buffer_fname)
@@ -556,15 +614,20 @@ def find_min_qascores(mswCollection: dict):
 
     return
 
-def get_ms_baseline_qascores(msNames: List[str], sci_line_data: List = None,
-                             thresholds: dict = default_thresholds,
-                             plot_output_path: str = '.', weblog_output_path: str = '.',
-                             buffer_data: bool = True,
-                             buffer_fname: str = 'mswCollection.bl.buffer.pkl') -> Tuple[list, list, list]:
+def get_ms_baseline_qascores(
+        ms_name: str,
+        sci_line_data: List = None,
+        thresholds=None,
+        plot_output_path: str = '.',
+        weblog_output_path: str = '.',
+        buffer_data: bool = True,
+        buffer_fname: str = 'mswCollection.bl.buffer.pkl'
+) -> Tuple[list, list, list]:
+
     '''Function used to obtain applycal X-Y QA score on a list of calibrated MSs, at the
     applycal stage of SD pipeline.
     param:
-        msNames: List of MS to process
+        ms_name: List of MS to process
         thresholds: Dictionary containing threshold parameters for ON-source XX-YY deviations,
                     Trec deviations, minimum deviation level, and QA score scaling.
         plot_output_path: (str) Path to save output plots.
@@ -579,7 +642,10 @@ def get_ms_baseline_qascores(msNames: List[str], sci_line_data: List = None,
     '''
 
     #Load data and gather statistics
-    mswCollection = load_and_stats_bl(msNames, sci_line_data=sci_line_data,
+    if thresholds is None:
+        thresholds = default_thresholds
+
+    mswCollection = load_and_stats_bl(ms_name, sci_line_data=sci_line_data,
                                       buffer_data=buffer_data, buffer_fname = buffer_fname)
 
     #Get QA scores by analyzing individual data pieces
@@ -599,9 +665,21 @@ def get_ms_baseline_qascores(msNames: List[str], sci_line_data: List = None,
     #Find minimum QAscores per data piece
     find_min_qascores(mswCollection)
 
-    #Gather list of minimum QA scores and
-    #make plots for each minimum QA score
-    (mswCollectionKeys, mslist, idxfirst, fieldnames, names_for, fieldid_for, antnames_for, spwlist, spwnamelist, mslist_for_fieldname) = sd_qa_utils.get_mswCollection_params(mswCollection)
+    # Gather list of minimum QA scores and make plots for each minimum QA score
+    # These variable names should be changed to support PEP8 standards but that is for another ticket.
+    (
+        mswCollectionKeys,
+        mslist,
+        idxfirst,
+        fieldnames,
+        names_for,
+        fieldid_for,
+        antnames_for,
+        spwlist,
+        spwnamelist,
+        mslist_for_fieldname
+    ) = sd_qa_utils.get_mswCollection_params(mswCollection)
+
     qascore_list = []
     plots_fnames = []
     for key, msw in mswCollection.items():

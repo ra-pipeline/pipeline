@@ -536,12 +536,12 @@ def outlier_detection(msw: mswrapper_sd.MSWrapperSD, thresholds: dict = default_
 
     return (msw, qascore, qascores_scans, plotfname)
 
-def load_and_stats(msNames: List[str], use_tsys_data: bool = True, sciline_det: bool = True,
+def load_and_stats(ms_name: List[str], use_tsys_data: bool = True, sciline_det: bool = True,
                    buffer_data: bool = False) -> dict:
     '''Load a collection of MSWrapper_SD objects, and run a basic filter and statistics on each of them.
     Return a dictionary of MSWrapper_SD objects, indexed by tuples in the form (ms, spw, ant, fieldid).
     param:
-        msNames: List of MS names to load.
+        ms_name: List of MS names to load.
         ondata_filters: List of filters to pass on the ON-source data
         use_tsys_data: True/False whether to load CalAtmosphere data from dataset
         sciline_det: True/False whether to attempt strong science line detection. The detected channels are passed to outlier_detection()
@@ -551,7 +551,7 @@ def load_and_stats(msNames: List[str], use_tsys_data: bool = True, sciline_det: 
     '''
 
     #Load buffered data from disk, if exists
-    buf = os.path.join(os.path.dirname(msNames[0]), 'mswCollection.buffer.pkl')
+    buf = os.path.join(os.path.dirname(ms_name[0]), 'mswCollection.buffer.pkl')
     if os.path.exists(buf):
         f = open(buf, 'rb')
         mswCollection = pickle.load(f)
@@ -560,7 +560,7 @@ def load_and_stats(msNames: List[str], use_tsys_data: bool = True, sciline_det: 
 
     #Load data and gather statistics
     mswCollection = {}
-    for ms in msNames:
+    for ms in ms_name:
         msonly = ms.split('/')[-1]
         #Load metadata
         spw_setup = sd_qa_utils.getSpecSetup(myms=ms)
@@ -589,14 +589,14 @@ def load_and_stats(msNames: List[str], use_tsys_data: bool = True, sciline_det: 
 
     return mswCollection
 
-def get_ms_applycal_qascores(msNames: List[str], thresholds: dict = default_thresholds, plot_output_path: str = '.',
+def get_ms_applycal_qascores(ms_name: List[str], thresholds: dict = default_thresholds, plot_output_path: str = '.',
                              use_tsys_data: bool = True, sciline_det: bool = True,
                              plot_sciline: str = 'on-detection', weblog_output_path: str = '.',
                              buffer_data: bool = False) -> Tuple[list, list, list]:
     '''Function used to obtain applycal X-Y QA score on a list of calibrated MSs, at the
     applycal stage of SD pipeline.
     param:
-        msNames: List of MS to process
+        ms_name: List of MS to process
         thresholds: Dictionary containing threshold parameters for ON-source XX-YY deviations,
                     Trec deviations, minimum deviation level, and QA score scaling.
         plot_output_path: (str) Path to save output plots.
@@ -611,7 +611,7 @@ def get_ms_applycal_qascores(msNames: List[str], thresholds: dict = default_thre
     '''
 
     #Load data and gather statistics
-    mswCollection = load_and_stats(msNames, use_tsys_data=use_tsys_data, sciline_det=sciline_det,
+    mswCollection = load_and_stats(ms_name, use_tsys_data=use_tsys_data, sciline_det=sciline_det,
                                    buffer_data=buffer_data)
 
     #Combine stats for science line detection, if requested

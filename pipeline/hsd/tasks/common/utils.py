@@ -471,7 +471,7 @@ def iterate_group_member(group_desc: dict,
                          member_id_list: List[int]
                          ) -> Iterable[Tuple[MeasurementSet, int, int, int]]:
     """
-    Yeild reduction group members.
+    Yield reduction group members.
 
     Args:
         group_desc: A reduction group dictionary. Keys of the dictionary are

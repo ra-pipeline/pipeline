@@ -1,9 +1,10 @@
-import os, sys
-import numpy as np
 import copy
+
 import casatools
+import numpy as np
 from scipy import signal
-import sd_qa_utils
+
+import pipeline.extern.sd_baseline_qa.sd_qa_utils as sd_qa_utils
 
 
 class MSWrapperSD(object):

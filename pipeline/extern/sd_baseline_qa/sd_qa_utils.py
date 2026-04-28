@@ -1,4 +1,4 @@
-import os, sys
+import os
 from typing import List, Tuple, Union
 import numpy as np
 import glob

@@ -21,6 +21,8 @@ from ..common import compress
 from pipeline.hsd.tasks.common.inspection_util import generate_ms, inspect_reduction_group, merge_reduction_group
 from ..common import utils
 
+import pipeline.extern.sd_baseline_qa.baseline_score as bs
+
 from .typing import FitFunc, FitOrder, LineWindow
 
 if TYPE_CHECKING:
@@ -689,22 +691,32 @@ class SDBaseline(basetask.StandardTaskTemplate):
             if 'baseline_quality_stat' in result.outcome:
                 baseline_quality_stat.extend(result.outcome['baseline_quality_stat'])
 
-        outcome = {'baselined': baselined,
-                   'vis_map': vis_map,
-                   'edge': edge,
-                   'deviation_mask': deviation_mask,
-                   'plots': plot_list,
-                   'baseline_quality_stat': baseline_quality_stat}
-        results = SDBaselineResults(task=self.__class__,
-                                    success=True,
-                                    outcome=outcome)
+        outcome = {
+            'baselined': baselined,
+            'vis_map': vis_map,
+            'edge': edge,
+            'deviation_mask': deviation_mask,
+            'plots': plot_list,
+            'baseline_quality_stat': baseline_quality_stat
+        }
+
+        results = SDBaselineResults(
+            task=self.__class__,
+            success=True,
+            outcome=outcome
+        )
+
+        # We will run this for each output measurementset. It would be better to do the QA calculation above as part of
+        # the general analysis. Perhaps this can be done at a later time.
+        for _outfile in vis_map.values():
+            bs.baseline_score(results=results, context=context, outfile=_outfile)
 
         return results
 
     def analyse(self, result: SDBaselineResults) -> SDBaselineResults:
         """Generate measurementset domain object for output MS.
 
-        The method generates measumentsets objects from output MSes
+        The method generates measumentset objects from output MSes
         of SDBaseline task. Newly created objects are registered to
         results instance.
 
