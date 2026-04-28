@@ -16,6 +16,7 @@ from .conversion import (
     mjd_seconds_to_datetime,
     range_to_list,
     safe_split,
+    phasecenter_to_skycoord
 )
 
 DomainMock = collections.namedtuple('DomainMock', ['id', 'name'])
