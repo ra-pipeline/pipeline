@@ -21,6 +21,7 @@ from __future__ import annotations
 import atexit
 import datetime
 import importlib.util
+import logging
 import multiprocessing
 import os
 import socket
@@ -354,6 +355,41 @@ def session_startup(casa_config: dict[str, str | None], loglevel: str | None = N
 _MAX_FRAME_BYTES = 1 << 30
 _dask_tcp_patched = False
 
+
+def _silence_stray_tcp_probe_logs() -> None:
+    """Drop noisy tornado/distributed tracebacks caused by non-Dask TCP probes.
+
+    Stray HTTP/health-check connections to the Dask scheduler port produce
+    huge bogus frame-size reads (e.g. interpreting "HTTP/1.1\\r\\n" as a length),
+    surfacing as a `MemoryError`/`_ArrayMemoryError` traceback from
+    `BaseTCPListener._handle_stream`. Our `_patch_dask_tcp()` already converts
+    these to harmless drops, but tornado/distributed still log the exception at
+    ERROR. Filter out only those specific records, preserving real errors.
+    """
+
+    class _StrayTcpProbeFilter(logging.Filter):
+        _MARKERS = (
+            '_handle_stream',
+            'BaseTCPListener',
+            'Implausible allocation request',
+            'Unable to allocate',
+        )
+
+        def filter(self, record: logging.LogRecord) -> bool:  # noqa: D401
+            msg = record.getMessage()
+            if any(m in msg for m in self._MARKERS):
+                return False
+            if record.exc_info:
+                exc = record.exc_info[1]
+                if isinstance(exc, MemoryError):
+                    return False
+            return True
+
+    flt = _StrayTcpProbeFilter()
+    for name in ('tornado.application', 'distributed.comm.tcp', 'distributed.core'):
+        logging.getLogger(name).addFilter(flt)
+
+
 def _patch_dask_tcp() -> None:
     """Monkey-patch distributed.comm.tcp to reject implausibly large frames."""
     global _dask_tcp_patched
@@ -483,6 +519,7 @@ def start_daskcluster(
     })
 
     _patch_dask_tcp()
+    _silence_stray_tcp_probe_logs()
 
     # Isolate D-Bus to prevent C++ casatools/plotms deadlocks in headless worker environments
     os.environ['DBUS_SESSION_BUS_ADDRESS'] = '/dev/null'

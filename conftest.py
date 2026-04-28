@@ -110,6 +110,21 @@ def pytest_configure(config: Config) -> None:
     pytest.pytestconfig = config
 
 
+def pytest_sessionfinish(session: Session, exitstatus: int | object) -> None:
+    """Silence all logging after the session ends.
+
+    Background threads from Dask/distributed (started by casampi's MPI
+    emulation during parallel tclean tests) remain alive into the interpreter
+    teardown phase. Their log calls reach Prefect's console handler, which
+    tries to write to stdout after pytest has already closed it, producing a
+    flood of ``ValueError: I/O operation on closed file`` noise.
+
+    Disabling the root logger here stops all further log records from being
+    processed, so background threads exit silently.
+    """
+    logging.disable(logging.CRITICAL)
+
+
 class _WeblogFailureInjectionRenderer:
     def __init__(self, renderer: Any) -> None:
         self._renderer = renderer

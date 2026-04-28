@@ -17,16 +17,24 @@ Usage:
 """
 
 import os
+import socket
 import sys
 from contextlib import contextmanager
 
 # --- Configuration -----------------------------------------------------------
-store_dir = '/lustre/cv/users/rxue/datasets/alma_if/'
-store_dir = '/zfs/data0/Workspace/nrao/datasets/alma_if/'
+_hostname = socket.gethostname()
+
+if _hostname.startswith('cvpost'):
+    store_dir = '/lustre/cv/users/rxue/datasets/alma_if/'
+    proc_dir = '/lustre/naasc/sciops/comm/rxue/tests/projs/2016.1.00053.S/prefect_tier0futures/'
+elif _hostname.startswith('xenon'):
+    store_dir = '/zfs/data0/Workspace/nrao/datasets/alma_if/'
+    proc_dir = '/zfs/data2/Workspace/nrao/tests/projs/2016.1.00053.S/prefect_tier0future/'
+else:
+    raise RuntimeError(f'Unknown host {_hostname!r}: set store_dir and proc_dir manually')
+
 ppr_file = store_dir + '2016.1.00053.S/rawdata/PPR_uid___A001_X889_X107_tier0.xml'
 raw_dir = store_dir + '2016.1.00053.S/rawdata/'
-work_dir = '/lustre/naasc/sciops/comm/rxue/tests/projs/2016.1.00053.S/prefect_tier0futures/'
-work_dir = '/zfs/data2/Workspace/nrao/tests/projs/2016.1.00053.S/prefect_tier0future/'
 prefect_api_url = 'http://127.0.0.1:4200/api'  # set to None to use ephemeral in-process API
 # -----------------------------------------------------------------------------
 
@@ -65,18 +73,20 @@ if __name__ == '__main__':
 
     signal.signal(signal.SIGINT, lambda *_: os._exit(130))
 
-    with work_directory(work_dir, create=True, cleanup=True, reset=True, subdir=True):
-        # Symlink rawdata directory into work_dir so executeppr can find it
-        rawdata_link = os.path.join(work_dir, 'rawdata')
+    with work_directory(proc_dir, create=True, cleanup=True, reset=True, subdir=True):
+        # Symlink rawdata directory into proc_dir so executeppr can find it
+        rawdata_link = os.path.join(proc_dir, 'rawdata')
         if os.path.islink(rawdata_link):
             os.unlink(rawdata_link)
         elif os.path.isdir(rawdata_link):
-            import datetime
+            try:
+                os.rmdir(rawdata_link)
+            except OSError:
+                import datetime
 
-            ts = datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
-            backup = rawdata_link + f'_bak_{ts}'
-            os.rename(rawdata_link, backup)
-            print(f'  backed up existing rawdata dir -> {backup}')
+                backup = f'{rawdata_link}_bak_{datetime.datetime.now():%Y%m%dT%H%M%S}'
+                os.rename(rawdata_link, backup)
+                print(f'  backed up existing rawdata dir -> {backup}')
         os.symlink(raw_dir, rawdata_link)
         print(f'  symlink: rawdata -> {raw_dir}')
         with capture_output('reduc.log'):
