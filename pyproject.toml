@@ -216,6 +216,11 @@ addopts = [
 ]
 junit_family = "legacy"
 tmp_path_retention_policy = "none"
+filterwarnings = [
+    "ignore:Document.async is deprecated:DeprecationWarning",
+    "ignore:XmlObject.async is deprecated:DeprecationWarning",
+    "ignore:PyFITS*:DeprecationWarning:pyfits*",
+]
 
 # Pixi Configuration
 
