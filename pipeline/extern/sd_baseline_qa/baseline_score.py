@@ -90,7 +90,7 @@ def baseline_score(
         antnames_for=antenna_names,
         plots_fnames=plots_function_names,
         plfolder=str(working_path),
-        plot_folder=str(plot_path), # TODO These paths are the same as far as I can tell in the production case.
+        plot_folder=str(plot_path),
         output_file=str(working_path.joinpath("qa_score_summary.csv")),
         writemode="w",
         weblog_adress=""
