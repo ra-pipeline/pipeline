@@ -419,6 +419,9 @@ def start_daskcluster(
             self.config = config or {}
 
         def setup(self, worker):
+            from pipeline.infrastructure import logging as log_utils
+            log_utils.DASK_WORKER_ID = f"daskworker-{worker.name}"
+            
             last_logfile = casatasks.casalog.logfile()
             if self.config.get('logfile'):
                 logfile = self.config.get('logfile')
@@ -481,6 +484,9 @@ def start_daskcluster(
 
     _patch_dask_tcp()
 
+    # Isolate D-Bus to prevent C++ casatools/plotms deadlocks in headless worker environments
+    os.environ['DBUS_SESSION_BUS_ADDRESS'] = '/dev/null'
+
     dashboard_address: str | None = dask.config.get('dashboard_address', default=None)
     host: str | None = dask.config.get('host', default=None)
     n_workers: int | None = dask.config.get('n_workers', default=None)
@@ -529,7 +535,10 @@ def start_daskcluster(
                     scheduler_options={'dashboard_address': dashboard_address},
                     death_timeout='60s',
                     worker_extra_args=worker_extra_args,
-                    job_script_prologue=[f'export PYTHONPATH={pythonpath_pkg}:$PYTHONPATH'],
+                    job_script_prologue=[
+                        f'export PYTHONPATH={pythonpath_pkg}:$PYTHONPATH',
+                        'export DBUS_SESSION_BUS_ADDRESS=/dev/null',
+                    ],
                 )
                 LOG.debug('dask SLURMCluster job script: \n %s', pformat(cluster.job_script()))
         elif clustertype == 'htcondor':

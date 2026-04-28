@@ -48,7 +48,6 @@ LOG = infrastructure.logging.get_logger(__name__)
 
 try:
     from prefect import flow, task
-
     _PREFECT_AVAILABLE = True
 except ImportError:  # pragma: no cover
     _PREFECT_AVAILABLE = False
@@ -380,7 +379,13 @@ def _execute_pipeline_task(task_name: str, task_args: dict[str, Any]) -> TaskRes
     from pipeline import cli
 
     start = time.monotonic()
-    LOG.info('Prefect adapter: executing %s(%s)', task_name, task_args)
+    import casatasks
+    from pipeline.infrastructure import logging as log_utils
+
+    origin = task_name
+    if getattr(log_utils, 'DASK_WORKER_ID', None):
+        origin = f'{log_utils.DASK_WORKER_ID}::{origin}'
+    casatasks.casalog.post(f'Prefect adapter: executing {task_name}({task_args})', 'INFO', origin)
 
     pipeline_task = cli.get_pipeline_task_with_name(task_name)
 
@@ -389,8 +394,14 @@ def _execute_pipeline_task(task_name: str, task_args: dict[str, Any]) -> TaskRes
     except Exception:
         elapsed = time.monotonic() - start
         tb = traceback.format_exc()
-        LOG.error('Prefect adapter: unhandled error in %s', task_name)
-        LOG.error(tb)
+        import casatasks
+        from pipeline.infrastructure import logging as log_utils
+
+        origin = task_name
+        if getattr(log_utils, 'DASK_WORKER_ID', None):
+            origin = f'{log_utils.DASK_WORKER_ID}::{origin}'
+        casatasks.casalog.post(f'Prefect adapter: unhandled error in {task_name}', 'SEVERE', origin)
+        casatasks.casalog.post(tb, 'SEVERE', origin)
         return TaskResultSummary(
             task_name=task_name,
             success=False,

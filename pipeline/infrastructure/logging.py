@@ -42,6 +42,9 @@ LOGGING_LEVELS = {'critical'  : CRITICAL,
 # import time will use this logging level.
 logging_level = logging.NOTSET
 
+# Dynamic tracking variable initialized by daskhelpers.py to identify log origins
+DASK_WORKER_ID = None
+
 # initialise the root logger so that module-level messages can be logged.
 # Change this to see lower level messages from module-level statements at import
 # time
@@ -98,6 +101,8 @@ class CASALogHandler(logging.Handler):
             msg = self.format(record)
             priority = CASALogHandler.get_casa_priority(record.levelno)
             origin = record.name
+            if DASK_WORKER_ID:
+                origin = f"{DASK_WORKER_ID}::{origin}"
             log = self._log
             log.post(msg, priority, origin)
             self.flush()

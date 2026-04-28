@@ -13,7 +13,7 @@ pipeconfig:
                          # Can also be enabled via PIPELINE_USE_PREFECT=1 env var (takes precedence)
     api_url: null        # Prefect API URL, e.g. "http://127.0.0.1:4200/api"
                          # null = use PREFECT_API_URL env var or Prefect's default
-    flow_name: "CASA Pipeline" # default flow name shown in Prefect UI
+    flow_name: "Pipeline" # default flow name shown in Prefect UI
     log_prints: true     # capture print() output in Prefect logs
   services:
     antpos_url: "https://asa.alma.cl/uncertainties-service/uncertainties/versions/last/measurements/casa/"
