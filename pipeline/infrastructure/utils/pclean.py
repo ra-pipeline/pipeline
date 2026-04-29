@@ -39,7 +39,7 @@ import sys
 import tempfile
 import textwrap
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import casaconfig.config
 import casatasks
