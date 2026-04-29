@@ -52,13 +52,13 @@ If you want the Prefect UI to capture the exact cluster execution:
     pixi run -e exp prefect server start --host 0.0.0.0 --port 4201
     ```
 
-    | Variable                                  | Purpose                                                                                             |
-    | ----------------------------------------- | --------------------------------------------------------------------------------------------------- |
-    | `PREFECT_SERVER_DATABASE_POOL_SIZE=20`    | Max persistent DB connections (default: 5); raise to handle concurrent Dask worker requests         |
-    | `PREFECT_SERVER_DATABASE_MAX_OVERFLOW=40` | Extra connections allowed beyond pool size (default: 10); prevents `QueuePool limit reached` errors |
-    | `PREFECT_SERVER_DATABASE_TIMEOUT=60`      | Seconds to wait for a DB connection before raising `TimeoutError` (default: 30)                     |
-    | `PREFECT_LOGGING_LEVEL=WARNING`           | Suppresses verbose INFO logs from the server process itself                                         |
-    | `PREFECT_API_URL=...`                     | Tells the server (and any CLI tools in the same shell) which URL to bind/advertise                  |
+| Variable                                  | Purpose                                                                                             |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `PREFECT_SERVER_DATABASE_POOL_SIZE=20`    | Max persistent DB connections (default: 5); raise to handle concurrent Dask worker requests         |
+| `PREFECT_SERVER_DATABASE_MAX_OVERFLOW=40` | Extra connections allowed beyond pool size (default: 10); prevents `QueuePool limit reached` errors |
+| `PREFECT_SERVER_DATABASE_TIMEOUT=60`      | Seconds to wait for a DB connection before raising `TimeoutError` (default: 30)                     |
+| `PREFECT_LOGGING_LEVEL=WARNING`           | Suppresses verbose INFO logs from the server process itself                                         |
+| `PREFECT_API_URL=...`                     | Tells the server (and any CLI tools in the same shell) which URL to bind/advertise                  |
 
   - **Optional: use PostgreSQL instead of SQLite** for better concurrency under heavy Dask workloads.
     First enter the `exp` shell so that `initdb`, `pg_ctl`, `createdb`, and `prefect` all resolve to the pixi-managed binaries:
