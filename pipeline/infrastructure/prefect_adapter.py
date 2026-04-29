@@ -48,6 +48,7 @@ LOG = infrastructure.logging.get_logger(__name__)
 
 try:
     from prefect import flow, task
+
     _PREFECT_AVAILABLE = True
 except ImportError:  # pragma: no cover
     _PREFECT_AVAILABLE = False
@@ -107,6 +108,12 @@ def _apply_prefect_config() -> None:
 
     except Exception as exc:
         LOG.debug('Could not apply Prefect config from config.yaml: %s', exc)
+
+    # Suppress httpx INFO-level logs (e.g. "HTTP Request: POST ... 500");
+    # errors are already caught and re-logged at DEBUG by our own code.
+    import logging
+
+    logging.getLogger('httpx').setLevel(logging.WARNING)
 
 
 # ---------------------------------------------------------------------------
@@ -244,8 +251,8 @@ def _log_dask_summary(task_name: str) -> None:
     Called after each ``run_pipeline_task`` to give Prefect users visibility
     into how the Dask cluster was used during that stage.  The artifact
     appears in the Prefect dashboard with a per-worker breakdown.
-    
-    This function spawns a daemon thread to prevent any slow or hanging Prefect 
+
+    This function spawns a daemon thread to prevent any slow or hanging Prefect
     API / Dask scheduler queries from blocking the main pipeline workflow.
     """
     try:
@@ -283,6 +290,7 @@ def _log_dask_summary(task_name: str) -> None:
                 LOG.debug('Could not collect Dask summary: %s', exc)
 
         import threading
+
         t = threading.Thread(target=_background_summary, daemon=True)
         t.start()
 
@@ -975,7 +983,6 @@ def _get_prefect_config() -> dict:
 
 
 if _PREFECT_AVAILABLE:
-
     # Apply config BEFORE defining @flow-decorated functions so that
     # PREFECT_API_URL is set when Prefect resolves the server connection.
     _apply_prefect_config()
@@ -987,16 +994,21 @@ if _PREFECT_AVAILABLE:
     def _ppr_flow_name() -> str:
         """Derive the flow run name from the PPR filename."""
         import prefect.runtime
+
         ppr_path = prefect.runtime.flow_run.parameters.get('pprXmlFile', 'unknown.xml')
         return os.path.basename(ppr_path).replace('.xml', '')
 
     def _recipe_flow_name() -> str:
         """Derive the flow run name from the recipe procedure or name."""
         import prefect.runtime
+
         params = prefect.runtime.flow_run.parameters
-        if params.get('name'):
-            return params['name']
-        procedure = params.get('procedure', 'procedure_unknown')
+        # run_recipe_flow is declared as ``def run_recipe_flow(**kwargs)``,
+        # so Prefect binds the call as a single ``kwargs`` parameter.
+        kwargs = params.get('kwargs', params)
+        if kwargs.get('name'):
+            return kwargs['name']
+        procedure = kwargs.get('procedure', 'procedure_unknown')
         return os.path.basename(procedure).replace('.xml', '')
 
     @flow(name=f'{_flow_name} PPR', flow_run_name=_ppr_flow_name, log_prints=_log_prints)
@@ -1013,7 +1025,7 @@ if _PREFECT_AVAILABLE:
         _register_dask_observer()
         return _run_vla_ppr_flow_impl(pprXmlFile, **kwargs)
 
-    @flow(name=f'{_flow_name} Recipe', flow_run_name=_recipe_flow_name, log_prints=_log_prints)
+    @flow(name=f'{_flow_name} Recipe', flow_run_name=_recipe_flow_name, log_prints=_log_prints, persist_result=False)
     def run_recipe_flow(**kwargs) -> Any:
         """Prefect flow wrapping :func:`recipereducer.reduce`."""
         _apply_prefect_config()
