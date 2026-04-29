@@ -245,7 +245,7 @@ class FutureTask:
         # - The task (myfunc(arg1, arg2)) is sent to a Dask worker.
         # - The worker computes the result and stores it in memory on that worker.
         # - The future object (on the client) is just a reference to that in-memory result.
-        self.future = daskclient.submit(future_exec, executable, pure=True)
+        self.future = daskclient.submit(future_exec, executable, pure=False)
 
     def get_result(self):
         """Retrieves the result from the Dask future and merges CASA logs.

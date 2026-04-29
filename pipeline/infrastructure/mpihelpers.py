@@ -273,11 +273,26 @@ class Tier0PipelineTask(Executable):
             if task_name is not None:
                 filenamer.NamingTemplate.task = task_name
 
-            return lambda: task.execute()
+            # Capture path for deferred cleanup so the file stays on disk until
+            # after task.execute() returns — a worker crash/reschedule can then
+            # re-read it on retry without a FileNotFoundError.
+            task_args_path = self.__task_args_path
 
-        finally:
+            def _run():
+                try:
+                    return task.execute()
+                finally:
+                    if task_args_path and os.path.exists(task_args_path):
+                        os.unlink(task_args_path)
+
+            return _run
+
+        except Exception:
+            # Clean up immediately if get_executable() itself fails (e.g.
+            # context or task_args file unreadable).
             if self.__task_args_path and os.path.exists(self.__task_args_path):
                 os.unlink(self.__task_args_path)
+            raise
 
     def __str__(self):
         return 'Tier0PipelineTask(%s, %s, %s)' % (self.__task_cls, self.__task_args_path, self.__context_path)
