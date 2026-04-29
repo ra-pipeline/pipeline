@@ -437,6 +437,7 @@ platforms = ["linux-64", "osx-arm64"]
 [tool.pixi.feature.exp.dependencies]
 # Pin packaging to resolve conflict: conda provides 26.1 but prefect needs <26.1
 packaging = "<26.1"
+postgresql = { version = "*", channel = "conda-forge" }
 
 [tool.pixi.feature.exp.pypi-dependencies]
 pipeline = { path = ".", editable = true, extras = ["exp"] }
