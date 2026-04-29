@@ -302,6 +302,8 @@ def start_xvfb():
         LOG.warning('Required package pyvirtualdisplay is not installed, '
                     'which is required to creating virtual displays for '
                     'GUI applications in headless environments')
+    except FileNotFoundError:
+        LOG.warning('Xvfb binary not found on this system; skipping virtual display setup')
 
 
 def stop_xvfb():
