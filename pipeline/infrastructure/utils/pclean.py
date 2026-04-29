@@ -256,7 +256,10 @@ def pclean(
             ) from e
 
         if not output.get('success', False):
-            raise RuntimeError(f'{output.get("type")}: {output.get("message")}')
+            raise RuntimeError(
+                f'{output.get("type")}: {output.get("message")}\n'
+                f'Remote traceback:\n{output.get("traceback", "<not available>")}'
+            )
 
         return output.get('result')
 
