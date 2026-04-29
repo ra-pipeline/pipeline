@@ -82,6 +82,29 @@ If you want the Prefect UI to capture the exact cluster execution:
         PREFECT_API_URL=http://127.0.0.1:4201/api pixi run -e exp python scripts/demo_prefect_tier0futures.py pltest1
         ```
     - Note the `/api` suffix is required in `PREFECT_API_URL`.
+    - **Accessing the server from other machines**: `--host 0.0.0.0` makes the server listen on all network interfaces, but clients must connect using the server machine's actual IP or hostname — not `0.0.0.0`. Use `hostname -f` to get a routable address dynamically:
+        ```bash
+        SERVER_IP=$(hostname -f)   # fully-qualified hostname, routable from other nodes
+        # or: SERVER_IP=$(hostname -I | awk '{print $1}')  # first IP address
+
+        PREFECT_SERVER_DATABASE_POOL_SIZE=20 \
+        PREFECT_SERVER_DATABASE_MAX_OVERFLOW=40 \
+        PREFECT_SERVER_DATABASE_TIMEOUT=60 \
+        PREFECT_LOGGING_LEVEL=WARNING \
+        PREFECT_API_URL=http://${SERVER_IP}:4201/api \
+        pixi run -e exp prefect server start --host 0.0.0.0 --port 4201
+        ```
+        From another node, point the client at the same address:
+        ```bash
+        PREFECT_API_URL=http://<server-hostname>:4201/api \
+        pixi run -e exp python scripts/demo_prefect_tier0futures.py pltest1
+        ```
+        If the port is blocked by a firewall, use an SSH tunnel instead:
+        ```bash
+        # On your local/client machine
+        ssh -L 4201:localhost:4201 <server-hostname>
+        # Then connect to http://localhost:4201 (UI) and use PREFECT_API_URL=http://127.0.0.1:4201/api
+        ```
 
 ## 4. Running the Pipeline on the Cluster
 
