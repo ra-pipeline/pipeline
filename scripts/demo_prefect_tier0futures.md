@@ -36,9 +36,52 @@ Ensure the experimental orchestration layers are targeted in your configuration.
 
 If you want the Prefect UI to capture the exact cluster execution:
 - Start the server on a known node: `pixi run -e exp prefect server start --host 0.0.0.0`
+    - note: to change the port (default `4200`): add `--port <number>`, e.g. `pixi run -e exp prefect server start --host 0.0.0.0 --port 4201`; update `prefect_api_url` in the script to match
     - note: to nuke the database: `pixi run -e exp prefect server database reset -y`
     - note: avoid the community upgrade banner: `prefect config set PREFECT_SERVER_UI_SHOW_PROMOTIONAL_CONTENT=False`
-- Configure the API endpoint: You can either set the `prefect_api_url` variable directly inside `scripts/demo_prefect_tier0futures.py`, or set the environment variable beforehand: `export PREFECT_API_URL="http://<server-ip>:4200/api"`
+    - **Recommended: start with tuned settings** to avoid SQLite connection pool exhaustion when many Dask workers post logs/artifacts concurrently (default pool is only 5+10 connections):
+        ```bash
+        PREFECT_SERVER_DATABASE_POOL_SIZE=20 \
+        PREFECT_SERVER_DATABASE_MAX_OVERFLOW=40 \
+        PREFECT_SERVER_DATABASE_TIMEOUT=60 \
+        PREFECT_LOGGING_LEVEL=WARNING \
+        PREFECT_API_URL=http://127.0.0.1:4201/api \
+        pixi run -e exp prefect server start --host 0.0.0.0 --port 4201
+        ```
+        | Variable | Purpose |
+        |---|---|
+        | `PREFECT_SERVER_DATABASE_POOL_SIZE=20` | Max persistent DB connections (default: 5); raise to handle concurrent Dask worker requests |
+        | `PREFECT_SERVER_DATABASE_MAX_OVERFLOW=40` | Extra connections allowed beyond pool size (default: 10); prevents `QueuePool limit reached` errors |
+        | `PREFECT_SERVER_DATABASE_TIMEOUT=60` | Seconds to wait for a DB connection before raising `TimeoutError` (default: 30) |
+        | `PREFECT_LOGGING_LEVEL=WARNING` | Suppresses verbose INFO logs from the server process itself |
+        | `PREFECT_API_URL=...` | Tells the server (and any CLI tools in the same shell) which URL to bind/advertise |
+    - **Optional: use PostgreSQL instead of SQLite** for better concurrency under heavy Dask workloads:
+        ```bash
+        # One-time setup
+        initdb -D ~/.prefect/prefect-pg && pg_ctl -D ~/.prefect/prefect-pg start
+        createdb prefect
+
+        # Start server pointing at PostgreSQL
+        PREFECT_API_DATABASE_CONNECTION_URL="postgresql+asyncpg://localhost/prefect" \
+        PREFECT_SERVER_DATABASE_POOL_SIZE=20 \
+        PREFECT_SERVER_DATABASE_MAX_OVERFLOW=40 \
+        PREFECT_SERVER_DATABASE_TIMEOUT=60 \
+        PREFECT_LOGGING_LEVEL=WARNING \
+        PREFECT_API_URL=http://127.0.0.1:4201/api \
+        pixi run -e exp prefect server start --host 0.0.0.0 --port 4201
+        ```
+- Configure the API endpoint so the script reports runs to the correct server. `--port` and `PREFECT_API_URL` serve different purposes and must agree:
+    - **`--port <number>`** tells the **server** which port to listen on (affects the URL you open in a browser).
+    - **`PREFECT_API_URL`** tells the **client** (the script, CLI commands, etc.) where to find the server.
+    - For the dashboard to show flow runs you need both pointing at the same port. On the default port `4200` neither is needed. On a custom port, set both:
+        ```bash
+        # Terminal 1 — start server on port 4201
+        PREFECT_API_URL=http://127.0.0.1:4201/api pixi run -e exp prefect server start --host 0.0.0.0 --port 4201
+
+        # Terminal 2 — run the script against that server
+        PREFECT_API_URL=http://127.0.0.1:4201/api pixi run -e exp python scripts/demo_prefect_tier0futures.py pltest1
+        ```
+    - Note the `/api` suffix is required in `PREFECT_API_URL`.
 
 ## 4. Running the Pipeline on the Cluster
 
@@ -56,7 +99,7 @@ cd /path/to/pipeline
 
 # Enable orchestration and run!
 export PIPELINE_USE_PREFECT=1
-pixi run -e exp python scripts/demo_prefect_tier0futures.py
+pixi run -e exp python scripts/demo_prefect_tier0futures.py if2016
 ```
 
 ### Option B: Batch Submission (SLURM)
@@ -76,7 +119,7 @@ cd /path/to/pipeline
 export PIPELINE_USE_PREFECT=1
 
 # Execute the test natively inside the Pixi managed environment
-pixi run -e exp python scripts/demo_prefect_tier0futures.py
+pixi run -e exp python scripts/demo_prefect_tier0futures.py if2016
 ```
 
 Submit via: `sbatch run_pipeline.sh`
