@@ -5,14 +5,10 @@ import os, sys
 import argparse
 import glob
 import time as systime
-import datetime
-import numpy as np
-import pickle
 import sd_qa_utils
 import sd_baseline_qa
 import sd_qa_reports
 from casatools import version_string as cversion
-from pipeline.h.cli import h_resume
 from pipeline.infrastructure import version as plversion
 
 #def_input_path = "/jaopost_spool/sd-qascores/PIPEREQ-305"
@@ -76,9 +72,13 @@ def main():
 
     #Change to working folder of pipeline
     init_cwd = os.getcwd()
-    plworking_folder = glob.glob(input_path+'/S*/G*/M*/working')
+    #plworking_folder = glob.glob(input_path+'/S*/G*/M*/working')
+    input_path =  '/work/dev/joshua.hoskins/verification/absolute_off/working'
+    plworking_folder = glob.glob(input_path)
+
     if len(plworking_folder) == 1:
         plworking_folder = plworking_folder[0]
+
     else:
         print('Could not find pipeline working folder inside '+input_path+'! Exiting...')
         sys.exit('Could not find pipeline working folder.')
@@ -87,21 +87,22 @@ def main():
 
     #Get science line data detections, if available
     sci_line_data = sd_qa_utils.read_sci_line_data_from_buffer()
-    if sci_line_data is None:
-        try:
-            print('Could not find science line detection in a sci_line_data.pkl buffer file, attempting read from the pipeline context.')
-            if (not folder_casaversion == casaversion) or (not folder_PLversion == PLversion):
-                print(f'Dataset {input_path} produced using CASA {folder_casaversion}, Pipeline {folder_PLversion},')
-                print(f'while current CASA is {casaversion} and Pipeline {PLversion}.')
-                print('Run extract_science_lines.sh to buffer context information into sci_line_data.pkl.')
-                print('Exiting...')
-                sys.exit('Wrong pipeline version for context reading')
-            sci_line_data = sd_qa_utils.read_sci_line_data_from_context()
-        except ValueError as e:
-            print(f"Could not read pipeline context to obtain science line detections. Check pipeline version. Error: {e}")
-            print("Exiting...")
-            sys.exit("Pipeline context reading error")
-
+    # if sci_line_data is None:
+    #      try:
+    #          print('Could not find science line detection in a sci_line_data.pkl buffer file, attempting read from the pipeline context.')
+    #          if (not folder_casaversion == casaversion) or (not folder_PLversion == PLversion):
+    #              print(f'Dataset {input_path} produced using CASA {folder_casaversion}, Pipeline {folder_PLversion},')
+    #              print(f'while current CASA is {casaversion} and Pipeline {PLversion}.')
+    #              print('Run extract_science_lines.sh to buffer context information into sci_line_data.pkl.')
+    #              print('Exiting...')
+    #              sys.exit('Wrong pipeline version for context reading')
+    #          sci_line_data = sd_qa_utils.read_sci_line_data_from_context()
+    #      except ValueError as e:
+    #          print(f"Could not read pipeline context to obtain science line detections. Check pipeline version. Error: {e}")
+    #          print("Exiting...")
+    #          sys.exit("Pipeline context reading error")
+    sci_line_data = sd_qa_utils.read_sci_line_data_from_context()
+    print(sci_line_data)
     #get list of ms, create relevant lists filtering out non-relevant MSs
     mslist = glob.glob('uid*.ms.atmcor.atmtype?_bl')
     justmslist = [ms.split('/')[-1] for ms in mslist]
@@ -120,21 +121,26 @@ def main():
         output_path = plfolder
 
     plot_output_path = os.path.join(output_path, 'sd_baseline_output')
+    plot_output_path = "/work/dev/joshua.hoskins/pipe-test/working/"
         
     #Create output paths, if they don't exist yet
     if (not os.path.exists(plot_output_path)):
         os.system('mkdir '+plot_output_path)
 
     print('Working PL folder:'+working_folder)
-    print('Requesting plot output to be in '+plot_output_path)
+    print('Requesting plot output to be in ' + plot_output_path)
+
+    import pathlib
+    print(pathlib.Path(plot_output_path).parent.resolve())
     #Run sd_applycal main method to get QA scores
     qascore_list = []
     plots_fnames = []
     antnames_for = {}
     for ms in mslist:
         msonly = ms.split('/')[-1]
+        print(f"MS: {msonly}")
         (this_qascore_list, this_antnames_for, this_plots_fnames) = \
-            sd_baseline_qa.get_ms_baseline_qascores([ms], sci_line_data = sci_line_data,
+            sd_baseline_qa.get_ms_baseline_qascores(ms, sci_line_data = sci_line_data,
                                                     plot_output_path = plot_output_path,
                                                     weblog_output_path = plot_output_path,
                                                     buffer_data = True,
@@ -144,15 +150,17 @@ def main():
         antnames_for.update(this_antnames_for)
 
     #End time
-    tend = systime.time()
-    dtime_min = (tend-tstart)/60.0
+    end_time = systime.time()
+    dtime_min = (end_time-tstart)/60.0
 
     #Write reports used for testing
     sd_qa_reports.addFLSLentry_bl(qascore_list, output_file = output_path+'prototype_qa_score.csv', dtime_min = dtime_min)
     sd_qa_reports.makeSummaryTable_bl(qascore_list, antnames_for, plots_fnames, plfolder, working_folder = working_folder, output_file = plot_output_path + '/qascore_summary.csv', writemode = 'w', weblog_adress = 'http://jaopost-web.sco.alma.cl/dataproc/hfrancke/hfranckebase/QAscores/PIPEREQ-305/'+plworking_folder)
 
     os.chdir(init_cwd)
- 
+
+    end_time = systime.time()
+    print(f"END TIME: {(end_time-tstart)/60.0}")
     return
 
 if __name__ == '__main__':

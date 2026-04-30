@@ -22,6 +22,7 @@ read -r -d '' LOOKUP_TABLE << EOM
 6.5.4.9   2023.1.0.124  2024JUN  casa-6.5.4-9-pipeline-2023.1.0.124
 6.6.1.17  2024.1.0.8    2024OCT  casa-6.6.1-17-pipeline-2024.1.0.8
 6.6.6.17  2025.1.0.35   2025OCT  casa-6.6.6-17-pipeline-2025.1.0.35-py3.10.el8
+6.7.3.1   2026.0.0.39   2026OCT  casa-6.7.3-1-py3.12.el8
 EOM
 # =================================================
 
@@ -40,14 +41,14 @@ if [[ ! -d "$INPUT_DIR" ]]; then
 fi
 
 # 1.5 Search for working folder
-workingfolder=`ls -d $1/S*/G*/M*/working`
+workingfolder=`ls -d /work/dev/joshua.hoskins/verification/absolute_off/working`
 
 #1.75 set up parameter for python
 # Fixed command line arguments for the program
 PROG_ARGS="os=__import__(""'""os""'"");sd_qa_utils=__import__(""'""sd_qa_utils""'"");os.chdir(""'""$workingfolder""'"");sd_qa_utils.read_sci_line_data_from_context();"
 
 # 2. Search for the first XML file in the directory
-XML_FILE=`ls -d $1/S*/G*/M*/working/pipeline_aquareport.xml`
+XML_FILE=`ls -d /work/dev/joshua.hoskins/verification/absolute_off/working/pipeline_aquareport.xml`
 
 if [[ -z "$XML_FILE" ]]; then
     echo "Error: No XML file found in '$INPUT_DIR'."
@@ -79,8 +80,8 @@ while read -r num1 num2 release casapath; do
         echo "Match found in lookup table."
         
         # Prepend to existing environment variables
-        export PATH="/opt/pipelinedriver/$release/casa/$casapath/bin:/users/hfrancke/bin/sd-applycal-qa"
-        export PYTHONPATH="/opt/pipelinedriver/$release/bin/common_dependencies/lib/python/site-packages/:/opt/pipelinedriver/$release/bin/pipeline_driver_build/lib/python/site-packages/:/users/hfrancke/bin/sd-applycal-qa"
+        #export PATH="/opt/pipelinedriver/$release/casa/$casapath/bin:/users/hfrancke/bin/sd-applycal-qa"
+        #export PYTHONPATH="/opt/pipelinedriver/$release/bin/common_dependencies/lib/python/site-packages/:/opt/pipelinedriver/$release/bin/pipeline_driver_build/lib/python/site-packages/:/users/hfrancke/bin/sd-applycal-qa"
         
         match_found=true
         break

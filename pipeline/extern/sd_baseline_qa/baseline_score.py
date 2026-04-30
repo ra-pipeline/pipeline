@@ -57,7 +57,7 @@ def baseline_score(
 
     # Generally, pipeline operates in the current working directory, so we will use that as the working path.
     working_path = pathlib.Path.cwd().resolve()
-    LOG.info(f"Current working directory: %s", working_path)
+    LOG.debug(f"Current working directory: %s", working_path)
 
     baseline_file = pathlib.Path(outfile)
     date_time = datetime.datetime.now(datetime.UTC).strftime("%Y%d%mT%H%M%SD%f")
