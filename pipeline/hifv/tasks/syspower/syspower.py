@@ -1,16 +1,15 @@
 import ast
+import collections
 import os
 import re
 import shutil
 from copy import deepcopy
 from math import factorial
-import collections
 
 import numpy as np
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
-import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import task_registry
@@ -112,7 +111,7 @@ class SyspowerResults(basetask.Results):
         if plotrq is None:
             plotrq = ''
 
-        super(SyspowerResults, self).__init__()
+        super().__init__()
 
         self.pipeline_casa_task = 'Syspower'
         self.gaintable = gaintable
@@ -474,11 +473,10 @@ class Syspower(basetask.StandardTaskTemplate):
                         LOG.info('    restored {0:.2f}% template flags after interpolation'.format(
                                  100.0 * np.sum(sp_median_mask) / sp_median_mask.size))
                         # repeat after square root
-                        if isinstance(sp_data.mask, bool):
-                            sp_data.mask = np.ma.getmaskarray(sp_data)
+                        sp_data.mask = np.ma.getmaskarray(sp_data)
                         sp_data.mask[sp_data < 0] = True
-                        sp_data = np.ma.masked_array(sp_data ** 0.5, mask=sp_data.mask)
-                        sp_template = np.ma.masked_array(sp_template ** 0.5, mask=sp_template.mask)
+                        sp_data = np.ma.masked_array(sp_data**0.5, mask=sp_data.mask)
+                        sp_template = np.ma.masked_array(sp_template**0.5, mask=sp_template.mask)
                         sp_data.mask[sp_data != sp_data] = True
                         sp_data, flag_percent = self.flag_with_medfilt(sp_data, sp_template, flag_rms=True,
                                                                        flag_median=True,
@@ -678,9 +676,7 @@ class Syspower(basetask.StandardTaskTemplate):
             y[-j:, -(i + 1)] = x[-1]
             y.mask[-j:, -(i + 1)] = True
         medians = np.ma.median(y, axis=1)
-
-        if isinstance(medians.mask, np.bool_):
-            medians.mask = np.ma.getmaskarray(medians)
+        medians.mask = np.ma.getmaskarray(medians)
 
         if np.ma.all(medians.mask): return medians
 
@@ -715,7 +711,7 @@ class Syspower(basetask.StandardTaskTemplate):
         else:
             resid = (x - temp[np.newaxis, :]).ravel()
         new_flags = self.medfilt(resid, k, threshold=threshold, flag_only=True, **kwargs)
-        x.mask = np.reshape(new_flags.mask, newshape=x.shape)
+        x.mask = np.reshape(new_flags.mask, x.shape)
         flag_percent = 100.0 * np.sum(x.mask) / x.size
         x.mask[x == 0] = True
         return x, flag_percent

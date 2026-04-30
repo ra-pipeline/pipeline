@@ -1,6 +1,7 @@
 """Set of heuristics for data grouping."""
-from numbers import Real
-from typing import Dict, List, NewType, Sequence, Tuple, Union
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -8,15 +9,21 @@ import pipeline.infrastructure.api as api
 import pipeline.infrastructure as infrastructure
 from pipeline.infrastructure import casa_tools
 
-LOG = infrastructure.get_logger(__name__)
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from numbers import Real
 
-Angle = NewType('Angle', Union[float, int, Dict])
+    from numpy.typing import NDArray
+
+    Angle = float | int | dict
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class GroupByPosition2(api.Heuristic):
     """Grouping by RA/DEC position."""
 
-    def calculate(self, ra: np.ndarray, dec: np.ndarray, r_combine: Angle, r_allowance: Angle) -> Tuple[Dict, List]:
+    def calculate(self, ra: NDArray, dec: NDArray, r_combine: Angle, r_allowance: Angle) -> tuple[dict, list]:
         """Group data by RA/DEC position.
 
         Divides data into groups by their positions in two
@@ -125,15 +132,13 @@ class GroupByPosition2(api.Heuristic):
             PosGapMsg = 'Found %d position gap(s)' % len(PosGap)
         LOG.info(PosGapMsg)
 
-        #print '\nPosGap', PosGap
-        #print '\nPosDict', PosDict
         return PosDict, PosGap
 
 
 class GroupByTime2(api.Heuristic):
     """Grouping by time sequence."""
 
-    def calculate(self, timebase: Sequence[Real], time_diff: Sequence[Real]) -> Tuple[List, List]:
+    def calculate(self, timebase: Sequence[Real], time_diff: Sequence[Real]) -> tuple[list, list]:
         """Group data by time sequence.
 
         Divides data into groups by their difference (time_diff).
@@ -217,17 +222,13 @@ class GroupByTime2(api.Heuristic):
             LOG.info(TimeGapMsg1)
             LOG.info(TimeGapMsg2)
 
-        #print '\nTimeGap', TimeGap
-        #print '\nTimeTable', TimeTable
         return TimeTable, TimeGap
-        # TimeGap is index
-        # TimeTable[][0] is row, TimeTable[][1] is index
 
 
 class ThresholdForGroupByTime(api.Heuristic):
     """Estimate thresholds for large and small time gaps."""
 
-    def calculate(self, timebase: Sequence[Real]) -> Tuple[List, List]:
+    def calculate(self, timebase: Sequence[Real]) -> tuple[list, list]:
         """Estimate thresholds for large and small time gaps.
 
         Estimate thresholds for large and small time gaps using
@@ -281,7 +282,7 @@ class ThresholdForGroupByTime(api.Heuristic):
 class MergeGapTables2(api.Heuristic):
     """Merge time gap and position gaps."""
 
-    def calculate(self, TimeGap: List, TimeTable: List, PosGap: List, tBEAM: Sequence[int]) -> Tuple[List, List]:
+    def calculate(self, TimeGap: list, TimeTable: list, PosGap: list, tBEAM: Sequence[int]) -> tuple[list, list]:
         """Merge time gap and position gaps.
 
         Merge time gap list (TimeGap) and position gap list (PosGap).
@@ -365,14 +366,11 @@ class MergeGapTables2(api.Heuristic):
         TimeTable = [[], []]
         for i in range(len(TimeTable2)):
             for index in range(len(TimeTable2[i])):
-                #rows = TimeTable2[i][index][0]
                 idxs = TimeTable2[i][index]
                 BeamDict = {}
                 for index2 in range(len(idxs)):
-                    #row = rows[index2]
                     idx = idxs[index2]
                     if tBEAM[idx] in BeamDict:
-                        #BeamDict[tBEAM[row]][0].append(row)
                         BeamDict[tBEAM[idx]].append(idx)
                     else:
                         BeamDict[tBEAM[idx]] = [idx]
@@ -380,11 +378,8 @@ class MergeGapTables2(api.Heuristic):
                 for beam in BeamList:
                     TimeTable[i].append(beam)
 
-        #print TimeTable[0]
         del BeamDict, BeamList, TimeTable2
 
         LOG.debug('TimeTable = %s' % (TimeTable))
 
-        #print '\nTimeGap', TimeGap
-        #print '\nTimeTable', TimeTable
         return TimeTable, TimeGap

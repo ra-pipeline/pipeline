@@ -2,8 +2,6 @@ import os
 import re
 import inspect
 
-from typing import Optional
-
 import numpy as np
 from scipy.ndimage import label
 
@@ -29,7 +27,7 @@ from .resultobjects import TcleanResult
 from .vlaautomaskthresholdsequence import VlaAutoMaskThresholdSequence
 from .vlassmaskthresholdsequence import VlassMaskThresholdSequence
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class TcleanInputs(cleanbase.CleanBaseInputs):
@@ -92,9 +90,9 @@ class TcleanInputs(cleanbase.CleanBaseInputs):
     @specmode.convert
     def specmode(self, value):
         if value == 'repBW':
-            self.orig_specmode = 'repBW'
+            self.hm_specmode = 'repBW'
             return 'cube'
-        self.orig_specmode = value
+        self.hm_specmode = value
         return value
 
     @vdp.VisDependentProperty
@@ -574,18 +572,19 @@ class Tclean(cleanbase.CleanBase):
         # Make sure there are LSRK selections if cont.dat/lines.dat exist.
         # For ALMA this is already done at the hif_makeimlist step. For VLASS
         # this does not (yet) happen in hif_editimlist.
+        sourcename = self.image_heuristics.get_sourcename(inputs.vis, inputs.field, inputs.intent)
+
         if inputs.spwsel_lsrk == {}:
             all_continuum = True
             low_bandwidth = True
             low_spread = True
             for spwid in inputs.spw.split(','):
 
-
                 cont_ranges_spwsel, all_continuum_spwsel, low_bandwidth_spwsel, low_spread_spwsel = self.image_heuristics.cont_ranges_spwsel()
-                spwsel_spwid = cont_ranges_spwsel.get(utils.dequote(inputs.field), {}).get(spwid, 'NONE')
-                all_continuum = all_continuum and all_continuum_spwsel.get(utils.dequote(inputs.field), {}).get(spwid, False)
-                low_bandwidth = low_bandwidth and low_bandwidth_spwsel.get(utils.dequote(inputs.field), {}).get(spwid, False)
-                low_spread = low_spread and low_spread_spwsel.get(utils.dequote(inputs.field), {}).get(spwid, False)
+                spwsel_spwid = cont_ranges_spwsel.get(sourcename, {}).get(spwid, 'NONE')
+                all_continuum = all_continuum and all_continuum_spwsel.get(sourcename, {}).get(spwid, False)
+                low_bandwidth = low_bandwidth and low_bandwidth_spwsel.get(sourcename, {}).get(spwid, False)
+                low_spread = low_spread and low_spread_spwsel.get(sourcename, {}).get(spwid, False)
 
                 if inputs.intent == 'TARGET':
                     if (spwsel_spwid == 'NONE') and self.image_heuristics.warn_missing_cont_ranges():
@@ -1482,7 +1481,7 @@ class Tclean(cleanbase.CleanBase):
                                                   restfreq=inputs.restfreq,
                                                   conjbeams=inputs.conjbeams,
                                                   uvrange=inputs.uvrange,
-                                                  orig_specmode=inputs.orig_specmode,
+                                                  hm_specmode=inputs.hm_specmode,
                                                   specmode=inputs.specmode,
                                                   gridder=inputs.gridder,
                                                   datacolumn=inputs.datacolumn,
@@ -1608,7 +1607,7 @@ class Tclean(cleanbase.CleanBase):
         imageheader.set_miscinfo(name=outfile, spw=self.inputs.spw, virtspw=virtspw,
                                  field=self.inputs.field, iter=iter,
                                  datatype=self.inputs.datatype, type=mom_type,
-                                 intent=self.inputs.intent, specmode=self.inputs.orig_specmode,
+                                 intent=self.inputs.intent, specmode=self.inputs.hm_specmode,
                                  context=context)
 
     # Calculate a "mom0_fc", "mom8_fc" and "mom10_fc: images: this is a moment
@@ -1889,12 +1888,12 @@ class Tclean(cleanbase.CleanBase):
         # Update the result.
         result.set_mom8(maxiter, mom8_name)
 
-    def _update_miscinfo(self, imagename: str, nfield: Optional[int] = None, datamin: Optional[float] = None,
-                         datamax: Optional[float] = None, datarms: Optional[float] = None,
-                         stokes: Optional[str] = None, effbw: Optional[float] = None,
-                         level: Optional[str] = None, ctrfrq: Optional[float] = None,
-                         obspatt: Optional[str] = None, arrays: Optional[str] = None,
-                         modifier: Optional[str] = None, session: Optional[str] = None):
+    def _update_miscinfo(self, imagename: str, nfield: int | None = None, datamin: float | None = None,
+                         datamax: float | None = None, datarms: float | None = None,
+                         stokes: str | None = None, effbw: float | None = None,
+                         level: str | None = None, ctrfrq: float | None = None,
+                         obspatt: str | None = None, arrays: str | None = None,
+                         modifier: str | None = None, session: str | None = None):
         """
         Update image header keywords.
 

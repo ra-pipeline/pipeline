@@ -100,7 +100,7 @@ def plotPWV(ms, figfile='', plotrange=[0, 0, 0, 0], clip=True):
     timeplot = matplotlib.dates.date2num(list_of_date_times)
     for a in range(len(unique_antennas)):
         matches = np.where(unique_antennas[a] == np.array(antennaName))[0]
-        plt.plot_date(timeplot[matches], water[matches], '.', color=overlayColors[a % len(overlayColors)])
+        plt.plot(timeplot[matches], water[matches], '.', color=overlayColors[a % len(overlayColors)])
 
     # Now sort to average duplicate timestamps to one value, then fit spline
     indices = np.argsort(watertime)
@@ -124,7 +124,7 @@ def plotPWV(ms, figfile='', plotrange=[0, 0, 0, 0], clip=True):
         water = splev(regular_time, ius, der=0)
     list_of_date_times = mjd_seconds_to_datetime(regular_time)
     timeplot = matplotlib.dates.date2num(list_of_date_times)
-    plt.plot_date(timeplot, water, 'k-')
+    plt.plot(timeplot, water, 'k-')
 
     # Plot limits and ranges
     if plotrange[0] != 0 or plotrange[1] != 0:

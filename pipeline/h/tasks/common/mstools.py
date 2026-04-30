@@ -1,22 +1,27 @@
-import numpy
+from __future__ import annotations
+
 import os
-from typing import List, Tuple, Optional, Union
+from typing import TYPE_CHECKING
+
+import numpy
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.utils as utils
 from pipeline.h.tasks.common.commonhelpermethods import get_corr_products
-from pipeline.domain.measurementset import MeasurementSet
 from pipeline.infrastructure import casa_tools
 
-LOG = infrastructure.get_logger(__name__)
+if TYPE_CHECKING:
+    from pipeline.domain import MeasurementSet
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 def read_channel_averaged_data_from_ms(ms: MeasurementSet,
-                                       fieldid: Union[str, int],
-                                       spwid: Union[str, int],
+                                       fieldid: str | int,
+                                       spwid: str | int,
                                        intent: str,
-                                       items: List[str],
-                                       baseline_set: Optional[List] = None) -> dict:
+                                       items: list[str],
+                                       baseline_set: list | None = None) -> dict:
     """
     Read the channel-averaged visibility data from a MS for the given field, spw, intent,
     and optionally a subset of baselines.
@@ -25,8 +30,8 @@ def read_channel_averaged_data_from_ms(ms: MeasurementSet,
         fieldid:  string or int representing the field ID.
         spwid:    string or int representing the SPW ID.
         intent:   intent or list of intents.
-        items:    list of data arrays to read, e.g., ['corrected_data', 'flag', 'antenna1', 'antenna2'].
-        baseline_set:  list of baselines (default: all).
+        items:    List of data arrays to read, e.g., ['corrected_data', 'flag', 'antenna1', 'antenna2'].
+        baseline_set:  List of baselines (default: all).
     Returns:
         a dict with the data array for each element in items.
     """
@@ -72,9 +77,9 @@ def read_channel_averaged_data_from_ms(ms: MeasurementSet,
 
 
 def compute_mean_flux(ms: MeasurementSet,
-                      fieldid: Union[str, int],
-                      spwid: Union[str, int],
-                      intent: str) -> Tuple[float, float]:
+                      fieldid: str | int,
+                      spwid: str | int,
+                      intent: str) -> tuple[float, float]:
     """
     Compute the mean flux and its standard deviation (averaged across available polarizations)
     for the given MS, field, spw and intent.

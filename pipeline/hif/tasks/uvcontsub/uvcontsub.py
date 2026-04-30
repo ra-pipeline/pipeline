@@ -333,7 +333,7 @@ class SerialUVcontSub(basetask.StandardTaskTemplate):
                             members = [m for m in tar.getmembers() if m.name == contdatfile]
                             if members:
                                 LOG.info("Extracting %s from %s", contdatfile, file_path)
-                                tar.extractall(members=members)
+                                tar.extractall(members=members, filter='fully_trusted')
                                 LOG.info("Extraction complete.")
                                 return
                     except tarfile.TarError as e:

@@ -17,7 +17,7 @@ RefantTR = collections.namedtuple('RefantTR', 'vis refant')
 
 class T2_4MDetailsLockRefantRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def __init__(self, uri='lockrefant.mako', description='Lock refant list', always_rerender=False):
-        super(T2_4MDetailsLockRefantRenderer, self).__init__(uri=uri, description=description,
+        super().__init__(uri=uri, description=description,
                                                              always_rerender=always_rerender)
 
     def update_mako_context(self, ctx, context, result):

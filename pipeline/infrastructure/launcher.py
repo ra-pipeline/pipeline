@@ -7,22 +7,27 @@ Classes:
     Context: Container for all pipeline state during execution.
     Pipeline: Entry point for initializing and managing the pipeline.
 """
+from __future__ import annotations
+
 import contextvars
 import datetime
 import os
 import pickle
 import pprint
-from typing import Any
+from typing import TYPE_CHECKING
 
 from pipeline import domain, environment
 
 from . import callibrary, casa_tools, eventbus, imagelibrary, logging, project, utils
 from .eventbus import ContextCreatedEvent, ContextResumedEvent
 
+if TYPE_CHECKING:
+    from typing import Any
+
 LOG = logging.get_logger(__name__)
 
 # minimum allowed CASA revision. Set to 0 or None to disable
-MIN_CASA_REVISION = [6, 6, 6, 16]
+MIN_CASA_REVISION = [6, 7, 3, 20]
 # maximum allowed CASA revision. Set to 0 or None to disable
 MAX_CASA_REVISION = None
 
@@ -91,7 +96,7 @@ class Context:
         if name is None:
             # initialise the context name with something reasonable: a current
             # timestamp
-            now = datetime.datetime.utcnow()
+            now = datetime.datetime.now(datetime.timezone.utc)
             name = now.strftime('pipeline-%Y%m%dT%H%M%S')
         self.name = name
 

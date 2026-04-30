@@ -14,7 +14,7 @@ from pipeline.h.tasks.common.displays import common as common
 LOG = infrastructure.get_logger(__name__)
 
 
-class PhaseOffsetPlotHelper(object):
+class PhaseOffsetPlotHelper:
     colour_map = {'BEFORE': {'L': ('-', 'orange', 0.6),
                              'R': ('--', 'sandybrown', 0.6),
                              'X': ('-', 'lightslategray', 0.6),
@@ -66,7 +66,7 @@ class PhaseOffsetPlotHelper(object):
                  transform=fig.transFigure, ha='center', size=9)
 
 
-class PhaseOffsetPlot(object):
+class PhaseOffsetPlot:
     def __init__(self, context, ms, plothelper, scan_intent=None, scan_id=None, scan_spw=None, score_retriever=None):
         self._context = context
         self._ms = ms        
@@ -207,7 +207,7 @@ class PhaseOffsetPlot(object):
 
                         # create fake masked slices and data arrays so we can 
                         # plot flagged annotation 
-                        class dummy(object):
+                        class dummy:
                             pass
 
                         dummy_slice = dummy()
@@ -222,8 +222,8 @@ class PhaseOffsetPlot(object):
 
                         dummy_data = numpy.ma.MaskedArray(data=[0, 1], mask=True)
 
-                        axis.plot_date(dummy_time.time, dummy_data, '.')
-                        _, = axis.plot_date(dummy_time.time, dummy_data)
+                        axis.plot(dummy_time.time, dummy_data, '.')
+                        _, = axis.plot(dummy_time.time, dummy_data, 'o')
 
                         self._plot_flagged_data(dummy_time, dummy_slice, axis,
                                                 True, annotation='NO DATA')
@@ -263,9 +263,9 @@ class PhaseOffsetPlot(object):
 
                         (symbol, color, alpha) = plothelper.get_symbol_and_colour(corr_axis, 
                                                                                   state)
-                        axis.plot_date(data.time, offset_deg, '.',
+                        axis.plot(data.time, offset_deg, '.',
                                        color=color, alpha=alpha)
-                        p, = axis.plot_date(data.time, offset_deg, symbol,
+                        p, = axis.plot(data.time, offset_deg, symbol,
                                             color=color, alpha=alpha)
 
                         legend_entry = '%s %s' % (corr_axis, state.lower())

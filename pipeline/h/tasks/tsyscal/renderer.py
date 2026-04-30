@@ -4,6 +4,7 @@ Created on 9 Sep 2014
 @author: sjw
 """
 import collections
+import collections.abc
 import os
 
 import numpy
@@ -25,7 +26,7 @@ class T2_4MDetailsTsyscalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def __init__(self, uri='tsyscal.mako', 
                  description='Calculate Tsys calibration',
                  always_rerender=False):
-        super(T2_4MDetailsTsyscalRenderer, self).__init__(
+        super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
     def update_mako_context(self, mako_context, pipeline_context, results):
@@ -122,7 +123,7 @@ class TsyscalPlotRenderer(basetemplates.JsonPlotRenderer):
         self._spwmap = {os.path.basename(r.inputs['vis']): r.final[0].spwmap
                         for r in result}
 
-        super(TsyscalPlotRenderer, self).__init__(
+        super().__init__(
                 'tsyscal_plots.mako', context, result, plots, title, outfile)
 
     def update_json_dict(self, d, plot):

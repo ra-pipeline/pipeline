@@ -252,7 +252,7 @@ class ImportData(basetask.StandardTaskTemplate):
                 to_import = [os.path.join(abs_output_dir, ms) for ms in to_import]
 
                 LOG.info('Extracting %s to %s', vis, abs_output_dir)
-                tar.extractall(path=abs_output_dir)
+                tar.extractall(path=abs_output_dir, filter='fully_trusted')
 
         # Assume that if vis is not a tar, it's a directory ready to be
         # imported, or in the case of an ASDM, converted then imported.

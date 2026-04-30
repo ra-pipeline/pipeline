@@ -106,9 +106,11 @@ def percent_flagged_diff(flagsummary1, flagsummary2):
 
 %>
 
-% for ms in flags.keys():
+% if flags:
 
 <h3 id="flagged_data_summary" class="jumptarget">Checkflag Summary</h3>
+
+% for ms in flags.keys():
 
 <h4>${os.path.basename(ms)}</h4>
 
@@ -171,6 +173,10 @@ def percent_flagged_diff(flagsummary1, flagsummary2):
 	</tbody>
 </table>
 
+<br style="clear: both;">
+
 % endfor
+
+% endif
 
 %endif

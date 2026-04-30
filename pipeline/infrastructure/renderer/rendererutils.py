@@ -4,7 +4,7 @@ from __future__ import annotations
 import html
 import itertools
 import os
-from typing import TYPE_CHECKING, Any, Iterable
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -13,6 +13,9 @@ from pipeline.infrastructure import basetask, casa_tasks, casa_tools, filenamer,
 from pipeline.infrastructure.renderer import logger
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from typing import Any
+
     from pipeline.infrastructure.basetask import Results
     from pipeline.infrastructure.launcher import Context
     from pipeline.infrastructure.pipelineqa import QAScore
@@ -289,7 +292,8 @@ def num_lines(path):
     path argument. If the file does not exist, report N/A.
     """
     if os.path.exists(path):
-        return sum(1 for line in open(path) if line.strip() and not line.startswith('#'))
+        with open(path, encoding='utf-8') as f:
+            return sum(1 for line in f if line.strip() and not line.lstrip().startswith('#'))
     else:
         return 'N/A'
 

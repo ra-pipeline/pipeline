@@ -1,7 +1,6 @@
 import math
 import os
 import collections
-from typing import List
 
 import numpy as np
 
@@ -20,8 +19,7 @@ from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import task_registry
 from pipeline.domain.measures import FrequencyUnits
 
-
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class FluxbootInputs(vdp.StandardInputs):
@@ -70,7 +68,7 @@ class FluxbootInputs(vdp.StandardInputs):
         if fitorder is None:
             fitorder = -1
 
-        super(FluxbootInputs, self).__init__()
+        super().__init__()
         self.context = context
         self.vis = vis
         self.caltable = caltable
@@ -126,7 +124,7 @@ class FluxbootResults(basetask.Results):
         if fluxscale_result is None:
             fluxscale_result = []
 
-        super(FluxbootResults, self).__init__()
+        super().__init__()
         self.vis = vis
         self.pool = pool[:]
         self.final = final[:]
@@ -242,7 +240,7 @@ class Fluxboot(basetask.StandardTaskTemplate):
                         for spw in spws:
                             reference_frequency = center_frequencies[spw.id]
                             EVLA_band = spw2band[spw.id]
- 
+
                             LOG.info("Center freq for spw " + str(spw.id) + " = " + str(reference_frequency)
                                      + ", observing band = " + EVLA_band)
 
@@ -273,9 +271,7 @@ class Fluxboot(basetask.StandardTaskTemplate):
 
             self.ignorerefant = self.inputs.context.evla['msinfo'][m.name].ignorerefant
 
-            # PIPE-1637: adding ',' in the manual and auto refantignore parameter
-            refantignore = self.inputs.refantignore + ','.join(['', *self.ignorerefant])
-
+            refantignore = utils.build_refantignore(refantignore=self.inputs.refantignore, ignorerefant=self.ignorerefant)
             refantfield = self.inputs.context.evla['msinfo'][m.name].calibrator_field_select_string
             # PIPE-595: if refant list is not provided, compute refants else use provided refant list.
             if len(self.inputs.refant) == 0:
@@ -429,7 +425,7 @@ class Fluxboot(basetask.StandardTaskTemplate):
         return self.sources, self.flux_densities, self.spws, weblog_results,\
                spindex_results, caltable, fluxscale_result
 
-    def _do_fluxscale(self, calMs: str, caltable: str) -> List:
+    def _do_fluxscale(self, calMs: str, caltable: str) -> list:
         """Set up and execute the CASA task fluxscale
 
         Args:
@@ -522,7 +518,7 @@ class Fluxboot(basetask.StandardTaskTemplate):
                     LOG.warning(f"Fluxscale failed for field {field}")
         return fluxscale_result
 
-    def find_fitorder(self, spwlist: List[str] = []) -> int:
+    def find_fitorder(self, spwlist: list[str] = []) -> int:
         """Determine the fitorder for a given list of spectral windows
 
         Args:
@@ -602,7 +598,7 @@ class Fluxboot(basetask.StandardTaskTemplate):
 
         return fitorder
 
-    def _do_powerfit(self, fluxscale_result: List):
+    def _do_powerfit(self, fluxscale_result: list):
         """Organize the fitting results from fluxscale, re-reference the fit coefficients, and prepare
             dictionaries for weblog display
 
@@ -974,7 +970,7 @@ class Fluxboot(basetask.StandardTaskTemplate):
 
         return results, weblog_results, spindex_results, fluxscale_result
 
-    def _do_setjy(self, calMs: str, fluxscale_result: List) -> bool:
+    def _do_setjy(self, calMs: str, fluxscale_result: list) -> bool:
         """Setup and execute setjy using the results from CASA task fluxscale
 
         Return:
@@ -1060,7 +1056,7 @@ class Fluxboot(basetask.StandardTaskTemplate):
             LOG.info(e)
             return None
 
-    def _do_gaincal(self, calMs: str, caltable: str, calmode: str, gaintablelist: List[str],
+    def _do_gaincal(self, calMs: str, caltable: str, calmode: str, gaintablelist: list[str],
                     solint: str = 'int', minsnr: float = 3.0, refAnt: str = None, field: str = '',
                     solnorm: bool = False, append: bool = False,
                     fluxflag: bool = False, vlassmode: bool = False, spw: str = ''):
@@ -1150,7 +1146,7 @@ class Fluxboot(basetask.StandardTaskTemplate):
 
             return self._executor.execute(job)
 
-    def re_reference_polynomial(self, c1: List, original_ref_freq: float, new_ref_freq: float) -> List:
+    def re_reference_polynomial(self, c1: list, original_ref_freq: float, new_ref_freq: float) -> list:
         """Re-reference polynomial
 
             Return:

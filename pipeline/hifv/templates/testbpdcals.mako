@@ -81,6 +81,7 @@ from pipeline.infrastructure.renderer import rendererutils
 		    <tr>
 			    <th>Antenna</th>
 			    <th>SPWs</th>
+				<th>Correlations</th>
 			    <th>Band / Basebands</th>
 		    </tr>
 	        </thead>
@@ -92,13 +93,15 @@ from pipeline.infrastructure.renderer import rendererutils
 	            <tr>
 	            <td>None</td>
 	            <td>None</td>
+				<td>None</td>
 	            <td>${bandname}</td>
 	            </tr>
 	            % else:
 	                % for key, valueDict in single_result.amp_collection[bandname].items():
 	                <tr>
 	                <td>${key}</td>
-	                <td>${','.join(valueDict['spws'])}</td>
+	                <td>${",".join(s["spw"] for s in valueDict['spws'])}</td>
+					<td>${",".join(s["correlation"] for s in valueDict['spws'])}</td>
 	                <td>${','.join(valueDict['basebands'])}</td>
 	                </tr>
 	                % endfor
@@ -117,6 +120,7 @@ from pipeline.infrastructure.renderer import rendererutils
 		    <tr>
 			    <th>Antenna</th>
 			    <th>SPWs</th>
+				<th>Correlations</th>
 			    <th>Band / Basebands</th>
 		    </tr>
 	        </thead>
@@ -128,13 +132,15 @@ from pipeline.infrastructure.renderer import rendererutils
 	                <tr>
 	                <td>None</td>
 	                <td>None</td>
+					<td>None</td>
 	                <td>${bandname}</td>
 	                </tr>
 	            % else:
 	                % for key, valueDict in single_result.phase_collection[bandname].items():
 	                    <tr>
 	                    <td>${key}</td>
-	                    <td>${','.join(valueDict['spws'])}</td>
+	                    <td>${",".join(s["spw"] for s in valueDict['spws'])}</td>
+						<td>${ ",".join(s["correlation"] for s in valueDict['spws'])}</td>
 	                    <td>${','.join(valueDict['basebands'])}</td>
 	                    </tr>
 	                % endfor

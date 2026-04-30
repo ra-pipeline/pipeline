@@ -1,5 +1,4 @@
 import os
-from typing import List, Optional, Tuple
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.callibrary as callibrary
@@ -12,7 +11,7 @@ from pipeline.hif.tasks.gaincal.common import GaincalResults
 from pipeline.hifa.heuristics.phasespwmap import combine_spwmap
 from pipeline.infrastructure import task_registry
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 __all__ = [
     'TimeGaincalInputs',
@@ -303,7 +302,7 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
         return result
 
     @staticmethod
-    def _get_spw_groupings(ms: MeasurementSet, spw: str, spwmap: List[int]) -> List[Tuple[int, str, str]]:
+    def _get_spw_groupings(ms: MeasurementSet, spw: str, spwmap: list[int]) -> list[tuple[int, str, str]]:
         """
         Group selected SpWs by SpectralSpec.
 
@@ -333,7 +332,7 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
 
         return grouped_spw
 
-    def _do_phasecal_for_target(self) -> List[callibrary.CalApplication]:
+    def _do_phasecal_for_target(self) -> list[callibrary.CalApplication]:
         """
         This method is responsible for creating phase gain caltable(s) that
         will be applicable to the TARGET, the CHECK source, and the PHASE
@@ -449,10 +448,10 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
         return calapp_list
 
     def _do_target_phasecal(self, caltable: str = None, field: str = None, spw: str = None, gaintype: str = None,
-                            combine: str = None, interp: str = None, spwmap: List[int] = None,
+                            combine: str = None, interp: str = None, spwmap: list[int] = None,
                             apply_to_field: str = None, apply_to_spw: str = None, include_field: str = None,
-                            refantmode: Optional[str] = None)\
-            -> List[callibrary.CalApplication]:
+                            refantmode: str | None = None)\
+            -> list[callibrary.CalApplication]:
         """
         This runs the gaincal for creating phase solutions intended for TARGET,
         CHECK, and PHASE. The result contains two CalApplications, one for
@@ -746,7 +745,7 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
     # Used to calibrate "selfcaled" targets
     def _do_calibrator_phasecal(self, field: str = None, intent: str = None, spw: str = None, gaintype: str = 'G',
                                 combine: str = None, solint: str = None, minsnr: float = None,
-                                interp: str = None, spwmap: List[int] = None) -> GaincalResults:
+                                interp: str = None, spwmap: list[int] = None) -> GaincalResults:
         """
         This runs the gaincal for creating phase solutions intended for the
         calibrators (amplitude, bandpass, polarization, phase, diffgain(ref/src)).
@@ -857,7 +856,7 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
 
         return result
 
-    def _do_caltarget_ampcal(self, solint: Optional[float] = None) -> GaincalResults:
+    def _do_caltarget_ampcal(self, solint: float | None = None) -> GaincalResults:
         """
         Create amplitude caltable used for diagnostic plots. Resulting
         caltable will not be registered in the context callibrary, i.e.
@@ -885,7 +884,7 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
 
         return result
 
-    def _do_target_ampcal(self) -> List[callibrary.CalApplication]:
+    def _do_target_ampcal(self) -> list[callibrary.CalApplication]:
         """
         This method computes the amplitude caltable intended for TARGET,
         CHECK, and all calibrators. It returns a list of two CalApplications,

@@ -1,5 +1,4 @@
 import re
-from typing import Union, Tuple, Optional
 
 import numpy
 
@@ -7,7 +6,7 @@ import pipeline.infrastructure as infrastructure
 from pipeline.infrastructure import casa_tools
 from .imageparams_base import ImageParamsHeuristics
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
@@ -18,7 +17,20 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
                                        linesfile, imaging_params, processing_intents)
         self.imaging_mode = 'VLASS-QL'
 
-    # niter
+    def is_eph_obj(self, field: str) -> bool:
+        """Determine whether a field is an ephemeris (moving) object.
+
+        The VLASS heuristic does not handle ephemeris (moving)
+        objects, so this method always returns False.
+
+        Args:
+            field: Field identifier (name or index). Ignored by this heuristic.
+
+        Returns:
+            Always False for this heuristic.
+        """
+        return False
+
     def niter_correction(self, niter, cell, imsize, residual_max, threshold, residual_robust_rms, mask_frac_rad=0.0, intent='TARGET') -> int:
         """Adjust niter value between cleaning iteration steps based on imaging parameters, mask and residual"""
         if niter:
@@ -42,16 +54,16 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
         """Tclean gridder parameter heuristics."""
         return 'mosaic'
 
-    def cell(self, beam=None, pixperbeam=None) -> Union[str, list]:
+    def cell(self, beam=None, pixperbeam=None) -> str | list:
         """Tclean cell parameter heuristics."""
         return ['1.0arcsec']
 
     def imsize(self, fields=None, cell=None, primary_beam=None, sfpblimit=None, max_pixels=None, centreonly=None,
-               vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None) -> Union[list, int]:
+               vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None) -> list | int:
         """Tclean imsize parameter heuristics."""
         return [7290, 7290]
 
-    def reffreq(self, deconvolver: Optional[str]=None, specmode: Optional[str]=None, spwsel: Optional[dict]=None) -> Optional[str]:
+    def reffreq(self, deconvolver: str | None=None, specmode: str | None=None, spwsel: dict | None=None) -> str | None:
         """Tclean reffreq parameter heuristics."""
         return '3.0GHz'
 
@@ -69,7 +81,7 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
         else:
             return 500
 
-    def nmajor(self, iteration: int) -> Union[None, int]:
+    def nmajor(self, iteration: int) -> None | int:
         """Tclean nmajor parameter heuristics."""
         if iteration == 0:
             return None
@@ -77,11 +89,11 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
             # PIPE-1745: default value of nmajor=220 for all editimlist stages of the VLASS QL/SE imaging workflow
             return 220
 
-    def scales(self, iteration: Union[int, None] = None) -> list:
+    def scales(self, iteration: int | None = None) -> list:
         """Tclean scales parameter heuristics."""
         return [0]
 
-    def uvtaper(self, beam_natural=None, protect_long=None) -> Union[str, list]:
+    def uvtaper(self, beam_natural=None, protect_long=None) -> str | list:
         """Tclean uvtaper parameter heuristics."""
         return []
 
@@ -90,7 +102,7 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
         return None, None
 
     def mask(self, hm_masking=None, rootname=None, iteration=None, mask=None,
-             results_list: Union[list, None] = None) -> str:
+             results_list: list | None = None) -> str:
         return ''
 
     def buffer_radius(self) -> float:
@@ -148,21 +160,23 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
             qdist = qa.toangle(distance)
             qrad = qa.convert(qdist, 'rad')
             maxrad = qrad['value']
-        except:
-            LOG.error('cannot parse distance {}'.format(distance))
+        except Exception as exc:
+            LOG.error('cannot parse distance %s', distance)
+            LOG.debug('Exception parsing distance: %s', exc)
             return
 
         try:
             tb.open(msfile + '/FIELD')
-        except:
-            LOG.error('could not open {}/FIELD'.format(msfile))
+        except Exception as exc:
+            LOG.error('could not open %s/FIELD', msfile)
+            LOG.debug('Exception opening FIELD table: %s', exc)
             return
         field_dirs = tb.getcol('PHASE_DIR')
         field_names = tb.getcol('NAME')
         tb.close()
 
         (nd, ni, nf) = field_dirs.shape
-        LOG.info('Found {} fields'.format(nf))
+        LOG.info('Found %s fields', nf)
 
         # compile field dictionaries
         ddirs = {}
@@ -185,10 +199,10 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
                 flookup[fn].append(i)
             else:
                 flookup[fn] = [i]
-        LOG.info('Cataloged {} fields'.format(nf))
+        LOG.info('Cataloged %s fields', nf)
 
         # Construct offset separations in ra,dec
-        LOG.info('Looking for fields with maximum separation {}'.format(distance))
+        LOG.info('Looking for fields with maximum separation %s', distance)
         nreject = 0
         skipmatch = matchregex == '' or matchregex == []
         for i in range(nf):
@@ -222,9 +236,9 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
                     else:
                         nreject += 1
 
-        LOG.info('Found {} fields within {}'.format(len(fieldlist), distance))
+        LOG.info('Found %s fields within %s', len(fieldlist), distance)
         if not skipmatch:
-            LOG.info('Rejected {} distance matches for regex'.format(nreject))
+            LOG.info('Rejected %s distance matches for regex', nreject)
 
         return fieldlist
 
@@ -252,21 +266,21 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
             qdist = qa.toangle(distance)
             qrad = qa.convert(qdist, 'rad')
             maxrad = qrad['value']
-        except:
-            LOG.error('cannot parse distance {}'.format(distance))
+        except Exception as exc:
+            LOG.error('cannot parse distance %s: %s', distance, exc)
             return
         #
         try:
-            tb.open(msfile+'/FIELD')
-        except:
-            LOG.error('could not open {}/FIELD'.format(msfile))
+            tb.open(msfile + '/FIELD')
+        except Exception as exc:
+            LOG.error('could not open %s/FIELD: %s', msfile, exc)
             return
         field_dirs = tb.getcol('PHASE_DIR')
         field_names = tb.getcol('NAME')
         tb.close()
         #
         (nd, ni, nf) = field_dirs.shape
-        LOG.info('Found {} fields'.format(nf))
+        LOG.info('Found %s fields', nf)
         #
         # compile field dictionaries
         ddirs = {}
@@ -289,10 +303,10 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
                 flookup[fn].append(i)
             else:
                 flookup[fn] = [i]
-        LOG.info('Cataloged {} fields'.format(nf))
+        LOG.info('Cataloged %s fields', nf)
         #
         # Construct offset separations in ra,dec
-        LOG.info('Looking for fields with maximum separation {}'.format(distance))
+        LOG.info('Looking for fields with maximum separation %s', distance)
         nreject = 0
         skipmatch = matchregex == '' or matchregex == []
         for i in range(nf):
@@ -325,9 +339,9 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
                     else:
                         nreject += 1
 
-        LOG.info('Found {} fields within {}'.format(len(fieldlist), distance))
+        LOG.info('Found %s fields within %s', len(fieldlist), distance)
         if not skipmatch:
-            LOG.info('Rejected {} distance matches for regex'.format(nreject))
+            LOG.info('Rejected %s distance matches for regex', nreject)
         #
         return fieldlist
 
@@ -356,21 +370,21 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
             qdist = qa.toangle(distance)
             qrad = qa.convert(qdist, 'rad')
             maxrad = qrad['value']
-        except:
-            LOG.error('cannot parse distance {}'.format(distance))
+        except Exception as exc:
+            LOG.error('cannot parse distance %s: %s', distance, exc)
             return
         #
         try:
-            tb.open(msfile+'/FIELD')
-        except:
-            LOG.error('could not open {}/FIELD'.format(msfile))
+            tb.open(msfile + '/FIELD')
+        except Exception as exc:
+            LOG.error('could not open %s/FIELD: %s', msfile, exc)
             return
         field_dirs = tb.getcol('PHASE_DIR')
         field_names = tb.getcol('NAME')
         tb.close()
         #
         (nd, ni, nf) = field_dirs.shape
-        LOG.info('Found {} fields'.format(nf))
+        LOG.info('Found %s fields', nf)
         #
         # compile field dictionaries
         ddirs = {}
@@ -393,10 +407,10 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
                 flookup[fn].append(i)
             else:
                 flookup[fn] = [i]
-        LOG.info('Cataloged {} fields'.format(nf))
+        LOG.info('Cataloged %s fields', nf)
         #
         # Construct offset separations in ra,dec
-        LOG.info('Looking for fields with maximum separation {}'.format(distance))
+        LOG.info('Looking for fields with maximum separation %s', distance)
         nreject = 0
         skipmatch = matchregex == '' or matchregex == []
         for i in range(nf):
@@ -430,16 +444,18 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
                     else:
                         nreject += 1
 
-        LOG.info('Found {} fields within {}'.format(len(fieldlist), distance))
+        LOG.info('Found %s fields within %s', len(fieldlist), distance)
         if not skipmatch:
-            LOG.info('Rejected {} distance matches for regex'.format(nreject))
+            LOG.info('Rejected %s distance matches for regex', nreject)
+
+        return fieldlist
 
     def threshold(self, iteration, threshold, hm_masking):
         return threshold
 
     def nsigma(
-        self, iteration: int, hm_nsigma: float, hm_masking: str, rms_multiplier: Optional[Union[int, float]] = None
-    ) -> Union[float, None]:
+        self, iteration: int, hm_nsigma: float, hm_masking: str, rms_multiplier: int | float | None = None
+    ) -> float | None:
         """Tclean nsigma parameter heuristics."""
         if hm_nsigma:
             return hm_nsigma
@@ -467,7 +483,7 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
         intent: str,
         specmode: str,
         robust: float,
-        rms_multiplier: Optional[Union[int, float]] = None,
+        rms_multiplier: int | float | None = None,
     ) -> tuple:
         """Default auto-boxing parameters."""
 

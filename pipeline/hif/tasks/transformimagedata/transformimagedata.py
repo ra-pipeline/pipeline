@@ -43,8 +43,15 @@ class TransformimagedataResults(basetask.Results):
         # Update clean_list_pending with new MS paths
         outvisname = os.path.join(context.output_dir, os.path.basename(self.outputvis))
         for clean_item in context.clean_list_pending:
-            clean_item['heuristics'].observing_run.measurement_sets[0].name = outvisname
-            clean_item['heuristics'].vislist = [self.outputvis]
+            for idx, vis in enumerate(clean_item['heuristics'].vislist):
+                if vis == self.vis:
+                    clean_item['heuristics'].vislist[idx] = self.outputvis
+            for ms in clean_item['heuristics'].observing_run.measurement_sets:
+                if ms.name == self.vis:
+                    ms.name = outvisname
+            for idx, vis in enumerate(clean_item['vis']):
+                if vis == self.vis:
+                    clean_item['vis'][idx] = self.outputvis
 
     def __str__(self):
         # Format the MsSplit results.
@@ -175,8 +182,10 @@ class Transformimagedata(mssplit.MsSplit):
 
         visfields = []
         visspws = []
+
         for imageparam in inputs.context.clean_list_pending:
-            visfields.extend(imageparam['field'].split(','))
+            vis_idx = imageparam['vis'].index(inputs.vis)
+            visfields.extend(imageparam['field'][vis_idx].split(','))
             visspws.extend(imageparam['spw'].split(','))
         visfields = ','.join(utils.deduplicate(visfields))
         visspws = ','.join(utils.deduplicate(visspws))

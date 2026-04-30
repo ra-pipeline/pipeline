@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import collections
+import collections.abc
 import contextlib
 import datetime
 import decimal
@@ -15,7 +16,7 @@ import shelve
 import shutil
 import sys
 from importlib.resources import files
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import mako
 import numpy as np
@@ -31,6 +32,8 @@ from pipeline.infrastructure.displays import pointing, summary
 from pipeline.infrastructure.renderer import qaadapter, templates, weblog
 
 if TYPE_CHECKING:
+    from typing import Any
+
     from pipeline.domain import Source
     from pipeline.domain.measurementset import MeasurementSet
     from pipeline.infrastructure.launcher import Context
@@ -219,7 +222,7 @@ def scan_has_intent(scans, intent):
     return False
 
 
-class Session(object):
+class Session:
     def __init__(self, mses=None, name='Unnamed Session'):
         self.mses = [] if mses is None else mses
         self.name = name
@@ -252,7 +255,7 @@ class Session(object):
         return [Session(mses, name) for _, name, mses in sorted(session_names, key=functools.cmp_to_key(mycmp))]
 
 
-class RendererBase(object):
+class RendererBase:
     """
     Base renderer class.
     """
@@ -837,7 +840,7 @@ class T2_1Renderer(RendererBase):
                 'sessions' : sessions}
 
 
-class T2_1DetailsRenderer(object):
+class T2_1DetailsRenderer:
     """
     T2-1Details renderer - Session Details
     """
@@ -1022,9 +1025,13 @@ class T2_1DetailsRenderer(object):
             'zd_min'          : round(zd_min, 2),
             'zd_avg'          : round(zd_avg, 2),
             'zd_max'          : round(zd_max, 2),
-            'telmjd_min'      : utils.format_datetime(datetime.datetime.fromtimestamp(telmjd_min)),
-            'telmjd_avg'      : utils.format_datetime(datetime.datetime.fromtimestamp(telmjd_avg)),
-            'telmjd_max'      : utils.format_datetime(datetime.datetime.fromtimestamp(telmjd_max)),
+            'telmjd_min'      : utils.format_datetime(
+                datetime.datetime.fromtimestamp(telmjd_min, tz=datetime.timezone.utc)
+                ),
+            'telmjd_avg'      : utils.format_datetime(
+                datetime.datetime.fromtimestamp(telmjd_avg, tz=datetime.timezone.utc)),
+            'telmjd_max'      : utils.format_datetime(
+                datetime.datetime.fromtimestamp(telmjd_max, tz=datetime.timezone.utc)),
             'vla_basebands'   : vla_basebands
         }
 
@@ -1045,7 +1052,7 @@ class T2_1DetailsRenderer(object):
                     fileobj.write(template.render(**display_context))
 
 
-class T2_2_XRendererBase(object):
+class T2_2_XRendererBase:
     """
     Base renderer for T2-2-X series of pages.
     """
@@ -1462,7 +1469,7 @@ class T2_4MRenderer(RendererBase):
                 'results'  : context.results}
 
 
-class T2_4MDetailsDefaultRenderer(object):
+class T2_4MDetailsDefaultRenderer:
     def __init__(self, template='t2-4m_details-generic.mako',
                  always_rerender=False):
         self.template = template
@@ -1552,7 +1559,7 @@ class T2_4MDetailsContainerRenderer(RendererBase):
             fileobj.write(template.render(**mako_context))
 
 
-class T2_4MDetailsRenderer(object):
+class T2_4MDetailsRenderer:
     # the filename component of the output file. While this is the same for
     # all results, the directory is stage-specific, so there's no risk of
     # collisions  
@@ -1913,7 +1920,7 @@ class WebLogGenerator:
             context.results = proxies
 
 
-class LogCopier(object):
+class LogCopier:
     """
     LogCopier copies and handles the CASA logs so that they may be referenced
     by the pipeline web logs. 
@@ -2018,7 +2025,7 @@ def compute_zd_telmjd_for_ms(
     data = {}
     fields = ms.get_fields(intent='TARGET')
     observatory = ms.antenna_array.name
-    mjd_epoch = datetime.datetime(1858, 11, 17)
+    mjd_epoch = datetime.datetime(1858, 11, 17, tzinfo=datetime.timezone.utc)
 
     for field in fields:
         if field.id not in data:

@@ -4,7 +4,10 @@ QA plugins for the ALMA applycal task.
 This module demonstrates how to target QAScore messages at particular sections
 of the web log.
 """
+from __future__ import annotations
+
 import collections
+import collections.abc
 import copy
 import dataclasses
 import itertools
@@ -13,22 +16,27 @@ import operator
 import os
 import re
 from pathlib import Path
-from typing import Iterable, Reversible, Optional, overload
+from typing import TYPE_CHECKING, overload
 
 import numpy as np
-import numpy.typing as npt
 
 import pipeline.h.tasks.applycal.applycal as h_applycal
 import pipeline.hif.tasks.applycal.ifapplycal as hif_applycal
-import pipeline.infrastructure.logging as logging
+import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
-from pipeline.domain.measurementset import MeasurementSet
-from pipeline.infrastructure.pipelineqa import WebLogLocation, QAScore
 from . import ampphase_vs_freq_qa, qa_utils
 from .ampphase_vs_freq_qa import Outlier, score_all_scans
 
-LOG = logging.get_logger(__name__)
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Reversible
+
+    from numpy.typing import NDArray
+
+    from pipeline.domain.measurementset import MeasurementSet
+    from pipeline.infrastructure.pipelineqa import QAScore, WebLogLocation
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 # TODO: there should be ONE place that we get this info from!
@@ -272,10 +280,10 @@ class QAScoreEvalFunc:
         ...
 
     @overload
-    def __call__(self, qascore: list[pqa.QAScore]) -> npt.NDArray:
+    def __call__(self, qascore: list[pqa.QAScore]) -> NDArray:
         ...
 
-    def __call__(self, qascore: pqa.QAScore | list[pqa.QAScore]) -> float | npt.NDArray:
+    def __call__(self, qascore: pqa.QAScore | list[pqa.QAScore]) -> float | NDArray:
         # If given a list of QA scores, evaluate them all and return an array of the results
         if type(qascore) == list:
             output = [self.__call__(q) for q in qascore]
@@ -400,8 +408,8 @@ def get_qa_scores(
         outlier_score: float,
         flag_all: bool,
         export_mswrappers: bool,
-        output_path: Optional[Path] = Path(''),
-        memory_gb: Optional[float] = MEMORY_CHUNK_SIZE,
+        output_path: Path | None = Path(''),
+        memory_gb: float | None = MEMORY_CHUNK_SIZE,
 ) -> dict[WebLogLocation, list[pqa.QAScore]]:
     """
     Calculate amp/phase vs freq and time outliers for an EB and convert to QA scores.

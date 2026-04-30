@@ -198,14 +198,11 @@ class XYf0Caltable(CaltableNamer):
     def get_namer(self):
         return filenamer.XYf0CalibrationTable()
 
+
 class SDSkyCaltable(CaltableNamer):
     def get_namer(self):
         return filenamer.SDSkyCalibrationTable()
 
-    def customise(self, namer, task_args):
-        if 'field' in task_args:
-            print('Set FIELD {}'.format(task_args['field']))
-            namer.source(task_args['field'])
 
 class SDBaselinetable(CaltableNamer):
     def get_namer(self):

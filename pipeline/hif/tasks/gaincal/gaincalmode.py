@@ -93,7 +93,7 @@ class GaincalModeInputs(vdp.ModeInputs):
             phasewrap: Wrap the phase for changes larger than this amount (degrees). Used for hm_gaintype='gspline'. Keep at default value.
 
         """
-        super(GaincalModeInputs, self).__init__(context, mode, **parameters)
+        super().__init__(context, mode, **parameters)
 
 
 @task_registry.set_equivalent_casa_task('hif_gaincal')

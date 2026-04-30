@@ -1,4 +1,4 @@
-import collections
+import collections.abc
 
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.pipelineqa as pqa
@@ -35,7 +35,7 @@ class ALMAAntposQAHandler(pqa.QAPlugin):
                     metric_score=rutils.SCORE_THRESHOLD_ERROR,
                     metric_units='antpos service',
                 ),
-                applies_to=pqa.TargetDataSelection(vis=vis),
+                applies_to=pqa.TargetDataSelection(vis={vis}),
             )
             result.qa.pool.append(qascore)
             return

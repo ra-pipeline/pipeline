@@ -1,17 +1,19 @@
 """The k2jycal task to perform the calibration of Jy/K conversion."""
+from __future__ import annotations
+
 import copy
 import os
 import numpy as np
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.callibrary as callibrary
+import pipeline.infrastructure.vdp as vdp
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import task_registry
 from pipeline.infrastructure.utils import relative_path
-import pipeline.infrastructure.vdp as vdp
 from pipeline.h.heuristics import caltable as caltable_heuristic
 from pipeline.hsd.tasks.common import observatory_policy
 from . import jyperkreader
@@ -20,7 +22,7 @@ if TYPE_CHECKING:
     from pipeline.infrastructure.launcher import Context
     from pipeline.infrastructure.callibrary import CalApplication
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 QUERIED_FACTOR_FILE = 'jyperk_query.csv'  # filename of the queried factor file
 
@@ -39,7 +41,7 @@ class SDK2JyCalInputs(vdp.StandardInputs):
         return self.vis
 
     @infiles.convert
-    def infiles(self, value: Union[str, List[str]]) -> Union[str, List[str]]:
+    def infiles(self, value: str | list[str]) -> str | list[str]:
         """Convert value into expected type.
 
         Currently, no conversion is performed.
@@ -67,7 +69,7 @@ class SDK2JyCalInputs(vdp.StandardInputs):
                                              stage=self.context.stage,
                                              **casa_args))
 
-    def to_casa_args(self) -> Dict[str, str]:
+    def to_casa_args(self) -> dict[str, str]:
         """Convert Inputs instance into dictionary.
 
         Returns:
@@ -81,13 +83,13 @@ class SDK2JyCalInputs(vdp.StandardInputs):
     # docstring and type hints: supplements hsd_k2jycal
     def __init__(
         self,
-        context: 'Context',
-        output_dir: Optional[str] = None,
-        infiles: Optional[Union[str, List[str]]] = None,
-        caltable: Optional[Union[str, List[str]]] = None,
-        reffile: Optional[str] = None,
-        dbservice: Optional[bool] = None,
-        endpoint: Optional[str] = None
+        context: Context,
+        output_dir: str | None = None,
+        infiles: str | list[str] | None = None,
+        caltable: str | list[str] | None = None,
+        reffile: str | None = None,
+        dbservice: bool | None = None,
+        endpoint: str | None = None
     ) -> None:
         """Initialize SDK2JyCalInputs instance.
 
@@ -166,7 +168,7 @@ class SDK2JyCalInputs(vdp.StandardInputs):
                 Default: None (equivalent to 'asdm')
 
         """
-        super(SDK2JyCalInputs, self).__init__()
+        super().__init__()
 
         # context and vis/infiles must be set first so that properties that require
         # domain objects can be function
@@ -186,13 +188,13 @@ class SDK2JyCalResults(basetask.Results):
 
     def __init__(
         self,
-        vis: Optional[str] = None,
-        final: List['CalApplication'] = [],
+        vis: str | None = None,
+        final: list[CalApplication] = [],
         pool: Any = [],
-        reffile: Optional[str] = None,
-        factors: Dict[str, Dict[int, Dict[str, Dict[str, float]]]] = {},
+        reffile: str | None = None,
+        factors: dict[str, dict[int, dict[str, dict[str, float]]]] = {},
         all_ok: bool = False,
-        dbstatus: Optional[bool] = None
+        dbstatus: bool | None = None
     ) -> None:
         """Initialize SDK2JyCalResults instance.
 
@@ -205,7 +207,7 @@ class SDK2JyCalResults(basetask.Results):
             all_ok: Boolean flag for availability of factors. Defaults to False.
             dbstatus: Status of DB access. Defaults to None.
         """
-        super(SDK2JyCalResults, self).__init__()
+        super().__init__()
 
         self.vis = vis
         self.pool = pool[:]
@@ -216,7 +218,7 @@ class SDK2JyCalResults(basetask.Results):
         self.all_ok = all_ok
         self.dbstatus = dbstatus
 
-    def merge_with_context(self, context: 'Context') -> None:
+    def merge_with_context(self, context: Context) -> None:
         """Merge result instance into context.
 
         Merge of the result instance of Jy/K calibration task includes
@@ -354,7 +356,7 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
                                 factors=valid_factors, all_ok=factors_ok,
                                 dbstatus=caltable_status)
 
-    def _extract_factors( self, context: 'Context', vis: str, caltable: str, dbstatus: bool ) -> Optional[Dict[str, Dict[str, Dict[str, float]]]]:
+    def _extract_factors( self, context: Context, vis: str, caltable: str, dbstatus: bool ) -> dict[str, dict[str, dict[str, float] | None]]:
         """
         extract Jy/K factors
 
@@ -423,7 +425,7 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
 
         return factors_used
 
-    def _create_caltable( self, common_params: Dict[str, str] ) -> Optional[bool]:
+    def _create_caltable( self, common_params: dict[str, str] ) -> bool | None:
         """
         Invoke gencal and ceate the calibration table file
 
@@ -538,7 +540,7 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
 
     @staticmethod
     def __check_factor(
-        factors: Dict[int, Dict[str, Dict[str, float]]],
+        factors: dict[int, dict[str, dict[str, float]]],
         spw: int,
         ant: str,
         pol: str

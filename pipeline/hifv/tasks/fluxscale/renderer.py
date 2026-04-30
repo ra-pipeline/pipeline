@@ -2,6 +2,8 @@ import collections
 import contextlib
 import os
 
+import numpy as np
+
 import pipeline.infrastructure.filenamer as filenamer
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
@@ -13,7 +15,7 @@ from . import testgainsdisplay
 LOG = logging.get_logger(__name__)
 
 
-class VLASubPlotRenderer(object):
+class VLASubPlotRenderer:
 
     def __init__(self, context, result, plots, json_path, template, filename_prefix, bandlist):
         self.context = context
@@ -77,11 +79,11 @@ class VLASubPlotRenderer(object):
 class T2_4MDetailsSolintRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def __init__(self, uri='solint.mako', description='Determine solint and Test gain calibrations',
                  always_rerender=False):
-        super(T2_4MDetailsSolintRenderer, self).__init__(uri=uri,
+        super().__init__(uri=uri,
                                                          description=description, always_rerender=always_rerender)
 
     def get_display_context(self, context, results):
-        super_cls = super(T2_4MDetailsSolintRenderer, self)
+        super_cls = super()
         ctx = super_cls.get_display_context(context, results)
 
         weblog_dir = os.path.join(context.report_dir, 'stage%s' % results.stage_number)
@@ -176,11 +178,11 @@ class T2_4MDetailsSolintRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 class T2_4MDetailsfluxbootRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def __init__(self, uri='fluxboot.mako', description='Gain table for flux density bootstrapping',
                  always_rerender=False):
-        super(T2_4MDetailsfluxbootRenderer, self).__init__(uri=uri,
+        super().__init__(uri=uri,
                                                            description=description, always_rerender=always_rerender)
 
     def get_display_context(self, context, results):
-        super_cls = super(T2_4MDetailsfluxbootRenderer, self)
+        super_cls = super()
         ctx = super_cls.get_display_context(context, results)
 
         weblog_dir = os.path.join(context.report_dir, 'stage%s' % results.stage_number)
@@ -221,14 +223,14 @@ class T2_4MDetailsfluxbootRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 spixerr = "{:.{}f}".format(float(row['spixerr']), precision)
                 curvature = "{:.{}f}".format(float(row['curvature']), precision)
                 curvatureerr = "{:.{}f}".format(float(row['curvatureerr']), precision)
-                gamma = "{:.{}f}".format(float(row['gamma']), precision)
-                gammaerr = "{:.{}f}".format(float(row['gammaerr']), precision)
-                delta = "{:.{}f}".format(float(row['delta']), precision)
-                deltaerr = "{:.{}f}".format(float(row['deltaerr']), precision)
-                fitflx = "{:.{}f}".format(float(row['fitflx']), precision)
-                fitflxerr = "{:.{}f}".format(float(row['fitflxerr']), precision)
-                reffreq = "{:.{}f}".format(float(row['reffreq']), precision)
-                bandcenterfreq = "{:.{}f}".format(float(row['bandcenterfreq'])/1.e9, precision)
+                gamma = "{:.{}f}".format(float(np.asarray(row['gamma']).item()), precision)
+                gammaerr = "{:.{}f}".format(float(np.asarray(row['gammaerr']).item()), precision)
+                delta = "{:.{}f}".format(float(np.asarray(row['delta']).item()), precision)
+                deltaerr = "{:.{}f}".format(float(np.asarray(row['deltaerr']).item()), precision)
+                fitflx = "{:.{}f}".format(float(np.asarray(row['fitflx']).item()), precision)
+                fitflxerr = "{:.{}f}".format(float(np.asarray(row['fitflxerr']).item()), precision)
+                reffreq = "{:.{}f}".format(float(np.asarray(row['reffreq']).item()), precision)
+                bandcenterfreq = "{:.{}f}".format(float(np.asarray(row['bandcenterfreq']).item())/1.e9, precision)
                 # fitflxAtRefFreq = "{:.{}f}".format(float(row['fitflxAtRefFreq']), precision)
                 # fitflxAtRefFreqErr = "{:.{}f}".format(float(row['fitflxAtRefFreqErr']), precision)
 

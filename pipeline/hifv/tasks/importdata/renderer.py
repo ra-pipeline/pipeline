@@ -11,11 +11,11 @@ class T2_4MDetailsVLAImportDataRenderer(basetemplates.T2_4MDetailsDefaultRendere
     def __init__(self, uri='vlaimportdata.mako', 
                  description='Register VLA measurement sets with the pipeline', 
                  always_rerender=False):
-        super(T2_4MDetailsVLAImportDataRenderer, self).__init__(
+        super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
     def get_display_context(self, context, result):
-        super_cls = super(T2_4MDetailsVLAImportDataRenderer, self)        
+        super_cls = super()
         ctx = super_cls.get_display_context(context, result)
 
         setjy_results = []

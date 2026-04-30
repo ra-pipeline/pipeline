@@ -23,99 +23,30 @@ LOG = infrastructure.get_logger(__name__)
 
 
 class FlagDeterBaseInputs(vdp.StandardInputs):
-    """
-    FlagDeterBaseInputs manages the inputs for the FlagDeterBase task.
+    """Manages the inputs for the FlagDeterBase task.
 
-    .. py:attribute:: context
-
-        the (:class:`~pipeline.infrastructure.launcher.Context`) holding all
-        pipeline state
-
-    .. py:attribute:: vis
-
-        a string or list of strings containing the MS name(s) on which to
-        operate
-
-    .. py:attribute:: output_dir
-
-        the directory to which pipeline data should be sent
-
-    .. py:attribute:: flagbackup
-
-        a boolean indicating whether whether existing flags should be backed
-        up before new flagging begins.
-
-    .. py:attribute:: autocorr
-
-        a boolean indicating whether autocorrelations are to be flagged.
-
-    .. py:attribute:: shadow
-
-        a boolean indicating whether shadowed antennas are to be flagged.
-
-    .. py:attribute:: tolerance
-
-        a float sets the tolerated projected antenna shadowing in meter.
-        Positive value allows overlap, negative value forces separation.
-
-    .. py:attribute:: scan
-
-        a boolean indicating whether scan flagging is to be performed.
-
-    .. py:attribute:: scannumber
-
-        A comma-delimited string stating the scans to flag. Standard data
-        selection syntax is valid.
-
-    .. py:attribute:: intents
-
-        A comma-delimited string stating the intents to flag. Wildcards (*
-        character) are allowed.
-
-    .. py:attribute:: edgespw
-
-        A boolean stating whether edge channels are flagged.
-
-    .. py:attribute:: fracspw
-
-        A float contains the fraction (between 0.0 and 1.0) of channels
-        to removed from the edge.
-
-    .. py:attribute:: online
-
-        A boolean indicating whether online flags are to be applied.
-
-    .. py:attribute:: partialpol
-
-        A boolean stating whether to flag polarization products where part of
-        the polarizations are flagged.
-
-    .. py:attribute:: fileonline
-
-        The filename of the ASCII file containing online flagging commands.
-
-    .. py:attribute:: template
-
-        A boolean indicating whether flagging templates are to be applied.
-
-    .. py:attribute:: filetemplate
-
-        The filename of the ASCII file that has the flagging template (for
-        RFI, birdies, telluric lines, etc.).
-
-    .. py:attribute:: lowtrans
-
-        A boolean stating whether to flag low transmission spectral windows.
-
-    .. py:attribute:: mintransnonrepspws
-
-        A float contains the minimum transmission (between 0.0 and 1.0)
-        required to flag non-representative spectral windows. Defaults to 0.1.
-
-    .. py:attribute:: mintransrepspw
-
-        A float contains the minimum transmission (between 0.0 and 1.0)
-        required to flag the representative spectral window. Defaults to 0.05.
+    Attributes:
+        context: The pipeline context holding all pipeline state.
+        vis: String or list of strings containing the MS name(s) on which to operate.
+        output_dir: The directory to which pipeline data should be sent.
+        flagbackup: Whether existing flags should be backed up before new flagging begins.
+        autocorr: Whether autocorrelations are to be flagged.
+        shadow: Whether shadowed antennas are to be flagged.
+        tolerance: Float setting the tolerated projected antenna shadowing in meters.
+            Positive value allows overlap, negative value forces separation.
+        scan: Whether scan flagging is to be performed.
+        scannumber: Comma-delimited string stating the scans to flag. Standard data selection syntax is valid.
+        intents: Comma-delimited string stating the intents to flag. Wildcards (*) are allowed.
+        edgespw: Whether edge channels are flagged.
+        fracspw: Float containing the fraction (between 0.0 and 1.0) of channels to remove from the edge.
+        online: Whether online flags are to be applied.
+        partialpol: Whether to flag polarization products where part of the polarizations are flagged.
+        fileonline: Filename of the ASCII file containing online flagging commands.
+        template: Whether flagging templates are to be applied.
+        filetemplate: Filename of the ASCII file that contains the flagging template (for RFI, birdies, telluric lines, etc.).
+        lowtrans: Whether to flag low transmission spectral windows.
+        mintransnonrepspws: Float containing the minimum transmission (0.0-1.0) required to flag non-representative spectral windows. Defaults to 0.1.
+        mintransrepspw: Float containing the minimum transmission (0.0-1.0) required to flag the representative spectral window. Defaults to 0.05.
     """
 
     autocorr = vdp.VisDependentProperty(default=True)
@@ -199,7 +130,7 @@ class FlagDeterBaseInputs(vdp.StandardInputs):
                  scan=None, scannumber=None, intents=None, edgespw=None, fracspw=None, fracspwfps=None, online=None,
                  fileonline=None, template=None, filetemplate=None, hm_tbuff=None, tbuff=None, partialpol=None,
                  lowtrans=None, mintransnonrepspws=None, mintransrepspw=None):
-        super(FlagDeterBaseInputs, self).__init__()
+        super().__init__()
 
         # pipeline inputs
         self.context = context
@@ -248,7 +179,7 @@ class FlagDeterBaseInputs(vdp.StandardInputs):
 
 class FlagDeterBaseResults(basetask.Results):
     def __init__(self, summaries, flagcmds):
-        super(FlagDeterBaseResults, self).__init__()
+        super().__init__()
         self.summaries = summaries
         self._flagcmds = flagcmds
 

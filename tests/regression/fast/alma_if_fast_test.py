@@ -99,24 +99,22 @@ def test_uid___A002_Xc46ab2_X15ae__selfcal_restore_procedure_hifa_image__regress
     pt.run()
 
 
-@pytest.mark.skip(reason="Dataset not available")
 @pytest.mark.seven
-def test_E2E9_1_00084_S__uid___A001_X2df7_X1ec__PPR__regression():
+@pytest.mark.mpi
+def test_2022_1_00207_S__uid___A001_X2d20_X373d__PPR__regression():
     """Run ALMA polcal+image regression on a multi-EB 7m test dataset with a PPR file.
 
-    PPR:                        pl-regressiontest/E2E9.1.00084.S/PPR.xml
-    Project:                    E2E9.1.00084.S
-    MOUS:                       uid___A001_X2df7_X1ec
-    EBs:                        uid___A002_Xfd80cd_X128a
-                                uid___A002_Xfd80cd_X1531
-                                uid___A002_Xfd80cd_X1748
+    PPR:                        pl-regressiontest/2022.1.00207.S/PPR.xml
+    Project:                    2022.1.00207.S
+    MOUS:                       uid___A001_X2d20_X373d
+    EBs:                        uid___A002_X10b6f7c_X41d1
+                                uid___A002_X10b6f7c_X46cc
     """
-    ref_directory = 'pl-regressiontest/E2E9.1.00084.S'
+    ref_directory = 'pl-regressiontest/2022.1.00207.S'
 
     pt = PipelineTester(
-        visname=['uid___A002_Xfd80cd_X128a',
-                 'uid___A002_Xfd80cd_X1531',
-                 'uid___A002_Xfd80cd_X1748'],
+        visname=['uid___A002_X10b6f7c_X41d1',
+                 'uid___A002_X10b6f7c_X46cc'],
         ppr=f"{ref_directory}/PPR.xml",
         input_dir=ref_directory,
         expectedoutput_dir=ref_directory,
@@ -125,8 +123,8 @@ def test_E2E9_1_00084_S__uid___A001_X2df7_X1ec__PPR__regression():
     pt.run()
 
 
-@pytest.mark.skip(reason="Dataset not available")
 @pytest.mark.seven
+@pytest.mark.mpi
 def test_2023_1_00228_S__uid___A002_X1199f9e_X7c24__procedure_hifa_calimage_diffgain__regression():
     """Run ALMA cal+image regression on a 7m B2B dataset with differential gain calibration.
 

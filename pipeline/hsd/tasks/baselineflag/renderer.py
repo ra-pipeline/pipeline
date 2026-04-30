@@ -1,7 +1,9 @@
 """Renderer hsd_blflag."""
+from __future__ import annotations
+
 import os
 import collections
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING
 
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.filenamer as filenamer
@@ -34,10 +36,10 @@ class T2_4MDetailsBLFlagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         Returns:
             (none)
         """
-        super(T2_4MDetailsBLFlagRenderer, self).__init__(
+        super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
-    def update_mako_context(self, ctx:dict, context:'Context', results:'SDBLFlagResults'):
+    def update_mako_context(self, ctx: dict, context: Context, results: SDBLFlagResults):
         """
         Update mako context.
 
@@ -79,11 +81,11 @@ class T2_4MDetailsBLFlagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                       'subpages_per_type'        : subpages_per_type,
                       'dovirtual'                : dovirtual } )
 
-    def _prepare_subpage( self, uri:str, context:'Context', results:'SDBLFlagResults',
-                          plots_list:List['Plot'], filename:str, title:str,
-                          allflags:Optional[bool]=False,
-                          myflag:Optional[bool]=False,
-                          types:Optional[bool]=True ):
+    def _prepare_subpage(self, uri: str, context: Context, results: SDBLFlagResults,
+                         plots_list: list[Plot], filename: str, title: str,
+                         allflags: bool | None = False,
+                         myflag: bool | None = False,
+                         types: bool | None = True) -> str:
         """
         prepare the subpage
 
@@ -133,9 +135,9 @@ class T2_4MDetailsBLFlagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
 class SDBLFlagStatisticsPlotRenderer( basetemplates.JsonPlotRenderer ):
     """Renderer class for Flag Statistics."""
-    def __init__( self, uri:str, context:'Context', results:'SDBLFlagResults', plots:List['Plot'],
-                  filename:str, title:str,
-                  allflags:Optional[bool]=False, myflag:Optional[bool]=False, types:Optional[bool]=True ):
+    def __init__(self, uri: str, context: Context, results: SDBLFlagResults, plots: list[Plot],
+                 filename: str, title: str,
+                 allflags: bool | None = False, myflag: bool | None = False, types: bool | None = True):
         """
         Construct SDBLFlagStatisticsPlotRenderer instance.
 
@@ -159,7 +161,7 @@ class SDBLFlagStatisticsPlotRenderer( basetemplates.JsonPlotRenderer ):
         outfile = filenamer.sanitize( filename.replace( " ", "_") )
         super(SDBLFlagStatisticsPlotRenderer, self ).__init__( uri, context, results, plots, title, outfile )
 
-    def update_json_dict( self, d:Dict, plot:'Plot' ):
+    def update_json_dict(self, d: dict, plot: Plot) -> None:
         """
         Update json dict to add new filters.
 
@@ -183,7 +185,7 @@ class SDBLFlagStatisticsPlotRenderer( basetemplates.JsonPlotRenderer ):
             d['expected_rms_postfit'] = plot.parameters['expected_rms_postfit']['frac']
 
 
-def accumulate_flag_per_eb( context:'Context', results:'SDBLFlagResults' ) -> Dict:
+def accumulate_flag_per_eb(context: Context, results: SDBLFlagResults) -> dict:
     """
     Accumulate flag per field, spw from the output of flagdata to a dictionary.
 
@@ -237,7 +239,7 @@ def accumulate_flag_per_eb( context:'Context', results:'SDBLFlagResults' ) -> Di
     return accum_flag
 
 
-def make_summary_table_per_eb( accum_flag:Dict ) -> List[str]:
+def make_summary_table_per_eb(accum_flag: dict) -> list[str]:
     """
     Make summary table data fpr flagsummary per EB.
 
@@ -255,7 +257,7 @@ def make_summary_table_per_eb( accum_flag:Dict ) -> List[str]:
         row_total = accum_flag[ms_name]['total']
         frac_before = accum_flag[ms_name]['flagdata_before']*100.0/accum_flag[ms_name]['flagdata_total']
         frac_after  = accum_flag[ms_name]['flagdata_after']*100.0/accum_flag[ms_name]['flagdata_total']
-        tr = FlagSummaryEB_TR( ms_name, 
+        tr = FlagSummaryEB_TR( ms_name,
                                '{:.3f} %'.format(accum_flag[ms_name]['RmsPostFitFlag']*100.0/row_total),
                                '{:.3f} %'.format(accum_flag[ms_name]['RmsPreFitFlag']*100.0/row_total),
                                '{:.3f} %'.format(accum_flag[ms_name]['RunMeanPostFitFlag']*100.0/row_total),
@@ -271,7 +273,7 @@ def make_summary_table_per_eb( accum_flag:Dict ) -> List[str]:
     return utils.merge_td_columns(rows, num_to_merge=0)
 
 
-def accumulate_flag_per_source_spw( context:'Context', results:'SDBLFlagResults' ):
+def accumulate_flag_per_source_spw(context: Context, results: SDBLFlagResults) -> dict:
     """
     Accumulate flag per field, spw from the output of flagdata to a dictionary
 

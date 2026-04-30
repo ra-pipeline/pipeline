@@ -1,6 +1,8 @@
 """This file contains some pipeline-specific pytest configuration settings."""
 from __future__ import annotations
 
+import gc
+import logging
 import os
 import pathlib
 from typing import TYPE_CHECKING
@@ -9,10 +11,58 @@ import pytest
 
 from casatasks import casalog
 
+LOG = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from typing import Any
+
     from _pytest.config import Config
     from _pytest.nodes import Item
     from pytest import FixtureRequest, Parser, Session
+
+
+@pytest.fixture(autouse=True)
+def clear_module_level_caches() -> Iterator[None]:
+    """Clear module-level caches between tests to reduce memory footprint.
+
+    Two module-level caches accumulate stale entries across regression tests:
+
+    1. ``MSTOOL_SELECTEDINDICES_CACHE`` (conversion.py) — a dict keyed by MS
+       absolute path, each holding an LRU cache of up to 40,000 ms.msselect()
+       results.  Each regression test uses different MSes, so entries from a
+       finished test are pure dead weight.
+
+    2. ``get_calstate_shape`` cache (callibrary.py) — decorated with
+       ``@cachetools.cached(LRUCache(50))``, keyed by ``MeasurementSet.name``.
+       Cached values hold ``IntervalTree`` objects that internally reference the
+       ``MeasurementSet`` dimensions, keeping ``MeasurementSet`` instances alive
+       even after the pipeline ``Context`` would otherwise be unreachable.
+
+    Both caches are cleared *after* each test (teardown phase of the fixture)
+    so the caches are still warm during the test that populated them, but stale
+    data does not carry over to the next test.
+    """
+    yield
+
+    try:
+        from pipeline.infrastructure.utils.conversion import MSTOOL_SELECTEDINDICES_CACHE
+        MSTOOL_SELECTEDINDICES_CACHE.clear()
+    except ImportError:
+        pass
+
+    try:
+        from pipeline.infrastructure.callibrary import get_calstate_shape
+        get_calstate_shape.cache_clear()
+    except (ImportError, AttributeError):
+        pass
+
+    # Both caches above can hold references into the Context object graph.
+    # Now that they are cleared and the test function has fully returned
+    # (so the 'context' local in PipelineTester.run() is gone), trigger a
+    # full GC cycle to collect the cyclic Context → ResultsProxy → Context
+    # chain that CPython's reference counting alone cannot free (PIPE-3061).
+    gc.collect()
 
 
 def pytest_addoption(parser: Parser) -> None:
@@ -58,6 +108,81 @@ def pytest_configure(config: Config) -> None:
     # pytest.config (global) is deprecated from pytest ver>5.0.
     # we save a copy of its content under `pytest.pytestconfig` for an easy access from helper classes.
     pytest.pytestconfig = config
+
+
+class _WeblogFailureInjectionRenderer:
+    def __init__(self, renderer: Any) -> None:
+        self._renderer = renderer
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._renderer, name)
+
+    @staticmethod
+    def _get_stages_to_fail() -> set[int]:
+        raw_stages = os.environ.get('SIMULATE_WEBLOG_FAILURE', '').strip()
+        if not raw_stages:
+            return set()
+
+        try:
+            return {int(stage.strip()) for stage in raw_stages.split(',') if stage.strip()}
+        except ValueError:
+            LOG.warning(
+                'Invalid SIMULATE_WEBLOG_FAILURE value: %s (expected comma-separated integers)',
+                raw_stages,
+            )
+            return set()
+
+    def render(self, context: Any, result: Any) -> Any:
+        stages_to_fail = self._get_stages_to_fail()
+        if result.stage_number in stages_to_fail:
+            LOG.warning('SIMULATE_WEBLOG_FAILURE: Raising exception for stage %s', result.stage_number)
+            raise RuntimeError(
+                'Simulated weblog rendering failure for stage '
+                f'{result.stage_number} (triggered by SIMULATE_WEBLOG_FAILURE environment variable)'
+            )
+
+        return self._renderer.render(context, result)
+
+
+def _wrap_renderer_for_test_failure_injection(renderer: Any) -> Any:
+    if isinstance(renderer, _WeblogFailureInjectionRenderer):
+        return renderer
+    return _WeblogFailureInjectionRenderer(renderer)
+
+
+@pytest.fixture(scope='session', autouse=True)
+def install_test_only_weblog_failure_injection() -> Iterator[None]:
+    """Install renderer wrappers in tests to simulate weblog failures by stage."""
+    from pipeline.infrastructure.renderer import weblog
+
+    original_default_map = weblog.registry.default_map
+    original_custom_map = weblog.registry.custom_map
+    original_add_renderer = weblog.registry.add_renderer
+
+    weblog.registry.default_map = {
+        task_cls: _wrap_renderer_for_test_failure_injection(renderer)
+        for task_cls, renderer in original_default_map.items()
+    }
+    weblog.registry.custom_map = {
+        task_cls: {
+            key: _wrap_renderer_for_test_failure_injection(renderer)
+            for key, renderer in keyed_renderers.items()
+        }
+        for task_cls, keyed_renderers in original_custom_map.items()
+    }
+
+    def add_renderer_with_test_wrapper(task_cls: Any, renderer: Any, group_by: str | None = None,
+                                       key_fn: Any | None = None, key: Any | None = None) -> None:
+        wrapped_renderer = _wrap_renderer_for_test_failure_injection(renderer)
+        original_add_renderer(task_cls, wrapped_renderer, group_by, key_fn, key)
+
+    weblog.registry.add_renderer = add_renderer_with_test_wrapper
+
+    yield
+
+    weblog.registry.default_map = original_default_map
+    weblog.registry.custom_map = original_custom_map
+    weblog.registry.add_renderer = original_add_renderer
 
 
 def pytest_collection_finish(session: Session) -> None:

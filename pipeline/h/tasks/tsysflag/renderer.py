@@ -3,18 +3,19 @@ Created on 9 Sep 2014
 
 @author: sjw
 """
+from __future__ import annotations
+
 import collections
 import functools
 import os
 import shutil
+from typing import TYPE_CHECKING
 
 import pipeline.infrastructure.filenamer as filenamer
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.renderer.rendererutils as rendererutils
 import pipeline.infrastructure.utils as utils
-from pipeline.infrastructure.launcher import Context
-from pipeline.infrastructure.basetask import ResultsList
 from pipeline.h.tasks.common import calibrationtableaccess as caltableaccess
 from pipeline.h.tasks.common import flagging_renderer_utils as flagutils
 from pipeline.h.tasks.common.displays import image as image
@@ -22,6 +23,10 @@ from pipeline.h.tasks.common.displays import slice as slice_display
 from pipeline.h.tasks.common.displays import tsys as tsys
 from pipeline.h.tasks.tsyscal import renderer as tsyscalrenderer
 from pipeline.h.tasks.common.flagging_renderer_utils import FlagTotal
+
+if TYPE_CHECKING:
+    from pipeline.infrastructure.basetask import ResultsList
+    from pipeline.infrastructure.launcher import Context
 
 LOG = logging.get_logger(__name__)
 
@@ -36,7 +41,7 @@ class T2_4MDetailsTsysflagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def __init__(self, uri='tsysflag.mako',
                  description='Flag Tsys calibration',
                  always_rerender=False):
-        super(T2_4MDetailsTsysflagRenderer, self).__init__(
+        super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
     def update_mako_context(self,
@@ -506,7 +511,7 @@ class PlotDetailRenderer(basetemplates.JsonPlotRenderer):
         title = '%s vs %s for %s' % (y_axis, x_axis, vis)
         self.shorttitle = '%s vs %s' % (y_axis, x_axis)
 
-        super(PlotDetailRenderer, self).__init__(template_uri, context, results, plots, title, outfile)
+        super().__init__(template_uri, context, results, plots, title, outfile)
 
     def update_json_dict(self, d, plot):
         if 'intent' in plot.parameters:

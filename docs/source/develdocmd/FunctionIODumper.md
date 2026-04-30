@@ -7,13 +7,13 @@ The decorator outputs the arguments and return value of a function in pickle and
 This allows debugging of individual functions, regression testing, behavior analysis, and even automatic test template generation using actual behavior data.
 
 ## 1. Basic Functionality
-- **I/O Serialization**:  
+- **I/O Serialization**:
   - The decorator captures the function’s inputs (arguments and keyword arguments), output (return value).
   - Data is serialized in two supported formats:
     - **Pickle**: Suitable for complete Python object serialization.
     - **JSON**: Provides human-readable output (with options to limit JSON depth to prevent excessively large dumps). It is not possible to serialize all objects into JSON format, so the exact representation is a JSON-like file.
 
-- **Condition**:  
+- **Condition**:
   - A user-supplied condition determines whether serialization should work or not.
   - The `condition` parameter can be specified either as a **callable** or as a **dict**:
     - **Callable Condition:**
@@ -35,21 +35,21 @@ This allows debugging of individual functions, regression testing, behavior anal
         ```
 
 ## 2. Optional/Additional Functionality
-- **Error Handling**:  
+- **Error Handling**:
   - If serialization (or condition evaluation) fails, the decorator logs the error (or warning) but does not affect the primary function execution.
 
-- **JSON Depth Control**:  
+- **JSON Depth Control**:
   - A parameter (`json_max_depth`) allows users to limit the nested levels in the JSON output to prevent huge or recursive dumps.
 
-- **File Naming and Storage**:  
+- **File Naming and Storage**:
   - Unique file names are generated based on the function name and timestamp to avoid overwriting existing files.
 
 ## 3. Use Cases
 
 This decorator is designed to address a wide variety of scenarios:
 
-- **Debugging and Issue Reproduction**:  
-  - Log detailed state information (arguments, outputs, exceptions) when certain conditions are met, aiding in diagnosing problems during development. 
+- **Debugging and Issue Reproduction**:
+  - Log detailed state information (arguments, outputs, exceptions) when certain conditions are met, aiding in diagnosing problems during development.
   - By using the dumped arguments and return values, the behavior of a particular function is reproduced and verified individually.
   - Help development and debug rapidly. For example, when a debugging of the weblog would normally require regenerating all PNG files per one test run, however, it can be regenerated for a limited number of PNG files by the execution of the individual function which has been debugging, with dumped files.
 
@@ -85,7 +85,7 @@ This decorator is designed to address a wide variety of scenarios:
 
   For example, decorate hsd/tasks/importdata/reader.py::merge_flagcmd() and execute hsd_importdata,
   then it will output pickle files of argument objects and returning object into merge_flagcmd* directory in current (working) directory.
-  We use the pickle file as expected input/output for a unit test. 
+  We use the pickle file as expected input/output for a unit test.
   This sample velow uses a pickle file for the input argument, but basically input parameters should be specified and used for unit testing.
 
   ```python
@@ -105,11 +105,11 @@ This decorator is designed to address a wide variety of scenarios:
 
       def test_merge_flagcmd(self):
           basepath = "merge_flagcmd.expected/"
-          
+
           # load input data and expected result
           _, commands = load_pickle(basepath + 'commands.pickle')
           result = merge_flagcmd(commands)
-          
+
           # load expected result
           objname, expected = load_pickle(basepath + 'merge_flagcmd.expected.result.pickle')
 
@@ -122,10 +122,10 @@ This decorator is designed to address a wide variety of scenarios:
   ```
 
 
-- **Regression Testing Automation**:  
+- **Regression Testing Automation**:
   - Automatically capture function inputs and outputs during execution. Later, these dumps can be used to generate test cases or compare against new code versions.
 
-- **Dynamic Decoration for Temporary Logging**:  
+- **Dynamic Decoration for Temporary Logging**:
   - By helper function, we can apply the decorator at runtime to a function without modifying its source code. This is useful for on-demand logging or debugging sessions.
 
 ## 4. Operating Specifications
@@ -143,20 +143,20 @@ This decorator is designed to address a wide variety of scenarios:
 ### 5.1 Main Decorator: `function_io_dumper`
 
 - **Parameters:**
-  - `to_pickle: bool`  
+  - `to_pickle: bool`
     Enable/disable Pickle serialization.
-  - `to_json: bool`  
+  - `to_json: bool`
     Enable/disable JSON serialization.
-  - `json_max_depth: int`  
+  - `json_max_depth: int`
     Limit the depth of JSON serialization (optional, for controlling output size).
-  - `condition: Optional[Union[Callable[[Tuple[Any, ...], Dict[str, Any]], bool], Dict[str, Any]]]`  
+  - `condition: Callable[[tuple[Any, ...], dict[str, Any]], bool] | dict[str, Any] | None`
     A condition that determines whether serialization should occur. It can be specified as either:
-    - A callable with the signature `Callable[[Tuple[Any, ...], Dict[str, Any]], bool]`, or
+    - A callable with the signature `Callable[[tuple[Any, ...], dict[str, Any]], bool]`, or
     - A dictionary for simple equality checking (e.g., `{'spw': 10}`).
-  - `timestamp: bool`  
+  - `timestamp: bool`
     When `True`, include a timestamp in the serialized data and file names.
 
-- **Return Value:**  
+- **Return Value:**
   - Returns a decorated function that retains the original function’s signature.
 
 - **Usage Example:**
@@ -164,7 +164,7 @@ This decorator is designed to address a wide variety of scenarios:
   # Using a callable condition:
   def my_condition(args, kwargs) -> bool:
       return kwargs.get("spw") in (10, True)
-  
+
   @function_io_dumper(to_pickle=True, to_json=True, condition=my_condition, timestamp=True)
   def my_function(x: int, spw: bool = False) -> int:
       return x * 2
@@ -173,7 +173,7 @@ This decorator is designed to address a wide variety of scenarios:
   ```python
   # Using a dictionary condition:
   simple_condition = {'spw': 10}
-  
+
   @function_io_dumper(to_pickle=True, to_json=True, condition=simple_condition, timestamp=True)
   def my_function(x: int, spw: bool = False) -> int:
       return x * 2
@@ -183,19 +183,19 @@ This decorator is designed to address a wide variety of scenarios:
 
 ### 6.1 Dynamic Decoration Helper: `decorate_io_dumper`
 
-**Purpose:** 
+**Purpose:**
 
 The `decorate_io_dumper` function dynamically applies the `function_io_dumper` decorator to methods of a specified class. This enables conditional input/output serialization of selected functions within a class without modifying their source code.
 
 **Parameters:**
 
-- **`cls: object`**  
+- **`cls: object`**
   The class whose methods should be decorated with `function_io_dumper`.
-- **`functions: List[str]` (optional)**  
+- **`functions: list[str] | None` (optional)**
   A list of function names to be decorated.
   - If specified, only the listed functions will be decorated.
   - If left empty (`[]`), all methods of the class will be decorated.
-- **`*args: Any`**, **`**kwargs: Any`**  
+- **`*args: Any`**, **`**kwargs: Any`**
   - Other parameters corresponding to `function_io_dumper` (e.g., `to_pickle`, `to_json`, `json_max_depth`, `condition`, `timestamp`).
 
 **Usage Example:**

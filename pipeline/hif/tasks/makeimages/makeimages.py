@@ -532,7 +532,7 @@ class MakeImages(basetask.StandardTaskTemplate):
                            is_representative=is_representative,
                            bandwidth=chanwidth_of_image,
                            effective_bw=effectiveBW_of_image,
-                           bwmode=result.orig_specmode,
+                           bwmode=result.hm_specmode,
                            beam=restoringbeam,
                            cell=cell,
                            robust=target['robust'],
@@ -545,7 +545,7 @@ class MakeImages(basetask.StandardTaskTemplate):
                            datatype=result.datatype)
 
 
-class CleanTaskFactory(object):
+class CleanTaskFactory:
     def __init__(self, inputs, executor):
         self.__inputs = inputs
         self.__context = inputs.context

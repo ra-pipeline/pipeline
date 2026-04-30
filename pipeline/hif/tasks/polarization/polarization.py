@@ -9,7 +9,7 @@ LOG = infrastructure.get_logger(__name__)
 
 class PolarizationResults(basetask.Results):
     def __init__(self, final=[], pool=[], preceding=[]):
-        super(PolarizationResults, self).__init__()
+        super().__init__()
         self.pool = pool[:]
         self.final = final[:]
         self.preceding = preceding[:]
@@ -31,7 +31,7 @@ class PolarizationResults(basetask.Results):
 
 class PolarizationInputs(vdp.StandardInputs):
     def __init__(self, context, vis=None):
-        super(PolarizationInputs, self).__init__()
+        super().__init__()
         self.context = context
         self.vis = vis
 

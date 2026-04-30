@@ -99,7 +99,7 @@ class MakecutoutimagesInputs(vdp.StandardInputs):
             offsettrc: +x and +y offsets to the top right corner (trc) in arcseconds
 
         """
-        super(MakecutoutimagesInputs, self).__init__()
+        super().__init__()
         self.context = context
         self.vis = vis
         self.offsetblc = offsetblc

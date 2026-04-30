@@ -13,7 +13,7 @@ LOG = infrastructure.get_logger(__name__)
 ImageStats = collections.namedtuple('ImageStats', 'rms max')
 
 
-class RmsimagesSummary(object):
+class RmsimagesSummary:
     def __init__(self, context, result):
         self.context = context
         self.result = result
@@ -45,7 +45,7 @@ class RmsimagesSummary(object):
         return [p for p in plot_wrappers if p is not None]
 
 
-class VlassCubeRmsimagesSummary(object):
+class VlassCubeRmsimagesSummary:
     def __init__(self, context, result):
         self.context = context
         self.result = result

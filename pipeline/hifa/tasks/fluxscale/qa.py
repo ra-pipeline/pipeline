@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 import ast
 import collections
+import collections.abc
 import functools
 import operator
 import re
 from decimal import Decimal
 from math import sqrt
-from typing import Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING
 
 import numpy
 
@@ -13,17 +16,33 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as qacalc
-from pipeline.domain import Field, FluxMeasurement, MeasurementSet, SpectralWindow
 from pipeline.domain.measures import FluxDensity, FluxDensityUnits, Frequency, FrequencyUnits
 from pipeline.h.tasks.common import commonfluxresults
 from pipeline.h.tasks.importdata.fluxes import ORIGIN_ANALYSIS_UTILS, ORIGIN_XML
-from pipeline.hifa.heuristics.snr import ALMA_BANDS, ALMA_SENSITIVITIES, ALMA_TSYS
+
+# PIPE-2901: import default values from the heuristics/snr.py instead of hardcoding in 
+# this module (vs <=PL2025)
+from pipeline.hifa.heuristics.snr import (
+    ALMA_BANDS,
+    ALMA_FIDUCIAL_BANDWIDTH,
+    ALMA_FIDUCIAL_EXP_TIME,
+    ALMA_FIDUCIAL_NUM_ANTENNAS,
+    ALMA_SENSITIVITIES,
+    ALMA_TSYS,
+)
 from pipeline.hifa.tasks.importdata.dbfluxes import ORIGIN_DB
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.launcher import Context
+
 from . import gcorfluxscale
 
-LOG = infrastructure.get_logger(__name__)
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from pipeline.domain import Field, FluxMeasurement, MeasurementSet, SpectralWindow
+    from pipeline.infrastructure.launcher import Context
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 COLSHAPE_FORMAT = re.compile(r'\[(?P<num_pols>\d+), (?P<num_rows>\d+)\]')
 
@@ -232,7 +251,7 @@ def _compute_snr_info_for_intent(context: Context, ms: MeasurementSet, caltable_
     intent, and spectral windows.
 
     This function first identifies what field to analyse for given intent, then
-    retrieves the fluxes for that field, and finally calls "gaincalSNR" to
+    retrieves the fluxes for that field, and finally calls "gaincalSNR" function to
     compute the SNR info.
 
     Args:
@@ -268,7 +287,7 @@ def _compute_snr_info_for_intent(context: Context, ms: MeasurementSet, caltable_
 
 
 def _compute_k_spws_for_flux_measurements(field: Field, flux_measurements: Iterable[FluxMeasurement], r_snr: float,
-                                          msg_fieldname: str, msg_intents: str) -> Optional[list]:
+                                          msg_fieldname: str, msg_intents: str) -> list | None:
     """
     Compute the "k_spw" metric for given list of flux measurements and given
     flux ratio for highest SNR SpW.
@@ -312,7 +331,7 @@ def _compute_k_spws_for_flux_measurements(field: Field, flux_measurements: Itera
     return k_spws
 
 
-def _get_field_to_analyse(ms: MeasurementSet, intent: str) -> Field:
+def _get_field_to_analyse(ms: MeasurementSet, intent: str) -> Field | None:
     """
     Identify and return which field to analyse for the "k_spw" score.
 
@@ -325,16 +344,18 @@ def _get_field_to_analyse(ms: MeasurementSet, intent: str) -> Field:
         intent: intent to find field for
 
     Returns:
-        Field to analyse.
+        Field to analyse, or None if no field found.
     """
     candidate_fields = [f for f in ms.get_fields(intent=intent) if 'TARGET' not in f.intents]
     if not candidate_fields:
         candidate_fields = ms.get_fields(intent=intent)
-    field = min(candidate_fields, key=lambda f: f.time.min())
-    return field
+    # PIPE-2694 handle CHECK (or any) intent passed when not an observed field
+    if not candidate_fields:
+        return None
+    return min(candidate_fields, key=lambda f: f.time.min())
 
 
-def _get_fluxes_for_field(ms: MeasurementSet, field: Field) -> List[Tuple[int, float, float]]:
+def _get_fluxes_for_field(ms: MeasurementSet, field: Field) -> list[tuple[int, float, float]]:
     """
     Return flux information for given measurement set and field.
 
@@ -361,7 +382,7 @@ def _get_fluxes_for_field(ms: MeasurementSet, field: Field) -> List[Tuple[int, f
 
 def _get_highest_snr_measurement_and_flux_ratio(field: Field, highest_snr_spw: SpectralWindow,
                                                 measurements: Iterable[FluxMeasurement], msg_fieldname: str,
-                                                msg_intents: str) -> Tuple[FluxMeasurement, Optional[float]]:
+                                                msg_intents: str) -> tuple[FluxMeasurement, float | None]:
     """
     Retrieve flux measurement for given "highest SNR" SpW, compute ratio of
     derived over catalog flux, and return both flux measurement and flux ratio.
@@ -402,7 +423,7 @@ def _get_highest_snr_measurement_and_flux_ratio(field: Field, highest_snr_spw: S
 
 
 def _get_highest_snr_spw(snr_info: dict, flux_measurements: Iterable[FluxMeasurement], ms: MeasurementSet,
-                         msg_fieldname: str, msg_intents: str) -> Optional[SpectralWindow]:
+                         msg_fieldname: str, msg_intents: str) -> SpectralWindow | None:
     """
     Return the highest SNR SpW for flux measurements based on SNR information.
 
@@ -485,7 +506,7 @@ def _get_tsys_caltable_path(context: Context, vis: str) -> str:
     return caltable_path
 
 
-def gaincalSNR(context: Context, ms: MeasurementSet, tsysTable: str, flux: Iterable[Tuple[int, float, float]],
+def gaincalSNR(context: Context, ms: MeasurementSet, tsysTable: str, flux: Iterable[tuple[int, float, float]],
                field: Field, spws: Iterable[SpectralWindow], intent='PHASE', required_snr: float = 25,
                edge_fraction: float = 0.03125, min_snr: float = 10) -> dict:
     """
@@ -605,13 +626,19 @@ def gaincalSNR(context: Context, ms: MeasurementSet, tsysTable: str, flux: Itera
             LOG.error(f"{ms.basename}: Estimated SNR from hifa_spwphaseup could not be retrieved.")
 
     # 6) compute the expected channel-averaged SNR
-    # TODO Ask Todd if this is an error or a confusingly-named variable
-    num_baselines = num_antennas - 1  # for an antenna-based solution
+    # Update w.r.t. PIPE-2901
+    # please see longer explanation in /hifa/heuristics/snr.py (searching PIPE-2901)
+    num_eff_antennas = num_antennas - 3
+    # for an antenna-based solution need number of effective antennas, was misnamed nbaselines
+    if num_eff_antennas <= 0:
+        LOG.warning('%s: Cannot compute gaincal SNR; fewer than 3 antennas (%d) present.', ms.basename, num_antennas)
+        return {}
 
     diffgain_mode = {}
     mydict = {}
 
-    eight_ghz = Frequency(8, FrequencyUnits.GIGAHERTZ)
+    # PIPE-2901: set ALMA_FIDUCIAL_BANDWIDTH as a Frequency type for computing with spw params already coded
+    alma_fiducial_bandwidth_freq = Frequency(ALMA_FIDUCIAL_BANDWIDTH, FrequencyUnits.HERTZ)  # 8e9 Hz
     for spw in all_target_spws:
         obsspw = spw
         if spw not in all_gaincal_spws:
@@ -628,22 +655,25 @@ def gaincalSNR(context: Context, ms: MeasurementSet, tsysTable: str, flux: Itera
         diffgain_mode[obsspw] = spw
         band_info = [b for b in BAND_INFOS if b.name == spw.band].pop()
         relative_tsys = median_tsys[spw.id] / band_info.nominal_tsys
-        time_factor = 1 / sqrt(time_on_source[spw].total_seconds() / 60.0)
-        array_size_factor = sqrt(16 * 15 / 2.) / sqrt(num_baselines)
+        # PIPE-2901 aligned with snr.py
+        time_factor = sqrt(ALMA_FIDUCIAL_EXP_TIME / (time_on_source[spw].total_seconds() / 60.0))
+        array_size_factor = sqrt(ALMA_FIDUCIAL_NUM_ANTENNAS * (ALMA_FIDUCIAL_NUM_ANTENNAS-1) / (2.0 * num_eff_antennas))
 
         area_factor = 1.0
         if seven_metres_majority:
             # scale by antenna collecting area
             area_factor = (12./7.)**2
 
-        # scale by chan bandwidth
-        bandwidth_factor = sqrt(eight_ghz / min([spw.bandwidth, max_effective_bandwidth_per_baseband]))
+        # scale by chan bandwidth - PIPE-2901 alignment with snr.py
+        bandwidth_factor = sqrt(alma_fiducial_bandwidth_freq / min([spw.bandwidth, max_effective_bandwidth_per_baseband]))
         # scale to single polarization solutions
         polarization_factor = sqrt(2)
         factor = relative_tsys * time_factor * array_size_factor * area_factor * bandwidth_factor * polarization_factor
         sensitivity = band_info.sensitivity * Decimal(factor)
 
-        aggregate_bandwidth_factor = sqrt(eight_ghz / aggregate_bandwidth)
+        # PIPE-2901
+        aggregate_bandwidth_factor = sqrt(alma_fiducial_bandwidth_freq / aggregate_bandwidth)
+
         factor = relative_tsys * time_factor * array_size_factor * area_factor * aggregate_bandwidth_factor * polarization_factor
         aggregate_bandwidth_sensitivity = band_info.sensitivity * Decimal(factor)
 
@@ -682,7 +712,8 @@ def gaincalSNR(context: Context, ms: MeasurementSet, tsysTable: str, flux: Itera
         if spw == obsspw:
             # Then it is not a DIFFGAIN mode (B2B or BWSW) dataset, so compute
             # snr in widest spw.
-            widest_spw_bandwidth_factor = sqrt(eight_ghz / widest_spw.bandwidth)
+            # PIPE-2901
+            widest_spw_bandwidth_factor = sqrt(alma_fiducial_bandwidth_freq / widest_spw.bandwidth)
             factor = relative_tsys * time_factor * array_size_factor * area_factor * widest_spw_bandwidth_factor * polarization_factor
             widest_spw_bandwidth_sensitivity = band_info.sensitivity * Decimal(factor)
             if numpy.isnan(median_tsys.get(spw.id)):
@@ -774,7 +805,7 @@ def frequency_min_max_after_aliasing(spw):
         return spw.min_frequency, spw.max_frequency
 
 
-class CaltableWrapperFactory(object):
+class CaltableWrapperFactory:
     @staticmethod
     def from_caltable(filename):
         LOG.trace('CaltableWrapperFactory.from_caltable(%r)', filename)
@@ -886,7 +917,7 @@ def get_dtype(tb, col):
             return col, CASA_DATA_TYPES[col_dtype], max_row_shape
 
 
-class CaltableWrapper(object):
+class CaltableWrapper:
     def __init__(self, filename, data, table_keywords, column_keywords):
         self.filename = filename
         self.data = data

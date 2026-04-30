@@ -1,21 +1,22 @@
+import collections
 import os
 import re
 import shutil
 import uuid
-from typing import Dict, Optional, Tuple, Union
 
 import numpy
-from casatasks.private.imagerhelpers.imager_parallel_continuum import PyParallelContSynthesisImager
-from casatasks.private.imagerhelpers.input_parameters import ImagerParameters
-
+import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.utils as utils
+from casatasks.private.imagerhelpers.imager_parallel_continuum import PyParallelContSynthesisImager
+from casatasks.private.imagerhelpers.input_parameters import ImagerParameters
 from pipeline.infrastructure import casa_tools
 
 from .imageparams_base import ImageParamsHeuristics
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
+
 
 
 class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
@@ -31,7 +32,129 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         # Value is None or float.
         self.user_cycleniter_final_image_nomask = None
 
-    # niter
+    def calc_topo_ranges(self, inputs):
+        """Calculate TOPO ranges for hif_tclean inputs.
+
+        Note: we might consider consolidating this with the similar code in contfilehelper.
+        """
+        spw_topo_freq_param_lists = []
+        spw_topo_chan_param_lists = []
+        spw_topo_freq_param_dict = collections.defaultdict(dict)
+        spw_topo_chan_param_dict = collections.defaultdict(dict)
+        total_topo_freq_ranges = []
+        topo_freq_ranges = []
+        num_channels = []
+
+        qaTool = casa_tools.quanta
+        aggregate_lsrk_bw = '0.0GHz'
+
+        for spwid in inputs.spw.split(','):
+            try:
+                msname = self.get_ref_msname(spwid)
+                ms = self.observing_run.get_ms(name=msname)
+                real_spwid = self.observing_run.virtual2real_spw_id(spwid, self.observing_run.get_ms(msname))
+                spw_info = ms.get_spectral_window(real_spwid)
+
+                num_channels.append(spw_info.num_channels)
+
+                min_frequency = float(spw_info.min_frequency.to_units(measures.FrequencyUnits.GIGAHERTZ))
+                max_frequency = float(spw_info.max_frequency.to_units(measures.FrequencyUnits.GIGAHERTZ))
+
+                # Save spw width
+                total_topo_freq_ranges.append((min_frequency, max_frequency))
+
+                if 'spw%s' % (spwid) in inputs.spwsel_lsrk:
+                    spw_topo_freq_param_lists.append([spwid] * len(inputs.vis))
+                    spw_topo_chan_param_lists.append([spwid] * len(inputs.vis))
+                    for msname in inputs.vis:
+                        spw_topo_freq_param_dict[os.path.basename(msname)][spwid] = ''
+                        spw_topo_chan_param_dict[os.path.basename(msname)][spwid] = ''
+                    topo_freq_ranges.append((min_frequency, max_frequency))
+                    aggregate_spw_lsrk_bw = '%.10fGHz' % (max_frequency - min_frequency)
+                    if (
+                        (inputs.spwsel_lsrk['spw%s' % (spwid)] not in ('ALL', 'ALLCONT'))
+                        and (inputs.intent == 'TARGET')
+                        and (inputs.specmode in ('mfs', 'cont') and self.warn_missing_cont_ranges())
+                    ):
+                        LOG.warning(
+                            'No continuum frequency selection for Target Field %s SPW %s' % (inputs.field, spwid)
+                        )
+                else:
+                    spw_topo_freq_param_lists.append([spwid] * len(inputs.vis))
+                    spw_topo_chan_param_lists.append([spwid] * len(inputs.vis))
+                    for msname in inputs.vis:
+                        spw_topo_freq_param_dict[os.path.basename(msname)][spwid] = ''
+                        spw_topo_chan_param_dict[os.path.basename(msname)][spwid] = ''
+                    topo_freq_ranges.append((min_frequency, max_frequency))
+                    aggregate_spw_lsrk_bw = '%.10fGHz' % (max_frequency - min_frequency)
+                    if (inputs.intent == 'TARGET') and (
+                        inputs.specmode in ('mfs', 'cont') and self.warn_missing_cont_ranges()
+                    ):
+                        LOG.warning(
+                            'No continuum frequency selection for Target Field %s SPW %s' % (inputs.field, spwid)
+                        )
+            except Exception as e:
+                LOG.warning(f'Could not determine min/max frequency for spw {spwid}. Exception: {str(e)}')
+
+            aggregate_lsrk_bw = qaTool.add(aggregate_lsrk_bw, aggregate_spw_lsrk_bw)
+
+        spw_topo_freq_param = [
+            ','.join(spwsel_per_ms)
+            for spwsel_per_ms in [
+                [spw_topo_freq_param_list_per_ms[i] for spw_topo_freq_param_list_per_ms in spw_topo_freq_param_lists]
+                for i in range(len(inputs.vis))
+            ]
+        ]
+        spw_topo_chan_param = [
+            ','.join(spwsel_per_ms)
+            for spwsel_per_ms in [
+                [spw_topo_chan_param_list_per_ms[i] for spw_topo_chan_param_list_per_ms in spw_topo_chan_param_lists]
+                for i in range(len(inputs.vis))
+            ]
+        ]
+
+        # Calculate total bandwidth
+        total_topo_bw = '0.0GHz'
+        for total_topo_freq_range in utils.merge_ranges(total_topo_freq_ranges):
+            total_topo_bw = qaTool.add(
+                total_topo_bw,
+                qaTool.sub(
+                    '%.10fGHz' % (float(total_topo_freq_range[1])), '%.10fGHz' % (float(total_topo_freq_range[0]))
+                ),
+            )
+
+        # Calculate aggregate selected bandwidth
+        aggregate_topo_bw = '0.0GHz'
+        for topo_freq_range in utils.merge_ranges(topo_freq_ranges):
+            aggregate_topo_bw = qaTool.add(
+                aggregate_topo_bw,
+                qaTool.sub('%.10fGHz' % (float(topo_freq_range[1])), '%.10fGHz' % (float(topo_freq_range[0]))),
+            )
+
+        return (
+            spw_topo_freq_param,
+            spw_topo_chan_param,
+            spw_topo_freq_param_dict,
+            spw_topo_chan_param_dict,
+            total_topo_bw,
+            aggregate_topo_bw,
+            aggregate_lsrk_bw,
+        )
+
+    def is_eph_obj(self, field: str) -> bool:
+        """Determine whether a field is an ephemeris (moving) object.
+
+        The VLASS heuristic does not handle ephemeris (moving)
+        objects, so this method always returns False.
+
+        Args:
+            field: Field identifier (name or index). Ignored by this heuristic.
+
+        Returns:
+            Always False for this heuristic.
+        """
+        return False
+
     def niter_correction(self, niter, cell, imsize, residual_max, threshold, residual_robust_rms,
                          mask_frac_rad=0.0, intent='TARGET') -> int:
         """Adjust niter value between cleaning iteration steps based on imaging parameters, mask and residual"""
@@ -59,16 +182,16 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         """Tclean gridder parameter heuristics."""
         return 'awproject'
 
-    def cell(self, beam=None, pixperbeam=None) -> Union[str, list]:
+    def cell(self, beam=None, pixperbeam=None) -> str | list:
         """Tclean cell parameter heuristics."""
         return ['0.6arcsec']
 
     def imsize(self, fields=None, cell=None, primary_beam=None, sfpblimit=None, max_pixels=None, centreonly=None,
-               vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None) -> Union[list, int]:
+               vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None) -> list | int:
         """Tclean imsize parameter heuristics."""
         return [16384, 16384]
 
-    def reffreq(self, deconvolver: Optional[str]=None, specmode: Optional[str]=None, spwsel: Optional[dict]=None) -> Optional[str]:
+    def reffreq(self, deconvolver: str | None=None, specmode: str | None=None, spwsel: dict | None=None) -> str | None:
         """Tclean reffreq parameter heuristics."""
         return '3.0GHz'
 
@@ -95,7 +218,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         else:
             return 5000
 
-    def nmajor(self, iteration: int) -> Union[None, int]:
+    def nmajor(self, iteration: int) -> None | int:
         """Tclean nmajor parameter heuristics."""
         if iteration == 0:
             return None
@@ -103,7 +226,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
             # PIPE-1745: default value of nmajor=220 for all editimlist stages of the VLASS QL/SE imaging workflow
             return 220
 
-    def scales(self, iteration: Union[int, None] = None) -> Union[list, None]:
+    def scales(self, iteration: int | None = None) -> list | None:
         """Tclean scales parameter heuristics."""
         if not iteration:
             return None
@@ -112,7 +235,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         else:
             return [0]
 
-    def uvtaper(self, beam_natural=None, protect_long=None, beam_user=None, tapering_limit=None, repr_freq=None) -> Union[str, list]:
+    def uvtaper(self, beam_natural=None, protect_long=None, beam_user=None, tapering_limit=None, repr_freq=None) -> str | list:
         """Tclean uvtaper parameter heuristics."""
         if self.vlass_stage == 3:
             return ''
@@ -126,7 +249,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         return '<12km', None
 
     def mask(self, hm_masking=None, rootname=None, iteration=None, mask=None,
-             results_list: Union[list, None] = None, clean_no_mask=None) -> Union[str, list]:
+             results_list: list | None = None, clean_no_mask=None) -> str | list:
         """Tier-1 mask name to be used for computing Tier-1 and Tier-2 combined mask.
 
             Obtain the mask name from the latest MakeImagesResult object in context.results.
@@ -168,7 +291,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         """Tclean intent parameter heuristics."""
         return 'TARGET'
 
-    def nterms(self, spwspec) -> Union[int, None]:
+    def nterms(self, spwspec) -> int | None:
         """Tclean nterms parameter heuristics."""
         return 2
 
@@ -179,7 +302,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
     def pb_correction(self) -> bool:
         return False
 
-    def pblimits(self, pb: Union[None, str], specmode: Optional[str] = None) -> Tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
 
         pblimit_image, pblimit_cleanmask = super().pblimits(pb)
@@ -193,7 +316,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         return True
 
     def get_sensitivity(self, ms_do, field, intent, spw, chansel, specmode, cell, imsize, weighting, robust, uvtaper) \
-            -> Tuple[float, None, None, None]:
+            -> tuple[float, None, None, None]:
         return 0.0, None, None, None
 
     def find_fields(self, distance: str = '0deg', phase_center: bool = None, matchregex: str = '') -> list:
@@ -300,7 +423,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         return fieldlist
 
     def keep_iterating(self, iteration, hm_masking, tclean_stopcode, dirty_dynamic_range, residual_max,
-                       residual_robust_rms, field, intent, spw, specmode) -> Tuple[bool, str]:
+                       residual_robust_rms, field, intent, spw, specmode) -> tuple[bool, str]:
         """Determine whether another tclean iteration is necessary."""
         if iteration == 0:
             return True, 'auto'
@@ -310,7 +433,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         else:
             return False, 'user'
 
-    def threshold(self, iteration: int, threshold: Union[str, float], hm_masking: str) -> Union[str, float]:
+    def threshold(self, iteration: int, threshold: str | float, hm_masking: str) -> str | float:
         """Tclean threshold parameter heuristics."""
         if hm_masking == 'auto':
             return '0.0mJy'
@@ -323,8 +446,8 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
             return threshold
 
     def nsigma(
-        self, iteration: int, hm_nsigma: float, hm_masking: str, rms_multiplier: Optional[Union[int, float]] = None
-    ) -> Union[float, None]:
+        self, iteration: int, hm_nsigma: float, hm_masking: str, rms_multiplier: int | float | None = None
+    ) -> float | None:
         """Tclean nsigma parameter heuristics."""
         if hm_nsigma:
             return hm_nsigma
@@ -344,7 +467,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         else:
             return 3.0
 
-    def savemodel(self, iteration: int) -> Union[str, None]:
+    def savemodel(self, iteration: int) -> str | None:
         """Tclean savemodel parameter heuristics."""
         # Model is saved in first imaging cycle last iteration
         if self.vlass_stage == 1:
@@ -375,7 +498,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         intent: str,
         specmode: str,
         robust: float,
-        rms_multiplier: Optional[Union[int, float]] = None,
+        rms_multiplier: int | float | None = None,
     ) -> tuple:
         """Default auto-boxing parameters."""
 
@@ -419,7 +542,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         else:
             return [cfcache, None]
 
-    def set_user_cycleniter_final_image_nomask(self, cycleniter_final_image_nomask: Union[int, None] = None) -> None:
+    def set_user_cycleniter_final_image_nomask(self, cycleniter_final_image_nomask: int | None = None) -> None:
         """Sets class variable controlling the cycleniter parameter of the last clean step (cleaning without user mask,
         pbmask only) in the third (final) VLASS-SE-CONT imaging stage."""
         if self.vlass_stage == 3 and cycleniter_final_image_nomask != None:
@@ -431,7 +554,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         """A numerical control to bias the scales when using multi-scale or mtmfs algorithms"""
         return 0.4
 
-    def restoringbeam(self) -> Union[list, str, bool]:
+    def restoringbeam(self) -> list | str | bool:
         """Tclean parameter"""
         return ''
 
@@ -445,7 +568,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         return 0.4
 
     def get_parallel_cont_synthesis_imager_csys(self, phasecenter=None, imsize=None, cell=None,
-                                                parallel='automatic') -> Union[None, Dict]:
+                                                parallel='automatic') -> None | dict:
         """
         This method creates an image with PyParallelContSynthesisImager and returns it's phase centre.
 
@@ -517,7 +640,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         return csys_record
 
     def get_outmaskratio(self, iteration: int,  image: str, pbimage: str, cleanmask: str,
-                         pblimit: float = 0.4, frac_lim: float = 0.2) -> Union[None, float]:
+                         pblimit: float = 0.4, frac_lim: float = 0.2) -> None | float:
         """Determine fractional flux in final image outside cleanmask, only in first imaging stage final image.
 
         A threshold of 10x sigma (measured on image) and a pblimit of 0.4 is applied.
@@ -619,7 +742,7 @@ class ImageParamsHeuristicsVlassSeContAWP2(ImageParamsHeuristicsVlassSeCont):
         """Tclean gridder parameter heuristics."""
         return 'awp2'
 
-    def pblimits(self, pb: Union[None, str], specmode: Optional[str] = None) -> Tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         _, pblimit_cleanmask = super().pblimits(pb)
 
@@ -647,7 +770,7 @@ class ImageParamsHeuristicsVlassSeContAWP2P001(ImageParamsHeuristicsVlassSeCont)
         """Tclean wprojplanes parameter heuristics."""
         return 1
 
-    def pblimits(self, pb: Union[None, str], specmode: Optional[str] = None) -> Tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         _, pblimit_cleanmask = super().pblimits(pb)
 
@@ -671,7 +794,7 @@ class ImageParamsHeuristicsVlassSeContAWPHPG(ImageParamsHeuristicsVlassSeCont):
         """Tclean gridder parameter heuristics."""
         return 'awphpg'
 
-    def pblimits(self, pb: Union[None, str], specmode: Optional[str] = None) -> Tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         _, pblimit_cleanmask = super().pblimits(pb)
 
@@ -699,7 +822,7 @@ class ImageParamsHeuristicsVlassSeContAWPHPGP001(ImageParamsHeuristicsVlassSeCon
         """Tclean wprojplanes parameter heuristics."""
         return 1
 
-    def pblimits(self, pb: Union[None, str], specmode: Optional[str] = None) -> Tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         _, pblimit_cleanmask = super().pblimits(pb)
 
@@ -724,7 +847,7 @@ class ImageParamsHeuristicsVlassSeContMosaic(ImageParamsHeuristicsVlassSeCont):
         self.user_cycleniter_final_image_nomask = None
 
     def imsize(self, fields=None, cell=None, primary_beam=None, sfpblimit=None, max_pixels=None, centreonly=None,
-               vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None) -> Union[list, int]:
+               vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None) -> list | int:
         """Tclean imsize parameter heuristics."""
         return [12500, 12500]
 
@@ -764,7 +887,7 @@ class ImageParamsHeuristicsVlassSeContMosaic(ImageParamsHeuristicsVlassSeCont):
         # Might change to True based on stackholder feedback
         return False
 
-    def pblimits(self, pb: Union[None, str], specmode: Optional[str] = None) -> Tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         _, pblimit_cleanmask = super().pblimits(pb)
 

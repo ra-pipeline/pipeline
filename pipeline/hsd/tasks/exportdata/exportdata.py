@@ -4,6 +4,7 @@ The exportdata for SD module.
 This module provides base classes for preparing data products on disk
 for upload to the archive.
 """
+from __future__ import annotations
 
 import collections
 import glob
@@ -12,22 +13,27 @@ import shutil
 import string
 import tarfile
 import traceback
-from typing import Dict, Generator, List, Optional
+from typing import TYPE_CHECKING
 
 import pipeline.h.tasks.exportdata.exportdata as exportdata
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
-from pipeline.infrastructure.launcher import Context
-from pipeline.infrastructure.utils import absolute_path
 import pipeline.infrastructure.project as project
-from pipeline.infrastructure import task_registry
 from pipeline.hsd.tasks.importdata.importdata import SDImportDataResults
 from pipeline.hsd.tasks.restoredata.restoredata import SDRestoreDataResults
 from pipeline.hsd.tasks.common.utils import is_nro
+from pipeline.infrastructure import task_registry
+from pipeline.infrastructure.utils import absolute_path
+
 from . import almasdaqua
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from pipeline.infrastructure.launcher import Context
+
 # the logger for this module
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class SDExportDataInputs(exportdata.ExportDataInputs):
@@ -64,7 +70,7 @@ class SDExportData(exportdata.ExportData):
         Returns:
             ExportDataResults object
         """
-        results = super(SDExportData, self).prepare()
+        results = super().prepare()
 
         oussid = self.inputs.context.get_oussid()
 
@@ -138,10 +144,10 @@ class SDExportData(exportdata.ExportData):
         return results
 
     def _do_aux_session_products(self, context: Context, oussid: str,
-                                 session_names: List[str],
-                                 session_vislists: List[List[str]],
+                                 session_names: list[str],
+                                 session_vislists: list[list[str]],
                                  products_dir: str) -> \
-            Dict[str, List[str]]:
+            dict[str, list[str]]:
         """Export auxiliary calibration tables to products directory and return session dictionary.
 
         Args:
@@ -179,7 +185,7 @@ class SDExportData(exportdata.ExportData):
 
         return sessiondict
 
-    def __get_last_baseline_table(self, vis: str) -> Optional[str]:
+    def __get_last_baseline_table(self, vis: str) -> str | None:
         """Sort baseline table names and return the last of them.
 
         Args:
@@ -199,7 +205,7 @@ class SDExportData(exportdata.ExportData):
             return None
 
     def _export_final_baseline_calfiles(self, context: Context, oussid: str,
-                                        session: str, vislist: List[str],
+                                        session: str, vislist: list[str],
                                         products_dir: str) -> str:
         """Save the final baseline tables in a tarfile one file per session.
 
@@ -253,9 +259,9 @@ class SDExportData(exportdata.ExportData):
 
         return tarfilename
 
-    def _do_aux_ms_products(self, context: Context, vislist: List[str],
+    def _do_aux_ms_products(self, context: Context, vislist: list[str],
                             products_dir: str) -> \
-            Dict[str, str]:
+            dict[str, str]:
         """Export auxiliary MS products.
 
         This method exports calibration apply files per MeasurementSet which
@@ -474,8 +480,8 @@ class SDExportData(exportdata.ExportData):
 
     def _export_casa_restore_script(self, context: Context, script_name: str,
                                     products_dir: str, oussid: str,
-                                    vislist: List[str],
-                                    session_list: List[str]) -> str:
+                                    vislist: list[str],
+                                    session_list: list[str]) -> str:
         """Save the CASA restore script.
 
         Args:
@@ -536,7 +542,7 @@ class SDExportData(exportdata.ExportData):
                                              products_dir: str,
                                              oussid: str,
                                              restore_task_name: str,
-                                             restore_task_args: Dict[str, str])\
+                                             restore_task_args: dict[str, str])\
             -> str:
         """Generate and export CASA restore script.
 
