@@ -9,7 +9,6 @@ import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.utils as utils
-from casatasks.private.imagerhelpers.imager_parallel_continuum import PyParallelContSynthesisImager
 from casatasks.private.imagerhelpers.input_parameters import ImagerParameters
 from pipeline.infrastructure import casa_tools
 
@@ -585,7 +584,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         See CAS-13338 and PIPE-728
         """
         qaTool = casa_tools.quanta
-        do_parallel = mpihelpers.parse_mpi_input_parameter(parallel)
+        do_parallel = mpihelpers.parse_parallel_input_parameter(parallel)
 
         # Fallback to serial mode if parallel was requested but MPI is not available
         if do_parallel and not mpihelpers.is_mpi_ready():
@@ -613,13 +612,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
                                          # cfcache=cfcache,
                                          parallel=do_parallel
                                          )
-            makepsf_imager = PyParallelContSynthesisImager(params=paramList)
-
-            makepsf_imager.initializeImagers()
-            makepsf_imager.initializeNormalizers()
-            makepsf_imager.setWeighting()
-            makepsf_imager.makePSF()
-            makepsf_imager.deleteTools()
+            self._run_parallel_psf_imager(paramList)
 
             # Obtain image reference and header
             with casa_tools.ImageReader('{}.psf'.format(tmp_psf_filename)) as image:

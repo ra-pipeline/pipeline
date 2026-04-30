@@ -360,7 +360,11 @@ if config.config['pipeconfig'].get('xvfb', False) or infrastructure.daskhelpers.
 matplotlib.use('agg')
 LOG.debug('Matplotlib backend set to %s', matplotlib.get_backend())
 
-if config.config['pipeconfig']['dask']['autostart'] and infrastructure.daskhelpers.is_daskclient_allowed():
+if (
+    config.config['pipeconfig']['dask']['autostart']
+    and infrastructure.daskhelpers.is_daskclient_allowed()
+    and not infrastructure.mpihelpers.MPIEnvironment.is_mpi_enabled
+):
     # Automatically start a Dask cluster if allowed.
     # However, this is generally discouraged because it can cause:
     #   - Accidental recursive process creation

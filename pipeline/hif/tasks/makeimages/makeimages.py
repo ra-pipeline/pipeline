@@ -760,13 +760,18 @@ class CleanTaskFactory:
     def __get_task_args(self, target):
         inputs = self.__inputs
 
-        parallel_wanted = mpihelpers.parse_mpi_input_parameter(inputs.parallel)
+        parallel_wanted = mpihelpers.parse_parallel_input_parameter(inputs.parallel)
 
-        # request Tier 1 tclean parallelisation if the user requested it, this
-        # is science target imaging, and we are running as an MPI client.
-        parallel = all([parallel_wanted,
-                        'TARGET' in target['intent'],
-                        mpihelpers.is_mpi_ready()])
+        # Request Tier 1 tclean parallelisation if the user requested it, this
+        # is science target imaging, and we have either an MPI client or a Dask
+        # cluster available. With Dask, casa_tasks._tclean will dispatch each
+        # tclean call to its own MPI subprocess via run_in_mpicasa; nproc is
+        # derived from the active Dask worker count to avoid oversubscription.
+        parallel = all([
+            parallel_wanted,
+            'TARGET' in target['intent'],
+            mpihelpers.is_mpi_ready() or daskhelpers.is_dask_ready(),
+        ])
 
         image_heuristics = target['heuristics']
 
