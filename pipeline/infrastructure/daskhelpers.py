@@ -541,11 +541,22 @@ def start_daskcluster(
     # Isolate D-Bus to prevent C++ casatools/plotms deadlocks in headless worker environments
     os.environ['DBUS_SESSION_BUS_ADDRESS'] = '/dev/null'
 
-    dashboard_address: str | None = dask.config.get('dashboard_address', default=None)
-    # If no host is configured, use the fully-qualified hostname so the scheduler
-    # and dashboard bind to the public interface and the logged link is reachable
-    # from other machines on the same network.
-    host: str = dask.config.get('host', default=None) or socket.getfqdn()
+    # Resolve the bind host: explicit config > FQDN (if dotted) > local IP.
+    _configured_host: str | None = dask.config.get('host', default=None)
+    if _configured_host:
+        host: str = _configured_host
+    else:
+        _fqdn = socket.getfqdn()
+        host = _fqdn if '.' in _fqdn else get_local_ip()
+
+    # Resolve the dashboard address: explicit config > host:0 (random port, avoids collisions).
+    dashboard_address: str = dask.config.get('dashboard_address', default=None) or f':0'
+    # If dashboard_address specifies an explicit host (e.g. '192.168.1.70:0' vs ':0'),
+    # promote it to `host` so that LocalCluster.dashboard_link reflects the correct URL.
+    _da_host = dashboard_address.rsplit(':', 1)[0]
+    if _da_host:
+        host = _da_host
+
     n_workers: int | None = dask.config.get('n_workers', default=None)
     clustertype: str | None = dask.config.get('clustertype', default=None)
 
@@ -789,3 +800,18 @@ def default_slurm_queue(default: str | None = None, override_with: str | None = 
         queue = os.getenv('SLURM_JOB_PARTITION')
 
     return queue or default
+
+
+def get_local_ip():
+    # Use a UDP socket
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        try:
+            # Connect to a known external IP (Google's DNS here)
+            # No data is actually sent, it just determines the routing path
+            s.connect(('8.8.8.8', 80))
+            local_ip = s.getsockname()[0]
+        except Exception:
+            # Fallback if there is no network connection
+            local_ip = '127.0.0.1'
+
+    return local_ip

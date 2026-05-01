@@ -4,7 +4,7 @@ pipeconfig:
   chdir: "./" # not used yet
   vis: # not used yet
   procedure: # not used yet
-  loglevel: "info" # default Python logging level, e.g. 'debug' (note: not confused with the global casalogsink level), 
+  loglevel: "info" # default Python logging level, e.g. 'debug' (note: not confused with the global casalogsink level)
   ppr: # not used yet
   vlappr: # not used yet
   xvfb: true # option for directly spawn xvfb server from the python session, pyvirtualdisplay is required for xvfb=True
@@ -29,7 +29,7 @@ pipeconfig:
     tier0futures: true
     autostart: true
     host: null # 0.0.0.0 to bind to all interfaces / acessile from network, null for default localhost
-    dashboard_address: ":0" # Port for the dask dashboard: ":0" to auto-select a port, null to disable
+    dashboard_address: null # address:port for the dask dashboard: ":0" to auto-select a port, null to disable
     clustertype: "local" # htcondor / slurm
     n_workers: null
     distributed:
