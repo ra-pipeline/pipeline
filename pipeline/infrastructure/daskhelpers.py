@@ -191,7 +191,7 @@ def parallel_map(fn, items):
         A list of results in the same order as items.
     """
     items = list(items)
-    if is_daskclient_allowed():
+    if len(items) > 1 and is_daskclient_allowed():
         import dask
         return list(dask.compute(*[dask.delayed(fn)(item) for item in items]))
     return list(map(fn, items))

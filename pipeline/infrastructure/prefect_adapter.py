@@ -32,6 +32,7 @@ import dataclasses
 import os
 import time
 import traceback
+import uuid
 from typing import TYPE_CHECKING, Any
 
 from pipeline import infrastructure
@@ -443,7 +444,7 @@ if _PREFECT_AVAILABLE:
 
     @task(
         name='pipeline-task',
-        task_run_name='{task_name}',
+        task_run_name=lambda task_name, **_: f'{task_name}-{uuid.uuid4().hex[:8]}',
         log_prints=True,
     )
     def run_pipeline_task(task_name: str, task_args: dict[str, Any]) -> TaskResultSummary:
