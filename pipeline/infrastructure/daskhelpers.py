@@ -542,7 +542,10 @@ def start_daskcluster(
     os.environ['DBUS_SESSION_BUS_ADDRESS'] = '/dev/null'
 
     dashboard_address: str | None = dask.config.get('dashboard_address', default=None)
-    host: str | None = dask.config.get('host', default=None)
+    # If no host is configured, use the fully-qualified hostname so the scheduler
+    # and dashboard bind to the public interface and the logged link is reachable
+    # from other machines on the same network.
+    host: str = dask.config.get('host', default=None) or socket.getfqdn()
     n_workers: int | None = dask.config.get('n_workers', default=None)
     clustertype: str | None = dask.config.get('clustertype', default=None)
 
