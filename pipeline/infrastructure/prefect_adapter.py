@@ -444,7 +444,7 @@ if _PREFECT_AVAILABLE:
 
     @task(
         name='pipeline-task',
-        task_run_name=lambda task_name, **_: f'{task_name}-{uuid.uuid4().hex[:8]}',
+        task_run_name=lambda parameters, **_: f'{parameters["task_name"]}-{uuid.uuid4().hex[:8]}',
         log_prints=True,
     )
     def run_pipeline_task(task_name: str, task_args: dict[str, Any]) -> TaskResultSummary:
