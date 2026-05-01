@@ -95,6 +95,9 @@ exp = [
 devdocs = ["Pipeline[dev]", "Pipeline[docs]"]
 all = ["Pipeline[dev]", "Pipeline[docs]", "Pipeline[exp]"]
 
+[project.scripts]
+pipeline = "pipeline.__main__:main"
+
 [project.urls]
 Documentation = "https://almascience.nrao.edu/processing/science-pipeline"
 Repository = "https://open-bitbucket.nrao.edu/projects/PIPE/repos/pipeline"

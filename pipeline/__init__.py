@@ -341,9 +341,44 @@ def inherit_docstring_and_type_hints():
         doctools.inherit_annotations(task_class, cli_task)
 
 
+def _cli_dask_allowed() -> bool:
+    """Return False when invoked as the pipeline CLI without the ``run`` subcommand.
+
+    ``pipeline/__init__.py`` is imported before ``pipeline/__main__.py`` runs,
+    so ``sys.argv`` is the only channel available here.  We suppress Dask
+    autostart for ``pipeline --help``, ``pipeline submit ...``, and bare
+    ``python -m pipeline`` invocations — only ``pipeline run ...`` gets a
+    cluster.
+    """
+    import sys
+
+    argv = sys.argv
+    LOG.debug('_cli_dask_allowed: sys.argv=%s', argv)
+    if not argv:
+        return True
+    prog = os.path.basename(argv[0])
+    # Detect: python -m pipeline … or the 'pipeline' console script.
+    # When pixi (or some launchers) run `python -m pipeline`, argv[0] is '-m'
+    # rather than the __main__.py path, so we check for that too.
+    is_pipeline_cli = (
+        prog == 'pipeline'
+        or prog == '-m'  # pixi / some launchers set argv[0]='-m' for `python -m pipeline`
+        or argv[0].endswith('pipeline/__main__.py')
+        or (prog == '__main__.py' and 'pipeline' in argv[0])
+    )
+    # Note: `prog == '-m'` is intentionally broad — any `python -m <anything>` that
+    # also imports pipeline will have Dask autostart suppressed.  This is the safer
+    # direction (no accidental cluster spawns) and is acceptable in practice.
+    if not is_pipeline_cli:
+        return True
+    # CLI detected: only allow autostart when the subcommand is 'run'.
+    # argv[1] is the subcommand for both 'pipeline run' and 'python -m pipeline run'.
+    return len(argv) > 1 and argv[1] == 'run'
+
+
 inherit_docstring_and_type_hints()
 
-if infrastructure.daskhelpers.is_daskclient_allowed():
+if infrastructure.daskhelpers.is_daskclient_allowed() and _cli_dask_allowed():
     log_host_environment()
 
 
@@ -360,10 +395,12 @@ if config.config['pipeconfig'].get('xvfb', False) or infrastructure.daskhelpers.
 matplotlib.use('agg')
 LOG.debug('Matplotlib backend set to %s', matplotlib.get_backend())
 
+
 if (
     config.config['pipeconfig']['dask']['autostart']
     and infrastructure.daskhelpers.is_daskclient_allowed()
     and not infrastructure.mpihelpers.MPIEnvironment.is_mpi_enabled
+    and _cli_dask_allowed()
 ):
     # Automatically start a Dask cluster if allowed.
     # However, this is generally discouraged because it can cause:

@@ -3,6 +3,7 @@ pipeconfig:
   flux_service_url_backup: "https://asa.alma.cl/sc/flux"             # env var: FLUX_SERVICE_URL_BACKUP
   chdir: "./" # not used yet
   vis: # not used yet
+  rawdata: null # explicit path to the rawdata directory; overrides the ../rawdata sibling and PPR-parent heuristics
   procedure: # not used yet
   loglevel: "info" # default Python logging level, e.g. 'debug' (note: not confused with the global casalogsink level)
   ppr: # not used yet
