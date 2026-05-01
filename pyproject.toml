@@ -18,6 +18,7 @@ dependencies = [
     "logutils~=0.3",
     "mako~=1.4",
     "pypubsub==4.0.7",
+    "cloudpickle~=3.1",
     # -- Optional & Tooling Dependencies --
     "bdsf~=1.14",
     "ps_mem~=3.14",
