@@ -6,7 +6,6 @@ from pipeline.infrastructure import casa_tools
 from tests.testing_utils import PipelineTester
 
 
-@pytest.mark.skip(reason="Dataset not available")
 @pytest.mark.importdata
 def test_uid___A002_X1181695_X1c6a4_8ant__chan_flagged_import__component():
     """Run test of importdata on small dataset with channels flagged.
@@ -59,7 +58,6 @@ def test_uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small_target__selfcal_and_self
     pt.run()
 
 
-@pytest.mark.skip(reason="Dataset not available")
 @pytest.mark.importdata
 @pytest.mark.selfcal
 @pytest.mark.makeimages
