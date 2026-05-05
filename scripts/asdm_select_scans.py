@@ -36,7 +36,7 @@ _VLA_BAND_LETTERS = '?4PLSCXUKAQ?'
 # Public API
 # ---------------------------------------------------------------------------
 
-def select_scans_by_vla_band(asdm_path: str, bands: Union[str, list]) -> str:
+def select_scans_by_vla_band(asdm_path: str, bands: Union[str, list], invert: bool = False) -> str:
     """Select ASDM scans whose spectral windows match the given VLA band(s).
 
     Parses the ASDM XML tables (SpectralWindow, DataDescription,
@@ -54,6 +54,9 @@ def select_scans_by_vla_band(asdm_path: str, bands: Union[str, list]) -> str:
             ``X`` (8–12 GHz), ``U``/``Ku`` (12–18 GHz),
             ``K`` (18–26.5 GHz), ``A``/``Ka`` (26.5–40 GHz),
             ``Q`` (40–56 GHz).
+        invert: When ``True``, return scans that do *not* contain any SPW in
+            the requested band(s) — i.e. the complement of the normal
+            selection.  Defaults to ``False``.
 
     Returns:
         A scan specification string in the ``importasdm`` ``scans`` format,
@@ -69,6 +72,9 @@ def select_scans_by_vla_band(asdm_path: str, bands: Union[str, list]) -> str:
 
         scans_str = select_scans_by_vla_band('/data/my.asdm', ['K', 'Ka'])
         importasdm(asdm='/data/my.asdm', vis='output.ms', scans=scans_str)
+
+        # Select every scan that is NOT K or Ka band
+        scans_str = select_scans_by_vla_band('/data/my.asdm', ['K', 'Ka'], invert=True)
     """
     if isinstance(bands, str):
         bands = [bands]
@@ -99,7 +105,8 @@ def select_scans_by_vla_band(asdm_path: str, bands: Union[str, list]) -> str:
                 spw_id = dd_spw.get(dd_id)
                 if spw_id is not None:
                     scan_bands.add(spw_band.get(spw_id, 'unknown').upper())
-        if scan_bands & target_bands:
+        match = bool(scan_bands & target_bands)
+        if match ^ invert:
             eb_scans[eb_id].append(scan_num)
 
     # 7. Format output: 'eb:scan_range[;eb:scan_range...]'
