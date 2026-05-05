@@ -27,6 +27,8 @@ class VLAImportDataInputs(importdata.ImportDataInputs):
     specline_spws = vdp.VisDependentProperty(default='auto')
     minparang = vdp.VisDependentProperty(default=0.0)
     parallel = sessionutils.parallel_inputs_impl(default=False)
+    scans = vdp.VisDependentProperty(default='')
+    ignore_time = vdp.VisDependentProperty(default=False)
 
     # docstring and type hints: supplements hifv_importdata
     def __init__(
@@ -48,6 +50,8 @@ class VLAImportDataInputs(importdata.ImportDataInputs):
         specline_spws=None,
         minparang=None,
         parallel=None,
+        scans=None,
+        ignore_time=None,
     ):
         """Initialize Inputs.
 
@@ -137,6 +141,18 @@ class VLAImportDataInputs(importdata.ImportDataInputs):
 
                 Default: ``None`` (equivalent to ``False``)
 
+            scans: Process only the specified scans. A scan specification consists of an exec block
+                index followed by ``':'``, followed by a comma-separated list of scan indexes or
+                scan index ranges. A ``':'``-less value is treated as a scan index across all exec
+                blocks. By default all scans are imported.
+
+                Example: ``scans='0:1;1:2~6,8;2:;3:24~30'``
+
+            ignore_time: When ``True``, process all rows of auxiliary tables (Feed, History,
+                Pointing, Source, SysCal, CalDevice, SysPower, Weather) regardless of the time
+                range of the selected exec block or scan. Useful when ``scans`` is set to a
+                subset, to avoid missing auxiliary data.
+
         """
         super().__init__(context, vis=vis, output_dir=output_dir, asis=asis,
                          process_caldevice=process_caldevice, session=session,
@@ -146,6 +162,8 @@ class VLAImportDataInputs(importdata.ImportDataInputs):
         self.specline_spws = specline_spws
         self.minparang = minparang
         self.parallel = parallel
+        self.scans = scans
+        self.ignore_time = ignore_time
 
 
 class VLAImportDataResults(basetask.Results):
@@ -296,7 +314,9 @@ class SerialVLAImportData(importdata.ImportData):
                                      with_pointing_correction=with_pointing_correction,
                                      ocorr_mode=inputs.ocorr_mode,
                                      process_pointing=True,
-                                     createmms=createmms)
+                                     createmms=createmms,
+                                     scans=inputs.scans,
+                                     ignore_time=inputs.ignore_time)
 
         self._executor.execute(task)
 
