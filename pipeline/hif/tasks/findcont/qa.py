@@ -2,6 +2,7 @@ import collections.abc
 
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.pipelineqa as pqa
+from pipeline.infrastructure.renderer import rendererutils
 import pipeline.infrastructure.utils as utils
 
 from . import resultobjects
@@ -34,6 +35,16 @@ class FindContQAHandler(pqa.QAPlugin):
         for xx in result.single_range_channel_fractions:
             newscore = self._single_range_channel_fraction_score(xx)
             scores.append(newscore)
+
+        for fallback in getattr(result, 'coarse_mode_fallbacks', []):
+            scores.append(
+                pqa.QAScore(
+                    rendererutils.SCORE_THRESHOLD_SUBOPTIMAL,
+                    longmsg='Coarse findcont mode fell back to previous-cycle imaging parameters for '
+                            'field {field} spw {spw}: {message}'.format(**fallback),
+                    shortmsg='Coarse fallback',
+                )
+            )
 
         result.qa.pool.extend(scores)
 

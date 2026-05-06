@@ -21,6 +21,7 @@ class FindContResult(basetask.Results):
         self.single_range_channel_fractions = single_range_channel_fractions
         self.momDiffSNRs = momDiffSNRs
         self.skip_stage = skip_stage
+        self.coarse_mode_fallbacks = []
 
     def merge_with_context(self, context):
         if not self.mitigation_error:

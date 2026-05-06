@@ -19,6 +19,88 @@ from .resultobjects import FindContResult
 
 LOG = infrastructure.get_logger(__name__)
 
+FINDCONT_BASE_PPB = 5.0
+FINDCONT_12M_TARGET_PPB = 3.0
+FINDCONT_7M_TARGET_PPB = 4.0
+FINDCONT_MIN_IMSIZE = 64
+
+FINDCONT_L80_MIN_M = 100.0
+FINDCONT_L80_PIVOT_M = 200.0
+FINDCONT_L80_MAX_M = 8000.0
+FINDCONT_ALPHA_POWER = np.log(0.5) / np.log(
+    (np.log(FINDCONT_L80_PIVOT_M) - np.log(FINDCONT_L80_MIN_M)) /
+    (np.log(FINDCONT_L80_MAX_M) - np.log(FINDCONT_L80_MIN_M))
+)
+
+
+def _coarse_findcont_parameters(context, image_heuristics, vislist, cell, imsize):
+    qa = casa_tools.quanta
+    mses = [context.observing_run.get_ms(vis) for vis in vislist]
+    array_descs = image_heuristics.arrays(vislist)
+
+    def scale_cell(quantity_or_list, ratio):
+        if quantity_or_list in (None, '', []):
+            return quantity_or_list
+        if isinstance(quantity_or_list, list):
+            return [scale_cell(item, ratio) for item in quantity_or_list]
+
+        quantity = qa.quantity(quantity_or_list)
+        scaled_quantity = qa.mul(quantity, ratio)
+        scaled_value = np.asarray(qa.getvalue(scaled_quantity)).item()
+        return '%.2g%s' % (scaled_value, qa.getunit(scaled_quantity))
+
+    def scale_imsize(size_or_list, ratio, minimum=None):
+        if size_or_list in (None, '', []):
+            return size_or_list
+        if isinstance(size_or_list, (list, tuple)):
+            return [scale_imsize(size, ratio, minimum=minimum) for size in size_or_list]
+        scaled = int(utils.round_half_up(float(size_or_list) / ratio))
+        if minimum is not None:
+            scaled = max(scaled, minimum)
+        return casa_tools.synthesisutils.getOptimumSize(max(1, scaled))
+
+    def taper_arcsec(local_cell, ratio):
+        if local_cell in (None, '', []):
+            return None
+        first_cell = local_cell[0] if isinstance(local_cell, list) else local_cell
+        cell_arcsec = float(np.asarray(qa.getvalue(qa.convert(qa.quantity(first_cell), 'arcsec'))).item())
+        new_cell_arcsec = cell_arcsec * ratio
+        taper_ratio = np.sqrt(max(0.0, FINDCONT_12M_TARGET_PPB**2 - (FINDCONT_BASE_PPB / ratio)**2))
+        return ['%.2garcsec' % (taper_ratio * new_cell_arcsec)]
+
+    if '7m' in array_descs:
+        imsize_ratio = FINDCONT_BASE_PPB / FINDCONT_7M_TARGET_PPB
+        return {
+            'weighting': 'briggs',
+            'robust': 1.0,
+            'perchanweightdensity': False,
+            'mosweight': False,
+            'cell': scale_cell(cell, imsize_ratio),
+            'imsize': scale_imsize(imsize, imsize_ratio, minimum=FINDCONT_MIN_IMSIZE),
+            'uvtaper': None,
+        }
+
+    baselines = [
+        ms.antenna_array.baselines_m for ms in mses
+        if ms.antenna_array is not None and len(ms.antenna_array.baselines_m) > 0
+    ]
+    if not baselines:
+        raise ValueError('Could not determine L80 for coarse findcont imaging')
+
+    l80 = float(np.percentile(np.concatenate(baselines), 80))
+    x = (np.log(l80) - np.log(FINDCONT_L80_MIN_M)) / (np.log(FINDCONT_L80_MAX_M) - np.log(FINDCONT_L80_MIN_M))
+    imsize_ratio = 2.0 + 2.0 * (float(np.clip(x, 0.0, 1.0)) ** FINDCONT_ALPHA_POWER)
+
+    return {
+        'weighting': 'briggs',
+        'robust': 1.0,
+        'perchanweightdensity': False,
+        'mosweight': False,
+        'cell': scale_cell(cell, imsize_ratio),
+        'imsize': scale_imsize(imsize, imsize_ratio, minimum=FINDCONT_MIN_IMSIZE),
+        'uvtaper': taper_arcsec(cell, imsize_ratio),
+    }
+
 
 class FindContInputs(vdp.StandardInputs):
     # Must use empty data type list to allow for user override and
@@ -27,8 +109,19 @@ class FindContInputs(vdp.StandardInputs):
 
     hm_perchanweightdensity = vdp.VisDependentProperty(default=None)
     hm_weighting = vdp.VisDependentProperty(default=None)
+    hm_findcontmode = vdp.VisDependentProperty(default='coarse')
     datacolumn = vdp.VisDependentProperty(default='')
     parallel = vdp.VisDependentProperty(default='automatic')
+
+    @hm_findcontmode.convert
+    def hm_findcontmode(self, value):
+        allowed = ('coarse', 'normal')
+        if value not in allowed:
+            m = ', '.join(('{!r}'.format(i) for i in allowed))
+            raise ValueError(
+                'Value not in allowed value set ({!s}): {!r}'.format(m, value)
+            )
+        return value
 
     @vdp.VisDependentProperty(null_input=['', None, {}])
     def target_list(self):
@@ -39,7 +132,8 @@ class FindContInputs(vdp.StandardInputs):
 
     # docstring and type hints: supplements hif_findcont
     def __init__(self, context, output_dir=None, vis=None, target_list=None, hm_mosweight=None,
-                 hm_perchanweightdensity=None, hm_weighting=None, datacolumn=None, parallel=None):
+                 hm_perchanweightdensity=None, hm_weighting=None, hm_findcontmode=None,
+                 datacolumn=None, parallel=None):
         """Initialize Inputs.
 
         Args:
@@ -63,6 +157,9 @@ class FindContInputs(vdp.StandardInputs):
 
             hm_weighting: Weighting scheme (natural,uniform,briggs,briggsabs[experimental],briggsbwtaper[experimental])
 
+            hm_findcontmode: Continuum-finding imaging mode. "coarse" applies the new fast local override
+                and "normal" preserves the previous-cycle behavior.
+
             datacolumn: Data column to image. Only to be used for manual overriding when the automatic choice by data type is not appropriate.
 
             parallel: Use CASA/tclean built-in parallel imaging when possible.
@@ -80,6 +177,7 @@ class FindContInputs(vdp.StandardInputs):
         self.hm_mosweight = hm_mosweight
         self.hm_perchanweightdensity = hm_perchanweightdensity
         self.hm_weighting = hm_weighting
+        self.hm_findcontmode = hm_findcontmode
         self.datacolumn = datacolumn
         self.parallel = parallel
 
@@ -93,6 +191,7 @@ class FindCont(basetask.StandardTaskTemplate):
     def prepare(self):
         inputs = self.inputs
         context = self.inputs.context
+        coarse_mode = inputs.hm_findcontmode == 'coarse'
 
         # Check if this stage should be skipped
         if self._skip_findcont():
@@ -165,7 +264,9 @@ class FindCont(basetask.StandardTaskTemplate):
         num_found = 0
         num_total = 0
         single_range_channel_fractions = []
+        coarse_fallbacks = []
         for i, target in enumerate(inputs.target_list):
+            target_coarse_params = None
             for spwid in target['spw'].split(','):
                 source_name = utils.dequote(target['field'])
                 spw_name = context.observing_run.virtual_science_spw_ids[int(spwid)]
@@ -228,6 +329,23 @@ class FindCont(basetask.StandardTaskTemplate):
                                                                                    target['intent'])
                         # Remove MSs that do not contain data for the given field(s)
                         vislist = [inputs.vis[i] for i in visindexlist]
+
+                    if coarse_mode and target_coarse_params is None:
+                        try:
+                            target_coarse_params = _coarse_findcont_parameters(
+                                context, image_heuristics, vislist, target['cell'], target['imsize']
+                            )
+                        except Exception as exc:
+                            LOG.warning(
+                                'Unable to derive coarse findcont parameters for field %s: %s. '
+                                'Using previous-cycle imaging parameters for this target.',
+                                target['field'], exc
+                            )
+                            coarse_fallbacks.append({
+                                'field': target['field'],
+                                'spw': target['spw'],
+                                'message': str(exc),
+                            })
 
                     # Need to make an LSRK or SOURCE/REST (ephemeris sources) cube to get
                     # the real ranges in the source frame.
@@ -367,16 +485,33 @@ class FindCont(basetask.StandardTaskTemplate):
 
                     # PIPE-107 requests using a fixed robust value of 1.0.
                     robust = 1.0
-
-                    if target['uvrange'] not in (None, [], ''):
-                        uvrange = target['uvrange']
-                    else:
-                        uvrange = None
+                    coarse_cell = target['cell']
+                    coarse_imsize = target['imsize']
+                    coarse_weighting = weighting
+                    coarse_perchanweightdensity = perchanweightdensity
+                    coarse_mosweight = mosweight
+                    coarse_robust = robust
+                    coarse_uvtaper = None
 
                     if target['uvtaper'] not in ([], None):
                         uvtaper = target['uvtaper']
                     else:
                         uvtaper = None
+                    coarse_uvtaper = uvtaper
+
+                    if coarse_mode and target_coarse_params is not None:
+                        coarse_weighting = target_coarse_params['weighting']
+                        coarse_perchanweightdensity = target_coarse_params['perchanweightdensity']
+                        coarse_mosweight = target_coarse_params['mosweight']
+                        coarse_robust = target_coarse_params['robust']
+                        coarse_cell = target_coarse_params['cell']
+                        coarse_imsize = target_coarse_params['imsize']
+                        coarse_uvtaper = target_coarse_params['uvtaper']
+
+                    if target['uvrange'] not in (None, [], ''):
+                        uvrange = target['uvrange']
+                    else:
+                        uvrange = None
 
                     if target['antenna'] not in ([], None):
                         antenna = target['antenna']
@@ -393,12 +528,12 @@ class FindCont(basetask.StandardTaskTemplate):
                                             intent=utils.to_CASA_intent(inputs.ms[0], target['intent']),
                                             field=target['field'], start=start, width=width, nchan=nchan,
                                             outframe=outframe, scan=scanidlist, specmode=specmode, gridder=gridder,
-                                            mosweight=mosweight, perchanweightdensity=perchanweightdensity,
+                                            mosweight=coarse_mosweight, perchanweightdensity=coarse_perchanweightdensity,
                                             pblimit=0.2, niter=0, threshold='0mJy', deconvolver='hogbom',
-                                            interactive=False, imsize=target['imsize'], cell=target['cell'],
+                                            interactive=False, imsize=coarse_imsize, cell=coarse_cell,
                                             phasecenter=phasecenter, psfphasecenter=psf_phasecenter,
-                                            stokes='I', weighting=weighting, robust=robust, uvrange=uvrange,
-                                            uvtaper=uvtaper,
+                                            stokes='I', weighting=coarse_weighting, robust=coarse_robust, uvrange=uvrange,
+                                            uvtaper=coarse_uvtaper,
                                             npixels=0, restoration=False, restoringbeam=[], pbcor=False,
                                             usepointing=usepointing, savemodel='none', parallel=parallel,
                                             fullsummary=False)
@@ -477,6 +612,7 @@ class FindCont(basetask.StandardTaskTemplate):
                 num_total += 1
 
         result = FindContResult(result_cont_ranges, cont_ranges, joint_mask_names, num_found, num_total, single_range_channel_fractions, momDiffSNRs)
+        result.coarse_mode_fallbacks = coarse_fallbacks
 
         return result
 
