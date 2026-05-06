@@ -392,9 +392,12 @@ class testBPdcals(basetask.StandardTaskTemplate):
 
         # Iterate and check the fraction of Flagged solutions, each time running gaincal in 'K' mode
         flagcount = 0
+
         while fracFlaggedSolns > critfrac and flagcount < 4:
             self._do_ktype_delaycal(caltable=ktypecaltable, addcaltable=gtypecaltable,
                                     RefAntOutput=RefAntOutput, spw=','.join(spwlist))
+            if not os.path.exists(ktypecaltable):
+                continue
             flaggedSolnResult = getCalFlaggedSoln(ktypecaltable)
             (fracFlaggedSolns, RefAntOutput) = self._check_flagSolns(flaggedSolnResult, RefAntOutput)
             LOG.info("Fraction of flagged solutions = " + str(flaggedSolnResult['all']['fraction']))
@@ -612,7 +615,9 @@ class testBPdcals(basetask.StandardTaskTemplate):
         minBL_for_cal = vla_minbaselineforcal()
 
         GainTables = sorted(self.inputs.context.callibrary.active.get_caltable())
-        GainTables.append(addcaltable)
+
+        if os.path.exists(addcaltable):
+            GainTables.append(addcaltable)
 
         delaycal_task_args = {'vis': self.inputs.vis,
                               'caltable': caltable,
