@@ -677,15 +677,21 @@ class SDBaseline(basetask.StandardTaskTemplate):
         edge_list = [edge for _ in registry]
         worker_cls = worker.BaselineSubtractionWorker
 
-        fitter_inputs = vdp.InputsContainer(worker_cls, context,
-                                            vis=vislist, plan=plan,
-                                            fit_func=fitfunc,
-                                            wave_number=wave_number,
-                                            fit_order=fitorder, switchpoly=switchpoly,
-                                            edge=edge_list, blparam=blparam,
-                                            deviationmask=deviationmask_list,
-                                            org_directions_dict=org_directions_dict,
-                                            parallel=self.inputs.parallel)
+        fitter_inputs = vdp.InputsContainer(
+            worker_cls,
+            context,
+            vis=vislist,
+            plan=plan,
+            fit_func=fitfunc,
+            wave_number=wave_number,
+            fit_order=fitorder,
+            switchpoly=switchpoly,
+            edge=edge_list,
+            blparam=blparam,
+            deviationmask=deviationmask_list,
+            org_directions_dict=org_directions_dict,
+            parallel=self.inputs.parallel
+        )
 
         fitter_task = worker_cls(fitter_inputs)
         fitter_results = self._executor.execute(fitter_task, merge=False)
