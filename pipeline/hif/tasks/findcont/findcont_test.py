@@ -65,7 +65,7 @@ def test_l80_uses_all_baselines_from_target_vislist(monkeypatch):
     params = findcont._coarse_findcont_parameters(context, heuristics, ['ms1', 'ms2'], ['1arcsec'], [100, 120])
 
     assert seen['values'].tolist() == [1.0, 2.0, 3.0, 4.0, 5.0]
-    assert params['cell'] == ['2arcsec']
+    assert params['cell'] == ['2.4arcsec']
     assert params['imsize'] == [64, 64]
     assert expected == pytest.approx(4.2)
 
@@ -109,11 +109,11 @@ def test_coarse_parameters_for_12m_scale_cell_imsize_and_taper(monkeypatch):
     assert params['robust'] == 1.0
     assert params['perchanweightdensity'] is False
     assert params['mosweight'] is False
-    assert params['cell'] == ['3arcsec']
+    assert params['cell'] == ['2.4arcsec']
     assert params['imsize'] == [64, 64]
     assert len(params['uvtaper']) == 1
     assert params['uvtaper'][0].endswith('arcsec')
-    assert float(params['uvtaper'][0].replace('arcsec', '')) == pytest.approx(7.5, abs=0.2)
+    assert float(params['uvtaper'][0].replace('arcsec', '')) == pytest.approx(8.3, abs=0.2)
 
 
 def test_coarse_parameters_for_12m_above_floor_scales_imsize(monkeypatch):
@@ -130,10 +130,25 @@ def test_coarse_parameters_for_12m_above_floor_scales_imsize(monkeypatch):
     assert params['robust'] == 1.0
     assert params['perchanweightdensity'] is False
     assert params['mosweight'] is False
-    assert params['cell'] == ['2.8arcsec']
-    assert params['imsize'] == [71, 85]
+    assert params['cell'] == ['2.3arcsec']
+    assert params['imsize'] == [87, 104]
     assert len(params['uvtaper']) == 1
     assert params['uvtaper'][0].endswith('arcsec')
+    assert float(params['uvtaper'][0].replace('arcsec', '')) == pytest.approx(7.8, abs=0.2)
+
+
+def test_coarse_parameters_for_12m_anchor_hits_2p5_at_250m(monkeypatch):
+    monkeypatch.setattr(findcont.casa_tools.synthesisutils, 'getOptimumSize', lambda size: size)
+    monkeypatch.setattr(findcont.np, 'percentile', lambda values, percentile: 250.0)
+
+    mses = {'12m.ms': FakeMS('12m.ms', [1.0, 2.0, 3.0])}
+    context = FakeContext(mses)
+    heuristics = FakeHeuristics('12m')
+
+    params = findcont._coarse_findcont_parameters(context, heuristics, ['12m.ms'], ['1arcsec'], [1000, 1000])
+
+    assert params['cell'] == ['2.5arcsec']
+    assert params['imsize'] == [400, 400]
 
 
 def test_findcont_qa_adds_blue_note_for_coarse_fallback():

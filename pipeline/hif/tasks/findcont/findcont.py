@@ -20,14 +20,20 @@ from .resultobjects import FindContResult
 LOG = infrastructure.get_logger(__name__)
 
 FINDCONT_BASE_PPB = 5.0
-FINDCONT_12M_TARGET_PPB = 3.0
+FINDCONT_12M_TARGET_PPB = 4.0
 FINDCONT_7M_TARGET_PPB = 4.0
 FINDCONT_MIN_IMSIZE = 64
 
 FINDCONT_L80_MIN_M = 100.0
-FINDCONT_L80_PIVOT_M = 200.0
+FINDCONT_L80_PIVOT_M = 250.0
 FINDCONT_L80_MAX_M = 8000.0
-FINDCONT_ALPHA_POWER = np.log(0.5) / np.log(
+FINDCONT_L80_MIN_IMSIZE_RATIO = 1.5
+FINDCONT_L80_PIVOT_IMSIZE_RATIO = 2.5
+FINDCONT_L80_MAX_IMSIZE_RATIO = 3.0
+FINDCONT_ALPHA_POWER = np.log(
+    (FINDCONT_L80_PIVOT_IMSIZE_RATIO - FINDCONT_L80_MIN_IMSIZE_RATIO) /
+    (FINDCONT_L80_MAX_IMSIZE_RATIO - FINDCONT_L80_MIN_IMSIZE_RATIO)
+) / np.log(
     (np.log(FINDCONT_L80_PIVOT_M) - np.log(FINDCONT_L80_MIN_M)) /
     (np.log(FINDCONT_L80_MAX_M) - np.log(FINDCONT_L80_MIN_M))
 )
@@ -89,7 +95,9 @@ def _coarse_findcont_parameters(context, image_heuristics, vislist, cell, imsize
 
     l80 = float(np.percentile(np.concatenate(baselines), 80))
     x = (np.log(l80) - np.log(FINDCONT_L80_MIN_M)) / (np.log(FINDCONT_L80_MAX_M) - np.log(FINDCONT_L80_MIN_M))
-    imsize_ratio = 2.0 + 2.0 * (float(np.clip(x, 0.0, 1.0)) ** FINDCONT_ALPHA_POWER)
+    imsize_ratio = FINDCONT_L80_MIN_IMSIZE_RATIO + (
+        FINDCONT_L80_MAX_IMSIZE_RATIO - FINDCONT_L80_MIN_IMSIZE_RATIO
+    ) * (float(np.clip(x, 0.0, 1.0)) ** FINDCONT_ALPHA_POWER)
 
     return {
         'weighting': 'briggs',
