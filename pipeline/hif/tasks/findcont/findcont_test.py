@@ -26,8 +26,9 @@ class FakeObservingRun:
 
 
 class FakeContext:
-    def __init__(self, mses):
+    def __init__(self, mses, size_mitigation_parameters=None):
         self.observing_run = FakeObservingRun(mses)
+        self.size_mitigation_parameters = size_mitigation_parameters or {}
 
 
 class FakeHeuristics:
@@ -149,6 +150,23 @@ def test_coarse_parameters_for_12m_anchor_hits_2p5_at_250m(monkeypatch):
 
     assert params['cell'] == ['2.5arcsec']
     assert params['imsize'] == [400, 400]
+
+
+def test_coarse_parameters_for_12m_respects_context_ppb_mitigation(monkeypatch):
+    monkeypatch.setattr(findcont.casa_tools.synthesisutils, 'getOptimumSize', lambda size: size)
+    monkeypatch.setattr(findcont.np, 'percentile', lambda values, percentile: 250.0)
+
+    mses = {'12m.ms': FakeMS('12m.ms', [1.0, 2.0, 3.0])}
+    context = FakeContext(mses, size_mitigation_parameters={'hm_cell': '3ppb'})
+    heuristics = FakeHeuristics('12m')
+
+    params = findcont._coarse_findcont_parameters(context, heuristics, ['12m.ms'], ['1arcsec'], [1000, 1000], spw='0')
+
+    assert params['cell'] == ['1.5arcsec']
+    assert params['imsize'] == [667, 667]
+    assert len(params['uvtaper']) == 1
+    assert params['uvtaper'][0].endswith('arcsec')
+    assert float(params['uvtaper'][0].replace('arcsec', '')) == pytest.approx(5.2, abs=0.2)
 
 
 def test_findcont_qa_adds_blue_note_for_coarse_fallback():

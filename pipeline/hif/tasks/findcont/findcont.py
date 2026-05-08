@@ -39,10 +39,28 @@ FINDCONT_ALPHA_POWER = np.log(
 )
 
 
-def _coarse_findcont_parameters(context, image_heuristics, vislist, cell, imsize):
+def _coarse_findcont_parameters(context, image_heuristics, vislist, cell, imsize, spw=None):
     qa = casa_tools.quanta
     mses = [context.observing_run.get_ms(vis) for vis in vislist]
     array_descs = image_heuristics.arrays(vislist)
+    size_mitigation_parameters = getattr(context, 'size_mitigation_parameters', {}) or {}
+
+    def ppb_mitigation_for(spw_id=None):
+        mitigation = None
+        if spw_id is not None:
+            mitigation = size_mitigation_parameters.get('multi_target_size_mitigation', {}).get(spw_id, {}).get('hm_cell')
+        mitigation = mitigation or size_mitigation_parameters.get('hm_cell')
+        if isinstance(mitigation, (list, tuple)):
+            mitigation = next((item for item in mitigation if isinstance(item, str) and 'ppb' in item), None)
+        if isinstance(mitigation, str) and 'ppb' in mitigation:
+            try:
+                return float(mitigation.split('ppb', 1)[0])
+            except ValueError:
+                pass
+        return FINDCONT_BASE_PPB
+
+    ppb_mitigation = ppb_mitigation_for(spw)
+    ppb_scale = ppb_mitigation / FINDCONT_BASE_PPB
 
     def scale_cell(quantity_or_list, ratio):
         if quantity_or_list in (None, '', []):
@@ -71,11 +89,13 @@ def _coarse_findcont_parameters(context, image_heuristics, vislist, cell, imsize
         first_cell = local_cell[0] if isinstance(local_cell, list) else local_cell
         cell_arcsec = float(np.asarray(qa.getvalue(qa.convert(qa.quantity(first_cell), 'arcsec'))).item())
         new_cell_arcsec = cell_arcsec * ratio
-        taper_ratio = np.sqrt(max(0.0, FINDCONT_12M_TARGET_PPB**2 - (FINDCONT_BASE_PPB / ratio)**2))
-        return ['%.2garcsec' % (taper_ratio * new_cell_arcsec)]
+        target_beam_arcsec = FINDCONT_12M_TARGET_PPB * new_cell_arcsec
+        input_beam_arcsec = ppb_mitigation * cell_arcsec
+        taper_arcsec_value = np.sqrt(max(0.0, target_beam_arcsec**2 - input_beam_arcsec**2))
+        return ['%.2garcsec' % taper_arcsec_value]
 
     if '7m' in array_descs:
-        imsize_ratio = FINDCONT_BASE_PPB / FINDCONT_7M_TARGET_PPB
+        imsize_ratio = (FINDCONT_BASE_PPB / FINDCONT_7M_TARGET_PPB) * ppb_scale
         return {
             'weighting': 'briggs',
             'robust': 1.0,
@@ -98,6 +118,7 @@ def _coarse_findcont_parameters(context, image_heuristics, vislist, cell, imsize
     imsize_ratio = FINDCONT_L80_MIN_IMSIZE_RATIO + (
         FINDCONT_L80_MAX_IMSIZE_RATIO - FINDCONT_L80_MIN_IMSIZE_RATIO
     ) * (float(np.clip(x, 0.0, 1.0)) ** FINDCONT_ALPHA_POWER)
+    imsize_ratio *= ppb_scale
 
     return {
         'weighting': 'briggs',
@@ -341,7 +362,7 @@ class FindCont(basetask.StandardTaskTemplate):
                     if coarse_mode and target_coarse_params is None:
                         try:
                             target_coarse_params = _coarse_findcont_parameters(
-                                context, image_heuristics, vislist, target['cell'], target['imsize']
+                                context, image_heuristics, vislist, target['cell'], target['imsize'], spw=target['spw']
                             )
                         except Exception as exc:
                             LOG.warning(
