@@ -430,8 +430,26 @@ class FastImagePrecheckBackend:
             intent='TARGET')
         return seed_sample, cell, imsize
 
-    def _evaluate_mode(self, mode, sample_specs, cell, imsize, selection_bw_hz, corr_factor_grid,
-                       temp_psf_file, seed_sample):
+    def _geometry_from_beam(self, beam):
+        cell = self.image_heuristics.cell(beam)
+        if cell == ['invalid']:
+            return None, None
+
+        try:
+            imsize = self.image_heuristics.imsize(
+                self.field_ids,
+                cell,
+                self.primary_beam_size,
+                centreonly=False,
+                intent='TARGET')
+        except Exception as exc:
+            LOG.info('Could not derive imsize from beam %s: %s', beam, exc)
+            return None, None
+
+        return cell, imsize
+
+    def _evaluate_mode(self, mode, sample_specs, cell, imsize, selection_bw_hz, corr_factor_grid, seed_sample,
+                       robust_values=None):
         if not sample_specs:
             raise RuntimeError(f'No valid samples available for {mode}')
 
@@ -439,121 +457,131 @@ class FastImagePrecheckBackend:
         sample_cache = []
         timing_start = time.perf_counter()
         selection_sum_bw_hz = 0.0
+        temp_dir = None
+        temp_psf_file = None
 
-        for sample in sample_specs:
-            try:
-                with casa_tools.SelectvisReader(sample.msname,
-                                                spw=f'{sample.real_spw}:{sample.channel_index}',
-                                                field=sample.field_id,
-                                                scan=sample.scanids,
-                                                taql=sample.taql) as imTool:
-                    imTool.defineimage(mode='mfs',
-                                       spw=sample.real_spw,
-                                       cellx=cell[0],
-                                       celly=cell[0],
-                                       nx=imsize[0],
-                                       ny=imsize[1])
-                    imTool.weight(type='uniform')
-                    gwgts = np.squeeze(np.asarray(imTool.getweightgrid(), dtype=float))
-                    imTool.weight(type='natural')
-                    nat_sens = float(imTool.apparentsens()[1])
-                    if not np.isfinite(nat_sens) or nat_sens <= 0.0:
-                        continue
+        try:
+            temp_dir, temp_psf_file = self._create_temp_psf_file(seed_sample, cell, imsize)
 
-                    bw_scale = sample.chunk_bw_hz / sample.channel_width_hz if sample.channel_width_hz > 0 else 1.0
-                    gwgts_scaled = gwgts * bw_scale
-                    nat_sens_scaled = nat_sens * math.sqrt(sample.channel_width_hz / sample.chunk_bw_hz) if sample.chunk_bw_hz > 0 else nat_sens
-                    nchan_equiv = max(1, int(round(sample.chunk_bw_hz / sample.channel_width_hz))) if sample.channel_width_hz > 0 else 1
-                    bw_corr_factor = 1.0
-                    try:
-                        bw_corr_factor, _, _, _ = self.image_heuristics.get_bw_corr_factor(
-                            self._ms_by_name[sample.msname], sample.virtual_spw, nchan_equiv)
-                    except Exception as exc:
-                        LOG.info('Could not determine bandwidth correction for ms=%s spw=%s nchan=%s: %s',
-                                 os.path.basename(sample.msname), sample.virtual_spw, nchan_equiv, exc)
-                    nat_sens_scaled *= bw_corr_factor
+            for sample in sample_specs:
+                try:
+                    with casa_tools.SelectvisReader(sample.msname,
+                                                    spw=f'{sample.real_spw}:{sample.channel_index}',
+                                                    field=sample.field_id,
+                                                    scan=sample.scanids,
+                                                    taql=sample.taql) as imTool:
+                        imTool.defineimage(mode='mfs',
+                                           spw=sample.real_spw,
+                                           cellx=cell[0],
+                                           celly=cell[0],
+                                           nx=imsize[0],
+                                           ny=imsize[1])
+                        imTool.weight(type='uniform')
+                        gwgts = np.squeeze(np.asarray(imTool.getweightgrid(), dtype=float))
+                        imTool.weight(type='natural')
+                        nat_sens = float(imTool.apparentsens()[1])
+                        if not np.isfinite(nat_sens) or nat_sens <= 0.0:
+                            continue
 
-                    if self.gridder == 'mosaic':
-                        ms = self._ms_by_name[sample.msname]
-                        source_matches = [f.source.name for f in ms.fields
-                                          if (utils.dequote(f.name) == utils.dequote(self.repr_field) and 'TARGET' in f.intents)]
-                        if source_matches:
-                            source_name = source_matches[0]
-                            if source_name.isdigit():
-                                source_name = '"{}"'.format(source_name)
-                            diameter = np.median([a.diameter for a in ms.antennas])
-                            overlap_factor = mosaicoverlap.mosaicOverlapFactorMS(ms, source_name, sample.virtual_spw, diameter)
-                            nat_sens_scaled /= overlap_factor
-                        else:
-                            LOG.info('No mosaic source match for %s field %s; leaving overlap factor at unity',
-                                     os.path.basename(sample.msname), self.repr_field)
+                        bw_scale = sample.chunk_bw_hz / sample.channel_width_hz if sample.channel_width_hz > 0 else 1.0
+                        gwgts_scaled = gwgts * bw_scale
+                        nat_sens_scaled = nat_sens * math.sqrt(sample.channel_width_hz / sample.chunk_bw_hz) if sample.chunk_bw_hz > 0 else nat_sens
+                        nchan_equiv = max(1, int(round(sample.chunk_bw_hz / sample.channel_width_hz))) if sample.channel_width_hz > 0 else 1
+                        bw_corr_factor = 1.0
+                        try:
+                            bw_corr_factor, _, _, _ = self.image_heuristics.get_bw_corr_factor(
+                                self._ms_by_name[sample.msname], sample.virtual_spw, nchan_equiv)
+                        except Exception as exc:
+                            LOG.info('Could not determine bandwidth correction for ms=%s spw=%s nchan=%s: %s',
+                                     os.path.basename(sample.msname), sample.virtual_spw, nchan_equiv, exc)
+                        nat_sens_scaled *= bw_corr_factor
 
-                    sample_cache.append({
-                        'sample': sample,
-                        'gwgts': gwgts_scaled,
-                        'nat_sens': nat_sens_scaled,
-                    })
-                    selection_sum_bw_hz += float(sample.chunk_bw_hz)
-            except Exception as exc:
-                LOG.info('Skipping sample ms=%s spw=%s chan=%s: %s',
-                         os.path.basename(sample.msname), sample.real_spw, sample.channel_index, exc)
-                continue
+                        if self.gridder == 'mosaic':
+                            ms = self._ms_by_name[sample.msname]
+                            source_matches = [f.source.name for f in ms.fields
+                                              if (utils.dequote(f.name) == utils.dequote(self.repr_field) and 'TARGET' in f.intents)]
+                            if source_matches:
+                                source_name = source_matches[0]
+                                if source_name.isdigit():
+                                    source_name = '"{}"'.format(source_name)
+                                diameter = np.median([a.diameter for a in ms.antennas])
+                                overlap_factor = mosaicoverlap.mosaicOverlapFactorMS(ms, source_name, sample.virtual_spw, diameter)
+                                nat_sens_scaled /= overlap_factor
+                            else:
+                                LOG.info('No mosaic source match for %s field %s; leaving overlap factor at unity',
+                                         os.path.basename(sample.msname), self.repr_field)
 
-        build_time = time.perf_counter() - timing_start
-        LOG.info('imageprecheck %s cached %d sparse samples in %.3fs', mode, len(sample_cache), build_time)
+                        sample_cache.append({
+                            'sample': sample,
+                            'gwgts': gwgts_scaled,
+                            'nat_sens': nat_sens_scaled,
+                        })
+                        selection_sum_bw_hz += float(sample.chunk_bw_hz)
+                except Exception as exc:
+                    LOG.info('Skipping sample ms=%s spw=%s chan=%s: %s',
+                             os.path.basename(sample.msname), sample.real_spw, sample.channel_index, exc)
+                    continue
 
-        if not sample_cache:
-            raise RuntimeError(f'No valid imageprecheck samples collected for {mode}')
+            build_time = time.perf_counter() - timing_start
+            LOG.info('imageprecheck %s cached %d sparse samples in %.3fs', mode, len(sample_cache), build_time)
 
-        combined_gwgts = None
-        combined_nat_sens_terms = []
-        for entry in sample_cache:
-            combined_gwgts = entry['gwgts'] if combined_gwgts is None else combined_gwgts + entry['gwgts']
-            if np.isfinite(entry['nat_sens']) and entry['nat_sens'] > 0.0:
-                combined_nat_sens_terms.append(entry['nat_sens'])
+            if not sample_cache:
+                raise RuntimeError(f'No valid imageprecheck samples collected for {mode}')
 
-        if combined_gwgts is None or not combined_nat_sens_terms:
-            raise RuntimeError(f'Unable to build combined weight grid for {mode}')
+            combined_gwgts = None
+            combined_nat_sens_terms = []
+            for entry in sample_cache:
+                combined_gwgts = entry['gwgts'] if combined_gwgts is None else combined_gwgts + entry['gwgts']
+                if np.isfinite(entry['nat_sens']) and entry['nat_sens'] > 0.0:
+                    combined_nat_sens_terms.append(entry['nat_sens'])
 
-        combined_nat_sens = 1.0 / np.sqrt(np.sum(1.0 / np.array(combined_nat_sens_terms) ** 2))
+            if combined_gwgts is None or not combined_nat_sens_terms:
+                raise RuntimeError(f'Unable to build combined weight grid for {mode}')
 
-        results = {}
-        for robust in self.robust_values:
-            t0 = time.perf_counter()
-            total_weights, sens_factor = _briggs_weight(combined_gwgts, robust, corr_factor_grid)
+            combined_nat_sens = 1.0 / np.sqrt(np.sum(1.0 / np.array(combined_nat_sens_terms) ** 2))
 
-            if total_weights is None or sens_factor is None:
-                beam = 'invalid'
-                sensitivity = None
-                sens_bw = None
-            else:
-                psf = _make_psf_from_weights(total_weights)
-                beam = self._fit_psf(seed_sample, psf, cell, imsize, temp_psf_file)
-                if beam == 'invalid':
+            if robust_values is None:
+                robust_values = self.robust_values
+
+            results = {}
+            for robust in robust_values:
+                t0 = time.perf_counter()
+                total_weights, sens_factor = _briggs_weight(combined_gwgts, robust, corr_factor_grid)
+
+                if total_weights is None or sens_factor is None:
+                    beam = 'invalid'
                     sensitivity = None
                     sens_bw = None
                 else:
-                    sensitivity = combined_nat_sens * sens_factor
-                    if mode == 'aggBW' and total_bandwidth_hz > 0.0 and selection_sum_bw_hz > total_bandwidth_hz:
-                        sensitivity *= math.sqrt(selection_sum_bw_hz / total_bandwidth_hz)
-                    sens_bw = total_bandwidth_hz
+                    psf = _make_psf_from_weights(total_weights)
+                    beam = self._fit_psf(seed_sample, psf, cell, imsize, temp_psf_file)
+                    if beam == 'invalid':
+                        sensitivity = None
+                        sens_bw = None
+                    else:
+                        sensitivity = combined_nat_sens * sens_factor
+                        if mode == 'aggBW' and total_bandwidth_hz > 0.0 and selection_sum_bw_hz > total_bandwidth_hz:
+                            sensitivity *= math.sqrt(selection_sum_bw_hz / total_bandwidth_hz)
+                        sens_bw = total_bandwidth_hz
 
-            elapsed = time.perf_counter() - t0
-            LOG.info('imageprecheck %s robust %.1f evaluated in %.3fs', mode, robust, elapsed)
-            results[robust] = {
-                'beam': beam,
-                'cell': cell,
-                'imsize': imsize,
-                'sensitivity': sensitivity,
-                'sens_bw_hz': sens_bw,
-                'sample_count': len(sample_cache),
-                'selection_bw_hz': total_bandwidth_hz,
-            }
+                elapsed = time.perf_counter() - t0
+                LOG.info('imageprecheck %s robust %.1f evaluated in %.3fs', mode, robust, elapsed)
+                results[robust] = {
+                    'beam': beam,
+                    'cell': cell,
+                    'imsize': imsize,
+                    'sensitivity': sensitivity,
+                    'sens_bw_hz': sens_bw,
+                    'sample_count': len(sample_cache),
+                    'selection_bw_hz': total_bandwidth_hz,
+                }
 
-        return results
+            return results
+        finally:
+            if temp_dir and os.path.isdir(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
 
     def run(self):
-        mode_results = {}
         timings = {}
 
         t0 = time.perf_counter()
@@ -565,22 +593,50 @@ class FastImagePrecheckBackend:
         seed_sample, cell, imsize = self._seed_cell_and_imsize(rep_samples or agg_samples)
         timings['seed'] = time.perf_counter() - t_seed
 
-        temp_dir = None
-        temp_psf_file = None
-        try:
-            temp_dir, temp_psf_file = self._create_temp_psf_file(seed_sample, cell, imsize)
-            rep_corr_factor_grid = _create_briggsbw_grid(imsize[0], imsize[1], self.repr_frac_bw) \
-                if self.repr_frac_bw > 0.0 else 1.0
+        t1 = time.perf_counter()
+        seed_rep_results = self._evaluate_mode('repBW', rep_samples, cell, imsize, rep_bw_hz,
+                                               _create_briggsbw_grid(imsize[0], imsize[1], self.repr_frac_bw)
+                                               if self.repr_frac_bw > 0.0 else 1.0,
+                                               seed_sample)
 
-            t1 = time.perf_counter()
-            mode_results['repBW'] = self._evaluate_mode('repBW', rep_samples, cell, imsize, rep_bw_hz,
-                                                        rep_corr_factor_grid, temp_psf_file, seed_sample)
-            mode_results['aggBW'] = self._evaluate_mode('aggBW', agg_samples, cell, imsize, agg_bw_hz,
-                                                        1.0, temp_psf_file, seed_sample)
-            timings['evaluate'] = time.perf_counter() - t1
-        finally:
-            if temp_dir and os.path.isdir(temp_dir):
-                shutil.rmtree(temp_dir, ignore_errors=True)
+        mode_results = {'repBW': {}, 'aggBW': {}}
+        geometry_by_robust = {}
+        for robust in self.robust_values:
+            beam = seed_rep_results[robust]['beam']
+            if beam == 'invalid':
+                geometry_by_robust[robust] = (None, None)
+                continue
+            robust_cell, robust_imsize = self._geometry_from_beam(beam)
+            if robust_cell is None or robust_imsize is None:
+                geometry_by_robust[robust] = (None, None)
+                continue
+            geometry_by_robust[robust] = (robust_cell, robust_imsize)
+
+        for robust in self.robust_values:
+            robust_cell, robust_imsize = geometry_by_robust.get(robust, (None, None))
+            if robust_cell is None or robust_imsize is None:
+                mode_results['repBW'][robust] = seed_rep_results[robust]
+                mode_results['aggBW'][robust] = {
+                    'beam': 'invalid',
+                    'cell': robust_cell,
+                    'imsize': robust_imsize,
+                    'sensitivity': None,
+                    'sens_bw_hz': None,
+                    'sample_count': 0,
+                    'selection_bw_hz': agg_bw_hz,
+                }
+                continue
+
+            rep_corr_factor_grid = _create_briggsbw_grid(robust_imsize[0], robust_imsize[1], self.repr_frac_bw) \
+                if self.repr_frac_bw > 0.0 else 1.0
+            mode_results['repBW'][robust] = self._evaluate_mode('repBW', rep_samples, robust_cell, robust_imsize,
+                                                                rep_bw_hz, rep_corr_factor_grid, seed_sample,
+                                                                robust_values=[robust])[robust]
+            mode_results['aggBW'][robust] = self._evaluate_mode('aggBW', agg_samples, robust_cell, robust_imsize,
+                                                                agg_bw_hz, 1.0, seed_sample,
+                                                                robust_values=[robust])[robust]
+
+        timings['evaluate'] = time.perf_counter() - t1
 
         LOG.info('imageprecheck backend timings: sample build %.3fs, evaluation %.3fs',
                  timings['sample_build'], timings['evaluate'])
