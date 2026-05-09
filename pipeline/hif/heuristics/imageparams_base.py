@@ -1700,10 +1700,15 @@ class ImageParamsHeuristics:
             with casa_tools.MSReader(msname) as msTool:
                 # CAS-8997 selectinit is required to avoid the 'Data shape varies...' warning message
                 msTool.selectinit(datadescid=dd_id)
-                # Antenna selection does not work (CAS-8757)
-                # staql={'field': field, 'spw': real_spwid, 'antenna': '*&*'}
-                staql = {'field': field, 'spw': str(real_spwid)}
-                msTool.msselect(staql)
+                # Normalize the field selection to concrete field IDs and use
+                # TaQL directly. This avoids CASA's field-type warnings when
+                # callers provide a field name or a stringified field id.
+                field_ids = utils.field_arg_to_id(msname, field, msDO.fields)
+                if not field_ids:
+                    LOG.warning('Could not resolve field %r in %s for spw %s', field, msname, spw)
+                    return np.array([True] * spwDO.num_channels)
+                field_taql = '||'.join('FIELD_ID==%d' % int(fid) for fid in sorted(set(field_ids)))
+                msTool.selecttaql('(%s)' % field_taql)
                 msTool.iterinit(maxrows=500)
                 msTool.iterorigin()
 

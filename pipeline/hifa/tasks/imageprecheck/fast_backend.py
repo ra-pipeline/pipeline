@@ -68,7 +68,10 @@ def _contiguous_runs(indices: list[int]) -> list[list[int]]:
 
 
 def _make_psf_from_weights(total_weights: np.ndarray) -> np.ndarray:
-    psf = np.abs(np.array([np.fft.fftshift(np.fft.fft2(np.fft.fftshift(total_weights))).T]).T)
+    # Keep the proxy strictly 2-D; the previous construction added a
+    # singleton axis and broke the beam fit.
+    psf = np.abs(np.fft.fftshift(np.fft.fft2(np.fft.fftshift(total_weights))))
+    psf = np.squeeze(psf)
     peak = np.max(psf)
     if peak > 0:
         psf /= peak
@@ -76,6 +79,9 @@ def _make_psf_from_weights(total_weights: np.ndarray) -> np.ndarray:
 
 
 def _fit_beam_from_psf(psf: np.ndarray, cell_arcsec: float) -> dict | str:
+    psf = np.squeeze(np.asarray(psf, dtype=float))
+    if psf.ndim != 2:
+        return 'invalid'
     peak_index = np.unravel_index(np.argmax(psf), psf.shape)
     peak = float(psf[peak_index])
     if not np.isfinite(peak) or peak <= 0.0:
