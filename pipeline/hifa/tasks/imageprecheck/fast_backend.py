@@ -129,6 +129,7 @@ class FastImagePrecheckBackend:
             field_ids,
             repr_bandwidth_hz,
             repr_frac_bw,
+            agg_frac_bw,
             single_continuum=False,
             sample_spacing_hz=SAMPLE_SPACING_HZ):
         self.inputs = inputs
@@ -145,6 +146,7 @@ class FastImagePrecheckBackend:
         self.field_ids = field_ids
         self.repr_bandwidth_hz = float(repr_bandwidth_hz)
         self.repr_frac_bw = float(repr_frac_bw)
+        self.agg_frac_bw = float(agg_frac_bw)
         self.single_continuum = single_continuum
         self.sample_spacing_hz = float(sample_spacing_hz)
 
@@ -491,20 +493,24 @@ class FastImagePrecheckBackend:
         if not sample_cache:
             raise RuntimeError(f'No valid imageprecheck samples collected for {mode}')
 
+        combined_gwgts = None
+        combined_nat_sens_terms = []
+        for entry in sample_cache:
+            combined_gwgts = entry['gwgts'] if combined_gwgts is None else combined_gwgts + entry['gwgts']
+            if np.isfinite(entry['nat_sens']) and entry['nat_sens'] > 0.0:
+                combined_nat_sens_terms.append(entry['nat_sens'])
+
+        if combined_gwgts is None or not combined_nat_sens_terms:
+            raise RuntimeError(f'Unable to build combined weight grid for {mode}')
+
+        combined_nat_sens = 1.0 / np.sqrt(np.sum(1.0 / np.array(combined_nat_sens_terms) ** 2))
+
         results = {}
         for robust in self.robust_values:
             t0 = time.perf_counter()
-            total_weights = None
-            sens_terms = []
-            for entry in sample_cache:
-                gwgts = entry['gwgts']
-                adjusted_weights, sens_factor = _briggs_weight(gwgts, robust, corr_factor_grid)
-                if adjusted_weights is None:
-                    continue
-                total_weights = adjusted_weights if total_weights is None else total_weights + adjusted_weights
-                sens_terms.append(entry['nat_sens'] * sens_factor)
+            total_weights, sens_factor = _briggs_weight(combined_gwgts, robust, corr_factor_grid)
 
-            if total_weights is None or not sens_terms:
+            if total_weights is None or sens_factor is None:
                 beam = 'invalid'
                 sensitivity = None
                 sens_bw = None
@@ -515,8 +521,7 @@ class FastImagePrecheckBackend:
                     sensitivity = None
                     sens_bw = None
                 else:
-                    combined = 1.0 / np.sqrt(np.sum(1.0 / np.array(sens_terms) ** 2))
-                    sensitivity = combined
+                    sensitivity = combined_nat_sens * sens_factor
                     sens_bw = total_bandwidth_hz
 
             elapsed = time.perf_counter() - t0
@@ -552,12 +557,14 @@ class FastImagePrecheckBackend:
             temp_dir, temp_psf_file = self._create_temp_psf_file(seed_sample, cell, imsize)
             rep_corr_factor_grid = _create_briggsbw_grid(imsize[0], imsize[1], self.repr_frac_bw) \
                 if self.repr_frac_bw > 0.0 else 1.0
+            agg_corr_factor_grid = _create_briggsbw_grid(imsize[0], imsize[1], self.agg_frac_bw) \
+                if self.agg_frac_bw > 0.0 else 1.0
 
             t1 = time.perf_counter()
             mode_results['repBW'] = self._evaluate_mode('repBW', rep_samples, cell, imsize, rep_bw_hz,
                                                         rep_corr_factor_grid, temp_psf_file, seed_sample)
             mode_results['aggBW'] = self._evaluate_mode('aggBW', agg_samples, cell, imsize, agg_bw_hz,
-                                                        1.0, temp_psf_file, seed_sample)
+                                                        agg_corr_factor_grid, temp_psf_file, seed_sample)
             timings['evaluate'] = time.perf_counter() - t1
         finally:
             if temp_dir and os.path.isdir(temp_dir):
