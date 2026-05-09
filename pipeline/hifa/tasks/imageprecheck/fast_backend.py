@@ -255,7 +255,7 @@ class FastImagePrecheckBackend:
 
         return None
 
-    def _create_temp_psf_file(self, seed_sample, cell, imsize):
+    def _create_temp_psf_file(self, seed_sample, cell, psf_imsize):
         temp_dir = tempfile.mkdtemp(prefix='imageprecheck_psf_', dir=os.getcwd())
         temp_psf_file = os.path.join(temp_dir, 'scratch.psf')
 
@@ -268,13 +268,13 @@ class FastImagePrecheckBackend:
                                spw=seed_sample.real_spw,
                                cellx=cell[0],
                                celly=cell[0],
-                               nx=imsize[0],
-                               ny=imsize[1])
+                               nx=psf_imsize[0],
+                               ny=psf_imsize[1])
             imTool.makeimage(type='psf', image=temp_psf_file)
 
         return temp_dir, temp_psf_file
 
-    def _fit_psf(self, seed_sample, psf_array, cell, imsize, temp_psf_file):
+    def _fit_psf(self, seed_sample, psf_array, cell, psf_imsize, temp_psf_file):
         try:
             with casa_tools.SelectvisReader(seed_sample.msname,
                                             spw=f'{seed_sample.real_spw}:{seed_sample.channel_index}',
@@ -285,8 +285,8 @@ class FastImagePrecheckBackend:
                                    spw=seed_sample.real_spw,
                                    cellx=cell[0],
                                    celly=cell[0],
-                                   nx=imsize[0],
-                                   ny=imsize[1])
+                                   nx=psf_imsize[0],
+                                   ny=psf_imsize[1])
                 with casa_tools.ImageReader(temp_psf_file) as image_tool:
                     image_tool.putregion(pixels=psf_array)
                 fit_result = imTool.fitpsf(psf=temp_psf_file)
@@ -459,10 +459,9 @@ class FastImagePrecheckBackend:
         selection_sum_bw_by_ms = {}
         temp_dir = None
         temp_psf_file = None
+        psf_imsize = None
 
         try:
-            temp_dir, temp_psf_file = self._create_temp_psf_file(seed_sample, cell, imsize)
-
             for sample in sample_specs:
                 try:
                     with casa_tools.SelectvisReader(sample.msname,
@@ -541,6 +540,11 @@ class FastImagePrecheckBackend:
 
             combined_nat_sens = 1.0 / np.sqrt(np.sum(1.0 / np.array(combined_nat_sens_terms) ** 2))
             selection_sum_bw_hz = max(selection_sum_bw_by_ms.values(), default=0.0)
+            psf_imsize = [combined_gwgts.shape[1], combined_gwgts.shape[0]]
+            if psf_imsize != imsize:
+                LOG.info('Using actual %s weight-grid shape %s for PSF fitting instead of requested imsize %s',
+                         mode, psf_imsize, imsize)
+            temp_dir, temp_psf_file = self._create_temp_psf_file(seed_sample, cell, psf_imsize)
             local_corr_factor_grid = corr_factor_grid
             if isinstance(local_corr_factor_grid, np.ndarray) and local_corr_factor_grid.shape != combined_gwgts.shape:
                 LOG.info('Rebuilding correction grid for %s to match weight-grid shape %s (was %s)',
@@ -565,7 +569,7 @@ class FastImagePrecheckBackend:
                     sens_bw = None
                 else:
                     psf = _make_psf_from_weights(total_weights)
-                    beam = self._fit_psf(seed_sample, psf, cell, imsize, temp_psf_file)
+                    beam = self._fit_psf(seed_sample, psf, cell, psf_imsize, temp_psf_file)
                     if beam == 'invalid':
                         sensitivity = None
                         sens_bw = None
