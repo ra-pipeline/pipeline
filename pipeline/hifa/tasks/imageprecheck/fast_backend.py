@@ -574,9 +574,23 @@ class FastImagePrecheckBackend:
                         sensitivity = None
                         sens_bw = None
                     else:
-                        sensitivity = combined_nat_sens * sens_factor
-                        if mode == 'aggBW' and total_bandwidth_hz > 0.0 and selection_sum_bw_hz > total_bandwidth_hz:
-                            sensitivity *= math.sqrt(selection_sum_bw_hz / total_bandwidth_hz)
+                        if mode == 'aggBW':
+                            robust_sens_terms = []
+                            for entry in sample_cache:
+                                _, entry_sens_factor = _briggs_weight(entry['gwgts'], robust, 1.0)
+                                if entry_sens_factor is None:
+                                    continue
+                                robust_sigma = entry['nat_sens'] * entry_sens_factor
+                                if np.isfinite(robust_sigma) and robust_sigma > 0.0:
+                                    robust_sens_terms.append(robust_sigma)
+                            if robust_sens_terms:
+                                sensitivity = 1.0 / np.sqrt(np.sum(1.0 / np.array(robust_sens_terms) ** 2))
+                                if total_bandwidth_hz > 0.0 and selection_sum_bw_hz > total_bandwidth_hz:
+                                    sensitivity *= math.sqrt(selection_sum_bw_hz / total_bandwidth_hz)
+                            else:
+                                sensitivity = None
+                        else:
+                            sensitivity = combined_nat_sens * sens_factor
                         sens_bw = total_bandwidth_hz
 
                 elapsed = time.perf_counter() - t0
