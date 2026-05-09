@@ -318,7 +318,6 @@ class ImagePreCheck(basetask.StandardTaskTemplate):
             field_ids=field_ids,
             repr_bandwidth_hz=float(cqa.getvalue(cqa.convert(repr_target[2], 'Hz'))[0]),
             repr_frac_bw=float(image_heuristics.get_fractional_bandwidth(str(repr_spw))),
-            agg_frac_bw=float(image_heuristics.get_fractional_bandwidth(str(cont_spw))),
             single_continuum=single_continuum,
         )
         backend_results = backend.run()

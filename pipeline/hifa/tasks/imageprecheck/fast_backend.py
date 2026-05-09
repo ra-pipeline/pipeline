@@ -129,7 +129,6 @@ class FastImagePrecheckBackend:
             field_ids,
             repr_bandwidth_hz,
             repr_frac_bw,
-            agg_frac_bw,
             single_continuum=False,
             sample_spacing_hz=SAMPLE_SPACING_HZ):
         self.inputs = inputs
@@ -146,7 +145,6 @@ class FastImagePrecheckBackend:
         self.field_ids = field_ids
         self.repr_bandwidth_hz = float(repr_bandwidth_hz)
         self.repr_frac_bw = float(repr_frac_bw)
-        self.agg_frac_bw = float(agg_frac_bw)
         self.single_continuum = single_continuum
         self.sample_spacing_hz = float(sample_spacing_hz)
 
@@ -211,6 +209,9 @@ class FastImagePrecheckBackend:
                 real_spw = self.image_heuristics.observing_run.virtual2real_spw_id(spw_id, ms)
                 spw_obj = ms.get_spectral_window(real_spw)
                 total_bw += float(spw_obj.bandwidth.to_units(measures.FrequencyUnits.HERTZ))
+            aggregate_bw = float(self._cqa.getvalue(self._cqa.convert(self.image_heuristics.aggregate_bandwidth(selected_spws), 'Hz'))[0])
+            if aggregate_bw > 0.0:
+                total_bw = aggregate_bw
             return spw, topo_dict, total_bw
         except Exception as exc:
             LOG.info('Falling back to empty selection for %s after selection failure: %s', mode, exc)
@@ -437,6 +438,7 @@ class FastImagePrecheckBackend:
         total_bandwidth_hz = float(selection_bw_hz or 0.0)
         sample_cache = []
         timing_start = time.perf_counter()
+        selection_sum_bw_hz = 0.0
 
         for sample in sample_specs:
             try:
@@ -461,6 +463,15 @@ class FastImagePrecheckBackend:
                     bw_scale = sample.chunk_bw_hz / sample.channel_width_hz if sample.channel_width_hz > 0 else 1.0
                     gwgts_scaled = gwgts * bw_scale
                     nat_sens_scaled = nat_sens * math.sqrt(sample.channel_width_hz / sample.chunk_bw_hz) if sample.chunk_bw_hz > 0 else nat_sens
+                    nchan_equiv = max(1, int(round(sample.chunk_bw_hz / sample.channel_width_hz))) if sample.channel_width_hz > 0 else 1
+                    bw_corr_factor = 1.0
+                    try:
+                        bw_corr_factor, _, _, _ = self.image_heuristics.get_bw_corr_factor(
+                            self._ms_by_name[sample.msname], sample.virtual_spw, nchan_equiv)
+                    except Exception as exc:
+                        LOG.info('Could not determine bandwidth correction for ms=%s spw=%s nchan=%s: %s',
+                                 os.path.basename(sample.msname), sample.virtual_spw, nchan_equiv, exc)
+                    nat_sens_scaled *= bw_corr_factor
 
                     if self.gridder == 'mosaic':
                         ms = self._ms_by_name[sample.msname]
@@ -482,6 +493,7 @@ class FastImagePrecheckBackend:
                         'gwgts': gwgts_scaled,
                         'nat_sens': nat_sens_scaled,
                     })
+                    selection_sum_bw_hz += float(sample.chunk_bw_hz)
             except Exception as exc:
                 LOG.info('Skipping sample ms=%s spw=%s chan=%s: %s',
                          os.path.basename(sample.msname), sample.real_spw, sample.channel_index, exc)
@@ -522,6 +534,8 @@ class FastImagePrecheckBackend:
                     sens_bw = None
                 else:
                     sensitivity = combined_nat_sens * sens_factor
+                    if mode == 'aggBW' and total_bandwidth_hz > 0.0 and selection_sum_bw_hz > total_bandwidth_hz:
+                        sensitivity *= math.sqrt(selection_sum_bw_hz / total_bandwidth_hz)
                     sens_bw = total_bandwidth_hz
 
             elapsed = time.perf_counter() - t0
@@ -557,14 +571,12 @@ class FastImagePrecheckBackend:
             temp_dir, temp_psf_file = self._create_temp_psf_file(seed_sample, cell, imsize)
             rep_corr_factor_grid = _create_briggsbw_grid(imsize[0], imsize[1], self.repr_frac_bw) \
                 if self.repr_frac_bw > 0.0 else 1.0
-            agg_corr_factor_grid = _create_briggsbw_grid(imsize[0], imsize[1], self.agg_frac_bw) \
-                if self.agg_frac_bw > 0.0 else 1.0
 
             t1 = time.perf_counter()
             mode_results['repBW'] = self._evaluate_mode('repBW', rep_samples, cell, imsize, rep_bw_hz,
                                                         rep_corr_factor_grid, temp_psf_file, seed_sample)
             mode_results['aggBW'] = self._evaluate_mode('aggBW', agg_samples, cell, imsize, agg_bw_hz,
-                                                        agg_corr_factor_grid, temp_psf_file, seed_sample)
+                                                        1.0, temp_psf_file, seed_sample)
             timings['evaluate'] = time.perf_counter() - t1
         finally:
             if temp_dir and os.path.isdir(temp_dir):
