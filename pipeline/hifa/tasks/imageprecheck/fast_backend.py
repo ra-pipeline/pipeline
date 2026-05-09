@@ -302,6 +302,7 @@ class FastImagePrecheckBackend:
     def _sample_specs_for_mode(self, mode):
         spw_spec, topo_dict, selected_bw_hz = self._mode_selection_inputs(mode)
         sample_specs = []
+        selection_group_meta = {}
 
         for msname in self.inputs.vis:
             ms = self._ms_by_name[msname]
@@ -348,6 +349,8 @@ class FastImagePrecheckBackend:
 
                 selection = topo_dict.get(os.path.basename(msname), {}).get(spw_id, '')
                 ranges = _parse_channel_ranges(selection, spw_obj.num_channels)
+                group_key = (os.path.basename(msname), int(spw_id))
+                group_meta = selection_group_meta.setdefault(group_key, {'selected_nchan': 0, 'selected_bw_hz': 0.0})
 
                 for start, stop in ranges:
                     allowed = [idx for idx in range(start, stop + 1) if idx < len(channel_centers) and (len(channel_flags) == 0 or not channel_flags[idx])]
@@ -358,6 +361,8 @@ class FastImagePrecheckBackend:
                         run_width = float(np.sum(channel_widths[run]))
                         if run_width <= 0.0:
                             continue
+                        group_meta['selected_nchan'] += len(run)
+                        group_meta['selected_bw_hz'] += run_width
 
                         n_samples = max(1, int(math.ceil(run_width / self.sample_spacing_hz)))
                         n_samples = min(n_samples, len(run))
@@ -397,7 +402,7 @@ class FastImagePrecheckBackend:
                             )
 
         sample_specs.sort(key=lambda s: s.center_freq_hz)
-        return spw_spec, sample_specs, selected_bw_hz
+        return spw_spec, sample_specs, selected_bw_hz, selection_group_meta
 
     def _seed_cell_and_imsize(self, sample_specs):
         if not sample_specs:
@@ -449,7 +454,7 @@ class FastImagePrecheckBackend:
         return cell, imsize
 
     def _evaluate_mode(self, mode, sample_specs, cell, imsize, selection_bw_hz, corr_factor_grid, seed_sample,
-                       robust_values=None):
+                       robust_values=None, selection_group_meta=None):
         if not sample_specs:
             raise RuntimeError(f'No valid samples available for {mode}')
 
@@ -460,6 +465,8 @@ class FastImagePrecheckBackend:
         temp_dir = None
         temp_psf_file = None
         psf_imsize = None
+        if selection_group_meta is None:
+            selection_group_meta = {}
 
         try:
             for sample in sample_specs:
@@ -485,17 +492,19 @@ class FastImagePrecheckBackend:
                         bw_scale = sample.chunk_bw_hz / sample.channel_width_hz if sample.channel_width_hz > 0 else 1.0
                         gwgts_scaled = gwgts * bw_scale
                         nat_sens_scaled = nat_sens * math.sqrt(sample.channel_width_hz / sample.chunk_bw_hz) if sample.chunk_bw_hz > 0 else nat_sens
-                        nchan_equiv = max(1, int(round(sample.chunk_bw_hz / sample.channel_width_hz))) if sample.channel_width_hz > 0 else 1
-                        bw_corr_factor = 1.0
-                        try:
-                            bw_corr_factor, _, _, _ = self.image_heuristics.get_bw_corr_factor(
-                                self._ms_by_name[sample.msname], sample.virtual_spw, nchan_equiv)
-                        except Exception as exc:
-                            LOG.info('Could not determine bandwidth correction for ms=%s spw=%s nchan=%s: %s',
-                                     os.path.basename(sample.msname), sample.virtual_spw, nchan_equiv, exc)
-                        nat_sens_scaled *= bw_corr_factor
 
-                        if self.gridder == 'mosaic':
+                        if mode != 'aggBW':
+                            nchan_equiv = max(1, int(round(sample.chunk_bw_hz / sample.channel_width_hz))) if sample.channel_width_hz > 0 else 1
+                            try:
+                                bw_corr_factor, _, _, _ = self.image_heuristics.get_bw_corr_factor(
+                                    self._ms_by_name[sample.msname], sample.virtual_spw, nchan_equiv)
+                            except Exception as exc:
+                                LOG.info('Could not determine bandwidth correction factor for ms=%s spw=%s nchan=%s: %s',
+                                         os.path.basename(sample.msname), sample.virtual_spw, nchan_equiv, exc)
+                                bw_corr_factor = 1.0
+                            nat_sens_scaled *= bw_corr_factor
+
+                        if self.gridder == 'mosaic' and mode != 'aggBW':
                             ms = self._ms_by_name[sample.msname]
                             source_matches = [f.source.name for f in ms.fields
                                               if (utils.dequote(f.name) == utils.dequote(self.repr_field) and 'TARGET' in f.intents)]
@@ -575,14 +584,44 @@ class FastImagePrecheckBackend:
                         sens_bw = None
                     else:
                         if mode == 'aggBW':
-                            robust_sens_terms = []
+                            grouped_terms = {}
                             for entry in sample_cache:
+                                sample = entry['sample']
+                                group_key = (os.path.basename(sample.msname), sample.virtual_spw)
                                 _, entry_sens_factor = _briggs_weight(entry['gwgts'], robust, 1.0)
                                 if entry_sens_factor is None:
                                     continue
                                 robust_sigma = entry['nat_sens'] * entry_sens_factor
                                 if np.isfinite(robust_sigma) and robust_sigma > 0.0:
-                                    robust_sens_terms.append(robust_sigma)
+                                    grouped_terms.setdefault(group_key, []).append(robust_sigma)
+
+                            robust_sens_terms = []
+                            for group_key, term_list in grouped_terms.items():
+                                if not term_list:
+                                    continue
+                                group_sigma = 1.0 / np.sqrt(np.sum(1.0 / np.array(term_list) ** 2))
+                                group_meta = selection_group_meta.get(group_key, {})
+                                nchan_sel = max(1, int(group_meta.get('selected_nchan', 1)))
+                                ms = self._ms_by_name[next(s.msname for s in sample_specs if os.path.basename(s.msname) == group_key[0])]
+                                try:
+                                    bw_corr_factor, _, _, _ = self.image_heuristics.get_bw_corr_factor(ms, group_key[1], nchan_sel)
+                                except Exception as exc:
+                                    LOG.info('Could not determine grouped bandwidth correction for ms=%s spw=%s nchan=%s: %s',
+                                             group_key[0], group_key[1], nchan_sel, exc)
+                                    bw_corr_factor = 1.0
+                                group_sigma *= bw_corr_factor
+                                if self.gridder == 'mosaic':
+                                    source_matches = [f.source.name for f in ms.fields
+                                                      if (utils.dequote(f.name) == utils.dequote(self.repr_field) and 'TARGET' in f.intents)]
+                                    if source_matches:
+                                        source_name = source_matches[0]
+                                        if source_name.isdigit():
+                                            source_name = '"{}"'.format(source_name)
+                                        diameter = np.median([a.diameter for a in ms.antennas])
+                                        overlap_factor = mosaicoverlap.mosaicOverlapFactorMS(ms, source_name, group_key[1], diameter)
+                                        group_sigma /= overlap_factor
+                                robust_sens_terms.append(group_sigma)
+
                             if robust_sens_terms:
                                 sensitivity = 1.0 / np.sqrt(np.sum(1.0 / np.array(robust_sens_terms) ** 2))
                                 if total_bandwidth_hz > 0.0 and selection_sum_bw_hz > total_bandwidth_hz:
@@ -614,8 +653,8 @@ class FastImagePrecheckBackend:
         timings = {}
 
         t0 = time.perf_counter()
-        rep_spw_spec, rep_samples, rep_bw_hz = self._sample_specs_for_mode('repBW')
-        agg_spw_spec, agg_samples, agg_bw_hz = self._sample_specs_for_mode('aggBW')
+        rep_spw_spec, rep_samples, rep_bw_hz, rep_group_meta = self._sample_specs_for_mode('repBW')
+        agg_spw_spec, agg_samples, agg_bw_hz, agg_group_meta = self._sample_specs_for_mode('aggBW')
         timings['sample_build'] = time.perf_counter() - t0
 
         t_seed = time.perf_counter()
@@ -626,7 +665,7 @@ class FastImagePrecheckBackend:
         seed_rep_results = self._evaluate_mode('repBW', rep_samples, cell, imsize, rep_bw_hz,
                                                _create_briggsbw_grid(imsize[0], imsize[1], self.repr_frac_bw)
                                                if self.repr_frac_bw > 0.0 else 1.0,
-                                               seed_sample)
+                                               seed_sample, selection_group_meta=rep_group_meta)
 
         mode_results = {'repBW': {}, 'aggBW': {}}
         geometry_by_robust = {}
@@ -660,10 +699,10 @@ class FastImagePrecheckBackend:
                 if self.repr_frac_bw > 0.0 else 1.0
             mode_results['repBW'][robust] = self._evaluate_mode('repBW', rep_samples, robust_cell, robust_imsize,
                                                                 rep_bw_hz, rep_corr_factor_grid, seed_sample,
-                                                                robust_values=[robust])[robust]
+                                                                robust_values=[robust], selection_group_meta=rep_group_meta)[robust]
             mode_results['aggBW'][robust] = self._evaluate_mode('aggBW', agg_samples, robust_cell, robust_imsize,
                                                                 agg_bw_hz, 1.0, seed_sample,
-                                                                robust_values=[robust])[robust]
+                                                                robust_values=[robust], selection_group_meta=agg_group_meta)[robust]
 
         timings['evaluate'] = time.perf_counter() - t1
 
