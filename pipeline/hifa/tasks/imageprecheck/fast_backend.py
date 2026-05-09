@@ -255,29 +255,6 @@ class FastImagePrecheckBackend:
 
         return None
 
-    def _mosaic_overlap_factor(self, ms, field_id, spw):
-        field_obj = next((f for f in ms.fields if f.id == field_id and 'TARGET' in f.intents), None)
-        if field_obj is None:
-            source_name = None
-        else:
-            source_name = field_obj.source.name
-
-        if not source_name:
-            source_matches = [f.source.name for f in ms.fields
-                              if (utils.dequote(f.name) == utils.dequote(self.repr_field) and 'TARGET' in f.intents)]
-            if source_matches:
-                source_name = source_matches[0]
-
-        if not source_name:
-            LOG.info('No mosaic source match for %s field_id %s spw %s; leaving overlap factor at unity',
-                     os.path.basename(ms.name), field_id, spw)
-            return 1.0
-
-        if source_name.isdigit():
-            source_name = '"{}"'.format(source_name)
-        diameter = np.median([a.diameter for a in ms.antennas])
-        return mosaicoverlap.mosaicOverlapFactorMS(ms, source_name, spw, diameter)
-
     def _create_temp_psf_file(self, seed_sample, cell, psf_imsize):
         temp_dir = tempfile.mkdtemp(prefix='imageprecheck_psf_', dir=os.getcwd())
         temp_psf_file = os.path.join(temp_dir, 'scratch.psf')
@@ -520,8 +497,18 @@ class FastImagePrecheckBackend:
 
                         if self.gridder == 'mosaic':
                             ms = self._ms_by_name[sample.msname]
-                            overlap_factor = self._mosaic_overlap_factor(ms, sample.field_id, sample.virtual_spw)
-                            nat_sens_scaled /= overlap_factor
+                            source_matches = [f.source.name for f in ms.fields
+                                              if (utils.dequote(f.name) == utils.dequote(self.repr_field) and 'TARGET' in f.intents)]
+                            if source_matches:
+                                source_name = source_matches[0]
+                                if source_name.isdigit():
+                                    source_name = '"{}"'.format(source_name)
+                                diameter = np.median([a.diameter for a in ms.antennas])
+                                overlap_factor = mosaicoverlap.mosaicOverlapFactorMS(ms, source_name, sample.virtual_spw, diameter)
+                                nat_sens_scaled /= overlap_factor
+                            else:
+                                LOG.info('No mosaic source match for %s field %s; leaving overlap factor at unity',
+                                         os.path.basename(sample.msname), self.repr_field)
 
                         sample_cache.append({
                             'sample': sample,
