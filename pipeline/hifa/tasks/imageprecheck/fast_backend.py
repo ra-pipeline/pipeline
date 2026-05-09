@@ -28,6 +28,8 @@ class SampleSpec:
     virtual_spw: int
     real_spw: int
     channel_index: int
+    selection_chanrange: str
+    selection_nchan: int
     channel_width_hz: float
     chunk_bw_hz: float
     center_freq_hz: float
@@ -360,6 +362,8 @@ class FastImagePrecheckBackend:
                             virtual_spw=int(spw_id),
                             real_spw=int(real_spw),
                             channel_index=int(chan_index),
+                            selection_chanrange=str(chan_index),
+                            selection_nchan=1,
                             channel_width_hz=float(channel_widths[chan_index]),
                             chunk_bw_hz=float(self.repr_bandwidth_hz),
                             center_freq_hz=float(channel_centers[chan_index]),
@@ -403,7 +407,13 @@ class FastImagePrecheckBackend:
                             continue
 
                         chunk_bw_hz = run_width / len(dedup)
-                        for chan_index in dedup:
+                        for i, chan_index in enumerate(dedup):
+                            left = int(math.floor(sample_edges[i]))
+                            right = int(math.ceil(sample_edges[i + 1])) - 1
+                            left = max(0, min(len(run) - 1, left))
+                            right = max(0, min(len(run) - 1, right))
+                            selection_start = run[left]
+                            selection_stop = run[right]
                             sample_specs.append(
                                 SampleSpec(
                                     msname=msname,
@@ -411,6 +421,8 @@ class FastImagePrecheckBackend:
                                     virtual_spw=int(spw_id),
                                     real_spw=int(real_spw),
                                     channel_index=int(chan_index),
+                                    selection_chanrange=f'{selection_start}~{selection_stop}',
+                                    selection_nchan=int(selection_stop - selection_start + 1),
                                     channel_width_hz=float(channel_widths[chan_index]),
                                     chunk_bw_hz=float(chunk_bw_hz),
                                     center_freq_hz=float(channel_centers[chan_index]),
@@ -500,15 +512,30 @@ class FastImagePrecheckBackend:
                                            ny=imsize[1])
                         imTool.weight(type='uniform')
                         gwgts = np.squeeze(np.asarray(imTool.getweightgrid(), dtype=float))
+                        sens_spw = f'{sample.real_spw}:{sample.selection_chanrange}' if mode == 'aggBW' else f'{sample.real_spw}:{sample.channel_index}'
                         imTool.weight(type='natural')
                         nat_sens = float(imTool.apparentsens()[1])
+                        if mode == 'aggBW' and sample.selection_chanrange != str(sample.channel_index):
+                            with casa_tools.SelectvisReader(sample.msname,
+                                                            spw=sens_spw,
+                                                            field=sample.field_id,
+                                                            scan=sample.scanids,
+                                                            taql=sample.taql) as sensTool:
+                                sensTool.defineimage(mode='mfs',
+                                                     spw=sample.real_spw,
+                                                     cellx=cell[0],
+                                                     celly=cell[0],
+                                                     nx=imsize[0],
+                                                     ny=imsize[1])
+                                sensTool.weight(type='natural')
+                                nat_sens = float(sensTool.apparentsens()[1])
                         if not np.isfinite(nat_sens) or nat_sens <= 0.0:
                             continue
 
                         bw_scale = sample.chunk_bw_hz / sample.channel_width_hz if sample.channel_width_hz > 0 else 1.0
                         gwgts_scaled = gwgts * bw_scale
-                        nat_sens_scaled = nat_sens * math.sqrt(sample.channel_width_hz / sample.chunk_bw_hz) if sample.chunk_bw_hz > 0 else nat_sens
-                        nchan_equiv = max(1, int(round(sample.chunk_bw_hz / sample.channel_width_hz))) if sample.channel_width_hz > 0 else 1
+                        nchan_equiv = sample.selection_nchan if mode == 'aggBW' else (
+                            max(1, int(round(sample.chunk_bw_hz / sample.channel_width_hz))) if sample.channel_width_hz > 0 else 1)
                         bw_corr_factor = 1.0
                         try:
                             bw_corr_factor, _, _, _ = self.image_heuristics.get_bw_corr_factor(
@@ -516,7 +543,11 @@ class FastImagePrecheckBackend:
                         except Exception as exc:
                             LOG.info('Could not determine bandwidth correction for ms=%s spw=%s nchan=%s: %s',
                                      os.path.basename(sample.msname), sample.virtual_spw, nchan_equiv, exc)
-                        nat_sens_scaled *= bw_corr_factor
+                        if mode == 'aggBW':
+                            nat_sens_scaled = nat_sens * bw_corr_factor
+                        else:
+                            nat_sens_scaled = nat_sens * math.sqrt(sample.channel_width_hz / sample.chunk_bw_hz) if sample.chunk_bw_hz > 0 else nat_sens
+                            nat_sens_scaled *= bw_corr_factor
 
                         if self.gridder == 'mosaic':
                             ms = self._ms_by_name[sample.msname]
