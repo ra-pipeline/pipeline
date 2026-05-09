@@ -80,8 +80,10 @@ def _make_psf_from_weights(total_weights: np.ndarray) -> np.ndarray:
 
 
 def _create_briggsbw_grid(npix_x: int, npix_y: int, frac_bw: float) -> np.ndarray:
-    uvdist_grid = np.sqrt(np.add.outer(np.arange(-(npix_x / 2.0), (npix_x / 2.0), 1.0) ** 2,
-                                       np.arange(-(npix_y / 2.0), (npix_y / 2.0), 1.0) ** 2))
+    x = np.arange(-(npix_x / 2.0), (npix_x / 2.0), 1.0)
+    y = np.arange(-(npix_y / 2.0), (npix_y / 2.0), 1.0)
+    xx, yy = np.meshgrid(x, y, indexing='xy')
+    uvdist_grid = np.sqrt(xx**2 + yy**2)
     r_nu_grid = frac_bw * uvdist_grid
     corr_factor_grid = r_nu_grid + 0.5
     transition_grid = (4.0 - r_nu_grid) / (4.0 - 2.0 * r_nu_grid)
@@ -422,13 +424,16 @@ class FastImagePrecheckBackend:
         cellv = qa.convert(rtn[2], 'arcsec')['value']
         cellv /= (0.5 * 5.0)
         cell = ['%.2garcsec' % cellv]
-        imsize = self.image_heuristics.imsize(
+        imsize = self._beam_imsize(cell)
+        return seed_sample, cell, imsize
+
+    def _beam_imsize(self, cell):
+        return self.image_heuristics.imsize(
             self.field_ids,
             cell,
             self.primary_beam_size,
             centreonly=False,
             intent='TARGET')
-        return seed_sample, cell, imsize
 
     def _geometry_from_beam(self, beam):
         cell = self.image_heuristics.cell(beam)
@@ -436,12 +441,7 @@ class FastImagePrecheckBackend:
             return None, None
 
         try:
-            imsize = self.image_heuristics.imsize(
-                self.field_ids,
-                cell,
-                self.primary_beam_size,
-                centreonly=False,
-                intent='TARGET')
+            imsize = self._beam_imsize(cell)
         except Exception as exc:
             LOG.info('Could not derive imsize from beam %s: %s', beam, exc)
             return None, None
@@ -456,7 +456,7 @@ class FastImagePrecheckBackend:
         total_bandwidth_hz = float(selection_bw_hz or 0.0)
         sample_cache = []
         timing_start = time.perf_counter()
-        selection_sum_bw_hz = 0.0
+        selection_sum_bw_by_ms = {}
         temp_dir = None
         temp_psf_file = None
 
@@ -516,7 +516,8 @@ class FastImagePrecheckBackend:
                             'gwgts': gwgts_scaled,
                             'nat_sens': nat_sens_scaled,
                         })
-                        selection_sum_bw_hz += float(sample.chunk_bw_hz)
+                        ms_key = os.path.basename(sample.msname)
+                        selection_sum_bw_by_ms[ms_key] = selection_sum_bw_by_ms.get(ms_key, 0.0) + float(sample.chunk_bw_hz)
                 except Exception as exc:
                     LOG.info('Skipping sample ms=%s spw=%s chan=%s: %s',
                              os.path.basename(sample.msname), sample.real_spw, sample.channel_index, exc)
@@ -539,6 +540,16 @@ class FastImagePrecheckBackend:
                 raise RuntimeError(f'Unable to build combined weight grid for {mode}')
 
             combined_nat_sens = 1.0 / np.sqrt(np.sum(1.0 / np.array(combined_nat_sens_terms) ** 2))
+            selection_sum_bw_hz = max(selection_sum_bw_by_ms.values(), default=0.0)
+            local_corr_factor_grid = corr_factor_grid
+            if isinstance(local_corr_factor_grid, np.ndarray) and local_corr_factor_grid.shape != combined_gwgts.shape:
+                LOG.info('Rebuilding correction grid for %s to match weight-grid shape %s (was %s)',
+                         mode, combined_gwgts.shape, local_corr_factor_grid.shape)
+                if mode == 'repBW' and self.repr_frac_bw > 0.0:
+                    local_corr_factor_grid = _create_briggsbw_grid(
+                        combined_gwgts.shape[1], combined_gwgts.shape[0], self.repr_frac_bw)
+                else:
+                    local_corr_factor_grid = 1.0
 
             if robust_values is None:
                 robust_values = self.robust_values
@@ -546,7 +557,7 @@ class FastImagePrecheckBackend:
             results = {}
             for robust in robust_values:
                 t0 = time.perf_counter()
-                total_weights, sens_factor = _briggs_weight(combined_gwgts, robust, corr_factor_grid)
+                total_weights, sens_factor = _briggs_weight(combined_gwgts, robust, local_corr_factor_grid)
 
                 if total_weights is None or sens_factor is None:
                     beam = 'invalid'
