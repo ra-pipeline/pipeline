@@ -269,11 +269,22 @@ class FastImagePrecheckBackend:
 
         return temp_dir, temp_psf_file
 
-    def _fit_psf(self, psf_array, temp_psf_file):
+    def _fit_psf(self, seed_sample, psf_array, cell, imsize, temp_psf_file):
         try:
-            with casa_tools.ImageReader(temp_psf_file) as image_tool:
-                image_tool.putregion(pixels=psf_array)
-            fit_result = casa_tools.imager.fitpsf(psf=temp_psf_file)
+            with casa_tools.SelectvisReader(seed_sample.msname,
+                                            spw=f'{seed_sample.real_spw}:{seed_sample.channel_index}',
+                                            field=seed_sample.field_id,
+                                            scan=seed_sample.scanids,
+                                            taql=seed_sample.taql) as imTool:
+                imTool.defineimage(mode='mfs',
+                                   spw=seed_sample.real_spw,
+                                   cellx=cell[0],
+                                   celly=cell[0],
+                                   nx=imsize[0],
+                                   ny=imsize[1])
+                with casa_tools.ImageReader(temp_psf_file) as image_tool:
+                    image_tool.putregion(pixels=psf_array)
+                fit_result = imTool.fitpsf(psf=temp_psf_file)
             return {
                 'major': fit_result[1],
                 'minor': fit_result[2],
@@ -416,7 +427,8 @@ class FastImagePrecheckBackend:
             intent='TARGET')
         return seed_sample, cell, imsize
 
-    def _evaluate_mode(self, mode, sample_specs, cell, imsize, selection_bw_hz, corr_factor_grid, temp_psf_file):
+    def _evaluate_mode(self, mode, sample_specs, cell, imsize, selection_bw_hz, corr_factor_grid,
+                       temp_psf_file, seed_sample):
         if not sample_specs:
             raise RuntimeError(f'No valid samples available for {mode}')
 
@@ -498,7 +510,7 @@ class FastImagePrecheckBackend:
                 sens_bw = None
             else:
                 psf = _make_psf_from_weights(total_weights)
-                beam = self._fit_psf(psf, temp_psf_file)
+                beam = self._fit_psf(seed_sample, psf, cell, imsize, temp_psf_file)
                 if beam == 'invalid':
                     sensitivity = None
                     sens_bw = None
@@ -543,13 +555,11 @@ class FastImagePrecheckBackend:
 
             t1 = time.perf_counter()
             mode_results['repBW'] = self._evaluate_mode('repBW', rep_samples, cell, imsize, rep_bw_hz,
-                                                        rep_corr_factor_grid, temp_psf_file)
+                                                        rep_corr_factor_grid, temp_psf_file, seed_sample)
             mode_results['aggBW'] = self._evaluate_mode('aggBW', agg_samples, cell, imsize, agg_bw_hz,
-                                                        1.0, temp_psf_file)
+                                                        1.0, temp_psf_file, seed_sample)
             timings['evaluate'] = time.perf_counter() - t1
         finally:
-            if temp_psf_file and os.path.isdir(temp_psf_file):
-                shutil.rmtree(temp_psf_file, ignore_errors=True)
             if temp_dir and os.path.isdir(temp_dir):
                 shutil.rmtree(temp_dir, ignore_errors=True)
 
