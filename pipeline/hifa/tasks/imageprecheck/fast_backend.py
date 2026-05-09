@@ -376,11 +376,11 @@ class FastImagePrecheckBackend:
             intent='TARGET')
         return seed_sample, cell, imsize
 
-    def _evaluate_mode(self, mode, sample_specs, cell, imsize):
+    def _evaluate_mode(self, mode, sample_specs, cell, imsize, selection_bw_hz):
         if not sample_specs:
             raise RuntimeError(f'No valid samples available for {mode}')
 
-        total_bandwidth_hz = float(np.sum([s.chunk_bw_hz for s in sample_specs]))
+        total_bandwidth_hz = float(selection_bw_hz or 0.0)
         sample_cache = []
         timing_start = time.perf_counter()
 
@@ -491,8 +491,8 @@ class FastImagePrecheckBackend:
         timings['seed'] = time.perf_counter() - t_seed
 
         t1 = time.perf_counter()
-        mode_results['repBW'] = self._evaluate_mode('repBW', rep_samples, cell, imsize)
-        mode_results['aggBW'] = self._evaluate_mode('aggBW', agg_samples, cell, imsize)
+        mode_results['repBW'] = self._evaluate_mode('repBW', rep_samples, cell, imsize, rep_bw_hz)
+        mode_results['aggBW'] = self._evaluate_mode('aggBW', agg_samples, cell, imsize, agg_bw_hz)
         timings['evaluate'] = time.perf_counter() - t1
 
         LOG.info('imageprecheck backend timings: sample build %.3fs, evaluation %.3fs',
