@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from types import SimpleNamespace
 import os
 import math
+import shutil
+import tempfile
 import time
 
 import numpy as np
@@ -16,7 +18,7 @@ from pipeline.hif.heuristics import mosaicoverlap
 
 LOG = infrastructure.get_logger(__name__)
 
-SAMPLE_SPACING_HZ = 200e6
+SAMPLE_SPACING_HZ = 500e6
 
 
 @dataclass(frozen=True)
@@ -68,70 +70,23 @@ def _contiguous_runs(indices: list[int]) -> list[list[int]]:
 
 
 def _make_psf_from_weights(total_weights: np.ndarray) -> np.ndarray:
-    # Keep the proxy strictly 2-D; the previous construction added a
-    # singleton axis and broke the beam fit.
-    psf = np.abs(np.fft.fftshift(np.fft.fft2(np.fft.fftshift(total_weights))))
-    psf = np.squeeze(psf)
+    # Match the prototype behavior here so CASA fitpsf sees the same
+    # singleton-axis array shape it was tuned against.
+    psf = np.abs(np.array([np.fft.fftshift(np.fft.fft2(np.fft.fftshift(total_weights))).T]).T)
     peak = np.max(psf)
     if peak > 0:
         psf /= peak
     return psf
 
 
-def _fit_beam_from_psf(psf: np.ndarray, cell_arcsec: float) -> dict | str:
-    psf = np.squeeze(np.asarray(psf, dtype=float))
-    if psf.ndim != 2:
-        return 'invalid'
-    peak_index = np.unravel_index(np.argmax(psf), psf.shape)
-    peak = float(psf[peak_index])
-    if not np.isfinite(peak) or peak <= 0.0:
-        return 'invalid'
-
-    ny, nx = psf.shape
-    x = np.arange(nx, dtype=float) - float(peak_index[1])
-    y = np.arange(ny, dtype=float) - float(peak_index[0])
-    xx, yy = np.meshgrid(x, y)
-    rr2 = xx**2 + yy**2
-
-    # Fit the central lobe only. A looser threshold is used first and then
-    # relaxed if the fit is underconstrained.
-    for threshold, radius_scale in ((0.2, 0.12), (0.1, 0.18), (0.05, 0.24)):
-        mask = (psf > threshold * peak) & (rr2 <= (radius_scale * min(nx, ny))**2)
-        if np.count_nonzero(mask) < 9:
-            continue
-
-        z = np.clip(psf[mask] / peak, 1e-12, 1.0)
-        b = -np.log(z)
-        a = np.column_stack([xx[mask] ** 2, xx[mask] * yy[mask], yy[mask] ** 2])
-
-        try:
-            coeff, _, _, _ = np.linalg.lstsq(a, b, rcond=None)
-            inv_cov = np.array([[2.0 * coeff[0], coeff[1]],
-                                [coeff[1], 2.0 * coeff[2]]], dtype=float)
-            cov = np.linalg.inv(inv_cov)
-            evals, evecs = np.linalg.eigh(cov)
-            if np.any(evals <= 0.0):
-                continue
-
-            order = np.argsort(evals)[::-1]
-            major_sigma_pix = float(np.sqrt(evals[order[0]]))
-            minor_sigma_pix = float(np.sqrt(evals[order[1]]))
-            major_vec = evecs[:, order[0]]
-            pa_deg = float(np.degrees(np.arctan2(major_vec[1], major_vec[0])))
-            fwhm = 2.3548200450309493
-            major_arcsec = major_sigma_pix * fwhm * cell_arcsec
-            minor_arcsec = minor_sigma_pix * fwhm * cell_arcsec
-            if major_arcsec < minor_arcsec:
-                major_arcsec, minor_arcsec = minor_arcsec, major_arcsec
-            return {
-                'major': {'value': major_arcsec, 'unit': 'arcsec'},
-                'minor': {'value': minor_arcsec, 'unit': 'arcsec'},
-                'positionangle': {'value': pa_deg, 'unit': 'deg'},
-            }
-        except Exception:
-            continue
-
-    return 'invalid'
+def _create_briggsbw_grid(npix_x: int, npix_y: int, frac_bw: float) -> np.ndarray:
+    uvdist_grid = np.sqrt(np.add.outer(np.arange(-(npix_x / 2.0), (npix_x / 2.0), 1.0) ** 2,
+                                       np.arange(-(npix_y / 2.0), (npix_y / 2.0), 1.0) ** 2))
+    r_nu_grid = frac_bw * uvdist_grid
+    corr_factor_grid = r_nu_grid + 0.5
+    transition_grid = (4.0 - r_nu_grid) / (4.0 - 2.0 * r_nu_grid)
+    corr_factor_grid[corr_factor_grid < 1.5] = transition_grid[corr_factor_grid < 1.5]
+    return corr_factor_grid
 
 
 def _briggs_weight(grid: np.ndarray, robust: float, corr_factor_grid=1.0):
@@ -172,6 +127,8 @@ class FastImagePrecheckBackend:
             primary_beam_size,
             gridder,
             field_ids,
+            repr_bandwidth_hz,
+            repr_frac_bw,
             single_continuum=False,
             sample_spacing_hz=SAMPLE_SPACING_HZ):
         self.inputs = inputs
@@ -186,6 +143,8 @@ class FastImagePrecheckBackend:
         self.primary_beam_size = primary_beam_size
         self.gridder = gridder
         self.field_ids = field_ids
+        self.repr_bandwidth_hz = float(repr_bandwidth_hz)
+        self.repr_frac_bw = float(repr_frac_bw)
         self.single_continuum = single_continuum
         self.sample_spacing_hz = float(sample_spacing_hz)
 
@@ -205,9 +164,9 @@ class FastImagePrecheckBackend:
 
     def _mode_selection_inputs(self, mode):
         if mode == 'repBW':
-            spw = str(self.repr_spw)
-        else:
-            spw = self.cont_spw
+            return str(self.repr_spw), {}, self.repr_bandwidth_hz
+
+        spw = self.cont_spw
 
         # Use existing PL cont.dat / linesfile handling if present.
         spwsel_lsrk = {}
@@ -265,10 +224,64 @@ class FastImagePrecheckBackend:
             for chan in spw_obj.channels
         ], dtype=float)
         channel_widths = np.array([
-            float(chan.getWidth().convert_to(measures.FrequencyUnits.HERTZ).value)
+            abs(float(chan.getWidth().convert_to(measures.FrequencyUnits.HERTZ).value))
             for chan in spw_obj.channels
         ], dtype=float)
         return spw_obj, channel_centers, channel_widths
+
+    def _representative_channel(self, channel_flags, nchan):
+        if nchan <= 0:
+            return None
+
+        center = int(nchan / 2)
+        if len(channel_flags) == 0:
+            return center
+
+        if not channel_flags[center]:
+            return center
+
+        for offset in range(1, nchan):
+            left = center - offset
+            right = center + offset
+            if left >= 0 and not channel_flags[left]:
+                return left
+            if right < nchan and not channel_flags[right]:
+                return right
+
+        return None
+
+    def _create_temp_psf_file(self, seed_sample, cell, imsize):
+        temp_dir = tempfile.mkdtemp(prefix='imageprecheck_psf_', dir=os.getcwd())
+        temp_psf_file = os.path.join(temp_dir, 'scratch.psf')
+
+        with casa_tools.SelectvisReader(seed_sample.msname,
+                                        spw=f'{seed_sample.real_spw}:{seed_sample.channel_index}',
+                                        field=seed_sample.field_id,
+                                        scan=seed_sample.scanids,
+                                        taql=seed_sample.taql) as imTool:
+            imTool.defineimage(mode='mfs',
+                               spw=seed_sample.real_spw,
+                               cellx=cell[0],
+                               celly=cell[0],
+                               nx=imsize[0],
+                               ny=imsize[1])
+            imTool.makeimage(type='psf', image=temp_psf_file)
+
+        return temp_dir, temp_psf_file
+
+    def _fit_psf(self, psf_array, temp_psf_file):
+        try:
+            with casa_tools.ImageReader(temp_psf_file) as image_tool:
+                image_tool.putregion(pixels=psf_array)
+            fit_result = casa_tools.imager.fitpsf(psf=temp_psf_file)
+            return {
+                'major': fit_result[1],
+                'minor': fit_result[2],
+                'positionangle': fit_result[3],
+            }
+        except Exception as exc:
+            LOG.info('PSF fit failed for %s: %s', temp_psf_file, exc)
+            return 'invalid'
 
     def _sample_specs_for_mode(self, mode):
         spw_spec, topo_dict, selected_bw_hz = self._mode_selection_inputs(mode)
@@ -296,6 +309,27 @@ class FastImagePrecheckBackend:
 
                 spw_obj, channel_centers, channel_widths = self._channel_info(ms, real_spw)
                 channel_flags = self.image_heuristics.get_channel_flags(msname, field_id, spw_id)
+
+                if mode == 'repBW':
+                    chan_index = self._representative_channel(channel_flags, spw_obj.num_channels)
+                    if chan_index is None:
+                        continue
+                    sample_specs.append(
+                        SampleSpec(
+                            msname=msname,
+                            field_id=int(field_id),
+                            virtual_spw=int(spw_id),
+                            real_spw=int(real_spw),
+                            channel_index=int(chan_index),
+                            channel_width_hz=float(channel_widths[chan_index]),
+                            chunk_bw_hz=float(self.repr_bandwidth_hz),
+                            center_freq_hz=float(channel_centers[chan_index]),
+                            scanids=scanids,
+                            taql=taql,
+                        )
+                    )
+                    continue
+
                 selection = topo_dict.get(os.path.basename(msname), {}).get(spw_id, '')
                 ranges = _parse_channel_ranges(selection, spw_obj.num_channels)
 
@@ -382,7 +416,7 @@ class FastImagePrecheckBackend:
             intent='TARGET')
         return seed_sample, cell, imsize
 
-    def _evaluate_mode(self, mode, sample_specs, cell, imsize, selection_bw_hz):
+    def _evaluate_mode(self, mode, sample_specs, cell, imsize, selection_bw_hz, corr_factor_grid, temp_psf_file):
         if not sample_specs:
             raise RuntimeError(f'No valid samples available for {mode}')
 
@@ -405,35 +439,39 @@ class FastImagePrecheckBackend:
                                        ny=imsize[1])
                     imTool.weight(type='uniform')
                     gwgts = np.squeeze(np.asarray(imTool.getweightgrid(), dtype=float))
-                    if gwgts.ndim != 2:
-                        gwgts = np.squeeze(gwgts)
                     imTool.weight(type='natural')
                     nat_sens = float(imTool.apparentsens()[1])
+                    if not np.isfinite(nat_sens) or nat_sens <= 0.0:
+                        continue
+
+                    bw_scale = sample.chunk_bw_hz / sample.channel_width_hz if sample.channel_width_hz > 0 else 1.0
+                    gwgts_scaled = gwgts * bw_scale
+                    nat_sens_scaled = nat_sens * math.sqrt(sample.channel_width_hz / sample.chunk_bw_hz) if sample.chunk_bw_hz > 0 else nat_sens
+
+                    if self.gridder == 'mosaic':
+                        ms = self._ms_by_name[sample.msname]
+                        source_matches = [f.source.name for f in ms.fields
+                                          if (utils.dequote(f.name) == utils.dequote(self.repr_field) and 'TARGET' in f.intents)]
+                        if source_matches:
+                            source_name = source_matches[0]
+                            if source_name.isdigit():
+                                source_name = '"{}"'.format(source_name)
+                            diameter = np.median([a.diameter for a in ms.antennas])
+                            overlap_factor = mosaicoverlap.mosaicOverlapFactorMS(ms, source_name, sample.virtual_spw, diameter)
+                            nat_sens_scaled /= overlap_factor
+                        else:
+                            LOG.info('No mosaic source match for %s field %s; leaving overlap factor at unity',
+                                     os.path.basename(sample.msname), self.repr_field)
+
+                    sample_cache.append({
+                        'sample': sample,
+                        'gwgts': gwgts_scaled,
+                        'nat_sens': nat_sens_scaled,
+                    })
             except Exception as exc:
                 LOG.info('Skipping sample ms=%s spw=%s chan=%s: %s',
                          os.path.basename(sample.msname), sample.real_spw, sample.channel_index, exc)
                 continue
-
-            if not np.isfinite(nat_sens) or nat_sens <= 0.0:
-                continue
-
-            bw_scale = sample.chunk_bw_hz / sample.channel_width_hz if sample.channel_width_hz > 0 else 1.0
-            gwgts_scaled = gwgts * bw_scale
-            nat_sens_scaled = nat_sens * math.sqrt(sample.channel_width_hz / sample.chunk_bw_hz) if sample.chunk_bw_hz > 0 else nat_sens
-            if self.gridder == 'mosaic':
-                ms = self._ms_by_name[sample.msname]
-                source_name = [f.source.name for f in ms.fields
-                               if (utils.dequote(f.name) == utils.dequote(self.repr_field) and 'TARGET' in f.intents)][0]
-                if source_name.isdigit():
-                    source_name = '"{}"'.format(source_name)
-                diameter = np.median([a.diameter for a in ms.antennas])
-                overlap_factor = mosaicoverlap.mosaicOverlapFactorMS(ms, source_name, sample.virtual_spw, diameter)
-                nat_sens_scaled /= overlap_factor
-            sample_cache.append({
-                'sample': sample,
-                'gwgts': gwgts_scaled,
-                'nat_sens': nat_sens_scaled,
-            })
 
         build_time = time.perf_counter() - timing_start
         LOG.info('imageprecheck %s cached %d sparse samples in %.3fs', mode, len(sample_cache), build_time)
@@ -448,7 +486,7 @@ class FastImagePrecheckBackend:
             sens_terms = []
             for entry in sample_cache:
                 gwgts = entry['gwgts']
-                adjusted_weights, sens_factor = _briggs_weight(gwgts, robust)
+                adjusted_weights, sens_factor = _briggs_weight(gwgts, robust, corr_factor_grid)
                 if adjusted_weights is None:
                     continue
                 total_weights = adjusted_weights if total_weights is None else total_weights + adjusted_weights
@@ -460,7 +498,7 @@ class FastImagePrecheckBackend:
                 sens_bw = None
             else:
                 psf = _make_psf_from_weights(total_weights)
-                beam = _fit_beam_from_psf(psf, float(casa_tools.quanta.convert(cell[0], 'arcsec')['value']))
+                beam = self._fit_psf(psf, temp_psf_file)
                 if beam == 'invalid':
                     sensitivity = None
                     sens_bw = None
@@ -496,10 +534,24 @@ class FastImagePrecheckBackend:
         seed_sample, cell, imsize = self._seed_cell_and_imsize(rep_samples or agg_samples)
         timings['seed'] = time.perf_counter() - t_seed
 
-        t1 = time.perf_counter()
-        mode_results['repBW'] = self._evaluate_mode('repBW', rep_samples, cell, imsize, rep_bw_hz)
-        mode_results['aggBW'] = self._evaluate_mode('aggBW', agg_samples, cell, imsize, agg_bw_hz)
-        timings['evaluate'] = time.perf_counter() - t1
+        temp_dir = None
+        temp_psf_file = None
+        try:
+            temp_dir, temp_psf_file = self._create_temp_psf_file(seed_sample, cell, imsize)
+            rep_corr_factor_grid = _create_briggsbw_grid(imsize[0], imsize[1], self.repr_frac_bw) \
+                if self.repr_frac_bw > 0.0 else 1.0
+
+            t1 = time.perf_counter()
+            mode_results['repBW'] = self._evaluate_mode('repBW', rep_samples, cell, imsize, rep_bw_hz,
+                                                        rep_corr_factor_grid, temp_psf_file)
+            mode_results['aggBW'] = self._evaluate_mode('aggBW', agg_samples, cell, imsize, agg_bw_hz,
+                                                        1.0, temp_psf_file)
+            timings['evaluate'] = time.perf_counter() - t1
+        finally:
+            if temp_psf_file and os.path.isdir(temp_psf_file):
+                shutil.rmtree(temp_psf_file, ignore_errors=True)
+            if temp_dir and os.path.isdir(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
 
         LOG.info('imageprecheck backend timings: sample build %.3fs, evaluation %.3fs',
                  timings['sample_build'], timings['evaluate'])

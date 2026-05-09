@@ -1,4 +1,5 @@
 import copy
+import os
 
 import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
@@ -65,19 +66,19 @@ class ImagePreCheckResults(basetask.Results):
         """
         # Calculated sensitivities for later stages
         if self.per_spw_cont_sensitivities_all_chan is not None:
-            if 'recalc' in self.per_spw_cont_sensitivities_all_chan:
-                context.per_spw_cont_sensitivities_all_chan = copy.deepcopy(self.per_spw_cont_sensitivities_all_chan)
-                del context.per_spw_cont_sensitivities_all_chan['recalc']
-            else:
-                utils.update_sens_dict(context.per_spw_cont_sensitivities_all_chan, self.per_spw_cont_sensitivities_all_chan)
+            if 'robust' in self.per_spw_cont_sensitivities_all_chan:
+                context.per_spw_cont_sensitivities_all_chan['robust'] = self.per_spw_cont_sensitivities_all_chan['robust']
+            if 'uvtaper' in self.per_spw_cont_sensitivities_all_chan:
+                context.per_spw_cont_sensitivities_all_chan['uvtaper'] = self.per_spw_cont_sensitivities_all_chan['uvtaper']
+            utils.update_sens_dict(context.per_spw_cont_sensitivities_all_chan, self.per_spw_cont_sensitivities_all_chan)
 
         # Calculated beams for later stages
         if self.synthesized_beams is not None:
-            if 'recalc' in self.synthesized_beams:
-                context.synthesized_beams = copy.deepcopy(self.synthesized_beams)
-                del context.synthesized_beams['recalc']
-            else:
-                utils.update_beams_dict(context.synthesized_beams, self.synthesized_beams)
+            if 'robust' in self.synthesized_beams:
+                context.synthesized_beams['robust'] = self.synthesized_beams['robust']
+            if 'uvtaper' in self.synthesized_beams:
+                context.synthesized_beams['uvtaper'] = self.synthesized_beams['uvtaper']
+            utils.update_beams_dict(context.synthesized_beams, self.synthesized_beams)
 
         # Store calculated robust and uvtaper values in the context for later stages
         #
@@ -315,6 +316,8 @@ class ImagePreCheck(basetask.StandardTaskTemplate):
             primary_beam_size=primary_beam_size,
             gridder=gridder,
             field_ids=field_ids,
+            repr_bandwidth_hz=float(cqa.getvalue(cqa.convert(repr_target[2], 'Hz'))[0]),
+            repr_frac_bw=float(image_heuristics.get_fractional_bandwidth(str(repr_spw))),
             single_continuum=single_continuum,
         )
         backend_results = backend.run()
@@ -452,32 +455,12 @@ class ImagePreCheck(basetask.StandardTaskTemplate):
         selected_mode = 'repBW' if reprBW_mode in ['nbin', 'repr_spw'] else 'aggBW'
         selected_result = mode_results[selected_mode][hm_robust]
         selected_spw_key = str(repr_spw) if selected_mode == 'repBW' else cont_spw
-        known_synthesized_beams = {'recalc': True, 'robust': hm_robust, 'uvtaper': default_uvtaper}
+        fast_known_synthesized_beams = {'robust': hm_robust, 'uvtaper': default_uvtaper}
         utils.set_nested_dict(
-            known_synthesized_beams,
+            fast_known_synthesized_beams,
             (repr_field, 'TARGET', selected_spw_key, 'beam'),
             selected_result['beam'])
-        known_per_spw_cont_sensitivities_all_chan = {'recalc': True, 'robust': hm_robust, 'uvtaper': default_uvtaper}
-        utils.set_nested_dict(
-            known_per_spw_cont_sensitivities_all_chan,
-            (os.path.basename(repr_ms.name), repr_field, 'TARGET', selected_spw_key, 'sensitivityAllChans'),
-            '%.3g Jy/beam' % (selected_result['sensitivity'] or 0.0))
-        utils.set_nested_dict(
-            known_per_spw_cont_sensitivities_all_chan,
-            (os.path.basename(repr_ms.name), repr_field, 'TARGET', selected_spw_key, 'nchanUnflagged'),
-            selected_result['sample_count'])
-        utils.set_nested_dict(
-            known_per_spw_cont_sensitivities_all_chan,
-            (os.path.basename(repr_ms.name), repr_field, 'TARGET', selected_spw_key, 'effChanBW'),
-            '%.3g Hz' % (selected_result['selection_bw_hz'] or 0.0))
-        utils.set_nested_dict(
-            known_per_spw_cont_sensitivities_all_chan,
-            (os.path.basename(repr_ms.name), repr_field, 'TARGET', selected_spw_key, 'sensBW'),
-            '%.3g Hz' % (selected_result['sens_bw_hz'] or 0.0))
-        utils.set_nested_dict(
-            known_per_spw_cont_sensitivities_all_chan,
-            (os.path.basename(repr_ms.name), repr_field, 'TARGET', selected_spw_key, 'sensfreq'),
-            backend_results['seed_sample'].center_freq_hz)
+        fast_known_per_spw_cont_sensitivities_all_chan = None
 
         if imaging_mode != 'ALMA-SRDP':
             return ImagePreCheckResults(
@@ -500,8 +483,8 @@ class ImagePreCheck(basetask.StandardTaskTemplate):
                 sensitivity_bandwidth=sensitivity_bandwidth,
                 score=hm_robust_score,
                 single_continuum=single_continuum,
-                per_spw_cont_sensitivities_all_chan=known_per_spw_cont_sensitivities_all_chan,
-                synthesized_beams=known_synthesized_beams,
+                per_spw_cont_sensitivities_all_chan=fast_known_per_spw_cont_sensitivities_all_chan,
+                synthesized_beams=fast_known_synthesized_beams,
                 beamRatios=beamRatios
             )
             # The below is for the ALMA-PI pipeline. userAngResolution)[0] will be 0.0 because desired_angular_resolution is not provided.
@@ -570,7 +553,7 @@ class ImagePreCheck(basetask.StandardTaskTemplate):
                                 robust=hm_robust,
                                 uvtaper=hm_uvtaper,
                                 theoretical_sensitivity=cqa.quantity(sensitivity, 'Jy/beam'),
-                                observed_sensitiviy=None))
+                                observed_sensitivity=None))
                         except Exception as e:
                             sensitivities.append(Sensitivity(
                                 array=array,
@@ -607,16 +590,15 @@ class ImagePreCheck(basetask.StandardTaskTemplate):
                             imsizes[(hm_robust, str(hm_uvtaper),
                                      'aggBW')],
                             'briggs', hm_robust, hm_uvtaper, True, known_per_spw_cont_sensitivities_all_chan, calcsb)
-                        if scale_aggBW_to_repBW and cont_sens_bw_mode == 'repBW':
-                            # Handle scaling to repSPW_BW < repBW <= 0.9 * aggBW case
-                            _bandwidth = repr_target[2]
-                            _sensitivity = cqa.mul(cqa.quantity(sensitivity, 'Jy/beam'),
-                                                   cqa.sqrt(cqa.div(cqa.quantity(sens_bw, 'Hz'), repr_target[2])))
-                        else:
-                            _bandwidth = cqa.quantity(min(sens_bw, num_cont_spw * 1.875e9), 'Hz')
-                            _sensitivity = cqa.quantity(sensitivity, 'Jy/beam')
-
                         for cont_sens_bw_mode in cont_sens_bw_modes:
+                            if scale_aggBW_to_repBW and cont_sens_bw_mode == 'repBW':
+                                # Handle scaling to repSPW_BW < repBW <= 0.9 * aggBW case
+                                _bandwidth = repr_target[2]
+                                _sensitivity = cqa.mul(cqa.quantity(sensitivity, 'Jy/beam'),
+                                                       cqa.sqrt(cqa.div(cqa.quantity(sens_bw, 'Hz'), repr_target[2])))
+                            else:
+                                _bandwidth = cqa.quantity(min(sens_bw, num_cont_spw * 1.875e9), 'Hz')
+                                _sensitivity = cqa.quantity(sensitivity, 'Jy/beam')
                             sensitivities.append(Sensitivity(
                                 array=array,
                                 intent='TARGET',

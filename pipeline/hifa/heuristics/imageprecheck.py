@@ -41,7 +41,7 @@ class ImagePreCheckHeuristics:
             beamArea_1p0 = None
             beamRatio_1p0 = None
 
-        if beam_1p0 is not None:
+        if beam_2p0 is not None:
             beamArea_2p0 = cqa.mul(beam_2p0['minor'], beam_2p0['major'])
             beamRatio_2p0 = cqa.tos(cqa.div(beam_2p0['major'], beam_2p0['minor']), 2)
         else:
