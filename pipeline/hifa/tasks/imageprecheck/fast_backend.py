@@ -551,6 +551,58 @@ class FastImagePrecheckBackend:
             if compute_sensitivity and combined_nat_sens_terms:
                 combined_nat_sens = 1.0 / np.sqrt(np.sum(1.0 / np.array(combined_nat_sens_terms) ** 2))
 
+            agg_combined_nat_sens = None
+            if mode == 'aggBW' and compute_sensitivity:
+                grouped_terms = {}
+                for entry in sample_cache:
+                    sample = entry['sample']
+                    group_key = (os.path.basename(sample.msname), sample.virtual_spw)
+                    grouped_terms.setdefault(group_key, []).append(entry)
+
+                agg_nat_sens_terms = []
+                for group_key, entries in grouped_terms.items():
+                    if not entries:
+                        continue
+                    entries = sorted(entries, key=lambda e: e['sample'].channel_index)
+                    representative_entry = entries[len(entries) // 2]
+                    representative_sample = representative_entry['sample']
+                    group_meta = selection_group_meta.get(group_key, {})
+                    selected_bw_hz = float(group_meta.get('selected_bw_hz', 0.0))
+                    nchan_sel = max(1, int(group_meta.get('selected_nchan', 1)))
+                    ms = self._ms_by_name[representative_sample.msname]
+
+                    if representative_entry['nat_sens'] is None or representative_entry['nat_sens'] <= 0.0:
+                        continue
+
+                    group_sigma = representative_entry['nat_sens']
+                    if selected_bw_hz > 0.0 and representative_sample.chunk_bw_hz > 0.0:
+                        group_sigma *= math.sqrt(representative_sample.chunk_bw_hz / selected_bw_hz)
+
+                    try:
+                        bw_corr_factor, _, _, _ = self.image_heuristics.get_bw_corr_factor(ms, group_key[1], nchan_sel)
+                    except Exception as exc:
+                        LOG.info('Could not determine grouped bandwidth correction for ms=%s spw=%s nchan=%s: %s',
+                                 group_key[0], group_key[1], nchan_sel, exc)
+                        bw_corr_factor = 1.0
+                    group_sigma *= bw_corr_factor
+
+                    if self.gridder == 'mosaic':
+                        source_matches = [f.source.name for f in ms.fields
+                                          if (utils.dequote(f.name) == utils.dequote(self.repr_field) and 'TARGET' in f.intents)]
+                        if source_matches:
+                            source_name = source_matches[0]
+                            if source_name.isdigit():
+                                source_name = '"{}"'.format(source_name)
+                            diameter = np.median([a.diameter for a in ms.antennas])
+                            overlap_factor = mosaicoverlap.mosaicOverlapFactorMS(ms, source_name, group_key[1], diameter)
+                            group_sigma /= overlap_factor
+
+                    if np.isfinite(group_sigma) and group_sigma > 0.0:
+                        agg_nat_sens_terms.append(group_sigma)
+
+                if agg_nat_sens_terms:
+                    agg_combined_nat_sens = 1.0 / np.sqrt(np.sum(1.0 / np.array(agg_nat_sens_terms) ** 2))
+
             psf_imsize = [combined_gwgts.shape[1], combined_gwgts.shape[0]]
             if psf_imsize != imsize:
                 LOG.info('Using actual %s weight-grid shape %s for PSF fitting instead of requested imsize %s',
@@ -586,57 +638,7 @@ class FastImagePrecheckBackend:
                         sens_bw = None
                     else:
                         if mode == 'aggBW' and compute_sensitivity:
-                            grouped_terms = {}
-                            for entry in sample_cache:
-                                sample = entry['sample']
-                                group_key = (os.path.basename(sample.msname), sample.virtual_spw)
-                                grouped_terms.setdefault(group_key, []).append(entry)
-
-                            robust_sens_terms = []
-                            for group_key, entries in grouped_terms.items():
-                                if not entries:
-                                    continue
-                                entries = sorted(entries, key=lambda e: e['sample'].channel_index)
-                                representative_entry = entries[len(entries) // 2]
-                                representative_sample = representative_entry['sample']
-                                group_meta = selection_group_meta.get(group_key, {})
-                                selected_bw_hz = float(group_meta.get('selected_bw_hz', 0.0))
-                                nchan_sel = max(1, int(group_meta.get('selected_nchan', 1)))
-                                ms = self._ms_by_name[representative_sample.msname]
-
-                                if representative_entry['nat_sens'] is None or representative_entry['nat_sens'] <= 0.0:
-                                    continue
-
-                                group_sigma = representative_entry['nat_sens']
-                                if selected_bw_hz > 0.0 and representative_sample.chunk_bw_hz > 0.0:
-                                    group_sigma *= math.sqrt(representative_sample.chunk_bw_hz / selected_bw_hz)
-
-                                _, representative_sens_factor = _briggs_weight(representative_entry['gwgts'], robust, 1.0)
-                                if representative_sens_factor is None:
-                                    continue
-                                group_sigma *= representative_sens_factor
-
-                                try:
-                                    bw_corr_factor, _, _, _ = self.image_heuristics.get_bw_corr_factor(ms, group_key[1], nchan_sel)
-                                except Exception as exc:
-                                    LOG.info('Could not determine grouped bandwidth correction for ms=%s spw=%s nchan=%s: %s',
-                                             group_key[0], group_key[1], nchan_sel, exc)
-                                    bw_corr_factor = 1.0
-                                group_sigma *= bw_corr_factor
-
-                                if self.gridder == 'mosaic':
-                                    source_matches = [f.source.name for f in ms.fields
-                                                      if (utils.dequote(f.name) == utils.dequote(self.repr_field) and 'TARGET' in f.intents)]
-                                    if source_matches:
-                                        source_name = source_matches[0]
-                                        if source_name.isdigit():
-                                            source_name = '"{}"'.format(source_name)
-                                        diameter = np.median([a.diameter for a in ms.antennas])
-                                        overlap_factor = mosaicoverlap.mosaicOverlapFactorMS(ms, source_name, group_key[1], diameter)
-                                        group_sigma /= overlap_factor
-                                robust_sens_terms.append(group_sigma)
-
-                            sensitivity = 1.0 / np.sqrt(np.sum(1.0 / np.array(robust_sens_terms) ** 2)) if robust_sens_terms else None
+                            sensitivity = None if agg_combined_nat_sens is None else agg_combined_nat_sens * sens_factor
                         else:
                             sensitivity = None if not compute_sensitivity else combined_nat_sens * sens_factor
                         sens_bw = total_bandwidth_hz
