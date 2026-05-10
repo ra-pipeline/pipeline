@@ -454,14 +454,13 @@ class FastImagePrecheckBackend:
         return cell, imsize
 
     def _evaluate_mode(self, mode, sample_specs, cell, imsize, selection_bw_hz, corr_factor_grid, seed_sample,
-                       robust_values=None, selection_group_meta=None):
+                       robust_values=None, selection_group_meta=None, compute_sensitivity=True):
         if not sample_specs:
             raise RuntimeError(f'No valid samples available for {mode}')
 
         total_bandwidth_hz = float(selection_bw_hz or 0.0)
         sample_cache = []
         timing_start = time.perf_counter()
-        selection_sum_bw_by_ms = {}
         temp_dir = None
         temp_psf_file = None
         psf_imsize = None
@@ -484,48 +483,47 @@ class FastImagePrecheckBackend:
                                            ny=imsize[1])
                         imTool.weight(type='uniform')
                         gwgts = np.squeeze(np.asarray(imTool.getweightgrid(), dtype=float))
-                        imTool.weight(type='natural')
-                        nat_sens = float(imTool.apparentsens()[1])
-                        if not np.isfinite(nat_sens) or nat_sens <= 0.0:
-                            continue
-
                         bw_scale = sample.chunk_bw_hz / sample.channel_width_hz if sample.channel_width_hz > 0 else 1.0
                         gwgts_scaled = gwgts * bw_scale
-                        nat_sens_scaled = nat_sens * math.sqrt(sample.channel_width_hz / sample.chunk_bw_hz) if sample.chunk_bw_hz > 0 else nat_sens
+                        nat_sens_scaled = None
+                        if compute_sensitivity:
+                            imTool.weight(type='natural')
+                            nat_sens = float(imTool.apparentsens()[1])
+                            if not np.isfinite(nat_sens) or nat_sens <= 0.0:
+                                continue
+                            nat_sens_scaled = nat_sens * math.sqrt(sample.channel_width_hz / sample.chunk_bw_hz) if sample.chunk_bw_hz > 0 else nat_sens
 
-                        if mode != 'aggBW':
-                            nchan_equiv = max(1, int(round(sample.chunk_bw_hz / sample.channel_width_hz))) if sample.channel_width_hz > 0 else 1
-                            try:
-                                bw_corr_factor, _, _, _ = self.image_heuristics.get_bw_corr_factor(
-                                    self._ms_by_name[sample.msname], sample.virtual_spw, nchan_equiv)
-                            except Exception as exc:
-                                LOG.info('Could not determine bandwidth correction factor for ms=%s spw=%s nchan=%s: %s',
-                                         os.path.basename(sample.msname), sample.virtual_spw, nchan_equiv, exc)
-                                bw_corr_factor = 1.0
-                            nat_sens_scaled *= bw_corr_factor
+                            if mode != 'aggBW':
+                                nchan_equiv = max(1, int(round(sample.chunk_bw_hz / sample.channel_width_hz))) if sample.channel_width_hz > 0 else 1
+                                try:
+                                    bw_corr_factor, _, _, _ = self.image_heuristics.get_bw_corr_factor(
+                                        self._ms_by_name[sample.msname], sample.virtual_spw, nchan_equiv)
+                                except Exception as exc:
+                                    LOG.info('Could not determine bandwidth correction factor for ms=%s spw=%s nchan=%s: %s',
+                                             os.path.basename(sample.msname), sample.virtual_spw, nchan_equiv, exc)
+                                    bw_corr_factor = 1.0
+                                nat_sens_scaled *= bw_corr_factor
 
-                        if self.gridder == 'mosaic' and mode != 'aggBW':
-                            ms = self._ms_by_name[sample.msname]
-                            source_matches = [f.source.name for f in ms.fields
-                                              if (utils.dequote(f.name) == utils.dequote(self.repr_field) and 'TARGET' in f.intents)]
-                            if source_matches:
-                                source_name = source_matches[0]
-                                if source_name.isdigit():
-                                    source_name = '"{}"'.format(source_name)
-                                diameter = np.median([a.diameter for a in ms.antennas])
-                                overlap_factor = mosaicoverlap.mosaicOverlapFactorMS(ms, source_name, sample.virtual_spw, diameter)
-                                nat_sens_scaled /= overlap_factor
-                            else:
-                                LOG.info('No mosaic source match for %s field %s; leaving overlap factor at unity',
-                                         os.path.basename(sample.msname), self.repr_field)
+                            if self.gridder == 'mosaic' and mode != 'aggBW':
+                                ms = self._ms_by_name[sample.msname]
+                                source_matches = [f.source.name for f in ms.fields
+                                                  if (utils.dequote(f.name) == utils.dequote(self.repr_field) and 'TARGET' in f.intents)]
+                                if source_matches:
+                                    source_name = source_matches[0]
+                                    if source_name.isdigit():
+                                        source_name = '"{}"'.format(source_name)
+                                    diameter = np.median([a.diameter for a in ms.antennas])
+                                    overlap_factor = mosaicoverlap.mosaicOverlapFactorMS(ms, source_name, sample.virtual_spw, diameter)
+                                    nat_sens_scaled /= overlap_factor
+                                else:
+                                    LOG.info('No mosaic source match for %s field %s; leaving overlap factor at unity',
+                                             os.path.basename(sample.msname), self.repr_field)
 
                         sample_cache.append({
                             'sample': sample,
                             'gwgts': gwgts_scaled,
                             'nat_sens': nat_sens_scaled,
                         })
-                        ms_key = os.path.basename(sample.msname)
-                        selection_sum_bw_by_ms[ms_key] = selection_sum_bw_by_ms.get(ms_key, 0.0) + float(sample.chunk_bw_hz)
                 except Exception as exc:
                     LOG.info('Skipping sample ms=%s spw=%s chan=%s: %s',
                              os.path.basename(sample.msname), sample.real_spw, sample.channel_index, exc)
@@ -541,14 +539,18 @@ class FastImagePrecheckBackend:
             combined_nat_sens_terms = []
             for entry in sample_cache:
                 combined_gwgts = entry['gwgts'] if combined_gwgts is None else combined_gwgts + entry['gwgts']
-                if np.isfinite(entry['nat_sens']) and entry['nat_sens'] > 0.0:
+                if compute_sensitivity and entry['nat_sens'] is not None and np.isfinite(entry['nat_sens']) and entry['nat_sens'] > 0.0:
                     combined_nat_sens_terms.append(entry['nat_sens'])
 
-            if combined_gwgts is None or not combined_nat_sens_terms:
+            if combined_gwgts is None:
                 raise RuntimeError(f'Unable to build combined weight grid for {mode}')
+            if compute_sensitivity and mode != 'aggBW' and not combined_nat_sens_terms:
+                raise RuntimeError(f'Unable to build combined natural sensitivity for {mode}')
 
-            combined_nat_sens = 1.0 / np.sqrt(np.sum(1.0 / np.array(combined_nat_sens_terms) ** 2))
-            selection_sum_bw_hz = max(selection_sum_bw_by_ms.values(), default=0.0)
+            combined_nat_sens = None
+            if compute_sensitivity and combined_nat_sens_terms:
+                combined_nat_sens = 1.0 / np.sqrt(np.sum(1.0 / np.array(combined_nat_sens_terms) ** 2))
+
             psf_imsize = [combined_gwgts.shape[1], combined_gwgts.shape[0]]
             if psf_imsize != imsize:
                 LOG.info('Using actual %s weight-grid shape %s for PSF fitting instead of requested imsize %s',
@@ -583,26 +585,37 @@ class FastImagePrecheckBackend:
                         sensitivity = None
                         sens_bw = None
                     else:
-                        if mode == 'aggBW':
+                        if mode == 'aggBW' and compute_sensitivity:
                             grouped_terms = {}
                             for entry in sample_cache:
                                 sample = entry['sample']
                                 group_key = (os.path.basename(sample.msname), sample.virtual_spw)
-                                _, entry_sens_factor = _briggs_weight(entry['gwgts'], robust, 1.0)
-                                if entry_sens_factor is None:
-                                    continue
-                                robust_sigma = entry['nat_sens'] * entry_sens_factor
-                                if np.isfinite(robust_sigma) and robust_sigma > 0.0:
-                                    grouped_terms.setdefault(group_key, []).append(robust_sigma)
+                                grouped_terms.setdefault(group_key, []).append(entry)
 
                             robust_sens_terms = []
-                            for group_key, term_list in grouped_terms.items():
-                                if not term_list:
+                            for group_key, entries in grouped_terms.items():
+                                if not entries:
                                     continue
-                                group_sigma = 1.0 / np.sqrt(np.sum(1.0 / np.array(term_list) ** 2))
+                                entries = sorted(entries, key=lambda e: e['sample'].channel_index)
+                                representative_entry = entries[len(entries) // 2]
+                                representative_sample = representative_entry['sample']
                                 group_meta = selection_group_meta.get(group_key, {})
+                                selected_bw_hz = float(group_meta.get('selected_bw_hz', 0.0))
                                 nchan_sel = max(1, int(group_meta.get('selected_nchan', 1)))
-                                ms = self._ms_by_name[next(s.msname for s in sample_specs if os.path.basename(s.msname) == group_key[0])]
+                                ms = self._ms_by_name[representative_sample.msname]
+
+                                if representative_entry['nat_sens'] is None or representative_entry['nat_sens'] <= 0.0:
+                                    continue
+
+                                group_sigma = representative_entry['nat_sens']
+                                if selected_bw_hz > 0.0 and representative_sample.chunk_bw_hz > 0.0:
+                                    group_sigma *= math.sqrt(representative_sample.chunk_bw_hz / selected_bw_hz)
+
+                                _, representative_sens_factor = _briggs_weight(representative_entry['gwgts'], robust, 1.0)
+                                if representative_sens_factor is None:
+                                    continue
+                                group_sigma *= representative_sens_factor
+
                                 try:
                                     bw_corr_factor, _, _, _ = self.image_heuristics.get_bw_corr_factor(ms, group_key[1], nchan_sel)
                                 except Exception as exc:
@@ -610,6 +623,7 @@ class FastImagePrecheckBackend:
                                              group_key[0], group_key[1], nchan_sel, exc)
                                     bw_corr_factor = 1.0
                                 group_sigma *= bw_corr_factor
+
                                 if self.gridder == 'mosaic':
                                     source_matches = [f.source.name for f in ms.fields
                                                       if (utils.dequote(f.name) == utils.dequote(self.repr_field) and 'TARGET' in f.intents)]
@@ -622,14 +636,9 @@ class FastImagePrecheckBackend:
                                         group_sigma /= overlap_factor
                                 robust_sens_terms.append(group_sigma)
 
-                            if robust_sens_terms:
-                                sensitivity = 1.0 / np.sqrt(np.sum(1.0 / np.array(robust_sens_terms) ** 2))
-                                if total_bandwidth_hz > 0.0 and selection_sum_bw_hz > total_bandwidth_hz:
-                                    sensitivity *= math.sqrt(selection_sum_bw_hz / total_bandwidth_hz)
-                            else:
-                                sensitivity = None
+                            sensitivity = 1.0 / np.sqrt(np.sum(1.0 / np.array(robust_sens_terms) ** 2)) if robust_sens_terms else None
                         else:
-                            sensitivity = combined_nat_sens * sens_factor
+                            sensitivity = None if not compute_sensitivity else combined_nat_sens * sens_factor
                         sens_bw = total_bandwidth_hz
 
                 elapsed = time.perf_counter() - t0
@@ -665,7 +674,8 @@ class FastImagePrecheckBackend:
         seed_rep_results = self._evaluate_mode('repBW', rep_samples, cell, imsize, rep_bw_hz,
                                                _create_briggsbw_grid(imsize[0], imsize[1], self.repr_frac_bw)
                                                if self.repr_frac_bw > 0.0 else 1.0,
-                                               seed_sample, selection_group_meta=rep_group_meta)
+                                               seed_sample, selection_group_meta=rep_group_meta,
+                                               compute_sensitivity=False)
 
         mode_results = {'repBW': {}, 'aggBW': {}}
         geometry_by_robust = {}
