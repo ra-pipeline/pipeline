@@ -1,4 +1,5 @@
 import os
+import re
 import tempfile
 from inspect import signature
 
@@ -8,11 +9,12 @@ import pipeline.infrastructure.daskhelpers as daskhelpers
 import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
+import pipeline.infrastructure.utils.imaging as imaging_utils
 import pipeline.infrastructure.vdp as vdp
 
 from pipeline.domain import DataType
 from pipeline.h.tasks.common.sensitivity import Sensitivity
-from pipeline.infrastructure import casa_tools, exceptions, task_registry
+from pipeline.infrastructure import casa_tools, casa_tasks, exceptions, task_registry
 
 from ..tclean import Tclean
 from ..tclean.resultobjects import TcleanResult
@@ -278,11 +280,13 @@ class MakeImages(basetask.StandardTaskTemplate):
                     # Note add_result() removes 'heuristics' from worker_result
                     heuristics = target['heuristics']
                     result.add_result(worker_result, target, outcome='success')
+
                     # Export RMS of  sources
                     if self._is_target_for_sensitivity(worker_result, heuristics):
                         s = self._get_image_rms_as_sensitivity(worker_result, target, heuristics)
                         if s is not None:
                             result.sensitivities_for_aqua.append(s)
+
                     del heuristics
 
         # set of descriptions
@@ -314,11 +318,15 @@ class MakeImages(basetask.StandardTaskTemplate):
         return result
 
     def _add_vlass_metadata(self, result):
-        """Attach extra imaging metadata to Tclean results for the VLASS Coarse Cube imaging."""
+        """Attach extra imaging metadata to Tclean results for the VLASS Coarse Cube imaging and add
+        VLASS specific header keywords."""
+
         if self.inputs.context.imaging_mode != 'VLASS-SE-CUBE':
             for idx, tclean_result in enumerate(result.results):
                 target = result.targets[idx]
                 tclean_result.imaging_metadata['cutout_imsize'] = (target['misc_vlass'] or {}).get('cutout_imsize')
+                # PIPE-2461: add VLASS header keywords to images
+                self._vlass_set_miscinfo(tclean_result)
             return result
 
         vlass_plane_reject_keys_allowed = [
@@ -408,7 +416,7 @@ class MakeImages(basetask.StandardTaskTemplate):
                 target_spw = result.targets[idx]['spw']
                 if target_spw in plane_keep_dict:
                     tclean_result.imaging_metadata['keep'] = plane_keep_dict[target_spw]
-                self._vlass_cube_set_miscinfo(tclean_result)
+                self._vlass_set_miscinfo(tclean_result)
 
         # attched the metadata w.r.t the plane rejection for the plane rejection plot.
         result.metadata['vlass_cube_metadata'] = {'bmajor_list': np.array(bmajor_list),
@@ -424,18 +432,98 @@ class MakeImages(basetask.StandardTaskTemplate):
 
         return result
 
-    def _vlass_cube_set_miscinfo(self, tclean_result):
-        """Add the VLASS cube plane rejection header keyword."""
-
+    def _vlass_set_miscinfo(self, tclean_result):
+        """Add the VLASS specific header keyword."""
         imagename = tclean_result.image
-        reject = not tclean_result.imaging_metadata['keep']
+
+        if imagename is None:
+            return
+
+        reject = None
+        if 'keep' in tclean_result.imaging_metadata:
+            reject = not tclean_result.imaging_metadata['keep']
+        else:
+            reject = False
+
         imlist = utils.glob_ordered(imagename.replace('.image', '.*'))
+
+        vis_name = self.inputs.vis[0]
+        msobj = self.inputs.context.observing_run.get_ms(vis_name)
+        job = casa_tasks.flagdata(vis=vis_name, mode='summary', spwchan=True,  spw=tclean_result.spw)
+        flag_stats = self._executor.execute(job)
+        vlass_bw = 0
+        spwobj = None
+        nominal_bw = 0.0
+        chan_diff = 0.0
+        for curspw in tclean_result.spw.split(","):
+            unflaged_chan_per_spw = 0
+            for spw_chan in flag_stats['spw:channel']:
+                spw, _ = spw_chan.split(':')
+                if spw != curspw:
+                    continue
+                if flag_stats['spw:channel'][spw_chan].get('flagged', 0) != flag_stats['spw:channel'][spw_chan].get('total', 0):
+                    unflaged_chan_per_spw += 1
+
+            spwobj = msobj.get_spectral_window(curspw)
+
+            if spwobj and spwobj.bandwidth is not None:
+                nominal_bw += float(spwobj.bandwidth.value)
+            if spwobj and len(spwobj.channels.chan_freqs) > 1:
+                chan_diff = np.diff(spwobj.channels.chan_freqs)
+            if spwobj and len(spwobj.channels.chan_freqs) != 0 and np.allclose(chan_diff, chan_diff[0]):
+                chan_width = spwobj.channels.chan_widths[0]
+            else:
+                chan_width = np.median(np.abs(chan_diff))
+            vlass_bw += unflaged_chan_per_spw * chan_width
+
+        if nominal_bw == 0.0:
+            nominal_bw = None
+
+        epoch, tile, version = self._get_vlass_epoch_tile_version(imagename)
         for name in imlist:
             with casa_tools.ImageReader(name) as image:
                 info = image.miscinfo()
+                info['VLASSBWN'] = nominal_bw
                 info['VLASSRJ'] = reject
                 LOG.info('mark the image %s as reject=%r', name, reject)
+                info['VLASSSPW'] = utils.find_ranges(tclean_result.spw)
+                info['VLASSPC'] = tclean_result.inputs["phasecenter"]
+                info['VLASSPL'] = tclean_result.stokes
+                info['VLASSPT'] = tclean_result.imaging_mode
+                info['VLASSBW'] = vlass_bw
+                info['VLASSITY'] = imaging_utils.get_vlass_image_type(name)
+                info['VLASSTN'] = tile
+                info['VLASSEP'] = epoch
+                info['VLASSVR'] = version
+                if tclean_result.inputs['gridder'].lower() in ('awp2', 'awphpg'):
+                    info['VLASSWP'] = tclean_result.inputs['wprojplanes']
+                else:
+                    info['VLASSWP'] = 0
                 image.setmiscinfo(info)
+
+    def _get_vlass_epoch_tile_version(self, filename):
+        """Determine the VLASS epoch, tile name and version in the filename."""
+
+        epoch_match = re.search(r"VLASS(\d+\.\d+)", filename)
+        tilename_match = re.search(r"\.(T\d+t\d+)\.", filename)
+        version_match = re.search(r"\.v(\d+)(?:\.|$)", filename)
+        if epoch_match:
+            epoch = epoch_match.group(1)
+        else:
+            LOG.warning(f"Unable to get epoch given the filename {filename}, setting epoch to ''")
+            epoch = ''
+        if tilename_match:
+            tile = tilename_match.group(1)
+        else:
+            LOG.warning(f"Unable to get tile name given the filename {filename}, setting tile name to ''")
+            tile = ''
+        if version_match:
+            version = version_match.group(1)
+        else:
+            LOG.warning(f"Unable to get version number given the filename {filename}, setting version number to ''")
+            version = ''
+
+        return epoch, tile, version
 
     def _is_target_for_sensitivity(self, clean_result, heuristics):
         """
