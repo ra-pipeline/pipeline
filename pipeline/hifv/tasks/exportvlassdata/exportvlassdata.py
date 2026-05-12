@@ -887,17 +887,17 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
                 }
                 if tt_type == "TT0" or 'alpha' in fitsname.lower():
                     header_comments["VLASSRMS"] = (
-                        "Median rms calculated from RMS_TT0 (Stokes I) image"
+                        "Median rms calculated from RMS_TT0 (I)"
                     )
                     header_comments["VLASSPK"] = (
-                        "Peak flux density of INTENSITY_PBCOR_TT0 (Stokes I) image"
+                        "Peak flux density of INTENSITY_PBCOR_TT0 (I)"
                     )
                 elif tt_type == "TT1":
                     header_comments["VLASSRMS"] = (
-                        "Median rms calculated from RMS_TT1 (Stokes I) image"
+                        "Median rms calculated from RMS_TT1 (I)"
                     )
                     header_comments["VLASSPK"] = (
-                        "Peak flux density of INTENSITY_PBCOR_TT1 (Stokes I) image"
+                        "Peak flux density of INTENSITY_PBCOR_TT1 (I)"
                     )
                 else:
                     header_comments["VLASSRMS"] = "Median RMS calculated from RMS image"
