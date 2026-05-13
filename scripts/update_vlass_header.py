@@ -5,6 +5,12 @@ The VLASS header keywords introduced in PIPE-2461 and PIPE-3040 are only present
 Data produced with earlier pipeline versions (prior to 6.7.1) do not include these keywords. This script provides a standalone 
 method to populate the missing header keywords in such datasets using information from archived files.
 
+Requirements:
+    - astropy
+
+Install with:
+    pip install astropy
+
 Usage:
     python update_vlass_header.py <products_dir>
 """
@@ -230,14 +236,14 @@ def get_vlass_metadata(imagename: str, stats: dict, parameters: dict) -> dict:
     return vlass_metadata
 
 
-def update_fits_header(imagename: str, vlass_metadata: dict) -> None:
+def update_fits_header(imagename: str, vlass_metadata: dict, dry_run: bool = False) -> None:
     """
     Update the FITS header of a VLASS image by adding VLASS header keywords.
 
     Args:
-        products_dir (str): Path to the products directory.
         imagename (str): Name of the FITS image to be updated.
-        stats (dict): Dictionary containing 'PEAK' and 'MEDIAN' values
+        vlass_metadata (dict): Dictionary containing VLASS header keywords and values.
+        dry_run (bool): If True, preview header updates without modifying FITS files.
     Returns:
         None
     """
@@ -276,13 +282,26 @@ def update_fits_header(imagename: str, vlass_metadata: dict) -> None:
         header_comments["VLASSRMS"] = "Median RMS calculated from RMS image"
         header_comments["VLASSPK"] = "Peak flux density of INTENSITY_PBCOR image"
     try:
-        LOG.info(f"Updating header for '{imagename}'...")
+
+        LOG.info(
+            f"{'[DRY RUN] ' if dry_run else ''}"
+            f"Updating header for '{imagename}'..."
+        )
+
+        if dry_run:
+            for key in vlass_metadata:
+                LOG.info(
+                    f"[DRY RUN] Would set "
+                    f"{key} = {vlass_metadata[key]!r} "
+                    f"/ {header_comments.get(key, '')}"
+                )
+            return
+
         with fits.open(imagename, mode='update') as hdul:
             header = hdul[0].header
             for key in vlass_metadata:
                 LOG.debug(f"Setting header keyword '{key}' to '{vlass_metadata[key]} with comment '{header_comments.get(key, '')}'")
                 header[key] = (vlass_metadata[key], header_comments.get(key, ""))
-            hdul.flush()  # Save changes to the file
 
         LOG.debug(f"Updated header for {imagename}")
     except Exception as e:
@@ -326,12 +345,13 @@ def parseParameterFiles(products_dir: str) -> dict:
     return parameters
 
 
-def process(products_dir: str) -> None:
+def process(products_dir: str, dry_run: bool = False) -> None:
     """
     Update the FITS header of VLASS images in the specified products directory by adding missing keywords.
 
     Args:
         products_dir (str): Path to the products directory containing the VLASS images.
+        dry_run (bool): If True, preview header updates without modifying FITS files.
     Returns:
         None
     """
@@ -364,7 +384,7 @@ def process(products_dir: str) -> None:
             basename = os.path.basename(image).split(".image.")[0]
         if basename in image_stats:
             vlass_metadata = get_vlass_metadata(image, image_stats[basename], parameters)
-            update_fits_header(image, vlass_metadata)
+            update_fits_header(image, vlass_metadata, dry_run=dry_run)
         else:
             LOG.warning(f"No stats found for '{image}', skipping header update.")
 
@@ -383,9 +403,15 @@ if __name__ == "__main__":
         help='Enable debug-level logging.',
     )
 
+    parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='Preview header updates without modifying FITS files.',
+    )
+
     args = parser.parse_args()
 
     if args.debug:
         LOG.setLevel(logging.DEBUG)
 
-    process(args.products_dir)
+    process(args.products_dir, dry_run=args.dry_run)
