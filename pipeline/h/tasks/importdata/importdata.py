@@ -38,6 +38,7 @@ class ImportDataInputs(vdp.StandardInputs):
     overwrite = vdp.VisDependentProperty(default=False)
     process_caldevice = vdp.VisDependentProperty(default=False)
     save_flagonline = vdp.VisDependentProperty(default=True)
+    scans = vdp.VisDependentProperty(default='')
     session = vdp.VisDependentProperty(default='session_1')
 
     # docstring and type hints: supplements h_importdata
@@ -57,6 +58,7 @@ class ImportDataInputs(vdp.StandardInputs):
             createmms: str | None = None,
             ocorr_mode: str | None = None,
             datacolumns: dict[str, str] | None = None,
+            scans: str | None = None,
             ):
         """Initialize Inputs.
 
@@ -100,6 +102,13 @@ class ImportDataInputs(vdp.StandardInputs):
 
             ocorr_mode: Read in cross- and auto-correlation data(ca), cross- correlation data only (co), or autocorrelation data only (ao).
 
+            scans: Process only the specified scans. A scan specification consists of an exec block
+                index followed by ``':'``, followed by a comma-separated list of scan indexes or
+                scan index ranges. A ``':'``-less value is treated as a scan index across all exec
+                blocks. By default all scans are imported.
+
+                Example: ``scans='0:1;1:2~6,8;2:;3:24~30'``
+
             datacolumns: Dictionary defining the data types of existing columns.
                 The format is:
 
@@ -140,6 +149,7 @@ class ImportDataInputs(vdp.StandardInputs):
         self.overwrite = overwrite
         self.process_caldevice = process_caldevice
         self.save_flagonline = save_flagonline
+        self.scans = scans
         self.session = session
 
     def to_casa_args(self):
@@ -535,7 +545,8 @@ class ImportData(basetask.StandardTaskTemplate):
                                      lazy=inputs.lazy,
                                      with_pointing_correction=with_pointing_correction,
                                      ocorr_mode=inputs.ocorr_mode,
-                                     createmms=createmms)
+                                     createmms=createmms,
+                                     scans=inputs.scans)
         try:
             self._executor.execute(task)
         except Exception as ee:

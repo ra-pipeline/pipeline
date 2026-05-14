@@ -58,6 +58,7 @@ class ALMAImportDataInputs(importdata.ImportDataInputs):
         datacolumns: dict[str, str] | None = None,
         minparang: float | None = None,
         parallel: bool | None = None,
+        scans: str | None = None,
     ):
         """Initialize Inputs.
 
@@ -147,12 +148,18 @@ class ALMAImportDataInputs(importdata.ImportDataInputs):
                 Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
 
                 Default: ``None`` (equivalent to ``False``)
+
+            scans: Process only the specified scans. A scan specification consists of an exec block
+                index followed by ``':'``, followed by a comma-separated list of scan indexes or
+                scan index ranges. By default all scans are imported.
+
+                Example: ``scans='0:1;1:2~6,8'``
         """
         super().__init__(context, vis=vis, output_dir=output_dir, asis=asis,
                          process_caldevice=process_caldevice, session=session,
                          overwrite=overwrite, nocopy=nocopy, bdfflags=bdfflags, lazy=lazy,
                          save_flagonline=save_flagonline, createmms=createmms,
-                         ocorr_mode=ocorr_mode, datacolumns=datacolumns)
+                         ocorr_mode=ocorr_mode, datacolumns=datacolumns, scans=scans)
         self.dbservice = dbservice
         self.minparang = minparang
         self.parallel = parallel
