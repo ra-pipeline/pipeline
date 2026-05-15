@@ -3543,8 +3543,28 @@ def score_multiply(scores_list):
 
 
 @log_qa
-def score_sd_skycal_elevation_difference(ms, resultdict, threshold=3.0):
+def score_sd_skycal_elevation_difference(
+    ms: MeasurementSet,
+    resultdict: dict,
+    threshold: float = 3.0
+) -> pqa.QAScore | None:
     """
+    Compute QA score based on elevation difference between ON and OFF scans.
+
+    Metric for the scoring is the maximum elevation difference in degrees
+    between ON and OFF scans among all the fields, antennas, and spws.
+    The QA score is 0.8 if the maximum elevation difference exceeds the
+    specified threshold, and 1.0 otherwise.
+
+    Args:
+        ms: MeasurementSet object
+        resultdict: A dictionary containing elevation difference results
+                    for each field, antenna, and spw.
+        threshold: Elevation difference threshold in degrees for scoring.
+
+    Returns:
+        A QAScore object representing the QA score based on elevation
+        difference, or None if no valid metric score is available.
     """
     field_ids = list(resultdict.keys())
     metric_score = []
@@ -3598,6 +3618,12 @@ def score_sd_skycal_elevation_difference(ms, resultdict, threshold=3.0):
     #           requirement is that score is 0.8 if elevation difference is larger than 3deg.
     # make sure threshold is 3deg
     assert el_threshold == 3.0
+
+    if len(metric_score) == 0:
+        # no valid metric score, skip scoring
+        LOG.info("No valid elevation difference data found. Skipping QA scoring.")
+        return None
+
     max_metric_score = np.max(metric_score)
     # lower the score if elevation difference exceeds 3deg
     score = 1.0 if max_metric_score < el_threshold else 0.8

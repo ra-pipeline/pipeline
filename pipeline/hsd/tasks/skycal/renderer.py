@@ -222,7 +222,7 @@ class T2_4MDetailsSingleDishSkyCalRenderer(basetemplates.T2_4MDetailsDefaultRend
         calmode_map = {'ps': 'Position-switch',
                        'otfraster': 'OTF raster edge'}
 
-        calapps = result.outcome
+        calapps = result.final
         for calapp in calapps:
             caltype = calmode_map[utils.get_origin_input_arg(calapp, 'calmode')]
             gaintable = os.path.basename(calapp.gaintable)
