@@ -394,6 +394,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
         flagcount = 0
 
         while fracFlaggedSolns > critfrac and flagcount < 4:
+            flagcount += 1
             self._do_ktype_delaycal(caltable=ktypecaltable, addcaltable=gtypecaltable,
                                     RefAntOutput=RefAntOutput, spw=','.join(spwlist))
             if not os.path.exists(ktypecaltable):
@@ -403,7 +404,6 @@ class testBPdcals(basetask.StandardTaskTemplate):
             LOG.info("Fraction of flagged solutions = " + str(flaggedSolnResult['all']['fraction']))
             LOG.info("Median fraction of flagged solutions per antenna = " +
                      str(flaggedSolnResult['antmedian']['fraction']))
-            flagcount += 1
 
         # Do initial amplitude and phase gain solutions on the BPcalibrator and delay
         # calibrator; the amplitudes are used for flagging; only phase
