@@ -1,4 +1,4 @@
-import collections
+import collections.abc
 
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils

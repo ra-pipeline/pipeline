@@ -1,31 +1,33 @@
 """Inspection module for importdata."""
+from __future__ import annotations
 
 import os
 import re
-from typing import Any, Dict, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any
 
 import numpy
 import pipeline.infrastructure as infrastructure
-from pipeline.domain.datatable import DataTableImpl
-from pipeline.domain.measurementset import MeasurementSet
-from pipeline.domain.singledish import MSReductionGroupDesc
 from pipeline.hsd.heuristics.rasterscan import RasterScanHeuristicsResult, RasterScanHeuristicsFailure
 from pipeline.hsd.tasks.common.inspection_util import (inspect_reduction_group,
                                                        set_beam_size)
-# import pipeline.domain.singledish as singledish
 from pipeline.infrastructure import casa_tools
-from pipeline.infrastructure.launcher import Context
 
 from ... import heuristics
 from . import reader
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
+
+if TYPE_CHECKING:
+    from pipeline.domain.datatable import DataTableImpl
+    from pipeline.domain.measurementset import MeasurementSet
+    from pipeline.domain.singledish import MSReductionGroupDesc
+    from pipeline.infrastructure.launcher import Context
 
 
-class SDInspection(object):
+class SDInspection:
     """Inspection class for hsd_importdata."""
 
-    def __init__(self, context: Context, table_name: str, ms: Optional[MeasurementSet]=None, hm_rasterscan: str = 'time'):
+    def __init__(self, context: Context, table_name: str, ms: MeasurementSet | None=None, hm_rasterscan: str = 'time'):
         """Initialise SDInspection class.
 
         Args:
@@ -42,7 +44,7 @@ class SDInspection(object):
         if self.hm_rasterscan not in ['time', 'direction']:
             raise ValueError("hm_rasterscan must be either 'time' or 'direction'")
 
-    def execute(self) -> Tuple[Dict[int, MSReductionGroupDesc], Dict[str, Union[str, Dict]]]:
+    def execute(self) -> tuple[dict[int, MSReductionGroupDesc], dict[str, str | dict]]:
         """Execute inspection process.
 
         This method calls execute method of reader.py.
@@ -205,9 +207,9 @@ class SDInspection(object):
 #
 #         return reduction_group
 
-    def __select_data(self, datatable: DataTableImpl, startrow: int=0, nrow: int=-1) -> Tuple[Dict[int, Set[int]],
-                                                                                              Dict[int, Set[int]],
-                                                                                              Dict[int, Set[int]]]:
+    def __select_data(self, datatable: DataTableImpl, startrow: int=0, nrow: int=-1) -> tuple[dict[int, set[int]],
+                                                                                              dict[int, set[int]],
+                                                                                              dict[int, set[int]]]:
         """Inspect DataTable and return row IDs grouped by antenna, spw, and field.
 
         Args:
@@ -264,7 +266,7 @@ class SDInspection(object):
         return by_antenna, by_spw, by_field
 
     def _group_data(self, datatable: DataTableImpl, position_group_id: int, time_group_id_small: int, time_group_id_large: int,
-                    startrow: int=0, nrow: int=-1) -> Dict[str, Union[numpy.array, Dict[int, Any]]]:
+                    startrow: int=0, nrow: int=-1) -> dict[str, numpy.array | dict[int, Any]]:
         """Inspect DataTable and generate time and position groups.
 
         Args:

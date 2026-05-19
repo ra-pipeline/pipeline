@@ -1,22 +1,30 @@
+from __future__ import annotations
+
 import collections
 import functools
 import operator
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Tuple
+from typing import TYPE_CHECKING
 
 import numpy as np
 import scipy.optimize
 
-import pipeline.infrastructure.logging as logging
-from pipeline.domain import MeasurementSet
+import pipeline.infrastructure as infrastructure
 from pipeline.domain.measures import FrequencyUnits
 
 from . import mswrapper, qa_utils
 from .qa_utils import UnitFactorType
 
-LOG = logging.get_logger(__name__)
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from numpy.typing import NDArray
+
+    from pipeline.domain import MeasurementSet
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 @dataclass
@@ -189,7 +197,7 @@ def score_all_scans(
     return outliers
 
 
-def get_best_fits_per_ant(wrapper: mswrapper.MSWrapper, frequencies: np.ndarray) -> list[AntennaFit]:
+def get_best_fits_per_ant(wrapper: mswrapper.MSWrapper, frequencies: NDArray) -> list[AntennaFit]:
     """
     Calculate and return the best amp/phase vs freq fits for data in the input
     MSWrapper.
@@ -730,8 +738,8 @@ def _create_masked_entry():
 
 
 def to_linear_fit_parameters(
-        fit: Tuple[float, float],
-        err: Tuple[float, float]
+        fit: tuple[float, float],
+        err: tuple[float, float]
 ) -> LinearFitParameters:
     """
     Convert tuples from the best fit evaluation into a LinearFitParameters
@@ -747,10 +755,10 @@ def to_linear_fit_parameters(
 
 def get_amp_fit(
         amp_model_fn: Callable,
-        frequencies: np.ndarray,
-        visibilities: np.ndarray,
-        sigma: np.ndarray
-) -> Tuple[np.ndarray, np.ndarray]:
+        frequencies: NDArray,
+        visibilities: NDArray,
+        sigma: NDArray
+) -> tuple[NDArray, NDArray]:
     """
     Fit a linear amplitude vs frequency model to a set of time-averaged
     visibilities.
@@ -788,10 +796,10 @@ def get_amp_fit(
 def get_phase_fit(
         amp_model_fn: Callable,
         ang_model_fn: Callable,
-        frequencies: np.ndarray,
-        visibilities: np.ndarray,
-        sigma: np.ndarray
-) -> Tuple[np.ndarray, np.ndarray]:
+        frequencies: NDArray,
+        visibilities: NDArray,
+        sigma: NDArray
+) -> tuple[NDArray, NDArray]:
     """
     Fit a linear model for phase vs frequency to a set of time-averaged
     visibilities.
@@ -883,11 +891,11 @@ def get_angular_linear_function(midpoint: float, x_scale: float) -> Callable:
 
 def get_chi2_ang_model(
         angular_model: Callable,
-        nu: np.ndarray,
+        nu: NDArray,
         omega: float,
         phi: float,
-        angdata: np.ndarray,
-        angsigma: np.ndarray
+        angdata: NDArray,
+        angsigma: NDArray
 ) -> float:
     """
     Calculates the chi-squared value for the angular model.
@@ -905,7 +913,7 @@ def get_chi2_ang_model(
     return float(np.sum(aux.real))
 
 
-def fit_angular_model(angular_model: Callable, nu: np.ndarray, angdata: np.ndarray, angsigma: np.ndarray) -> dict:
+def fit_angular_model(angular_model: Callable, nu: NDArray, angdata: NDArray, angsigma: NDArray) -> dict:
     """
     Fits the angular model to the data.
 
@@ -922,7 +930,7 @@ def fit_angular_model(angular_model: Callable, nu: np.ndarray, angdata: np.ndarr
     return fitres
 
 
-def robust_stats(a: np.ndarray) -> Tuple[float, float]:
+def robust_stats(a: NDArray) -> tuple[float, float]:
     """
     Return median and estimate standard deviation of numpy array A using median statistics
 

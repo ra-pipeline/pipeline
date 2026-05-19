@@ -9,16 +9,17 @@ frequency range.
 
 import collections
 import re
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any
 
 import numpy as np
 
-from . import casa_tools, logging, utils
+import pipeline.infrastructure as infrastructure
+from . import casa_tools, utils
 
-LOG = logging.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
-class ContFileHandler(object):
+class ContFileHandler:
 
     def __init__(self, filename, warn_nonexist=False):
         self.filename = filename
@@ -140,7 +141,7 @@ class ContFileHandler(object):
                                                                     freq_range['refer']))
                         fd.write('\n')
 
-    def get_merged_selection(self, field_name:str, spw_id:str, spw_name:Union[str, None]=None, cont_ranges:Union[Dict, None]=None):
+    def get_merged_selection(self, field_name:str, spw_id:str, spw_name:str | None=None, cont_ranges:dict | None=None):
         """
         Inputs:
 
@@ -207,7 +208,7 @@ class ContFileHandler(object):
 
         return cont_ranges_spwsel, all_continuum, low_bandwidth, low_spread
 
-    def to_topo(self, selection:str, msnames:List[str], fields:List[Union[int, str]], spw_id:Union[int, str], observing_run:Any, spw_name:Union[str, None]=None, ctrim:int=0, ctrim_nchan:int=-1) -> Tuple[List[str], List[str], Dict]:
+    def to_topo(self, selection:str, msnames:list[str], fields:list[int | str], spw_id:int | str, observing_run:Any, spw_name:str | None=None, ctrim:int=0, ctrim_nchan:int=-1) -> tuple[list[str], list[str], dict]:
 
         frame_freq_selection, refer = selection.split()
         if refer not in ('LSRK', 'SOURCE'):
@@ -279,7 +280,7 @@ class ContFileHandler(object):
 
         return topo_freq_selections, topo_chan_selections, aggregate_frame_bw
 
-    def get_cont_dat_virt_spw_id(self, spw_id:str, spw_name:Union[str, None]):
+    def get_cont_dat_virt_spw_id(self, spw_id:str, spw_name:str | None):
 
         virt_spw_id = None
         if spw_name is not None:
@@ -320,7 +321,7 @@ def contfile_to_spwsel(vis, context, contfile='cont.dat', use_realspw=True):
 
     for field in contdict['fields']:
 
-        # Note that ContFileHandler and cont.dat use original field names from CASA tables, rather than 
+        # Note that ContFileHandler and cont.dat use original field names from CASA tables, rather than
         # the "CASA-safe" names (see PIPE-1887 and heurtsics/field_parameter.md). So we need the dequotation
         # and then match.
         fieldid_list = [fieldobj.id for fieldobj in ms.fields if utils.dequote(fieldobj.name) == field]

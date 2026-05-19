@@ -5,21 +5,26 @@ The restore data module provides a class for reimporting, reflagging, and
 recalibrating a subset of the MSes belonging to a member OUS, using pipeline
 flagging and calibration data products.
 """
+from __future__ import annotations
+
 import os
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING
 
 import pipeline.h.tasks.restoredata.restoredata as restoredata
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.vdp as vdp
-from pipeline.h.tasks.applycal import ApplycalResults
 from pipeline.hsd.tasks.applycal import applycal
-from pipeline.infrastructure import Context, casa_tools, task_registry
+from pipeline.infrastructure import casa_tools, task_registry
 from pipeline.infrastructure.basetask import ResultsList
 
 from ..importdata import importdata as importdata
 from . import ampcal
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
+
+if TYPE_CHECKING:
+    from pipeline.h.tasks.applycal import ApplycalResults
+    from pipeline.infrastructure.launcher import Context
 
 
 class NRORestoreDataInputs(restoredata.RestoreDataInputs):
@@ -30,17 +35,17 @@ class NRORestoreDataInputs(restoredata.RestoreDataInputs):
     hm_rasterscan = vdp.VisDependentProperty(default='time')
 
     # docstring and type hints: supplements hsdn_retoredata
-    def __init__(self, context: Context, vis: List[str] = None, caltable: vdp.VisDependentProperty = None,
+    def __init__(self, context: Context, vis: list[str] = None, caltable: vdp.VisDependentProperty = None,
                  reffile: vdp.VisDependentProperty = None, products_dir: str = None,
                  copytoraw: vdp.VisDependentProperty = None, rawdata_dir: str = None, output_dir: str = None,
-                 hm_rasterscan: Optional[str] = None):
+                 hm_rasterscan: str | None = None):
         """
         Initialise the Inputs, initialising any property values to those given here.
 
         Args:
             context: the pipeline Context state object
 
-            vis: List of raw visibility data files to be restored.
+            vis: list of raw visibility data files to be restored.
                 Assumed to be in the directory specified by rawdata_dir.
 
                 Example: ``vis=['mg2.ms']``
@@ -124,7 +129,7 @@ class NRORestoreDataResults(restoredata.RestoreDataResults):
     """Results object of NRORestoreData."""
 
     def __init__(self, importdata_results: ResultsList = None, applycal_results: ResultsList = None,
-                 ampcal_results: ResultsList = None, flagging_summaries: List[Dict[str, str]] = None):
+                 ampcal_results: ResultsList = None, flagging_summaries: list[dict[str, str]] = None):
         """
         Initialise the results objects.
 
@@ -134,7 +139,7 @@ class NRORestoreDataResults(restoredata.RestoreDataResults):
             ampcal_results: results of ampcal
             flagging_summaries: summaries of flagdata
         """
-        super(NRORestoreDataResults, self).__init__(importdata_results, applycal_results, flagging_summaries)
+        super().__init__(importdata_results, applycal_results, flagging_summaries)
         self.ampcal_results = ampcal_results
 
     def merge_with_context(self, context: Context):
@@ -144,7 +149,7 @@ class NRORestoreDataResults(restoredata.RestoreDataResults):
         Args:
             context: Context object
         """
-        super(NRORestoreDataResults, self).merge_with_context(context)
+        super().merge_with_context(context)
 
         # set amplitude scaling factor to ms domain objects
         if isinstance(self.applycal_results, ResultsList):
@@ -203,7 +208,7 @@ class NRORestoreData(restoredata.RestoreData):
         LOG.debug('prepare inputs = {0}'.format(inputs))
 
         # run prepare method in the parent class
-        results = super(NRORestoreData, self).prepare()
+        results = super().prepare()
         ampcal_results = self.ampcal_results
 
         # apply baseline table and produce baseline-subtracted MSs
@@ -213,7 +218,7 @@ class NRORestoreData(restoredata.RestoreData):
                                         results.flagging_summaries)
         return results
 
-    def _do_importasdm(self, sessionlist: List[str], vislist: List[str]):
+    def _do_importasdm(self, sessionlist: list[str], vislist: list[str]):
         """
         Execute importasdm.
 

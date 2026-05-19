@@ -1,16 +1,15 @@
 import collections
 import os
 import shutil
-from typing import Optional, List
 
 import pipeline.h.tasks.common.flagging_renderer_utils as flagutils
 import pipeline.h.tasks.common.displays.flagging as flagging
-import pipeline.infrastructure.logging as logging
+import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.utils as utils
 from . import displaycheckflag
 
-LOG = logging.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 FlagTotal = collections.namedtuple('FlagSummary', 'flagged total')
 
@@ -285,8 +284,8 @@ class T2_4MDetailsFlagtargetsdataRenderer(basetemplates.T2_4MDetailsDefaultRende
     def flags_for_result(self,
                          ms,
                          summary,
-                         intents_to_summarise: Optional[List[str]] = None,
-                         non_science_agents: Optional[List[str]] = None):
+                         intents_to_summarise: list[str] | None = None,
+                         non_science_agents: list[str] | None = None):
         if intents_to_summarise is None:
             intents_to_summarise = ['BANDPASS', 'PHASE', 'AMPLITUDE', 'TARGET']
 

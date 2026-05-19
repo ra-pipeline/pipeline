@@ -15,7 +15,7 @@ LOG = logging.get_logger(__name__)
 
 
 # This class holds the project summary information
-class ProjectSummary(object):
+class ProjectSummary:
     def __init__(self, proposal_code='', proposal_title='undefined', piname='undefined',
                  observatory='ALMA Joint Observatory', telescope='ALMA'):
 
@@ -30,7 +30,7 @@ class ProjectSummary(object):
 
 
 # This class holds the ALMA project structure information.
-class ProjectStructure(object):
+class ProjectStructure:
     def __init__(self, ous_entity_type='ObsProject', ous_entity_id='unknown', ous_part_id='unknown',
                  ous_title='undefined', ous_type='Member', ps_entity_type='ProjectStatus', ps_entity_id='unknown',
                  ousstatus_type='OUSStatus', ousstatus_entity_id='unknown', ppr_type='SciPipeRequest',
@@ -55,7 +55,7 @@ class ProjectStructure(object):
 
 
 # This class holds the ALMA OUS performance parameters information.
-class PerformanceParameters(object):
+class PerformanceParameters:
 
     def __init__(self, desired_angular_resolution='0.0arcsec', min_angular_resolution='0.0arcsec',
                  max_angular_resolution='0.0arcsec',
@@ -98,7 +98,7 @@ def get_state(o):
     return [(cls_name, k, v) for k, v in modified.items()]
 
 
-class ModificationListener(object, metaclass=abc.ABCMeta):
+class ModificationListener(abc.ABC):
     """
     Interface for listener classes that want to be notified when an object
     property changes.
@@ -133,7 +133,7 @@ class LoggingModificationListener(ModificationListener):
         LOG.info('Modifying property: {!s}.{!s} = {!r}'.format(modified_obj.__class__.__name__, attr, val))
 
 
-class ModificationPublisher(object):
+class ModificationPublisher:
     """
     Base class that publishes an event to registered listeners when public
     properties of an instance of this class are set or deleted.
@@ -158,7 +158,7 @@ class ModificationPublisher(object):
 
     def __setattr__(self, name, value):
         LOG.trace('Setting {!s}.{!s} = {!r}'.format(self.__class__.__name__, name, value))
-        super(ModificationPublisher, self).__setattr__(name, value)
+        super().__setattr__(name, value)
 
         # Only log changes to public properties
         if not name.startswith('_'):
@@ -166,7 +166,7 @@ class ModificationPublisher(object):
                 listener.on_setattr(self, name, value)
 
     def __delattr__(self, name):
-        super(ModificationPublisher, self).__delattr__(name)
+        super().__delattr__(name)
 
         # Only log changes to public properties
         if not name.startswith('_'):

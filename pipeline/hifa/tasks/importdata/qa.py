@@ -1,7 +1,7 @@
 # Do not evaluate type annotations at definition time.
 from __future__ import annotations
 
-import collections
+import collections.abc
 import itertools
 from typing import TYPE_CHECKING
 

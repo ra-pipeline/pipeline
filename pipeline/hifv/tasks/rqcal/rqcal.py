@@ -28,7 +28,7 @@ class RqcalInputs(vdp.StandardInputs):
         self.caltable = caltable
 
     def to_casa_args(self):
-        args = super(RqcalInputs, self).to_casa_args()
+        args = super().to_casa_args()
         args['caltype'] = 'rq'
         return args
 

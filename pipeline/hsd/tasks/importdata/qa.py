@@ -1,17 +1,20 @@
 """QA Handler module."""
+from __future__ import annotations
 
-from typing import List
+from typing import TYPE_CHECKING
 
 import pipeline.h.tasks.importdata.qa as importdataqa
-from pipeline.infrastructure.launcher import Context
-import pipeline.infrastructure.logging as logging
+import pipeline.infrastructure as infrastructure
 import pipeline.qa.scorecalculator as qacalc
-from pipeline.domain.measurementset import MeasurementSet
 from pipeline.infrastructure.pipelineqa import QAPlugin, QAScore
 
 from . import importdata
 
-LOG = logging.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
+
+if TYPE_CHECKING:
+    from pipeline.domain.measurementset import MeasurementSet
+    from pipeline.infrastructure.launcher import Context
 
 
 class SDImportDataQAHandler(importdataqa.ImportDataQAHandler, QAPlugin):
@@ -27,7 +30,7 @@ class SDImportDataQAHandler(importdataqa.ImportDataQAHandler, QAPlugin):
     child_cls = None
     generating_task = importdata.SerialSDImportData
 
-    def _check_intents(self, mses: List[MeasurementSet]) -> QAScore:
+    def _check_intents(self, mses: list[MeasurementSet]) -> QAScore:
         """
         Check each measurement set in the list for a set of required intents.
 
@@ -41,9 +44,9 @@ class SDImportDataQAHandler(importdataqa.ImportDataQAHandler, QAPlugin):
         """
         return qacalc.score_missing_intents(mses, array_type='ALMA_TP')
 
-    def handle(self, context:'Context', result:'importdata.SDImportDataResults'):
+    def handle(self, context: Context, result: importdata.SDImportDataResults) -> None:
         """Generate QA score for hsd_importdata.
-        
+
         Most scores are calculated with the QA handler of h_importdata.
 
         Args:

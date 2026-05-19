@@ -100,6 +100,7 @@ def test_uid___A002_Xc46ab2_X15ae__selfcal_restore_procedure_hifa_image__regress
 
 
 @pytest.mark.seven
+@pytest.mark.mpi
 def test_2022_1_00207_S__uid___A001_X2d20_X373d__PPR__regression():
     """Run ALMA polcal+image regression on a multi-EB 7m test dataset with a PPR file.
 
@@ -123,6 +124,7 @@ def test_2022_1_00207_S__uid___A001_X2d20_X373d__PPR__regression():
 
 
 @pytest.mark.seven
+@pytest.mark.mpi
 def test_2023_1_00228_S__uid___A002_X1199f9e_X7c24__procedure_hifa_calimage_diffgain__regression():
     """Run ALMA cal+image regression on a 7m B2B dataset with differential gain calibration.
 

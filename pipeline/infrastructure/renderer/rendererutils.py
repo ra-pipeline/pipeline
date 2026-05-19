@@ -4,7 +4,7 @@ from __future__ import annotations
 import html
 import itertools
 import os
-from typing import TYPE_CHECKING, Any, Iterable
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -13,6 +13,9 @@ from pipeline.infrastructure import basetask, casa_tasks, casa_tools, filenamer,
 from pipeline.infrastructure.renderer import logger
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from typing import Any
+
     from pipeline.infrastructure.basetask import Results
     from pipeline.infrastructure.launcher import Context
     from pipeline.infrastructure.pipelineqa import QAScore
@@ -461,7 +464,7 @@ def summarise_fields(fields: str) -> str:
 def make_parang_plots(
         context: Context,
         result: Results,
-        intent_lookup: dict[str, str],
+        intent: list[str],
 ) -> dict:
     """
     Create parallactic angle plots for each session.
@@ -477,8 +480,7 @@ def make_parang_plots(
 
     for session_name, session_data in sessions.items():
         num_ms = len(sessions[session_name]['vis'])
-        intents_to_plot = [intent_lookup[key] for key in intent_lookup
-                           if key in session_data and session_data[key]]
+        intents_to_plot_session = [value for value in intent if value in session_data and session_data[value]]
 
         plot_title = f'MOUS {ous_id}, session {session_name}'
         filename_component = filenamer.sanitize(f'{ous_id}_{session_name}')
@@ -488,8 +490,14 @@ def make_parang_plots(
         for i, msname in enumerate(sessions[session_name]['vis']):
             symbolcolor = plot_colors[i % len(plot_colors)]
 
-            science_spws = context.observing_run.get_ms(msname).get_spectral_windows()
+            ms = context.observing_run.get_ms(msname)
+            science_spws = ms.get_spectral_windows()
             spwspec = ','.join(f'{s.id}:{s.num_channels // 2}' for s in science_spws)
+
+            # Filter intents to only include those present in this specific MS.
+            # `intents_to_plot_session` already uses mapped pipeline intents.
+            intents_to_plot = [intent_to_plot for intent_to_plot in intents_to_plot_session
+                               if any(intent_to_plot in field.intents for field in ms.get_fields())]
 
             plot_name = plot_path if i == num_ms - 1 else ''
 
@@ -505,12 +513,22 @@ def make_parang_plots(
                 'plotrange': [0, 0, 0, 360],
                 'plotindex': i,
                 'clearplots': clearplots,
-                'intent': ','.join(intents_to_plot),
                 'showgui': False,
                 'showlegend': True,
                 'coloraxis': 'field',
                 'legendposition': 'exteriorRight',
             }
+
+            if intents_to_plot:
+                try:
+                    casa_intent = utils.to_CASA_intent(ms, ','.join(intents_to_plot))
+                except Exception:
+                    LOG.warning('Failed to convert pipeline intents %s to CASA intents for %s',
+                                intents_to_plot, msname)
+                    casa_intent = ''
+
+                if casa_intent:
+                    task_args['intent'] = casa_intent
 
             task = casa_tasks.plotms(**task_args)
             basetask.Executor(context).execute(task)

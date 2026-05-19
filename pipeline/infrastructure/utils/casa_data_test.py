@@ -1,6 +1,8 @@
-from datetime import datetime
 import re
+from datetime import datetime, timezone
+
 import pytest
+
 from .. import casa_tools
 from .casa_data import (
     get_file_md5,
@@ -11,7 +13,6 @@ from .casa_data import (
     IERSInfo,
     from_mjd_to_datetime
 )
-
 
 # Validation of ISO 8601 strings
 REGEX_ISO8601 = (
@@ -144,9 +145,9 @@ def test_get_IERS_info():
 @skip_if_no_data_repo
 def test_validate_date_method():
     iers_info = IERSInfo(iers_path=GEODETIC_PATH)
-    assert iers_info.validate_date(datetime(2020, 12, 1, 0, 0))
-    assert not iers_info.validate_date(datetime(2021, 12, 1, 0, 0))
-    assert iers_info.validate_date(datetime(2019, 12, 1, 0, 0))
+    assert iers_info.validate_date(datetime(2020, 12, 1, 0, 0, tzinfo=timezone.utc))
+    assert not iers_info.validate_date(datetime(2021, 12, 1, 0, 0, tzinfo=timezone.utc))
+    assert iers_info.validate_date(datetime(2019, 12, 1, 0, 0, tzinfo=timezone.utc))
 
 
 @skip_if_no_data_repo
@@ -155,33 +156,33 @@ def test_string_representation_for_IERS_info():
     assert str(iers_info) == (
         'IERS table information => {"versions": {"IERSpredict": "0623.0351", '
         '"IERSeop2000": "0001.0144"}, "IERSeop2000_last_MJD": 59184.0, '
-        '"IERSeop2000_last": "2020-12-01 00:00:00", "IERSpredict_last": "2021-04-25 00:00:00"}'
+        '"IERSeop2000_last": "2020-12-01 00:00:00+00:00", "IERSpredict_last": "2021-04-25 00:00:00+00:00"}'
     )
 
 @skip_if_no_data_repo
 def test_date_message_type():
     iers_info = IERSInfo(iers_path=GEODETIC_PATH)
     # Before the end of IERSeop2000
-    assert iers_info.date_message_type(datetime(2019, 12, 1, 0, 0)) == "GOOD"
+    assert iers_info.date_message_type(datetime(2019, 12, 1, 0, 0, tzinfo=timezone.utc)) == "GOOD"
     # At the end of IERSeop2000
-    assert iers_info.date_message_type(datetime(2020, 12, 1, 0, 0)) == "GOOD"
+    assert iers_info.date_message_type(datetime(2020, 12, 1, 0, 0, tzinfo=timezone.utc)) == "GOOD"
     # Between the end of IERSeop2000 and IERSeop2000+3 months
-    assert iers_info.date_message_type(datetime(2020, 12, 2, 0, 0)) == "INFO"
+    assert iers_info.date_message_type(datetime(2020, 12, 2, 0, 0, tzinfo=timezone.utc)) == "INFO"
     # Between IERSeop2000 + 3 months and the end of IERSpredict
-    assert iers_info.date_message_type(datetime(2021, 3, 25, 0, 0)) == "WARN"
+    assert iers_info.date_message_type(datetime(2021, 3, 25, 0, 0, tzinfo=timezone.utc)) == "WARN"
     # At the end of IERSpredict
-    assert iers_info.date_message_type(datetime(2021, 4, 25, 0, 0)) == "WARN"
+    assert iers_info.date_message_type(datetime(2021, 4, 25, 0, 0, tzinfo=timezone.utc)) == "WARN"
     # After the end of IERSpredict
-    assert iers_info.date_message_type(datetime(2021, 12, 1, 0, 0)) == "CRITICAL"
+    assert iers_info.date_message_type(datetime(2021, 12, 1, 0, 0, tzinfo=timezone.utc)) == "CRITICAL"
 
 
 def test_date_message_type_when_data_is_not_found():
     iers_info = IERSInfo(iers_path=WRONG_GEODETIC_PATH)
-    assert iers_info.date_message_type(datetime(2020, 12, 1, 0, 0)) == 'CRITICAL'
+    assert iers_info.date_message_type(datetime(2020, 12, 1, 0, 0, tzinfo=timezone.utc)) == 'CRITICAL'
 
 
 def test_from_mjd_to_datetime():
-    assert from_mjd_to_datetime(59184.0) == datetime(2020, 12, 1, 0, 0)
+    assert from_mjd_to_datetime(59184.0) == datetime(2020, 12, 1, 0, 0, tzinfo=timezone.utc)
 
 
 def test_IERSInfo_when_data_is_not_found():
@@ -199,9 +200,9 @@ def test_get_IERS_info_when_data_is_not_found():
 
 def test_validate_date_method_when_data_is_not_found():
     iers_info = IERSInfo(iers_path=WRONG_GEODETIC_PATH)
-    assert not iers_info.validate_date(datetime(2020, 12, 1, 0, 0))
-    assert not iers_info.validate_date(datetime(2021, 12, 1, 0, 0))
-    assert not iers_info.validate_date(datetime(2019, 12, 1, 0, 0))
+    assert not iers_info.validate_date(datetime(2020, 12, 1, 0, 0, tzinfo=timezone.utc))
+    assert not iers_info.validate_date(datetime(2021, 12, 1, 0, 0, tzinfo=timezone.utc))
+    assert not iers_info.validate_date(datetime(2019, 12, 1, 0, 0, tzinfo=timezone.utc))
 
 
 def test_string_representation_for_IERS_info_when_data_is_not_found():

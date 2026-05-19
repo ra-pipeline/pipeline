@@ -1,10 +1,16 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pipeline.infrastructure as infrastructure
-from pipeline.domain.measurementset import MeasurementSet
 
-LOG = infrastructure.get_logger(__name__)
+if TYPE_CHECKING:
+    from pipeline.domain import MeasurementSet
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 
-def get_antenna_names(ms):
+def get_antenna_names(ms: MeasurementSet) -> tuple[dict[int, str], list[int]]:
     """Get antenna names.
     """
     antenna_ids = sorted([antenna.id for antenna in ms.antennas])
@@ -16,7 +22,7 @@ def get_antenna_names(ms):
     return antenna_name, antenna_ids
 
 
-def get_corr_products(ms, spwid):
+def get_corr_products(ms: MeasurementSet, spwid: int) -> str:
     """Get names of corr products stored in ms.
     """
     # get names of correlation products
@@ -27,7 +33,7 @@ def get_corr_products(ms, spwid):
     return corr_type
 
 
-def get_corr_axis(ms, spwid):
+def get_corr_axis(ms: MeasurementSet, spwid: int) -> list[str]:
     """Get names of polarizations
     """
     # get names of the polarizations

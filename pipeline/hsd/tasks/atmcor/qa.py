@@ -1,12 +1,19 @@
 """QA handling for hsd_atmcor stage."""
-import collections
+from __future__ import annotations
+
+import collections.abc
 import os
+from typing import TYPE_CHECKING
 
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 from . import atmcor
-from pipeline.infrastructure.launcher import Context
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from pipeline.infrastructure.launcher import Context
 
 LOG = logging.get_logger(__name__)
 
@@ -17,7 +24,7 @@ class SDATMCorrectionQAHandler(pqa.QAPlugin):
     result_cls = atmcor.SDATMCorrectionResults
     child_cls = None
 
-    def handle(self, context: Context, result: result_cls):
+    def handle(self, context: Context, result: atmcor.SDATMCorrectionResults):
         """Generate QA score for hsd_atmcor.
 
         Generate QA score for hsd_atmcor and register it to the result.
@@ -53,7 +60,7 @@ class SDATMCorrectionListQAHandler(pqa.QAPlugin):
     result_cls = collections.abc.Iterable
     child_cls = atmcor.SDATMCorrectionResults
 
-    def handle(self, context: Context, result: result_cls):
+    def handle(self, context: Context, result: Iterable[atmcor.SDATMCorrectionResults]):
         """Generate QA score for hsd_atmcor.
 
         Generate QA score for hsd_atmcor and register it to the result.

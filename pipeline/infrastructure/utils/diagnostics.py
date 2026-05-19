@@ -76,7 +76,7 @@ def enable_memstats():
 enable_memstats.enabled = False
 
 
-class Interval(object):
+class Interval:
     def __init__(self, interval, function, args=None, kwargs=None):
         """
         Runs the function at a specified interval with given arguments.

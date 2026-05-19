@@ -9,7 +9,7 @@ event listeners downstream.
 """
 
 
-class Event(object):
+class Event:
     """
     Base class inherited by all pipeline events.
     """

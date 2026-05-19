@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import collections
 import contextlib
 import operator
 import os
 import uuid
 from functools import reduce
-from typing import List, Set, Tuple, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 import scipy.stats as stats
@@ -17,7 +19,7 @@ import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.sessionutils as sessionutils
 import pipeline.infrastructure.vdp as vdp
-from pipeline.domain import FluxMeasurement, MeasurementSet
+from pipeline.domain import FluxMeasurement
 from pipeline.h.tasks.common import commonfluxresults, mstools
 from pipeline.h.tasks.flagging.flagdatasetter import FlagdataSetter
 from pipeline.hif.tasks import applycal, gaincal
@@ -30,6 +32,9 @@ from pipeline.infrastructure import (casa_tasks, casa_tools, exceptions,
 from ... import heuristics
 from . import fluxes
 
+if TYPE_CHECKING:
+    from pipeline.domain import MeasurementSet
+
 __all__ = [
     'GcorFluxscale',
     'GcorFluxscaleInputs',
@@ -38,7 +43,7 @@ __all__ = [
     'SessionGcorFluxscaleInputs'
 ]
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 ORIGIN = 'gcorfluxscale'
 
@@ -508,7 +513,7 @@ class SerialGcorFluxscale(basetask.StandardTaskTemplate):
 
         return fluxscale_result
 
-    def _do_ampcal(self, antenna: str, refant: str, minblperant: int) -> Tuple[Union[None, GaincalResults], str, bool]:
+    def _do_ampcal(self, antenna: str, refant: str, minblperant: int) -> tuple[None | GaincalResults, str, bool]:
         inputs = self.inputs
 
         ampcal_result = None
@@ -617,7 +622,7 @@ class SerialGcorFluxscale(basetask.StandardTaskTemplate):
         return result
 
     def _do_phasecals(self, all_ants: str, restr_ants: str, refant: str, minblperant: int,
-                      uvrange: str) -> List[GaincalResults]:
+                      uvrange: str) -> list[GaincalResults]:
         # Collect phase cal results for merging into context.
         phase_results = []
 
@@ -665,7 +670,7 @@ class SerialGcorFluxscale(basetask.StandardTaskTemplate):
         return phase_results
 
     @staticmethod
-    def _extract_calapps_for_check(gaincal_results: List[GaincalResults]) -> List:
+    def _extract_calapps_for_check(gaincal_results: list[GaincalResults]) -> list:
         # Extract list of CalApps for any gaincal result where intent was
         # CHECK.
         calapps = []
@@ -675,7 +680,7 @@ class SerialGcorFluxscale(basetask.StandardTaskTemplate):
         return calapps
 
     @staticmethod
-    def _get_intent_field(ms: MeasurementSet, intents: Set, exclude_intents: Set = None) -> List[Tuple[str, str]]:
+    def _get_intent_field(ms: MeasurementSet, intents: set, exclude_intents: set = None) -> list[tuple[str, str]]:
         if exclude_intents is None:
             exclude_intents = set()
 
@@ -1109,7 +1114,7 @@ class SerialGcorFluxscale(basetask.StandardTaskTemplate):
         LOG.debug(f'Adding calibration to callibrary:\n{new_calapp.calto}\n{new_calapp.calfrom}')
         inputs.context.callibrary.add(new_calapp.calto, new_calapp.calfrom)
 
-    def _flag_ampcal(self, caltable: str) -> List[str]:
+    def _flag_ampcal(self, caltable: str) -> list[str]:
         # Get fields and SpWs to evaluate.
         fields = self.inputs.ms.get_fields(name=','.join([self.inputs.transfer, self.inputs.reference]))
         scispws = self.inputs.ms.get_spectral_windows()

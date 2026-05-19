@@ -20,7 +20,7 @@ class KTypeGaincalInputs(common.VdpCommonGaincalInputs):
                  antenna=None, uvrange=None, smodel=None, calmode=None, solint=None, combine=None, refant=None,
                  refantmode=None, minblperant=None, minsnr=None, solnorm=None, append=None, scan=None, opacity=None,
                  parang=None):
-        super(KTypeGaincalInputs, self).__init__(context, output_dir=output_dir, vis=vis, caltable=caltable,
+        super().__init__(context, output_dir=output_dir, vis=vis, caltable=caltable,
                                                  intent=intent, field=field, spw=spw, refant=refant,
                                                  refantmode=refantmode, antenna=antenna, minblperant=minblperant,
                                                  opacity=opacity, selectdata=None, uvrange=uvrange, calmode=calmode)

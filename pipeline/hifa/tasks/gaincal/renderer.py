@@ -4,6 +4,7 @@ Created on 29 Oct 2014
 @author: sjw
 """
 import collections
+import collections.abc
 import os
 
 import pipeline.infrastructure
@@ -339,7 +340,7 @@ class GaincalPhaseVsTimePlotRenderer(basetemplates.JsonPlotRenderer):
         title = 'Phase vs time for %s' % vis
         outfile = filenamer.sanitize('phase_vs_time-%s.html' % vis)
 
-        super(GaincalPhaseVsTimePlotRenderer, self).__init__(
+        super().__init__(
             'generic_x_vs_y_spw_ant_plots.mako', context, result, plots, title, outfile)
 
 
@@ -361,7 +362,7 @@ class GaincalPhaseVsTimeDiagnosticPlotRenderer(basetemplates.JsonPlotRenderer):
 
         self._score_types = frozenset(['PHASE_SCORE_XY', 'PHASE_SCORE_X2X1'])
 
-        super(GaincalPhaseVsTimeDiagnosticPlotRenderer, self).__init__(
+        super().__init__(
             'diagnostic_phase_vs_time_plots.mako', context, results, plots, title, outfile)
 
     def update_json_dict(self, json_dict, plot):
@@ -413,7 +414,7 @@ class GaincalAmpVsTimePlotRenderer(basetemplates.JsonPlotRenderer):
         title = 'Amplitude vs time for %s' % vis
         outfile = filenamer.sanitize('amp_vs_time-%s.html' % vis)
 
-        super(GaincalAmpVsTimePlotRenderer, self).__init__(
+        super().__init__(
             'generic_x_vs_y_spw_ant_plots.mako', context, result, plots, title, outfile)
 
 
@@ -424,7 +425,7 @@ class GaincalAmpVsTimeDiagnosticPlotRenderer(basetemplates.JsonPlotRenderer):
         title = 'Amplitude vs time for %s' % vis
         outfile = filenamer.sanitize('diagnostic_amp_vs_time-%s.html' % vis)
 
-        super(GaincalAmpVsTimeDiagnosticPlotRenderer, self).__init__(
+        super().__init__(
             'generic_x_vs_y_spw_ant_plots.mako', context, result, plots, title, outfile)
 
 
@@ -435,5 +436,5 @@ class GaincalPhaseOffsetVsTimeDiagnosticPlotRenderer(basetemplates.JsonPlotRende
         title = 'Phase offset vs time for %s' % vis
         outfile = filenamer.sanitize('diagnostic_phaseoffset_vs_time-%s.html' % vis)
 
-        super(GaincalPhaseOffsetVsTimeDiagnosticPlotRenderer, self).__init__(
+        super().__init__(
             'generic_x_vs_y_spw_ant_plots.mako', context, result, plots, title, outfile)

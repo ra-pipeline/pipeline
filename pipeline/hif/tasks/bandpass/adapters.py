@@ -35,20 +35,19 @@ class PhaseUpSolIntAdapter(adapters.Adapter):
     def __init__(self, heuristic):
         """Create a new PhaseUpSolIntAdapter, wrapping the given heuristic.
 
-        :param heuristic: the target heuristic
-        :type heuristic: :class:`~pipeline.hif.heuristics.solint.PhaseUpSolInt`
+        Args:
+            heuristic: The target heuristic.
         """
-        super(PhaseUpSolIntAdapter, self).__init__(heuristic)
+        super().__init__(heuristic)
 
     def calculate(self, ms, intent):
         """Extract the integration time for observations with the given intent
         from the measurement set and pass it to the wrapped heuristic,
         returning the result.
 
-        :param ms: the MeasurementSet to examine 
-        :type ms: :class:`~pipeline.domain.measurementset.MeasurementSet`
-        :param intent: the intent for which to find the integration time 
-        :type intent: string
+        Args:
+            ms: The MeasurementSet to examine.
+            intent: The intent for which to find the integration time.
         """
         int_time = ms.get_integration_time_stats(intent=intent, stat_type="median")
         return self._adaptee(int_time)
@@ -65,10 +64,10 @@ class PolynomialHeuristicAdapter(adapters.Adapter):
         """
         Create a new PolynomialHeuristicAdapter, wrapping the given heuristic.
 
-        :param heuristic: the target heuristic
-        :type heuristic: :class:`~pipeline.hifheuristics.bporder.BPOrder`
+        Args:
+            heuristic: The target heuristic.
         """
-        super(PolynomialHeuristicAdapter, self).__init__(heuristic)
+        super().__init__(heuristic)
 
     def calculate(self, ms, caltable, spw):        
         if isinstance(self._adaptee, echoheuristic.EchoHeuristic):
@@ -85,15 +84,14 @@ class PolynomialHeuristicAdapter(adapters.Adapter):
         Method to read channel calibration table and return it as a Python
         array.
 
-        Keyword arguments:
-        table  -- The name of the calibration table
-        spw    -- The SpW of interest.
-        msobject -- MeasurementSet domain object from which the calibration
-                    was calculated.
+        Args:
+            ms: MeasurementSet domain object from which the calibration
+                was calculated.
+            caltable: The calibration table.
+            spw: The SpW of interest.
 
         Returns:
-        data - 'view' of calibration gains in numpy complex array[antenna,channel]
-        flag - flags associated with data array bool[antenna,channel]
+            numpy.ndarray: View of calibration gains in complex array[antenna,channel].
         """
         if not os.path.exists(caltable.name):
             LOG.warning('Table {0} does not exist. Returning a dummy array'
@@ -140,14 +138,14 @@ class PolynomialHeuristicAdapter(adapters.Adapter):
             data = numpy.zeros([num_antenna+1, nchannels], complex)
             flag = numpy.zeros([num_antenna+1, nchannels], bool)
 
-            antennas1 = [antenna1[i] for i in range(numpy.shape(gain)[2])
-                         if i in antenna_ids]
-            for ant in antennas1:
-                for p in range(npol):
-                    data[ant, :] += gain[p, :, i]
-                    flag[ant, :] = numpy.logical_or(flag[ant, :],
-                     cal_flag[p, :, i])
-                data[ant, :] /= float(npol)
+            for i in range(numpy.shape(gain)[2]):
+                if i in antenna_ids:
+                    ant = antenna1[i]
+                    for p in range(npol):
+                        data[ant, :] += gain[p, :, i]
+                        flag[ant, :] = numpy.logical_or(flag[ant, :],
+                         cal_flag[p, :, i])
+                    data[ant, :] /= float(npol)
 
         return data
 
@@ -156,10 +154,10 @@ class DegAmpAdapter(PolynomialHeuristicAdapter):
     def __init__(self, heuristic):
         """Create a new DegAmpAdapter, wrapping the given heuristic.
 
-        :param heuristic: the target heuristic
-        :type heuristic: :class:`~pipeline.hif.heuristics.bandpass.BPOrder`
+        Args:
+            heuristic: The target heuristic.
         """
-        super(DegAmpAdapter, self).__init__(heuristic)
+        super().__init__(heuristic)
 
     def _get_channel_data(self, data, antennas):
         amplitudes = {}
@@ -173,10 +171,10 @@ class DegPhaseAdapter(PolynomialHeuristicAdapter):
     def __init__(self, heuristic):
         """Create a new DegPhaseAdapter, wrapping the given heuristic.
 
-        :param heuristic: the target heuristic
-        :type heuristic: :class:`~pipeline.hif.heuristics.bandpass.BPOrder`
+        Args:
+            heuristic: The target heuristic.
         """
-        super(DegPhaseAdapter, self).__init__(heuristic)
+        super().__init__(heuristic)
 
     def _get_channel_data(self, data, antennas):
         phases = {}

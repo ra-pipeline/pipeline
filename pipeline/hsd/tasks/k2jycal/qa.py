@@ -1,9 +1,10 @@
 """QA score handlers for k2jycal task."""
-import collections
+from __future__ import annotations
 
+import collections.abc
 from typing import TYPE_CHECKING
 
-import pipeline.infrastructure.logging as logging
+import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 from . import k2jycal
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
     from pipeline.infrastructure.launcher import Context
     from pipeline.infrastructure.basetask import ResultsList
 
-LOG = logging.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class SDK2JyCalQAHandler(pqa.QAPlugin):
@@ -21,7 +22,7 @@ class SDK2JyCalQAHandler(pqa.QAPlugin):
     result_cls = k2jycal.SDK2JyCalResults
     child_cls = None
 
-    def handle(self, context: 'Context', result: k2jycal.SDK2JyCalResults) -> None:
+    def handle(self, context: Context, result: k2jycal.SDK2JyCalResults) -> None:
         """Evaluate QA score for k2jycal result.
 
         Score is 0.0 if
@@ -62,12 +63,12 @@ class SDK2JyCalListQAHandler(pqa.QAPlugin):
     result_cls = collections.abc.Iterable
     child_cls = k2jycal.SDK2JyCalResults
 
-    def handle(self, context: 'Context', result: 'ResultsList') -> None:
+    def handle(self, context: Context, result: ResultsList) -> None:
         """Evaluate QA score for a list of k2jycal results.
 
         Args:
             context: Pipeline context (not used)
-            result: List of SDK2JyCalResults instances
+            result: list of SDK2JyCalResults instances
         """
         # collate the QAScores from each child result, pulling them into our
         # own QAscore list

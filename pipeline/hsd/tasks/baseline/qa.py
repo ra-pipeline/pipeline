@@ -1,21 +1,20 @@
 """QA score calculation for baseline subtraction task."""
-import os
-from typing import TYPE_CHECKING, List, Optional, Union
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import pipeline.infrastructure.basetask as basetask
-import pipeline.infrastructure.logging as logging
+import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.pipelineqa as pqa
-import pipeline.infrastructure.renderer.logger as logger
 import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as qacalc
 
-from ..common import compress
 from . import baseline
 
 if TYPE_CHECKING:
     from pipeline.infrastructure.launcher import Context
 
-LOG = logging.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class SDBaselineQAHandler(pqa.QAPlugin):
@@ -24,7 +23,7 @@ class SDBaselineQAHandler(pqa.QAPlugin):
     result_cls = baseline.SDBaselineResults
     child_cls = None
 
-    def handle(self, context: 'Context', result: result_cls) -> None:
+    def handle(self, context: Context, result: result_cls) -> None:
         """Compute QA score for baseline subtraction task.
 
         QA scoring is performed based on the following metric:
@@ -55,7 +54,7 @@ class SDBaselineListQAHandler(pqa.QAPlugin):
     result_cls = basetask.ResultsList
     child_cls = baseline.SDBaselineResults
 
-    def handle(self, context: 'Context', result: result_cls) -> None:
+    def handle(self, context: Context, result: result_cls) -> None:
         """Compute QA score for baseline subtraction task.
 
         Collate and join QA scores from results instances included in the

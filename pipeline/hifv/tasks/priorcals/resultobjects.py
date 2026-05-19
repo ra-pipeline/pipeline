@@ -22,7 +22,7 @@ class PriorcalsResults(basetask.Results):
         if preceding is None:
             preceding = []
 
-        super(PriorcalsResults, self).__init__()
+        super().__init__()
 
         self.vis = None
         self.pool = pool

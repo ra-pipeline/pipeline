@@ -1,10 +1,14 @@
-# import os
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.vdp as vdp
 from pipeline.infrastructure import task_registry
-from pipeline.infrastructure.launcher import Context
+
+if TYPE_CHECKING:
+    from pipeline.infrastructure.launcher import Context
 
 __all__ = [
     'LockRefAnt',

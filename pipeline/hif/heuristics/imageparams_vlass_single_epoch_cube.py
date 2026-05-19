@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import copy
-from typing import Optional, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -11,14 +11,11 @@ from pipeline.infrastructure import casa_tasks
 
 from .imageparams_vlass_single_epoch_continuum import ImageParamsHeuristicsVlassSeContMosaic
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
+    from pipeline.hif.tasks.makeimlist.cleantarget import CleanTarget
     from pipeline.infrastructure.vdp import StandardInputs
-    from pipeline.hif.tasks.makeimlist import CleanTarget
 
-
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class ImageParamsHeuristicsVlassSeCube(ImageParamsHeuristicsVlassSeContMosaic):
@@ -28,7 +25,7 @@ class ImageParamsHeuristicsVlassSeCube(ImageParamsHeuristicsVlassSeContMosaic):
         self.imaging_mode = 'VLASS-SE-CUBE'
         self.vlass_stage = 3
 
-    def reffreq(self, deconvolver: Optional[str]=None, specmode: Optional[str]=None, spwsel: Optional[dict]=None) -> Optional[str]:
+    def reffreq(self, deconvolver: str | None=None, specmode: str | None=None, spwsel: dict | None=None) -> str | None:
         """Tclean reffreq parameter heuristics.
 
         tclean(reffreq=None) will automatically calculate the referenece frequency using the mean frequency of the selected spws.
@@ -53,7 +50,7 @@ class ImageParamsHeuristicsVlassSeCube(ImageParamsHeuristicsVlassSeContMosaic):
 
         return str(meanfreq_value)+'GHz'
 
-    def _flagpct_spwgroup(self, results_list: Union[list, None] = None, spw_selection=None):
+    def _flagpct_spwgroup(self, results_list: list | None = None, spw_selection=None):
         """Get the flag percentage of a spw group (specified by a selection string, e.g. '2,3,4').
 
         Note: Quick check using cached results from hifv_flagtargetsdata() (PIPE-1401).
@@ -241,9 +238,9 @@ class ImageParamsHeuristicsVlassSeCube(ImageParamsHeuristicsVlassSeContMosaic):
         rootname=None,
         iteration=None,
         mask=None,
-        results_list: Union[list, None] = None,
+        results_list: list | None = None,
         clean_no_mask=None,
-    ) -> Union[str, list]:
+    ) -> str | list:
         """Tier-1 mask name to be used for computing Tier-1 and Tier-2 combined mask.
 
             Obtain the mask name from the latest MakeImagesResult object in context.results.
@@ -273,7 +270,7 @@ class ImageParamsHeuristicsVlassSeCube(ImageParamsHeuristicsVlassSeContMosaic):
         # In case hif_makeimages result was not found or results_list was not provided
         return mask_list
 
-    def nterms(self, spwspec) -> Union[int, None]:
+    def nterms(self, spwspec) -> int | None:
         """Tclean nterms parameter heuristics."""
         return 1
 

@@ -1,5 +1,4 @@
 import re
-from typing import Union, Tuple, Optional
 
 import numpy
 
@@ -7,7 +6,7 @@ import pipeline.infrastructure as infrastructure
 from pipeline.infrastructure import casa_tools
 from .imageparams_base import ImageParamsHeuristics
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class ImageParamsHeuristicsVlassSeTaper(ImageParamsHeuristics):
@@ -40,16 +39,16 @@ class ImageParamsHeuristicsVlassSeTaper(ImageParamsHeuristics):
         """Tclean gridder parameter heuristics."""
         return 'mosaic'
 
-    def cell(self, beam=None, pixperbeam=None) -> Union[str, list]:
+    def cell(self, beam=None, pixperbeam=None) -> str | list:
         """Tclean cell parameter heuristics."""
         return ['1.8arcsec']
 
     def imsize(self, fields=None, cell=None, primary_beam=None, sfpblimit=None, max_pixels=None, centreonly=None,
-               vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None) -> Union[list, int]:
+               vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None) -> list | int:
         """Tclean imsize parameter heuristics."""
         return [4050, 4050]
 
-    def reffreq(self, deconvolver: Optional[str]=None, specmode: Optional[str]=None, spwsel: Optional[dict]=None) -> Optional[str]:
+    def reffreq(self, deconvolver: str | None=None, specmode: str | None=None, spwsel: dict | None=None) -> str | None:
         """Tclean reffreq parameter heuristics."""
         return '3.0GHz'
 
@@ -61,11 +60,11 @@ class ImageParamsHeuristicsVlassSeTaper(ImageParamsHeuristics):
         """Tclean cycleniter parameter heuristics."""
         return 2000
 
-    def scales(self, iteration: Union[int, None] = None) -> list:
+    def scales(self, iteration: int | None = None) -> list:
         """Tclean scales parameter heuristics."""
         return [0]
 
-    def uvtaper(self, beam_natural=None, protect_long=None, beam_user=None, tapering_limit=None, repr_freq=None) -> Union[str, list]:
+    def uvtaper(self, beam_natural=None, protect_long=None, beam_user=None, tapering_limit=None, repr_freq=None) -> str | list:
         """Tclean uvtaper parameter heuristics."""
         return ['7.0arcsec']
 
@@ -74,7 +73,7 @@ class ImageParamsHeuristicsVlassSeTaper(ImageParamsHeuristics):
         return None, None
 
     def mask(self, hm_masking=None, rootname=None, iteration=None, mask=None,
-             results_list: Union[list, None] = None) -> str:
+             results_list: list | None = None) -> str:
         return ''
 
     def buffer_radius(self) -> float:
@@ -210,7 +209,7 @@ class ImageParamsHeuristicsVlassSeTaper(ImageParamsHeuristics):
         return fieldlist
 
     def keep_iterating(self, iteration, hm_masking, tclean_stopcode, dirty_dynamic_range, residual_max,
-                       residual_robust_rms, field, intent, spw, specmode) -> Tuple[bool, str]:
+                       residual_robust_rms, field, intent, spw, specmode) -> tuple[bool, str]:
         """Determine if another tclean iteration is necessary."""
         if iteration == 0:
             return True, hm_masking
@@ -220,7 +219,7 @@ class ImageParamsHeuristicsVlassSeTaper(ImageParamsHeuristics):
         else:
             return False, hm_masking
 
-    def threshold(self, iteration: int, threshold: Union[str, float], hm_masking: str) -> Union[str, float]:
+    def threshold(self, iteration: int, threshold: str | float, hm_masking: str) -> str | float:
         """Tclean threshold parameter heuristics."""
         if hm_masking == 'auto':
             return '0.0mJy'
@@ -233,8 +232,8 @@ class ImageParamsHeuristicsVlassSeTaper(ImageParamsHeuristics):
             return threshold
 
     def nsigma(
-        self, iteration: int, hm_nsigma: float, hm_masking: str, rms_multiplier: Optional[Union[int, float]] = None
-    ) -> Union[float, None]:
+        self, iteration: int, hm_nsigma: float, hm_masking: str, rms_multiplier: int | float | None = None
+    ) -> float | None:
         """Tclean nsigma parameter heuristics."""
         if hm_nsigma:
             return hm_nsigma
@@ -246,7 +245,7 @@ class ImageParamsHeuristicsVlassSeTaper(ImageParamsHeuristics):
         else:
             return 4.5
 
-    def savemodel(self, iteration: int) -> Union[str, None]:
+    def savemodel(self, iteration: int) -> str | None:
         """Tclean savemodel parameter heuristics."""
         if iteration == 2:
             return 'modelcolumn'

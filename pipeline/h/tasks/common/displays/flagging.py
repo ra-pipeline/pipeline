@@ -7,7 +7,7 @@ from pipeline.infrastructure import casa_tasks
 LOG = infrastructure.get_logger(__name__)
 
 
-class PlotAntsChart(object):
+class PlotAntsChart:
     def __init__(self, context, result):
         self.context = context
         self.result = result

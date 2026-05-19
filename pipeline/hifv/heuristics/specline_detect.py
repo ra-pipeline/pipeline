@@ -1,18 +1,22 @@
 """
 Heuristic for identifying and/or defining the SPW designation, either as a continuum window or for spectral line analysis
 """
-from typing import Type
+from __future__ import annotations
 
-import pipeline.infrastructure.logging as logging
-from pipeline.domain.spectralwindow import SpectralWindow
-from pipeline.domain.measurementset import MeasurementSet
+from typing import TYPE_CHECKING
+
+import pipeline.infrastructure as infrastructure
 from pipeline.infrastructure.utils.conversion import range_to_list, commafy
 from pipeline.infrastructure.utils import find_ranges
 
-LOG = logging.get_logger(__name__)
+if TYPE_CHECKING:
+    from pipeline.domain.spectralwindow import SpectralWindow
+    from pipeline.domain.measurementset import MeasurementSet
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 
-def detect_spectral_lines(mset: Type[MeasurementSet], specline_spws: str='auto') -> None:
+def detect_spectral_lines(mset: type[MeasurementSet], specline_spws: str='auto') -> None:
     """Handles assignment of spectral windows
 
     Args:
@@ -53,7 +57,7 @@ def detect_spectral_lines(mset: Type[MeasurementSet], specline_spws: str='auto')
         if int(spw.id) in spec_windows:
             spw.specline_window = True
 
-def _auto_detector(spw: Type[SpectralWindow], band: str) -> None:
+def _auto_detector(spw: type[SpectralWindow], band: str) -> None:
     """Determines if a spectral window should be designated as a spectral line window using the following logic:
        - frequency above L-band (greater than 1GHz) and
          - L- or S-band and window more narrow than 32 MHz and more than 64 channels or
@@ -82,4 +86,3 @@ def _auto_detector(spw: Type[SpectralWindow], band: str) -> None:
                 spw_type = "spectral line"
         LOG.info("Spw %d has been identified as a %s window.", spw.id, spw_type)
     spw.specline_window = spectral_line_spw
-        

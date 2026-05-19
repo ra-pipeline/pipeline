@@ -13,6 +13,7 @@ import numpy as np
 from casatasks import imhead
 
 import pipeline.infrastructure as infrastructure
+from pipeline.extern.findContinuum import convertColonDelimitersToHMSDMS
 from pipeline.infrastructure import casa_tools
 
 LOG = infrastructure.get_logger(__name__)

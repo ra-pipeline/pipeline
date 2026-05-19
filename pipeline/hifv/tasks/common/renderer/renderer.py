@@ -9,7 +9,7 @@ import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.renderer.weblog as weblog
 
 
-class VLASubPlotRenderer(object):
+class VLASubPlotRenderer:
     def __init__(self, context, result, plots, json_path, template, filename_prefix, bandlist, spwlist=None, spw_plots=None, taskname=None):
         self.context = context
         self.result = result

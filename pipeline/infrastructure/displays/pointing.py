@@ -1,25 +1,34 @@
 """Pointing methods and classes."""
+from __future__ import annotations
+
 import gc
 import math
-from numbers import Integral
 import os
-from typing import List, Optional, Tuple, Union
+from typing import TYPE_CHECKING
 
-from matplotlib.axes._axes import Axes
 import matplotlib.figure as figure
-from matplotlib.ticker import (AutoLocator, Formatter, FuncFormatter, Locator,
-                               MultipleLocator)
 import numpy as np
+from matplotlib.ticker import AutoLocator, FuncFormatter, MultipleLocator
 
-from pipeline.domain import Antenna, MeasurementSet
+import pipeline.infrastructure as infrastructure
 from pipeline.domain.datatable import DataTableImpl as DataTable
 from pipeline.domain.datatable import OnlineFlagIndex
-import pipeline.infrastructure as infrastructure
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.displays.plotstyle import casa5style_plot
 from pipeline.infrastructure.renderer.logger import Plot
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
+
+if TYPE_CHECKING:
+    from numbers import Integral
+
+    from matplotlib.axes._axes import Axes
+    from matplotlib.ticker import Formatter, Locator
+    from numpy import floating
+    from numpy.typing import NDArray
+
+    from pipeline.domain import Antenna, MeasurementSet
+    from pipeline.infrastructure.launcher import Context
 
 RArotation = 90
 DECrotation = 0
@@ -31,7 +40,7 @@ hsyb = ':'
 msyb = ':'
 
 
-def Deg2HMS(x: float, prec: int=0) -> List[str]:
+def Deg2HMS(x: float, prec: int=0) -> list[str]:
     """
     Convert an angle in degree to hour angle.
 
@@ -228,7 +237,7 @@ def HHMMSSsss(x: float, pos=None) -> str:
     return __format_hms(x, prec=9)
 
 
-def Deg2DMS(x: float, prec: int=0) -> List[str]:
+def Deg2DMS(x: float, prec: int=0) -> list[str]:
     r"""
     Convert an angle in degree to dms angle (ddmmss.s).
 
@@ -403,7 +412,7 @@ def DDMMSSss(x: float, pos=None) -> str:
 
 
 def GLGBlabel(span: float
-    ) -> Tuple[MultipleLocator, MultipleLocator, FuncFormatter, FuncFormatter]:
+    ) -> tuple[MultipleLocator, MultipleLocator, FuncFormatter, FuncFormatter]:
     """
     Create x- and y-axis formatters of plots suitable for a map in galactic coordinate.
 
@@ -414,22 +423,16 @@ def GLGBlabel(span: float
         (GLlocator, GBlocator, GLformatter, GBformatter) for Galactic coordinate
 
     """
-    # RAtick = [15.0, 5.0, 2.5, 1.25, 1/2.0, 1/4.0, 1/12.0, 1/24.0, 1/48.0, 1/120.0, 1/240.0, 1/480.0, 1/1200.0,
-    #           1/2400.0, 1/4800.0, 1/12000.0, 1/24000.0, 1/48000.0, -1.0]
+
     XYtick = [20.0, 10.0, 5.0, 2.0, 1.0, 1/3.0, 1/6.0, 1/12.0, 1/30.0, 1/60.0, 1/180.0, 1/360.0, 1/720.0, 1/1800.0,
               1/3600.0, 1/7200.0, 1/18000.0, 1/36000.0, -1.0]
-    #for RAt in RAtick:
-    #    if span > (RAt * 3.0) and RAt > 0:
-    #        RAlocator = MultipleLocator(RAt)
-    #        break
-    #if RAt < 0: RAlocator = MultipleLocator(1/96000.)
-    #if RAt < 0: RAlocator = AutoLocator()
+
     for t in XYtick:
         if span > (t * 3.0) and t > 0:
             GLlocator = MultipleLocator(t)
             GBlocator = MultipleLocator(t)
             break
-    #if DECt < 0: DEClocator = MultipleLocator(1/72000.0)
+
     if t < 0:
         GLlocator = AutoLocator()
         GBlocator = AutoLocator()
@@ -445,7 +448,6 @@ def GLGBlabel(span: float
         GBformatter = FuncFormatter(DDMMSS)
     elif span < 1.0:
         GLformatter = FuncFormatter(DDMMSS)
-        #GBformatter=FuncFormatter(DDMM)
         GBformatter = FuncFormatter(DDMMSS)
     else:
         GLformatter = FuncFormatter(DDMM)
@@ -456,7 +458,7 @@ def GLGBlabel(span: float
 
 def RADEClabel(span: float,
         ofs_coord: bool
-    ) -> Tuple[MultipleLocator, MultipleLocator, FuncFormatter, FuncFormatter]:
+    ) -> tuple[MultipleLocator, MultipleLocator, FuncFormatter, FuncFormatter]:
     """
     Create x- and y-axis formatters of plots suitable for a map in general R.A. and Dec. coordinate.
 
@@ -477,13 +479,13 @@ def RADEClabel(span: float,
         if span > (RAt * 3.0) and RAt > 0:
             RAlocator = MultipleLocator(RAt)
             break
-    #if RAt < 0: RAlocator = MultipleLocator(1/96000.)
+
     if RAt < 0: RAlocator = AutoLocator()
     for DECt in DECtick:
         if span > (DECt * 3.0) and DECt > 0:
             DEClocator = MultipleLocator(DECt)
             break
-    #if DECt < 0: DEClocator = MultipleLocator(1/72000.0)
+
     if DECt < 0: DEClocator = AutoLocator()
 
     if span < 0.0001:
@@ -509,7 +511,6 @@ def RADEClabel(span: float,
             RAformatter = FuncFormatter(DDMMSS)
         else:
             RAformatter = FuncFormatter(HHMMSS)
-        #DECformatter=FuncFormatter(DDMM)
         DECformatter = FuncFormatter(DDMMSS)
     else:
         if ofs_coord:
@@ -522,7 +523,7 @@ def RADEClabel(span: float,
 
 
 def XYlabel(span: float, direction_reference: str, ofs_coord: bool=False
-            ) -> Tuple[Union[GLGBlabel, RADEClabel]]:
+            ) -> tuple[GLGBlabel | RADEClabel]:
     """
     Create labels for the x- and y-axes in plot.
 
@@ -544,7 +545,7 @@ def XYlabel(span: float, direction_reference: str, ofs_coord: bool=False
         return RADEClabel(span, ofs_coord)
 
 
-class MapAxesManagerBase(object):
+class MapAxesManagerBase:
     """Base class for MapAxesManager classes.
 
     Holds information to construct direction coordinates.
@@ -602,7 +603,7 @@ class MapAxesManagerBase(object):
         self._direction_reference = None
         self._ofs_coord = None
 
-    def get_axes_labels(self) -> Tuple[str, str]:
+    def get_axes_labels(self) -> tuple[str, str]:
         """
         Get direction coordinate axes labels.
 
@@ -655,9 +656,9 @@ class PointingAxesManager(MapAxesManagerBase):
                   xlocator: Locator, ylocator: Locator,
                   xformatter: Formatter, yformatter: Formatter,
                   xrotation: Integral, yrotation: Integral,
-                  aspect: Union[Integral, str],
-                  xlim: Optional[Tuple[Integral, Integral]]=None,
-                  ylim: Optional[Tuple[Integral, Integral]]=None,
+                  aspect: Integral | str,
+                  xlim: tuple[Integral, Integral] | None=None,
+                  ylim: tuple[Integral, Integral] | None=None,
                   reset: bool=False) -> None:
         """
         Initialize matplotlib.axes.Axes instance.
@@ -752,13 +753,13 @@ def draw_beam(axes, r: float, aspect: float, x_base: float, y_base: float,
 
 
 def draw_pointing(axes_manager: PointingAxesManager,
-                  RA: np.ndarray,
-                  DEC: np.ndarray,
-                  FLAG: Optional[np.ndarray]=None,
-                  plotfile: Optional[str]=None,
+                  RA: NDArray[floating],
+                  DEC: NDArray[floating],
+                  FLAG: NDArray[np.bool_] | None=None,
+                  plotfile: str | None=None,
                   connect: bool=True,
-                  circle: List[Optional[float]]=[],
-                  ObsPattern: Optional[str]=None,
+                  circle: list[float | None]=[],
+                  ObsPattern: str | None=None,
                   plotpolicy: str='ignore'
                   ) -> None:
     """
@@ -851,14 +852,14 @@ def draw_pointing(axes_manager: PointingAxesManager,
     fig.clf()
 
 
-class SingleDishPointingChart(object):
+class SingleDishPointingChart:
     """Generate pointing plots.
 
     Generate pointing plot for given data, antenna, and field.
     Data and antenna must be given as domain objects.
     """
     def __init__(self,
-                 context: infrastructure.launcher.Context,
+                 context: Context,
                  ms: MeasurementSet) -> None:
         """Initialize SingleDishPointingChart class.
 
@@ -876,7 +877,7 @@ class SingleDishPointingChart(object):
     def __del__(self):
         del self.datatable
 
-    def __get_field(self, field_id: Optional[int], intent: Optional[str] = None):
+    def __get_field(self, field_id: int | None, intent: str | None = None):
         """Get field domain object.
 
         If field_id is not given, None is returned.
@@ -901,23 +902,23 @@ class SingleDishPointingChart(object):
             return None
 
     @casa5style_plot
-    def plot(self, revise_plot: bool=False, antenna: Antenna=None, target_field_id: Optional[int]=None,
-             reference_field_id: Optional[int]=None, target_only: bool=True, ofs_coord: bool=False) -> Optional[Plot]:
+    def plot(self, revise_plot: bool=False, antenna: Antenna=None, target_field_id: int | None=None,
+             reference_field_id: int | None=None, target_only: bool=True, ofs_coord: bool=False) -> Plot | None:
         """Generate a plot object.
 
         If plot file exists and revise_plot is False, Plot object
         based on existing file is returned.
 
         Args:
-            revise_plot (bool): Overwrite existing plot or not. Defaults to False.
-            antenna (Antenna): Antenna domain object. Defaults to None.
-            target_field_id (Optional[int]): ID for target (ON_SOURCE) field. Defaults to None.
-            reference_field_id (Optional[int]): ID for reference (OFF_SOURCE) field. Defaults to None.
-            target_only (bool): Whether plot ON_SOURCE only (True) or both ON_SOURCE and OFF_SOURCE. Defaults to True.
-            ofs_coord (bool): Use offset coordinate or not. Defaults to False.
+            revise_plot: Overwrite existing plot or not. Defaults to False.
+            antenna: Antenna domain object. Defaults to None.
+            target_field_id: ID for target (ON_SOURCE) field. Defaults to None.
+            reference_field_id: ID for reference (OFF_SOURCE) field. Defaults to None.
+            target_only: Whether plot ON_SOURCE only (True) or both ON_SOURCE and OFF_SOURCE. Defaults to True.
+            ofs_coord: Use offset coordinate or not. Defaults to False.
 
         Returns:
-            Optional[Plot]: A Plot object.
+            A Plot object or None.
         """
         self.antenna = antenna
         self.target_only = target_only
@@ -1044,8 +1045,8 @@ class SingleDishPointingChart(object):
             thumb_file = ret.thumbnail
 
         # execute gc.collect() when the number of uncollected objects reaches 256 (decided ad hoc) or more.
-        # figure.Figure creates a huge number of objects, and if plot() is called a significant number of times to plot points,
-        # the python kernel cannot collect objects all at once by default GC setting.
+        # figure.Figure creates a huge number of objects, and if plot() is called a significant number of times
+        # to plot points, the python kernel cannot collect objects all at once by default GC setting.
         if gc.get_count()[0] > 255:
             gc.collect()
 
@@ -1056,7 +1057,7 @@ class SingleDishPointingChart(object):
         Generate file path to export a plot.
 
         Returns:
-            str: file path to export a plot.
+            The file path to export a plot.
 
         """
         session_part = self.ms.session
@@ -1086,7 +1087,7 @@ class SingleDishPointingChart(object):
         Generate a Plot object.
 
         Returns:
-            Plot: A Plot object.
+            A Plot object.
 
         """
         intent = 'target' if self.target_only == True else 'target,reference'

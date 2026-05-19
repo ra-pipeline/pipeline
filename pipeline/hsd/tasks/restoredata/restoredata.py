@@ -5,7 +5,10 @@ The restore data module provides a class for reimporting, reflagging, and
 recalibrating a subset of the ASDMs belonging to a member OUS, using pipeline
 flagging and calibration data products.
 """
+from __future__ import annotations
+
 import os
+from typing import TYPE_CHECKING
 
 import pipeline.h.tasks.restoredata.restoredata as restoredata
 import pipeline.infrastructure as infrastructure
@@ -15,15 +18,13 @@ from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import task_registry
 from .. import applycal
 from ..importdata import importdata as importdata
-from typing import List, Dict, Optional, TYPE_CHECKING # typing.List/Dict is obsolete in Python 3.9, but we need to use it to support 3.6
 
 if TYPE_CHECKING:
     from pipeline.hsd.tasks.applycal import SDApplycalResults
     from pipeline.hsd.tasks.importdata import SDImportDataResults
     from pipeline.infrastructure.launcher import Context
 
-
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class SDRestoreDataInputs(restoredata.RestoreDataInputs):
@@ -34,10 +35,10 @@ class SDRestoreDataInputs(restoredata.RestoreDataInputs):
     hm_rasterscan = vdp.VisDependentProperty(default='time')
 
     # docstring and type hints: supplements hsd_restoredata
-    def __init__(self, context: 'Context', copytoraw: Optional[bool] = None, products_dir: Optional[str] = None,
-                 rawdata_dir: Optional[str] = None, output_dir: Optional[str] = None, session: Optional[str] = None,
-                 vis: List[str] = None, bdfflags: Optional[bool] = None, lazy: Optional[bool] = None,
-                 asis: Optional[str] = None, ocorr_mode: Optional[str] = None, hm_rasterscan: Optional[str] = None):
+    def __init__(self, context: Context, copytoraw: bool | None = None, products_dir: str | None = None,
+                 rawdata_dir: str | None = None, output_dir: str | None = None, session: str | None = None,
+                 vis: list[str] = None, bdfflags: bool | None = None, lazy: bool | None = None,
+                 asis: str | None = None, ocorr_mode: str | None = None, hm_rasterscan: str | None = None):
         """
         Initialise the Inputs, initialising any property values to those given here.
 
@@ -125,8 +126,8 @@ class SDRestoreDataInputs(restoredata.RestoreDataInputs):
 class SDRestoreDataResults(restoredata.RestoreDataResults):
     """Results object of SDRestoreData."""
 
-    def __init__(self, importdata_results: 'SDImportDataResults', applycal_results: 'SDApplycalResults',
-                 flagging_summaries: List[Dict[str, str]]):
+    def __init__(self, importdata_results: SDImportDataResults, applycal_results: SDApplycalResults,
+                 flagging_summaries: list[dict[str, str]]):
         """
         Initialise the results objects.
 
@@ -135,16 +136,16 @@ class SDRestoreDataResults(restoredata.RestoreDataResults):
             applycal_results: results of applycal
             flagging_summaries: summaries of flagdata
         """
-        super(SDRestoreDataResults, self).__init__(importdata_results, applycal_results, flagging_summaries)
+        super().__init__(importdata_results, applycal_results, flagging_summaries)
 
-    def merge_with_context(self, context: 'Context'):
+    def merge_with_context(self, context: Context):
         """
         Call same method of superclass and _merge_k2jycal().
 
         Args:
             context: the pipeline Context state object
         """
-        super(SDRestoreDataResults, self).merge_with_context(context)
+        super().merge_with_context(context)
 
         # set k2jy factor to ms domain objects
         if isinstance(self.applycal_results, basetask.ResultsList):
@@ -153,7 +154,7 @@ class SDRestoreDataResults(restoredata.RestoreDataResults):
         else:
             self._merge_k2jycal(context, self.applycal_results)
 
-    def _merge_k2jycal(self, context: 'Context', applycal_results: 'SDApplycalResults'):
+    def _merge_k2jycal(self, context: Context, applycal_results: SDApplycalResults):
         """
         Merge k2jycal caltable into context.
 
@@ -203,7 +204,7 @@ class SDRestoreData(restoredata.RestoreData):
     def prepare(self):
         """Call prepare method of superclass, create Results ofject."""
         # run prepare method in the parent class
-        results = super(SDRestoreData, self).prepare()
+        results = super().prepare()
 
         # apply baseline table and produce baseline-subtracted MSs
 
@@ -215,7 +216,7 @@ class SDRestoreData(restoredata.RestoreData):
 
         return sdresults
 
-    def _do_importasdm(self, sessionlist: List[str], vislist: List[str]):
+    def _do_importasdm(self, sessionlist: list[str], vislist: list[str]):
         """
         Execute importasdm task.
 

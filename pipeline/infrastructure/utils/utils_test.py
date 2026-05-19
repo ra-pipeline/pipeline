@@ -1,12 +1,14 @@
-from collections.abc import Callable
+from __future__ import annotations
+
+import copy
+import os
 import sys
-from typing import Any, Union, List, Dict, Tuple
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
 import numpy as np
 import pytest
-import copy
-import os
 
 from pipeline import domain
 from pipeline.infrastructure import casa_tools, casa_tasks
@@ -16,14 +18,20 @@ from .utils import find_ranges, dict_merge, are_equal, approx_equal, flagged_int
     get_field_accessor, get_field_identifiers, get_receiver_type_for_spws, place_repr_source_first, \
     get_taskhistory_fromimage, list_to_str, build_refantignore
 
+if TYPE_CHECKING:
+    from typing import Any
+
+    from numpy import generic
+    from numpy.typing import NDArray
+
+
 params_find_ranges = [('', ''), ([], ''), ('1:2', '1:2'), ([1, 2, 3], '1~3'),
                       (['5~12', '14', '16:17'], '5~12,14,16:17'),
                       ([1, 2, 3, 6, 7], '1~3,6~7'),
                       ([1, 2, 3, '6', '7'], '1~3,6~7')]
 
-
 @pytest.mark.parametrize('data, expected', params_find_ranges)
-def test_find_ranges(data: Union[str, list], expected: str):
+def test_find_ranges(data: str | list, expected: str):
     """Test find_ranges()
 
     This utility function takes a string or a list of integers (e.g. spectral
@@ -42,7 +50,7 @@ params_dict_merge = [({}, {}, {}), ({}, 1, 1), ({'a': 1}, {}, {'a': 1}),
 
 
 @pytest.mark.parametrize('a, b, expected', params_dict_merge)
-def test_dict_merge(a: Dict, b: Dict, expected: Dict):
+def test_dict_merge(a: dict, b: dict, expected: dict):
     """Test dict_merge()
 
     This utility function recursively merges dictionaries. If second argument
@@ -63,7 +71,7 @@ params_are_equal = [([1, 2, 3], [1, 2, 3], True), ([1, 2.5, 3], [1, 2, 3], False
 
 
 @pytest.mark.parametrize('a, b, expected', params_are_equal)
-def test_are_equal(a: Union[List, np.ndarray], b: Union[List, np.ndarray], expected: bool):
+def test_are_equal(a: list | NDArray[generic], b: list | NDArray[generic], expected: bool):
     """Test are_equal()
 
     This utility function check the equivalence of array like objects. Two arrays
@@ -108,7 +116,7 @@ params_flagged_intervals = [([], []), ([1, 2], [(0, 0)]),
 
 
 @pytest.mark.parametrize('vec, expected', params_flagged_intervals)
-def test_flagged_intervals(vec: Union[List[int], np.ndarray], expected: List[Tuple[int]]):
+def test_flagged_intervals(vec: list[int] | NDArray[generic], expected: list[tuple[int]]):
     """Test flagged_intervals()
 
     This utility function finds islands of ones in vector provided in argument.
@@ -229,7 +237,7 @@ params_get_casa_quantity = [(None, {'unit': '', 'value': 0.0}),
 
 
 @pytest.mark.parametrize('value, expected', params_get_casa_quantity)
-def test_get_casa_quantity(value: Union[str, float, Dict, None], expected: Dict):
+def test_get_casa_quantity(value: str | float | dict | None, expected: dict):
     """Test get_casa_quantity()
 
     This utility function handles None values when calling CASA quanta.quantity()
@@ -243,7 +251,7 @@ params_place_repr_source_first = [(['f0', 'f1', 'f2', 'f3'], 'f2', ['f2', 'f0', 
 
 
 @pytest.mark.parametrize('itemlist, repr_source, expected', params_place_repr_source_first)
-def test_place_repr_source_first(itemlist: Union[List[str], List[Tuple]], repr_source: str, expected: Union[List[str], List[Tuple]]):
+def test_place_repr_source_first(itemlist: list[str] | list[tuple], repr_source: str, expected: list[str] | list[tuple]):
     """
     Test place_repr_source_first()
     """
@@ -291,7 +299,7 @@ def test_get_taskhistory_fromimage(tmpdir):
         (list(np.arange(10000)), lambda: str(list(range(10000))))
     ]
 )
-def test_list_to_str(value: Any, expected: Union[str, Callable]):
+def test_list_to_str(value: Any, expected: str | Callable):
     svalue = list_to_str(value)
     expected = expected() if isinstance(expected, Callable) else expected
     assert svalue == expected
@@ -305,7 +313,7 @@ def test_list_to_str(value: Any, expected: Union[str, Callable]):
         ([[np.int64(1)], [np.int64(2), np.int64(3)]], '[[np.int64(1)], [np.int64(2), np.int64(3)]]')
     ]
 )
-def test_list_to_str_py310(value: Any, expected: Union[str, Callable]):
+def test_list_to_str_py310(value: Any, expected: str | Callable):
     svalue = list_to_str(value)
     expected = expected() if isinstance(expected, Callable) else expected
     assert svalue == expected

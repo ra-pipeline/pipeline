@@ -36,7 +36,7 @@ class TargetflagInputs(vdp.StandardInputs):
             intents: List of intents of scans to be flagged.
 
         """
-        super(TargetflagInputs, self).__init__()
+        super().__init__()
         self.context = context
         self.vis = vis
         self.intents = intents
@@ -50,7 +50,7 @@ class TargetflagResults(basetask.Results):
         if summarydict is None:
             summarydict = {}
 
-        super(TargetflagResults, self).__init__()
+        super().__init__()
 
         self.jobs = jobs
         self.summarydict = summarydict

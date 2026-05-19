@@ -1,13 +1,17 @@
+from __future__ import annotations
+
 import collections
-from typing import List, Set
+from typing import TYPE_CHECKING
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 from pipeline.h.tasks.common import flaggableviewresults
 from pipeline.h.tasks.tsyscal import resultobjects
-from pipeline.infrastructure.refantflag import FullyFlaggedAntennasNotification
 
-LOG = infrastructure.get_logger(__name__)
+if TYPE_CHECKING:
+    from pipeline.infrastructure.refantflag import FullyFlaggedAntennasNotification
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class TsysflagResults(resultobjects.TsyscalResults):
@@ -16,7 +20,7 @@ class TsysflagResults(resultobjects.TsyscalResults):
         Construct and return a new TsysflagResults.
         """
         # the results to be merged back into the context
-        super(TsysflagResults, self).__init__()
+        super().__init__()
 
         # component results
         self.components = collections.OrderedDict()
@@ -26,13 +30,13 @@ class TsysflagResults(resultobjects.TsyscalResults):
 
         # list of antennas that should be moved to the end
         # of the refant list
-        self.refants_to_demote: Set[str] = set()
+        self.refants_to_demote: set[str] = set()
 
         # list of entirely flagged antennas that should be removed from refants
-        self.refants_to_remove: Set[str] = set()
+        self.refants_to_remove: set[str] = set()
 
         # further information about entirely flagged antennas used in QA scoring
-        self.fully_flagged_antenna_notifications: List[FullyFlaggedAntennasNotification] = []
+        self.fully_flagged_antenna_notifications: list[FullyFlaggedAntennasNotification] = []
 
     def merge_with_context(self, context):
         # Update reference antennas for MS.
@@ -44,7 +48,7 @@ class TsysflagResults(resultobjects.TsyscalResults):
         self.components[name] = result
 
     def __repr__(self):
-        s = super(TsysflagResults, self).__repr__()
+        s = super().__repr__()
         s = 'TsysflagResults incorporating %s' % s
         components = list(self.components.keys())
         if not components:
@@ -72,7 +76,7 @@ class TsysflagspectraResults(resultobjects.TsyscalResults,
         pass
 
     def __repr__(self):
-        s = super(TsysflagspectraResults, self).__repr__()
+        s = super().__repr__()
         s = 'TsysflagspectraResults incorporating %s' % s
         return s
 

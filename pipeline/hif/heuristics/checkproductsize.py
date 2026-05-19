@@ -10,7 +10,7 @@ from pipeline.hif.tasks.makeimlist import makeimlist
 LOG = infrastructure.get_logger(__name__)
 
 
-class CheckProductSizeHeuristics(object):
+class CheckProductSizeHeuristics:
     def __init__(self, inputs):
         self.inputs = inputs
         self.context = inputs.context

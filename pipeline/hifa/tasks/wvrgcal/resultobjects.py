@@ -14,7 +14,7 @@ class WvrgcalResult(basetask.Results):
         """
         Construct and return a new WvrgcalResult.
         """
-        super(WvrgcalResult, self).__init__()
+        super().__init__()
 
         if final is None:
             final = []
@@ -50,6 +50,8 @@ class WvrgcalResult(basetask.Results):
         # various flags
         self.PHnoisy = False
         self.BPnoisy = False
+        self.PHgood = False
+        self.BPgood = False
         self.suggest_remcloud = False
 
     def merge_with_context(self, context):

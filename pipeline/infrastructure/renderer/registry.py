@@ -8,7 +8,7 @@ import pipeline.infrastructure.logging as logging
 LOG = logging.get_logger(__name__)
 
 
-class RendererRegistry(object):
+class RendererRegistry:
     def __init__(self):
         # holds registrations of renderers that should be used in all
         # situations, unless a context-specific registration takes precedence.

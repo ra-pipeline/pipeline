@@ -14,7 +14,7 @@ class FluxCalibrationResults(basetask.Results):
     of dictionaries trap again.. 
     """
     def __init__(self, vis, resantenna=None, uvrange=None, measurements=None):
-        super(FluxCalibrationResults, self).__init__()
+        super().__init__()
 
         if resantenna is None:
             resantenna = ''

@@ -1,13 +1,12 @@
 import collections
 import enum
+
 import numpy
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.api as api
 
-from typing import List, Optional, Tuple
-
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 EdgeChannels = collections.namedtuple('EdgeChannels', ['left', 'right'])
@@ -77,7 +76,7 @@ class FitOrderHeuristics(api.Heuristic):
     """
     MaxDominantFreq = 15
 
-    def calculate(self, data: numpy.ndarray, mask: Optional[List[List[int]]] = None, edge: EdgeChannels = EdgeChannels(0, 0)):
+    def calculate(self, data: numpy.ndarray, mask: list[list[int] | None] = None, edge: EdgeChannels = EdgeChannels(0, 0)):
         """
         Determine fitting order from a set of spectral data, data,
         with masks for each spectral data, mask, and number of edge
@@ -161,7 +160,7 @@ class FitOrderHeuristics(api.Heuristic):
         return poly_order
 
 
-class MaskMakerNoLine(object):
+class MaskMakerNoLine:
     """Generate mask array."""
 
     def __init__(self, nchan: int, edge: EdgeChannels):
@@ -192,7 +191,7 @@ class MaskMakerNoLine(object):
 class MaskMaker(MaskMakerNoLine):
     """Generate mask array. Lines are masked."""
 
-    def __init__(self, nchan: int, lines: List[List[int]], edge: EdgeChannels):
+    def __init__(self, nchan: int, lines: list[list[int]], edge: EdgeChannels):
         """Initialize the instance
 
         Args:
@@ -202,7 +201,7 @@ class MaskMaker(MaskMakerNoLine):
                   [[-1,-1]] indicates no mask.
             edge: number of edge channels to be dropped.
         """
-        super(MaskMaker, self).__init__(nchan, edge)
+        super().__init__(nchan, edge)
         self.lines = lines
 
     def get_mask(self, row):
@@ -225,7 +224,7 @@ class MaskMaker(MaskMakerNoLine):
 
 
 class SwitchPolynomialWhenLargeMaskAtEdgeHeuristic(api.Heuristic):
-    def calculate(self, nchan: int, edge: EdgeChannels, num_pieces: int, masklist: List[List[int]]) -> Tuple[FittingFunction, int]:
+    def calculate(self, nchan: int, edge: EdgeChannels, num_pieces: int, masklist: list[list[int]]) -> tuple[FittingFunction, int]:
         """Perform fitting function heuristics.
 
         Logic of the fitting function heuristics is as follows.

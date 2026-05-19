@@ -1,32 +1,34 @@
 """Test for heuristics defined in grouping2.py."""
-from typing import Tuple
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 
 from pipeline.infrastructure import casa_tools
-from .grouping2 import GroupByPosition2
-from .grouping2 import GroupByTime2
-from .grouping2 import MergeGapTables2
-from .grouping2 import ThresholdForGroupByTime
+from .grouping2 import GroupByPosition2, GroupByTime2, MergeGapTables2, ThresholdForGroupByTime
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 qa = casa_tools.quanta
 
 
-def random_noise(n: int, mean: int = 0, amp: int = 1, rs: np.random.mtrand.RandomState = None) -> np.ndarray:
+def random_noise(n: int, mean: int = 0, amp: int = 1, rs: np.random.mtrand.RandomState = None) -> NDArray:
     """Generate random noise.
 
     Generate random noise with given mean and maximum amplitude.
     Seed for random noise can be specified.
 
     Args:
-        n (int): number of random noise
-        mean (int, optional): mean value of random noise. Defaults to 0.
-        amp (int, optional): maximum amplitude of random noise. Defaults to 1.
-        rs (np.random.mtrand.RandomState, optional): seed for random noise. Defaults to None.
+        n: number of random noise
+        mean: mean value of random noise. Defaults to 0.
+        amp: maximum amplitude of random noise. Defaults to 1.
+        rs: seed for random noise. Defaults to None.
 
     Returns:
-        np.ndarray: random noise
+        An array of random noise.
     """
     if rs is None:
         r = np.random.rand(n)
@@ -35,7 +37,7 @@ def random_noise(n: int, mean: int = 0, amp: int = 1, rs: np.random.mtrand.Rando
     return (r - (0.5 - mean)) * amp / 0.5
 
 
-def generate_position_data_psw() -> Tuple[np.ndarray, np.ndarray]:
+def generate_position_data_psw() -> tuple[NDArray, NDArray]:
     """Generate position data for simulated position-switch observation.
 
     Generate position data for simulated position-switch observatin.
@@ -77,7 +79,7 @@ def generate_position_data_psw() -> Tuple[np.ndarray, np.ndarray]:
     return ra_list, dec_list
 
 
-def generate_time_data_psw() -> np.ndarray:
+def generate_time_data_psw() -> NDArray:
     """Generate time series for simulated position-switch observation.
 
     Generate time series for simulated position-switch observation.
@@ -91,7 +93,7 @@ def generate_time_data_psw() -> np.ndarray:
     |   POSITION 0  |       |  POS 1  |           |  POS 3  |
 
     Returns:
-        np.ndarray: time series
+        An array of time series.
     """
     time_list = np.arange(40, dtype=float)
     for gap, incr in [(10, 9), (20, 59), (30, 9)]:
@@ -99,7 +101,7 @@ def generate_time_data_psw() -> np.ndarray:
     return time_list
 
 
-def generate_position_data_raster() -> Tuple[np.ndarray, np.ndarray]:
+def generate_position_data_raster() -> tuple[NDArray, NDArray]:
     """Generate position data for simulated OTF raster observation.
 
     Generate position data for simulated OTF raster observatin
@@ -144,7 +146,7 @@ def generate_position_data_raster() -> Tuple[np.ndarray, np.ndarray]:
     return ra_list, dec_list
 
 
-def generate_time_data_raster() -> np.ndarray:
+def generate_time_data_raster() -> NDArray:
     """Generate time series for simulated OTF raster observation.
 
     Generate time series for simulated OTF raster observation.
@@ -157,7 +159,7 @@ def generate_time_data_raster() -> np.ndarray:
     |     RASTER ROW 0    |       |  RASTER ROW 1 |
 
     Returns:
-        np.ndarray: time series
+        An array of time series.
     """
     time_list = np.arange(40, dtype=float)
     time_list[20:] += 9

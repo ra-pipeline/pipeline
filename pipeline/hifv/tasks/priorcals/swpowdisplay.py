@@ -7,7 +7,7 @@ import pipeline.infrastructure.casa_tasks as casa_tasks
 LOG = infrastructure.get_logger(__name__)
 
 
-class swpowSummaryChart(object):
+class swpowSummaryChart:
     def __init__(self, context, result):
         self.context = context
         self.result = result
@@ -64,7 +64,7 @@ class swpowSummaryChart(object):
         return wrapper
 
 
-class swpowPerAntennaChart(object):
+class swpowPerAntennaChart:
     def __init__(self, context, result, yaxis, science_scan_ids, band, selectbasebands, spw):
         self.context = context
         self.result = result

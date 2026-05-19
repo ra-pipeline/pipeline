@@ -5,13 +5,13 @@ Classes and Methods:
     SingleDishResults: Common single dish Results class.
 """
 
-from typing import Any, Optional
+from typing import Any
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 from pipeline.infrastructure.utils import absolute_path
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class SingleDishResults(basetask.Results):
@@ -31,8 +31,8 @@ class SingleDishResults(basetask.Results):
         error: A set of strings to store error messages.
     """
     
-    def __init__(self, task: Optional[basetask.StandardTaskTemplate]=None,
-                 success: Optional[bool]=None, outcome:  Any=None):
+    def __init__(self, task: basetask.StandardTaskTemplate | None =None,
+                 success: bool | None = None, outcome: Any | None = None):
         """
         Initialize class attributes and super class.
         
@@ -41,7 +41,7 @@ class SingleDishResults(basetask.Results):
             success: True if the task completes successfully. Otherwise, False.
             outcome: Outcome of the task.
         """
-        super(SingleDishResults, self).__init__()
+        super().__init__()
         self.task = task
         self.success = success
         self.outcome = outcome

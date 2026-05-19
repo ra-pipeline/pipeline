@@ -2,6 +2,8 @@
 rsc_path = ""
 import os
 import pipeline.infrastructure.renderer.htmlrenderer as hr
+
+
 %>
 <%inherit file="t2-4m_details-base.mako"/>
 
@@ -34,29 +36,30 @@ $(document).ready(function() {
 <table class="table">
         <tr>
             <td><strong>maximum</strong></td>
-            <td>${'%#.4e' % (plotter.result.max)} Jy/beam</td>
+            <td>${'%#.4e' % (plotter.result.rmsstats[plotter.result.rmsimagenames[0]]['max'][0])} Jy/beam</td>
         </tr>
         <tr>
             <td><strong>minimum</strong></td>
-            <td>${'%#.4e' % (plotter.result.min)} Jy/beam</td>
+            <td>${'%#.4e' % (plotter.result.rmsstats[plotter.result.rmsimagenames[0]]['min'][0])} Jy/beam</td>
         </tr>
         <tr>
             <td><strong>mean</strong></td>
-            <td>${'%#.4e' % (plotter.result.mean)} Jy/beam</td>
+            <td>${'%#.4e' % (plotter.result.rmsstats[plotter.result.rmsimagenames[0]]['mean'][0])} Jy/beam</td>
         </tr>
         <tr>
             <td><strong>median</strong></td>
-            <td>${'%#.4e' % (plotter.result.median)} Jy/beam</td>
+            <td>${'%#.4e' % (plotter.result.rmsstats[plotter.result.rmsimagenames[0]]['median'][0])} Jy/beam</td>
         </tr>
         <tr>
             <td><strong>sigma</strong></td>
-            <td>${'%#.4e' % (plotter.result.sigma)} Jy/beam</td>
+            <td>${'%#.4e' % (plotter.result.rmsstats[plotter.result.rmsimagenames[0]]['sigma'][0])} Jy/beam</td>
         </tr>
         <tr>
             <td><strong>MAD rms</strong></td>
-            <td>${'%#.4e' % (plotter.result.MADrms)}  Jy/beam</td>
+            <td>${'%#.4e' % (plotter.result.rmsstats[plotter.result.rmsimagenames[0]]['medabsdevmed'][0]* 1.4826)}  Jy/beam</td>
         </tr>
 </table>
+
 
 <%self:plot_group plot_dict="${rmsplots}"
                                   url_fn="${lambda ms:  'noop'}">

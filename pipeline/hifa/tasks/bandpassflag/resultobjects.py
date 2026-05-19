@@ -2,9 +2,8 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 from pipeline.infrastructure.refantflag import FullyFlaggedAntennasNotification
 from pipeline.hif.tasks.correctedampflag import resultobjects
-from typing import List, Set
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class BandpassflagResults(basetask.Results):
@@ -16,13 +15,13 @@ class BandpassflagResults(basetask.Results):
         self.vis = vis
 
         # Set of antennas that should be moved to the end of the refant list.
-        self.refants_to_demote: Set[str] = set()
+        self.refants_to_demote: set[str] = set()
 
         # Set of entirely flagged antennas that should be removed from refants.
-        self.refants_to_remove: Set[str] = set()
+        self.refants_to_remove: set[str] = set()
 
         # further information about entirely flagged antennas used in QA scoring
-        self.fully_flagged_antenna_notifications: List[FullyFlaggedAntennasNotification] = []
+        self.fully_flagged_antenna_notifications: list[FullyFlaggedAntennasNotification] = []
 
         # records callibrary files used in applycal calls
         self.callib_map = {} 

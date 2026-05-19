@@ -410,7 +410,7 @@ def buildscans(msfile, scd):
     return scandict
 
 
-class VLAScanHeuristics(object):
+class VLAScanHeuristics:
     def __init__(self, vis):
         self.vis = vis
 
@@ -1134,17 +1134,17 @@ def testCalibratorIntents(vis):
     newObj = VLAScanHeuristics(vis)
     exceptionThrown = False
     try:
-        start = datetime.datetime.now()
+        start = datetime.datetime.now(datetime.timezone.utc)
         origObj.calibratorIntentsOld()
-        print('origObj: {}'.format(datetime.datetime.now()-start))
+        print('origObj: {}'.format(datetime.datetime.now(datetime.timezone.utc)-start))
     except Exception as e:
         print(e)
         exceptionThrown = True
 
     try:
-        start = datetime.datetime.now()
+        start = datetime.datetime.now(datetime.timezone.utc)
         newObj.calibratorIntents()
-        print('newObj: {}'.format(datetime.datetime.now()-start))
+        print('newObj: {}'.format(datetime.datetime.now(datetime.timezone.utc)-start))
     except Exception as e:
         print(e)
         exceptionThrown = True

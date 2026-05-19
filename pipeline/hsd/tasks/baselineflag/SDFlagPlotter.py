@@ -1,12 +1,12 @@
 """Classes and methods to create SD Flag Plots."""
-import os
-from typing import Dict, List, Optional, Tuple
+from __future__ import annotations
 
-import matplotlib  
-import matplotlib.figure as figure 
+import os
+from typing import TYPE_CHECKING
+
+import matplotlib.figure as figure
 from matplotlib.axes._axes import Axes as MplAxes
 
-from pipeline.domain import DataTable, MeasurementSet
 import pipeline.infrastructure as infrastructure
 from pipeline.infrastructure.displays.plotstyle import casa5style_plot
 from . import SDFlagRule
@@ -14,16 +14,19 @@ from .SDFlagRule import INVALID_STAT
 from ..common import display as sd_display
 from ..common import utils as sdutils
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
+
+if TYPE_CHECKING:
+    from pipeline.domain import MeasurementSet, DataTable
 
 DPIDetail = 130
 FIGSIZE_INCHES = (7.0, 2.9)
 
-class SDFlagPlotter(object):
+class SDFlagPlotter:
     """Class to create Flag Plots for hsd_blflag weblog."""
 
     def __init__( self, msobj:MeasurementSet, datatable:DataTable, antid:int, spwid:int,
-                  time_gap:List[List[int]], FigFileDir:Optional[str] ):
+                  time_gap:list[list[int]], FigFileDir:str | None ):
         """
         Construct SDFlagPlotter instance.
 
@@ -55,9 +58,9 @@ class SDFlagPlotter(object):
 
 
     def register_data( self, pol:str,
-                         is_baselined:bool, FlagRule_local:Dict,
-                         PermanentFlag:List[int], NPp:Dict,
-                         threshold:List[List[float]] ) -> List[str]:
+                         is_baselined:bool, FlagRule_local:dict,
+                         PermanentFlag:list[int], NPp:dict,
+                         threshold:list[list[float]] ) -> list[str]:
         """
         Resiter data to be plotted.
 
@@ -85,7 +88,7 @@ class SDFlagPlotter(object):
         return
 
 
-    def create_plots( self, FigFileRoot:Optional[str]=None ) -> Dict:
+    def create_plots( self, FigFileRoot:str | None=None ) -> dict:
         """
         Create Summary plots.
 
@@ -230,7 +233,7 @@ class SDFlagPlotter(object):
 
 
     @casa5style_plot
-    def StatisticsPlot( self, pollist:List[str], PlotData_dict:Dict, FigFileDir:Optional[str]=None, figfilename:Optional[Dict]=None ):
+    def StatisticsPlot( self, pollist:list[str], PlotData_dict:dict, FigFileDir:str | None=None, figfilename:dict | None=None ):
         """
         Create blflag statistics plot.
 
@@ -295,7 +298,7 @@ class SDFlagPlotter(object):
         return
 
 
-    def _pack_data( self, plotdata:Dict ) -> Tuple[ Dict, List[float], List[float], Dict, Dict ]:
+    def _pack_data( self, plotdata:dict ) -> tuple[ dict, list[float], list[float], dict, dict ]:
         """
         Pack data for plotting for each pol.
 
@@ -378,11 +381,11 @@ class SDFlagPlotter(object):
         return data, xlim, ylim, ScaleOut, LowRange
 
 
-    def _plot( self, figfiledir:Optional[str], figfilename:Optional[str],
-               pollist:List[int],
-               PlotData_dict:Dict, data_dict:Optional[Dict],
-               xlim_dict:List[Dict], ylim_dict:List[Dict],
-               ScaleOut_dict:Optional[Dict], LowRange_dict:Optional[Dict] ):
+    def _plot( self, figfiledir:str | None, figfilename:str | None,
+               pollist:list[int],
+               PlotData_dict:dict, data_dict:dict | None,
+               xlim_dict:list[dict], ylim_dict:list[dict],
+               ScaleOut_dict:dict | None, LowRange_dict:dict | None ):
         """
         Create actual plots.
 
@@ -429,8 +432,8 @@ class SDFlagPlotter(object):
         return
 
 
-    def __plot_frame_to_axes( self, pollist, ax:Dict, PlotData_dict:Dict,
-                              xlim:List[float], ylim:List[float] ):
+    def __plot_frame_to_axes( self, pollist, ax:dict, PlotData_dict:dict,
+                              xlim:list[float], ylim:list[float] ):
         """
         Prepare the frame on axes.
 
@@ -508,9 +511,9 @@ class SDFlagPlotter(object):
         return
 
 
-    def __plot_data_to_axes( self, pollist:List[str], ax:MplAxes,
-                             PlotData:Dict, data:Optional[Dict],
-                             ScaleOut:Optional[List[float]], LowRange:Optional[bool] ):
+    def __plot_data_to_axes( self, pollist:list[str], ax:MplAxes,
+                             PlotData:dict, data:dict | None,
+                             ScaleOut:list[float] | None, LowRange:bool | None ):
         """
         Plot data to axes.
 

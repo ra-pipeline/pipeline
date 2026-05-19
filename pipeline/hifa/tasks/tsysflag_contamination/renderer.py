@@ -1,14 +1,19 @@
-import collections
+from __future__ import annotations
+
+import collections.abc
 import copy
 import os
-from typing import Dict, List
+from typing import TYPE_CHECKING
 
 import pipeline.infrastructure.utils as utils
 from pipeline.h.tasks.tsysflag.renderer import T2_4MDetailsTsysflagRenderer
-from pipeline.infrastructure import Context, filenamer
-from pipeline.infrastructure.basetask import ResultsList
+from pipeline.infrastructure import filenamer
 from pipeline.infrastructure.renderer import basetemplates
-from pipeline.infrastructure.renderer.logger import Plot
+
+if TYPE_CHECKING:
+    from pipeline.infrastructure import Context
+    from pipeline.infrastructure.basetask import ResultsList
+    from pipeline.infrastructure.renderer.logger import Plot
 
 
 class T2_4MDetailsTsysflagContaminationRenderer(T2_4MDetailsTsysflagRenderer):
@@ -76,7 +81,7 @@ class T2_4MDetailsTsysflagContaminationRenderer(T2_4MDetailsTsysflagRenderer):
 
         return tsys_map
 
-    def post_process_plots(self, pcontext: Context, spw_map: Dict[int, List[int]], plots: List[Plot]) -> List[Plot]:
+    def post_process_plots(self, pcontext: Context, spw_map: dict[int, list[int]], plots: list[Plot]) -> list[Plot]:
         """
         Transform the 'foreign' plot wrappers coming from extern code into
         native wrappers more aligned with the pipeline and standard pipeline
@@ -134,7 +139,7 @@ class TsysContaminationPlotRenderer(basetemplates.JsonPlotRenderer):
         if not isinstance(result, collections.abc.Iterable):
             result = [result]
 
-        super(TsysContaminationPlotRenderer, self).__init__(
+        super().__init__(
             "tsysflagcontamination_plots.mako", context, result, plots, title, outfile
         )
 

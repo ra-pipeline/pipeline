@@ -4,25 +4,28 @@ Single-Dish Exportdata task dedicated to NRO data.
 Please see hsd/tasks/exportdata/exportdata.py for generic
 description on how Exportdata task works.
 """
+from __future__ import annotations
+
 import collections
 import os
-from typing import List, Optional
-from xml.etree.ElementTree import Element
+from typing import TYPE_CHECKING
 
 import pipeline.h.tasks.exportdata.exportdata as exportdata
 import pipeline.hsd.tasks.exportdata.exportdata as sdexportdata
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 from pipeline.infrastructure import task_registry
-from pipeline.infrastructure.launcher import Context
-from pipeline.infrastructure.project import ProjectStructure
 from pipeline.hsdn.tasks.importdata.importdata import NROImportDataResults
 from pipeline.hsdn.tasks.restoredata.restoredata import NRORestoreDataResults
 from . import manifest
 from . import nrotemplategenerator
 
 # the logger for this module
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
+
+if TYPE_CHECKING:
+    from pipeline.infrastructure.launcher import Context
+    from pipeline.infrastructure.project import ProjectStructure
 
 
 class NROPipelineNameBuilder(exportdata.PipelineProductNameBuilder):
@@ -33,8 +36,8 @@ class NROPipelineNameBuilder(exportdata.PipelineProductNameBuilder):
     nor session name in Nobeyama datasets."""
 
     @classmethod
-    def _build_from_oussid(self, basename: str, ousstatus_entity_id: Optional[str]=None,
-                           output_dir: Optional[str]=None) -> str:
+    def _build_from_oussid(self, basename: str, ousstatus_entity_id: str | None=None,
+                           output_dir: str | None=None) -> str:
         """Build a string for use as path.
 
         Args:
@@ -49,9 +52,9 @@ class NROPipelineNameBuilder(exportdata.PipelineProductNameBuilder):
 
     @classmethod
     def _build_from_ps_oussid(self, basename: str,
-                              project_structure: Optional[ProjectStructure]=None,
-                              ousstatus_entity_id: Optional[str]=None,
-                              output_dir: Optional[str]=None) -> str:
+                              project_structure: ProjectStructure | None=None,
+                              ousstatus_entity_id: str | None=None,
+                              output_dir: str | None=None) -> str:
         """Build a string for use as path.
 
         Args:
@@ -67,9 +70,9 @@ class NROPipelineNameBuilder(exportdata.PipelineProductNameBuilder):
 
     @classmethod
     def _build_from_oussid_session(self, basename: str,
-                                   ousstatus_entity_id: Optional[str]=None,
-                                   session_name: Optional[str]=None,
-                                   output_dir: Optional[str]=None):
+                                   ousstatus_entity_id: str | None=None,
+                                   session_name: str | None=None,
+                                   output_dir: str | None=None):
         """Build a string for use as path.
 
         Args:
@@ -114,7 +117,7 @@ class NROExportData(sdexportdata.SDExportData):
         Returns:
             object of exportdata.ExportDataResults
         """
-        results = super(NROExportData, self).prepare()
+        results = super().prepare()
 
         # manifest file
         manifest_file = os.path.join(self.inputs.context.products_dir,
@@ -197,8 +200,8 @@ class NROExportData(sdexportdata.SDExportData):
 
     def _export_casa_restore_script(self, context: Context, script_name: str,
                                     products_dir: str, oussid: str,
-                                    vislist: List[str],
-                                    session_list: List[str]) -> str:
+                                    vislist: list[str],
+                                    session_list: list[str]) -> str:
         """Generate and export CASA restore script.
 
         Args:

@@ -13,7 +13,7 @@ from scipy.interpolate import griddata
 LOG = infrastructure.get_logger(__name__)
 
 
-class checkflagSummaryChart(object):
+class checkflagSummaryChart:
     def __init__(self, context, result, suffix='', plotms_args={}):
         self.context = context
         self.result = result
@@ -117,7 +117,7 @@ class checkflagSummaryChart(object):
         return wrapper
 
 
-class checkflagPercentageMap(object):
+class checkflagPercentageMap:
     def __init__(self, context, result):
         self.context = context
         self.result = result

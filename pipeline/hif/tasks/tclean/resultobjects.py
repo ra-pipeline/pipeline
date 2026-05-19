@@ -14,7 +14,7 @@ LOG = infrastructure.get_logger(__name__)
 
 class BoxResult(basetask.Results):
     def __init__(self):
-        super(BoxResult, self).__init__()
+        super().__init__()
         self.threshold = None
         self.sensitivity = None
         self.cleanmask = None

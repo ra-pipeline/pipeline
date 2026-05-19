@@ -13,7 +13,7 @@ import copy
 import os
 import pathlib
 import pprint
-from typing import Any, Optional
+from typing import Any
 
 import casaconfig.config
 import yaml
@@ -146,7 +146,7 @@ def nested_update(d: dict[str, Any], u: dict[str, Any]) -> dict[str, Any]:
     return d
 
 
-def casatasks_startup(casa_config: dict[str, Optional[str]], loglevel: Optional[str] = None) -> tuple[str, str]:
+def casatasks_startup(casa_config: dict[str, str | None], loglevel: str | None = None) -> tuple[str, str]:
     """Initializes a CASA session with custom configurations and log settings.
 
     This function updates the casaconfig attributes, sets the CASA log file, and adjusts

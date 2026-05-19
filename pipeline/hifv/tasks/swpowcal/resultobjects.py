@@ -16,7 +16,7 @@ class SwpowcalResults(basetask.Results):
         if preceding is None:
             preceding = []
 
-        super(SwpowcalResults, self).__init__()
+        super().__init__()
 
         self.vis = None
         self.pool = pool[:]

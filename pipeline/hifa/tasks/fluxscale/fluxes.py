@@ -1,5 +1,4 @@
 import csv
-import os
 
 import pipeline.infrastructure as infrastructure
 from ..importdata.dbfluxes import ORIGIN_DB

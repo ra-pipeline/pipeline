@@ -84,7 +84,7 @@ class VdpCommonCalibrationInputs(vdp.StandardInputs):
 
     def __init__(self, context, output_dir=None, vis=None, intent=None, field=None, spw=None, refant=None,
                  antenna=None, minblperant=None, opacity=None, selectdata=None, uvrange=None):
-        super(VdpCommonCalibrationInputs, self).__init__()
+        super().__init__()
 
         # pipeline inputs
         self.context = context

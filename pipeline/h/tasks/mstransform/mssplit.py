@@ -1,13 +1,19 @@
+from __future__ import annotations
+
 import os
 import shutil
+from typing import TYPE_CHECKING
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.tablereader as tablereader
 import pipeline.infrastructure.vdp as vdp
-from pipeline.domain import DataType, MeasurementSet
+from pipeline.domain import DataType
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import task_registry
+
+if TYPE_CHECKING:
+    from pipeline.domain import MeasurementSet
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -78,7 +84,7 @@ class MsSplitInputs(vdp.StandardInputs):
 
             replace: If a split was performed delete the parent MS and remove it from the context.
         """
-        super(MsSplitInputs, self).__init__()
+        super().__init__()
 
         self.context = context
         self.vis = vis
@@ -94,7 +100,7 @@ class MsSplitInputs(vdp.StandardInputs):
         self.replace = replace
 
     def to_casa_args(self):
-        d = super(MsSplitInputs, self).to_casa_args()
+        d = super().to_casa_args()
 
         if d['chanbin'] > 1:
             d['chanaverage'] = True
@@ -204,7 +210,7 @@ class MsSplit(basetask.StandardTaskTemplate):
 
 class MsSplitResults(basetask.Results):
     def __init__(self, vis, outputvis):
-        super(MsSplitResults, self).__init__()
+        super().__init__()
         self.vis = vis
         self.outputvis = outputvis
         self.ms = None

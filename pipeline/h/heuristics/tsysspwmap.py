@@ -12,10 +12,16 @@
 # tsysspwmap  - generate an "applycal-ready" spwmap for TDM to FDM
 #                 transfer of Tsys
 #
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.utils as utils
-from pipeline.domain.measurementset import MeasurementSet
 from pipeline.infrastructure import casa_tools
+
+if TYPE_CHECKING:
+    from pipeline.domain.measurementset import MeasurementSet
 
 LOG = infrastructure.get_logger(__name__)
 

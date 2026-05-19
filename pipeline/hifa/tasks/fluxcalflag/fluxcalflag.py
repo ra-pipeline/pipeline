@@ -93,7 +93,7 @@ class FluxcalFlagInputs(vdp.StandardInputs):
             applyflags: Boolean for whether to apply the generated flag commands. (default True)
 
         """
-        super(FluxcalFlagInputs, self).__init__()
+        super().__init__()
 
         # pipeline inputs
         self.context = context
@@ -114,7 +114,7 @@ class FluxcalFlagResults(basetask.Results):
         """
         Initialise the flux calibration flagging task results object.
         """
-        super(FluxcalFlagResults, self).__init__()
+        super().__init__()
         self._vis = vis
         self._fluxcal_linelist = fluxcal_linelist
         self._fluxcal_flagcmds = fluxcal_flagcmds

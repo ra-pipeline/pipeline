@@ -178,13 +178,13 @@ It generates an image combined spectral data from whole antenna as well as image
 %if rms_table is not None and len(rms_table) > 0:
 	<h3 id="sensitivity" class="jumptarget">Image Sensitivity</h3>
 	<p>
-	RMS of line-free channels. Estimated RMS is listed for representative images.
+	Sensitivities of line-free channels. Estimated sensitivities are listed for representative images.
 	</p>
 	<table class="table table-bordered table-striped" summary="Image Sentivitity">
 		<caption>RMS of line-free channels</caption>
     	<thead>
 	    	<tr>
-	        	<th>Name</th><th>Frame</th><th>Frequency Ranges</th><th>Channel width</th><th>Theoretical RMS</th><th>Observed RMS</th>
+			<th>Name</th><th>Frame</th><th>Frequency Ranges</th><th>Channel width</th><th>Theoretical sensitivity</th><th>Observed sensitivity</th>
 	    	</tr>
 
   		</thead>

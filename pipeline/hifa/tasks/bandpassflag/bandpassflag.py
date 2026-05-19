@@ -1,5 +1,4 @@
 import functools
-from typing import Dict
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -25,7 +24,7 @@ __all__ = [
     'Bandpassflag'
 ]
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class BandpassflagInputs(ALMAPhcorBandpassInputs):
@@ -518,7 +517,7 @@ class SerialBandpassflag(basetask.StandardTaskTemplate):
         return result
 
     @staticmethod
-    def _get_ant_id_to_name_dict(ms) -> Dict[int, str]:
+    def _get_ant_id_to_name_dict(ms) -> dict[int, str]:
         """
         Return dictionary with antenna ID mapped to antenna name.
         If no unique antenna name can be assigned to each antenna ID,

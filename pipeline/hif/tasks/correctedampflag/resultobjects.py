@@ -9,7 +9,7 @@ LOG = infrastructure.get_logger(__name__)
 class CorrectedampflagResults(basetask.Results):
 
     def __init__(self):
-        super(CorrectedampflagResults, self).__init__()
+        super().__init__()
         self.flagging = []
 
     def merge_with_context(self, context):

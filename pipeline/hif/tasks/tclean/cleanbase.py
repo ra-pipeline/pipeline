@@ -855,7 +855,7 @@ class CleanBase(basetask.StandardTaskTemplate):
                                     'image already has a beam. We will skip copying the restoring beam')
 
 
-class CleanBaseError(object):
+class CleanBaseError:
     """Clean Base Error Class to transfer detailed messages for weblog
     reporting.
     """

@@ -208,7 +208,7 @@ class GaincalSnrResults(basetask.Results):
         """
         Initialise the results object.
         """
-        super(GaincalSnrResults, self).__init__()
+        super().__init__()
 
         self.vis = vis
         if spwids is None:

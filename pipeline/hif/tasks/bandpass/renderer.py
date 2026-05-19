@@ -4,6 +4,7 @@ Created on 11 Sep 2014
 @author: sjw
 """
 import collections
+import collections.abc
 import os
 
 import pipeline.infrastructure.filenamer as filenamer

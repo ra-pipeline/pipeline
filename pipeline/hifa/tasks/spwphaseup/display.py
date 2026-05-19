@@ -10,7 +10,7 @@ import pipeline.infrastructure.renderer.logger as logger
 LOG = infrastructure.get_logger(__name__)
 
 
-class SpatialStructureFunctionChart(object):
+class SpatialStructureFunctionChart:
     """ 
     Creates a spatial structure function plot from the results 
     from PhaseStabilityHeuristics. Adapted from PIPE692.py as part of PIPE-1624. 

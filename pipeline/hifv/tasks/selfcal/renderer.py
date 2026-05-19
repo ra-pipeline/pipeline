@@ -11,7 +11,7 @@ from . import display as selfcaldisplay
 LOG = logging.get_logger(__name__)
 
 
-class VLASubPlotRenderer(object):
+class VLASubPlotRenderer:
     #template = 'testdelays_plots.html'
 
     def __init__(self, context, result, plots, json_path, template, filename_prefix):
@@ -71,11 +71,11 @@ class VLASubPlotRenderer(object):
 class T2_4MDetailsselfcalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def __init__(self, uri='vlass_selfcal.mako', description='Selfcal tables',
                  always_rerender=False):
-        super(T2_4MDetailsselfcalRenderer, self).__init__(
+        super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
     def get_display_context(self, context, results):
-        super_cls = super(T2_4MDetailsselfcalRenderer, self)
+        super_cls = super()
         ctx = super_cls.get_display_context(context, results)
 
         weblog_dir = os.path.join(context.report_dir,

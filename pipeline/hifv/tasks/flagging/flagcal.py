@@ -11,7 +11,7 @@ LOG = infrastructure.get_logger(__name__)
 
 class FlagcalResults(basetask.Results):
     def __init__(self, final=[], pool=[], preceding=[]):
-        super(FlagcalResults, self).__init__()
+        super().__init__()
         self.pool = pool[:]
         self.final = final[:]
         self.preceding = preceding[:]
@@ -49,7 +49,7 @@ class FlagcalInputs(vdp.StandardInputs):
             clipminmax: Range to use for clipping.
 
         """
-        super(FlagcalInputs, self).__init__()
+        super().__init__()
         self.context = context
         self.vis = vis
         self.caltable = caltable

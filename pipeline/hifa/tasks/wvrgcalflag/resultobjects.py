@@ -14,7 +14,7 @@ class WvrgcalflagResults(basetask.Results):
         """
         Construct and return a new WvrgcalflagResults.
         """
-        super(WvrgcalflagResults, self).__init__()
+        super().__init__()
 
         self.vis = vis
         self.flaggerresult = flaggerresult
@@ -48,5 +48,5 @@ class WvrgcalflagViewResults(flaggableviewresults.FlaggableViewResults):
         """
         Construct and return a new WvrgcalflagViewResults.
         """
-        super(WvrgcalflagViewResults, self).__init__()
+        super().__init__()
         self.vis = vis

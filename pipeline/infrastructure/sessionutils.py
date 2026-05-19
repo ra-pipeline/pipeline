@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 import collections
+import collections.abc
 import datetime
 import itertools
 import os
@@ -100,7 +101,7 @@ def group_into_sessions(context, all_results, measurement_sets=None):
 
     def get_start_time(r):
         basename = os.path.basename(r[0])
-        return ms_start_times.get(basename, datetime.datetime.utcfromtimestamp(0))
+        return ms_start_times.get(basename, datetime.datetime.fromtimestamp(0, tz=datetime.timezone.utc))
 
     def chrono_sort_results(arg_tuple):
         session_id, results = arg_tuple
@@ -155,7 +156,7 @@ def get_vislist_for_session(context, session):
     return [ms.name for ms in context.observing_run.get_measurement_sets() if ms.session == session]
 
 
-class VDPTaskFactory(object):
+class VDPTaskFactory:
     """
     VDPTaskFactory is a class that implements the Factory design
     pattern, returning tasks that execute on an MPI client or locally
@@ -399,7 +400,7 @@ class ParallelTemplate(basetask.StandardTaskTemplate):
         raise NotImplementedError
 
     def __init__(self, inputs):
-        super(ParallelTemplate, self).__init__(inputs)
+        super().__init__(inputs)
 
     @basetask.result_finaliser
     def get_result_for_exception(self, vis: str, exception: Exception) -> basetask.FailedTaskResults:

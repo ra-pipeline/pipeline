@@ -30,11 +30,11 @@ import pytest
 from .utils import mjd_to_datetime, mjd_to_datestring
 
 test_cases = [
-    (56839.91646527777, datetime.datetime(2014, 7, 1, 21, 59, 42, 599999)),
-    (56839.91647013888, datetime.datetime(2014, 7, 1, 21, 59, 43, 19999)),
-    (60414, datetime.datetime(2024, 4, 14, 0, 0, 0)),
-    (60414.9999999999, datetime.datetime(2024, 4, 14, 23, 59, 59, 999991)),
-    (60414.999999999985, datetime.datetime(2024, 4, 14, 23, 59, 59, 999999))
+    (56839.91646527777, datetime.datetime(2014, 7, 1, 21, 59, 42, 599999, tzinfo=datetime.timezone.utc)),
+    (56839.91647013888, datetime.datetime(2014, 7, 1, 21, 59, 43, 19999, tzinfo=datetime.timezone.utc)),
+    (60414, datetime.datetime(2024, 4, 14, 0, 0, 0, tzinfo=datetime.timezone.utc)),
+    (60414.9999999999, datetime.datetime(2024, 4, 14, 23, 59, 59, 999991, tzinfo=datetime.timezone.utc)),
+    (60414.999999999985, datetime.datetime(2024, 4, 14, 23, 59, 59, 999999, tzinfo=datetime.timezone.utc))
 ]
 
 

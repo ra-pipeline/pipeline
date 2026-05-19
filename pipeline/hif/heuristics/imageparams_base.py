@@ -10,7 +10,7 @@ import re
 import shutil
 import traceback
 import uuid
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING
 
 import astropy.units as u
 import numpy as np
@@ -26,19 +26,19 @@ import pipeline.infrastructure.filenamer as filenamer
 import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.utils as utils
 from pipeline.hif.heuristics import mosaicoverlap
-from pipeline.infrastructure import casa_tools, logging
+from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.launcher import current_task_name
 from pipeline.infrastructure.utils.conversion import phasecenter_to_skycoord, refcode_to_skyframe
 
 if TYPE_CHECKING:
-    from pipeline.hif.tasks.makeimlist import CleanTarget
+    from pipeline.hif.tasks.makeimlist.cleantarget import CleanTarget
     from pipeline.infrastructure.vdp import StandardInputs
 
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
-class ImageParamsHeuristics(object):
+class ImageParamsHeuristics:
     """
     Image parameters heuristics base class. One instance is made per make/editimlist
     call. There are subclasses for different imaging modes such as ALMA
@@ -837,9 +837,9 @@ class ImageParamsHeuristics(object):
             max_separation_uarcsec = cqa.getvalue(cqa.convert(max_separation, "uarcsec"))[0]  # in micro arcsec
             # PIPE-1504/PIPE-2859: only issue this message at the WARNING level if it's executed by hifa_imageprecheck
             if current_task_name.get() == 'hifa_imageprecheck':
-                log_level = logging.WARNING
+                log_level = infrastructure.logging.WARNING
             else:
-                log_level = logging.INFO
+                log_level = infrastructure.logging.INFO
             for mdirection in mdirections:
                 separation = cme.separation(mdirection, mdirections[0])
                 if cqa.gt(separation, max_separation):
@@ -986,7 +986,7 @@ class ImageParamsHeuristics(object):
             intent (str, optional): intent string. Defaults to 'TARGET'.
             name (str, optional): name string, which could be a wildcard like '1*,2*,0*' Defaults to None.
             phasecenter (str, optional): center of the search box. Defaults to None.
-            offsets (optional): sky offsets search limits along the longitude/ latitude direction in the reference frame. 
+            offsets (optional): sky offsets search limits along the longitude/ latitude direction in the reference frame.
                 Defaults to None.
 
         Returns:
@@ -1433,7 +1433,7 @@ class ImageParamsHeuristics(object):
 
         return ncorr
 
-    def pblimits(self, pb: Union[None, str], specmode: Optional[str] = None):
+    def pblimits(self, pb: None | str, specmode: str | None = None):
 
         pblimit_image = 0.2
         pblimit_cleanmask = 0.3
@@ -1908,7 +1908,7 @@ class ImageParamsHeuristics(object):
             center_only=False, known_sensitivities={},
             force_calc=False, calc_reffreq=False):
         """Compute sensitivity estimate using CASA.
-        
+
         Note: calc_reffreq is defaulted to False for backwards compatibility uses in imageprecheck.
         """
 
@@ -2297,7 +2297,7 @@ class ImageParamsHeuristics(object):
         intent: str,
         specmode: str,
         robust: float,
-        rms_multiplier: Optional[Union[int, float]] = None,
+        rms_multiplier: int | float | None = None,
     ) -> tuple:
         """Default auto-boxing parameters."""
 
@@ -2347,12 +2347,12 @@ class ImageParamsHeuristics(object):
     def uvrange(self, field=None, spwspec=None, specmode=None):
         return None, None
 
-    def reffreq(self, deconvolver: Optional[str]=None, specmode: Optional[str]=None, spwsel: Optional[dict]=None) -> Optional[str]:
+    def reffreq(self, deconvolver: str | None=None, specmode: str | None=None, spwsel: dict | None=None) -> str | None:
         return None
 
     def restfreq(
-            self, specmode: Optional[str] = None, nchan: Optional[int] = None, start: Optional[Union[str, float]] = None,
-            width: Optional[Union[str, float]] = None) -> Optional[str]:
+            self, specmode: str | None = None, nchan: int | None = None, start: str | float | None = None,
+            width: str | float | None = None) -> str | None:
         return None
 
     def conjbeams(self):
@@ -2400,7 +2400,7 @@ class ImageParamsHeuristics(object):
 
         return majority_antenna_ids
 
-    def arrays(self, vislist: Optional[List[str]] = None) -> str:
+    def arrays(self, vislist: list[str] | None = None) -> str:
 
         """Return the array descriptions."""
 
@@ -2494,15 +2494,15 @@ class ImageParamsHeuristics(object):
 
         This method primarily catches issues with CASA's internal FitGaussianPSF algorithm and was
         initially developed for ALMA cube imaging cases as a trigger for calling .find_good_commonbeam().
-        
+
         Note that CASA's internal FitGaussianPSF algorithm (CAS-13022) performs channel-wise
         interpolation/extrapolation, so header values may not exactly reflect the actual per-channel
         beam size in edge cases. For example, a blank channel might still report a beam fit value
         derived from interpolation.
-        
+
         Reference:
             https://open-bitbucket.nrao.edu/projects/CASA/repos/casa6/browse/casatools/src/code/synthesis/TransformMachines/StokesImageUtil.cc#481
-        """        
+        """
         cqa = casa_tools.quanta
         bad_psf_fit = False
 
@@ -2696,7 +2696,7 @@ class ImageParamsHeuristics(object):
         return None
 
     def get_outmaskratio(self, iteration: int,  image: str, pbimage: str, cleanmask: str,
-                         pblimit: float = 0.4, frac_lim: float = 0.2) -> Union[None, float]:
+                         pblimit: float = 0.4, frac_lim: float = 0.2) -> None | float:
         """Determine fractional flux in final image outside cleanmask"""
         return None
 

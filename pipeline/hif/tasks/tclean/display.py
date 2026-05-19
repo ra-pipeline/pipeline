@@ -23,7 +23,7 @@ LOG = infrastructure.get_logger(__name__)
 ImageStats = collections.namedtuple('ImageStats', 'rms max')
 
 
-class CleanSummary(object):
+class CleanSummary:
     def __init__(self, context, result, image_stats):
         self.context = context
         self.result = result
@@ -225,7 +225,7 @@ class CleanSummary(object):
         is_cube_or_repbw = any(keyword in iteration.get(imagetype, '') for keyword in ['cube', 'repBW'])
         return is_cube_or_repbw
 
-class TcleanMajorCycleSummaryFigure(object):
+class TcleanMajorCycleSummaryFigure:
     """Tclean major cycle summery statistics plot with two panels, contains:
 
     Flux density cleaned vs. major cycle

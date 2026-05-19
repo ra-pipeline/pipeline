@@ -103,6 +103,11 @@ def getantposalma(*v, **k) -> JobRequest:
 
 
 @register_task
+def getjyperkalma(*v, **k) -> JobRequest:
+    return JobRequest(casatasks.getjyperkalma, *v, **k)
+
+
+@register_task
 def hanningsmooth(*v, **k) -> JobRequest:
     return JobRequest(casatasks.hanningsmooth, *v, **k)
 

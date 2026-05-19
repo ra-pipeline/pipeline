@@ -1,7 +1,7 @@
 import textwrap
 
 
-class TaskMapping(object):
+class TaskMapping:
     def __init__(self, casa_task, pipeline_class, comment):
         self.casa_task = casa_task
         self.pipeline_class = pipeline_class
@@ -11,7 +11,7 @@ class TaskMapping(object):
         return '<TaskMapping({!r}, {!r}, {!r})>'.format(self.casa_task, self.pipeline_class, self.comment)
 
 
-class TaskRegistry(object):
+class TaskRegistry:
     # The object used to map pipeline classes to CASA tasks
     task_mapping_class = TaskMapping
 

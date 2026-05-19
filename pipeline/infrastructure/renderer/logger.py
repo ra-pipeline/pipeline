@@ -19,12 +19,12 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
 # *****************************************************************************
 import collections
-import shutil
 import itertools
 import os
 import platform
 import re
 import string
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -69,7 +69,7 @@ def getPath(filename):
     return path
 
 
-class Parameters(object):
+class Parameters:
     """
     Provides a set of utility functions that describe how the plot parameters
     given as keys of the optional parameters dictionary given to Plot() should
@@ -124,7 +124,7 @@ class Parameters(object):
             return t
 
 
-class PlotGroup(object):
+class PlotGroup:
     # the full template for the selectors in this series of plots
     full_template = string.Template('<li class="selectorHeading">$description'
         + ':<ul class="selector">\n$selectors</ul>\n</li>\n')
@@ -244,7 +244,7 @@ class PlotGroup(object):
         return self.toHtml()
 
 
-class Selector(object):
+class Selector:
     # CSS classes have a restricted character sets, so we use a regex to 
     # remove them
     _regex = re.compile(r'\W')

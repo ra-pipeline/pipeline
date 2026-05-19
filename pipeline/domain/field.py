@@ -5,12 +5,12 @@ import datetime
 import pprint
 from typing import TYPE_CHECKING
 
-import numpy as np
-
 from pipeline.infrastructure import casa_tools, utils
 
 if TYPE_CHECKING:
-    from pipeline.infrastructure.utils.utils import DirectionDict, EpochDict, QuantityDict
+    from numpy.typing import NDArray
+
+    from pipeline.infrastructure.utils.casa_types import DirectionDict, EpochDict, QuantityDict
 
 _pprinter = pprint.PrettyPrinter(width=1e99)
 
@@ -35,7 +35,7 @@ class Field:
             field_id: int,
             name: str,
             source_id: int,
-            time: np.ndarray,
+            time: NDArray,
             direction: DirectionDict,
             ) -> None:
         """
@@ -204,7 +204,7 @@ class Field:
             observatory: Name of the observatory (e.g., 'VLA', 'ALMA').
         """
         # Mean observing time
-        mjd_epoch = datetime.datetime(1858, 11, 17)
+        mjd_epoch = datetime.datetime(1858, 11, 17, tzinfo=datetime.timezone.utc)
         start_time = mjd_epoch + datetime.timedelta(seconds=min(self.time))
         end_time = mjd_epoch + datetime.timedelta(seconds=max(self.time))
         mid_time = utils.obs_midtime(start_time, end_time)

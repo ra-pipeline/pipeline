@@ -3,7 +3,6 @@ import os
 import re
 import shutil
 import uuid
-from typing import Dict, Optional, Tuple, Union
 
 import numpy
 import pipeline.domain.measures as measures
@@ -16,7 +15,7 @@ from pipeline.infrastructure import casa_tools
 
 from .imageparams_base import ImageParamsHeuristics
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 
@@ -183,16 +182,16 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         """Tclean gridder parameter heuristics."""
         return 'awproject'
 
-    def cell(self, beam=None, pixperbeam=None) -> Union[str, list]:
+    def cell(self, beam=None, pixperbeam=None) -> str | list:
         """Tclean cell parameter heuristics."""
         return ['0.6arcsec']
 
     def imsize(self, fields=None, cell=None, primary_beam=None, sfpblimit=None, max_pixels=None, centreonly=None,
-               vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None) -> Union[list, int]:
+               vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None) -> list | int:
         """Tclean imsize parameter heuristics."""
         return [16384, 16384]
 
-    def reffreq(self, deconvolver: Optional[str]=None, specmode: Optional[str]=None, spwsel: Optional[dict]=None) -> Optional[str]:
+    def reffreq(self, deconvolver: str | None=None, specmode: str | None=None, spwsel: dict | None=None) -> str | None:
         """Tclean reffreq parameter heuristics."""
         return '3.0GHz'
 
@@ -219,7 +218,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         else:
             return 5000
 
-    def nmajor(self, iteration: int) -> Union[None, int]:
+    def nmajor(self, iteration: int) -> None | int:
         """Tclean nmajor parameter heuristics."""
         if iteration == 0:
             return None
@@ -227,7 +226,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
             # PIPE-1745: default value of nmajor=220 for all editimlist stages of the VLASS QL/SE imaging workflow
             return 220
 
-    def scales(self, iteration: Union[int, None] = None) -> Union[list, None]:
+    def scales(self, iteration: int | None = None) -> list | None:
         """Tclean scales parameter heuristics."""
         if not iteration:
             return None
@@ -236,7 +235,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         else:
             return [0]
 
-    def uvtaper(self, beam_natural=None, protect_long=None, beam_user=None, tapering_limit=None, repr_freq=None) -> Union[str, list]:
+    def uvtaper(self, beam_natural=None, protect_long=None, beam_user=None, tapering_limit=None, repr_freq=None) -> str | list:
         """Tclean uvtaper parameter heuristics."""
         if self.vlass_stage == 3:
             return ''
@@ -250,7 +249,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         return '<12km', None
 
     def mask(self, hm_masking=None, rootname=None, iteration=None, mask=None,
-             results_list: Union[list, None] = None, clean_no_mask=None) -> Union[str, list]:
+             results_list: list | None = None, clean_no_mask=None) -> str | list:
         """Tier-1 mask name to be used for computing Tier-1 and Tier-2 combined mask.
 
             Obtain the mask name from the latest MakeImagesResult object in context.results.
@@ -292,7 +291,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         """Tclean intent parameter heuristics."""
         return 'TARGET'
 
-    def nterms(self, spwspec) -> Union[int, None]:
+    def nterms(self, spwspec) -> int | None:
         """Tclean nterms parameter heuristics."""
         return 2
 
@@ -303,7 +302,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
     def pb_correction(self) -> bool:
         return False
 
-    def pblimits(self, pb: Union[None, str], specmode: Optional[str] = None) -> Tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
 
         pblimit_image, pblimit_cleanmask = super().pblimits(pb)
@@ -317,7 +316,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         return True
 
     def get_sensitivity(self, ms_do, field, intent, spw, chansel, specmode, cell, imsize, weighting, robust, uvtaper) \
-            -> Tuple[float, None, None, None]:
+            -> tuple[float, None, None, None]:
         return 0.0, None, None, None
 
     def find_fields(self, distance: str = '0deg', phase_center: bool = None, matchregex: str = '') -> list:
@@ -424,7 +423,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         return fieldlist
 
     def keep_iterating(self, iteration, hm_masking, tclean_stopcode, dirty_dynamic_range, residual_max,
-                       residual_robust_rms, field, intent, spw, specmode) -> Tuple[bool, str]:
+                       residual_robust_rms, field, intent, spw, specmode) -> tuple[bool, str]:
         """Determine whether another tclean iteration is necessary."""
         if iteration == 0:
             return True, 'auto'
@@ -434,7 +433,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         else:
             return False, 'user'
 
-    def threshold(self, iteration: int, threshold: Union[str, float], hm_masking: str) -> Union[str, float]:
+    def threshold(self, iteration: int, threshold: str | float, hm_masking: str) -> str | float:
         """Tclean threshold parameter heuristics."""
         if hm_masking == 'auto':
             return '0.0mJy'
@@ -447,8 +446,8 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
             return threshold
 
     def nsigma(
-        self, iteration: int, hm_nsigma: float, hm_masking: str, rms_multiplier: Optional[Union[int, float]] = None
-    ) -> Union[float, None]:
+        self, iteration: int, hm_nsigma: float, hm_masking: str, rms_multiplier: int | float | None = None
+    ) -> float | None:
         """Tclean nsigma parameter heuristics."""
         if hm_nsigma:
             return hm_nsigma
@@ -468,7 +467,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         else:
             return 3.0
 
-    def savemodel(self, iteration: int) -> Union[str, None]:
+    def savemodel(self, iteration: int) -> str | None:
         """Tclean savemodel parameter heuristics."""
         # Model is saved in first imaging cycle last iteration
         if self.vlass_stage == 1:
@@ -499,7 +498,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         intent: str,
         specmode: str,
         robust: float,
-        rms_multiplier: Optional[Union[int, float]] = None,
+        rms_multiplier: int | float | None = None,
     ) -> tuple:
         """Default auto-boxing parameters."""
 
@@ -543,7 +542,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         else:
             return [cfcache, None]
 
-    def set_user_cycleniter_final_image_nomask(self, cycleniter_final_image_nomask: Union[int, None] = None) -> None:
+    def set_user_cycleniter_final_image_nomask(self, cycleniter_final_image_nomask: int | None = None) -> None:
         """Sets class variable controlling the cycleniter parameter of the last clean step (cleaning without user mask,
         pbmask only) in the third (final) VLASS-SE-CONT imaging stage."""
         if self.vlass_stage == 3 and cycleniter_final_image_nomask != None:
@@ -555,7 +554,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         """A numerical control to bias the scales when using multi-scale or mtmfs algorithms"""
         return 0.4
 
-    def restoringbeam(self) -> Union[list, str, bool]:
+    def restoringbeam(self) -> list | str | bool:
         """Tclean parameter"""
         return ''
 
@@ -569,7 +568,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         return 0.4
 
     def get_parallel_cont_synthesis_imager_csys(self, phasecenter=None, imsize=None, cell=None,
-                                                parallel='automatic') -> Union[None, Dict]:
+                                                parallel='automatic') -> None | dict:
         """
         This method creates an image with PyParallelContSynthesisImager and returns it's phase centre.
 
@@ -641,7 +640,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         return csys_record
 
     def get_outmaskratio(self, iteration: int,  image: str, pbimage: str, cleanmask: str,
-                         pblimit: float = 0.4, frac_lim: float = 0.2) -> Union[None, float]:
+                         pblimit: float = 0.4, frac_lim: float = 0.2) -> None | float:
         """Determine fractional flux in final image outside cleanmask, only in first imaging stage final image.
 
         A threshold of 10x sigma (measured on image) and a pblimit of 0.4 is applied.
@@ -743,7 +742,7 @@ class ImageParamsHeuristicsVlassSeContAWP2(ImageParamsHeuristicsVlassSeCont):
         """Tclean gridder parameter heuristics."""
         return 'awp2'
 
-    def pblimits(self, pb: Union[None, str], specmode: Optional[str] = None) -> Tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         _, pblimit_cleanmask = super().pblimits(pb)
 
@@ -771,7 +770,7 @@ class ImageParamsHeuristicsVlassSeContAWP2P001(ImageParamsHeuristicsVlassSeCont)
         """Tclean wprojplanes parameter heuristics."""
         return 1
 
-    def pblimits(self, pb: Union[None, str], specmode: Optional[str] = None) -> Tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         _, pblimit_cleanmask = super().pblimits(pb)
 
@@ -795,7 +794,7 @@ class ImageParamsHeuristicsVlassSeContAWPHPG(ImageParamsHeuristicsVlassSeCont):
         """Tclean gridder parameter heuristics."""
         return 'awphpg'
 
-    def pblimits(self, pb: Union[None, str], specmode: Optional[str] = None) -> Tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         _, pblimit_cleanmask = super().pblimits(pb)
 
@@ -823,7 +822,7 @@ class ImageParamsHeuristicsVlassSeContAWPHPGP001(ImageParamsHeuristicsVlassSeCon
         """Tclean wprojplanes parameter heuristics."""
         return 1
 
-    def pblimits(self, pb: Union[None, str], specmode: Optional[str] = None) -> Tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         _, pblimit_cleanmask = super().pblimits(pb)
 
@@ -848,7 +847,7 @@ class ImageParamsHeuristicsVlassSeContMosaic(ImageParamsHeuristicsVlassSeCont):
         self.user_cycleniter_final_image_nomask = None
 
     def imsize(self, fields=None, cell=None, primary_beam=None, sfpblimit=None, max_pixels=None, centreonly=None,
-               vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None) -> Union[list, int]:
+               vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None) -> list | int:
         """Tclean imsize parameter heuristics."""
         return [12500, 12500]
 
@@ -888,7 +887,7 @@ class ImageParamsHeuristicsVlassSeContMosaic(ImageParamsHeuristicsVlassSeCont):
         # Might change to True based on stackholder feedback
         return False
 
-    def pblimits(self, pb: Union[None, str], specmode: Optional[str] = None) -> Tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         _, pblimit_cleanmask = super().pblimits(pb)
 

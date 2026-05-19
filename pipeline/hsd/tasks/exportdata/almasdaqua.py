@@ -1,13 +1,16 @@
 """AQUA pipeline report generator for Single Dish."""
+from __future__ import annotations
 
-from typing import List
-from xml.etree.ElementTree import Element
 import xml.etree.ElementTree as ElementTree
+from typing import TYPE_CHECKING
+from xml.etree.ElementTree import Element
 
-from pipeline.h.tasks.common.sensitivity import Sensitivity
 import pipeline.h.tasks.exportdata.aqua as aqua
-from pipeline.infrastructure.basetask import Results, ResultsList
-from pipeline.infrastructure.launcher import Context
+
+if TYPE_CHECKING:
+    from pipeline.h.tasks.common.sensitivity import Sensitivity
+    from pipeline.infrastructure.basetask import Results, ResultsList
+    from pipeline.infrastructure.launcher import Context
 
 
 class AlmaAquaXmlGenerator(aqua.AquaXmlGenerator):
@@ -19,7 +22,7 @@ class AlmaAquaXmlGenerator(aqua.AquaXmlGenerator):
 
     def __init__(self):
         """Initialize AlmaAquaXmlGenerator instance."""
-        super(AlmaAquaXmlGenerator, self).__init__()
+        super().__init__()
 
     def get_project_structure(self, context: Context) -> Element:
         """Get the project structure element.
@@ -31,7 +34,7 @@ class AlmaAquaXmlGenerator(aqua.AquaXmlGenerator):
             XML Element object for project structure
         """
         # get base XML from base class
-        root = super(AlmaAquaXmlGenerator, self).get_project_structure(context)
+        root = super().get_project_structure(context)
 
         # add our ALMA-specific elements
         ElementTree.SubElement(root, 'OusEntityId').text = \
@@ -44,18 +47,18 @@ class AlmaAquaXmlGenerator(aqua.AquaXmlGenerator):
         return root
 
     def get_imaging_topic(self, context: Context,
-                          topic_results: List[Results]) -> Element:
+                          topic_results: list[Results]) -> Element:
         """Get the XML for the imaging topic.
 
         Args:
             context : pipeline context
-            topic_results : list of Results for this topic
+            topic_results : List of Results for this topic
 
         Returns:
             XML for imaging topic
         """
         # get base XML from base class
-        xml_root = super(AlmaAquaXmlGenerator, self).get_imaging_topic(
+        xml_root = super().get_imaging_topic(
             context, topic_results)
 
         # add sensitivities
@@ -68,8 +71,7 @@ class AlmaAquaXmlGenerator(aqua.AquaXmlGenerator):
         return xml_root
 
 
-def _hsd_imaging_sensitivity_exporter(stage_results: ResultsList) \
-        -> List[Sensitivity]:
+def _hsd_imaging_sensitivity_exporter(stage_results: ResultsList) -> list[Sensitivity]:
     """XML exporter expects this function to return a list of dictionaries.
 
     This function is used only once for now, with no arguments
@@ -79,7 +81,7 @@ def _hsd_imaging_sensitivity_exporter(stage_results: ResultsList) \
         stage_results: ResultsList of stages
 
     Returns:
-        list of Sensitivity
+        List of Sensitivity
     """
     # XML exporter expects this function to return a list of dictionaries
     sensitivities = []

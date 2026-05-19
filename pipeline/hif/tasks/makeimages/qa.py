@@ -1,5 +1,5 @@
+import collections.abc
 import copy
-import collections
 from functools import reduce
 
 import numpy as np

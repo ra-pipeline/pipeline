@@ -9,7 +9,7 @@ LOG = infrastructure.get_logger(__name__)
 
 class PbcorResults(basetask.Results):
     def __init__(self, pbcorimagenames={}, multitermlist=[]):
-        super(PbcorResults, self).__init__()
+        super().__init__()
         self.pbcorimagenames = pbcorimagenames
         self.multitermlist = multitermlist
 
@@ -33,7 +33,7 @@ class PbcorInputs(vdp.StandardInputs):
             vis: List of input visibility data.
 
         """
-        super(PbcorInputs, self).__init__()
+        super().__init__()
         self.context = context
         self.vis = vis
 

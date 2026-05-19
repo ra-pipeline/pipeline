@@ -325,6 +325,20 @@ if True:
         # assert False, f"{nn} {scale}"
         return (np.exp(scale * nn) - 1) / (np.exp(scale) - 1) * maximum
 
+    def _savgol_filter_nan(x, **kwargs):
+        """Apply savgol_filter while ignoring NaN values.
+
+        PIPE-2947: savgol_filter does not natively handle NaN values (scipy 1.17.0+).
+        This function applies savgol_filter to the non-NaN subset of the data (x[non_nan]),
+        which fundamentally changes the filter's behavior compared to interpolating NaN values
+        before filtering or other approaches that properly handle missing data. This may need
+        to be revisited in the future if a better approach to handling NaN values is decided.
+        """
+        non_nan = np.logical_not(np.isnan(x))
+        result = np.full(shape=np.shape(x), fill_value=np.nan)
+        result[non_nan] = savgol_filter(x[non_nan], **kwargs)
+        return result
+
     def model_break(model, peaks, window_length=5):  # v3.5
         peaks = [] if peaks is None else peaks
         nchan = model.shape[0]
@@ -334,7 +348,7 @@ if True:
             return xp, np.interp(chans, xp[0], model[xp[0]])
         window_length += 1 - window_length % 2
         (atm_1, atm_2) = (
-            savgol_filter(model, window_length=window_length, deriv=dd, polyorder=3)
+            _savgol_filter_nan(model, window_length=window_length, deriv=dd, polyorder=3)
             for dd in (1, 2)
         )
         if (
@@ -809,7 +823,7 @@ if True:
         window_size += 1 - window_size % 2
         stype = "constant" if stype != "sg" else "sg"
         if stype == "sg":
-            s = savgol_filter(vector_for_smoothing, window_size, order)
+            s = _savgol_filter_nan(vector_for_smoothing, window_length=window_size, polyorder=order)
         elif stype == "constant":
             s = np.nanmean(vector_for_smoothing) * np.ones(len(vector_for_smoothing))
         if vector_to_subtract_from is None:

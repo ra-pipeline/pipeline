@@ -28,7 +28,7 @@ class GainCurvesInputs(vdp.StandardInputs):
         self.parameter = parameter
 
     def to_casa_args(self):
-        args = super(GainCurvesInputs, self).to_casa_args()
+        args = super().to_casa_args()
         args['caltype'] = 'gc'
         return args
 

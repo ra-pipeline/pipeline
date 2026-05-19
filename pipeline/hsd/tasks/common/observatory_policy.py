@@ -2,20 +2,21 @@
 from __future__ import annotations
 
 import abc
-from typing import Type
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 import casatasks.private.sdbeamutil as sdbeamutil
 
-from pipeline.domain import MeasurementSet
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.casa_tools as casa_tools
-from pipeline.infrastructure.launcher import Context
 from . import utils as sdutils
 
+if TYPE_CHECKING:
+    from pipeline.domain import MeasurementSet
+    from pipeline.infrastructure.launcher import Context
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class ObservatoryImagingPolicy(abc.ABC):
@@ -254,7 +255,7 @@ class NROImagingPolicy(ObservatoryImagingPolicy):
         return 0.3193
 
 
-def get_imaging_policy(context: Context) -> Type[ObservatoryImagingPolicy]:
+def get_imaging_policy(context: Context) -> type[ObservatoryImagingPolicy]:
     """Get appropriate observatory policy for imaging.
 
     Args:
@@ -313,7 +314,7 @@ class ALMACalibrationPolicy(ObservatoryCalibrationPolicy):
         return valid_range
 
 
-def get_calibration_policy(context: Context) -> Type[ObservatoryCalibrationPolicy]:
+def get_calibration_policy(context: Context) -> type[ObservatoryCalibrationPolicy]:
     """Get appropriate observatory policy for calibration.
 
     Args:

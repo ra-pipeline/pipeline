@@ -47,7 +47,7 @@ class T2_4MDetailsSDApplycalRenderer(super_renderer.T2_4MDetailsApplycalRenderer
             description : description of the class, default:'Apply calibrations from context'
             always_rerender : rerendering execution flag, default: False
         """
-        super(T2_4MDetailsSDApplycalRenderer, self).__init__(
+        super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
     def update_mako_context(self, ctx: dict, context: Context, result: ResultsList):

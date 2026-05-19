@@ -94,7 +94,7 @@ def gpcal_calc(caltable):
 
                     tb1 = tbLoc.query('FIELD_ID == '+str(fieldId)+' AND SPECTRAL_WINDOW_ID == '+str(spwId)+' AND ANTENNA1 == '+str(antId))
                 else:
-                    tb1 = tbLoc.query('FIELD_ID == '+str(fieldId)+' AND CAL_DESC_ID == '+str(spwids.index(spwId))+' AND ANTENNA1 == '+str(antId))
+                    tb1 = tbLoc.query('FIELD_ID == '+str(fieldId)+' AND CAL_DESC_ID == '+str(spwIds.index(spwId))+' AND ANTENNA1 == '+str(antId))
 
                 ngains = tb1.nrows()
                 if ngains == 0:

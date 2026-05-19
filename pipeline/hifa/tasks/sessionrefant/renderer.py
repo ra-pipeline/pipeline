@@ -11,7 +11,7 @@ LOG = logging.get_logger(__name__)
 class T2_4MDetailsSessionRefAntRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def __init__(self, uri='sessionrefant.mako', description='Select reference antenna for session(s)',
                  always_rerender=False):
-        super(T2_4MDetailsSessionRefAntRenderer, self).__init__(
+        super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
     def update_mako_context(self, mako_context, pipeline_context, results):

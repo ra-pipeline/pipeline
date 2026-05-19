@@ -1,67 +1,72 @@
 """Plotting class for k2jycal stage."""
-import collections
-import decimal
-import os
+from __future__ import annotations
 
-from typing import Any, Dict, Generator, List, Sequence, Tuple, Union
+import itertools
+import os
+from typing import TYPE_CHECKING
 
 import numpy as np
-import itertools
-     
-from matplotlib.figure import Figure
 from matplotlib import colormaps
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from matplotlib.figure import Figure
 
+import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.renderer.logger as logger
-import pipeline.infrastructure.logging as logging
-
-from ..common.display import DPISummary
-from pipeline.domain.spectralwindow import SpectralWindow
 from pipeline.domain.measures import FrequencyUnits
 
-LOG = logging.get_logger(__name__)
+from ..common.display import DPISummary
 
-class K2JyBoxScatterDisplay(object):
+if TYPE_CHECKING:
+    from collections.abc import Generator
+    from typing import Any
+
+    from numpy import floating
+    from numpy.typing import NDArray
+
+LOG = infrastructure.logging.get_logger(__name__)
+
+
+class K2JyBoxScatterDisplay:
     """A display class to generate a mixed box and scatter plot of Jy/K factors across all SPWs."""
-    
+
     def __init__(
         self,
-        stage_dir: str, 
-        valid_factors: Dict[Any, Any], 
-        ms_labels: List[str], 
-        spws: Dict[Any, Any] = None
+        stage_dir: str,
+        valid_factors: dict[Any, Any],
+        ms_labels: list[str],
+        spws: dict[Any, Any] = None
     ) -> None:
         """Initialize K2JyBoxScatterDisplay instance.
 
         Args:
             stage_dir: Stage directory to which plots are exported
-            valid_factors:  A dictionary where each key is an SPW ID and each value is another dictionary 
+            valid_factors:  A dictionary where each key is an SPW ID and each value is another dictionary
                             containing:
                                 - "spw_obj": The spectral window object.
                                 - "all_factors": Jy/K factors for all MS associated with this SPW (for boxplots).
                                 - "ms_dict": Mapping of MS labels to Jy/K factors.
                                 - "outliers": List of (MS label, factor) tuples for outliers.
             ms_labels: A list of MS labels corresponding to the valid_factors dataset.
-            spws: A dictionary mapping SPW IDs to their metadata. 
+            spws: A dictionary mapping SPW IDs to their metadata.
                   If not provided, it is inferred from `valid_factors`.
         """
         self.stage_dir = stage_dir
         self.valid_factors = valid_factors
         self.ms_labels = ms_labels
-        if spws is not None:   
+        if spws is not None:
             self.spws = spws
         else:
             # Infer spw objects from valid_factors
             self.spws = {spw_id: valid_factors[spw_id]["spw_obj"] for spw_id in valid_factors}
-        
-    def plot(self) -> List[logger.Plot]:
+
+    def plot(self) -> list[logger.Plot]:
         """Generate plot.
 
         Returns:
             List of plots.
         """
         return list(self._plot())
-    
+
     def _create_plot(self, plotfile: str, x_axis: str, y_axis: str) -> logger.Plot:
         """Create Plot instance from plotfile.
 
@@ -82,13 +87,13 @@ class K2JyBoxScatterDisplay(object):
                             y_axis=y_axis,
                             parameters=parameters)
         return plot_obj
-    
+
     def _plot(self) -> Generator[logger.Plot, None, None]:
         """
         Create a plot with:
             - Primary x-axis: Centre Frequency (GHz)
             - Secondary x-axis: SPW IDs
-            
+
         Yields:
             Plot instance
 
@@ -119,10 +124,10 @@ class K2JyBoxScatterDisplay(object):
         else:
             spw_ids, frequencies = [], []
         positions = self.__compute_x_positions(frequencies, ALPHA)
-        
+
         xlabel_bottom = 'Frequency (GHz)'
         ylabel = 'Jy/K factor'
-        
+
         fig = Figure(figsize=(8, 6))
         canvas = FigureCanvas(fig)
         ax = fig.add_subplot(111)
@@ -164,7 +169,7 @@ class K2JyBoxScatterDisplay(object):
             for box in bp['boxes']:
                 box.set_facecolor('orange')
                 box.set_alpha(0.7)
-                
+
             # Scatter outliers manually
             handles = {}
             for i, spw_id in enumerate(spw_ids):
@@ -207,9 +212,9 @@ class K2JyBoxScatterDisplay(object):
         canvas.print_figure(plotfile, format='png', dpi=DPISummary)
         plot = self._create_plot(plotfile, xlabel_bottom, ylabel)
         yield plot
-        
-    @staticmethod    
-    def __compute_x_positions(frequencies: List[float], alpha: float) -> np.ndarray:
+
+    @staticmethod
+    def __compute_x_positions(frequencies: list[float], alpha: float) -> NDArray[floating]:
         """
         The x-positions for SPWs plotting are computed as a blend between uniform spacing (by index) and
         normalized frequency differences:

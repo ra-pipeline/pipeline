@@ -1,4 +1,6 @@
 """A collection of Single Dish utility methods and classes."""
+from __future__ import annotations
+
 import collections
 import contextlib
 import datetime
@@ -6,29 +8,29 @@ import functools
 import os
 import sys
 import time
-from typing import Any, Callable, Dict, Generator, Iterable, List, NewType, Optional, Sequence, Union, Tuple
-
-from astropy.time import Time
-
-# Imported for annotation pupose only. Use table in casa_tools in code.
-from casatools import table as casa_table
+from typing import TYPE_CHECKING
 
 import numpy
+from astropy.time import Time
 
 import pipeline.infrastructure as infrastructure
-import pipeline.infrastructure.logging as logging
-from pipeline.domain import DataTable, Field, MeasurementSet, ObservingRun
 from pipeline.domain.datatable import OnlineFlagIndex
 from pipeline.domain.spectralwindow import match_spw_basename
-from pipeline.infrastructure import Context
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.utils import absolute_path, relative_path, list_to_str
 from . import compress
 
-LOG = infrastructure.get_logger(__name__)
+if TYPE_CHECKING:
+    from collections.abc import Generator, Iterable, Sequence, Callable
+    from typing import Any, TypeAlias
 
-TableLike = NewType('TableLike',
-                    Union[casa_tools._logging_table_cls, casa_table])
+    from casatools import table as casa_table
+    TableLike: TypeAlias = casa_tools._logging_table_cls | casa_table
+
+    from pipeline.domain import DataTable, Field, MeasurementSet, ObservingRun
+    from pipeline.infrastructure import Context
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 def profiler(func: Callable):
@@ -65,8 +67,8 @@ def require_virtual_spw_id_handling(observing_run: ObservingRun) -> bool:
                       for spw in ms.get_spectral_windows(science_windows_only=True)])
 
 
-def convert_spw_virtual2real(context, spw_in: Union[str, int],
-                             mses: List[MeasurementSet] = []) -> Dict[str, str]:
+def convert_spw_virtual2real(context, spw_in: str | int,
+                             mses: list[MeasurementSet] = []) -> dict[str, str]:
     """Convert virtual spw selection into real spw selection.
 
     Real spw selection can be different among MSes. This method returns
@@ -76,7 +78,7 @@ def convert_spw_virtual2real(context, spw_in: Union[str, int],
         context: pipeline context
         spw_in: virtual spw selection string (a comma separated list of
             virtual spw IDs) or an integer ID
-        mses: list of measurementset domain objects (optional)
+        mses: List of measurementset domain objects (optional)
     Returns:
         real spw selection per MS
     """
@@ -176,7 +178,7 @@ def get_data_table_path(context: Context, msobj: MeasurementSet) -> str:
     origin_ms_name = os.path.basename(msobj.origin_ms)
     return relative_path(os.path.join(context.observing_run.ms_datatable_name, origin_ms_name))
 
-def match_origin_ms(ms_list: List[MeasurementSet], origin_name: str) -> MeasurementSet:
+def match_origin_ms(ms_list: list[MeasurementSet], origin_name: str) -> MeasurementSet:
     """
     Return an MS domain object that has the same origin_ms as origin_name.
 
@@ -194,7 +196,7 @@ def match_origin_ms(ms_list: List[MeasurementSet], origin_name: str) -> Measurem
     return None
 
 
-class ProgressTimer(object):
+class ProgressTimer:
     """
     Show the progress bar on the console.
 
@@ -209,7 +211,7 @@ class ProgressTimer(object):
     """
 
     def __init__(self, length: int=80, maxCount: int=80,
-                 LogLevel: Union[int, str]='info'):
+                 LogLevel: int | str='info'):
         """
         Initialize ProgressTimer class.
 
@@ -223,15 +225,15 @@ class ProgressTimer(object):
         self.curCount = 0
         self.scale = float(length)/float(maxCount)
         if isinstance(LogLevel, str):
-            self.LogLevel = logging.LOGGING_LEVELS[LogLevel] if LogLevel in logging.LOGGING_LEVELS else logging.INFO
+            self.LogLevel = infrastructure.logging.LOGGING_LEVELS[LogLevel] if LogLevel in infrastructure.logging.LOGGING_LEVELS else infrastructure.logging.INFO
         else:
             self.LogLevel = LogLevel
-        if self.LogLevel >= logging.INFO:
+        if self.LogLevel >= infrastructure.logging.INFO:
             print('\n|{} 100% {}|'.format('=' * ((length - 8) // 2), '=' * ((length - 8) // 2)))
 
     def __del__(self):
         """Destructor of ProgressTimer."""
-        if self.LogLevel >= logging.INFO:
+        if self.LogLevel >= infrastructure.logging.INFO:
             print('\n')
 
     def count(self, increment: int=1):
@@ -241,7 +243,7 @@ class ProgressTimer(object):
         Args:
             increment: A count to be prgressed.
         """
-        if self.LogLevel >= logging.INFO:
+        if self.LogLevel >= infrastructure.logging.INFO:
             self.curCount += increment
             newLevel = int(self.curCount * self.scale)
             if newLevel != self.currentLevel:
@@ -251,7 +253,7 @@ class ProgressTimer(object):
 
 
 # parse edge parameter to tuple
-def parseEdge(edge: Union[float, List[float]]) -> Tuple[float, float]:
+def parseEdge(edge: float | list[float]) -> tuple[float, float]:
     """
     Convert a given edge value to a two-element-tuple.
 
@@ -333,7 +335,7 @@ def mjd_to_datestring(t: float, unit: str='sec') -> str:
     return mjdstr
 
 
-def to_list(s: Any) -> Optional[Sequence[Any]]:
+def to_list(s: Any) -> Sequence[Any] | None:
     """
     Convert the input argument to a list.
 
@@ -386,7 +388,7 @@ def to_list(s: Any) -> Optional[Sequence[Any]]:
         return [s]
 
 
-def to_bool(s: Any) -> Union[bool, str, None]:
+def to_bool(s: Any) -> bool | str | None:
     """
     Convert the input argument to a bool.
 
@@ -468,8 +470,8 @@ def get_mask_from_flagtra(flagtra: Sequence[int]) -> numpy.ndarray:
 
 
 def iterate_group_member(group_desc: dict,
-                         member_id_list: List[int]
-                         ) -> Iterable[Tuple[MeasurementSet, int, int, int]]:
+                         member_id_list: list[int]
+                         ) -> Iterable[tuple[MeasurementSet, int, int, int]]:
     """
     Yeild reduction group members.
 
@@ -487,9 +489,9 @@ def iterate_group_member(group_desc: dict,
         yield member.ms, member.field_id, member.antenna_id, member.spw_id
 
 
-def get_index_list_for_ms(datatable: DataTable, origin_vis_list: List[str],
-                          antennaid_list: List[int], fieldid_list: List[int],
-                          spwid_list: List[int])  -> numpy.ndarray:
+def get_index_list_for_ms(datatable: DataTable, origin_vis_list: list[str],
+                          antennaid_list: list[int], fieldid_list: list[int],
+                          spwid_list: list[int])  -> numpy.ndarray:
     """
     Return an array of row IDs in datatable that matches selection.
 
@@ -511,9 +513,9 @@ def get_index_list_for_ms(datatable: DataTable, origin_vis_list: List[str],
                                                 spwid_list), dtype=numpy.int64)
 
 
-def _get_index_list_for_ms(datatable: DataTable, origin_vis_list: List[str],
-                           antennaid_list: List[int], fieldid_list: List[int],
-                           spwid_list: List[int]
+def _get_index_list_for_ms(datatable: DataTable, origin_vis_list: list[str],
+                           antennaid_list: list[int], fieldid_list: list[int],
+                           spwid_list: list[int]
                            ) -> Generator[int, None, None]:
     """
     Yield row IDs in datatable that matches given selection criteria.
@@ -556,7 +558,7 @@ def _get_index_list_for_ms(datatable: DataTable, origin_vis_list: List[str],
 
 
 def get_index_list_for_ms2(datatable_dict: dict, group_desc: dict,
-                           member_list: List[int]) -> collections.defaultdict:
+                           member_list: list[int]) -> collections.defaultdict:
     """
     Return row IDs of datatable of selected reductions group members.
 
@@ -597,9 +599,9 @@ def get_index_list_for_ms2(datatable_dict: dict, group_desc: dict,
 
 
 # TODO (ksugimoto): refactor get_valid_ms_members
-def get_valid_ms_members(group_desc: dict, msname_filter: List[str],
+def get_valid_ms_members(group_desc: dict, msname_filter: list[str],
                          ant_selection: str, field_selection: str,
-                         spw_selection: Union[str, dict]) -> Generator[int, None, None]:
+                         spw_selection: str | dict) -> Generator[int, None, None]:
     """
     Yield IDs of reduction groups that matches selection criteria.
 
@@ -670,7 +672,7 @@ def get_valid_ms_members(group_desc: dict, msname_filter: List[str],
 
 # TODO (ksugimoto): Move this to casa_tools module.
 @contextlib.contextmanager
-def TableSelector(name: str, query: str) -> casa_table:
+def TableSelector(name: str, query: str) -> Generator[casa_table, None, None]:
     """
     Retun a CASA table tool instance of selected rows of a table.
 
@@ -722,8 +724,8 @@ def make_row_map_between_ms(src_ms: MeasurementSet, derived_vis: str,
 
 #@profiler
 def make_row_map(src_ms: MeasurementSet, derived_vis: str,
-                 src_tb: Optional[TableLike]=None,
-                 derived_tb: Optional[TableLike]=None) -> dict:
+                 src_tb: TableLike | None=None,
+                 derived_tb: TableLike | None=None) -> dict:
     """
     Make row mapping between a source and a derived MeasurementSet (MS).
 
@@ -976,7 +978,7 @@ def make_row_map(src_ms: MeasurementSet, derived_vis: str,
     return rowmap
 
 
-class SpwSimpleView(object):
+class SpwSimpleView:
     """
     A simple class that holds an spectral windpw (SpW) ID and Name pair.
 
@@ -991,7 +993,7 @@ class SpwSimpleView(object):
         self.name = name
 
 
-class SpwDetailedView(object):
+class SpwDetailedView:
     """
     A class to store Spestral Window (SpW) settings.
 
@@ -1026,7 +1028,7 @@ class SpwDetailedView(object):
         self.max_frequency = max_frequency
 
 
-def get_spw_names(vis: str) -> List[SpwSimpleView]:
+def get_spw_names(vis: str) -> list[SpwSimpleView]:
     """
     Return a list of SpWSimpleView of all spectral windpws in a MeasurementSet.
 
@@ -1042,7 +1044,7 @@ def get_spw_names(vis: str) -> List[SpwSimpleView]:
     return spws
 
 
-def get_spw_properties(vis: str) -> List[SpwDetailedView]:
+def get_spw_properties(vis: str) -> list[SpwDetailedView]:
     """
     Return a list of SpwDetailedView of all spectral windpws in a MeasurementSet.
 
@@ -1067,7 +1069,7 @@ def get_spw_properties(vis: str) -> List[SpwDetailedView]:
 
 
 # @profiler
-def __read_table(reader: Optional[Callable], method: Callable,
+def __read_table(reader: Callable | None, method: Callable,
                  vis: Any) -> Any:
     # Returns results of either method(reader(vis)) or method(vis).
     if reader is None:
@@ -1125,10 +1127,9 @@ def make_spwid_map(srcvis: str, dstvis: str) -> dict:
                     spwid_map[src.id] = spw.id
     return spwid_map
 
+PolarizationData = tuple[int, int, list[int], list[int], bool]
 
-PolarizationData = Tuple[int, int, List[int], List[int], bool]
-
-def _read_polarization_table(vis: str) -> List[PolarizationData]:
+def _read_polarization_table(vis: str) -> list[PolarizationData]:
     """
     Read the POLARIZATION table of a given MeasurementSet.
 
@@ -1236,7 +1237,7 @@ def get_datacolumn_name(vis: str) -> str:
 
 
 def get_restfrequency(vis: str, spwid: int,
-                      source_id: int) -> Optional[numpy.ndarray]:
+                      source_id: int) -> numpy.ndarray | None:
     """
     Obtain the rest frequency of a given source and spectral windpw (SpW).
 
@@ -1264,7 +1265,7 @@ def get_restfrequency(vis: str, spwid: int,
             tsel.close()
 
 
-class RGAccumulator(object):
+class RGAccumulator:
     """
     Accumulate metadata information of a reduction group.
 
@@ -1287,9 +1288,9 @@ class RGAccumulator(object):
         self.channelmap_range = []
 
     def append(self, field_id: int, antenna_id: int, spw_id: int,
-               pol_ids: Union[List[int], List[str], None]=None,
-               grid_table: Union[dict, compress.CompressedObj, None]=None,
-               channelmap_range: Optional[List[int]]=None):
+               pol_ids: list[int] | list[str] | None=None,
+               grid_table: dict | compress.CompressedObj | None=None,
+               channelmap_range: list[int] | None=None):
         """
         Add an entry to class.
 
@@ -1340,7 +1341,7 @@ class RGAccumulator(object):
         """Return a list of channel map ranges registered to the class."""
         return self.channelmap_range
 
-    def iterate_id(self) -> Generator[Tuple[int, int, int], None, None]:
+    def iterate_id(self) -> Generator[tuple[int, int, int], None, None]:
         """Yield field, antenna, and spectral window registered."""
         assert len(self.field) == len(self.antenna)
         assert len(self.field) == len(self.spw)
@@ -1350,7 +1351,7 @@ class RGAccumulator(object):
 
     def iterate_all(
             self
-            ) -> Generator[Tuple[int, int, int, Optional[dict], List[int]],
+            ) -> Generator[tuple[int, int, int, dict | None, list[int]],
                            None, None]:
         """
         Yield metadata registered.
@@ -1371,8 +1372,7 @@ class RGAccumulator(object):
 
     def get_process_list(
             self, withpol: bool=False
-            ) -> Union[Tuple[int, int, int],
-                       Tuple[int, int, int, Union[List[int], List[str]]]]:
+            ) -> tuple[int, int, int] | tuple[int, int, int, list[int] | list[str]]:
         """
         Obtain a list of metadata registered.
 
@@ -1399,7 +1399,7 @@ class RGAccumulator(object):
             return field_id_list, antenna_id_list, spw_id_list
 
 
-def sort_fields(context: Context) -> List[Field]:
+def sort_fields(context: Context) -> list[Field]:
     """
     Obtain a set of field objects registered to a context.
 

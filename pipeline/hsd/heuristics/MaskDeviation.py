@@ -60,7 +60,7 @@ class MaskDeviationHeuristic(api.Heuristic):
         return mask_list
 
 
-class MaskDeviation(object):
+class MaskDeviation:
     """
     The class is used to detect channels having large variation or deviation. If there are any
     emission lines or atmospheric absorption/emission on some channels, their values largely

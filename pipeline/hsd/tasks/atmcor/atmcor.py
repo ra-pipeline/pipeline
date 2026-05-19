@@ -1,28 +1,31 @@
 """Offline ATM correction stage."""
+from __future__ import annotations
+
 import collections
+import collections.abc
 import os
-from typing import List, Optional, Tuple, Union
+from typing import TYPE_CHECKING
 
-import numpy as np
-
+import pipeline.hsd.heuristics.SDcalatmcorr as SDcalatmcorr
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.casa_tasks as casa_tasks
 import pipeline.infrastructure.casa_tools as casa_tools
-import pipeline.infrastructure.logging as logging
+import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.sessionutils as sessionutils
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
-import pipeline.hsd.heuristics.SDcalatmcorr as SDcalatmcorr
 from pipeline.domain import DataType
 from pipeline.h.heuristics import fieldnames
 from pipeline.hsd.tasks.common.inspection_util import generate_ms, inspect_reduction_group, merge_reduction_group
 from pipeline.infrastructure import task_registry
-from pipeline.infrastructure.launcher import Context
 from pipeline.infrastructure.utils import relative_path
 from .. import common
 
-LOG = logging.get_logger(__name__)
+if TYPE_CHECKING:
+    from pipeline.infrastructure.launcher import Context
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 ATMModelParam = collections.namedtuple('ATMModelParam', 'atmtype maxalt dtem_dh h0')
@@ -47,7 +50,7 @@ class SDATMCorrectionInputs(vdp.StandardInputs):
     intent = vdp.VisDependentProperty(default='TARGET')
 
     @atmtype.convert
-    def atmtype(self, value: Union[int, str, List[Union[int, str]]]) -> Union[str, List[str]]:
+    def atmtype(self, value: int | str | list[int | str]) -> str | list[str]:
         """Convert atmtype into str or a list of str.
 
         Args:
@@ -69,7 +72,7 @@ class SDATMCorrectionInputs(vdp.StandardInputs):
             value = str(value)
         return value
 
-    def __to_float_value(self, value: Union[float, str, dict, List[Union[float, str, dict]]], default_unit: str) -> Union[float, List[float]]:
+    def __to_float_value(self, value: float | str | dict | list[float | str | dict], default_unit: str) -> float | list[float]:
         """Convert input value into float value or list of float values.
 
         This method converts any value into float value. If input is a list,
@@ -116,7 +119,7 @@ class SDATMCorrectionInputs(vdp.StandardInputs):
         return ret
 
     @h0.convert
-    def h0(self, value: Union[float, str, dict, List[Union[float, str, dict]]]) -> Union[float, List[float]]:
+    def h0(self, value: float | str | dict | list[float | str | dict]) -> float | list[float]:
         """Convert any h0 value into float or a list of float.
 
         Input value(s) can be numerical value or a quantity in the
@@ -132,7 +135,7 @@ class SDATMCorrectionInputs(vdp.StandardInputs):
         return self.__to_float_value(value, 'km')
 
     @dtem_dh.convert
-    def dtem_dh(self, value: Union[float, str, dict, List[Union[float, str, dict]]]) -> Union[float, List[float]]:
+    def dtem_dh(self, value: float | str | dict | list[float | str | dict]) -> float | list[float]:
         """Convert any dtem_dh value into float or a list of float.
 
         Input value(s) can be numerical value or a quantity in the
@@ -148,7 +151,7 @@ class SDATMCorrectionInputs(vdp.StandardInputs):
         return self.__to_float_value(value, 'K/km')
 
     @maxalt.convert
-    def maxalt(self, value: Union[float, str, dict, List[Union[float, str, dict]]]) -> Union[float, List[float]]:
+    def maxalt(self, value: float | str | dict | list[float | str | dict]) -> float | list[float]:
         """Convert any maxalt value into float or a list of float.
 
         Input value(s) can be numerical value or a quantity in the
@@ -265,16 +268,16 @@ class SDATMCorrectionInputs(vdp.StandardInputs):
     # docstring and type hints: supplements hsd_atmcor
     def __init__(self,
                  context: Context,
-                 atmtype: Optional[Union[int, str, List[int], List[str]]] = None,
-                 dtem_dh: Optional[Union[float, str, dict, List[float], List[str], List[dict]]] = None,
-                 h0: Optional[Union[float, str, dict, List[float], List[str], List[dict]]] = None,
-                 maxalt: Optional[Union[float, str, dict, List[float], List[str], List[dict]]] = None,
-                 infiles: Optional[Union[str, List[str]]] = None,
-                 antenna: Optional[Union[str, List[str]]] = None,
-                 field: Optional[Union[str, List[str]]] = None,
-                 spw: Optional[Union[str, List[str]]] = None,
-                 pol: Optional[Union[str, List[str]]] = None,
-                 parallel: Optional[Union[bool, str]] = None):
+                 atmtype: int | str | list[int] | list[str] | None = None,
+                 dtem_dh: float | str | dict | list[float] | list[str] | list[dict] | None = None,
+                 h0: float | str | dict | list[float] | list[str] | list[dict] | None = None,
+                 maxalt: float | str | dict | list[float] | list[str] | list[dict] | None = None,
+                 infiles: str | list[str] | None = None,
+                 antenna: str | list[str] | None = None,
+                 field: str | list[str] | None = None,
+                 spw: str | list[str] | None = None,
+                 pol: str | list[str] | None = None,
+                 parallel: bool | str | None = None):
         """Initialize Inputs instance for hsd_atmcor.
 
         Args:
@@ -403,7 +406,7 @@ class SDATMCorrectionInputs(vdp.StandardInputs):
 
         return k2jycal_caltable
 
-    def get_gainfactor(self) -> Union[float, str]:
+    def get_gainfactor(self) -> float | str:
         """Retrieve k2jycal table from callibrary.
 
         Returns:
@@ -497,9 +500,9 @@ class SDATMCorrectionResults(common.SingleDishResults):
     """Results instance for hsd_atmcor."""
 
     def __init__(self,
-                 task: Optional[basetask.StandardTaskTemplate] =None,
-                 success: Optional[bool] =None,
-                 outcome: Optional[dict] =None):
+                 task: basetask.StandardTaskTemplate | None =None,
+                 success: bool | None =None,
+                 outcome: dict | None =None):
         """Initialize results instance for hsd_atmcor.
 
         The outcome must be a dict that contains:
@@ -644,7 +647,7 @@ class SerialSDATMCorrection(basetask.StandardTaskTemplate):
         result.out_mses.append(new_ms)
         return result
 
-    def _perform_atm_heuristics(self) -> Tuple[str, dict, int, List[Tuple[int, float, float, float]]]:
+    def _perform_atm_heuristics(self) -> tuple[str, dict, int, list[tuple[int, float, float, float]]]:
         """Perform ATM model heuristics.
 
         Perform ATM model heuristics, SDcalatmcorr.
@@ -713,7 +716,7 @@ class SerialSDATMCorrection(basetask.StandardTaskTemplate):
             LOG.info(f'ATM heuristics failed. Falling back to default model {default_model}.')
             LOG.info('Original error:')
             LOG.info(str(e))
-            if LOG.isEnabledFor(logging.DEBUG):
+            if LOG.isEnabledFor(infrastructure.logging.DEBUG):
                 import traceback
                 LOG.debug(traceback.format_exc())
 

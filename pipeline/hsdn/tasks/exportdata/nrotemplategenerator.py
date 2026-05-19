@@ -5,22 +5,27 @@ into products folder:
 - scale file: norscalefile.csv
 - reduction template: rebase_and_image.py
 """
+from __future__ import annotations
 
 import glob
 import itertools
-import string
 import os
-from typing import Generator, List
+import string
+from typing import TYPE_CHECKING
 
-from pipeline.domain.measurementset import MeasurementSet
-from pipeline.domain.singledish import MSReductionGroupDesc, MSReductionGroupMember
+import pipeline.hsd.tasks.common.observatory_policy as observatory_policy
 import pipeline.infrastructure as infrastructure
 from pipeline.infrastructure import casa_tools
-import pipeline.hsd.tasks.common.observatory_policy as observatory_policy
-from pipeline.infrastructure.launcher import Context
 
 # the logger for this module
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from pipeline.domain import MeasurementSet
+    from pipeline.domain.singledish import MSReductionGroupMember
+    from pipeline.infrastructure.launcher import Context
 
 
 def generate_template(filename: str) -> string.Template:
@@ -88,8 +93,8 @@ def get_template(name: str) -> str:
 
 
 def generate_group_entries(ms: MeasurementSet,
-                           member_list: List[MSReductionGroupMember])\
-        -> Generator[str, None, None]:
+                           member_list: list[MSReductionGroupMember],
+                           ) -> Generator[str, None, None]:
     """Yield a CSV string for NRO scale file corresponding to ms and member_list.
 
     Args:

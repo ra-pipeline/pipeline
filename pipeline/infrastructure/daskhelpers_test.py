@@ -25,7 +25,7 @@ import importlib
 import os
 import shutil
 import time
-from typing import TYPE_CHECKING, Any, Dict, Generator, List
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
@@ -36,7 +36,12 @@ from pipeline.infrastructure.daskhelpers import start_daskcluster, stop_daskclus
 skip_if_no_dask = pytest.mark.skipif(importlib.util.find_spec('dask') is None, reason='dask not installed')
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+    from typing import Any
+
     from dask.distributed import Client
+    from numpy import generic, floating
+    from numpy.typing import NDArray
 
 
 @pytest.fixture(scope='module')
@@ -88,26 +93,26 @@ def test_parallel_processing(dask_client: Client, sample_data_dir: str) -> None:
     import dask
 
     @dask.delayed
-    def load_array(filename: str) -> np.ndarray:
+    def load_array(filename: str) -> NDArray[generic]:
         """Load a numpy array from file.
 
         Args:
             filename: The path to the numpy array file.
 
         Returns:
-            np.ndarray: The loaded numpy array.
+            The loaded numpy array.
         """
         return np.load(filename)
 
     @dask.delayed
-    def process_array(array: np.ndarray) -> Dict[str, float]:
+    def process_array(array: NDArray[floating]) -> dict[str, float]:
         """Process an array with a CPU-intensive operation.
 
         Args:
             array: The numpy array to process.
 
         Returns:
-            Dict[str, float]: A dictionary containing statistics of the processed array.
+            A dictionary containing statistics of the processed array.
         """
         # Simulate CPU-intensive work
         result = np.sin(array) * np.cos(array) * np.sqrt(np.abs(array))
@@ -119,7 +124,7 @@ def test_parallel_processing(dask_client: Client, sample_data_dir: str) -> None:
         }
 
     # Create computation graph
-    computation_tasks: List[Dict[str, float]] = []
+    computation_tasks: list[dict[str, float]] = []
     for i in range(5):
         filename = f'{sample_data_dir}/array_{i}.npy'
         array = load_array(filename)
@@ -127,7 +132,7 @@ def test_parallel_processing(dask_client: Client, sample_data_dir: str) -> None:
         computation_tasks.append(stats)
 
     # Execute all tasks in parallel
-    results: List[Dict[str, float]] = dask.compute(*computation_tasks)
+    results: list[dict[str, float]] = dask.compute(*computation_tasks)
 
     # Verify results
     assert len(results) == 5
@@ -154,20 +159,20 @@ def test_parallel_map(dask_client: Client, sample_data_dir: str) -> None:
     import dask.bag as db
 
     # List all numpy files
-    files: List[str] = [f'{sample_data_dir}/array_{i}.npy' for i in range(5)]
+    files: list[str] = [f'{sample_data_dir}/array_{i}.npy' for i in range(5)]
 
     # Create a bag from the file list
     file_bag = db.from_sequence(files)
 
     # Define operations
-    def calculate_stats(filename: str) -> Dict[str, Any]:
+    def calculate_stats(filename: str) -> dict[str, Any]:
         """Load a file and calculate statistics.
 
         Args:
             filename: The path to the file.
 
         Returns:
-            Dict[str, Any]: A dictionary containing file statistics.
+            A dictionary containing file statistics.
         """
         arr = np.load(filename)
         transformed = np.exp(-arr) * np.cos(arr)
@@ -180,7 +185,7 @@ def test_parallel_map(dask_client: Client, sample_data_dir: str) -> None:
 
     # Apply the function to each file in parallel
     result_bag = file_bag.map(calculate_stats)
-    results: List[Dict[str, Any]] = result_bag.compute()
+    results: list[dict[str, Any]] = result_bag.compute()
 
     # Verify results
     assert len(results) == 5
@@ -215,7 +220,7 @@ def test_parallel_task_performance(dask_client: Client, sample_data_dir: str) ->
             seed: Seed for random number generation.
 
         Returns:
-            float: The mean of the calculation results.
+            The mean of the calculation results.
         """
         np.random.seed(seed)
         x = np.random.random(1000000)
@@ -225,13 +230,13 @@ def test_parallel_task_performance(dask_client: Client, sample_data_dir: str) ->
 
     # Sequential execution
     start_time = time.time()
-    sequential_results: List[float] = [intensive_task(i) for i in range(10)]
+    sequential_results: list[float] = [intensive_task(i) for i in range(10)]
     sequential_time = time.time() - start_time
 
     # Parallel execution with Dask
     start_time = time.time()
     delayed_tasks = [dask.delayed(intensive_task)(i) for i in range(10)]
-    parallel_results: List[float] = dask.compute(*delayed_tasks)
+    parallel_results: list[float] = dask.compute(*delayed_tasks)
     parallel_time = time.time() - start_time
 
     # Verify results match

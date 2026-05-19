@@ -1,28 +1,33 @@
+from __future__ import annotations
+
 import collections
 import copy
 import os
 from statistics import mode
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING
 
 import numpy as np
-from numpy.typing import NDArray
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
-from pipeline.domain.measurementset import MeasurementSet
 from pipeline.h.tasks.common import commonhelpermethods, mstools
 from pipeline.h.tasks.common.arrayflaggerbase import FlagCmd
 from pipeline.h.tasks.flagging.flagdatasetter import FlagdataSetter
 from pipeline.infrastructure import task_registry
 from .resultobjects import CorrectedampflagResults
 
-LOG = infrastructure.get_logger(__name__)
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
+
+    from pipeline.domain import MeasurementSet
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 
-def _consolidate_flags(flags: List[FlagCmd]) -> List[FlagCmd]:
+def _consolidate_flags(flags: list[FlagCmd]) -> list[FlagCmd]:
     """
     Function to consolidate a list of FlagCmd objects ("flags").
     """
@@ -41,7 +46,7 @@ def _consolidate_flags(flags: List[FlagCmd]) -> List[FlagCmd]:
     return flags
 
 
-def _consolidate_flags_with_same_pol(flags: List[FlagCmd]) -> List[FlagCmd]:
+def _consolidate_flags_with_same_pol(flags: list[FlagCmd]) -> list[FlagCmd]:
     """
     Function to consolidate a list of FlagCmd objects ("flags") by removing
     flags that differ only in polarisation.
@@ -118,7 +123,7 @@ def _consolidate_flags_with_same_pol(flags: List[FlagCmd]) -> List[FlagCmd]:
     return cflags
 
 
-def _consolidate_flags_by_timestamps(flags: List[FlagCmd]) -> List[FlagCmd]:
+def _consolidate_flags_by_timestamps(flags: list[FlagCmd]) -> list[FlagCmd]:
     """
     Function to consolidate a list of FlagCmd objects ("flags") by removing
     flags with timestamps if for the same (spw, field, intent), the antenna
@@ -191,7 +196,7 @@ def _consolidate_flags_by_timestamps(flags: List[FlagCmd]) -> List[FlagCmd]:
     return cflags
 
 
-def _consolidate_flags_by_antennas(flags: List[FlagCmd]) -> List[FlagCmd]:
+def _consolidate_flags_by_antennas(flags: list[FlagCmd]) -> list[FlagCmd]:
     """
     Function to consolidate a list of FlagCmd objects ("flags")
     by antennas.
@@ -209,7 +214,7 @@ def _consolidate_flags_by_antennas(flags: List[FlagCmd]) -> List[FlagCmd]:
     return flags
 
 
-def _consolidate_flags_non_antenna_specific(flags: List[FlagCmd]) -> List[FlagCmd]:
+def _consolidate_flags_non_antenna_specific(flags: list[FlagCmd]) -> list[FlagCmd]:
     """
     Function to consolidate a list of FlagCmd objects ("flags") by removing
     flags with antennas/baselines if the same (timestamp, spw, field,
@@ -271,7 +276,7 @@ def _consolidate_flags_non_antenna_specific(flags: List[FlagCmd]) -> List[FlagCm
     return cflags
 
 
-def _consolidate_flags_for_ant_in_baselines(flags: List[FlagCmd]) -> List[FlagCmd]:
+def _consolidate_flags_for_ant_in_baselines(flags: list[FlagCmd]) -> list[FlagCmd]:
     """Function to consolidate a list of FlagCmd objects ("flags") by removing
     flags with baselines if the same (timestamp, spw, field, intent) is
     covered by a flagging command for one of the antennas in the baseline.
@@ -325,7 +330,7 @@ def _consolidate_flags_for_ant_in_baselines(flags: List[FlagCmd]) -> List[FlagCm
     return cflags
 
 
-def _consolidate_duplicate_flags(flags: List[FlagCmd]) -> List[FlagCmd]:
+def _consolidate_duplicate_flags(flags: list[FlagCmd]) -> list[FlagCmd]:
     """
     Function to consolidate a list of FlagCmd objects ("flags") by removing
     duplicate flags that result in the same flagging command.
@@ -350,7 +355,7 @@ def _consolidate_duplicate_flags(flags: List[FlagCmd]) -> List[FlagCmd]:
     return cflags
 
 
-def _propagate_phase_flags(flags: List[FlagCmd], ms: MeasurementSet, antenna_id_to_name: Dict) -> List[FlagCmd]:
+def _propagate_phase_flags(flags: list[FlagCmd], ms: MeasurementSet, antenna_id_to_name: dict) -> list[FlagCmd]:
     """
     Function to take a list of FlagCmd objects ("flags") and propagate
     flags with reason = 'bad baseline' and intent = PHASE to intents
@@ -644,7 +649,7 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         return result
 
     @staticmethod
-    def _get_ant_id_to_name_dict(ms: MeasurementSet) -> Dict:
+    def _get_ant_id_to_name_dict(ms: MeasurementSet) -> dict:
         """
         Return dictionary with antenna ID mapped to antenna name.
         If no unique antenna name can be assigned to each antenna ID,
@@ -669,7 +674,7 @@ class Correctedampflag(basetask.StandardTaskTemplate):
 
         return antenna_id_to_name
 
-    def _run_flagging_iteration(self, ms: MeasurementSet, antenna_id_to_name: Dict) -> List[FlagCmd]:
+    def _run_flagging_iteration(self, ms: MeasurementSet, antenna_id_to_name: dict) -> list[FlagCmd]:
         inputs = self.inputs
 
         # Get the spws to use.
@@ -724,7 +729,7 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         return newflags
 
     def _evaluate_heuristic(self, ms: MeasurementSet, intent: str, field: str, spwid: int,
-                            antenna_id_to_name: Dict) -> List[FlagCmd]:
+                            antenna_id_to_name: dict) -> list[FlagCmd]:
         # Initialize flags.
         allflags = []
 
@@ -746,7 +751,7 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         return allflags
 
     @staticmethod
-    def _identify_baseline_sets(ms: MeasurementSet) -> List[Tuple[str, str]]:
+    def _identify_baseline_sets(ms: MeasurementSet) -> list[tuple[str, str]]:
         # Determine unique antenna diameters.
         uniq_diams = {ant.diameter for ant in ms.antennas}
 
@@ -829,8 +834,8 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         return factor
 
     def _evaluate_heuristic_for_baseline_set(self, ms: MeasurementSet, intent: str, field: str, spwid: int,
-                                             antenna_id_to_name: Dict,
-                                             baseline_set: Optional[List] = None) -> List[FlagCmd]:
+                                             antenna_id_to_name: dict,
+                                             baseline_set: list | None = None) -> list[FlagCmd]:
 
         inputs = self.inputs
 
@@ -1439,8 +1444,8 @@ class Correctedampflag(basetask.StandardTaskTemplate):
 
     @staticmethod
     def _create_flags_for_ultrahigh_baselines_timestamps(ms: MeasurementSet, spwid: int, intent: str, icorr: int,
-                                                         field: str, timestamps: List, baselines: List,
-                                                         antenna_id_to_name: Dict) -> List[FlagCmd]:
+                                                         field: str, timestamps: list, baselines: list,
+                                                         antenna_id_to_name: dict) -> list[FlagCmd]:
         newflags = []
         for idx in range(len(baselines)):
             newflags.append(
@@ -1461,9 +1466,9 @@ class Correctedampflag(basetask.StandardTaskTemplate):
     def _evaluate_antbased_heuristics(ms: MeasurementSet, spwid: int, intent: str, icorr: int, field: str,
                                       ants_in_outlier_baseline_scans_thresh: float,
                                       ants_in_outlier_baseline_scans_partial_thresh: float,
-                                      max_frac_outlier_scans: float, antenna_id_to_name: Dict, ant1_sel: NDArray,
+                                      max_frac_outlier_scans: float, antenna_id_to_name: dict, ant1_sel: NDArray,
                                       ant2_sel: NDArray, nants: int, id_highsig: NDArray, time_sel_highsig: NDArray,
-                                      time_sel_highsig_uniq: NDArray) -> List[FlagCmd]:
+                                      time_sel_highsig_uniq: NDArray) -> list[FlagCmd]:
 
         # Initialize flags.
         newflags = []
@@ -1580,8 +1585,8 @@ class Correctedampflag(basetask.StandardTaskTemplate):
 
         return newflags
 
-    def _apply_flags(self, flags: List[FlagCmd], sum_before: bool = False, sum_after: bool = False) \
-            -> Tuple[Dict, Dict]:
+    def _apply_flags(self, flags: list[FlagCmd], sum_before: bool = False, sum_after: bool = False) \
+            -> tuple[dict, dict]:
 
         inputs = self.inputs
 

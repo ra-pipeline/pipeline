@@ -1,12 +1,13 @@
-import collections
+import collections.abc
+
 import numpy as np
 
-from pipeline.infrastructure import casa_tools
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
-from pipeline.infrastructure.renderer import rendererutils
 import pipeline.qa.scorecalculator as qacalc
+from pipeline.infrastructure import casa_tools
+from pipeline.infrastructure.renderer import rendererutils
 
 from . import statwt
 

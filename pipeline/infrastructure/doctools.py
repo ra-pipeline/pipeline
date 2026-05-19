@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 import inspect
+from typing import TYPE_CHECKING
 
 from docstring_inheritance import inherit_google_docstring
 
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.sessionutils as sessionutils
 
-from typing import Callable
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def inherit_type_hints(parent_func: Callable, child_func: Callable):

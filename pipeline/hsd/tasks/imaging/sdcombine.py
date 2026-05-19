@@ -1,6 +1,7 @@
 """SDImageCombine classes"""
+from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, List, NewType, Optional
+from typing import TYPE_CHECKING
 
 import os
 import shutil
@@ -14,10 +15,10 @@ from pipeline.infrastructure import casa_tools
 from .resultobjects import SDImagingResultItem
 
 if TYPE_CHECKING:
+    from pipeline.hsd.tasks.common.direction_utils import Direction
     from pipeline.infrastructure.launcher import Context
-    Direction = NewType( 'Direction', Dict )
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class SDImageCombineInputs(vdp.StandardInputs):
@@ -40,11 +41,11 @@ class SDImageCombineInputs(vdp.StandardInputs):
         return value
 
     def __init__(self,
-                 context:        'Context',
-                 inimages:       List[str],
+                 context:        Context,
+                 inimages:       list[str],
                  outfile:        str,
-                 org_directions: List[Optional['Direction']],
-                 specmodes:      List[str]):
+                 org_directions: list[Direction | None],
+                 specmodes:      list[str]):
         """
         Construct SDImageCombineInputs instance.
 
@@ -55,7 +56,7 @@ class SDImageCombineInputs(vdp.StandardInputs):
             org_directions : List of direction of origin for ephemeris objects
             specmodes      : List of specmodes
         """
-        super(SDImageCombineInputs, self).__init__()
+        super().__init__()
 
         self.context = context
         self.inimages = inimages

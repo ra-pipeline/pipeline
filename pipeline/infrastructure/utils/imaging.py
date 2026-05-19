@@ -3,24 +3,34 @@ The imaging module contains utility functions used by the imaging tasks.
 
 TODO These utility functions should migrate to hif.tasks.common
 """
+from __future__ import annotations
+
+import os
+
 import re
+from typing import TYPE_CHECKING
 
-from .. import casa_tools
-from .. import logging
 import numpy
-from typing import Union, Tuple, List, Dict, Any, Generator
 
-from .. import utils
+import pipeline.infrastructure as infrastructure
+from pipeline.infrastructure import casa_tasks
 
-LOG = logging.get_logger(__name__)
+from .. import casa_tools, utils
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+    from typing import Any
+
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 __all__ = ['chan_selection_to_frequencies', 'freq_selection_to_channels', 'spw_intersect', 'update_sens_dict',
            'update_beams_dict', 'set_nested_dict', 'intersect_ranges', 'intersect_ranges_by_weight', 'merge_ranges', 'equal_to_n_digits',
            'velocity_to_frequency', 'frequency_to_velocity',
-           'predict_kernel']
+           'predict_kernel', 'get_vlass_image_type', 'get_stats']
 
 
-def _get_cube_freq_axis(img: str) -> Tuple[float, float, str, float, int]:
+def _get_cube_freq_axis(img: str) -> tuple[float, float, str, float, int]:
     """
     Get CASA image/cube frequency axis.
 
@@ -49,7 +59,7 @@ def _get_cube_freq_axis(img: str) -> Tuple[float, float, str, float, int]:
     return refFreq, deltaFreq, freqUnit, refPix, numPix
 
 
-def chan_selection_to_frequencies(img: str, selection: str, unit: str = 'GHz') -> Union[List[float], List[str]]:
+def chan_selection_to_frequencies(img: str, selection: str, unit: str = 'GHz') -> list[float] | list[str]:
     """
     Convert channel selection to frequency tuples for a given CASA cube.
 
@@ -98,7 +108,7 @@ def chan_selection_to_frequencies(img: str, selection: str, unit: str = 'GHz') -
     return frequencies
 
 
-def freq_selection_to_channels(img: str, selection: str) -> Union[List[int], List[str]]:
+def freq_selection_to_channels(img: str, selection: str) -> list[int] | list[str]:
     """
     Convert frequency selection to channel tuples for a given CASA cube.
 
@@ -160,7 +170,7 @@ def freq_selection_to_channels(img: str, selection: str) -> Union[List[int], Lis
     return channels
 
 
-def spw_intersect(spw_range: List[float], line_regions: List[List[float]]) -> List[List[float]]:
+def spw_intersect(spw_range: list[float], line_regions: list[list[float]]) -> list[list[float]]:
     """
     This utility function takes a frequency range (as numbers with arbitrary
     but common units) and computes the intersection with a list of frequency
@@ -200,7 +210,7 @@ def spw_intersect(spw_range: List[float], line_regions: List[List[float]]) -> Li
     return spw_sel_intervals
 
 
-def update_sens_dict(dct: Dict, udct: Dict) -> None:
+def update_sens_dict(dct: dict, udct: dict) -> None:
     """
     Update a sensitivity dictionary. All generic solutions
     tried so far did not do the job. So this method assumes
@@ -231,7 +241,7 @@ def update_sens_dict(dct: Dict, udct: Dict) -> None:
                         dct[msname][field][intent][spw] = udct[msname][field][intent][spw]
 
 
-def update_beams_dict(dct: Dict, udct: Dict) -> None:
+def update_beams_dict(dct: dict, udct: dict) -> None:
     """
     Update a beams dictionary. All generic solutions
     tried so far did not do the job. So this method assumes
@@ -259,7 +269,7 @@ def update_beams_dict(dct: Dict, udct: Dict) -> None:
                     dct[field][intent][spwids] = udct[field][intent][spwids]
 
 
-def set_nested_dict(dct: Dict, keys: Tuple[Any], value: Any) -> None:
+def set_nested_dict(dct: dict, keys: tuple[Any], value: Any) -> None:
     """
     Set a hierarchy of dictionaries with given keys and value
     for the lowest level key.
@@ -282,7 +292,7 @@ def set_nested_dict(dct: Dict, keys: Tuple[Any], value: Any) -> None:
     dct[keys[-1]] = value
 
 
-def intersect_ranges(ranges: List[Tuple[Union[float, int]]]) -> Tuple[Union[float, int]]:
+def intersect_ranges(ranges: list[tuple[float | int]]) -> tuple[float | int]:
     """
     Compute intersection of ranges.
 
@@ -309,7 +319,7 @@ def intersect_ranges(ranges: List[Tuple[Union[float, int]]]) -> Tuple[Union[floa
         return intersect_range
 
 
-def intersect_ranges_by_weight(ranges: List[Tuple[Union[float, int]]], delta: float, threshold: float) -> Tuple[float]:
+def intersect_ranges_by_weight(ranges: list[tuple[float | int]], delta: float, threshold: float) -> tuple[float]:
     """
     Compute intersection of ranges through weight arrays and a threshold.
 
@@ -340,7 +350,7 @@ def intersect_ranges_by_weight(ranges: List[Tuple[Union[float, int]]], delta: fl
         return ()
 
 
-def merge_ranges(ranges: List[Tuple[Union[float, int]]]) -> Generator[List[Tuple[float]], None, None]:
+def merge_ranges(ranges: list[tuple[float | int]]) -> Generator[list[tuple[float]], None, None]:
     """
     Merge overlapping and adjacent ranges and yield the merged ranges
     in order. The argument must be an iterable of pairs (start, stop).
@@ -395,7 +405,7 @@ def equal_to_n_digits(x: float, y: float, numdigits: int = 7) -> bool:
         return False
 
 
-def velocity_to_frequency(velocity: Union[Dict, str], restfreq: Union[Dict, str]) -> Union[Dict, str]:
+def velocity_to_frequency(velocity: dict | str, restfreq: dict | str) -> dict | str:
     """
     Convert radial velocity to frequency using radio convention.
 
@@ -418,7 +428,7 @@ def velocity_to_frequency(velocity: Union[Dict, str], restfreq: Union[Dict, str]
     return frequency
 
 
-def frequency_to_velocity(frequency: Union[Dict, str], restfreq: Union[Dict, str]) -> Union[Dict, str]:
+def frequency_to_velocity(frequency: dict | str, restfreq: dict | str) -> dict | str:
     """
     Convert frequency to radial velocity using radio convention.
 
@@ -488,7 +498,7 @@ def predict_kernel(beam, target_beam, pstol=1e-6, patol=1e-3):
         origin_bm = [cqa.tos(beam['major']), cqa.tos(beam['minor']), cqa.tos(beam[bpa_key])]
 
         # filter out the potential runtime error message when ia.beamforconvolvedsize() fails.
-        with logging.log_filtermsg('Unable to reach target resolution of major'):
+        with infrastructure.logging.log_filtermsg('Unable to reach target resolution of major'):
             try:
                 rt_kernel = cia.beamforconvolvedsize(source=origin_bm, convolved=target_bm)
                 if cqa.convert(rt_kernel['major'], 'arcsec')['value'] < pstol:
@@ -505,3 +515,35 @@ def predict_kernel(beam, target_beam, pstol=1e-6, patol=1e-3):
 
 
     return rt_kernel, rt_code
+
+
+def get_vlass_image_type(filename:str, append_tt: bool = True) -> str:
+    """
+        Determine the VLASS image type based on specific substrings in the filename.
+    """
+    filename = os.path.basename(filename).lower()
+    base = (
+        "ALPHAERR" if ".alpha.error" in filename else
+        "ALPHA" if ".alpha" in filename else
+        "RMS" if ".rms" in filename else
+        "INTENSITY_PBCOR" if "image.pbcor." in filename else
+        "WEIGHT" if ".weight." in filename else
+        "SUMWT" if ".sumwt." in filename else
+        "PSF" if ".psf." in filename else
+        "UNKNOWN"
+    )
+    if base == "UNKNOWN" or not append_tt:
+        return base
+
+    tt = ("_TT0" if "tt0" in filename else "_TT1" if "tt1" in filename else "")
+    return base + tt
+
+
+def get_stats(image_name: str, metrics: list, stokes: str = 'I') -> dict:
+    """Return a dict of requested statistics for the given image."""
+
+    if not os.path.exists(image_name):
+        return {m: None for m in metrics}
+    job = casa_tasks.imstat(imagename=image_name, stokes=stokes)
+    stats = job.execute()
+    return {m: (float(stats.get(m)[0]) if stats.get(m) is not None else None) for m in metrics}

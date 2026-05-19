@@ -32,6 +32,7 @@ from .utils import *
 
 from .caltable_tools import *
 from .casa_data import *
+from .casa_types import *
 from .conversion import *
 from .diagnostics import *
 from .framework import *
@@ -48,6 +49,7 @@ from .conf import *
 _all_modules = [
     'caltable_tools',
     'casa_data',
+    'casa_types',
     'conversion',
     'diagnostics',
     'framework',

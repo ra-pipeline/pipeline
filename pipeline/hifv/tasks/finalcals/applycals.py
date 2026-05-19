@@ -75,7 +75,7 @@ class ApplycalsInputs(applycal.IFApplycalInputs):
             gainmap: Mode to map gainfields to scans.
 
         """
-        super(ApplycalsInputs, self).__init__(context, output_dir=output_dir, vis=vis, field=field, spw=spw,
+        super().__init__(context, output_dir=output_dir, vis=vis, field=field, spw=spw,
                                               antenna=antenna, intent=intent, parang=parang,
                                               applymode=applymode, flagbackup=flagbackup, flagsum=flagsum,
                                               flagdetailedsum=flagdetailedsum)
@@ -91,7 +91,7 @@ class ApplycalsInputs(applycal.IFApplycalInputs):
     gainmap = vdp.VisDependentProperty(default=False)
 
     def to_casa_args(self):
-        d = super(ApplycalsInputs, self).to_casa_args()
+        d = super().to_casa_args()
         d['intent'] = ''
         d['field'] = ''
         d['spw'] = ''

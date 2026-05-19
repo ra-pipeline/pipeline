@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import collections
 import copy
 import os
-from typing import Callable, Dict, Optional
+from typing import TYPE_CHECKING
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -12,9 +14,13 @@ import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import task_registry
-from pipeline.infrastructure.callibrary import IntervalCalState
 
 from ...heuristics.fieldnames import IntentFieldnames
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from pipeline.infrastructure.callibrary import IntervalCalState
 
 __all__ = [
     'Applycal',
@@ -23,7 +29,7 @@ __all__ = [
     'ApplycalResults',
 ]
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class ApplycalInputs(vdp.StandardInputs):
@@ -163,8 +169,8 @@ class ApplycalResults(basetask.Results):
     ApplycalResults is the results class for the pipeline Applycal task.
     """
 
-    def __init__(self, applied=None, callib_map: Dict[str, str]=None,
-                 data_type: Optional[DataType]=None):
+    def __init__(self, applied=None, callib_map: dict[str, str]=None,
+                 data_type: DataType | None=None):
         """
         Construct and return a new ApplycalResults.
 
@@ -172,7 +178,7 @@ class ApplycalResults(basetask.Results):
         CalibrationTables corresponding to the caltables applied by this task.
 
         :param applied: caltables applied by this task
-        :type applied: list of :class:`~pipeline.domain.caltable.CalibrationTable`
+        :type applied: List of :class:`~pipeline.domain.caltable.CalibrationTable`
         """
         if applied is None:
             applied = []
@@ -376,18 +382,6 @@ def reshape_flagdata_summary(flagdata_result):
             flagsummary[field_name][report_level]['type'] = report_type
 
     return flagsummary
-
-
-# def limit_fields(flagsummary, ms):
-#     calibrator_fields = ms.get_fields(intent='AMPLITUDE,PHASE,BANDPASS')
-#
-#     target_fields = ms.get_fields(intent='TARGET')
-#     plot_stride = len(target_fields) / 30 + 1
-#     targetfields = target_fields[::plot_stride]
-#
-#     fields_to_plot = calibrator_fields + targetfields
-#
-#     return {k: v for k, v in flagsummary.items() if k in fields_to_plot}
 
 
 @task_registry.set_equivalent_casa_task('h_applycal')

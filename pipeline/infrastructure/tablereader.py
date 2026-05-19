@@ -11,8 +11,7 @@ import os
 import re
 import traceback
 import xml
-from collections.abc import Callable, Iterator
-from typing import TYPE_CHECKING, Any, Generic, TypedDict, TypeVar
+from typing import TYPE_CHECKING, Generic, TypedDict, TypeVar
 
 import cachetools
 import numpy as np
@@ -22,18 +21,19 @@ from pipeline.domain import measures
 from pipeline.infrastructure import casa_tools, utils
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
+    from typing import Any
+
+    from numpy import generic
     from numpy.typing import NDArray
+
     from pipeline.domain import Antenna, AntennaArray, DataDescription, Field, MeasurementSet, \
         ObservingRun, Polarization, Scan, Source, SpectralWindow, State
     from pipeline.domain.measures import Frequency, FrequencyRange
     from pipeline.domain.state import StateFactory
-    from pipeline.infrastructure.utils.utils import DirectionDict, QuantityDict
+    from pipeline.infrastructure.utils.casa_types import DirectionDict, LongLatDict, QuantityDict
 
 LOG = infrastructure.logging.get_logger(__name__)
-
-class LongLatDict(TypedDict):
-    latitude: QuantityDict
-    longitude: QuantityDict
 
 T = TypeVar('T')
 
@@ -203,10 +203,6 @@ class MeasurementSetReader:
                 intents = functools.reduce(lambda s, t: s.union(t.intents), states, set())
 
                 fields = [f for f in ms.fields if f.id in fieldsforscans[str(scan_id)]]
-
-                # can't use msmd.timesforscan as we need unique times grouped
-                # by spw
-                # scan_times = msmd.timesforscan(scan_id)
 
                 exposures = {spw_id: msmd.exposuretime(scan=scan_id, spwid=spw_id, obsid=obs_id)
                              for spw_id in spwsforscans[str(scan_id)]}
@@ -560,7 +556,7 @@ class MeasurementSetReader:
             return list(data.values())[0]
 
     @staticmethod
-    def _get_correlator_name(ms: domain.MeasurementSet) -> str:
+    def _get_correlator_name(ms: MeasurementSet) -> str:
         """
         Get correlator name information from the PROCESSOR table in the MS. 
         
@@ -620,7 +616,7 @@ class MeasurementSetReader:
         return (acs_software_version, acs_software_build_version)
 
     @staticmethod
-    def get_history(ms_name: str) -> np.ndarray | None:
+    def get_history(ms_name: str) -> NDArray[generic] | None:
         """Retrieve the MS history from the HISTORY table.
 
         Args:
@@ -1434,7 +1430,7 @@ class StateTable:
 
         epoch_start = me.epoch(time_ref, qa.quantity(scan_start, time_unit))
         str_start = qa.time(epoch_start['m0'], form=['fits'])[0]
-        dt_start = datetime.datetime.strptime(str_start, '%Y-%m-%dT%H:%M:%S')
+        dt_start = datetime.datetime.strptime(str_start, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=datetime.timezone.utc)
 
         return domain.state.StateFactory(facility, dt_start)        
 

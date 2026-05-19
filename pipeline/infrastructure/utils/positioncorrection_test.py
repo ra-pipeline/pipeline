@@ -1,6 +1,5 @@
 import os
 import shutil
-from typing import Union, Dict, Tuple
 
 import astropy.io.fits as apfits
 import pytest
@@ -40,9 +39,9 @@ test_params_func = [({'unit': 'deg', 'value': 239.9617912649343},
 
 
 @pytest.mark.parametrize('fitsname, obs_long, obs_lat, expected', test_params_fits)
-def test_do_wide_field_corr(fitsname: str, obs_long: Dict[str, Union[str, float]],
-                            obs_lat: Dict[str, Union[str, float]],
-                            expected: Tuple[Dict, Dict], epsilon: float = 1.0e-9):
+def test_do_wide_field_corr(fitsname: str, obs_long: dict[str, str | float],
+                            obs_lat: dict[str, str | float],
+                            expected: tuple[dict, dict], epsilon: float = 1.0e-9):
     """Test do_wide_field_corr()
 
     This utility function downloads a FITS image and applies wide field position
@@ -85,8 +84,8 @@ def test_do_wide_field_corr(fitsname: str, obs_long: Dict[str, Union[str, float]
 
 
 @pytest.mark.parametrize('ra, dec, obs_long, obs_lat, date_time, expected', test_params_func)
-def test_calc_zd_pa(ra: Dict, dec: Dict, obs_long: Dict, obs_lat: Dict, date_time: Dict,
-                    expected: Tuple[float, float], epsilon: float = 1.0e-9):
+def test_calc_zd_pa(ra: dict, dec: dict, obs_long: dict, obs_lat: dict, date_time: dict,
+                    expected: tuple[float, float], epsilon: float = 1.0e-9):
     """Test calc_zd_pa()
 
     This utility function tests the mathematical correctness of the zenith distance and parallactic

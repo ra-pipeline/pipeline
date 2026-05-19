@@ -1,4 +1,4 @@
-import collections
+import collections.abc
 import os
 
 import pipeline.infrastructure.logging as logging
@@ -26,7 +26,7 @@ class TimegaincalQAPool(pqa.QAScorePool):
     }
 
     def __init__(self, phase_qa_results_dict, phase_offsets_qa_results_list):
-        super(TimegaincalQAPool, self).__init__()
+        super().__init__()
         self.phase_qa_results_dict = phase_qa_results_dict
         self.phase_offsets_qa_results_list = phase_offsets_qa_results_list
 

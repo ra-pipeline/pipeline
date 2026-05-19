@@ -10,7 +10,7 @@ from pipeline.infrastructure import casa_tools
 LOG = infrastructure.get_logger(__name__)
 
 
-class FindContHeuristics(object):
+class FindContHeuristics:
     def __init__(self, context):
         self.context = context
 

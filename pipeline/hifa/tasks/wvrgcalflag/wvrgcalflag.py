@@ -568,7 +568,7 @@ class WvrgcalflagData(basetask.StandardTaskTemplate):
         return result
 
 
-class WvrgcalflagView(object):
+class WvrgcalflagView:
     def __init__(self, context, flag_intent=None):
         """
         Creates an WvrgcalflagView instance.

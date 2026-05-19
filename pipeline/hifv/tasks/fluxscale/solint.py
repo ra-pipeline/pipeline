@@ -57,7 +57,7 @@ class SolintInputs(vdp.StandardInputs):
                 Example: refant = 'ea01, ea02'
 
         """
-        super(SolintInputs, self).__init__()
+        super().__init__()
         self.context = context
         self.vis = vis
         self.limit_short_solint = limit_short_solint

@@ -144,7 +144,7 @@ class StateALMA(State):
             state_id: Numerical identifier of this State.
             obs_mode: Unique obs_mode values associated with this State.
         """
-        super(StateALMA, self).__init__(state_id, obs_mode)
+        super().__init__(state_id, obs_mode)
 
         if 'CALIBRATE_FLUX' in obs_mode:
             LOG.trace('Translating %s intent to AMPLITUDE for state #%s'
@@ -173,7 +173,7 @@ class StateALMACycle0(StateALMA):
             state_id: Numerical identifier of this State.
             obs_mode: Unique obs_mode values associated with this State.
         """
-        super(StateALMACycle0, self).__init__(state_id, obs_mode)
+        super().__init__(state_id, obs_mode)
 
         # For Cycle 0, check whether this state has PHASE and another cal
         # intent. If so, the PHASE obsmode will be removed.
@@ -280,7 +280,7 @@ class StateVLA(State):
             state_id: Numerical identifier of this State.
             obs_mode: Unique obs_mode values associated with this State.
         """
-        super(StateVLA, self).__init__(state_id, obs_mode)
+        super().__init__(state_id, obs_mode)
 
 
 class StateAPEX(State):
@@ -305,7 +305,7 @@ class StateAPEX(State):
             state_id: Numerical identifier of this State.
             obs_mode: Unique obs_mode values associated with this State.
         """
-        super(StateAPEX, self).__init__(state_id, obs_mode)
+        super().__init__(state_id, obs_mode)
 
 
 class StateSMT(State):
@@ -330,7 +330,7 @@ class StateSMT(State):
             state_id: Numerical identifier of this State.
             obs_mode: Unique obs_mode values associated with this State.
         """
-        super(StateSMT, self).__init__(state_id, obs_mode)
+        super().__init__(state_id, obs_mode)
 
 
 class StateNAOJ(State):
@@ -359,7 +359,7 @@ class StateNAOJ(State):
             state_id: Numerical identifier of this State.
             obs_mode: Unique obs_mode values associated with this State.
         """
-        super(StateNAOJ, self).__init__(state_id, obs_mode)
+        super().__init__(state_id, obs_mode)
 
 
 
@@ -379,7 +379,7 @@ class StateFactory:
                 to distinguish between Cycle 0 and later ALMA datasets.
         """
         if observatory == 'ALMA':
-            if start and start < datetime.datetime(2013, 1, 21):
+            if start and start < datetime.datetime(2013, 1, 21, tzinfo=datetime.timezone.utc):
                 self._constructor = StateALMACycle0
             else:
                 self._constructor = StateALMA

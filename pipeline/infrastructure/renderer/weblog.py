@@ -83,7 +83,7 @@ def register_mako_templates(directory, prefix=''):
 
 class WebLogRendererRegistry(RendererRegistry):
     def __init__(self):
-        super(WebLogRendererRegistry, self).__init__()
+        super().__init__()
         self._render_by_session = set()
         self._render_ungrouped = set()
 
@@ -111,7 +111,7 @@ class WebLogRendererRegistry(RendererRegistry):
         :param key_fn: optional function that accepts a pipeline context and returns the renderer key
         :return:
         """
-        super(WebLogRendererRegistry, self).add_renderer(task_cls, renderer, key_fn, key)
+        super().add_renderer(task_cls, renderer, key_fn, key)
 
         if group_by == 'session':
             self._render_by_session.add(task_cls.__name__)

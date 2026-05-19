@@ -2,7 +2,7 @@ import collections
 import math
 import os
 import time
-from typing import Any, List
+from typing import Any
 
 import numpy
 
@@ -18,7 +18,7 @@ from ..common import compress
 from .accumulator import Accumulator
 from ..common import observatory_policy
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 DO_TEST = True
 
 
@@ -53,7 +53,7 @@ class GriddingInputs(vdp.StandardInputs):
         return self.infiles
 
     def __init__(self, context, infiles, antennaids, fieldids, spwids, poltypes, nx=None, ny=None):
-        super(GriddingInputs, self).__init__()
+        super().__init__()
 
         self.context = context
         self.infiles = infiles
@@ -67,10 +67,10 @@ class GriddingInputs(vdp.StandardInputs):
 
 class GriddingResults(common.SingleDishResults):
     def __init__(self, task=None, success=None, outcome=None):
-        super(GriddingResults, self).__init__(task, success, outcome)
+        super().__init__(task, success, outcome)
 
     def merge_with_context(self, context):
-        super(GriddingResults, self).merge_with_context(context)
+        super().merge_with_context(context)
 
     def _outcome_name(self):
         # return [image.imagename for image in self.outcome]
@@ -388,10 +388,10 @@ class GriddingBase(basetask.StandardTaskTemplate):
 
 
 class RasterGridding(GriddingBase):
-    def _group(self, index_list: List[int], msids: List[int], ras: List[float],
-               decs: List[float], stats: List[float],
+    def _group(self, index_list: list[int], msids: list[int], ras: list[float],
+               decs: list[float], stats: list[float],
                CombineRadius: float, Allowance: float, GridSpacing: float,
-               DecCorrection: float) -> List[List[Any]]:
+               DecCorrection: float) -> list[list[Any]]:
         """
         Grid STATISTICS by RA/DEC position for raster map.
 
@@ -493,10 +493,10 @@ class RasterGridding(GriddingBase):
 
 
 class SinglePointGridding(GriddingBase):
-    def _group(self, index_list: List[int], msids: List[int], ras: List[float],
-               decs: List[float], stats: List[float],
+    def _group(self, index_list: list[int], msids: list[int], ras: list[float],
+               decs: list[float], stats: list[float],
                CombineRadius: float, Allowance: float, GridSpacing: float,
-               DecCorrection: float) -> List[List[Any]]:
+               DecCorrection: float) -> list[list[Any]]:
         """
         Grid STATISTICS by RA/DEC position for single pointing data.
 
@@ -545,10 +545,10 @@ class SinglePointGridding(GriddingBase):
 
 
 class MultiPointGridding(GriddingBase):
-    def _group(self, index_list: List[int], msids: List[int], ras: List[float],
-               decs: List[float], stats: List[float],
+    def _group(self, index_list: list[int], msids: list[int], ras: list[float],
+               decs: list[float], stats: list[float],
                CombineRadius: float, Allowance: float, GridSpacing: float,
-               DecCorrection: float) -> List[List[Any]]:
+               DecCorrection: float) -> list[list[Any]]:
         """
          Grid STATISTICS by RA/DEC position for multi-pointing data.
 

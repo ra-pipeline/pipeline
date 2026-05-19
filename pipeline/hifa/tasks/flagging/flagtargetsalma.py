@@ -29,40 +29,20 @@ Flag ALMA target science target data.
 
 
 class FlagTargetsALMAInputs(vdp.StandardInputs):
-    """
-    FlagTargetsALMA Inputs manages the inputs for the FlagTargetALMA task.
+    """Manages the inputs for the FlagTargetsALMA task.
 
-    .. py:attribute:: context
-
-        the (:class:`~pipeline.infrastructure.launcher.Context`) holding all
-        pipeline state
-
-    .. py:attribute:: vis
-
-        a string or list of strings containing the MS name(s) on which to
-        operate
-
-    .. py:attribute:: output_dir
-
-        the directory to which pipeline data should be sent
-
-    .. py:attribute:: flagbackup
-
-        a boolean indicating whether whether existing flags should be backed
-        up before new flagging begins.
-
-    .. py:attribute:: template
-
-        A boolean indicating whether flagging templates are to be applied.
-
-    .. py:attribute:: filetemplate
-
-        The filename of the ASCII file that contains the flagging template
+    Attributes:
+        context: The pipeline context holding all pipeline state.
+        vis: String or list of strings containing the MS name(s) on which to operate.
+        output_dir: The directory to which pipeline data should be sent.
+        flagbackup: Whether existing flags should be backed up before new flagging begins.
+        template: Whether flagging templates are to be applied.
+        filetemplate: The filename of the ASCII file that contains the flagging template.
     """
     # Search order of input vis
     processing_data_type = [DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
-    flagbackup = vdp.VisDependentProperty (default=False)
+    flagbackup = vdp.VisDependentProperty(default=False)
     template = vdp.VisDependentProperty(default=True)
 
     @vdp.VisDependentProperty
@@ -140,7 +120,7 @@ class FlagTargetsALMAInputs(vdp.StandardInputs):
 
 class FlagTargetsALMAResults(basetask.Results):
     def __init__(self, summaries, flagcmds):
-        super(FlagTargetsALMAResults, self).__init__()
+        super().__init__()
         self.summaries = summaries
         self._flagcmds = flagcmds
 

@@ -17,7 +17,7 @@ from pipeline.hifa.tasks.common.displays import phaseoffset
 LOG = infrastructure.get_logger(__name__)
 
 
-class WVRScoreFinder(object):
+class WVRScoreFinder:
     def __init__(self, delegate):
         self._delegate = delegate
         self._cache = cachetools.LRUCache(maxsize=1000)
@@ -45,8 +45,8 @@ class WVRScoreFinder(object):
         return scores_for_antenna[0]
 
 
-class WVRPhaseVsBaselineChart(object):
-    class WvrChartHelper(object):
+class WVRPhaseVsBaselineChart:
+    class WvrChartHelper:
         def __init__(self, antennas):
             self._antennas = antennas
 
@@ -474,7 +474,7 @@ class WVRPhaseOffsetPlotHelper(phaseoffset.PhaseOffsetPlotHelper):
         caltable_map['BEFORE'] = nowvr_gaintable
         caltable_map['AFTER'] = wvr_gaintable
 
-        super(WVRPhaseOffsetPlotHelper, self).__init__(rootdir, prefix, caltable_map, plot_per_antenna=plot_per_antenna)
+        super().__init__(rootdir, prefix, caltable_map, plot_per_antenna=plot_per_antenna)
 
 
 class WVRPhaseOffsetPlot(phaseoffset.PhaseOffsetPlot):
@@ -492,7 +492,7 @@ class WVRPhaseOffsetPlot(phaseoffset.PhaseOffsetPlot):
 
 class WVRPhaseOffsetSummaryPlotHelper(WVRPhaseOffsetPlotHelper):
     def __init__(self, context, result):
-        super(WVRPhaseOffsetSummaryPlotHelper, self).__init__(context, result, plot_per_antenna=False)
+        super().__init__(context, result, plot_per_antenna=False)
 
 
 class WVRPhaseOffsetSummaryPlot(phaseoffset.PhaseOffsetPlot):

@@ -13,7 +13,7 @@ from pipeline.infrastructure.displays.plotstyle import matplotlibrc_formal
 LOG = infrastructure.get_logger(__name__)
 
 
-class VlassCubeStokesSummary(object):
+class VlassCubeStokesSummary:
     def __init__(self, context, result):
         self.context = context
         self.result = result
@@ -100,7 +100,7 @@ class VlassCubeStokesSummary(object):
         return plot_wrappers
 
 
-class VlassCubeFluxSummary(object):
+class VlassCubeFluxSummary:
     def __init__(self, context, result):
         self.context = context
         self.result = result
