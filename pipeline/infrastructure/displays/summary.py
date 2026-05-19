@@ -1091,7 +1091,8 @@ class UVChart:
         self.ms = ms
         self.customflagged = customflagged
         self.figfile = self._get_figfile(output_dir=output_dir)
-
+        self.custom_plot_flags = None
+        
         # Get spw_id, field, field_name, and intent to plot.
         self.spw_id, self.field, self.field_name, self.intent = self._get_spwid_and_field()
 
@@ -1109,8 +1110,7 @@ class UVChart:
             wavelength_m = 299792458 / float(spw.max_frequency.to_units(measures.FrequencyUnits.HERTZ))
             bl_max = float(ms.antenna_array.baseline_max.length.to_units(measures.DistanceUnits.METRE))
             self.uv_max = math.ceil(1.05 * bl_max / wavelength_m)
-
-            self.custom_plot_flags = None
+            
             if custom_plot_flags is not None:
                 self.custom_plot_flags = custom_plot_flags
                 
@@ -1144,9 +1144,19 @@ class UVChart:
             'height': 1000,
             'width': 1000
         }
-        #
+        """Further, to speed up the plot we'd like to plot only 3
+        channels (nchan//4, nchan//2, (3*nchan)//4) instead of
+        averaging all channels, and set correlator='XX,YY'. (this made
+        a factor of 2 difference in the msplot runtime for the
+        PLBM2022 data 2019.1.00037.S, ms=uid___A002_Xf010cd_X36c9.ms)
+
+        """
+        # Include additional plotting flags
         if self.custom_plot_flags is not None:
+            # PIPE-1780
             task_args.update(self.custom_plot_flags)
+            task_args["spw"]        = self.custom_plot_flags["spw"]
+            task_args["avgchannel"] = self.custom_plot_flags["avgchannel"]
 
         #
         task = casa_tasks.plotms(**task_args)
