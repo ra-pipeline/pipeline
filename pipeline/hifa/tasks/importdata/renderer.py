@@ -30,8 +30,22 @@ class T2_4MDetailsALMAImportDataRenderer(renderer.T2_4MDetailsImportDataRenderer
         else:
             parang_plots = {}
 
+        # PIPE-65 call new rendererutils task for separation angle plots
+        sepang_plots = rendererutils.make_separation_plots(
+            pipeline_context,
+            result,
+            )  
+        
+        if result.sep_angles:
+            # where is this from PIPE-836 removed the equivalant parang_ranges
+            # from almaimportdata ? 
+            sep_table = rendererutils.sep_angles_for_table(pipeline_context, result.sep_angles, sepang_plots) # context is context, result is from QA 
+
+
         mako_context.update({
             'minparang': minparang,
             'parang_ranges': parang_ranges,
             'parang_plots': parang_plots,
+            'sepangle_table': sep_table,
+            'sepangle_plots': sepang_plots
         })

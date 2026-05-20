@@ -8,7 +8,7 @@ from casatasks.private import solar_system_setjy as ss_setjy
 import pipeline.infrastructure as infrastructure
 from pipeline.infrastructure import casa_tools
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 def antenna(ms, refsource, refant, peak_frac=0.7):

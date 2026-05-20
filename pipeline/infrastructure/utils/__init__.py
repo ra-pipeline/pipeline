@@ -20,6 +20,7 @@ Modules:
     math: Mathematical functions and algorithms
     positioncorrection: Position correction utilities
     parallactic_range: Parallactic range calculation utilties
+    separation_angles: Source/Field separation angle calculation utilities
     ppr: Pipeline processing request utilities
     sorting: Sorting algorithms and utilities
     weblog: Web logging utilities
@@ -39,6 +40,7 @@ from .framework import *
 from .imaging import *
 from .math import *
 from .parallactic_range import *
+from .separation_angles import *
 from .positioncorrection import *
 from .ppr import *
 from .sorting import *
@@ -60,6 +62,7 @@ _all_modules = [
     'weblog',
     'math',
     'parallactic_range',
+    'separation_angles',
     'positioncorrection',
 ]
 
