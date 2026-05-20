@@ -127,8 +127,8 @@ import pipeline.infrastructure.renderer.htmlrenderer as hr
 			<h3>Baseline Summary</h3>
 
 			<%
-			baselines = sorted(ms.antenna_array.baselines, key=lambda b: b.length)
-			num_baselines = len(ms.antenna_array.baselines)
+			baselines = sorted(ms.antenna_array.baselines_for_antennas([a.id for a in ms.antenna_array.antennas]), key=lambda b: b.length)
+			num_baselines = len(baselines)
 			min_baseline = ms.antenna_array.baseline_min
 			max_baseline = ms.antenna_array.baseline_max
 			%>
