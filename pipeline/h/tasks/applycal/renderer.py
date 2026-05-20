@@ -345,7 +345,7 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             #
             plot = UVChart(context, ms, custom_plot_flags=plot_par, customflagged=True,
                            output_dir=weblog_dir, title_prefix="Post applycal: ").plot()
-            
+
             # PIPE-1294: only attached valid plot wrapper objects.
             if plot is not None:
                 uv_plots[vis].append(plot)
