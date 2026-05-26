@@ -10,6 +10,9 @@ from typing import TYPE_CHECKING
 from pipeline.domain.measurementset import MeasurementSet
 from pipeline.infrastructure import casa_tools
 
+if TYPE_CHECKING:
+    from pipeline.domain import Field
+
 
 class TestComputeAzEl:
     """Tests for compute_az_el_to_field and compute_az_el_for_ms methods."""
@@ -103,9 +106,6 @@ class TestComputeAzEl:
         epoch = {'m0': {'unit': 'd', 'value': 60462.40586666667}, 'refer': 'UTC', 'type': 'epoch'}
 
         result = MeasurementSet.compute_az_el_to_field(ms, field, epoch)
-
-        if TYPE_CHECKING:
-            from pipeline.domain import Field
 
         def compute_az_el_to_field_casa(ms: MeasurementSet, field: Field | None = None, epoch: dict | None = None) -> list[float]:
             """The old CASA-based equivalent of MeasurementSet.compute_az_el_to_field, for regression testing only."""
