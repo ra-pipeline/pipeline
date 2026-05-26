@@ -1685,11 +1685,7 @@ class MeasurementSet:
         location = utils.get_observatory_location(self.antenna_array.name)
         obs_time = Time(epoch['m0']['value'], format='mjd', scale='utc')
 
-        refer = field.mdirection['refer'].upper()
-        if refer in ('J2000', 'FK5'):
-            frame = 'fk5'
-        else:
-            frame = refer.lower()
+        frame = utils.casa_to_astropy_frame(field.mdirection['refer'])
 
         coords = SkyCoord(
             field.mdirection['m0']['value'],
