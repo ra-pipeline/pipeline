@@ -13,7 +13,7 @@ import pytest
 from pipeline import domain
 from pipeline.infrastructure import casa_tools, casa_tasks
 from pipeline.infrastructure.utils import caltable_tools
-from .utils import casa_to_astropy_frame, find_ranges, dict_merge, are_equal, approx_equal, flagged_intervals, \
+from .utils import find_ranges, dict_merge, are_equal, approx_equal, flagged_intervals, \
     get_casa_quantity, fieldname_for_casa, fieldname_clean, \
     get_field_accessor, get_field_identifiers, get_observatory_location, get_receiver_type_for_spws, place_repr_source_first, \
     get_taskhistory_fromimage, list_to_str, build_refantignore, obs_midtime, compute_zenith_distance
@@ -39,38 +39,6 @@ def test_find_ranges(data: str | list, expected: str):
     E.g. [1,2,3] -> '1~3'
     """
     assert find_ranges(data) == expected
-
-
-params_casa_to_astropy_frame = [
-    ('J2000', 'fk5'),
-    ('j2000', 'fk5'),
-    ('FK5', 'fk5'),
-    ('fk5', 'fk5'),
-    ('JMEAN', 'altaz'),
-    ('jmean', 'altaz'),
-    ('APP', 'altaz'),
-    ('app', 'altaz'),
-    ('AZEL', 'altaz'),
-    ('azel', 'altaz'),
-    ('AZELGEO', 'altaz'),
-    ('azelgeo', 'altaz'),
-    ('GALACTIC', 'galactic'),
-    ('galactic', 'galactic'),
-    ('ECLIPTIC', 'ecliptic'),
-    ('ecliptic', 'ecliptic'),
-]
-
-
-@pytest.mark.parametrize('casa_frame, expected', params_casa_to_astropy_frame)
-def test_casa_to_astropy_frame(casa_frame: str, expected: str):
-    """Test casa_to_astropy_frame()
-
-    This utility function converts CASA coordinate reference frame names to
-    Astropy-compatible frame names. J2000 and FK5 both map to 'fk5', while
-    JMEAN, APP, AZEL, and AZELGEO all map to 'altaz'. Other frames are
-    lowercased directly.
-    """
-    assert casa_to_astropy_frame(casa_frame) == expected
 
 
 params_dict_merge = [({}, {}, {}), ({}, 1, 1), ({'a': 1}, {}, {'a': 1}),

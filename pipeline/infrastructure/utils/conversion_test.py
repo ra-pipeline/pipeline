@@ -15,6 +15,7 @@ from .conversion import (
     format_timedelta,
     mjd_seconds_to_datetime,
     range_to_list,
+    refcode_to_skyframe,
     safe_split,
     unix_seconds_to_datetime,
     phasecenter_to_skycoord
@@ -328,3 +329,35 @@ def test_phasecenter_to_skycoord(phasecenter, ra_deg, dec_deg):
 
     assert abs(coord.ra.deg - ra_deg) < 1e-3
     assert abs(coord.dec.deg - dec_deg) < 1e-3
+
+params_refcode_to_skyframe = [
+    ('J2000', 'fk5'),
+    ('j2000', 'fk5'),
+    ('FK5', 'fk5'),
+    ('fk5', 'fk5'),
+    ('JMEAN', 'altaz'),
+    ('jmean', 'altaz'),
+    ('APP', 'altaz'),
+    ('app', 'altaz'),
+    ('AZEL', 'altaz'),
+    ('azel', 'altaz'),
+    ('AZELGEO', 'altaz'),
+    ('azelgeo', 'altaz'),
+    ('GALACTIC', 'galactic'),
+    ('galactic', 'galactic'),
+    ('ECLIPTIC', 'ecliptic'),
+    ('ecliptic', 'ecliptic'),
+    ('b1950', 'fk4'),
+]
+
+
+@pytest.mark.parametrize('casa_frame, expected', params_refcode_to_skyframe)
+def test_refcode_to_skyframe(casa_frame: str, expected: str):
+    """Test refcode_to_skyframe()
+
+    This utility function converts CASA coordinate reference frame names to
+    Astropy-compatible frame names. J2000 and FK5 both map to 'fk5', while
+    JMEAN, APP, AZEL, and AZELGEO all map to 'altaz'. Other frames are
+    lowercased directly.
+    """
+    assert refcode_to_skyframe(casa_frame) == expected
