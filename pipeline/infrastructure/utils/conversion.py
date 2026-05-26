@@ -55,6 +55,7 @@ __all__ = [
     'to_pipeline_intent',
     'convert_paths_to_basenames',
     'human_file_size',
+    'refcode_to_skyframe',
     ]
 
 # By default we use CASA to parse arguments into spw/field/ant IDs. However, this
@@ -800,7 +801,8 @@ def refcode_to_skyframe(refcode: str) -> str:
 
     Limitations:
 
-    Currently, it only handles the common cases, e.g. J2000, B1950, ICRS
+    Currently, it only handles the common cases, e.g. J2000, B1950, ICRS.
+    Other frames are lowercased and returned directly.
 
     To get a list of built-in astropy.coordinates frame names:
         from astropy.coordinates import frame_transform_graph
@@ -812,12 +814,14 @@ def refcode_to_skyframe(refcode: str) -> str:
     """
 
     frame = refcode.lower()
-    if frame == 'j2000':
-        frame = 'fk5'
-    if frame == 'b1950':
-        frame = 'fk4'
-
-    return frame
+    if frame in ('j2000', 'fk5'):
+        return 'fk5'
+    elif frame == 'b1950':
+        return 'fk4'
+    elif frame in ('jmean', 'app', 'azel', 'azelgeo'):
+        return 'altaz'
+    else:
+        return frame
 
 
 def invert_dict(input_dict: dict) -> dict:

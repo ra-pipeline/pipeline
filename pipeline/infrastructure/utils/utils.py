@@ -34,7 +34,7 @@ from astropy.time import Time
 
 from pipeline import infrastructure
 from pipeline.infrastructure import casa_tools
-from .conversion import commafy, dequote, range_to_list
+from .conversion import commafy, dequote, range_to_list, refcode_to_skyframe
 
 _ALMA_GEOCENTRIC = (2225122.3902694373, -5440258.9852695046, -2481007.6374628348)  # CASA WGS84 coords
 
@@ -59,7 +59,6 @@ __all__ = [
     'approx_equal',
     'are_equal',
     'build_refantignore',
-    'casa_to_astropy_frame',
     'clear_time_cache',
     'compute_zenith_distance',
     'deduplicate',
@@ -1187,40 +1186,6 @@ def obs_midtime(start_time: datetime, end_time: datetime) -> EpochDict:
     return casa_tools.measures.epoch('utc', mid_time.isoformat())
 
 
-def casa_to_astropy_frame(casa_frame: str) -> str:
-    """Convert CASA coordinate reference frame name to Astropy-compatible frame name.
-
-    CASA and Astropy use different names for the same coordinate frames. This
-    function maps CASA frame names to their Astropy equivalents for use with
-    Astropy's SkyCoord and AltAz transformations.
-
-    Args:
-        casa_frame: CASA coordinate reference frame name (e.g., 'J2000', 'AZEL', 'GALACTIC').
-            Case-insensitive.
-
-    Returns:
-        Astropy-compatible frame name (lowercase), suitable for use with Astropy's
-        coordinate transformation functions.
-
-    Examples:
-        >>> casa_to_astropy_frame('J2000')
-        'fk5'
-        >>> casa_to_astropy_frame('FK5')
-        'fk5'
-        >>> casa_to_astropy_frame('AZEL')
-        'altaz'
-        >>> casa_to_astropy_frame('GALACTIC')
-        'galactic'
-    """
-    refer = casa_frame.upper()
-    if refer in ('J2000', 'FK5'):
-        return 'fk5'
-    elif refer in ('JMEAN', 'APP', 'AZEL', 'AZELGEO'):
-        return 'altaz'
-    else:
-        return refer.lower()
-
-
 def compute_zenith_distance(
         field_direction: DirectionDict,
         epoch: EpochDict,
@@ -1253,7 +1218,7 @@ def compute_zenith_distance(
     location = get_observatory_location(observatory)
     obs_time = Time(epoch['m0']['value'], format='mjd', scale='utc')
 
-    frame = casa_to_astropy_frame(field_direction['refer'])
+    frame = refcode_to_skyframe(field_direction['refer'])
 
     coords = SkyCoord(
         field_direction['m0']['value'],

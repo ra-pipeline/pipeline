@@ -1685,7 +1685,7 @@ class MeasurementSet:
         location = utils.get_observatory_location(self.antenna_array.name)
         obs_time = Time(epoch['m0']['value'], format='mjd', scale='utc')
 
-        frame = utils.casa_to_astropy_frame(field.mdirection['refer'])
+        frame = utils.refcode_to_skyframe(field.mdirection['refer'])
 
         coords = SkyCoord(
             field.mdirection['m0']['value'],
