@@ -1,4 +1,4 @@
-"""Unit tests for DataType enumeration (Phase 5)."""
+"""Unit tests for DataType enumeration."""
 
 import unittest
 

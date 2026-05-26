@@ -1,4 +1,4 @@
-"""Pydantic-based DataDescription domain object prototype for Phase 5 modernization."""
+"""Pydantic-based DataDescription domain object prototype."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ class DataDescription(BaseModel):
     """Data description domain object."""
 
     id: int = PydanticField(..., description='Numerical identifier of the data description')
-    spw: SpectralWindow = PydanticField(..., description='SpectralWindow object')
+    spw: SpectralWindow | Any = PydanticField(..., description='SpectralWindow object')
     pol_id: int = PydanticField(..., description='Polarization ID')
     obs_time: Any | None = PydanticField(default=None, description='Mean observation time')
     chan_freq: list[Any] = PydanticField(default_factory=list, description='Channel centre frequencies')
@@ -48,7 +48,7 @@ class DataDescription(BaseModel):
         validate_default=True,
     )
 
-    def __init__(self, id: int | None = None, spw: SpectralWindow | None = None, pol_id: int | None = None, **data: Any) -> None:
+    def __init__(self, id: int | None = None, spw: SpectralWindow | Any | None = None, pol_id: int | None = None, **data: Any) -> None:
         """Create a DataDescription.
 
         The legacy pipeline code constructs data descriptions positionally as

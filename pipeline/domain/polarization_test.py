@@ -1,4 +1,4 @@
-"""Unit tests for Polarization prototype (Phase 5)."""
+"""Unit tests for Polarization prototype."""
 
 import json
 import unittest

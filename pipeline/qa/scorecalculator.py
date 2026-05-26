@@ -113,6 +113,7 @@ __all__ = ['score_polintents',                                # ALMA specific
            'score_syspowerdata',
            'score_solint',
            'score_longsolint',
+           'score_flagged_ant_spw',
            'score_fluxboot',
            'score_testBPdcals_dts_ants',
            'score_testBPdcals_refant',
@@ -1427,37 +1428,36 @@ def countbaddelays(m, delaytable, delaymax):
 
 
 @log_qa
-def score_total_data_vla_delay(filename, m):
+def score_total_data_vla_delay(filename, vis, bandname=None):
     """
-    Use a filename of a delay (K-type) calibration table
-    Calculate a score for antennas with a delay > 200 ns
-    For each antenna with delays > 200 ns, reduce score by 0.1
+    Compute a QA score based on maximum delay values in a calibration table.
+    If the maximum delay is below 15 ns, the score is 1.0. Otherwise, the score
+    decreases linearly with increasing delay, down to a minimum of 0.3.
     """
 
     with casa_tools.TableReader(filename) as tb:
         fpar = tb.getcol('FPARAM')
         delays = np.abs(fpar)  # Units of nanoseconds
         maxdelay = np.max(delays)
-
-    if maxdelay < 200.0:
+    # PIPE-2582: if delays > 15 ns, QA score < 0.5
+    if maxdelay < 15.0:
         score = 1.0
     else:
-        # For each antenna with a delay > 200.0 ns, deduct 0.1 from the score
-        delaydict = countbaddelays(m, filename, 200.0)
-        count = len(delaydict)
-        score = 1.0 - (0.1 * count)
-    if score < 0.0:
-        score = 0.0
-
+        score = round(max(0.3, 0.49 - 0.01 * (maxdelay - 15)), 2)
+    longmsg = "Max delay"
+    if bandname is not None:
+        longmsg = longmsg + f' for band {bandname}'
     # Set score message and origin
-    longmsg = 'Max delay is {!s} ns'.format(str(maxdelay))
+    longmsg = longmsg + f' is {maxdelay:.2f} ns'
+
     shortmsg = longmsg
 
     origin = pqa.QAOrigin(metric_name='score_total_data_vla_delay',
                           metric_score=score,
-                          metric_units='Delays that exceed 200 ns')
+                          metric_units='Delays that exceed 15 ns')
 
-    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=os.path.basename(filename), origin=origin)
+    applies_to = pqa.TargetDataSelection(vis={vis})
+    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=os.path.basename(filename), origin=origin, applies_to=applies_to)
 
 
 @log_qa
@@ -3543,8 +3543,28 @@ def score_multiply(scores_list):
 
 
 @log_qa
-def score_sd_skycal_elevation_difference(ms, resultdict, threshold=3.0):
+def score_sd_skycal_elevation_difference(
+    ms: MeasurementSet,
+    resultdict: dict,
+    threshold: float = 3.0
+) -> pqa.QAScore | None:
     """
+    Compute QA score based on elevation difference between ON and OFF scans.
+
+    Metric for the scoring is the maximum elevation difference in degrees
+    between ON and OFF scans among all the fields, antennas, and spws.
+    The QA score is 0.8 if the maximum elevation difference exceeds the
+    specified threshold, and 1.0 otherwise.
+
+    Args:
+        ms: MeasurementSet object
+        resultdict: A dictionary containing elevation difference results
+                    for each field, antenna, and spw.
+        threshold: Elevation difference threshold in degrees for scoring.
+
+    Returns:
+        A QAScore object representing the QA score based on elevation
+        difference, or None if no valid metric score is available.
     """
     field_ids = list(resultdict.keys())
     metric_score = []
@@ -3598,6 +3618,12 @@ def score_sd_skycal_elevation_difference(ms, resultdict, threshold=3.0):
     #           requirement is that score is 0.8 if elevation difference is larger than 3deg.
     # make sure threshold is 3deg
     assert el_threshold == 3.0
+
+    if len(metric_score) == 0:
+        # no valid metric score, skip scoring
+        LOG.info("No valid elevation difference data found. Skipping QA scoring.")
+        return None
+
     max_metric_score = np.max(metric_score)
     # lower the score if elevation difference exceeds 3deg
     score = 1.0 if max_metric_score < el_threshold else 0.8
@@ -3979,7 +4005,7 @@ def score_sd_line_emission_off_range_at_peak(context: Context, result: SDImaging
         smsg = 'No significant off-line-range emission is detected at peak.'
         score = 1.0
 
-    origin = pqa.QAOrigin(metric_name='line_emission_off_range_at_peak',
+    origin = pqa.QAOrigin(metric_name='score_sd_line_emission_off_range_at_peak',
                           metric_score=score,
                           metric_units='')
     selection = pqa.TargetDataSelection(spw=set(result.outcome['assoc_spws']),
@@ -4080,6 +4106,70 @@ def score_sdimage_contamination(context: Context, result: SDImagingResultItem) -
                           metric_units='Sign of possible line contamination')
     selection = pqa.TargetDataSelection(spw=set(result.outcome['assoc_spws']),
                                         field=set(result.outcome['assoc_fields']),
+                                        intent={'TARGET'},
+                                        pol={'I'})
+    return pqa.QAScore(score,
+                       longmsg=lmsg,
+                       shortmsg=smsg,
+                       origin=origin,
+                       applies_to=selection)
+
+
+@log_qa
+def score_sdimage_sensitivity_ratio(result: SDImagingResultItem) -> pqa.QAScore:
+    """Evaluate QA score based on observed and theoretical sensitivities estimated from the image
+
+    Requirements (PIPE-2958):
+        - QA score should be
+          - 1.0  if X1 < observed sensitivity / theoretical sensitivity < X2
+          - 0.5  for others
+
+    Args:
+        result: Imaging result instance
+
+    Returns:
+        QAScore -- QAScore instance holding the score based on the sensitivity estimates
+
+    Raises:
+        ValueError: when the unit of observed and theoretical sensitivies do not match
+                    when the theoretical sensitivity is not a positive
+    """
+    # threshold values
+    X1, X2 = 0.9, 1.6
+
+    imageitem = result.outcome['image']
+    field = imageitem.sourcename
+    spw = ','.join(map(str, np.unique(imageitem.spwlist)))
+
+    # fetch sensitivities
+    observed    = result.sensitivity_info.sensitivity['observed_sensitivity']
+    theoretical = result.theoretical_rms['theoretical_sensitivity']
+
+    if theoretical['unit'] != observed['unit']:
+        msg = (f"Field {field} Spw {spw}: "
+               "Unit mismatch between Observed sensitivity and Theoretical sensitivity")
+        raise ValueError( msg )
+
+    if theoretical['value'] <= 0.0:
+        msg = (f"Field {field} Spw {spw}: "
+               f"Invalid Theoretical sensitivity {theoretical['value']} {theoretical['unit']}")
+        raise ValueError( msg )
+
+    x = observed['value'] / theoretical['value']
+    if X1 < x and x < X2:
+        score = 1.0
+        smsg = 'Observed sensitivity agrees with Theoretical sensitivity.'
+        lmsg = f'Field {field} Spw {spw}: {smsg}'
+    else:
+        score = 0.5
+        smsg = 'Observed sensitivity deviates from Theoretical sensitivity.'
+        lmsg = f'Field {field} Spw {spw}: {smsg}'
+
+    origin = pqa.QAOrigin(metric_name='score_sd_image_sensitivity_ratio',
+                          metric_score=x,
+                          metric_units='Ratio of Observed sensitivity to Theoretical sensitivity')
+    selection = pqa.TargetDataSelection(spw=set(result.outcome['assoc_spws']),
+                                        field={field},
                                         intent={'TARGET'},
                                         pol={'I'})
     return pqa.QAScore(score,
@@ -5317,6 +5407,71 @@ def score_testBPdcals_delay(vis: str, caltable: str, bandname: str) -> pqa.QASco
     qa_score = pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=applies_to)
 
     return qa_score
+
+@log_qa
+def score_flagged_ant_spw(vis:str, flaggedSolnApplycaldelay:dict) -> [pqa.QAScore]:
+    """
+        Calculates score for testBPdcals
+        if > 50% of spws in a baseband on a majority of antennas newly flagged 
+        then score < 0.5
+        The flaggedSolnApplycaldelay dictionary is structured as follows:
+        flaggedSolnApplycaldelay = {
+            'antspw': {
+                antenna: {
+                    spwid: {
+                        polid: {
+                            'flagged': <numeric_value>
+                            'total': <numeric_value>
+                            'fraction': <numeric_value>
+                        }
+                    }
+                }
+            }
+        }
+    """
+    badbandlist = []
+    goodbandlist = []
+    applies_to = pqa.TargetDataSelection(vis={vis})
+    scorelist = []
+    for bandname, flag_results in flaggedSolnApplycaldelay.items():
+        flagged_ants = 0
+        total_ants = len(flag_results['antspw'])
+
+        for antenna in flag_results['antspw']:
+            flagged_spw_count = 0
+            for spwid in flag_results['antspw'][antenna]:
+                spw_flagged = False
+                for polid in flag_results['antspw'][antenna][spwid]:
+                    if flag_results['antspw'][antenna][spwid][polid]['flagged'] > 0:
+                        spw_flagged = True
+                if spw_flagged:
+                    flagged_spw_count += 1
+            # If >50% of SPWs flagged on this antenna
+            if flagged_spw_count > len(flag_results['antspw'][antenna])//2:
+                flagged_ants += 1
+
+        if flagged_ants > total_ants // 2:
+            badbandlist.append(bandname)
+        else:
+            goodbandlist.append(bandname)
+    if len(badbandlist)>0:
+        score = rendererutils.SCORE_THRESHOLD_ERROR
+        longmsg = f"More than 50% of SPWs are newly flagged on the majority of antennas in {','.join(badbandlist)} band"
+        shortmsg = longmsg
+        origin = pqa.QAOrigin(metric_name='score_flagged_ant_spw', metric_score=score, metric_units='')
+        score = pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=applies_to)
+        scorelist.append(score)
+
+    if len(goodbandlist)>0:
+        score = 1
+        longmsg = f"Less than 50% of SPWs are newly flagged on the majority of antennas in {','.join(goodbandlist)} band"
+        shortmsg = longmsg
+        origin = pqa.QAOrigin(metric_name='score_flagged_ant_spw', metric_score=score, metric_units='')
+        score = pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=applies_to)
+        scorelist.append(score)
+
+    return scorelist
+
 
 @log_qa
 def score_fluxboot(context, result) -> list[pqa.QAScore]:

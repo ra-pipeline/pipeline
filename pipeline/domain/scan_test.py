@@ -1,4 +1,4 @@
-"""Unit tests for Scan prototype (Phase 5)."""
+"""Unit tests for Scan prototype."""
 
 import datetime
 import unittest

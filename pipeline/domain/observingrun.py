@@ -1,4 +1,4 @@
-"""Pydantic-based ObservingRun domain object prototype for Phase 5 modernization."""
+"""Pydantic-based ObservingRun domain object prototype."""
 
 from __future__ import annotations
 

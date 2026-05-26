@@ -1,4 +1,4 @@
-"""Pydantic-based State domain objects prototype for Phase 5 modernization."""
+"""Pydantic-based State domain objects prototype."""
 
 from __future__ import annotations
 
@@ -297,10 +297,12 @@ class StateNAOJ(State):
 class StateFactory:
     """Factory for building State instances based on facility and start time."""
 
-    _CYCLE0_END: ClassVar[datetime.datetime] = datetime.datetime(2013, 1, 21)
+    _CYCLE0_END: ClassVar[datetime.datetime] = datetime.datetime(2013, 1, 21, tzinfo=datetime.timezone.utc)
 
     def __init__(self, facility: str, dt_start: datetime.datetime | None) -> None:
         self.facility = facility
+        if dt_start is not None and dt_start.tzinfo is None:
+            dt_start = dt_start.replace(tzinfo=datetime.timezone.utc)
         self.dt_start = dt_start
         self._state_cls = self._resolve_state_class()
 

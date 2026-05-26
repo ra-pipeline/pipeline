@@ -16,7 +16,7 @@ from pipeline.domain import DataType
 from pipeline.h.tasks.common import commonhelpermethods, mstools
 from pipeline.h.tasks.common.arrayflaggerbase import FlagCmd
 from pipeline.h.tasks.flagging.flagdatasetter import FlagdataSetter
-from pipeline.infrastructure import task_registry
+from pipeline.infrastructure import casa_tools, task_registry
 from .resultobjects import CorrectedampflagResults
 
 if TYPE_CHECKING:
@@ -683,44 +683,54 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         # Initialize list of newly found flags.
         newflags = []
 
-        # Evaluate flagging heuristics separately for each intent.
-        for intent in inputs.intent.split(','):
+        # Open the MS once for all (intent, field, spw) reads (PIPE-3089).
+        with casa_tools.MSReader(ms.name) as openms:
+            # Evaluate flagging heuristics separately for each intent.
+            for intent in inputs.intent.split(','):
+                # For current intent, identify which fields from inputs are valid.
+                if intent == 'TARGET':
+                    # Use field IDs to loop over individual mosaic pointings for
+                    # science targets (PIPE-337).
+                    valid_fields = [
+                        str(field.id)
+                        for field in ms.get_fields(intent=intent)
+                        if field.name in list(utils.safe_split(inputs.field))
+                    ]
+                else:
+                    # Use field names for calibrators.
+                    valid_fields = [
+                        field.name
+                        for field in ms.get_fields(intent=intent)
+                        if field.name in list(utils.safe_split(inputs.field))
+                    ]
 
-            # For current intent, identify which fields from inputs are valid.
-            if intent == 'TARGET':
-                # Use field IDs to loop over individual mosaic pointings for
-                # science targets (PIPE-337).
-                valid_fields = [str(field.id)
-                                for field in ms.get_fields(intent=intent)
-                                if field.name in list(utils.safe_split(inputs.field))]
-            else:
-                # Use field names for calibrators.
-                valid_fields = [field.name
-                                for field in ms.get_fields(intent=intent)
-                                if field.name in list(utils.safe_split(inputs.field))]
+                # If no valid fields were found, raise warning, and continue to
+                # next intent. The following intents are optional and do not require
+                # a warning: CHECK (PIPE-281), POLANGLE, POLLEAKAGE (PIPE-607),
+                # DIFFGAINREF, DIFFGAINSRC (PIPE-2082, PIPE-2145).
+                if not valid_fields:
+                    if intent not in ['CHECK', 'DIFFGAINREF', 'DIFFGAINSRC', 'POLANGLE', 'POLLEAKAGE']:
+                        LOG.warning(
+                            'Invalid data selection for given intent(s) and field(s): fields %s do not include '
+                            "intent '%s'.",
+                            utils.commafy(utils.safe_split(inputs.field)),
+                            intent,
+                        )
+                    continue
 
-            # If no valid fields were found, raise warning, and continue to
-            # next intent. The following intents are optional and do not require
-            # a warning: CHECK (PIPE-281), POLANGLE, POLLEAKAGE (PIPE-607),
-            # DIFFGAINREF, DIFFGAINSRC (PIPE-2082, PIPE-2145).
-            if not valid_fields:
-                if intent not in ['CHECK', 'DIFFGAINREF', 'DIFFGAINSRC', 'POLANGLE', 'POLLEAKAGE']:
-                    LOG.warning("Invalid data selection for given intent(s) and field(s): fields {} do not include"
-                                " intent \'{}\'.".format(utils.commafy(utils.safe_split(inputs.field)), intent))
-                continue
+                # Evaluate heuristic for each valid field.
+                for field in valid_fields:
+                    # Evaluate flagging heuristics separately for each spw.
+                    for spwid in spwids:
+                        flags_for_intent_field_spw = self._evaluate_heuristic(
+                            ms, intent, field, spwid, antenna_id_to_name, ms_handle=openms
+                        )
+                        newflags.extend(flags_for_intent_field_spw)
 
-            # Evaluate heuristic for each valid field.
-            for field in valid_fields:
-
-                # Evaluate flagging heuristics separately for each spw.
-                for spwid in spwids:
-
-                    flags_for_intent_field_spw = self._evaluate_heuristic(
-                        ms, intent, field, spwid, antenna_id_to_name)
-                    newflags.extend(flags_for_intent_field_spw)
-
-        LOG.debug("Flagging commands from current iteration, before consolidation:\n{}"
-                  "".format('\n'.join([flag.flagcmd for flag in newflags])))
+        LOG.debug(
+            'Flagging commands from current iteration, before consolidation:\n%s',
+            '\n'.join([flag.flagcmd for flag in newflags]),
+        )
 
         # Consolidate flagging commands from current iteration to minimize
         # request for flagdata.
@@ -728,8 +738,9 @@ class Correctedampflag(basetask.StandardTaskTemplate):
 
         return newflags
 
-    def _evaluate_heuristic(self, ms: MeasurementSet, intent: str, field: str, spwid: int,
-                            antenna_id_to_name: dict) -> list[FlagCmd]:
+    def _evaluate_heuristic(
+        self, ms: MeasurementSet, intent: str, field: str, spwid: int, antenna_id_to_name: dict, *, ms_handle=None
+    ) -> list[FlagCmd]:
         # Initialize flags.
         allflags = []
 
@@ -739,13 +750,17 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         # If no baseline sets were received, then evaluate heuristics for
         # all baselines at once.
         if not baseline_sets:
-            allflags.extend(self._evaluate_heuristic_for_baseline_set(
-                ms, intent, field, spwid, antenna_id_to_name))
+            allflags.extend(
+                self._evaluate_heuristic_for_baseline_set(
+                    ms, intent, field, spwid, antenna_id_to_name, ms_handle=ms_handle
+                )
+            )
         else:
             # Evaluate heuristic for each set of baselines.
             for baseline_set in baseline_sets:
                 newflags = self._evaluate_heuristic_for_baseline_set(
-                    ms, intent, field, spwid, antenna_id_to_name, baseline_set)
+                    ms, intent, field, spwid, antenna_id_to_name, baseline_set, ms_handle=ms_handle
+                )
                 allflags.extend(newflags)
 
         return allflags
@@ -833,9 +848,17 @@ class Correctedampflag(basetask.StandardTaskTemplate):
             LOG.info('Using uvbinFactor=%.2f' % (factor))
         return factor
 
-    def _evaluate_heuristic_for_baseline_set(self, ms: MeasurementSet, intent: str, field: str, spwid: int,
-                                             antenna_id_to_name: dict,
-                                             baseline_set: list | None = None) -> list[FlagCmd]:
+    def _evaluate_heuristic_for_baseline_set(
+        self,
+        ms: MeasurementSet,
+        intent: str,
+        field: str,
+        spwid: int,
+        antenna_id_to_name: dict,
+        baseline_set: list | None = None,
+        *,
+        ms_handle=None,
+    ) -> list[FlagCmd]:
 
         inputs = self.inputs
 
@@ -890,8 +913,15 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         newflags = []
 
         # Read in data from MS. If no valid data could be read, return early with no flags.
-        data = mstools.read_channel_averaged_data_from_ms(ms, field, spwid, intent,
-            ['corrected_data', 'model_data', 'antenna1', 'antenna2', 'flag', 'time', 'uvdist'], baseline_set)
+        data = mstools.read_channel_averaged_data_from_ms(
+            ms,
+            field,
+            spwid,
+            intent,
+            ['corrected_data', 'model_data', 'antenna1', 'antenna2', 'flag', 'time', 'uvdist'],
+            baseline_set,
+            ms_handle=ms_handle,
+        )
         if not data:
             return newflags
 

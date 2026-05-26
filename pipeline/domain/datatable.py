@@ -1,4 +1,4 @@
-"""Pydantic-based DataTable implementation for Phase 5 modernization (full port)."""
+"""Pydantic-based DataTable implementation (full port)."""
 
 from __future__ import annotations
 

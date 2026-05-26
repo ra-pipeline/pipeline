@@ -1,22 +1,23 @@
-"""Pydantic-based Field domain object prototype for Phase 5 modernization."""
+"""Pydantic-based Field domain object prototype."""
 
 from __future__ import annotations
 
 import datetime
 import json
 import pprint
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 from pydantic import BaseModel, ConfigDict, Field as PydanticField, field_validator
 
+from pipeline.domain.fluxmeasurement import FluxMeasurement
+from pipeline.domain.source import Source
+from pipeline.domain.spectralwindow import SpectralWindow
+from pipeline.domain.state import State
 from pipeline.infrastructure import casa_tools, utils
+from pipeline.infrastructure.utils.casa_types import DirectionDict, QuantityDict
 
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
-
-    from pipeline.domain import FluxMeasurement, Source, SpectralWindow, State
-    from pipeline.infrastructure.utils.casa_types import DirectionDict, EpochDict, QuantityDict
 
 _pprinter = pprint.PrettyPrinter(width=1e99)
 
@@ -42,7 +43,10 @@ class Field(BaseModel):
     source_id: int = PydanticField(..., description='Associated source identifier')
     time: NDArray[np.float64] = PydanticField(..., description='Unique observation times')
     name_raw: str = PydanticField(..., alias='name', description='Raw field name')
-    direction: DirectionDict = PydanticField(..., description='CASA direction measure')
+    direction: DirectionDict | dict[str, Any] = PydanticField(
+        ...,
+        description='CASA direction measure',
+    )
     intents: set[str] = PydanticField(default_factory=set, description='Scan intents')
     states: set[State] = PydanticField(default_factory=set, description='State objects')
     valid_spws: set[SpectralWindow] = PydanticField(default_factory=set, description='Valid spectral windows')
@@ -51,8 +55,14 @@ class Field(BaseModel):
         description='Flux density measurements',
     )
     source: Source | None = PydanticField(default=None, exclude=True, description='Linked source object')
-    zd: QuantityDict | None = PydanticField(default=None, description='Zenith distance')
-    telmjd: QuantityDict | None = PydanticField(default=None, description='TELMJD epoch')
+    zd: QuantityDict | dict[str, Any] | None = PydanticField(
+        default=None,
+        description='Zenith distance',
+    )
+    telmjd: QuantityDict | dict[str, Any] | None = PydanticField(
+        default=None,
+        description='TELMJD epoch',
+    )
 
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
@@ -66,7 +76,7 @@ class Field(BaseModel):
         name: str | None = None,
         source_id: int | None = None,
         time: NDArray[np.float64] | None = None,
-        direction: DirectionDict | None = None,
+        direction: DirectionDict | dict[str, Any] | None = None,
         **data: Any,
     ) -> None:
         """Create a Field.
@@ -132,22 +142,22 @@ class Field(BaseModel):
         return self.name if self.name else '#{0}'.format(self.id)
 
     @property
-    def latitude(self) -> EpochDict:
+    def latitude(self) -> QuantityDict | dict[str, Any]:
         """Return latitude for the phasecenter of the field."""
         return self.direction['m1']
 
     @property
-    def longitude(self) -> EpochDict:
+    def longitude(self) -> QuantityDict | dict[str, Any]:
         """Return longitude for the phasecenter of the field."""
         return self.direction['m0']
 
     @property
-    def mdirection(self) -> DirectionDict:
+    def mdirection(self) -> DirectionDict | dict[str, Any]:
         """Return direction measure dictionary for phasecenter of the field."""
         return self.direction
 
     @property
-    def _mdirection(self) -> DirectionDict:
+    def _mdirection(self) -> DirectionDict | dict[str, Any]:
         """Backward-compatible alias for `mdirection`.
 
         Some legacy code paths (e.g., weblog rendering) expect a private

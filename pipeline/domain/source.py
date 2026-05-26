@@ -1,4 +1,4 @@
-"""Pydantic-based Source domain object prototype for Phase 5 modernization.
+"""Pydantic-based Source domain object prototype.
 
 This module demonstrates how to refactor the current Source class to use Pydantic
 for data validation and serialization while preserving the existing public API.

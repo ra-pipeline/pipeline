@@ -1,4 +1,4 @@
-"""Pydantic-based SpectralWindow domain object prototype for Phase 5 modernization."""
+"""Pydantic-based SpectralWindow domain object prototype."""
 
 from __future__ import annotations
 
@@ -6,19 +6,16 @@ import decimal
 import itertools
 import json
 import operator
+from collections.abc import Iterable, Iterator, Sequence
 from typing import TYPE_CHECKING, Any
 
 import numpy
+from numpy.typing import NDArray
 from pydantic import BaseModel, ConfigDict, Field as PydanticField, PrivateAttr, field_validator
 
 from pipeline import infrastructure
 from pipeline.domain import measures
 from pipeline.infrastructure import casa_tools
-
-if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator, Sequence
-
-    from numpy.typing import NDArray
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -201,6 +198,87 @@ class Channel:
     def high(self) -> measures.Frequency:
         return self.frequency_range.high
 
+    def contains(self, frequency: measures.Frequency | measures.FrequencyRange) -> bool:
+        """Returns whether the Channel contains given frequency (range)."""
+        return self.frequency_range.contains(frequency)
+
+    def convert_to(self, newUnits: dict = measures.FrequencyUnits.GIGAHERTZ) -> measures.FrequencyRange:
+        """Converts both endpoints of this Channel (frequency range) to the
+        given units.
+
+        This converts the endpoint frequency of the endpoints in-place, as well
+        as returns a reference to the frequency range of this Channel.
+
+        Args:
+            newUnits: New units to convert the frequencies to. By default, this
+                will convert to Gigahertz.
+        """
+        return self.frequency_range.convert_to(newUnits)
+
+    def getCentreFrequency(self) -> measures.Frequency:
+        """Returns the center frequency of the Channel."""
+        return self.frequency_range.getCentreFrequency()
+
+    def getOverlapWith(self, other: measures.FrequencyRange) -> measures.FrequencyRange:
+        """Return a new frequency range that represents the region of overlap
+        between this Channel (frequency range) and "other". If there is no
+        overlap, None is returned.
+
+        Args:
+            other: Another frequency range that may overlap this Channel.
+
+        Returns:
+            FrequencyRange object representing the overlapping region of this
+            range and other, or None if there is no overlap.
+        """
+        return self.frequency_range.getOverlapWith(other)
+
+    def getGapBetween(self, other: measures.FrequencyRange) -> measures.FrequencyRange | None:
+        """Returns a new frequency range that represents the region of frequency
+        space between this Channel (frequency range) and ``other``. If the other
+        range is coincident with, or overlaps, this Channel, None is returned.
+        If the other range is None, None is returned.
+
+        Args:
+            other: Channel/frequency range for which to assess frequency gap
+                with this Channel.
+
+        Returns:
+            The frequency gap between this range and ``other``."""
+        return self.frequency_range.getGapBetween(other)
+
+    def getWidth(self) -> measures.Frequency:
+        """Returns the width of the Channel."""
+        return self.frequency_range.getWidth()
+
+    def overlaps(self, other: Channel) -> bool:
+        """
+        Returns whether this Channel overlaps with given ``other`` Channel.
+
+        The Channel spans a frequency range that is a closed interval, that is,
+        one that contains both of its endpoints.
+
+        Args:
+            other: Another Channel (frequency range) that may overlap this one.
+
+        Returns:
+            True if this Channel overlaps with ``other``. If ``other`` is not a
+            Channel, the return value is False.
+        """
+        if isinstance(other, Channel):
+            return self.frequency_range.overlaps(other.frequency_range)
+        return False
+
+    def set(self, frequency1: measures.Frequency, frequency2: measures.Frequency) -> None:
+        """
+        Set frequency range for this Channel based on given frequency endpoints.
+
+        Args:
+            frequency1: One endpoint of frequency range for this Channel.
+            frequency2: Other endpoint of frequency range for this Channel.
+        """
+        self.frequency_range.set(frequency1, frequency2)
+
 
 class SpectralWindowWithChannelSelection:
     """Proxy that applies a channel selection to a spectral window."""
@@ -276,6 +354,10 @@ class SpectralWindow(BaseModel):
     median_receptor_angle: NDArray | None = PydanticField(default=None, description='Median receptor angle')
     specline_window: bool = PydanticField(default=False, description='Spectral line window flag')
     grouping_id: str | None = PydanticField(default=None, description='Grouping ID')
+    chan_resolutions: Sequence[int | float] | None = PydanticField(
+        default=None,
+        description='Per-channel spectral resolutions in Hz',
+    )
     intents: set[str] = PydanticField(default_factory=set, description='Observing intents')
 
     mean_frequency: measures.Frequency | None = PydanticField(default=None, exclude=True)
@@ -294,9 +376,12 @@ class SpectralWindow(BaseModel):
 
     def __init__(
         self,
+        *args: Any,
         id: int | None = None,
+        spw_id: int | None = None,
         name: str | None = None,
         type: str | None = None,
+        spw_type: str | None = None,
         bandwidth: measures.Frequency | float | None = None,
         ref_freq: dict[str, Any] | None = None,
         mean_freq: float | None = None,
@@ -316,8 +401,35 @@ class SpectralWindow(BaseModel):
         models only accept keyword arguments by default, so we map these
         positional arguments onto the corresponding fields.
         """
+        positional_fields = (
+            'id',
+            'name',
+            'type',
+            'bandwidth',
+            'ref_freq',
+            'mean_freq',
+            'chan_freqs',
+            'chan_widths',
+            'chan_effective_bws',
+            'sideband',
+            'baseband',
+            'receiver',
+            'freq_lo',
+        )
+        if len(args) > len(positional_fields):
+            raise TypeError(
+                f'SpectralWindow expected at most {len(positional_fields)} positional arguments, '
+                f'got {len(args)}'
+            )
+        for field_name, value in zip(positional_fields, args):
+            data.setdefault(field_name, value)
+
+        if spw_id is not None and 'id' not in data and id is None:
+            data['id'] = spw_id
         if id is not None and 'id' not in data:
             data['id'] = id
+        if spw_type is not None and 'type' not in data and type is None:
+            data['type'] = spw_type
         if name is not None and 'name' not in data:
             data['name'] = name
         if type is not None and 'type' not in data:
@@ -344,7 +456,14 @@ class SpectralWindow(BaseModel):
             data['freq_lo'] = freq_lo
         super().__init__(**data)
 
-    @field_validator('chan_freqs', 'chan_widths', 'chan_effective_bws', 'transitions', mode='before')
+    @field_validator(
+        'chan_freqs',
+        'chan_widths',
+        'chan_effective_bws',
+        'transitions',
+        'chan_resolutions',
+        mode='before',
+    )
     @classmethod
     def convert_numpy_to_list(cls, v: Any) -> list[int | float] | list[str] | Any:
         """Convert numpy arrays to lists for Pydantic validation."""
@@ -411,6 +530,16 @@ class SpectralWindow(BaseModel):
     def centre_frequency(self) -> measures.Frequency:
         """Return the center frequency of the SpectralWindow."""
         return self._centre_frequency
+
+    @property
+    def resolution(self) -> measures.Frequency | None:
+        """Return the spectral resolution of the first channel, if available."""
+        if self.chan_resolutions is None:
+            return None
+        return measures.Frequency(
+            float(self.chan_resolutions[0]),
+            measures.FrequencyUnits.HERTZ,
+        )
 
     @property
     def num_channels(self) -> int:
@@ -546,6 +675,9 @@ class SpectralWindow(BaseModel):
             'median_receptor_angle': self.median_receptor_angle,
             'specline_window': self.specline_window,
             'grouping_id': self.grouping_id,
+            'chan_resolutions': None
+            if self.chan_resolutions is None
+            else self._sequence_to_list(self.chan_resolutions),
         }
 
     def to_json(self) -> str:

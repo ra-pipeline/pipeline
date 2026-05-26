@@ -30,7 +30,7 @@ class FinalcalsQAHandler(pqa.QAPlugin):
 
             score1 = qacalc.score_total_data_flagged_vla_bandpass(
                 result.bpdgain_touse, result.flaggedSolnApplycalbandpass['antmedian']['fraction'])
-            score2 = qacalc.score_total_data_vla_delay(result.ktypecaltable, m)
+            score2 = qacalc.score_total_data_vla_delay(result.ktypecaltable, result.inputs['vis'])
             scores = [score1, score2]
         else:
             LOG.error('Error with bandpass and/or delay table.')

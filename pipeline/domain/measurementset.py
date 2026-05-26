@@ -18,6 +18,7 @@ from pipeline import infrastructure
 from pipeline.domain import measures
 from pipeline.domain import spectralwindow
 from pipeline.infrastructure import casa_tools, tablereader, utils
+from pipeline.infrastructure.tablereader import RetrieveByIndexContainer
 
 if TYPE_CHECKING:
     from typing import Callable
@@ -27,8 +28,6 @@ if TYPE_CHECKING:
     from pipeline.domain import (Antenna, AntennaArray, DataDescription, DataType, Field,
                                  Polarization, Scan, SpectralWindow, State)
     from pipeline.infrastructure.utils.casa_types import EpochDict
-    from pipeline.infrastructure.tablereader import RetrieveByIndexContainer
-
 LOG = infrastructure.logging.get_logger(__name__)
 
 
@@ -47,10 +46,10 @@ class MeasurementSet(BaseModel):
     array_name: str = PydanticField(default='')
     correlator_name: str | None = PydanticField(default=None)
     data_column: dict = PydanticField(default_factory=dict)
-    data_descriptions: RetrieveByIndexContainer = PydanticField(default_factory=RetrieveByIndexContainer)
+    data_descriptions: RetrieveByIndexContainer = PydanticField(default_factory=lambda: RetrieveByIndexContainer([]))
     data_types_per_source_and_spw: dict = PydanticField(default_factory=dict)
     execblock_id: str = PydanticField(default='')
-    fields: RetrieveByIndexContainer = PydanticField(default_factory=RetrieveByIndexContainer)
+    fields: RetrieveByIndexContainer = PydanticField(default_factory=lambda: RetrieveByIndexContainer([]))
     observer: str = PydanticField(default='')
     observing_modes: list[str] = PydanticField(default_factory=list)
     polarizations: list[Polarization] = PydanticField(default_factory=list)
@@ -62,10 +61,10 @@ class MeasurementSet(BaseModel):
     scans: list[Scan] = PydanticField(default_factory=list)
     schedblock_id: str = PydanticField(default='')
     science_goals: dict = PydanticField(default_factory=dict)
-    sources: RetrieveByIndexContainer = PydanticField(default_factory=RetrieveByIndexContainer)
-    spectral_windows: RetrieveByIndexContainer = PydanticField(default_factory=RetrieveByIndexContainer)
+    sources: RetrieveByIndexContainer = PydanticField(default_factory=lambda: RetrieveByIndexContainer([]))
+    spectral_windows: RetrieveByIndexContainer = PydanticField(default_factory=lambda: RetrieveByIndexContainer([]))
     spectralspec_spwmap: dict = PydanticField(default_factory=dict)
-    states: RetrieveByIndexContainer = PydanticField(default_factory=RetrieveByIndexContainer)
+    states: RetrieveByIndexContainer = PydanticField(default_factory=lambda: RetrieveByIndexContainer([]))
 
     derived_fluxes: dict[str, Any] | None = PydanticField(default=None)
     fluxscale_fluxes: dict[str, Any] | None = PydanticField(default=None)

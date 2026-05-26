@@ -1,4 +1,4 @@
-"""Unit tests for core MeasurementSet port (Phase 5)."""
+"""Unit tests for core MeasurementSet port."""
 
 import datetime
 import unittest

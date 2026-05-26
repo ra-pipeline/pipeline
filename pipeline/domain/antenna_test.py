@@ -1,4 +1,4 @@
-"""Unit tests for Antenna prototype (Phase 5).
+"""Unit tests for Antenna prototype.
 
 Tests demonstrate:
 1. Data model validation

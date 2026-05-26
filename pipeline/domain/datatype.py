@@ -1,4 +1,4 @@
-"""Pydantic-friendly DataType enumeration for Phase 5 modernization."""
+"""Pydantic-friendly DataType enumeration."""
 
 from __future__ import annotations
 

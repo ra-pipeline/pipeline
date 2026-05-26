@@ -1,4 +1,4 @@
-"""Unit tests for State prototypes (Phase 5)."""
+"""Unit tests for State prototypes."""
 
 import unittest
 

@@ -1,4 +1,4 @@
-"""Unit tests for AntennaArray prototype (Phase 5)."""
+"""Unit tests for AntennaArray prototype."""
 
 import unittest
 from unittest.mock import patch

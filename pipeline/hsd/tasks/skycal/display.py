@@ -161,30 +161,15 @@ class SingleDishSkyCalAmpVsFreqSummaryChart(PlotbandpassDetailBase, SingleDishSk
                    for spw_id in self.spw_ids
                    if not os.path.exists(self._figfile[spw_id])]
         if missing:
-            LOG.trace('Executing new plotbandpass job for missing figures')
             for spw_id in missing:
                 # PIPE-110: show image sideband for DSB receivers.
                 showimage = self._rxmap.get(spw_id, "") == "DSB"
                 try:
-                    task = self.create_task(spw_id, '', showimage=showimage)
-                    commands[spw_id] = str(task)
-                    task.execute()
-                except Exception as ex:
-                    LOG.error('Could not create plotbandpass summary plots')
-                    LOG.exception(ex)
-
-        # workaround for CAS-13863
-        # So far, missing plots issue happens only for TP Spectral Scan data
-        missing = [spw_id
-                   for spw_id in self.spw_ids
-                   if not os.path.exists(self._figfile[spw_id])]
-        if missing:
-            LOG.info('Executing plotbandpass again for missing figures')
-            for spw_id in missing:
-                # PIPE-110: show image sideband for DSB receivers.
-                showimage = self._rxmap.get(spw_id, "") == "DSB"
-                try:
-                    task = self.create_task_for_tp_spectral_scan(spw_id, '', showimage=showimage)
+                    task = self.tweak_param_and_create_task(
+                        spw_id,
+                        '',
+                        showimage=showimage
+                    )
                     commands[spw_id] = str(task)
                     task.execute()
                     self.rename_and_clear_figure(spw_id)
@@ -226,14 +211,14 @@ class SingleDishSkyCalAmpVsFreqSummaryChart(PlotbandpassDetailBase, SingleDishSk
             pieces = self._figfile[spw_id].split('.')
             try:
                 spw_index = pieces.index(spw_indicator)
-            except:
+            except Exception:
                 spw_index = -3
             # remove antenna name from the filename
             pieces.pop(spw_index - 1)
             self._figfile[spw_id] = '.'.join(pieces)
 
-    def create_task_for_tp_spectral_scan(self, spw_arg: int, antenna_arg: str,
-                                         showimage: bool = False) -> JobRequest:
+    def tweak_param_and_create_task(self, spw_arg: int, antenna_arg: str,
+                                    showimage: bool = False) -> JobRequest:
         """
         Return plotbandpass task job with a tweaked parameter value.
 
@@ -251,8 +236,11 @@ class SingleDishSkyCalAmpVsFreqSummaryChart(PlotbandpassDetailBase, SingleDishSk
         kwargs_org = self._kwargs.copy()
         try:
             ms = self.context.observing_run.get_ms(self._vis)
-            def __get_sorted_reference_scans(msobj: MeasurementSet,
-                                             spw: int | str | Sequence | None = None) -> list[Scan]:
+
+            def __get_sorted_reference_scans(
+                    msobj: MeasurementSet,
+                    spw: int | str | Sequence | None = None
+            ) -> list[Scan]:
                 """
                 Return a list of REFERENCE Scan objects sorted by scan IDs.
                 Args:
@@ -260,7 +248,11 @@ class SingleDishSkyCalAmpVsFreqSummaryChart(PlotbandpassDetailBase, SingleDishSk
                     spw: Spw selection
                 Returns: a list of REFERENCE scan objects sorted by scan ID.
                 """
-                scans = msobj.get_scans(scan_intent='REFERENCE', spw=spw)
+                scans = msobj.get_scans(
+                    scan_intent='REFERENCE',
+                    field=self.field_id,
+                    spw=spw
+                )
                 return sorted(scans, key=lambda s: s.id)
 
             # The solutionTimeThresholdSeconds should be equal to or smaller than
@@ -276,7 +268,7 @@ class SingleDishSkyCalAmpVsFreqSummaryChart(PlotbandpassDetailBase, SingleDishSk
                 self._kwargs['solutionTimeThresholdSeconds'] = start_time_scan_spw - end_time_previous_scan
             else:  # I don't think this should happen but defining a reasonable value to avoid failure.
                 self._kwargs['solutionTimeThresholdSeconds'] = scan_spw.exposure_time(spw_arg).seconds / 2
-            self._kwargs['scans'] = scan_spw.id
+            self._kwargs['scans'] = str(scan_spw.id)
             task = super().create_task(spw_arg, antenna_arg, showimage)
         finally:
             self._kwargs = kwargs_org
@@ -290,15 +282,15 @@ class SingleDishSkyCalAmpVsFreqSummaryChart(PlotbandpassDetailBase, SingleDishSk
             spw_id: Spw ID
         """
         figfile = self._figfile[spw_id]
-        if os.path.exists(figfile):
-            return
-
         prefix, extension = os.path.splitext(self._figroot)
         pattern = f'{prefix}.spw{spw_id}.t*{extension}'
         figures = sorted(glob.glob(pattern))
         if len(figures) == 0:
             return
-        os.rename(figures[0], figfile)
+
+        if figures[0] != figfile:
+            os.rename(figures[0], figfile)
+
         for fig in figures[1:]:
             os.remove(fig)
 
@@ -468,8 +460,6 @@ class SingleDishPlotmsLeaf:
         spw: str = '',
         ant: str = '',
         coloraxis: str = '',
-        plotindex: int = 0,
-        flush_plot: bool = False,
         **kwargs: Any
     ) -> None:
         """Construct SingleDishPlotmsLeaf instance.
@@ -486,8 +476,6 @@ class SingleDishPlotmsLeaf:
             spw: Spectral window selection. Defaults to '' (all spw).
             ant: Antenna selection. Defaults to '' (all antenna).
             coloraxis: Color axis type. Defaults to ''.
-            plotindex: Index of plot to show the field (actually calapp).
-            flush_plot: Flag to flush plot.
         Raises:
             RuntimeError: Invalid field selection in calapp
         """
@@ -500,8 +488,6 @@ class SingleDishPlotmsLeaf:
         self.spw = str(spw)
         self.antenna = str(ant)
         self.coloraxis = coloraxis
-        self.plotindex = plotindex
-        self.flush_plot = flush_plot
         self.field = calapp.gainfield
 
         ms = context.observing_run.get_ms(self.vis)
@@ -543,16 +529,10 @@ class SingleDishPlotmsLeaf:
             except Exception as e:
                 LOG.error(str(e))
                 LOG.debug(traceback.format_exc())
-                if self.flush_plot:
-                    LOG.error('Failed to generate plot "{}"'.format(figfile))
-                else:
-                    LOG.error('Failed to generate plot for field "{}"'.format(self.field))
+                LOG.error('Failed to generate plot "{}"'.format(figfile))
                 return []
 
-        if self.flush_plot:
-            return [self._get_plot_object(figfile, task)]
-        else:
-            return []
+        return [self._get_plot_object(figfile, task)]
 
     def _create_task(self, title: str, figfile: str) -> JobRequest:
         """Create task of CASA plotms.
@@ -563,9 +543,6 @@ class SingleDishPlotmsLeaf:
         Return:
             Instance of JobRequest.
         """
-        clearplots = True if self.plotindex == 0 else False
-        if not self.flush_plot:
-            figfile = ""
         task_args = {'vis': self.caltable,
                      'xaxis': self.xaxis,
                      'yaxis': self.yaxis,
@@ -578,8 +555,6 @@ class SingleDishPlotmsLeaf:
                      'legendposition': 'exteriorRight',
                      'averagedata': True,
                      'avgchannel': '1e8',
-                     'plotindex': self.plotindex,
-                     'clearplots': clearplots,
                      'plotfile': figfile
                      }
 
@@ -621,12 +596,13 @@ class SingleDishPlotmsSpwComposite(LeafComposite):
         table_spws = sorted(dict_calapp_spws.keys())
         children = []
         for spw in table_spws:
-            children_field = []
-            for plotindex, cal in enumerate(calapp):
-                final_field = plotindex == len(calapp)-1
-                item = self.leaf_class(context, result, cal, xaxis, yaxis, spw=int(spw), ant=ant, pol=pol, plotindex=plotindex, flush_plot=final_field, **kwargs)
-                children_field.append(item)
-            children.extend(children_field)
+            # generate plot per caltable for each spw
+            calapp_unique = list(
+                {c.gaintable: c for c in dict_calapp_spws[spw]}.values()
+            )
+            for cal in calapp_unique:
+                item = self.leaf_class(context, result, cal, xaxis, yaxis, spw=int(spw), ant=ant, pol=pol, **kwargs)
+                children.append(item)
 
         super().__init__(children)
 
@@ -645,12 +621,6 @@ class SingleDishPlotmsAntSpwComposite(LeafComposite):
                     ant=int(ant), pol=pol, **kwargs)
                     for ant in table_ants]
         super().__init__(children)
-
-
-class SingleDishPlotmsAntComposite(AntComposite):
-    """Class to create a PlotLeaf for each antenna."""
-
-    leaf_class = SingleDishPlotmsLeaf
 
 
 class SingleDishSkyCalAmpVsTimeSummaryChart(SingleDishPlotmsSpwComposite):
@@ -739,10 +709,18 @@ def plot_elevation_difference(
     figroot = os.path.join(context.report_dir,
                            'stage%s' % result.stage_number)
 
-    start_time = np.min([np.min(x.timeon) for z in eldiff.values() for y in z.values()
-                            for x in y.values() if len(x.timeon) > 0])
-    end_time = np.max([np.max(x.timeon) for z in eldiff.values() for y in z.values()
-                          for x in y.values() if len(x.timeon) > 0])
+    start_time_list = [np.min(x.timeon) for z in eldiff.values()
+                       for y in z.values()
+                       for x in y.values() if len(x.timeon) > 0]
+
+    if len(start_time_list) == 0:
+        LOG.info('No valid ON-SOURCE pointings found. Skipping elevation difference plot.')
+        return []
+
+    start_time = np.min(start_time_list)
+    end_time = np.max([np.max(x.timeon) for z in eldiff.values()
+                       for y in z.values()
+                       for x in y.values() if len(x.timeon) > 0])
 
     def init_figure(figure: Figure) -> tuple[Axes, Axes]:
         """Initialize the figure.

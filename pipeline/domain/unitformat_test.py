@@ -1,4 +1,4 @@
-"""Unit tests for UnitFormat helpers (Phase 5)."""
+"""Unit tests for UnitFormat helpers."""
 
 import unittest
 

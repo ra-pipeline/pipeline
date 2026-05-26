@@ -1,4 +1,4 @@
-"""Pydantic-based FluxMeasurement domain object prototype for Phase 5 modernization."""
+"""Pydantic-based FluxMeasurement domain object prototype."""
 
 from __future__ import annotations
 

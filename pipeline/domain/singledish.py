@@ -22,7 +22,7 @@ class MSReductionGroupMember(BaseModel):
     set, antenna, spectral window, and field.
     """
 
-    ms: MeasurementSet = PydanticField(..., description='MeasurementSet object')
+    ms: MeasurementSet | Any = PydanticField(..., description='MeasurementSet object')
     antenna_id: int = PydanticField(..., description='Antenna ID')
     spw_id: int = PydanticField(..., description='Spectral window ID')
     field_id: int = PydanticField(default=-1, description='Field ID (default -1 if unspecified)')
@@ -128,7 +128,7 @@ class MSReductionGroupDesc(BaseModel):
     min_frequency: float | None = PydanticField(default=None, description='Minimum frequency')
     max_frequency: float | None = PydanticField(default=None, description='Maximum frequency')
     nchan: int | None = PydanticField(default=None, description='Number of channels')
-    field: Field = PydanticField(default=None, description='Field object')
+    field: Field | Any | None = PydanticField(default=None, description='Field object')
     members: list[MSReductionGroupMember] = PydanticField(
         default_factory=list, description='List of reduction group members'
     )

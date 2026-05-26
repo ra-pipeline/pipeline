@@ -458,7 +458,7 @@ class PipelineTester:
         new_results = sorted(regression.extract_regression_results(context))
         return new_results
 
-    def __do_sanity_checks(self, context: Context):
+    def __do_sanity_checks(self, context: Context | None = None):
         """
         Do the following sanity-checks on the pipeline run
 
@@ -468,8 +468,12 @@ class PipelineTester:
         4. No weblog rendering failures
 
         Args:
-            context: Pipeline context object from the current run.
+            context: Pipeline context object from the current run. If omitted,
+                the last pipeline context is loaded.
         """
+
+        if context is None:
+            context = launcher.Pipeline(context='last').context
 
         # 1. rawdata, working, products directories are present
         # The rawdata directory is only present for PPR runs

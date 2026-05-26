@@ -1,7 +1,7 @@
-# Running Pipeline tasks with Pixi
+# Pixi and Running Pixi tasks
 
 [Pixi](https://prefix.dev/docs/pixi/overview) is a fast, cross-platform package manager built on top of the conda ecosystem.
-It manages reproducible environments per CASA version and exposes common developer workflows as named tasks.
+In Pipeline development, Pixi manages reproducible environments per CASA version and exposes common developer workflows as named tasks.
 
 ---
 
@@ -48,36 +48,40 @@ pixi run -e casa671-py312 test-unit
 
 ### `test-unit` — unit tests with coverage
 
-Runs all unit tests (any test not under a `regression` or `component` path is
-auto-marked `unit` by `conftest.py`).  Uses `pytest-xdist` with `-n logical`
-to parallelize across available CPUs.  Coverage is written to `htmlcov/` and
-`coverage.xml` in the working directory.
+Runs all unit tests (any `*_test.py` file under `pipeline/`) using
+`pytest-xdist` with `-n logical` to parallelize across available CPUs.
+`--max-worker-restart=1` limits retries of crashed xdist workers.
+Coverage is accumulated with `--cov-append` and written to `htmlcov/` and
+`coverage.xml` **in the directory where `pixi run` is invoked** (`$INIT_CWD`).
 
 ```bash
+# from a scratch directory so CASA logs and coverage land there
+cd /my/workdir
 pixi run test-unit
 ```
 
-Runs from the **project root** (`pyproject.toml` directory).
-
 ---
 
-### `test-regression` — fast regression suite (serial CASA session, xdist)
+### `test-regression` — fast regression suite (xdist, no MPI)
 
-Runs the full `tests/regression/fast/` suite inside a plain Python session
-(not `mpicasa`) using `pytest-xdist --dist worksteal`.  Tests marked `mpi`
-are excluded — use `test-regression-mpi` (not yet defined) for those.
+Runs the full `tests/regression/fast/` suite in a plain Python session
+(not `mpicasa`) using `pytest-xdist -n 12 --dist worksteal` with 12 parallel
+workers.  Tests marked `mpi` are excluded.
+
+Output (CASA logs, pipeline working dirs, coverage) lands in the directory
+where `pixi run` is invoked (`$INIT_CWD`).
 
 ```bash
-# default: output lands in ../working/
+cd /my/workdir
 pixi run test-regression
-
-# custom output directory
-PL_WORKDIR=/zfs/scratch/myrun pixi run test-regression
 ```
 
-`PL_WORKDIR` defaults to `../working` (a sibling of the `pipeline/` source
-directory).  Set it to any writable path to keep CASA logs, pipeline output
-directories, and coverage files out of the source tree.
+To invoke from outside the source tree:
+
+```bash
+cd /my/workdir
+pixi run --manifest-path /path/to/pipeline/pyproject.toml test-regression
+```
 
 ---
 
@@ -87,12 +91,15 @@ Runs one small ALMA 7m regression test
 (`test_uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small__PPR__regression`)
 inside `casashell`.  Useful for a fast smoke-test of the ALMA-IF code path.
 
+Output lands in `$INIT_CWD` — the directory where `pixi run` is invoked.
+
 ```bash
-# default output directory: ../working/
+cd /my/workdir
 pixi run test-pltest1
 
-# custom output directory
-PL_WORKDIR=/tmp/pl_scratch pixi run test-pltest1
+# or from anywhere, pointing at the manifest
+cd /my/workdir
+pixi run --manifest-path /path/to/pipeline/pyproject.toml test-pltest1
 ```
 
 ---
@@ -141,32 +148,35 @@ pixi run build-pdf
 
 ---
 
-## Controlling the working directory (`PL_WORKDIR`)
+## Controlling the working directory (`$INIT_CWD`)
 
-By default `test-regression` and `test-pltest1` `cd` into `../working`
-before launching.  This prevents CASA log files (`casa-*.log`), pipeline
-working directories, and coverage artifacts from polluting the source tree.
+All test tasks (`test-unit`, `test-regression`, `test-pltest1`) start with
+`cd $INIT_CWD`, where `$INIT_CWD` is the directory from which `pixi run` was
+invoked.  This means CASA log files (`casa-*.log`), pipeline output
+directories, and coverage artifacts land in your working directory — not in
+the source tree.
 
 ```
-pipeline/         ← source tree (pyproject.toml here)
-working/          ← default PL_WORKDIR; created by you once
-  casa-*.log
-  pipeline_output_*/
-  htmlcov/
-  coverage.xml
+/my/workdir/            ← invoke pixi run from here
+  casa-*.log            ← CASA log output
+  uid___…_test_output/  ← pipeline working directories
+  htmlcov/              ← coverage HTML report
+  coverage.xml          ← coverage XML report
+
+pipeline/               ← source tree (pyproject.toml here); stays clean
 ```
 
-Create it once:
+Example workflow:
 
 ```bash
-mkdir -p ../working
+mkdir -p /zfs/scratch/PIPE-3061
+cd /zfs/scratch/PIPE-3061
+pixi run --manifest-path /path/to/pipeline/pyproject.toml test-pltest1
 ```
 
-Override per invocation:
-
-```bash
-PL_WORKDIR=/zfs/scratch/PIPE-3061 pixi run test-pltest1
-```
+> **Note:** pixi's task shell (`deno_task_shell`) is not bash.
+> The `$INIT_CWD` variable is set by pixi to the shell's cwd at invocation time.
+> `$PIXI_PROJECT_ROOT` always points to the directory containing `pyproject.toml`.
 
 ---
 
@@ -193,13 +203,131 @@ pixi shell -e casa671-py312 # specific environment
 
 ---
 
+## Migrating conda dependencies to pixi
+
+If you have an existing `environment.yml` (conda) and want to migrate its
+packages into `pyproject.toml`, use `pixi`'s built-in import command:
+
+```bash
+pixi init --import environment.yml
+```
+
+This creates a new standalone `pixi.toml` in the current directory with
+conda packages mapped to `[dependencies]` and pip packages mapped to
+`[pypi-dependencies]`.  To use `pyproject.toml` instead, copy the generated
+sections into `[tool.pixi.dependencies]` and `[tool.pixi.pypi-dependencies]`
+respectively.
+
+For manual migration or to inspect what pixi would generate, export a solved
+conda environment first:
+
+```bash
+# Export the currently active conda env to a YAML file
+conda env export --no-builds > environment_export.yml
+
+# Or export only explicitly installed packages (cleaner)
+conda env export --from-history > environment_export.yml
+```
+
+Then map the sections manually into `pyproject.toml`:
+
+| `environment.yml` section | `pyproject.toml` section |
+|---|---|
+| `dependencies:` (conda packages) | `[tool.pixi.dependencies]` |
+| `pip:` block under `dependencies:` | `[tool.pixi.pypi-dependencies]` |
+| `channels:` | `[tool.pixi.workspace]` → `channels = [...]` |
+| `name:` | becomes the pixi environment name under `[tool.pixi.environments]` |
+
+Example `environment.yml` fragment and its pixi equivalent:
+
+```yaml
+# environment.yml
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - openmpi>=5.0
+  - pip:
+    - casatasks>=6.6.6
+```
+
+```toml
+# pyproject.toml
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+
+[tool.pixi.dependencies]
+python = "3.12.*"
+openmpi = ">=5.0"
+
+[tool.pixi.pypi-dependencies]
+casatasks = { version = ">=6.6.6", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+```
+
+> **Tip:** Pixi version constraints use `">=x.y"` (string) rather than conda's
+> bare `>=x.y`.  Also use `"x.y.*"` instead of `=x.y` for minor-version pins.
+
+### Exporting a pixi environment to `environment.yml`
+
+To share or reproduce a pixi environment via conda, export it with:
+
+```bash
+# Export default environment (reads from pixi.lock)
+pixi project export conda-environment > environment_casa675_py312.yml
+
+# Export a specific environment
+pixi project export conda-environment -e casa671-py312 > environment_casa671_py312.yml
+
+# From outside the source tree
+pixi project export conda-environment \
+  --manifest-path /path/to/pipeline/pyproject.toml \
+  -e casa675-py312
+```
+
+> **Note:** The exported YAML contains pinned conda-managed packages from
+> `pixi.lock`.  PyPI-only dependencies (e.g. `casatasks`, `pipeline` itself)
+> appear under a `pip:` block if pixi includes them, but some may be omitted —
+> verify the output before using it as a standalone conda spec.
+
+#### Private index URLs are not exported
+
+`pixi project export conda-environment` drops the `index =` URLs from
+`[tool.pixi.pypi-dependencies]`, so packages sourced from the NRAO CASA pip
+index will be listed without their index URL.  A subsequent
+`conda env create -f ...` will fail because pip cannot find `casatasks`,
+`casashell`, etc. on PyPI.
+
+**Workaround** — insert `--extra-index-url` as the first entry under `pip:`
+after exporting:
+
+```bash
+pixi project export conda-environment -e casa674-py312 \
+  | sed 's|^- pip:$|- pip:\n  - --extra-index-url https://casa-pip.nrao.edu/repository/pypi-group/simple|' \
+  > environment_casa674_py312.yml
+```
+
+Or add it manually to the exported file:
+
+```yaml
+- pip:
+  - --extra-index-url https://casa-pip.nrao.edu/repository/pypi-group/simple
+  - casashell==6.7.4.*
+  - casatasks>=6.6.6
+  - ...
+```
+
+This is an upstream pixi limitation — there is no flag to include index URLs
+in the export.
+
+---
+
 ## Summary
 
-| Task | Command | Default cwd |
+| Task | Command | Output cwd |
 |------|---------|-------------|
-| Unit tests | `pixi run test-unit` | project root |
-| Fast regression (all) | `pixi run test-regression` | `../working` |
-| Single ALMA-IF test | `pixi run test-pltest1` | `../working` |
+| Unit tests | `pixi run test-unit` | `$INIT_CWD` (invocation dir) |
+| Fast regression (all) | `pixi run test-regression` | `$INIT_CWD` (invocation dir) |
+| Single ALMA-IF test | `pixi run test-pltest1` | `$INIT_CWD` (invocation dir) |
 | Init CASA runtime data | `pixi run fetch-casarundata` | project root |
 | Build docs (clean) | `pixi run build-docs` | `docs/` |
 | Build docs (fast) | `pixi run build-docs-fast` | `docs/` |

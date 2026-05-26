@@ -1,4 +1,4 @@
-"""Pydantic-based AntennaArray domain object prototype for Phase 5 modernization."""
+"""Pydantic-based AntennaArray domain object prototype."""
 
 from __future__ import annotations
 

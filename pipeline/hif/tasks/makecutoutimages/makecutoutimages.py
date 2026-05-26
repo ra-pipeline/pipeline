@@ -7,10 +7,13 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.imagelibrary as imagelibrary
 import pipeline.infrastructure.utils as utils
+import pipeline.infrastructure.utils.imaging as imaging_utils
 import pipeline.infrastructure.vdp as vdp
+
 from pipeline.domain import DataType
 from pipeline.infrastructure import casa_tasks, casa_tools, task_registry
 from pipeline.infrastructure.utils import get_stokes, imstat_items
+
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -128,7 +131,7 @@ class Makecutoutimages(basetask.StandardTaskTemplate):
         # PIPE-1048: hif_makecutoutimages should only process final products in the VLASS-SE-CONT mode
         if is_vlass_se_cont:
             imlist = [imlist[-1]]
-
+        pbcor_stats = {}
         # Per VLASS Tech Specs page 22
         for imageitem in imlist:
             imagename: str = imageitem['imagename']
@@ -142,6 +145,7 @@ class Makecutoutimages(basetask.StandardTaskTemplate):
                 imagenames.extend(utils.glob_ordered(f'{imagename_base}.psf*.tt0'))
                 imagenames.extend(utils.glob_ordered(f'{imagename_base}.image.residual.pbcor*.tt0'))
                 imagenames.extend(utils.glob_ordered(f'{imagename_base}.pb*.tt0'))
+                pbcor_stats[f'{imagename_base}.image.pbcor.tt0'] = {}
                 # PIPE-631/1039: make alpha/.tt1 image cutouts in the VLASS-SE-CONT mode
                 if is_vlass_se_cont:
                     imagenames.extend(utils.glob_ordered(f'{imagename}.tt1'))  # non-pbcor
@@ -152,6 +156,8 @@ class Makecutoutimages(basetask.StandardTaskTemplate):
                     imagenames.extend(utils.glob_ordered(f'{imagename_base}.image.residual.pbcor*.tt1'))
                     imagenames.extend(utils.glob_ordered(f'{imagename_base}.alpha'))
                     imagenames.extend(utils.glob_ordered(f'{imagename_base}.alpha.error'))
+                    pbcor_stats[f'{imagename_base}.image.pbcor.tt1'] = {}
+
             else:
 
                 imagenames.extend(utils.glob_ordered(imagename))  # non-pbcor
@@ -161,6 +167,7 @@ class Makecutoutimages(basetask.StandardTaskTemplate):
                 imagenames.extend(utils.glob_ordered(f'{imagename_base}.psf'))
                 imagenames.extend(utils.glob_ordered(f'{imagename_base}.image.residual.pbcor'))
                 imagenames.extend(utils.glob_ordered(f'{imagename_base}.pb'))
+                pbcor_stats[f'{imagename_base}.image.pbcor'] = {}
 
         cutout_imsize_map = {
             os.path.splitext(imageitem['imagename'])[0]: imageitem['metadata'].get('cutout_imsize')
@@ -169,7 +176,14 @@ class Makecutoutimages(basetask.StandardTaskTemplate):
 
         subimagenames = []
         subimage_size = None
+        images_to_update = []
+        stats_mapping = {
+            'rms': ('rms', ['median']),
+            'intensity_pbcor': ('peak', ['max'])
+        }
+
         for imagename in imagenames:
+
             subimagename = f'{imagename}.subim'
             if not os.path.exists(subimagename):
                 LOG.info('Make a cutout image under the image name: %s', subimagename)
@@ -178,11 +192,46 @@ class Makecutoutimages(basetask.StandardTaskTemplate):
                     LOG.info('Using cutout_imsize from imlist metadata: %s', cutout_imsize)
                 self._do_subim(imagename, cutout_imsize=cutout_imsize)
                 subimagenames.append(subimagename)
+                images_to_update.append(subimagename)
+                image_type = imaging_utils.get_vlass_image_type(imagename, append_tt=False).lower()
+                if image_type in stats_mapping:
+                    if image_type == 'rms':
+                        pbcor_key = os.path.splitext(imagename)[0]
+                    else:
+                        pbcor_key = imagename
+                    if pbcor_key in pbcor_stats:
+                        stat_key, stat_metrics = stats_mapping[image_type]
+                        stat_values = imaging_utils.get_stats(subimagename, metrics=stat_metrics, stokes='I')
+                        pbcor_stats[pbcor_key][stat_key] = stat_values.get(stat_metrics[0])
             else:
                 LOG.info('A cutout image named %s already exists, and we will reuse this image for weblog.',
                          subimagename)
                 subimagenames.append(subimagename)
             subimage_size = self._get_image_size(subimagename)
+        for subim in images_to_update:
+            image_type = imaging_utils.get_vlass_image_type(subim, append_tt=False).lower()
+            if image_type == 'rms':
+                key = subim.split('.rms')[0]
+            elif image_type == 'alpha':
+                key = subim.split('.alpha')[0]+".image.pbcor.tt0"
+            elif image_type == 'alphaerr':
+                key = subim.split('.alpha.error')[0]+".image.pbcor.tt0"
+            else:
+                key = subim.split('.subim')[0]
+            if key in pbcor_stats:
+                # PIPE-2461: updating stokes, peak and rms in the image header
+                with casa_tools.ImageReader(subim) as image:
+                    cs = image.coordsys()
+                    stokes_labels = cs.stokes()
+                    cs.done()
+                    stokes = [stokes_labels[idx] for idx in range(image.shape()[2])]
+                    stokes = ''.join(stokes)
+                    info = image.miscinfo()
+                    info['VLASSPL'] = stokes
+                    info['VLASSPK'] = pbcor_stats[key].get('peak')
+                    info['VLASSRMS'] = pbcor_stats[key].get('rms')
+                    info['VLASSITY'] = imaging_utils.get_vlass_image_type(subim)
+                    image.setmiscinfo(info)
 
         if is_vlass_se_cube:
             stats = self._do_stats(subimagenames)
@@ -326,6 +375,7 @@ class Makecutoutimages(basetask.StandardTaskTemplate):
 
                 image_miscinfo = image.miscinfo()
                 virtspw = image_miscinfo['virtspw']
+
                 if virtspw not in stats:
                     stats[virtspw] = collections.OrderedDict()
 

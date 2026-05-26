@@ -1,4 +1,4 @@
-"""Pydantic-based unit formatting helpers for Phase 5 modernization."""
+"""Pydantic-based unit formatting helpers."""
 
 from __future__ import annotations
 

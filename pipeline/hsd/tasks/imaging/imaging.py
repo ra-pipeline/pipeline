@@ -367,7 +367,7 @@ class SDImaging(basetask.StandardTaskTemplate):
         # attach sensitivity_info if available
         if sensitivity_info is not None:
             result.sensitivity_info = sensitivity_info
-        # attach theoretical RMS if available
+        # attach theoretical sensitivity if available
         if theoretical_rms is not None:
             result.theoretical_rms = theoretical_rms
 
@@ -1005,8 +1005,8 @@ class SDImaging(basetask.StandardTaskTemplate):
                 _val = _statval.get(_stat_name, [])
                 setattr(pp, f'image_{_stat_name}', _val[0] if _val else -1.0)
 
-        # Theoretical RMS
-        LOG.info('Calculating theoretical RMS of image, {}'.format(pp.imagename))
+        # Theoretical sensitivity
+        LOG.info(f'Calculating theoretical sensitivity of image, {pp.imagename}')
         pp.theoretical_rms = self.calculate_theoretical_image_rms(cp, rgp, pp)
 
     def _execute_combine_images(self, rgp: imaging_params.ReductionGroupParameters):
@@ -1052,7 +1052,7 @@ class SDImaging(basetask.StandardTaskTemplate):
            _cqa.time(rgp.ref_ms.start_time['m0'], 0, ['ymd', 'no_time'])[0] < '2015/10/01':
             LOG.warning("ALMA Cycle 2 and earlier project does not have a valid effective bandwidth. "
                         "Therefore, a nominal value of channel separation loaded from the MS "
-                        "is used as an effective bandwidth for RMS estimation.")
+                        "is used as an effective bandwidth for sensitivity estimation.")
 
     def _calculate_sensitivity(self, cp: imaging_params.CommonParameters,
                                rgp: imaging_params.ReductionGroupParameters,
@@ -1599,9 +1599,9 @@ class SDImaging(basetask.StandardTaskTemplate):
                 exclude_chan_ranges = convert_frequency_ranges_to_channels(combined_rms_exclude, cs, num_chan)
             finally:
                 cs.done()
-        LOG.info("Merged spectral line channel ranges of combined image = {}".format(str(exclude_chan_ranges)))
+        LOG.info(f"Merged spectral line channel ranges of combined image = {exclude_chan_ranges}")
         include_chan_ranges = invert_ranges(exclude_chan_ranges, num_chan, edge)
-        LOG.info("Line free channel ranges of image to calculate RMS = {}".format(str(include_chan_ranges)))
+        LOG.info(f"Line free channel ranges of image to calculate sensitivities = {include_chan_ranges}")
         return include_chan_ranges
 
     def _get_stat_region(self, pp: imaging_params.PostProcessParameters) -> str | None:
@@ -1707,7 +1707,7 @@ class SDImaging(basetask.StandardTaskTemplate):
     def calculate_theoretical_image_rms(self, cp: imaging_params.CommonParameters,
                                         rgp: imaging_params.ReductionGroupParameters,
                                         pp: imaging_params.PostProcessParameters) -> dict[str, float]:
-        """Calculate theoretical RMS of an image (PIPE-657).
+        """Calculate theoretical sensitivity of an image (PIPE-657).
 
         Args:
             cp : Common parameter object of prepare()
@@ -1718,13 +1718,13 @@ class SDImaging(basetask.StandardTaskTemplate):
               to that of infiles
 
         Returns:
-            A quantum value of theoretical image RMS.
+            A quantum value of theoretical image sensitivity.
             The value of quantity will be negative when calculation is aborted, i.e., -1.0 Jy/beam
         """
         tirp = imaging_params.TheoreticalImageRmsParameters(pp, self.inputs.context)
 
         if len(rgp.combined.infiles) == 0:
-            LOG.error('No MS given to calculate a theoretical RMS. Aborting calculation of theoretical thermal noise.')
+            LOG.error('No MS given to calculate theoretical image sensitivities. Aborting calculation.')
             return tirp.failed_rms
         assert len(rgp.combined.infiles) == len(rgp.combined.antids)
         assert len(rgp.combined.infiles) == len(rgp.combined.fieldids)
@@ -1770,7 +1770,7 @@ class SDImaging(basetask.StandardTaskTemplate):
             return tirp.failed_rms
 
         _theoretical_rms = numpy.sqrt(tirp.sq_rms) / tirp.weight_sum
-        LOG.info('Theoretical RMS of image = {} {}'.format(_theoretical_rms, pp.brightnessunit))
+        LOG.info(f'Theoretical sensitivity of image = {_theoretical_rms} {pp.brightnessunit}')
         return tirp.cqa.quantity(_theoretical_rms, pp.brightnessunit)
 
     def _obtain_t_sub_on_off(self, tirp: imaging_params.TheoreticalImageRmsParameters) -> bool:
@@ -1996,7 +1996,7 @@ class SDImaging(basetask.StandardTaskTemplate):
         SKIP = (False, True)
         GO = (False, False)
         if tirp.msobj.observing_pattern[tirp.antid][tirp.spwid][tirp.fieldid] != 'RASTER':
-            LOG.warning('Unable to calculate RMS of non-Raster map. ' + tirp.error_msg)
+            LOG.warning('Unable to calculate sensitivity of a non-Raster map. ' + tirp.error_msg)
             return HALT
         LOG.info(
             'Processing MS {}, Field {}, SpW {}, '
@@ -2009,7 +2009,7 @@ class SDImaging(basetask.StandardTaskTemplate):
                              .setdefault(tirp.msobj.origin_ms, []) \
                              .append(_rsres)
             _rsres.set_result_fail(tirp.antid, tirp.spwid, tirp.fieldid)
-            LOG.debug(f'Raster scan analysis incomplete. Skipping calculation of theoretical image RMS : EB:{tirp.msobj.execblock_id}:{tirp.msobj.antennas[tirp.antid].name}')
+            LOG.debug(f'Raster scan analysis incomplete. Skipping calculation of theoretical image sensitivity : MS:{tirp.msobj.execblock_id}:{tirp.msobj.antennas[tirp.antid].name}')
             return SKIP
         tirp.dt = cp.dt_dict[tirp.msobj.basename]
         # Note: index_list is a list of DataTable row IDs for selected data EXCLUDING rows where all pols are flagged online.
