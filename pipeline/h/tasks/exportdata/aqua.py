@@ -837,13 +837,6 @@ def xml_for_sensitivity(d, stage_name):
         Field=d['field'],
         Robust=str(d.get('robust', '')),
         UVTaper=str(d.get('uvtaper', '')),
-        # The conditional is just for PL2025 when the new names TheoreticalSensitivityJyPerBeam
-        # and ObservedSensitivityJyPerBeam were introduced late in the development cycle.
-        # Downstream systems needs to be adjusted next year to pick up the information from the
-        # new parameters. Then SensitivityJyPerBeam will be deprecated and this line removed.
-        # The "stage_name" parameter of the "xml_for_sensitivity" method can then also be
-        # removed again.
-        SensitivityJyPerBeam=theoretical_sensitivity_jy_per_beam if stage_name in ['hifa_imageprecheck'] else observed_sensitivity_jy_per_beam,
         TheoreticalSensitivityJyPerBeam=theoretical_sensitivity_jy_per_beam,
         ObservedSensitivityJyPerBeam=observed_sensitivity_jy_per_beam,
         MsSpwId=d['spw'],
