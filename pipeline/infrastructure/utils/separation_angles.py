@@ -53,7 +53,7 @@ def ms_separation_angles(
         for field_unq in field_name_unique:
             mosaic_target =  is_mosaic(msuse, field_unq)
             mosaic_dict[field_unq]=mosaic_target
-            ephemeris_target = _is_eph_obj(msuse, field_unq)
+            ephemeris_target = is_eph_obj(msuse, field_unq)
             ephemeris_dict[field_unq]=ephemeris_target
             
         # generally have only one PHASE and one CHECK
@@ -255,7 +255,7 @@ def is_mosaic(
     return is_f_mosaic
 
 
-def _is_eph_obj(msin, field_name):
+def is_eph_obj(msin, field_name):
     """ Method to check if the field object is an ephemeris or not
     as this needs a different extraction of the coordinates"""
     is_eph_obj = False
