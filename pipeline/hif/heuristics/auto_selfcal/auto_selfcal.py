@@ -6,13 +6,14 @@ see: https://github.com/jjtobin/auto_selfcal
 import fnmatch
 import glob
 import os
+import pathlib
 import shutil
 
 import numpy as np
 
 import pipeline.infrastructure as infrastructure
 from pipeline.domain.observingrun import ObservingRun
-from pipeline.infrastructure import casa_tools, filenamer, logging, utils
+from pipeline.infrastructure import casa_tools, filenamer, logging, utils, exceptions
 from pipeline.infrastructure.casa_tasks import CasaTasks
 from pipeline.infrastructure.casa_tools import imager as im
 from pipeline.infrastructure.casa_tools import msmd
@@ -260,8 +261,8 @@ class SelfcalHeuristics:
                 if spw == 'all':
                     sensitivity_scale_factor = 1.0
                 else:
-                    sensitivity_agg=self.get_sensitivity()
-                    sensitivity_scale_factor=selfcal_library['RMS_NF_curr']/sensitivity_agg
+                    sensitivity_agg, _, _ = self.get_sensitivity()
+                    sensitivity_scale_factor = selfcal_library['RMS_NF_curr'] / sensitivity_agg
                 threshold = str(4.0*sensitivity_nomod*sensitivity_scale_factor)+'Jy'
 
         if threshold != '0.0Jy':
@@ -438,7 +439,9 @@ class SelfcalHeuristics:
                     self.cts.importfits(fitsimage=image, imagename=image.replace('.fits', ''))
                     selfcal_library['usermodel'][i] = image.replace('.fits', '')
         elif isinstance(selfcal_library['usermodel'], str):
-            self.cts.importfits(fitsimage=selfcal_library['usermodel'], imagename=selfcal_library['usermodel'].replace('.fits', ''))
+            if 'fits' in selfcal_library['usermodel']:
+                self.cts.importfits(fitsimage=selfcal_library['usermodel'], imagename=selfcal_library['usermodel'].replace('.fits', ''))
+                selfcal_library['usermodel'] = selfcal_library['usermodel'].replace('.fits', '')
             nterms = 1
 
         if mask == '':
@@ -1552,17 +1555,32 @@ class SelfcalHeuristics:
 
                 # Fill in the usermask and usermodel, if supplied.
 
-                print(self.usermask)
-                print(self.usermodel)
-                if band in self.usermask:
+                if isinstance(self.usermask, dict) and band in self.usermask:
                     selfcal_library[target][band]['usermask'] = self.usermask[band]
+                elif isinstance(self.usermask, str):
+                    selfcal_library[target][band]['usermask'] = self.usermask
                 else:
                     selfcal_library[target][band]['usermask'] = ''
 
-                if band in self.usermodel:
+                if selfcal_library[target][band]['usermask'] != '':
+                    if not pathlib.Path(selfcal_library[target][band]['usermask']).is_absolute():
+                        selfcal_library[target][band]['usermask'] = "../"+selfcal_library[target][band]['usermask']
+
+                if isinstance(self.usermodel, dict) and band in self.usermodel:
                     selfcal_library[target][band]['usermodel'] = self.usermodel[band]
+                elif isinstance(self.usermodel, str) or isinstance(self.usermodel, list):
+                    selfcal_library[target][band]['usermodel'] = self.usermodel
                 else:
                     selfcal_library[target][band]['usermodel'] = ''
+
+                if selfcal_library[target][band]['usermodel'] != '':
+                    if isinstance(selfcal_library[target][band]['usermodel'], str):
+                        if not pathlib.Path(selfcal_library[target][band]['usermodel']).is_absolute():
+                            selfcal_library[target][band]['usermodel'] = "../"+selfcal_library[target][band]['usermodel']
+                    elif isinstance(selfcal_library[target][band]['usermodel'], list):
+                        for i in range(len(selfcal_library[target][band]['usermodel'])):
+                            if not pathlib.Path(selfcal_library[target][band]['usermodel'][i]).is_absolute():
+                                selfcal_library[target][band]['usermodel'][i] = "../"+selfcal_library[target][band]['usermodel'][i]
 
                 # Make sure the fields get mapped properly, in case the order in which they are observed changes from EB to EB.
 
@@ -2498,7 +2516,9 @@ class SelfcalHeuristics:
                         LOG.info("\n*************************************************************")
                         LOG.info("WARNING: Selfcal tried to start an infinite loop. Exiting.")
                         LOG.info("*************************************************************\n")
-                        sys.exit(0)
+                        raise exceptions.PipelineException(
+                            'Selfcal entered an infinite loop for target %s band %s' % (target, band)
+                            )
 
                     if delta_beamarea > delta_beam_thresh:
                         do_fallback_combinespw = False
