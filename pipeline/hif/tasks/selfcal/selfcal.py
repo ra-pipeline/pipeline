@@ -296,9 +296,18 @@ class SelfcalInputs(vdp.StandardInputs):
                 before the pre-defined exhaustive search list.
                 The value can be the file path of *\*auxproducts.tgz* file or *\*selfcal.json* file.
 
-            usermask: User mask to be used for self-calibration imaging. (not implemented)
+            usermask: User mask to be used for self-calibration imaging. Must be supplied as a dictionary with target names as keys
+                and mask file paths as values, e.g. ``usermask={'target1':'target1.mask', 'target2':'target2.mask'}`` or  as a 
+                nested dictionary with target and then band, e.g. 
+                ``usermask={'target1':{'Band_6':'target1.mask'}, 'target2':{'Band_6': 'target2.mask'}}``.
 
-            usermodel: User model to be used for self-calibration imaging. (not implemented)
+            usermodel: User model to be used for self-calibration imaging. Must be supplied as a dictionary with target names as keys 
+                and model file paths (or list of model file paths for multi-term) as values, e.g. 
+                ``usermodel={'target1':['target1.model.tt0', 'target1.model.tt1'], 'target2':['target2.model.tt0', 'target2.model.tt1']}`` 
+                or as a nested dictionary with target and then band, e.g. 
+                ``usermodel={'target1':{'Band_6':['target1.model.tt0', 'target1.model.tt1']}, 'target2':{'Band_6':['target2.model.tt0', 
+                'target2.model.tt1']}}``. Model files can be specified as a single file, e.g. ``usermodel={'target1':'target1.model.tt0'}``, 
+                or as a list if multiple Taylor terms are to be used, e.g. ``usermodel={'target1':['target1.model.tt0', 'target1.model.tt1']}``.
 
         """
         super().__init__()
