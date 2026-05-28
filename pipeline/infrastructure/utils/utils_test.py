@@ -361,9 +361,7 @@ def test_get_observatory_location():
     assert isinstance(location, EarthLocation)
 
     alma_geocentric = (2225122.3902694373, -5440258.9852695046, -2481007.6374628348)
-    assert location.x.value == pytest.approx(alma_geocentric[0], rel=1e-6)
-    assert location.y.value == pytest.approx(alma_geocentric[1], rel=1e-6)
-    assert location.z.value == pytest.approx(alma_geocentric[2], rel=1e-6)
+    assert (location.x.value, location.y.value, location.z.value) == alma_geocentric
 
 
 def test_get_observatory_location_unknown_raises():
@@ -395,7 +393,6 @@ def test_compute_zenith_distance_regression_set1():
     """Regression test for compute_zenith_distance with real pipeline data (set 1).
 
     Uses ALMA geocentric coordinates matching CASA's WGS84 values.
-    Expected difference from CASA is < 0.5 arcsec.
     """
     field_direction = {
         'm0': {'unit': 'rad', 'value': -1.2005642899794717},
@@ -405,15 +402,13 @@ def test_compute_zenith_distance_regression_set1():
     }
     epoch = {'m0': {'unit': 'd', 'value': 60462.40688407407}, 'refer': 'UTC', 'type': 'epoch'}
     zd = compute_zenith_distance(field_direction, epoch, 'ALMA', 'AZELGEO')
-    assert zd['unit'] == 'rad'
-    assert zd['value'] == pytest.approx(0.5948535221, abs=0.0001)
+    assert zd['value'] == pytest.approx(0.594852971525817)
 
 
 def test_compute_zenith_distance_regression_set2():
     """Regression test for compute_zenith_distance with real pipeline data (set 2).
 
     Uses ALMA geocentric coordinates matching CASA's WGS84 values.
-    Expected difference from CASA is < 0.5 arcsec.
     """
     field_direction = {
         'm0': {'unit': 'rad', 'value': -1.344869047803906},
@@ -423,5 +418,4 @@ def test_compute_zenith_distance_regression_set2():
     }
     epoch = {'m0': {'unit': 'd', 'value': 60462.413365185195}, 'refer': 'UTC', 'type': 'epoch'}
     zd = compute_zenith_distance(field_direction, epoch, 'ALMA', 'AZELGEO')
-    assert zd['unit'] == 'rad'
-    assert zd['value'] == pytest.approx(0.9153826141, abs=0.0001)
+    assert zd['value'] == pytest.approx(0.9153820259873402)

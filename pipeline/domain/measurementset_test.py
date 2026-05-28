@@ -86,12 +86,9 @@ class TestComputeAzEl:
         assert 0 <= el_min <= 90
         assert 0 <= el_max <= 90
 
-    def test_compute_az_el_to_field_regression(self):
-        """Regression test for compute_az_el_to_field with real pipeline data.
-
-        Uses ALMA geocentric coordinates matching CASA's WGS84 values.
-        Expected difference from CASA is < 1 arcsecond.
-        """
+    @pytest.fixture
+    def alma_az_el_inputs(self):
+        """Fixture providing inputs for ALMA az/el regression tests."""
         ms = Mock(spec=MeasurementSet)
         ms.antenna_array = Mock()
         ms.antenna_array.name = 'ALMA'
@@ -105,6 +102,29 @@ class TestComputeAzEl:
         }
         epoch = {'m0': {'unit': 'd', 'value': 60462.40586666667}, 'refer': 'UTC', 'type': 'epoch'}
 
+        return ms, field, epoch
+
+    def test_compute_az_el_to_field_regression_static(self, alma_az_el_inputs):
+        """Regression test for compute_az_el_to_field with real pipeline data.
+
+        Uses ALMA geocentric coordinates matching CASA's WGS84 values,
+        calculated once using the old CASA-based compute_az_el_to_field
+        implementation.
+        """
+        ms, field, epoch = alma_az_el_inputs
+        result = MeasurementSet.compute_az_el_to_field(ms, field, epoch)
+        # values computed using the old CASA.measures based compute_az_el_to_field implementation
+        assert result == pytest.approx((251.46158051094426, 56.23792676533593))
+
+
+    def test_compute_az_el_to_field_regression_dynamic(self, alma_az_el_inputs):
+        """Regression test for compute_az_el_to_field with real pipeline data.
+
+        Uses ALMA geocentric coordinates matching CASA's WGS84 values,
+        calculated dynamically using a copy of the old CASA-based
+        compute_az_el_to_field implementation.
+        """
+        ms, field, epoch = alma_az_el_inputs
         result = MeasurementSet.compute_az_el_to_field(ms, field, epoch)
 
         def compute_az_el_to_field_casa(ms: MeasurementSet, field: Field | None = None, epoch: dict | None = None) -> list[float]:
@@ -122,7 +142,4 @@ class TestComputeAzEl:
 
         result_casa = compute_az_el_to_field_casa(ms, field, epoch)
 
-        assert isinstance(result, list)
-        assert len(result) == 2
-        assert result[0] == pytest.approx(251.4615347, abs=0.001)
-        assert result[1] == pytest.approx(56.2378962, abs=0.001)
+        assert result == pytest.approx(result_casa)

@@ -1182,7 +1182,7 @@ def compute_zenith_distance(
         ) -> QuantityDict:
     """Calculate zenith distance for a field at a given time and observatory.
 
-    This function uses CASA measures to calculate the zenith distance, similar to
+    This function uses astropy to calculate the zenith distance, similar to
     how compute_az_el_to_field works in htmlrenderer.py.
 
     Args:
