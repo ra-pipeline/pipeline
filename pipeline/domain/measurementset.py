@@ -1668,7 +1668,7 @@ class MeasurementSet:
     def compute_az_el_to_field(self, field: Field | None = None, epoch: dict | None = None) -> list[float] | None:
         """Computes azimuth and elevation of a field at a given epoch.
 
-        This method uses the CASA `measures` tool to convert the direction
+        This method uses the astropy library to convert the direction
         of a field to azimuth and elevation (AZELGEO frame) at the time
         specified by the epoch and location of the observatory.
 
