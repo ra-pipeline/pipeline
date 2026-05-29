@@ -5,9 +5,8 @@ import copy
 import itertools
 from typing import TYPE_CHECKING
 
-
 from matplotlib.lines import Line2D
-from matplotlib.patches import Circle
+from matplotlib.patches import Polygon
 from matplotlib.ticker import FuncFormatter
 import matplotlib.pyplot as plt
 import numpy as np
@@ -28,7 +27,6 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
     from numpy import floating
     from pipeline.domain import Field, MeasurementSet, Source 
-
     
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -41,11 +39,8 @@ def plot_separations(
     and the PHASE and CHECK calibrators with the 
     field types coloured by intent.
     """
-
     fields = get_field_object(ms)
-
-    ref_ra, ref_dec, delta_ra, delta_dec = get_position_offsets(fields)
-   
+    ref_ra, ref_dec, delta_ra, delta_dec = get_position_offsets(fields) 
     fig, ax, fontsize, dpi= create_figure(delta_ra, delta_dec)
 
     # add fields on the plot axes
@@ -56,8 +51,7 @@ def plot_separations(
 
     # Set tight layout and adjust title
     plt.tight_layout()
-
-    
+  
     # make sure title text fits into the picture, if not, then reduce the font size
     xmax = title_text.get_window_extent(fig.canvas.get_renderer()).xmax
     figwidth = fig.canvas.get_width_height()[0]
@@ -67,7 +61,6 @@ def plot_separations(
     fig.savefig(figfile, dpi=dpi)
     plt.close(fig)
     
-
 def get_arc_formatter(
         precision):  
     """
@@ -80,10 +73,8 @@ def get_arc_formatter(
     f.addUnitOfMagnitude(1., s + r'$\degree$')
     return f
 
-
 # Used to label x and y plot axes
 AXES_FORMATTER = get_arc_formatter(1)
-
 
 def label_format(x, _):
     """
@@ -105,7 +96,6 @@ def get_sym_colour_orig(
     else:
         return 'k'
 
-
 def get_sym_colour(
         fieldintent: set # object 
 ) -> str:
@@ -125,8 +115,6 @@ def get_sym_colour(
     else:
         # assumed a target
         return 'k'
-
-
 
 def get_field_object(
         ms
@@ -159,10 +147,10 @@ def get_field_object(
             target_fld_final.extend([fld for fld in ms.get_fields(intent='TARGET', name=fld_unq_name)]) # list of list
 
     # now the field objects
-    fields = list(itertools.chain.from_iterable([phase_fld, check_fld, target_fld_final])) # flatten all the lists to a single list, with PHASE(s) first
+    fields = list(itertools.chain.from_iterable([phase_fld, check_fld, target_fld_final]))
+    # flatten all the lists to a single list, with PHASE(s) first
 
     return fields   
-
 
 def get_position_offsets(
         fields: list
@@ -192,7 +180,6 @@ def get_position_offsets(
 
     return ref_ra, ref_dec, delta_ra, delta_dec
 
-
 def create_figure(
         delta_ra: NDArray[floating],
         delta_dec: NDArray[floating],
@@ -218,9 +205,8 @@ def create_figure(
     """
 
     # some heuristics to determine the appropriate x- and y-range for plotting, adjusting the figure size as needed
-    radians_to_deg = 180 / np.pi  # can use np.degrees below?     
-    ra_range_deg  = (max(delta_ra)  - min(delta_ra))  * radians_to_deg
-    dec_range_deg = (max(delta_dec) - min(delta_dec)) * radians_to_deg
+    ra_range_deg  = np.degrees((max(delta_ra)  - min(delta_ra)))
+    dec_range_deg = np.degrees((max(delta_dec) - min(delta_dec)))
 
     # testing indicates these are ok, previous (local) version calculated parameters but it made a mess
     pixels_per_beam = 60.
@@ -237,10 +223,7 @@ def create_figure(
     fig = plt.figure(figsize=((pixels_x + margin_x) / dpi, (pixels_y + margin_y) / dpi))
     ax = fig.add_subplot(1, 1, 1)
 
-
     return fig, ax, fontsize, dpi
-
-
 
 def configure_labels(
         ax: Axes,
@@ -268,9 +251,7 @@ def configure_labels(
 
     Returns:
         title text: The matplotlib format text of the title.
-    """
-
-    # Title        
+    """        
     title_string = f'{vis}\n Separation from PHASE - {field_name}(#{field_id})  '
     title_font_size = 12
     title_text = ax.set_title(title_string, size=title_font_size)
@@ -300,11 +281,9 @@ def configure_labels(
     ax.yaxis.grid(True, which='major')
     ax.invert_xaxis()
 
-    ax.margins(0.15) # default is 5% update to 15% buffers symbol size and text annotation
+    ax.margins(0.15) # 15% buffers symbol size and text annotation
  
     return title_text
-
-
 
 def add_to_plot(
         ax: Axes,
@@ -329,20 +308,22 @@ def add_to_plot(
     legend_labels = {}
     legend_colours = {}
 
-
     legend_labels['PHASE']=Line2D(list(range(1)), list(range(1)), color='r', linewidth=2,linestyle='solid')
     legend_colours['PHASE']= get_sym_colour({'PHASE'})
 
     legend_labels['TARGET']=Line2D(list(range(1)), list(range(1)), color='k', linewidth=2,linestyle='solid')
     legend_colours['TARGET']= get_sym_colour({'TARGET'})
-    
+
     for field, rel_ra, rel_dec in zip(fields, delta_ra, delta_dec):
         x = np.degrees(rel_ra)
         y = np.degrees(rel_dec)
         colour = get_sym_colour(field.intents)
-        ax.plot(x, y, marker = '+', linestyle='None', color = colour, markersize=30, markeredgewidth=6, zorder = 2) 
-        ax.text(x-0.2, y+0.2, '{}'.format(field.id), ha='center', va='center', fontsize=fontsize, color=colour) # offset in degrees
-
+        xyver = make_plus_patch(x,y,1.0)
+        plus = Polygon(xyver, facecolor='none', edgecolor=colour,
+                     linestyle='solid', alpha=0.6, linewidth=2, zorder=2)
+        ax.add_patch(plus)
+        ax.text(x, y, '{}'.format(field.id), ha='center', va='center', fontsize=fontsize, color=colour) 
+        
         # check the keys for CHECK if a CHECK intent is to be plotted
         if 'CHECK' in field.intents and 'CHECK' not in legend_colours.keys():
             legend_labels['CHECK']=Line2D(list(range(1)), list(range(1)), color='b', linewidth=2,linestyle='solid')
@@ -350,3 +331,43 @@ def add_to_plot(
 
     return legend_labels, legend_colours
 
+def make_plus_patch(
+        xpos: float,
+        ypos: float,
+        len_sym: float
+        ) -> List : # (of lists?)
+    """Produce a plus symbol outline to act as the plot symbol
+    for the separation angle plots between INTENTS. Plus
+    symbol is assumed to be symetric 
+
+    Args:
+        xpos: x-axes central position as a float
+        ypos: y-axes central position as a float
+        len_sym: total length of the symbol in plot axis units
+
+    Returns:
+        xyvertex: verties of the plus symbol   
+    """
+
+    # 12 vertex points
+    # main distances are 0.5 * len_sym
+    # and 1/6 * len_sym
+
+    # moving top right most vertex and around
+    sm_ver = 0.167 * len_sym
+    lg_ver = 0.5 * len_sym
+    xyvertex = [[xpos+sm_ver,ypos+lg_ver],
+              [xpos+sm_ver,ypos+sm_ver],
+              [xpos+lg_ver,ypos+sm_ver],
+              [xpos+lg_ver,ypos-sm_ver],
+              [xpos+sm_ver,ypos-sm_ver],
+              [xpos+sm_ver,ypos-lg_ver],
+              [xpos-sm_ver,ypos-lg_ver],
+              [xpos-sm_ver,ypos-sm_ver],
+              [xpos-lg_ver,ypos-sm_ver],
+              [xpos-lg_ver,ypos+sm_ver],
+              [xpos-sm_ver,ypos+sm_ver],
+              [xpos-sm_ver,ypos+lg_ver]]
+    
+    return xyvertex
+        

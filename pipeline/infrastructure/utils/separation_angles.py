@@ -38,7 +38,7 @@ def ms_separation_angles(
     
     for msuse in mses:
 
-        phase_target_check_pairing = _local_derive_phase_to_target_check_mapping(msuse) 
+        phase_target_check_pairing = local_derive_phase_to_target_check_mapping(msuse) 
         # returns a dict that is formatted as {PHASENAME: {TARGETNAME, TARGET2NAME, CHECKNAME}}, ie. names are a set
 
         
@@ -325,12 +325,11 @@ def get_median_separation(msin, fieldname, phasedir, eph_field):
     return med_sepangle
 
 
-## this code is part of the spwphaseup task CLASS and is a static method
-## if I try to import that function, Pipeline will not import
-## I have replicated here - should I however try to swap this
-## code to a heursitic or util code - we don't want it repeated
+## PIPE-65 required the moving of this code from a
+## static function associated only with spwphaseup
+## to a common function 
 
-def _local_derive_phase_to_target_check_mapping(ms: MeasurementSet) -> Dict[str, Set]:
+def derive_phase_to_target_check_mapping(ms: MeasurementSet) -> Dict[str, Set]:
     """
     Derive mapping between PHASE calibrator fields (by name) and
     corresponding fields (by name) with TARGET / CHECK intent that these

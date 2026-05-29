@@ -363,7 +363,8 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             self._unregister_spwphaseup()
 
         # Derive the mapping from phase fields to target/check fields.
-        phasecal_mapping = self._derive_phase_to_target_check_mapping(inputs.ms)
+        LOG.info(" Check using new utils here")
+        phasecal_mapping = utils.separation_angles.derive_phase_to_target_check_mapping(inputs.ms)
 
         # Derive the optimal spectral window maps.
         spwmaps = self._derive_spwmaps(spwmap_intents, exclude_intents)
@@ -407,73 +408,6 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
         result.phaseup_result.error.update(missing)
 
         return result
-
-    @staticmethod
-    def _derive_phase_to_target_check_mapping(ms: MeasurementSet) -> dict[str, set]:
-        """
-        Derive mapping between PHASE calibrator fields (by name) and
-        corresponding fields (by name) with TARGET / CHECK intent that these
-        PHASE calibrators should calibrate.
-
-        PIPE-1154: This heuristic is intended for ALMA observing, and assumes
-        that the first scan of a TARGET / CHECK field is always preceded by a
-        scan of the corresponding PHASE calibrator. This method further assumes
-        that scan IDs increase sequentially with observing time.
-
-        Args:
-            ms: MeasurementSet to derive mapping for.
-
-        Returns:
-            Dictionary of PHASE field names (key) and set of names of
-            corresponding TARGET/CHECK fields (value).
-        """
-        # Get the PHASE field names.
-        phase_fields = [f.name for f in ms.get_fields(intent='PHASE')]
-
-        # Initialize the mapping for each PHASE calibrator field.
-        mapping = {f: set() for f in phase_fields}
-
-        # Get IDs of PHASE intent scans.
-        phase_scan_ids = [s.id for s in ms.get_scans(scan_intent='PHASE')]
-
-        for intent in ['CHECK', 'TARGET']:
-            # Get field names for current intent.
-            fields = [f.name for f in ms.get_fields(intent=intent)]
-
-            for field in fields:
-                # Get ID of first scan for current field with current intent.
-                first_scan_id = ms.get_scans(field=field, scan_intent=intent)[0].id
-
-                # PIPE-1154: in standard ALMA observing, each first scan of a
-                # field with TARGET or CHECK intent should be preceded by a
-                # scan of its corresponding PHASE calibrator.
-                # Identify PHASE intent scans that preceded the first scan.
-                preceding_phase_scan_ids = [i for i in phase_scan_ids if i < first_scan_id]
-                if preceding_phase_scan_ids:
-                    # Pick nearest in time PHASE intent scan as the match, and
-                    # identify name of corresponding field.
-                    matching_phase_scan_id = max(preceding_phase_scan_ids)
-                else:
-                    # Identify PHASE intent scans that followed the first scan.
-                    following_phase_scan_ids = [i for i in phase_scan_ids if i > first_scan_id]
-                    if following_phase_scan_ids:
-                        # As a fall-back, pick nearest in time PHASE intent
-                        # scan after first field scan, but raise warning.
-                        matching_phase_scan_id = min(following_phase_scan_ids)
-                        LOG.warning(f"{ms.basename}: no PHASE scans found prior to the first scan for field {field}"
-                                    f" ({intent}), will match nearest PHASE scan that was taken after.")
-                    else:
-                        matching_phase_scan_id = None
-                        LOG.warning(f"{ms.basename}: no PHASE scans found prior or after first scan for field {field}"
-                                    f" ({intent}).")
-
-                # If a matching PHASE scan was found, then update mapping to
-                # link the corresponding PHASE field to current field.
-                if matching_phase_scan_id:
-                    matching_phase_field = [f.name for f in ms.get_scans(scan_id=matching_phase_scan_id)[0].fields][0]
-                    mapping[matching_phase_field].add(field)
-
-        return mapping
 
     def _derive_spwmaps(self, spwmap_intents: str, exclude_intents: str) -> dict[IntentField, SpwMapping]:
         """
