@@ -384,7 +384,7 @@ class DetectMissedLines:
             bbox = Bbox( [[size[0] / 2, 0], [size[0], size[1]]] )
 
         # save figure to file
-        LOG.info( "Saving diagnostic plot for missed-lines to {}".format(plot_outfile) )
+        LOG.info( "Saving diagnostic plot for off-line-range emissions to {}".format(plot_outfile) )
         fig.savefig( plot_outfile, bbox_inches=bbox )
 
     def _plot( self,

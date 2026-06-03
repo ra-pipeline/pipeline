@@ -131,6 +131,7 @@ def log_qa(method):
     WARNING for any other level. These messages are meant for pipeline runs
     without a weblog output.
     """
+    @functools.wraps(method)
     def f(self, *args, **kw):
         # get the size of the CASA log before task execution
         qascore = method(self, *args, **kw)
@@ -2998,6 +2999,10 @@ def examine_sd_wide_lines(line_ranges: list[tuple[int, int]], nchan: int, edge: 
     end = nchan - edge[1]
     effective_nchan = nchan - sum(edge)
     line_coverage = np.sum(mask[start:end])
+    LOG.debug(
+        "line coverage %s, threshold %.1f, (effective nchan %s, fraction %s), edge (%s, %s)",
+        line_coverage, effective_nchan * fraction, effective_nchan, fraction, edge[0], edge[1]
+    )
 
     return line_coverage > effective_nchan * fraction
 
@@ -3063,8 +3068,12 @@ def channel_ranges_for_image(edge: tuple[int, int], nchan: int, sideband: int, r
     return sorted(tuple(x) for x in _ranges_image)
 
 
+
 @log_qa
-def score_sd_line_detection(reduction_group: dict, result: 'SDBaselineResults') -> list[pqa.QAScore]:
+def score_sd_line_detection(
+    reduction_group: dict,
+    result: SDBaselineResults
+) -> list[pqa.QAScore]:
     """Compute QA score based on detected lines and deviation/ATM mask overlaps.
 
     QA scores are evaluated based on the line detection result for
@@ -3186,7 +3195,7 @@ def score_sd_line_detection(reduction_group: dict, result: 'SDBaselineResults') 
 
     # edge parameter for image channel mapping
     _edge = result.outcome['edge']
-    edge = (_edge, _edge) if isinstance(_edge, int) else tuple(_edge[:2])
+    edge_param = (_edge, _edge) if isinstance(_edge, int) else tuple(_edge[:2])
 
     # Process each baseline for line detection and DM
     for bl in result.outcome['baselined']:
@@ -3198,9 +3207,21 @@ def score_sd_line_detection(reduction_group: dict, result: 'SDBaselineResults') 
         # sideband is 1 for USB, -1 for LSB
         sideband = int(spw.sideband)
         nchan = reduction_group_desc.nchan
-        lines = get_line_ranges(bl['lines'])
+        # PIPE-2959/PIPE-2964 use channelmap_range for QA evaluation
+        lines = get_line_ranges(bl['channelmap_range'])
 
         LOG.debug('Processing reduction group %s, field %s, spw %s', reduction_group_id, field_name, spw.id)
+
+        # edge channels
+        flagged_edges = bl['flagged_edges']
+
+        # take max of edge channels from user inputs and
+        # edge channels flagged by preceding stages
+        LOG.info(f"spw: {spw.id}, edge_flagged: {flagged_edges}")
+        edge = (
+            max(flagged_edges[0], edge_param[0]),
+            max(flagged_edges[1], edge_param[1])
+        )
 
         # spectral-line scoring
         if len(lines) > 0:
@@ -3332,8 +3353,14 @@ def score_sd_baseline_quality(vis: str, source: str, ant: str, vspw: str,
     origin = pqa.QAOrigin(metric_name='score_sd_baseline_quality',
                           metric_score=len(stat),
                           metric_units='Statistics of binned spectra')
+    selection = pqa.TargetDataSelection(vis={vis},
+                                        field={source},
+                                        spw={vspw},
+                                        ant={ant},
+                                        pol={pol},
+                                        intent={'TARGET'})
 
-    return pqa.QAScore(final_score, longmsg=longmsg, shortmsg=shortmsg, origin=origin)
+    return pqa.QAScore(final_score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=selection)
 
 
 @log_qa
@@ -4706,7 +4733,7 @@ def score_mom8_fc_image(
     mom8_fc_score_max = 1.00
     mom8_fc_metric_scale = 100.0
     if mom8_fc_frac_max_segment != 0.0:
-        mom8_fc_score = (mom8_fc_score_min + 0.5 * (mom8_fc_score_max - mom8_fc_score_min) * 
+        mom8_fc_score = (mom8_fc_score_min + 0.5 * (mom8_fc_score_max - mom8_fc_score_min) *
                          (1.0 + special.erf(-np.log10(mom8_fc_metric_scale * mom8_fc_frac_max_segment))))
     else:
         mom8_fc_score = mom8_fc_score_max
@@ -4716,10 +4743,10 @@ def score_mom8_fc_image(
         field = info.get('field')
         spw = info.get('virtspw')
 
-    if (mom8_fc_peak_snr > mom8_fc_outlier_threshold1 and 
+    if (mom8_fc_peak_snr > mom8_fc_outlier_threshold1 and
         mom8_10_fc_histogram_asymmetry > mom8_fc_histogram_asymmetry_threshold1) or \
-       (mom8_fc_peak_snr > mom8_fc_outlier_threshold2 and 
-        mom8_10_fc_histogram_asymmetry > mom8_fc_histogram_asymmetry_threshold2 and 
+       (mom8_fc_peak_snr > mom8_fc_outlier_threshold2 and
+        mom8_10_fc_histogram_asymmetry > mom8_fc_histogram_asymmetry_threshold2 and
         mom8_fc_max_segment_beams > mom8_fc_max_segment_beams_threshold):
         mom8_fc_final_score = min(mom8_fc_score, 0.65)
     else:
