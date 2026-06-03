@@ -2005,8 +2005,54 @@ def get_ms_attr_for_result(context, vis, accessor):
     ms = context.observing_run.get_ms(ms_basename)
     return accessor(ms)
 
+## FIXME HIER
+from line_profiler import profile
+from itertools import chain
 
-def compute_zd_telmjd_for_ms(
+@profile
+def compute_zd_telmjd_for_ms(ms: MeasurementSet) -> dict[int, dict[str, list[float] | list[datetime.datetime]]]:
+    """
+    Retrieve zenith angles (degrees) and times for TARGET fields at all timestamps.
+    Args:
+        ms: The MeasurementSet object.
+
+    Returns:
+        Dictionary keyed by field ID with lists of zenith angles (degrees) and
+        corresponding UTC datetimes. Times are derived from field.time seconds
+        offset from `mjd_epoch` (1858-11-17).
+        Format: {field_id: {'zd': [zd1, zd2, ...], 'telmjd': [dt1, dt2, ...]}}
+    """
+
+    data = {}
+    fields = ms.get_fields(intent='TARGET')
+    observatory = ms.antenna_array.name
+    mjd_epoch = datetime.datetime(1858, 11, 17, tzinfo=datetime.timezone.utc)
+    field_id_set = set([field.id for field in fields])
+
+    data = {}
+    for id in field_id_set:
+        data[field.id] = {'zd': [], 'telmjd': [] }
+    #
+    for field in fields:
+        obs_times = [ mjd_epoch + datetime.timedelta(seconds=float(t))
+                      for t in field.time
+                     ]
+        zds = [
+            casa_tools.quanta.convert(
+                utils.compute_zenith_distance(
+                    field_direction=field._mdirection,
+                    epoch=casa_tools.measures.epoch("utc", obs_time.isoformat()),
+                    observatory=observatory),
+                "deg")["value"]
+            for obs_time in obs_times
+        ]
+
+        data[field.id]['zd']     = list(chain(data[field.id]['zd'], zds))
+        data[field.id]['telmjd'] = list(chain(data[field.id]['telmjd'], obs_times))
+
+    return data
+
+def compute_zd_telmjd_for_ms_orig(
         ms: MeasurementSet,
         ) -> dict[int, dict[str, list[float] | list[datetime.datetime]]]:
     """
@@ -2051,7 +2097,7 @@ def compute_zd_telmjd_for_ms(
             data[field.id]['telmjd'].append(obs_time)
 
     return data
-
+## END FIXME HIER
 
 def cmp(a, b):
     return (a > b) - (a < b)
