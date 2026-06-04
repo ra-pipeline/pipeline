@@ -314,6 +314,7 @@ def add_to_plot(
     legend_labels['TARGET']=Line2D(list(range(1)), list(range(1)), color='k', linewidth=2,linestyle='solid')
     legend_colours['TARGET']= get_sym_colour({'TARGET'})
 
+    label_list = [[],[],[]]
     for field, rel_ra, rel_dec in zip(fields, delta_ra, delta_dec):
         x = np.degrees(rel_ra)
         y = np.degrees(rel_dec)
@@ -322,12 +323,34 @@ def add_to_plot(
         plus = Polygon(xyver, facecolor='none', edgecolor=colour,
                      linestyle='solid', alpha=0.6, linewidth=2, zorder=2)
         ax.add_patch(plus)
-        ax.text(x, y, '{}'.format(field.id), ha='center', va='center', fontsize=fontsize, color=colour) 
-        
-        # check the keys for CHECK if a CHECK intent is to be plotted
+
+        # Always label the PHASE(s) and CHECK(s) directly
+        if 'PHASE' in field.intents or 'CHECK' in field.intents:
+            ax.text(x, y, '{}'.format(field.id), ha='center', va='center', fontsize=fontsize, color=colour)             
+            
+        # Check the keys for CHECK if a CHECK intent is to be plotted
         if 'CHECK' in field.intents and 'CHECK' not in legend_colours.keys():
             legend_labels['CHECK']=Line2D(list(range(1)), list(range(1)), color='b', linewidth=2,linestyle='solid')
-            legend_colours['CHECK']= get_sym_colour({'CHECK'})      
+            legend_colours['CHECK']= get_sym_colour({'CHECK'})
+
+        # Build label list for TARGET intents to consolidate
+        if 'TARGET' in field.intents:
+             label_list[0].append(field.id)
+             label_list[1].append(x)
+             label_list[2].append(y)
+
+    # Loop over the targets listed for possible consolidation of the field ID annotations         
+    colour = get_sym_colour({'TARGET'})     
+    # if there is only one label then plot it, else consolidate
+    if len(label_list[0]) == 1:
+        label_plot = zip(label_list[0],label_list[1],label_list[2], ['center']) # 4th value is for the horizontal aligment 
+    else:   
+        # Consolidate the target labels 
+        label_plot = consolidate_labels(label_list)
+        colour = get_sym_colour({'TARGET'})
+    # Plot the text     
+    for lab_fields, lab_ra, lab_dec, lab_loc in label_plot:
+            ax.text(lab_ra, lab_dec, '{}'.format(lab_fields), ha=lab_loc, va='center', fontsize=fontsize, color=colour)  
 
     return legend_labels, legend_colours
 
@@ -371,3 +394,70 @@ def make_plus_patch(
     
     return xyvertex
         
+def consolidate_labels(
+        field_ra_dec: List, ##Tuple,
+        overlap: float = 0.6
+        ) -> Tuple:
+    """ Function to take the zip of the field object, ra and dec 
+    delta positions of the fields that are plotted and consolidate 
+    the lables as the field.id if they are overlapping too much.
+
+    Args:
+        field_ra_dec the list of lists of field, delta_ra, delta_dec.
+        overlap: value in degrees below which a label overlap is considered.
+    
+    Return:
+        zip tuple of the field ids, plot ra postion, and plot dec position for 
+        the lables, and the label locator w.r.t. the plot position.
+    """
+
+    field_ids=[]
+    lab_ra=[]
+    lab_dec=[]
+    lab_loc=[]
+
+    # have to better search all positions with others, then
+    # assign a mask ?
+    # iterative loop and remove?
+    
+    # get a mask if the positions are individual or not
+    diff_mask = ((np.abs(np.diff(field_ra_dec[1]))>overlap) | (np.abs(np.diff(field_ra_dec[2]))>overlap))
+    # because this is a diff, we need to prepend a first mask same as the first boolean
+    # if the first element in diff_mask is True, this means the first and second positons are far and should
+    # be separate groups, given the later cumsum, this means set to true. Otherwise, if
+    # the first element is False, they do overlap and thus prepends a False to be part of same group
+    diff_mask = np.concatenate(([diff_mask[0]],diff_mask))
+    # now find the unqiue groups with np.cumsum, increments with True
+    groups = np.cumsum(diff_mask)
+    LOG.info(diff_mask)
+    LOG.info(groups)
+    # loop the unique groups and assess if we need a common label and average location
+    # limit is same number of groups as targets themselves
+    for group_ids in np.unique(groups):
+        # mask for coords we want
+        mask_cords = (groups == group_ids)
+        # if we have more than one element we need to assess the consolidation
+        if np.sum(mask_cords)>1:
+            LOG.info('Testing only - more than one coord overlap plot')
+            LOG.info(np.array(field_ra_dec[0])[mask_cords])
+            # symbol to right (more negative)
+            lab_ra.append(np.min(np.array(field_ra_dec[1])[mask_cords]) - 0.55) # based on symbol size
+            lab_dec.append(np.mean(np.array(field_ra_dec[2])[mask_cords]))
+            lab_loc.append('left') # want label to be written from right hand side (note units axis flips) otherwise long strings overruns the plus patch
+            # manipulate the string
+            field_str = ','.join([str(s_use) for s_use in np.unique(np.array(field_ra_dec[0])[mask_cords])])
+            # finally check if the string is a mosaic add an 's'
+            if field_str == 'mosaic':
+                field_ids.append('mosaics')
+            else:
+                field_ids.append(field_str)
+            
+        else:
+            LOG.info('No overlap for this coord')
+            field_ids.append(str(np.array(field_ra_dec[0])[mask_cords][0]))
+            lab_ra.append(float(np.array(field_ra_dec[1])[mask_cords][0])) # np float
+            lab_dec.append(float(np.array(field_ra_dec[2])[mask_cords][0])) # np float
+            lab_loc.append('center')
+
+
+    return zip(field_ids, lab_ra, lab_dec, lab_loc)

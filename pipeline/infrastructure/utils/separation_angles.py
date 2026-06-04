@@ -38,10 +38,8 @@ def ms_separation_angles(
     
     for msuse in mses:
 
-        phase_target_check_pairing = local_derive_phase_to_target_check_mapping(msuse) 
+        phase_target_check_pairing = derive_phase_to_target_check_mapping(msuse) 
         # returns a dict that is formatted as {PHASENAME: {TARGETNAME, TARGET2NAME, CHECKNAME}}, ie. names are a set
-
-        
         field_dict = {}  # dict per ms
         mosaic_dict = {}
         ephemeris_dict = {}
