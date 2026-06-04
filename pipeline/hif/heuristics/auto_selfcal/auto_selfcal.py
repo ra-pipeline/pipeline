@@ -2197,7 +2197,7 @@ class SelfcalHeuristics:
                                         # threshold=str(slib['nsigma'][iteration]* slib['RMS_NF_curr'])+'Jy',
                                         threshold=str(slib[vislist[0]][solint]['clean_threshold'])+'Jy',
                                         savemodel='none', parallel=self.parallel,
-                                        field=target,
+                                        field=self.field,
                                         nfrms_multiplier=slib[vislist[0]][solint]['nfrms_multiplier'], resume=resume)
 
                     # Check that a mask was actually created, because if not the model will be empty and gaincal will do bad things and the
@@ -2226,7 +2226,7 @@ class SelfcalHeuristics:
                                             # threshold=str(slib['nsigma'][iteration]* slib['RMS_NF_curr'])+'Jy',
                                             threshold=str(slib[vislist[0]][solint]['clean_threshold'])+'Jy',
                                             savemodel='modelcolumn', parallel=self.parallel,
-                                            field=target,
+                                            field=self.field,
                                             nfrms_multiplier=slib[vislist[0]][solint]['nfrms_multiplier'],
                                             savemodel_only=True)
 
