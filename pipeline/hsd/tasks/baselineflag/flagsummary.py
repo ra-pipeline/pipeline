@@ -1,15 +1,15 @@
 """Class SDBLFlagSummary."""
+from __future__ import annotations
+
+import collections
 import copy
 import os
 import time
-import collections
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from typing import Dict, List, Tuple
-
-from pipeline.infrastructure import Context
-from pipeline.domain import DataTable, MeasurementSet
+from pipeline.domain import DataTable
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.utils as utils
 
@@ -19,18 +19,22 @@ from .worker import _get_permanent_flag_summary, _get_iteration
 from .. import common
 from ..common import utils as sdutils
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
+
+if TYPE_CHECKING:
+    from pipeline.infrastructure.launcher import Context
+    from pipeline.domain import MeasurementSet
 
 
-class SDBLFlagSummary(object):
+class SDBLFlagSummary:
     """
     A class of single dish flagging task.
 
     This class defines per spwid flagging operation.
     """
 
-    def __init__( self, context:Context, ms:MeasurementSet, antid_list:List[int], fieldid_list:List[int],
-                  spwid_list:List[int], pols_list:List[str], thresholds:List[Dict], flagRule:Dict ):
+    def __init__(self, context: Context, ms: MeasurementSet, antid_list: list[int], fieldid_list: list[int],
+                 spwid_list: list[int], pols_list: list[str], thresholds: list[dict], flagRule: dict):
         """
         Construct SDBLFlagSummary instance.
 
@@ -58,7 +62,7 @@ class SDBLFlagSummary(object):
         self.flagRule = flagRule
         self.bunit = sdutils.get_brightness_unit(self.ms.name, defaultunit='Jy/beam')
 
-    def execute(self) -> Tuple[List[Dict],List]:
+    def execute(self) -> tuple[list[dict], list]:
         """
         Summarizes flagging results.
 
@@ -193,7 +197,13 @@ class SDBLFlagSummary(object):
 
         return flagSummary, plot_list
 
-    def pack_flags( self, datatable:DataTable, polid:int, ids, FlagRule_local:Dict ) -> Tuple[ List[int], Dict, List[int], Dict ]:
+    def pack_flags(
+            self,
+            datatable: DataTable,
+            polid: int,
+            ids: list[int],
+            FlagRule_local: dict,
+            ) -> tuple[list[int], dict, list[int], dict]:
         """
         Pack flag data into data sets.
 
@@ -306,7 +316,7 @@ class SDBLFlagSummary(object):
         return FlaggedRows, FlaggedRowsCategory, PermanentFlag, NPp_dict
 
 
-    def show_flags( self, nrow:int, is_baselined:bool, FlaggedRows:List[int], FlaggedRowsCategory:Dict ):
+    def show_flags(self, nrow:int, is_baselined:bool, FlaggedRows: list[int], FlaggedRowsCategory: dict) -> None:
         """
         Output flag statistics to LOG.
 
@@ -365,7 +375,7 @@ class SDBLFlagSummary(object):
             LOG.debug('Final Flagged rows by all active categories =%s ' % FlaggedRows)
 
 
-    def create_summary_data( self, FlaggedRows:List[int], FlaggedRowsCategory:Dict ) -> Dict:
+    def create_summary_data(self, FlaggedRows: list[int], FlaggedRowsCategory: dict) -> dict:
         """
         Count flagged rows for each flagging reason.
 

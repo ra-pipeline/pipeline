@@ -9,7 +9,7 @@ from pipeline.infrastructure import casa_tools
 LOG = infrastructure.get_logger(__name__)
 
 
-class ImageHistDisplay(object):
+class ImageHistDisplay:
     """
     A display class to generate histogram of a CASA image
     """

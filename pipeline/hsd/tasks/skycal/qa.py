@@ -1,17 +1,21 @@
 """QA score module for skycal task."""
+from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
-import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as qacalc
 import pipeline.h.tasks.exportdata.aqua as aqua
 from . import skycal
-from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from pipeline.infrastructure.launcher import Context
 
-LOG = logging.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
+
 
 class SDSkyCalQAHandler(pqa.QAPlugin):
     """Class to handle QA score for skycal result."""
@@ -19,20 +23,26 @@ class SDSkyCalQAHandler(pqa.QAPlugin):
     result_cls = skycal.SDSkyCalResults
     child_cls = None
 
-    def handle(self, context: 'Context', result: skycal.SDSkyCalResults) -> None:
+    def handle(self, context: Context, result: skycal.SDSkyCalResults) -> None:
         """Evaluate QA score for skycal result.
 
         Args:
             context: Pipeline context object containing state information.
             result: SDSkyCalResults instance.
         """
-        calapps = result.outcome
+        calapps = result.final
         resultdict = skycal.compute_elevation_difference(context, result)
+
+        if len(calapps) == 0:
+            LOG.warning('No skycal solution found, skipping QA score calculation.')
+            return
+
         vis = calapps[0].calto.vis
         ms = context.observing_run.get_ms(vis)
         threshold = skycal.ELEVATION_DIFFERENCE_THRESHOLD
-        scores = qacalc.score_sd_skycal_elevation_difference(ms, resultdict, threshold=threshold)
-        result.qa.pool.append(scores)
+        score = qacalc.score_sd_skycal_elevation_difference(ms, resultdict, threshold=threshold)
+        if score:
+            result.qa.pool.append(score)
 
 
 class SDSkyCalListQAHandler(pqa.QAPlugin):
@@ -41,7 +51,7 @@ class SDSkyCalListQAHandler(pqa.QAPlugin):
     result_cls = basetask.ResultsList
     child_cls = skycal.SDSkyCalResults
 
-    def handle(self, context: 'Context', result: skycal.SDSkyCalResults) -> None:
+    def handle(self, context: Context, result: skycal.SDSkyCalResults) -> None:
         """Evaluate QA score for a list of skycal results.
 
         Args:

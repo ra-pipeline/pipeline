@@ -21,7 +21,7 @@ class GSplineGaincalInputs(common.VdpCommonGaincalInputs):
     def __init__(self, context, output_dir=None, vis=None, caltable=None, field=None, spw=None, antenna=None,
                  uvrange=None, intent=None, smodel=None, calmode=None, refant=None, refantmode=None, minblperant=None,
                  splinetime=None, npointaver=None, append=None, phasewrap=None, opacity=None, parang=None, preavg=None):
-        super(GSplineGaincalInputs, self).__init__(context, output_dir=output_dir, vis=vis, caltable=caltable,
+        super().__init__(context, output_dir=output_dir, vis=vis, caltable=caltable,
                                                    intent=intent, field=field, spw=spw, refant=refant,
                                                    refantmode=refantmode, antenna=antenna, minblperant=minblperant,
                                                    opacity=opacity, selectdata=None, uvrange=uvrange, calmode=calmode)

@@ -7,7 +7,6 @@ import time
 import types
 from contextlib import contextmanager
 from logging import CRITICAL, DEBUG, ERROR, INFO, WARNING
-from typing import List, Optional, Union
 
 import logutils
 import logutils.colorize as colorize
@@ -301,7 +300,7 @@ def suspend_handler(handler_class):
     return to_remove
 
 
-class SuspendCapturingLogger(object):
+class SuspendCapturingLogger:
     def __enter__(self):
         self.__removed = suspend_handler(CapturingHandler)
 
@@ -324,7 +323,7 @@ class CapturingHandler(logging.Handler):
         """
         Initialize the handler.
         """
-        super(CapturingHandler, self).__init__(level)
+        super().__init__(level)
         self.buffer = []
 
     def emit(self, record):
@@ -373,19 +372,19 @@ class UTCFormatter(logging.Formatter):
 
 # Code, Frame and Traceback are serializable substitutes for the Traceback
 # logged with exceptions
-class Code(object):
+class Code:
     def __init__(self, code):
         self.co_filename = code.co_filename
         self.co_name = code.co_name
 
 
-class Frame(object):
+class Frame:
     def __init__(self, frame):
         self.f_globals = {"__file__": frame.f_globals["__file__"]}
         self.f_code = Code(frame.f_code)
 
 
-class Traceback(object):
+class Traceback:
     def __init__(self, tb):
         self.tb_frame = Frame(tb.tb_frame)
         self.tb_lineno = tb.tb_lineno
@@ -435,7 +434,7 @@ def log_level(name, level=logging.WARNING, filter=None):
 
 
 @contextmanager
-def log_filtermsg(msglist: Union[str, List[str]]):
+def log_filtermsg(msglist: str | list[str]):
     """Context manager to temporarily filter out specific messages from the CASA global logger.
     
     Note (as of CASA ver6.6.1):

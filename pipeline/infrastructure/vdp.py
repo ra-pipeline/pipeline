@@ -58,6 +58,7 @@ Examples:
 
 """
 import collections
+import collections.abc
 import copy
 import inspect
 import numbers
@@ -97,7 +98,7 @@ class SingletonType(type):
             return cls.__instance
 
 
-class NullMarker(object):
+class NullMarker:
     """
     NullMarker is a class that represents the null "parameter not-set" case.
     It exists to distinguish between a user-provided null value, such as None
@@ -161,7 +162,7 @@ class PipelineInputsMeta(type):
         return cls
 
 
-class VisDependentProperty(object):
+class VisDependentProperty:
     """
     VisDependentProperty is a Python data descriptor that standardises the
     behaviour of pipeline Inputs properties and lets them create default values
@@ -321,7 +322,7 @@ class VisDependentProperty(object):
         self.name = name
 
 
-class InputsContainer(object):
+class InputsContainer:
     """
     InputsContainer is the top-level container object for all task Inputs.
 
@@ -582,10 +583,10 @@ class InputsContainer(object):
         # pickle, which checks for __getnewargs__ and __getstate__.
         if name.startswith('__') and name.endswith('__'):
             # LOG.error('Implement {!s} in InputsContainer'.format(name))
-            return super(InputsContainer, self).__getattr__(name)
+            return super().__getattr__(name)
 
         if name in dir(self):
-            return super(InputsContainer, self).__getattr__(name)
+            return super().__getattr__(name)
 
         if name == self._scope_attr:
             LOG.trace('Retrieving scope from {!s}.{!s}'.format(self._task_cls.Inputs.__name__, name))
@@ -604,7 +605,7 @@ class InputsContainer(object):
                     '_multivis', '_current_inputs_cls'):
             if LOG.isEnabledFor(logging.TRACE):
                 LOG.trace('Setting {!s}.{!s} = {!r}'.format(self.__class__.__name__, name, val))
-            return super(InputsContainer, self).__setattr__(name, val)
+            return super().__setattr__(name, val)
 
         # check whether this class has a getter/setter by this name. If so,
         # allow the write to __dict__
@@ -867,10 +868,10 @@ class ModeInputs(api.Inputs, metaclass=PipelineInputsMeta):
         # we return the standard implementation. This is necessary for
         # pickle, which checks for __getnewargs__ and __getstate__.
         if name.startswith('__') and name.endswith('__'):
-            return super(ModeInputs, self).__getattr__(name)
+            return super().__getattr__(name)
 
         if name in dir(self):
-            return super(ModeInputs, self).__getattr__(name)
+            return super().__getattr__(name)
 
         LOG.trace('ModeInputs.{!s}: delegating to {!s}'.format(name, self._active.__class__.__name__))
         return getattr(self._active, name)
@@ -881,7 +882,7 @@ class ModeInputs(api.Inputs, metaclass=PipelineInputsMeta):
         # __setattr__ method
         if name in ('_active', '_delegates', '_mode', '_pipeline_casa_task'):
             LOG.trace('Setting {!s}.{!s} = {!r}'.format(self.__class__.__name__, name, val))
-            return super(ModeInputs, self).__setattr__(name, val)
+            return super().__setattr__(name, val)
 
 #         # check whether this class has a getter/setter by this name. If so,
 #         # allow the write to __dict__
@@ -893,7 +894,7 @@ class ModeInputs(api.Inputs, metaclass=PipelineInputsMeta):
 #                 LOG.trace('Getter/setter found on {0}. Setting \'{1}\' '
 #                           'attribute to \'{2}\''.format(self.__class__.__name__,
 #                                                         name, val))
-#                 super(ModeInputs, self).__setattr__(name, val)
+#                 super().__setattr__(name, val)
 #
 #                 # overriding defaults of wrapped classes requires us to re-get
 #                 # the value after setting it, as the property setter of this
@@ -911,7 +912,7 @@ class ModeInputs(api.Inputs, metaclass=PipelineInputsMeta):
             if name in (fn_name, '_' + fn_name):
             # if name == fn_name:
                 LOG.trace('Getter/setter found: setting {!s}.{!s} = {!r}'.format(self.__class__.__name__, name, val))
-                super(ModeInputs, self).__setattr__(name, val)
+                super().__setattr__(name, val)
 
                 # overriding defaults of wrapped classes requires us to re-get
                 # the value after setting it, as the property setter of this

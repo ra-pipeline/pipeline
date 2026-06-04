@@ -35,38 +35,19 @@ LOG = infrastructure.get_logger(__name__)
 
 
 class RestoreDataInputs(vdp.StandardInputs):
+    """Manages the inputs for the RestoreData task.
+
+    Attributes:
+        context: The pipeline Context state object holding all pipeline state.
+        products_dir: The directory containing the archived pipeline flagging and calibration
+            data products. Data products will be unpacked from this directory into rawdata_dir.
+            Support for this parameter is not yet implemented.
+        rawdata_dir: The directory containing the raw data ASDM(s) and the pipeline
+            flagging and calibration data products.
+        output_dir: The working directory where the restored data will be written.
+        session: A string or list of strings containing the sessions(s) one for each vis.
+        vis: A string or list of strings containing the ASDM(s) to be restored.
     """
-    RestoreDataInputs manages the inputs for the RestoreData task.
-
-    .. py:attribute:: context
-
-        the (:class:`~pipeline.infrastructure.launcher.Context`) holding all
-        pipeline state
-
-    .. py:attribute:: products_dir
-
-        the directory containing the archived pipeline flagging and calibration
-        data products. Data products will be unpacked from this directory
-        into rawdata_dir. Support for this parameter is not yet implemented.
-
-    .. py:attribute:: rawdata_dir
-
-        the directory containing the raw data ASDM(s) and the pipeline
-        flagging and calibration data products.
-
-    .. py:attribute:: output_dir
-
-        the working directory where the restored data will be written
-
-    .. py:attribute:: session
-
-        a string or list of strings containing the sessions(s) one for
-        each vis.
-
-    .. py:attribute:: vis
-
-        a string or list of strings containing the ASDM(s) to be restored.
-     """
 
     asis = vdp.VisDependentProperty(default='')
     bdfflags = vdp.VisDependentProperty(default=True)
@@ -92,74 +73,25 @@ class RestoreDataInputs(vdp.StandardInputs):
     def __init__(self, context, copytoraw=None, products_dir=None, rawdata_dir=None, output_dir=None, session=None,
                  vis=None, bdfflags=None, lazy=None, asis=None, ocorr_mode=None):
         """
-        Initialise the Inputs, initialising any property values to those given
-        here.
-
-        :param context: the pipeline Context state object
-        :type context: :class:`~pipeline.infrastructure.launcher.Context`
-        :param copytoraw: copy the required data products from products_dir to
-         rawdata_dir
-        :param products_dir: the directory of archived pipeline products
-        :type products_dir: string
-        :param rawdata_dir: the raw data directory for ASDM(s) and products
-        :type products_dir: string
-        :param output_dir: the working directory for the restored data
-        :type output_dir: string
-        :param session: the  parent session of each vis
-        :type session: a string or list of strings
-        :param vis: the ASDMs(s) for which data is to be restored
-        :type vis: a string or list of strings
-        :param bdfflags: set the BDF flags
-        :type bdfflags: boolean True or False
-        :param lazy: use the lazy filler to restore data
-        :type lazy: boolean True or False
-        :param asis: Creates verbatim copies of the ASDM tables in the output MS.
-        :type asis: space delimated list of tables
+        Initialise the Inputs, initialising any property values to those given here.
 
         Args:
-            context: the pipeline Context state object.
-
-            copytoraw: Copy calibration and flagging tables from products_dir to rawdata_dir directory.
-
-                Example: ``copytoraw=False``
-
-            products_dir: Path to the data products directory, used to copy
-                calibration products from. The parameter is effective only when
-                copytoraw=True. When copytoraw=False, calibration products in
-                rawdata_dir will be used.
-
-                Example: ``products_dir='/path/to/my/products'``
-
-            rawdata_dir: Path to the rawdata subdirectory.
-
-                Example: ``rawdata_dir='/path/to/my/rawdata'``
-
-            output_dir: the working directory for the restored data.
-
-            session: List of sessions, one per visibility file.
-
-                Example: ``session=['session_3']``
-
-            vis: List of raw visibility data files to be restored. Assumed to be in the directory specified by rawdata_dir.
-
-                Example: ``vis=['uid___A002_X30a93d_X43e']``
-
-            bdfflags: Set the BDF flags.
-
-                Example: ``bdfflags=False``
-
-            lazy: Use the lazy filler option.
-
-                Example: ``lazy=True``
-
-            asis: Creates verbatim copies of the ASDM tables in the output MS. The value given to this option must be a list of table names separated by space characters.
-
-                Example: ``asis='Source Receiver'``
-
-            ocorr_mode: Set correlation import mode.
-
-                Example: ``ocorr_mode='ca'``
-
+            context: The pipeline Context state object.
+            copytoraw: Copy calibration and flagging tables from products_dir to rawdata_dir.
+                Defaults to True. Example: ``copytoraw=False``
+            products_dir: Path to the data products directory for copying calibration products.
+                Only effective when copytoraw=True. When copytoraw=False, calibration products in
+                rawdata_dir will be used. Example: ``products_dir='/path/to/my/products'``
+            rawdata_dir: Path to the rawdata subdirectory. Example: ``rawdata_dir='/path/to/my/rawdata'``
+            output_dir: The working directory for the restored data.
+            session: List of sessions, one per visibility file. Example: ``session=['session_3']``
+            vis: List of raw visibility data files to be restored. Assumed to be in the directory
+                specified by rawdata_dir. Example: ``vis=['uid___A002_X30a93d_X43e']``
+            bdfflags: Set the BDF flags. Defaults to True. Example: ``bdfflags=False``
+            lazy: Use the lazy filler option. Defaults to False. Example: ``lazy=True``
+            asis: Creates verbatim copies of the ASDM tables in the output MS. Value must be a
+                space-separated list of table names. Example: ``asis='Source Receiver'``
+            ocorr_mode: Set correlation import mode. Defaults to 'ca'. Example: ``ocorr_mode='ca'``
         """
         super().__init__()
 
@@ -184,7 +116,7 @@ class RestoreDataResults(basetask.Results):
         """
         Initialise the results objects.
         """
-        super(RestoreDataResults, self).__init__()
+        super().__init__()
         self.importdata_results = importdata_results
         self.applycal_results = applycal_results
         self.mses = []

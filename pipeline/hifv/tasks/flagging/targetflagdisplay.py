@@ -8,7 +8,7 @@ from pipeline.infrastructure import casa_tools
 LOG = infrastructure.get_logger(__name__)
 
 
-class targetflagSummaryChart(object):
+class targetflagSummaryChart:
     def __init__(self, context, result):
         self.context = context
         self.result = result

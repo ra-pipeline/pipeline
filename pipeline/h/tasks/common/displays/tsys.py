@@ -10,7 +10,7 @@ from pipeline.infrastructure import casa_tasks
 LOG = infrastructure.get_logger(__name__)
 
 
-class TsysSummaryChart(object):
+class TsysSummaryChart:
     def __init__(self, context, result, calapp, xaxis='freq', yaxis='tsys'):
         self._context = context
         self._result = result

@@ -9,7 +9,7 @@ LOG = infrastructure.get_logger(__name__)
 class SessionRefAntResults(basetask.Results):
 
     def __init__(self):
-        super(SessionRefAntResults, self).__init__()
+        super().__init__()
 
         # Initialize dictionary of sessions, mapping each session to list of
         # evaluated MSes and final refant chosen for that session.

@@ -1,4 +1,6 @@
 """Set of base classes and utility functions for display modules."""
+from __future__ import annotations
+
 import abc
 import collections
 import copy
@@ -7,30 +9,39 @@ import itertools
 import math
 import os
 import scipy
-from typing import Generator, List, NoReturn, Optional, Tuple, Union
-
-from casatools import coordsys as casa_coordsys  # Used for annotation purpose.
+from typing import TYPE_CHECKING
 
 import matplotlib
 import matplotlib.figure as figure
-from matplotlib.axes import Axes
-from matplotlib.dates import date2num, DateFormatter, MinuteLocator
 import matplotlib.gridspec as gridspec
 import numpy as np
+from matplotlib.dates import date2num, DateFormatter, MinuteLocator
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.displays.pointing as pointing
 from pipeline.infrastructure import casa_tools
-from pipeline.domain.singledish import MSReductionGroupDesc
-from pipeline.infrastructure.renderer.logger import Plot
 from pipeline.infrastructure.utils import absolute_path
 from .utils import mjd_to_datetime
 
-LOG = infrastructure.get_logger(__name__)
+if TYPE_CHECKING:
+    from collections.abc import Generator
+    from typing import NoReturn
+
+    from matplotlib.axes import Axes
+    from numpy import floating, generic
+    from numpy.ma.core import MaskedArray
+    from numpy.typing import NDArray
+
+    from casatools import coordsys as casa_coordsys
+
+    from pipeline.domain.singledish import MSReductionGroupDesc
+    from pipeline.infrastructure.api import Results
+    from pipeline.infrastructure.launcher import Context
+    from pipeline.infrastructure.renderer.logger import Plot
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 DPISummary = 90
-# DPIDetail = 120
-# DPIDetail = 130
 DPIDetail = 260
 LightSpeedQuantity = casa_tools.quanta.constants('c')
 LightSpeed = casa_tools.quanta.convert(LightSpeedQuantity, 'km/s')['value']  # speed of light in km/s
@@ -41,14 +52,14 @@ NoData = -32767.0
 NoDataThreshold = NoData + 10000.0
 
 
-def mjd_to_plotval(mjd_list: Union[List[float], np.ndarray]) -> np.ndarray:
+def mjd_to_plotval(mjd_list: list[float] | NDArray[generic]) -> NDArray[generic]:
     """Convert list of MJD values to Matplotlib dates.
 
     Args:
         mjd_list: Sequence of MJD values in day.
 
     Returns:
-        np.ndarray: Sequence of Matplotlib dates.
+        Sequence of Matplotlib dates.
     """
     datetime_list = [mjd_to_datetime(x) for x in mjd_list]
     return date2num(datetime_list)
@@ -97,7 +108,7 @@ class CustomDateFormatter(DateFormatter):
             pos: position. Defaults to 0.
 
         Returns:
-            str: tick label.
+            The tick label.
         """
         fmt_saved = self.fmt
         if pos == 0 or x % 1.0 == 0.0:
@@ -117,13 +128,13 @@ def utc_formatter(fmt: str = '%H:%M') -> CustomDateFormatter:
         fmt: Tick format. Defaults to '%H:%M'.
 
     Returns:
-        CustomDateFormatter: formatter instance.
+        The formatter instance.
     """
     return CustomDateFormatter(fmt)
 
 
-def utc_locator(start_time: Optional[float] = None,
-                end_time: Optional[float] = None) -> MinuteLocator:
+def utc_locator(start_time: float | None = None,
+                end_time: float | None = None) -> MinuteLocator:
     """Generate MinuteLocator instance.
 
     Generate MinuteLocator instance. If either start_time or end_time is None,
@@ -137,7 +148,7 @@ def utc_locator(start_time: Optional[float] = None,
                   Can be minimum or maximum. Defaults to None.
 
     Returns:
-        MinuteLocator: locator instance.
+        The locator instance.
     """
     if start_time is None or end_time is None:
         return MinuteLocator()
@@ -154,12 +165,12 @@ def utc_locator(start_time: Optional[float] = None,
         return MinuteLocator(byminute=list(range(0, 60, tick_interval)))
 
 
-class SingleDishDisplayInputs(object):
+class SingleDishDisplayInputs:
     """Represents inputs to Display classes."""
 
     def __init__(self,
-                 context: infrastructure.launcher.Context,
-                 result: infrastructure.api.Results) -> None:
+                 context: Context,
+                 result: Results) -> None:
         """Construct SingleDishDisplayInputs instance.
 
         Args:
@@ -177,7 +188,7 @@ class SingleDishDisplayInputs(object):
             RuntimeError: Data from two or more observatories are mixed.
 
         Returns:
-            bool: True if data is from NRO45m, otherwise False
+            True if data is from NRO45m, otherwise False
         """
         arrays = {ms.antenna_array.name for ms in self.context.observing_run.measurement_sets}
         if len(arrays) != 1:
@@ -186,11 +197,11 @@ class SingleDishDisplayInputs(object):
         return 'NRO' in arrays
 
 
-class SpectralImage(object):
+class SpectralImage:
     """Representation of four-dimensional spectral image."""
 
     @property
-    def data(self) -> np.ndarray:
+    def data(self) -> NDArray[generic]:
         """Retrun image data."""
         with casa_tools.ImageReader(self.imagename) as ia:
             data = ia.getchunk()
@@ -198,7 +209,7 @@ class SpectralImage(object):
         return data
 
     @property
-    def mask(self) -> np.ndarray:
+    def mask(self) -> NDArray[generic]:
         """Return boolean image mask."""
         with casa_tools.ImageReader(self.imagename) as ia:
             mask = ia.getchunk(getmask=True)
@@ -303,8 +314,8 @@ class SpectralImage(object):
         return self._beamsize_in_deg
 
     def to_velocity(self,
-                    frequency: Union[float, np.ndarray],
-                    freq_unit: str = 'GHz') -> Union[float, np.ndarray]:
+                    frequency: float | NDArray[floating],
+                    freq_unit: str = 'GHz') -> float | NDArray[floating]:
         """Convert frequency or array of frequency to velocity.
 
         Args:
@@ -312,7 +323,7 @@ class SpectralImage(object):
             freq_unit: Frequency Unit. Defaults to 'GHz'.
 
         Returns:
-            Union[float, np.ndarray]: Velocity value(s).
+            Velocity value(s).
         """
         qa = casa_tools.quanta
         if self.rest_frequency['unit'] != freq_unit:
@@ -321,7 +332,7 @@ class SpectralImage(object):
             vrf = self.rest_frequency['value']
         return (1.0 - (frequency / vrf)) * LightSpeed
 
-    def spectral_axis(self, unit: str = 'GHz') -> Tuple[float, float, float]:
+    def spectral_axis(self, unit: str = 'GHz') -> tuple[float, float, float]:
         """Return conversion information for spectral axis.
 
         Three-tuple required for conversion between pixel and world spectral
@@ -332,11 +343,11 @@ class SpectralImage(object):
             unit: Frequency unit. Defaults to 'GHz'.
 
         Returns:
-            Tuple[float, float, float]: (refpix, refval, increment) for spectral axis.
+            (refpix, refval, increment) for spectral axis.
         """
         return self.__axis(self.id_spectral, unit=unit)
 
-    def direction_axis(self, idx: int, unit: str = 'deg') -> Tuple[float, float, float]:
+    def direction_axis(self, idx: int, unit: str = 'deg') -> tuple[float, float, float]:
         """Return conversion information for direction axes.
 
         Three-tuple required for conversion between pixel and world direction
@@ -349,12 +360,11 @@ class SpectralImage(object):
             unit: Direction unit. Defaults to 'deg'.
 
         Returns:
-            Tuple[float, float, float]: (refpix, refval, increment) for direction axis
-                                        specified by idx.
+            (refpix, refval, increment) for direction axis specified by idx.
         """
         return self.__axis(self.id_direction[idx], unit=unit)
 
-    def __axis(self, idx: int, unit: str) -> Tuple[float, float, float]:
+    def __axis(self, idx: int, unit: str) -> tuple[float, float, float]:
         """Return conversion information for specified image axis.
 
         Three-tuple required for conversion between pixel and world direction
@@ -366,8 +376,7 @@ class SpectralImage(object):
             unit: Unit string.
 
         Returns:
-            Tuple[float, float, float]: (refpix, refval, increment) for
-                                        the axis specified by idx.
+            (refpix, refval, increment) for the axis specified by idx.
         """
         qa = casa_tools.quanta
         refpix = self.refpixs[idx]
@@ -401,15 +410,15 @@ class SDImageDisplayInputs(SingleDishDisplayInputs):
     ]
 
     def __init__(self,
-                 context: infrastructure.launcher.Context,
-                 result: infrastructure.api.Results) -> None:
+                 context: Context,
+                 result: Results) -> None:
         """Construct SDImageDisplayInputs instance.
 
         Args:
             context: Pipeline context object containing state information.
             result: Pipeline task execution result.
         """
-        super(SDImageDisplayInputs, self).__init__(context, result)
+        super().__init__(context, result)
         self.image = SpectralImage(self.imagename)
 
     @property
@@ -417,7 +426,7 @@ class SDImageDisplayInputs(SingleDishDisplayInputs):
         """Return name of the single dish image."""
         return self.result.outcome['image'].imagename
 
-    def moment_imagename(self, moments: Union[List[Moment], Moment], chans: ChannelSelection) -> str:
+    def moment_imagename(self, moments: list[Moment] | Moment, chans: ChannelSelection) -> str:
         """Return name of the moment image.
 
         If number of moments is 1, moment image name will include moment
@@ -453,7 +462,7 @@ class SDImageDisplayInputs(SingleDishDisplayInputs):
             return spwlist
 
     @property
-    def vis(self) -> Optional[str]:
+    def vis(self) -> str | None:
         """Return name of the MeasurementSet if available.
 
         If no MeasurementSet is associated with the result,
@@ -474,7 +483,7 @@ class SDImageDisplayInputs(SingleDishDisplayInputs):
         string "COMBINED" is returned.
 
         Returns:
-            str: Name of the antenna.
+            Name of the antenna.
         """
         return self.result.outcome['image'].antenna
 
@@ -489,19 +498,19 @@ class SDImageDisplayInputs(SingleDishDisplayInputs):
         return self.context.observing_run.ms_reduction_group[group_id]
 
     @property
-    def msid_list(self) -> List[int]:
+    def msid_list(self) -> list[int]:
         """Return list of indices for MeasurementSets.
 
         The list specifies the MeasurementSets that are used to
         generate the image.
 
         Returns:
-            List[int]: index list for MeasurementSets.
+            Index list for MeasurementSets.
         """
         return self.result.outcome['file_index']
 
     @property
-    def antennaid_list(self) -> List[int]:
+    def antennaid_list(self) -> list[int]:
         """Return list of antenna ids.
 
         Return list of antenna ids corresponding to antenna
@@ -512,12 +521,12 @@ class SDImageDisplayInputs(SingleDishDisplayInputs):
         indices for all the antennas are returned.
 
         Returns:
-            List[int]: List of antenna ids.
+            List of antenna ids.
         """
         return self.result.outcome['assoc_antennas']
 
     @property
-    def fieldid_list(self) -> List[int]:
+    def fieldid_list(self) -> list[int]:
         """Return list of field ids.
 
         Return list of field ids. Order of the index is
@@ -526,12 +535,12 @@ class SDImageDisplayInputs(SingleDishDisplayInputs):
         specified by msid_list[0].
 
         Returns:
-            List[int]: List of field ids.
+            List of field ids.
         """
         return self.result.outcome['assoc_fields']
 
     @property
-    def spwid_list(self) -> List[int]:
+    def spwid_list(self) -> list[int]:
         """Return list of spectral windo (spw) ids.
 
         Return list of spw ids. Order of the index is
@@ -540,7 +549,7 @@ class SDImageDisplayInputs(SingleDishDisplayInputs):
         specified by msid_list[0].
 
         Returns:
-            List[int]: List of spw ids.
+            List of spw ids.
         """
         return self.result.outcome['assoc_spws']
 
@@ -570,7 +579,7 @@ class SDImageDisplayInputs(SingleDishDisplayInputs):
         """Return file name of the contamination plot."""
         return self.imagename.rstrip('/') + '.contamination.png'
 
-    def valid_lines(self) -> List[List[Union[float, int, bool]]]:
+    def valid_lines(self) -> list[list[float | int | bool]]:
         """
         Return list of channel ranges of valid spectral lines.
 
@@ -633,7 +642,7 @@ class SDImageDisplayInputs(SingleDishDisplayInputs):
         # at both ends, i.e., [start, end]
         return ';'.join([f'{s}~{e - 1}' for s, e in range_list])
 
-    def get_line_free_channels(self) -> List[int]:
+    def get_line_free_channels(self) -> list[int]:
         """Get list of line-free channels.
 
         Returns:
@@ -671,7 +680,7 @@ class SDImageDisplayInputs(SingleDishDisplayInputs):
         return stats
 
 
-def invert_range_list(range_list: List[List[int]], nchan: int) -> List[List[int]]:
+def invert_range_list(range_list: list[list[int]], nchan: int) -> list[list[int]]:
     """Invert channel range list.
 
     Overlap among ranges is handled properly.
@@ -702,7 +711,7 @@ def invert_range_list(range_list: List[List[int]], nchan: int) -> List[List[int]
     return inverted
 
 
-class SDCalibrationDisplay(object, metaclass=abc.ABCMeta):
+class SDCalibrationDisplay(abc.ABC):
     """Base plotter class for single-dish calibration tasks."""
 
     Inputs = SingleDishDisplayInputs
@@ -715,11 +724,11 @@ class SDCalibrationDisplay(object, metaclass=abc.ABCMeta):
         """
         self.inputs = inputs
 
-    def plot(self) -> List[Plot]:
+    def plot(self) -> list[Plot]:
         """Generate plots according to the provided results.
 
         Returns:
-            List[Plot]: List of Plot instances.
+            List of Plot instances.
         """
         results = self.inputs.result
         report_dir = self.inputs.context.report_dir
@@ -736,7 +745,7 @@ class SDCalibrationDisplay(object, metaclass=abc.ABCMeta):
         return plots
 
     @abc.abstractmethod
-    def doplot(self, result: infrastructure.api.Results, stage_dir: str) -> NoReturn:
+    def doplot(self, result: Results, stage_dir: str) -> NoReturn:
         """Generate plot from the result instance.
 
         This method must be implemented in the subclasses.
@@ -752,7 +761,7 @@ class SDCalibrationDisplay(object, metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
 
-class SDImageDisplay(object, metaclass=abc.ABCMeta):
+class SDImageDisplay(abc.ABC):
     """Base plotter class for imaging tasks."""
 
     Inputs = SDImageDisplayInputs
@@ -771,7 +780,6 @@ class SDImageDisplay(object, metaclass=abc.ABCMeta):
 
     def init(self) -> None:
         """Initialize plotter using specifiec image."""
-        # self.image = SpectralImage(self.imagename)
         qa = casa_tools.quanta
         self.nchan = self.image.nchan
         self.nx = self.image.nx
@@ -807,7 +815,7 @@ class SDImageDisplay(object, metaclass=abc.ABCMeta):
         self.aspect = 1.0 / math.cos(0.5 * (self.dec_min + self.dec_max) / 180.0 * 3.141592653)
 
     @property
-    def context(self) -> infrastructure.launcher.Context:
+    def context(self) -> Context:
         """Return Pipeline context."""
         return self.inputs.context
 
@@ -837,18 +845,18 @@ class SDImageDisplay(object, metaclass=abc.ABCMeta):
         return self.inputs.vis
 
     @property
-    def data(self) -> Optional[np.ndarray]:
+    def data(self) -> NDArray[generic] | None:
         """Return image data as numpy float array."""
         return self.image.data if self.image is not None else None
 
     @property
-    def mask(self) -> Optional[np.ndarray]:
+    def mask(self) -> NDArray[generic] | None:
         """Return image mask as numpy bool array.
 
         Mask is True for valid pixels while False for invalid pixels.
 
         Returns:
-            Optional[np.ndarray]: Image mask.
+            NDArray[generic] | None: Image mask.
         """
         return self.image.mask if self.image is not None else None
 
@@ -863,21 +871,21 @@ class SDImageDisplay(object, metaclass=abc.ABCMeta):
         return self.image.id_stokes if self.image is not None else None
 
     @property
-    def num_valid_spectrum(self) -> np.ndarray:
+    def num_valid_spectrum(self) -> NDArray[generic]:
         """Return Number of valid spectral data accumulated to each position."""
         return self.__reshape2d(self.inputs.result.outcome['validsp'])
 
     @property
-    def rms(self) -> np.ndarray:
+    def rms(self) -> NDArray[generic]:
         """Return rms for each position."""
         return self.__reshape2d(self.inputs.result.outcome['rms'])
 
     @property
-    def edge(self) -> Tuple[int, int]:
+    def edge(self) -> tuple[int, int]:
         """Return edge channels to exclude."""
         return self.inputs.result.outcome['edge']
 
-    def __reshape2d(self, array2d: np.ndarray) -> np.ndarray:
+    def __reshape2d(self, array2d: NDArray[generic]) -> NDArray[generic]:
         """Reshape input two-dimensional array into three-dimensional array.
 
         Returned array should have the shape (nx, ny, npol) where nx is
@@ -889,7 +897,7 @@ class SDImageDisplay(object, metaclass=abc.ABCMeta):
             array2d: Two-dimensional array.
 
         Returns:
-            np.ndarray: Resheped array.
+            Reshaped array.
         """
         array3d = np.zeros((self.npol, self.ny, self.nx), dtype=array2d.dtype)
         if len(array2d) == self.npol:
@@ -926,7 +934,7 @@ def form3(n: int) -> int:
         n: Number of panels along vertical axis.
 
     Returns:
-        float: Factor for panel position.
+        Factor for panel position.
     """
     if n <= 4:
         return 4
@@ -949,7 +957,7 @@ def form4(n: int) -> float:
         n: Number of panels along vertical axis.
 
     Returns:
-        float: Factor for panel position.
+        Factor for panel position.
     """
     if n <= 4:
         return 4
@@ -983,7 +991,7 @@ class SparseMapAxesManager(pointing.MapAxesManagerBase):
             ticksize: Size of tick label.
             clearpanel: Clear existing Axes. Defaults to True.
         """
-        super(SparseMapAxesManager, self).__init__()
+        super().__init__()
         self.figure = fig
         self.nh = nh
         self.nv = nv
@@ -1004,12 +1012,6 @@ class SparseMapAxesManager(pointing.MapAxesManagerBase):
                                            hspace=0, wspace=0,
                                            left=0, right=0.95,
                                            bottom=0.01, top=1.0 - 1.0 / _f - 0.07)
-#         self.gs_top = gridspec.GridSpec(1, 1,
-#                                         bottom=1.0 - 1.0/form3(self.nv), top=0.96)
-#         self.gs_bottom = gridspec.GridSpec(self.nv+1, self.nh+1,
-#                                            hspace=0, wspace=0,
-#                                            left=0, right=0.95,
-#                                            bottom=0.01, top=1.0 - 1.0/form3(self.nv)-0.07)
 
     @property
     def axes_integsp(self) -> Axes:
@@ -1019,7 +1021,7 @@ class SparseMapAxesManager(pointing.MapAxesManagerBase):
         spectrum, which is located at the top of the figure.
 
         Returns:
-            Axes: Axes instance for integrated spectrum.
+            Axes instance for integrated spectrum.
         """
         if self._axes_integsp is None:
             axes = self.figure.add_subplot(self.gs_top[:, :])
@@ -1040,14 +1042,14 @@ class SparseMapAxesManager(pointing.MapAxesManagerBase):
         return self._axes_integsp
 
     @property
-    def axes_spmap(self) -> List[Axes]:
+    def axes_spmap(self) -> list[Axes]:
         """Create Axes instances for profile map.
 
         Creates and returns list of Axes instances that constitutes
         sparse profile map.
 
         Returns:
-            List[Axes]: List of Axes instances for profile map.
+            List of Axes instances for profile map.
         """
         if self._axes_spmap is None:
             self._axes_spmap = list(self.__axes_spmap())
@@ -1063,7 +1065,7 @@ class SparseMapAxesManager(pointing.MapAxesManagerBase):
         Microwaves (ATM) model. The Axes overlays integrated spectrum.
 
         Returns:
-            Axes: Axes instance for ATM transmission.
+            Axes instance for ATM transmission.
         """
         if self._axes_atm is None:
             self._axes_atm = self.axes_integsp.twinx()
@@ -1087,7 +1089,7 @@ class SparseMapAxesManager(pointing.MapAxesManagerBase):
         integrated spectrum.
 
         Returns:
-            Axes: Axes for channel axis.
+            Axes instance for channel axis.
         """
         if self._axes_chan is None:
             self.__adjust_integsp_for_chan()
@@ -1138,8 +1140,8 @@ class SparseMapAxesManager(pointing.MapAxesManagerBase):
                 yield axes
 
     def setup_labels(self,
-                     label_ra: Union[List[float], np.ndarray],
-                     label_dec: Union[List[float], np.ndarray]) -> None:
+                     label_ra: list[float] | NDArray[floating],
+                     label_dec: list[float] | NDArray[floating]) -> None:
         """Set up position labels for sparse profile map.
 
         Set up position (longitude and latitude) labels for sparse
@@ -1202,7 +1204,7 @@ class SparseMapAxesManager(pointing.MapAxesManagerBase):
                 obj.remove()
 
 
-class SDSparseMapPlotter(object):
+class SDSparseMapPlotter:
     """Plotter for sparse spectral map."""
 
     def __init__(self, fig: figure.Figure, nh: int, nv: int, step: int, brightnessunit: str,
@@ -1262,13 +1264,13 @@ class SDSparseMapPlotter(object):
 
     @direction_reference.setter
     def direction_reference(self, value) -> None:
-        """Set direction reference string."""
+        """set direction reference string."""
         self.axes.direction_reference = value
 
     def setup_labels_relative(self,
-                              refpix_list: Tuple[float, float],
-                              refval_list: Tuple[float, float],
-                              increment_list: Tuple[float, float]) -> None:
+                              refpix_list: tuple[float, float],
+                              refval_list: tuple[float, float],
+                              increment_list: tuple[float, float]) -> None:
         """Set up position labels.
 
         Set up position labels for both horizontal and vertical axes
@@ -1303,7 +1305,7 @@ class SDSparseMapPlotter(object):
             LabelDEC[y][1] = refval + (y1 - refpix) * increment
         self.axes.setup_labels(LabelRA, LabelDEC)
 
-    def setup_labels_absolute(self, ralist: List[float], declist: List[float]) -> None:
+    def setup_labels_absolute(self, ralist: list[float], declist: list[float]) -> None:
         """Set up position labels.
 
         Set up position labels for both horizontal and vertical axes
@@ -1320,8 +1322,8 @@ class SDSparseMapPlotter(object):
         self.axes.setup_labels(LabelRA, LabelDEC)
 
     def setup_lines(self,
-                    lines_averaged: List[float],
-                    lines_map: Optional[List[float]] = None) -> None:
+                    lines_averaged: list[float],
+                    lines_map: list[float] | None = None) -> None:
         """Set detected lines.
 
         Provided lines are displayed as shaded area. Lines given to
@@ -1336,7 +1338,7 @@ class SDSparseMapPlotter(object):
         self.lines_averaged = lines_averaged
         self.lines_map = lines_map
 
-    def setup_reference_level(self, level: Optional[float] = 0.0) -> None:
+    def setup_reference_level(self, level: float | None = 0.0) -> None:
         """Set reference level of the sparse profile map.
 
         If float value is given, red horizontal line at the value is
@@ -1371,7 +1373,7 @@ class SDSparseMapPlotter(object):
         """
         self.deviation_mask = mask
 
-    def set_edge(self, edge: Tuple[int, int]) -> None:
+    def set_edge(self, edge: tuple[int, int]) -> None:
         """Set edge parameter.
 
         Edge region specified by edge parameter is shaded with grey.
@@ -1381,7 +1383,7 @@ class SDSparseMapPlotter(object):
         """
         self.edge = edge
 
-    def set_atm_transmission(self, transmission: List[float], frequency: List[float]) -> None:
+    def set_atm_transmission(self, transmission: list[float], frequency: list[float]) -> None:
         """Set atmospheric transmission data.
 
         If trasnmission and frequency are given properly, atmospheric
@@ -1416,7 +1418,7 @@ class SDSparseMapPlotter(object):
         """Disable channel axis for integrated spectrum."""
         self.channel_axis = False
 
-    def add_channel_axis(self, frequency: List[float]) -> None:
+    def add_channel_axis(self, frequency: list[float]) -> None:
         """Add channel axis to integrated spectrum.
 
         Args:
@@ -1427,10 +1429,11 @@ class SDSparseMapPlotter(object):
         axes.set_xlim((np.argmin(f), np.argmax(f)))
 
     def plot(self,
-             map_data: Union[np.ndarray, np.ma.masked_array],
-             averaged_data: Union[np.ndarray, np.ma.masked_array],
-             frequency: np.ndarray, fit_result: Optional[np.ndarray] = None,
-             figfile: Optional[str] = None) -> bool:
+             map_data: NDArray[generic] | MaskedArray,
+             averaged_data: NDArray[generic] | MaskedArray,
+             frequency: NDArray[floating],
+             fit_result: NDArray[generic] | None = None,
+             figfile: str | None = None) -> bool:
         """Generate sparse profile map.
 
         Generates sparse profile map. If fit_result is given, it is
@@ -1445,7 +1448,7 @@ class SDSparseMapPlotter(object):
             figfile: Name of the plot file. Defaults to None.
 
         Returns:
-            bool: Whether or not if plot is successful.
+            Whether or not if plot is successful.
         """
         if figfile is None:
             LOG.debug('Skip creating sparse profile map')
@@ -1488,10 +1491,6 @@ class SDSparseMapPlotter(object):
                         yield oper(unmasked)
             ListMax = np.fromiter(stat_per_spectra(valid_data, np.max), dtype=np.float64)
             ListMin = np.fromiter(stat_per_spectra(valid_data, np.min), dtype=np.float64)
-#             ListMax = np.fromiter((np.max(v.data[v.mask == False]) for v in valid_data),
-#                                      dtype=np.float64)
-#             ListMin = np.fromiter((np.min(v.data[v.mask == False]) for v in valid_data),
-#                                      dtype=np.float64)
             LOG.debug('ListMax from masked_array=%s', ListMax)
             LOG.debug('ListMin from masked_array=%s', ListMin)
         else:
@@ -1500,10 +1499,7 @@ class SDSparseMapPlotter(object):
         del valid_data
         if len(ListMax) == 0 or len(ListMin) == 0:
             return False
-        # if isinstance(ListMin, np.ma.masked_array):
-        #     ListMin = ListMin.data[ListMin.mask == False]
-        # if isinstance(ListMax, np.ma.masked_array):
-        #     ListMax = ListMax.data[ListMax.mask == False]
+
         LOG.debug('ListMax=%s', list(ListMax))
         LOG.debug('ListMin=%s', list(ListMin))
         global_ymax = np.sort(ListMax)[len(ListMax) - len(ListMax) // 10 - 1]
@@ -1602,7 +1598,6 @@ class SDSparseMapPlotter(object):
                     xmax = global_xmax
                     if map_data[x][y].min() > NoDataThreshold:
                         median = np.ma.median(map_data[x][y])
-                        # mad = np.median(map_data[x][y] - median)
                         sigma = map_data[x][y].std()
                         ymin = median - 2.0 * sigma
                         ymax = median + 5.0 * sigma
@@ -1623,13 +1618,6 @@ class SDSparseMapPlotter(object):
                         axes.axvspan(fedge_span[0], fedge_span[1], color='lightgray')
                         axes.axvspan(fedge_span[2], fedge_span[3], color='lightgray')
 
-                    # elif self.lines_averaged is not None:
-                    #     for chmin, chmax in self.lines_averaged:
-                    #         fmin = ch_to_freq(chmin, frequency)
-                    #         fmax = ch_to_freq(chmax, frequency)
-                    #         LOG.debug('plotting line range for %s, %s (reuse lines_averaged): [%s, %s]',
-                    #                   x, y, chmin, chmax)
-                    #        plot_helper.axvspan(fmin, fmax, color='cyan')
                     if is_valid_fit_result:
                         axes.plot(frequency, fit_result[x][y], color='r', linewidth=0.4)
                     elif self.reference_level is not None and ymin < self.reference_level and self.reference_level < ymax:
@@ -1654,7 +1642,7 @@ class SDSparseMapPlotter(object):
         del fig
 
 
-def ch_to_freq(ch: Union[float, List[float]], frequency: List[float]) -> Union[float, List[float]]:
+def ch_to_freq(ch: float | list[float], frequency: list[float]) -> float | list[float]:
     """Convert channel into frequency.
 
     Args:
@@ -1662,7 +1650,7 @@ def ch_to_freq(ch: Union[float, List[float]], frequency: List[float]) -> Union[f
         frequency: Frequency labels.
 
     Returns:
-        float: Frequency value(s) corresponding to ch.
+        Frequency value(s) corresponding to ch.
     """
     interpolator = scipy.interpolate.interp1d(
         np.arange(len(frequency)),

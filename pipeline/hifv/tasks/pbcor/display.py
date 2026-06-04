@@ -12,7 +12,7 @@ LOG = infrastructure.get_logger(__name__)
 ImageStats = collections.namedtuple('ImageStats', 'rms max')
 
 
-class PbcorimagesSummary(object):
+class PbcorimagesSummary:
     def __init__(self, context, result):
         self.context = context
         self.result = result

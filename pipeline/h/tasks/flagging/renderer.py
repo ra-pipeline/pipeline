@@ -20,7 +20,7 @@ class T2_4MDetailsFlagDeterBaseRenderer(basetemplates.T2_4MDetailsDefaultRendere
     def __init__(self, uri='flagdeterbase.mako',
                  description='Deterministic flagging', always_rerender=False):
 
-        super(T2_4MDetailsFlagDeterBaseRenderer, self).__init__(
+        super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
     def update_mako_context(self, mako_context, pipeline_context, result):

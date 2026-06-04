@@ -53,7 +53,7 @@ def check_ppr(pprfile):
 
 def write_errorexit_file(path, root, extension):
     # Get formatted UTC time
-    now = datetime.datetime.utcnow().strftime('%Y%m%dT%H%M%S')
+    now = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S')
 
     # Root name is composed of root, the current UTC time, and the extension
     basename = root + '-' + now + '.' + extension

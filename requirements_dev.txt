@@ -5,8 +5,10 @@ pytest                  # Core testing framework
 pytest-xdist            # https://github.com/pytest-dev/pytest-xdist
 pytest-cov              # https://github.com/pytest-dev/pytest-cov
 pytest-html             # https://pypi.org/project/pytest-html/
-pytest-benchmark        # https://pytest-benchmark.readthedocs.io/en/latest/
+pytest-xvfb             # https://github.com/The-Compiler/pytest-xvfb
+pytest-forked           # https://github.com/pytest-dev/pytest-forked
 junit2html              # https://github.com/inorton/junit2html, requires jinja2
+# pytest-benchmark        # https://pytest-benchmark.readthedocs.io/en/latest/
 
 # Code Quality & Style
 black                   # Code formatter

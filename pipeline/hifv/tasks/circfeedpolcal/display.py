@@ -9,7 +9,7 @@ import pipeline.infrastructure.casa_tasks as casa_tasks
 LOG = infrastructure.get_logger(__name__)
 
 
-class CircFeedPolCalChart(object):
+class CircFeedPolCalChart:
     def __init__(self, context, result, caltable='', yaxis='delay', xaxis='freq', antenna='', caption=''):
         self.context = context
         self.result = result
@@ -71,7 +71,7 @@ class CircFeedPolCalChart(object):
         return wrapper
 
 
-class ampfreqPerAntennaChart(object):
+class ampfreqPerAntennaChart:
     def __init__(self, context, result, caltable):
         self.context = context
         self.result = result

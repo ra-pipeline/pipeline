@@ -1,9 +1,9 @@
-import collections
+import collections.abc
 
-from pipeline import infrastructure
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as qacalc
+from pipeline import infrastructure
 
 from . import syspower
 

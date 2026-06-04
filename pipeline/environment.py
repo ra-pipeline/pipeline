@@ -21,12 +21,11 @@ import resource
 import shutil
 import subprocess
 import sys
-import typing
 from importlib.metadata import (PackageNotFoundError, distribution, metadata,
                                 version)
-from io import StringIO
+from io import StringIO, TextIOWrapper
 from pathlib import Path
-from typing import AnyStr, Optional, TextIO, Union
+from typing import AnyStr, Protocol
 
 import casatasks
 
@@ -45,9 +44,9 @@ LOG = logging.get_logger(__name__)
 
 def _run(
     command: str,
-    stdout: Optional[Union[TextIO, StringIO]] = None,
-    stderr: Optional[Union[TextIO, StringIO]] = None,
-    cwd: Optional[str] = None,
+    stdout: TextIOWrapper | StringIO | None = None,
+    stderr: TextIOWrapper | StringIO | None = None,
+    cwd: str | None = None,
     shell: bool = True
 ) -> int:
     """Run a command in a subprocess.
@@ -83,7 +82,7 @@ def _run(
     return proc.returncode
 
 
-def _safe_run(command: str, on_error: str = 'N/A', cwd: Optional[str] = None, log_errors: bool = True) -> str:
+def _safe_run(command: str, on_error: str = 'N/A', cwd: str | None = None, log_errors: bool = True) -> str:
     """Safely run a command in a subprocess, returning the given string if an error occurs.
     
     Executes the specified command and returns its stdout output. If the command
@@ -112,7 +111,7 @@ def _safe_run(command: str, on_error: str = 'N/A', cwd: Optional[str] = None, lo
     return on_error
 
 
-def _load(path: str, encoding: str = 'UTF-8', on_error: Optional[AnyStr] = None) -> AnyStr:
+def _load(path: str, encoding: str = 'UTF-8', on_error: AnyStr | None = None) -> AnyStr:
     """Reads a file and returns its contents.
 
     Args:
@@ -132,7 +131,7 @@ def _load(path: str, encoding: str = 'UTF-8', on_error: Optional[AnyStr] = None)
     return on_error
 
 
-class Environment(typing.Protocol):
+class Environment(Protocol):
     """
     Environment is a Protocol that collects the attributes that describe a
     pipeline execution environment.
@@ -345,9 +344,9 @@ class CGroupController:
 
     def get_limits(
             self,
-            v1_attrs: typing.List[str],
-            v2_attrs: typing.List[str]
-    ) -> typing.List:
+            v1_attrs: list[str],
+            v2_attrs: list[str]
+    ) -> list:
         """
         Get the cgroup limits for a list of cgroup attributes.
 
@@ -378,7 +377,7 @@ class CGroupController:
 class CGroupControllerParser:
 
     @staticmethod
-    def get_controllers() -> typing.Dict[str, CGroupController]:
+    def get_controllers() -> dict[str, CGroupController]:
         """
         Get a dict of cgroup controllers and mount points that can be used
         for parsing cgroup limits.
@@ -503,7 +502,7 @@ class CGroupLimit:
             return f'{self.weight}%'
 
         @staticmethod
-        def get_limit(controllers: typing.Dict[str, CGroupController]):
+        def get_limit(controllers: dict[str, CGroupController]):
             if 'cpu' not in controllers:
                 return 'N/A'
             controller = controllers['cpu']
@@ -546,7 +545,7 @@ class CGroupLimit:
             return f'{self.ratio:.0%}'
 
         @staticmethod
-        def get_limit(controllers: typing.Dict[str, CGroupController]):
+        def get_limit(controllers: dict[str, CGroupController]):
             if 'cpu' not in controllers:
                 return 'N/A'            
             controller = controllers['cpu']
@@ -575,7 +574,7 @@ class CGroupLimit:
             self.num_cpus = len(self.cpus)
 
         @staticmethod
-        def _expand(s: str) -> typing.List[int]:
+        def _expand(s: str) -> list[int]:
             """
             Converts a CPU allocation from the original cgroups format to an
             equivalent list of integer CPU IDs.
@@ -595,7 +594,7 @@ class CGroupLimit:
             return f'{self.num_cpus}'
 
         @staticmethod
-        def get_limit(controllers: typing.Dict[str, CGroupController]) -> CGroupLimit.CPUAllocation:
+        def get_limit(controllers: dict[str, CGroupController]) -> CGroupLimit.CPUAllocation:
             if 'cpuset' not in controllers:
                 return 'N/A'
 
@@ -628,7 +627,7 @@ class CGroupLimit:
             return f'{self.limit}'
 
         @staticmethod
-        def get_limit(controllers: typing.Dict[str, CGroupController]):
+        def get_limit(controllers: dict[str, CGroupController]):
             if 'memory' not in controllers:
                 return 'N/A'
 
@@ -657,7 +656,7 @@ class MacOSEnvironment(CommonEnvironment):
     """
 
     def __init__(self):
-        super(MacOSEnvironment, self).__init__()
+        super().__init__()
 
         self.cpu_type = self._from_sysctl('machdep.cpu.brand_string')
         self.logical_cpu_cores = self._from_sysctl('hw.logicalcpu')
@@ -748,17 +747,6 @@ def _pipeline_revision() -> str:
             pass
 
     return version_str
-
-
-def _cluster_details():
-    env_details = [node_details]
-    if mpihelpers.is_mpi_ready():
-        mpi_results = mpihelpers.mpiclient.push_command_request('pipeline.environment.node_details', block=True,
-                                                                target_server=mpihelpers.mpi_server_list)
-        for r in mpi_results:
-            env_details.append(r['ret'])
-
-    return env_details
 
 
 casa_version = casatasks.version()

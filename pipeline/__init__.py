@@ -1,4 +1,6 @@
 """Pipeline software package."""
+from __future__ import annotations
+
 import atexit
 import decimal
 import http.server
@@ -9,10 +11,13 @@ import os
 import pathlib
 import threading
 import webbrowser
-from typing import Any, Optional
+from typing import TYPE_CHECKING
 
 import matplotlib
 from astropy.utils.iers import conf as iers_conf
+
+if TYPE_CHECKING:
+    from typing import Any
 
 # import `pipeline.config` early to allow modifications of
 # `casaconfig.config` attributes before importing casatasks/casatools
@@ -174,11 +179,11 @@ def _find_caller_globals() -> dict[str, Any]:
 
 def _import_module_contents(module_name: str, target_globals: dict[str, Any]) -> bool:
     """Import all public contents from a module into the target globals dictionary.
-    
+
     Args:
         module_name: The full name of the module to import from
         target_globals: The globals dictionary to import into
-        
+
     Returns:
         bool: True if import was successful, False otherwise
     """
@@ -205,9 +210,9 @@ def _import_module_contents(module_name: str, target_globals: dict[str, Any]) ->
         return False
 
 
-def initcli(user_globals: Optional[dict[str, Any]] = None) -> None:
+def initcli(user_globals: dict[str, Any] | None = None) -> None:
     """Initialize CLI by importing pipeline commands from various packages.
-    
+
     Args:
         user_globals: Optional globals dictionary to import into.
                      If None, the caller's globals will be used.

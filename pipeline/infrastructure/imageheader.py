@@ -4,8 +4,6 @@ import os
 import re
 from typing import TYPE_CHECKING
 
-import numpy as np
-
 import pipeline
 from pipeline import environment, infrastructure
 from pipeline.infrastructure import casa_tools

@@ -6,7 +6,7 @@ import pprint
 import tempfile
 from inspect import signature
 
-from pipeline.infrastructure import daskhelpers, exceptions, logging
+from pipeline.infrastructure import daskhelpers, exceptions, filenamer, logging
 from pipeline.infrastructure.utils import gen_hash, get_obj_size, human_file_size
 
 casampi_spec = importlib.util.find_spec('casampi')
@@ -33,7 +33,7 @@ BUFFER_LIMIT = 100*1024*1024  # 100 MiB
 LOG = logging.get_logger(__name__)
 
 
-class AsyncTask(object):
+class AsyncTask:
     def __init__(self, executable):
         """
         Create a new AsyncTask.
@@ -147,7 +147,7 @@ class AsyncTask(object):
             )
 
 
-class SyncTask(object):
+class SyncTask:
     def __init__(self, task, executor=None):
         """
         Create a new SyncTask object.
@@ -194,7 +194,7 @@ class SyncTask(object):
             raise exceptions.PipelineException(err_msg)
 
 
-class Executable(object):
+class Executable:
     def __init__(self):
         self.logs = {}
 
@@ -206,13 +206,12 @@ class Executable(object):
 
 class Tier0PipelineTask(Executable):
     def __init__(self, task_cls, task_args, context_path):
-        """
-        Create a new Tier0PipelineTask representing a pipeline task to be
-        executed on an MPI server.
+        """Create a new Tier0PipelineTask representing a pipeline task to be executed on an MPI server.
 
-        :param task_cls: the class of the pipeline task to execute
-        :param task_args: any arguments to passed to the task Inputs
-        :param context_path: the filesystem path to the pickled Context
+        Args:
+            task_cls: The class of the pipeline task to execute.
+            task_args: Arguments to pass to the task Inputs.
+            context_path: Filesystem path to the pickled Context.
         """
         super().__init__()
         self.__task_cls = task_cls
@@ -255,6 +254,25 @@ class Tier0PipelineTask(Executable):
             inputs = self.__task_cls.Inputs(context, **task_args)
             task = self.__task_cls(inputs)
 
+            # Propagate the Pipeline task name to the MPI server so that data
+            # product filenames match those produced in serial mode.
+            # NamingTemplate.task is normally set by basetask.execute() only
+            # when is_top_level_task() is True, which is always False on MPI
+            # servers, so we must set it explicitly here.
+            from pipeline.infrastructure import task_registry as _tr
+
+            try:
+                task_name = _tr.get_casa_task(self.__task_cls)
+            except KeyError:
+                # Worker class not directly registered — look for a registered
+                # ParallelFoo whose .Task attribute points to this class.
+                task_name = next(
+                    (m.casa_task for m in _tr.task_map if getattr(m.pipeline_class, 'Task', None) is self.__task_cls),
+                    None,
+                )
+            if task_name is not None:
+                filenamer.NamingTemplate.task = task_name
+
             return lambda: task.execute()
 
         finally:
@@ -282,7 +300,7 @@ class Tier0JobRequest(Executable):
         else:
             # Exclude the context reference inside the executor shallow copy before pushing from the client
             # to reduce the risk of reaching the MPI buffer size limit (150MiB as of CASA ver6.4.1,
-            # see PIPE-13656/PIPE-1337).
+            # see CAS-13656/PIPE-1337).
             self.__executor = executor.copy(exclude_context=True)
 
     def get_executable(self):
@@ -335,7 +353,7 @@ class Tier0FunctionCall(Executable):
         else:
             # Exclude the context reference inside the executor shallow copy before pushing from the client
             # to reduce the risk of reaching the MPI buffer size limit (150MiB as of CASA ver6.4.1,
-            # see PIPE-13656/PIPE-1337).
+            # see CAS-13656/PIPE-1337).
             self.__executor = executor.copy(exclude_context=True)
 
         # the following code is used to get a nice repr format

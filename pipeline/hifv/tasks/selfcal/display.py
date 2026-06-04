@@ -13,7 +13,7 @@ import pipeline.infrastructure.renderer.logger as logger
 LOG = infrastructure.get_logger(__name__)
 
 
-class selfcalphaseGainPerAntennaChart(object):
+class selfcalphaseGainPerAntennaChart:
     def __init__(self, context, result):
         self.context = context
         self.result = result
@@ -102,7 +102,7 @@ class selfcalphaseGainPerAntennaChart(object):
         return [p for p in plots if p is not None]
 
 
-class selfcalSolutionNumPerFieldChart(object):
+class selfcalSolutionNumPerFieldChart:
     """present the selfcal solution flag stats as a heatmap.
     likely only work for the self-cal gain table from the 'VLASS-SE' mode (see PIPE-1010), i.e.
         one solution per polarization per image-row (unique source id) for each antenna

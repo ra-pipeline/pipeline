@@ -7,7 +7,7 @@ import pipeline.infrastructure as infrastructure
 LOG = infrastructure.get_logger(__name__)
 
 
-class GaussianKernel(object):
+class GaussianKernel:
     def __init__(self, width):
         self.width = width
         self.width_squared = width * width
@@ -17,7 +17,7 @@ class GaussianKernel(object):
         return math.exp(-0.69314718055994529 * (radius * radius) / self.width_squared)
 
 
-class LinearKernel(object):
+class LinearKernel:
     def __init__(self, width):
         self.width = width
 
@@ -25,7 +25,7 @@ class LinearKernel(object):
         return (1.0 - 0.5 * radius / self.width)
 
 
-class Accumulator(object):
+class Accumulator:
     KernelType = {'gauss': GaussianKernel,
                   'linear': LinearKernel}
 

@@ -8,7 +8,7 @@ import decimal
 # for reformatiing GHz, want to say 'print precision to nearest 10kHz'
 
 
-class UnitOfMagnitude(object):
+class UnitOfMagnitude:
     """Models a unit of magnitude such as 'Kilobyte', 'milimetre' or 'hectare'."""
     def __init__(self, magnitude, format, html):
         self.magnitude = decimal.Decimal(str(magnitude))
@@ -37,7 +37,7 @@ class UnitOfMagnitude(object):
         return self.magnitude >= other.magnitude
 
 
-class UnitFormat(object):
+class UnitFormat:
     def __init__(self, prefer_integers=False):
         self.units = list()
         self.prefer_integers = prefer_integers

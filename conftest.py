@@ -1,6 +1,7 @@
 """This file contains some pipeline-specific pytest configuration settings."""
 from __future__ import annotations
 
+import gc
 import logging
 import os
 import pathlib
@@ -19,6 +20,49 @@ if TYPE_CHECKING:
     from _pytest.config import Config
     from _pytest.nodes import Item
     from pytest import FixtureRequest, Parser, Session
+
+
+@pytest.fixture(autouse=True)
+def clear_module_level_caches() -> Iterator[None]:
+    """Clear module-level caches between tests to reduce memory footprint.
+
+    Two module-level caches accumulate stale entries across regression tests:
+
+    1. ``MSTOOL_SELECTEDINDICES_CACHE`` (conversion.py) — a dict keyed by MS
+       absolute path, each holding an LRU cache of up to 40,000 ms.msselect()
+       results.  Each regression test uses different MSes, so entries from a
+       finished test are pure dead weight.
+
+    2. ``get_calstate_shape`` cache (callibrary.py) — decorated with
+       ``@cachetools.cached(LRUCache(50))``, keyed by ``MeasurementSet.name``.
+       Cached values hold ``IntervalTree`` objects that internally reference the
+       ``MeasurementSet`` dimensions, keeping ``MeasurementSet`` instances alive
+       even after the pipeline ``Context`` would otherwise be unreachable.
+
+    Both caches are cleared *after* each test (teardown phase of the fixture)
+    so the caches are still warm during the test that populated them, but stale
+    data does not carry over to the next test.
+    """
+    yield
+
+    try:
+        from pipeline.infrastructure.utils.conversion import MSTOOL_SELECTEDINDICES_CACHE
+        MSTOOL_SELECTEDINDICES_CACHE.clear()
+    except ImportError:
+        pass
+
+    try:
+        from pipeline.infrastructure.callibrary import get_calstate_shape
+        get_calstate_shape.cache_clear()
+    except (ImportError, AttributeError):
+        pass
+
+    # Both caches above can hold references into the Context object graph.
+    # Now that they are cleared and the test function has fully returned
+    # (so the 'context' local in PipelineTester.run() is gone), trigger a
+    # full GC cycle to collect the cyclic Context → ResultsProxy → Context
+    # chain that CPython's reference counting alone cannot free (PIPE-3061).
+    gc.collect()
 
 
 def pytest_addoption(parser: Parser) -> None:

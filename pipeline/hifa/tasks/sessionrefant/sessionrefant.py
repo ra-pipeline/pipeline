@@ -75,7 +75,7 @@ class SessionRefAnt(basetask.StandardTaskTemplate):
     is_multi_vis_task = True
 
     def __init__(self, inputs):
-        super(SessionRefAnt, self).__init__(inputs)
+        super().__init__(inputs)
 
     def prepare(self, **parameters):
         # Initialize results.
