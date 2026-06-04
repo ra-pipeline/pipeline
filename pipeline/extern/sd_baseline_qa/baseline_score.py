@@ -1,15 +1,13 @@
+import datetime
 import pathlib
 import time
-import datetime
 
-import pipeline.extern.sd_baseline_qa.sd_qa_utils as sd_qa_utils
+from casatools import version_string as cversion
+
 import pipeline.extern.sd_baseline_qa.sd_baseline_qa as sd_baseline_qa
 import pipeline.extern.sd_baseline_qa.sd_qa_reports as sd_qa_reports
 
-#from pipeline.infrastructure.launcher import Context
 import pipeline.infrastructure as infrastructure
-
-from casatools import version_string as cversion
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -28,15 +26,15 @@ def baseline_score(
         results,
         context,
         outfile
-):
+)-> None | dict[str, list]:
     """
 
     Args:
         results: SDBaselineResults
-        context:
+        context: Data structure containing pertinent run and results information.
         outfile: This is the baseline ms file that is used for analysis.
 
-    Returns:
+    Returns: None | Dict
 
     """
 
@@ -53,7 +51,7 @@ def baseline_score(
 
     if line_data is None:
         LOG.error("Science line data not found; Baseline QA heuristic for XX-YY profiles canceled")
-        return
+        return None
 
     # Generally, pipeline operates in the current working directory, so we will use that as the working path.
     working_path = pathlib.Path.cwd().resolve()
@@ -73,8 +71,7 @@ def baseline_score(
         sci_line_data=line_data,
         plot_output_path=str(plot_path),
         weblog_output_path=str(weblog_path),
-        buffer_data=True,
-        buffer_fname=str(baseline_file.with_suffix(".mswCollection.bl.buffer.pkl"))
+        buffer_data=False
     )
 
     elapsed_time = (time.time() - start_time) / 60.0
@@ -95,3 +92,5 @@ def baseline_score(
         writemode="w",
         weblog_adress=""
     )
+
+    return {"score": qa_score, "plot_names" :plots_function_names}

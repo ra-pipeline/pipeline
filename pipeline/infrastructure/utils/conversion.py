@@ -55,7 +55,7 @@ __all__ = [
     'to_pipeline_intent',
     'convert_paths_to_basenames',
     'human_file_size',
-    ]
+]
 
 # By default we use CASA to parse arguments into spw/field/ant IDs. However, this
 # requires access to the data. Setting this property to False uses the pipeline's
@@ -726,7 +726,7 @@ def _parse_antenna(task_arg: str | None, antennas: dict[str, NDArray[generic]] |
 
 def record_to_quantity(
         record: dict | list[dict] | tuple[dict]
-        ) -> u.Quantity | list[u.Quantity] | tuple[u.Quantity]:
+) -> u.Quantity | list[u.Quantity] | tuple[u.Quantity]:
     """Convert a CASA record to an Astropy quantity.
 
     Optionally, the input can be a list/tuple in which each element is a CASA record.
@@ -760,11 +760,11 @@ def phasecenter_to_skycoord(phasecenter: str) -> SkyCoord:
 
     # handle common case of Dec expressed with two dots instead of colons
     if (
-        dec.count('.') >= 2
-        and ':' not in dec
-        and 'deg' not in dec
-        and 'd' not in dec
-        and 'rad' not in dec
+            dec.count('.') >= 2
+            and ':' not in dec
+            and 'deg' not in dec
+            and 'd' not in dec
+            and 'rad' not in dec
     ):
         dec = dec.replace('.', ':', 2)
 
@@ -926,7 +926,7 @@ def human_file_size(size_in_bytes: int | float) -> str:
     unit_index = min(unit_index, len(unit_labels) - 1)
 
     # Calculate the size in the chosen unit
-    human_readable_size = size_in_bytes / (base**unit_index)
+    human_readable_size = size_in_bytes / (base ** unit_index)
 
     # Get the unit label
     unit = unit_labels[unit_index]
@@ -937,3 +937,17 @@ def human_file_size(size_in_bytes: int | float) -> str:
     else:
         # Format to one decimal place, adjust as needed
         return f"{human_readable_size:.1f} {unit}"
+
+
+def set_to_data(s: set[Any | list[Any]])-> Any | list[Any]:
+    SINGLE = 1
+
+    if not isinstance(s, set):
+        LOG.error(f"Invalid data type in set() conversion: {type(s)} ...")
+        return None
+
+    struct = list(s)
+    if len(struct) > SINGLE:
+        return struct
+
+    return struct[0]

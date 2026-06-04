@@ -13,6 +13,7 @@ import pipeline.extern.sd_baseline_qa.sd_qa_reports as sd_qa_reports
 import pipeline.extern.sd_baseline_qa.mswrapper_sd as mswrapper_sd
 
 import pipeline.infrastructure as infrastructure
+import pipeline.infrastructure.pipelineqa as pipelineqa
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -86,6 +87,7 @@ def data_stats_bl(msw: mswrapper_sd.MSWrapperSD, scisel: np.ndarray, min_nwave: 
     is_fully_flagged = {scan: {pol: ((msw.time_mean_scan is None) or (np.sum(msw.time_mean_scan[scan].mask[pol]) == msw.nchan)) for pol in range(msw.npol)} for scan in extscanlist}
     if msw.analysis is None:
         msw.analysis = {}
+
     msw.analysis['is_fully_flagged'] = is_fully_flagged
 
     #If no data, fill in with dummy values
@@ -241,10 +243,28 @@ def calc_baseline_qascore_single(
     if (nrows == 0) or (len(notflaggedscans) == 0):
         #Create objects to create QAscore
         reason = 'BLine.deviation'
-        applies_to = pqa.TargetDataSelection(vis={msname}, scan={'all'}, intent={'*OBSERVE_TARGET#ON_SOURCE*'}, spw={msw.spw}, ant={msw.antenna}, pol={'N/A'})
-        comes_from = pqa.QAOrigin(metric_name=reason, metric_score=0.0, metric_units='n-sigma deviation')
-        qascore = pqa.QAScore(1.0, longmsg=f'{msname}: All data flagged for spw {msw.spw}, antenna {msw.antenna} in scan all (field {fieldname}).', shortmsg='Baseline deviation', origin=comes_from, applies_to=applies_to, hierarchy=reason)
-        return (msw, qascore, [qascore], 'N/A')
+        applies_to = pqa.TargetDataSelection(
+            vis={msname},
+            scan={"All"},
+            intent={'*OBSERVE_TARGET#ON_SOURCE*'},
+            spw={msw.spw},
+            ant={msw.antenna},
+            pol={'NA'},
+            field={fieldname},
+        )
+
+        comes_from = pipelineqa.QAOrigin(metric_name=reason, metric_score=0.0, metric_units='n-sigma deviation')
+
+        qascore = pipelineqa.QAScore(
+            1.0,
+            longmsg=f'{msname}: All data flagged for spw {msw.spw}, antenna {msw.antenna} in scan all (field {fieldname}).',
+            shortmsg='Baseline deviation',
+            origin=comes_from,
+            applies_to=applies_to,
+            hierarchy=reason
+        )
+
+        return msw, qascore, [qascore], 'N/A'
 
     #Calculate XX/YY deviations from 0 and Fourier analysis
     diff0 = {}
@@ -276,10 +296,28 @@ def calc_baseline_qascore_single(
                 polstr = 'XX' if (pol == 0) else 'YY'
                 qascore_value = qascorefunc(max_diff0_sigma, score_top = this_score_top, score_bottom = this_score_bottom, nsigma_threshold = thresholds['max_diff0_sigma'], nsigma_bottom = 2.0*thresholds['max_diff0_sigma'])
                 reason = 'BLine.continuum.dev'
-                applies_to = pqa.TargetDataSelection(vis={msname}, scan={scan}, intent={'*OBSERVE_TARGET#ON_SOURCE*'}, spw={msw.spw}, ant={msw.antenna}, pol={polstr})
-                comes_from = pqa.QAOrigin(metric_name=reason, metric_score=float(np.round(max_diff0_sigma, 3)), metric_units='Deviation from 0')
+                applies_to = pqa.TargetDataSelection(
+                    vis={msname},
+                    scan={scan},
+                    intent={'*OBSERVE_TARGET#ON_SOURCE*'},
+                    spw={msw.spw},
+                    ant={msw.antenna},
+                    pol={'NA'},
+                    field={fieldname},
+                )
+
+                comes_from = pipelineqa.QAOrigin(metric_name=reason, metric_score=float(np.round(max_diff0_sigma, 3)), metric_units='Deviation from 0')
                 message = f'{msname}: Significant baseline deviation for spw {msw.spw}, antenna {msw.antenna}, field {fieldname}, scan {scan}, polarization {polstr}.'
-                qascore = pqa.QAScore(float(np.round(qascore_value, 3)), longmsg=message, shortmsg='Baseline deviation', origin=comes_from, applies_to=applies_to, hierarchy=reason)
+
+                qascore = pipelineqa.QAScore(
+                    score=float(np.round(qascore_value, 3)),
+                    longmsg=f'{msname}: All data flagged for spw {msw.spw}, antenna {msw.antenna} in scan all (field {fieldname}).',
+                    shortmsg='Baseline deviation',
+                    origin=comes_from,
+                    applies_to=applies_to,
+                    hierarchy=reason
+                )
+
                 qascores_list.append(qascore)
 
             #Put a yellow QA scores if there is a sinusoidal residual in line free channels
@@ -287,8 +325,18 @@ def calc_baseline_qascore_single(
                 polstr = 'XX' if (pol == 0) else 'YY'
                 qascore_value = qascorefunc(sinusoid_sigma[scan][pol]['n_sigma'], score_top = this_score_top, score_bottom = this_score_bottom, nsigma_threshold = thresholds['sinusoid_sigma'], nsigma_bottom = 2.0*thresholds['sinusoid_sigma'])
                 reason = 'BLine.continuum.sinusoid'
-                applies_to = pqa.TargetDataSelection(vis={msname}, scan={scan}, intent={'*OBSERVE_TARGET#ON_SOURCE*'}, spw={msw.spw}, ant={msw.antenna}, pol={polstr})
-                comes_from = pqa.QAOrigin(metric_name=reason, metric_score=float(np.round(sinusoid_sigma[scan][pol]['n_sigma'], 3)), metric_units='Deviation from 0')
+
+                applies_to = pqa.TargetDataSelection(
+                    vis={msname},
+                    scan={scan},
+                    intent={'*OBSERVE_TARGET#ON_SOURCE*'},
+                    spw={msw.spw},
+                    ant={msw.antenna},
+                    pol={polstr},
+                    field={fieldname},
+                )
+
+                comes_from = pipelineqa.QAOrigin(metric_name=reason, metric_score=float(np.round(sinusoid_sigma[scan][pol]['n_sigma'], 3)), metric_units='Deviation from 0')
                 message = '{0:s}: Sinusoidal baseline deviation for spw {1:s}, antenna {2:s}, field {3:s}, scan {4:s}, polarization {5:s}. Amplitude {6:.1f}% of requested RMS, wavelength {7:.3f}MHz (nwave={8:s})'.format(
                     msname,
                     str(msw.spw),
@@ -302,7 +350,15 @@ def calc_baseline_qascore_single(
                         )
                 )
 
-                qascore = pqa.QAScore(float(np.round(qascore_value, 3)), longmsg=message, shortmsg='Baseline deviation', origin=comes_from, applies_to=applies_to, hierarchy=reason)
+                qascore = pipelineqa.QAScore(
+                    score=float(np.round(qascore_value, 3)),
+                    longmsg=message,
+                    shortmsg='Baseline deviation',
+                    origin=comes_from,
+                    applies_to=applies_to,
+                    hierarchy=reason
+                )
+
                 qascores_list.append(qascore)
 
     if (len(notflaggedscans) > 0) and (npol == 2):
@@ -344,17 +400,36 @@ def calc_baseline_qascore_single(
         if np.sum(low_pXY_high_diff) > 0:
             qascore_value = qascorefunc(min_pXY, score_top = this_score_top, score_bottom = this_score_bottom, nsigma_threshold = thresholds['min_pXY_corr'], nsigma_bottom = 0.0)
             reason = 'BLine.scienceline.lowpXYsci'
-            applies_to = pqa.TargetDataSelection(vis={msname}, scan={'all'}, intent={'*OBSERVE_TARGET#ON_SOURCE*'}, spw={msw.spw}, ant={msw.antenna}, pol={'N/A'})
-            comes_from = pqa.QAOrigin(metric_name=reason, metric_score=float(np.round(min_pXY, 3)), metric_units='XX-YY Pearsons cross-correlation')
-            qascore = pqa.QAScore(float(np.round(qascore_value, 3)), longmsg=f'{msname}: Significant lack of XX-YY correlation and XX-YY difference in science line detection for spw {msw.spw}, antenna {msw.antenna}, field {fieldname} in channels {chan_str}.', shortmsg='Science line detection problem', origin=comes_from, applies_to=applies_to, hierarchy=reason)
+
+            applies_to = pqa.TargetDataSelection(
+                vis={msname},
+                scan={scan},
+                intent={'*OBSERVE_TARGET#ON_SOURCE*'},
+                spw={msw.spw},
+                ant={msw.antenna},
+                pol={polstr},
+                field={fieldname},
+            )
+            comes_from = pipelineqa.QAOrigin(metric_name=reason, metric_score=float(np.round(min_pXY, 3)), metric_units='XX-YY Pearsons cross-correlation')
+            qascore = pipelineqa.QAScore(float(np.round(qascore_value, 3)), longmsg=f'{msname}: Significant lack of XX-YY correlation and XX-YY difference in science line detection for spw {msw.spw}, antenna {msw.antenna}, field {fieldname} in channels {chan_str}.', shortmsg='Science line detection problem', origin=comes_from, applies_to=applies_to, hierarchy=reason)
+
             qascores_list.append(qascore)
 
         elif np.sum(low_pXY) > 0:
             qascore_value = qascorefunc(min_pXY, score_top = 0.80, score_bottom = this_score_top, nsigma_threshold = thresholds['min_pXY_corr'], nsigma_bottom = 0.0)
             reason = 'BLine.scienceline.lowpXYsci'
-            applies_to = pqa.TargetDataSelection(vis={msname}, scan={'all'}, intent={'*OBSERVE_TARGET#ON_SOURCE*'}, spw={msw.spw}, ant={msw.antenna}, pol={'N/A'})
-            comes_from = pqa.QAOrigin(metric_name=reason, metric_score=float(np.round(min_pXY, 3)), metric_units='XX-YY Pearsons cross-correlation')
-            qascore = pqa.QAScore(float(np.round(qascore_value, 3)), longmsg=f'{msname}: Significant lack of XX-YY correlation in science line detection for spw {msw.spw}, antenna {msw.antenna}, field {fieldname} in channels {chan_str}.', shortmsg='Science line detection problem', origin=comes_from, applies_to=applies_to, hierarchy=reason)
+
+            applies_to = pqa.TargetDataSelection(
+                vis={msname},
+                scan={scan},
+                intent={'*OBSERVE_TARGET#ON_SOURCE*'},
+                spw={msw.spw},
+                ant={msw.antenna},
+                pol={polstr},
+                field={fieldname},
+            )
+            comes_from = pipelineqa.QAOrigin(metric_name=reason, metric_score=float(np.round(min_pXY, 3)), metric_units='XX-YY Pearsons cross-correlation')
+            qascore = pipelineqa.QAScore(float(np.round(qascore_value, 3)), longmsg=f'{msname}: Significant lack of XX-YY correlation in science line detection for spw {msw.spw}, antenna {msw.antenna}, field {fieldname} in channels {chan_str}.', shortmsg='Science line detection problem', origin=comes_from, applies_to=applies_to, hierarchy=reason)
             qascores_list.append(qascore)
 
     #Test for any weird correlation in continuum channels, which should not be
@@ -379,24 +454,43 @@ def calc_baseline_qascore_single(
             qascore_value = qascorefunc(max_pXY_cont, score_top = this_score_top, score_bottom = this_score_bottom, nsigma_threshold = thresholds['max_pXY_cont'], nsigma_bottom = 2.0*thresholds['max_pXY_cont'])
             print('max_pXY_cont: '+str(max_pXY_cont)+' -> qascore_value: '+str(qascore_value))
             reason = 'BLine.scienceline.highpXYcont'
-            applies_to = pqa.TargetDataSelection(vis={msname}, scan={'all'}, intent={'*OBSERVE_TARGET#ON_SOURCE*'}, spw={msw.spw}, ant={msw.antenna}, pol={'N/A'})
-            comes_from = pqa.QAOrigin(metric_name=reason, metric_score=float(np.round(max_pXY_cont, 3)), metric_units='XX-YY Pearsons cross-correlation')
-            qascore = pqa.QAScore(float(np.round(qascore_value, 3)), longmsg=f'{msname}: Possible miss of science line detection for spw {msw.spw}, antenna {msw.antenna}, field {fieldname} at {freq_max_pXY_cont:.4f}MHz.', shortmsg='Science line detection problem', origin=comes_from, applies_to=applies_to, hierarchy=reason)
+
+            applies_to = pqa.TargetDataSelection(
+                vis={msname},
+                scan={scan},
+                intent={'*OBSERVE_TARGET#ON_SOURCE*'},
+                spw={msw.spw},
+                ant={msw.antenna},
+                pol={polstr},
+                field={fieldname},
+            )
+            comes_from = pipelineqa.QAOrigin(metric_name=reason, metric_score=float(np.round(max_pXY_cont, 3)), metric_units='XX-YY Pearsons cross-correlation')
+            qascore = pipelineqa.QAScore(float(np.round(qascore_value, 3)), longmsg=f'{msname}: Possible miss of science line detection for spw {msw.spw}, antenna {msw.antenna}, field {fieldname} at {freq_max_pXY_cont:.4f}MHz.', shortmsg='Science line detection problem', origin=comes_from, applies_to=applies_to, hierarchy=reason)
             qascores_list.append(qascore)
 
         if maxXYrange > thresholds['maxant_rangeratio']:
             polstr = 'XX' if msw.analysis['data_range'][scanmax_XYranges][0] > msw.analysis['data_range'][scanmax_XYranges][1] else 'YY'
             qascore_value = qascorefunc(maxXYrange, score_top = this_score_top, score_bottom = this_score_bottom, nsigma_threshold = thresholds['maxant_rangeratio'], nsigma_bottom = 2.0*thresholds['maxant_rangeratio'])
             reason = 'BLine.continuum.XYrangeratio'
-            applies_to = pqa.TargetDataSelection(vis={msname}, scan={scanmax_XYranges}, intent={'*OBSERVE_TARGET#ON_SOURCE*'}, spw={msw.spw}, ant={msw.antenna}, pol={polstr})
-            comes_from = pqa.QAOrigin(metric_name=reason, metric_score=float(np.round(maxXYrange, 3)), metric_units='Deviation from 0')
+
+            applies_to = pqa.TargetDataSelection(
+                vis={msname},
+                scan={scan},
+                intent={'*OBSERVE_TARGET#ON_SOURCE*'},
+                spw={msw.spw},
+                ant={msw.antenna},
+                pol={polstr},
+                field={fieldname},
+            )
+            comes_from = pipelineqa.QAOrigin(metric_name=reason, metric_score=float(np.round(maxXYrange, 3)), metric_units='Deviation from 0')
             message = f'{msname}: Baseline data range significantly greater compared to other polarization for spw {msw.spw}, antenna {msw.antenna}, field {fieldname}, scan {scan}, polarization {polstr}.'
-            qascore = pqa.QAScore(float(np.round(qascore_value, 3)), longmsg=message, shortmsg='Continuum data range', origin=comes_from, applies_to=applies_to, hierarchy=reason)
+            qascore = pipelineqa.QAScore(float(np.round(qascore_value, 3)), longmsg=message, shortmsg='Continuum data range', origin=comes_from, applies_to=applies_to, hierarchy=reason)
             qascores_list.append(qascore)
 
     #Save QA scores generated into the msw data structure
     if 'qascores_list' not in msw.analysis.keys():
         msw.analysis['qascores_list'] = []
+
     msw.analysis['qascores_list'].extend(qascores_list)
 
     return
@@ -475,10 +569,19 @@ def calc_qascores_collection(
                     triggerscan = np.array(scans)[idxmax_data_ranges]
                     triggerpol = np.array(pols)[idxmax_data_ranges]
                     triggerpolstr = 'XX' if (triggerpol == 0) else 'YY'
-                    applies_to = pqa.TargetDataSelection(vis={ms}, scan={triggerscan}, intent={'*OBSERVE_TARGET#ON_SOURCE*'}, spw={spw}, ant={triggerant}, pol={triggerpolstr})
-                    comes_from = pqa.QAOrigin(metric_name=reason, metric_score=float(np.round(metricvalue, 3)), metric_units='Data range Max to Min ratio')
+
+                    applies_to = pqa.TargetDataSelection(
+                        vis={ms},
+                        scan={triggerscan},
+                        intent={'*OBSERVE_TARGET#ON_SOURCE*'},
+                        spw={msw.spw},
+                        ant={triggerant},
+                        pol={triggerpolstr},
+                        field={field},
+                    )
+                    comes_from = pipelineqa.QAOrigin(metric_name=reason, metric_score=float(np.round(metricvalue, 3)), metric_units='Data range Max to Min ratio')
                     message = f'{ms}: Data range excess for spw {spw}, antenna {triggerant}, field {field}, scan {triggerscan}, polarization {triggerpolstr}.'
-                    qascore = pqa.QAScore(float(np.round(qascore_value, 3)), longmsg=message, shortmsg='Baseline data range excess', origin=comes_from, applies_to=applies_to, hierarchy=reason)
+                    qascore = pipelineqa.QAScore(float(np.round(qascore_value, 3)), longmsg=message, shortmsg='Baseline data range excess', origin=comes_from, applies_to=applies_to, hierarchy=reason)
                     #Append qasocres to msw analysis dict
                     msw = mswCollection[(ms, spw, triggerant, str(fieldid))]
                     if 'qascores_list' not in msw.analysis.keys():
@@ -569,8 +672,8 @@ def load_and_stats_bl(
         #Clear raw data from MSWrapper object to release memory
         mswCollection[(measurementset, spw, ant, str(fieldid))].data = None
 
-    if buffer_data and (not os.path.exists(buffer_fname)):
-        save_mswCollection(mswCollection, buffer_fname)
+    #if buffer_data and (not os.path.exists(buffer_fname)):
+    #    save_mswCollection(mswCollection, buffer_fname)
 
     return mswCollection
 
@@ -589,13 +692,34 @@ def add_non_outlier_qascores(mswCollection: dict):
         if len(msw.analysis['qascores_list']) == 0:
             #Create objects to create QAscore
             reason = 'BLine.continuum'
-            applies_to = pqa.TargetDataSelection(vis={ms}, scan={'all'}, intent={'*OBSERVE_TARGET#ON_SOURCE*'}, spw={spw}, ant={msw.antenna}, pol={'N/A'})
-            comes_from = pqa.QAOrigin(metric_name=reason, metric_score=0.0, metric_units='Deviation from 0')
             fieldname = msw.spw_setup['namesfor'][str(msw.fieldid)][0]
-            qascore_value = 1.0
-            longmsg = '{0:s}: No significant baseline deviation detected for spw {1:s}, antenna {2:s} in all scans (field {3:s})'.format(ms, str(spw), ant, fieldname)
-            qascore = pqa.QAScore(qascore_value, longmsg=f"{ms}: {longmsg}", shortmsg='Baseline deviation', origin=comes_from, applies_to=applies_to, hierarchy=reason)
-            msw.analysis['qascores_list'].append(qascore)
+            scanlist = msw.spw_setup['scansforfield'][str(msw.fieldid)]
+
+            for scan in scanlist:
+                applies_to = pqa.TargetDataSelection(
+                    vis={ms},
+                    scan={scan},
+                    intent={'*OBSERVE_TARGET#ON_SOURCE*'},
+                    spw={msw.spw},
+                    ant={msw.antenna},
+                    pol={"NA"},
+                    field={fieldname},
+                )
+                comes_from = pipelineqa.QAOrigin(metric_name=reason, metric_score=0.0, metric_units='Deviation from 0')
+
+                qascore_value = 1.0
+                longmsg = '{0:s}: No significant baseline deviation detected for spw {1:s}, antenna {2:s} in all scans (field {3:s})'.format(ms, str(spw), ant, fieldname)
+                qascore = pipelineqa.QAScore(
+                    qascore_value,
+                    longmsg=f"{ms}: {longmsg}",
+                    shortmsg='Baseline deviation',
+                    origin=comes_from,
+                    applies_to=applies_to,
+                    hierarchy=reason
+                )
+
+                msw.analysis['qascores_list'].append(qascore)
+
     return
 
 def find_min_qascores(mswCollection: dict):
@@ -686,8 +810,8 @@ def get_ms_baseline_qascores(
         fname = sd_qa_reports.plot_data_single_bl(msw, plot_output_path = plot_output_path)
         plots_fnames.append(fname)
 
-    if buffer_data:
-        save_mswCollection(mswCollection, buffer_fname)
+    #if buffer_data:
+    #    save_mswCollection(mswCollection, buffer_fname)
 
     return (qascore_list, antnames_for, plots_fnames)
 

@@ -73,7 +73,7 @@ def main():
     #Change to working folder of pipeline
     init_cwd = os.getcwd()
     #plworking_folder = glob.glob(input_path+'/S*/G*/M*/working')
-    input_path =  '/work/dev/joshua.hoskins/verification/absolute_off/working'
+    input_path =  '/work/dev/joshua.hoskins/pipe-test/working'
     plworking_folder = glob.glob(input_path)
 
     if len(plworking_folder) == 1:
@@ -86,7 +86,7 @@ def main():
     os.chdir(plworking_folder)
 
     #Get science line data detections, if available
-    sci_line_data = sd_qa_utils.read_sci_line_data_from_buffer()
+    #sci_line_data = sd_qa_utils.read_sci_line_data_from_buffer()
     # if sci_line_data is None:
     #      try:
     #          print('Could not find science line detection in a sci_line_data.pkl buffer file, attempting read from the pipeline context.')
@@ -155,7 +155,16 @@ def main():
 
     #Write reports used for testing
     sd_qa_reports.addFLSLentry_bl(qascore_list, output_file = output_path+'prototype_qa_score.csv', dtime_min = dtime_min)
-    sd_qa_reports.makeSummaryTable_bl(qascore_list, antnames_for, plots_fnames, plfolder, working_folder = working_folder, output_file = plot_output_path + '/qascore_summary.csv', writemode = 'w', weblog_adress = 'http://jaopost-web.sco.alma.cl/dataproc/hfrancke/hfranckebase/QAscores/PIPEREQ-305/'+plworking_folder)
+    sd_qa_reports.makeSummaryTable_bl(
+        qascore_list,
+        antnames_for,
+        plots_fnames,
+        plfolder,
+        plot_folder = plot_output_path,
+        output_file = plot_output_path + '/qascore_summary.csv',
+        writemode = 'w',
+        weblog_adress = 'http://jaopost-web.sco.alma.cl/dataproc/hfrancke/hfranckebase/QAscores/PIPEREQ-305/'+plworking_folder
+    )
 
     os.chdir(init_cwd)
 

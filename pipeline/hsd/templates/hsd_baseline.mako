@@ -76,7 +76,7 @@ def clustering_plot_title(title_exp, spw, field=None):
 %>
 
 <!-- short description of what the task does -->
-<p>This task generates baseline fitting tables and subtracts baseline from spectra. 
+<p>This task generates baseline fitting tables and subtracts baseline from spectra.
 Spectral lines are detected by clustering analysis for each spectral window, 
 and line free channels are used for baseline fitting. </p>
 
@@ -99,6 +99,48 @@ line detection stage.</p>
 <li><a href="#clusteranalysis">Line Detection by Clustering Analysis</a></li>
 % endif
 </ul>
+
+<h2 id="profileheuristic" class="jumptarget" >QA Comparison of the Profiles between XX and YY spectra</h2>
+
+% for field in profile_heuristic_subpages.keys():
+        <h3><a class="replace"
+           href="${os.path.join(dirname, profile_heuristic_subpages[field])}"
+           data-field="${field}">${field}</a>
+        </h3>
+
+     % for plot in profile_heuristic:
+        % if os.path.exists(plot.thumbnail):
+	        <div class="col-md-3">
+	            <div class="thumbnail">
+	                <a href="${os.path.relpath(plot.abspath, pcontext.report_dir)}"
+	                   data-fancybox="thumbs">
+	                    <img class="lazyload"
+                             data-src="${os.path.relpath(plot.thumbnail, pcontext.report_dir)}"
+	                         title="${spmap_plot_title(plot.parameters['spw'], apply_bl=False)}">
+	                </a>
+
+	                <div class="caption">
+	                    <h4>
+	                        <a href="${os.path.join(dirname, profile_heuristic_subpages[field])}"
+	                           class="replace"
+	                           data-spw="${plot.parameters['spw']}"
+	                           data-field="${field}">
+	                           ${get_spw_exp(plot.parameters['spw'])}
+	                        </a>
+	                    </h4>
+	                    <p>Antenna: ${plot.parameters['ant']}<br>
+	                        Field: ${plot.parameters['field']}<br>
+	                        ${get_spw_desc(plot.parameters['spw'])}<br>
+	                    </p>
+	                </div>
+	            </div>
+	        </div>
+        % endif
+    %endfor
+    <div class="clearfix"></div><!--  flush plots, break to next row -->
+%endfor
+
+
 
 <h2 id="rawbeforebaseline" class="jumptarget">Spectral Data Before Baseline Subtraction</h2>
 
@@ -185,6 +227,8 @@ for baseline subtraction.</p>
     % endfor
 	<div class="clearfix"></div><!--  flush plots, break to next row -->
 %endfor
+
+
 
 
 <h2 id="rawafterbaseline" class="jumptarget">Spectral Data After Baseline Subtraction</h2>

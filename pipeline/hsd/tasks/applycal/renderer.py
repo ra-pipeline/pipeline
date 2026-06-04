@@ -288,7 +288,7 @@ class T2_4MDetailsSDApplycalRenderer(super_renderer.T2_4MDetailsApplycalRenderer
 
         This function generates Plot objects for XY-deviation plots registered
         to the results objects. Generated Plot objects are classified with the
-        metadata, and put to the detail page craeted by this function.
+        metadata, and put to the detail page created by this function.
         Summary plots are selected for each field and spectral window
         combination based on the associated QA score.
 
