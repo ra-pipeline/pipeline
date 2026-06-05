@@ -666,13 +666,9 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
                     _, nfrms = estimate_near_field_SNR(image_name, las=las_as)
 
                     LOG.info('The ratio of nf_rms and rms before TARGET imaging (%s): %s', imagename, nfrms / rms)
-                    mask_name = imagename.rsplit('.image', 1)[0] + '.mask'
 
                     nfrms_multiplier = max(nfrms / rms, 1.0)
                     LOG.info('The nfrms multiplier for TARGET imaging (%s): %s', imagename, nfrms_multiplier)
-
-                    LOG.info('Remove any clean mask inherited from TARGET .iter1 imaging.')
-                    casa_tasks.rmtree(mask_name, ignore_errors=True).execute()
 
                 except Exception as err:
                     LOG.info('NF rms threshold scaling heuristics failed: %s', str(err))

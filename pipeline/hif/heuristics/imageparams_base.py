@@ -1792,7 +1792,7 @@ class ImageParamsHeuristics:
                 if not field_dos:
                     continue
                 # spw not observed for the field(s)
-                if not [f for f in field_dos if spw_do in f.valid_spws]:
+                if not [f for f in field_dos if spw_do in f.valid_spws and intent in spw_do.intents]:
                     continue
 
                 # Get the channel flags (uses virtual spw ID !)
@@ -1930,7 +1930,6 @@ class ImageParamsHeuristics:
         field_ids = self.field(intent, field, vislist=vis)  # list of strings with comma separated IDs per MS
         phasecenter, _ = self.phasecenter(field_ids, vislist=vis)  # string
         center_field_ids = self.center_field_ids(vis, field, intent, phasecenter)  # list of integer IDs per MS
-
         for ms_index, msname in enumerate(vis):
             ms = self.observing_run.get_ms(name=msname)
             for intSpw in map(int, spw.split(',')):
@@ -1945,7 +1944,7 @@ class ImageParamsHeuristics:
                     if not field_dos:
                         continue
                     # spw not observed for the field(s)
-                    if not [f for f in field_dos if spw_do in f.valid_spws]:
+                    if not [f for f in field_dos if spw_do in f.valid_spws and intent in spw_do.intents]:
                         continue
 
                     sens_bws[intSpw] = 0.0
