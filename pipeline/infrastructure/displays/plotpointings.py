@@ -4,7 +4,7 @@ from __future__ import annotations
 import contextlib
 import copy
 import os
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,9 +19,12 @@ from pipeline.infrastructure import casa_tools, utils
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
+    from numpy import floating
+    from numpy.typing import NDArray
 
     from pipeline.domain import Field, MeasurementSet, Source
     from pipeline.domain.measures import Distance, EquatorialArc
+    from pipeline.infrastructure.utils.casa_types import DirectionDict
 
 COLORBLIND_PALETTE = {
     'on_tsys': "#FF00E6",
@@ -39,22 +42,10 @@ C_MKS = 299792458
 RADIANS_TO_ARCSEC = 180 / np.pi * 60 * 60
 
 
-class CoordValue(TypedDict):
-    unit: str
-    value: float
-
-
-class MDirection(TypedDict):
-    m0: CoordValue
-    m1: CoordValue
-    refer: str
-    type: str
-
-
 def compute_obs_data(
         ms: MeasurementSet,
         fields: list[Field],
-        ) -> tuple[np.ndarray, np.ndarray, float, list[Distance], list[float]]:
+        ) -> tuple[NDArray[floating], NDArray[floating], float, list[Distance], list[float]]:
     """Extract and compute relevant observation data for plotting.
 
     Args:
@@ -87,7 +78,10 @@ def compute_obs_data(
     return ra, dec, median_ref_freq, dish_diameters, beam_diameters
 
 
-def compute_offsets(ra: np.ndarray, dec: np.ndarray) -> tuple[np.ndarray, np.ndarray, float, float]:
+def compute_offsets(
+        ra: NDArray[floating],
+        dec: NDArray[floating],
+        ) -> tuple[NDArray[floating], NDArray[floating], float, float]:
     """Compute RA/Dec offsets for plotting.
 
     Args:
@@ -110,8 +104,8 @@ def compute_offsets(ra: np.ndarray, dec: np.ndarray) -> tuple[np.ndarray, np.nda
 
 
 def create_figure(
-        delta_ra: np.ndarray,
-        delta_dec: np.ndarray,
+        delta_ra: NDArray[floating],
+        delta_dec: NDArray[floating],
         beam_diameters: list[float],
         margin_x: int = 100,
         margin_y: int = 80,
@@ -188,7 +182,9 @@ def add_elements_to_plot(
                         ax.plot(x, y, marker='+', linestyle='None', color=color, markersize=4)
 
                 if f'Tsys {intent} Scan(s)' not in legend_labels:
-                    legend_labels[f'Tsys {intent} Scan(s)'] = lines.Line2D([0], [0], color=color, linewidth=2, linestyle=linestyle)
+                    legend_labels[f'Tsys {intent} Scan(s)'] = lines.Line2D(
+                        [0], [0], color=color, linewidth=2, linestyle=linestyle,
+                        )
                     legend_colors[f'Tsys {intent} Scan(s)'] = color
         for key, specs in values['target fields'].items():
             linestyle = 'dotted'
@@ -379,7 +375,9 @@ def plot_tsys_scans(ms: MeasurementSet, source: Source, figfile: str) -> None:
 
     # Create Tsys scans plot
     fig, ax, fontsize = create_figure(delta_ra, delta_dec, beam_diameters)
-    plot_dict = compute_element_locs(fields, delta_ra, delta_dec, dish_diameters, beam_diameters, tsys_scans_dict=tsys_scans_dict)
+    plot_dict = compute_element_locs(
+        fields, delta_ra, delta_dec, dish_diameters, beam_diameters, tsys_scans_dict=tsys_scans_dict,
+        )
     legend_labels, legend_colors = add_elements_to_plot(ax, plot_dict, fontsize=fontsize)
 
     # Add title, legend, and labels
@@ -610,7 +608,7 @@ def antenna_taper_factor(array_name: str) -> float:
 
 def tsys_scans_radec(
         ms: MeasurementSet,
-        mean_direction: MDirection,
+        mean_direction: DirectionDict,
         tsys_field: Field,
 ) -> dict[str, dict[int, dict[str, tuple[float, float] | bool]]]:
     """
@@ -663,7 +661,9 @@ def tsys_scans_radec(
                 else:
                     LOG.warning("Result may be inaccurate, especially if it's (0,0).")
             else:
-                LOG.attention("Cycle number could not be determined. Result may be inaccurate, especially if it's (0,0).")
+                LOG.attention(
+                    "Cycle number could not be determined. Result may be inaccurate, especially if it's (0,0).",
+                    )
 
     with (
         casa_tools.MSReader(vis) as myms,
@@ -777,7 +777,7 @@ def tsys_scans_radec(
 
 
 def apply_offset_to_radec(
-        direction: MDirection,
+        direction: DirectionDict,
         offsets: tuple[float, float] = (0.0, 0.0),
         use_euler_angles: bool = True
         ) -> tuple[float, float]:
@@ -862,7 +862,7 @@ def rotation_euler(rao: float, deco: float, r_long: float, r_lat: float) -> tupl
     return new_ra, new_dec
 
 
-def radec_to_direction(ra: float, dec: float, unit: str = "rad", frame: str = 'ICRS') -> MDirection:
+def radec_to_direction(ra: float, dec: float, unit: str = "rad", frame: str = 'ICRS') -> DirectionDict:
     """
     Converts RA and Dec float values into a CASA direction dictionary.
     Adapted from Todd Hunter's AU tool rad2direction
@@ -879,7 +879,7 @@ def radec_to_direction(ra: float, dec: float, unit: str = "rad", frame: str = 'I
     return casa_tools.measures.direction(frame, f'{ra}{unit}', f'{dec}{unit}')
 
 
-def direction_to_radec(direction: MDirection) -> tuple[float, float]:
+def direction_to_radec(direction: DirectionDict) -> tuple[float, float]:
     """
     Extracts RA and Dec values from a CASA direction dictionary.
     Adapted from Todd Hunter's AU tool direction2rad
@@ -893,7 +893,7 @@ def direction_to_radec(direction: MDirection) -> tuple[float, float]:
     return direction['m0']['value'], direction['m1']['value']
 
 
-def diff_directions(orig_direction: MDirection, offset_direction: MDirection) -> tuple[float, float]:
+def diff_directions(orig_direction: DirectionDict, offset_direction: DirectionDict) -> tuple[float, float]:
     """
     Compute the relative difference between the original position and an offset position.
 

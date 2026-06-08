@@ -7,7 +7,7 @@ from pipeline.infrastructure.utils import deduplicate, list_to_str
 LOG = infrastructure.get_logger(__name__)
 
 
-class WvrgcalHeuristics(object):
+class WvrgcalHeuristics:
     def __init__(self, context, vis, hm_tie, tie, hm_smooth, smooth, sourceflag, nsol, segsource):
         self.context = context
         self.vis = vis

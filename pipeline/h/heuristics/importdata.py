@@ -1,11 +1,15 @@
-import ast
+from __future__ import annotations
 
-import numpy as np
+import ast
+from typing import TYPE_CHECKING
 
 from pipeline.domain.datatype import DataType
 
+if TYPE_CHECKING:
+    from numpy import ndarray
 
-def get_ms_data_types_from_history(msgs: np.ndarray) -> (dict, dict):
+
+def get_ms_data_types_from_history(msgs: ndarray) -> tuple[dict, dict]:
     """Retrieve the original datatype lookup dictionaries from MS HISTORY table entries.
 
     Args:

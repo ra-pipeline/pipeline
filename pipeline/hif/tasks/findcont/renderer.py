@@ -5,7 +5,6 @@ Created on 24 Aug 2015
 """
 import collections
 import copy
-import glob
 import operator
 import os
 import shutil
@@ -33,7 +32,7 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                  uri='findcont.mako',
                  description='Detect continuum frequency ranges',
                  always_rerender=False):
-        super(T2_4MDetailsFindContRenderer, self).__init__(uri=uri,
+        super().__init__(uri=uri,
                                                            description=description,
                                                            always_rerender=always_rerender)
 

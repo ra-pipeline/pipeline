@@ -49,7 +49,7 @@ class FinalcalsInputs(vdp.StandardInputs):
                 Example: refant = 'ea01, ea02'
 
         """
-        super(FinalcalsInputs, self).__init__()
+        super().__init__()
         self.context = context
         self.vis = vis
         self._weakbp = weakbp
@@ -91,7 +91,7 @@ class FinalcalsResults(basetask.Results):
         if preceding is None:
             preceding = []
 
-        super(FinalcalsResults, self).__init__()
+        super().__init__()
 
         self.vis = vis
         self.pool = pool[:]

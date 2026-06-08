@@ -15,7 +15,7 @@ LOG = infrastructure.get_logger(__name__)
 
 class SelfcalResults(basetask.Results):
     def __init__(self, caltable=None):
-        super(SelfcalResults, self).__init__()
+        super().__init__()
         self.pipeline_casa_task = 'Selfcal'
 
         self.caltable = caltable

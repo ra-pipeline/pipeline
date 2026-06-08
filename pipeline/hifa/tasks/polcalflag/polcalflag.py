@@ -14,27 +14,26 @@ from pipeline.hif.tasks import correctedampflag
 from pipeline.hif.tasks import gaincal
 from pipeline.infrastructure.refantflag import identify_fully_flagged_antennas_from_flagcmds, \
     mark_antennas_for_refant_update, aggregate_fully_flagged_antenna_notifications, FullyFlaggedAntennasNotification
-from typing import List, Set
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class PolcalflagResults(basetask.Results):
     def __init__(self):
-        super(PolcalflagResults, self).__init__()
+        super().__init__()
 
         self.vis = None
         self.cafresult = None
         self.plots = dict()
 
         # Set of antennas that should be moved to the end of the refant list.
-        self.refants_to_demote: Set[str] = set()
+        self.refants_to_demote: set[str] = set()
 
         # Set of entirely flagged antennas that should be removed from refants.
-        self.refants_to_remove: Set[str] = set()
+        self.refants_to_remove: set[str] = set()
 
         # further information about entirely flagged antennas used in QA scoring
-        self.fully_flagged_antenna_notifications: List[FullyFlaggedAntennasNotification] = []
+        self.fully_flagged_antenna_notifications: list[FullyFlaggedAntennasNotification] = []
 
         # records callibrary files used in applycal calls
         self.callib_map = {}
@@ -442,5 +441,5 @@ class AmpVsXChart(applycal_displays.SpwSummaryChart):
         }
         plot_args.update(**overrides)
 
-        super(AmpVsXChart, self).__init__(context, output_dir, calto, xaxis=xaxis, yaxis='amp',
+        super().__init__(context, output_dir, calto, xaxis=xaxis, yaxis='amp',
                                           intent='POLARIZATION,POLANGLE,POLLEAKAGE', **plot_args)

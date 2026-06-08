@@ -1,4 +1,4 @@
-import collections
+import collections.abc
 import os
 import shutil
 import tempfile
@@ -25,7 +25,7 @@ class BandpassQAPool(pqa.QAScorePool):
     }
 
     def __init__(self, rawdata, caltable):
-        super(BandpassQAPool, self).__init__()
+        super().__init__()
         # rawdata will hold the dictionary output by the CA QA task
         self.rawdata = rawdata
         self._num_pols = caltable_tools.get_num_caltable_polarizations(caltable)

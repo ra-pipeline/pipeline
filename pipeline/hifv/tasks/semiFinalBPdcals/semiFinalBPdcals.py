@@ -1,6 +1,5 @@
-import os
 import collections
-from typing import List, Dict
+import os
 
 import numpy as np
 
@@ -15,7 +14,7 @@ from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import task_registry
 from pipeline.infrastructure import utils
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class semiFinalBPdcalsInputs(vdp.StandardInputs):
@@ -49,7 +48,7 @@ class semiFinalBPdcalsInputs(vdp.StandardInputs):
                 Example: refant = 'ea01, ea02'
 
         """
-        super(semiFinalBPdcalsInputs, self).__init__()
+        super().__init__()
         self.context = context
         self.vis = vis
         self._weakbp = weakbp
@@ -87,7 +86,7 @@ class semiFinalBPdcalsResults(basetask.Results):
         if preceding is None:
             preceding = []
 
-        super(semiFinalBPdcalsResults, self).__init__()
+        super().__init__()
 
         # self.vis = None
         self.pool = pool[:]
@@ -168,7 +167,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         """
         return results
 
-    def _do_semifinal(self, band: str, spwlist: List[str]):
+    def _do_semifinal(self, band: str, spwlist: list[str]):
         """Execute semiFinalBPdcals heuristics per band and spwlist
 
         Args:
@@ -274,7 +273,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         return bpdgain_touse, gtypecaltable, ktypecaltable, bpcaltable, flaggedSolnApplycalbandpass, \
                flaggedSolnApplycaldelay
 
-    def _do_gtype_delaycal(self, caltable: str = None, RefAntOutput: List[str] = None, spwlist: List[str] = []) -> bool:
+    def _do_gtype_delaycal(self, caltable: str = None, RefAntOutput: list[str] = None, spwlist: list[str] = []) -> bool:
         """Perform a G-Type delay calibration with CASA task gaincal
 
         Args:
@@ -336,7 +335,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         return True
 
     def _do_ktype_delaycal(self, caltable: str = None, addcaltable: str = None,
-                           RefAntOutput: List[str] = None, spw: str = '') -> bool:
+                           RefAntOutput: list[str] = None, spw: str = '') -> bool:
         """Perform a K-Type delay calibration with CASA task gaincal
 
         Args:
@@ -400,7 +399,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
 
         return True
 
-    def _check_flagSolns(self, flaggedSolnResult: Dict, RefAntOutput: List[str] = None) -> (float, List[str]):
+    def _check_flagSolns(self, flaggedSolnResult: dict, RefAntOutput: list[str] = None) -> tuple[float, list[str]]:
         """Change reference antenna list based on a critical fraction of flagged solutions
             (defined in the domain ms object)
 
@@ -434,7 +433,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         return fracFlaggedSolns
 
     def _do_gtype_bpdgains(self, caltable: str, addcaltable: str = None, solint: str = 'int',
-                           RefAntOutput: List[str] = None, spwlist: List[str] = []) -> bool:
+                           RefAntOutput: list[str] = None, spwlist: list[str] = []) -> bool:
         """Perform a G-Type cal with CASA task gaincal on the bp'd gaintable
 
         Args:

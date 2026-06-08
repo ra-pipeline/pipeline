@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 import ast
 import collections
+import collections.abc
 import functools
 import operator
 import re
 from decimal import Decimal
 from math import sqrt
-from typing import Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING
 
 import numpy
 
@@ -13,7 +16,6 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as qacalc
-from pipeline.domain import Field, FluxMeasurement, MeasurementSet, SpectralWindow
 from pipeline.domain.measures import FluxDensity, FluxDensityUnits, Frequency, FrequencyUnits
 from pipeline.h.tasks.common import commonfluxresults
 from pipeline.h.tasks.importdata.fluxes import ORIGIN_ANALYSIS_UTILS, ORIGIN_XML
@@ -34,7 +36,13 @@ from pipeline.infrastructure.launcher import Context
 
 from . import gcorfluxscale
 
-LOG = infrastructure.get_logger(__name__)
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from pipeline.domain import Field, FluxMeasurement, MeasurementSet, SpectralWindow
+    from pipeline.infrastructure.launcher import Context
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 COLSHAPE_FORMAT = re.compile(r'\[(?P<num_pols>\d+), (?P<num_rows>\d+)\]')
 
@@ -279,7 +287,7 @@ def _compute_snr_info_for_intent(context: Context, ms: MeasurementSet, caltable_
 
 
 def _compute_k_spws_for_flux_measurements(field: Field, flux_measurements: Iterable[FluxMeasurement], r_snr: float,
-                                          msg_fieldname: str, msg_intents: str) -> Optional[list]:
+                                          msg_fieldname: str, msg_intents: str) -> list | None:
     """
     Compute the "k_spw" metric for given list of flux measurements and given
     flux ratio for highest SNR SpW.
@@ -347,7 +355,7 @@ def _get_field_to_analyse(ms: MeasurementSet, intent: str) -> Field | None:
     return min(candidate_fields, key=lambda f: f.time.min())
 
 
-def _get_fluxes_for_field(ms: MeasurementSet, field: Field) -> List[Tuple[int, float, float]]:
+def _get_fluxes_for_field(ms: MeasurementSet, field: Field) -> list[tuple[int, float, float]]:
     """
     Return flux information for given measurement set and field.
 
@@ -374,7 +382,7 @@ def _get_fluxes_for_field(ms: MeasurementSet, field: Field) -> List[Tuple[int, f
 
 def _get_highest_snr_measurement_and_flux_ratio(field: Field, highest_snr_spw: SpectralWindow,
                                                 measurements: Iterable[FluxMeasurement], msg_fieldname: str,
-                                                msg_intents: str) -> Tuple[FluxMeasurement, Optional[float]]:
+                                                msg_intents: str) -> tuple[FluxMeasurement, float | None]:
     """
     Retrieve flux measurement for given "highest SNR" SpW, compute ratio of
     derived over catalog flux, and return both flux measurement and flux ratio.
@@ -415,7 +423,7 @@ def _get_highest_snr_measurement_and_flux_ratio(field: Field, highest_snr_spw: S
 
 
 def _get_highest_snr_spw(snr_info: dict, flux_measurements: Iterable[FluxMeasurement], ms: MeasurementSet,
-                         msg_fieldname: str, msg_intents: str) -> Optional[SpectralWindow]:
+                         msg_fieldname: str, msg_intents: str) -> SpectralWindow | None:
     """
     Return the highest SNR SpW for flux measurements based on SNR information.
 
@@ -498,7 +506,7 @@ def _get_tsys_caltable_path(context: Context, vis: str) -> str:
     return caltable_path
 
 
-def gaincalSNR(context: Context, ms: MeasurementSet, tsysTable: str, flux: Iterable[Tuple[int, float, float]],
+def gaincalSNR(context: Context, ms: MeasurementSet, tsysTable: str, flux: Iterable[tuple[int, float, float]],
                field: Field, spws: Iterable[SpectralWindow], intent='PHASE', required_snr: float = 25,
                edge_fraction: float = 0.03125, min_snr: float = 10) -> dict:
     """
@@ -797,7 +805,7 @@ def frequency_min_max_after_aliasing(spw):
         return spw.min_frequency, spw.max_frequency
 
 
-class CaltableWrapperFactory(object):
+class CaltableWrapperFactory:
     @staticmethod
     def from_caltable(filename):
         LOG.trace('CaltableWrapperFactory.from_caltable(%r)', filename)
@@ -909,7 +917,7 @@ def get_dtype(tb, col):
             return col, CASA_DATA_TYPES[col_dtype], max_row_shape
 
 
-class CaltableWrapper(object):
+class CaltableWrapper:
     def __init__(self, filename, data, table_keywords, column_keywords):
         self.filename = filename
         self.data = data

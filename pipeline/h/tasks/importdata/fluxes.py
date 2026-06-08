@@ -6,7 +6,7 @@ import operator
 import os
 import re
 import xml.etree.ElementTree as ElementTree
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import reduce
 
 import pipeline.domain as domain
@@ -308,16 +308,19 @@ def export_flux_from_result(results, context, filename='flux.csv'):
         with open_with_lock(abspath, 'rt', encoding='utf-8') as f:
 
             first = f.readline()
-            if not first.startswith(','.join(columns)):
+            # Handle empty or whitespace-only lines (can occur with concurrent MPI access)
+            if not first or not first.strip():
+                LOG.warning('Flux file exists but is empty or has blank header, treating as new file: %s', abspath)
+            elif not first.startswith(','.join(columns)):
                 # Try old format, without uvmin/uvmax (before r42290)
                 if first.startswith(','.join(old_standard_cols)):
                     columns = old_standard_cols
                     use_old_std_cols = True
                 else:
-                    raise ValueError('Cannot recognize header line in flux file: {0}'.format(first))
-
-            # slurp in all but the header rows
-            existing.extend([l for l in f.readlines() if not l.startswith(','.join(columns))])
+                    raise ValueError(f'Cannot recognize header line in flux file: {first!r}')
+            else:
+                # slurp in all but the header rows
+                existing.extend([l for l in f.readlines() if not l.startswith(','.join(columns))])
 
     # so we can write it back out again, with our measurements appended
     comment_template = '# field={field} intents={intents} origin={origin} age={age} queried_at={queried_at}'
@@ -450,7 +453,9 @@ def import_flux(output_dir, observing_run, filename=None):
             query_date = match.group('timestamp') if match else None
             if query_date:
                 try:
-                    query_date = datetime.strptime(query_date, '%Y-%m-%d %H:%M:%S %Z')
+                    query_date = datetime.strptime(query_date, '%Y-%m-%d %H:%M:%S %Z').replace(
+                        tzinfo=timezone.utc
+                        )
                 except TypeError:
                     query_date = None
 

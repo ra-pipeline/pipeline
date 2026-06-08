@@ -1,4 +1,4 @@
-import collections
+import collections.abc
 import os
 
 import pipeline.infrastructure.logging as logging

@@ -7,7 +7,7 @@ import shutil
 LOG = infrastructure.get_logger(__name__)
 
 
-class opacitiesSummaryChart(object):
+class opacitiesSummaryChart:
     def __init__(self, context, result):
         self.context = context
         self.result = result

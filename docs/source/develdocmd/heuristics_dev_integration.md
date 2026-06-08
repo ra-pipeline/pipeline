@@ -35,9 +35,9 @@ Help on function `alma_renorm` in module `pipeline.extern.almarenorm`
 
 ```python
 alma_renorm(
-    vis: str, spw: List[int], create_cal_table: bool,
-    threshold: Union[NoneType, float], excludechan: Dict,
-    atm_auto_exclude: bool, bwthreshspw: Dict, caltable: str
+    vis: str, spw: list[int], create_cal_table: bool,
+    threshold: NoneType | float, excludechan: dict,
+    atm_auto_exclude: bool, bwthreshspw: dict, caltable: str
 ) -> tuple
 
 Interface function for ALMA Pipeline: this runs the ALMA renormalization

@@ -2,11 +2,16 @@
 The eventbus module defines the interface for publishing events and
 subscribing to events.
 """
-from typing import Callable, TypeVar
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, TypeVar
 
 from pubsub import pub
 
 from .events import Event
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 E = TypeVar('E', bound=Event)
 
@@ -21,6 +26,23 @@ def subscribe(fn: Callable[[E], None], topic: str):
     :param topic: event topic to match
     """
     pub.subscribe(fn, topic)
+
+
+def unsubscribe(fn: Callable[[E], None], topic: str) -> None:
+    """
+    Cancel a previously registered callback for a topic.
+
+    Silently ignores attempts to unsubscribe a listener that is not currently
+    subscribed (e.g. already removed or never registered).
+
+    :param fn: callback function to remove
+    :param topic: event topic the callback was subscribed to
+    """
+    try:
+        if pub.isSubscribed(fn, topic):
+            pub.unsubscribe(fn, topic)
+    except pub.TopicNameError:
+        pass
 
 
 def send_message(event: E):

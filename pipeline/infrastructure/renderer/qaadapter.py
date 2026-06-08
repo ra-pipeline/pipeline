@@ -4,6 +4,7 @@ stage number, into a structure ordered by task type. This regrouping is used
 by the QA sections of the weblog.
 '''
 import collections
+import collections.abc
 import json
 import os
 import weakref
@@ -13,7 +14,7 @@ import pipeline.infrastructure as infrastructure
 LOG = infrastructure.get_logger(__name__)
 
 
-class Topic(object):    
+class Topic:
     """
     Topic is the base class for a Topic web log section. It should not be
     instantiated directly.    
@@ -84,7 +85,7 @@ class DataSetTopic(Topic):
     handling tasks.
     """    
     def __init__(self):
-        super(DataSetTopic, self).__init__('t2-3-1m.html', 'Data Sets')
+        super().__init__('t2-3-1m.html', 'Data Sets')
 
 
 class CalibrationTopic(Topic):
@@ -93,7 +94,7 @@ class CalibrationTopic(Topic):
     calibration tasks.
     """    
     def __init__(self):
-        super(CalibrationTopic, self).__init__('t2-3-2m.html', 'Calibration')
+        super().__init__('t2-3-2m.html', 'Calibration')
 
 
 class FlaggingTopic(Topic):
@@ -102,7 +103,7 @@ class FlaggingTopic(Topic):
     tasks.
     """
     def __init__(self):
-        super(FlaggingTopic, self).__init__('t2-3-3m.html', 'Flagging')
+        super().__init__('t2-3-3m.html', 'Flagging')
 
 
 class LineFindingTopic(Topic):
@@ -111,7 +112,7 @@ class LineFindingTopic(Topic):
     line-finding tasks.
     """
     def __init__(self):
-        super(LineFindingTopic, self).__init__('t2-3-4m.html', 'Line Finding')
+        super().__init__('t2-3-4m.html', 'Line Finding')
 
 
 class ImagingTopic(Topic):
@@ -120,7 +121,7 @@ class ImagingTopic(Topic):
     tasks.
     """
     def __init__(self):
-        super(ImagingTopic, self).__init__('t2-3-5m.html', 'Imaging')
+        super().__init__('t2-3-5m.html', 'Imaging')
 
 
 class MiscellaneousTopic(Topic):
@@ -129,10 +130,10 @@ class MiscellaneousTopic(Topic):
     miscellaneous tasks that don't belong in any other category.
     """
     def __init__(self):
-        super(MiscellaneousTopic, self).__init__('t2-3-6m.html', 'Miscellaneous')
+        super().__init__('t2-3-6m.html', 'Miscellaneous')
 
 
-class TopicRegistry(object):
+class TopicRegistry:
     # holds the Topics into which we should push the results 
     topic_classes = [DataSetTopic,
                      CalibrationTopic,
@@ -212,7 +213,7 @@ class TopicRegistry(object):
                 if topic.handles_result(result)]
 
 
-class QABaseAdapter(object):
+class QABaseAdapter:
     def __init__(self, context, result):
         if not getattr(result, 'qa', None):
             return

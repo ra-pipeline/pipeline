@@ -1,6 +1,6 @@
 import collections
+import collections.abc
 import os
-import numpy as np
 
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.pipelineqa as pqa

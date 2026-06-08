@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, List, Optional, Union
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import pipeline.h.tasks.tsysflag.tsysflag as tsysflag
 import pipeline.infrastructure as infrastructure
@@ -15,7 +17,7 @@ __all__ = [
     'TsysflagInputs'
 ]
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class TsysflagInputs(tsysflag.TsysflagInputs):
@@ -26,29 +28,29 @@ class TsysflagInputs(tsysflag.TsysflagInputs):
 
     # docstring and type hints: supplements hsd_tsysflag
     def __init__(self,
-                 context: 'Context',
-                 output_dir: Optional[str] = None,
-                 vis: Optional[List[str]] = None,
-                 caltable: Optional[List[str]] = None,
-                 flag_nmedian: Optional[Union[bool, str]] = None,
-                 fnm_limit: Optional[Union['Integral', str]] = None,
-                 fnm_byfield: Optional[Union[bool, str]] = None,
-                 flag_derivative: Optional[Union[bool, str]] = None,
-                 fd_max_limit: Optional[Union['Integral', str]] = None,
-                 flag_edgechans: Optional[Union[bool, str]] = None,
-                 fe_edge_limit: Optional[Union['Integral', str]] = None,
-                 flag_fieldshape: Optional[Union[bool, str]] = None,
-                 ff_refintent: Optional[str] = None,
-                 ff_max_limit: Optional[Union['Integral', str]] = None,
-                 flag_birdies: Optional[Union[bool, str]] = None,
-                 fb_sharps_limit: Optional[Union['Integral', str]] = None,
-                 flag_toomany: Optional[Union[bool, str]] = None,
-                 tmf1_limit: Optional[Union['Integral', str]] = None,
-                 tmef1_limit: Optional[Union['Integral', str]] = None,
-                 metric_order: Optional[str] = None,
-                 normalize_tsys: Optional[Union[bool, str]] = None,
-                 filetemplate: Optional[str] = None,
-                 parallel: Optional[Union[str, bool]] = None):
+                 context: Context,
+                 output_dir: str | None = None,
+                 vis: list[str] | None = None,
+                 caltable: list[str] | None = None,
+                 flag_nmedian: bool | str | None = None,
+                 fnm_limit: Integral | str | None = None,
+                 fnm_byfield: bool | str | None = None,
+                 flag_derivative: bool | str | None = None,
+                 fd_max_limit: Integral | str | None = None,
+                 flag_edgechans: bool | str | None = None,
+                 fe_edge_limit: Integral | str | None = None,
+                 flag_fieldshape: bool | str | None = None,
+                 ff_refintent: str | None = None,
+                 ff_max_limit: Integral | str | None = None,
+                 flag_birdies: bool | str | None = None,
+                 fb_sharps_limit: Integral | str | None = None,
+                 flag_toomany: bool | str | None = None,
+                 tmf1_limit: Integral | str | None = None,
+                 tmef1_limit: Integral | str | None = None,
+                 metric_order: str | None = None,
+                 normalize_tsys: bool | str | None = None,
+                 filetemplate: str | None = None,
+                 parallel: str | bool | None = None):
         """Construct TsysflagInputs instance for SD Tsysflag task.
 
         Args:

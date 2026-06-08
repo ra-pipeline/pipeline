@@ -1,8 +1,13 @@
+from __future__ import annotations
+
 import collections
+from typing import TYPE_CHECKING
 
 import pipeline.infrastructure.logging as logging
-from pipeline.infrastructure.launcher import Context
-from pipeline.infrastructure.basetask import ResultsList
+
+if TYPE_CHECKING:
+    from pipeline.infrastructure.basetask import ResultsList
+    from pipeline.infrastructure.launcher import Context
 
 LOG = logging.get_logger(__name__)
 

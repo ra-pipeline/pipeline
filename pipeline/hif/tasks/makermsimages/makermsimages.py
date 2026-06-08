@@ -1,4 +1,7 @@
+import numpy as np
 import os
+from scipy.stats import median_abs_deviation
+
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -8,22 +11,31 @@ import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
-from pipeline.infrastructure import casa_tasks, task_registry
+from pipeline.infrastructure import casa_tasks, casa_tools, task_registry
 
 LOG = infrastructure.get_logger(__name__)
 
 
 class MakermsimagesResults(basetask.Results):
-    def __init__(self, rmsimagelist=None, rmsimagenames=None):
+    def __init__(self, rmsimagelist=None, rmsimagenames=None, rmsstats=None, stats_summary=None):
         super().__init__()
 
         if rmsimagelist is None:
             rmsimagelist = []
+
         if rmsimagenames is None:
             rmsimagenames = []
 
+        if rmsstats is None:
+            rmsstats = {}
+
+        if stats_summary is None:
+            stats_summary = {}
+
         self.rmsimagelist = rmsimagelist[:]
         self.rmsimagenames = rmsimagenames[:]
+        self.rmsstats = rmsstats
+        self.stats_summary = stats_summary
 
     def merge_with_context(self, context):
         """
@@ -95,7 +107,8 @@ class Makermsimages(basetask.StandardTaskTemplate):
         tier0_imdev_enabled = True
         rmsimagenames = []
         queued_job_rmsimagename = []
-
+        rmsstats = {}
+        stats_summary = {}
         for imagename in imagenames:
             rmsimagename = imagename + '.rms'
             if not os.path.exists(rmsimagename) and 'residual' not in imagename:
@@ -118,12 +131,38 @@ class Makermsimages(basetask.StandardTaskTemplate):
             queue_job.get_result()
             if os.path.exists(rmsimagename):
                 rmsimagenames.append(rmsimagename)
+                if self.inputs.context.imaging_mode == "VLASS-SE-CUBE":
+                    with casa_tools.ImageReader(rmsimagename) as image:
+                        rmsstats[rmsimagename] = image.statistics(robust=True, axes=[0, 1, 3])
+                        medabsdevmed = rmsstats[rmsimagename].get('medabsdevmed')
+                        if medabsdevmed is not None:
+                            rmsstats[rmsimagename]['madrms'] = rmsstats[rmsimagename]['medabsdevmed'] * 1.4826  # see CAS-9631
+                else:
+                    with casa_tools.ImageReader(rmsimagename) as image:
+                        stats = image.statistics(robust=True)
+                        if '.tt1.' not in rmsimagename:
+                            rmsstats[rmsimagename] = stats
+                            medabsdevmed = stats.get('medabsdevmed')
+                            if medabsdevmed is not None:
+                                rmsstats[rmsimagename]['madrms'] = medabsdevmed[0] * 1.4826  # see CAS-9631
 
+        if self.inputs.context.imaging_mode == "VLASS-SE-CUBE" and rmsstats:
+            for item in ['max', 'min', 'mean', 'median', 'sigma', 'madrms']:
+                value_arr = np.array([rmsstats[rmsimage][item] for rmsimage in rmsstats if item in rmsstats[rmsimage]])
+                if value_arr.size == 0:
+                    continue
+                stats_summary[item] = {
+                    'range': np.percentile(value_arr, (0, 100)),
+                    'spwwise_madrms': median_abs_deviation(
+                        value_arr, axis=0, scale='normal'),
+                    'spwwise_median': np.median(value_arr, axis=0)
+                    }
         LOG.info("RMS image list: " + ','.join(rmsimagenames))
 
-        return MakermsimagesResults(rmsimagelist=imlist, rmsimagenames=rmsimagenames)
+        return MakermsimagesResults(rmsimagelist=imlist, rmsimagenames=rmsimagenames, rmsstats=rmsstats, stats_summary=stats_summary)
 
     def analyse(self, results):
+
         return results
 
     def _get_imdev_args(self, imagename):

@@ -16,7 +16,7 @@ class T2_4MDetailsCheckProductSizeRenderer(basetemplates.T2_4MDetailsDefaultRend
                  uri='imageprecheck.mako',
                  description='Image pre-check',
                  always_rerender=True):
-        super(T2_4MDetailsCheckProductSizeRenderer, self).__init__(uri=uri,
+        super().__init__(uri=uri,
                                                            description=description,
                                                            always_rerender=always_rerender)
 

@@ -43,7 +43,7 @@ class SDAmpCalInputs(vdp.StandardInputs):
 
     def __init__(self, context, output_dir=None, infiles=None, caltable=None,
                  reffile=None, endpoint=None):
-        super(SDAmpCalInputs, self).__init__()
+        super().__init__()
 
         # context and vis/infiles must be set first so that properties that require
         # domain objects can be function
@@ -59,7 +59,7 @@ class SDAmpCalInputs(vdp.StandardInputs):
 class SDAmpCalResults(basetask.Results):
     def __init__(self, vis=None, final=[], pool=[], reffile=None, factors={},
                  all_ok=False):
-        super(SDAmpCalResults, self).__init__()
+        super().__init__()
 
         self.vis = vis
         self.pool = pool[:]

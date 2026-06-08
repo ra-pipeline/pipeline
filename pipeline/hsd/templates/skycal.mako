@@ -106,6 +106,8 @@ def get_original_field_name(field_name, vis):
 % for ms in get_mses():
     <%
         vis = ms.basename
+        if vis not in amp_vs_freq_subpages:
+            continue
         subpage = os.path.join(dirname, amp_vs_freq_subpages[vis])
     %>
     <h4><a class="replace" href="${subpage}" data-vis="${vis}">${vis}</a></h4>
@@ -146,6 +148,8 @@ def get_original_field_name(field_name, vis):
 % for ms in get_mses():
     <%
         vis = ms.basename
+        if vis not in amp_vs_time_subpages:
+            continue
         subpage = os.path.join(dirname, amp_vs_time_subpages[vis])
     %>
     <h4><a class="replace" href="${subpage}" data-vis="${vis}">${vis}</a></h4>
@@ -185,6 +189,8 @@ def get_original_field_name(field_name, vis):
 % for ms in get_mses():
     <%
         vis = ms.basename
+        if vis not in elev_diff_subpages:
+            continue
         subpage = os.path.join(dirname, elev_diff_subpages[vis])
     %>
     <h4><a class="replace" href="${subpage}" data-vis="${vis}">${vis}</h4>

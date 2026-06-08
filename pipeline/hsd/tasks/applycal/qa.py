@@ -1,7 +1,7 @@
 """QA score module for applycal task."""
 from __future__ import annotations
 
-import collections
+import collections.abc
 from typing import TYPE_CHECKING
 
 import pipeline.infrastructure.logging as logging

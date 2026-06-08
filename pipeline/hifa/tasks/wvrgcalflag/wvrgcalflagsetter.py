@@ -23,7 +23,7 @@ class WvrgcalFlagSetterResult(basetask.Results):
         if results is None:
             results = []
 
-        super(WvrgcalFlagSetterResult, self).__init__()
+        super().__init__()
 
         self.jobs = jobs
         self.results = results

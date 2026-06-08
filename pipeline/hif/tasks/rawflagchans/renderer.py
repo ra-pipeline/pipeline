@@ -94,6 +94,6 @@ class BaselineVsChannelsPlotRenderer(basetemplates.JsonPlotRenderer):
         title = 'Baseline vs channels for %s' % vis
         outfile = filenamer.sanitize('baseline_vs_channels-%s.html' % vis)
 
-        super(BaselineVsChannelsPlotRenderer, self).__init__(
+        super().__init__(
                 'generic_x_vs_y_spw_pol_plots.mako', context,
                 result, plots, title, outfile)

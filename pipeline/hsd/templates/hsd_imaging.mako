@@ -167,9 +167,7 @@ It generates an image combined spectral data from whole antenna as well as image
         <li><a href="#${plots['title'].replace(" ", "")}">${plots['title']}</a></li>
     %endif
 % endfor
-%if missedlines_plots is not None:
-    <li><a href="#missedlinesplot">Diagnostic plots for possible missed line channels</a></li>
-%endif
+<li><a href="#missedlinesplot">Diagnostic plots for possible off-line-range emissions</a></li>
 %if contaminationmap_plots is not None:
     <li><a href="#contaminationplot">Contamination Plots</a></li>
 %endif
@@ -178,13 +176,13 @@ It generates an image combined spectral data from whole antenna as well as image
 %if rms_table is not None and len(rms_table) > 0:
 	<h3 id="sensitivity" class="jumptarget">Image Sensitivity</h3>
 	<p>
-	RMS of line-free channels. Estimated RMS is listed for representative images.
+	Sensitivities of line-free channels. Estimated sensitivities are listed for representative images.
 	</p>
 	<table class="table table-bordered table-striped" summary="Image Sentivitity">
 		<caption>RMS of line-free channels</caption>
     	<thead>
 	    	<tr>
-	        	<th>Name</th><th>Frame</th><th>Frequency Ranges</th><th>Channel width</th><th>Theoretical RMS</th><th>Observed RMS</th>
+			<th>Name</th><th>Frame</th><th>Frequency Ranges</th><th>Channel width</th><th>Theoretical sensitivity</th><th>Observed sensitivity</th>
 	    	</tr>
 
   		</thead>
@@ -315,8 +313,17 @@ It generates an image combined spectral data from whole antenna as well as image
 	<div class="clearfix"></div><!--  flush plots, break to next row -->
 % endfor
 
+<h3 id="missedlinesplot" class="jumptarget">Diagnostic plots for possible off-line-range emissions</h3>
+
 %if missedlines_plots is not None:
-<h3 id="missedlinesplot" class="jumptarget">Diagnostic plots for possible missed line channels</h3>
+    <p>There are two types of diagnostic methods: "single peak" and "extended".
+    Only the plots with possible off-line-range emissions detected are shown.
+    The thresholds for "single peak" and "extended" are 7&sigma; and 5&sigma;, respectively,
+    as indicated by the blue dotted lines. The emission line ranges detected at hsd_baseline
+    stage are painted in cyan, and channel ranges excluded from the analysis (deviation masks, etc.)
+    are over-plotted with magenta.
+    The red points indicate the excess found as possible off-line-range emission.</p>
+
     % for field, plot_list in missedlines_plots.items():
       <h4>${field}</h4>
           % for plot in plot_list:
@@ -331,7 +338,7 @@ It generates an image combined spectral data from whole antenna as well as image
                     </a>
                                         <div class="caption">
                                                 <h4>${get_spw_exp(plot.parameters['spw'])}</h4>
-                                                <p>Diagnostic plot for possible missed line channels of Field ${field} ${get_spw_inline_desc(plot.parameters['spw'])}.</p>
+                                                <p>Diagnostic plot for possible off-line-range emissions of Field ${field} ${get_spw_inline_desc(plot.parameters['spw'])}.</p>
                                         </div>
                                 </div>
                         </div>
@@ -339,6 +346,8 @@ It generates an image combined spectral data from whole antenna as well as image
           %endfor
           <div class="clearfix"></div><!--  flush plots, break to next row -->
     %endfor
+%else:
+    <p>No significant off-line-range emission is detected.</p>
 %endif
 
 %if contaminationmap_plots is not None:

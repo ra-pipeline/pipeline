@@ -56,7 +56,7 @@ class OrderedDefaultdict(collections.OrderedDict):
                 raise TypeError('first argument must be callable or None')
             self.default_factory = args[0]
             args = args[1:]
-        super(OrderedDefaultdict, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def __missing__(self, key):
         if self.default_factory is None:

@@ -1,8 +1,8 @@
-from typing import Dict, List, NewType, Tuple, Union 
+from typing import TypeAlias
 
-ClusteringResult = NewType('ClusteringResult', Tuple[int, List[List[Union[int, bool]]], List[int], List[List[Union[int, float, bool]]]])
-DetectedLineList = NewType('DetectedLineList', List[List[Union[int, float, bool]]])
-LineProperty = NewType('LineProperty', List[Union[float, bool]])
-LineWindow = NewType('LineWindow', Union[str, dict, List[int], List[float], List[str]])
-FitFunc = NewType('FitFunc', Union[str, Dict[Union[int, str], str]])
-FitOrder = NewType('FitOrder', Union[str, int, Dict[Union[int, str], int]])
+ClusteringResult: TypeAlias = tuple[int, list[list[int | bool]], list[int], list[list[int | float | bool]]]
+DetectedLineList: TypeAlias = list[list[int | float | bool]]
+LineProperty: TypeAlias = list[float | bool]
+LineWindow: TypeAlias = str | dict | list[int] | list[float] | list[str]
+FitFunc: TypeAlias = str | dict[int | str, str]
+FitOrder: TypeAlias = str | int | dict[int | str, int]

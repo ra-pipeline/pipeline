@@ -1,7 +1,12 @@
-import numpy as np
+from __future__ import annotations
 
-from pipeline.domain import MeasurementSet
+import numpy as np
+from typing import TYPE_CHECKING
+
 from pipeline.domain.measures import FrequencyUnits
+
+if TYPE_CHECKING:
+    from pipeline.domain import MeasurementSet
 
 # List of SSO objects
 SSOfieldnames = {
@@ -19,7 +24,6 @@ SSOfieldnames = {
     "Venus",
     "Vesta",
 }
-
 
 UnitFactorType = dict[int, dict[str, float]]
 

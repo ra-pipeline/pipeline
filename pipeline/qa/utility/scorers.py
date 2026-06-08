@@ -6,7 +6,7 @@ import numpy as np
 from scipy.special import erf
 
 
-class erfScorer(object):
+class erfScorer:
 
     def __init__(self, good_level, bad_level, lowest_score=0.0):
         """
@@ -27,7 +27,7 @@ class erfScorer(object):
         return (1.0 - self.lowest_score) * (erf(x * self.slope + self.offset) + 1.0) / 2.0 + self.lowest_score
 
 
-class gaussScorer(object):
+class gaussScorer:
     """
     Gauss function based scorer using the difference to the
     center value as the metric.
@@ -41,7 +41,7 @@ class gaussScorer(object):
         return np.exp(-4.0 * np.log(2.0) * np.power((x - self.x0) / self.sigma, 2))
 
 
-class linScorer(object):
+class linScorer:
     """
     Linear function scorer to map a metric range to a score
     range. Used for piecewise linear sections.

@@ -1,7 +1,8 @@
 """Parameter classes of Imaging."""
+from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any, Dict, List, NewType, Optional, Union, Final
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 import numpy
 
@@ -11,19 +12,30 @@ from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.utils.debugwrapper import debugwrapper
 
 if TYPE_CHECKING:
-    from collections import namedtuple
-    from pipeline.hsd.tasks.imaging.resultobjects import SDImagingResults
+    from typing import Any, Final, NamedTuple
+
+    from pipeline.hsd.tasks.imaging.resultobjects import SDImagingResults, SDImagingResultItem
+    from pipeline.hsd.tasks.common.direction_utils import Direction
     from pipeline.infrastructure import Context
     from pipeline.domain.datatable import DataTableImpl
     from pipeline.domain import MeasurementSet
     from pipeline.domain.singledish import MSReductionGroupDesc
-    RasterInfo = NewType('RasterInfo', namedtuple('RasterInfo', 'center_ra center_dec width'
-                                                                'height scan_angle row_separation row_duration'))
-    ImageGroup = Dict[str, List[Union['MeasurementSet', int,
-                                      List[Union[str, List[List[Union[float, bool]]]]]]]]
+
+    class RasterInfo(NamedTuple):
+        center_ra: float
+        center_dec: float
+        width: float
+        height: float
+        scan_angle: float
+        row_separation: float
+        row_duration: float
+
+    ImageGroup = dict[str, list[MeasurementSet | int | list[str | list[list[float | bool]]]]]
+
+T = TypeVar('T')
 
 
-class ObservedList(list):
+class ObservedList(list[T], Generic[T]):
     """Class inherit list to observe its behavior.
 
     This class intends to observe/output list stuff for debugging more easier.
@@ -137,27 +149,27 @@ class CommonParameters(Parameters):
         return not self.is_nro
 
 
-def initialize_common_parameters(args_spw: Dict[str, str], dt_dict: Dict[str, 'DataTableImpl'],
-                                 edge: List[int], imagemode: str, in_field: str,
-                                 infiles: List[str], is_nro: numpy.bool_, ms_list: List['MeasurementSet'],
-                                 ms_names: List[str], session_names: List[str], reduction_group: Dict[int, 'MSReductionGroupDesc'],
-                                 restfreq_list: Union[str, List[str]], results: 'SDImagingResults'
+def initialize_common_parameters(args_spw: dict[str, str], dt_dict: dict[str, DataTableImpl],
+                                 edge: list[int], imagemode: str, in_field: str,
+                                 infiles: list[str], is_nro: numpy.bool_, ms_list: list[MeasurementSet],
+                                 ms_names: list[str], session_names: list[str], reduction_group: dict[int, MSReductionGroupDesc],
+                                 restfreq_list: str | list[str], results: SDImagingResults,
                                  ) -> CommonParameters:
     """Initialize an instance of CommonParameters and return it.
 
     Args:
-        args_spw (Dict[str, str]): Spw selection per MS
-        dt_dict (Dict[str, DataTableImpl]): Dictionary of input MS and corresponding datatable
-        edge (List[int]): Edge channel of most recent SDBaselineResults or [0, 0]
+        args_spw (dict[str, str]): Spw selection per MS
+        dt_dict (dict[str, DataTableImpl]): Dictionary of input MS and corresponding datatable
+        edge (list[int]): Edge channel of most recent SDBaselineResults or [0, 0]
         imagemode (str): Image mode
         in_field (str): Comma-separated list of target field names that are extracted from all input MSs
-        infiles (List[str]): List of input files
+        infiles (list[str]): List of input files
         is_nro (numpy.bool_): Flag of NRO data
-        ms_list (List[MeasurementSet]): List of ms to process
-        ms_names (List[str]): List of name of ms in ms_list
-        session_names (List[str]): List of session name of ms in ms_list
-        reduction_group (Dict[int, MSReductionGroupDesc]): Reduction group object
-        restfreq_list (Union[str, List[str]]): List of rest frequency
+        ms_list (list[MeasurementSet]): List of ms to process
+        ms_names (list[str]): List of name of ms in ms_list
+        session_names (list[str]): List of session name of ms in ms_list
+        reduction_group (dict[int, MSReductionGroupDesc]): Reduction group object
+        restfreq_list (str | list[str]): List of rest frequency
         results (SDImagingResults): Instance of SDImagingResults
 
     Returns:
@@ -184,7 +196,7 @@ def initialize_common_parameters(args_spw: Dict[str, str], dt_dict: Dict[str, 'D
 class ReductionGroupParameters(Parameters):
     """Parameters of Reduction Group Processing."""
 
-    def __init__(self, group_id: int, group_desc: 'MSReductionGroupDesc'):
+    def __init__(self, group_id: int, group_desc: MSReductionGroupDesc):
         """Initialize an object with group value.
 
         Args:
@@ -192,49 +204,47 @@ class ReductionGroupParameters(Parameters):
             group_desc : MeasurementSet Reduction Group Desciption object
         """
         super().__init__()
-        self.group_id = group_id           # int: Reduction group ID
-        self.group_desc = group_desc       # MSReductionGroupDesc(spw_name:str, frequency_range:List[float], nchan:int,
-                                           #                      field:str, member:List[MSReductionGroupMember]):
-                                           #                      MSReductionGroupDesc object
-        self.antenna_list = None           # List[int]: List of antenna ID
-        self.antids = None                 # List[int]: List of antenna ID
-        self.ant_name = None               # str: Name of antenna
-        self.asdm = None                   # str: ASDM name of reference MS
-        self.cellx = None                  # Dict[str, float]: Cell size x, {'unit': 'arcsec', 'value': 6.4}
-        self.celly = None                  # Dict[str, float]: Cell size y, {'unit': 'arcsec', 'value': 6.4}
-        self.chanmap_range_list = None     # List[List[List[Union[float, bool]]]]: List of channel map range
-        self.channelmap_range_list = None  # List[List[List[Union[float, bool]]]]: List of channel map range
-        self.combined = None               # CombinedImageParameters: CombinedImageParameters object
-        self.coord_set = False             # bool: Flag of Coord setting
-        self.correlations = None           # str: A joined list of correlations
-        self.fieldid_list = None           # List[int]: List of field ID
-        self.fieldids = None               # List[int]: List of field ID
-        self.image_group = None            # ImageGroup: Dictionary of image group of reduction group
-        self.imagename = None              # str: Image name
-        self.imagename_nro = None          # Optional[str]: Image name for NRO
-        self.imager_result = None          # SDImagingResultItem: Result object of imager
-        self.imager_result_nro = None      # SDImagingResultItem: Result object of imager for NRO
-        self.member_list = None            # List[int]: List of reduction group ID
-        self.members = None                # List[List[MeasurementSet, int, List[str]]]: Image group of reduction group
-        self.msobjs = None                 # List[MeasurementSet]: List of MeasurementSet
-        self.name = None                   # str: Name of reduction group
-        self.nx = None                     # Union[int, numpy.int64]: X of image shape
-        self.ny = None                     # Union[int, numpy.int64]: Y of image shape
-        self.org_direction = None          # Direction: a direction of origin for ephemeris object
-        self.phasecenter = None            # str: Phase center of coord set
-        self.polslist = None               # List[List[str]]: List of Polarization. NOT USED NOW virtually.
-        self.pols_list = None              # List[List[str]]: List of Polarization
-        self.ref_ms = None                 # MeasurementSet: Reference MS object
-        self.restfreq = None               # str: Rest frequency
-        self.rmss = None                   # List[float]: List of RMSs
-        self.source_name = None            # str: Name of source like 'M100'
-        self.specmode = None               # str: Spec mode like 'cube'
-        self.spwid_list = None             # List[int]: List of Spectral window IDs of _group_desc
-        self.spwids = None                 # List[int]: List of Spectral window IDs of _members
-        self.stokes_list = None            # List[str]: List of stokes
-        self.tocombine = None              # ToCombineImageParameters: ToCombineImageParameters object
-        self.validsps = None               # List[List[int]]: List of valid spectrum
-        self.v_spwids = None               # List[int]: List of Virtual Spectral window IDs
+        self.group_id: int = group_id
+        self.group_desc: MSReductionGroupDesc = group_desc
+        self.antenna_list: list[int] | None = None
+        self.antids: list[int] | None = None
+        self.ant_name: str | None = None
+        self.asdm: str | None = None
+        self.cellx: dict[str, float] | None = None
+        self.celly: dict[str, float] | None = None
+        self.chanmap_range_list: list[list[list[float | bool]]] | None = None
+        self.channelmap_range_list: list[list[list[float | bool]]] | None = None
+        self.combined: CombinedImageParameters | None = None
+        self.coord_set: bool = False
+        self.correlations: str | None = None
+        self.fieldid_list: list[int] | None = None
+        self.fieldids: list[int] | None = None
+        self.image_group: ImageGroup | None = None
+        self.imagename: str | None = None
+        self.imagename_nro: str | None = None
+        self.imager_result: SDImagingResultItem | None = None
+        self.imager_result_nro: SDImagingResultItem | None = None
+        self.member_list: list[int] | None = None
+        self.members: list[list[MeasurementSet | int | list[str]]] | None = None
+        self.msobjs: list[MeasurementSet] | None = None
+        self.name: str | None = None
+        self.nx: int | numpy.int64 | None = None
+        self.ny: int | numpy.int64 | None = None
+        self.org_direction: Direction | None = None
+        self.phasecenter: str | None = None
+        self.polslist: list[list[str]] | None = None
+        self.pols_list: list[list[str]] | None = None
+        self.ref_ms: MeasurementSet | None = None
+        self.restfreq: str | None = None
+        self.rmss: list[float] | None = None
+        self.source_name: str | None = None
+        self.specmode: str | None = None
+        self.spwid_list: list[int] | None = None
+        self.spwids: list[int] | None = None
+        self.stokes_list: list[str] | None = None
+        self.tocombine: ToCombineImageParameters | None = None
+        self.validsps: list[list[int]] | None = None
+        self.v_spwids: list[int] | None = None
 
 
 class CombinedImageParameters(Parameters):
@@ -243,14 +253,14 @@ class CombinedImageParameters(Parameters):
     def __init__(self):
         """Initialize an object."""
         super().__init__()
-        self.antids = ObservedList()           # ObservedList[int]: List of antenna ID
-        self.fieldids = ObservedList()         # ObservedList[int]: List of field ID
-        self.infiles = ObservedList()          # ObservedList[str]: List of input file names
-        self.pols = ObservedList()             # List[List[str]]: List of Polarization
-        self.rms_exclude = ObservedList()      # ObservedList[numpy.ndarray[float]]: RMS mask frequency range
-        self.spws = ObservedList()             # ObservedList[int]: List of Spectral window IDs
-        self.v_spws = ObservedList()           # ObservedList[int]: List of Virtual Spectral window IDs
-        self.v_spws_unique = ObservedList()    # ObservedList[int]: List of unique values of _v_spws
+        self.antids: ObservedList[int] = ObservedList()
+        self.fieldids: ObservedList[int] = ObservedList()
+        self.infiles: ObservedList[str] = ObservedList()
+        self.pols: ObservedList[list[str]] = ObservedList()
+        self.rms_exclude: ObservedList[numpy.ndarray] = ObservedList()
+        self.spws: ObservedList[int] = ObservedList()
+        self.v_spws: ObservedList[int] = ObservedList()
+        self.v_spws_unique: ObservedList[int] = ObservedList()
 
     def extend(self, _cp: CommonParameters, _rgp: ReductionGroupParameters):
         """Extend list properties using CP and RGP.
@@ -273,11 +283,11 @@ class ToCombineImageParameters(Parameters):
     def __init__(self):
         """Initialize an object."""
         super().__init__()
-        self.images = ObservedList()               # ObservedList[str]: List of image name
-        self.images_nro = ObservedList()           # ObservedList[str]: List of image name for NRO
-        self.org_directions = ObservedList()       # ObservedList[Direction]: List of directions of origin for ephemeris object
-        self.org_directions_nro = ObservedList()   # ObservedList[Direction]: List of Directions for NRO
-        self.specmodes = ObservedList()            # ObservedList[str]: List of spec mode
+        self.images: ObservedList[str] = ObservedList()
+        self.images_nro: ObservedList[str] = ObservedList()
+        self.org_directions: ObservedList[Direction] = ObservedList()
+        self.org_directions_nro: ObservedList[Direction] = ObservedList()
+        self.specmodes: ObservedList[str] = ObservedList()
 
 
 class PostProcessParameters(Parameters):
@@ -286,28 +296,28 @@ class PostProcessParameters(Parameters):
     def __init__(self):
         """Initialize an object."""
         super().__init__()
-        self.beam = None                           # Dict[str, Dict[str, float]]: Beam data
-        self.brightnessunit = None                 # str: Brightness unit like 'Jy/beam'
-        self.chan_width = None                     # numpy.float64: Channel width of faxis
-        self.cs = None                             # coordsys: Coordsys object
-        self.faxis = None                          # int: Spectral axis which is found
-        self.imagename = None                      # str: Image name
-        self.image_rms = None                      # float: Image statistics (rms)
-        self.image_max = None                      # float: Image statistics (maximum value)
-        self.image_min = None                      # float: Image statistics (minimum value)
-        self.include_channel_range = None          # List[int]: List of channel ranges to calculate image statistics
-        self.is_representative_source_and_spw = None  # bool: Flag of representative source spw and representative spw
-        self.nx = None                             # numpy.int64: X of image shape
-        self.ny = None                             # numpy.int64: Y of image shape
-        self.org_direction = None                  # Direction: a direction of origin for ephemeris object
-        self.qcell = None                          # Dict[str, Dict[str, float]]: Cell data
-        self.raster_infos = None                   # List[RasterInfo]: List of RasterInfo(center/width/height/angle/row)
-        self.region = None                         # str: Region to calculate statistics
-        self.rmss = None                           # List[float]: List of RMSs
-        self.stat_chans = None                     # str: Converted string from include_channel_range
-        self.stat_freqs = None                     # str: Statistics frequencies
-        self.theoretical_rms = None                # Dict[str, float]: Theoretical RMSs
-        self.validsps = None                       # List[int]: List of valid spectrum
+        self.beam: dict[str, dict[str, float]] | None = None
+        self.brightnessunit: str | None = None
+        self.chan_width: numpy.float64 | None = None
+        self.cs: coordsys | None = None
+        self.faxis: int | None = None
+        self.imagename: str | None = None
+        self.image_rms: float | None = None
+        self.image_max: float | None = None
+        self.image_min: float | None = None
+        self.include_channel_range: list[int] | None = None
+        self.is_representative_source_and_spw: bool | None = None
+        self.nx: numpy.int64 | None = None
+        self.ny: numpy.int64 | None = None
+        self.org_direction: Direction | None = None
+        self.qcell: dict[str, dict[str, float]] | None = None
+        self.raster_infos: list[RasterInfo] | None = None
+        self.region: str | None = None
+        self.rmss: list[float] | None = None
+        self.stat_chans: str | None = None
+        self.stat_freqs: str | None = None
+        self.theoretical_rms: dict[str, float] | None = None
+        self.validsps: list[int] | None = None
 
     def done(self):
         if isinstance(self.cs, coordsys):
@@ -317,7 +327,7 @@ class PostProcessParameters(Parameters):
 class TheoreticalImageRmsParameters(Parameters):
     """ Parameter class of calculate_theoretical_image_rms()."""
 
-    def __init__(self, _pp: PostProcessParameters, context: 'Context'):
+    def __init__(self, _pp: PostProcessParameters, context: Context):
         """Initialize the object.
 
         Args:
@@ -325,34 +335,34 @@ class TheoreticalImageRmsParameters(Parameters):
             context : pipeline Context
         """
         super().__init__()
-        self.cqa = casa_tools.quanta       # LoggingQuanta: LoggingQuanta object
-        self.failed_rms = self.cqa.quantity(-1, _pp.brightnessunit)    # Dict[str, float]: Failed RMS value
-        self.sq_rms = 0.0                  # float: Square of RMS
-        self.weight_sum = 0.0              # float: Weighted sum of time on source.
-        self.time_unit: Final[str] = 's'                   # str: Time unit (constant)
-        self.ang_unit = self.cqa.getunit(_pp.qcell[0])     # str: Ang unit
-        self.cx_val = self.cqa.getvalue(_pp.qcell[0])[0]   # float: cx
-        self.cy_val = self.cqa.getvalue(self.cqa.convert(_pp.qcell[1], self.ang_unit))[0]  # float: cy
-        self.bandwidth = numpy.abs(_pp.chan_width)         # float: Band width
-        self.context = context                             # Context: Pipeline context
-        self.is_nro = sdutils.is_nro(context)              # bool: NRO flag
-        self.infile = None                 # str: Input file
-        self.antid = None                  # int Antenna ID
-        self.fieldid = None                # int: Field ID
-        self.spwid = None                  # int: Spectrum ID
-        self.pol_names = None              # List[str]: Polarization names
-        self.polids = None                 # List[int]: Polarization ID
-        self.raster_info = None            # RasterInfo: RasterInfo object
-        self.msobj = None                  # MeasurementSet: MeasuremetSet
-        self.calmsobj = None               # MeasurementSet: Calibrated MeasurementSet
-        self.error_msg = None              # str: Error message
-        self.dt = None                     # DataTableImpl: Datatable object
-        self.index_list = None             # numpy.ndarray[int64]: Index list
-        self.effBW = None                  # float: Effective BW
-        self.mean_tsys_per_pol = None      # numpy.ndarray[float]: Mean of Tsys per polarization
-        self.width = None                  # float: Width
-        self.height = None                 # float: Height
-        self.calst = None                  # IntervalCalState: Interval calibration state object
-        self.t_on_act = None               # float: T_on actual
-        self.t_sub_on = None               # float: Tsub on
-        self.t_sub_off = None              # float: Tsub off
+        self.cqa: Any = casa_tools.quanta
+        self.failed_rms: Any = self.cqa.quantity(-1, _pp.brightnessunit)
+        self.sq_rms: float = 0.0
+        self.weight_sum: float = 0.0
+        self.time_unit: Final[str] = 's'
+        self.ang_unit: str = self.cqa.getunit(_pp.qcell[0])
+        self.cx_val: float = self.cqa.getvalue(_pp.qcell[0])[0]
+        self.cy_val: float = self.cqa.getvalue(self.cqa.convert(_pp.qcell[1], self.ang_unit))[0]
+        self.bandwidth: float = numpy.abs(_pp.chan_width)
+        self.context: Context = context
+        self.is_nro: bool = sdutils.is_nro(context)
+        self.infile: str | None = None
+        self.antid: int | None = None
+        self.fieldid: int | None = None
+        self.spwid: int | None = None
+        self.pol_names: list[str] | None = None
+        self.polids: list[int] | None = None
+        self.raster_info: RasterInfo | None = None
+        self.msobj: MeasurementSet | None = None
+        self.calmsobj: MeasurementSet | None = None
+        self.error_msg: str | None = None
+        self.dt: DataTableImpl | None = None
+        self.index_list: numpy.ndarray | None = None
+        self.effBW: float | None = None
+        self.mean_tsys_per_pol: numpy.ndarray | None = None
+        self.width: float | None = None
+        self.height: float | None = None
+        self.calst: Any | None = None
+        self.t_on_act: float | None = None
+        self.t_sub_on: float | None = None
+        self.t_sub_off: float | None = None

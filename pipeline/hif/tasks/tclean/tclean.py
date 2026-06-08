@@ -2,8 +2,6 @@ import os
 import re
 import inspect
 
-from typing import Optional
-
 import numpy as np
 from scipy.ndimage import label
 
@@ -29,7 +27,7 @@ from .resultobjects import TcleanResult
 from .vlaautomaskthresholdsequence import VlaAutoMaskThresholdSequence
 from .vlassmaskthresholdsequence import VlassMaskThresholdSequence
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class TcleanInputs(cleanbase.CleanBaseInputs):
@@ -1889,12 +1887,12 @@ class Tclean(cleanbase.CleanBase):
         # Update the result.
         result.set_mom8(maxiter, mom8_name)
 
-    def _update_miscinfo(self, imagename: str, nfield: Optional[int] = None, datamin: Optional[float] = None,
-                         datamax: Optional[float] = None, datarms: Optional[float] = None,
-                         stokes: Optional[str] = None, effbw: Optional[float] = None,
-                         level: Optional[str] = None, ctrfrq: Optional[float] = None,
-                         obspatt: Optional[str] = None, arrays: Optional[str] = None,
-                         modifier: Optional[str] = None, session: Optional[str] = None):
+    def _update_miscinfo(self, imagename: str, nfield: int | None = None, datamin: float | None = None,
+                         datamax: float | None = None, datarms: float | None = None,
+                         stokes: str | None = None, effbw: float | None = None,
+                         level: str | None = None, ctrfrq: float | None = None,
+                         obspatt: str | None = None, arrays: str | None = None,
+                         modifier: str | None = None, session: str | None = None):
         """
         Update image header keywords.
 

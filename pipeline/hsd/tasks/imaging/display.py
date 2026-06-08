@@ -1,43 +1,51 @@
 """Set of plotting classes for hsd_imaging task."""
-import copy
+from __future__ import annotations
+
 import datetime
 import functools
 import itertools
 import math
-from math import ceil, floor
 import os
 import time
-from typing import Callable, Dict, Generator, List, Optional, Tuple, Union
+from math import ceil, floor
+from typing import TYPE_CHECKING
 
-import numpy
-from scipy import interpolate
 import matplotlib
 import matplotlib.axes as axes
 import matplotlib.figure as figure
 import matplotlib.ticker as ticker
+import numpy
 from matplotlib.ticker import MultipleLocator
+from scipy import interpolate
 
-from pipeline.environment import casa_version_string, pipeline_revision
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.displays.pointing as pointing
 import pipeline.infrastructure.renderer.logger as logger
 from pipeline.domain import DataType
+from pipeline.environment import casa_version_string, pipeline_revision
 from pipeline.h.tasks.common import atmutil
-from pipeline.hsd.tasks.common.display import DPIDetail, SDImageDisplay, SDImageDisplayInputs
-from pipeline.hsd.tasks.common.display import sd_polmap as polmap, SpectralImage
-from pipeline.hsd.tasks.common.display import SDSparseMapPlotter
-from pipeline.hsd.tasks.common.display import NoData
+from pipeline.hsd.tasks.common.display import (
+    DPIDetail, NoData, SDImageDisplay, SDSparseMapPlotter, SpectralImage,
+    sd_polmap as polmap
+)
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
-from pipeline.infrastructure.displays.pointing import MapAxesManagerBase
 from pipeline.infrastructure.displays.plotstyle import casa5style_plot
+from pipeline.infrastructure.displays.pointing import MapAxesManagerBase
+
+if TYPE_CHECKING:
+    from collections.abc import Generator, Callable
+
+    from numpy.ma.core import MaskedArray
+
+    from pipeline.hsd.tasks.common.display import SDImageDisplayInputs
 
 RArotation = pointing.RArotation
 DECrotation = pointing.DECrotation
 DDMMSSs = pointing.DDMMSSs
 HHMMSSss = pointing.HHMMSSss
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class ImageAxesManager(MapAxesManagerBase):
@@ -61,7 +69,7 @@ class ImageAxesManager(MapAxesManagerBase):
             ticksize: tick label size
             colormap: colormap to use. 'gray' for gray scale. Otherwise, 'jet' is used.
         """
-        super(ImageAxesManager, self).__init__()
+        super().__init__()
         self.figure = fig
         self.xformatter = xformatter
         self.yformatter = yformatter
@@ -130,7 +138,7 @@ class SingleImageAxesManager(ImageAxesManager):
             ticksize: tick label size
             colormap: colormap to use. 'gray' for gray scale. Otherwise, 'jet' is used.
         """
-        super(SingleImageAxesManager, self).__init__(fig, xformatter, yformatter, xlocator, ylocator, xrotation, yrotation, ticksize, colormap)
+        super().__init__(fig, xformatter, yformatter, xlocator, ylocator, xrotation, yrotation, ticksize, colormap)
         self._image_axes = None
 
     @property
@@ -167,7 +175,7 @@ class SingleImageAxesManager(ImageAxesManager):
 class SDChannelAveragedImageDisplay(SDImageDisplay):
     """Plotter to create a color map for channel averaged spw."""
 
-    def plot(self) -> List[logger.Plot]:
+    def plot(self) -> list[logger.Plot]:
         """Create list of color maps for channel averaged spw.
 
         Returns:
@@ -300,7 +308,7 @@ class SDMomentMapDisplay(SDImageDisplay):
             self.moment_images.extend(moment_imagename_list)
         super(self.__class__, self).init()
 
-    def plot(self) -> List[logger.Plot]:
+    def plot(self) -> list[logger.Plot]:
         """Create list of moment maps.
 
         Returns:
@@ -475,10 +483,17 @@ class ChannelMapAxesManager(ImageAxesManager):
             brightnessunit: unit of the data to be displayed
             freq_frame: frequency reference frame
         """
-        super(ChannelMapAxesManager, self).__init__(fig, xformatter, yformatter,
-                                                    xlocator, ylocator,
-                                                    xrotation, yrotation,
-                                                    ticksize, colormap)
+        super().__init__(
+            fig,
+            xformatter,
+            yformatter,
+            xlocator,
+            ylocator,
+            xrotation,
+            yrotation,
+            ticksize,
+            colormap,
+        )
         self.nh = nh
         self.nv = nv
         self.brightnessunit = brightnessunit
@@ -576,7 +591,7 @@ class ChannelMapAxesManager(ImageAxesManager):
         return self._axes_integsp_zoom
 
     @property
-    def axes_chmap(self) -> List[axes.Axes]:
+    def axes_chmap(self) -> list[axes.Axes]:
         """Create Axes instances for channel map.
 
         Creates and returns Axes instance for channel map,
@@ -634,7 +649,7 @@ class SDSparseMapDisplay(SDImageDisplay):
         """Disable overlay of ATM transmission curve."""
         self.showatm = False
 
-    def plot(self) -> List[logger.Plot]:
+    def plot(self) -> list[logger.Plot]:
         """Create list of sparse profile maps.
 
         Returns:
@@ -644,7 +659,7 @@ class SDSparseMapDisplay(SDImageDisplay):
 
         return self.__plot_sparse_map()
 
-    def __plot_sparse_map(self) -> List[logger.Plot]:
+    def __plot_sparse_map(self) -> list[logger.Plot]:
         """Create list of sparse profile maps.
 
         Returns:
@@ -783,7 +798,7 @@ class SDSparseMapDisplay(SDImageDisplay):
 
         return plot_list
 
-    def _get_array_chunk(self, data: numpy.ndarray, blc: List[int], trc: List[int], axes: List[int]) -> numpy.ndarray:
+    def _get_array_chunk(self, data: numpy.ndarray, blc: list[int], trc: list[int], axes: list[int]) -> numpy.ndarray:
         """
         Return a slice of an array.
 
@@ -826,7 +841,7 @@ class SDChannelMapDisplay(SDImageDisplay):
         Returns:
             extended ndarray of velocities
         """
-        assert len( self.velocity ) > 1
+        assert len(self.velocity) > 1
 
         extended_velocity = numpy.append(
             self.velocity,
@@ -834,7 +849,7 @@ class SDChannelMapDisplay(SDImageDisplay):
         )
         return extended_velocity
 
-    def plot(self) -> List[logger.Plot]:
+    def plot(self) -> list[logger.Plot]:
         """Create list of channel maps.
 
         Returns:
@@ -847,7 +862,7 @@ class SDChannelMapDisplay(SDImageDisplay):
 
         return self.__plot_channel_map()
 
-    def __get_integrated_spectra(self) -> numpy.ma.masked_array:
+    def __get_integrated_spectra(self) -> MaskedArray:
         """Compute integrated spectrum from the image.
 
         Image weights provided by the weight image is taken into account.
@@ -907,7 +922,7 @@ class SDChannelMapDisplay(SDImageDisplay):
                     sp_ave[pol, :] = curr_sp
         return sp_ave
 
-    def __plot_channel_map(self) -> List[logger.Plot]:
+    def __plot_channel_map(self) -> list[logger.Plot]:
         """Create list of channel maps.
 
         Returns:
@@ -1215,7 +1230,7 @@ class SDChannelMapDisplay(SDImageDisplay):
         return plot_list
 
     def _calc_plot_values(self, f_line_center:float, slice_width: int, is_lsb:bool) -> \
-            Tuple[Union[bool, int, float, List[int]]]:
+            tuple[bool | int | float | list[int]]:
         """
         Digitize values and calculate related values.
 
@@ -1339,7 +1354,7 @@ class SDChannelMapDisplay(SDImageDisplay):
             # If one side of the lines is out of nchan, returns the allowed max slice width
             return _allowed_max_width
 
-    def calc_velocity_lines(self, is_leftside:bool, slice_width: int, idx_vertlines: List[int], velocity_line_center:float) -> List[float]:
+    def calc_velocity_lines(self, is_leftside:bool, slice_width: int, idx_vertlines: list[int], velocity_line_center:float) -> list[float]:
         """
         Calculate relative velocities for red vertical lines on the velocity plot using extrapolation.
 
@@ -1373,7 +1388,7 @@ class SDChannelMapDisplay(SDImageDisplay):
 class SDRmsMapDisplay(SDImageDisplay):
     """Plotter to create a baseline rms map."""
 
-    def plot(self) -> List[logger.Plot]:
+    def plot(self) -> list[logger.Plot]:
         """Create list of baseline rms maps.
 
         Returns:
@@ -1428,7 +1443,7 @@ class SDRmsMapDisplay(SDImageDisplay):
                 array3d[pol, :, :] = numpy.array(array2d[pol]).reshape((self.ny, self.nx))
         return numpy.flipud(array3d.transpose())
 
-    def __plot(self) -> List[logger.Plot]:
+    def __plot(self) -> list[logger.Plot]:
         """Create list of baseline rms maps.
 
         Returns:
@@ -1544,7 +1559,7 @@ class SpectralMapAxesManager(MapAxesManagerBase):
             locator: locator for x-axis
             ticksize: tick label size
         """
-        super(SpectralMapAxesManager, self).__init__()
+        super().__init__()
         self.figure = fig
         self.nh = nh
         self.nv = nv
@@ -1555,7 +1570,7 @@ class SpectralMapAxesManager(MapAxesManagerBase):
         self._axes = None
 
     @property
-    def axes_list(self) -> List[axes.Axes]:
+    def axes_list(self) -> list[axes.Axes]:
         """Return list of Axes instances for the profile map.
 
         Translation of one-dimensional list into two-dimensional location
@@ -1613,7 +1628,7 @@ class SDSpectralMapDisplay(SDImageDisplay):
     MaxNhPanel = 5
     MaxNvPanel = 5
 
-    def plot(self) -> List[logger.Plot]:
+    def plot(self) -> list[logger.Plot]:
         """Create detailed profile map.
 
         If provided image is so large that its number of spatial pixels
@@ -1626,7 +1641,7 @@ class SDSpectralMapDisplay(SDImageDisplay):
         self.init()
         return self.__plot_spectral_map()
 
-    def __get_strides(self) -> List[int]:
+    def __get_strides(self) -> list[int]:
         """Return the stride for creating profile map.
 
         The stride represents the number of spatial pixels that are combined into
@@ -1643,7 +1658,7 @@ class SDSpectralMapDisplay(SDImageDisplay):
             factors.append(int(numpy.round(abs(self.grid_size / cell))))
         return factors
 
-    def __plot_spectral_map(self) -> List[logger.Plot]:
+    def __plot_spectral_map(self) -> list[logger.Plot]:
         """Create detailed profile map.
 
         If provided image is so large that its number of spatial pixels
@@ -1836,8 +1851,8 @@ class SDSpectralImageDisplay(SDImageDisplay):
     """Plotter for science spectral window."""
 
     def __plot(self, display_cls: SDImageDisplay,
-               prologue: Optional[Callable[[SDImageDisplay], None]] = None,
-               epilogue: Optional[Callable[[SDImageDisplay], None]] = None) -> List[logger.Plot]:
+               prologue: Callable[[SDImageDisplay], None | None] = None,
+               epilogue: Callable[[SDImageDisplay], None | None] = None) -> list[logger.Plot]:
         """Generate Plot list using given display class.
 
         Args:
@@ -1861,7 +1876,7 @@ class SDSpectralImageDisplay(SDImageDisplay):
         return plot_list
 
     @casa5style_plot
-    def plot(self) -> List[logger.Plot]:
+    def plot(self) -> list[logger.Plot]:
         """Create Plot instances for science spectral windows.
 
         It creates the following plots from the single inputs.
@@ -1914,7 +1929,7 @@ class SDSpectralImageDisplay(SDImageDisplay):
 
         return plot_list
 
-    def add_plot( self, plot_type: str, filename: str ) -> List[logger.Plot]:
+    def add_plot( self, plot_type: str, filename: str ) -> list[logger.Plot]:
         """Return list of Plot instances for plots created beforehand.
 
         Plot instance is created only when input has valid file
@@ -1949,7 +1964,7 @@ class SDSpectralImageDisplay(SDImageDisplay):
             return []
 
 
-def SDImageDisplayFactory(mode: str) -> Union[SDChannelAveragedImageDisplay, SDSpectralImageDisplay]:
+def SDImageDisplayFactory(mode: str) -> SDChannelAveragedImageDisplay | SDSpectralImageDisplay:
     """Return appropriate display class for plotting.
 
     If mode is "TP", SDChannelAveragedImageDisplay is returned.
@@ -1969,14 +1984,14 @@ def SDImageDisplayFactory(mode: str) -> Union[SDChannelAveragedImageDisplay, SDS
         # mode should be 'SP'
         return SDSpectralImageDisplay
 
-def get_metadata(obj: SDImageDisplay) -> Dict[str, str]:
+def get_metadata(obj: SDImageDisplay) -> dict[str, str]:
     """Get metadata for PNG header.
 
     Args:
         obj (SDImageDisplay): Parent object
 
     Returns:
-        Dict[str, str]: metadata
+        dict[str, str]: metadata
     """
     _metadata = {}
     _metadata['SPW'] = getattr(obj, 'spw', None)
@@ -1984,7 +1999,7 @@ def get_metadata(obj: SDImageDisplay) -> Dict[str, str]:
     _metadata['ANTENNA'] = getattr(obj, 'antenna', None)
     _metadata['CASA'] = casa_version_string
     _metadata['VERSION'] = pipeline_revision
-    _metadata['DATE'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S:%f')
+    _metadata['DATE'] = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S:%f')
     if hasattr(obj, 'inputs'):
         _metadata['IMAGE'] = getattr(obj.inputs, 'imagename', None)
         _metadata['FIELD'] = getattr(obj.inputs, 'source', None)

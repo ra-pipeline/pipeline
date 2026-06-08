@@ -10,7 +10,7 @@ from pipeline.infrastructure import casa_tools
 LOG = infrastructure.get_logger(__name__)
 
 
-class testgainsSummaryChart(object):
+class testgainsSummaryChart:
     def __init__(self, context, result):
         self.context = context
         self.result = result
@@ -61,7 +61,7 @@ class testgainsSummaryChart(object):
         return wrapper
 
 
-class testgainsPerAntennaChart(object):
+class testgainsPerAntennaChart:
     def __init__(self, context, result, yaxis):
         self.context = context
         self.result = result

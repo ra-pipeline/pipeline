@@ -9,7 +9,7 @@ import pipeline.infrastructure as infrastructure
 LOG = infrastructure.get_logger(__name__)
 
 
-class ResultAxis(object):
+class ResultAxis:
     def __init__(self, name, units, data, channel_width=None):
         self.name = name
         self.units = units
@@ -23,7 +23,7 @@ class ResultAxis(object):
             self.channel_width = channel_width
 
 
-class ResultBase(object):
+class ResultBase:
 
     @property
     def fieldname(self):
@@ -162,7 +162,7 @@ class SpectrumResult(ResultBase):
         self.units = units
 
 
-class QaResult(object):
+class QaResult:
     def __init__(self):
         self.overall_score = None
         self.view_score = {}

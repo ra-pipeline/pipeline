@@ -12,7 +12,7 @@ LOG = infrastructure.get_logger(__name__)
 
 class BandpassDetailChart(common.PlotbandpassDetailBase):
     def __init__(self, context, result, xaxis, yaxis, **kwargs):
-        super(BandpassDetailChart, self).__init__(context, result, xaxis, yaxis, **kwargs)
+        super().__init__(context, result, xaxis, yaxis, **kwargs)
 
     def plot(self):
         # PIPE-110: create separate calls to plotbandpass for DSB and non-DSB
@@ -69,7 +69,7 @@ class BandpassDetailChart(common.PlotbandpassDetailBase):
 
 class BandpassSummaryChart(common.PlotbandpassDetailBase):
     def __init__(self, context, result, xaxis, yaxis, **kwargs):
-        super(BandpassSummaryChart, self).__init__(context, result, xaxis, yaxis, overlay='baseband', **kwargs)
+        super().__init__(context, result, xaxis, yaxis, overlay='baseband', **kwargs)
 
         # overlaying baseband, so we need to merge the individual spw keys
         # into joint keys, and the filenames into a list as the output could
@@ -125,7 +125,7 @@ class BandpassAmpVsFreqSummaryChart(BandpassSummaryChart):
     """
     def __init__(self, context, result):
         # request plots per spw, overlaying all antennas
-        super(BandpassAmpVsFreqSummaryChart, self).__init__(context, result, xaxis='freq', yaxis='amp', showatm=True)
+        super().__init__(context, result, xaxis='freq', yaxis='amp', showatm=True)
 
 
 class BandpassPhaseVsFreqSummaryChart(BandpassSummaryChart):
@@ -134,7 +134,7 @@ class BandpassPhaseVsFreqSummaryChart(BandpassSummaryChart):
     """
     def __init__(self, context, result):
         # request plots per spw, overlaying all antennas
-        super(BandpassPhaseVsFreqSummaryChart, self).__init__(context, result, xaxis='freq', yaxis='phase',
+        super().__init__(context, result, xaxis='freq', yaxis='phase',
                                                               showatm=True, markersize=6)
 
 
@@ -144,7 +144,7 @@ class BandpassAmpVsFreqDetailChart(BandpassDetailChart):
     """
     def __init__(self, context, result):
         # request plots per antenna and spw
-        super(BandpassAmpVsFreqDetailChart, self).__init__(context, result, xaxis='freq', yaxis='amp', showatm=True)
+        super().__init__(context, result, xaxis='freq', yaxis='amp', showatm=True)
 
 
 class BandpassPhaseVsFreqDetailChart(BandpassDetailChart):
@@ -153,7 +153,7 @@ class BandpassPhaseVsFreqDetailChart(BandpassDetailChart):
     """
     def __init__(self, context, result):
         # request plots per antenna and spw
-        super(BandpassPhaseVsFreqDetailChart, self).__init__(context, result, xaxis='freq', yaxis='phase', showatm=True,
+        super().__init__(context, result, xaxis='freq', yaxis='phase', showatm=True,
                                                              markersize=6)
 
 
@@ -173,7 +173,7 @@ class BandpassAmpVsUVDetailChart(applycal.SpwSummaryChart):
         }
         plot_args.update(**overrides)
 
-        super(BandpassAmpVsUVDetailChart, self).__init__(context, output_dir, calto, xaxis='uvdist', yaxis='amp',
+        super().__init__(context, output_dir, calto, xaxis='uvdist', yaxis='amp',
                                                          intent=intent, **plot_args)
 
 
@@ -193,5 +193,5 @@ class BandpassAmpVsTimeDetailChart(applycal.SpwSummaryChart):
         }
         plot_args.update(**overrides)
 
-        super(BandpassAmpVsUVDetailChart, self).__init__(context, output_dir, calto, xaxis='uvdist', yaxis='amp',
+        super().__init__(context, output_dir, calto, xaxis='uvdist', yaxis='amp',
                                                          intent=intent, **plot_args)

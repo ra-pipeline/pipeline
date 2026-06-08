@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import collections
 import itertools
 import operator
 import os
 import re
-from typing import Union, List, Dict
+from typing import TYPE_CHECKING
 
 import cachetools
 import matplotlib.dates
@@ -14,11 +16,13 @@ import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.renderer.logger as logger
 import pipeline.infrastructure.utils as utils
 from pipeline.infrastructure.utils import caltable_tools
-from pipeline.domain import MeasurementSet
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 
-LOG = infrastructure.get_logger(__name__)
+if TYPE_CHECKING:
+    from pipeline.domain import MeasurementSet
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 COLSHAPE_FORMAT = re.compile(r'\[(?P<num_pols>\d+), (?P<num_rows>\d+)\]')
 
@@ -141,7 +145,7 @@ class PlotbandpassDetailBase:
         pass
 
 
-class PlotmsCalLeaf(object):
+class PlotmsCalLeaf:
     """
     Class to execute plotms and return a plot wrapper. It passes the spw and
     ant arguments through to plotms without further manipulation, creating
@@ -151,7 +155,7 @@ class PlotmsCalLeaf(object):
     will be overplotted on the same plot.
     """
 
-    def __init__(self, context, result, calapp: Union[List[callibrary.CalApplication], callibrary.CalApplication],
+    def __init__(self, context, result, calapp: list[callibrary.CalApplication] | callibrary.CalApplication,
                  xaxis, yaxis, spw='', ant='', pol='', correlation='', plotrange=[], coloraxis=''):
         self._context = context
         self._result = result
@@ -289,7 +293,7 @@ class PlotmsCalLeaf(object):
         return task_list
 
 
-class PlotbandpassLeaf(object):
+class PlotbandpassLeaf:
     """
     Class to execute plotbandpass and return a plot wrapper. It passes the spw
     and ant arguments through to plotbandpass without further manipulation. More
@@ -410,7 +414,7 @@ class PlotbandpassLeaf(object):
         return casa_tasks.plotbandpass(**task_args)
 
 
-class LeafComposite(object):
+class LeafComposite:
     """
     Base class to hold multiple PlotLeafs, thus generating multiple plots when
     plot() is called.
@@ -425,7 +429,7 @@ class LeafComposite(object):
             plots.extend(child.plot())
         return [p for p in plots if p is not None]
 
-    def _create_calapp_contents_dict(self, calapps: List[callibrary.CalApplication], column_name: str) -> Dict[int, List[callibrary.CalApplication]]:
+    def _create_calapp_contents_dict(self, calapps: list[callibrary.CalApplication], column_name: str) -> dict[int, list[callibrary.CalApplication]]:
         """
         Creates and returns a dictionary mapping some element (e.g. spw, ant) specified by the input
         column_name to lists of the input calapps that have that element present in their caltables.
@@ -469,7 +473,7 @@ class PolComposite(LeafComposite):
         children = [self.leaf_class(context, result, calapp, xaxis, yaxis,
                                     spw=spw, ant=ant, pol=pol, **kwargs)
                     for pol in range(num_pols)]
-        super(PolComposite, self).__init__(children)
+        super().__init__(children)
 
 
 class SpwComposite(LeafComposite):
@@ -479,7 +483,7 @@ class SpwComposite(LeafComposite):
     # reference to the PlotLeaf class to call
     leaf_class = None
 
-    def __init__(self, context, result, calapp: Union[List[callibrary.CalApplication], callibrary.CalApplication],
+    def __init__(self, context, result, calapp: list[callibrary.CalApplication] | callibrary.CalApplication,
                  xaxis, yaxis, ant='', pol='', **kwargs):
 
         if isinstance(calapp, list):
@@ -510,7 +514,7 @@ class SpwAntComposite(LeafComposite):
     # reference to the PlotLeaf class to call
     leaf_class = None
 
-    def __init__(self, context, result, calapp: Union[List[callibrary.CalApplication], callibrary.CalApplication],
+    def __init__(self, context, result, calapp: list[callibrary.CalApplication] | callibrary.CalApplication,
                  xaxis, yaxis, pol='', ysamescale=False, **kwargs):
         # Support for lists of calapps was added for PIPE-1409 and PIPE-1377.
         if isinstance(calapp, list):
@@ -593,7 +597,7 @@ class AntComposite(LeafComposite):
     # reference to the PlotLeaf class to call
     leaf_class = None
 
-    def __init__(self, context, result, calapp: Union[List[callibrary.CalApplication], callibrary.CalApplication],
+    def __init__(self, context, result, calapp: list[callibrary.CalApplication] | callibrary.CalApplication,
                  xaxis, yaxis, spw='', pol='', **kwargs):
         if isinstance(calapp, list):
             # Create a dictionary to keep track of which caltables have which ants.
@@ -629,7 +633,7 @@ class AntSpwComposite(LeafComposite):
         children = [self.leaf_class(context, result, calapp, xaxis, yaxis,
                                     ant=ant, pol=pol, **kwargs)
                     for ant in caltable_antennas]
-        super(AntSpwComposite, self).__init__(children)
+        super().__init__(children)
 
 
 class SpwPolComposite(LeafComposite):
@@ -646,7 +650,7 @@ class SpwPolComposite(LeafComposite):
         children = [self.leaf_class(context, result, calapp, xaxis, yaxis,
                                     spw=spw, ant=ant, **kwargs)
                     for spw in caltable_spws]
-        super(SpwPolComposite, self).__init__(children)
+        super().__init__(children)
 
 
 class AntSpwPolComposite(LeafComposite):
@@ -663,7 +667,7 @@ class AntSpwPolComposite(LeafComposite):
         children = [self.leaf_class(context, result, calapp, xaxis, yaxis,
                                     ant=ant, **kwargs)
                     for ant in caltable_antennas]
-        super(AntSpwPolComposite, self).__init__(children)
+        super().__init__(children)
 
 
 class PlotmsCalAntComposite(AntComposite):
@@ -706,7 +710,7 @@ class PlotbandpassAntSpwPolComposite(AntSpwPolComposite):
     leaf_class = PlotbandpassSpwPolComposite
 
 
-class CaltableWrapperFactory(object):
+class CaltableWrapperFactory:
     @staticmethod
     def from_caltable(filename, gaincalamp=False):
         LOG.trace('CaltableWrapperFactory.from_caltable(%r)', filename)
@@ -781,7 +785,7 @@ class CaltableWrapperFactory(object):
                                    scan)
 
 
-class CaltableWrapper(object):
+class CaltableWrapper:
     @staticmethod
     def from_caltable(filename):
         return CaltableWrapperFactory.from_caltable(filename)
@@ -809,7 +813,6 @@ class CaltableWrapper(object):
         return mask
 
     def filter(self, spw=None, antenna=None, scan=None):
-        # LOG.trace('filter(spw=%s, antenna=%s, scan=%s)' % (spw, antenna, scan))
         if spw is None:
             spw = self._spws
         if antenna is None:
@@ -836,7 +839,7 @@ class CaltableWrapper(object):
         return CaltableWrapper(self.filename, data, time, antenna, spw, scan)
 
 
-class PhaseVsBaselineData(object):
+class PhaseVsBaselineData:
     def __init__(self, data, ms: MeasurementSet, corr_id, refant_id):
         # While it is possible to do so, we shouldn't calculate statistics for
         # mixed antennas/spws/scans.
@@ -848,7 +851,6 @@ class PhaseVsBaselineData(object):
             raise ValueError('Data slice contains multiple antennas. Got %s' % data.antenna)
         if len(set(data.spw)) > 1:
             raise ValueError('Data slice contains multiple spws. Got %s' % data.spw)
-        #        assert len(set(data.scan)) is 1, 'Data slice contains multiple scans'
 
         self.data = data
         self.data_for_corr = self.data.data[:, corr_id]
@@ -964,7 +966,7 @@ class PhaseVsBaselineData(object):
         return self._median_offset
 
 
-class XYData(object):
+class XYData:
     def __init__(self, delegate, x_axis, y_axis):
         self.__delegate = delegate
         self.__x_axis = x_axis
@@ -1003,7 +1005,7 @@ class XYData(object):
         return getattr(self.__delegate, self.__y_axis)
 
 
-class DataRatio(object):
+class DataRatio:
     def __init__(self, before, after):
         # test symmetric differences to find data selection errors
         if set(before.antenna) ^ set(after.antenna):
@@ -1074,6 +1076,6 @@ class DataRatio(object):
         return before / after
 
 
-class NullScoreFinder(object):
+class NullScoreFinder:
     def get_score(self, *args, **kwargs):
         return None

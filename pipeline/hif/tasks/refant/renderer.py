@@ -19,7 +19,7 @@ LOG = logging.get_logger(__name__)
 
 class T2_4MDetailsRefantRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def __init__(self, uri='refant.mako', description='Select reference antennas', always_rerender=False):
-        super(T2_4MDetailsRefantRenderer, self).__init__(uri=uri, description=description,
+        super().__init__(uri=uri, description=description,
                                                          always_rerender=always_rerender)
 
     def update_mako_context(self, ctx, context, result):

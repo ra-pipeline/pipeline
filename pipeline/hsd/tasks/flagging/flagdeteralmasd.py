@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import collections
+import collections.abc
 import itertools
 import os
 import re
 import shutil
 import string
-from typing import TYPE_CHECKING, Generator, List, Optional, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -25,10 +26,13 @@ from pipeline.hsd.heuristics.pointing_outlier import PointingOutlierHeuristics
 from pipeline.hsd.tasks.common.flagcmd_util import datatable_rowid_to_timerange
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from pipeline.domain import SpectralWindow
     from pipeline.infrastructure import Context
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
+
 
 PointingOutlierStats = collections.namedtuple(
     "PointingOutlierStats",
@@ -58,7 +62,7 @@ class FlagDeterALMASingleDishInputs(flagdeterbase.FlagDeterBaseInputs):
     template = vdp.VisDependentProperty(default=True)
 
     @flagdeterbase.FlagDeterBaseInputs.filetemplate.postprocess
-    def filetemplate(self, unprocessed: Union[str, List[str]]) -> str:
+    def filetemplate(self, unprocessed: str | list[str]) -> str:
         """Post-process filetemplate.
 
         This ensures filetemplate value is string.
@@ -94,30 +98,30 @@ class FlagDeterALMASingleDishInputs(flagdeterbase.FlagDeterBaseInputs):
 
     # docstring and type hints: supplements hsd_flagdata
     def __init__(self,
-                 context: 'Context',
-                 vis: Optional[List[str]] = None,
-                 output_dir: Optional[str] = None,
-                 flagbackup: Optional[Union[str, bool]] = None,
-                 autocorr: Optional[Union[str, bool]] = None,
-                 shadow: Optional[Union[str, bool]] = None,
-                 scan: Optional[Union[str, bool]] = None,
-                 scannumber: Optional[str] = None,
-                 intents: Optional[str] = None,
-                 edgespw: Optional[Union[str, bool]] = None,
-                 fracspw: Optional[str] = None,
-                 fracspwfps: Optional[Union[str, float]] = None,
-                 online: Optional[Union[str, bool]] = None,
-                 fileonline: Optional[str] = None,
-                 template: Optional[Union[str, bool]] = None,
-                 filetemplate: Optional[str] = None,
-                 pointing: Optional[Union[str, bool]] = None,
-                 filepointing: Optional[str] = None,
-                 incompleteraster: Optional[Union[str, bool]] = None,
-                 hm_tbuff: Optional[str] = None,
-                 tbuff: Optional[Union[str, float]] = None,
-                 qa0: Optional[Union[str, bool]] = None,
-                 qa2: Optional[Union[str, bool]] = None,
-                 parallel: Optional[Union[str, bool]] = None):
+                 context: Context,
+                 vis: list[str] | None = None,
+                 output_dir: str | None = None,
+                 flagbackup: str | bool | None = None,
+                 autocorr: str | bool | None = None,
+                 shadow: str | bool | None = None,
+                 scan: str | bool | None = None,
+                 scannumber: str | None = None,
+                 intents: str | None = None,
+                 edgespw: str | bool | None = None,
+                 fracspw: str | None = None,
+                 fracspwfps: str | float | None = None,
+                 online: str | bool | None = None,
+                 fileonline: str | None = None,
+                 template: str | bool | None = None,
+                 filetemplate: str | None = None,
+                 pointing: str | bool | None = None,
+                 filepointing: str | None = None,
+                 incompleteraster: str | bool | None = None,
+                 hm_tbuff: str | None = None,
+                 tbuff: str | float | None = None,
+                 qa0: str | bool | None = None,
+                 qa2: str | bool | None = None,
+                 parallel: str | bool | None = None):
         """Construct FlagDeterALMASingleDishInputs instance.
 
         Args:
@@ -605,7 +609,7 @@ class SerialFlagDeterALMASingleDish(flagdeterbase.FlagDeterBase):
 
             yield cmd
 
-    def _get_edgespw_cmds(self) -> List[str]:
+    def _get_edgespw_cmds(self) -> list[str]:
         """Construct and return list of flag commands.
 
         Returned list contains flag commands for edge channel flagging.
@@ -675,7 +679,7 @@ class SerialFlagDeterALMASingleDish(flagdeterbase.FlagDeterBase):
         if isinstance(self.inputs.fracspw, str) and spw.bandwidth.value <= self.bandwidth_limit:
             raise ValueError('Skipping edge flagging for spw %s' % spw.id)
 
-    def _get_flag_commands(self) -> List[str]:
+    def _get_flag_commands(self) -> list[str]:
         """
         Edit flag commands so that all summaries are based on target data instead of total.
         """

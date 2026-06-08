@@ -40,7 +40,7 @@ AUTO = "automatic"
                 {17: "poly",  19: "cspline",  23: "sinusoid"},
                 False
         ),
-        # error inputs 
+        # error inputs
         (
                 "badfunc",
                 ValueError,
@@ -56,9 +56,9 @@ AUTO = "automatic"
 def test_build_fitting_configuration(inp, expected, should_raise):
     if should_raise:
         with pytest.raises(expected):
-            worker.build_fitting_configuration(spw_id_list=SPWS, fit_function=inp)
+            worker.build_fitting_configuration(real_spw_id_list=SPWS, fit_function=inp)
         return
-    cfg = worker.build_fitting_configuration(spw_id_list=SPWS, fit_function=inp)
+    cfg = worker.build_fitting_configuration(real_spw_id_list=SPWS, fit_function=inp)
     assert isinstance(cfg, dict) and set(cfg.keys()) == set(SPWS)
     assert all(isinstance(v, BaselineFitParamConfig) for v in cfg.values())
     plain = {k: v.fitfunc.blfunc for k, v in cfg.items()}
@@ -80,7 +80,7 @@ def test_build_fitting_configuration(inp, expected, should_raise):
                           {17: 2,     19: AUTO, 23: AUTO},   False),
         ({17: 0, 19: 3, 23: 5},
                           {17: 0,    19: 3,    23: 5},       False),
-        # error inputs 
+        # error inputs
         ("bad",            ValueError,                       True),
         (1.5,              TypeError,                        True),
     ],

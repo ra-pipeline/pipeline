@@ -10,7 +10,7 @@ import pipeline.infrastructure.casa_tasks as casa_tasks
 LOG = infrastructure.get_logger(__name__)
 
 
-class fluxbootSummaryChart(object):
+class fluxbootSummaryChart:
     """
     Handles the creation of the "Model calibrator. Plot of amp vs. freq." figure in plotms
     """
@@ -67,7 +67,7 @@ class fluxbootSummaryChart(object):
         return wrapper
 
 
-class fluxgaincalSummaryChart(object):
+class fluxgaincalSummaryChart:
     """
     Handles the creation of the "Caltable: fluxgaincal.g. Plot of amp vs. freq." figure in plotms
     """
@@ -122,7 +122,7 @@ class fluxgaincalSummaryChart(object):
         return wrapper
 
 
-class modelfitSummaryChart(object):
+class modelfitSummaryChart:
     """
     Handles the creation of the "Flux vs frequency" figure in matplotlib
     """
@@ -279,7 +279,7 @@ class modelfitSummaryChart(object):
         return wrapper
 
 
-class residualsSummaryChart(object):
+class residualsSummaryChart:
     """
     Handles the creation of the "Fluxboot residuals vs. frequency" figure in matplotlib
     """

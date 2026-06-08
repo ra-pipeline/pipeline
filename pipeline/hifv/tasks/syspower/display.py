@@ -13,7 +13,7 @@ import pipeline.infrastructure.casa_tools as casa_tools
 LOG = infrastructure.get_logger(__name__)
 
 
-class syspowerBoxChart(object):
+class syspowerBoxChart:
     def __init__(self, context, result, dat_common, band):
         self.context = context
         self.result = result
@@ -21,7 +21,6 @@ class syspowerBoxChart(object):
         self.band = band
         self.ms = context.observing_run.get_ms(result.inputs['vis'])
         self.caltable = result.gaintable
-        # results[4].read()[0].rq_result[0].final[0].gaintable
 
     def plot(self):
         plots = [self.get_plot_wrapper('syspower_box')]
@@ -82,7 +81,7 @@ class syspowerBoxChart(object):
         return wrapper
 
 
-class syspowerBarChart(object):
+class syspowerBarChart:
     def __init__(self, context, result,  dat_common, band):
         self.context = context
         self.result = result
@@ -90,7 +89,6 @@ class syspowerBarChart(object):
         self.band = band
         self.ms = context.observing_run.get_ms(result.inputs['vis'])
         self.caltable = result.gaintable
-        # results[4].read()[0].rq_result[0].final[0].gaintable
 
     def plot(self):
         plots = [self.get_plot_wrapper('syspower_bar')]
@@ -149,7 +147,7 @@ class syspowerBarChart(object):
         return wrapper
 
 
-class compressionSummary(object):
+class compressionSummary:
     def __init__(self, context, result, spowerdict, band):
         self.context = context
         self.result = result
@@ -186,11 +184,15 @@ class compressionSummary(object):
             q1 = qa.quantity(time, 's')
             time1 = qa.time(q1, form='fits')
             try:
-                datetime_object = datetime.datetime.strptime(time1[0], '%Y-%m-%dT%H:%M:%S')
+                datetime_object = datetime.datetime.strptime(time1[0], '%Y-%m-%dT%H:%M:%S').replace(
+                    tzinfo=datetime.timezone.utc
+                )
             except ValueError:
                 timestr = time1[0]
                 timestr = timestr.replace('T24', 'T23')
-                datetime_object = datetime.datetime.strptime(timestr, '%Y-%m-%dT%H:%M:%S')
+                datetime_object = datetime.datetime.strptime(timestr, '%Y-%m-%dT%H:%M:%S').replace(
+                    tzinfo=datetime.timezone.utc
+                )
                 datetime_object += datetime.timedelta(hours=1)
             utc_time.append(datetime_object)
 
@@ -206,7 +208,6 @@ class compressionSummary(object):
             # to resolve a bug in plotting
             t = atime(epoch['m0']["value"], format='mjd')
             dd = t.datetime
-            # datestring = dd.strftime('%Y-%m-%dT%H:%M:%S')
             scantimes.append({'scanid': scan.id, 'time': dd})
 
         pdiff = self.spowerdict['spower_common']  # self.result.spowerdict['spower_common']
@@ -241,11 +242,9 @@ class compressionSummary(object):
                 offset = 1.285
             plottime = scantime['time'] - datetime.timedelta(0, 20)
             axes[0].text(plottime, offset, str(scantime['scanid']), fontsize='xx-small')
-        # leg = axes[0].legend(loc='lower center', ncol=3, bbox_to_anchor=(0.5, 1.0), frameon=True, numpoints=1,
-        #                      fancybox=False)
+
         leg = axes[0].legend(loc='center right', ncol=1, bbox_to_anchor=(1.0, 1.52), frameon=True, numpoints=1,
                              fancybox=False)
-        # title = axes[0].set_title('P_diff template summary    {!s}-band'.format(self.band))
         title = axes[0].set_title('  ')
         title.set_position([.5, 1.225])
 
@@ -255,7 +254,6 @@ class compressionSummary(object):
 
         plt.savefig(figfile)
         leg.set_bbox_to_anchor((0.5, 0.85))
-        # mpld3.save_html(fig0, figname.replace('.png', '.html'))
         plt.close(fig0)
         plt.close()
 
@@ -285,7 +283,7 @@ class compressionSummary(object):
         return wrapper
 
 
-class medianSummary(object):
+class medianSummary:
     def __init__(self, context, result, spowerdict, band):
         self.context = context
         self.result = result
@@ -328,11 +326,15 @@ class medianSummary(object):
             q1 = qa.quantity(time, 's')
             time1 = qa.time(q1, form='fits')
             try:
-                datetime_object = datetime.datetime.strptime(time1[0], '%Y-%m-%dT%H:%M:%S')
+                datetime_object = datetime.datetime.strptime(time1[0], '%Y-%m-%dT%H:%M:%S').replace(
+                    tzinfo=datetime.timezone.utc
+                )
             except ValueError:
                 timestr = time1[0]
                 timestr = timestr.replace('T24', 'T23')
-                datetime_object = datetime.datetime.strptime(timestr, '%Y-%m-%dT%H:%M:%S')
+                datetime_object = datetime.datetime.strptime(timestr, '%Y-%m-%dT%H:%M:%S').replace(
+                    tzinfo=datetime.timezone.utc
+                )
                 datetime_object += datetime.timedelta(hours=1)
             utc_time.append(datetime_object)
 
@@ -348,7 +350,6 @@ class medianSummary(object):
             # to resolve a bug in plotting
             t = atime(epoch['m0']["value"], format='mjd')
             dd = t.datetime
-            # datestring = dd.strftime('%Y-%m-%dT%H:%M:%S')
             scantimes.append({'scanid': scan.id, 'time': dd})
 
         pd = self.spowerdict['spower_common']  # self.result.spowerdict['spower_common']
@@ -356,21 +357,13 @@ class medianSummary(object):
 
         pdiff_ma = np.ma.masked_where(pdiff == 0, pdiff)
 
-        xrange = np.array(range(pdiff.shape[3]))
         pdiff_ma.data[pdiff_ma > 1.1] = 1.1
         pdiff_ma.data[pdiff_ma < 0.8] = 0.7
         n_blank = 100
 
-        # https://github.com/numpy/numpy/issues/14650
-
-        try:
-            pdiff_ma.mask[:, :, :, :n_blank] = True
-        except Exception as e:
-            if type(pdiff_ma.mask) == np.bool_:
-                pdiff_ma.mask = np.ma.getmaskarray(pdiff_ma)
-            pdiff_ma.mask[:, :, :, :n_blank] = True
-            LOG.debug("Issue with the array mask {!s}".format(e))
-            LOG.info("No zero values in pdiff - mask value set to a scalar boolean.  Reset to a matrix. ")
+        # Ensure mask is a full boolean array before item assignment
+        pdiff_ma.mask = np.ma.getmaskarray(pdiff_ma)
+        pdiff_ma.mask[:, :, :, :n_blank] = True
 
         ma_medians = np.ma.median(pdiff_ma, axis=0)
 
@@ -395,15 +388,12 @@ class medianSummary(object):
             plottime = scantime['time'] - datetime.timedelta(0, 20)
             plt.text(plottime, offset * np.max(ma_medians), str(scantime['scanid']), fontsize='xx-small')
 
-        # plt.xlim(0, pdiff.shape[3])
         leg = plt.legend(loc='upper center', ncol=6, bbox_to_anchor=(0.5, 1.15), fontsize='x-small')
         plt.xlabel('UTC Day Time [Day HH:MM]')
         plt.ylabel('median P_diff     {!s}-band'.format(self.band))
-        # p lt.ticklabel_format(useOffset=False)
         plt.gcf().set_size_inches(8, 7)
         plt.savefig(figfile)
         leg.set_bbox_to_anchor((0.5, 0.99))
-        # mpld3.save_html(fig0, figname.replace('.png', '.html'))
         plt.close(fig0)
         plt.close()
 
@@ -433,7 +423,7 @@ class medianSummary(object):
         return wrapper
 
 
-class syspowerPerAntennaChart(object):
+class syspowerPerAntennaChart:
     def __init__(self, context, result, yaxis, caltable, fileprefix, tabletype, band, spw, selectbasebands, science_scan_ids):
         self.context = context
         self.result = result

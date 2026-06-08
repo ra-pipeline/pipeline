@@ -1,5 +1,6 @@
 import abc
 import collections
+import collections.abc
 import copy
 import datetime
 import functools
@@ -40,9 +41,9 @@ VISLIST_RESET_KEY = '_do_not_reset_vislist'
 def timestamp(method):
     @functools.wraps(method)
     def attach_timestamp_to_results(self, *args, **kw):
-        start = datetime.datetime.utcnow()
+        start = datetime.datetime.now(datetime.timezone.utc)
         result = method(self, *args, **kw)
-        end = datetime.datetime.utcnow()
+        end = datetime.datetime.now(datetime.timezone.utc)
 
         if result is not None:
             result.timestamps = Timestamps(start, end)
@@ -136,7 +137,7 @@ class ModeTask(api.Task):
     is_multi_vis_task = False
 
     def __init__(self, inputs):
-        super(ModeTask, self).__init__()
+        super().__init__()
 
         # complain if we were given the wrong type of inputs
         if not isinstance(inputs, self.Inputs):
@@ -193,7 +194,7 @@ class Results(api.Results):
     advantage of the shared functionality.
     """
     def __init__(self):
-        super(Results, self).__init__()
+        super().__init__()
 
         # set the value used to uniquely identify this object. This value will
         # be used to determine whether this results has already been merged
@@ -400,7 +401,7 @@ class FailedTaskResults(Results):
     an exception during execution.
     """
     def __init__(self, origtask_cls, exception, tb):
-        super(FailedTaskResults, self).__init__()
+        super().__init__()
         self.exception = exception
         self.origtask_cls = origtask_cls
         self.task = FailedTask
@@ -412,7 +413,7 @@ class FailedTaskResults(Results):
         return s
 
 
-class ResultsProxy(object):
+class ResultsProxy:
     def __init__(self, context):
         self._context = context
 
@@ -483,7 +484,7 @@ T = TypeVar('T')
 
 class ResultsList(Results, Generic[T]):
     def __init__(self, results=None):
-        super(ResultsList, self).__init__()
+        super().__init__()
         self.__results = []
         if results:
             self.__results.extend(results)
@@ -507,7 +508,7 @@ class ResultsList(Results, Generic[T]):
         self.__results.append(other)
 
     def accept(self, context=None):
-        return super(ResultsList, self).accept(context)
+        return super().accept(context)
 
     def extend(self, other):
         for o in other:
@@ -524,7 +525,7 @@ class ResultsList(Results, Generic[T]):
             return None
 
 
-class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
+class StandardTaskTemplate(api.Task, abc.ABC):
     """
     StandardTaskTemplate is a template class for pipeline reduction tasks whose
     execution can be described by a common four-step process:
@@ -562,7 +563,7 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
 
         :param Inputs inputs: inputs required for this Task.
         """
-        super(StandardTaskTemplate, self).__init__()
+        super().__init__()
 
         # complain if we were given the wrong type of inputs
         if isinstance(inputs, vdp.InputsContainer):
@@ -813,10 +814,10 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
 class FailedTask(StandardTaskTemplate):
     def __init__(self, context):
         inputs = vdp.InputsContainer(self, context)
-        super(FailedTask, self).__init__(inputs)
+        super().__init__(inputs)
 
 
-class Executor(object):
+class Executor:
     def __init__(self, context):
         self._context = context
         self._output_dir = self._context.output_dir

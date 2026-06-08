@@ -1,17 +1,22 @@
 """ Ulititiy methods related to coordinate calculations."""
 from __future__ import annotations
 
-import numpy as np
+from typing import TYPE_CHECKING
+
 from astropy.coordinates import SkyCoord
 
 import pipeline.infrastructure.utils.conversion as conversion
 
+if TYPE_CHECKING:
+    from numpy import floating
+    from numpy.typing import NDArray
+
 
 def angular_distances(dir_frame: str,
-                      ra: np.ndarray,
-                      dec: np.ndarray,
+                      ra: NDArray[floating],
+                      dec: NDArray[floating],
                       ref_ra: float,
-                      ref_dec: float) -> np.ndarray:
+                      ref_dec: float) -> NDArray[floating]:
     """Compute angular distances from a reference position.
 
     Args:

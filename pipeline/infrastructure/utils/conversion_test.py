@@ -24,6 +24,8 @@ DomainMock = collections.namedtuple('DomainMock', ['id', 'name'])
 AntennaMock = DomainMock
 FieldMock = DomainMock
 
+UTC = datetime.timezone.utc
+
 
 @pytest.mark.parametrize("inp, kwargs, expected", [
     ([], {}, ""),
@@ -75,9 +77,9 @@ def test_flatten_empty():
 
 
 @pytest.mark.parametrize("inp, kwargs, expected", [
-    (datetime.datetime(2020, 1, 1, 12, 34, 56, 7), {}, '2020-01-01 12:34:56'),
-    (datetime.datetime(2020, 1, 1, 12, 34, 56, 7), {'dp': 5}, '2020-01-01 12:34:56.00001'),
-    (datetime.datetime(2020, 1, 1, 12, 34, 56, 7), {'dp': 6}, '2020-01-01 12:34:56.000007'),
+    (datetime.datetime(2020, 1, 1, 12, 34, 56, 7, tzinfo=UTC), {}, '2020-01-01 12:34:56'),
+    (datetime.datetime(2020, 1, 1, 12, 34, 56, 7, tzinfo=UTC), {'dp': 5}, '2020-01-01 12:34:56.00001'),
+    (datetime.datetime(2020, 1, 1, 12, 34, 56, 7, tzinfo=UTC), {'dp': 6}, '2020-01-01 12:34:56.000007'),
 ])
 def test_format_datetime(inp, kwargs, expected):
     """Test format_datetime()"""
@@ -87,7 +89,7 @@ def test_format_datetime(inp, kwargs, expected):
 def test_format_datetime_raises_exception_too_high_precision():
     """Test format_datetime() when requesting too high precision"""
     with pytest.raises(ValueError):
-        format_datetime(datetime.datetime(2020, 1, 1, 12, 34, 56, 7), dp=7)
+        format_datetime(datetime.datetime(2020, 1, 1, 12, 34, 56, 7, tzinfo=UTC), dp=7)
 
 
 @pytest.mark.parametrize("inp, kwargs, expected", [
@@ -107,8 +109,14 @@ def test_format_timedelta_raises_exception_too_high_precision():
 
 
 @pytest.mark.parametrize("inp, expected", [
-    ([1, 2], [datetime.datetime(1858, 11, 17, 0, 0, 1), datetime.datetime(1858, 11, 17, 0, 0, 2)]),
-    ([1, 1.5], [datetime.datetime(1858, 11, 17, 0, 0, 1), datetime.datetime(1858, 11, 17, 0, 0, 1, 500000)]),
+    ([1, 2], [
+        datetime.datetime(1858, 11, 17, 0, 0, 1, tzinfo=UTC),
+        datetime.datetime(1858, 11, 17, 0, 0, 2, tzinfo=UTC),
+    ]),
+    ([1, 1.5], [
+        datetime.datetime(1858, 11, 17, 0, 0, 1, tzinfo=UTC),
+        datetime.datetime(1858, 11, 17, 0, 0, 1, 500000, tzinfo=UTC),
+    ]),
 ])
 def test_mjd_seconds_to_datetime(inp, expected):
     """Test mjd_seconds_to_datetime()"""
@@ -138,7 +146,10 @@ def test_safe_split(inp, expected):
 
 
 @pytest.mark.parametrize("inp, expected", [
-    ([1, 1.5], [datetime.datetime(1970, 1, 1, 0, 0, 1), datetime.datetime(1970, 1, 1, 0, 0, 1, 500000)]),
+    ([1, 1.5], [
+        datetime.datetime(1970, 1, 1, 0, 0, 1, tzinfo=UTC),
+        datetime.datetime(1970, 1, 1, 0, 0, 1, 500000, tzinfo=UTC),
+    ]),
 ])
 def test_unix_seconds_to_datetime(inp, expected):
     """Test unix_seconds_to_datetime()"""

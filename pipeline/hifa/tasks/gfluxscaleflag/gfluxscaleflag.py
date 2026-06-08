@@ -3,16 +3,17 @@ Created on 01 Jun 2017
 
 @author: Vincent Geers (UKATC)
 """
+from __future__ import annotations
+
 import functools
 import os.path
-from typing import Dict, Optional, Tuple
+from typing import TYPE_CHECKING
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
-from pipeline.domain import MeasurementSet
 from pipeline.h.tasks.common.displays import applycal as applycal_displays
 from pipeline.h.tasks.flagging.flagdatasetter import FlagdataSetter
 from pipeline.hif.tasks import applycal
@@ -21,9 +22,12 @@ from pipeline.hif.tasks import gaincal
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import task_registry
 from pipeline.infrastructure.callibrary import CalTo
-from pipeline.infrastructure.launcher import Context
 from .resultobjects import GfluxscaleflagResults
 import pipeline.infrastructure.sessionutils as sessionutils
+
+if TYPE_CHECKING:
+    from pipeline.domain import MeasurementSet
+    from pipeline.infrastructure.launcher import Context
 
 __all__ = [
     'GfluxscaleflagInputs',
@@ -31,7 +35,7 @@ __all__ = [
     'Gfluxscaleflag'
 ]
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class GfluxscaleflagInputs(vdp.StandardInputs):
@@ -353,7 +357,7 @@ class SerialGfluxscaleflag(basetask.StandardTaskTemplate):
     def analyse(self, result):
         return result
 
-    def _do_applycal(self, merge: bool) -> Dict:
+    def _do_applycal(self, merge: bool) -> dict:
         inputs = self.inputs
 
         # SJW - always just one job
@@ -373,10 +377,10 @@ class SerialGfluxscaleflag(basetask.StandardTaskTemplate):
 
         return callib_map
 
-    def _do_gaincal(self, field: Optional[str] = None, intent: Optional[str] = None, gaintype: str = 'G',
-                    calmode: Optional[str] = None, combine: Optional[str] = None, solint: Optional[str] = None,
-                    minsnr: Optional[float] = None, refant: Optional[str] = None, spwmap: Optional[list] = None,
-                    interp: Optional[str] = None):
+    def _do_gaincal(self, field: str | None = None, intent: str | None = None, gaintype: str = 'G',
+                    calmode: str | None = None, combine: str | None = None, solint: str | None = None,
+                    minsnr: float | None = None, refant: str | None = None, spwmap: list | None = None,
+                    interp: str | None = None):
         inputs = self.inputs
         ms = inputs.ms
 
@@ -515,7 +519,7 @@ class SerialGfluxscaleflag(basetask.StandardTaskTemplate):
                                  interp=interp)
 
     @staticmethod
-    def _get_phasecal_params(ms: MeasurementSet, intent: str, field: str) -> Tuple[str, Optional[str], list]:
+    def _get_phasecal_params(ms: MeasurementSet, intent: str, field: str) -> tuple[str, str | None, list]:
         # By default, no spw mapping or combining, no interp.
         combine = ''
         interp = None

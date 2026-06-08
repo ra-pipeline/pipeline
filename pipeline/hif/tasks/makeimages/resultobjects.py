@@ -10,7 +10,7 @@ from pipeline.hif.tasks.makeimlist.cleantarget import CleanTargetInfo
 
 class MakeImagesResult(basetask.Results):
     def __init__(self):
-        super(MakeImagesResult, self).__init__()
+        super().__init__()
         self.targets = []
         self.results = []
         self.plot_path = None

@@ -1,20 +1,24 @@
+from __future__ import annotations
+
 import collections
 import os
-from typing import Dict, Optional
+from typing import TYPE_CHECKING
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.filenamer as filenamer
 import pipeline.infrastructure.renderer.logger as logger
 import pipeline.infrastructure.utils as utils
 from pipeline.infrastructure import casa_tasks
-from pipeline.infrastructure.launcher import Context
-from pipeline.infrastructure.callibrary import CalTo
 from . import common
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
+
+if TYPE_CHECKING:
+    from pipeline.infrastructure.callibrary import CalTo
+    from pipeline.infrastructure.launcher import Context
 
 
-class PlotmsLeaf(object):
+class PlotmsLeaf:
     """
     Class to execute plotms and return a plot wrapper. It passes the spw and
     ant arguments through to plotms without further manipulation, creating
@@ -55,14 +59,6 @@ class PlotmsLeaf(object):
                 raise NotImplementedError('Could not expand correlation for observatory: {!s}'.format(observatory))
         self._correlation = correlation
 
-        #         # convert intent to scan selection
-        #         if intent != '':
-        #             domain_fields = self._ms.get_fields(field)
-        #             domain_spws = self._ms.get_spectral_windows(spw)
-        #             scans = [s for s in self._ms.get_scans(scan_intent=intent)
-        #                      if s.fields.intersection(domain_fields)
-        #                      and s.spws.intersection(domain_spws)]
-        #             scan = ','.join([str(s.id) for s in scans])
         self._scan = scan
 
         # use field name rather than ID where possible
@@ -285,7 +281,7 @@ class SpwComposite(common.LeafComposite):
                         intent=intent, **kwargs_copy)
             children.append(leaf_obj)
 
-        super(SpwComposite, self).__init__(children)
+        super().__init__(children)
 
 
 class BasebandComposite(common.LeafComposite):
@@ -342,7 +338,7 @@ class BasebandComposite(common.LeafComposite):
                                                intent=intent, baseband=str(baseband_id), receiver=receiver_id, **kwargs)
                     children.append(leaf_obj)
 
-        super(BasebandComposite, self).__init__(children)
+        super().__init__(children)
 
 
 class AntComposite(common.LeafComposite):
@@ -362,7 +358,7 @@ class AntComposite(common.LeafComposite):
         children = [self.leaf_class(context, output_dir, calto, xaxis, yaxis,
                                     ant=ant, spw=spw, field=field, intent=intent, **kwargs)
                     for ant in antennas]
-        super(AntComposite, self).__init__(children)
+        super().__init__(children)
 
 
 class FieldComposite(common.LeafComposite):
@@ -389,7 +385,7 @@ class FieldComposite(common.LeafComposite):
                                        field=str(field.id), **kwargs)
             children.append(leaf_obj)
 
-        super(FieldComposite, self).__init__(children)
+        super().__init__(children)
 
 
 class FieldSpwComposite(common.LeafComposite):
@@ -427,7 +423,7 @@ class FieldSpwComposite(common.LeafComposite):
                                        field=str(field.id), **kwargs)
                 children.append(leaf_obj)
 
-        super(FieldSpwComposite, self).__init__(children)
+        super().__init__(children)
 
 
 class SpwAntComposite(common.LeafComposite):
@@ -446,7 +442,7 @@ class SpwAntComposite(common.LeafComposite):
                                        **kwargs)
             children.append(leaf_obj)
 
-        super(SpwAntComposite, self).__init__(children)
+        super().__init__(children)
 
 
 class FieldSpwAntComposite(common.LeafComposite):
@@ -469,7 +465,7 @@ class FieldSpwAntComposite(common.LeafComposite):
                                        field=str(field.id), **kwargs)
             children.append(leaf_obj)
 
-        super(FieldSpwAntComposite, self).__init__(children)
+        super().__init__(children)
 
 
 class PlotmsAntComposite(AntComposite):
@@ -480,7 +476,7 @@ class PlotmsAntComposite(AntComposite):
         singledish = getattr(self, "singledish", False)
 
         # merge separate ant jobs into one job using plotms iterator
-        jobs_and_wrappers = super(PlotmsAntComposite, self).plot()
+        jobs_and_wrappers = super().plot()
         successful_wrappers = utils.plotms_iterate(jobs_and_wrappers, 'antenna', singledish=singledish)
         return successful_wrappers
 
@@ -490,7 +486,7 @@ class PlotmsSpwComposite(SpwComposite):
 
     def plot(self):
         # merge separate spw jobs into one job using plotms iterator
-        jobs_and_wrappers = super(PlotmsSpwComposite, self).plot()
+        jobs_and_wrappers = super().plot()
         successful_wrappers = utils.plotms_iterate(jobs_and_wrappers, 'spw')
         return successful_wrappers
 
@@ -500,7 +496,7 @@ class PlotmsBasebandComposite(BasebandComposite):
 
     def plot(self):
         # merge separate spw jobs into one job using plotms iterator
-        jobs_and_wrappers = super(PlotmsBasebandComposite, self).plot()
+        jobs_and_wrappers = super().plot()
         successful_wrappers = utils.plotms_iterate(jobs_and_wrappers, 'spw')
         return successful_wrappers
 
@@ -510,7 +506,7 @@ class PlotmsFieldComposite(FieldComposite):
 
     def plot(self):
         # merge separate spw jobs into one job using plotms iterator
-        jobs_and_wrappers = super(PlotmsFieldComposite, self).plot()
+        jobs_and_wrappers = super().plot()
         successful_wrappers = utils.plotms_iterate(jobs_and_wrappers, 'field')
         return successful_wrappers
 
@@ -548,8 +544,7 @@ class SpwFieldSummaryChart(PlotmsFieldSpwComposite):
         else:
             field = calto.field
         # request plots per spw, overlaying all antennas
-        super().__init__(context, output_dir, calto, xaxis, yaxis, intent=intent, field=field,
-                                              **kwargs)
+        super().__init__(context, output_dir, calto, xaxis, yaxis, intent=intent, field=field, **kwargs)
 
 
 class SpwSummaryChart(PlotmsSpwComposite):
@@ -570,8 +565,7 @@ class SpwSummaryChart(PlotmsSpwComposite):
             field = calto.field
 
         # request plots per spw, overlaying all antennas
-        super(SpwSummaryChart, self).__init__(context, output_dir, calto, xaxis, yaxis, intent=intent, field=field,
-                                              **kwargs)
+        super().__init__(context, output_dir, calto, xaxis, yaxis, intent=intent, field=field, **kwargs)
 
 
 class BasebandSummaryChart(PlotmsBasebandComposite):
@@ -580,7 +574,6 @@ class BasebandSummaryChart(PlotmsBasebandComposite):
     """
 
     def __init__(self, context, output_dir, calto, xaxis, yaxis, intent, **kwargs):
-        # (calto, intent) = _get_summary_args(context, result, intent)
         LOG.info('%s vs %s plot: %s' % (yaxis, xaxis, calto))
 
         if 'field' in kwargs:
@@ -593,8 +586,7 @@ class BasebandSummaryChart(PlotmsBasebandComposite):
         # request plots per spw, overlaying all antennas
         # if field is specified in kwargs, it will override the calto.field
         # selection
-        super(BasebandSummaryChart, self).__init__(context, output_dir,
-                                                   calto, xaxis, yaxis, intent=intent, field=field, **kwargs)
+        super().__init__(context, output_dir, calto, xaxis, yaxis, intent=intent, field=field, **kwargs)
 
 
 class FieldBasebandSummaryChart(PlotmsFieldBasebandComposite):
@@ -603,7 +595,6 @@ class FieldBasebandSummaryChart(PlotmsFieldBasebandComposite):
     """
 
     def __init__(self, context, output_dir, calto, xaxis, yaxis, intent, **kwargs):
-        # (calto, intent) = _get_summary_args(context, result, intent)
         LOG.info('%s vs %s plot: %s' % (yaxis, xaxis, calto))
 
         if 'field' in kwargs:
@@ -637,8 +628,7 @@ class AmpVsUVSummaryChart(SpwSummaryChart):
         }
         plot_args.update(**overrides)
 
-        super(AmpVsUVSummaryChart, self).__init__(context, output_dir, calto, xaxis='uvdist', yaxis='amp',
-                                                  intent=intent, **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='uvdist', yaxis='amp', intent=intent, **plot_args)
 
 
 class AmpVsUVFieldSummaryChart(SpwFieldSummaryChart):
@@ -684,8 +674,7 @@ class AmpVsUVBasebandSummaryChart(BasebandSummaryChart):
         }
         plot_args.update(kwargs)
 
-        super(AmpVsUVBasebandSummaryChart, self).__init__(context, output_dir, calto, xaxis='uvdist', yaxis='amp',
-                                                          intent=intent, **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='uvdist', yaxis='amp', intent=intent, **plot_args)
 
 
 class PhaseVsUVSummaryChart(SpwSummaryChart):
@@ -706,8 +695,7 @@ class PhaseVsUVSummaryChart(SpwSummaryChart):
         }
         plot_args.update(**overrides)
 
-        super(PhaseVsUVSummaryChart, self).__init__(context, output_dir, calto, xaxis='uvdist', yaxis='phase',
-                                                    intent=intent, **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='uvdist', yaxis='phase', intent=intent, **plot_args)
 
 
 class AmpVsTimeSummaryChart(SpwSummaryChart):
@@ -727,8 +715,7 @@ class AmpVsTimeSummaryChart(SpwSummaryChart):
         }
         plot_args.update(**overrides)
 
-        super(AmpVsTimeSummaryChart, self).__init__(context, output_dir, calto, xaxis='time', yaxis='amp',
-                                                    intent=intent, **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='time', yaxis='amp', intent=intent, **plot_args)
 
 
 class PhaseVsTimeSummaryChart(SpwSummaryChart):
@@ -748,8 +735,7 @@ class PhaseVsTimeSummaryChart(SpwSummaryChart):
         }
         plot_args.update(**overrides)
 
-        super(PhaseVsTimeSummaryChart, self).__init__(context, output_dir, calto, xaxis='time', yaxis='phase',
-                                                      intent=intent, **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='time', yaxis='phase', intent=intent, **plot_args)
 
 
 class AmpVsFrequencySummaryChart(SpwSummaryChart):
@@ -774,8 +760,8 @@ class AmpVsFrequencySummaryChart(SpwSummaryChart):
         }
         plot_args.update(kwargs)
 
-        super(AmpVsFrequencySummaryChart, self).__init__(context, output_dir, calto, xaxis='freq', yaxis='amp',
-                                                         intent=intent, **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='freq', yaxis='amp', intent=intent, **plot_args)
+
 
 class AmpVsFrequencyFieldSummaryChart(SpwFieldSummaryChart):
     """
@@ -799,8 +785,7 @@ class AmpVsFrequencyFieldSummaryChart(SpwFieldSummaryChart):
         }
         plot_args.update(kwargs)
 
-        super().__init__(context, output_dir, calto, xaxis='freq', yaxis='amp',
-                         intent=intent, **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='freq', yaxis='amp', intent=intent, **plot_args)
 
 
 class AmpVsFrequencyPerBasebandSummaryChart(BasebandSummaryChart):
@@ -842,8 +827,7 @@ class AmpVsFrequencyPerFieldBasebandSummaryChart(FieldBasebandSummaryChart):
         }
         plot_args.update(kwargs)
 
-        super().__init__(context, output_dir, calto, xaxis='freq', yaxis='amp',
-                         intent=intent, **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='freq', yaxis='amp', intent=intent, **plot_args)
 
 
 class PhaseVsFrequencyPerSpwSummaryChart(SpwFieldSummaryChart):
@@ -865,8 +849,7 @@ class PhaseVsFrequencyPerSpwSummaryChart(SpwFieldSummaryChart):
         }
         plot_args.update(kwargs)
 
-        super(PhaseVsFrequencyPerSpwSummaryChart, self).__init__(context, output_dir, calto, xaxis='freq',
-                                                                 yaxis='phase', intent=intent, **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='freq', yaxis='phase', intent=intent, **plot_args)
 
 
 class PhaseVsFrequencyPerBasebandSummaryChart(BasebandSummaryChart):
@@ -886,8 +869,7 @@ class PhaseVsFrequencyPerBasebandSummaryChart(BasebandSummaryChart):
                      'overwrite': True}
         plot_args.update(kwargs)
 
-        super(PhaseVsFrequencyPerBasebandSummaryChart, self).__init__(
-            context, output_dir, calto, xaxis='freq', yaxis='phase', intent=intent, **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='freq', yaxis='phase', intent=intent, **plot_args)
 
 
 class PhaseVsFrequencyPerFieldBasebandSummaryChart(FieldBasebandSummaryChart):
@@ -916,7 +898,6 @@ class SpwAntDetailChart(PlotmsSpwAntComposite):
     """
 
     def __init__(self, context, output_dir, calto, xaxis, yaxis, intent, **kwargs):
-        # (calto, intent) = _get_summary_args(context, result, intent)
         LOG.info('%s vs %s plot: %s' % (yaxis, xaxis, calto))
 
         if 'field' in kwargs:
@@ -929,8 +910,7 @@ class SpwAntDetailChart(PlotmsSpwAntComposite):
         # request plots per spw, overlaying all antennas
         # if field is specified in kwargs, it will override the calto.field
         # selection
-        super(SpwAntDetailChart, self).__init__(context, output_dir, calto, xaxis, yaxis, intent=intent, field=field,
-                                                **kwargs )
+        super().__init__(context, output_dir, calto, xaxis, yaxis, intent=intent, field=field, **kwargs)
 
 
 class FieldSpwAntDetailChart(PlotmsFieldSpwAntComposite):
@@ -939,11 +919,10 @@ class FieldSpwAntDetailChart(PlotmsFieldSpwAntComposite):
     """
 
     def __init__(self, context, output_dir, calto, xaxis, yaxis, intent, **kwargs):
-        # (calto, intent) = _get_summary_args(context, result, intent)
         LOG.info('%s vs %s plot: %s' % (yaxis, xaxis, calto))
 
         # request plots per spw, overlaying all antennas
-        super(FieldSpwAntDetailChart, self).__init__(context, output_dir, calto, xaxis, yaxis, intent=intent, **kwargs)
+        super().__init__(context, output_dir, calto, xaxis, yaxis, intent=intent, **kwargs)
 
 
 class AmpVsFrequencyDetailChart(FieldSpwAntDetailChart):
@@ -966,8 +945,7 @@ class AmpVsFrequencyDetailChart(FieldSpwAntDetailChart):
         }
         plot_args.update(**overrides)
 
-        super(AmpVsFrequencyDetailChart, self).__init__(context, output_dir, calto, xaxis='freq', yaxis='amp',
-                                                        intent=intent, **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='freq', yaxis='amp', intent=intent, **plot_args)
 
 
 class PhaseVsFrequencyDetailChart(FieldSpwAntDetailChart):
@@ -990,8 +968,7 @@ class PhaseVsFrequencyDetailChart(FieldSpwAntDetailChart):
         }
         plot_args.update(**overrides)
 
-        super(PhaseVsFrequencyDetailChart, self).__init__(context, output_dir, calto, xaxis='freq', yaxis='phase',
-                                                          intent=intent, **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='freq', yaxis='phase', intent=intent, **plot_args)
 
 
 class AmpVsUVDetailChart(FieldSpwAntDetailChart):
@@ -1012,8 +989,7 @@ class AmpVsUVDetailChart(FieldSpwAntDetailChart):
         }
         plot_args.update(**overrides)
 
-        super(AmpVsUVDetailChart, self).__init__(context, output_dir, calto, xaxis='uvdist', yaxis='amp', intent=intent,
-                                                 **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='uvdist', yaxis='amp', intent=intent, **plot_args)
 
 
 class PhaseVsUVDetailChart(SpwAntDetailChart):
@@ -1034,8 +1010,7 @@ class PhaseVsUVDetailChart(SpwAntDetailChart):
         }
         plot_args.update(**overrides)
 
-        super(PhaseVsUVDetailChart, self).__init__(context, output_dir, calto, xaxis='uvdist', yaxis='phase', intent=intent,
-                                                   **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='uvdist', yaxis='phase', intent=intent, **plot_args)
 
 
 class AmpVsTimeDetailChart(FieldSpwAntDetailChart):
@@ -1056,8 +1031,7 @@ class AmpVsTimeDetailChart(FieldSpwAntDetailChart):
         }
         plot_args.update(**overrides)
 
-        super(AmpVsTimeDetailChart, self).__init__(context, output_dir, calto, xaxis='time', yaxis='amp', intent=intent,
-                                                   **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='time', yaxis='amp', intent=intent, **plot_args)
 
 
 class CAS9154AmpVsTimeDetailChart(SpwAntDetailChart):
@@ -1082,8 +1056,7 @@ class CAS9154AmpVsTimeDetailChart(SpwAntDetailChart):
         }
         plot_args.update(**overrides)
 
-        super(CAS9154AmpVsTimeDetailChart, self).__init__(context, output_dir, calto, xaxis='time', yaxis='amp', intent=intent,
-                                                          **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='time', yaxis='amp', intent=intent, **plot_args)
 
 
 class PhaseVsTimeDetailChart(FieldSpwAntDetailChart):
@@ -1104,8 +1077,7 @@ class PhaseVsTimeDetailChart(FieldSpwAntDetailChart):
         }
         plot_args.update(**overrides)
 
-        super(PhaseVsTimeDetailChart, self).__init__(context, output_dir, calto, xaxis='time', yaxis='phase', intent=intent,
-                                                     **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='time', yaxis='phase', intent=intent, **plot_args)
 
 
 class CorrectedToModelRatioVsAntenna1SummaryChart(SpwSummaryChart):
@@ -1122,8 +1094,7 @@ class CorrectedToModelRatioVsAntenna1SummaryChart(SpwSummaryChart):
         }
         plot_args.update(kwargs)
 
-        super(CorrectedToModelRatioVsAntenna1SummaryChart, self).__init__(context, output_dir, calto, xaxis='antenna1',
-                                                                          yaxis='amp', intent=intent, **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='antenna1', yaxis='amp', intent=intent, **plot_args)
 
 
 class CorrectedToModelRatioVsUVDistanceSummaryChart(SpwSummaryChart):
@@ -1140,8 +1111,7 @@ class CorrectedToModelRatioVsUVDistanceSummaryChart(SpwSummaryChart):
         }
         plot_args.update(kwargs)
 
-        super(CorrectedToModelRatioVsUVDistanceSummaryChart, self).__init__(context, output_dir, calto, xaxis='uvdist',
-                                                                            yaxis='amp', intent=intent, **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='uvdist', yaxis='amp', intent=intent, **plot_args)
 
 
 class RealVsFrequencySummaryChart(SpwSummaryChart):
@@ -1164,8 +1134,8 @@ class RealVsFrequencySummaryChart(SpwSummaryChart):
         }
         plot_args.update(kwargs)
 
-        super(RealVsFrequencySummaryChart, self).__init__(context, output_dir, calto, xaxis='freq', yaxis='real',
-                                                          intent=intent, **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='freq', yaxis='real', intent=intent, **plot_args)
+
 
 class RealVsFrequencyDetailChart(SpwAntDetailChart):
     """
@@ -1176,8 +1146,8 @@ class RealVsFrequencyDetailChart(SpwAntDetailChart):
                  output_dir: str,
                  calto: CalTo,
                  intent: str='',
-                 ydatacolumn: Optional[str]='corrected',
-                 **kwargs: Optional[Dict]
+                 ydatacolumn: str | None = 'corrected',
+                 **kwargs: dict | None
     ) -> None:
         """
         Construct RealVsFrequencyDetailChart instance
@@ -1206,5 +1176,4 @@ class RealVsFrequencyDetailChart(SpwAntDetailChart):
 
         # determine SD or not from context
         self.singledish = utils.contains_single_dish(context)
-        super(RealVsFrequencyDetailChart, self).__init__(context, output_dir, calto, xaxis='freq', yaxis='real',
-                                                         intent=intent, **plot_args)
+        super().__init__(context, output_dir, calto, xaxis='freq', yaxis='real', intent=intent, **plot_args)

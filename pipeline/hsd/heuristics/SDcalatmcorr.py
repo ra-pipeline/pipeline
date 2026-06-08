@@ -55,11 +55,14 @@
 # 08/jan/2021: - Added functionality to run atmcorr routine in "try" mode and extract three different
 #                metrics for a family of model parameters.
 # 24/jul/2020: - Aligned with script atmcorr_20200722.py
-
-import os
-from typing import Generator
+from __future__ import annotations
 
 import glob
+import os
+import time as systime
+from itertools import product
+from typing import TYPE_CHECKING
+
 import numpy as np
 from itertools import pairwise, product
 import matplotlib
@@ -67,9 +70,15 @@ import time as systime
 from scipy.interpolate import CubicSpline
 
 import pipeline.infrastructure.callibrary as callibrary
-import pipeline.infrastructure.logging as logging
-import pipeline.infrastructure.casa_tools as casa_tools
 import pipeline.infrastructure.casa_tasks as casa_tasks
+import pipeline.infrastructure.casa_tools as casa_tools
+import pipeline.infrastructure.logging as logging
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from numpy import floating
+    from numpy.typing import NDArray
 
 LOG = logging.get_logger(__name__)
 
@@ -100,6 +109,7 @@ def robuststats(A):
     sigma = (1.0/bn)*madfactor*np.ma.median(np.ma.abs(A - mu))
     return (mu, sigma)
 
+
 def segmentEdges(seq, gap, label, sortdata = True):
     '''Return edges of sequence of values with gaps
     Assumes 1D array "seq" is ordered. Otherwise one should sort it first.
@@ -126,6 +136,7 @@ def segmentEdges(seq, gap, label, sortdata = True):
 
     return output
 
+
 def selectRanges(timeseq, rangetable):
     '''Return selection boolean array for a time sequence, given a table of time ranges.
     '''
@@ -135,6 +146,7 @@ def selectRanges(timeseq, rangetable):
     for i in range(nranges):
         sel += np.all([timeseq >= rangetable['tstart'][i], timeseq <= rangetable['tend'][i]], axis=0)
     return sel
+
 
 def sigclipfit(x, A, Asig, fitdeg, nclips, nsigma, bordertokeep = 0.05, progdegree = False, smoothselbox = 0.05):
     '''Return polynomial model parameters done to vector A and residuals from the fit.
@@ -200,6 +212,7 @@ def sigclipfit(x, A, Asig, fitdeg, nclips, nsigma, bordertokeep = 0.05, progdegr
     output['border'] = border
     return output
 
+
 def enlargesel(sel, box):
     '''Enlarge selection by "box" pixels around each selected pixel
     in "sel" vector.
@@ -239,6 +252,7 @@ def smooth(y: np.ndarray, box_pts: int):
     y_smooth = np.ma.convolve(y_expand, box, mode='same')
     return y_smooth[extra_chans:-extra_chans]
 
+
 def getskylines(tauspec, spw, spwsetup, fraclevel = 0.5, minpeaklevel = 0.0, spwbordertoavoid = 0.025, taudeg = 2):
     '''Get position of sky lines and line widths from the optical depth.
     fraclevel: fraction of the maximum of the optical depth to look for.
@@ -277,8 +291,6 @@ def getskylines(tauspec, spw, spwsetup, fraclevel = 0.5, minpeaklevel = 0.0, spw
     output['taufit'] = taufit
     for k, idx in enumerate(idxpeak):
         #calculate the decrease from the tau depth relative to the minimum tau in the SPW
-        #peakratioleft = np.array([(tauspec[idx - i]-mintau)/(peaktau[k]-mintau) for i in range(idx)])
-        #peakratioright = np.array([(tauspec[idx + i]-mintau)/(peaktau[k]-mintau) for i in range(nch-idx)])
         peakratioleft = np.array([subtau[idx - i]/subtau[idx] for i in range(idx)])
         peakratioright = np.array([subtau[idx + i]/subtau[idx] for i in range(nch-idx)])
         posrightneg = peakratioright < fraclevel
@@ -339,9 +351,9 @@ def gradeskylines(skylines: dict, cntrweight: float = 1.0):
     These "grades" are based on a normalized value of the opacity at the skyline peak and the position of
     the line in the SPW, and is aimed at providing a decision on which skyline to used for model evaluation.
     param:
-        skylines: (dict) Dictionary of detected skylines indexed by SPW, where each sub-dictionary is as obtained
+        skylines: Dictionary of detected skylines indexed by SPW, where each sub-dictionary is as obtained
                   from getskylines().
-        cntrweight: (float) Relative weight given to the position of the skyline relative to the center of the SPW.
+        cntrweight: Relative weight given to the position of the skyline relative to the center of the SPW.
                     Must be a positive float number between 0 and 1, a value of 0.0 means no weight to position,
                     a value >0 gives the line a linearly decreasing grade the further it is away from the center of the SPW.
     returns:
@@ -729,7 +741,6 @@ def getCalAtmData(ms: str, spws: list, spwsetup: dict):
         #Load Tsys and Trx tables
         auxtsys = [subtb.getcell('tSysSpectrum', i) for i in range(subtb.nrows())]
         auxtrec = [subtb.getcell('tRecSpectrum', i) for i in range(subtb.nrows())]
-        # (npols, nchantsys, nrowstsys) = np.shape(auxtsys)
         npols = auxtsys[0].shape[0]
         nrowstsys = len(auxtsys)
         tsys[spwid] = np.zeros((npols, spwsetup[spwid]['nchan'], nrowstsys))
@@ -927,8 +938,8 @@ def select_and_yield(
         datacolumn: str,
         data_desc_id: int,
         field_id: int,
-        state_id_list: np.ndarray
-) -> Generator[tuple[np.ndarray, np.ndarray], None, None]:
+        state_id_list: NDArray[np.int_],
+) -> Generator[tuple[NDArray[floating], NDArray[floating]], None, None]:
     """Select data from MS and yield data array with mask.
 
     Args:
@@ -971,8 +982,8 @@ def get_stats_and_shape(
         datacolumn: str,
         data_desc_id: int,
         field_id: int,
-        state_id_list: np.ndarray
-) -> tuple[np.ndarray, float, np.ndarray]:
+    state_id_list: NDArray[np.int_]
+) -> tuple[NDArray[floating], float, NDArray[np.int_]]:
     """Compute metrics from selected data in the given MS.
 
     Core part of this function computes the mean and standard deviation
@@ -1024,9 +1035,9 @@ def get_metric(
         datacolumn: str,
         data_desc_id: int,
         field_id: int,
-        state_id_list: np.ndarray,
-        skychansel: np.ndarray
-) -> tuple[np.ndarray, float, np.ndarray]:
+        state_id_list: NDArray[np.int_],
+        skychansel: NDArray[np.bool_]
+    ) -> tuple[NDArray[floating], float, NDArray[np.bool_]]:
     """Compute metrics from selected data in the given MS.
 
     Core part of this function computes the mean and maximum

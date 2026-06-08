@@ -3,24 +3,30 @@ Created on 25 Nov 2014
 
 @author: sjw
 """
+from __future__ import annotations
+
 import collections
 import functools
-from typing import Optional, List, Sequence, Dict
+from typing import TYPE_CHECKING
 
-import pipeline.infrastructure.logging as logging
+import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.utils as utils
-from pipeline.infrastructure.launcher import Context
-from pipeline.domain.measurementset import MeasurementSet
 
-LOG = logging.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from pipeline.domain.measurementset import MeasurementSet
+    from pipeline.infrastructure.launcher import Context
 
 FlagTotal = collections.namedtuple('FlagSummary', 'flagged total')
 
 
 def flags_for_result(result,
                      context: Context,
-                     intents_to_summarise: Optional[List[str]] = None,
-                     non_science_agents: Optional[List[str]] = None):
+                     intents_to_summarise: list[str] | None = None,
+                     non_science_agents: list[str] | None = None):
     if intents_to_summarise is None:
         intents_to_summarise = ['BANDPASS', 'PHASE', 'AMPLITUDE', 'TARGET']
 
@@ -40,13 +46,13 @@ def flags_for_result(result,
 
 
 def flags_by_intent(ms: MeasurementSet,
-                    summaries: List[dict],
-                    intents: Sequence[str] = None) -> Dict[str, Dict[str, FlagTotal]]:
+                    summaries: list[dict],
+                    intents: Sequence[str] = None) -> dict[str, dict[str, FlagTotal]]:
     """
     Arguments:
         ms: an instance of MeasurementSet.
         summaries: a list of summaries created by flagging tasks.
-        intents: list of intents for which the total flagging percentage should be reported.
+        intents: List of intents for which the total flagging percentage should be reported.
     Returns:
         a dictionary indexed by summary name (e.g. 'before', '...'),
         where each element is itself a dictionary containing FlagTotal tuples for each intent.
@@ -90,7 +96,7 @@ def flags_by_intent(ms: MeasurementSet,
     return total
 
 
-def flags_by_science_spws(ms: MeasurementSet, summaries: List[dict]) -> Dict[str, Dict[str, FlagTotal]]:
+def flags_by_science_spws(ms: MeasurementSet, summaries: list[dict]) -> dict[str, dict[str, FlagTotal]]:
     """
     Returns:
         a dictionary indexed by summary name, where each element is a dict
@@ -132,11 +138,11 @@ def adjust_non_science_totals(flagtotals, non_science_agents=None):
     account for flagging performed by non-science flagging agents.
 
     The incoming flagtotals report how much data was flagged per agent per
-    data selection. These flagtotals are divided into two groups: those whose 
-    agent should be considered 'non-science' (and are indicated as such in the 
+    data selection. These flagtotals are divided into two groups: those whose
+    agent should be considered 'non-science' (and are indicated as such in the
     non_science_agents argument) and the remainder. The total number of rows
-    flagged due to non-science agents is calculated and subtracted from the 
-    total for each of the remainder agents.     
+    flagged due to non-science agents is calculated and subtracted from the
+    total for each of the remainder agents.
     """
     if not non_science_agents:
         return flagtotals
@@ -147,7 +153,7 @@ def adjust_non_science_totals(flagtotals, non_science_agents=None):
     for result in flagtotals.values():
         data_selections.update(set(result.keys()))
 
-    # copy agents that use the total number of visibilities across to new 
+    # copy agents that use the total number of visibilities across to new
     # results
     adjusted_results = dict((agent, flagtotals[agent])
                             for agent in agents_to_copy
@@ -173,7 +179,7 @@ def adjust_non_science_totals(flagtotals, non_science_agents=None):
     return adjusted_results
 
 
-def intents_to_summarise(context: Context, all_flag_summary_intents: Optional[Sequence[str]] = None) -> List[str]:
+def intents_to_summarise(context: Context, all_flag_summary_intents: Sequence[str] | None = None) -> list[str]:
     """Find out which intents to list in the flagging table.
 
     Arguments:

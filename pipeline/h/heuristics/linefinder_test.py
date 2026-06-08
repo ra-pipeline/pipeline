@@ -1,14 +1,16 @@
 """Unit test for h/heuristics/linefinder.py module."""
-import pytest
-from . linefinder import HeuristicsLineFinder
-from typing import List, NoReturn
+from __future__ import annotations
 
-#spectrum_0 = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 5.0, 15.0, 
-#            30.0, 15.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
-#            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-#spectrum_1 = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 5.0, 15.0, 
-#            30.0, 15.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
-#            10.0, 20.0, 40.0, 20.0, 10.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+from typing import TYPE_CHECKING
+
+import pytest
+
+from . linefinder import HeuristicsLineFinder
+
+if TYPE_CHECKING:
+    from typing import NoReturn
+
+
 spectrum_0 = [100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 105.0, 115.0, 
             130.0, 115.0, 105.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 
             100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0]
@@ -27,7 +29,6 @@ spectrum_2 = [100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100
                              (spectrum_1, 7.0, False, [], [7, 5], []),
                              (spectrum_2, 7.0, False, [], None, [10, 18]),
                          ])
-
 def test_linefinder(spectrum, threshold, tweak, mask, edge, expected) -> NoReturn:
     """
     Unit test for calculate method.

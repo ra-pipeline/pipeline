@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 LOG = infrastructure.get_logger(__name__)
 
 
-class ApplyCalSingleDishPlotmsLeaf(object):
+class ApplyCalSingleDishPlotmsLeaf:
     """Class to execute plotms and return a plot wrapper.
 
     Task arguments for plotms are customized for single dish usecase.

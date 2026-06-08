@@ -4,7 +4,7 @@ from pipeline.infrastructure import casa_tools
 LOG = infrastructure.get_logger(__name__)
 
 
-class ImagePreCheckHeuristics(object):
+class ImagePreCheckHeuristics:
     def __init__(self, inputs):
         self.inputs = inputs
         self.context = inputs.context

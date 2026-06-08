@@ -29,7 +29,7 @@ from pipeline import environment
 #         LOG.warning('Could not find command to calculate checksum. MD5 will not be written to manifest.')
 
 
-class PipelineManifest(object):
+class PipelineManifest:
     """
     Class for creating the pipeline data product manifest
     """

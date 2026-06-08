@@ -6,6 +6,7 @@ from . import checkflag
 from . import targetflag
 from . import renderer
 from . import flagtargetsdata
+from . import flagdetervla
 
 from . import qa
 

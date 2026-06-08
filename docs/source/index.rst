@@ -35,6 +35,7 @@
    develdocmd/building_the_pipeline.md
    modular
 
+   testing_docs/index
    develdocmd/pipeline_tests.md
    develdocmd/DataType_Testing.md
    develdocmd/QA_scores.md

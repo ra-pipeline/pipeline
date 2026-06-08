@@ -13,7 +13,7 @@ class SDImagingResultItem(common.SingleDishResults):
     """
     def __init__(self, task=None, success=None, outcome=None, sensitivity_info=None,
                  theoretical_rms=None, frequency_channel_reversed=False):
-        super(SDImagingResultItem, self).__init__(task, success, outcome)
+        super().__init__(task, success, outcome)
         self.sensitivity_info = sensitivity_info
         self.theoretical_rms = theoretical_rms
         self.frequency_channel_reversed = frequency_channel_reversed
@@ -24,7 +24,7 @@ class SDImagingResultItem(common.SingleDishResults):
         self.rasterscan_heuristics_results_incomp = {}  # {originms : [RasterScanHeuristicsResult]}
 
     def merge_with_context(self, context):
-        super(SDImagingResultItem, self).merge_with_context(context)
+        super().merge_with_context(context)
         LOG.todo('need to decide what is done in SDImagingResultItem.merge_with_context')
 
         # check if data is NRO
@@ -73,15 +73,15 @@ class SDImagingResults(basetask.ResultsList):
         if hasattr(self, 'logrecords') and len(self) > 0:
             self[0].logrecords.extend(self.logrecords)
         # merge per item
-        super(SDImagingResults, self).merge_with_context(context)
+        super().merge_with_context(context)
 
 
 class SDImagingWorkerResults(common.SingleDishResults):
     def __init__(self, task=None, success=None, outcome=None):
-        super(SDImagingWorkerResults, self).__init__(task, success, outcome)
+        super().__init__(task, success, outcome)
 
     def merge_with_context(self, context):
-        super(SDImagingWorkerResults, self).merge_with_context(context)
+        super().merge_with_context(context)
 
     def _outcome_name(self):
         # return [image.imagename for image in self.outcome]

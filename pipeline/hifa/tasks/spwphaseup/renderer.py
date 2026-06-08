@@ -1,17 +1,21 @@
+from __future__ import annotations
+
 import collections
 import os
-from typing import Dict, List
+from typing import TYPE_CHECKING
 
-import pipeline.infrastructure.logging as logging
+import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.renderer.logger as logger
 import pipeline.infrastructure.utils as utils
-from pipeline.infrastructure.launcher import Context
-from pipeline.infrastructure.basetask import ResultsList
 from pipeline.hifa.tasks.common.common_renderer_utils import get_spwmaps
 from pipeline.hifa.tasks.spwphaseup import display
 
-LOG = logging.get_logger(__name__)
+if TYPE_CHECKING:
+    from pipeline.infrastructure.basetask import ResultsList
+    from pipeline.infrastructure.launcher import Context
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 PhaseTR = collections.namedtuple('PhaseTR', 'ms phase_field field_names')
 SnrTR = collections.namedtuple('SnrTR', 'ms threshold field intent spw calc_snr gaintable_snr')
@@ -57,7 +61,7 @@ class T2_4MDetailsSpwPhaseupRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         })
 
 
-def get_gaincal_applications(context: Context, results: ResultsList) -> List[SpwPhaseupApplication]:
+def get_gaincal_applications(context: Context, results: ResultsList) -> list[SpwPhaseupApplication]:
     """
     Return list of SpwPhaseupApplication entries that contain all the necessary
     information to show in a Phase-up caltable application table in the task
@@ -110,7 +114,7 @@ def get_gaincal_applications(context: Context, results: ResultsList) -> List[Spw
     return applications
 
 
-def get_pcal_table_rows(context: Context, results: ResultsList) -> List[str]:
+def get_pcal_table_rows(context: Context, results: ResultsList) -> list[str]:
     """
     Return list of strings containing HTML TD columns, representing rows for
     the phase calibrator mapping table.
@@ -136,7 +140,7 @@ def get_pcal_table_rows(context: Context, results: ResultsList) -> List[str]:
     return utils.merge_td_columns(rows)
 
 
-def get_snr_table_rows(context: Context, results: ResultsList) -> List[str]:
+def get_snr_table_rows(context: Context, results: ResultsList) -> list[str]:
     """
     Return list of strings containing HTML TD columns, representing rows for
     the phase SNR table.
@@ -214,7 +218,7 @@ def get_snr_table_rows(context: Context, results: ResultsList) -> List[str]:
     return utils.merge_td_columns(rows)
 
 
-def get_phaserms_table_rows(context: Context, results: ResultsList) -> List[str]:
+def get_phaserms_table_rows(context: Context, results: ResultsList) -> list[str]:
     """
     Return list of strings containing HTML TD columns, representing rows for
     the decoherence assessment phase rms results table. (SEE PIPE-692)
@@ -246,7 +250,7 @@ def get_phaserms_table_rows(context: Context, results: ResultsList) -> List[str]
     return utils.merge_td_columns(rows)
 
 
-def make_rms_plots(context, results) -> Dict[str, List[logger.Plot]]:
+def make_rms_plots(context, results) -> dict[str, list[logger.Plot]]:
     """
     Create and return a list of the Spatial Structure Functions (SSF) plots. 
     (See PIPE-692)

@@ -1,4 +1,4 @@
-import collections
+import collections.abc
 
 import pipeline.h.tasks.exportdata.aqua as aqua
 import pipeline.infrastructure.logging as logging

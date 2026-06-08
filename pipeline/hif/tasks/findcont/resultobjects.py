@@ -10,7 +10,7 @@ LOG = infrastructure.get_logger(__name__)
 
 class FindContResult(basetask.Results):
     def __init__(self, result_cont_ranges, cont_ranges, joint_mask_names, num_found, num_total, single_range_channel_fractions, momDiffSNRs, skip_stage=False):
-        super(FindContResult, self).__init__()
+        super().__init__()
         self.result_cont_ranges = result_cont_ranges
         self.cont_ranges = cont_ranges
         self.joint_mask_names = joint_mask_names

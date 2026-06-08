@@ -4,7 +4,7 @@ version: 2
 build:
   os: ubuntu-24.04
   tools:
-    python: miniconda-latest # use miniconda-latest before miniforge3 becomes available.
+    python: "3.12"
   apt_packages:
     - git
     - xvfb
@@ -16,11 +16,11 @@ build:
     - texlive-fonts-recommended
   # Build commands for HTML and PDF
   commands:
-    - conda env update --file=environment.yml
-    - conda run -n pipeline python -m pip install .[docs]
+    - curl -fsSL https://pixi.sh/install.sh | bash
+    - $HOME/.pixi/bin/pixi install -e docs
     - mkdir -p ~/.casa/data
-    - cd docs && conda run -n pipeline make html_docs
-    - cd docs && conda run -n pipeline make latexpdf
+    - $HOME/.pixi/bin/pixi run -e docs build-docs
+    - $HOME/.pixi/bin/pixi run -e docs build-pdf
     - mkdir --parents _readthedocs/html/ _readthedocs/pdf/
     - cp --recursive docs/_build/html/* _readthedocs/html/
     - cp --recursive docs/_build/latex/*.pdf _readthedocs/pdf/

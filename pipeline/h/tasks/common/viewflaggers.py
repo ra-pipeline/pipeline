@@ -65,7 +65,7 @@ class MatrixFlaggerInputs(vdp.StandardInputs):
     def __init__(self, context, output_dir=None, vis=None, datatask=None, viewtask=None, flagsettertask=None,
                  rules=None, niter=None, extendfields=None, extendbaseband=None, iter_datatask=None,
                  use_antenna_names=None, prepend=None, skip_fully_flagged=None):
-        super(MatrixFlaggerInputs, self).__init__()
+        super().__init__()
 
         # pipeline inputs
         self.context = context
@@ -1404,7 +1404,7 @@ class VectorFlaggerInputs(vdp.StandardInputs):
 
     def __init__(self, context, output_dir=None, vis=None, datatask=None, viewtask=None, flagsettertask=None,
                  rules=None, niter=None, iter_datatask=None, use_antenna_names=None, prepend=None):
-        super(VectorFlaggerInputs, self).__init__()
+        super().__init__()
 
         # pipeline inputs
         self.context = context

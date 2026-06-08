@@ -1,11 +1,12 @@
 """A utility module to handle newly generated MeasurementSets."""
+from __future__ import annotations
+
 import os
-from typing import Dict, Optional, Tuple
+from typing import TYPE_CHECKING
 
 import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.tablereader as tablereader
-from pipeline.domain import MeasurementSet, ObservingRun
 from pipeline.domain.singledish import MSReductionGroupDesc
 from pipeline.domain.spectralwindow import match_spw_basename
 from pipeline.infrastructure import casa_tools
@@ -13,7 +14,11 @@ from pipeline.infrastructure.utils import relative_path
 
 from ... import heuristics
 
-LOG = infrastructure.get_logger(__name__)
+if TYPE_CHECKING:
+    from pipeline.domain import MeasurementSet, ObservingRun
+
+LOG = infrastructure.logging.get_logger(__name__)
+
 
 def generate_ms(name: str, ref_ms: MeasurementSet) -> MeasurementSet:
     """
@@ -89,7 +94,7 @@ def __transfer_ephemeris_flag(new_ms: MeasurementSet, ref_ms: MeasurementSet):
 
 def set_beam_size(ms: MeasurementSet):
     """
-    Set beam size of each antenna and spwctral window pair to MS domain object.
+    set beam size of each antenna and spwctral window pair to MS domain object.
 
     The beam size of each spectral window in MS is set as an attribute, 'beam_sizes'.
     The beam_sizes is a dictionary in the form beam_sizes[antenna ID][spw ID].
@@ -113,7 +118,7 @@ def set_beam_size(ms: MeasurementSet):
     ms.beam_sizes = beam_sizes
 
 def merge_reduction_group(observing_run: ObservingRun,
-                          reduction_group: Dict[int, MSReductionGroupDesc]):
+                          reduction_group: dict[int, MSReductionGroupDesc]):
     """
     Merge a reduction group description to observing_run in context.
 
@@ -138,7 +143,7 @@ def merge_reduction_group(observing_run: ObservingRun,
             key = len(observing_run.ms_reduction_group)
             observing_run.ms_reduction_group[key] = mydesc
 
-def inspect_reduction_group(ms: MeasurementSet) -> Dict[int, MSReductionGroupDesc]:
+def inspect_reduction_group(ms: MeasurementSet) -> dict[int, MSReductionGroupDesc]:
     """
     Inspect MS and define Reduction Group Description of the MS.
 
@@ -198,7 +203,7 @@ def inspect_reduction_group(ms: MeasurementSet) -> Dict[int, MSReductionGroupDes
     return reduction_group
 
 def __find_match_by_name(spw_name: str, field_name: str,
-                         group_names: Dict[int, Tuple[int, int]]) -> int:
+                         group_names: dict[int, tuple[int, int]]) -> int:
     """
     Return a group ID that matches given spw and field.
 
@@ -224,9 +229,9 @@ def __find_match_by_name(spw_name: str, field_name: str,
 
 def __find_match_by_coverage(nchan: int, min_frequency: float,
                              max_frequency: float,
-                             reduction_group: Dict[int, MSReductionGroupDesc],
+                             reduction_group: dict[int, MSReductionGroupDesc],
                              fraction: float=0.99,
-                             field_name: Optional[str]=None) -> int:
+                             field_name: str | None=None) -> int:
     """
     Return a group ID that matches search criteria.
 

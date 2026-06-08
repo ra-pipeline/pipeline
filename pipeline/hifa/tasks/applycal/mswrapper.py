@@ -19,7 +19,7 @@ def average_visibility_dtype(npol,nchan,f_avg_max_length):
     return dtype
 
 
-class MSWrapper(object):
+class MSWrapper:
     """
     MSWrapper is a wrapper around a NumPy array populated with measurement set
     data for a specified scan and spectral window. The MSWrapper can be

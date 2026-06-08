@@ -58,11 +58,11 @@ def log_call(fn, level):
         tool_call = '{!s}.{!s}({!s})'.format(fn.__module__, fn.__name__, ', '.join(msg_args))
         CASACALLS_LOG.log(level, tool_call)
 
-        start_time = datetime.datetime.utcnow()
+        start_time = datetime.datetime.now(datetime.timezone.utc)
         try:
             return fn(*args, **kwargs)
         finally:
-            end_time = datetime.datetime.utcnow()
+            end_time = datetime.datetime.now(datetime.timezone.utc)
             elapsed = end_time - start_time
             LOG.log(level, '{} CASA tool call took {}s'.format(tool_call, elapsed.total_seconds()))
 

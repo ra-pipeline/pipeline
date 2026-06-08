@@ -1,9 +1,11 @@
 """Task to perform simple two-dimensional gridding with "BOX" kernel."""
+from __future__ import annotations
+
 import collections
 import functools
 import os
 from math import cos
-from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any
 
 import numpy
 
@@ -15,7 +17,6 @@ from pipeline.domain.datatable import DataTableIndexer
 from pipeline.infrastructure import casa_tools
 from .. import common
 from ..common import utils
-
 from .typing import LineWindow
 
 if TYPE_CHECKING:
@@ -24,7 +25,7 @@ if TYPE_CHECKING:
     from pipeline.infrastructure.launcher import Context
 
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 NoData = common.NoData
 DO_TEST = False
@@ -39,19 +40,19 @@ class SDSimpleGriddingInputs(vdp.StandardInputs):
     nplane = vdp.VisDependentProperty(default=3)
 
     @property
-    def group_desc(self) -> 'MSReductionGroupDesc':
+    def group_desc(self) -> MSReductionGroupDesc:
         """Return reduction group instance of the current group."""
         return self.context.observing_run.ms_reduction_group[self.group_id]
 
     @property
-    def member_ms(self) -> List['MeasurementSet']:
+    def member_ms(self) -> list[MeasurementSet]:
         """Return a list of unitque MS domain objects of group members."""
         duplicated_ms_names = [ self.group_desc[i].ms.name for i in self.member_list ]
         return [ms for ms in self.context.observing_run.measurement_sets \
                 if ms.name in duplicated_ms_names]
 
     @property
-    def reference_member(self) -> 'MSReductionGroupMember':
+    def reference_member(self) -> MSReductionGroupMember:
         """Return the first reduction group member instance in the current group."""
         return self.group_desc[self.member_list[0]]
 
@@ -75,12 +76,12 @@ class SDSimpleGriddingInputs(vdp.StandardInputs):
         self._windowmode = value
 
     def __init__(self,
-                 context: 'Context',
+                 context: Context,
                  group_id: int,
-                 member_list: List[int],
+                 member_list: list[int],
                  window: LineWindow,
                  windowmode: str,
-                 nplane: Optional[int] = None) -> None:
+                 nplane: int | None = None) -> None:
         """Construct SDSimpleGriddingInputs instance.
 
         Args:
@@ -91,7 +92,7 @@ class SDSimpleGriddingInputs(vdp.StandardInputs):
             windowmode: Line window mode. Either 'replace' or 'merge'
             nplane: Number of gridding planes. Defaults to 3 if None is given.
         """
-        super(SDSimpleGriddingInputs, self).__init__()
+        super().__init__()
 
         self.context = context
         self.group_id = group_id
@@ -105,8 +106,8 @@ class SDSimpleGriddingResults(common.SingleDishResults):
     """Results class to hold the result of simple gridding task."""
 
     def __init__(self,
-                 task: Optional[Type[basetask.StandardTaskTemplate]] = None,
-                 success: Optional[bool] = None,
+                 task: type[basetask.StandardTaskTemplate] | None = None,
+                 success: bool | None = None,
                  outcome: Any = None) -> None:
         """Construct SDSimpleGriddingResults instance.
 
@@ -115,9 +116,9 @@ class SDSimpleGriddingResults(common.SingleDishResults):
             success: Whether task execution is successful or not.
             outcome: Outcome of the task execution.
         """
-        super(SDSimpleGriddingResults, self).__init__(task, success, outcome)
+        super().__init__(task, success, outcome)
 
-    def merge_with_context(self, context: 'Context') -> None:
+    def merge_with_context(self, context: Context) -> None:
         """Merge result instance into context.
 
         No specific merge operation is done.
@@ -125,7 +126,7 @@ class SDSimpleGriddingResults(common.SingleDishResults):
         Args:
             context: Pipeline context object containing state information.
         """
-        super(SDSimpleGriddingResults, self).merge_with_context(context)
+        super().merge_with_context(context)
 
     def _outcome_name(self) -> str:
         """Return string representing the outcome.
@@ -148,7 +149,7 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
 
     def prepare(self,
                 datatable_dict: dict,
-                index_list: List[int]) -> SDSimpleGriddingResults:
+                index_list: list[int]) -> SDSimpleGriddingResults:
         """Perform simple gridding.
 
         Args:
@@ -192,8 +193,8 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
         return result
 
     def make_grid_table(
-        self, datatable_dict: dict, index_list: List[int]
-    ) -> List[List[Union[int, float, numpy.ndarray]]]:
+        self, datatable_dict: dict, index_list: list[int]
+    ) -> list[list[int | float | numpy.ndarray]]:
         """Create grid table.
 
         The method configures two-dimensional grid onto the celestial
@@ -342,8 +343,8 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
         return grid_table
 
     def grid(self,
-             grid_table: List[List[Union[int, float, numpy.ndarray]]],
-             datatable_dict: dict) -> Tuple[numpy.ndarray, List[List[Union[int, float]]]]:
+             grid_table: list[list[int | float | numpy.ndarray]],
+             datatable_dict: dict) -> tuple[numpy.ndarray, list[list[int | float]]]:
         """Perform gridding operation according to grid_table.
 
         The process does re-map and combine spectrum for each position.

@@ -1,6 +1,5 @@
 import operator
 import os
-from typing import List, Tuple, Union
 
 import numpy as np
 
@@ -19,7 +18,7 @@ from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import sessionutils
 from pipeline.infrastructure import task_registry
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 __all__ = [
     'Polcal',
@@ -213,7 +212,7 @@ class Polcal(basetask.StandardTaskTemplate):
             sresults.error.update(missing)
         return result
 
-    def _polcal_for_session(self, session_name: str, vislist: List[str]) -> PolcalSessionResults:
+    def _polcal_for_session(self, session_name: str, vislist: list[str]) -> PolcalSessionResults:
         """
         Run polarization calibration heuristics for a single session and
         corresponding list of measurement sets.
@@ -405,7 +404,7 @@ class Polcal(basetask.StandardTaskTemplate):
 
         return result
 
-    def _get_refant(self, session_name: str, vislist: List[str]) -> str:
+    def _get_refant(self, session_name: str, vislist: list[str]) -> str:
         # In the polarization recipes, the best reference antenna should have
         # been determined for the entire session by hifa_session_refant, and
         # stored in each MS of the session. Retrieve this refant from the first
@@ -414,7 +413,7 @@ class Polcal(basetask.StandardTaskTemplate):
         LOG.info(f"Session '{session_name}' is using reference antenna: {ms.reference_antenna}.")
         return ms.reference_antenna
 
-    def _check_matching_pol_field(self, session_name: str, vislist: List[str]) -> str:
+    def _check_matching_pol_field(self, session_name: str, vislist: list[str]) -> str:
         # Retrieve polarization calibrator field name for each MS in session.
         pol_fields = {}
         for vis in vislist:
@@ -449,7 +448,7 @@ class Polcal(basetask.StandardTaskTemplate):
         actask = applycal.SerialIFApplycal(acinputs)
         self._executor.execute(actask)
 
-    def _create_session_ms(self, session_name: str, vislist: List[str]) -> Tuple[str, dict]:
+    def _create_session_ms(self, session_name: str, vislist: list[str]) -> tuple[str, dict]:
         """This method uses mstransform to create a new MS that contains only
         the polarization calibrator data."""
         # Extract polarization data for each vis, and capture name of new MS.
@@ -539,7 +538,7 @@ class Polcal(basetask.StandardTaskTemplate):
 
         return result
 
-    def _register_calapps_from_results(self, results: List):
+    def _register_calapps_from_results(self, results: list):
         """This method will register any "final" CalApplication present in any
         of the input Results to the callibrary in the local context (stored in
         inputs).
@@ -554,7 +553,7 @@ class Polcal(basetask.StandardTaskTemplate):
         calapps_to_merge = [calapp for result in results for calapp in result.final]
         self._register_calapps(calapps_to_merge)
 
-    def _register_calapps(self, calapps: List):
+    def _register_calapps(self, calapps: list):
         """This method will register a list of CalApplications to the
         callibrary in the local context (stored in inputs)."""
         for calapp in calapps:
@@ -562,7 +561,7 @@ class Polcal(basetask.StandardTaskTemplate):
             self.inputs.context.callibrary.add(calapp.calto, calapp.calfrom)
 
     @staticmethod
-    def _compute_gain_ratio_rms(result: gaincal.common.GaincalResults) -> Tuple[List, List]:
+    def _compute_gain_ratio_rms(result: gaincal.common.GaincalResults) -> tuple[list, list]:
         # Get caltable to analyse.
         caltable = result.final[0].gaintable
 
@@ -617,8 +616,8 @@ class Polcal(basetask.StandardTaskTemplate):
 
         return best_scan_id
 
-    def _compute_xy_delay(self, vis: str, vislist: List[str], refant: str, best_scan: int, spwmaps: dict) \
-            -> Tuple[gaincal.common.GaincalResults, List]:
+    def _compute_xy_delay(self, vis: str, vislist: list[str], refant: str, best_scan: int, spwmaps: dict) \
+            -> tuple[gaincal.common.GaincalResults, list]:
         inputs = self.inputs
 
         # Initialize gaincal task inputs.
@@ -660,8 +659,8 @@ class Polcal(basetask.StandardTaskTemplate):
 
         return result, final_calapps
 
-    def _calibrate_xy_phase(self, vis: str, vislist: List[str], smodel: List[float], scan_duration: int,
-                            spwmaps: dict) -> Tuple[polcal.polcalworker.PolcalWorkerResults, List]:
+    def _calibrate_xy_phase(self, vis: str, vislist: list[str], smodel: list[float], scan_duration: int,
+                            spwmaps: dict) -> tuple[polcal.polcalworker.PolcalWorkerResults, list]:
         inputs = self.inputs
 
         # Initialize polcal task inputs.
@@ -717,8 +716,8 @@ class Polcal(basetask.StandardTaskTemplate):
 
         self.inputs.context.callibrary.unregister_calibrations(hifa_polcal_matcher)
 
-    def _final_gaincal(self, vis: str, vislist: List[str], refant: str, smodel: List[float], spwmaps: dict) \
-            -> Tuple[gaincal.common.GaincalResults, List]:
+    def _final_gaincal(self, vis: str, vislist: list[str], refant: str, smodel: list[float], spwmaps: dict) \
+            -> tuple[gaincal.common.GaincalResults, list]:
         inputs = self.inputs
 
         # Initialize gaincal task inputs.
@@ -758,8 +757,8 @@ class Polcal(basetask.StandardTaskTemplate):
 
         return result, final_calapps
 
-    def _compute_leakage_terms(self, vis: str, vislist: List[str], smodel: List[float], scan_duration: int,
-                               spwmaps: dict) -> Tuple[polcal.polcalworker.PolcalWorkerResults, List]:
+    def _compute_leakage_terms(self, vis: str, vislist: list[str], smodel: list[float], scan_duration: int,
+                               spwmaps: dict) -> tuple[polcal.polcalworker.PolcalWorkerResults, list]:
         inputs = self.inputs
 
         # Initialize polcal task inputs.
@@ -799,8 +798,8 @@ class Polcal(basetask.StandardTaskTemplate):
 
         return result, final_calapps
 
-    def _compute_xy_ratio(self, vis: str, vislist: List[str], refant: str, smodel: List[float], spwmaps: dict) \
-            -> Tuple[gaincal.common.GaincalResults, List]:
+    def _compute_xy_ratio(self, vis: str, vislist: list[str], refant: str, smodel: list[float], spwmaps: dict) \
+            -> tuple[gaincal.common.GaincalResults, list]:
         inputs = self.inputs
 
         # Initialize gaincal task inputs.
@@ -837,7 +836,7 @@ class Polcal(basetask.StandardTaskTemplate):
 
         return result, final_calapps
 
-    def _run_visstat(self, vis: str, obsid: Union[None, str] = None) -> dict:
+    def _run_visstat(self, vis: str, obsid: None | str = None) -> dict:
         if obsid is None:
             obsid = ''
 
@@ -893,7 +892,7 @@ class Polcal(basetask.StandardTaskTemplate):
 
         return diffs
 
-    def _setjy_for_polcal(self, vis: str, smodel: List[float]):
+    def _setjy_for_polcal(self, vis: str, smodel: list[float]):
         # Get pol calibrator field ID and science SpWs from MS.
         ms = self.inputs.context.observing_run.get_ms(name=vis)
         sci_spws = ms.get_spectral_windows(science_windows_only=True)
@@ -949,8 +948,8 @@ class Polcal(basetask.StandardTaskTemplate):
             job = casa_tasks.setjy(**task_args)
             self._executor.execute(job)
 
-    def _compute_ampcal_for_polcal(self, vislist: List[str], refant: str) \
-            -> Tuple[List[gaincal.common.GaincalResults], List]:
+    def _compute_ampcal_for_polcal(self, vislist: list[str], refant: str) \
+            -> tuple[list[gaincal.common.GaincalResults], list]:
         inputs = self.inputs
 
         results = []

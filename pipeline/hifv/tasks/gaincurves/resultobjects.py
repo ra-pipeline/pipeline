@@ -13,7 +13,7 @@ class GainCurvesResults(basetask.Results):
             pool = []
         if preceding is None:
             preceding = []
-        super(GainCurvesResults, self).__init__()
+        super().__init__()
 
         self.vis = None
         self.pool = pool

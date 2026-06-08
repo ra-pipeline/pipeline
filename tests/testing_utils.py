@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import gc
 import glob
 import os
 import re
@@ -13,11 +14,13 @@ import pytest
 from pipeline import environment, infrastructure, recipereducer
 from pipeline.infrastructure import casa_tools, executeppr, executevlappr, launcher, utils
 from pipeline.infrastructure.renderer import regression
+from pipeline.h.cli import cli as h_cli
 
 if TYPE_CHECKING:
     from typing import Any, Literal
 
     from packaging.version import Version
+    from pipeline.infrastructure.launcher import Context
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -336,15 +339,29 @@ class PipelineTester:
                     elif self.mode == 'component':
                         recipereducer.run_named_tasks(self.tasks)
 
-                # Do sanity checks
-                self.__do_sanity_checks()
+                # Load the pipeline context once so that both the sanity checks and
+                # results extraction share the same in-memory object.  Loading it
+                # twice would fire two ContextResumedEvents, creating two extra
+                # TaskTimeTracker instances whose pubsub subscriptions would never
+                # be cleaned up (see PIPE-3061).
+                context = launcher.Pipeline(context='last').context
 
-                # Copy the reference results file to current working directory for record
-                if self.expectedoutput_file and os.path.exists(self.expectedoutput_file):
-                    shutil.copyfile(self.expectedoutput_file, os.path.basename(self.expectedoutput_file))
+                try:
+                    # Do sanity checks
+                    self.__do_sanity_checks(context)
 
-                # Get new results
-                new_results = self.__get_results_of_from_current_context()
+                    # Copy the reference results file to current working directory for record
+                    if self.expectedoutput_file and os.path.exists(self.expectedoutput_file):
+                        shutil.copyfile(self.expectedoutput_file, os.path.basename(self.expectedoutput_file))
+
+                    # Get new results
+                    new_results = self.__get_results_of_from_current_context(context)
+                finally:
+                    # Release context before _cleanup()'s gc.collect() so the cyclic
+                    # Context → ResultsProxy → Context chain is actually collectable.
+                    # Without this, gc.collect() fires while 'context' is still a live
+                    # local variable and cannot free the cycle (PIPE-3061).
+                    del context
 
                 # new results file path
                 if self.mode == 'component':
@@ -429,17 +446,19 @@ class PipelineTester:
         with open(new_file, 'w') as fd:
             fd.writelines([str(x) + '\n' for x in new_results])
 
-    def __get_results_of_from_current_context(self) -> list[str]:
+    def __get_results_of_from_current_context(self, context: Context) -> list[str]:
         """
         Get results of current execution from context.
 
+        Args:
+            context: Pipeline context object from the current run.
+
         Returns: a list of new results
         """
-        context = launcher.Pipeline(context='last').context
         new_results = sorted(regression.extract_regression_results(context))
         return new_results
 
-    def __do_sanity_checks(self):
+    def __do_sanity_checks(self, context: Context):
         """
         Do the following sanity-checks on the pipeline run
 
@@ -447,8 +466,10 @@ class PipelineTester:
         2. Non-existence of errorexit-*.txt in working directory
         3. *pipeline_manifest.xml is present under the products directory (regression mode only)
         4. No weblog rendering failures
+
+        Args:
+            context: Pipeline context object from the current run.
         """
-        context = launcher.Pipeline(context='last').context
 
         # 1. rawdata, working, products directories are present
         # The rawdata directory is only present for PPR runs
@@ -506,7 +527,15 @@ class PipelineTester:
             LOG.error("Telescope is not 'alma' or 'vla'. Can't run executeppr.")
 
     def _cleanup(self):
-        """Cleans up the working directory if it exists."""
+        """Cleans up the working directory and releases the pipeline context from memory.
+
+        Dropping the global pipeline reference and forcing a garbage-collection
+        cycle allows Python to reclaim the large Context objects (measurement-set
+        domain data, calibration state, staged results, etc.) that would otherwise
+        linger in memory until the *next* test overwrites them — the primary cause
+        of the steady memory growth observed when running many regression tests
+        consecutively in one pytest session (PIPE-3061).
+        """
         if not self.compare_only and self.remove_workdir and os.path.isdir(self.output_dir):
             try:
                 shutil.rmtree(self.output_dir)
@@ -515,3 +544,16 @@ class PipelineTester:
                 LOG.debug("Working directory %s already removed before cleanup.", self.output_dir)
             except OSError as exc:
                 LOG.warning("Failed to remove working directory %s: %s", self.output_dir, exc)
+
+        # Release the global Pipeline reference held in h_cli.stack so that the
+        # context from this test (which may be several GB) becomes unreachable and
+        # can be reclaimed by the garbage collector below. A later test run will
+        # add a new stack entry during its normal context setup path (typically via
+        # _register_context()), so cleanup should not retain this test's context.
+        h_cli.stack.pop(h_cli.PIPELINE_NAME, None)
+
+        # Context objects form reference cycles (ResultsProxy._context → Context →
+        # results list → ResultsProxy), so CPython's reference-counting alone cannot
+        # free them.  An explicit gc.collect() here ensures they are collected
+        # promptly between tests rather than accumulating across the session.
+        gc.collect()

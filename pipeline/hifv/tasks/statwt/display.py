@@ -1,7 +1,6 @@
 import collections
 import math
 import os
-from typing import List, Tuple
 
 import matplotlib.cbook as cbook
 import matplotlib.pyplot as plt
@@ -10,10 +9,10 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.casa_tools as casa_tools
 import pipeline.infrastructure.renderer.logger as logger
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
-class weightboxChart(object):
+class weightboxChart:
     whis = 3.944
 
     def __init__(self, context, result):
@@ -57,7 +56,7 @@ class weightboxChart(object):
 
     # This is used to get the scans for a band by passing in the appropriate list of spws
     # and is only used for the VLA-PI code
-    def _get_scans_with_spws(self, tbl: str, spws: List=[]):
+    def _get_scans_with_spws(self, tbl: str, spws: list=[]):
         """Get the scans from the weights table with the spws in the input list"""
 
         query = 'ntrue(FLAG)==0 && SPECTRAL_WINDOW_ID IN {0}'.format(list(map(int, spws)))
@@ -74,7 +73,7 @@ class weightboxChart(object):
             plots.extend(self._get_plot_wrapper(suffix=k))
         return [p for p in plots if p is not None]
 
-    def _split(self, to_split: List, n: int) -> Tuple[List]:
+    def _split(self, to_split: list, n: int) -> tuple[list]:
         """Utility function to divide the input list to_split into sublists of size n and return
         a tuple of these lists"""
         quotient, remainder = divmod(len(to_split), n)
@@ -96,7 +95,7 @@ class vlaWeightboxChart(weightboxChart):
                                             self.ms.basename, 'summary', band, suffix])))+'.png'
         return os.path.join(stage_dir, fig_basename)
 
-    def _get_plot_wrapper(self, suffix:str='', band:str='') -> List[logger.Plot]:
+    def _get_plot_wrapper(self, suffix:str='', band:str='') -> list[logger.Plot]:
         figfile = self._get_figfile(suffix, band)
         wrappers = []
 
@@ -189,7 +188,7 @@ class vlaWeightboxChart(weightboxChart):
             scans = self._get_scans_with_spws(tbl, self.band2spw[band])
 
             bxpstats_per_scan = list()
-            for this_scan in scans: 
+            for this_scan in scans:
                 dat = self._get_weight_from_wtable(tbl, this_scan=this_scan)
                 if dat.size > 0:
                     dat = dat[dat > 0]
@@ -241,13 +240,13 @@ class vlaWeightboxChart(weightboxChart):
             ax2.set_ylabel('$Wt_{i}$')
             ax2.get_yaxis().get_major_formatter().set_useOffset(False)
 
-            # Save-off y-axis limits so they can be re-used for the scans plots. 
-            # Since the scan plost can be split up if there are more than max_scans_per_plot scans, 
+            # Save-off y-axis limits so they can be re-used for the scans plots.
+            # Since the scan plost can be split up if there are more than max_scans_per_plot scans,
             # this is used to keep the y-axes consistent.
             y_min, y_max = ax2.get_ylim()
 
             # Create per-scan sub-plots
-            if number_of_scan_plots == 1: 
+            if number_of_scan_plots == 1:
                 ax3.bxp(bxpstats_per_scan, flierprops=flierprops)
                 ax3.axes.set_xticklabels(scans, rotation=45, ha='center')
                 ax3.set_xlabel('Scan Number')
@@ -256,13 +255,13 @@ class vlaWeightboxChart(weightboxChart):
             else:
                 bxpstats_per_scan_split = list(self._split(bxpstats_per_scan, number_of_scan_plots))
                 scans_split = list(self._split(scans, number_of_scan_plots))
-                for i, axis in enumerate(ax_scans): 
+                for i, axis in enumerate(ax_scans):
                     axis.bxp(bxpstats_per_scan_split[i], flierprops=flierprops)
                     axis.axes.set_xticklabels(scans_split[i], rotation=45, ha='center')
                     axis.set_xlabel('Scan Number')
                     axis.set_ylabel('$Wt_{i}$')
                     axis.set_ylim([y_min, y_max])
-                    axis.get_yaxis().get_major_formatter().set_useOffset(False) 
+                    axis.get_yaxis().get_major_formatter().set_useOffset(False)
 
             fig.tight_layout()
             fig.savefig(figfile)
@@ -291,11 +290,11 @@ class vlassWeightboxChart(weightboxChart):
 
         return os.path.join(stage_dir, fig_basename)
 
-    def _get_plot_wrapper(self, suffix:str='') -> List[logger.Plot]:
+    def _get_plot_wrapper(self, suffix:str='') -> list[logger.Plot]:
         figfile = self._get_figfile(suffix)
         wrappers = []
 
-        if self.result.inputs['statwtmode'] == "VLASS-SE": 
+        if self.result.inputs['statwtmode'] == "VLASS-SE":
             wrapper = logger.Plot(figfile, x_axis='antenna or spectral window', y_axis='antenna-based weight',
                     parameters={'vis': self.ms.basename,
                                 'x_axis': 'ant/spw',

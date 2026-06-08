@@ -23,7 +23,7 @@ class T2_4MDetailsBandpassRenderer(baserenderer.T2_4MDetailsBandpassRenderer):
     def __init__(self, uri='bandpass.mako', 
                  description='Phase-up bandpass calibration',
                  always_rerender=False):
-        super(T2_4MDetailsBandpassRenderer, self).__init__(uri=uri,
+        super().__init__(uri=uri,
                 description=description, always_rerender=always_rerender)
 
     def get_phaseup_applications(self, context, result, ms):

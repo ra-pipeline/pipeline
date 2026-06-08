@@ -1,10 +1,9 @@
-import collections
+import collections.abc
 
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as qacalc
-# from ..common import commonfluxresults
 from pipeline.h.tasks.common import commonfluxresults
 from . import setjy
 from . import setmodel

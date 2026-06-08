@@ -40,7 +40,7 @@ class T2_4MDetailsSingleDishImagingRenderer(basetemplates.T2_4MDetailsDefaultRen
     def __init__(self, uri='hsd_imaging.mako',
                  description='Image single dish data',
                  always_rerender=False):
-        super(T2_4MDetailsSingleDishImagingRenderer, self).__init__(
+        super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
     def update_mako_context(self, ctx, context, results):

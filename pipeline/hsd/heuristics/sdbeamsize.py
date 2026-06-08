@@ -111,4 +111,4 @@ class SingleDishBeamSizeFromName(SingleDishBeamSize):
         """
         h = AntennaDiameter()
         diameter = h(name)
-        return super(SingleDishBeamSizeFromName, self).calculate(diameter, frequency)
+        return super().calculate(diameter, frequency)

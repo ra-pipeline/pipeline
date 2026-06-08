@@ -6,7 +6,7 @@ import datetime
 import decimal
 import ssl
 import urllib
-from typing import TYPE_CHECKING, Any, DefaultDict
+from typing import TYPE_CHECKING, Any
 from xml.dom import minidom
 from xml.parsers.expat import ExpatError
 
@@ -66,7 +66,7 @@ def get_setjy_results(
 
 def read_fluxes_db(
         ms: MeasurementSet,
-        ) -> tuple[DefaultDict[Source, list[FluxMeasurement]], list[dict[str, Any]] | None]:
+        ) -> tuple[collections.defaultdict[Source, list[FluxMeasurement]], list[dict[str, Any]] | None]:
     """
     Read fluxes from the database server, defaulting to the Source XML table
     if no fluxes can be found
@@ -82,7 +82,7 @@ def read_fluxes_db(
     return results, qacodes
 
 
-def flux_nosourcexml(ms: MeasurementSet) -> DefaultDict[Source, list[tuple[FluxMeasurement | str | None]]]:
+def flux_nosourcexml(ms: MeasurementSet) -> collections.defaultdict[Source, list[tuple[FluxMeasurement | str | None]]]:
     """
     Call the flux service and get the frequencies from the ms if no Source.xml is available
     """
@@ -247,15 +247,15 @@ def query_online_catalogue(
 
 
 def add_catalogue_fluxes(
-        measurements: DefaultDict[Source, list[FluxMeasurement]],
+        measurements: collections.defaultdict[Source, list[FluxMeasurement]],
         ms: MeasurementSet,
-        ) -> tuple[DefaultDict[Source, list[FluxMeasurement]], list[dict[str, Any]]]:
+        ) -> tuple[collections.defaultdict[Source, list[FluxMeasurement]], list[dict[str, Any]]]:
     results = collections.defaultdict(list)
     qacodes = []  # Dictionaries will be added here for codes and warning messages from the sources catalog
     science_windows = ms.get_spectral_windows(science_windows_only=True)
 
     # Test query to see if we need to switch to the backup URL
-    obs_time = datetime.datetime(2013, 3, 27, 7, 53, 3, 168000)
+    obs_time = datetime.datetime(2013, 3, 27, 7, 53, 3, 168000, tzinfo=datetime.timezone.utc)
     freq_hz = '86837309056.169219970703125'
     source_name = 'J1427-4206'
     contact_fail = False

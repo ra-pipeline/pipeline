@@ -6,7 +6,7 @@ from decimal import Decimal
 from .measures import FluxDensity, FluxDensityUnits
 
 
-class FluxMeasurement(object):
+class FluxMeasurement:
     """
     FluxMeasurement is a logical representation of a flux measurement.
 

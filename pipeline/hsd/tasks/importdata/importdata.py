@@ -4,27 +4,29 @@ The hsd_importdata task.
 This task loads the specified visibility data into the pipeline
 context unpacking and / or converting it as necessary.
 """
+from __future__ import annotations
 
 import os
-from typing import Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 import pipeline.h.tasks.importdata.importdata as importdata
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.sessionutils as sessionutils
 import pipeline.infrastructure.vdp as vdp
-from pipeline.h.tasks.common.commonfluxresults import FluxCalibrationResults
-from pipeline.domain.measurementset import MeasurementSet
-from pipeline.domain.observingrun import ObservingRun
-from pipeline.domain.singledish import MSReductionGroupDesc
 from pipeline.hsd.tasks.common.inspection_util import merge_reduction_group
 from pipeline.infrastructure import task_registry
-from pipeline.infrastructure.launcher import Context
 from pipeline.infrastructure.utils import relative_path
 
 from . import inspection
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
+
+if TYPE_CHECKING:
+    from pipeline.domain import MeasurementSet, ObservingRun
+    from pipeline.domain.singledish import MSReductionGroupDesc
+    from pipeline.h.tasks.common.commonfluxresults import FluxCalibrationResults
+    from pipeline.infrastructure.launcher import Context
 
 
 class SDImportDataInputs(importdata.ImportDataInputs):
@@ -44,22 +46,22 @@ class SDImportDataInputs(importdata.ImportDataInputs):
     # docstring and type hints: supplements hsd_importdata
     def __init__(self,
                  context: Context,
-                 vis: Optional[List[str]] = None,
-                 output_dir: Optional[str] = None,
-                 asis: Optional[str] = None,
-                 process_caldevice: Optional[bool] = None,
-                 session: Optional[List[str]] = None,
-                 overwrite: Optional[bool] = None,
-                 nocopy: Optional[bool] = None,
-                 bdfflags: Optional[bool] = None,
-                 datacolumns: Optional[Dict] = None,
-                 save_flagonline: Optional[bool] = None,
-                 lazy: Optional[bool] = None,
-                 with_pointing_correction: Optional[bool] = None,
-                 createmms: Optional[str] = None,
-                 ocorr_mode: Optional[str] = None,
-                 hm_rasterscan: Optional[str] = None,
-                 parallel: Optional[Union[str, bool]] = None):
+                 vis: list[str] | None = None,
+                 output_dir: str | None = None,
+                 asis: str | None = None,
+                 process_caldevice: bool | None = None,
+                 session: list[str] | None = None,
+                 overwrite: bool | None = None,
+                 nocopy: bool | None = None,
+                 bdfflags: bool | None = None,
+                 datacolumns: dict | None = None,
+                 save_flagonline: bool | None = None,
+                 lazy: bool | None = None,
+                 with_pointing_correction: bool | None = None,
+                 createmms: str | None = None,
+                 ocorr_mode: str | None = None,
+                 hm_rasterscan: str | None = None,
+                 parallel: str | bool | None = None):
         """Initialise SDImportDataInputs class.
 
         Args:
@@ -188,21 +190,21 @@ class SDImportDataResults(basetask.Results):
     """
 
     def __init__(self,
-                 mses: Optional[List[MeasurementSet]] = None,
-                 reduction_group_list: Optional[List[Dict[int, MSReductionGroupDesc]]] = None,
-                 datatable_prefix: Optional[str] = None,
-                 setjy_results: Optional[List[FluxCalibrationResults]] = None,
-                 org_directions: Optional[Dict[str, Union[str, Dict[str, Union[str, float]]]]] = None):
+                 mses: list[MeasurementSet] | None = None,
+                 reduction_group_list: list[dict[int, MSReductionGroupDesc] | None] = None,
+                 datatable_prefix: str | None = None,
+                 setjy_results: list[FluxCalibrationResults] | None = None,
+                 org_directions: dict[str, str | dict[str, str | float | None]] = None):
         """Initialise SDImportDataResults class.
 
         Args:
-            mses: list of MeasurementSet domain objects
-            reduction_group_list: list of dictionaries that consist of reduction group IDs (key) and MSReductionGroupDesc (value)
+            mses: List of MeasurementSet domain objects
+            reduction_group_list: List of dictionaries that consist of reduction group IDs (key) and MSReductionGroupDesc (value)
             datatable_prefix: path to directory that stores DataTable of each MeasurementSet
             setjy_results: the flux results generated from Source.xml
-            org_directions: dict of Direction objects of the origin
+            org_directions: Dict of Direction objects of the origin
         """
-        super(SDImportDataResults, self).__init__()
+        super().__init__()
         self.mses = [] if mses is None else mses
         self.reduction_group_list = reduction_group_list
         self.datatable_prefix = datatable_prefix
@@ -224,12 +226,12 @@ class SDImportDataResults(basetask.Results):
         context.observing_run.ms_datatable_name = self.datatable_prefix
         context.observing_run.org_directions = self.org_directions
 
-    def __merge_reduction_group(self, observing_run: ObservingRun, reduction_group_list: List[Dict[int, MSReductionGroupDesc]]):
+    def __merge_reduction_group(self, observing_run: ObservingRun, reduction_group_list: list[dict[int, MSReductionGroupDesc]]):
         """Call merge_reduction_group.
 
         Args:
             observing_run: pipeline.domain.observingrun.ObservingRun object
-            reduction_group_list: list of dictionaries that consist of reduction group IDs (key) and MSReductionGroupDesc (value)
+            reduction_group_list: List of dictionaries that consist of reduction group IDs (key) and MSReductionGroupDesc (value)
         """
         for reduction_group in reduction_group_list:
             merge_reduction_group(observing_run, reduction_group)
@@ -251,7 +253,7 @@ class SerialSDImportData(importdata.ImportData):
 
     Inputs = SDImportDataInputs
 
-    def prepare(self, **parameters: Dict[str, Any]) -> SDImportDataResults:
+    def prepare(self, **parameters: dict[str, Any]) -> SDImportDataResults:
         """Prepare job requests for execution.
 
         Args:
@@ -260,7 +262,7 @@ class SerialSDImportData(importdata.ImportData):
             SDImportDataResults : result object
         """
         # get results object by running super.prepare()
-        results = super(SerialSDImportData, self).prepare()
+        results = super().prepare()
 
         # per MS inspection
         table_prefix = relative_path(os.path.join(self.inputs.context.name, 'MSDataTable.tbl'),

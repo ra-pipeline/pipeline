@@ -7,7 +7,7 @@ LOG = logging.get_logger(__name__)
 
 
 # This class contains a list of ImageItem objects encoded as dictionaries.
-class ImageLibrary(object):
+class ImageLibrary:
     def __init__(self):
         self._images = []
 

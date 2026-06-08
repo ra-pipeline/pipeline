@@ -18,7 +18,7 @@ class T2_4MDetailsNRORestoreDataRenderer(sdapplycal.T2_4MDetailsSDApplycalRender
     def __init__(self, uri='hsdn_restoredata.mako',
                  description='Restoredata with scale adjustment among beams for NRO FOREST data.',
                  always_rerender=False):
-        super(T2_4MDetailsNRORestoreDataRenderer, self).__init__(
+        super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
     def update_mako_context(self, ctx, context, results):

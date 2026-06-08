@@ -54,7 +54,7 @@ class StatwtInputs(vdp.StandardInputs):
                 Default is 'VLA'.
 
         """
-        super(StatwtInputs, self).__init__()
+        super().__init__()
         self.context = context
         self.vis = vis
         self.datacolumn = datacolumn
@@ -68,7 +68,7 @@ class StatwtResults(basetask.Results):
         if jobs is None:
             jobs = []
 
-        super(StatwtResults, self).__init__()
+        super().__init__()
         self.jobs = jobs
         self.summaries = flag_summaries
         self.wtables = wtables

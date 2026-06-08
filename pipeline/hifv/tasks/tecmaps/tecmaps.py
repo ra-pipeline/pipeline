@@ -48,7 +48,7 @@ class TecMapsInputs(vdp.StandardInputs):
 
             parameter:
         """
-        super(TecMapsInputs, self).__init__()
+        super().__init__()
         self.context = context
         self.output_dir = output_dir
         self.vis = vis
@@ -59,7 +59,7 @@ class TecMapsInputs(vdp.StandardInputs):
         self.caltype = caltype
 
     def to_casa_args(self):
-        args = super(TecMapsInputs, self).to_casa_args()
+        args = super().to_casa_args()
         args['caltype'] = 'tecim'
         return args
 
@@ -75,7 +75,7 @@ class TecMapsResults(basetask.Results):
         if preceding is None:
             preceding = []
 
-        super(TecMapsResults, self).__init__()
+        super().__init__()
 
         self.vis = None
         self.pool = pool[:]

@@ -291,7 +291,7 @@ class VLASetjyInputs(vdp.StandardInputs):
 
         """
 
-        super(VLASetjyInputs, self).__init__()
+        super().__init__()
 
         self.context = context
         self.vis = vis
@@ -310,7 +310,7 @@ class VLASetjyInputs(vdp.StandardInputs):
         self.normfluxes = normfluxes
 
     def to_casa_args(self):
-        d = super(VLASetjyInputs, self).to_casa_args()
+        d = super().to_casa_args()
 
         d['fluxdensity'] = d['refspectra'][1]
         try:

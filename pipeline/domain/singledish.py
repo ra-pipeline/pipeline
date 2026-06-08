@@ -4,7 +4,7 @@ from pipeline.domain.spectralwindow import match_spw_basename
 LOG = infrastructure.get_logger(__name__)
 
 
-class MSReductionGroupMember(object):
+class MSReductionGroupMember:
     def __init__(self, ms, antenna_id, spw_id, field_id=None):
         self.ms = ms
         self.antenna_id = antenna_id

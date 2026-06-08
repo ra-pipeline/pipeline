@@ -144,8 +144,7 @@ $(function () {
 
     <%
     plots = rmsplots[ms_name]
-    #spw_colname=[plot[0].parameters['virtspw'] for plot in plots]
-    stats=plotter.result.stats
+    stats=plotter.result.rmsstats
     stats_summary=plotter.result.stats_summary
     %>
 
@@ -188,7 +187,7 @@ $(function () {
         </tr>
        
 
-        % for idx, stats_per_spw in enumerate(stats):
+        % for idx, rmsfilename in enumerate(stats):
             <tr>
             <%
             cell_style=[f'border-left: {border_line}',f'border-right: {border_line}']
@@ -196,15 +195,15 @@ $(function () {
                 cell_style.append('border-bottom: '+border_line)          
             cell_style='style="{}"'.format(('; ').join(cell_style))
             cell_title=''                    
-            reject_desc=is_rejected(info_dict.get(stats_per_spw['virtspw'],True))
+            reject_desc=is_rejected(info_dict.get(stats[rmsfilename]['virtspw'],True))
             %> 
 
-            <td ${cell_style}><b>${stats_per_spw['virtspw']} ${reject_desc}</b></td>
+            <td ${cell_style}><b>${stats[rmsfilename]['virtspw']} ${reject_desc}</b></td>
             % for idx_pol,name_pol in enumerate(['I','Q','U','V']):
                 % for item, cmap in [('Max','Reds'),('Min','Oranges'),('Mean','Greens'),('Median','Blues'),('Sigma','Purples'),('MADrms','Greys')]:
                     <%
                     cell_style=[]
-                    dev_in_madrms=stats_per_spw[item.lower()][idx_pol]-stats_summary[item.lower()]['spwwise_median'][idx_pol]
+                    dev_in_madrms=stats[rmsfilename][item.lower()][idx_pol]-stats_summary[item.lower()]['spwwise_median'][idx_pol]
                     madrms=stats_summary[item.lower()]['spwwise_madrms'][idx_pol]
                     if abs(dev_in_madrms)>madrms*3.0:
                         #bgcolor=val2color(dev_in_madrms/madrms,cmap_name='Greys',vmin=3,vmax=10)
@@ -219,7 +218,7 @@ $(function () {
                     cell_style+=' title="{}" data-toggle="tooltip"'.format(cell_title)
                     %>                    
                     
-                    <td ${cell_style}>${fmt_rms(stats_per_spw[item.lower()][idx_pol])}</td>
+                    <td ${cell_style}>${fmt_rms(stats[rmsfilename][item.lower()][idx_pol])}</td>
                 % endfor
             % endfor
             </tr>

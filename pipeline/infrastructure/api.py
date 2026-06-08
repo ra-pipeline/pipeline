@@ -45,7 +45,7 @@ partner class directly, eg.::
 import abc
 
 
-class Heuristic(object, metaclass=abc.ABCMeta):
+class Heuristic(abc.ABC):
     """
     Heuristic is the superclass of all user-accessible heuristics code in the
     pipeline.
@@ -88,7 +88,7 @@ class Heuristic(object, metaclass=abc.ABCMeta):
         return self.__class__.__name__
 
 
-class Inputs(object):
+class Inputs:
     """
     Inputs defines the interface used to create a constructor argument for a
     :class:`Task`.
@@ -105,7 +105,7 @@ class Inputs(object):
         raise NotImplementedError
 
 
-class Results(object, metaclass=abc.ABCMeta):
+class Results(abc.ABC):
     """
     Results defines the interface used to hold the output of a |Task| plus
     some common parameters used by all weblog templates. This class is
@@ -113,30 +113,12 @@ class Results(object, metaclass=abc.ABCMeta):
     Refer to the sub-class for details on the structure expected by the
     task-specific weblog template.
 
-    .. py:attribute:: task_class
-
-        the Class of the |Task| that generated this Results object.
-
-    .. py:attribute:: inputs
-
-        the |Inputs| used by the |Task| that generated this |Results|
-
-    .. py:attribute:: timestamps
-
-        the (:class:`~pipeline.infrastructure.basetask.Timestamps`) named
-        tuple holding the start and end timestamps for the |Task|
-
-    .. py:attribute:: stage_number
-
-        the stage number of the task that generated this |Results|
-
-    .. py:attribute:: metadata
-
-        the dict holding metadata describing this result and the generating |Task|
-
-.. |Inputs| replace:: :class:`Inputs`
-.. |Task| replace:: :class:`Task`
-.. |Results| replace:: :class:`Results`
+    Attributes:
+        task_class: The Class of the Task that generated this Results object.
+        inputs: The Inputs used by the Task that generated this Results object.
+        timestamps: Named tuple holding the start and end timestamps for the Task.
+        stage_number: The stage number of the task that generated this Results object.
+        metadata: Dictionary holding metadata describing this result and the generating Task.
 
     """
 
@@ -170,7 +152,7 @@ class Results(object, metaclass=abc.ABCMeta):
         """
 
 
-class ResultRenderer(object, metaclass=abc.ABCMeta):
+class ResultRenderer(abc.ABC):
     """
     ResultRenderer is the interface for task-specific weblog renderers
     (T2-4M details pages in weblog nomenclature).
@@ -198,7 +180,7 @@ class ResultRenderer(object, metaclass=abc.ABCMeta):
         raise NotImplementedError
 
 
-class Task(object, metaclass=abc.ABCMeta):
+class Task(abc.ABC):
     """
     The Runnable interface should be implemented by any class whose
     instances are intended to be executed by an Executor.
@@ -235,7 +217,7 @@ class Task(object, metaclass=abc.ABCMeta):
         raise NotImplementedError
 
 
-# class ImagingMeasurementSetsPreferred(object, metaclass=abc.ABCMeta):
+# class ImagingMeasurementSetsPreferred(abc.ABC):
 #     """
 #     Class used to register Inputs classes that prefer to see post-mstransform
 #     data when available.

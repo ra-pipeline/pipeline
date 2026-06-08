@@ -103,7 +103,7 @@ def median_and_mad(data):
     return data_median, data_mad
 
 
-class FlagCmd(object):
+class FlagCmd:
     """
     Create a flagcmd.
         Added detailed docs here.
@@ -378,9 +378,6 @@ class FlagCmd(object):
             else:
                 match = match and (('ANTENNA' in str(self.axisnames).upper()) or
                                    ('BASELINE' in str(self.axisnames).upper()))
-
-#        if self.flag_time is not None:
-#            match = match and ('TIME' in self.axisnames)
 
         # does correlation/pol match?
         match = match and (

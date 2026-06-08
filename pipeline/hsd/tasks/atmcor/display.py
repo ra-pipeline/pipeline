@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 LOG = infrastructure.get_logger(__name__)
 
 
-class PlotmsRealVsFreqPlotter(object):
+class PlotmsRealVsFreqPlotter:
     """Plotter class to generate real_vs_freq plot."""
 
     def __init__(self,

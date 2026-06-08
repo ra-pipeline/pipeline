@@ -9,7 +9,7 @@ from pipeline.infrastructure import casa_tools
 LOG = infrastructure.get_logger(__name__)
 
 
-class CalibrationTableData(object):
+class CalibrationTableData:
     """CalibrationTableData holds the name of a CASA calibration table 
     and its contents.
     """
@@ -32,7 +32,7 @@ class CalibrationTableData(object):
         return '<CalibrationTable({name})>'.format(name=self.name)
 
 
-class CalibrationTableRow(object):
+class CalibrationTableRow:
     """CalibrationTableRow represents a row in a CASA calibration table.
     """
     def __init__(self, columns, *coldata):
@@ -45,7 +45,7 @@ class CalibrationTableRow(object):
         return self.rowdata[upfield]
 
 
-class CalibrationTableDataFiller(object):
+class CalibrationTableDataFiller:
     """CalibrationTableDataFiller contains methods to fill a 
     CalibrationTableData object.
     """

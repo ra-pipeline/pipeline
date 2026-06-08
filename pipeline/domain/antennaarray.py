@@ -1,15 +1,21 @@
+from __future__ import annotations
+
 import collections
 import itertools
 import math
-import warnings
-from typing import Sequence
+from typing import TYPE_CHECKING
 
 import numpy
 
 from pipeline.infrastructure import casa_tools
 
-from . import Antenna, measures
+from . import measures
 from .measures import Distance, DistanceUnits
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from pipeline.domain import Antenna
 
 Baseline = collections.namedtuple('Baseline', 'antenna1 antenna2 length')
 
@@ -101,8 +107,6 @@ class AntennaArray:
                 length=Distance(value=self.baseline_lookup[max_x][max_y], units=DistanceUnits.METRE)
             )
 
-        self._baselines = self.baselines_for_antennas([a.id for a in antennas])
-
     def __repr__(self) -> str:
         return 'AntennaArray({0!r}, {1}, {2!r})'.format(
             self.__name,
@@ -162,14 +166,6 @@ class AntennaArray:
                 length=Distance(self.baseline_lookup[ant1][ant2], DistanceUnits.METRE)
             ) for ant1, ant2 in itertools.combinations(unique_ids, 2)
         ]
-
-    @property
-    def baselines(self) -> list[Baseline]:
-        """Return a list of Baseline tuples for all antennas in the array."""
-        warnings.warn('AntennaArray.baselines is deprecated. '
-                      'Use AntennaArray.baselines_m instead.',
-                      category=DeprecationWarning, stacklevel=2)
-        return self._baselines
 
     @staticmethod
     def _calc_baseline_lookup(antennas: list[Antenna]) -> numpy.ndarray:

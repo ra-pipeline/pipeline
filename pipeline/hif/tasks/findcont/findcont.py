@@ -368,6 +368,11 @@ class FindCont(basetask.StandardTaskTemplate):
                     # PIPE-107 requests using a fixed robust value of 1.0.
                     robust = 1.0
 
+                    if target['uvrange'] not in (None, [], ''):
+                        uvrange = target['uvrange']
+                    else:
+                        uvrange = None
+
                     if target['uvtaper'] not in ([], None):
                         uvtaper = target['uvtaper']
                     else:
@@ -392,7 +397,8 @@ class FindCont(basetask.StandardTaskTemplate):
                                             pblimit=0.2, niter=0, threshold='0mJy', deconvolver='hogbom',
                                             interactive=False, imsize=target['imsize'], cell=target['cell'],
                                             phasecenter=phasecenter, psfphasecenter=psf_phasecenter,
-                                            stokes='I', weighting=weighting, robust=robust, uvtaper=uvtaper,
+                                            stokes='I', weighting=weighting, robust=robust, uvrange=uvrange,
+                                            uvtaper=uvtaper,
                                             npixels=0, restoration=False, restoringbeam=[], pbcor=False,
                                             usepointing=usepointing, savemodel='none', parallel=parallel,
                                             fullsummary=False)

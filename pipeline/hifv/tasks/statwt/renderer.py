@@ -12,11 +12,11 @@ from . import display as statwtdisplay
 class T2_4MDetailsstatwtRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def __init__(self, uri='statwt.mako', description='Statwt summary',
                  always_rerender=False):
-        super(T2_4MDetailsstatwtRenderer, self).__init__(uri=uri, description=description,
+        super().__init__(uri=uri, description=description,
                                                          always_rerender=always_rerender)
 
     def get_display_context(self, context, results):
-        super_cls = super(T2_4MDetailsstatwtRenderer, self)
+        super_cls = super()
         ctx = super_cls.get_display_context(context, results)
 
         weblog_dir = os.path.join(context.report_dir, 'stage%s' % results.stage_number)

@@ -11,13 +11,19 @@ from __future__ import annotations
 import decimal
 import itertools
 import operator
-from typing import Iterable, Iterator, Sequence
+from typing import TYPE_CHECKING
 
 import numpy
 
+import pipeline.infrastructure as infrastructure
 from pipeline.infrastructure import casa_tools
 
 from . import measures
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator, Sequence
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class ArithmeticProgression:
@@ -309,6 +315,7 @@ class SpectralWindow:
         receiver: Receiver type, e.g., 'TSB'.
         ref_frequency: The reference frequency.
         sideband: Side band.
+        spectralspec: SpectralSpec name.
         transitions: Spectral transitions recorded associated with spectral window.
         type: Spectral window type, e.g., 'TDM'.
         sdm_num_bin: Number of bins for online spectral averaging.
@@ -316,11 +323,13 @@ class SpectralWindow:
         median_receptor_angle: Median feed receptor angle.
         specline_window: Whether spw is intended for spectral line or continuum (VLA only).
         grouping_id: Grouping ID to uniquely identify this spw in different MOUS within the same GOUS (ALMA-only, introduced in Cycle 12).
+        chan_resolutions: A list of spectral resolution of each channel in spw in Hz.
+            Present in ALMA Cycle 3+ data; absent in older data and VLA.
     """
     __slots__ = ('id', 'band', 'bandwidth', 'type', 'intents', 'ref_frequency', 'name', 'baseband', 'sideband',
                  'receiver', 'freq_lo', 'mean_frequency', '_min_frequency', '_max_frequency', '_centre_frequency',
                  'channels', '_ref_frequency_frame', 'spectralspec', 'transitions', 'sdm_num_bin', 'correlation_bits',
-                 'median_receptor_angle', 'specline_window', 'grouping_id')
+                 'median_receptor_angle', 'specline_window', 'grouping_id', 'chan_resolutions')
 
     def __init__(
             self,
@@ -344,7 +353,8 @@ class SpectralWindow:
             correlation_bits: str | None = None,
             median_receptor_angle: numpy.ndarray | None = None,
             specline_window: bool = False,
-            grouping_id: str | None = None
+            grouping_id: str | None = None,
+            chan_resolutions: numpy.ndarray | None = None
             ):
         """
         Initialize SpectralWindow class.
@@ -371,6 +381,8 @@ class SpectralWindow:
             median_receptor_angle: Median feed receptor angle.
             specline_window: Whether spw is intended for spectral line or continuum (VLA only).
             grouping_id: GOUS ID used to identify project group level (new in Cycle 12 ALMA data)  TODO improve description
+            chan_resolutions: A list of spectral resolution of each channel in spw in Hz.
+                Present in ALMA Cycle 3+ data; absent in older data and VLA.
         """
         if transitions is None:
             transitions = ['Unknown']
@@ -415,6 +427,7 @@ class SpectralWindow:
         self.median_receptor_angle = median_receptor_angle
         self.specline_window = specline_window
         self.grouping_id = grouping_id
+        self.chan_resolutions = chan_resolutions
 
     def __getstate__(self) -> tuple:
         """Define what to pickle as a class instance."""
@@ -422,14 +435,15 @@ class SpectralWindow:
                 self.baseband, self.sideband, self.receiver, self.freq_lo, self.mean_frequency, self._min_frequency,
                 self._max_frequency, self._centre_frequency, self.channels, self._ref_frequency_frame,
                 self.spectralspec, self.transitions, self.sdm_num_bin, self.correlation_bits, self.median_receptor_angle,
-                self.specline_window, self.grouping_id)
+                self.specline_window, self.grouping_id, self.chan_resolutions)
 
     def __setstate__(self, state: tuple) -> None:
         """Define how to unpickle a class instance."""
         (self.id, self.band, self.bandwidth, self.type, self.intents, self.ref_frequency, self.name, self.baseband,
          self.sideband, self.receiver, self.freq_lo, self.mean_frequency, self._min_frequency, self._max_frequency,
          self._centre_frequency, self.channels, self._ref_frequency_frame, self.spectralspec, self.transitions,
-         self.sdm_num_bin, self.correlation_bits, self.median_receptor_angle, self.specline_window, self.grouping_id) = state
+         self.sdm_num_bin, self.correlation_bits, self.median_receptor_angle, self.specline_window, self.grouping_id,
+         self.chan_resolutions) = state
 
     def __repr__(self) -> str:
         chan_freqs = self.channels.chan_freqs
@@ -473,6 +487,18 @@ class SpectralWindow:
     def centre_frequency(self) -> measures.Frequency:
         """Return the center frequency of the SpectralWindow."""
         return self._centre_frequency
+
+    @property
+    def resolution(self) -> measures.Frequency | None:
+        """Return the spectral resolution of the first channel, or None if not available.
+
+        The resolution is read from the RESOLUTION column of the MS SPECTRAL_WINDOW
+        subtable, present in ALMA Cycle 3+ data. Returns None for older data and VLA,
+        where the column is absent.
+        """
+        if self.chan_resolutions is None:
+            return None
+        return measures.Frequency(float(self.chan_resolutions[0]), measures.FrequencyUnits.HERTZ)
 
     def channel_range(self, minfreq: measures.Frequency, maxfreq: measures.Frequency) \
             -> tuple[int, int] | tuple[None, None]:

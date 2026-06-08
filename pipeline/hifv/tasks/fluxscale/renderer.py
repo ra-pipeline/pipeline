@@ -15,7 +15,7 @@ from . import testgainsdisplay
 LOG = logging.get_logger(__name__)
 
 
-class VLASubPlotRenderer(object):
+class VLASubPlotRenderer:
 
     def __init__(self, context, result, plots, json_path, template, filename_prefix, bandlist):
         self.context = context
@@ -79,11 +79,11 @@ class VLASubPlotRenderer(object):
 class T2_4MDetailsSolintRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def __init__(self, uri='solint.mako', description='Determine solint and Test gain calibrations',
                  always_rerender=False):
-        super(T2_4MDetailsSolintRenderer, self).__init__(uri=uri,
+        super().__init__(uri=uri,
                                                          description=description, always_rerender=always_rerender)
 
     def get_display_context(self, context, results):
-        super_cls = super(T2_4MDetailsSolintRenderer, self)
+        super_cls = super()
         ctx = super_cls.get_display_context(context, results)
 
         weblog_dir = os.path.join(context.report_dir, 'stage%s' % results.stage_number)
@@ -178,11 +178,11 @@ class T2_4MDetailsSolintRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 class T2_4MDetailsfluxbootRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def __init__(self, uri='fluxboot.mako', description='Gain table for flux density bootstrapping',
                  always_rerender=False):
-        super(T2_4MDetailsfluxbootRenderer, self).__init__(uri=uri,
+        super().__init__(uri=uri,
                                                            description=description, always_rerender=always_rerender)
 
     def get_display_context(self, context, results):
-        super_cls = super(T2_4MDetailsfluxbootRenderer, self)
+        super_cls = super()
         ctx = super_cls.get_display_context(context, results)
 
         weblog_dir = os.path.join(context.report_dir, 'stage%s' % results.stage_number)

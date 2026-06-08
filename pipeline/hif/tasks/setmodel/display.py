@@ -14,7 +14,7 @@ class BasebandComposite(applycal.BasebandComposite):
     Create a PlotLeaf for each baseband in the applied calibration.
     """
     def __init__(self, context, output_dir, calto, xaxis, yaxis, ant='', field='', intent='', uvrange='', **kwargs):
-        super(BasebandComposite, self).__init__(context, output_dir, calto, xaxis, yaxis, ant=ant, field=field,
+        super().__init__(context, output_dir, calto, xaxis, yaxis, ant=ant, field=field,
                                                 intent=intent, uvrange=uvrange, **kwargs)
 
 
@@ -23,7 +23,7 @@ class PlotmsBasebandComposite(BasebandComposite):
 
     def plot(self):
         # merge separate spw jobs into one job using plotms iterator
-        jobs_and_wrappers = super(PlotmsBasebandComposite, self).plot()
+        jobs_and_wrappers = super().plot()
         successful_wrappers = utils.plotms_iterate(jobs_and_wrappers)
         return successful_wrappers
 
@@ -36,7 +36,7 @@ class BasebandSummaryChart(PlotmsBasebandComposite):
         LOG.info('%s vs %s plot' % (yaxis, xaxis))
 
         # request plots per spw, overlaying all antennas
-        super(BasebandSummaryChart, self).__init__(context, output_dir, calto, xaxis, yaxis, intent=intent, **kwargs)
+        super().__init__(context, output_dir, calto, xaxis, yaxis, intent=intent, **kwargs)
 
 
 class AmpVsUVSummaryChart(BasebandSummaryChart):
@@ -56,5 +56,5 @@ class AmpVsUVSummaryChart(BasebandSummaryChart):
         }
         plot_args.update(**overrides)
 
-        super(AmpVsUVSummaryChart, self).__init__(context, output_dir, calto, xaxis='uvdist', yaxis='amp',
+        super().__init__(context, output_dir, calto, xaxis='uvdist', yaxis='amp',
                                                   intent=intent, **plot_args)

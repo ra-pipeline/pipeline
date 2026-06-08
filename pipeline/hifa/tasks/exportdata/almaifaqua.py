@@ -57,11 +57,11 @@ class AlmaAquaXmlGenerator(aqua.AquaXmlGenerator):
     """
 
     def __init__(self):
-        super(AlmaAquaXmlGenerator, self).__init__()
+        super().__init__()
 
     def get_project_structure(self, context):
         # get base XML from base class
-        root = super(AlmaAquaXmlGenerator, self).get_project_structure(context)
+        root = super().get_project_structure(context)
 
         # add our ALMA-specific elements
         ElementTree.SubElement(root, 'OusEntityId').text = context.project_structure.ous_entity_id
@@ -72,7 +72,7 @@ class AlmaAquaXmlGenerator(aqua.AquaXmlGenerator):
 
     def get_calibration_topic(self, context, topic_results):
         # get base XML from base class
-        xml_root = super(AlmaAquaXmlGenerator, self).get_calibration_topic(context, topic_results)
+        xml_root = super().get_calibration_topic(context, topic_results)
 
         m = {
             'hifa_gfluxscale': (operator.attrgetter('measurements'), lambda r: str(r.qa.representative.score))
@@ -84,7 +84,7 @@ class AlmaAquaXmlGenerator(aqua.AquaXmlGenerator):
 
     def get_dataset_topic(self, context, topic_results):
         # get base XML from base class
-        xml_root = super(AlmaAquaXmlGenerator, self).get_dataset_topic(context, topic_results)
+        xml_root = super().get_dataset_topic(context, topic_results)
 
         m = {
             'hifa_importdata': (lambda x: x.setjy_results[0].measurements, lambda _: UNDEFINED),
@@ -111,7 +111,7 @@ class AlmaAquaXmlGenerator(aqua.AquaXmlGenerator):
         :rtype: xml.etree.ElementTree.Element
         """
         # get base XML from base class
-        xml_root = super(AlmaAquaXmlGenerator, self).get_imaging_topic(context, topic_results)
+        xml_root = super().get_imaging_topic(context, topic_results)
 
         sensitivity_xml = aqua.sensitivity_xml_for_stages(context, topic_results, name='ImageSensitivities')
         # omit containing element if no measurements were found

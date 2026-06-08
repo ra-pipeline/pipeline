@@ -1,40 +1,52 @@
-import numpy
+from __future__ import annotations
+
 import os
-from typing import List, Tuple, Optional, Union
+from typing import TYPE_CHECKING
+
+import numpy
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.utils as utils
 from pipeline.h.tasks.common.commonhelpermethods import get_corr_products
-from pipeline.domain.measurementset import MeasurementSet
 from pipeline.infrastructure import casa_tools
 
-LOG = infrastructure.get_logger(__name__)
+if TYPE_CHECKING:
+    import casatools
+    from pipeline.domain import MeasurementSet
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 def read_channel_averaged_data_from_ms(ms: MeasurementSet,
-                                       fieldid: Union[str, int],
-                                       spwid: Union[str, int],
+                                       fieldid: str | int,
+                                       spwid: str | int,
                                        intent: str,
-                                       items: List[str],
-                                       baseline_set: Optional[List] = None) -> dict:
-    """
-    Read the channel-averaged visibility data from a MS for the given field, spw, intent,
-    and optionally a subset of baselines.
-    Arguments:
-        ms:       MeasurementSet.
-        fieldid:  string or int representing the field ID.
-        spwid:    string or int representing the SPW ID.
-        intent:   intent or list of intents.
-        items:    list of data arrays to read, e.g., ['corrected_data', 'flag', 'antenna1', 'antenna2'].
-        baseline_set:  list of baselines (default: all).
+                                       items: list[str],
+                                       baseline_set: list | None = None,
+                                       *,
+                                       ms_handle: casatools.ms | None = None) -> dict:
+    """Read the channel-averaged visibility data from a MS for the given field, spw, intent, and optionally a subset of baselines.
+
+    Args:
+        ms: MeasurementSet.
+        fieldid: string or int representing the field ID.
+        spwid: string or int representing the SPW ID.
+        intent: intent or list of intents.
+        items: List of data arrays to read, e.g., ['corrected_data', 'flag', 'antenna1', 'antenna2'].
+        baseline_set: List of baselines (default: all).
+        ms_handle: Optional already-open CASA ms tool (casatools.ms). When provided the MS is not
+            opened/closed by this function, allowing callers to amortise the
+            (potentially expensive) open cost across many calls. The caller is
+            responsible for the lifetime of the handle.
+
     Returns:
-        a dict with the data array for each element in items.
+        A dict with the data array for each element in items.
     """
     # Identify scans for given data selection.
     scans_with_data = ms.get_scans(scan_intent=intent, field=str(fieldid), spw=str(spwid))
     if not scans_with_data:
-        LOG.info('No data expected for {} {} intent, field {}, spw {}. Continuing...'.
-                 format(ms.basename, intent, fieldid, spwid))
+        LOG.info('No data expected for %s %s intent, field %s, spw %s. Continuing...',
+                 ms.basename, intent, fieldid, spwid)
         return {}
 
     # Initialize data selection.
@@ -54,46 +66,59 @@ def read_channel_averaged_data_from_ms(ms: MeasurementSet,
     # Get number of channels for this spw.
     nchans = ms.get_all_spectral_windows(str(spwid))[0].num_channels
 
-    # Read in data from MS.
-    with casa_tools.MSReader(ms.name) as openms:
+    def _do_read(openms):
         try:
-            # Apply data selection, and set channel selection to take the
-            # average of all channels.
+            # Clear any prior selection, then apply new data and channel selection.
+            openms.reset()
             openms.msselect(data_selection)
             openms.selectchannel(1, 0, nchans, 1)
 
             # Extract data from MS.
-            data = openms.getdata(items)
-        except:
-            LOG.warning('Unable to read data for intent {}, field {}, spw {}'.format(intent, fieldid, spwid))
-            data = {}
+            return openms.getdata(items)
+        except Exception:
+            LOG.warning('Unable to read data for intent %s, field %s, spw %s', intent, fieldid, spwid)
+            return {}
+
+    # If an open MS handle was supplied by the caller, reuse it to avoid the
+    # overhead of opening/closing the MS file on every call (which is especially
+    # costly for lazy-import MSes whose DATA column is ASDM-backed).
+    if ms_handle is not None:
+        data = _do_read(ms_handle)
+    else:
+        with casa_tools.MSReader(ms.name) as openms:
+            data = _do_read(openms)
 
     return data
 
 
 def compute_mean_flux(ms: MeasurementSet,
-                      fieldid: Union[str, int],
-                      spwid: Union[str, int],
-                      intent: str) -> Tuple[float, float]:
-    """
-    Compute the mean flux and its standard deviation (averaged across available polarizations)
-    for the given MS, field, spw and intent.
-    Arguments:
-        ms:  MeasurementSet.
-        fieldid:  string or int representing the field ID.
-        spwid:    string or int representing the SPW ID.
-        intent:   intent or list of intents.
-    Returns:
-        a tuple of two values -- mean flux and its standard deviation, or a tuple of two zeros if data not available.
-    """
+                      fieldid: str | int,
+                      spwid: str | int,
+                      intent: str,
+                      *,
+                      ms_handle: casatools.ms | None = None) -> tuple[float, float]:
+    """Compute the mean flux and its standard deviation (averaged across available polarizations) for the given MS, field, spw and intent.
 
+    Args:
+        ms: MeasurementSet.
+        fieldid: string or int representing the field ID.
+        spwid: string or int representing the SPW ID.
+        intent: intent or list of intents.
+        ms_handle: Optional already-open CASA ms tool (casatools.ms), passed through to
+            read_channel_averaged_data_from_ms (see that function for details).
+
+    Returns:
+        A tuple of (mean_flux, std_flux) -- mean flux and its standard deviation, or
+        (0.0, 0.0) if data is not available.
+    """
     # Read in data from the MS, for specified intent, field, and spw.
     try:
         data = read_channel_averaged_data_from_ms(
-            ms, fieldid, spwid, intent, ['corrected_data', 'flag', 'antenna1', 'antenna2', 'weight'])
+            ms, fieldid, spwid, intent, ['corrected_data', 'flag', 'antenna1', 'antenna2', 'weight'],
+            ms_handle=ms_handle)
     except Exception as ex:
-        LOG.warning('Cannot retrieve data for MS {}, field {}, spw {}, intent {}: {}'.
-                    format(ms.basename, fieldid, spwid, intent, ex))
+        LOG.warning('Cannot retrieve data for MS %s, field %s, spw %s, intent %s: %s',
+                    ms.basename, fieldid, spwid, intent, ex)
         data = {}
 
     # Return zero if no valid data were read.
@@ -116,8 +141,8 @@ def compute_mean_flux(ms: MeasurementSet,
     elif ncorrs == 4 and set(corr_type) == {'XX', 'XY', 'YX', 'YY'}:
         columns_to_select = [corr_type.index('XX'), corr_type.index('YY')]
     else:
-        LOG.warning("Unexpected polarisations found for MS {}, unable to compute mean visibility fluxes.".
-                    format(ms.basename))
+        LOG.warning('Unexpected polarisations found for MS %s, unable to compute mean visibility fluxes.',
+                    ms.basename)
         columns_to_select = []
 
     # Derive mean flux and variance for each polarisation.
@@ -164,8 +189,8 @@ def compute_mean_flux(ms: MeasurementSet,
     # If no valid data was found for any polarisation, then set flux and
     # uncertainty to zero.
     else:
-        LOG.debug("No valid data found for MS {}, field {}, spw {}, unable to compute mean visibility flux; flux"
-                  " and uncertainty will be set to zero.".format(ms.basename, fieldid, spwid))
+        LOG.debug('No valid data found for MS %s, field %s, spw %s, unable to compute mean visibility flux;'
+                  ' flux and uncertainty will be set to zero.', ms.basename, fieldid, spwid)
         mean_flux = 0.0
         std_flux = 0.0
 

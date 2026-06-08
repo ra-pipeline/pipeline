@@ -14,7 +14,7 @@ class T2_4MDetailsCheckProductSizeRenderer(basetemplates.T2_4MDetailsDefaultRend
                  uri='checkproductsize.mako',
                  description='Check product size',
                  always_rerender=False):
-        super(T2_4MDetailsCheckProductSizeRenderer, self).__init__(
+        super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
     def update_mako_context(self, mako_context, pipeline_context, results):

@@ -167,7 +167,7 @@ class ALMAExportData(exportdata.ExportData):
 
         # Make the standard sessions dictionary and export per session products
         #    Currently these are compressed tar files of per session calibration tables
-        sessiondict = super(ALMAExportData, self)._do_standard_session_products(
+        sessiondict = super()._do_standard_session_products(
             context, oussid, session_names, session_vislists, products_dir, imaging=True)
 
         return sessiondict
@@ -178,7 +178,7 @@ class ALMAExportData(exportdata.ExportData):
         # create the calibration apply file(s) in the products directory.
         apply_file_list = []
         for visfile in vislist:
-            apply_file = super(ALMAExportData, self)._export_final_applylist(
+            apply_file = super()._export_final_applylist(
                 context, visfile, products_dir, imaging=True)
             apply_file_list.append(apply_file)
 

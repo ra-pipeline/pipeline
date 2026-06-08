@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 
 from pipeline.domain import Field, MeasurementSet, Source
 from pipeline.infrastructure.displays.plotpointings import select_tsys_field
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
 
 
 def make_source(id: int, name: str, fields: Sequence[Field]) -> Source:

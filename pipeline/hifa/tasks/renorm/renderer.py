@@ -1,16 +1,15 @@
-import os
 import collections
-import shutil
+import os
 import re
-from typing import Dict, List
+import shutil
 import xml.etree.ElementTree as ET
 
-import pipeline.infrastructure.logging as logging
+import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.renderer.logger as logger
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.utils as utils
 
-LOG = logging.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class T2_4MDetailsRenormRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
@@ -118,7 +117,7 @@ def getchild(el):
         return el
 
 
-def make_renorm_plots(results, weblog_dir: str) -> Dict[str, List[logger.Plot]]:
+def make_renorm_plots(results, weblog_dir: str) -> dict[str, list[logger.Plot]]:
     """
     Create and return a list of renorm plots.
 

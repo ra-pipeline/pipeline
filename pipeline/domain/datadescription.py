@@ -1,4 +1,9 @@
-from .spectralwindow import SpectralWindow
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pipeline.domain import SpectralWindow
 
 polarization_map = { 'linear': { 0: ['XX',  9],
                                  1: ['YY', 12],
