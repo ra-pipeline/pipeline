@@ -865,7 +865,6 @@ class MakeImList(basetask.StandardTaskTemplate):
 
         # Need to record if there are targets for a vislist
         have_targets = {}
-        max_file_name_length = 128
         expected_num_targets = 0
         for selected_datatype_str, selected_datatype_info in zip(selected_datatypes_str, selected_datatypes_info):
             for band in band_spws:
@@ -1494,12 +1493,10 @@ class MakeImList(basetask.StandardTaskTemplate):
 
                             # construct imagename
                             if inputs.imagename == '':
-                                if is_cluster and len(field_intent[0])> max_file_name_length:
+
+                                if is_cluster:
                                     field_list = field_intent[0].split(',')
-                                    if len(field_list) > 1:
-                                        imgname_field_intent = f"{field_list[0]}_{field_list[-1]}"[:max_file_name_length]
-                                    else:
-                                        imgname_field_intent = field_intent[0][:max_file_name_length]
+                                    imgname_field_intent = field_list[0]
                                 else:
                                     imgname_field_intent = field_intent[0]
                                 imagename = target_heuristics.imagename(output_dir=inputs.output_dir, intent=field_intent[1],
@@ -1507,7 +1504,6 @@ class MakeImList(basetask.StandardTaskTemplate):
                                                                         specmode=specmode, band=band, datatype=datatype_suffix)
                             else:
                                 imagename = inputs.imagename
-
                             if inputs.nbins != '' and inputs.specmode != 'cont':
                                 nbin_items = inputs.nbins.split(',')
                                 nbins_dict = {}
