@@ -43,6 +43,22 @@ if TYPE_CHECKING:
 LOG = infrastructure.logging.get_logger(__name__)
 
 
+def format_correlation_bits(ms, spw):
+    """Format the correlation-bits value for the Spectral Setup Details weblog page."""
+    correlation_bits = spw.correlation_bits
+
+    if correlation_bits == 'UNKNOWN':
+        return 'Unknown'
+
+    if correlation_bits:
+        return correlation_bits
+
+    if ms.correlator_name == 'ALMA_ACA':
+        return 'BITS_4x4'
+
+    return 'Unknown'
+
+
 def get_task_description(result_obj, context, include_stage=True):
     if not isinstance(result_obj, (list, basetask.ResultsList)):
         return get_task_description([result_obj, ], context)
