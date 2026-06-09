@@ -657,13 +657,13 @@ def xml_for_sensitivity_stage(context, stage_results, exporter, name):
     sensitivity_dicts = exporter(stage_results)
 
     for d in sensitivity_dicts:
-        ms_xml = xml_for_sensitivity(d, stage_name)
+        ms_xml = xml_for_sensitivity(d)
         xml_root.append(ms_xml)
 
     return xml_root
 
 
-def xml_for_sensitivity(d, stage_name):
+def xml_for_sensitivity(d):
     """Return the XML representation for a sensitivity dictionary.
 
     :param d: sensitivity dict
