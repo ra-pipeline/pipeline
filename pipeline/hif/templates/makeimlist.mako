@@ -2,6 +2,7 @@
 rsc_path = ""
 import os
 import pipeline.infrastructure.renderer.htmlrenderer as hr
+import pipeline.infrastructure.utils as utils
 
 def num_targets (result):
     ntargets = 0
@@ -24,24 +25,6 @@ def get_message(result):
         message = r.clean_list_info.get('msg', '')
         break
     return message
-
-def wrap_long_spw_str(spw_str, length=50):
-    '''Wraps long string by inserting new line escape sequence(s).
-
-    :param spw_str: comma separated list of spectral window ids (string)
-    :param length: maximum number of characters in a text line (integer)
-    '''
-    if len(spw_str) > length:
-        spwlist = spw_str.split(',')
-        # spw id may have more digits and comas also contributes to the string length limit
-        # If the modulo of the string created from the first n element is larger than that of the first n+1 element,
-        # then the line length limit is reached and a linebreak is inserted.
-        wrapped_spw_str = ['%s' % spwlist[i] if len(','.join(spwlist[0:i])) % length <
-                           len(','.join(spwlist[0:i+1])) % length else '\n%s' % spwlist[i]
-                           for i in range(len(spwlist)-1)] + [spwlist[-1]]
-        return ','.join(wrapped_spw_str)
-    else:
-        return spw_str
 
 def check_all_targets(result_obj, key, none_values):
     '''
@@ -137,7 +120,7 @@ This task had an error!
             <tr>
                 <td>${target['field']}</td>
                 <td>${target['intent']}</td>
-                <td>${wrap_long_spw_str(target['spw'])}</td>
+                <td>${utils.find_ranges(target['spw'])}</td>
                 <td>${target['datatype_info']}</td>
                 <td>${target['phasecenter']}</td>
                 <td>${target['cell']}</td>
