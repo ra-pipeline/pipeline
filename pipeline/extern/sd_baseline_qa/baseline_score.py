@@ -9,6 +9,8 @@ import pipeline.extern.sd_baseline_qa.sd_qa_reports as sd_qa_reports
 
 import pipeline.infrastructure as infrastructure
 
+from pipeline.extern.sd_baseline_qa.sd_qa_utils import FailedAnalysisException
+
 LOG = infrastructure.get_logger(__name__)
 
 def _science_lines(context, results):
@@ -65,32 +67,35 @@ def baseline_score(
     # This should always exist but incase
     plot_path.mkdir(parents=True, exist_ok=True)
     weblog_path = context.report_dir
+    try:
+        qa_score, antenna_names, plots_function_names = sd_baseline_qa.get_ms_baseline_qascores(
+            ms_name = str(baseline_file),
+            sci_line_data=line_data,
+            plot_output_path=str(plot_path),
+            weblog_output_path=str(weblog_path),
+            buffer_data=False
+        )
 
-    qa_score, antenna_names, plots_function_names = sd_baseline_qa.get_ms_baseline_qascores(
-        ms_name = str(baseline_file),
-        sci_line_data=line_data,
-        plot_output_path=str(plot_path),
-        weblog_output_path=str(weblog_path),
-        buffer_data=False
-    )
+        elapsed_time = (time.time() - start_time) / 60.0
 
-    elapsed_time = (time.time() - start_time) / 60.0
+        sd_qa_reports.addFLSLentry_bl(
+            qascore_list=qa_score,
+            output_file=working_path.joinpath(".prototype_qa_score.csv"),
+            dtime_min=elapsed_time
+        )
 
-    sd_qa_reports.addFLSLentry_bl(
-        qascore_list=qa_score,
-        output_file=working_path.joinpath(".prototype_qa_score.csv"),
-        dtime_min=elapsed_time
-    )
-
-    sd_qa_reports.makeSummaryTable_bl(
-        qascore_list=qa_score,
-        antnames_for=antenna_names,
-        plots_fnames=plots_function_names,
-        plfolder=str(working_path),
-        plot_folder=str(plot_path),
-        output_file=str(working_path.joinpath(f"qa_score_summary_{date_time}.csv")),
-        writemode="w",
-        weblog_adress=""
-    )
+        sd_qa_reports.makeSummaryTable_bl(
+            qascore_list=qa_score,
+            antnames_for=antenna_names,
+            plots_fnames=plots_function_names,
+            plfolder=str(working_path),
+            plot_folder=str(plot_path),
+            output_file=str(working_path.joinpath(f"qa_score_summary_{date_time}.csv")),
+            writemode="w",
+            weblog_adress=""
+        )
+    except FailedAnalysisException:
+        plot_path.rmdir()
+        return None
 
     return {"score": qa_score, "plot_names" :plots_function_names}

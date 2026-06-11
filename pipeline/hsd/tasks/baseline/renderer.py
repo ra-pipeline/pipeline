@@ -208,30 +208,32 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
 
         profile_heuristic, profile_heuristic_subpages = make_profile_heuristic_plots(context)
 
-        detail_page_title = f"Comparison of the Profiles between XX and YY spectra"
+        # If this analysis was not done, skip it
+        if (len(profile_heuristic) > 0) and profile_heuristic_subpages:
+            detail_page_title = f"Comparison of the Profiles between XX and YY spectra"
 
-        detail_renderer = basetemplates.JsonPlotRenderer(
-                    'generic_x_vs_y_field_spw_ant_detail_plots.mako',
-                    context,
-                    results,
-                    profile_heuristic,
-                    detail_page_title,
-                    filenamer.sanitize(f'{detail_page_title.lower()}.html')
-        )
+            detail_renderer = basetemplates.JsonPlotRenderer(
+                        'generic_x_vs_y_field_spw_ant_detail_plots.mako',
+                        context,
+                        results,
+                        profile_heuristic,
+                        detail_page_title,
+                        filenamer.sanitize(f'{detail_page_title.lower()}.html')
+            )
 
-        with detail_renderer.get_file() as fileobj:
-                    fileobj.write(detail_renderer.render())
+            with detail_renderer.get_file() as fileobj:
+                        fileobj.write(detail_renderer.render())
 
-        for field_object in sorted_fields:
-            name = field_object.clean_name
+            for field_object in sorted_fields:
+                name = field_object.clean_name
 
-            if name is not None:
-                profile_heuristic_subpages[name] = os.path.basename(detail_renderer.path)
+                if name is not None:
+                    profile_heuristic_subpages[name] = os.path.basename(detail_renderer.path)
 
-        ctx.update({
-            "profile_heuristic": profile_heuristic,
-            "profile_heuristic_subpages": profile_heuristic_subpages
-        })
+            ctx.update({
+                "profile_heuristic": profile_heuristic,
+                "profile_heuristic_subpages": profile_heuristic_subpages
+            })
 
 
     @staticmethod

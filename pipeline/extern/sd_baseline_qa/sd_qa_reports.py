@@ -619,6 +619,7 @@ def plot_data_single_bl(msw: mswrapper_sd.MSWrapperSD, max_nwave_frac = 0.1, plo
     min_qa_pol = list(msw.analysis['min_qascore'].applies_to.pol)[0]
     if ((type(min_qa_scan) == str) or (type(min_qa_scan) == np.str_)) and min_qa_scan.isdigit():
         min_qa_scan = int(min_qa_scan)
+
     if msw.nrows > 0:
         mindata_XX = np.ma.min(msw.time_mean_scan[min_qa_scan][0])
         maxdata_XX = np.ma.max(msw.time_mean_scan[min_qa_scan][0])
@@ -704,9 +705,9 @@ def plot_data_single_bl(msw: mswrapper_sd.MSWrapperSD, max_nwave_frac = 0.1, plo
     if len(highlight_regions) > 0:
         apply_highlights(ax_left) # Add highlighted ranges
 
-    if not msw.analysis['sensgoal'] is None:
+    if not msw.analysis['sensgoal'] == None:
         #Mark sensitivity goal lines if they exist
-        if (msw.analysis is not None) and ((msw.analysis['sensgoal'] <= maxdata) or (-msw.analysis['sensgoal'] > mindata)):
+        if (msw.analysis != None) and ((msw.analysis['sensgoal'] <= maxdata) or (-1*msw.analysis['sensgoal'] > mindata)):
             ax_left.plot([minfreq, maxfreq], np.ones(2)*msw.analysis['sensgoal'], ':k', label='Sensitivity Goal level')
             ax_left.plot([minfreq, maxfreq], -1.0*np.ones(2)*msw.analysis['sensgoal'], ':k')
     #Axes labels

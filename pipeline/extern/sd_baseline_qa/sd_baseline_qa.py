@@ -2,6 +2,7 @@ import os
 import numpy as np
 import copy
 import pickle
+import pathlib
 
 from scipy import stats
 from typing import List, Tuple
@@ -190,6 +191,9 @@ def calc_baseline_qascore_single(
         Function modifies the 'analysis' attribute inside the MSWrapperSD object to add a list of all per-scan QA scores.
     '''
 
+    GHz = 1e-9
+    MHz = 1e-6
+
     if thresholds is None:
         thresholds = default_thresholds
 
@@ -206,38 +210,43 @@ def calc_baseline_qascore_single(
 
     #Get dataset array size
     (npol, nchan, nrows) = (msw.npol, msw.nchan, msw.nrows)
-    msname = msw.fname.split('/')[-1]
+
+    msname = pathlib.Path(msw.fname).name
+
     #Channel frequencies in GHz and separation in MHz, and min and max frequency
-    freqs = msw.spw_setup[msw.spw]['chanfreqs']*(1.e-09)
-    chansep = np.abs(msw.spw_setup[msw.spw]['chansep']*(1.e-06))
+    freqs = msw.spw_setup[msw.spw]['chanfreqs']*GHz
+
+    chansep = np.abs(msw.spw_setup[msw.spw]['chansep']*MHz)
     minfreq = np.min(freqs)
     maxfreq = np.max(freqs)
+
+    repBW = msw.spw_setup['representativeBandwidthinHz']*0.1
+
     #Representative BW in MHz, sensitivity Goal in Jy
-    repBW = msw.spw_setup['representativeBandwidthinHz']*(1.e-06)
-
-    msw.analysis['sensgoal'] = None
-    if not msw.spw_setup['sensitivityGoalinJy'] is None:      # User specified value
-        msw.analysis['sensgoal'] = msw.spw_setup['sensitivityGoalinJy']*np.sqrt(repBW/chansep)
-
-    #msw.analysis['sensgoal'] = sensgoal
+    msw.analysis['sensgoal'] = msw.spw_setup['sensitivityGoalinJy'] if repBW is None else msw.spw_setup['sensitivityGoalinJy'] * np.sqrt(repBW / chansep)
     sensgoal = msw.analysis['sensgoal']
+
     #Scan numbers
     scanlist = msw.spw_setup['scansforfield'][str(msw.fieldid)]
     fieldname = msw.spw_setup['namesfor'][str(msw.fieldid)][0]
     tsys_scanlist = msw.spw_setup['scan']['*CALIBRATE_ATMOSPHERE#OFF_SOURCE*']
+
     nscans = len(scanlist)
     extscanlist = copy.deepcopy(scanlist)
     extscanlist.append('all')
+
     #Science line channels
-    scisel = msw.analysis['scisel']
+    scisel = msw.analysis.get('scisel')
+
     #Selection of skylines
-    skylinesel = msw.analysis['skylinesel']#  sd_qa_utils.get_skysel_from_msw(msw)
+    skylinesel = msw.analysis.get('skylinesel')#  sd_qa_utils.get_skysel_from_msw(msw)
 
     #Check fully flagged pieces of data
-    is_fully_flagged = msw.analysis['is_fully_flagged']
+    is_fully_flagged = msw.analysis.get("is_fully_flagged")
+
     lineidx = sorted([l for l in scisel.keys() if l!='all'])
     sci_line_detected = (np.sum(scisel['all']) > 0)
-    notflaggedscans = [scan for scan in extscanlist if (not is_fully_flagged[scan][0]) and (not is_fully_flagged[scan][1])]
+    notflaggedscans = [scan for scan in extscanlist if (not is_fully_flagged[scan].get(0)) and (not is_fully_flagged[scan].get(1))]
 
     #If this is an empty piece of the dataset, return QA score of 1.0, there is nothing to do here
     if (nrows == 0) or (len(notflaggedscans) == 0):
@@ -337,18 +346,25 @@ def calc_baseline_qascore_single(
                 )
 
                 comes_from = pipelineqa.QAOrigin(metric_name=reason, metric_score=float(np.round(sinusoid_sigma[scan][pol]['n_sigma'], 3)), metric_units='Deviation from 0')
-                message = '{0:s}: Sinusoidal baseline deviation for spw {1:s}, antenna {2:s}, field {3:s}, scan {4:s}, polarization {5:s}. Amplitude {6:.1f}% of requested RMS, wavelength {7:.3f}MHz (nwave={8:s})'.format(
-                    msname,
-                    str(msw.spw),
-                    msw.antenna,
-                    fieldname,
-                    str(scan),
-                    polstr,
-                    100.0*sinusoid_sigma[scan][pol]['n_amp']/sensgoal if not sensgoal is None else 1.0,
-                    sinusoid_sigma[scan][pol]['freqMHz'],
-                    str(sinusoid_sigma[scan][pol]['nwave']
+
+                # This is similar to the original code but slightly modified to accommodate the new
+                # NoneSafeDict class.
+                _calculation = 100.0*sinusoid_sigma[scan][pol]['n_amp']/sensgoal
+                _calculation = 1.0 if _calculation == None else _calculation
+
+                message = ('{0:s}: Sinusoidal baseline deviation for spw {1:s}, antenna {2:s}, '
+                           'field {3:s}, scan {4:s}, polarization {5:s}. Amplitude {6:.1f}% of '
+                           'requested RMS, wavelength {7:.3f}MHz (nwave={8:s})').format(
+                            msname,
+                            str(msw.spw),
+                            msw.antenna,
+                            fieldname,
+                            str(scan),
+                            polstr,
+                            _calculation,
+                            sinusoid_sigma[scan][pol]['freqMHz'],
+                            str(sinusoid_sigma[scan][pol]['nwave'])
                         )
-                )
 
                 qascore = pipelineqa.QAScore(
                     score=float(np.round(qascore_value, 3)),
@@ -461,7 +477,7 @@ def calc_baseline_qascore_single(
                 intent={'*OBSERVE_TARGET#ON_SOURCE*'},
                 spw={msw.spw},
                 ant={msw.antenna},
-                pol={polstr},
+                pol={pol},
                 field={fieldname},
             )
             comes_from = pipelineqa.QAOrigin(metric_name=reason, metric_score=float(np.round(max_pXY_cont, 3)), metric_units='XX-YY Pearsons cross-correlation')
@@ -649,7 +665,12 @@ def load_and_stats_bl(
 
     for datapiece in datapieces:
         (spw, ant, fieldid) = datapiece
-        #spwname = spw_setup['spwnames'][spw_setup['spwlist'].index(spw)]
+        print(spw_setup_orig[spw]["npol"])
+        # We want to stop the analysis if there is only a single polarization.
+        if spw_setup_orig[spw]["npol"] == 1:
+            LOG.debug(f"Skipping spw: {spw} because it is single polarization.")
+            continue
+
         fieldname = str(spw_setup['namesfor'][str(fieldid)][0])
         print('Processing MS {0:s}, SPW {1:d}, antenna {2:s}, FieldID {3:d}'.format(measurementset,spw,ant,fieldid))
         #Load ON-SOURCE data and create MSWrapperSD object
@@ -672,6 +693,9 @@ def load_and_stats_bl(
         #Clear raw data from MSWrapper object to release memory
         mswCollection[(measurementset, spw, ant, str(fieldid))].data = None
 
+    if not mswCollection:
+        raise sd_qa_utils.FailedAnalysisException(
+            "Measurementset doesn't contain analysis relevant data. Like contains only a single polarization.")
     #if buffer_data and (not os.path.exists(buffer_fname)):
     #    save_mswCollection(mswCollection, buffer_fname)
 
@@ -748,7 +772,7 @@ def get_ms_baseline_qascores(
 ) -> Tuple[list, list, list]:
 
     '''Function used to obtain applycal X-Y QA score on a list of calibrated MSs, at the
-    applycal stage of SD pipeline.
+    applycal stage of SD` pipeline.
     param:
         ms_name: List of MS to process
         thresholds: Dictionary containing threshold parameters for ON-source XX-YY deviations,

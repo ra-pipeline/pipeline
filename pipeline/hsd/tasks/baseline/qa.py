@@ -45,10 +45,11 @@ class SDBaselineQAHandler(pqa.QAPlugin):
             qacalc.score_sd_line_detection(context.observing_run.ms_reduction_group, result)
         )
 
-        # XX-YY profile heuristic PIPE-2961
-        for eb in result.outcome["profile_qa_score"].values():
-            for qa_score in eb["score"]:
-                scores.append(qa_score)
+        if result.outcome["profile_qa_score"]:
+            # XX-YY profile heuristic PIPE-2961
+            for eb in result.outcome["profile_qa_score"].values():
+                for qa_score in eb["score"]:
+                    scores.append(qa_score)
 
         result.qa.pool.extend(scores)
 

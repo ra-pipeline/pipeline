@@ -6,6 +6,65 @@ from scipy import signal
 
 import pipeline.extern.sd_baseline_qa.sd_qa_utils as sd_qa_utils
 
+# This is to fix the fact that analysis code doesn't check to see if the values it is
+# using exist.
+class NoneSafeDict(dict):
+
+    class _NoneHandler:
+        def __init__(self, value):
+            self.value = value
+
+        def __mul__(self, other):
+            return None
+
+        def __rmul__(self, other):
+            return None
+
+        def __truediv__(self, other):
+            return None
+
+        def __rtruediv__(self, other):
+            return None
+
+        def __add__(self, other):
+            return None
+
+        def __sub__(self, other):
+            return None
+
+        def __pow__(self, other):
+            return None
+
+        def __lt__(self, other):
+            return None
+
+        def __gt__(self, other):
+            return None
+
+        def __le__(self, other):
+            return None
+
+        def __ge__(self, other):
+            return None
+
+        def __eq__(self, other):
+            return self.value == other
+
+        def __ne__(self, other):
+            return self.value != other
+
+        def __neg__(self):
+            return None
+
+        def __pos__(self):
+            return None
+
+    def __getitem__(self, key):
+        value = super().__getitem__(key)
+        if value is None:
+            return self._NoneHandler(value)
+
+        return value
 
 class MSWrapperSD(object):
     """
@@ -44,7 +103,7 @@ class MSWrapperSD(object):
         self.fieldid = fieldid
         self.column = column
         self.onoffsel = onoffsel
-        self.spw_setup = spw_setup
+        self.spw_setup = NoneSafeDict(spw_setup) if isinstance(spw_setup, dict) else None
         self.data = data
         self.weight = weight
         self.time = time
@@ -57,7 +116,7 @@ class MSWrapperSD(object):
         self.time_mean_scan = time_mean_scan
         self.time_std_scan = time_std_scan
         self.data_stats = data_stats
-        self.analysis = analysis
+        self.analysis = NoneSafeDict(analysis) if isinstance(analysis, dict) else None
 
 
     @staticmethod

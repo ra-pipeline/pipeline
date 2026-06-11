@@ -21,6 +21,11 @@ import colorsys
 #Useful function for fully flattening array
 flattenlist = lambda l: [item for sublist in l for item in sublist]
 
+class FailedAnalysisException(Exception):
+    def __init__(self, message="There was an unexpected error in the analysis."):
+        self.message = message
+        super().__init__(self.message)
+
 def genColorList(N, purity = 0.75, brightness = 0.75, rndseed = None):
     '''Generate list of distictive colors for plotting, return RGB value tuples.'''
     if rndseed is not None:

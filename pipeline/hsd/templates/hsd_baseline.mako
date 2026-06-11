@@ -99,47 +99,47 @@ line detection stage.</p>
 <li><a href="#clusteranalysis">Line Detection by Clustering Analysis</a></li>
 % endif
 </ul>
+% if profile_heuristic_subpages:
+    <h2 id="profileheuristic" class="jumptarget" >QA Comparison of the Profiles between XX and YY spectra</h2>
 
-<h2 id="profileheuristic" class="jumptarget" >QA Comparison of the Profiles between XX and YY spectra</h2>
+    % for field in profile_heuristic_subpages.keys():
+            <h3><a class="replace"
+               href="${os.path.join(dirname, profile_heuristic_subpages[field])}"
+               data-field="${field}">${field}</a>
+            </h3>
 
-% for field in profile_heuristic_subpages.keys():
-        <h3><a class="replace"
-           href="${os.path.join(dirname, profile_heuristic_subpages[field])}"
-           data-field="${field}">${field}</a>
-        </h3>
+         % for plot in profile_heuristic:
+            % if os.path.exists(plot.thumbnail):
+                <div class="col-md-3">
+                    <div class="thumbnail">
+                        <a href="${os.path.relpath(plot.abspath, pcontext.report_dir)}"
+                           data-fancybox="thumbs">
+                            <img class="lazyload"
+                                 data-src="${os.path.relpath(plot.thumbnail, pcontext.report_dir)}"
+                                 title="${spmap_plot_title(plot.parameters['spw'], apply_bl=False)}">
+                        </a>
 
-     % for plot in profile_heuristic:
-        % if os.path.exists(plot.thumbnail):
-	        <div class="col-md-3">
-	            <div class="thumbnail">
-	                <a href="${os.path.relpath(plot.abspath, pcontext.report_dir)}"
-	                   data-fancybox="thumbs">
-	                    <img class="lazyload"
-                             data-src="${os.path.relpath(plot.thumbnail, pcontext.report_dir)}"
-	                         title="${spmap_plot_title(plot.parameters['spw'], apply_bl=False)}">
-	                </a>
-
-	                <div class="caption">
-	                    <h4>
-	                        <a href="${os.path.join(dirname, profile_heuristic_subpages[field])}"
-	                           class="replace"
-	                           data-spw="${plot.parameters['spw']}"
-	                           data-field="${field}">
-	                           ${get_spw_exp(plot.parameters['spw'])}
-	                        </a>
-	                    </h4>
-	                    <p>Antenna: ${plot.parameters['ant']}<br>
-	                        Field: ${plot.parameters['field']}<br>
-	                        ${get_spw_desc(plot.parameters['spw'])}<br>
-	                    </p>
-	                </div>
-	            </div>
-	        </div>
-        % endif
+                        <div class="caption">
+                            <h4>
+                                <a href="${os.path.join(dirname, profile_heuristic_subpages[field])}"
+                                   class="replace"
+                                   data-spw="${plot.parameters['spw']}"
+                                   data-field="${field}">
+                                   ${get_spw_exp(plot.parameters['spw'])}
+                                </a>
+                            </h4>
+                            <p>Antenna: ${plot.parameters['ant']}<br>
+                                Field: ${plot.parameters['field']}<br>
+                                ${get_spw_desc(plot.parameters['spw'])}<br>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            % endif
+        %endfor
+        <div class="clearfix"></div><!--  flush plots, break to next row -->
     %endfor
-    <div class="clearfix"></div><!--  flush plots, break to next row -->
-%endfor
-
+% endif
 
 
 <h2 id="rawbeforebaseline" class="jumptarget">Spectral Data Before Baseline Subtraction</h2>
