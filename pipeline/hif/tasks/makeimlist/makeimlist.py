@@ -915,7 +915,9 @@ class MakeImList(basetask.StandardTaskTemplate):
 
                         mosaic_heuristics = MosaicDetectionHeuristics()
                         target_fields = band_fields.get(band, set())
-                        mosaic_fields, single_fields = mosaic_heuristics.check_targets_for_mosaic(inputs.context, vislist, target_fields, float(freq.value))
+                        # For VLA, hpbw (in arcmin) = 42.0 / observing frequency in Hz
+                        hpbw = 42.0e9 / float(freq.value) * 60.0 * 60.0  # hpbw in arcseconds
+                        mosaic_fields, single_fields = mosaic_heuristics.check_targets_for_mosaic(inputs.context, vislist, target_fields, hpbw)
                         is_cluster = True if len(mosaic_fields) > 0 else False
                     if is_cluster:
                         field_intent_list_temp = []
