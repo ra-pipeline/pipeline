@@ -517,7 +517,8 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         if intent:
             namer.intent(intent)
         if field:
-            namer.source(field)
+            fieldlist = field.split(",")
+            namer.source(fieldlist[0])
         if specmode != 'cont' and spwspec:
             # find all the spwids present in the list
             p = re.compile(r"[ ,]+(\d+)")

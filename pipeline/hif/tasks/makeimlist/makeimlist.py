@@ -1495,14 +1495,8 @@ class MakeImList(basetask.StandardTaskTemplate):
 
                             # construct imagename
                             if inputs.imagename == '':
-
-                                if is_cluster:
-                                    field_list = field_intent[0].split(',')
-                                    imgname_field_intent = field_list[0]
-                                else:
-                                    imgname_field_intent = field_intent[0]
                                 imagename = target_heuristics.imagename(output_dir=inputs.output_dir, intent=field_intent[1],
-                                                                        field=imgname_field_intent, spwspec=actual_spwspec,
+                                                                        field=field_intent[0], spwspec=actual_spwspec,
                                                                         specmode=specmode, band=band, datatype=datatype_suffix)
                             else:
                                 imagename = inputs.imagename
