@@ -210,28 +210,35 @@ def get_vlass_metadata(imagename: str, stats: dict, parameters: dict) -> dict:
         vlass_im_mode = 'VLASS-SE-CUBE'
     elif 'VLASS-SE-CONT' in parameters.get('imaging_mode', []):
         vlass_im_mode = 'VLASS-SE-CONT'
+    elif 'VLASS-SE-CONT-AWPHPG' in parameters.get('imaging_mode', []):
+        vlass_im_mode = 'VLASS-SE-CONT-AWPHPG'
     else:
         vlass_im_mode = 'VLASS-QL'
+
     if vlass_im_mode == 'VLASS-SE-CUBE':
         bandwidth = 2000000000
+        stokes = ''
     else:
         bandwidth = 128000000
+        stokes = 'I'
+
     im_type = get_vlass_image_type(imagename)
     if 'COM' in im_type:
         im_type = im_type.replace("COM", "INTENSITY_PBCOR")
+
     vlass_metadata['VLASSITY'] = im_type
     vlass_metadata['VLASSPT'] = vlass_im_mode
     vlass_metadata['VLASSTN'] = tile
     vlass_metadata['VLASSPC'] = parameters.get('phasecenter', '')
     vlass_metadata['VLASSEP'] = epoch
     vlass_metadata['VLASSVR'] = version
-    vlass_metadata['VLASSPL'] = ''
-    vlass_metadata['VLASSRJ'] = ''
+    vlass_metadata['VLASSPL'] = stokes
+    vlass_metadata['VLASSRJ'] = 'F'
     vlass_metadata['VLASSSPW'] = spw
-    vlass_metadata['VLASSRMS'] = stats.get('MEDIAN', '')
-    vlass_metadata['VLASSPK'] = stats.get('PEAK', '')
+    vlass_metadata['VLASSRMS'] = float(stats.get('MEDIAN', ''))
+    vlass_metadata['VLASSPK'] = float(stats.get('PEAK', ''))
     vlass_metadata['VLASSBWN'] = bandwidth
-    vlass_metadata['VLASSWP'] = ''
+    vlass_metadata['VLASSWP'] = 0
 
     return vlass_metadata
 
@@ -266,17 +273,17 @@ def update_fits_header(imagename: str, vlass_metadata: dict, dry_run: bool = Fal
     }
     if tt_type == "TT0" or 'alpha' in lower_imagename:
         header_comments["VLASSRMS"] = (
-            "Median rms calculated from RMS_TT0 (Stokes I) image"
+            "Median rms calculated from RMS_TT0 (I)"
         )
         header_comments["VLASSPK"] = (
-            "Peak flux density of INTENSITY_PBCOR_TT0 (Stokes I) image"
+            "Peak flux density of INTENSITY_PBCOR_TT0 (I)"
         )
     elif tt_type == "TT1":
         header_comments["VLASSRMS"] = (
-            "Median rms calculated from RMS_TT1 (Stokes I) image"
+            "Median rms calculated from RMS_TT1 (I)"
         )
         header_comments["VLASSPK"] = (
-            "Peak flux density of INTENSITY_PBCOR_TT1 (Stokes I) image"
+            "Peak flux density of INTENSITY_PBCOR_TT1 (I)"
         )
     else:
         header_comments["VLASSRMS"] = "Median RMS calculated from RMS image"
