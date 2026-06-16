@@ -8,6 +8,7 @@ import decimal
 import enum
 import functools
 import itertools
+from itertools import chain
 import operator
 import os
 import pydoc
@@ -2056,9 +2057,10 @@ def get_ms_attr_for_result(context, vis, accessor):
 
 ## FIXME HIER
 from line_profiler import profile
-from itertools import chain
+import cProfile, pstats, io
+from pstats import SortKey
 
-@profile
+## @profile # enaible for line-profiler.
 def compute_zd_telmjd_for_ms(ms: MeasurementSet) -> dict[int, dict[str, list[float] | list[datetime.datetime]]]:
     """
     Retrieve zenith angles (degrees) and times for TARGET fields at all timestamps.
@@ -2072,7 +2074,10 @@ def compute_zd_telmjd_for_ms(ms: MeasurementSet) -> dict[int, dict[str, list[flo
         Format: {field_id: {'zd': [zd1, zd2, ...], 'telmjd': [dt1, dt2, ...]}}
     """
 
-    data = {}
+    # data = {}
+    pr = cProfile.Profile()
+    pr.enable()
+    #
     fields = ms.get_fields(intent='TARGET')
     observatory = ms.antenna_array.name
     mjd_epoch = datetime.datetime(1858, 11, 17, tzinfo=datetime.timezone.utc)
@@ -2080,7 +2085,7 @@ def compute_zd_telmjd_for_ms(ms: MeasurementSet) -> dict[int, dict[str, list[flo
 
     data = {}
     for id in field_id_set:
-        data[field.id] = {'zd': [], 'telmjd': [] }
+        data[id] = {'zd': [], 'telmjd': [] }
     #
     for field in fields:
         obs_times = [ mjd_epoch + datetime.timedelta(seconds=float(t))
@@ -2098,9 +2103,16 @@ def compute_zd_telmjd_for_ms(ms: MeasurementSet) -> dict[int, dict[str, list[flo
 
         data[field.id]['zd']     = list(chain(data[field.id]['zd'], zds))
         data[field.id]['telmjd'] = list(chain(data[field.id]['telmjd'], obs_times))
-
+    ####
+    pr.disable()
+    s = io.StringIO()
+    sortby = SortKey.CUMULATIVE
+    ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+    ps.print_stats()
+    print(s.getvalue())
+    #####
     return data
-
+## below: the original implementation. Please remove before the merge request.
 def compute_zd_telmjd_for_ms_orig(
         ms: MeasurementSet,
         ) -> dict[int, dict[str, list[float] | list[datetime.datetime]]]:
