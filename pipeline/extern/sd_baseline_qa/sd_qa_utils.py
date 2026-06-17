@@ -342,6 +342,7 @@ def getSpecSetup(myms: str, spwlist: list = [], intentlist: list = ['*OBSERVE_TA
     msmd.open(myms)
     if len(spwlist) == 0:
         spwlist = getSpwList(msmd)
+
     spwsetup = {}
     spwsetup['spwlist'] = spwlist
     spwsetup['intentlist'] = intentlist
@@ -1227,18 +1228,27 @@ def line_list_to_datasel(lines: List, spw_setup: dict) -> dict:
         datasel = {}
 
     for item in lines:
-        field = item[0]
-        spw = item[1]
-        linelist = item[2]
+
+        field, spw, linelist = item
+        # field = item[0]
+        # spw = item[1]
+        # linelist = item[2]
+        # Not sure if this is alright to do, but we are skipping if the 'spw' exists
+        if spw_setup.get(spw) is None:
+            continue
+
+
         lineranges = [(max(0,int(l[0]-l[1])),min(int(l[0]+l[1]),spw_setup[spw]['nchan']-1)) for l in linelist if l[2]]
         lineranges = consolidate_index_ranges(lineranges)
         nranges = len(lineranges)
-        sel = {k: np.zeros(spw_setup[spw]['nchan'], dtype=np.bool_) for k in ['all']+list(range(nranges))}
+
+        sel = {k: np.zeros(spw_setup.get(spw)['nchan'], dtype=np.bool_) for k in ['all']+list(range(nranges))}
         for k, lr in enumerate(lineranges):
             sel['all'][lr[0]:lr[1]] = True
             sel[k][lr[0]:lr[1]] = True
         if field not in datasel.keys():
             datasel[field] = {}
+
         datasel[field][spw] = copy.deepcopy(sel)
 
     return datasel

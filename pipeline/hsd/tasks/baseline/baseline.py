@@ -748,11 +748,11 @@ class SDBaseline(basetask.StandardTaskTemplate):
         # We will run this for each output measurementset. It would be better to do the QA calculation above as part of
         # the general analysis. Perhaps this can be done at a later time.
 
-        for _outfile in vis_map.values():
-            qa_score_dict = bs.baseline_score(results=results, context=context, outfile=_outfile)
+        for basename, outfile in vis_map.items():
+            qa_score_dict = bs.baseline_score(results=results, context=context, file_info=(basename, outfile))
 
             if not qa_score_dict is None:
-                results.outcome["profile_qa_score"][_outfile] = qa_score_dict
+                results.outcome["profile_qa_score"][outfile] = qa_score_dict
 
         return results
 

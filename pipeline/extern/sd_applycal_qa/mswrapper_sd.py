@@ -16,11 +16,31 @@ class MSWrapperSD(object):
     MSWrapper objects.
     """
 
-    def __init__(self, fname=None, antenna=None, spw=None, npol=None, nchan=None, nrows=None,
-        fieldid=None, column='CORRECTED_DATA', onoffsel='ON', spw_setup=None,
-        data=None, weight=None, time=None, outliers=None, outlierfreq=None, outliertime=None,
-        tsysdata=None, scantimesel=None, nrowscan=None, time_mean_scan=None, time_std_scan=None,
-        data_stats=None, analysis=None):
+    def __init__(
+            self,
+            fname=None,
+            antenna=None,
+            spw=None, npol=None,
+            nchan=None,
+            nrows=None,
+            fieldid=None,
+            column='CORRECTED_DATA',
+            onoffsel='ON',
+            spw_setup=None,
+            data=None,
+            weight=None,
+            time=None,
+            outliers=None,
+            outlierfreq=None,
+            outliertime=None,
+            tsysdata=None,
+            scantimesel=None,
+            nrowscan=None,
+            time_mean_scan=None,
+            time_std_scan=None,
+            data_stats=None,
+            analysis=None
+    ):
         """
         Create a new MSWrapperSD object for the specified ms, antenna, etc.
         :param fname: measurement set filename

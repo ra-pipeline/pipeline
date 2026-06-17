@@ -27,14 +27,14 @@ def _science_lines(context, results):
 def baseline_score(
         results,
         context,
-        outfile
+        file_info
 )-> None | dict[str, list]:
     """
 
     Args:
         results: SDBaselineResults
         context: Data structure containing pertinent run and results information.
-        outfile: This is the baseline ms file that is used for analysis.
+        file_info: This is the baseline ms file that is used for analysis adn the original ms name as a tuple.
 
     Returns: None | Dict
 
@@ -49,6 +49,7 @@ def baseline_score(
     #  products directory = context.product_dir
     #  html/report directory = context.report_dir
 
+    basename, baseline_file = file_info
     line_data = _science_lines(context, results)
 
     if line_data is None:
@@ -59,7 +60,6 @@ def baseline_score(
     working_path = pathlib.Path.cwd().resolve()
     LOG.debug(f"Current working directory: %s", working_path)
 
-    baseline_file = pathlib.Path(outfile)
     date_time = datetime.datetime.now(datetime.UTC).strftime("%Y%d%mT%H%M%SD%f")
 
     plot_path = pathlib.Path(context.products_dir).joinpath(f"baseline_qa_plots_{date_time}")
@@ -67,13 +67,15 @@ def baseline_score(
     # This should always exist but incase
     plot_path.mkdir(parents=True, exist_ok=True)
     weblog_path = context.report_dir
+
     try:
         qa_score, antenna_names, plots_function_names = sd_baseline_qa.get_ms_baseline_qascores(
-            ms_name = str(baseline_file),
+            ms_name = baseline_file,
             sci_line_data=line_data,
             plot_output_path=str(plot_path),
             weblog_output_path=str(weblog_path),
-            buffer_data=False
+            buffer_data=False,
+            basename = basename
         )
 
         elapsed_time = (time.time() - start_time) / 60.0

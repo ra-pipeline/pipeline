@@ -345,11 +345,16 @@ def calc_baseline_qascore_single(
                     field={fieldname},
                 )
 
-                comes_from = pipelineqa.QAOrigin(metric_name=reason, metric_score=float(np.round(sinusoid_sigma[scan][pol]['n_sigma'], 3)), metric_units='Deviation from 0')
+                comes_from = pipelineqa.QAOrigin(
+                    metric_name=reason,
+                    metric_score=float(np.round(sinusoid_sigma[scan][pol]['n_sigma'], 3)),
+                    metric_units='Deviation from 0'
+                )
 
                 # This is similar to the original code but slightly modified to accommodate the new
-                # NoneSafeDict class.
-                _calculation = 100.0*sinusoid_sigma[scan][pol]['n_amp']/sensgoal
+                # NoneSafeDict class. The conditional is needed because the NoneSafeDict is a fudge
+                # fix to avoid a long list of if else statements.
+                _calculation = 100.0*sinusoid_sigma[scan][pol]['n_amp']/sensgoal if sensgoal is not None else None
                 _calculation = 1.0 if _calculation == None else _calculation
 
                 message = ('{0:s}: Sinusoidal baseline deviation for spw {1:s}, antenna {2:s}, '
@@ -622,6 +627,7 @@ def save_mswCollection(mswCollection: dict, mswCfile: str):
 
 def load_and_stats_bl(
         measurementset: str,
+        basename,
         sci_line_data: List = None,
         buffer_data: bool = True,
         buffer_fname: str = 'mswCollection.bl.buffer.pkl'
@@ -636,11 +642,7 @@ def load_and_stats_bl(
                     use for repeated execution of the code, mostly testing.
     """
 
-    
-    #Load buffered data from disk, if exists
-    if buffer_data and os.path.exists(buffer_fname):
-        mswCollection = load_mswCollection(buffer_fname)
-        return mswCollection
+
 
     #Load data and gather statistics
     mswCollection = {}
@@ -652,8 +654,8 @@ def load_and_stats_bl(
     #Get science line selection vectors from context and spw_setup
     science_line_sel = sd_qa_utils.line_list_to_datasel(lines=sci_line_data, spw_setup=spw_setup)
     #Load original MS metadata
-    origms = measurementset.split('.ms.')[0]+'.ms'
-    spw_setup_orig = sd_qa_utils.getSpecSetup(myms=origms)
+
+    spw_setup_orig = sd_qa_utils.getSpecSetup(myms=basename)
     #In case any SPW reindex, need to map SPWs
     sortidx = np.argsort(spw_setup['spwnames'])
     sortidx_orig = np.argsort(spw_setup_orig['spwnames'])
@@ -686,7 +688,7 @@ def load_and_stats_bl(
         )
 
         #Get Tsys data from original MS
-        mswCollection[(measurementset, spw, ant, str(fieldid))].tsysdata = sd_qa_utils.getAtmDataForSPW(origms, spw_setup_orig, spwmap[spw], ant)
+        mswCollection[(measurementset, spw, ant, str(fieldid))].tsysdata = sd_qa_utils.getAtmDataForSPW(basename, spw_setup_orig, spwmap[spw], ant)
         #Gather necessary stats
         LOG.info('>> Data stats for '+str((measurementset, spw, ant, str(fieldid))))
         data_stats_bl(mswCollection[(measurementset, spw, ant, str(fieldid))], science_line_sel[fieldname][spw])
@@ -763,12 +765,12 @@ def find_min_qascores(mswCollection: dict):
 
 def get_ms_baseline_qascores(
         ms_name: str,
+        basename: str,
         sci_line_data: List = None,
         thresholds=None,
         plot_output_path: str = '.',
         weblog_output_path: str = '.',
-        buffer_data: bool = True,
-        buffer_fname: str = 'mswCollection.bl.buffer.pkl'
+        buffer_data: bool = True
 ) -> Tuple[list, list, list]:
 
     '''Function used to obtain applycal X-Y QA score on a list of calibrated MSs, at the
@@ -792,8 +794,12 @@ def get_ms_baseline_qascores(
     if thresholds is None:
         thresholds = default_thresholds
 
-    mswCollection = load_and_stats_bl(ms_name, sci_line_data=sci_line_data,
-                                      buffer_data=buffer_data, buffer_fname = buffer_fname)
+    mswCollection = load_and_stats_bl(
+        ms_name,
+        basename,
+        sci_line_data=sci_line_data,
+        buffer_data=buffer_data
+    )
 
     #Get QA scores by analyzing individual data pieces
     #Iterate over collection of individual MSWrapperSD objects
