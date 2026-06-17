@@ -1,4 +1,4 @@
-import collections
+import collections.abc
 
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.pipelineqa as pqa

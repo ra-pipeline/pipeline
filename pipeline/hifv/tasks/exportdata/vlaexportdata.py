@@ -1,9 +1,8 @@
-import os
-import sys
-import shutil
-import collections
-import tarfile
 import io
+import os
+import shutil
+import sys
+import tarfile
 import xml.etree.ElementTree as eltree
 
 import pipeline.infrastructure as infrastructure

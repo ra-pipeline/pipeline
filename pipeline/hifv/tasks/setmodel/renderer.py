@@ -21,7 +21,7 @@ class T2_4MDetailsVLASetjyRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def __init__(self, uri='vlasetjy.mako',
                  description='Set calibrator model visibilities',
                  always_rerender=False):
-        super(T2_4MDetailsVLASetjyRenderer, self).__init__(
+        super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
     def update_mako_context(self, ctx, context, result):

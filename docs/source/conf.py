@@ -19,7 +19,7 @@
 import os
 import sys
 import textwrap
-from datetime import datetime
+from datetime import datetime, timezone
 
 pipeline_src = os.getenv('pipeline_src')
 if pipeline_src is not None:
@@ -142,8 +142,6 @@ master_doc = 'index'
 release = build_version = pipeline.environment.pipeline_revision  # used on the PDF cover
 version = build_version.split('+')[0]
 
-release = '2025.1.0'  # temporarily hard-coded for the PL2025 release
-
 # remove -detached suffix as readthedocs always uses git checkout --force to create a
 # detached state
 build_version_short = build_version.removesuffix('-detached')
@@ -151,7 +149,7 @@ build_version_short = build_version.removesuffix('-detached')
 # General information about the project.
 project = f'Pipeline \n ({version})'
 author = 'Pipeline Dev. Team'
-copyright = f'2020–{datetime.now().year}, {author}, build: {build_version_short}'
+copyright = f'2020–{datetime.now(timezone.utc).year}, {author}, build: {build_version_short}'
 
 # The version info for the project you're documenting, acts as replacement
 # for |version| and |release|, also used in various other places throughout

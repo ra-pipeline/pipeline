@@ -44,7 +44,7 @@ flag_color = {'edges': 'lightblue',
               'tmf': 'aqua'}
 
 
-class SliceDisplay(object):
+class SliceDisplay:
     def plot(self, context, results, reportdir, description_to_plot=None,
              overplot_spectrum=None, plotbad=True, plot_only_flagged=False,
              prefix=''):
@@ -302,7 +302,7 @@ class SliceDisplay(object):
             if xtitle.upper() == 'TIME':
                 temp = []
                 for item in good_x:
-                    temp.append(datetime.datetime.utcfromtimestamp(item))
+                    temp.append(datetime.datetime.fromtimestamp(item, tz=datetime.timezone.utc))
                 good_x = temp
                 datemin = min(good_x)
                 datemax = max(good_x)
@@ -336,7 +336,7 @@ class SliceDisplay(object):
             if xtitle.upper() == 'TIME':
                 temp = []
                 for item in bad_x:
-                    temp.append(datetime.datetime.utcfromtimestamp(item))
+                    temp.append(datetime.datetime.fromtimestamp(item, tz=datetime.timezone.utc))
                 bad_x = temp
                 if datemin is None:
                     datemin = min(bad_x)
@@ -424,7 +424,7 @@ class SliceDisplay(object):
             if xtitle.upper() == 'TIME':
                 temp = []
                 for item in bad_x:
-                    temp.append(datetime.datetime.utcfromtimestamp(item))
+                    temp.append(datetime.datetime.fromtimestamp(item, tz=datetime.timezone.utc))
                 bad_x = temp
             bad_data[:] = yflag
             plt.errorbar(bad_x, bad_data, linestyle='None', marker='o',

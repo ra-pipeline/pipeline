@@ -1,9 +1,15 @@
+from __future__ import annotations
+
 import collections
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 import pipeline.infrastructure.api as api
 from pipeline.infrastructure.utils import coordinate_utils
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 PointingOutlierHeuristicsResult = collections.namedtuple(
     "PointingOutlierHeuristicsResult",
@@ -33,8 +39,8 @@ class PointingOutlierHeuristics(api.Heuristic):
 
     def calculate(self,
                   dir_frame: str,
-                  x: np.ndarray,
-                  y: np.ndarray,
+                  x: NDArray,
+                  y: NDArray,
                   iterate: bool = False) -> PointingOutlierHeuristicsResult:
         """Perform pointing outlier heuristics.
 

@@ -9,6 +9,7 @@
    develdocmd/ways_to_run_the_pipeline.md
    develdocmd/recipes.md
    dependencies
+   interface
    releases
    timeline
    
@@ -34,6 +35,7 @@
    develdocmd/building_the_pipeline.md
    modular
 
+   testing_docs/index
    develdocmd/pipeline_tests.md
    develdocmd/DataType_Testing.md
    develdocmd/QA_scores.md

@@ -16,29 +16,6 @@
 # * This class performs all of the deterministic flagging types in the
 #   FlagDeterBase*() classes.
 
-# To test these classes by themselves without the rest of the pipeline, enter
-# these commands:
-#
-# import pipeline
-#
-# vis = [ '<MS name>' ]
-# context = pipeline.Pipeline( vis ).context
-#
-# inputs = pipeline.hifv.tasks.flagging.FlagDeterVLA.Inputs( context, vis=vis,
-#   output_dir='.', autocorr=True, shadow=True, scan=True, scannumber='4,5,8',
-#   intents='*AMPLI*', edgespw=True, fracspw=0.1, fracspwfps=0.1 )
-#
-# task = pipeline.hifv.tasks.flagging.FlagDeterVLA( inputs )
-# jobs = task.analyse()
-#
-# status = task.execute()
-#
-# In other words, create a context, create the inputs (which sets the public
-# variables to the correct values and creates the temporary flag command file),
-# convert the class arguments to arguments to the CASA task tflagdata), create
-# the FlatDeterVLA() instance, perform FlatDeterVLA.analyse(), and execute the
-# class.
-
 # Classes:
 # --------
 # FlagDeterVLA        - This class represents the pipeline interface to the
@@ -289,7 +266,7 @@ class FlagDeterVLAInputs(flagdeterbase.FlagDeterBaseInputs):
             tbuff: List of time buffers (sec) to pad timerange in flag commands.
 
         """
-        super(FlagDeterVLAInputs, self).__init__(
+        super().__init__(
             context, vis=vis, output_dir=output_dir, flagbackup=flagbackup, autocorr=autocorr, shadow=shadow,
             scan=scan, scannumber=scannumber, intents=intents, edgespw=edgespw, fracspw=fracspw, fracspwfps=fracspwfps,
             online=online, fileonline=fileonline, template=template, filetemplate=filetemplate, hm_tbuff=hm_tbuff,
@@ -332,7 +309,7 @@ class FlagDeterVLAInputs(flagdeterbase.FlagDeterBaseInputs):
 
         # Initialize the arguments from the inherited
         # FlagDeterBaseInputs() class
-        task_args = super(FlagDeterVLAInputs, self).to_casa_args()
+        task_args = super().to_casa_args()
 
         # Return the tflagdata task arguments
         return task_args
@@ -459,7 +436,7 @@ class FlagDeterVLA(flagdeterbase.FlagDeterBase):
     def _get_flag_commands(self):
         """ Adding quack and clip
         """
-        # flag_cmds = super(FlagDeterVLA, self)._get_flag_commands()
+        # flag_cmds = super()._get_flag_commands()
 
         flag_cmds = []
 
@@ -741,7 +718,7 @@ class FlagDeterVLA(flagdeterbase.FlagDeterBase):
     def verify_spw(self, spw):
         # override the default verifier, adding an extra test that bypasses
         # flagging of TDM windows
-        super(FlagDeterVLA, self).verify_spw(spw)
+        super().verify_spw(spw)
 
         # Skip if TDM mode where TDM modes are defined to be modes with
         # <= 256 channels per correlation

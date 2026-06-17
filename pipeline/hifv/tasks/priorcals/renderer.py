@@ -17,7 +17,7 @@ from . import swpowdisplay
 LOG = logging.get_logger(__name__)
 
 
-class VLASubPlotRenderer(object):
+class VLASubPlotRenderer:
     # template = 'testdelays_plots.html'
 
     def __init__(self, context, result, plots, json_path, template, filename_prefix, band, spw, allbands):
@@ -90,12 +90,12 @@ class VLASubPlotRenderer(object):
 class T2_4MDetailspriorcalsRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def __init__(self, uri='priorcals.mako', description='Priorcals (gaincurves, opacities, antenna positions corrections, rq gains, and switched power)',
                  always_rerender=False):
-        super(T2_4MDetailspriorcalsRenderer, self).__init__(uri=uri,
+        super().__init__(uri=uri,
                                                             description=description,
                                                             always_rerender=always_rerender)
 
     def get_display_context(self, context, results):
-        super_cls = super(T2_4MDetailspriorcalsRenderer, self)
+        super_cls = super()
         ctx = super_cls.get_display_context(context, results)
 
         weblog_dir = os.path.join(context.report_dir,

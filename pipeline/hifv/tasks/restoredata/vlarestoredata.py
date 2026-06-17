@@ -219,7 +219,7 @@ class VLARestoreData(restoredata.RestoreData):
             LOG.info('    From %s' % tarfilename)
             LOG.info('    Into %s' % inputs.output_dir)
             with tarfile.open(tarfilename, 'r:gz') as tar:
-                tar.extractall(path=inputs.output_dir)
+                tar.extractall(path=inputs.output_dir, filter='fully_trusted')
 
             # Restore final flags version using flagmanager
             try_version = None

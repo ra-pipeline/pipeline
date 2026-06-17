@@ -23,13 +23,17 @@ given the Result for processing. In this step, the QA framework calls
 QAPlugin.handle(context, result), the method overridden by the task-specific
 QAPlugin.
 """
+from __future__ import annotations
+
 import abc
-import collections
+import collections.abc
 import glob
 import os.path
 import random
 import re
+import shelve
 from collections import OrderedDict
+from typing import TYPE_CHECKING
 
 from pipeline.hifv.tasks.finalcals.applycals import Applycals
 from pipeline.hifv.tasks.finalcals.finalcals import Finalcals, FinalcalsResults
@@ -52,14 +56,16 @@ from pipeline.hsd.tasks.imaging.resultobjects import SDImagingResults
 from pipeline.hsd.tasks.restoredata.restoredata import SDRestoreData, SDRestoreDataResults
 from pipeline.hsdn.tasks.restoredata.restoredata import NRORestoreData, NRORestoreDataResults
 from pipeline.infrastructure import logging
-from pipeline.infrastructure.basetask import Results, ResultsList, StandardTaskTemplate
-from pipeline.infrastructure.launcher import Context
 from pipeline.infrastructure.taskregistry import task_registry
+
+if TYPE_CHECKING:
+    from pipeline.infrastructure.basetask import Results, ResultsList, StandardTaskTemplate
+    from pipeline.infrastructure.launcher import Context
 
 LOG = logging.get_logger(__name__)
 
 
-class RegressionExtractor(object, metaclass=abc.ABCMeta):
+class RegressionExtractor(abc.ABC):
     """The mandatory base class for all regression test result extractors."""
 
     # the Results class this handler is expected to handle
@@ -115,7 +121,7 @@ class RegressionExtractor(object, metaclass=abc.ABCMeta):
         raise NotImplemented
 
 
-class RegressionExtractorRegistry(object):
+class RegressionExtractorRegistry:
     """
     The registry and manager of the regression result extractor framework.
 
@@ -334,6 +340,54 @@ def is_iterable(obj):
 #                 if qa_score.score < 0:
 #                     return False
 #     return True
+
+
+def weblog_rendering_failures(context: Context) -> list[int]:
+    """
+    Check for weblog rendering failures by inspecting the timetracker database.
+
+    The timetracker records weblog rendering lifecycle events including abnormal exits.
+    This function reads the timetracker shelve database and identifies any stages where
+    weblog rendering terminated with 'abnormal exit' state.
+
+    Args:
+        context: Context object
+
+    Returns:
+        list of stage numbers where weblog rendering failed
+    """
+    failed_stages = []
+
+    # Construct path to timetracker database (shelve uses multiple files)
+    timetracker_db = os.path.join(context.output_dir, f'{context.name}.timetracker')
+
+    # Check if timetracker database exists (shelve produces .dat, .dir, .bak files on Unix)
+    db_exists = False
+    for ext in ['.dat', '.dir', '.bak']:
+        if os.path.exists(timetracker_db + ext):
+            db_exists = True
+            break
+
+    if not db_exists:
+        LOG.debug('Timetracker database not found: %s', timetracker_db)
+        return failed_stages
+
+    try:
+        with shelve.open(timetracker_db, 'r') as db:
+            # Check weblog rendering status for each stage
+            if 'weblog' in db:
+                weblog_data = db['weblog']
+                for stage_num, execution_state in weblog_data.items():
+                    # execution_state is an ExecutionState namedtuple with fields:
+                    # (stage, start, end, state)
+                    # state will be 'complete' for successful renders or 'abnormal exit' for failures
+                    if execution_state.state == 'abnormal exit':
+                        failed_stages.append(stage_num)
+                        LOG.warning('Weblog rendering failed for stage %s', stage_num)
+    except (OSError, KeyError) as e:
+        LOG.warning('Failed to read timetracker database: %s', e)
+
+    return sorted(failed_stages)
 
 
 def get_all_subclasses(cls: RegressionExtractor) -> list[RegressionExtractor]:

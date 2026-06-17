@@ -33,7 +33,7 @@ from .selfcal_helpers import (analyze_inf_EB_flagging, checkmask,
 LOG = infrastructure.get_logger(__name__)
 
 
-class SelfcalHeuristics(object):
+class SelfcalHeuristics:
     """Class to hold the heuristics for selfcal."""
 
     def __init__(
@@ -340,11 +340,8 @@ class SelfcalHeuristics(object):
         if savemodel == 'modelcolumn' and not usermodel:
             LOG.info("")
             LOG.info("Running tclean in the prediction-only setting to fill the MS model column.")
-            # A workaround for CAS-14386
-            parallel_predict = parallel
-            if parallel_predict and 'mosaic' in tclean_args['gridder']:
-                LOG.debug("A parallel model write operation does not work with gridder='mosaic': enforcing parallel=False.")
-                parallel_predict = False
+            # PIPE-3025: Removed workaround for CAS-14386 (parallel model writes failed with 'mosaic' gridder).
+            # PIPE-2001 enforced serial writes; CAS-14386 fixed in CASA 6.6.5+, so workaround no longer needed.
             tclean_args.update({'niter': 0,
                                 'interactive': False,
                                 'nsigma': 0.0,
@@ -355,7 +352,7 @@ class SelfcalHeuristics(object):
                                 'calcpsf': False,
                                 'restoration': False,
                                 'threshold': '0.0mJy',
-                                'parallel': parallel_predict,
+                                'parallel': parallel,
                                 'startmodel': ''})
             tc_ret = self.cts.tclean(**tclean_args)
 
@@ -1604,7 +1601,7 @@ class SelfcalHeuristics(object):
                                    threshold='0.0Jy',
                                    savemodel='modelcolumn', parallel=self.parallel, cellsize=self.cell, imsize=self.imsize,
                                    nterms=slib['nterms'], reffreq=slib['reffreq'],
-                                   field=target, spw=slib['spws_per_vis'], uvrange=slib['uvrange'], obstype=slib['obstype'],
+                                   field=self.field, spw=slib['spws_per_vis'], uvrange=slib['uvrange'], obstype=slib['obstype'],
                                    resume=False,
                                    image_mosaic_fields_separately=self.is_mosaic,
                                    mosaic_field_phasecenters=slib['sub-fields-phasecenters'],
@@ -1686,7 +1683,7 @@ class SelfcalHeuristics(object):
                                     threshold=str(slib[vislist[0]][solint]['clean_threshold'])+'Jy',
                                     savemodel='none', parallel=self.parallel,
                                     nterms=slib['nterms'],
-                                    field=target, spw=slib['spws_per_vis'], uvrange=slib['uvrange'], obstype=slib['obstype'],
+                                    field=self.field, spw=slib['spws_per_vis'], uvrange=slib['uvrange'], obstype=slib['obstype'],
                                     nfrms_multiplier=slib[vislist[0]][solint]['nfrms_multiplier'], resume=resume,
                                     image_mosaic_fields_separately=slib['obstype'] == 'mosaic', mosaic_field_phasecenters=slib['sub-fields-phasecenters'], mosaic_field_fid_map=slib['sub-fields-fid_map'], cyclefactor=slib['cyclefactor'], mask=mask, usermodel=usermodel)
 
@@ -1728,7 +1725,7 @@ class SelfcalHeuristics(object):
                                             threshold=str(slib[vislist[0]][solint]['clean_threshold'])+'Jy',
                                             savemodel='modelcolumn', parallel=self.parallel,
                                             nterms=slib['nterms'],
-                                            field=target, spw=slib['spws_per_vis'], uvrange=slib['uvrange'], obstype=slib['obstype'],
+                                            field=self.field, spw=slib['spws_per_vis'], uvrange=slib['uvrange'], obstype=slib['obstype'],
                                             nfrms_multiplier=slib[vislist[0]][solint]['nfrms_multiplier'],
                                             savemodel_only=True, cyclefactor=slib['cyclefactor'], mask=mask, usermodel=usermodel)
 
@@ -2404,7 +2401,7 @@ class SelfcalHeuristics(object):
                                         threshold=str(slib[vislist[0]][solint]['clean_threshold'])+'Jy',
                                         savemodel='none', parallel=self.parallel,
                                         nterms=slib['nterms'],
-                                        field=target, spw=slib['spws_per_vis'], uvrange=slib['uvrange'], obstype=slib['obstype'],
+                                        field=self.field, spw=slib['spws_per_vis'], uvrange=slib['uvrange'], obstype=slib['obstype'],
                                         nfrms_multiplier=slib[vislist[0]][solint]['nfrms_multiplier'],
                                         image_mosaic_fields_separately=slib['obstype'] == 'mosaic', mosaic_field_phasecenters=slib['sub-fields-phasecenters'], mosaic_field_fid_map=slib['sub-fields-fid_map'], cyclefactor=slib['cyclefactor'], mask=mask, usermodel=usermodel)
 
@@ -2673,7 +2670,7 @@ class SelfcalHeuristics(object):
                                             threshold=str(slib[vislist[0]][solint]['clean_threshold'])+'Jy',
                                             savemodel='none', parallel=self.parallel,
                                             nterms=slib['nterms'],
-                                            field=target, spw=slib['spws_per_vis'], uvrange=slib['uvrange'], obstype=slib['obstype'],
+                                            field=self.field, spw=slib['spws_per_vis'], uvrange=slib['uvrange'], obstype=slib['obstype'],
                                             nfrms_multiplier=slib[vislist[0]][solint]['nfrms_multiplier'],
                                             image_mosaic_fields_separately=False, mosaic_field_phasecenters=slib['sub-fields-phasecenters'], mosaic_field_fid_map=slib['sub-fields-fid_map'], cyclefactor=slib['cyclefactor'], mask=mask, usermodel=usermodel)
 

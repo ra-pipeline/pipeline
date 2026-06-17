@@ -1,6 +1,5 @@
-import os
 import collections
-from typing import TYPE_CHECKING, List, Optional, Tuple, Union, Any, Dict
+import os
 
 import numpy as np
 
@@ -13,9 +12,9 @@ from pipeline.hifv.heuristics import weakbp, do_bandpass, uvrange
 from pipeline.hifv.heuristics.lib_EVLApipeutils import vla_minbaselineforcal
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import task_registry
+from pipeline.infrastructure import utils
 
-
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class semiFinalBPdcalsInputs(vdp.StandardInputs):
@@ -49,7 +48,7 @@ class semiFinalBPdcalsInputs(vdp.StandardInputs):
                 Example: refant = 'ea01, ea02'
 
         """
-        super(semiFinalBPdcalsInputs, self).__init__()
+        super().__init__()
         self.context = context
         self.vis = vis
         self._weakbp = weakbp
@@ -65,7 +64,7 @@ class semiFinalBPdcalsResults(basetask.Results):
     """
     def __init__(self, final=None, pool=None, preceding=None, bpdgain_touse=None,
                  gtypecaltable=None, ktypecaltable=None, bpcaltable=None, flaggedSolnApplycalbandpass=None,
-                 flaggedSolnApplycaldelay=None):
+                 flaggedSolnApplycaldelay=None, spw_solint=None):
         """
         Args:
             final(List, optional): Calibration list applied - not used
@@ -77,7 +76,7 @@ class semiFinalBPdcalsResults(basetask.Results):
             bpcaltable(Dict): Dictionary of tables per band
             flaggedSolnApplycalbandpass(Dict): returned from getCalFlaggedSoln for bpdgain_touse (per band)
             flaggedSolnApplycaldelay(Dict): returned from getCalFlaggedSoln for ktypecaltable (per band)
-
+            spw_solint(Dict): Dictionary of solints per spw per band
         """
 
         if final is None:
@@ -87,9 +86,8 @@ class semiFinalBPdcalsResults(basetask.Results):
         if preceding is None:
             preceding = []
 
-        super(semiFinalBPdcalsResults, self).__init__()
+        super().__init__()
 
-        # self.vis = None
         self.pool = pool[:]
         self.final = final[:]
         self.preceding = preceding[:]
@@ -100,6 +98,7 @@ class semiFinalBPdcalsResults(basetask.Results):
         self.bpcaltable = bpcaltable
         self.flaggedSolnApplycalbandpass = flaggedSolnApplycalbandpass
         self.flaggedSolnApplycaldelay = flaggedSolnApplycaldelay
+        self.spw_solint = spw_solint if spw_solint is not None else {}
 
 
 @task_registry.set_equivalent_casa_task('hifv_semiFinalBPdcals')
@@ -136,11 +135,12 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         bpdgain_touse = {}
         flaggedSolnApplycalbandpass = {}
         flaggedSolnApplycaldelay = {}
+        spw_solint_perband = {}
 
         for band, spwlist in band2spw.items():
 
             bpdgain_tousename, gtypecaltablename, ktypecaltablename, bpcaltablename, \
-            flaggedSolnApplycalbandpassperband, flaggedSolnApplycaldelayperband = self._do_semifinal(band, spwlist)
+            flaggedSolnApplycalbandpassperband, flaggedSolnApplycaldelayperband, spw_solint = self._do_semifinal(band, spwlist)
 
             gtypecaltable[band] = gtypecaltablename
             ktypecaltable[band] = ktypecaltablename
@@ -148,11 +148,11 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
             bpdgain_touse[band] = bpdgain_tousename
             flaggedSolnApplycalbandpass[band] = flaggedSolnApplycalbandpassperband
             flaggedSolnApplycaldelay[band] = flaggedSolnApplycaldelayperband
-
+            spw_solint_perband[band] = spw_solint
         return semiFinalBPdcalsResults(bpdgain_touse=bpdgain_touse, gtypecaltable=gtypecaltable,
                                        ktypecaltable=ktypecaltable, bpcaltable=bpcaltable,
                                        flaggedSolnApplycalbandpass=flaggedSolnApplycalbandpass,
-                                       flaggedSolnApplycaldelay=flaggedSolnApplycaldelay)
+                                       flaggedSolnApplycaldelay=flaggedSolnApplycaldelay, spw_solint=spw_solint_perband)
 
     def analyse(self, results):
         """Determine the best parameters by analysing the given jobs before returning any final jobs to execute.
@@ -168,7 +168,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         """
         return results
 
-    def _do_semifinal(self, band: str, spwlist: List[str]):
+    def _do_semifinal(self, band: str, spwlist: list[str]):
         """Execute semiFinalBPdcals heuristics per band and spwlist
 
         Args:
@@ -182,6 +182,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
             bpcaltable(str):     BP cal table
             flaggedSolnApplycalbandpass(Dict):  returned from getCalFlaggedSoln for bpdgain_tous
             flaggedSolnApplycaldelay(Dict): returned from getCalFlaggedSoln for ktypecaltable
+            spw_solint(Dict): Dictionary of solints per spw
 
         """
         LOG.info("Executing for band {!s}  spws: {!s}".format(band, ','.join(spwlist)))
@@ -203,8 +204,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
 
         table_suffix = ['_{!s}.tbl'.format(band), '3_{!s}.tbl'.format(band), '10_{!s}.tbl'.format(band)]
         self.ignorerefant = self.inputs.context.evla['msinfo'][m.name].ignorerefant
-        # PIPE-1637: adding ',' in the manual and auto refantignore parameter
-        refantignore = self.inputs.refantignore + ','.join(['', *self.ignorerefant])
+        refantignore = utils.build_refantignore(refantignore=self.inputs.refantignore, ignorerefant=self.ignorerefant)
         refantfield = self.inputs.context.evla['msinfo'][m.name].calibrator_field_select_string
         # PIPE-595: if refant list is not provided, compute refants else use provided refant list.
         if len(self.inputs.refant) == 0:
@@ -245,7 +245,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         bpdgain_touse = tablebase + table_suffix[0]
 
         LOG.debug("WEAKBP: " + str(self.inputs.weakbp))
-
+        spw_solint = {}
         if self.inputs.weakbp:
             LOG.debug("USING WEAKBP HEURISTICS")
             interp = weakbp(self.inputs.vis, bpcaltable, context=self.inputs.context, RefAntOutput=RefAntOutput,
@@ -253,13 +253,12 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
                             executor=self._executor, spw=','.join(spwlist))
         else:
             LOG.debug("Using REGULAR heuristics")
-            do_bandpass(self.inputs.vis, bpcaltable, context=self.inputs.context, RefAntOutput=RefAntOutput,
+            spw_solint = do_bandpass(self.inputs.vis, bpcaltable, context=self.inputs.context, RefAntOutput=RefAntOutput,
                         spw=','.join(spwlist), ktypecaltable=ktypecaltable, bpdgain_touse=bpdgain_touse,
                         solint='inf', append=False, executor=self._executor)
 
             AllCalTables = sorted(self.inputs.context.callibrary.active.get_caltable())
             AllCalTables.append(ktypecaltable)
-            # AllCalTables.append(bpdgain_touse)
             AllCalTables.append(bpcaltable)
             ntables = len(AllCalTables)
             interp = [''] * ntables
@@ -273,9 +272,9 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         flaggedSolnApplycaldelay = getCalFlaggedSoln(ktypecaltable)
 
         return bpdgain_touse, gtypecaltable, ktypecaltable, bpcaltable, flaggedSolnApplycalbandpass, \
-               flaggedSolnApplycaldelay
+               flaggedSolnApplycaldelay, spw_solint
 
-    def _do_gtype_delaycal(self, caltable: str = None, RefAntOutput: List[str] = None, spwlist: List[str] = []) -> bool:
+    def _do_gtype_delaycal(self, caltable: str = None, RefAntOutput: list[str] = None, spwlist: list[str] = []) -> bool:
         """Perform a G-Type delay calibration with CASA task gaincal
 
         Args:
@@ -337,7 +336,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         return True
 
     def _do_ktype_delaycal(self, caltable: str = None, addcaltable: str = None,
-                           RefAntOutput: List[str] = None, spw: str = '') -> bool:
+                           RefAntOutput: list[str] = None, spw: str = '') -> bool:
         """Perform a K-Type delay calibration with CASA task gaincal
 
         Args:
@@ -401,7 +400,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
 
         return True
 
-    def _check_flagSolns(self, flaggedSolnResult: Dict, RefAntOutput: List[str] = None) -> (float, List[str]):
+    def _check_flagSolns(self, flaggedSolnResult: dict, RefAntOutput: list[str] = None) -> tuple[float, list[str]]:
         """Change reference antenna list based on a critical fraction of flagged solutions
             (defined in the domain ms object)
 
@@ -435,7 +434,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         return fracFlaggedSolns
 
     def _do_gtype_bpdgains(self, caltable: str, addcaltable: str = None, solint: str = 'int',
-                           RefAntOutput: List[str] = None, spwlist: List[str] = []) -> bool:
+                           RefAntOutput: list[str] = None, spwlist: list[str] = []) -> bool:
         """Perform a G-Type cal with CASA task gaincal on the bp'd gaintable
 
         Args:

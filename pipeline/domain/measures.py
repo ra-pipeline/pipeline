@@ -14,7 +14,7 @@ import pipeline.infrastructure.utils as utils
 from . import unitformat
 
 
-class ArcUnits(object):
+class ArcUnits:
     DEGREE           = { 'name' : 'DEGREE'           , 'symbol' : 'd'   , 'html' : '&#x00B0;' , 'units per circle' : decimal.Decimal(360)        }
     RADIAN           = { 'name' : 'RADIAN'           , 'symbol' : 'rad' , 'html' : 'rad'      , 'units per circle' : decimal.Decimal(str(2*math.pi))  }
     PERCENT          = { 'name' : 'PERCENT'          , 'symbol' : '%'   , 'html' : '&#x0025;' , 'units per circle' : decimal.Decimal(100)        }
@@ -26,7 +26,7 @@ class ArcUnits(object):
     MILLI_ARC_SECOND = { 'name' : 'MILLI_ARC_SECOND' , 'symbol' : 'mas' , 'html' : 'mas'      , 'units per circle' : decimal.Decimal(1296000000) }
 
 
-class DistanceUnits(object):
+class DistanceUnits:
     ANGSTROM          = { 'name' : 'ANGSTROM'          , 'symbol' : '\\u212B', 'metres' : decimal.Decimal('1e-10')              }
     NANOMETRE         = { 'name' : 'NANOMETRE'         , 'symbol' : 'nm'     , 'metres' : decimal.Decimal('1e-9')               }
     MICROMETRE        = { 'name' : 'MICROMETRE'        , 'symbol' : '\\u00B5m', 'metres' : decimal.Decimal('1e-6')               }
@@ -44,7 +44,7 @@ class DistanceUnits(object):
     MEGAPARSEC        = { 'name' : 'MEGAPARSEC'        , 'symbol' : 'Mpc'    , 'metres' : decimal.Decimal('3.085677581306e22')  }
 
 
-class FluxDensityUnits(object):
+class FluxDensityUnits:
     YOCTOJANSKY = { 'name' : 'YOCTOJANSKY' , 'symbol' : 'yJy'      , 'Jy' : decimal.Decimal('1e-24') }
     ZEPTOJANSKY = { 'name' : 'ZEPTOJANSKY' , 'symbol' : 'zJy'      , 'Jy' : decimal.Decimal('1e-21') }
     ATTOJANSKY  = { 'name' : 'ATTOJANSKY'  , 'symbol' : 'aJy'      , 'Jy' : decimal.Decimal('1e-18') }
@@ -68,7 +68,7 @@ class FluxDensityUnits(object):
     YOTTAJANSKY = { 'name' : 'YOTTAJANSKY' , 'symbol' : 'YJy'      , 'Jy' : decimal.Decimal('1e24')  }
 
 
-class FrequencyUnits(object):
+class FrequencyUnits:
     YOCTOHERTZ = { 'name' : 'YOCTOHERTZ' , 'symbol' : 'yHz'      , 'hz' : decimal.Decimal('1e-24') }
     ZEPTOHERTZ = { 'name' : 'ZEPTOHERTZ' , 'symbol' : 'zHz'      , 'hz' : decimal.Decimal('1e-21') }
     ATTOHERTZ  = { 'name' : 'ATTOHERTZ'  , 'symbol' : 'aHz'      , 'hz' : decimal.Decimal('1e-18') }
@@ -92,13 +92,13 @@ class FrequencyUnits(object):
     YOTTAHERTZ = { 'name' : 'YOTTAHERTZ' , 'symbol' : 'YHz'      , 'hz' : decimal.Decimal('1e24')  }
 
 
-class LinearVelocityUnits(object):
+class LinearVelocityUnits:
     METRES_PER_SECOND     = { 'name' : 'METRES_PER_SECOND'     , 'symbol' : 'm/s'  , 'mps' : decimal.Decimal(1)         }
     KILOMETRES_PER_SECOND = { 'name' : 'KILOMETERS_PER_SECOND' , 'symbol' : 'km/s' , 'mps' : decimal.Decimal(1000)      }
     Z                     = { 'name' : 'Z'                     , 'symbol' : 'Z'    , 'mps' : decimal.Decimal(299792458) }
 
 
-class FileSizeUnits(object):
+class FileSizeUnits:
     BYTES     = { 'name' : 'BYTES'    , 'symbol' : 'b' , 'bytes' : decimal.Decimal(1)               }
     KILOBYTES = { 'name' : 'KILOBYTES', 'symbol' : 'kb', 'bytes' : decimal.Decimal('1024')          }
     MEGABYTES = { 'name' : 'MEGABYTES', 'symbol' : 'Mb', 'bytes' : decimal.Decimal('1048576')       }
@@ -630,7 +630,7 @@ class Frequency(ComparableUnit):
                                                      self.units['name'])
 
 
-class FrequencyRange(object):
+class FrequencyRange:
     __slots__ = ('low', 'high')
 
     def __getstate__(self) -> tuple[Frequency, Frequency]:
@@ -852,7 +852,7 @@ class Latitude(EquatorialArc):
             value: The magnitude for this latitude.
             units: The units for this latitude.
         """
-        super(Latitude, self).__init__(value, units)
+        super().__init__(value, units)
         perCircle = self.units['units per circle']
         perHalf = perCircle / 2
         perQuarter = perCircle / 4
@@ -988,7 +988,7 @@ class Longitude(EquatorialArc):
             value: The magnitude of the longitude.
             units: The units of longitude.
         """
-        super(Longitude, self).__init__(value, units)
+        super().__init__(value, units)
         perCircle = self.units['units per circle']
 
         # normalize value to < 360 degrees
@@ -1108,7 +1108,7 @@ class Longitude(EquatorialArc):
                                          utils.round_half_up(s, 2), ArcUnits.SECOND['symbol'])
 
 
-class TimeInterval(object):
+class TimeInterval:
     """
     Logical representation of a time interval.
 
@@ -1118,7 +1118,7 @@ class TimeInterval(object):
     """
     __slots__ = ('start', 'end')
 
-    FOREVER = datetime.datetime(9999, 12, 31)
+    FOREVER = datetime.datetime(9999, 12, 31, tzinfo=datetime.timezone.utc)
 
     def __getstate__(self) -> tuple[datetime.datetime, datetime.datetime]:
         return self.start, self.end
@@ -1216,6 +1216,6 @@ class TimeInterval(object):
         Returns an open-ended TimeInterval starting from now.
 
         Returns:
-            TimeInterval object from "utcnow()" until 31-12-9999.
+            TimeInterval object.
         """
-        return cls(datetime.datetime.utcnow(), cls.FOREVER)
+        return cls(datetime.datetime.now(datetime.timezone.utc), cls.FOREVER)

@@ -14,7 +14,7 @@ def is_rejected(keep):
 <%
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.pyplot import cm
+from matplotlib import colormaps
 import matplotlib.colors as colors
 
 def fmt_rms(rms,scale=1.e3):
@@ -30,7 +30,7 @@ def val2color(x, cmap_name='Greys',vmin=None,vmax=None):
     """
     norm=colors.Normalize(vmin, vmax)
     x_norm=0.05+0.5*(x-vmin) / (vmax-vmin)
-    cmap=cm.get_cmap(name=cmap_name)
+    cmap=colormaps.get_cmap(cmap_name)
     rgb=cmap(x_norm)
     rgb_hex=colors.to_hex(rgb)
     return rgb_hex
@@ -49,7 +49,7 @@ def dev2color(x):
 
 def dev2shade(x):
     color_list=['gainsboro','lightgreen','yellow','red']
-    cmap=cm.get_cmap(name='Reds')
+    cmap=colormaps.get_cmap('Reds')
     absx=abs(x)
     if absx<4 and absx>=3:
       rgb_hex=colors.to_hex(cmap(0.2))
@@ -144,8 +144,7 @@ $(function () {
 
     <%
     plots = rmsplots[ms_name]
-    #spw_colname=[plot[0].parameters['virtspw'] for plot in plots]
-    stats=plotter.result.stats
+    stats=plotter.result.rmsstats
     stats_summary=plotter.result.stats_summary
     %>
 
@@ -188,7 +187,7 @@ $(function () {
         </tr>
        
 
-        % for idx, stats_per_spw in enumerate(stats):
+        % for idx, rmsfilename in enumerate(stats):
             <tr>
             <%
             cell_style=[f'border-left: {border_line}',f'border-right: {border_line}']
@@ -196,15 +195,15 @@ $(function () {
                 cell_style.append('border-bottom: '+border_line)          
             cell_style='style="{}"'.format(('; ').join(cell_style))
             cell_title=''                    
-            reject_desc=is_rejected(info_dict.get(stats_per_spw['virtspw'],True))
+            reject_desc=is_rejected(info_dict.get(stats[rmsfilename]['virtspw'],True))
             %> 
 
-            <td ${cell_style}><b>${stats_per_spw['virtspw']} ${reject_desc}</b></td>
+            <td ${cell_style}><b>${stats[rmsfilename]['virtspw']} ${reject_desc}</b></td>
             % for idx_pol,name_pol in enumerate(['I','Q','U','V']):
                 % for item, cmap in [('Max','Reds'),('Min','Oranges'),('Mean','Greens'),('Median','Blues'),('Sigma','Purples'),('MADrms','Greys')]:
                     <%
                     cell_style=[]
-                    dev_in_madrms=stats_per_spw[item.lower()][idx_pol]-stats_summary[item.lower()]['spwwise_median'][idx_pol]
+                    dev_in_madrms=stats[rmsfilename][item.lower()][idx_pol]-stats_summary[item.lower()]['spwwise_median'][idx_pol]
                     madrms=stats_summary[item.lower()]['spwwise_madrms'][idx_pol]
                     if abs(dev_in_madrms)>madrms*3.0:
                         #bgcolor=val2color(dev_in_madrms/madrms,cmap_name='Greys',vmin=3,vmax=10)
@@ -219,7 +218,7 @@ $(function () {
                     cell_style+=' title="{}" data-toggle="tooltip"'.format(cell_title)
                     %>                    
                     
-                    <td ${cell_style}>${fmt_rms(stats_per_spw[item.lower()][idx_pol])}</td>
+                    <td ${cell_style}>${fmt_rms(stats[rmsfilename][item.lower()][idx_pol])}</td>
                 % endfor
             % endfor
             </tr>

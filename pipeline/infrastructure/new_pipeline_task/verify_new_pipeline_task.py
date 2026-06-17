@@ -8,7 +8,14 @@ import sys
 import argparse
 
 import pipeline
+
+from pipeline.infrastructure import launcher
+
 pipeline.initcli()
+
+from pipeline.h.cli import h_init, h_save
+from pipeline.hifv.cli import hifv_importdata
+
 
 class NewTask:
 
@@ -47,7 +54,7 @@ class NewTask:
         hifv_importdata(vis=[vis], session=['session_1'], overwrite=False)
         h_save()
 
-        context = pipeline.Pipeline(context='last').context
+        context = launcher.Pipeline(context='last').context
 
         # ---------------------------
         #  execute the task

@@ -1,21 +1,21 @@
 """QA score calculation for baseline subtraction task."""
-import os
-from typing import TYPE_CHECKING, List, Optional, Union
+from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+from pipeline.hsd.tasks.common import qautils
 import pipeline.infrastructure.basetask as basetask
-import pipeline.infrastructure.logging as logging
+import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.pipelineqa as pqa
-import pipeline.infrastructure.renderer.logger as logger
 import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as qacalc
 
-from ..common import compress
 from . import baseline
 
 if TYPE_CHECKING:
     from pipeline.infrastructure.launcher import Context
 
-LOG = logging.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class SDBaselineQAHandler(pqa.QAPlugin):
@@ -24,7 +24,23 @@ class SDBaselineQAHandler(pqa.QAPlugin):
     result_cls = baseline.SDBaselineResults
     child_cls = None
 
-    def handle(self, context: 'Context', result: result_cls) -> None:
+    def __init__(self):
+        """
+        register the parameters for longmsg formatter and aggregator
+        """
+        # register the properties for 'score_sd_line_detection'
+        metric_name = 'score_sd_line_detection'
+        qautils.registry.register_longmsg_keys(metric_name, ['vis', 'field', 'spw', 'ant', 'pol'])
+        qautils.registry.register_keys_to_aggregate(metric_name, ['vis', 'field', 'spw', 'ant', 'pol'])
+
+        # register the properties for 'score_sd_baseline_quality'
+        metric_name = 'score_sd_baseline_quality'
+        qautils.registry.register_keys_to_aggregate(metric_name,
+                                                     ['vis', 'field', 'spw', 'ant', 'pol'])
+        qautils.registry.register_longmsg_keys(metric_name,
+                                                ['vis', 'field', 'spw', 'ant', 'pol'])
+
+    def handle(self, context: Context, result: result_cls) -> None:
         """Compute QA score for baseline subtraction task.
 
         QA scoring is performed based on the following metric:
@@ -46,8 +62,11 @@ class SDBaselineQAHandler(pqa.QAPlugin):
             qacalc.score_sd_line_detection(context.observing_run.ms_reduction_group, result)
         )
 
+        # reformat the messages and append to result.qa.pool
+        formatter = qautils.QAScoreFormatter()
+        for qascore in scores:
+            formatter.update_longmsg(qascore)
         result.qa.pool.extend(scores)
-
 
 class SDBaselineListQAHandler(pqa.QAPlugin):
     """QA handler to handle list of results."""
@@ -55,7 +74,7 @@ class SDBaselineListQAHandler(pqa.QAPlugin):
     result_cls = basetask.ResultsList
     child_cls = baseline.SDBaselineResults
 
-    def handle(self, context: 'Context', result: result_cls) -> None:
+    def handle(self, context: Context, result: result_cls) -> None:
         """Compute QA score for baseline subtraction task.
 
         Collate and join QA scores from results instances included in the

@@ -1,13 +1,14 @@
 """Plotter for baseline subtraction result."""
+from __future__ import annotations
+
 import collections
 import itertools
 import os
-from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING
 
 import matplotlib.figure as figure
 import matplotlib.pyplot as plt
 import numpy
-from numpy.ma.core import MaskedArray
 import statistics
 
 import pipeline.infrastructure as infrastructure
@@ -24,11 +25,16 @@ from ..common.display import DPIDetail, ch_to_freq, sd_polmap
 from ..common import direction_utils as dirutil
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+    from typing import Any
+
+    from numpy.ma.core import MaskedArray
+
     from pipeline.infrastructure.launcher import Context
     from pipeline.domain.datatable import DataTableImpl as DataTable
     from pipeline.domain.measurementset import MeasurementSet
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 # A named tuple to store statistics of baseline quality
 BinnedStat = collections.namedtuple(
@@ -38,7 +44,7 @@ BinnedStat = collections.namedtuple(
 QualityStat = collections.namedtuple('QualityStat', 'vis field spw ant pol stat')
 
 
-class PlotterPool(object):
+class PlotterPool:
     """Pool class to hold resources for plotting.
 
     TODO: this class is not useful. Should be removed in future.
@@ -52,9 +58,9 @@ class PlotterPool(object):
     def create_plotter(self,
                        num_ra: int,
                        num_dec: int,
-                       ralist: List[float],
-                       declist: List[float],
-                       direction_reference: Optional[str] = None,
+                       ralist: list[float],
+                       declist: list[float],
+                       direction_reference: str | None = None,
                        brightnessunit: str = 'Jy/beam',
                        freq_frame: str = '') -> display.SDSparseMapPlotter:
         """Create plotter instance.
@@ -85,7 +91,7 @@ class PlotterPool(object):
             plotter.done()
 
 
-class PlotDataStorage(object):
+class PlotDataStorage:
     """Storage class to hold array data for plotting."""
 
     def __init__(self) -> None:
@@ -150,10 +156,10 @@ class PlotDataStorage(object):
         self.integrated_data = numpy.reshape(self.integrated_data_storage[:num_integrated], (num_pol, num_chan))
 
 
-class BaselineSubtractionDataManager(object):
+class BaselineSubtractionDataManager:
     """Class to produce data of baseline subtraction plot and quality statistics."""
 
-    def __init__(self, ms: 'MeasurementSet', blvis: str, context: 'Context', datatable: 'DataTable') -> None:
+    def __init__(self, ms: MeasurementSet, blvis: str, context: Context, datatable: DataTable) -> None:
         """Construct BaselineSubtractionDataManager instance.
 
         Args:
@@ -188,19 +194,20 @@ class BaselineSubtractionDataManager(object):
         self.prefit_storage.resize_storage(num_ra, num_dec, num_pol, num_chan)
         self.postfit_storage.resize_storage(num_ra, num_dec, num_pol, num_chan)
 
-    def store_result_get_data(self,
-                              num_ra: int,
-                              num_dec: int,
-                              rowlist: List[Dict[str, Union[int, float, List[int]]]],
-                              npol: int,
-                              nchan: int,
-                              out_rowmap: Optional[dict] = None,
-                              in_rowmap: Optional[dict] = None
-                              ) -> Tuple[numpy.ma.masked_array,
-                                         numpy.ma.masked_array,
-                                         Optional[numpy.ma.masked_array],
-                                         Optional[numpy.ma.masked_array],
-                                         Optional[numpy.ma.masked_array]]:
+    def store_result_get_data(
+            self,
+            num_ra: int,
+            num_dec: int,
+            rowlist: list[dict[str, int | float | list[int]]],
+            npol: int,
+            nchan: int,
+            out_rowmap: dict | None = None,
+            in_rowmap: dict | None = None,
+            ) -> tuple[MaskedArray,
+                        MaskedArray,
+                        MaskedArray | None,
+                        MaskedArray | None,
+                        MaskedArray | None]:
         """
         Args:
             num_ra: Number of panels along horizontal axis
@@ -251,10 +258,10 @@ class BaselineSubtractionDataManager(object):
         origin_ms_id: int,
         antid: int,
         virtual_spwid: int,
-        polids: List[int],
-        grid_table: List[List[Union[int, float, numpy.ndarray]]],
+        polids: list[int],
+        grid_table: list[list[int | float | numpy.ndarray]],
         org_direction: dirutil.Direction
-    ) -> Tuple[int, int, int, List[Dict[str, Union[int, float, List[int]]]]]:
+    ) -> tuple[int, int, int, list[dict[str, int | float | list[int]]]]:
         """Create and analyze plot table.
 
         Extract datatable row ids that match the selection given by
@@ -318,6 +325,7 @@ class BaselineSubtractionDataManager(object):
             dec = numpy.mean(declist)
             if org_direction is not None:
                 ra, dec = dirutil.direction_recover(ra, dec, org_direction)
+                ra = ra % 360.0  # keep ra within [0, 360)
 
             rowlist[row_index].update(
                     {"RAID": raid, "DECID": decid, "RA": ra, "DEC": dec,
@@ -327,7 +335,7 @@ class BaselineSubtractionDataManager(object):
 
         return num_ra, num_dec, num_plane, rowlist
 
-    def _pick_representative_with_distance( self, index_list: List[int], valid_index_list: List[int] ) -> int:
+    def _pick_representative_with_distance( self, index_list: list[int], valid_index_list: list[int] ) -> int:
         """
         Pick the representative row with distance measures
 
@@ -382,13 +390,13 @@ class BaselineSubtractionDataManager(object):
         num_dec: int,
         num_chan: int,
         num_pol: int,
-        rowlist: List[Dict[str, Union[int, float, List[int]]]],
-        rowmap: Optional[dict] = None,
-        integrated_data_storage: Optional[numpy.ndarray] = None,
-        map_data_storage: Optional[numpy.ndarray] = None,
-        map_mask_storage: Optional[numpy.ndarray] = None,
+        rowlist: list[dict[str, int | float | list[int]]],
+        rowmap: dict | None = None,
+        integrated_data_storage: numpy.ndarray | None = None,
+        map_data_storage: numpy.ndarray | None = None,
+        map_mask_storage: numpy.ndarray | None = None,
         produce_averaged_data: bool = False
-    ) -> Tuple[numpy.ma.masked_array, ...]:
+    ) -> tuple[MaskedArray, ...]:
         """Create array data for sparse map.
 
         Computes the following masked array data for sparse map:
@@ -565,7 +573,7 @@ class BaselineSubtractionDataManager(object):
 class BaselineSubtractionPlotManager(BaselineSubtractionDataManager):
     """Manages any operation necessary to produce baseline subtraction plot."""
 
-    def __init__(self, ms: 'MeasurementSet', blvis: str, context: 'Context', datatable: 'DataTable') -> None:
+    def __init__(self, ms: MeasurementSet, blvis: str, context: Context, datatable: DataTable) -> None:
         """Construct BaselineSubtractionPlotManager instance.
 
         Args:
@@ -597,9 +605,9 @@ class BaselineSubtractionPlotManager(BaselineSubtractionDataManager):
     @staticmethod
     def _generate_plot_meta_table(
         spw_id: int,
-        polarization_ids: List[int],
-        grid_table: List[List[Union[int, float, numpy.ndarray]]]
-    ) -> Generator[List[Union[int, float]], None, None]:
+        polarization_ids: list[int],
+        grid_table: list[list[int | float | numpy.ndarray]]
+    ) -> Generator[list[int | float], None, None]:
         """Extract necessary data from grid_table.
 
         Rows of grid_table are filtered by spw and polarization ids,
@@ -621,9 +629,9 @@ class BaselineSubtractionPlotManager(BaselineSubtractionDataManager):
     @staticmethod
     def generate_plot_meta_table(
         spw_id: int,
-        polarization_ids: List[int],
-        grid_table: List[List[Union[int, float, numpy.ndarray]]]
-    ) -> List[List[Union[int, float]]]:
+        polarization_ids: list[int],
+        grid_table: list[list[int | float | numpy.ndarray]]
+    ) -> list[list[int | float]]:
         """Return metadata table for plotting.
 
         Metadata table for given spw and polarization ids contains
@@ -659,9 +667,9 @@ class BaselineSubtractionPlotManager(BaselineSubtractionDataManager):
         origin_ms_id: int,
         antenna_id: int,
         spw_id: int,
-        polarization_ids: List[int],
-        grid_table: List[List[Union[int, float, numpy.ndarray]]],
-        grid_list: List[Tuple[int, int]]
+        polarization_ids: list[int],
+        grid_table: list[list[int | float | numpy.ndarray]],
+        grid_list: list[tuple[int, int]]
     ) -> Generator[numpy.ndarray, None, None]:
         """Yield list of datatable row ids that match selection.
 
@@ -691,11 +699,11 @@ class BaselineSubtractionPlotManager(BaselineSubtractionDataManager):
         origin_ms_id: int,
         antenna_id: int,
         spw_id: int,
-        polarization_ids: List[int],
-        grid_table: List[List[Union[int, float, numpy.ndarray]]],
-        plot_table: List[List[Union[int, float]]],
-        each_plane: List[int]
-    ) -> List[int]:
+        polarization_ids: list[int],
+        grid_table: list[list[int | float | numpy.ndarray]],
+        plot_table: list[list[int | float]],
+        each_plane: list[int]
+    ) -> list[int]:
         """Generate list of datatable row ids for plotting.
 
         Extract list of datatable row ids that matches selection for
@@ -732,23 +740,23 @@ class BaselineSubtractionPlotManager(BaselineSubtractionDataManager):
         field_id: int,
         antenna_id: int,
         spw_id: int,
-        postfit_integrated_data: numpy.ma.masked_array,
-        postfit_map_data: numpy.ma.masked_array,
-        prefit_integrated_data: numpy.ma.masked_array,
-        prefit_map_data: numpy.ma.masked_array,
-        prefit_averaged_data: numpy.ma.masked_array,
+        postfit_integrated_data: MaskedArray,
+        postfit_map_data: MaskedArray,
+        prefit_integrated_data: MaskedArray,
+        prefit_map_data: MaskedArray,
+        prefit_averaged_data: MaskedArray,
         num_ra: int,
         num_dec: int,
-        rowlist: List[Dict[str, Union[int, float, List[int]]]],
+        rowlist: list[dict[str, int | float | list[int]]],
         npol: int,
-        frequency: List[float],
-        grid_table: Optional[List[List[Union[int, float, numpy.ndarray]]]] = None,
-        deviation_mask: Optional[List[Tuple[int, int]]] = None,
-        channelmap_range: Optional[List[Tuple[int, int, bool]]] = None,
-        edge: Optional[List[int]] = None,
+        frequency: list[float],
+        grid_table: list[list[int | float | numpy.ndarray] | None] = None,
+        deviation_mask: list[tuple[int, int] | None] = None,
+        channelmap_range: list[tuple[int, int, bool] | None] = None,
+        edge: list[int] | None = None,
         showatm: bool = True,
-        in_rowmap: Optional[dict] = None
-    ) -> List[compress.CompressedObj]:
+        in_rowmap: dict | None = None
+    ) -> list[compress.CompressedObj]:
         """Create various types of plots.
 
         For given set of field, antenna, and spw ids, this method generates
@@ -892,24 +900,24 @@ class BaselineSubtractionPlotManager(BaselineSubtractionDataManager):
         self,
         prefit_figfile_prefix: str,
         postfit_figfile_prefix: str,
-        postfit_integrated_data: numpy.ma.masked_array,
-        postfit_map_data: numpy.ma.masked_array,
-        prefit_integrated_data: numpy.ma.masked_array,
-        prefit_map_data: numpy.ma.masked_array,
-        prefit_averaged_data: numpy.ma.masked_array,
+        postfit_integrated_data: MaskedArray,
+        postfit_map_data: MaskedArray,
+        prefit_integrated_data: MaskedArray,
+        prefit_map_data: MaskedArray,
+        prefit_averaged_data: MaskedArray,
         num_ra: int,
         num_dec: int,
-        rowlist: List[Dict[str, Union[int, float, List[int]]]],
+        rowlist: list[dict[str, int | float | list[int]]],
         npol: int,
-        frequency: List[float],
-        deviation_mask: Optional[List[Tuple[int, int]]],
-        line_range: Optional[List[Tuple[int, int]]],
-        atm_transmission: Optional[numpy.ndarray],
-        atm_frequency: Optional[numpy.ndarray],
-        edge: Optional[List[int]],
-        in_rowmap: Optional[dict] = None,
+        frequency: list[float],
+        deviation_mask: list[tuple[int, int] | None],
+        line_range: list[tuple[int, int] | None],
+        atm_transmission: numpy.ndarray | None,
+        atm_frequency: numpy.ndarray | None,
+        edge: list[int] | None,
+        in_rowmap: dict | None = None,
         freq_frame: str = ''
-    ) -> Dict[str, Dict[int, str]]:
+    ) -> dict[str, dict[int, str]]:
         """Create various type of plots.
 
         This method produces the following plots.
@@ -976,8 +984,7 @@ class BaselineSubtractionPlotManager(BaselineSubtractionDataManager):
         plotter.set_edge(edge)
         plotter.set_atm_transmission(atm_transmission, atm_frequency)
         plotter.set_global_scaling()
-        if utils.is_nro(self.context):
-            plotter.set_channel_axis()
+        plotter.set_channel_axis()
         for ipol in range(npol):
             postfit_figfile = postfit_figfile_prefix + '_pol%s.png' % ipol
             # LOG.info('#TIMING# Begin SDSparseMapPlotter.plot(postfit,pol%s)'%(ipol))
@@ -1054,9 +1061,9 @@ class BaselineSubtractionPlotManager(BaselineSubtractionDataManager):
     def plot_flatness_profile(
         self,
         postfit_figfile_prefix: str,
-        postfit_integrated_data: numpy.ma.masked_array,
+        postfit_integrated_data: MaskedArray,
         npol: int
-    ) -> Dict[str, Dict[int, str]]:
+    ) -> dict[str, dict[int, str]]:
         """Create plots of baseline flatness profile of a spectrum (after baseline subtraction).
 
         Args:
@@ -1086,7 +1093,7 @@ class BaselineSubtractionPlotManager(BaselineSubtractionDataManager):
 class BaselineSubtractionQualityManager(BaselineSubtractionDataManager):
     """Class to calculate quality statistics."""
 
-    def __init__(self, ms: 'MeasurementSet', blvis: str, context: 'Context', datatable: 'DataTable') -> None:
+    def __init__(self, ms: MeasurementSet, blvis: str, context: Context, datatable: DataTable) -> None:
         """Construct BaselineSubtractionQualityManager instance.
 
         Args:
@@ -1100,10 +1107,10 @@ class BaselineSubtractionQualityManager(BaselineSubtractionDataManager):
         self.binned_freq = None
         self.binned_data = None
 
-    def analyze_flatness(self, spectrum: List[float], frequency: List[float],
-                         line_range: Optional[List[Tuple[float, float]]],
-                         deviation_mask: Optional[List[Tuple[int, int]]],
-                         edge: Tuple[int, int]) -> BinnedStat:
+    def analyze_flatness(self, spectrum: list[float], frequency: list[float],
+                         line_range: list[tuple[float, float] | None],
+                         deviation_mask: list[tuple[int, int] | None],
+                         edge: tuple[int, int]) -> BinnedStat:
         """
         Create a data of baseline flatness of a spectrum.
 
@@ -1200,10 +1207,10 @@ class BaselineSubtractionQualityManager(BaselineSubtractionDataManager):
 
         return stat
 
-    def plot_flatness(self, spectrum: List[float], frequency: List[float],
-                      line_range: Optional[List[Tuple[float, float]]],
-                      deviation_mask: Optional[List[Tuple[int, int]]],
-                      edge: Tuple[int, int], brightnessunit: str,
+    def plot_flatness(self, spectrum: list[float], frequency: list[float],
+                      line_range: list[tuple[float, float] | None],
+                      deviation_mask: list[tuple[int, int] | None],
+                      edge: tuple[int, int], brightnessunit: str,
                       freq_frame: str, stat: BinnedStat,
                       figfile: str) -> None:
         """
@@ -1286,11 +1293,11 @@ class BaselineSubtractionQualityManager(BaselineSubtractionDataManager):
         plt.savefig(figfile, dpi=DPIDetail)
 
     def calculate_baseline_quality_stat(self, field_id: int, ant_id: int, spw_id: int,
-                                        postfit_integrated_data: numpy.ma.masked_array,
-                                        npol: int, frequency: List[float],
-                                        deviation_mask: Optional[List[Tuple[int, int]]],
-                                        channelmap_range: Optional[List[Tuple[int, int, bool]]],
-                                        edge: Optional[List[int]]) -> List[QualityStat]:
+                                        postfit_integrated_data: MaskedArray,
+                                        npol: int, frequency: list[float],
+                                        deviation_mask: list[tuple[int, int] | None],
+                                        channelmap_range: list[tuple[int, int, bool] | None],
+                                        edge: list[int] | None) -> list[QualityStat]:
         """Calculate quality statistics after baseline subtraction.
 
         Args:
@@ -1379,7 +1386,7 @@ class BaselineSubtractionQualityManager(BaselineSubtractionDataManager):
         return baseline_quality_stat
 
 
-def generate_grid_panel_map(ngrid: int, npanel: int, num_plane: int = 1) -> Generator[List[int], None, None]:
+def generate_grid_panel_map(ngrid: int, npanel: int, num_plane: int = 1) -> Generator[list[int], None, None]:
     """Yield list of grid table indices that belong to the sparse map panel.
 
     Args:
@@ -1388,7 +1395,7 @@ def generate_grid_panel_map(ngrid: int, npanel: int, num_plane: int = 1) -> Gene
         num_plane: Number of planes per grid position. Defaults to 1.
 
     Yields:
-        List of indices for the grid table
+        list of indices for the grid table
     """
     ng = ngrid // npanel
     mg = ngrid % npanel
@@ -1408,7 +1415,7 @@ def configure_1d_panel(
     nx: int,
     ny: int,
     num_plane: int = 1
-) -> Tuple[List[List[int]], List[List[int]]]:
+) -> tuple[list[list[int]], list[list[int]]]:
     """Configure linear mapping between grid table index and sparse map panel.
 
     When number of grid positions, nx * ny, exceeds 50, neighboring positions
@@ -1447,11 +1454,11 @@ def configure_1d_panel(
 
 
 def configure_2d_panel(
-    xpanel: List[List[int]],
-    ypanel: List[List[int]],
+    xpanel: list[list[int]],
+    ypanel: list[list[int]],
     ngridx: int,
     num_plane: int = 3
-) -> List[List[int]]:
+) -> list[list[int]]:
     """Confure two-dimensional mapping between grid table and sparse map panel.
 
     Args:
@@ -1476,11 +1483,11 @@ def configure_2d_panel(
 
 
 def get_lines(
-    datatable: 'DataTable',
+    datatable: DataTable,
     num_ra: int,
     num_pol: int,
-    rowlist: List[Dict[str, Union[int, float, List[int]]]]
-) -> List[collections.defaultdict]:
+    rowlist: list[dict[str, int | float | list[int]]]
+) -> list[collections.defaultdict]:
     """Get detected line ranges per sparse map panel.
 
     Line information is taken from the datatable row specified
@@ -1516,12 +1523,12 @@ def get_lines(
 
 def get_lines2(
     infile: str,
-    datatable: 'DataTable',
+    datatable: DataTable,
     num_ra: int,
-    rowlist: List[Dict[str, Union[int, float, List[int]]]],
-    polids: List[int],
-    rowmap: Optional[dict] = None
-) -> List[collections.defaultdict]:
+    rowlist: list[dict[str, int | float | list[int]]],
+    polids: list[int],
+    rowmap: dict | None = None
+) -> list[collections.defaultdict]:
     """Get detected line ranges per sparse map panel.
 
     get_lines2 performs the same operation with get_lines from
@@ -1579,8 +1586,8 @@ def get_lines2(
     return lines_map
 
 
-def binned_mean_ma(x: List[float], masked_data: MaskedArray,
-                   nbin: int) -> Tuple[numpy.ndarray, MaskedArray]:
+def binned_mean_ma(x: list[float], masked_data: MaskedArray,
+                   nbin: int) -> tuple[numpy.ndarray, MaskedArray]:
     """
     Bin an array.
 
@@ -1624,7 +1631,7 @@ def binned_mean_ma(x: List[float], masked_data: MaskedArray,
     return binned_x, binned_data
 
 
-def sort_with_key( arr: List[Dict[str, Any]], key: str, reverse: Optional[bool] = False ) -> List[Dict[str, Any]]:
+def sort_with_key( arr: list[dict[str, Any]], key: str, reverse: bool | None = False ) -> list[dict[str, Any]]:
     """
     Sort the list of dictionaries with the value of the specified key in each list component
 

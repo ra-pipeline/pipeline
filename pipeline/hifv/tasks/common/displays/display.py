@@ -10,7 +10,7 @@ from pipeline.infrastructure import casa_tools
 LOG = infrastructure.get_logger(__name__)
 
 
-class Chart(object):
+class Chart:
     def plot(self):
         task_plots = {
             "testBPdcals": [self.get_plot_wrapper('BPcal'), self.get_plot_wrapper('delaycal')],

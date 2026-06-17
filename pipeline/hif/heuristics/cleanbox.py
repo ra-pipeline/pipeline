@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os.path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -10,9 +10,13 @@ import pipeline.infrastructure.utils as utils
 from pipeline.infrastructure import casa_tools
 
 if TYPE_CHECKING:
-    import casatools.image
-    from pipeline.infrastructure.casa_tools import _logging_image_cls as LoggingImage
+    from typing import Any
 
+    from numpy.typing import NDArray
+
+    import casatools.image
+
+    from pipeline.infrastructure.casa_tools import _logging_image_cls as LoggingImage
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -213,7 +217,7 @@ def analyse_clean_result(multiterm, model, restored, residual, pb, cleanmask, pb
                 try:
                     npoints_mask = flattened_mask_image.statistics(mask='"%s" > 0.1' % (os.path.basename(flattened_mask)), axes=[0, 1, 3], robust=False, stretch=True)['npts'][0]
                     if npoints_mask.shape != (0,):
-                        nonpbcor_image_cleanmask_npoints = int(npoints_mask)
+                        nonpbcor_image_cleanmask_npoints = int(np.asarray(npoints_mask).item())
                     else:
                         nonpbcor_image_cleanmask_npoints = 0
                 except:
@@ -424,7 +428,7 @@ def image_statistics_per_stokes(
     stokescontrol: str = 'a',
     region: dict | None = None,
     **kwargs: Any,
-) -> dict[str, np.ndarray]:
+) -> dict[str, NDArray]:
     """Compute statistics for each Stokes plane of a 4D CASA image cube.
 
     This function iterates through the Stokes planes (e.g., I, Q, U, V) of a 4D image cube, computes a standard

@@ -27,7 +27,7 @@ __all__ = ['time_tracker']
 ExecutionState = collections.namedtuple('ExecutionState', ['stage', 'start', 'end', 'state'])
 
 
-class TaskTimeTracker(object):
+class TaskTimeTracker:
     """
     TaskTimeTracker listens for pipeline lifecycle events, recording the start
     and end times on event reception so that the duration of the corresponding
@@ -49,6 +49,12 @@ class TaskTimeTracker(object):
         eventbus.subscribe(self.on_weblog_stage_lifecycle_event, WebLogStageLifecycleEvent.topic)
         eventbus.subscribe(self.on_result_lifecycle_event, ResultLifecycleEvent.topic)
 
+    def unsubscribe(self) -> None:
+        """Unsubscribe all pubsub callbacks to allow this instance to be garbage collected."""
+        eventbus.unsubscribe(self.on_task_lifecycle_event, TaskLifecycleEvent.topic)
+        eventbus.unsubscribe(self.on_weblog_stage_lifecycle_event, WebLogStageLifecycleEvent.topic)
+        eventbus.unsubscribe(self.on_result_lifecycle_event, ResultLifecycleEvent.topic)
+
     def on_lifecycle_event(self, event, db_key, start_event, stop_events, export_on=None):
         """
         Process lifecycle event, recording duration of a lifecycle phase as
@@ -63,7 +69,7 @@ class TaskTimeTracker(object):
         if event.context_name != self.context_name:
             return
 
-        now = datetime.datetime.now()
+        now = datetime.datetime.now(datetime.timezone.utc)
         stage_number = event.stage_number
 
         try:
@@ -140,7 +146,7 @@ class TaskTimeTracker(object):
             json.dump(r, json_file, sort_keys=True, indent=4, separators=(',', ': '))
 
 
-class ContextTimeTracker(object):
+class ContextTimeTracker:
     """
     ContextTimeTracker listens for events related to the creation/resumption
     of a pipeline Context. As a Context is created or resumed, this class
@@ -157,6 +163,12 @@ class ContextTimeTracker(object):
     def track(self, event: ContextLifecycleEvent) -> None:
         context_name = event.context_name
         LOG.info('Tracking execution duration for context: %s', context_name)
+        # Unsubscribe the previous tracker for this context name before replacing it.
+        # Without this, the replaced TaskTimeTracker's bound-method subscribers would be
+        # kept alive by pubsub indefinitely, preventing garbage collection.
+        old_tracker = self.tracking.get(context_name)
+        if old_tracker is not None:
+            old_tracker.unsubscribe()
         self.tracking[context_name] = TaskTimeTracker(context_name=context_name, output_dir=event.output_dir)
 
 

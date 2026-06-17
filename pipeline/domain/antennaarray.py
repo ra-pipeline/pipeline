@@ -1,34 +1,40 @@
+from __future__ import annotations
+
 import collections
 import itertools
 import math
-import warnings
-from typing import Sequence
+from typing import TYPE_CHECKING
 
 import numpy
 
 from pipeline.infrastructure import casa_tools
 
-from . import Antenna, measures
+from . import measures
 from .measures import Distance, DistanceUnits
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from pipeline.domain import Antenna
 
 Baseline = collections.namedtuple('Baseline', 'antenna1 antenna2 length')
 
 
-class AntennaArray(object):
-    """
-    AntennaArray is a logical representation of the antenna array.
+class AntennaArray:
+    """A logical representation of the antenna array.
 
     Attributes:
-        antennas: a list of Antenna objects that comprise the array.
-        baseline_lookup: 2D matrix of baseline lengths.
-        baselines_m: 1D array of baseline lengths for unique antenna baselines
+        antennas: List of Antenna objects that comprise the array.
+        baseline_lookup: 2D matrix of baseline lengths in metres, indexed by antenna ID.
+        baselines_m: 1D array of baseline lengths for unique antenna pairs
             (excluding auto-correlations).
-        baseline_min: Baseline tuple (antenna1, antenna2, length) for shortest baseline.
-        baseline_max: Baseline tuple (antenna1, antenna2, length) for longest baseline.
+        baseline_min: Baseline namedtuple (antenna1, antenna2, length) for the shortest
+            baseline, or None if fewer than two antennas.
+        baseline_max: Baseline namedtuple (antenna1, antenna2, length) for the longest
+            baseline, or None if fewer than two antennas.
     """
     def __init__(self, name: str, position: dict, antennas: list[Antenna]) -> None:
-        """
-        Initialize an AntennaArray object.
+        """Initialize an AntennaArray object.
 
         Args:
             name: the name of the observatory/telescope (as per OBSERVATIONS
@@ -101,8 +107,6 @@ class AntennaArray(object):
                 length=Distance(value=self.baseline_lookup[max_x][max_y], units=DistanceUnits.METRE)
             )
 
-        self._baselines = self.baselines_for_antennas([a.id for a in antennas])
-
     def __repr__(self) -> str:
         return 'AntennaArray({0!r}, {1}, {2!r})'.format(
             self.__name,
@@ -162,14 +166,6 @@ class AntennaArray(object):
                 length=Distance(self.baseline_lookup[ant1][ant2], DistanceUnits.METRE)
             ) for ant1, ant2 in itertools.combinations(unique_ids, 2)
         ]
-
-    @property
-    def baselines(self) -> list[Baseline]:
-        """Return a list of Baseline tuples for all antennas in the array."""
-        warnings.warn('AntennaArray.baselines is deprecated. '
-                      'Use AntennaArray.baselines_m instead.',
-                      category=DeprecationWarning, stacklevel=2)
-        return self._baselines
 
     @staticmethod
     def _calc_baseline_lookup(antennas: list[Antenna]) -> numpy.ndarray:

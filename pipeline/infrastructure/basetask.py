@@ -1,5 +1,6 @@
 import abc
 import collections
+import collections.abc
 import copy
 import datetime
 import functools
@@ -10,7 +11,6 @@ import pickle
 import re
 import textwrap
 import traceback
-from typing import Generic, TypeVar
 import uuid
 
 from . import api
@@ -24,9 +24,12 @@ from . import project
 from . import task_registry
 from . import utils
 from . import vdp
+
 from .eventbus import TaskStartedEvent, TaskCompleteEvent, TaskAbnormalExitEvent
 from .eventbus import ResultAcceptingEvent, ResultAcceptedEvent, ResultAcceptErrorEvent
 from .casa_tasks import CasaTasks
+
+from typing import Generic, TypeVar
 
 LOG = logging.get_logger(__name__)
 
@@ -38,9 +41,9 @@ VISLIST_RESET_KEY = '_do_not_reset_vislist'
 def timestamp(method):
     @functools.wraps(method)
     def attach_timestamp_to_results(self, *args, **kw):
-        start = datetime.datetime.utcnow()
+        start = datetime.datetime.now(datetime.timezone.utc)
         result = method(self, *args, **kw)
-        end = datetime.datetime.utcnow()
+        end = datetime.datetime.now(datetime.timezone.utc)
 
         if result is not None:
             result.timestamps = Timestamps(start, end)
@@ -134,7 +137,7 @@ class ModeTask(api.Task):
     is_multi_vis_task = False
 
     def __init__(self, inputs):
-        super(ModeTask, self).__init__()
+        super().__init__()
 
         # complain if we were given the wrong type of inputs
         if not isinstance(inputs, self.Inputs):
@@ -191,7 +194,7 @@ class Results(api.Results):
     advantage of the shared functionality.
     """
     def __init__(self):
-        super(Results, self).__init__()
+        super().__init__()
 
         # set the value used to uniquely identify this object. This value will
         # be used to determine whether this results has already been merged
@@ -328,25 +331,22 @@ class Results(api.Results):
                 # various logs and scripts are calculated during web log generation
                 write_pipeline_casa_tasks(context)
 
-            # generate weblog if accepting a result from outside a task execution
-            if task_completed and not DISABLE_WEBLOG:
-                # cannot import at initial import time due to cyclic dependency
-                import pipeline.infrastructure.renderer.htmlrenderer as htmlrenderer
-                htmlrenderer.WebLogGenerator.render(context)
-
             # If running at DEBUG loglevel and this is a top-level task result,
             # then store to disk a pickle of the context as it existed at the
             # end of this pipeline stage; this may be useful for debugging.
             if task_completed and LOG.isEnabledFor(logging.DEBUG):
-                basename = 'context-stage%s.pickle' % result_to_append.stage_number
-                path = os.path.join(context.output_dir,
-                                    context.name,
-                                    'saved_state',
-                                    basename)
+                basename = f'context-stage{result_to_append.stage_number}.pickle'
+                path = os.path.join(context.output_dir, context.name, 'saved_state', basename)
 
                 utils.mkdir_p(os.path.dirname(path))
                 with open(path, 'wb') as outfile:
                     pickle.dump(context, outfile, -1)
+
+            # generate weblog if accepting a result from outside a task execution
+            if task_completed and not DISABLE_WEBLOG:
+                # cannot import at initial import time due to cyclic dependency
+                from pipeline.infrastructure.renderer import htmlrenderer
+                htmlrenderer.WebLogGenerator.render(context)
 
             # Event must be sent from inside finally block to ensure that
             # the event is always sent even if result acceptance is failed.
@@ -401,7 +401,7 @@ class FailedTaskResults(Results):
     an exception during execution.
     """
     def __init__(self, origtask_cls, exception, tb):
-        super(FailedTaskResults, self).__init__()
+        super().__init__()
         self.exception = exception
         self.origtask_cls = origtask_cls
         self.task = FailedTask
@@ -413,7 +413,7 @@ class FailedTaskResults(Results):
         return s
 
 
-class ResultsProxy(object):
+class ResultsProxy:
     def __init__(self, context):
         self._context = context
 
@@ -484,7 +484,7 @@ T = TypeVar('T')
 
 class ResultsList(Results, Generic[T]):
     def __init__(self, results=None):
-        super(ResultsList, self).__init__()
+        super().__init__()
         self.__results = []
         if results:
             self.__results.extend(results)
@@ -508,7 +508,7 @@ class ResultsList(Results, Generic[T]):
         self.__results.append(other)
 
     def accept(self, context=None):
-        return super(ResultsList, self).accept(context)
+        return super().accept(context)
 
     def extend(self, other):
         for o in other:
@@ -525,7 +525,7 @@ class ResultsList(Results, Generic[T]):
             return None
 
 
-class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
+class StandardTaskTemplate(api.Task, abc.ABC):
     """
     StandardTaskTemplate is a template class for pipeline reduction tasks whose
     execution can be described by a common four-step process:
@@ -563,7 +563,7 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
 
         :param Inputs inputs: inputs required for this Task.
         """
-        super(StandardTaskTemplate, self).__init__()
+        super().__init__()
 
         # complain if we were given the wrong type of inputs
         if isinstance(inputs, vdp.InputsContainer):
@@ -654,50 +654,49 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
         handler = logging.CapturingHandler(logging.ATTENTION)
 
         try:
-            # if this task does not handle multiple input mses but was
-            # invoked with multiple mses in its inputs, call our utility
-            # function to invoke the task once per ms.
-            if not self.is_multi_vis_task:
-                if isinstance(self.inputs, vdp.InputsContainer) or isinstance(self.inputs.vis, list):
-                    return self._handle_multiple_vis(**parameters)
 
-            if isinstance(self.inputs, vdp.InputsContainer) and self.inputs._pipeline_casa_task is not None:
-                LOG.info('Equivalent Pipeline CLI call: %s', self.inputs._pipeline_casa_task)
-
-            # We should not pass unused parameters to prepare(), so first
-            # inspect the signature to find the names the arguments and then
-            # create a dictionary containing only those parameters
-            prepare_args = set(inspect.getfullargspec(self.prepare).args)
-            prepare_parameters = dict(parameters)
-            for arg in parameters:
-                if arg not in prepare_args:
-                    del prepare_parameters[arg]
-
-            # register the capturing log handler, buffering all messages so that
-            # we can add them to the result - and subsequently, the weblog
-            logging.add_handler(handler)
-
-            # get our result
-            result = self.prepare(**prepare_parameters)
-
-            # analyse them..
-            result = self.analyse(result)
-
-            # tag the result with the class of the originating task
-            result.task = self.__class__
-
-            # add the log records to the result
-            if not hasattr(result, 'logrecords'):
-                result.logrecords = handler.buffer
+            if not self.is_multi_vis_task and (isinstance(self.inputs, vdp.InputsContainer) or isinstance(self.inputs.vis, list)):
+                # if this task does not handle multiple input mses but was
+                # invoked with multiple mses in its inputs, call our utility
+                # function to invoke the task once per ms.
+                result = self._handle_multiple_vis(**parameters)
             else:
-                result.logrecords.extend(handler.buffer)
+                if isinstance(self.inputs, vdp.InputsContainer) and self.inputs._pipeline_casa_task is not None:
+                    LOG.info('Equivalent Pipeline CLI call: %s', self.inputs._pipeline_casa_task)
+
+                # We should not pass unused parameters to prepare(), so first
+                # inspect the signature to find the names the arguments and then
+                # create a dictionary containing only those parameters
+                prepare_args = set(inspect.getfullargspec(self.prepare).args)
+                prepare_parameters = dict(parameters)
+                for arg in parameters:
+                    if arg not in prepare_args:
+                        del prepare_parameters[arg]
+
+                # register the capturing log handler, buffering all messages so that
+                # we can add them to the result - and subsequently, the weblog
+                logging.add_handler(handler)
+
+                # get our result
+                result = self.prepare(**prepare_parameters)
+
+                # analyse them
+                result = self.analyse(result)
+
+                # tag the result with the class of the originating task
+                result.task = self.__class__
+
+                # add the log records to the result
+                if not hasattr(result, 'logrecords'):
+                    result.logrecords = handler.buffer
+                else:
+                    result.logrecords.extend(handler.buffer)
 
             if utils.is_top_level_task():
                 event = TaskCompleteEvent(
                     context_name=self.inputs.context.name, stage_number=self.inputs.context.task_counter
                 )
                 eventbus.send_message(event)
-
             return result
 
         except Exception as ex:
@@ -815,10 +814,10 @@ class StandardTaskTemplate(api.Task, metaclass=abc.ABCMeta):
 class FailedTask(StandardTaskTemplate):
     def __init__(self, context):
         inputs = vdp.InputsContainer(self, context)
-        super(FailedTask, self).__init__(inputs)
+        super().__init__(inputs)
 
 
-class Executor(object):
+class Executor:
     def __init__(self, context):
         self._context = context
         self._output_dir = self._context.output_dir

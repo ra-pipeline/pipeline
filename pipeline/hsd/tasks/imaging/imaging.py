@@ -1,11 +1,12 @@
 """Imaging stage."""
+from __future__ import annotations
 
 import collections
 import functools
 import math
 import os
 from numbers import Number
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING
 
 import numpy
 from scipy import interpolate
@@ -17,10 +18,11 @@ import pipeline.infrastructure.filenamer as filenamer
 import pipeline.infrastructure.imageheader as imageheader
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
-from pipeline.domain import DataTable, DataType, MeasurementSet
+from pipeline.domain import DataTable, DataType
 from pipeline.h.heuristics import fieldnames
 from pipeline.h.tasks.common.sensitivity import Sensitivity
 from pipeline.hsd.heuristics import rasterscan
+from pipeline.hsd.heuristics import SDcalatmcorr as sdatm
 from pipeline.hsd.heuristics.rasterscan import RasterScanHeuristicsResult, RasterScanHeuristicsFailure
 from pipeline.hsd.tasks import common
 from pipeline.hsd.tasks.baseline import baseline
@@ -29,15 +31,17 @@ from pipeline.hsd.tasks.common import utils as sdutils
 from pipeline.hsd.tasks.imaging import (detect_missed_lines,
                                         detectcontamination, gridding,
                                         imaging_params, resultobjects,
-                                        sdcombine, weighting, worker)
-from pipeline.infrastructure import casa_tasks, casa_tools, task_registry
+                                        sdcombine, worker)
+from pipeline.infrastructure import casa_tools, task_registry
 
 if TYPE_CHECKING:
     from casatools import coordsys
+    from pipeline.domain import MeasurementSet
     from pipeline.infrastructure import Context
+    from pipeline.infrastructure.imagelibrary import ImageItem
     from resultobjects import SDImagingResults
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 # SensitivityInfo:
 #     sensitivity: Sensitivity of an image
@@ -57,6 +61,7 @@ REF_MS_ID = 0
 # Adjust the value when Pipeline supports observation modes/instruments with smaller integration time.
 MIN_INTEGRATION_SEC = 9.9e-4
 
+
 class SDImagingInputs(vdp.StandardInputs):
     """Inputs for imaging task class."""
 
@@ -71,7 +76,7 @@ class SDImagingInputs(vdp.StandardInputs):
     mode = vdp.VisDependentProperty(default='line')
 
     @field.postprocess
-    def field(self, unprocessed: Optional[str]) -> Optional[str]:
+    def field(self, unprocessed: str | None) -> str | None:
         """Get fields as a string.
 
         Args:
@@ -109,7 +114,7 @@ class SDImagingInputs(vdp.StandardInputs):
 
     # Synchronization between infiles and vis is still necessary
     @vdp.VisDependentProperty
-    def vis(self) -> List[str]:
+    def vis(self) -> list[str]:
         return self.infiles
 
     @property
@@ -132,9 +137,9 @@ class SDImagingInputs(vdp.StandardInputs):
         return _datatype
 
     # docstring and type hints: supplements hsd_imaging
-    def __init__(self, context: 'Context', mode: Optional[str]=None, restfreq: Optional[str]=None,
-                 infiles: Optional[List[str]]=None, field: Optional[str]=None, spw: Optional[str]=None,
-                 org_direction: Optional['sdtyping.Direction']=None):
+    def __init__(self, context: Context, mode: str | None=None, restfreq: str | None=None,
+                 infiles: list[str] | None=None, field: str | None=None, spw: str | None=None,
+                 org_direction: sdtyping.Direction | None=None):
         """Initialize an object.
 
         Args:
@@ -206,6 +211,11 @@ class SDImaging(basetask.StandardTaskTemplate):
         Returns:
             result object of imaging
         """
+        # The following dictionaries are intended to convey values computed
+        # in the prepare method to the analyse method. Dict key is image name.
+        self.channelmap_range_dict = {}
+        self.include_channel_range_dict = {}
+
         cp = self._initialize_common_parameters()
 
         # loop over reduction group (spw and source combination)
@@ -218,8 +228,7 @@ class SDImaging(basetask.StandardTaskTemplate):
             for rgp.name, rgp.members in rgp.image_group.items():
                 self._set_image_group_item_into_reduction_group_patameters(cp, rgp)
 
-                # Step 1: initialize weight column
-                self._initialize_weight_column_based_on_baseline_rms(cp, rgp)
+                # Step 1: (removed with PIPE-2491)
 
                 # Step 2: imaging
                 if not self._execute_imaging(cp, rgp):
@@ -276,10 +285,6 @@ class SDImaging(basetask.StandardTaskTemplate):
                 finally:
                     pp.done()
 
-                self._detect_missed_lines( cp, rgp, pp )
-
-                self._detect_contamination(rgp)
-
                 self._append_result(cp, rgp)
 
             # NRO specific: generate combined image for each correlation
@@ -290,30 +295,30 @@ class SDImaging(basetask.StandardTaskTemplate):
 
     @classmethod
     def _finalize_worker_result(cls,
-                                context: 'Context',
-                                result: 'SDImagingResults',
+                                context: Context,
+                                result: SDImagingResults,
                                 session: str,
                                 sourcename: str,
-                                spwlist: List[int],
+                                spwlist: list[int],
                                 antenna: str,
                                 specmode: str,
                                 imagemode: str,
                                 stokes: str,
                                 datatype: DataType,
-                                datamin: Optional[float],
-                                datamax: Optional[float],
-                                datarms: Optional[float],
-                                validsp: List[List[int]],
-                                rms: List[List[float]],
-                                edge: List[int],
+                                datamin: float | None,
+                                datamax: float | None,
+                                datarms: float | None,
+                                validsp: list[list[int]],
+                                rms: list[list[float]],
+                                edge: list[int],
                                 reduction_group_id: int,
-                                file_index: List[int],
-                                assoc_antennas: List[int],
-                                assoc_fields: List[int],
-                                assoc_spws: List[int],
-                                sensitivity_info: Optional[SensitivityInfo]=None,
-                                theoretical_rms: Optional[Dict]=None,
-                                effbw: Optional[float]=None):
+                                file_index: list[int],
+                                assoc_antennas: list[int],
+                                assoc_fields: list[int],
+                                assoc_spws: list[int],
+                                sensitivity_info: SensitivityInfo | None=None,
+                                theoretical_rms: dict | None=None,
+                                effbw: float | None=None):
         """
         Fanalize the worker result.
 
@@ -365,7 +370,7 @@ class SDImaging(basetask.StandardTaskTemplate):
         # attach sensitivity_info if available
         if sensitivity_info is not None:
             result.sensitivity_info = sensitivity_info
-        # attach theoretical RMS if available
+        # attach theoretical sensitivity if available
         if theoretical_rms is not None:
             result.theoretical_rms = theoretical_rms
 
@@ -427,7 +432,7 @@ class SDImaging(basetask.StandardTaskTemplate):
         # finally replace task attribute with the top-level one
         result.task = cls
 
-    def _get_edge(self) -> List[int]:
+    def _get_edge(self) -> list[int]:
         """
         Search results and retrieve edge parameter from the most recent SDBaselineResults if it exists.
 
@@ -472,7 +477,7 @@ class SDImaging(basetask.StandardTaskTemplate):
         )
 
     def _get_correlations_if_nro(self, cp: imaging_params.CommonParameters,
-                                 rgp: imaging_params.ReductionGroupParameters) -> Optional[str]:
+                                 rgp: imaging_params.ReductionGroupParameters) -> str | None:
         """If data is from NRO, then get correlations.
 
         Args:
@@ -494,7 +499,7 @@ class SDImaging(basetask.StandardTaskTemplate):
             return None
 
     def _get_rgp_image_group(self, cp: imaging_params.CommonParameters,
-                             rgp: imaging_params.ReductionGroupParameters) -> Dict[str, List[List[str]]]:
+                             rgp: imaging_params.ReductionGroupParameters) -> dict[str, list[list[str]]]:
         """Get image group of reduction group.
 
         Args:
@@ -699,22 +704,6 @@ class SDImaging(basetask.StandardTaskTemplate):
 
         # restfreq
         self._pick_restfreq_from_restfreq_list(cp, rgp)
-
-    def _initialize_weight_column_based_on_baseline_rms(self, cp: imaging_params.CommonParameters,
-                                                        rgp: imaging_params.ReductionGroupParameters):
-        """Initialize weight column of MS.
-
-        Args:
-            cp : Common parameter object of prepare()
-            rgp : Reduction group parameter object of prepare()
-        """
-        _origin_ms = [msobj.origin_ms for msobj in rgp.msobjs]
-        _work_ms = [msobj.name for msobj in rgp.msobjs]
-        _weighting_inputs = vdp.InputsContainer(weighting.WeightMS, self.inputs.context,
-                                                infiles=_origin_ms, outfiles=_work_ms,
-                                                antenna=rgp.antids, spwid=rgp.spwids, fieldid=rgp.fieldids)
-        _weighting_task = weighting.WeightMS(_weighting_inputs)
-        self._executor.execute(_weighting_task, merge=False, datatable_dict=cp.dt_dict)
 
     def _initialize_coord_set(self, cp: imaging_params.CommonParameters,
                               rgp: imaging_params.ReductionGroupParameters) -> bool:
@@ -994,6 +983,8 @@ class SDImaging(basetask.StandardTaskTemplate):
 
         # Define image channels to calculate statistics
         pp.include_channel_range = self._get_stat_chans(pp.imagename, rgp.combined.rms_exclude, cp.edge)
+        imagename = rgp.imager_result.outcome["image"].imagename
+        self.include_channel_range_dict[imagename] = pp.include_channel_range
         pp.stat_chans = convert_range_list_to_string(pp.include_channel_range)
         # Define region to calculate statistics
         pp.raster_infos = self.get_raster_info_list(cp, rgp)
@@ -1019,8 +1010,8 @@ class SDImaging(basetask.StandardTaskTemplate):
                 _val = _statval.get(_stat_name, [])
                 setattr(pp, f'image_{_stat_name}', _val[0] if _val else -1.0)
 
-        # Theoretical RMS
-        LOG.info('Calculating theoretical RMS of image, {}'.format(pp.imagename))
+        # Theoretical sensitivity
+        LOG.info(f'Calculating theoretical sensitivity of image, {pp.imagename}')
         pp.theoretical_rms = self.calculate_theoretical_image_rms(cp, rgp, pp)
 
     def _execute_combine_images(self, rgp: imaging_params.ReductionGroupParameters):
@@ -1040,6 +1031,8 @@ class SDImaging(basetask.StandardTaskTemplate):
             _freq_chan_reversed = rgp.imager_result.frequency_channel_reversed
         rgp.imager_result = self._executor.execute(_combine_task)
         rgp.imager_result.frequency_channel_reversed = _freq_chan_reversed
+        imagename = rgp.imager_result.outcome["image"].imagename
+        self.channelmap_range_dict[imagename] = rgp.chanmap_range_list
 
     def _set_representative_flag(self,
                                  rgp: imaging_params.ReductionGroupParameters,
@@ -1066,7 +1059,7 @@ class SDImaging(basetask.StandardTaskTemplate):
            _cqa.time(rgp.ref_ms.start_time['m0'], 0, ['ymd', 'no_time'])[0] < '2015/10/01':
             LOG.warning("ALMA Cycle 2 and earlier project does not have a valid effective bandwidth. "
                         "Therefore, a nominal value of channel separation loaded from the MS "
-                        "is used as an effective bandwidth for RMS estimation.")
+                        "is used as an effective bandwidth for sensitivity estimation.")
 
     def _calculate_sensitivity(self, cp: imaging_params.CommonParameters,
                                rgp: imaging_params.ReductionGroupParameters,
@@ -1247,61 +1240,113 @@ class SDImaging(basetask.StandardTaskTemplate):
         """
         return rgp.imager_result_nro is not None and rgp.imager_result_nro.outcome is not None
 
-    def _detect_missed_lines(self,
-                             cp: imaging_params.CommonParameters,
-                             rgp: imaging_params.ReductionGroupParameters,
-                             pp: imaging_params.PostProcessParameters ):
+    def _detect_missed_lines(
+            self,
+            result_item: SDImagingResultItem,
+            spw_nchan: int,
+            frequency_channel_reversed: bool,
+            extra_edge_channels: tuple[int, int],
+            atm_channels: numpy.ndarray | list[bool] = []
+    ) -> dict[str, bool]:
         """
         Detect lines that are possibly missed to be identified
 
         Args:
-            cp  : Common parameter object of prepare()
-            rgp : Reduction group parameter object of prepare()
-            pp  : Imaging post process parameters of prepare()
+            result_item: Imaging result item to be checked for missed lines
+            spw_nchan: Number of channels of the spw in the MS
+                       (before trimming edge channels)
+            frequency_channel_reversed: A boolean flag whether
+                                        the frequency channel is reversed
+            extra_edge_channels: Two tuple of integers of the number of
+                                 edge channels to be excluded from the
+                                 analysis. Channels specified by the tuple
+                                 are excluded in addition to the edge channels
+                                 trimmed during imaging according to the
+                                 edge parameter for hsd_baseline stage.
+            atm_channels: Channel mask for ATM feature. True means that the
+                          channel is a part of ATM feature.
         Raises:
-            ValueError if unknown mask mode is returned DetectMissedLines.analyze()
+            ValueError if unknown mask mode is returned by
+            DetectMissedLines.analyze()
         """
         do_plot = not basetask.DISABLE_WEBLOG
+        image_item = result_item.outcome['image']
+        imagename = image_item.imagename
 
         # pick valid_lines
-        valid_lines = [ ll[0:2] for ll in rgp.channelmap_range_list[0] if ll[2] is True ]
+        channelmap_range_list = self.channelmap_range_dict[imagename]
+        valid_lines = [ll[0:2] for ll in channelmap_range_list[0] if ll[2] is True]
 
         # get linefree ranges from pp
-        linefree_ranges = convert_range_list_to_ranges( pp.include_channel_range )
+        include_channel_range = self.include_channel_range_dict[imagename]
+        # Input list, include_channel_range, is 1-D list of line ranges like
+        # [min0, max0, min1, max1, ...]. What we need is a list of [min, max]
+        # pairs, so reshape to 2-D like [[min0, max0], [min1, max1], ...].
+        linefree_ranges = numpy.reshape(
+            include_channel_range,
+            (len(include_channel_range) // 2, 2)
+        ).tolist()
 
         # initialize
+        edge = result_item.outcome["edge"]
         missed_lines = detect_missed_lines.DetectMissedLines(
             self.inputs.context,
-            rgp.msobjs,
-            rgp.spwid_list,
-            rgp.fieldid_list,
-            rgp.imager_result.outcome['image'],
-            rgp.imager_result.frequency_channel_reversed,
-            cp.edge,
+            image_item,
+            spw_nchan,
+            frequency_channel_reversed,
+            edge,
             do_plot
         )
 
         # analyze
-        detections = missed_lines.analyze( valid_lines, linefree_ranges )
+        detections = missed_lines.analyze(
+            valid_lines,
+            linefree_ranges,
+            extra_edge_channels,
+            atm_channels
+        )
 
-        # register the results
-        rgp.imager_result.outcome['line_emission_off_range_at_peak'] = detections['single_beam']
-        rgp.imager_result.outcome['line_emission_off_range_extended'] = detections['moment_mask']
+        return detections
 
-    def _detect_contamination(self, rgp: imaging_params.ReductionGroupParameters):
+    def _detect_contamination(
+            self,
+            image_item: ImageItem,
+            is_lsb: bool,
+            extra_edge_channels: tuple[int, int] = (0, 0),
+            atm_channels: numpy.ndarray | list[bool] = []
+    ) -> bool:
         """Detect contamination of image.
 
         Args:
-            rgp : Reduction group parameter object of prepare()
+            image_item: Image item to be checked for contamination
+            is_lsb: A boolean flag whether the image is for lower sideband
+                    (LSB) spw or not
+            extra_edge_channels: Two tuple of integers of the number of
+                                 edge channels to be excluded from the
+                                 analysis. Channels specified by the tuple
+                                 are excluded in addition to the edge channels
+                                 trimmed during imaging according to the
+                                 edge parameter for hsd_baseline stage.
+            atm_channels: Channel mask for ATM feature. True means that the
+                          channel is a part of ATM feature.
+
+        Returns:
+            A boolean flag whether the image is contaminated or not
         """
         # PIPE-251: detect contamination
         do_plot = not basetask.DISABLE_WEBLOG
+        # exclude ATM feature
+        channel_mask = numpy.logical_not(atm_channels)
+        # exclude edge channels
+        edge_count_lower, edge_count_upper = extra_edge_channels
+        if edge_count_lower > 0:
+            channel_mask[:edge_count_lower] = False
+        if edge_count_upper > 0:
+            channel_mask[-edge_count_upper:] = False
         contaminated = detectcontamination.detect_contamination(
-            self.inputs.context, rgp.imager_result.outcome['image'],
-            rgp.imager_result.frequency_channel_reversed,
-            do_plot
+            self.inputs.context, image_item, is_lsb, do_plot, channel_mask
         )
-        rgp.imager_result.outcome['contaminated'] = contaminated
+        return contaminated
 
     def _append_result(self, cp: imaging_params.CommonParameters, rgp: imaging_params.ReductionGroupParameters):
         """Append result to RGP.
@@ -1311,19 +1356,114 @@ class SDImaging(basetask.StandardTaskTemplate):
         """
         cp.results.append(rgp.imager_result)
 
-    def analyse(self, result: 'SDImagingResults') -> 'SDImagingResults':
-        """Override method of basetask.
+    def analyse(self, results: SDImagingResults) -> SDImagingResults:
+        """Analyse results generated by prepare.
+
+        Analysis includes a detection of edge channels as well as
+        channel range for ATM feature. Based on these information,
+        contamination and missed line detection of the image are examined.
 
         Args:
-            result : Result object
+            results: Results object
 
         Returns:
-            Result object
+            Results object
         """
-        return result
+        ctx = self.inputs.context
+
+        # edge channel detection for combined images
+        results_for_combined_image = [
+            r for r in results if r.outcome["image"].antenna == "COMBINED"
+        ]
+
+        for r in results_for_combined_image:
+            image_item = r.outcome['image']
+
+            # detect edge channels to be excluded further
+            # extra_edge_channels is a two tuple of integers
+            extra_edge_channels = detect_extra_edge_channels(
+                image_item.imagename
+            )
+            LOG.debug(
+                "extra edge channels for %s are %s",
+                image_item.imagename,
+                extra_edge_channels
+            )
+            r.outcome["extra_edge_channels"] = extra_edge_channels
+
+        # contamination analysis for Stokes I combined images
+        results_for_analysis = filter(
+            lambda r: r.outcome["image"].stokes == "I",
+            results_for_combined_image
+        )
+
+        for r in results_for_analysis:
+            edge_param = r.outcome["edge"]
+            image_item = r.outcome['image']
+            extra_edge_channels = r.outcome["extra_edge_channels"]
+            with casa_tools.ImageReader(image_item.imagename) as ia:
+                image_shape = ia.shape()
+                cs = ia.coordsys()
+                freq_axis = cs.findaxisbyname("spectral")
+                cs.done()
+                image_nchan = image_shape[freq_axis]
+
+            # detect range of ATM feature
+            ms_index_list, unique_indices = numpy.unique(
+                r.outcome['file_index'], return_index=True
+            )
+            vspw_list = numpy.asarray(
+                r.outcome['assoc_spws']
+            )[unique_indices]
+
+            # number of channels for the spectral data
+            # (before trimming edge channels)
+            ms = ctx.observing_run.measurement_sets[ms_index_list[0]]
+            spw_id = ctx.observing_run.virtual2real_spw_id(vspw_list[0], ms)
+            spw_nchan = ms.get_spectral_window(spw_id).num_channels
+
+            atm_channels = numpy.zeros(image_nchan, dtype=bool)
+            for ms_id, vspw in zip(ms_index_list, vspw_list):
+                ms = ctx.observing_run.measurement_sets[ms_id]
+                spw_id = ctx.observing_run.virtual2real_spw_id(vspw, ms)
+                # detect channels overlapped with ATM feature
+                _detected_chans = detect_atm_channels(ms, spw_id)
+                if _detected_chans is not None and len(_detected_chans) == spw_nchan:
+                    assert spw_nchan - sum(edge_param) == image_nchan
+                    # trim edge channels excluded at hsd_baseline stage
+                    _trimmed = _detected_chans[edge_param[0]:spw_nchan - edge_param[1]]
+                    atm_channels = numpy.logical_or(
+                        atm_channels, _trimmed
+                    )
+
+            is_lsb = r.frequency_channel_reversed
+            if is_lsb:
+                # mask needs to be reversed
+                atm_channels = atm_channels[::-1]
+
+            LOG.debug(
+                "ATM feature range: %s",
+                numpy.where(atm_channels)[0].tolist()
+            )
+
+            contaminated = self._detect_contamination(
+                image_item,
+                is_lsb,
+                extra_edge_channels=extra_edge_channels,
+                atm_channels=atm_channels
+            )
+            r.outcome['contaminated'] = contaminated
+
+            detections = self._detect_missed_lines(
+                r, spw_nchan, is_lsb, extra_edge_channels, atm_channels
+            )
+            r.outcome['line_emission_off_range_at_peak'] = detections['single_beam']
+            r.outcome['line_emission_off_range_extended'] = detections['moment_mask']
+
+        return results
 
     def _get_rms_exclude_freq_range_image(self, to_frame: str, cp: imaging_params.CommonParameters,
-                                          rgp: imaging_params.ReductionGroupParameters) -> List[Tuple[Number, Number]]:
+                                          rgp: imaging_params.ReductionGroupParameters) -> list[tuple[Number, Number]]:
         """
         Return a combined list of frequency ranges.
 
@@ -1430,7 +1570,7 @@ class SDImaging(basetask.StandardTaskTemplate):
 
         return merge_ranges(numpy.reshape(image_rms_freq_range, (len(image_rms_freq_range) // 2, 2), 'C'))
 
-    def get_imagename(self, source: str, spwids: List[int],
+    def get_imagename(self, source: str, spwids: list[int],
                       antenna: str=None, asdm: str=None, stokes: str=None, specmode: str='cube') -> str:
         """Generate a filename of the image.
 
@@ -1495,8 +1635,8 @@ class SDImaging(basetask.StandardTaskTemplate):
         return imagename
 
     def _get_stat_chans(self, imagename: str,
-                        combined_rms_exclude: List[Tuple[float, float]],
-                        edge: Tuple[int, int]=(0, 0)) -> List[int]:
+                        combined_rms_exclude: list[tuple[float, float]],
+                        edge: tuple[int, int]=(0, 0)) -> list[int]:
         """Return a list of channel ranges to calculate image statistics.
 
         Args:
@@ -1515,12 +1655,12 @@ class SDImaging(basetask.StandardTaskTemplate):
                 exclude_chan_ranges = convert_frequency_ranges_to_channels(combined_rms_exclude, cs, num_chan)
             finally:
                 cs.done()
-        LOG.info("Merged spectral line channel ranges of combined image = {}".format(str(exclude_chan_ranges)))
+        LOG.info(f"Merged spectral line channel ranges of combined image = {exclude_chan_ranges}")
         include_chan_ranges = invert_ranges(exclude_chan_ranges, num_chan, edge)
-        LOG.info("Line free channel ranges of image to calculate RMS = {}".format(str(include_chan_ranges)))
+        LOG.info(f"Line free channel ranges of image to calculate sensitivities = {include_chan_ranges}")
         return include_chan_ranges
 
-    def _get_stat_region(self, pp: imaging_params.PostProcessParameters) -> Optional[str]:
+    def _get_stat_region(self, pp: imaging_params.PostProcessParameters) -> str | None:
         """
         Retrun region to calculate statistics.
 
@@ -1581,7 +1721,7 @@ class SDImaging(basetask.StandardTaskTemplate):
         return region
 
     def get_raster_info_list(self, cp: imaging_params.CommonParameters,
-                             rgp: imaging_params.ReductionGroupParameters) -> List[RasterInfo]:
+                             rgp: imaging_params.ReductionGroupParameters) -> list[RasterInfo]:
         """
         Retrun a list of raster information.
 
@@ -1622,8 +1762,8 @@ class SDImaging(basetask.StandardTaskTemplate):
 
     def calculate_theoretical_image_rms(self, cp: imaging_params.CommonParameters,
                                         rgp: imaging_params.ReductionGroupParameters,
-                                        pp: imaging_params.PostProcessParameters) -> Dict[str, float]:
-        """Calculate theoretical RMS of an image (PIPE-657).
+                                        pp: imaging_params.PostProcessParameters) -> dict[str, float]:
+        """Calculate theoretical sensitivity of an image (PIPE-657).
 
         Args:
             cp : Common parameter object of prepare()
@@ -1634,13 +1774,13 @@ class SDImaging(basetask.StandardTaskTemplate):
               to that of infiles
 
         Returns:
-            A quantum value of theoretical image RMS.
+            A quantum value of theoretical image sensitivity.
             The value of quantity will be negative when calculation is aborted, i.e., -1.0 Jy/beam
         """
         tirp = imaging_params.TheoreticalImageRmsParameters(pp, self.inputs.context)
 
         if len(rgp.combined.infiles) == 0:
-            LOG.error('No MS given to calculate a theoretical RMS. Aborting calculation of theoretical thermal noise.')
+            LOG.error('No MS given to calculate theoretical image sensitivities. Aborting calculation.')
             return tirp.failed_rms
         assert len(rgp.combined.infiles) == len(rgp.combined.antids)
         assert len(rgp.combined.infiles) == len(rgp.combined.fieldids)
@@ -1686,7 +1826,7 @@ class SDImaging(basetask.StandardTaskTemplate):
             return tirp.failed_rms
 
         _theoretical_rms = numpy.sqrt(tirp.sq_rms) / tirp.weight_sum
-        LOG.info('Theoretical RMS of image = {} {}'.format(_theoretical_rms, pp.brightnessunit))
+        LOG.info(f'Theoretical sensitivity of image = {_theoretical_rms} {pp.brightnessunit}')
         return tirp.cqa.quantity(_theoretical_rms, pp.brightnessunit)
 
     def _obtain_t_sub_on_off(self, tirp: imaging_params.TheoreticalImageRmsParameters) -> bool:
@@ -1744,7 +1884,7 @@ class SDImaging(basetask.StandardTaskTemplate):
         return True
 
     def _obtain_jy_per_k(self, pp: imaging_params.PostProcessParameters,
-                         tirp: imaging_params.TheoreticalImageRmsParameters) -> Union[float, bool]:
+                         tirp: imaging_params.TheoreticalImageRmsParameters) -> float | bool:
         """Obtain Jy/K. A sub method of calculate_theoretical_image_rms().
 
         Args:
@@ -1886,7 +2026,7 @@ class SDImaging(basetask.StandardTaskTemplate):
 
     def _loop_initializer_of_theoretical_image_rms(self, cp: imaging_params.CommonParameters,
                                                    rgp: imaging_params.ReductionGroupParameters,
-                                                   tirp: imaging_params.TheoreticalImageRmsParameters) -> Tuple[bool]:
+                                                   tirp: imaging_params.TheoreticalImageRmsParameters) -> tuple[bool]:
         """Initialize imaging_params.TheoreticalImageRmsParameters for the loop of calculate_theoretical_image_rms().
 
         Args:
@@ -1912,7 +2052,7 @@ class SDImaging(basetask.StandardTaskTemplate):
         SKIP = (False, True)
         GO = (False, False)
         if tirp.msobj.observing_pattern[tirp.antid][tirp.spwid][tirp.fieldid] != 'RASTER':
-            LOG.warning('Unable to calculate RMS of non-Raster map. ' + tirp.error_msg)
+            LOG.warning('Unable to calculate sensitivity of a non-Raster map. ' + tirp.error_msg)
             return HALT
         LOG.info(
             'Processing MS {}, Field {}, SpW {}, '
@@ -1925,7 +2065,7 @@ class SDImaging(basetask.StandardTaskTemplate):
                              .setdefault(tirp.msobj.origin_ms, []) \
                              .append(_rsres)
             _rsres.set_result_fail(tirp.antid, tirp.spwid, tirp.fieldid)
-            LOG.debug(f'Raster scan analysis incomplete. Skipping calculation of theoretical image RMS : EB:{tirp.msobj.execblock_id}:{tirp.msobj.antennas[tirp.antid].name}')
+            LOG.debug(f'Raster scan analysis incomplete. Skipping calculation of theoretical image sensitivity : MS:{tirp.msobj.execblock_id}:{tirp.msobj.antennas[tirp.antid].name}')
             return SKIP
         tirp.dt = cp.dt_dict[tirp.msobj.basename]
         # Note: index_list is a list of DataTable row IDs for selected data EXCLUDING rows where all pols are flagged online.
@@ -1938,7 +2078,7 @@ class SDImaging(basetask.StandardTaskTemplate):
 
 
 def _analyze_raster_pattern(datatable: DataTable, msobj: MeasurementSet,
-                            fieldid: int, spwid: int, antid: int, rgp: 'imaging_params.ReductionGroupParameters') -> RasterInfo:
+                            fieldid: int, spwid: int, antid: int, rgp: imaging_params.ReductionGroupParameters) -> RasterInfo:
     """Analyze raster scan pattern from pointing in DataTable.
 
     Args:
@@ -2111,8 +2251,8 @@ def calc_image_statistics(imagename: str, chans: str, region: str) -> dict:
 
 
 # Utility methods to calcluate channel ranges
-def convert_frequency_ranges_to_channels(range_list: List[Tuple[float, float]],
-                                         cs: 'coordsys', num_chan: int) -> List[Tuple[int, int]]:
+def convert_frequency_ranges_to_channels(range_list: list[tuple[float, float]],
+                                         cs: coordsys, num_chan: int) -> list[tuple[int, int]]:
     """Convert frequency ranges to channel ones.
 
     Args:
@@ -2146,7 +2286,7 @@ def convert_frequency_ranges_to_channels(range_list: List[Tuple[float, float]],
     return merge_ranges(channel_ranges)
 
 
-def convert_range_list_to_string(range_list: List[int]) -> str:
+def convert_range_list_to_string(range_list: list[int]) -> str:
     """Convert a list of index ranges to string.
 
     Args:
@@ -2164,26 +2304,7 @@ def convert_range_list_to_string(range_list: List[int]) -> str:
     return stat_chans
 
 
-def convert_range_list_to_ranges(range_list: List[int]) -> List[List[int]]:
-    """
-    Convert a list of index ranges to list of signle ranges
-
-    Args:
-        range_list : A list of ranges, e.g., [imin0, imax0, imin1, imax1, ...]
-
-    Returns:
-        A list of single ranges, e.g. '[ [imin0, imax0], [imin1, imax1], ...]
-
-    Example:
-        >>> convert_range_list_to_string( [5, 10, 15, 20] )
-        '[[5, 10], [15, 20]]'
-    """
-    ranges = [ [range_list[i], range_list[i+1]] for i in range(0, len(range_list), 2) ]
-
-    return ranges
-
-
-def merge_ranges(range_list: List[Tuple[Number, Number]]) -> List[Tuple[Number, Number]]:
+def merge_ranges(range_list: list[tuple[Number, Number]]) -> list[tuple[Number, Number]]:
     """Merge overlapping ranges in range_list.
 
     Args:
@@ -2227,8 +2348,8 @@ def merge_ranges(range_list: List[Tuple[Number, Number]]) -> List[Tuple[Number, 
     return merged
 
 
-def invert_ranges(id_range_list: List[Tuple[int, int]],
-                  num_ids: int, edge: Tuple[int, int]) -> List[int]:
+def invert_ranges(id_range_list: list[tuple[int, int]],
+                  num_ids: int, edge: tuple[int, int]) -> list[int]:
     """Return inverted ID ranges.
 
     Args:
@@ -2261,3 +2382,70 @@ def invert_ranges(id_range_list: List[Tuple[int, int]],
         if id_range_list[-1][1] + 1 < num_ids - 1 - edge[1]:
             inverted_list.extend([id_range_list[-1][1] + 1, num_ids - 1 - edge[1]])
     return inverted_list
+
+
+def detect_extra_edge_channels(imagename: str) -> tuple[int, int]:
+    """Detect list of extra edge channels to be excluded from QA evaluation.
+
+    There are a few edge channels that have less valid spatial pixels
+    than other spectral channels, probably due to the effect of frame
+    conversion from TOPO to LSRK with progressively varying time stamp.
+    Raster OTF scan without frequency tracking can cause this effect.
+
+    Other possible reason is edge channel flagging by hsd_flagdata
+    and/or hsd_tsysflag.
+
+    This function detects such edge channels by calculating the median
+    number of valid spatial pixels in each channel. Consecutive
+    channels with less valid spatial pixels than the median are
+    regarded as edge channels. If non-zero edge values are specified
+    when hsd_baseline is executed, these channels are trimmed during
+    imaging. This function excludes more channels on top of that.
+
+    Args:
+        imagename: Name of the image
+
+    Returns:
+        Number of edge channels excluded from lower and upper
+        side of the spectral axis
+    """
+    with casa_tools.ImageReader(imagename) as ia:
+        mask = ia.getchunk(getmask=True)
+
+    num_valid_pixels = numpy.sum(mask, axis=(0, 1, 2))
+    nchan = len(num_valid_pixels)
+    # PIPE-1727 threshold for edge channels should be strict,
+    # no tolerance using stddev nor MAD
+    median_num_valid_pixels = numpy.median(num_valid_pixels)
+    LOG.debug(
+        "typical number of valid pixels %s",
+        median_num_valid_pixels
+    )
+    threshold = median_num_valid_pixels
+    edge_count_lower = 0
+    for i in range(nchan):
+        if num_valid_pixels[i] < threshold:
+            edge_count_lower += 1
+        else:
+            break
+    edge_count_upper = 0
+    for i in range(nchan - 1, -1, -1):
+        if num_valid_pixels[i] < threshold:
+            edge_count_upper += 1
+        else:
+            break
+
+    return edge_count_lower, edge_count_upper
+
+
+def detect_atm_channels(ms: MeasurementSet, spw: int) -> numpy.ndarray | None:
+    if ms.antenna_array.name == 'NRO':
+        return None
+
+    spwlist = [spw]
+    spwsetup = sdatm.getSpecSetup(ms.basename, spwlist=spwlist)
+    tau = sdatm.getCalAtmData(ms.basename, spwlist, spwsetup)[-2]
+    skylines = sdatm.getskylines(tau[spw], spw, spwsetup, fraclevel=0.3, minpeaklevel=0.05)
+    atm_masks = sdatm.skysel(skylines, linestouse='all')
+
+    return atm_masks

@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import collections
 import os
-from typing import TYPE_CHECKING, Any, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -11,7 +13,6 @@ from pipeline.domain import DataType
 from pipeline.h.heuristics import fieldnames
 from pipeline.h.tasks.applycal.applycal import reshape_flagdata_summary
 from pipeline.infrastructure.utils import absolute_path
-
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import task_registry
 from . import worker
@@ -20,18 +21,18 @@ from .. import common
 from ..common import utils as sdutils
 
 if TYPE_CHECKING:
-    from numbers import Integral
+    from numbers import Real
 
     from pipeline.infrastructure import Context
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class SDBLFlagInputs(vdp.StandardInputs):
     """
     Inputs for single dish flagging
     """
-    def __to_numeric(self, val: Any) -> 'Integral':
+    def __to_numeric(self, val: Any) -> Real | str | None:
         """Convert any value into numeric.
 
         Utility method for VisDependentProperty.
@@ -70,7 +71,7 @@ class SDBLFlagInputs(vdp.StandardInputs):
         """
         return int(val)
 
-    def __to_list(self, val: Any) -> List[int]:
+    def __to_list(self, val: Any) -> list[int]:
         """Convert any value into integer list.
 
         Utility method for VisDependentProperty.
@@ -112,7 +113,7 @@ class SDBLFlagInputs(vdp.StandardInputs):
     plotflag = vdp.VisDependentProperty(default=True, fconvert=__to_bool)
 
     @vdp.VisDependentProperty
-    def infiles(self) -> Optional[Union[str, List[str]]]:
+    def infiles(self) -> str | list[str] | None:
         """Name of input MS.
 
         This is just an alias of vis.
@@ -123,7 +124,7 @@ class SDBLFlagInputs(vdp.StandardInputs):
         return self.vis
 
     @infiles.convert
-    def infiles(self, value: Optional[Union[str, List[str]]]) -> Optional[Union[str, List[str]]]:
+    def infiles(self, value: str | list[str] | None) -> str | list[str] | None:
         """Additional conversion operation on infiles.
 
         It doesn't apply any conversion. Instead, this ensures
@@ -141,7 +142,7 @@ class SDBLFlagInputs(vdp.StandardInputs):
     antenna = vdp.VisDependentProperty(default='')
 
     @antenna.convert
-    def antenna(self, value: Optional[str]) -> str:
+    def antenna(self, value: str | None) -> str:
         """Make antenna selection consistent with vis.
 
         Args:
@@ -197,34 +198,36 @@ class SDBLFlagInputs(vdp.StandardInputs):
         return ','.join(pols)
 
     #  docstring and type hints: supplements hsd_blflag
-    def __init__(self,
-                 context: 'Context',
-                 output_dir: Optional[str] = None,
-                 iteration: Optional[Union[str, int]] = None,
-                 edge: Optional[Union[str, int, List[int]]] = None,
-                 flag_tsys: Optional[Union[str, bool]] = None,
-                 tsys_thresh: Optional[Union[str, 'Integral']] = None,
-                 flag_prfre: Optional[Union[str, bool]] = None,
-                 prfre_thresh: Optional[Union[str, 'Integral']] = None,
-                 flag_pofre: Optional[Union[str, bool]] = None,
-                 pofre_thresh: Optional[Union[str, 'Integral']] = None,
-                 flag_prfr: Optional[Union[str, bool]] = None,
-                 prfr_thresh: Optional[Union[str, 'Integral']] = None,
-                 flag_pofr: Optional[Union[str, bool]] = None,
-                 pofr_thresh: Optional[Union[str, 'Integral']] = None,
-                 flag_prfrm: Optional[Union[str, bool]] = None,
-                 prfrm_thresh: Optional[Union[str, 'Integral']] = None,
-                 prfrm_nmean: Optional[Union[str, 'Integral']] = None,
-                 flag_pofrm: Optional[Union[str, bool]] = None,
-                 pofrm_thresh: Optional[Union[str, 'Integral']] = None,
-                 pofrm_nmean: Optional[Union[str, 'Integral']] = None,
-                 plotflag: Optional[Union[str, bool]] = None,
-                 infiles: Optional[Union[str, List[str]]] = None,
-                 antenna: Optional[Union[str, List[str]]] = None,
-                 field: Optional[Union[str, List[str]]] = None,
-                 spw: Optional[Union[str, List[str]]] = None,
-                 pol: Optional[Union[str, List[str]]] = None,
-                 parallel: Optional[Union[bool, str]] = None):
+    def __init__(
+            self,
+            context: Context,
+            output_dir: str | None = None,
+            iteration: str | int | None = None,
+            edge: str | int | list[int] | None = None,
+            flag_tsys: str | bool | None = None,
+            tsys_thresh: str | int | float | None = None,
+            flag_prfre: str | bool | None = None,
+            prfre_thresh: str | int | float | None = None,
+            flag_pofre: str | bool | None = None,
+            pofre_thresh: str | int | float | None = None,
+            flag_prfr: str | bool | None = None,
+            prfr_thresh: str | int | float | None = None,
+            flag_pofr: str | bool | None = None,
+            pofr_thresh: str | int | float | None = None,
+            flag_prfrm: str | bool | None = None,
+            prfrm_thresh: str | int | float | None = None,
+            prfrm_nmean: str | int | None = None,
+            flag_pofrm: str | bool | None = None,
+            pofrm_thresh: str | int | float | None = None,
+            pofrm_nmean: str | int | None = None,
+            plotflag: str | bool | None = None,
+            infiles: str | list[str] | None = None,
+            antenna: str | list[str] | None = None,
+            field: str | list[str] | None = None,
+            spw: str | list[str] | None = None,
+            pol: str | list[str] | None = None,
+            parallel: bool | str | None = None,
+            ):
         """Construct SDBLFlagInputs instance.
 
         Args:
@@ -419,10 +422,10 @@ class SDBLFlagResults(common.SingleDishResults):
     The results of SDFalgData
     """
     def __init__(self, task=None, success=None, outcome=None):
-        super(SDBLFlagResults, self).__init__(task, success, outcome)
+        super().__init__(task, success, outcome)
 
     def merge_with_context(self, context):
-        super(SDBLFlagResults, self).merge_with_context(context)
+        super().merge_with_context(context)
 
     def _outcome_name(self):
         return 'none'

@@ -49,7 +49,7 @@ class FinalcalsInputs(vdp.StandardInputs):
                 Example: refant = 'ea01, ea02'
 
         """
-        super(FinalcalsInputs, self).__init__()
+        super().__init__()
         self.context = context
         self.vis = vis
         self._weakbp = weakbp
@@ -67,7 +67,7 @@ class FinalcalsResults(basetask.Results):
                  gtypecaltable=None, ktypecaltable=None, bpcaltable=None,
                  phaseshortgaincaltable=None, finalampgaincaltable=None,
                  finalphasegaincaltable=None, flaggedSolnApplycalbandpass=None,
-                 flaggedSolnApplycaldelay=None):
+                 flaggedSolnApplycaldelay=None, spw_solint=None):
         """
         Args:
             final(List, optional): Calibration list applied - not used
@@ -82,6 +82,7 @@ class FinalcalsResults(basetask.Results):
             finalphasegaincaltable(Dict):  Phase gain table to be paseed to applycal
             flaggedSolnApplycalbandpass(Dict): returned from getCalFlaggedSoln for bpdgain_touse (per band)
             flaggedSolnApplycaldelay(Dict): returned from getCalFlaggedSoln for ktypecaltable (per band)
+            spw_solint(Dict): Dictionary of solints per spw (per band)
 
         """
         if final is None:
@@ -91,7 +92,7 @@ class FinalcalsResults(basetask.Results):
         if preceding is None:
             preceding = []
 
-        super(FinalcalsResults, self).__init__()
+        super().__init__()
 
         self.vis = vis
         self.pool = pool[:]
@@ -106,6 +107,7 @@ class FinalcalsResults(basetask.Results):
         self.finalphasegaincaltable = finalphasegaincaltable
         self.flaggedSolnApplycalbandpass = flaggedSolnApplycalbandpass
         self.flaggedSolnApplycaldelay = flaggedSolnApplycaldelay
+        self.spw_solint = spw_solint if spw_solint is not None else {}
 
     def merge_with_context(self, context):
 
@@ -155,7 +157,7 @@ class Finalcals(basetask.StandardTaskTemplate):
 
         bpdgain_touse, gtypecaltable, ktypecaltable, bpcaltable, phaseshortgaincaltable, \
         finalampgaincaltable, finalphasegaincaltable, \
-        flaggedSolnApplycalbandpass, flaggedSolnApplycaldelay = self._do_finalscals(band2spw)
+        flaggedSolnApplycalbandpass, flaggedSolnApplycaldelay, spw_solint_perband = self._do_finalscals(band2spw)
 
         return FinalcalsResults(vis=self.inputs.vis, pool=self.pool, final=self.final,
                                 bpdgain_touse=bpdgain_touse, gtypecaltable=gtypecaltable,
@@ -164,7 +166,8 @@ class Finalcals(basetask.StandardTaskTemplate):
                                 finalampgaincaltable=finalampgaincaltable,
                                 finalphasegaincaltable=finalphasegaincaltable,
                                 flaggedSolnApplycalbandpass=flaggedSolnApplycalbandpass,
-                                flaggedSolnApplycaldelay=flaggedSolnApplycaldelay)
+                                flaggedSolnApplycaldelay=flaggedSolnApplycaldelay,
+                                spw_solint=spw_solint_perband)
 
     def _do_finalscals(self, band2spw):
         """Execute finalcals heuristics
@@ -182,6 +185,7 @@ class Finalcals(basetask.StandardTaskTemplate):
             finalphasegaincaltable(Dict):  Phase gain table to be paseed to applycal
             flaggedSolnApplycalbandpass(Dict):  returned from getCalFlaggedSoln for bpdgain_tous
             flaggedSolnApplycaldelay(Dict): returned from getCalFlaggedSoln for ktypecaltable
+            spw_solint_perband (Dict): Dictionary of solints per spw per band
 
         """
 
@@ -205,8 +209,7 @@ class Finalcals(basetask.StandardTaskTemplate):
 
         self.ignorerefant = self.inputs.context.evla['msinfo'][m.name].ignorerefant
 
-        # PIPE-1637: adding ',' in the manual and auto refantignore parameter
-        refantignore = self.inputs.refantignore + ','.join(['', *self.ignorerefant])
+        refantignore = utils.build_refantignore(refantignore=self.inputs.refantignore, ignorerefant=self.ignorerefant)
         refantfield = self.inputs.context.evla['msinfo'][m.name].calibrator_field_select_string
         # PIPE-595: if refant list is not provided, compute refants else use provided refant list.
         if len(self.inputs.refant) == 0:
@@ -241,7 +244,7 @@ class Finalcals(basetask.StandardTaskTemplate):
 
         bpdgain_touse = tablebase + table_suffix[0]
         LOG.info("Initial BP gain calibration complete")
-
+        spw_solint_perband = {}
         for band, spwlist in band2spw.items():
             append = False
             isdir = os.path.isdir(bpcaltable)
@@ -258,9 +261,10 @@ class Finalcals(basetask.StandardTaskTemplate):
             else:
                 LOG.debug("Using REGULAR heuristics")
                 interp = ''
-                do_bandpass(self.inputs.vis, bpcaltable, context=self.inputs.context, RefAntOutput=RefAntOutput,
+                spw_solint = do_bandpass(self.inputs.vis, bpcaltable, context=self.inputs.context, RefAntOutput=RefAntOutput,
                             spw=','.join(spwlist), ktypecaltable=ktypecaltable, bpdgain_touse=bpdgain_touse, solint='inf', append=append,
                             executor=self._executor)
+                spw_solint_perband[band] = spw_solint
 
         LOG.info("Bandpass calibration complete")
 
@@ -352,7 +356,7 @@ class Finalcals(basetask.StandardTaskTemplate):
             flaggedSolnApplycaldelay = getCalFlaggedSoln(ktypecaltable)
 
         return bpdgain_touse, gtypecaltable, ktypecaltable, bpcaltable, phaseshortgaincaltable, \
-            finalampgaincaltable, finalphasegaincaltable, flaggedSolnApplycalbandpass, flaggedSolnApplycaldelay
+            finalampgaincaltable, finalphasegaincaltable, flaggedSolnApplycalbandpass, flaggedSolnApplycaldelay, spw_solint_perband
 
     def analyse(self, results):
         """Determine the best parameters by analysing the given jobs before returning any final jobs to execute.

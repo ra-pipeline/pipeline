@@ -1,3 +1,4 @@
+import os
 import numpy as np
 
 import pipeline.infrastructure as infrastructure
@@ -72,7 +73,9 @@ class DiffGaincalResults(basetask.Results):
 
 class DiffGaincalInputs(vdp.StandardInputs):
 
-    flagging_frac_limit = vdp.VisDependentProperty(default=0.7)
+    # PIPE-2932 stop diffgain flagging targets when offset solns missing
+    # change flagging_frac_limit such that if 1 (of 2) scans are flagged, combine='spw' occurs
+    flagging_frac_limit = vdp.VisDependentProperty(default=0.5)
     hm_spwmapmode = vdp.VisDependentProperty(default='auto')
 
     @hm_spwmapmode.convert
@@ -423,8 +426,8 @@ class DiffGaincal(basetask.StandardTaskTemplate):
             missing_scan_ratio = 1.0 - float(len(scanids_for_spwid)) / n_exp_scan_solns
 
             # If fraction of missing scans exceeds the limit, then mark this SpW
-            # as bad.
-            if missing_scan_ratio > inputs.missing_scans_frac_limit:
+            # as bad. 
+            if missing_scan_ratio >= inputs.missing_scans_frac_limit:
                 spw_with_too_many_missing_scans.append(uniq_spwid)
 
         # If any SpW has too many missing scans:
@@ -460,7 +463,7 @@ class DiffGaincal(basetask.StandardTaskTemplate):
                 # If fraction of flagged data in even just one polarization
                 # exceeds the limit, then mark this SpW as bad, and continue
                 # with next SpW.
-                if flag_ratio > inputs.flagging_frac_limit:
+                if flag_ratio >= inputs.flagging_frac_limit:
                     spw_with_too_much_flagging.append(uniq_spwid)
                     break
 
@@ -543,13 +546,31 @@ class DiffGaincal(basetask.StandardTaskTemplate):
             # Run gaincal for the first scan group.
             result = self._do_gaincal(intent=intent, spw=spwids_str, combine=combine, scan=scan_groups[0])
 
-            # Run gaincal for any additional scan groups, appending to the initial caltable.
+            # Only extract and reuse the caltable if there is more than one scan group.
             if len(scan_groups) > 1:
                 caltable = result.inputs['caltable']
-                for scan_group in scan_groups[1:]:
-                    self._do_gaincal(intent=intent, spw=spwids_str, combine=combine, caltable=caltable, scan=scan_group,
-                                     append=True)
 
+                # Loop the remaining scan groups - specifically diffgain_onsource 'b2b offset' solve.
+                # Should only be one 'more' as current operations as of 2024 use two diffgain 'blocks'.
+                for scan_group in scan_groups[1:]:
+                    # PIPE-2915: check if there was a gaintable made in the first instance, then append
+                    # If the first scan group solve did not get made (possibly due to flags),
+                    # we use the next group to make a fresh gaintable.
+                    # Note that in operations there is likely only ever two scan groups.
+                    table_exists = os.path.exists(caltable)
+
+                    if not table_exists:
+                        LOG.info('Diffgain B2B offset caltable not found for initial scan group')
+
+                    # If table_exists is True, we append. If False, we start a fresh solve.
+                    result = self._do_gaincal(
+                        intent=intent,
+                        spw=spwids_str,
+                        combine=combine,
+                        scan=scan_group,
+                        caltable=caltable,
+                        append=table_exists,
+                    )
         return result
 
     def _do_phasecal_for_diffgain_reference(self) -> tuple[common.GaincalResults, dict[IntentField, SpwMapping]]:

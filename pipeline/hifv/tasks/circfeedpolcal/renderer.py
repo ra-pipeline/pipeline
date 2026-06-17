@@ -10,7 +10,7 @@ import pipeline.infrastructure.renderer.weblog as weblog
 LOG = logging.get_logger(__name__)
 
 
-class VLASubPlotRenderer(object):
+class VLASubPlotRenderer:
 
     def __init__(self, context, result, plots, json_path, template, filename_prefix):
         self.context = context
@@ -69,7 +69,7 @@ class VLASubPlotRenderer(object):
 class T2_4MDetailsCircfeedpolcalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     def __init__(self, uri='circfeedpolcal.mako',
                  description='CircFeed Polarization', always_rerender=False):
-        super(T2_4MDetailsCircfeedpolcalRenderer, self).__init__(uri=uri,
+        super().__init__(uri=uri,
                                                                  description=description,
                                                                  always_rerender=always_rerender)
 

@@ -1,0 +1,160 @@
+name: "Template: Environment Setup and Run (Pixi)"
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        description: "Operating System to run on"
+        required: false
+        default: "ubuntu-latest"
+        type: string
+      pixi_env:
+        description: "Pixi environment name (from pyproject.toml)"
+        required: false
+        default: "default"
+        type: string
+      test_data:
+        description: "Type of test data to checkout (e.g., 'unit')"
+        required: false
+        default: "none"
+        type: string
+      task:
+        description: "Pixi task name to run (e.g., 'test-unit')"
+        required: false
+        default: ""
+        type: string
+      run_command:
+        description: "Bash commands to run inside the pixi env (used if task is empty)"
+        required: false
+        default: ""
+        type: string
+      artifact_name:
+        description: "Name of the artifact to upload"
+        required: false
+        type: string
+      artifact_path:
+        description: "Path of files to upload"
+        required: false
+        type: string
+
+jobs:
+  run-in-env:
+    name: Run in Pixi Env
+    runs-on: ${{ inputs.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Install Pixi
+        uses: prefix-dev/setup-pixi@v0.8.8
+        with:
+          pixi-version: v0.63.2
+          environments: ${{ inputs.pixi_env }}
+          # Caching is disabled to always use the latest dev snapshots on demand.
+          cache: false
+          # To enable caching in future, set `cache: true` and define an appropriate cache key,
+          # for example: v1-${{ runner.os }}-${{ inputs.pixi_env }}.
+          activate-environment: ${{ inputs.pixi_env }}
+
+      - name: Enable post-link scripts
+        shell: bash
+        run: pixi config set --local run-post-link-scripts insecure
+
+      - name: Install System Dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y git xvfb
+
+      - name: Install System Dependencies (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          # GH macOS runners use Homebrew for package management          
+          brew install git
+          # Note: xvfb is X11 specific. macOS usually doesn't need it for headless browsers,
+          # or requires XQuartz (brew install --cask xquartz) if you specifically need X11.          
+          brew install --cask xquartz
+
+      - name: Configure CASA
+        shell: bash
+        run: |
+          mkdir -p ~/.casa
+          mkdir -p casarundata
+          cat > ~/.casa/config.py << PYEOF
+          measurespath = "$GITHUB_WORKSPACE/casarundata"
+          datapath = [ "$GITHUB_WORKSPACE/casarundata", "$GITHUB_WORKSPACE/pipeline-testdata" ]
+          measures_auto_update = True
+          data_auto_update = True
+          PYEOF
+
+      - name: Cache casarundata
+        uses: actions/cache@v4
+        with:
+          path: casarundata
+          key: casarundata
+
+      - name: Fetch casarundata
+        # Trigger casatools import to fetch or update casarundata under $GITHUB_WORKSPACE/casarundata.
+        # This may download or update measurement sets and related runtime data; fail explicitly if it does not succeed.
+        shell: bash
+        run: |
+          pixi run -e ${{ inputs.pixi_env }} python -c "import casatools" || {
+            echo 'casatools import failed; casarundata may be incomplete.' >&2
+            exit 1
+          }
+
+      - name: Get latest testdata commit hash
+        id: testdata-commit
+        if: inputs.test_data == 'unit'
+        shell: bash
+        run: |
+          # Get the latest commit hash from the remote repository's default branch
+          # This will be used as part of the cache key.
+          echo "sha=$(git ls-remote https://open-bitbucket.nrao.edu/scm/pipe/pipeline-testdata.git HEAD | awk '{ print $1 }')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pipeline-testdata
+        if: inputs.test_data == 'unit'
+        uses: actions/cache@v4
+        id: cache-testdata
+        with:
+          path: pipeline-testdata
+          key: pipeline-testdata-unit-${{ steps.testdata-commit.outputs.sha }}
+
+      - name: Checkout and LFS pull test data
+        if: inputs.test_data == 'unit' && steps.cache-testdata.outputs.cache-hit != 'true'
+        run: |
+          # This creates the directory 'pipeline-testdata' INSIDE the current workspace ($GITHUB_WORKSPACE)
+          if [ ! -d "pipeline-testdata/.git" ]; then
+            git clone --filter=blob:none --sparse \
+              https://open-bitbucket.nrao.edu/scm/pipe/pipeline-testdata.git pipeline-testdata
+          fi
+          cd pipeline-testdata
+          # Configure sparse checkout & Pull LFS files
+          git sparse-checkout set pl-unittest
+          git lfs pull
+
+      - name: Run Pixi Task
+        if: inputs.task != ''
+        shell: bash
+        run: pixi run -e ${{ inputs.pixi_env }} ${{ inputs.task }}
+
+      - name: Run Custom Commands
+        if: inputs.task == '' && inputs.run_command != ''
+        shell: bash
+        env:
+          RUN_COMMAND: ${{ inputs.run_command }}
+        run: |
+          pixi run -e ${{ inputs.pixi_env }} bash -c "$RUN_COMMAND"
+
+      - name: Upload Artifacts
+        if: inputs.artifact_name != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ inputs.artifact_path }}
+          if-no-files-found: warn

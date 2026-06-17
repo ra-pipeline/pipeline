@@ -1,9 +1,13 @@
-import numpy
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 
 class Polarization(object):
-    """
-    Polarization is a logical representation of a polarization.
+    """A logical representation of a polarization.
 
     Integer correlation Stokes types are translated to their corresponding
     string representation using a local definition of the Stokes enumeration
@@ -20,7 +24,7 @@ class Polarization(object):
         corr_type_string: String representation of Stokes type for each
             correlation associated with this polarization.
     """
-    def __init__(self, pol_id: int, num_corr: int, corr_type: numpy.ndarray, corr_product: numpy.ndarray) -> None:
+    def __init__(self, pol_id: int, num_corr: int, corr_type: NDArray, corr_product: NDArray) -> None:
         """
         Initialize a Polarization object.
 

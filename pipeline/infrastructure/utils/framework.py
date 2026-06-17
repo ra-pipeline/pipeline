@@ -8,6 +8,7 @@ The framework module contains:
 from __future__ import annotations
 
 import collections
+import collections.abc
 import copy
 import errno
 import glob
@@ -19,9 +20,10 @@ import os
 import pickle
 import string
 import uuid
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING
 
-from pipeline.infrastructure import daskhelpers, logging, mpihelpers
+import pipeline.infrastructure as infrastructure
+from pipeline.infrastructure import daskhelpers, mpihelpers
 from pipeline.infrastructure.jobrequest import JobRequest
 
 from .conversion import flatten, safe_split
@@ -30,7 +32,7 @@ if TYPE_CHECKING:
     from pipeline.infrastructure.launcher import Context
     from pipeline.infrastructure.renderer.logger import Plot
 
-LOG = logging.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 __all__ = ['task_depth', 'is_top_level_task', 'get_calfroms', 'pickle_copy', 'pickle_load', 'gen_hash',
            'collect_properties', 'mkdir_p', 'get_tracebacks', 'get_qascores', 'merge_jobs', 'get_origin_input_arg',
@@ -333,10 +335,10 @@ def contains_single_dish(context: Context) -> bool:
 
 
 def plotms_iterate(
-        jobs_and_wrappers: List[Tuple[JobRequest,Plot]],
-        iteraxis: Optional[str]=None,
-        singledish: Optional[bool]=False
-) -> List[Plot]:
+        jobs_and_wrappers: list[tuple[JobRequest,Plot]],
+        iteraxis: str | None=None,
+        singledish: bool | None=False
+) -> list[Plot]:
     """
     Iterate multiple plotms job requests
 

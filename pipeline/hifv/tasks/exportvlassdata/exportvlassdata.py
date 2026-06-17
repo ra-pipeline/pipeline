@@ -11,6 +11,7 @@ import numpy as np
 
 import xml.etree.ElementTree as eltree
 import astropy.io.fits as apfits
+from collections import defaultdict
 
 import pipeline as pipeline
 import pipeline.infrastructure as infrastructure
@@ -23,6 +24,7 @@ from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import task_registry
 from pipeline.infrastructure import utils
+import pipeline.infrastructure.utils.imaging as imaging_utils
 from pipeline.domain import DataType
 
 from pipeline.infrastructure.utils import predict_kernel
@@ -47,7 +49,7 @@ def natural_keys(text):
 
 class ExportvlassdataResults(basetask.Results):
     def __init__(self, final=[], pool=[], preceding=[]):
-        super(ExportvlassdataResults, self).__init__()
+        super().__init__()
         self.pool = pool[:]
         self.final = final[:]
         self.preceding = preceding[:]
@@ -91,7 +93,7 @@ class ExportvlassdataInputs(exportdata.ExportDataInputs):
             gainmap:
 
         """
-        super(ExportvlassdataInputs, self).__init__(context, output_dir=output_dir, session=session, vis=vis,
+        super().__init__(context, output_dir=output_dir, session=session, vis=vis,
                                                     exportmses=exportmses, pprfile=pprfile, calintents=calintents,
                                                     calimages=calimages, targetimages=targetimages,
                                                     products_dir=products_dir)
@@ -116,8 +118,14 @@ class VlassPipelineManifest(manifest.PipelineManifest):
 @task_registry.set_equivalent_casa_task('hifv_exportvlassdata')
 class Exportvlassdata(basetask.StandardTaskTemplate):
     Inputs = ExportvlassdataInputs
+    is_multi_vis_task = True
 
     NameBuilder = exportdata.PipelineProductNameBuilder
+
+    def __init__(self, inputs):
+        super().__init__(inputs)
+        self.selfcaltable_list: list[str] = []
+        self.flagversion_list: list[str] = []
 
     def prepare(self):
 
@@ -233,10 +241,10 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
 
             # Create list for tar file
             self.masks = [QLmask, secondmask, finalmask]
-
+        subim_stats = defaultdict(dict)
         if type(img_mode) is str and img_mode.startswith('VLASS-SE-CUBE'):
             # PIPE-1434: split VLASS-SE-CUBE full-Stokes images into IQU and V.
-            images_list = self._split_vlass_cube_stokes(images_list)
+            images_list, subim_stats = self._split_vlass_cube_stokes(images_list)
 
         fits_list = []
         for image in images_list:
@@ -274,6 +282,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
                                                                obs_lat=observatory['m1'])
                 # Update FITS header
                 self._fix_vlass_fits_header(self.inputs.context, fitsfile)
+            self._update_vlass_fits_header(fitsfile)
 
         # SE Cont imaging mode export for VLASS
         if type(img_mode) is str and img_mode.startswith('VLASS-SE-CONT'):
@@ -303,7 +312,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
                 try:
                     LOG.info('')
                     LOG.info(f'start to smooth and regrid {imagename}, and split it into IQU and V.')
-                    self._smooth_and_regrid(imagename, refimagename, common_beam)
+                    self._smooth_and_regrid(imagename, refimagename, common_beam, subim_stats)
                 except Exception as e:
                     LOG.warning(f'Exception while getting the common beam image(s) for {imagename}: {e}')
                     LOG.info(traceback.format_exc())
@@ -311,7 +320,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         # Return the results object, which will be used for the weblog
         return result
 
-    def _smooth_and_regrid(self, imagename, ref_imagename, target_beam):
+    def _smooth_and_regrid(self, imagename, ref_imagename, target_beam, subim_stats):
         """Perform the operation to get a sci image in the commom beam/WCS."""
 
         cme = casa_tools.measures
@@ -358,8 +367,15 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
                 f'crval separation: {sep_arcsec} arcsec, with a regridding tolerence warning at {sptol} arcsec = 0.1 * pixdiag_size')
 
             image_rgd = image_smo.regrid(csys=cs_nominal.torecord(), overwrite=True, axes=[0, 1])
-
             rgTool = casa_tools.regionmanager
+            subim_key = imagename.replace('.IQUV.', '.IQU.')
+            subim_peak = ''
+            subim_rms = ''
+            if subim_key in subim_stats:
+                if 'peak' in subim_stats[subim_key]:
+                    subim_peak = subim_stats[subim_key]['peak']
+                if 'rms' in subim_stats[subim_key]:
+                    subim_rms = subim_stats[subim_key]['rms']
             for stokes in ['IQU', 'V']:
                 region = rgTool.frombcs(csys=image_rgd.coordsys().torecord(), shape=image_rgd.shape(),
                                         stokes=stokes, stokescontrol='a')
@@ -372,8 +388,15 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
                         beam0 = beam['beams']['*0']['*0']
                         image_rgd.setrestoringbeam(remove=True)
                         image_rgd.setrestoringbeam(beam=beam0)
+
+                info = image_rgd.miscinfo()
+                info['VLASSPL'] = stokes
+                info['VLASSPK'] = subim_peak
+                info['VLASSRMS'] = subim_rms
+                image_rgd.setmiscinfo(info)
                 image_rgd.tofits(fits_name, region=region, overwrite=True)
                 self._fix_vlass_fits_header(self.inputs.context, fits_name)
+                self._update_vlass_fits_header(fits_name)
                 LOG.info(f'write the commom beam/frame FITS image: {fits_name}')
 
             image_smo.done()
@@ -464,33 +487,28 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
 
         # SE Cont imaging mode export for VLASS
         img_mode = self.inputs.context.imaging_mode
-        if type(img_mode) is str and img_mode.startswith('VLASS-SE-CONT'):
+        if isinstance(img_mode, str) and img_mode.startswith('VLASS-SE-CONT'):
             # Identify self cal table
-            selfcal_result = None
+            selfcal_results: list | None = None
             for result in context.results:
                 task_result = result.read()
-                if task_result.taskname == "hifv_selfcal":
-                    selfcal_result = task_result[0]
+                if task_result.taskname == 'hifv_selfcal':
+                    selfcal_results = task_result
                     break
-
-            if selfcal_result and selfcal_result.caltable and os.path.exists(selfcal_result.caltable):
-                self.selfcaltable = selfcal_result.caltable
-            else:
-                self.selfcaltable = ''
+            if selfcal_results is not None:
+                for selfcal_result in selfcal_results:
+                    if selfcal_result and selfcal_result.caltable and os.path.exists(selfcal_result.caltable):
+                        self.selfcaltable_list.append(selfcal_result.caltable)
 
             # Identify flagversion
-            self.flagversion = os.path.basename(self.inputs.vis)+'.flagversions'
+            vis_list = [self.inputs.vis] if isinstance(self.inputs.vis, str) else self.inputs.vis
+            self.flagversion_list: list[str] = [f'{os.path.basename(vis)}.flagversions' for vis in vis_list]
 
-        return StdFileProducts(ppr_file,
-                               weblog_file,
-                               casa_commands_file,
-                               casa_pipescript,
-                               parameterlist_set)
+        return StdFileProducts(ppr_file, weblog_file, casa_commands_file, casa_pipescript, parameterlist_set)
 
     def _make_pipe_manifest(self, context, oussid, stdfproducts, sessiondict, visdict, calimages, targetimages,
                             reimaging_resources, parameterlist):
         """Generate the manifest file."""
-
         # Initialize the manifest document and the top level ous status.
         pipemanifest = self._init_pipemanifest(oussid)
         ouss = pipemanifest.set_ous(oussid)
@@ -669,7 +687,6 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         os.chdir(os.path.abspath(context.output_dir))
 
         # Define the name of the output tarfile
-        ps = context.project_structure
         tarfilename = 'reimaging_resources.tgz'
 
         LOG.info('Saving reimaging resources in %s...' % tarfilename)
@@ -680,22 +697,35 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
 
         for mask in self.masks:
             tar.add(mask, mask)
-            LOG.info('....Adding {!s}'.format(mask))
+            LOG.info('....Adding %s', mask)
 
         for initial_model in self.initial_models:
             tar.add(initial_model, initial_model)
-            LOG.info('....Adding {!s}'.format(initial_model))
+            LOG.info('....Adding %s', initial_model)
 
         for final_model in self.final_models:
             tar.add(final_model, final_model)
-            LOG.info('....Adding {!s}'.format(final_model))
-        if os.path.exists(self.selfcaltable):
-            tar.add(self.selfcaltable, self.selfcaltable)
-            LOG.info('....Adding {!s}'.format(self.selfcaltable))
-        else:
-            LOG.warning('selfcal table not present.')
-        tar.add(self.flagversion, self.flagversion)
-        LOG.info('....Adding {!s}'.format(self.flagversion))
+            LOG.info('....Adding %s', final_model)
+
+        n_selfcaltable = 0
+        for selfcaltable in self.selfcaltable_list:
+            if os.path.exists(selfcaltable):
+                tar.add(selfcaltable, selfcaltable)
+                LOG.info('....Adding %s', selfcaltable)
+                n_selfcaltable += 1
+        if n_selfcaltable == 0:
+            LOG.warning('No selfcal table found to add to the reimaging resources tarball.')
+        n_flagversion = 0
+        for flagversion in self.flagversion_list:
+            if os.path.exists(flagversion):
+                tar.add(flagversion, flagversion)
+                LOG.info('....Adding %s', flagversion)
+                n_flagversion += 1
+            else:
+                LOG.warning('Flagversions directory %s not found; skipping.', flagversion)
+        if n_flagversion == 0:
+            LOG.warning('No flagversions directories found to add to the reimaging resources tarball.')
+
         tar.close()
 
         # Restore the original current working directory
@@ -714,11 +744,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         return os.path.basename(out_parameterlist_file)
 
     def _export_table(self, context, table_name, products_dir, oussid):
-        """
-        Save directories (either cal table or flag versions)
-        """
-
-        ps = context.project_structure
+        """Save directories, either cal table or flag versions."""
         table_file = table_name
         out_table_file = os.path.join(products_dir, table_file)
 
@@ -728,10 +754,7 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         return os.path.basename(out_table_file)
 
     def _export_casa_commands_log(self, context, casalog_name, products_dir, oussid):
-        """
-        Save the CASA commands file.
-        """
-
+        """Save the CASA commands file."""
         ps = context.project_structure
         casalog_file = os.path.join(context.report_dir, casalog_name)
         out_casalog_file = self.NameBuilder.casa_script(casalog_name,
@@ -802,51 +825,100 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
 
         if os.path.exists(fitsname):
             # Open FITS image and obtain header
-            hdulist = apfits.open(fitsname, mode='update')
-            header = hdulist[0].header
+            with apfits.open(fitsname, mode='update') as hdulist:
+                header = hdulist[0].header
+                # DATE-OBS and DATE-END keywords
+                # Note: the new DATE-OBS value (first scan start time) might differ from the original value
+                # (first un-flagged scan start time).
+                header['date-obs'] = (infrastructure.utils.get_epoch_as_datetime(
+                    context.observing_run.start_time).isoformat(), 'First scan started')
+                date_end = ('date-end', infrastructure.utils.get_epoch_as_datetime(
+                    context.observing_run.end_time).isoformat(), 'Last scan finished')
+                if 'date-end' in [k.lower() for k in header.keys()]:
+                    header['date-end'] = date_end[1:]
+                else:
+                    pos = header.index('date-obs')
+                    header.insert(pos, date_end, after=True)
 
-            # DATE-OBS and DATE-END keywords
-            # Note: the new DATE-OBS value (first scan start time) might differ from the original value
-            # (first un-flagged scan start time).
-            header['date-obs'] = (infrastructure.utils.get_epoch_as_datetime(
-                context.observing_run.start_time).isoformat(), 'First scan started')
-            date_end = ('date-end', infrastructure.utils.get_epoch_as_datetime(
-                context.observing_run.end_time).isoformat(), 'Last scan finished')
-            if 'date-end' in [k.lower() for k in header.keys()]:
-                header['date-end'] = date_end[1:]
-            else:
-                pos = header.index('date-obs')
-                header.insert(pos, date_end, after=True)
+                # RADESYS
+                if header['radesys'].upper() == 'FK5':
+                    header['radesys'] = 'ICRS'
 
-            # RADESYS
-            if header['radesys'].upper() == 'FK5':
-                header['radesys'] = 'ICRS'
+                # OBJECT
+                # We assume that the FITS name follows the convention described in PIPE-968 (minus the stage
+                #    prefixes) and directly extract the 'OBJECT' name (first FIELD name of the image) from it.
 
-            # OBJECT
-            # We assume that the FITS name follows the convention described in PIPE-968 (minus the stage
-            #    prefixes) and directly extract the 'OBJECT' name (first FIELD name of the image) from it.
+                filename_components = os.path.basename(fitsname).split('.')
+                object_name = filename_components[4]
+                if object_name != '' and header['object'].upper() != object_name.upper():
+                    header['object'] = object_name
 
-            filename_components = os.path.basename(fitsname).split('.')
-            object_name = filename_components[4]
-            if object_name != '' and header['object'].upper() != object_name.upper():
-                header['object'] = object_name
-
-            # Save changes and inform log
-            hdulist.flush()
-            LOG.info("Header updated in {}".format(fitsname))
-
-            # Close FITS file
-            hdulist.close()
+                # Save changes and inform log
+                hdulist.flush()
+                LOG.info("Header updated in {}".format(fitsname))
 
         else:
             LOG.warning('FITS header cannot be updated: image {} does not exist.'.format(fitsname))
 
         return
 
+    def _update_vlass_fits_header(self, fitsname):
+        """PIPE-2461: Updates VLASS fits keywords and adds comment to the keywords."""
+        if os.path.exists(fitsname):
+            # Open FITS image and obtain header
+            with apfits.open(fitsname, mode='update') as hdulist:
+                header = hdulist[0].header
+                tt_type = "TT0" if "tt0" in fitsname.lower() else "TT1" if "tt1" in fitsname.lower() else None
+                header_comments = {
+                    "VLASSITY": "VLASS image type",
+                    "VLASSPT": "VLASS product type",
+                    "VLASSTN": "VLASS tile name",
+                    "VLASSPC": "VLASS phasecenter",
+                    "VLASSEP": "VLASS epoch",
+                    "VLASSVR": "VLASS version number",
+                    "VLASSPL": "VLASS Stokes/polarization parameter",
+                    "VLASSRJ": "Rejected plane relevant for VLASS CC processing",
+                    "VLASSSPW": "Spectral windows used for image",
+                    "VLASSBWN": "Nominal bandwidth",
+                    "VLASSBW": "Actual bandwidth after flagging",
+                    "VLASSRMS": None,
+                    "VLASSPK": None,
+                    "VLASSWP": "Number of w-projection planes"
+                }
+                if tt_type == "TT0" or 'alpha' in fitsname.lower():
+                    header_comments["VLASSRMS"] = (
+                        "Median rms calculated from RMS_TT0 (I)"
+                    )
+                    header_comments["VLASSPK"] = (
+                        "Peak flux density of INTENSITY_PBCOR_TT0 (I)"
+                    )
+                elif tt_type == "TT1":
+                    header_comments["VLASSRMS"] = (
+                        "Median rms calculated from RMS_TT1 (I)"
+                    )
+                    header_comments["VLASSPK"] = (
+                        "Peak flux density of INTENSITY_PBCOR_TT1 (I)"
+                    )
+                else:
+                    header_comments["VLASSRMS"] = "Median RMS calculated from RMS image"
+                    header_comments["VLASSPK"] = "Peak flux density of INTENSITY_PBCOR image"
+
+                for key, comment in header_comments.items():
+                    value = header.get(key, None)
+                    if value is None:
+                        LOG.warning(f'Keyword {key} not found in FITS header of {fitsname}')
+                        continue
+                    header[key] = (value, comment)
+
     def _split_vlass_cube_stokes(self, image_list):
         """Split full-Stokes images into the IQU and V images and return a new image list."""
 
         new_image_list = []
+        subim_stats = defaultdict(dict)
+        stats_mapping = {
+            'rms': ('rms', ['median']),
+            'intensity_pbcor': ('peak', ['max'])
+        }
 
         for imagename in image_list:
             if '.IQUV.' in imagename:
@@ -855,12 +927,51 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
                     job = casa_tasks.imsubimage(imagename, outfile=outfile,
                                                 stokes=stokes_select, overwrite=True, dropdeg=False)
                     self._executor.execute(job)
-                    LOG.info(f'Wrote {outfile}')
+
                     new_image_list.append(outfile)
+
+                    if stokes_select == 'V':
+                        continue
+                    image_type = imaging_utils.get_vlass_image_type(outfile, append_tt=False).lower()
+                    if image_type == 'rms':
+                        stats_key = outfile.replace('.rms', '')
+                    elif image_type == 'intensity_pbcor':
+                        stats_key = outfile
+                    else:
+                        continue
+
+                    metrics_key, stat_metrics = stats_mapping[image_type]
+                    stat_values = imaging_utils.get_stats(outfile, metrics=stat_metrics, stokes='I')
+                    subim_stats[stats_key][metrics_key] = stat_values.get(stat_metrics[0])
+                    LOG.info(f'Wrote {outfile}')
             else:
                 new_image_list.append(imagename)
+        for new_image in new_image_list:
+            image_type = imaging_utils.get_vlass_image_type(new_image, append_tt=False).lower()
+            if image_type == 'rms':
+                stats_key = new_image.replace('.rms', '')
+            else:
+                stats_key = new_image
 
-        return new_image_list
+            with casa_tools.ImageReader(new_image) as image:
+                info = image.miscinfo()
+                cs = image.coordsys()
+                stokes_labels = cs.stokes()
+                cs.done()
+                stokes = [stokes_labels[idx] for idx in range(image.shape()[2])]
+                stokes = ''.join(stokes)
+                info['VLASSPL'] = stokes
+                if stokes == 'V':
+                    stats_key = stats_key.replace('.V.','.IQU.')
+                if stats_key in subim_stats:
+                    info['VLASSRMS'] = subim_stats[stats_key].get('rms', '')
+                    info['VLASSPK'] = subim_stats[stats_key].get('peak', '')
+                else:
+                    info['VLASSRMS'] = ''
+                    info['VLASSPK'] = ''
+                image.setmiscinfo(info)
+
+        return new_image_list, subim_stats
 
     def _get_common_beam(self, image_list):
         """Get the common beam from the supplied "cube" image list."""

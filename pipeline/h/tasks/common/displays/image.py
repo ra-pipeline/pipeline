@@ -45,7 +45,7 @@ def sanitize(text):
     return filename
 
 
-class ImageDisplay(object):
+class ImageDisplay:
 
     @staticmethod
     def _findchunks(times):
@@ -187,7 +187,7 @@ class ImageDisplay(object):
             self._plot_panel(fig, axs[0], nsubplots, 1, results.first(description), '')
 
         # Reduce the padding of the constrained layout.
-        fig.set_constrained_layout_pads(w_pad=0.04, h_pad=0.04)
+        fig.get_layout_engine().set(w_pad=0.04, h_pad=0.04)
 
         # # Plot the legend panel.
         self._plot_legend_panel(axs[-1], antennas, flagcmds)
@@ -283,7 +283,6 @@ class ImageDisplay(object):
         xunits = image.axes[0].units
         ytitle = image.axes[1].name
         ydata = image.axes[1].data
-        # yunits = image.axes[1].units
         dataunits = image.units
         datatype = image.datatype
 

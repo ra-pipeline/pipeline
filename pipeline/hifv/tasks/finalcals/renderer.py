@@ -31,7 +31,7 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
     def __init__(self, uri='applycals.mako',
                  description='Apply calibrations from context',
                  always_rerender=False):
-        super(T2_4MDetailsVLAApplycalRenderer, self).__init__(
+        super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
     def update_mako_context(self, ctx, context, result):
@@ -267,47 +267,6 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
                         'with visstat. Using Field #%s (%s) for Source #%s'
                         '', field.id, field.name, source_id)
             result[source_id] = field
-            continue
-            # FIXME: code below here in remainder of for-loop is unreachable
-
-            field_ids = {(f.id, f.name) for f in fields}
-
-            # holds the mapping of field name to mean flux
-            average_flux = {}
-
-            # defines the parameters for the visstat job
-            job_params = {
-                'vis': ms.name,
-                'axis': 'amp',
-                'datacolumn': 'corrected',
-                'spw': ','.join(map(str, spw_ids)),
-            }
-
-            # solve circular import problem by importing at run-time
-            from pipeline.infrastructure import casa_tasks
-
-            LOG.info('Calculating which %s field has the highest mean flux '
-                     'for Source #%s', intent, source_id)
-            # run visstat for each scan selection for the target
-            for field_id, field_name in field_ids:
-                job_params['field'] = str(field_id)
-                job = casa_tasks.visstat(**job_params)
-                LOG.debug('Calculating statistics for %r (#%s)', field_name, field_id)
-                result = job.execute()
-
-                average_flux[(field_id, field_name)] = float(result['CORRECTED']['mean'])
-
-            LOG.debug('Mean flux for %s targets:', intent)
-            for field_id, field_name, v in average_flux.items():
-                LOG.debug('\t%r (%s): %s', field_name, field_id, v)
-
-            # find the ID of the field with the highest average flux
-            sorted_by_flux = sorted(average_flux.items(), key=operator.itemgetter(1), reverse=True)
-            (brightest_id, brightest_name), highest_flux = sorted_by_flux[0]
-
-            LOG.info('%s field %r (%s) has highest mean flux (%s)', intent,
-                     brightest_name, brightest_id, highest_flux)
-            result[source_id] = brightest_id
 
         return result
 
@@ -414,7 +373,7 @@ class ApplycalAmpVsFreqPlotRenderer(basetemplates.JsonPlotRenderer):
         title = 'Calibrated amplitude vs frequency for %s' % vis
         outfile = filenamer.sanitize('amp_vs_freq-%s.html' % vis)
 
-        super(ApplycalAmpVsFreqPlotRenderer, self).__init__(
+        super().__init__(
                 'generic_x_vs_y_field_spw_ant_detail_plots.mako', context,
                 result, plots, title, outfile, **overrides)
 
@@ -425,7 +384,7 @@ class ApplycalPhaseVsFreqPlotRenderer(basetemplates.JsonPlotRenderer):
         title = 'Calibrated phase vs frequency for %s' % vis
         outfile = filenamer.sanitize('phase_vs_freq-%s.html' % vis)
 
-        super(ApplycalPhaseVsFreqPlotRenderer, self).__init__(
+        super().__init__(
                 'generic_x_vs_y_field_spw_ant_detail_plots.mako', context,
                 result, plots, title, outfile, **overrides)
 
@@ -436,7 +395,7 @@ class ApplycalAmpVsFreqSciencePlotRenderer(basetemplates.JsonPlotRenderer):
         title = 'Calibrated amplitude vs frequency for %s' % vis
         outfile = filenamer.sanitize('science_amp_vs_freq-%s.html' % vis)
 
-        super(ApplycalAmpVsFreqSciencePlotRenderer, self).__init__(
+        super().__init__(
                 'generic_x_vs_y_field_baseband_detail_plots.mako', context,
                 result, plots, title, outfile, **overrides)
 
@@ -447,7 +406,7 @@ class ApplycalPhaseVsFreqSciencePlotRenderer(basetemplates.JsonPlotRenderer):
         title = 'Calibrated phase vs frequency for %s' % vis
         outfile = filenamer.sanitize('science_phase_vs_freq-%s.mako' % vis)
 
-        super(ApplycalPhaseVsFreqSciencePlotRenderer, self).__init__(
+        super().__init__(
                 'generic_x_vs_y_field_baseband_detail_plots.html', context,
                 result, plots, title, outfile, **overrides)
 
@@ -458,7 +417,7 @@ class ApplycalAmpVsUVSciencePlotRenderer(basetemplates.JsonPlotRenderer):
         title = 'Calibrated amplitude vs UV distance for %s' % vis
         outfile = filenamer.sanitize('science_amp_vs_uv-%s.html' % vis)
 
-        super(ApplycalAmpVsUVSciencePlotRenderer, self).__init__(
+        super().__init__(
                 'generic_x_vs_y_field_baseband_detail_plots.mako', context,
                 result, plots, title, outfile, **overrides)
 
@@ -469,7 +428,7 @@ class ApplycalAmpVsUVPlotRenderer(basetemplates.JsonPlotRenderer):
         title = 'Calibrated amplitude vs UV distance for %s' % vis
         outfile = filenamer.sanitize('amp_vs_uv-%s.html' % vis)
 
-        super(ApplycalAmpVsUVPlotRenderer, self).__init__(
+        super().__init__(
                 'generic_x_vs_y_spw_ant_plots.mako', context,
                 result, plots, title, outfile, **overrides)
 
@@ -480,7 +439,7 @@ class ApplycalPhaseVsUVPlotRenderer(basetemplates.JsonPlotRenderer):
         title = 'Calibrated phase vs UV distance for %s' % vis
         outfile = filenamer.sanitize('phase_vs_uv-%s.html' % vis)
 
-        super(ApplycalPhaseVsUVPlotRenderer, self).__init__(
+        super().__init__(
                 'generic_x_vs_y_spw_ant_plots.mako', context,
                 result, plots, title, outfile, **overrides)
 
@@ -491,7 +450,7 @@ class ApplycalAmpVsTimePlotRenderer(basetemplates.JsonPlotRenderer):
         title = 'Calibrated amplitude vs times for %s' % vis
         outfile = filenamer.sanitize('amp_vs_time-%s.html' % vis)
 
-        super(ApplycalAmpVsTimePlotRenderer, self).__init__(
+        super().__init__(
                 'generic_x_vs_y_field_spw_ant_detail_plots.mako', context,
                 result, plots, title, outfile, **overrides)
 
@@ -502,6 +461,6 @@ class ApplycalPhaseVsTimePlotRenderer(basetemplates.JsonPlotRenderer):
         title = 'Calibrated phase vs times for %s' % vis
         outfile = filenamer.sanitize('phase_vs_time-%s.html' % vis)
 
-        super(ApplycalPhaseVsTimePlotRenderer, self).__init__(
+        super().__init__(
                 'generic_x_vs_y_field_spw_ant_detail_plots.mako', context,
                 result, plots, title, outfile, **overrides)

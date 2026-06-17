@@ -38,7 +38,22 @@ On a multi-core system, `pytest-xdist` can speed things up significantly, when t
 
 A summary of various test frameworks and tools is available in [PIPE-806](https://open-jira.nrao.edu/browse/PIPE-806).
 
-## Regression tests
+## Component tests
+
+The component tests are meant to exercise task and inter-task behavior without running an entire pipeline workflow.
+
+```console
+PYTHONNOUSERSITE=1 ${casa_dir}/bin/python3 -m pytest -vv --junitxml=component-results.xml -n 4 <pipeline_dir>/pipeline/component/.
+```
+
+or alternatively
+
+```console
+xvfb-run -d ${casa_dir}/bin/casa --nogui --nologger --agg -c \
+    "import pytest; pytest.main(['-vv', '--junitxml=component-results.xml', '-n', '4', '<pipeline_dir>/tests/component'])"
+```
+
+## Regression End-to-End Tests
 
 See <https://open-confluence.nrao.edu/display/PL/Regression+Testing> for details
 
@@ -84,19 +99,15 @@ PYTHONNOUSERSITE=1 xvfb-run -d ${casa_dir}/bin/python3 -m pytest -v --pyclean --
 
 The coverage report will be saved as `htmlcov/index.html`. A similar call can be issued to report the test coverage of the entire regression test suite, although such run will take much longer.
 
-## Component tests
+### Running Tests in an `mpicasa` Session
 
-The component tests are meant to exercise task and inter-task behavior without running an entire pipeline workflow.
-
-```console
-PYTHONNOUSERSITE=1 ${casa_dir}/bin/python3 -m pytest -vv --junitxml=component-results.xml -n 4 <pipeline_dir>/pipeline/component/.
-```
-
-or alternatively
+Running tests in an `mpicasa` session is similar to the above examples, except that you need to use `mpicasa` to launch CASA with multiple MPI processes.
+Here is an example of running a single regression test in an `mpicasa` session with 5 processes (one as client and four as workers):
 
 ```console
-xvfb-run -d ${casa_dir}/bin/casa --nogui --nologger --agg -c \
-    "import pytest; pytest.main(['-vv', '--junitxml=component-results.xml', '-n', '4', '<pipeline_dir>/tests/component'])"
+PYTHONNOUSERSITE=1 xvfb-run -d ${casa_dir}/bin/mpicasa -display-allocation -display-map --report-bindings -oversubscribe -n 5 \
+    ${casa_dir}/bin/casa --cachedir ./rcdir --configfile ./rcdir/config.py --startupfile ./rcdir/startup.py --nologger --log2term --nogui --agg -c \
+    "import pytest; pytest.main(['--junitxml=./regression.xml', '<pipeline_dir>/pipeline/infrastructure/utils/regression_tester.py::test_csv_3899_eb2_small__procedure_hifa_calimage__regression'])"
 ```
 
 ### Combining Coverage Reports

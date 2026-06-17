@@ -1,14 +1,19 @@
+from __future__ import annotations
+
 import abc
-import collections
+import collections.abc
 import copy
 import datetime
 import enum
 import json
 import re
-
-from typing import Dict, List, Set, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
+
+import pipeline.infrastructure as infrastructure
+import pipeline.infrastructure.renderer.htmlrenderer as htmlrenderer
+import pipeline.infrastructure.utils as utils
 from pipeline import environment
 from pipeline.domain import measures
 from pipeline.h.tasks.applycal.applycal import ApplycalResults
@@ -20,11 +25,12 @@ from pipeline.hifa.tasks.gfluxscaleflag import Gfluxscaleflag
 from pipeline.hifa.tasks.gfluxscaleflag.resultobjects import GfluxscaleflagResults
 from pipeline.infrastructure.basetask import Results, ResultsList
 import pipeline.infrastructure.renderer.htmlrenderer as htmlrenderer
-from pipeline.domain.datatype import DataType
 from pipeline.infrastructure.launcher import Context
 from pipeline.domain.measurementset import MeasurementSet
 from pipeline.domain.measures import FluxDensityUnits
+from pipeline.domain.datatype import DataType
 from pipeline.h.tasks.common import flagging_renderer_utils as flagutils
+from pipeline.hifa.tasks.flagging.flagdeteralma import FlagDeterALMAResults
 from pipeline.infrastructure.renderer import regression
 from pipeline.infrastructure import launcher, utils
 
@@ -50,9 +56,16 @@ from pipeline.hsd.tasks.imaging.resultobjects import SDImagingResults
 from pipeline.hsd.tasks.restoredata.restoredata import SDRestoreData, SDRestoreDataResults
 from pipeline.hsdn.tasks.restoredata.restoredata import NRORestoreData, NRORestoreDataResults
 
-from . import logging
+LOG = infrastructure.logging.get_logger(__name__)
 
-LOG = logging.get_logger(__name__)
+
+if TYPE_CHECKING:
+    from numpy import generic
+    from numpy.typing import NDArray
+
+    from pipeline.domain.measurementset import MeasurementSet
+    from pipeline.infrastructure.basetask import Results, ResultsList
+    from pipeline.infrastructure.launcher import Context
 
 
 # useful helper functions:
@@ -100,7 +113,7 @@ class PipelineStatistic:
         units: The units associated with the value (Optional)
         level: A PipelineStatisticLevel that specifies whether this value applies to a MOUS, EB, or SPW
     """
-    def __init__(self, name: str, value: Union[str, int, float, List, Dict, Set, np.int64, np.ndarray],
+    def __init__(self, name: str, value: str | int | float | list | dict | set | np.int64 | NDArray[generic],
                  longdesc: str, origin: str = '', units: str = '',
                  level: PipelineStatisticLevel = None):
 
@@ -127,7 +140,7 @@ class PipelineStatistic:
     def __str__(self) -> str:
         return 'PipelineStatistic({!s}, {!r}, {!r}, {!s})'.format(self.name, self.value, self.origin, self.units)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """
         Convert an individual pipeline statistics item to a dictionary
         representation
@@ -140,7 +153,7 @@ class PipelineStatistic:
         if self.units not in ["", None]:
             stats_dict['units'] = self.units
 
-        if self.longdesc not in ["", None]: 
+        if self.longdesc not in ["", None]:
             stats_dict['longdescription'] = self.longdesc
 
         if self.origin not in ["", None]:
@@ -197,12 +210,12 @@ class PipelineStatsCollection:
         else:
             LOG.warning(f"Unknown pipeline statistics level: {level}")
 
-    def add_stats(self, stats: List[PipelineStatistic], mous: str = None, source: str = None, 
+    def add_stats(self, stats: list[PipelineStatistic], mous: str = None, source: str = None,
                   level: PipelineStatisticLevel = None, eb: str = None, spw: str = None):
         for stat in stats:
             self.add_stat(stat, level=level, mous=mous, source=source, eb=eb, spw=spw)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """
         Generates a nested output dict with EBs, SPWs, TARGETs, MOUSs
         Each level is represented in the structure of the output.
@@ -269,7 +282,7 @@ class PipelineStatsCollection:
         return final_dict
 
 
-def _generate_header() -> Dict:
+def _generate_header() -> dict:
     """
     Creates a header with information about the pipeline stats file
     """
@@ -299,7 +312,7 @@ def casa_version(environment) -> str:
     return environment.casa_version_string
 
 
-def mous_uid(context) -> str: 
+def mous_uid(context) -> str:
     return context.get_oussid()
 
 
@@ -314,9 +327,9 @@ def stage_duration(context) -> list:
     ## The end time of the last task is tentatively defined as the time of current time.
 
     timestamps = [r.read().timestamps.start for r in context.results]
-    
+
     # tentative task end time stamp for the last stage
-    timestamps.append(datetime.datetime.utcnow())
+    timestamps.append(datetime.datetime.now(datetime.timezone.utc))
     task_duration = []
     for i in range(len(context.results)):
         # task execution duration
@@ -328,9 +341,9 @@ def stage_duration(context) -> list:
 
 def execution_duration(context) -> float:
     """
-    Return the execution duration as reported in the aquareport. 
+    Return the execution duration as reported in the aquareport.
     This is the difference between the time the first stage was
-    run in the pipeline and the time the last stage was completed. 
+    run in the pipeline and the time the last stage was completed.
     """
 
     # Processing time
@@ -349,7 +362,7 @@ def stage_info(context) -> dict:
     return info
 
 
-def _get_mous_values(context, mous: str, ms_list: List[MeasurementSet],
+def _get_mous_values(context, mous: str, ms_list: list[MeasurementSet],
                      stats_collection: PipelineStatsCollection):
     """
     Get the statistics values for a given MOUS
@@ -526,7 +539,7 @@ def l80(ms: MeasurementSet) -> float:
     return np.percentile(ms.antenna_array.baselines_m, 80)
 
 
-def _get_eb_values(context, mous: str, ms_list: List[MeasurementSet],
+def _get_eb_values(context, mous: str, ms_list: list[MeasurementSet],
                    stats_collection: PipelineStatsCollection):
     """
     Get the statistics values for a given EB
@@ -597,7 +610,7 @@ def n_pol(spw, ms) -> int:
     return numpols
 
 
-def _get_spw_values(context, mous: str, ms_list: List[MeasurementSet],
+def _get_spw_values(context, mous: str, ms_list: list[MeasurementSet],
                     stats_collection: PipelineStatsCollection):
     """
     Get the statistics values for a given SPW
@@ -675,7 +688,7 @@ def pointings(ms, source):
     return pointings
 
 
-def _get_source_values(context, mous: str, ms_list: List[MeasurementSet],
+def _get_source_values(context, mous: str, ms_list: list[MeasurementSet],
                        stats_collection: PipelineStatsCollection):
     """
     Get the statistics values for a given source
@@ -737,7 +750,7 @@ def get_stats_from_context(context) -> PipelineStatsCollection:
 
 
 # Used to be in stats_extractor.py
-class ResultsStatsExtractor(object, metaclass=abc.ABCMeta):
+class ResultsStatsExtractor(abc.ABC):
     """
     Adapted from the RegressisonExtractor,
     this class is the base class for a pipeline statistics extractor
@@ -751,7 +764,7 @@ class ResultsStatsExtractor(object, metaclass=abc.ABCMeta):
     # all results of this type regardless of which task generated it
     generating_task = None
 
-    def is_handler_for(self, result: Union[Results, ResultsList]) -> bool:
+    def is_handler_for(self, result: Results | ResultsList) -> bool:
         """
         Return True if this StatsExtractor can process the Result.
 
@@ -793,7 +806,7 @@ class ResultsStatsExtractor(object, metaclass=abc.ABCMeta):
         raise NotImplementedError
 
 
-class StatsExtractorRegistry(object):
+class StatsExtractorRegistry:
     """
     The registry and manager of the stats result extractor framework.
 
@@ -823,7 +836,7 @@ class StatsExtractorRegistry(object):
         LOG.debug('Registering {} as new pipeline stats handler for {}'.format(handler.__class__.__name__, s))
         self.__handlers.append(handler)
 
-    def handle(self, result: Union[Results, ResultsList], context=None):
+    def handle(self, result: Results | ResultsList, context=None):
         """
         Extract values from corresponding StatsExtractor object of Result object.
         """
@@ -862,13 +875,13 @@ class FlagDeterALMAResultsExtractor(ResultsStatsExtractor):
     result_cls = FlagDeterALMAResults
     child_cls = None
 
-    def handle(self, result: FlagDeterALMAResults, context) -> Dict:
+    def handle(self, result: FlagDeterALMAResults, context) -> dict:
         value = self.calculate_value(result, context)
         ps = self.create_stat(value)
         print("EVEN HERE?")
         return ps
 
-    def calculate_value(self, result: FlagDeterALMAResults, context: Context) -> Dict:
+    def calculate_value(self, result: FlagDeterALMAResults, context: Context) -> dict:
         intents_to_summarise = flagutils.intents_to_summarise(context)
         flag_table_intents = ['TOTAL', 'SCIENCE SPWS']
         flag_table_intents.extend(intents_to_summarise)
@@ -892,7 +905,7 @@ class FlagDeterALMAResultsExtractor(ResultsStatsExtractor):
                             output_dict[ms][reason] = percentage
         return output_dict
 
-    def create_stat(self, value_dict: dict) -> Dict:
+    def create_stat(self, value_dict: dict) -> dict:
         longdescription = "dictionary giving percentage of data newly flagged by the following intents: online, shadow, qa0, qa2 before and template flagging agents"
         stats = []
         for ms in value_dict:
@@ -905,6 +918,7 @@ class FlagDeterALMAResultsExtractor(ResultsStatsExtractor):
         return stats
 
 
+<<<<<<< HEAD
 class FluxcalflagResultsStatsExtractor(ResultsStatsExtractor):
     """Regression test result extractor for hifa_gfluxscaleflag.
 
@@ -2018,7 +2032,7 @@ def extract_qa_score_regression(result: Results) -> List:
 
     return qa
 
-def union(input: List, new: Union[Dict, List[Dict]]) -> List[Dict]:
+def union(input: list, new: dict | list[dict]) -> list[dict]:
     """
     Combines lst which is always a list, with new,
     which could be a list of PipelineStatistic objects
@@ -2052,6 +2066,7 @@ def get_stats_from_results(context: Context, stats_collection: PipelineStatsColl
 #            print(f"stats collection results so far: {stats_collection}")
 
 
+<<<<<<< HEAD
 def serialize_qa(context: Context) -> dict:
     """Extract QA scores from all results and add to stages"""
     qa_dict = {}
@@ -2068,8 +2083,12 @@ def serialize_qa(context: Context) -> dict:
 
 # Main interface for generating statistics.
 def generate_stats(context: Context) -> Dict:
+=======
+# This is the main interface for generating statistics.
+def generate_stats(context: Context) -> dict:
+>>>>>>> 68b73a438d0491c28627dabe9f820cd1d1d611cc
     """
-    Gathers statistics from the context and results and returns a 
+    Gathers statistics from the context and results and returns a
     representation of them as a dict.
     """
     # These don't need to be in any particular order

@@ -1,4 +1,5 @@
 import collections
+import collections.abc
 
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.pipelineqa as pqa
@@ -23,7 +24,7 @@ class testBPdcalsQAHandler(pqa.QAPlugin):
         # > 60%  of data flagged  --> 0
 
         m = context.observing_run.get_ms(result.inputs['vis'])
-
+        vis = result.inputs['vis']
         scores = []
 
         self.antspw = collections.defaultdict(list)
@@ -35,7 +36,7 @@ class testBPdcalsQAHandler(pqa.QAPlugin):
 
                 score1 = qacalc.score_total_data_flagged_vla_bandpass(result.bpdgain_touse[bandname],
                                                                       result.flaggedSolnApplycalbandpass[bandname]['antmedian']['fraction'])
-                score2 = qacalc.score_total_data_vla_delay(result.ktypecaltable[bandname], m)
+                score2 = qacalc.score_total_data_vla_delay(result.ktypecaltable[bandname], result.inputs['vis'], bandname)
                 scores.append(score1)
                 scores.append(score2)
             else:
@@ -51,8 +52,16 @@ class testBPdcalsQAHandler(pqa.QAPlugin):
             score3 = qacalc.score_flagged_vla_baddef(result.amp_collection[bandname],
                                                      result.phase_collection[bandname],
                                                      result.num_antennas[bandname])
-
             scores.append(score3)
+
+            score_dts_ant = qacalc.score_testBPdcals_dts_ants(vis, result.amp_collection[bandname], result.phase_collection[bandname], bandname)
+            scores.append(score_dts_ant)
+
+            score_refant = qacalc.score_testBPdcals_refant(vis, result.bad_refant[bandname], bandname)
+            scores.append(score_refant)
+
+            score_median_delay = qacalc.score_testBPdcals_delay(vis, result.ktypecaltable[bandname], bandname)
+            scores.append(score_median_delay)
 
         for antenna, spwlist in self.antspw.items():
             uniquespw = list(set(spwlist))
@@ -61,6 +70,12 @@ class testBPdcalsQAHandler(pqa.QAPlugin):
             uniquespwlist = [str(spw) for spw in uniquespwlist]
             LOG.warning('Antenna {!s}, spws: {!s} have a flagging fraction of 1.0.'
                         ''.format(antenna, ','.join(uniquespwlist)))
+
+        # PIPE-2512: add QA score for spw solint
+        for bandname, spw_solint in result.spw_solint.items():
+            score3 = qacalc.score_spw_solint(vis, bandname, spw_solint)
+            if score3:
+                scores.append(score3)
 
         result.qa.pool.extend(scores)
 

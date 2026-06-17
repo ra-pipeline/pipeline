@@ -1,8 +1,8 @@
-import os
 import collections
+import os
 import shutil
-from typing import List, Dict
 from collections import defaultdict
+
 import numpy as np
 
 import pipeline.hif.heuristics.findrefant as findrefant
@@ -18,7 +18,7 @@ from pipeline.infrastructure import utils
 from pipeline.hifv.heuristics import getBCalStatistics
 
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class testBPdcalsInputs(vdp.StandardInputs):
@@ -64,7 +64,7 @@ class testBPdcalsInputs(vdp.StandardInputs):
                 Example: refant = 'ea01, ea02'
 
         """
-        super(testBPdcalsInputs, self).__init__()
+        super().__init__()
         self.context = context
         self.vis = vis
         self._weakbp = weakbp
@@ -87,7 +87,8 @@ class testBPdcalsResults(basetask.Results):
                  shortsol1=None, vis=None, bpdgain_touse=None, gtypecaltable=None,
                  ktypecaltable=None, bpcaltable=None, flaggedSolnApplycalbandpass=None,
                  flaggedSolnApplycaldelay=None, result_amp=None, result_phase=None,
-                 amp_collection=None, phase_collection=None, num_antennas=None, ignorerefant=None):
+                 amp_collection=None, phase_collection=None, num_antennas=None, ignorerefant=None, bad_refant=None,
+                 spw_solint=None):
         """
         Args:
             vis(str): String name of the measurement set
@@ -108,6 +109,7 @@ class testBPdcalsResults(basetask.Results):
             phase_collection(Dict): Bad deformatters phase weblog table per band
             num_antennas(Dict):  Number of antennas (same per band, but included for weblog formatting)
             ignorerefant(List):  List of antennas removed if a baseband is determined to be bad for >50% of antennas.
+            spw_solint(Dict): Dictionary of solints per spw per band
 
         """
 
@@ -128,7 +130,7 @@ class testBPdcalsResults(basetask.Results):
         if ignorerefant is None:
             ignorerefant = []
 
-        super(testBPdcalsResults, self).__init__()
+        super().__init__()
 
         self.vis = vis
         self.pool = pool[:]
@@ -150,6 +152,8 @@ class testBPdcalsResults(basetask.Results):
         self.amp_collection = amp_collection
         self.phase_collection = phase_collection
         self.num_antennas = num_antennas
+        self.bad_refant = bad_refant
+        self.spw_solint = spw_solint if spw_solint is not None else {}
 
     def merge_with_context(self, context):
         m = context.observing_run.get_ms(self.vis)
@@ -208,8 +212,10 @@ class testBPdcals(basetask.StandardTaskTemplate):
         amp_collection_perband = defaultdict(list)
         phase_collection_perband = defaultdict(list)
         num_antennas_perband = len(m.antennas)
+        bad_refant = {}  # PIPE-2580: used for QA score
+        spw_solint_perband = {}
         for band, spwlist in band2spw.items():
-
+            bad_refant[band] = []
             for i in [0, 1, 2]:
                 # PIPE-1554: backing up the flags before applycal with version name.
                 # The given version name is used to restore the flags when required.
@@ -221,7 +227,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
                     raise
                 LOG.debug("    RUNNING FIRST PART TESTBPDCALS    ")
                 gain_solint1perband, shortsol1perband, vis, bpdgain_tousename, gtypecaltablename, ktypecaltablename, bpcaltablename, \
-                flaggedSolnApplycalbandpassperband, flaggedSolnApplycaldelayperband, refant = self._do_testBPdcals(band, spwlist)
+                flaggedSolnApplycalbandpassperband, flaggedSolnApplycaldelayperband, refant, spw_solint = self._do_testBPdcals(band, spwlist)
 
                 """
                 If an entire baseband is determined to be bad for >50% of antennas,
@@ -257,6 +263,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
                         self.ignorerefant.append(refant)
                         LOG.warning("A baseband is determined to be bad for >50% of antennas.  "
                                     "Removing reference antenna(s) {!s} and rerunning the test calibration.".format(','.join(self.ignorerefant)))
+                        bad_refant[band].append(refant)
                 else:
                     LOG.info("Skipping bad deformatter flagging")
 
@@ -283,6 +290,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
             amp_collection[band] = amp_collection_perband
             phase_collection[band] = phase_collection_perband
             num_antennas[band] = num_antennas_perband
+            spw_solint_perband[band] = spw_solint
 
         return testBPdcalsResults(gain_solint1=gain_solint1, shortsol1=shortsol1, vis=vis,
                                   bpdgain_touse=bpdgain_touse, gtypecaltable=gtypecaltable,
@@ -291,7 +299,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
                                   flaggedSolnApplycaldelay=flaggedSolnApplycaldelay, result_amp=result_amp,
                                   result_phase=result_phase, amp_collection=amp_collection,
                                   phase_collection=phase_collection,
-                                  num_antennas=num_antennas, ignorerefant=self.ignorerefant)
+                                  num_antennas=num_antennas, ignorerefant=self.ignorerefant, bad_refant=bad_refant, spw_solint=spw_solint_perband)
 
     def analyse(self, results):
         """Determine the best parameters by analysing the given jobs before returning any final jobs to execute.
@@ -307,7 +315,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
         """
         return results
 
-    def _do_testBPdcals(self, band: str, spwlist: List[str]):
+    def _do_testBPdcals(self, band: str, spwlist: list[str]):
         """Execute testBPdcals heuristics per band and spwlist
 
         Args:
@@ -325,6 +333,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
             flaggedSolnApplycalbandpass(Dict):  returned from getCalFlaggedSoln for bpdgain_tous
             flaggedSolnApplycaldelay(Dict): returned from getCalFlaggedSoln for ktypecaltable
             RefAntOutput(str):  Reference antenna used
+            spw_solint(Dict): Dictionary of solints per spw
 
         """
 
@@ -363,8 +372,8 @@ class testBPdcals(basetask.StandardTaskTemplate):
                 LOG.info("Removing table: {!s}".format(tablename))
                 shutil.rmtree(tablename)
 
-        # PIPE-1637: adding ',' in the manual and auto refantignore parameter
-        refantignore = self.inputs.refantignore + ','.join(['', *self.ignorerefant])
+        refantignore = utils.build_refantignore(refantignore=self.inputs.refantignore, ignorerefant=self.ignorerefant)
+
         refantfield = self.inputs.context.evla['msinfo'][m.name].calibrator_field_select_string
 
         # PIPE-595: if refant list is not provided, compute refants else use provided refant list.
@@ -487,6 +496,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
             LOG.info("Using short solint = {!s} for band {!s}".format(str(gain_solint1), band))
 
         LOG.info("Doing test bandpass calibration for band {!s}".format(band))
+        spw_solint = {}
 
         if self.inputs.weakbp:
             # LOG.info("USING WEAKBP HEURISTICS")
@@ -496,7 +506,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
         else:
             # LOG.info("Using REGULAR heuristics")
             interp = ''
-            do_bandpass(self.inputs.vis, bpcaltable, context=self.inputs.context, RefAntOutput=RefAntOutput,
+            spw_solint = do_bandpass(self.inputs.vis, bpcaltable, context=self.inputs.context, RefAntOutput=RefAntOutput,
                         spw=','.join(spwlist), ktypecaltable=ktypecaltable, bpdgain_touse=bpdgain_touse,
                         solint='inf', append=False, executor=self._executor)
 
@@ -526,9 +536,9 @@ class testBPdcals(basetask.StandardTaskTemplate):
         flaggedSolnApplycaldelay = getCalFlaggedSoln(ktypecaltable)
 
         return gain_solint1, shortsol1, self.inputs.vis, bpdgain_touse, gtypecaltable,\
-               ktypecaltable, bpcaltable, flaggedSolnApplycalbandpass, flaggedSolnApplycaldelay, RefAntOutput[0]
+               ktypecaltable, bpcaltable, flaggedSolnApplycalbandpass, flaggedSolnApplycaldelay, RefAntOutput[0], spw_solint
 
-    def _do_gtype_delaycal(self, caltable: str = None, RefAntOutput: List[str] = None, spwlist: List[str] = []) -> bool:
+    def _do_gtype_delaycal(self, caltable: str = None, RefAntOutput: list[str] = None, spwlist: list[str] = []) -> bool:
         """Perform a G-Type delay calibration with CASA task gaincal
 
         Args:
@@ -589,7 +599,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
         return True
 
     def _do_ktype_delaycal(self, caltable: str = None, addcaltable: str = None,
-                           RefAntOutput: List[str] = None, spw: str = '') -> bool:
+                           RefAntOutput: list[str] = None, spw: str = '') -> bool:
         """Perform a K-Type delay calibration with CASA task gaincal
 
         Args:
@@ -651,7 +661,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
 
         return True
 
-    def _check_flagSolns(self, flaggedSolnResult: Dict, RefAntOutput: List[str] = None) -> (float, List[str]):
+    def _check_flagSolns(self, flaggedSolnResult: dict, RefAntOutput: list[str] = None) -> tuple[float, list[str]]:
         """Change reference antenna list based on a critical fraction of flagged solutions
             (defined in the domain ms object)
 
@@ -683,7 +693,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
         return fracFlaggedSolns, RefAntOutput
 
     def _do_gtype_bpdgains(self, caltable: str, addcaltable: str = None, solint: str = 'int',
-                           RefAntOutput: List[str] = None, spwlist: List[str] = []) -> bool:
+                           RefAntOutput: list[str] = None, spwlist: list[str] = []) -> bool:
         """Perform a G-Type cal with CASA task gaincal on the bp'd gaintable
 
         Args:
@@ -917,11 +927,6 @@ class testBPdcals(basetask.StandardTaskTemplate):
         else:
             doflagdata = True
 
-        # Define the table to run this on
-        # calBPtablename ='testBPcal.b'
-        # Define the REASON given for the flags
-        # flagreason = 'bad_deformatters_amp or RFI'
-
         LOG.info("Will test on quantity: "+testq)
         LOG.info("Will test using statistic: "+tstat)
 
@@ -949,10 +954,11 @@ class testBPdcals(basetask.StandardTaskTemplate):
         flaglist = []
         extflaglist = []
         weblogflagdict = collections.defaultdict(list)
+        badpols = collections.defaultdict(lambda: collections.defaultdict(list))
+        crosshands = ['RL', 'LR']
 
         for iant in calBPstatresult['antband']:
             antName = calBPstatresult['antDict'][iant]
-
             # PIPE-1183, only antenna name provided in ignore list so
             # skip bad deformatter flagging for all bands and spws corresponding to that antenna
             isAntIgnored = True if antName in iglist.keys() else False
@@ -1032,6 +1038,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
                                     if (testunder and testval < testlimit) or (not testunder and testval > testlimit):
                                         nbadspws += 1
                                         badspws.append(ispw)
+                                        badpols[iant][ispw].append(poln)
                                         if doprintall:
                                             LOG.info('  Found Ant %s (%s) %s %s spw=%s %s %s=%6.4f' %
                                                      (str(iant), antName, rrx, bband, str(ispw), testq, tstat, testval))
@@ -1059,50 +1066,76 @@ class testBPdcals(basetask.StandardTaskTemplate):
                                  (str(iant), antName, rrx, bband, str(flaggedspws)))
 
             if len(badspwlist) > 0:
-                spwstr = ''
+                spw_info_list = []
+                corr_str = ''
                 for ispw in badspwlist:
-                    if spwstr == '':
-                        spwstr = str(ispw)
+                    # PIPE-1435: get list of bad polarizations for this spw
+                    pol_list = badpols[iant].get(ispw, [])
+                    if len(pol_list) > 0:
+                        dd = m.get_data_description(ispw)
+                        off_corr = [dd.get_polarization_label(polid) for polid in pol_list]
+                        all_corr = m.get_vla_corrlist_from_spw(str(ispw))
+                        crosshands_in_spw = [c for c in all_corr if c in crosshands]
+                        corr_to_flag = list(set(off_corr + crosshands_in_spw))
+                        if corr_to_flag:
+                            corr_str = ','.join(map(str, corr_to_flag))
+                            flagstr = (
+                                f"mode='manual' antenna='{antName}' "
+                                f"spw='{ispw}' correlation='{corr_str}' "
+                                )
+                        else:
+                            flagstr = (
+                                f"mode='manual' antenna='{antName}' spw='{ispw}' "
+                                )
                     else:
-                        spwstr += ','+str(ispw)
-                #
-                # reastr = 'bad_deformatters'
-                reastr = flagreason
-                # Add entry for this antenna
-                # flagstr = "mode='manual' antenna='"+str(iant)+"' spw='"+spwstr+"' reason='"+reastr+"'"
-                # Use name for flagging
-                flagstr = "mode='manual' antenna='"+antName+"' spw='"+spwstr+"'"
-                flaglist.append(flagstr)
-                weblogflagdict[antName].append(spwstr)
+                        flagstr = (
+                            f"mode='manual' antenna='{antName}' spw='{ispw}' "
+                            )
+
+                    flaglist.append(flagstr)
+                    spw_info_list.append({
+                        "spw": str(ispw),
+                        "correlation": corr_str
+                        })
+                weblogflagdict[antName].extend(spw_info_list)
 
             if doflagemptyspws and len(flaggedspwlist) > 0:
-                spwstr = ''
+                corr_str = ''
+                spw_info_list = []
                 for ispw in flaggedspwlist:
-                    if spwstr == '':
-                        spwstr = str(ispw)
+                    pol_list = badpols[iant].get(ispw, [])
+                    if len(pol_list) > 0:
+                        corr_str = ','.join(map(str, pol_list))
+                        flagstr = (
+                            f"mode='manual' antenna='{antName}' "
+                            f"spw='{ispw}' correlation='{corr_str}' "
+                            )
                     else:
-                        spwstr += ','+str(ispw)
-                #
-                # Add entry for this antenna
-                reastr = 'no_unflagged_solutions'
-                # flagstr = "mode='manual' antenna='"+str(iant)+"' spw='"+spwstr+"' reason='"+reastr+"'"
-                # Use name for flagging
-                flagstr = "mode='manual' antenna='"+antName+"' spw='"+spwstr+"'"
-                extflaglist.append(flagstr)
-                weblogflagdict[antName].append(spwstr)
+                        flagstr = (
+                            f"mode='manual' antenna='{antName}' spw='{ispw}' "
+                            )
+                    flaglist.append(flagstr)
+                    spw_info_list.append({
+                        "spw": str(ispw),
+                        "correlation": corr_str
+                        })
+                extflaglist.extend(flaglist)
+                weblogflagdict[antName].extend(spw_info_list)
 
         # Get basebands matched with spws.  spws is a single element list with a single csv string
         tempDict = {}
         for antNamekey, spws in weblogflagdict.items():
             basebands = []
-            for spwstr in spws[0].split(','):
-                spw = m.get_spectral_window(spwstr)
+            for spwentry in spws:
+                spw_id = spwentry.get("spw")
+                if spw_id is None:
+                    continue
+                spw = m.get_spectral_window(spw_id)
                 basebands.append(spw.name.split('#')[0] + '  ' + spw.name.split('#')[1])
             basebands = list(set(basebands))  # Unique basebands
             tempDict[antNamekey] = {'spws': spws, 'basebands': basebands}
 
         weblogflagdict = tempDict
-
         nflagcmds = len(flaglist) + len(extflaglist)
         if nflagcmds < 1:
             LOG.info("No bad basebands/spws found")
@@ -1129,19 +1162,6 @@ class testBPdcals(basetask.StandardTaskTemplate):
 
                 job = casa_tasks.flagdata(**task_args)
 
-                # self._executor.execute(job)
-
-                # get the total fraction of data flagged for all antennas
-                # flagging_stats = getCalFlaggedSoln(calBPtablename)
-                # total = 0
-                # flagged = 0
-                # for antenna in flagging_stats['ant']:
-                #     for pol in flagging_stats['ant'][antenna]:
-                #         flagged += flagging_stats['ant'][antenna][pol]['flagged']
-                #         total += flagging_stats['ant'][antenna][pol]['total']
-                # fraction_flagged = flagged / total
-
-                # LOG.info('Flagged ({}) Total ({}) Fraction ({})'.format(flagged, total, fraction_flagged))
                 return flaglist, weblogflagdict, num_antennas, job
 
         # If the flag commands are not executed.

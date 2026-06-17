@@ -5,17 +5,19 @@ import collections
 import itertools
 import operator
 import os
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.utils as utils
 
-from .datatype import TYPE_PRIORITY_ORDER, DataType
+from .datatype import TYPE_PRIORITY_ORDER
 from .spectralwindow import match_spw_basename
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from datetime import datetime
-    from . import MeasurementSet
+
+    from pipeline.domain import DataType, MeasurementSet
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -44,7 +46,7 @@ def sort_measurement_set(ms: MeasurementSet) -> tuple[int, datetime]:
 
 
 class ObservingRun(object):
-    """Logical representation of an observing run.
+    """A logical representation of an observing run.
 
     Attributes:
         measurement_sets: List of measurementSet objects associated with run.

@@ -1,7 +1,7 @@
-# Do not evaluate type annotations at definition time.
 from __future__ import annotations
 
 import collections
+import collections.abc
 import contextlib
 import datetime
 import decimal
@@ -12,10 +12,11 @@ import operator
 import os
 import pydoc
 import re
+import shelve
 import shutil
 import sys
 from importlib.resources import files
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import mako
 import numpy as np
@@ -24,16 +25,20 @@ import pipeline
 import pipeline.infrastructure.pipelineqa as pqa
 from pipeline import environment, infrastructure
 from pipeline.domain import measures
-from pipeline.infrastructure import basetask, casa_tasks, casa_tools, eventbus, \
-    logging, mpihelpers, task_registry, utils
+from pipeline.infrastructure import (basetask, casa_tasks, casa_tools,
+                                     eventbus, logging, mpihelpers,
+                                     task_registry, utils)
 from pipeline.infrastructure.displays import pointing, summary
 from pipeline.infrastructure.renderer import qaadapter, templates, weblog
 
 if TYPE_CHECKING:
+    from typing import Any
+
     from pipeline.domain import Source
     from pipeline.domain.measurementset import MeasurementSet
     from pipeline.infrastructure.launcher import Context
     from pipeline.infrastructure.renderer import logger
+
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -217,7 +222,7 @@ def scan_has_intent(scans, intent):
     return False
 
 
-class Session(object):
+class Session:
     def __init__(self, mses=None, name='Unnamed Session'):
         self.mses = [] if mses is None else mses
         self.name = name
@@ -250,7 +255,7 @@ class Session(object):
         return [Session(mses, name) for _, name, mses in sorted(session_names, key=functools.cmp_to_key(mycmp))]
 
 
-class RendererBase(object):
+class RendererBase:
     """
     Base renderer class.
     """
@@ -337,13 +342,40 @@ class T1_1Renderer(RendererBase):
         CASA_MEMORY = "Memory available to pipeline"
         CGROUP_NUM_CPUS = "Cgroup CPU allocation"
         CGROUP_CPU_BANDWIDTH = "Cgroup CPU bandwidth"
-        CGROUP_CPU_WEIGHT = "CPU distribution within cgroup"
-        CGROUP_MEM_LIMIT = "Cgroup memory limit"
+        CGROUP_CPU_WEIGHT = 'CPU distribution within cgroup'
+        CGROUP_MEM_LIMIT = 'Cgroup memory limit'
+        PYTHON_VERSION = 'Python'
+        PLATFORM_TAG = 'Platform tag'
+        GPU_INFO = 'GPU'
 
         def description(self, ctx):
             if self is self.CASA_MEMORY:
                 return f'Memory available to {"pipeline" if utils.contains_single_dish(ctx) else "tclean"}'
             return self.value
+
+    class _LibraryVersionProp:
+        """Key for a dynamically-discovered library version row.
+
+        Acts as a drop-in replacement for an EnvironmentProperty enum member:
+        it is hashable, supports equality, and provides a description() method
+        so that EnvironmentTable can treat it uniformly.
+        """
+        __slots__ = ('_name',)
+
+        def __init__(self, name: str):
+            self._name = name
+
+        def description(self, ctx):
+            return self._name
+
+        def __hash__(self):
+            return hash(self._name)
+
+        def __eq__(self, other):
+            return isinstance(other, T1_1Renderer._LibraryVersionProp) and self._name == other._name
+
+        def __repr__(self):
+            return f'_LibraryVersionProp({self._name!r})'
 
     class EnvironmentTable:
         """
@@ -597,10 +629,24 @@ class T1_1Renderer(RendererBase):
             data_rows[props.ULIMIT_MEM].append(n.ulimit_mem)
             data_rows[props.ULIMIT_CPU].append(n.ulimit_cpu)
 
+            data_rows[props.PLATFORM_TAG].append(n.platform_tag)
+            data_rows[props.GPU_INFO].append(n.gpu_info)
+            data_rows[props.PYTHON_VERSION].append(n.python_version)
+            for pkg_name, detail in environment.dependency_details.items():
+                pkg_prop = T1_1Renderer._LibraryVersionProp(pkg_name)
+                data_rows[pkg_prop].append(detail['version'] if detail else 'N/A')
+
+        # Conditionally include GPU info row only if GPU is available
+        has_gpu = any(gpu_info and gpu_info != 'N/A' for gpu_info in data_rows[props.GPU_INFO])
+        host_info_rows = [props.HOSTNAME, props.OS, props.PLATFORM_TAG]
+        if has_gpu:
+            host_info_rows.append(props.GPU_INFO)
+        host_info_rows.extend([props.NUM_MPI_SERVERS, props.ULIMIT_FILES])
+
         tables = {
             "Host information": T1_1Renderer.EnvironmentTable(
                 ctx=ctx,
-                rows=[props.HOSTNAME, props.OS, props.NUM_MPI_SERVERS, props.ULIMIT_FILES],
+                rows=host_info_rows,
                 data=data_rows
             ),
             "CPU resources and limits": T1_1Renderer.EnvironmentTable(
@@ -615,6 +661,14 @@ class T1_1Renderer(RendererBase):
                 ctx=ctx,
                 rows=[props.HOSTNAME, props.RAM, props.SWAP, props.CGROUP_MEM_LIMIT,
                       props.ULIMIT_MEM, props.CASA_MEMORY],
+                data=data_rows
+            ),
+            "Python and library versions": T1_1Renderer.EnvironmentTable(
+                ctx=ctx,
+                rows=(
+                    [props.HOSTNAME, props.PYTHON_VERSION]
+                    + [T1_1Renderer._LibraryVersionProp(pkg) for pkg in environment.dependency_details]
+                ),
                 data=data_rows
             )
         }
@@ -773,9 +827,7 @@ class T1_3MRenderer(RendererBase):
 
 
 class T1_4MRenderer(RendererBase):
-    """
-    T1-4M renderer - Task Summary
-    """
+    """T1-4M renderer - Task Summary."""
     output_file = 't1-4.html'
     # TODO get template at run-time
     template = 't1-4m.mako'
@@ -787,29 +839,40 @@ class T1_4MRenderer(RendererBase):
         for result in context.results:
             scores[result.stage_number] = result.qa.representative
 
-        # Obtain time duration of tasks by the difference of start times successive tasks.
-        # The end time of the last task is tentatively defined as the time of current time.
-        timestamps = [ r.timestamps.start for r in context.results ]
-        # tentative task end time stamp for the last stage
-        timestamps.append(datetime.datetime.utcnow())
-        task_duration = []
-        for i in range(len(context.results)):
-            # task execution duration
-            dt = timestamps[i+1] - timestamps[i]
-            # remove unnecessary precision for execution duration
-            task_duration.append(datetime.timedelta(days=dt.days, seconds=dt.seconds))
+        # PIPE-2014: obtain the task time duration from the timetracker event database.
+        db_path = os.path.join(context.output_dir, f'{context.name}.timetracker')
+        r: dict[str, dict[int, datetime.timedelta]] = {}
+        with shelve.open(db_path, writeback=False) as db:
+            for k, stages in db.items():
+                r[k] = {}
+                for e in stages.values():
+                    if e.end == e.start and k == 'results':
+                        # The end time of the last task (open-ended) is tentatively
+                        # defined as the current time.
+                        r[k][e.stage] = datetime.datetime.now(datetime.timezone.utc) - e.start
+                    else:
+                        r[k][e.stage] = e.end - e.start
+
+        task_stage_map: dict[int, datetime.timedelta] = r.get('tasks', {})
+        result_stage_map: dict[int, datetime.timedelta] = r.get('results', {})
+        fallback_duration = datetime.timedelta(0)
+        task_duration = [task_stage_map.get(result.stage_number, fallback_duration) for result in context.results]
+        # The 'results' field in the timetrack db includes the cost of QA and weblog.
+        result_duration = [result_stage_map.get(result.stage_number, fallback_duration) for result in context.results]
 
         # copy PPR for weblog
         pprfile = context.project_structure.ppr_file
         if pprfile != '' and os.path.exists(pprfile):
-            dest_path = os.path.join(context.report_dir,
-                                     os.path.basename(pprfile))
+            dest_path = os.path.join(context.report_dir, os.path.basename(pprfile))
             shutil.copy(pprfile, dest_path)
 
-        return {'pcontext' : context,
-                'results'  : context.results,
-                'scores'   : scores,
-                'task_duration': task_duration}
+        return {
+            'pcontext': context,
+            'results': context.results,
+            'scores': scores,
+            'task_duration': task_duration,
+            'result_duration': result_duration,
+        }
 
 
 class T2_1Renderer(RendererBase):
@@ -826,7 +889,7 @@ class T2_1Renderer(RendererBase):
                 'sessions' : sessions}
 
 
-class T2_1DetailsRenderer(object):
+class T2_1DetailsRenderer:
     """
     T2-1Details renderer - Session Details
     """
@@ -1011,9 +1074,13 @@ class T2_1DetailsRenderer(object):
             'zd_min'          : round(zd_min, 2),
             'zd_avg'          : round(zd_avg, 2),
             'zd_max'          : round(zd_max, 2),
-            'telmjd_min'      : utils.format_datetime(datetime.datetime.fromtimestamp(telmjd_min)),
-            'telmjd_avg'      : utils.format_datetime(datetime.datetime.fromtimestamp(telmjd_avg)),
-            'telmjd_max'      : utils.format_datetime(datetime.datetime.fromtimestamp(telmjd_max)),
+            'telmjd_min'      : utils.format_datetime(
+                datetime.datetime.fromtimestamp(telmjd_min, tz=datetime.timezone.utc)
+                ),
+            'telmjd_avg'      : utils.format_datetime(
+                datetime.datetime.fromtimestamp(telmjd_avg, tz=datetime.timezone.utc)),
+            'telmjd_max'      : utils.format_datetime(
+                datetime.datetime.fromtimestamp(telmjd_max, tz=datetime.timezone.utc)),
             'vla_basebands'   : vla_basebands
         }
 
@@ -1034,7 +1101,7 @@ class T2_1DetailsRenderer(object):
                     fileobj.write(template.render(**display_context))
 
 
-class T2_2_XRendererBase(object):
+class T2_2_XRendererBase:
     """
     Base renderer for T2-2-X series of pages.
     """
@@ -1451,7 +1518,7 @@ class T2_4MRenderer(RendererBase):
                 'results'  : context.results}
 
 
-class T2_4MDetailsDefaultRenderer(object):
+class T2_4MDetailsDefaultRenderer:
     def __init__(self, template='t2-4m_details-generic.mako',
                  always_rerender=False):
         self.template = template
@@ -1541,7 +1608,7 @@ class T2_4MDetailsContainerRenderer(RendererBase):
             fileobj.write(template.render(**mako_context))
 
 
-class T2_4MDetailsRenderer(object):
+class T2_4MDetailsRenderer:
     # the filename component of the output file. While this is the same for
     # all results, the directory is stage-specific, so there's no risk of
     # collisions  
@@ -1694,21 +1761,18 @@ class T2_4MDetailsRenderer(object):
             # .. and write the renderer's interpretation of this result to
             # the file object
             try:
-                LOG.trace('Writing %s output to %s', renderer.__class__.__name__,
-                          path)
-
+                LOG.trace('Writing %s output to %s', renderer.__class__.__name__, path)
                 event = eventbus.WebLogStageRenderingStartedEvent(
                     context_name=context.name, stage_number=result.stage_number
-                    )
+                )
                 eventbus.send_message(event)
 
                 fileobj.write(renderer.render(context, result))
 
                 event = eventbus.WebLogStageRenderingCompleteEvent(
                     context_name=context.name, stage_number=result.stage_number
-                    )
+                )
                 eventbus.send_message(event)
-
             except:
                 LOG.warning('Template generation failed for %s', cls.__name__)
                 LOG.debug(mako.exceptions.text_error_template().render())
@@ -1834,9 +1898,8 @@ def group_by_root(context, task_results):
     return d
 
 
-class WebLogGenerator(object):
-    renderers = [T1_1Renderer,         # OUS splash page
-                 T1_2Renderer,         # observation summary
+class WebLogGenerator:
+    renderers = [T1_2Renderer,         # observation summary
                  T1_3MRenderer,        # by topic page
                  T2_1Renderer,         # session tree
                  T2_1DetailsRenderer,  # session details
@@ -1844,20 +1907,22 @@ class WebLogGenerator(object):
                  T2_2_2Renderer,       # spectral setup
                  T2_2_3Renderer,       # antenna setup
                  T2_2_4Renderer,       # sky setup
-#                 T2_2_5Renderer,       # weather
+                 # T2_2_5Renderer,     # weather
                  T2_2_6Renderer,       # scans
                  T2_2_7Renderer,       # telescope pointing (single dish specific)
                  T2_3_1MRenderer,      # data set topic
                  T2_3_2MRenderer,      # calibration topic
                  T2_3_3MRenderer,      # flagging topic
-        # disable unused line finding topic for July 2014 release
-        # T2_3_4MRenderer,             # line finding topic
+                 # disable unused line finding topic for July 2014 release
+                 # T2_3_4MRenderer,    # line finding topic
                  T2_3_5MRenderer,      # imaging topic
                  T2_3_6MRenderer,      # miscellaneous topic
                  T2_4MRenderer,        # task tree
-                 T2_4MDetailsRenderer, # task details
-        # some summary renderers are placed last for access to scores
-                 T1_4MRenderer]        # task summary
+                 T2_4MDetailsRenderer,  # task details
+                 # place T1_4MRenderer (task summary) after other renderers for access to scores.
+                 T1_4MRenderer,         # task summary
+                 T1_1Renderer,         # OUS splash page
+                 ]
 
     @staticmethod
     def copy_resources(context):
@@ -1904,7 +1969,7 @@ class WebLogGenerator(object):
             context.results = proxies
 
 
-class LogCopier(object):
+class LogCopier:
     """
     LogCopier copies and handles the CASA logs so that they may be referenced
     by the pipeline web logs. 
@@ -2009,7 +2074,7 @@ def compute_zd_telmjd_for_ms(
     data = {}
     fields = ms.get_fields(intent='TARGET')
     observatory = ms.antenna_array.name
-    mjd_epoch = datetime.datetime(1858, 11, 17)
+    mjd_epoch = datetime.datetime(1858, 11, 17, tzinfo=datetime.timezone.utc)
 
     for field in fields:
         if field.id not in data:

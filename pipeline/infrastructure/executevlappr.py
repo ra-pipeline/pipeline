@@ -7,10 +7,12 @@ Factor and document properly  when details worked out
 Raises:
     exceptions.PipelineException
 """
+from __future__ import annotations
+
 import os
 import sys
 import traceback
-from typing import TYPE_CHECKING, Tuple, Union
+from typing import TYPE_CHECKING
 
 from . import casa_tools
 from . import exceptions
@@ -230,7 +232,7 @@ def executeppr(pprXmlFile: str, importonly: bool = True, loglevel: str = 'info',
 # Return the intents list, the ASDM list, and the processing commands
 # for the first processing request. There should in general be only
 # one but the schema permits more. Generalize later if necessary.
-def _getFirstRequest(pprXmlFile: 'XmlObject') -> Union[Tuple[list, str, dict, list, list], Tuple[list, list, str, dict, list, str, list]]:
+def _getFirstRequest(pprXmlFile: XmlObject) -> tuple[list, str, dict, list, list] | tuple[list, list, str, dict, list, str, list]:
     # Initialize
     info = []
     relativePath = ""
@@ -353,7 +355,7 @@ def _getNumSchedBlockSets(pprObject: 'XmlObject', requestId: int, numRequests: i
 # Given the pipeline processing request object return a list of ASDMs
 # where each element in the list is a tuple consisting of the path
 # to the ASDM, the name of the ASDM, and the UID of the ASDM.
-def _getAsdmList(pprObject: 'XmlObject', numSbSets: int, numRequests: int) -> Tuple[str, int, list]:
+def _getAsdmList(pprObject: XmlObject, numSbSets: int, numRequests: int) -> tuple[str, int, list]:
     if numRequests == 1:
         ppr_dset = pprObject.SciPipeRequest.ProcessingRequests.ProcessingRequest.DataSet
         if numSbSets == 1:

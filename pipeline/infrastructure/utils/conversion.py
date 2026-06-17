@@ -7,6 +7,7 @@ user.
 from __future__ import annotations
 
 import collections
+import collections.abc
 import datetime
 import decimal
 import math
@@ -14,11 +15,10 @@ import os
 import re
 import string
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterable, Iterator, Sequence
+from typing import TYPE_CHECKING
 
 import astropy.units as u
 import cachetools
-import numpy as np
 import pyparsing
 from astropy.coordinates import SkyCoord
 
@@ -26,6 +26,12 @@ from pipeline import infrastructure
 from pipeline.infrastructure import casa_tools
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator, Sequence
+    from typing import Any
+
+    from numpy import generic
+    from numpy.typing import NDArray
+
     from pipeline.domain import Field, MeasurementSet
 
 LOG = infrastructure.logging.get_logger(__name__)
@@ -57,6 +63,8 @@ __all__ = [
 # importing a remote context for debugging purposes, when we don't have access to
 # the data.
 USE_CASA_PARSING_ROUTINES = True
+
+_ANGLE_UNITS = ('rad', 'deg', 'arcmin', 'arcsec', 'amin', 'asec')
 
 
 class LoggingLRUCache(cachetools.LRUCache):
@@ -183,7 +191,7 @@ def unix_seconds_to_datetime(unix_secs: list[int | float]) -> list[datetime.date
     Returns:
         List of equivalent Python datetime objects.
     """
-    return [datetime.datetime.utcfromtimestamp(s) for s in unix_secs]
+    return [datetime.datetime.fromtimestamp(s, datetime.timezone.utc) for s in unix_secs]
 
 
 def mjd_seconds_to_datetime(mjd_secs: list[int | float]) -> list[datetime.datetime]:
@@ -225,7 +233,7 @@ def get_epoch_as_datetime(epoch: dict) -> datetime.datetime:
     t = mt.getvalue(epoch_utc)['m0']
     t = qt.sub(t, base_time)
     t = qt.convert(t, 's')
-    t = datetime.datetime.utcfromtimestamp(qt.getvalue(t)[0])
+    t = datetime.datetime.fromtimestamp(qt.getvalue(t)[0], datetime.timezone.utc)
 
     return t
 
@@ -252,11 +260,11 @@ def range_to_list(arg: str) -> list[int]:
     TILDE = pyparsing.Suppress('~')
 
     # recognise '123' as a number, converting to an integer
-    number = pyparsing.Word(pyparsing.nums).setParseAction(lambda tokens: int(tokens[0]))
+    number = pyparsing.Word(pyparsing.nums).set_parse_action(lambda tokens: int(tokens[0]))
 
     # convert '1~10' to a range
     rangeExpr = number('start') + TILDE + number('end')
-    rangeExpr.setParseAction(lambda tokens: list(range(tokens.start, tokens.end + 1)))
+    rangeExpr.set_parse_action(lambda tokens: list(range(tokens.start, tokens.end + 1)))
 
     casa_chars = ''.join([c for c in string.printable
                           if c not in ',;"/' + string.whitespace])
@@ -266,9 +274,9 @@ def range_to_list(arg: str) -> list[int]:
     atomExpr = rangeExpr | number | textExpr
 
     # we can have multiple items separated by commas
-    atoms = pyparsing.delimitedList(atomExpr, delim=',')('atoms')
+    atoms = pyparsing.DelimitedList(atomExpr, delim=',')('atoms')
 
-    return atoms.parseString(str(arg)).asList()
+    return atoms.parse_string(str(arg)).asList()
 
 
 def to_CASA_intent(ms: MeasurementSet, intents: str) -> str:
@@ -377,7 +385,7 @@ def ant_arg_to_id(ms_path: str, ant_arg: str | int, all_antennas) -> list[int]:
         return _parse_antenna(ant_arg, all_antennas)
 
 
-def _convert_arg_to_id(arg_name: str, ms_path: str, arg_val: str) -> dict[str, np.ndarray]:
+def _convert_arg_to_id(arg_name: str, ms_path: str, arg_val: str) -> dict[str, NDArray[generic]]:
     """Parse the CASA input argument and return the matching IDs.
 
     Originally the cache was set on this function with the cache size fixed at
@@ -436,7 +444,7 @@ def safe_split(fields: str) -> list[str]:
     Returns:
         A list, taking account of field names within quotes.
     """
-    return pyparsing.pyparsing_common.comma_separated_list.parseString(str(fields)).asList()
+    return pyparsing.pyparsing_common.comma_separated_list.parse_string(str(fields)).asList()
 
 
 def dequote(s: str) -> str:
@@ -558,28 +566,28 @@ def _parse_spw(task_arg: str, all_spw_ids: tuple = None) -> list[tuple[str, list
     TILDE, LESSTHAN, CARET, COLON, ASTERISK = list(map(pyparsing.Suppress, '~<^:*'))
 
     # recognise '123' as a number, converting to an integer
-    number = pyparsing.Word(pyparsing.nums).setParseAction(lambda tokens: int(tokens[0]))
+    number = pyparsing.Word(pyparsing.nums).set_parse_action(lambda tokens: int(tokens[0]))
 
     # convert '1~10' to a range
     rangeExpr = number('start') + TILDE + number('end')
-    rangeExpr.setParseAction(lambda tokens: list(range(tokens.start, tokens.end + 1)))
+    rangeExpr.set_parse_action(lambda tokens: list(range(tokens.start, tokens.end + 1)))
 
     # convert '1~10^2' to a range with the given step size
     rangeWithStepExpr = number('start') + TILDE + number('end') + CARET + number('step')
-    rangeWithStepExpr.setParseAction(lambda tokens: list(range(tokens.start, tokens.end + 1, tokens.step)))
+    rangeWithStepExpr.set_parse_action(lambda tokens: list(range(tokens.start, tokens.end + 1, tokens.step)))
 
     # convert <10 to a range
     ltExpr = LESSTHAN + number('max')
-    ltExpr.setParseAction(lambda tokens: list(range(0, tokens.max)))
+    ltExpr.set_parse_action(lambda tokens: list(range(0, tokens.max)))
 
     # convert * to all spws
-    allExpr = ASTERISK.setParseAction(lambda tokens: all_spw_ids)
+    allExpr = ASTERISK.set_parse_action(lambda tokens: all_spw_ids)
 
     # spw and channel components can be any of the above patterns
     numExpr = rangeWithStepExpr | rangeExpr | ltExpr | allExpr | number
 
     # recognise and group multiple channel definitions separated by semi-colons
-    channelsExpr = pyparsing.Group(pyparsing.delimitedList(numExpr, delim=';'))
+    channelsExpr = pyparsing.Group(pyparsing.DelimitedList(numExpr, delim=';'))
 
     # group the number so it converted to a node, spw in this case
     spwsExpr = pyparsing.Group(numExpr)
@@ -588,9 +596,9 @@ def _parse_spw(task_arg: str, all_spw_ids: tuple = None) -> list[tuple[str, list
     atomExpr = pyparsing.Group(spwsExpr('spws') + COLON + channelsExpr('channels') | spwsExpr('spws'))
 
     # and we can have multiple items separated by commas
-    finalExpr = pyparsing.delimitedList(atomExpr('atom'), delim=',')('result')
+    finalExpr = pyparsing.DelimitedList(atomExpr('atom'), delim=',')('result')
 
-    parse_result = finalExpr.parseString(str(task_arg))
+    parse_result = finalExpr.parse_string(str(task_arg))
 
     results = {}
     for atom in parse_result.result:
@@ -624,11 +632,11 @@ def _parse_field(task_arg: str | None, fields: Field | None = None) -> list[int]
     TILDE = pyparsing.Suppress('~')
 
     # recognise '123' as a number, converting to an integer
-    number = pyparsing.Word(pyparsing.nums).setParseAction(lambda tokens: int(tokens[0]))
+    number = pyparsing.Word(pyparsing.nums).set_parse_action(lambda tokens: int(tokens[0]))
 
     # convert '1~10' to a range
     rangeExpr = number('start') + TILDE + number('end')
-    rangeExpr.setParseAction(lambda tokens: list(range(tokens.start, tokens.end + 1)))
+    rangeExpr.set_parse_action(lambda tokens: list(range(tokens.start, tokens.end + 1)))
 
     boundary = ''.join([c for c in pyparsing.printables if c not in (' ', ',')])
     field_id = pyparsing.WordStart(boundary) + (rangeExpr | number) + pyparsing.WordEnd(boundary)
@@ -644,18 +652,18 @@ def _parse_field(task_arg: str | None, fields: Field | None = None) -> list[int]
             return [f.id for f in fields if re.match(regex, f.name)]
         return [f.id for f in fields if f.name == search_term]
 
-    field_name.setParseAction(get_ids_for_matching)
+    field_name.set_parse_action(get_ids_for_matching)
 
     results = set()
-    for atom in pyparsing.pyparsing_common.comma_separated_list.parseString(str(task_arg)):
+    for atom in pyparsing.pyparsing_common.comma_separated_list.parse_string(str(task_arg)):
         for parser in [field_name('fields'), field_id('fields')]:
-            for match in parser.searchString(atom):
+            for match in parser.search_string(atom):
                 results.update(match.asList())
 
     return sorted(list(results))
 
 
-def _parse_antenna(task_arg: str | None, antennas: dict[str, np.ndarray] | None = None) -> list[int]:
+def _parse_antenna(task_arg: str | None, antennas: dict[str, NDArray[generic]] | None = None) -> list[int]:
     """Convert the antenna selection in CASA format to a list of antenna IDs.
 
     Inner method.
@@ -675,11 +683,11 @@ def _parse_antenna(task_arg: str | None, antennas: dict[str, np.ndarray] | None 
     TILDE = pyparsing.Suppress('~')
 
     # recognise '123' as a number, converting to an integer
-    number = pyparsing.Word(pyparsing.nums).setParseAction(lambda tokens: int(tokens[0]))
+    number = pyparsing.Word(pyparsing.nums).set_parse_action(lambda tokens: int(tokens[0]))
 
     # convert '1~10' to a range
     rangeExpr = number('start') + TILDE + number('end')
-    rangeExpr.setParseAction(lambda tokens: list(range(tokens.start, tokens.end + 1)))
+    rangeExpr.set_parse_action(lambda tokens: list(range(tokens.start, tokens.end + 1)))
 
     # antenna-oriented 'by ID' expressions can be any of the above patterns
     boundary = ''.join([c for c in pyparsing.printables if c not in (' ', ',')])
@@ -699,7 +707,7 @@ def _parse_antenna(task_arg: str | None, antennas: dict[str, np.ndarray] | None 
             return [a.id for a in antennas if re.match(regex, a.name)]
         return [a.id for a in antennas if a.name == search_term]
 
-    antenna_name.setParseAction(get_antenna)
+    antenna_name.set_parse_action(get_antenna)
 
     antenna_name_expr = pyparsing.Group(antenna_name)
 
@@ -707,8 +715,8 @@ def _parse_antenna(task_arg: str | None, antennas: dict[str, np.ndarray] | None 
     atomExpr = pyparsing.Group(antenna_id_expr('antennas') | antenna_name_expr('antennas'))
 
     results = set()
-    for substr in pyparsing.pyparsing_common.comma_separated_list.parseString(str(task_arg)):
-        atoms = atomExpr.parseString(substr)
+    for substr in pyparsing.pyparsing_common.comma_separated_list.parse_string(str(task_arg)):
+        atoms = atomExpr.parse_string(substr)
         for atom in atoms:
             for ant in atom.antennas:
                 results.add(ant)
@@ -746,12 +754,43 @@ def phasecenter_to_skycoord(phasecenter: str) -> SkyCoord:
         dec = phasecenter_list[2]
         refcode = phasecenter_list[0]
     else:
-        LOG.error('cannot parse the phasecenter string %s', phasecenter)
-        return
+        raise ValueError(f"Cannot parse phasecenter string: {phasecenter}")
 
-    dec = dec.replace('.', ':', 2)
     frame = refcode_to_skyframe(refcode)
-    coord = SkyCoord(ra, dec, unit=(u.hourangle, u.deg), frame=frame)
+
+    # handle common case of Dec expressed with two dots instead of colons
+    if (
+        dec.count('.') >= 2
+        and ':' not in dec
+        and 'deg' not in dec
+        and 'd' not in dec
+        and 'rad' not in dec
+    ):
+        dec = dec.replace('.', ':', 2)
+
+    # determine RA unit
+    if any(u in ra for u in _ANGLE_UNITS):
+        # if units are specified, let astropy handle it
+        ra_unit = None
+    elif 'h' in ra or ':' in ra:
+        ra_unit = u.hourangle
+    else:
+        try:
+            _ = float(ra)
+            ra_unit = u.deg
+        except ValueError:
+            ra_unit = u.hourangle
+            LOG.info("Unable to determine RA unit, assuming hourangle for RA value %s", ra)
+
+    # determine Dec unit
+    if any(u in dec for u in _ANGLE_UNITS):
+        # if units are specified, let astropy handle it
+        dec_unit = None
+    else:
+        dec_unit = u.deg
+        LOG.info("Unable to determine Dec unit, assuming degrees for Dec value %s", dec)
+
+    coord = SkyCoord(ra, dec, unit=(ra_unit, dec_unit), frame=frame)
 
     return coord
 

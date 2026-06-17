@@ -11,20 +11,15 @@ import pipeline.infrastructure.utils as utils
 from pipeline.infrastructure import casa_tools
 
 if TYPE_CHECKING:  # Avoid circular import. Used only for type annotation.
-    from .antenna import Antenna
-    from .datadescription import DataDescription
-    from .field import Field
-    from .spectralwindow import SpectralWindow
-    from .state import State
+    from pipeline.domain import Antenna, DataDescription, Field, SpectralWindow, State
 
 _pprinter = pprint.PrettyPrinter()
 
 LOG = infrastructure.get_logger(__name__)
 
 
-class Scan(object):
-    """
-    Scan is a logical representation of a single scan.
+class Scan:
+    """A logical representation of a single scan.
 
     Attributes:
         id: The scan number within the MeasurementSet.

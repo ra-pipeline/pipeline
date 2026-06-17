@@ -1,28 +1,33 @@
+from __future__ import annotations
+
 import collections
 import copy
 import os
 from statistics import mode
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING
 
 import numpy as np
-from numpy.typing import NDArray
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
-from pipeline.domain.measurementset import MeasurementSet
 from pipeline.h.tasks.common import commonhelpermethods, mstools
 from pipeline.h.tasks.common.arrayflaggerbase import FlagCmd
 from pipeline.h.tasks.flagging.flagdatasetter import FlagdataSetter
-from pipeline.infrastructure import task_registry
+from pipeline.infrastructure import casa_tools, task_registry
 from .resultobjects import CorrectedampflagResults
 
-LOG = infrastructure.get_logger(__name__)
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
+
+    from pipeline.domain import MeasurementSet
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 
-def _consolidate_flags(flags: List[FlagCmd]) -> List[FlagCmd]:
+def _consolidate_flags(flags: list[FlagCmd]) -> list[FlagCmd]:
     """
     Function to consolidate a list of FlagCmd objects ("flags").
     """
@@ -41,7 +46,7 @@ def _consolidate_flags(flags: List[FlagCmd]) -> List[FlagCmd]:
     return flags
 
 
-def _consolidate_flags_with_same_pol(flags: List[FlagCmd]) -> List[FlagCmd]:
+def _consolidate_flags_with_same_pol(flags: list[FlagCmd]) -> list[FlagCmd]:
     """
     Function to consolidate a list of FlagCmd objects ("flags") by removing
     flags that differ only in polarisation.
@@ -118,7 +123,7 @@ def _consolidate_flags_with_same_pol(flags: List[FlagCmd]) -> List[FlagCmd]:
     return cflags
 
 
-def _consolidate_flags_by_timestamps(flags: List[FlagCmd]) -> List[FlagCmd]:
+def _consolidate_flags_by_timestamps(flags: list[FlagCmd]) -> list[FlagCmd]:
     """
     Function to consolidate a list of FlagCmd objects ("flags") by removing
     flags with timestamps if for the same (spw, field, intent), the antenna
@@ -191,7 +196,7 @@ def _consolidate_flags_by_timestamps(flags: List[FlagCmd]) -> List[FlagCmd]:
     return cflags
 
 
-def _consolidate_flags_by_antennas(flags: List[FlagCmd]) -> List[FlagCmd]:
+def _consolidate_flags_by_antennas(flags: list[FlagCmd]) -> list[FlagCmd]:
     """
     Function to consolidate a list of FlagCmd objects ("flags")
     by antennas.
@@ -209,7 +214,7 @@ def _consolidate_flags_by_antennas(flags: List[FlagCmd]) -> List[FlagCmd]:
     return flags
 
 
-def _consolidate_flags_non_antenna_specific(flags: List[FlagCmd]) -> List[FlagCmd]:
+def _consolidate_flags_non_antenna_specific(flags: list[FlagCmd]) -> list[FlagCmd]:
     """
     Function to consolidate a list of FlagCmd objects ("flags") by removing
     flags with antennas/baselines if the same (timestamp, spw, field,
@@ -271,7 +276,7 @@ def _consolidate_flags_non_antenna_specific(flags: List[FlagCmd]) -> List[FlagCm
     return cflags
 
 
-def _consolidate_flags_for_ant_in_baselines(flags: List[FlagCmd]) -> List[FlagCmd]:
+def _consolidate_flags_for_ant_in_baselines(flags: list[FlagCmd]) -> list[FlagCmd]:
     """Function to consolidate a list of FlagCmd objects ("flags") by removing
     flags with baselines if the same (timestamp, spw, field, intent) is
     covered by a flagging command for one of the antennas in the baseline.
@@ -325,7 +330,7 @@ def _consolidate_flags_for_ant_in_baselines(flags: List[FlagCmd]) -> List[FlagCm
     return cflags
 
 
-def _consolidate_duplicate_flags(flags: List[FlagCmd]) -> List[FlagCmd]:
+def _consolidate_duplicate_flags(flags: list[FlagCmd]) -> list[FlagCmd]:
     """
     Function to consolidate a list of FlagCmd objects ("flags") by removing
     duplicate flags that result in the same flagging command.
@@ -350,7 +355,7 @@ def _consolidate_duplicate_flags(flags: List[FlagCmd]) -> List[FlagCmd]:
     return cflags
 
 
-def _propagate_phase_flags(flags: List[FlagCmd], ms: MeasurementSet, antenna_id_to_name: Dict) -> List[FlagCmd]:
+def _propagate_phase_flags(flags: list[FlagCmd], ms: MeasurementSet, antenna_id_to_name: dict) -> list[FlagCmd]:
     """
     Function to take a list of FlagCmd objects ("flags") and propagate
     flags with reason = 'bad baseline' and intent = PHASE to intents
@@ -644,7 +649,7 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         return result
 
     @staticmethod
-    def _get_ant_id_to_name_dict(ms: MeasurementSet) -> Dict:
+    def _get_ant_id_to_name_dict(ms: MeasurementSet) -> dict:
         """
         Return dictionary with antenna ID mapped to antenna name.
         If no unique antenna name can be assigned to each antenna ID,
@@ -669,7 +674,7 @@ class Correctedampflag(basetask.StandardTaskTemplate):
 
         return antenna_id_to_name
 
-    def _run_flagging_iteration(self, ms: MeasurementSet, antenna_id_to_name: Dict) -> List[FlagCmd]:
+    def _run_flagging_iteration(self, ms: MeasurementSet, antenna_id_to_name: dict) -> list[FlagCmd]:
         inputs = self.inputs
 
         # Get the spws to use.
@@ -678,44 +683,54 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         # Initialize list of newly found flags.
         newflags = []
 
-        # Evaluate flagging heuristics separately for each intent.
-        for intent in inputs.intent.split(','):
+        # Open the MS once for all (intent, field, spw) reads (PIPE-3089).
+        with casa_tools.MSReader(ms.name) as openms:
+            # Evaluate flagging heuristics separately for each intent.
+            for intent in inputs.intent.split(','):
+                # For current intent, identify which fields from inputs are valid.
+                if intent == 'TARGET':
+                    # Use field IDs to loop over individual mosaic pointings for
+                    # science targets (PIPE-337).
+                    valid_fields = [
+                        str(field.id)
+                        for field in ms.get_fields(intent=intent)
+                        if field.name in list(utils.safe_split(inputs.field))
+                    ]
+                else:
+                    # Use field names for calibrators.
+                    valid_fields = [
+                        field.name
+                        for field in ms.get_fields(intent=intent)
+                        if field.name in list(utils.safe_split(inputs.field))
+                    ]
 
-            # For current intent, identify which fields from inputs are valid.
-            if intent == 'TARGET':
-                # Use field IDs to loop over individual mosaic pointings for
-                # science targets (PIPE-337).
-                valid_fields = [str(field.id)
-                                for field in ms.get_fields(intent=intent)
-                                if field.name in list(utils.safe_split(inputs.field))]
-            else:
-                # Use field names for calibrators.
-                valid_fields = [field.name
-                                for field in ms.get_fields(intent=intent)
-                                if field.name in list(utils.safe_split(inputs.field))]
+                # If no valid fields were found, raise warning, and continue to
+                # next intent. The following intents are optional and do not require
+                # a warning: CHECK (PIPE-281), POLANGLE, POLLEAKAGE (PIPE-607),
+                # DIFFGAINREF, DIFFGAINSRC (PIPE-2082, PIPE-2145).
+                if not valid_fields:
+                    if intent not in ['CHECK', 'DIFFGAINREF', 'DIFFGAINSRC', 'POLANGLE', 'POLLEAKAGE']:
+                        LOG.warning(
+                            'Invalid data selection for given intent(s) and field(s): fields %s do not include '
+                            "intent '%s'.",
+                            utils.commafy(utils.safe_split(inputs.field)),
+                            intent,
+                        )
+                    continue
 
-            # If no valid fields were found, raise warning, and continue to
-            # next intent. The following intents are optional and do not require
-            # a warning: CHECK (PIPE-281), POLANGLE, POLLEAKAGE (PIPE-607),
-            # DIFFGAINREF, DIFFGAINSRC (PIPE-2082, PIPE-2145).
-            if not valid_fields:
-                if intent not in ['CHECK', 'DIFFGAINREF', 'DIFFGAINSRC', 'POLANGLE', 'POLLEAKAGE']:
-                    LOG.warning("Invalid data selection for given intent(s) and field(s): fields {} do not include"
-                                " intent \'{}\'.".format(utils.commafy(utils.safe_split(inputs.field)), intent))
-                continue
+                # Evaluate heuristic for each valid field.
+                for field in valid_fields:
+                    # Evaluate flagging heuristics separately for each spw.
+                    for spwid in spwids:
+                        flags_for_intent_field_spw = self._evaluate_heuristic(
+                            ms, intent, field, spwid, antenna_id_to_name, ms_handle=openms
+                        )
+                        newflags.extend(flags_for_intent_field_spw)
 
-            # Evaluate heuristic for each valid field.
-            for field in valid_fields:
-
-                # Evaluate flagging heuristics separately for each spw.
-                for spwid in spwids:
-
-                    flags_for_intent_field_spw = self._evaluate_heuristic(
-                        ms, intent, field, spwid, antenna_id_to_name)
-                    newflags.extend(flags_for_intent_field_spw)
-
-        LOG.debug("Flagging commands from current iteration, before consolidation:\n{}"
-                  "".format('\n'.join([flag.flagcmd for flag in newflags])))
+        LOG.debug(
+            'Flagging commands from current iteration, before consolidation:\n%s',
+            '\n'.join([flag.flagcmd for flag in newflags]),
+        )
 
         # Consolidate flagging commands from current iteration to minimize
         # request for flagdata.
@@ -723,8 +738,9 @@ class Correctedampflag(basetask.StandardTaskTemplate):
 
         return newflags
 
-    def _evaluate_heuristic(self, ms: MeasurementSet, intent: str, field: str, spwid: int,
-                            antenna_id_to_name: Dict) -> List[FlagCmd]:
+    def _evaluate_heuristic(
+        self, ms: MeasurementSet, intent: str, field: str, spwid: int, antenna_id_to_name: dict, *, ms_handle=None
+    ) -> list[FlagCmd]:
         # Initialize flags.
         allflags = []
 
@@ -734,19 +750,23 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         # If no baseline sets were received, then evaluate heuristics for
         # all baselines at once.
         if not baseline_sets:
-            allflags.extend(self._evaluate_heuristic_for_baseline_set(
-                ms, intent, field, spwid, antenna_id_to_name))
+            allflags.extend(
+                self._evaluate_heuristic_for_baseline_set(
+                    ms, intent, field, spwid, antenna_id_to_name, ms_handle=ms_handle
+                )
+            )
         else:
             # Evaluate heuristic for each set of baselines.
             for baseline_set in baseline_sets:
                 newflags = self._evaluate_heuristic_for_baseline_set(
-                    ms, intent, field, spwid, antenna_id_to_name, baseline_set)
+                    ms, intent, field, spwid, antenna_id_to_name, baseline_set, ms_handle=ms_handle
+                )
                 allflags.extend(newflags)
 
         return allflags
 
     @staticmethod
-    def _identify_baseline_sets(ms: MeasurementSet) -> List[Tuple[str, str]]:
+    def _identify_baseline_sets(ms: MeasurementSet) -> list[tuple[str, str]]:
         # Determine unique antenna diameters.
         uniq_diams = {ant.diameter for ant in ms.antennas}
 
@@ -828,9 +848,17 @@ class Correctedampflag(basetask.StandardTaskTemplate):
             LOG.info('Using uvbinFactor=%.2f' % (factor))
         return factor
 
-    def _evaluate_heuristic_for_baseline_set(self, ms: MeasurementSet, intent: str, field: str, spwid: int,
-                                             antenna_id_to_name: Dict,
-                                             baseline_set: Optional[List] = None) -> List[FlagCmd]:
+    def _evaluate_heuristic_for_baseline_set(
+        self,
+        ms: MeasurementSet,
+        intent: str,
+        field: str,
+        spwid: int,
+        antenna_id_to_name: dict,
+        baseline_set: list | None = None,
+        *,
+        ms_handle=None,
+    ) -> list[FlagCmd]:
 
         inputs = self.inputs
 
@@ -885,8 +913,15 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         newflags = []
 
         # Read in data from MS. If no valid data could be read, return early with no flags.
-        data = mstools.read_channel_averaged_data_from_ms(ms, field, spwid, intent,
-            ['corrected_data', 'model_data', 'antenna1', 'antenna2', 'flag', 'time', 'uvdist'], baseline_set)
+        data = mstools.read_channel_averaged_data_from_ms(
+            ms,
+            field,
+            spwid,
+            intent,
+            ['corrected_data', 'model_data', 'antenna1', 'antenna2', 'flag', 'time', 'uvdist'],
+            baseline_set,
+            ms_handle=ms_handle,
+        )
         if not data:
             return newflags
 
@@ -1179,11 +1214,11 @@ class Correctedampflag(basetask.StandardTaskTemplate):
                         prior_uvstart = uvstart
                         maxInThisBin = np.max(cmetric_sel[id_uvbin])
                         if len(uvdist_sel) > 1000:
-                            Q1 = np.percentile(cmetric_sel[id_uvbin], 25, interpolation='midpoint')
-                            Q3 = np.percentile(cmetric_sel[id_uvbin], 75, interpolation='midpoint')
+                            Q1 = np.percentile(cmetric_sel[id_uvbin], 25, method='midpoint')
+                            Q3 = np.percentile(cmetric_sel[id_uvbin], 75, method='midpoint')
                             if npts >= 20:
-                                D1 = np.percentile(cmetric_sel[id_uvbin], 10, interpolation='midpoint')
-                                D9 = np.percentile(cmetric_sel[id_uvbin], 90, interpolation='midpoint')
+                                D1 = np.percentile(cmetric_sel[id_uvbin], 10, method='midpoint')
+                                D9 = np.percentile(cmetric_sel[id_uvbin], 90, method='midpoint')
                                 IQR = 0.5*(Q3-Q1)
                                 IDR = 0.5*(D9-D1)/1.9004
                                 mad = np.max([IQR, np.min([2*IQR, IDR])])
@@ -1439,8 +1474,8 @@ class Correctedampflag(basetask.StandardTaskTemplate):
 
     @staticmethod
     def _create_flags_for_ultrahigh_baselines_timestamps(ms: MeasurementSet, spwid: int, intent: str, icorr: int,
-                                                         field: str, timestamps: List, baselines: List,
-                                                         antenna_id_to_name: Dict) -> List[FlagCmd]:
+                                                         field: str, timestamps: list, baselines: list,
+                                                         antenna_id_to_name: dict) -> list[FlagCmd]:
         newflags = []
         for idx in range(len(baselines)):
             newflags.append(
@@ -1461,9 +1496,9 @@ class Correctedampflag(basetask.StandardTaskTemplate):
     def _evaluate_antbased_heuristics(ms: MeasurementSet, spwid: int, intent: str, icorr: int, field: str,
                                       ants_in_outlier_baseline_scans_thresh: float,
                                       ants_in_outlier_baseline_scans_partial_thresh: float,
-                                      max_frac_outlier_scans: float, antenna_id_to_name: Dict, ant1_sel: NDArray,
+                                      max_frac_outlier_scans: float, antenna_id_to_name: dict, ant1_sel: NDArray,
                                       ant2_sel: NDArray, nants: int, id_highsig: NDArray, time_sel_highsig: NDArray,
-                                      time_sel_highsig_uniq: NDArray) -> List[FlagCmd]:
+                                      time_sel_highsig_uniq: NDArray) -> list[FlagCmd]:
 
         # Initialize flags.
         newflags = []
@@ -1580,8 +1615,8 @@ class Correctedampflag(basetask.StandardTaskTemplate):
 
         return newflags
 
-    def _apply_flags(self, flags: List[FlagCmd], sum_before: bool = False, sum_after: bool = False) \
-            -> Tuple[Dict, Dict]:
+    def _apply_flags(self, flags: list[FlagCmd], sum_before: bool = False, sum_after: bool = False) \
+            -> tuple[dict, dict]:
 
         inputs = self.inputs
 

@@ -17,11 +17,14 @@ from .conversion import (
     range_to_list,
     safe_split,
     unix_seconds_to_datetime,
+    phasecenter_to_skycoord
 )
 
 DomainMock = collections.namedtuple('DomainMock', ['id', 'name'])
 AntennaMock = DomainMock
 FieldMock = DomainMock
+
+UTC = datetime.timezone.utc
 
 
 @pytest.mark.parametrize("inp, kwargs, expected", [
@@ -74,9 +77,9 @@ def test_flatten_empty():
 
 
 @pytest.mark.parametrize("inp, kwargs, expected", [
-    (datetime.datetime(2020, 1, 1, 12, 34, 56, 7), {}, '2020-01-01 12:34:56'),
-    (datetime.datetime(2020, 1, 1, 12, 34, 56, 7), {'dp': 5}, '2020-01-01 12:34:56.00001'),
-    (datetime.datetime(2020, 1, 1, 12, 34, 56, 7), {'dp': 6}, '2020-01-01 12:34:56.000007'),
+    (datetime.datetime(2020, 1, 1, 12, 34, 56, 7, tzinfo=UTC), {}, '2020-01-01 12:34:56'),
+    (datetime.datetime(2020, 1, 1, 12, 34, 56, 7, tzinfo=UTC), {'dp': 5}, '2020-01-01 12:34:56.00001'),
+    (datetime.datetime(2020, 1, 1, 12, 34, 56, 7, tzinfo=UTC), {'dp': 6}, '2020-01-01 12:34:56.000007'),
 ])
 def test_format_datetime(inp, kwargs, expected):
     """Test format_datetime()"""
@@ -86,7 +89,7 @@ def test_format_datetime(inp, kwargs, expected):
 def test_format_datetime_raises_exception_too_high_precision():
     """Test format_datetime() when requesting too high precision"""
     with pytest.raises(ValueError):
-        format_datetime(datetime.datetime(2020, 1, 1, 12, 34, 56, 7), dp=7)
+        format_datetime(datetime.datetime(2020, 1, 1, 12, 34, 56, 7, tzinfo=UTC), dp=7)
 
 
 @pytest.mark.parametrize("inp, kwargs, expected", [
@@ -106,8 +109,14 @@ def test_format_timedelta_raises_exception_too_high_precision():
 
 
 @pytest.mark.parametrize("inp, expected", [
-    ([1, 2], [datetime.datetime(1858, 11, 17, 0, 0, 1), datetime.datetime(1858, 11, 17, 0, 0, 2)]),
-    ([1, 1.5], [datetime.datetime(1858, 11, 17, 0, 0, 1), datetime.datetime(1858, 11, 17, 0, 0, 1, 500000)]),
+    ([1, 2], [
+        datetime.datetime(1858, 11, 17, 0, 0, 1, tzinfo=UTC),
+        datetime.datetime(1858, 11, 17, 0, 0, 2, tzinfo=UTC),
+    ]),
+    ([1, 1.5], [
+        datetime.datetime(1858, 11, 17, 0, 0, 1, tzinfo=UTC),
+        datetime.datetime(1858, 11, 17, 0, 0, 1, 500000, tzinfo=UTC),
+    ]),
 ])
 def test_mjd_seconds_to_datetime(inp, expected):
     """Test mjd_seconds_to_datetime()"""
@@ -137,7 +146,10 @@ def test_safe_split(inp, expected):
 
 
 @pytest.mark.parametrize("inp, expected", [
-    ([1, 1.5], [datetime.datetime(1970, 1, 1, 0, 0, 1), datetime.datetime(1970, 1, 1, 0, 0, 1, 500000)]),
+    ([1, 1.5], [
+        datetime.datetime(1970, 1, 1, 0, 0, 1, tzinfo=UTC),
+        datetime.datetime(1970, 1, 1, 0, 0, 1, 500000, tzinfo=UTC),
+    ]),
 ])
 def test_unix_seconds_to_datetime(inp, expected):
     """Test unix_seconds_to_datetime()"""
@@ -287,3 +299,32 @@ task(
 def test_convert_paths(input_str, expected_output):
     """Test various path conversion scenarios."""
     assert convert_paths_to_basenames(input_str) == expected_output
+
+
+@pytest.mark.parametrize(
+    "phasecenter, ra_deg, dec_deg",
+    [
+        # explicit degrees
+        ("J2000 302.999666667deg -0.71deg", 302.999666667, -0.71),
+
+        # CASA sexagesimal RA + dd.mm.ss Dec
+        ("J2000 20:11:59.992 -000.42.36.0000", 302.9999666333333, -0.71),
+
+        # explicit hourangle RA
+        ("J2000 20h11m59.992s -0.71deg", 302.9999666333333, -0.71),
+
+        # explicit arcminutes
+        ("J2000 18179.998arcmin -42.6arcmin", 302.9999666333333, -0.71),
+
+        # explicit radians
+        ("J2000 5.288347rad -0.012394rad", 302.9999666333333, -0.71),
+
+        # no reference frame (defaults to ICRS)
+        ("20:11:59.992 -000.42.36.0000", 302.9999666333333, -0.71),
+    ],
+)
+def test_phasecenter_to_skycoord(phasecenter, ra_deg, dec_deg):
+    coord = phasecenter_to_skycoord(phasecenter)
+
+    assert abs(coord.ra.deg - ra_deg) < 1e-3
+    assert abs(coord.dec.deg - dec_deg) < 1e-3
