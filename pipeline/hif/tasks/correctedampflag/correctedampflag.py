@@ -16,7 +16,7 @@ from pipeline.domain import DataType
 from pipeline.h.tasks.common import commonhelpermethods, mstools
 from pipeline.h.tasks.common.arrayflaggerbase import FlagCmd
 from pipeline.h.tasks.flagging.flagdatasetter import FlagdataSetter
-from pipeline.infrastructure import task_registry
+from pipeline.infrastructure import casa_tools, task_registry
 from .resultobjects import CorrectedampflagResults
 
 if TYPE_CHECKING:
@@ -478,10 +478,13 @@ class CorrectedampflagInputs(vdp.StandardInputs):
     # tooManyIntegrationsFraction
     tmint = vdp.VisDependentProperty(default=0.085)
 
+    # Whether to examine the XY+YX sum for multi-scan full-polarization data.
+    examineCrossPolSum = vdp.VisDependentProperty(default=False)
+
     # docstring and type hints: supplements hif_correctedampflag
     def __init__(self, context, output_dir=None, vis=None, intent=None, field=None, spw=None, antnegsig=None,
                  antpossig=None, tmantint=None, tmint=None, tmbl=None, antblnegsig=None, antblpossig=None,
-                 relaxed_factor=None, niter=None):
+                 relaxed_factor=None, niter=None, examineCrossPolSum=None):
         """Initialize Inputs.
 
         Args:
@@ -527,6 +530,9 @@ class CorrectedampflagInputs(vdp.StandardInputs):
             niter: Maximum number of times to iterate on evaluation of flagging heuristics. If an iteration results in no new flags, then
                 subsequent iterations are skipped.
 
+            examineCrossPolSum: Whether to examine the XY+YX sum for multi-scan full-polarization data. Defaults to
+                False, so only XX+YY is evaluated because the cross-pol sum can be non-flat when Stokes I is stable.
+
         """
         super().__init__()
 
@@ -551,6 +557,7 @@ class CorrectedampflagInputs(vdp.StandardInputs):
         self.antblpossig = antblpossig
         self.relaxed_factor = relaxed_factor
         self.niter = niter
+        self.examineCrossPolSum = examineCrossPolSum
 
 
 @task_registry.set_equivalent_casa_task('hif_correctedampflag')
@@ -683,44 +690,54 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         # Initialize list of newly found flags.
         newflags = []
 
-        # Evaluate flagging heuristics separately for each intent.
-        for intent in inputs.intent.split(','):
+        # Open the MS once for all (intent, field, spw) reads (PIPE-3089).
+        with casa_tools.MSReader(ms.name) as openms:
+            # Evaluate flagging heuristics separately for each intent.
+            for intent in inputs.intent.split(','):
+                # For current intent, identify which fields from inputs are valid.
+                if intent == 'TARGET':
+                    # Use field IDs to loop over individual mosaic pointings for
+                    # science targets (PIPE-337).
+                    valid_fields = [
+                        str(field.id)
+                        for field in ms.get_fields(intent=intent)
+                        if field.name in list(utils.safe_split(inputs.field))
+                    ]
+                else:
+                    # Use field names for calibrators.
+                    valid_fields = [
+                        field.name
+                        for field in ms.get_fields(intent=intent)
+                        if field.name in list(utils.safe_split(inputs.field))
+                    ]
 
-            # For current intent, identify which fields from inputs are valid.
-            if intent == 'TARGET':
-                # Use field IDs to loop over individual mosaic pointings for
-                # science targets (PIPE-337).
-                valid_fields = [str(field.id)
-                                for field in ms.get_fields(intent=intent)
-                                if field.name in list(utils.safe_split(inputs.field))]
-            else:
-                # Use field names for calibrators.
-                valid_fields = [field.name
-                                for field in ms.get_fields(intent=intent)
-                                if field.name in list(utils.safe_split(inputs.field))]
+                # If no valid fields were found, raise warning, and continue to
+                # next intent. The following intents are optional and do not require
+                # a warning: CHECK (PIPE-281), POLANGLE, POLLEAKAGE (PIPE-607),
+                # DIFFGAINREF, DIFFGAINSRC (PIPE-2082, PIPE-2145).
+                if not valid_fields:
+                    if intent not in ['CHECK', 'DIFFGAINREF', 'DIFFGAINSRC', 'POLANGLE', 'POLLEAKAGE']:
+                        LOG.warning(
+                            'Invalid data selection for given intent(s) and field(s): fields %s do not include '
+                            "intent '%s'.",
+                            utils.commafy(utils.safe_split(inputs.field)),
+                            intent,
+                        )
+                    continue
 
-            # If no valid fields were found, raise warning, and continue to
-            # next intent. The following intents are optional and do not require
-            # a warning: CHECK (PIPE-281), POLANGLE, POLLEAKAGE (PIPE-607),
-            # DIFFGAINREF, DIFFGAINSRC (PIPE-2082, PIPE-2145).
-            if not valid_fields:
-                if intent not in ['CHECK', 'DIFFGAINREF', 'DIFFGAINSRC', 'POLANGLE', 'POLLEAKAGE']:
-                    LOG.warning("Invalid data selection for given intent(s) and field(s): fields {} do not include"
-                                " intent \'{}\'.".format(utils.commafy(utils.safe_split(inputs.field)), intent))
-                continue
+                # Evaluate heuristic for each valid field.
+                for field in valid_fields:
+                    # Evaluate flagging heuristics separately for each spw.
+                    for spwid in spwids:
+                        flags_for_intent_field_spw = self._evaluate_heuristic(
+                            ms, intent, field, spwid, antenna_id_to_name, ms_handle=openms
+                        )
+                        newflags.extend(flags_for_intent_field_spw)
 
-            # Evaluate heuristic for each valid field.
-            for field in valid_fields:
-
-                # Evaluate flagging heuristics separately for each spw.
-                for spwid in spwids:
-
-                    flags_for_intent_field_spw = self._evaluate_heuristic(
-                        ms, intent, field, spwid, antenna_id_to_name)
-                    newflags.extend(flags_for_intent_field_spw)
-
-        LOG.debug("Flagging commands from current iteration, before consolidation:\n{}"
-                  "".format('\n'.join([flag.flagcmd for flag in newflags])))
+        LOG.debug(
+            'Flagging commands from current iteration, before consolidation:\n%s',
+            '\n'.join([flag.flagcmd for flag in newflags]),
+        )
 
         # Consolidate flagging commands from current iteration to minimize
         # request for flagdata.
@@ -728,8 +745,9 @@ class Correctedampflag(basetask.StandardTaskTemplate):
 
         return newflags
 
-    def _evaluate_heuristic(self, ms: MeasurementSet, intent: str, field: str, spwid: int,
-                            antenna_id_to_name: dict) -> list[FlagCmd]:
+    def _evaluate_heuristic(
+        self, ms: MeasurementSet, intent: str, field: str, spwid: int, antenna_id_to_name: dict, *, ms_handle=None
+    ) -> list[FlagCmd]:
         # Initialize flags.
         allflags = []
 
@@ -739,13 +757,17 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         # If no baseline sets were received, then evaluate heuristics for
         # all baselines at once.
         if not baseline_sets:
-            allflags.extend(self._evaluate_heuristic_for_baseline_set(
-                ms, intent, field, spwid, antenna_id_to_name))
+            allflags.extend(
+                self._evaluate_heuristic_for_baseline_set(
+                    ms, intent, field, spwid, antenna_id_to_name, ms_handle=ms_handle
+                )
+            )
         else:
             # Evaluate heuristic for each set of baselines.
             for baseline_set in baseline_sets:
                 newflags = self._evaluate_heuristic_for_baseline_set(
-                    ms, intent, field, spwid, antenna_id_to_name, baseline_set)
+                    ms, intent, field, spwid, antenna_id_to_name, baseline_set, ms_handle=ms_handle
+                )
                 allflags.extend(newflags)
 
         return allflags
@@ -833,9 +855,17 @@ class Correctedampflag(basetask.StandardTaskTemplate):
             LOG.info('Using uvbinFactor=%.2f' % (factor))
         return factor
 
-    def _evaluate_heuristic_for_baseline_set(self, ms: MeasurementSet, intent: str, field: str, spwid: int,
-                                             antenna_id_to_name: dict,
-                                             baseline_set: list | None = None) -> list[FlagCmd]:
+    def _evaluate_heuristic_for_baseline_set(
+        self,
+        ms: MeasurementSet,
+        intent: str,
+        field: str,
+        spwid: int,
+        antenna_id_to_name: dict,
+        baseline_set: list | None = None,
+        *,
+        ms_handle=None,
+    ) -> list[FlagCmd]:
 
         inputs = self.inputs
 
@@ -890,8 +920,15 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         newflags = []
 
         # Read in data from MS. If no valid data could be read, return early with no flags.
-        data = mstools.read_channel_averaged_data_from_ms(ms, field, spwid, intent,
-            ['corrected_data', 'model_data', 'antenna1', 'antenna2', 'flag', 'time', 'uvdist'], baseline_set)
+        data = mstools.read_channel_averaged_data_from_ms(
+            ms,
+            field,
+            spwid,
+            intent,
+            ['corrected_data', 'model_data', 'antenna1', 'antenna2', 'flag', 'time', 'uvdist'],
+            baseline_set,
+            ms_handle=ms_handle,
+        )
         if not data:
             return newflags
 
@@ -916,9 +953,9 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         ncorrs = len(corr_type)
 
         # CAS-12011: For multi-scan observations, analyze the mean of the
-        # metric for XX and YY, and for XY and YX (if ncorrs = 4). Combine the
-        # flagging state of the individual correlations by only marking the
-        # mean metric as flagged where both individual contributing
+        # metric for XX and YY. Optionally analyze XY and YX (if ncorrs = 4).
+        # Combine the flagging state of the individual correlations by only
+        # marking the mean metric as flagged where both individual contributing
         # correlations are marked as flagged (by floor-dividing by 2).
         if nscans > 1:
             cmetric_mask = np.ma.array(cmetric_all, mask=flag_all)
@@ -931,15 +968,22 @@ class Correctedampflag(basetask.StandardTaskTemplate):
                 col_sel = [corr_type.index('XX'), corr_type.index('YY')]
                 cmetric_copol = np.ma.mean(cmetric_mask[col_sel, :], axis=0, keepdims=True)
                 flag_copol = np.sum(flag_all[col_sel, :], axis=0, keepdims=True) // 2
-                # Create mean of XY and YX polarization, and combine flags.
-                col_sel = [corr_type.index('XY'), corr_type.index('YX')]
-                cmetric_crosspol = np.ma.mean(cmetric_mask[col_sel, :], axis=0, keepdims=True)
-                flag_crosspol = np.sum(flag_all[col_sel, :], axis=0, keepdims=True) // 2
-                # Create new scalar difference array with the mean data, and
-                # corresponding flagging array.
-                cmetric_all = np.concatenate((cmetric_copol, cmetric_crosspol), axis=0)
-                flag_all = np.concatenate((flag_copol, flag_crosspol), axis=0)
-                ncorrs = 2
+                if inputs.examineCrossPolSum:
+                    # Create mean of XY and YX polarization, and combine flags.
+                    col_sel = [corr_type.index('XY'), corr_type.index('YX')]
+                    cmetric_crosspol = np.ma.mean(cmetric_mask[col_sel, :], axis=0, keepdims=True)
+                    flag_crosspol = np.sum(flag_all[col_sel, :], axis=0, keepdims=True) // 2
+                    # Create new scalar difference array with the mean data,
+                    # and corresponding flagging array.
+                    cmetric_all = np.concatenate((cmetric_copol, cmetric_crosspol), axis=0)
+                    flag_all = np.concatenate((flag_copol, flag_crosspol), axis=0)
+                    ncorrs = 2
+                else:
+                    # PIPE-2956: by default, avoid the multi-scan cross-pol
+                    # sum because it can be non-flat when Stokes I is stable.
+                    cmetric_all = cmetric_copol
+                    flag_all = flag_copol
+                    ncorrs = 1
             # PIPE-2631: cast from MaskedArray back to regular Numpy array to
             # avoid Numpy warnings in heuristics below (that use regular Numpy
             # functions that ignore mask); heuristics below already select for
