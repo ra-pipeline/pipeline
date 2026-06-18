@@ -265,9 +265,10 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         if utils.contains_single_dish(pipeline_context):
             uv_plots = None
         else:
-            # PIPE_1780: Custom plot parameters.
+            # PIPE_1780: Custom plot parameters. FIXME NEEDS CLEANING
             custom_plot_par = {"avgscan": False, "avgtime": "999999", "correlation":"XX,YY"}
-            
+            # custom_plot_par   = {"avgscan": False, "avgtime": "999999"}
+
             uv_plots = self.create_uv_plots(context=pipeline_context, results=result, weblog_dir=weblog_dir,
                                             plot_par=custom_plot_par)
 
@@ -329,6 +330,8 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             ms  = context.observing_run.get_ms(vis)
             ##### Reduce number of channels (performance opti.)
             spw_list = ms.get_spectral_windows()
+            ## FIXME NEEDS CLEANING
+            # represent_source_spw, represent_spw_id = ms.get_representative_source_spw()
             spw_plot_string = ""
             for x in spw_list:
                 id_int = x.id
