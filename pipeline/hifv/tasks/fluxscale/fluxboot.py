@@ -1118,7 +1118,6 @@ class Fluxboot(basetask.StandardTaskTemplate):
                     self._executor.execute(job)
                 else:
                     LOG.warning("No data found for field id {!s} in {!s}".format(fieldidstring, calMs))
-            return True
         elif fluxflag and vlassmode:
             fieldobjlist = m.get_fields(name=field)
             fieldidlist = []
@@ -1140,7 +1139,6 @@ class Fluxboot(basetask.StandardTaskTemplate):
                     self._executor.execute(job)
                 else:
                     LOG.warning("No data found for field id {!s} in {!s}".format(fieldidstring, calMs))
-            return True
         else:
             # Apply uvrange constraints from flux.csv for specific field
             fieldobjlist = m.get_fields(name=field)
@@ -1155,8 +1153,7 @@ class Fluxboot(basetask.StandardTaskTemplate):
                 LOG.warning('Field %s not found in MS, uvrange constraints not applied', field)
 
             job = casa_tasks.gaincal(**task_args)
-
-            return self._executor.execute(job)
+            self._executor.execute(job)
 
     def re_reference_polynomial(self, c1: list, original_ref_freq: float, new_ref_freq: float) -> list:
         """Re-reference polynomial
