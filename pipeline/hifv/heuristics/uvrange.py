@@ -1,35 +1,34 @@
-def uvrange(setjy_results, field_id, spw_id=2):
-    """
+def uvrange(setjy_results, field_id: int, spw_id: int = 2) -> str:
+    """Construct UV range constraint string from flux calibration results.
+
+    Extracts uvmin and uvmax from the flux calibration domain object and
+    formats them as a UV range constraint string in lambda units.
 
     Args:
-        setjy_results: Flux domain object read in from the import stage
-        field_id: integer field id
-        spw_id: integer spw id, default is spw_id=2 for VLASS
-        ** However, currently it just picks the first index of zero
+        setjy_results: Flux domain object read from import stage.
+        field_id: Field ID as integer.
+        spw_id: Spectral window ID (default: 2 for VLASS). Currently unused;
+            always uses first measurement (spw_index=0).
 
-    uvmin and uvmax are of type Decimal
-
-    Units are always assumed to be lambda
-
-    Returns: uvrange string
-
+    Returns:
+        UV range constraint string in lambda units. Examples: '500~5000lambda',
+        '>500lambda', or empty string if both uvmin and uvmax are zero.
     """
-
     try:
-        # spw_index = [flux.spw_id for flux in setjy_results[0].measurements[field_id]].index(spw_id)
         spw_index = 0
+        uvmin_val = float(setjy_results[0].measurements[field_id][spw_index].uvmin)
+        uvmax_val = float(setjy_results[0].measurements[field_id][spw_index].uvmax)
+    except (IndexError, AttributeError, TypeError, ValueError):
+        uvmin_val = 0.0
+        uvmax_val = 0.0
 
-        uvmin = setjy_results[0].measurements[field_id][spw_index].uvmin
-        uvmax = setjy_results[0].measurements[field_id][spw_index].uvmax
-    except Exception as e:
-        uvmin = 0.0
-        uvmax = 0.0
-
-    if float(uvmin) == 0.0 and float(uvmax) == 0.0:
+    if uvmin_val == 0.0 and uvmax_val == 0.0:
         return ''
 
-    if float(uvmin) != 0.0 and float(uvmax) == 0.0:
-        return '>{!s}lambda'.format(str(float(uvmin)))
+    if uvmin_val != 0.0 and uvmax_val == 0.0:
+        return f'>{uvmin_val}lambda'
 
-    if float(uvmin) != 0.0 and float(uvmax) != 0.0:
-        return '{!s}~{!s}lambda'.format(str(float(uvmin)), str(float(uvmax)))
+    if uvmin_val != 0.0 and uvmax_val != 0.0:
+        return f'{uvmin_val}~{uvmax_val}lambda'
+
+    return ''
