@@ -1142,6 +1142,18 @@ class Fluxboot(basetask.StandardTaskTemplate):
                     LOG.warning("No data found for field id {!s} in {!s}".format(fieldidstring, calMs))
             return True
         else:
+            # Apply uvrange constraints from flux.csv for specific field
+            fieldobjlist = m.get_fields(name=field)
+            if fieldobjlist:
+                if len(fieldobjlist) > 1:
+                    LOG.debug('Multiple fields match name %s, using first (id=%s)', field, fieldobjlist[0].id)
+                fieldid = fieldobjlist[0].id
+                uvrangestring = uvrange(self.setjy_results, str(fieldid))
+                task_args['uvrange'] = uvrangestring
+                task_args['selectdata'] = True
+            else:
+                LOG.warning('Field %s not found in MS, uvrange constraints not applied', field)
+
             job = casa_tasks.gaincal(**task_args)
 
             return self._executor.execute(job)
