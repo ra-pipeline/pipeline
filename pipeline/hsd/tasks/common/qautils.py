@@ -106,7 +106,8 @@ class QAScoreFormatter:
     def update_longmsg(self,
                        qascore: pqa.QAScore,
                        longmsg_format: str | None = None,
-                       longmsg_keys: list[str] | None = None):
+                       longmsg_keys: list[str] | None = None,
+                       force_update: bool = False):
         """
         Update longmsg of QA score with asocciated keys in applies_to
 
@@ -121,6 +122,8 @@ class QAScoreFormatter:
             longmsg_keys:          List of keys to show on the updated longmsg of QA score,
                                        default is None which applies all keys in applies_to of QA score
                                        longmsg_format will be used regardless the longmsg_keys if longmsg_format is specified
+            force_update:          True to Update the longmsg even if TargetDataSelection is empty
+                                       default is False which inhibits to update longmsg for an empty TargetDataSelection
         """
         # if longmsg_keys is not specified, try to get it from the registry
         if longmsg_keys is None:
@@ -128,6 +131,11 @@ class QAScoreFormatter:
             # apply all keys in TargetDataSelection if longmsg_keys still does not exist
             if longmsg_keys is None:
                 longmsg_keys = list(vars(qascore.applies_to).keys())
+
+        # inhibit formatting if 1) everything associated with longmsg_keys are empty and 2) force_update is False
+        # this will prevent longmsg from being unintentionally overwritten with shortmsg
+        if all(len(getattr(qascore.applies_to, key)) == 0 for key in longmsg_keys) and not force_update:
+            return
 
         # if longmsg_format is not specified, try to get it from the registry
         if longmsg_format is None:
@@ -143,7 +151,6 @@ class QAScoreFormatter:
                             longmsg_format +=  '  Antenna: {ant}' if len(qascore.applies_to.ant) > 0 else ''
                         case _:
                             longmsg_format += f'  {key.capitalize()}: {{{key}}}' if len(getattr(qascore.applies_to, key)) > 0 else ''
-
         # compose and update the longmsg
         qascore.longmsg = longmsg_format.format(shortmsg=qascore.shortmsg,
                                                 score_metric=qascore.origin.metric_name,
@@ -277,6 +284,11 @@ class QAScoreAggregator:
                 # filter out qascores with different metric_name
                 if target_qascore.origin.metric_name != metric_name:
                     continue
+
+                # skip if none of the keys of 'keys_to_aggregate' exist in target_qascore
+                if all(len(getattr(target_qascore.applies_to, key)) == 0 for key in keys_to_aggregate):
+                    continue
+
                 # now the target qascore is selected
                 target_idx = qascores.index(target_qascore)
 
