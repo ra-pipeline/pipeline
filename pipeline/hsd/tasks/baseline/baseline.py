@@ -749,7 +749,7 @@ class SDBaseline(basetask.StandardTaskTemplate):
         # the general analysis. Perhaps this can be done at a later time.
 
         for basename, outfile in vis_map.items():
-            original_ms = context.observing_run.measurement_sets[basename].origin_ms
+            original_ms = next(ms.origin_ms for ms in context.observing_run.measurement_sets if ms.basename == basename)
             qa_score_dict = bs.baseline_score(results=results, context=context, file_info=(original_ms, outfile))
 
             if not qa_score_dict is None:

@@ -100,4 +100,9 @@ def baseline_score(
         plot_path.rmdir()
         return None
 
+    # except Exception as error:
+    #     LOG.error(f"There was an unknown critical error in baseline_score: {error}")
+    #     plot_path.rmdir()
+    #     return None
+
     return {"score": qa_score, "plot_names" :plots_function_names}

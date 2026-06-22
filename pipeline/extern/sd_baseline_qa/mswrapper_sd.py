@@ -4,6 +4,8 @@ import casatools
 import numpy as np
 from scipy import signal
 
+from pipeline.infrastructure.utils import conversion
+
 import pipeline.extern.sd_baseline_qa.sd_qa_utils as sd_qa_utils
 
 # This is to fix the fact that analysis code doesn't check to see if the values it is
@@ -237,6 +239,11 @@ class MSWrapperSD(object):
         nrowscan = {}
         time_mean_scan = {}
         time_std_scan = {}
+
+        # It seems that there are times when the scan list and the `scansforfield` don't line up.
+        scanlist = set(scanlist).intersection(spw_setup['scantimes'])
+        scanlist = conversion.set_to_data(scanlist)
+
         for scan in scanlist:
             scantimesel[scan] = (tmdata >= spw_setup['scantimes'][scan][0]) & (tmdata < spw_setup['scantimes'][scan][1])
             nrowscan[scan] = np.sum(scantimesel[scan])
