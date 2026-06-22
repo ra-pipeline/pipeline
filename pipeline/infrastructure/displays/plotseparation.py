@@ -342,7 +342,7 @@ def add_to_plot(
     # Loop over the targets listed for possible consolidation of the field ID annotations         
     colour = get_sym_colour({'TARGET'})     
     # if there is only one label then plot it, else consolidate
-    if len(label_list[0]) == 1:
+    if len(label_list[0])  == 1:  # wnat individual to see
         label_plot = zip(label_list[0],label_list[1],label_list[2], ['center']) # 4th value is for the horizontal aligment 
     else:   
         # Consolidate the target labels 
@@ -393,71 +393,103 @@ def make_plus_patch(
               [xpos-sm_ver,ypos+lg_ver]]
     
     return xyvertex
-        
+
+
+## DONEST WORK EITHER - still goes in order, not a heck of all with a check of all others
+## also associating wringly - damn
+## need like a global nearest neighbours - matrix thing? astropy or something then - urg 
+
+
 def consolidate_labels(
-        field_ra_dec: List, ##Tuple,
-        overlap: float = 0.6
+        field_ra_dec: List,
+        overlap: float = 0.9
         ) -> Tuple:
-    """ Function to take the zip of the field object, ra and dec 
-    delta positions of the fields that are plotted and consolidate 
-    the lables as the field.id if they are overlapping too much.
+    """ Function to take the list (of lists) of the field object, delta ra and  
+    delta dec positions of the TARGET intents that are plotted and consolidate 
+    the lables and adjust where those labels will be positions for overlapping
+    fields, defined by the overlap parameter (in degrees).
 
     Args:
         field_ra_dec the list of lists of field, delta_ra, delta_dec.
-        overlap: value in degrees below which a label overlap is considered.
+        overlap: value in degrees below which a label overlap is considered (symbol 
+        sizes are 1 x 1 deg).
     
     Return:
         zip tuple of the field ids, plot ra postion, and plot dec position for 
-        the lables, and the label locator w.r.t. the plot position.
+        the lables, and the matplotlib label locator w.r.t. the plot position.
     """
 
+    # final parameters to zip for plots
     field_ids=[]
     lab_ra=[]
     lab_dec=[]
     lab_loc=[]
+    # hold the fields that already got listed
+    index_out = []
+    # loop start the TARGET list
+    for index_pri in range(len(field_ra_dec[0])):
+        # made a temporary holder of overlapping fields
+        # within the 'primary' index loop
+        hold_field_ids = []
+        hold_lab_ra = []
+        hold_lab_dec = []
+        if index_pri not in index_out:
+            isnew = True # for every primary loop we go into the while
+            # assign the field with 'primary' index to the holder
+            LOG.info('Adding position for field index '+str(index_pri)+' start loop pri') # testing
+            hold_field_ids.append(field_ra_dec[0][index_pri])
+            hold_lab_ra.append(field_ra_dec[1][index_pri])
+            hold_lab_dec.append(field_ra_dec[2][index_pri])
+            index_out.append(index_pri)
+            # loop of all other fields iterativly so we actually compare with
+            # any new added values and constantly to 'grow' the coodinate
+            while isnew == True:
+                isnew  = False # such that if nothing is overlapping the loop exits
+                for index_sec in range(index_pri+1, len(field_ra_dec[0])):
+                    if index_sec not in index_out:
+                        # if the position is between the extremeties of those in the holder
+                        # acconting for the overlap, then the field is overlapping
+                        if ((field_ra_dec[1][index_sec] > min(hold_lab_ra)-overlap) and \
+                           (field_ra_dec[1][index_sec] < max(hold_lab_ra) +overlap))   and \
+                           ((field_ra_dec[2][index_sec] > min(hold_lab_dec) -overlap) and \
+                           (field_ra_dec[2][index_sec] < max(hold_lab_dec) +overlap)):                        
+                            # put into the holder if overlapping
+                            #LOG.info('....adding position of field index '+str(index_sec)+ ' as it overlaps') # testing
+                            hold_field_ids.append(field_ra_dec[0][index_sec])
+                            hold_lab_ra.append(field_ra_dec[1][index_sec])
+                            hold_lab_dec.append(field_ra_dec[2][index_sec])
+                            index_out.append(index_sec)
+                            isnew = True
+                        #else:
+                        #    LOG.info('...field of index'+str(index_pri)+' has no overlap with field of index'+str(index_sec)) # testing
 
-    # have to better search all positions with others, then
-    # assign a mask ?
-    # iterative loop and remove?
-    
-    # get a mask if the positions are individual or not
-    diff_mask = ((np.abs(np.diff(field_ra_dec[1]))>overlap) | (np.abs(np.diff(field_ra_dec[2]))>overlap))
-    # because this is a diff, we need to prepend a first mask same as the first boolean
-    # if the first element in diff_mask is True, this means the first and second positons are far and should
-    # be separate groups, given the later cumsum, this means set to true. Otherwise, if
-    # the first element is False, they do overlap and thus prepends a False to be part of same group
-    diff_mask = np.concatenate(([diff_mask[0]],diff_mask))
-    # now find the unqiue groups with np.cumsum, increments with True
-    groups = np.cumsum(diff_mask)
-    LOG.info(diff_mask)
-    LOG.info(groups)
-    # loop the unique groups and assess if we need a common label and average location
-    # limit is same number of groups as targets themselves
-    for group_ids in np.unique(groups):
-        # mask for coords we want
-        mask_cords = (groups == group_ids)
-        # if we have more than one element we need to assess the consolidation
-        if np.sum(mask_cords)>1:
-            LOG.info('Testing only - more than one coord overlap plot')
-            LOG.info(np.array(field_ra_dec[0])[mask_cords])
-            # symbol to right (more negative)
-            lab_ra.append(np.min(np.array(field_ra_dec[1])[mask_cords]) - 0.55) # based on symbol size
-            lab_dec.append(np.mean(np.array(field_ra_dec[2])[mask_cords]))
-            lab_loc.append('left') # want label to be written from right hand side (note units axis flips) otherwise long strings overruns the plus patch
-            # manipulate the string
-            field_str = ','.join([str(s_use) for s_use in np.unique(np.array(field_ra_dec[0])[mask_cords])])
-            # finally check if the string is a mosaic add an 's'
-            if field_str == 'mosaic':
-                field_ids.append('mosaics')
+                    #else:
+                    #    LOG.info(' the field index '+str(index_sec)+' is already in overlapping something,bypass this secondary loop') # testing
+
+            # within the first index loop, create the consolidated label and position if fields are overlapping       
+            if len(hold_field_ids) > 1:
+                field_str = str(','.join([str(s_use) for s_use in (np.unique(hold_field_ids))]))
+                # check if the string is a mosaic add an 's'
+                if field_str == 'mosaic':
+                    field_ids.append('mosaics')
+                else:
+                    field_ids.append(field_str)
+                # now the coordinate to assciate with the position
+                # we want the median Y coord, then selected the X coords within the median
+                # Y range as to set the X position. We need to be (-ve) righwards in the plot, i.e. use min(x)
+                med_y = np.median(hold_lab_dec)
+                lab_dec.append(med_y)
+                id_for_x = np.where(np.abs(np.array(hold_lab_dec)-med_y) < overlap)[0]
+                lab_ra.append(float(np.min(np.array(hold_lab_ra)[id_for_x]) - 0.55))
+                lab_loc.append('left')
             else:
-                field_ids.append(field_str)
-            
-        else:
-            LOG.info('No overlap for this coord')
-            field_ids.append(str(np.array(field_ra_dec[0])[mask_cords][0]))
-            lab_ra.append(float(np.array(field_ra_dec[1])[mask_cords][0])) # np float
-            lab_dec.append(float(np.array(field_ra_dec[2])[mask_cords][0])) # np float
-            lab_loc.append('center')
-
+                # no overlapping fields, just append the single values into the final lists
+                field_ids.append(hold_field_ids[0])
+                lab_ra.append(hold_lab_ra[0])
+                lab_dec.append(hold_lab_dec[0])
+                lab_loc.append('center')
+        #else:
+        #    LOG.info(' the field index '+str(index_pri)+' is alerdy overlapping something, bypass this primary loop') # testing
 
     return zip(field_ids, lab_ra, lab_dec, lab_loc)
+
