@@ -31,7 +31,7 @@ import matplotlib.transforms as transforms
 import numpy as np
 import scipy.constants
 from matplotlib.patches import Rectangle
-from scipy.ndimage import label
+from scipy.ndimage import binary_dilation, label
 from scipy.optimize import Bounds, minimize
 from scipy.signal import find_peaks, peak_prominences, peak_widths, savgol_filter
 from scipy.spatial import ConvexHull
@@ -325,18 +325,28 @@ if True:
         # assert False, f"{nn} {scale}"
         return (np.exp(scale * nn) - 1) / (np.exp(scale) - 1) * maximum
 
-    def _savgol_filter_nan(x, **kwargs):
+    def _savgol_filter_nan(x, window_length, polyorder, **kwargs):
         """Apply savgol_filter while ignoring NaN values.
 
-        PIPE-2947: savgol_filter does not natively handle NaN values (scipy 1.17.0+).
-        This function applies savgol_filter to the non-NaN subset of the data (x[non_nan]),
-        which fundamentally changes the filter's behavior compared to interpolating NaN values
-        before filtering or other approaches that properly handle missing data. This may need
-        to be revisited in the future if a better approach to handling NaN values is decided.
+        Drop-in replacement for savgol_filter with a compatible signature.
+
+        PIPE-2947: savgol_filter has never had native NaN handling (confirmed
+        through scipy 1.17.0). This function applies savgol_filter to the non-NaN
+        subset of the data, then NaNs out channels within window_length//2 of any
+        masked region, since the filter there uses data from only one side of the
+        gap and is unreliable. This matches the NaN-propagation behavior of
+        savgol_filter in scipy 1.16.3 when NaN values are present in the input.
+        Suggested by AEG (2026-05-11) with additional refactoring.
         """
-        non_nan = np.logical_not(np.isnan(x))
-        result = np.full(shape=np.shape(x), fill_value=np.nan)
-        result[non_nan] = savgol_filter(x[non_nan], **kwargs)
+        is_nan = np.isnan(x)
+        result = x.copy()
+        result[~is_nan] = savgol_filter(x[~is_nan], window_length=window_length,
+                                        polyorder=polyorder, **kwargs)
+        # Dilate the NaN mask using a window_length-wide structuring element so that
+        # channels within window_length//2 of a gap are also set to NaN (unreliable
+        # edge estimates).
+        nan_boundary = binary_dilation(is_nan, structure=np.ones(window_length, dtype=bool))
+        result[nan_boundary] = np.nan
         return result
 
     def model_break(model, peaks, window_length=5):  # v3.5
@@ -348,7 +358,7 @@ if True:
             return xp, np.interp(chans, xp[0], model[xp[0]])
         window_length += 1 - window_length % 2
         (atm_1, atm_2) = (
-            _savgol_filter_nan(model, window_length=window_length, deriv=dd, polyorder=3)
+            _savgol_filter_nan(model, window_length=window_length, polyorder=3, deriv=dd)
             for dd in (1, 2)
         )
         if (

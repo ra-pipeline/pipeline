@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 LOG = logging.get_logger(__name__)
 
 # minimum allowed CASA revision. Set to 0 or None to disable
-MIN_CASA_REVISION = [6, 7, 3, 20]
+MIN_CASA_REVISION = [6, 7, 4, 2]
 # maximum allowed CASA revision. Set to 0 or None to disable
 MAX_CASA_REVISION = None
 

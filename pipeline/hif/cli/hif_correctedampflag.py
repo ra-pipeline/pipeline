@@ -7,7 +7,7 @@ def hif_correctedampflag(
         vis=None, intent=None, field=None, spw=None, antnegsig=None,
         antpossig=None, tmantint=None,
         tmint=None, tmbl=None, antblnegsig=None,
-        antblpossig=None, relaxed_factor=None, niter=None):
+        antblpossig=None, relaxed_factor=None, niter=None, examineCrossPolSum=None):
     """Flag corrected - model amplitudes based on calibrators.
 
     ``hif_correctedampflag`` looks for outlier visibility points by statistically examining the scalar

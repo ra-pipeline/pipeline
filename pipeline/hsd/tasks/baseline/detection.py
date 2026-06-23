@@ -4,7 +4,7 @@ from __future__ import annotations
 import collections
 import math
 import numbers
-import numpy
+import numpy as np
 import os
 import time
 from typing import TYPE_CHECKING, Any
@@ -160,8 +160,8 @@ class DetectLine(basetask.StandardTaskTemplate):
 
     def prepare(self,
                 datatable_dict: dict,
-                grid_table: list[list[int | float | numpy.ndarray]],
-                spectral_data: numpy.ndarray | None = None) -> DetectLineResults:
+                grid_table: list[list[int | float | np.ndarray]],
+                spectral_data: np.ndarray | None = None) -> DetectLineResults:
         """Find spectral line feature.
 
         The process finds emission lines and determines protection regions for baselinefit
@@ -315,15 +315,38 @@ class DetectLine(basetask.StandardTaskTemplate):
             LOG.debug('End Row %s: Elapsed Time=%.1f sec', row, (ProcEndTime - ProcStartTime))
         del Timer
 
+        # analyse mask (True: valid)
+        collapsed_mask = np.any(masks, axis=0)
+        # identify the range of flagged channels at the beginning
+        ic1 = 0
+        while (not collapsed_mask[ic1]) and (ic1 < nchan):
+            ic1 += 1
+        # identify the range of flagged channels at the end
+        ic2 = 0
+        while (not collapsed_mask[nchan - 1 - ic2]) and (ic2 < nchan):
+            ic2 += 1
+        flagged_edges = [ic1, ic2]
+        LOG.info(f"flagged edge channels: {flagged_edges}")
+        DEBUG_EDGE_CHANNELS_TO_SHOW = 10
+        LOG.trace(
+            "collapsed_mask = %s...%s",
+            collapsed_mask[:DEBUG_EDGE_CHANNELS_TO_SHOW].tolist(),
+            collapsed_mask[-DEBUG_EDGE_CHANNELS_TO_SHOW:].tolist()
+        )
+
         #LOG.debug('DetectSignal = %s'%(detect_signal))
+        outcome={
+            'signals': detect_signal,
+            'flagged_edges': flagged_edges
+        }
         result = DetectLineResults(task=self.__class__,
                                    success=True,
-                                   outcome={'signals': detect_signal})
+                                   outcome=outcome)
 
         return result
 
     def plot_detectrange(self,
-                         sp: numpy.ndarray,
+                         sp: np.ndarray,
                          protected: list[int],
                          fname: str) -> None:
         """Plot detected line range for testing.
@@ -345,9 +368,9 @@ class DetectLine(basetask.StandardTaskTemplate):
         plt.savefig(fname, format='png')
 
     def MaskBinning(self,
-                    data: numpy.ndarray,
+                    data: np.ndarray,
                     Bin: int,
-                    offset: int = 0) -> numpy.ndarray:
+                    offset: int = 0) -> np.ndarray:
         """Perform Binning for mask array.
 
         Args:
@@ -361,12 +384,12 @@ class DetectLine(basetask.StandardTaskTemplate):
         if Bin == 1:
             return data
         else:
-            return numpy.array([data[i:i+Bin].min() for i in range(offset, len(data)-Bin+1, Bin)], dtype=bool)
+            return np.array([data[i:i+Bin].min() for i in range(offset, len(data)-Bin+1, Bin)], dtype=bool)
 
     def SpBinning(self,
-                  data: numpy.ndarray,
+                  data: np.ndarray,
                   Bin: int,
-                  offset: int = 0) -> numpy.ndarray:
+                  offset: int = 0) -> np.ndarray:
         """Perform Binning for spectral data array.
 
         Args:
@@ -380,7 +403,7 @@ class DetectLine(basetask.StandardTaskTemplate):
         if Bin == 1:
             return data
         else:
-            return numpy.array([data[i:i+Bin].mean() for i in range(offset, len(data)-Bin+1, Bin)], dtype=float)
+            return np.array([data[i:i+Bin].mean() for i in range(offset, len(data)-Bin+1, Bin)], dtype=float)
 
     def analyse(self, result: DetectLineResults) -> DetectLineResults:
         """Analyse result.
@@ -393,8 +416,8 @@ class DetectLine(basetask.StandardTaskTemplate):
         return result
 
     def _detect(self,
-                spectrum: numpy.ndarray,
-                mask: numpy.ndarray,
+                spectrum: np.ndarray,
+                mask: np.ndarray,
                 threshold: float,
                 tweak: bool,
                 edge: list[int]) -> list[list[int]]:
@@ -558,7 +581,7 @@ class LineWindowParser:
                 processed = self._exclude_non_science_spws(
                     self._string2dict(self.window)
                 )
-        elif isinstance(self.window, (list, numpy.ndarray)):
+        elif isinstance(self.window, (list, np.ndarray)):
             # convert string into dictionary
             # keys are all science spectral window ids
             processed = self._list2dict(self.window)
@@ -770,7 +793,7 @@ class LineWindowParser:
         item_type = type(window[0])
 
         # process recursively if item is a list
-        if item_type in (list, numpy.ndarray):
+        if item_type in (list, np.ndarray):
             converted = []
             for w in window:
                 LOG.trace('_freq2chan: w=%s type %s', w, type(w))

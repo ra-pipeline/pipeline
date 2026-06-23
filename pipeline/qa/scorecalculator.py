@@ -113,10 +113,12 @@ __all__ = ['score_polintents',                                # ALMA specific
            'score_syspowerdata',
            'score_solint',
            'score_longsolint',
+           'score_flagged_ant_spw',
            'score_fluxboot',
            'score_testBPdcals_dts_ants',
            'score_testBPdcals_refant',
-           'score_testBPdcals_delay']
+           'score_testBPdcals_delay',
+           'score_spw_solint']
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -130,6 +132,7 @@ def log_qa(method):
     WARNING for any other level. These messages are meant for pipeline runs
     without a weblog output.
     """
+    @functools.wraps(method)
     def f(self, *args, **kw):
         # get the size of the CASA log before task execution
         qascore = method(self, *args, **kw)
@@ -1089,7 +1092,7 @@ def score_online_shadow_template_agents(ms, summaries):
 
     0 < score < 1 === 60% < frac_flagged < 5%
     """
-    score = score_data_flagged_by_agents(ms, summaries, 0.05, 0.6,
+    score = score_data_flagged_by_agents(ms, summaries, 0.24, 0.79,
                                          agents=['online', 'shadow', 'qa0', 'qa2', 'before', 'template'])
 
     new_origin = pqa.QAOrigin(metric_name='score_online_shadow_template_agents',
@@ -1244,7 +1247,7 @@ def score_applycal_agents(ms, summaries):
     intents = ['TARGET']
 
     # Get score for 'applycal' agent and 'TARGET' intent.
-    score = score_data_flagged_by_agents(ms, summaries, 0.05, 0.6, agents=agents, intents=intents)
+    score = score_data_flagged_by_agents(ms, summaries, 0.24, 0.79, agents=agents, intents=intents)
     perc_flagged = 100. * score.origin.metric_score
 
     # Get score for all agents (total) for 'TARGET' intent.
@@ -1427,37 +1430,36 @@ def countbaddelays(m, delaytable, delaymax):
 
 
 @log_qa
-def score_total_data_vla_delay(filename, m):
+def score_total_data_vla_delay(filename, vis, bandname=None):
     """
-    Use a filename of a delay (K-type) calibration table
-    Calculate a score for antennas with a delay > 200 ns
-    For each antenna with delays > 200 ns, reduce score by 0.1
+    Compute a QA score based on maximum delay values in a calibration table.
+    If the maximum delay is below 15 ns, the score is 1.0. Otherwise, the score
+    decreases linearly with increasing delay, down to a minimum of 0.3.
     """
 
     with casa_tools.TableReader(filename) as tb:
         fpar = tb.getcol('FPARAM')
         delays = np.abs(fpar)  # Units of nanoseconds
         maxdelay = np.max(delays)
-
-    if maxdelay < 200.0:
+    # PIPE-2582: if delays > 15 ns, QA score < 0.5
+    if maxdelay < 15.0:
         score = 1.0
     else:
-        # For each antenna with a delay > 200.0 ns, deduct 0.1 from the score
-        delaydict = countbaddelays(m, filename, 200.0)
-        count = len(delaydict)
-        score = 1.0 - (0.1 * count)
-    if score < 0.0:
-        score = 0.0
-
+        score = round(max(0.3, 0.49 - 0.01 * (maxdelay - 15)), 2)
+    longmsg = "Max delay"
+    if bandname is not None:
+        longmsg = longmsg + f' for band {bandname}'
     # Set score message and origin
-    longmsg = 'Max delay is {!s} ns'.format(str(maxdelay))
+    longmsg = longmsg + f' is {maxdelay:.2f} ns'
+
     shortmsg = longmsg
 
     origin = pqa.QAOrigin(metric_name='score_total_data_vla_delay',
                           metric_score=score,
-                          metric_units='Delays that exceed 200 ns')
+                          metric_units='Delays that exceed 15 ns')
 
-    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=os.path.basename(filename), origin=origin)
+    applies_to = pqa.TargetDataSelection(vis={vis})
+    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=os.path.basename(filename), origin=origin, applies_to=applies_to)
 
 
 @log_qa
@@ -2998,6 +3000,10 @@ def examine_sd_wide_lines(line_ranges: list[tuple[int, int]], nchan: int, edge: 
     end = nchan - edge[1]
     effective_nchan = nchan - sum(edge)
     line_coverage = np.sum(mask[start:end])
+    LOG.debug(
+        "line coverage %s, threshold %.1f, (effective nchan %s, fraction %s), edge (%s, %s)",
+        line_coverage, effective_nchan * fraction, effective_nchan, fraction, edge[0], edge[1]
+    )
 
     return line_coverage > effective_nchan * fraction
 
@@ -3063,8 +3069,12 @@ def channel_ranges_for_image(edge: tuple[int, int], nchan: int, sideband: int, r
     return sorted(tuple(x) for x in _ranges_image)
 
 
+
 @log_qa
-def score_sd_line_detection(reduction_group: dict, result: 'SDBaselineResults') -> list[pqa.QAScore]:
+def score_sd_line_detection(
+    reduction_group: dict,
+    result: SDBaselineResults
+) -> list[pqa.QAScore]:
     """Compute QA score based on detected lines and deviation/ATM mask overlaps.
 
     QA scores are evaluated based on the line detection result for
@@ -3186,7 +3196,7 @@ def score_sd_line_detection(reduction_group: dict, result: 'SDBaselineResults') 
 
     # edge parameter for image channel mapping
     _edge = result.outcome['edge']
-    edge = (_edge, _edge) if isinstance(_edge, int) else tuple(_edge[:2])
+    edge_param = (_edge, _edge) if isinstance(_edge, int) else tuple(_edge[:2])
 
     # Process each baseline for line detection and DM
     for bl in result.outcome['baselined']:
@@ -3198,9 +3208,21 @@ def score_sd_line_detection(reduction_group: dict, result: 'SDBaselineResults') 
         # sideband is 1 for USB, -1 for LSB
         sideband = int(spw.sideband)
         nchan = reduction_group_desc.nchan
-        lines = get_line_ranges(bl['lines'])
+        # PIPE-2959/PIPE-2964 use channelmap_range for QA evaluation
+        lines = get_line_ranges(bl['channelmap_range'])
 
         LOG.debug('Processing reduction group %s, field %s, spw %s', reduction_group_id, field_name, spw.id)
+
+        # edge channels
+        flagged_edges = bl['flagged_edges']
+
+        # take max of edge channels from user inputs and
+        # edge channels flagged by preceding stages
+        LOG.info(f"spw: {spw.id}, edge_flagged: {flagged_edges}")
+        edge = (
+            max(flagged_edges[0], edge_param[0]),
+            max(flagged_edges[1], edge_param[1])
+        )
 
         # spectral-line scoring
         if len(lines) > 0:
@@ -3332,8 +3354,14 @@ def score_sd_baseline_quality(vis: str, source: str, ant: str, vspw: str,
     origin = pqa.QAOrigin(metric_name='score_sd_baseline_quality',
                           metric_score=len(stat),
                           metric_units='Statistics of binned spectra')
+    selection = pqa.TargetDataSelection(vis={vis},
+                                        field={source},
+                                        spw={vspw},
+                                        ant={ant},
+                                        pol={pol},
+                                        intent={'TARGET'})
 
-    return pqa.QAScore(final_score, longmsg=longmsg, shortmsg=shortmsg, origin=origin)
+    return pqa.QAScore(final_score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=selection)
 
 
 @log_qa
@@ -3834,7 +3862,7 @@ def generate_metric_mask(
     # exclude edge channels
     imagename = outcome['image'].imagename
     nchan = metric_mask.shape[3]
-    edge_count_lower, edge_count_upper = outcome.get("edge_channels", (0, 0))
+    edge_count_lower, edge_count_upper = outcome.get("extra_edge_channels", (0, 0))
     log_edge_channels(imagename, nchan, edge_count_lower, edge_count_upper)
     if edge_count_lower > 0:
         metric_mask[:, :, :, :edge_count_lower] = False
@@ -3886,6 +3914,9 @@ def score_sdimage_masked_pixels(context: Context, result: SDImagingResultItem) -
     result_item = result.outcome
     image_item = result_item['image']
     imagename = image_item.imagename
+    field = image_item.sourcename
+    spw = result_item['assoc_spws']
+    stokes = result_item['stokes']
 
     LOG.debug('imagename = {}'.format(imagename))
     with casa_tools.ImageReader(imagename) as ia:
@@ -3929,36 +3960,41 @@ def score_sdimage_masked_pixels(context: Context, result: SDImagingResultItem) -
     metric_score_threshold = 0.1
     metric_score_max = 1.0
     metric_score_min = 0.0
+    eps = 1.0E-6
 
     # convert score and threshold for logging purpose
     frac2percentage = lambda x: '{:.4g}%'.format(x * 100)
     imbasename = os.path.basename(imagename.rstrip('/'))
 
+    # force score=0.0 for inappropriate cases
     if metric_score > metric_score_max:
         # metric_score should not exceed 1.0. something wrong.
         _x = frac2percentage(metric_score_max)
-        lmsg = '{}: fraction of number of masked pixels should not exceed {}. something went wrong.'.format(imbasename, _x)
-        smsg = 'metric value out of range.'
+        _y = frac2percentage(metric_score)
+        lmsg = f'{imbasename}: fraction of number of masked pixels should not exceed {_x}. something went wrong.'
+        smsg = f'Masked image pixels ({_y}) exceeds {_x}'
         score = 0.0
     elif metric_score < metric_score_min:
-        lmsg = '{}: No pixels associated with pointing data exist. something went wrong.'.format(imbasename)
-        smsg = 'metric value out of range.'
+        lmsg = f'{imbasename}: No pixels associated with pointing data exist. something went wrong.'
+        smsg = 'No data exists.'
         score = 0.0
-    elif metric_score == metric_score_min:
-        lmsg = 'All examined pixels in image {} are valid.'.format(imbasename)
-        smsg = 'All examined pixels are valid.'
+
+    # deal with the realistic cases
+    elif abs(metric_score - metric_score_min) < eps:
+        lmsg = f'All examined pixels in image {imbasename} are valid.'
+        smsg = 'All examined image pixels are valid.'
         score = 1.0
     elif metric_score > metric_score_threshold:
         _x = frac2percentage(metric_score_threshold)
         _y = frac2percentage(metric_score)
-        lmsg = 'Fraction of masked pixels in image {} is {}, exceeding threshold value ({}).'.format(imbasename, _y, _x)
-        smsg = 'More than {} of image pixels are masked.'.format(_x)
+        lmsg = f'Fraction of masked pixels in image {imbasename} is {_y}, exceeding threshold value ({_x}).'
+        smsg = f'Masked image pixels ({_y}) exceeds threshold of {_x}.'
         score = 0.0
     else:
         # interpolate between 0.5 and 0.0
         _x = frac2percentage(metric_score)
-        lmsg = 'Fraction of masked pixels in image {} is {}.'.format(imbasename, _x)
-        smsg = '{} of image pixels are masked.'.format(_x)
+        lmsg = f'Fraction of masked pixels in image {imbasename} is {_x}.'
+        smsg = f'{_x} of image pixels are masked.'
         smax = 0.5
         mmax = 0.0
         smin = 0.0
@@ -3968,11 +4004,13 @@ def score_sdimage_masked_pixels(context: Context, result: SDImagingResultItem) -
     origin = pqa.QAOrigin(metric_name='SingleDishImageMaskedPixels',
                           metric_score=metric_score,
                           metric_units='Fraction of masked pixels in image')
+    selection = pqa.TargetDataSelection(field={field}, spw=set(spw), pol={stokes})
 
     return pqa.QAScore(score,
                        longmsg=lmsg,
                        shortmsg=smsg,
-                       origin=origin)
+                       origin=origin,
+                       applies_to=selection)
 
 
 def score_sd_line_emission_off_range_at_peak(context: Context, result: SDImagingResultItem) -> pqa.QAScore:
@@ -3994,6 +4032,8 @@ def score_sd_line_emission_off_range_at_peak(context: Context, result: SDImaging
     imageitem = result.outcome['image']
     field = imageitem.sourcename
     spw = ','.join(map(str, np.unique(imageitem.spwlist)))
+    stokes = result.outcome['stokes']
+
     if emission_off_range_at_peak:
         lmsg = (f'Field {field} Spw {spw}: '
                 'Significant off-line-range emission is detected at peak.')
@@ -4005,13 +4045,13 @@ def score_sd_line_emission_off_range_at_peak(context: Context, result: SDImaging
         smsg = 'No significant off-line-range emission is detected at peak.'
         score = 1.0
 
-    origin = pqa.QAOrigin(metric_name='line_emission_off_range_at_peak',
+    origin = pqa.QAOrigin(metric_name='score_sd_line_emission_off_range_at_peak',
                           metric_score=score,
                           metric_units='')
     selection = pqa.TargetDataSelection(spw=set(result.outcome['assoc_spws']),
-                                        field=set(result.outcome['assoc_fields']),
+                                        field={field},
                                         intent={'TARGET'},
-                                        pol={'I'})
+                                        pol={stokes})
     return pqa.QAScore(score,
                        longmsg=lmsg,
                        shortmsg=smsg,
@@ -4038,6 +4078,8 @@ def score_sd_line_emission_off_range_extended(context: Context, result: SDImagin
     imageitem = result.outcome['image']
     field = imageitem.sourcename
     spw = ','.join(map(str, np.unique(imageitem.spwlist)))
+    stokes = result.outcome['stokes']
+
     if emission_off_range_extended:
         lmsg = (f'Field {field} Spw {spw}: '
                 'Significant off-line-range extended emission is detected.')
@@ -4053,9 +4095,9 @@ def score_sd_line_emission_off_range_extended(context: Context, result: SDImagin
                           metric_score=score,
                           metric_units='')
     selection = pqa.TargetDataSelection(spw=set(result.outcome['assoc_spws']),
-                                        field=set(result.outcome['assoc_fields']),
+                                        field={field},
                                         intent={'TARGET'},
-                                        pol={'I'})
+                                        pol={stokes})
     return pqa.QAScore(score,
                        longmsg=lmsg,
                        shortmsg=smsg,
@@ -4089,6 +4131,8 @@ def score_sdimage_contamination(context: Context, result: SDImagingResultItem) -
     imageitem = result.outcome['image']
     field = imageitem.sourcename
     spw = ','.join(map(str, np.unique(imageitem.spwlist)))
+    stokes = result.outcome['stokes']
+
     if contaminated:
         lmsg = (f'Field {field} Spw {spw}: '
                 'Possible astronomical line contamination was detected. '
@@ -4105,7 +4149,71 @@ def score_sdimage_contamination(context: Context, result: SDImagingResultItem) -
                           metric_score=contaminated,
                           metric_units='Sign of possible line contamination')
     selection = pqa.TargetDataSelection(spw=set(result.outcome['assoc_spws']),
-                                        field=set(result.outcome['assoc_fields']),
+                                        field={field},
+                                        intent={'TARGET'},
+                                        pol={stokes})
+    return pqa.QAScore(score,
+                       longmsg=lmsg,
+                       shortmsg=smsg,
+                       origin=origin,
+                       applies_to=selection)
+
+
+@log_qa
+def score_sdimage_sensitivity_ratio(result: SDImagingResultItem) -> pqa.QAScore:
+    """Evaluate QA score based on observed and theoretical sensitivities estimated from the image
+
+    Requirements (PIPE-2958):
+        - QA score should be
+          - 1.0  if X1 < observed sensitivity / theoretical sensitivity < X2
+          - 0.5  for others
+
+    Args:
+        result: Imaging result instance
+
+    Returns:
+        QAScore -- QAScore instance holding the score based on the sensitivity estimates
+
+    Raises:
+        ValueError: when the unit of observed and theoretical sensitivies do not match
+                    when the theoretical sensitivity is not a positive
+    """
+    # threshold values
+    X1, X2 = 0.9, 1.6
+
+    imageitem = result.outcome['image']
+    field = imageitem.sourcename
+    spw = ','.join(map(str, np.unique(imageitem.spwlist)))
+
+    # fetch sensitivities
+    observed    = result.sensitivity_info.sensitivity['observed_sensitivity']
+    theoretical = result.theoretical_rms['theoretical_sensitivity']
+
+    if theoretical['unit'] != observed['unit']:
+        msg = (f"Field {field} Spw {spw}: "
+               "Unit mismatch between Observed sensitivity and Theoretical sensitivity")
+        raise ValueError( msg )
+
+    if theoretical['value'] <= 0.0:
+        msg = (f"Field {field} Spw {spw}: "
+               f"Invalid Theoretical sensitivity {theoretical['value']} {theoretical['unit']}")
+        raise ValueError( msg )
+
+    x = observed['value'] / theoretical['value']
+    if X1 < x and x < X2:
+        score = 1.0
+        smsg = 'Observed sensitivity agrees with Theoretical sensitivity.'
+        lmsg = f'Field {field} Spw {spw}: {smsg}'
+    else:
+        score = 0.5
+        smsg = 'Observed sensitivity deviates from Theoretical sensitivity.'
+        lmsg = f'Field {field} Spw {spw}: {smsg}'
+
+    origin = pqa.QAOrigin(metric_name='score_sd_image_sensitivity_ratio',
+                          metric_score=x,
+                          metric_units='Ratio of Observed sensitivity to Theoretical sensitivity')
+    selection = pqa.TargetDataSelection(spw=set(result.outcome['assoc_spws']),
+                                        field={field},
                                         intent={'TARGET'},
                                         pol={'I'})
     return pqa.QAScore(score,
@@ -4642,7 +4750,7 @@ def score_mom8_fc_image(
     mom8_fc_score_max = 1.00
     mom8_fc_metric_scale = 100.0
     if mom8_fc_frac_max_segment != 0.0:
-        mom8_fc_score = (mom8_fc_score_min + 0.5 * (mom8_fc_score_max - mom8_fc_score_min) * 
+        mom8_fc_score = (mom8_fc_score_min + 0.5 * (mom8_fc_score_max - mom8_fc_score_min) *
                          (1.0 + special.erf(-np.log10(mom8_fc_metric_scale * mom8_fc_frac_max_segment))))
     else:
         mom8_fc_score = mom8_fc_score_max
@@ -4652,10 +4760,10 @@ def score_mom8_fc_image(
         field = info.get('field')
         spw = info.get('virtspw')
 
-    if (mom8_fc_peak_snr > mom8_fc_outlier_threshold1 and 
+    if (mom8_fc_peak_snr > mom8_fc_outlier_threshold1 and
         mom8_10_fc_histogram_asymmetry > mom8_fc_histogram_asymmetry_threshold1) or \
-       (mom8_fc_peak_snr > mom8_fc_outlier_threshold2 and 
-        mom8_10_fc_histogram_asymmetry > mom8_fc_histogram_asymmetry_threshold2 and 
+       (mom8_fc_peak_snr > mom8_fc_outlier_threshold2 and
+        mom8_10_fc_histogram_asymmetry > mom8_fc_histogram_asymmetry_threshold2 and
         mom8_fc_max_segment_beams > mom8_fc_max_segment_beams_threshold):
         mom8_fc_final_score = min(mom8_fc_score, 0.65)
     else:
@@ -4743,7 +4851,7 @@ def score_rasterscan_correctness_imaging_raster_analysis_incomplete(result: SDIm
     Returns:
         A list of QAScores.
     """
-    msg = 'Raster scan analysis incomplete. Skipping calculation of theoretical image RMS'
+    msg = 'Raster scan analysis incomplete. Skipping calculation of Theoretical sensitivity'
     return _score_rasterscan_correctness(result.rasterscan_heuristics_results_incomp, msg)
 
 
@@ -4759,7 +4867,7 @@ def _score_rasterscan_correctness(
         msg: short message for QA
 
     Returns:
-        A lists contains QAScore objects.
+        A list contains QAScore objects.
     """
 
     qa_scores = []  # [pqa.QAScore]
@@ -4790,7 +4898,8 @@ def _rasterscan_failed_per_eb(execblock_id:str, failed_ants: list[str], msg: str
     origin = pqa.QAOrigin(metric_name='score_rasterscan_correctness',
                         metric_score=SCORE_FAIL,
                         metric_units='raster scan correctness')
-    return pqa.QAScore(SCORE_FAIL, longmsg=longmsg, shortmsg=msg, origin=origin)
+    selection = pqa.TargetDataSelection(vis={execblock_id}, ant=set(failed_ants))
+    return pqa.QAScore(SCORE_FAIL, longmsg=longmsg, shortmsg=msg, origin=origin, applies_to=selection)
 
 
 @log_qa
@@ -5329,6 +5438,71 @@ def score_testBPdcals_delay(vis: str, caltable: str, bandname: str) -> pqa.QASco
     return qa_score
 
 @log_qa
+def score_flagged_ant_spw(vis:str, flaggedSolnApplycaldelay:dict) -> [pqa.QAScore]:
+    """
+        Calculates score for testBPdcals
+        if > 50% of spws in a baseband on a majority of antennas newly flagged 
+        then score < 0.5
+        The flaggedSolnApplycaldelay dictionary is structured as follows:
+        flaggedSolnApplycaldelay = {
+            'antspw': {
+                antenna: {
+                    spwid: {
+                        polid: {
+                            'flagged': <numeric_value>
+                            'total': <numeric_value>
+                            'fraction': <numeric_value>
+                        }
+                    }
+                }
+            }
+        }
+    """
+    badbandlist = []
+    goodbandlist = []
+    applies_to = pqa.TargetDataSelection(vis={vis})
+    scorelist = []
+    for bandname, flag_results in flaggedSolnApplycaldelay.items():
+        flagged_ants = 0
+        total_ants = len(flag_results['antspw'])
+
+        for antenna in flag_results['antspw']:
+            flagged_spw_count = 0
+            for spwid in flag_results['antspw'][antenna]:
+                spw_flagged = False
+                for polid in flag_results['antspw'][antenna][spwid]:
+                    if flag_results['antspw'][antenna][spwid][polid]['flagged'] > 0:
+                        spw_flagged = True
+                if spw_flagged:
+                    flagged_spw_count += 1
+            # If >50% of SPWs flagged on this antenna
+            if flagged_spw_count > len(flag_results['antspw'][antenna])//2:
+                flagged_ants += 1
+
+        if flagged_ants > total_ants // 2:
+            badbandlist.append(bandname)
+        else:
+            goodbandlist.append(bandname)
+    if len(badbandlist)>0:
+        score = rendererutils.SCORE_THRESHOLD_ERROR
+        longmsg = f"More than 50% of SPWs are newly flagged on the majority of antennas in {','.join(badbandlist)} band"
+        shortmsg = longmsg
+        origin = pqa.QAOrigin(metric_name='score_flagged_ant_spw', metric_score=score, metric_units='')
+        score = pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=applies_to)
+        scorelist.append(score)
+
+    if len(goodbandlist)>0:
+        score = 1
+        longmsg = f"Less than 50% of SPWs are newly flagged on the majority of antennas in {','.join(goodbandlist)} band"
+        shortmsg = longmsg
+        origin = pqa.QAOrigin(metric_name='score_flagged_ant_spw', metric_score=score, metric_units='')
+        score = pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=applies_to)
+        scorelist.append(score)
+
+    return scorelist
+
+
+@log_qa
 def score_fluxboot(context, result) -> list[pqa.QAScore]:
     qascores = []
     calms = "calibrators.ms"
@@ -5464,3 +5638,41 @@ def score_fluxboot(context, result) -> list[pqa.QAScore]:
                 qascores.append(pqa.QAScore(score, longmsg=msg, shortmsg=msg, origin=origin, applies_to=applies_to))
 
     return qascores
+
+# PIPE-2512: adding QA score for solint of spws
+@log_qa
+def score_spw_solint(vis: str, band: str, spw_solint: dict)-> pqa.QAScore | None:
+    """Evaluate QA score based on the solint of each spectral window"""
+
+    qascore = None
+
+    pairs = [
+        f"[spw={spw}, solint={solint}ch]"
+        for spw, solint in spw_solint.items()
+        if solint > 1
+    ]
+
+    if pairs:
+        score = rendererutils.SCORE_THRESHOLD_ERROR
+        msg = f"Using per-SPW solints: {', '.join(pairs)} for {band} band"
+        shortmsg = f"Per-SPW solints > 1ch for {band} band"
+        origin = pqa.QAOrigin(
+            metric_name='score_spw_solint',
+            metric_score=score,
+            metric_units=''
+        )
+
+        applies_to = pqa.TargetDataSelection(
+            vis={vis},
+            spw=set(spw_solint.keys())
+        )
+
+        qascore = pqa.QAScore(
+            score,
+            longmsg=msg,
+            shortmsg=shortmsg,
+            origin=origin,
+            applies_to=applies_to
+        )
+
+    return qascore

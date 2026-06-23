@@ -20,12 +20,18 @@ class T2_4MDetailsALMAImportDataRenderer(renderer.T2_4MDetailsImportDataRenderer
         super().update_mako_context(mako_context, pipeline_context, result)
 
         minparang = result.inputs['minparang']
-        parang_ranges = result.parang_ranges
-        if parang_ranges['intents_found']:
+        # Some results (e.g. ResultsList) may not have parang_ranges.
+        # Guard access and default to no intents found when absent.
+        if hasattr(result, 'parang_ranges') and result.parang_ranges is not None:
+            parang_ranges = result.parang_ranges
+        else:
+            parang_ranges = {'intents_found': False}
+
+        if parang_ranges.get('intents_found'):
             parang_plots = rendererutils.make_parang_plots(
                 pipeline_context,
                 result,
-                intent_lookup={'POLARIZATION': 'CALIBRATE_POLARIZATION#ON_SOURCE'},
+                intent=['POLARIZATION'],
                 )
         else:
             parang_plots = {}

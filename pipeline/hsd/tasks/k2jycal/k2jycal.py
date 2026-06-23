@@ -26,6 +26,13 @@ LOG = infrastructure.logging.get_logger(__name__)
 
 QUERIED_FACTOR_FILE = 'jyperk_query.csv'  # filename of the queried factor file
 
+DEFAULT_BACKUP_URLS = [
+    "https://asa.alma.cl/science/jy-kelvins",  # JAO
+    "https://almascience.nao.ac.jp/science/jy-kelvins",  # EA
+    "https://almascience.nrao.edu/science/jy-kelvins",  # NA
+    "https://almascience.eso.org/science/jy-kelvins"  # EU
+]
+
 
 class SDK2JyCalInputs(vdp.StandardInputs):
     """Inputs class for SDK2JyCal task."""
@@ -34,6 +41,7 @@ class SDK2JyCalInputs(vdp.StandardInputs):
     dbservice = vdp.VisDependentProperty(default=True)
     endpoint = vdp.VisDependentProperty(default='asdm')
     caltype = vdp.VisDependentProperty(default='amp', readonly=True)
+    backup_urls = vdp.VisDependentProperty(default=DEFAULT_BACKUP_URLS)
 
     @vdp.VisDependentProperty
     def infiles(self) -> str:
@@ -69,7 +77,7 @@ class SDK2JyCalInputs(vdp.StandardInputs):
                                              stage=self.context.stage,
                                              **casa_args))
 
-    def to_casa_args(self) -> dict[str, str]:
+    def to_casa_args(self) -> dict[str, str | list[str]]:
         """Convert Inputs instance into dictionary.
 
         Returns:
@@ -77,8 +85,8 @@ class SDK2JyCalInputs(vdp.StandardInputs):
         """
         return {'vis': self.vis,
                 'caltable': self.caltable,
-                'caltype': self.caltype,
-                'endpoint': self.endpoint}
+                'endpoint': self.endpoint,
+                'backup_hosts': self.backup_urls}
 
     # docstring and type hints: supplements hsd_k2jycal
     def __init__(
@@ -89,7 +97,8 @@ class SDK2JyCalInputs(vdp.StandardInputs):
         caltable: str | list[str] | None = None,
         reffile: str | None = None,
         dbservice: bool | None = None,
-        endpoint: str | None = None
+        endpoint: str | None = None,
+        backup_urls: list[str] = DEFAULT_BACKUP_URLS
     ) -> None:
         """Initialize SDK2JyCalInputs instance.
 
@@ -167,6 +176,14 @@ class SDK2JyCalInputs(vdp.StandardInputs):
 
                 Default: None (equivalent to 'asdm')
 
+            backup_urls: List of backup URLs for DB query.
+                The primary endpoint URL should be defined in the
+                environment variable, JYPERKDB_URL. The URLs listed
+                here will be used in order when the query
+                to the primary endpoint fails.
+                Default is a list of URLs for all available endpoints,
+                namely JAO, EA, NA, and EU.
+
         """
         super().__init__()
 
@@ -181,6 +198,7 @@ class SDK2JyCalInputs(vdp.StandardInputs):
         self.reffile = reffile
         self.dbservice = dbservice
         self.endpoint = endpoint
+        self.backup_urls = backup_urls
 
 
 class SDK2JyCalResults(basetask.Results):
@@ -356,7 +374,7 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
                                 factors=valid_factors, all_ok=factors_ok,
                                 dbstatus=caltable_status)
 
-    def _extract_factors( self, context: Context, vis: str, caltable: str, dbstatus: bool ) -> dict[str, dict[str, dict[str, float] | None]]:
+    def _extract_factors(self, context: Context, vis: str, caltable: str, dbstatus: bool) -> dict[str, dict[str, dict[str, float] | None]]:
         """
         extract Jy/K factors
 
@@ -370,8 +388,8 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
         """
         # get list of antennas and science_windows from ms
         ms = context.observing_run.get_ms(vis)
-        antennas = [ x.name for x in ms.get_antenna() ]
-        science_windows = [ x.id for x in ms.get_spectral_windows(science_windows_only=True) ]
+        antennas = [x.name for x in ms.get_antenna()]
+        science_windows = [x.id for x in ms.get_spectral_windows(science_windows_only=True)]
 
         # get antenna list from caltable
         with casa_tools.TableReader(caltable+"/ANTENNA") as tb:
@@ -379,9 +397,9 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
         antidx = {}   # index of antenna in caltable
         for ant in antennas:
             if ant not in caltable_antlist:
-                LOG.error( "{}: antenna {} does not exist in caltable".format(vis, ant) )
+                LOG.error(f"{vis}: antenna {ant} does not exist in caltable")
                 return None
-            antidx[ant] = np.where( caltable_antlist == ant )[0][0]
+            antidx[ant] = np.where(caltable_antlist == ant)[0][0]
 
         # fetch Jy/K factors from caltable file
         factors_table = {}
@@ -391,11 +409,14 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
                 ddid = ms.get_data_description(spw=spw)
                 pol_list = list(map(ddid.get_polarization_label, range(ddid.num_polarizations)))
                 for ant in antennas:
-                    subtb = tb.query( "ANTENNA1={} && SPECTRAL_WINDOW_ID={}".format(antidx[ant], spw) )
-                    factors = subtb.getcol("CPARAM")[:,0,0].real
+                    subtb = tb.query(f"ANTENNA1={antidx[ant]} && SPECTRAL_WINDOW_ID={spw}")
+                    factors = subtb.getcol("CPARAM")[:, 0, 0].real
                     subtb.close()
                     if len(factors) < len(pol_list):
-                        LOG.error( "{}: insufficient pols in caltable (MS:{} caltable:{})".format(vis, len(pol_list), len(factors)) )
+                        LOG.error(
+                            f"{vis}: insufficient pols in caltable "
+                            f"(MS: {len(pol_list)}, caltable: {len(factors)})"
+                        )
                         return None
                     else:
                         factors_table[spw][ant] = {}
@@ -413,7 +434,7 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
                 for ant in factors_table[spw].keys():
                     for pol in factors_table[spw][ant].keys():
                         found = False
-                        allowed_pol = [ pol, 'I' ]
+                        allowed_pol = [pol, 'I']
                         for factor in factors_list:
                             if factor[1:3] == [ant, str(spw)] and factor[3] in allowed_pol:
                                 found = True
@@ -425,7 +446,7 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
 
         return factors_used
 
-    def _create_caltable( self, common_params: dict[str, str] ) -> bool | None:
+    def _create_caltable(self, common_params: dict[str, str]) -> bool | None:
         """
         Invoke gencal and ceate the calibration table file
 
@@ -443,35 +464,30 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
         inputs = self.inputs
         status = None
 
-        gencal_args = common_params.copy()
-        gencal_args['caltype'] = 'jyperk'     # override to invoke gencal in jyperk mode
+        task_args = common_params.copy()
+        task_args['infile'] = inputs.reffile
 
-        # retrieve factors from DB
         if inputs.dbservice:
-            gencal_job = casa_tasks.gencal(**gencal_args)
+            # retrieve factors from Jy/K DB, fallback to file if all DB access fails
+            job = casa_tasks.getjyperkalma(**task_args)
             try:
-                self._executor.execute(gencal_job)
-                status = True
+                self._executor.execute(job)
+                status = os.path.exists(task_args['caltable'])
             except Exception as e:
-                if len(str(e)) == 0:
-                    LOG.warning( "Failed to get Jy/K factors from DB." )
-                else:
-                    LOG.warning( e )
-                LOG.warning( "{}: Query to Jy/K DB failed. Will fallback to read CSV file '{}'".format(inputs.vis, inputs.reffile) )
+                LOG.warning(f"{inputs.vis}: Query to Jy/K DB failed.")
                 status = False
-
-        # retrieve factors from file
-        if not status:
-            gencal_args['infile'] = inputs.reffile
-
+        else:
+            # retrieve factors from file
             if not os.path.exists(inputs.reffile):
                 LOG.error( "Jy/K scaling factor file '{}' does not exist.".format(inputs.reffile) )
                 status = False
             else:
-                gencal_job = casa_tasks.gencal(**gencal_args)
+                task_args["caltype"] = "jyperk"
+                task_args.pop("backup_hosts")
+                job = casa_tasks.gencal(**task_args)
                 try:
-                    self._executor.execute(gencal_job)
-                    status = None
+                    self._executor.execute(job)
+                    status = os.path.exists(task_args['caltable'])
                 except Exception as e:
                     LOG.error( "{}: Failed to create caltable from CSV file: {}".format(inputs.vis, e) )
                     status = False

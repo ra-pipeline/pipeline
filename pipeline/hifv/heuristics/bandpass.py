@@ -1,4 +1,6 @@
 import os
+import math
+import time
 
 import numpy as np
 
@@ -94,16 +96,44 @@ def computeChanFlag(vis, caltable, context):
                 if length > len(flagArr[1])/32.0:
                     largechunk = True
 
-            # print rrow.rjust(4), 'Pol A:', str(np.sum(flagArr[0])).rjust(4),' Pol B:',
-                    # str(np.sum(flagArr[1])).rjust(4),
-                    # ' / ',str(len(flagArr[0])),
-                    # ' chan flagged ', '(', 100.0*float(np.sum(flagArr[0]))/len(flagArr[0]),
-                    # '%,  ',                                 100.0*float(np.sum(flagArr[1]))/len(flagArr[1]), '%)'
-
     spwids = np.unique(spwids)
     spwids = list(spwids)
 
     return (largechunk, spwids)
+
+
+def _compute_median_snr(caltable: str) -> dict:
+    """Compute the median S/N for each SPW in the given caltable, ignoring flagged
+    and NaN values. Returns a dictionary mapping SPW ID to median S/N.
+    """
+
+    median_snr = {}
+
+    with casa_tools.TableReader(caltable) as table:
+        # Get all unique SPWs
+        uniq_spws = np.unique(table.getcol('SPECTRAL_WINDOW_ID'))
+
+        for spw in uniq_spws:
+            # Query the subtable for this SPW
+            query_str = f'SPECTRAL_WINDOW_ID=={spw}'
+            subtable = table.query(query=query_str)
+            # Read SNR and FLAG columns
+            snr = subtable.getcol('SNR')
+            flag = subtable.getcol('FLAG')
+            # Compute median SNR
+            if snr.size == 0:
+                median_snr[spw] = 0
+                subtable.close()
+                continue
+            valid_snr = snr[(~flag) & (~np.isnan(snr))].ravel()
+            # if there are no valid SNR values, set median to 0
+            if valid_snr.size:
+                median_snr[spw] = np.median(valid_snr)
+            else:
+                median_snr[spw] = 0
+            subtable.close()
+
+    return median_snr
 
 
 def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypecaltable=None,
@@ -172,7 +202,56 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
 
         executor.execute(job)
 
-    return True
+    # PIPE-2512:  Re-run bandpass for low-S/N SPWs with smoothing
+    median_snrs = _compute_median_snr(caltable)
+    low_snr_spws = [spw for spw, snr in median_snrs.items() if snr < 50.0]
+    good_snr_spws = [spw for spw, snr in median_snrs.items() if snr >= 50.0]
+    if not low_snr_spws:
+        LOG.info("All SPWs have median S/N ≥ 50 — no rerun needed.")
+        return {}
+
+    LOG.info(f"Re-running bandpass for SPWs with low S/N: {low_snr_spws}")
+    # rename the old caltable
+    if os.path.exists(caltable):
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        os.rename(caltable, f"{caltable}.allspws.{timestamp}.bak")
+    if len(good_snr_spws) != 0:
+        # Run bandpass using high-SNR SPWs only
+        bandpass_task_args['spw'] = ','.join(map(str, good_snr_spws))
+        bandpass_task_args['append'] = False
+        job = casa_tasks.bandpass(**bandpass_task_args)
+        executor.execute(job)
+    else:
+        LOG.warning("No SPWs with median S/N ≥ 50, so skipping bandpass run.")
+    spw_solint = {}
+    # re-run the low-SNR SPWs individually with smoothing
+    for bad_spw in low_snr_spws:
+        snr = median_snrs[bad_spw]
+        nchan = m.get_spectral_window(bad_spw).num_channels
+        if nchan < 16:
+            continue
+        Nbin = nchan / 16 if snr <= 0 else min((50.0 / snr) ** 2, nchan / 16)
+        start = int(math.ceil(Nbin))
+
+        for i in range(start, nchan+1):
+            if nchan % i == 0:
+                Nbin = i
+                break
+        spw_solint[bad_spw] = Nbin
+        solint_smooth = f"inf,{int(Nbin)}ch"
+
+        LOG.info(f"SPW {bad_spw}: median S/N={snr:.1f}, rerunning with solint='{solint_smooth}'")
+
+        bandpass_task_args.update({
+            'spw': str(bad_spw),
+            'solint': solint_smooth,
+            'append': True,
+        })
+
+        job = casa_tasks.bandpass(**bandpass_task_args)
+        executor.execute(job)
+
+    return spw_solint
 
 
 def do_bandpassweakbp(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypecaltable=None,
