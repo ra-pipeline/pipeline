@@ -436,7 +436,7 @@ def consolidate_labels(
         if index_pri not in index_out:
             isnew = True # for every primary loop we go into the while
             # assign the field with 'primary' index to the holder
-            LOG.info('Adding position for field index '+str(index_pri)+' start loop pri') # testing
+            #LOG.info('Adding position for field index '+str(index_pri)+' start loop pri') # testing
             hold_field_ids.append(field_ra_dec[0][index_pri])
             hold_lab_ra.append(field_ra_dec[1][index_pri])
             hold_lab_dec.append(field_ra_dec[2][index_pri])

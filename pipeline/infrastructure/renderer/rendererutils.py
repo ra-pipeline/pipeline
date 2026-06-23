@@ -623,14 +623,17 @@ def sep_angles_for_table(context, sepangles, sepplots):
     # PIPE-65
     
     SepAng = collections.namedtuple('SepAng', 'ms field1 intent1 field2 intent2 sepang sepplot') 
-    
-    # result.sep_angles is the dict as sepangles 
+    MaxTargets = 4
+    # result.sep_angles is the dict as sepangles
     # main key is measurementset ms
     # then intent, fieldid, fieldname
     # need to make tuple table
     rows = []
     for keyu in sepangles.keys(): # should be msname, can better name this loop
         msbasename = keyu
+        rows_holder=[] # to get all but allow filtering if too many targets
+        max_sep = 0.0
+        min_sep = 99.0
         for primary, secondaries in sepangles[keyu].items():
             # primary will be intent, fieldid, fieldname
             # secondaries is another dict with intent, fieldid, fieldname as key, and a dict as the value with unit and value
@@ -638,13 +641,39 @@ def sep_angles_for_table(context, sepangles, sepplots):
             field1 = f'{primary[2]} (#{primary[1]})' # can use other string process like -->>  f"{field} (#{fieldid})"
             # pull the items into a tuple
             intent2 = [(fld2,id2,nm2,ang['unit'],ang['value']) for (fld2,id2,nm2),ang in secondaries.items()][0] # only item per secondary
-            field2 = f'{intent2[2]} (#{intent2[1]})'            
+            field2 = f'{intent2[2]} (#{intent2[1]})'
             if intent2[3] == 'deg':
                 sepvalue=round(intent2[4],2) # or 3 dp ?
-                rows.append(SepAng(msbasename, field1, intent1, field2, intent2[0], sepvalue, sepplots[keyu]['html'])) # format as the input tuple
+                if sepvalue > max_sep:
+                    max_sep = sepvalue
+                    maxfield = SepAng(msbasename, field1, intent1, field2, intent2[0], sepvalue, sepplots[keyu]['html'])
+                if sepvalue < min_sep:
+                    min_sep = sepvalue
+                    minfield = SepAng(msbasename, field1, intent1, field2, intent2[0], sepvalue, sepplots[keyu]['html'])
+                rows_holder.append(SepAng(msbasename, field1, intent1, field2, intent2[0], sepvalue, sepplots[keyu]['html'])) # format as the input tuple
+                # Log output so all fields/intents are at least listed even if filterd below
+                LOG.info('Separation Angle of Fields: '+field1+'('+intent1+') - '+field2+'('+intent2[0]+') is '+str(sepvalue))
             else:
-                rows.append(SepAng(msbasename, field1, intent1, field2, intent2[0], 'n/a', 'n/a')) # if there is an issue with unit or something return n/a                
+                rows_holder.append(SepAng(msbasename, field1, intent1, field2, intent2[0], 'n/a', 'n/a')) # if there is an issue with unit or something return n/a
+                LOG.info('Separation Angle of Fields: '+field1+'('+intent1+') - '+field2+'('+intent2[0]+') is n/a')
 
+        # somehow here we want this list out
+        
+        # now we assess if we have too many targets and
+        # only append the fields with max and min separations along with any CHECK intents
+        field_counts = collections.Counter(elem.intent1 for elem in rows_holder)
+        if field_counts['TARGET'] > MaxTargets:
+            LOG.info('reducing list')
+            rows.append(minfield)
+            rows.append(maxfield)
+            for row in rows_holder:
+                if row.intent1 == 'CHECK':
+                    rows.append(row)
+        # otherwise append all information
+        else:
+            for row in rows_holder:
+                rows.append(row)
+                    
 
     return utils.merge_td_columns(rows)   
 

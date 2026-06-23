@@ -10,7 +10,7 @@ import pipeline.qa.scorecalculator as qacalc
 from pipeline import infrastructure
 from pipeline.h.tasks.exportdata import aqua
 from pipeline.hifa.tasks.importdata import almaimportdata
-from pipeline.infrastructure.utils import ms_separation_angles# the funct of the file? Tom used funct in scorecal for parallactic range
+from pipeline.infrastructure.utils import ms_separation_angles
 if TYPE_CHECKING:
     from pipeline.domain import MeasurementSet
     from pipeline.infrastructure.basetask import Results

@@ -140,36 +140,7 @@ def ms_separation_angles(
                     LOG.info('There is more than one Phase cal for the allowed fields') # testing only - need to check with a multi-phasecal PL-able project
 
 
-        # check here how many targets we have, don't print all if there are many (can be changed as require/harcode)
-
-        # field dict is for this MS only
-        if len(field_dict.keys()) > 4:  # ok for 5 or more we filter as explained in the mako if <5 we show, otherwise max and min separations
-            min_sep = 99.0 # start high and we go below
-            max_sep = 0.0  # start low and we go above
-            for primary, secondaries in field_dict.items():
-                intent2 = [(fld2,id2,nm2,ang['unit'],ang['value']) for (fld2,id2,nm2),ang in secondaries.items()][0] # only item per secondary                     
-                if intent2[4]<min_sep:
-                    min_holder=[primary,secondaries]  # do we need to copy, command line test shows a tuple is writen fully not a pointer?
-                    #LOG.info(f'min is currently {min_holder}') # testing
-                    min_sep = intent2[4]
-                if intent2[4]>max_sep:
-                    max_holder = [primary,secondaries]
-                    #LOG.info(f'max is currently {max_holder}')  # testing 
-                    max_sep = intent2[4]
-                       
-
-           
-            # once we completed the loop we have min and max, so repopulate the field_dict
-            # currently if there is >1 phase cal, this will find a global min and max for TAR to PH, irrespective of
-            # if those are paired to be used (or not), can happen same spectral spec, different field pairs
-            # does a dataset like that exist ? 
-            field_dict = {}
-            field_dict[min_holder[0]] = min_holder[1]
-            field_dict[max_holder[0]] = max_holder[1]
-
-                    
-
-        # then outside above loops also want PHASE vs CHECK
+        # outside the target loop do the check source            
         # useful for quality of check source
         # this could be used to do a QA score ? 
         chkcount=0
