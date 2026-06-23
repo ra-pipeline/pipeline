@@ -1146,30 +1146,19 @@ class UVChart:
             'height': 1000,
             'width': 1000
         }
-        """Further, to speed up the plot we'd like to plot only 3
-        channels (nchan//4, nchan//2, (3*nchan)//4) instead of
-        averaging all channels, and set correlator='XX,YY'. (this made
-        a factor of 2 difference in the msplot runtime for the
-        PLBM2022 data 2019.1.00037.S, ms=uid___A002_Xf010cd_X36c9.ms)
-        FIXME NEEDS CLEANING
-        """
-        # Include additional plotting flags #FIXME NOW
+        # PIPE-1780: Include additional plotting flags.
         if self.custom_plot_flags is not None:
-            # PIPE-1780
             task_args.update(self.custom_plot_flags)
-            # task_args["spw"]        = self.custom_plot_flags["spw"]
-            
+            # Reduce number of channels (optimisation)
             represent_source_spw, represent_spw_id = self._get_representative_source_and_spwid()
             rep_spw = self.ms.get_spectral_window(represent_spw_id)
-            chan_list = rep_spw.channels
-            num_chan = len(chan_list)
+            num_chan = len(rep_spw.channels)
+            #
             spwPlt_txt = str(represent_spw_id)+ ":" + str(num_chan//2)
             spwPlt_txt = spwPlt_txt + ";" + str(num_chan//4)
-            spwPlt_txt = spwPlt_txt + ";" + str(3*num_chan//4)
-
-            task_args["spw"]        = spwPlt_txt
-            task_args["avgchannel"] = self.custom_plot_flags["avgchannel"]
-
+            spwPlt_txt = spwPlt_txt + ";" + str( 3 * num_chan//4)
+            #
+            task_args["spw"] = spwPlt_txt
         #
         task = casa_tasks.plotms(**task_args)
 

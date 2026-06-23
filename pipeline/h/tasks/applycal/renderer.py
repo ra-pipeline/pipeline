@@ -268,10 +268,12 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         if utils.contains_single_dish(pipeline_context):
             uv_plots = None
         else:
-            # PIPE_1780: Custom plot parameters. FIXME NEEDS CLEANING
-            custom_plot_par = {"avgscan": False, "avgtime": "999999", "correlation":"XX,YY"}
-            # custom_plot_par   = {"avgscan": False, "avgtime": "999999"}
-
+            # PIPE_1780: Custom plot parameters.
+            custom_plot_par = {"avgscan":    False,
+                               "avgtime":    "999999",
+                               "correlation":"XX,YY",
+                               "avgchannel": ""}
+            #
             uv_plots = self.create_uv_plots(context=pipeline_context, results=result, weblog_dir=weblog_dir,
                                             plot_par=custom_plot_par)
 
@@ -331,23 +333,6 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         for result in results:
             vis = os.path.basename(result.inputs['vis'])
             ms  = context.observing_run.get_ms(vis)
-            ##### Reduce number of channels (performance opti.)
-            spw_list = ms.get_spectral_windows()
-            ## FIXME NEEDS CLEANING
-            # represent_source_spw, represent_spw_id = ms.get_representative_source_spw()
-            spw_plot_string = ""
-            for x in spw_list:
-                id_int = x.id
-                chan_list = x.channels
-                l_nchan = len(chan_list)
-                spw_plot_string = spw_plot_string + str(id_int) + ":" + str(l_nchan//2)
-                spw_plot_string = spw_plot_string + ";" + str(l_nchan//4)
-                spw_plot_string = spw_plot_string + ";" + str((3*l_nchan)//4)+","
-            #
-            spw_plot_string = spw_plot_string.rstrip(",")
-            # PIPE-1780: modify plot pars
-            plot_par["spw"]        = spw_plot_string
-            plot_par["avgchannel"] = ""
             #
             plot = UVChart(context, ms, custom_plot_flags=plot_par, customflagged=True,
                            output_dir=weblog_dir, title_prefix="Post applycal: ").plot()
