@@ -25,6 +25,7 @@ class QAScorePropertiesRegistry:
         self.longmsg_format_dict = {}
         self.keys_dict = {}
         self.to_aggregate_dict = {}
+        self.excludes = []
 
     def register_longmsg_format(self, metric_name: str, template: str):
         """
@@ -55,6 +56,15 @@ class QAScorePropertiesRegistry:
             keys        : longmsg_ksys
         """
         self.to_aggregate_dict[metric_name] = keys
+
+    def register_excludes(self, metric_names: list[str]):
+        """
+        Register metric_name to excludes list
+
+        Args:
+            metric_names : List of QA score metric names to exclude
+        """
+        self.excludes = metric_names
 
     def get_longmsg_format(self, metric_name: str) -> str | None:
         """
@@ -91,6 +101,15 @@ class QAScorePropertiesRegistry:
             None if the longmsg_keys associated with the metric_name is not registered
         """
         return self.to_aggregate_dict.get(metric_name)
+
+    def get_excludes(self) -> list[str]:
+        """
+        Get the metric_names to exclude
+
+        Returns:
+            List of metric_names to exclude
+        """
+        return self.excludes
 
 
 class QAScoreFormatter:
@@ -132,6 +151,10 @@ class QAScoreFormatter:
             if longmsg_keys is None:
                 longmsg_keys = list(vars(qascore.applies_to).keys())
 
+        # skip formatting if the metric_name is in the excludes list
+        if qascore.origin.metric_name in registry.get_excludes():
+            return
+
         # inhibit formatting if 1) everything associated with longmsg_keys are empty and 2) force_update is False
         # this will prevent longmsg from being unintentionally overwritten with shortmsg
         if all(len(getattr(qascore.applies_to, key)) == 0 for key in longmsg_keys) and not force_update:
@@ -157,9 +180,10 @@ class QAScoreFormatter:
                                                 vis=', '.join(sorted(qascore.applies_to.vis)),
                                                 field=', '.join(sorted(qascore.applies_to.field)),
                                                 intent=', '.join(sorted(qascore.applies_to.intent)),
-                                                spw=', '.join(sorted(str(v) for v in qascore.applies_to.spw)),
+                                                spw=', '.join(sorted([str(v) for v in qascore.applies_to.spw], key=smartsort)),
                                                 ant=', '.join(sorted(qascore.applies_to.ant)),
-                                                pol=', '.join(sorted(qascore.applies_to.pol)))
+                                                pol=', '.join(sorted(qascore.applies_to.pol)),
+                                                scan=', '.join(sorted([str(v) for v in qascore.applies_to.scan], key=smartsort)))
 
 
 class QAScoreAggregator:
@@ -281,6 +305,11 @@ class QAScoreAggregator:
                 # go next if the target_qascore is already removed during former aggregation during the loop
                 if target_qascore not in qascores:
                     continue
+
+                # skip qascores with metric_name registered as excludes
+                if target_qascore in registry.get_excludes():
+                    continue
+
                 # filter out qascores with different metric_name
                 if target_qascore.origin.metric_name != metric_name:
                     continue
@@ -356,6 +385,25 @@ class QAScoreAggregator:
                 qascores.append(qascore)
 
         return qascores
+
+
+def smartsort(x: any) -> tuple[int, any]:
+    """
+    Auxiliary method to sort a numerical value / str mixed list
+
+    This can be used with shrted as: sorted(arr, key=smartsort)
+    Numerical values in str are coverted to float for evaluation.
+
+    Args:
+        x : any value
+        Returns:
+            (0, float(x)) : if x is a numerical value
+            (1, x)        : if x is not a numerical value (ex. str)
+    """
+    try:
+        return (0, float(x))
+    except ValueError:
+        return (1, x)
 
 
 registry = QAScorePropertiesRegistry()
