@@ -421,6 +421,7 @@ def calc_baseline_qascore_single(
         if np.sum(low_pXY_high_diff) > 0:
             qascore_value = qascorefunc(min_pXY, score_top = this_score_top, score_bottom = this_score_bottom, nsigma_threshold = thresholds['min_pXY_corr'], nsigma_bottom = 0.0)
             reason = 'BLine.scienceline.lowpXYsci'
+            polstr = 'XX' if (pol == 0) else 'YY'
 
             applies_to = pqa.TargetDataSelection(
                 vis={msname},
@@ -439,6 +440,7 @@ def calc_baseline_qascore_single(
         elif np.sum(low_pXY) > 0:
             qascore_value = qascorefunc(min_pXY, score_top = 0.80, score_bottom = this_score_top, nsigma_threshold = thresholds['min_pXY_corr'], nsigma_bottom = 0.0)
             reason = 'BLine.scienceline.lowpXYsci'
+            polstr = 'XX' if (pol == 0) else 'YY'
 
             applies_to = pqa.TargetDataSelection(
                 vis={msname},

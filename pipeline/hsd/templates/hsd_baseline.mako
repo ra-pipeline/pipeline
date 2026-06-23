@@ -109,7 +109,7 @@ line detection stage.</p>
             </h3>
 
          % for plot in profile_heuristic:
-            % if os.path.exists(plot.thumbnail):
+            % if os.path.exists(plot.thumbnail) and plot.parameters["ant"] == profile_heuristic[0].parameters["ant"]:
                 <div class="col-md-3">
                     <div class="thumbnail">
                         <a href="${os.path.relpath(plot.abspath, pcontext.report_dir)}"
