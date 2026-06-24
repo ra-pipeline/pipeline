@@ -83,6 +83,7 @@ __all__ = ['score_polintents',                                # ALMA specific
            'score_polcal_leakage',                            # ALMA IF specific
            'score_polcal_residual_pol',                       # ALMA IF specific
            'score_polcal_results',                            # ALMA IF specific
+           'score_separation_angles',                         # ALMA IF specific
            'score_file_exists',
            'score_path_exists',
            'score_flags_exist',
@@ -4474,6 +4475,63 @@ def score_polcal_results(session_name: str, caltables: list) -> pqa.QAScore:
                           metric_units='polarisation caltables')
 
     return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin)
+
+@log_qa
+def score_separation_angles(mses: MeasurementSet, sepangles: disck) -> pqa.QAScore:
+    """
+    The current heuristic exists only to 
+    reports the separation angles between the TARGET
+    (and CHECK) intents to the PHASE intent for 
+    each measurement set
+
+    Args:
+        mses: the measurement set name to use as the key
+        for the separation angle dictionary
+        sepangles: dictionary of separations angles
+
+    Returns:
+        QAScore object
+    """
+
+    # holds the final list of QA scores
+    scores: list[pqa.QAScore] = []
+
+    # Sort to ensure presentation consistency
+    mses = sorted(mses, key=lambda ms: ms.basename)
+    for ms in mses:
+        # filter the dict
+        for primary, secondaries in sepangles[ms.basename].items():
+            # primary will be intent, fieldid, fieldname
+            # secondaries is another dict with intent, fieldid, fieldname as key,
+            # and a dict as the value with unit and value
+            intent1 = primary[0]
+            field1 = f'{primary[2]}' # can use other string process like -->>  f"{field} (#{fieldid})"
+            # pull the items into a tuple
+            intent2 = [(fld2,id2,nm2,ang['unit'],ang['value']) for (fld2,id2,nm2),ang in secondaries.items()][0] # only item per secondary
+            field2 = f'{intent2[2]}'
+            if intent2[3] == 'deg':
+                sepvalue=round(intent2[4],2) # or 3 dp ?
+                # do the score
+                score = 1.0
+                longmsg = 'For %s the %s %s to %s %s separation angle is %s deg'%(ms.basename, intent1, field1, intent2[0], field2, str(sepvalue))
+                shortmsg = ' %s to %s is %s'%(field1, field2, str(sepvalue))
+                reportsep=str(sepvalue)
+            else:
+                # do the score
+                score = 0.90
+                longmsg = 'For %s the %s %s to %s %s separation angle cannot be extracted'%(ms.basename, intent1, field1, intent2[0], field2)
+                shortmsg = ' %s to %s is n/a'
+                reportsep='n/a'
+                
+            origin = pqa.QAOrigin(metric_name='report_separation_angles',
+                          metric_score=reportsep, # this is the value not a 0 to 1 score
+                          metric_units='degrees')
+
+            score = pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin, weblog_location=pqa.WebLogLocation.HIDDEN) # weblog location can be HIDDEN - do not render it
+       
+            scores.append(score)
+                                
+    return scores
 
 
 @log_qa

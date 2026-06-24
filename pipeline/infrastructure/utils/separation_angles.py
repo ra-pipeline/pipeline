@@ -174,7 +174,7 @@ def ms_separation_angles(
                     field_dict[('CHECK',chkfield_use.id,chkfield_use.name)] = {('PHASE', phfield_use.id, phfield_use.name): cal_sep}
                 else:
                     continue # dont match this check and phase 
-        print(msuse.name, field_dict)         
+        #print(msuse.name, field_dict) # testing 
                 
         # get directions and separations, dict is keyed by ms name
         sep_dict[msuse.name] = field_dict 

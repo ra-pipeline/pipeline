@@ -572,7 +572,7 @@ def make_separation_plots(
     
     for msuse in mses:
         ms_name = msuse.name
-        LOG.info(f' Generating intent separation angle plot for {ms_name}')
+        LOG.info(f'Generating intent separation angle plot for {ms_name}')
         sanitised_filename_component = filenamer.sanitize(f'{ous_id}_{ms_name}') 
         plot_name = os.path.join(context.report_dir, stage_id, f'{sanitised_filename_component}_separation_angle.png')
 
@@ -652,7 +652,7 @@ def sep_angles_for_table(context, sepangles, sepplots):
                     minfield = SepAng(msbasename, field1, intent1, field2, intent2[0], sepvalue, sepplots[keyu]['html'])
                 rows_holder.append(SepAng(msbasename, field1, intent1, field2, intent2[0], sepvalue, sepplots[keyu]['html'])) # format as the input tuple
                 # Log output so all fields/intents are at least listed even if filterd below
-                LOG.info('Separation Angle of Fields: '+field1+'('+intent1+') - '+field2+'('+intent2[0]+') is '+str(sepvalue))
+                LOG.info('Separation Angle of Fields: '+field1+'('+intent1+') - '+field2+'('+intent2[0]+') is '+str(sepvalue)+' deg')
             else:
                 rows_holder.append(SepAng(msbasename, field1, intent1, field2, intent2[0], 'n/a', 'n/a')) # if there is an issue with unit or something return n/a
                 LOG.info('Separation Angle of Fields: '+field1+'('+intent1+') - '+field2+'('+intent2[0]+') is n/a')

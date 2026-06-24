@@ -30,7 +30,7 @@ Issues with the Original Schema / Current Pipeline Design
     Stages which generate multiple scores / metrics and multiple
     ASDMs are currently dealt with on an ad hoc basis.
 
-    The scores and metrics are noew stored with the stage results.
+    The scores and metrics are now stored with the stage results.
 
     Metrics may have units information. They may be encoded as
     CASA quanta strings if appropriate.
@@ -41,7 +41,7 @@ Future Technical Solutions
     list of metrics for export. Pass these to the QA classes
     for scoring.
 
-    Add the euivalent of a  toAqua registration method similar to what is
+    Add the equivalent of a toAqua registration method similar to what is
     done with QA handlers already
 """
 from __future__ import annotations
@@ -210,6 +210,14 @@ class AquaXmlGenerator:
         for stage_result in ordered_results:
             # Create the generic stage element
             stage_name, representative_score, subscores = _get_pipeline_stage_and_scores(stage_result)
+
+            # For hifa_importdata we have added some hidden scores as to not clutter the weblog
+            # we want to have these in the AQUA report at this time (PIPE-65)
+            # thus we reextract the scores again for that stage including hidden ones
+            if stage_name == 'hifa_importdata':
+                stage_name, representative_score, subscores = _get_pipeline_stage_and_scores(stage_result, include_hidden_scores=True)
+    
+            
             stage_element = ElementTree.Element('Stage',
                                                 Number=str(stage_result.stage_number),
                                                 Name=stage_name)

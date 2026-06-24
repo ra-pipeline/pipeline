@@ -45,6 +45,11 @@ class ALMAImportDataListQAHandler(pqa.QAPlugin):
         sep_angle_dict = ms_separation_angles(mses)
         result.sep_angles = sep_angle_dict
 
+        # Make scores for separations angles - all 1.0 for now just to report information
+        # hidden from weblog accordion for current implementation
+        sepang_scores = qacalc.score_separation_angles(mses, result.sep_angles)
+        result.qa.pool.extend(sepang_scores)
+
 
 class ALMAImportDataQAHandler(pqa.QAPlugin):
     result_cls = almaimportdata.ALMAImportDataResults
@@ -79,7 +84,7 @@ class ALMAImportDataQAHandler(pqa.QAPlugin):
 
         # Check for flux service status codes
         score9 = _check_fluxservicestatuscodes(result)
-
+        
         # Add all scores to QA score pool in result.
         result.qa.pool.extend(polcal_scores)
         result.qa.pool.extend([score2, score4, score6, score8, score9])
@@ -150,3 +155,54 @@ def _check_calobjects(recipe_name: str, mses: list[MeasurementSet]) -> list[pqa.
     """
 
     return qacalc.score_samecalobjects(recipe_name, mses)
+
+def _report_separation_angles(sepangles: dict) -> pqa.QAScore:
+    """
+    Reports the separation angles for the ms's TARGET to 
+    PHASE and if present CHECK to PHASE
+    """
+
+    # test the scoring here before the qacalc area
+    mskeys = sepangles.keys()
+
+    # loop the mskeys and report each source
+    # we don't really want to show all these as a score...anyway..
+
+    # holds the final list of QA scores
+    scores: list[pqa.QAScore] = []
+
+    LOG.info('doing the sepangle scores')
+    
+    for mskey in mskeys:
+        # filter the dict
+        for primary, secondaries in sepangles[mskey].items():
+            # primary will be intent, fieldid, fieldname
+            # secondaries is another dict with intent, fieldid, fieldname as key, and a dict as the value with unit and value
+            intent1 = primary[0]
+            field1 = f'{primary[2]}' # can use other string process like -->>  f"{field} (#{fieldid})"
+            # pull the items into a tuple
+            intent2 = [(fld2,id2,nm2,ang['unit'],ang['value']) for (fld2,id2,nm2),ang in secondaries.items()][0] # only item per secondary
+            field2 = f'{intent2[2]}'
+            if intent2[3] == 'deg':
+                sepvalue=round(intent2[4],2) # or 3 dp ?
+                # do the score
+                score = 1.0
+                longmsg = 'For %s the %s %s to %s %s separation angle is %s deg'%(mskey, intent1, field1, intent2[0], field2, str(sepvalue))
+                shortmsg = ' %s to %s is %s'%(field1, field2, str(sepvalue))
+                reportsep=str(sepvalue)
+            else:
+                # do the score
+                score = 0.90
+                longmsg = 'For %s the %s %s to %s %s separation angle cannot be extracted'%(mskey, intent1, field1, intent2[0], field2)
+                shortmsg = ' %s to %s is n/a'
+                reportsep='n/a'
+                
+            origin = pqa.QAOrigin(metric_name='report_separation_angles',
+                          metric_score=reportsep, # this is the value not a 0 to 1 score
+                          metric_units='degrees')
+
+            score = pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=mskey, origin=origin, weblog_location=pqa.WebLogLocation.HIDDEN)# weblog location can be HIDDEN - doesnt render
+       
+            scores.append(score)
+                                
+    return scores
