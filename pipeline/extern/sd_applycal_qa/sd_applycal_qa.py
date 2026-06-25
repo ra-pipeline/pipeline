@@ -551,7 +551,7 @@ def load_and_stats(ms_name: List[str], use_tsys_data: bool = True, sciline_det: 
     '''
 
     #Load buffered data from disk, if exists
-    buf = os.path.join(os.path.dirname(ms_name[0]), 'mswCollection.buffer.pkl')
+    buf = os.path.join(os.path.dirname(msNames[0]), 'mswCollection.buffer.pkl')
     if os.path.exists(buf):
         f = open(buf, 'rb')
         mswCollection = pickle.load(f)
@@ -560,7 +560,7 @@ def load_and_stats(ms_name: List[str], use_tsys_data: bool = True, sciline_det: 
 
     #Load data and gather statistics
     mswCollection = {}
-    for ms in ms_name:
+    for ms in msNames:
         msonly = ms.split('/')[-1]
         #Load metadata
         spw_setup = sd_qa_utils.getSpecSetup(myms=ms)
@@ -589,14 +589,14 @@ def load_and_stats(ms_name: List[str], use_tsys_data: bool = True, sciline_det: 
 
     return mswCollection
 
-def get_ms_applycal_qascores(ms_name: List[str], thresholds: dict = default_thresholds, plot_output_path: str = '.',
+def get_ms_applycal_qascores(msNames: List[str], thresholds: dict = default_thresholds, plot_output_path: str = '.',
                              use_tsys_data: bool = True, sciline_det: bool = True,
                              plot_sciline: str = 'on-detection', weblog_output_path: str = '.',
                              buffer_data: bool = False) -> Tuple[list, list, list]:
     '''Function used to obtain applycal X-Y QA score on a list of calibrated MSs, at the
     applycal stage of SD pipeline.
     param:
-        ms_name: List of MS to process
+        msNames: List of MS to process
         thresholds: Dictionary containing threshold parameters for ON-source XX-YY deviations,
                     Trec deviations, minimum deviation level, and QA score scaling.
         plot_output_path: (str) Path to save output plots.
@@ -611,7 +611,7 @@ def get_ms_applycal_qascores(ms_name: List[str], thresholds: dict = default_thre
     '''
 
     #Load data and gather statistics
-    mswCollection = load_and_stats(ms_name, use_tsys_data=use_tsys_data, sciline_det=sciline_det,
+    mswCollection = load_and_stats(msNames, use_tsys_data=use_tsys_data, sciline_det=sciline_det,
                                    buffer_data=buffer_data)
 
     #Combine stats for science line detection, if requested
