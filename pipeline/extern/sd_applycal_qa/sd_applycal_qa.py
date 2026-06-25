@@ -536,7 +536,7 @@ def outlier_detection(msw: mswrapper_sd.MSWrapperSD, thresholds: dict = default_
 
     return (msw, qascore, qascores_scans, plotfname)
 
-def load_and_stats(ms_name: List[str], use_tsys_data: bool = True, sciline_det: bool = True,
+def load_and_stats(msNames: List[str], use_tsys_data: bool = True, sciline_det: bool = True,
                    buffer_data: bool = False) -> dict:
     '''Load a collection of MSWrapper_SD objects, and run a basic filter and statistics on each of them.
     Return a dictionary of MSWrapper_SD objects, indexed by tuples in the form (ms, spw, ant, fieldid).
