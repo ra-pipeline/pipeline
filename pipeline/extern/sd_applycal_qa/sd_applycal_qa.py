@@ -541,7 +541,7 @@ def load_and_stats(msNames: List[str], use_tsys_data: bool = True, sciline_det: 
     '''Load a collection of MSWrapper_SD objects, and run a basic filter and statistics on each of them.
     Return a dictionary of MSWrapper_SD objects, indexed by tuples in the form (ms, spw, ant, fieldid).
     param:
-        ms_name: List of MS names to load.
+        msNames: List of MS names to load.
         ondata_filters: List of filters to pass on the ON-source data
         use_tsys_data: True/False whether to load CalAtmosphere data from dataset
         sciline_det: True/False whether to attempt strong science line detection. The detected channels are passed to outlier_detection()
