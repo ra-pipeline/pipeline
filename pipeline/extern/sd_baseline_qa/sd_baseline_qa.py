@@ -8,7 +8,6 @@ from scipy import stats
 from typing import List, Tuple
 from itertools import product
 
-import pipeline.extern.sd_baseline_qa.pipelineqa as pqa
 import pipeline.extern.sd_baseline_qa.sd_qa_utils as sd_qa_utils
 import pipeline.extern.sd_baseline_qa.sd_qa_reports as sd_qa_reports
 import pipeline.extern.sd_baseline_qa.mswrapper_sd as mswrapper_sd
@@ -252,7 +251,7 @@ def calc_baseline_qascore_single(
     if (nrows == 0) or (len(notflaggedscans) == 0):
         #Create objects to create QAscore
         reason = 'BLine.deviation'
-        applies_to = pqa.TargetDataSelection(
+        applies_to = pipelineqa.TargetDataSelection(
             vis={msname},
             scan={"All"},
             intent={'*OBSERVE_TARGET#ON_SOURCE*'},
@@ -305,7 +304,7 @@ def calc_baseline_qascore_single(
                 polstr = 'XX' if (pol == 0) else 'YY'
                 qascore_value = qascorefunc(max_diff0_sigma, score_top = this_score_top, score_bottom = this_score_bottom, nsigma_threshold = thresholds['max_diff0_sigma'], nsigma_bottom = 2.0*thresholds['max_diff0_sigma'])
                 reason = 'BLine.continuum.dev'
-                applies_to = pqa.TargetDataSelection(
+                applies_to = pipelineqa.TargetDataSelection(
                     vis={msname},
                     scan={scan},
                     intent={'*OBSERVE_TARGET#ON_SOURCE*'},
@@ -335,7 +334,7 @@ def calc_baseline_qascore_single(
                 qascore_value = qascorefunc(sinusoid_sigma[scan][pol]['n_sigma'], score_top = this_score_top, score_bottom = this_score_bottom, nsigma_threshold = thresholds['sinusoid_sigma'], nsigma_bottom = 2.0*thresholds['sinusoid_sigma'])
                 reason = 'BLine.continuum.sinusoid'
 
-                applies_to = pqa.TargetDataSelection(
+                applies_to = pipelineqa.TargetDataSelection(
                     vis={msname},
                     scan={scan},
                     intent={'*OBSERVE_TARGET#ON_SOURCE*'},
@@ -423,7 +422,7 @@ def calc_baseline_qascore_single(
             reason = 'BLine.scienceline.lowpXYsci'
             polstr = 'XX' if (pol == 0) else 'YY'
 
-            applies_to = pqa.TargetDataSelection(
+            applies_to = pipelineqa.TargetDataSelection(
                 vis={msname},
                 scan={scan},
                 intent={'*OBSERVE_TARGET#ON_SOURCE*'},
@@ -442,7 +441,7 @@ def calc_baseline_qascore_single(
             reason = 'BLine.scienceline.lowpXYsci'
             polstr = 'XX' if (pol == 0) else 'YY'
 
-            applies_to = pqa.TargetDataSelection(
+            applies_to = pipelineqa.TargetDataSelection(
                 vis={msname},
                 scan={scan},
                 intent={'*OBSERVE_TARGET#ON_SOURCE*'},
@@ -478,7 +477,7 @@ def calc_baseline_qascore_single(
             print('max_pXY_cont: '+str(max_pXY_cont)+' -> qascore_value: '+str(qascore_value))
             reason = 'BLine.scienceline.highpXYcont'
 
-            applies_to = pqa.TargetDataSelection(
+            applies_to = pipelineqa.TargetDataSelection(
                 vis={msname},
                 scan={scan},
                 intent={'*OBSERVE_TARGET#ON_SOURCE*'},
@@ -496,7 +495,7 @@ def calc_baseline_qascore_single(
             qascore_value = qascorefunc(maxXYrange, score_top = this_score_top, score_bottom = this_score_bottom, nsigma_threshold = thresholds['maxant_rangeratio'], nsigma_bottom = 2.0*thresholds['maxant_rangeratio'])
             reason = 'BLine.continuum.XYrangeratio'
 
-            applies_to = pqa.TargetDataSelection(
+            applies_to = pipelineqa.TargetDataSelection(
                 vis={msname},
                 scan={scan},
                 intent={'*OBSERVE_TARGET#ON_SOURCE*'},
@@ -593,7 +592,7 @@ def calc_qascores_collection(
                     triggerpol = np.array(pols)[idxmax_data_ranges]
                     triggerpolstr = 'XX' if (triggerpol == 0) else 'YY'
 
-                    applies_to = pqa.TargetDataSelection(
+                    applies_to = pipelineqa.TargetDataSelection(
                         vis={ms},
                         scan={triggerscan},
                         intent={'*OBSERVE_TARGET#ON_SOURCE*'},
@@ -724,7 +723,7 @@ def add_non_outlier_qascores(mswCollection: dict):
             scanlist = msw.spw_setup['scansforfield'][str(msw.fieldid)]
 
             for scan in scanlist:
-                applies_to = pqa.TargetDataSelection(
+                applies_to = pipelineqa.TargetDataSelection(
                     vis={ms},
                     scan={scan},
                     intent={'*OBSERVE_TARGET#ON_SOURCE*'},
@@ -775,8 +774,8 @@ def get_ms_baseline_qascores(
         buffer_data: bool = True
 ) -> Tuple[list, list, list]:
 
-    '''Function used to obtain applycal X-Y QA score on a list of calibrated MSs, at the
-    applycal stage of SD` pipeline.
+    '''Function used to obtain baseline X-Y QA score on a list of calibrated MSs, at the
+    baseline stage of SD` pipeline.
     param:
         ms_name: List of MS to process
         thresholds: Dictionary containing threshold parameters for ON-source XX-YY deviations,

@@ -68,7 +68,7 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
     def __init__(self,
                  template: str = 'hsd_baseline.mako',
                  description: str = 'Generate Baseline tables and subtract spectral baseline',
-                 always_rerender: bool = True) -> None:
+                 always_rerender: bool = False) -> None:
         """Create T2_4MDetailsSingleDishBaselineRenderer instance.
 
         Args:

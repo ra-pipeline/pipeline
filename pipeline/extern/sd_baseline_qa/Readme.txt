@@ -10,8 +10,7 @@ sd_qa_utils.py:        Auxiliary module containing general utilities used to acc
                        perform some general statistical calculations.
 mswrapper_sd.py:       Module containing the MSWrapperSD class, a data container for accessing
 		       the necessary ON-source data and CalAtmosphere tables.
-pipelineqa.py:         Copy of the pipeline file containing the TargetDataSelection and
-                       QAScore classes.
+
 extract_science_lines.sh: Bash script used to extract the science line information in the case
                           of a pipeline folder and context created with an older version of the
 			  pipeline.

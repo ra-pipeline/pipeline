@@ -752,7 +752,7 @@ def plot_data_single_bl(msw: mswrapper_sd.MSWrapperSD, max_nwave_frac = 0.1, plo
     #Axes labels
     ax_bot_right.set_xlabel('Freq [GHz]')
     ax_bot_right.set_ylabel('Pr(XX,YY)')
-    ax_bot_right.set_title('Pearsons correlation XX and YY')
+    ax_bot_right.set_title("Pearson's correlation XX and YY")
     ax_bot_right.grid(True, linestyle='--', alpha=0.5)
 
     #write titles and detections info
