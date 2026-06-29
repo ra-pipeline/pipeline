@@ -363,7 +363,6 @@ class SpwPhaseup(gtypegaincal.GTypeGaincal):
             self._unregister_spwphaseup()
 
         # Derive the mapping from phase fields to target/check fields.
-        LOG.info(" Check using new utils here")
         phasecal_mapping = utils.separation_angles.derive_phase_to_target_check_mapping(inputs.ms)
 
         # Derive the optimal spectral window maps.

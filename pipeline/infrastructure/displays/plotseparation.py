@@ -394,12 +394,6 @@ def make_plus_patch(
     
     return xyvertex
 
-
-## DONEST WORK EITHER - still goes in order, not a heck of all with a check of all others
-## also associating wringly - damn
-## need like a global nearest neighbours - matrix thing? astropy or something then - urg 
-
-
 def consolidate_labels(
         field_ra_dec: List,
         overlap: float = 0.9
