@@ -263,7 +263,7 @@ class QAScoreAggregator:
         such as keys_to_aggregate and keys_to_show.
         This method is coded to respect the original 'order' of QA scores during the aggregation.
 
-        Aggregation happens within QA scores whose score, metric_name, and metric_units match:
+        Aggregation happens within QA scores whose score, shortmsg, metric_name, and metric_units match:
         attributes in TargetDataSelection (applies_to) are merged, meric_value will be concateneted with commas
 
         Args:
@@ -307,7 +307,7 @@ class QAScoreAggregator:
                     continue
 
                 # skip qascores with metric_name registered as excludes
-                if target_qascore in registry.get_excludes():
+                if target_qascore.origin.metric_name in registry.get_excludes():
                     continue
 
                 # filter out qascores with different metric_name
