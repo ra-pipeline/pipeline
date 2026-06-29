@@ -4522,13 +4522,22 @@ def score_separation_angles(mses: MeasurementSet, sepangles: disck) -> pqa.QASco
                 longmsg = 'For %s the %s %s to %s %s separation angle cannot be extracted'%(ms.basename, intent1, field1, intent2[0], field2)
                 shortmsg = ' %s to %s is n/a'
                 reportsep='n/a'
+            # for QA scrore data selection
+            fieldqa = field1+','+field2
+            intentqa = intent1+','+intent2[0]
                 
             origin = pqa.QAOrigin(metric_name='report_separation_angles',
                           metric_score=reportsep, # this is the value not a 0 to 1 score
                           metric_units='degrees')
 
-            score = pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin, weblog_location=pqa.WebLogLocation.HIDDEN) # weblog location can be HIDDEN - do not render it
-       
+            score = pqa.QAScore(score,
+                                longmsg=longmsg,
+                                shortmsg=shortmsg,
+                                vis=ms.basename, 
+                                origin=origin,
+                                weblog_location=pqa.WebLogLocation.HIDDEN, 
+                                applies_to=pqa.TargetDataSelection(vis={ms.basename}, field={fieldqa}, intent={intentqa}))
+                                # weblog location can be HIDDEN - do not render it
             scores.append(score)
                                 
     return scores

@@ -623,20 +623,20 @@ def sep_angles_for_table(context, sepangles, sepplots):
     # PIPE-65
     
     SepAng = collections.namedtuple('SepAng', 'ms field1 intent1 field2 intent2 sepang sepplot') 
-    MaxTargets = 4
+    MaxTargets = 5
     # result.sep_angles is the dict as sepangles
     # main key is measurementset ms
     # then intent, fieldid, fieldname
     # need to make tuple table
     rows = []
-    for keyu in sepangles.keys(): # should be msname, can better name this loop
+    for keyu in sepangles.keys(): 
         msbasename = keyu
         rows_holder=[] # to get all but allow filtering if too many targets
         max_sep = 0.0
         min_sep = 99.0
         for primary, secondaries in sepangles[keyu].items():
             # primary will be intent, fieldid, fieldname
-            # secondaries is another dict with intent, fieldid, fieldname as key, and a dict as the value with unit and value
+            # secondaries is another dict with intent, fieldid, fieldname as key, and a dict as the value with unit and value.
             intent1 = primary[0]
             field1 = f'{primary[2]} (#{primary[1]})' # can use other string process like -->>  f"{field} (#{fieldid})"
             # pull the items into a tuple
@@ -651,19 +651,18 @@ def sep_angles_for_table(context, sepangles, sepplots):
                     min_sep = sepvalue
                     minfield = SepAng(msbasename, field1, intent1, field2, intent2[0], sepvalue, sepplots[keyu]['html'])
                 rows_holder.append(SepAng(msbasename, field1, intent1, field2, intent2[0], sepvalue, sepplots[keyu]['html'])) # format as the input tuple
-                # Log output so all fields/intents are at least listed even if filterd below
+                # Log output so all fields/intents are at least listed even if filterd below.
                 LOG.info('Separation Angle of Fields: '+field1+'('+intent1+') - '+field2+'('+intent2[0]+') is '+str(sepvalue)+' deg')
             else:
                 rows_holder.append(SepAng(msbasename, field1, intent1, field2, intent2[0], 'n/a', 'n/a')) # if there is an issue with unit or something return n/a
                 LOG.info('Separation Angle of Fields: '+field1+'('+intent1+') - '+field2+'('+intent2[0]+') is n/a')
 
-        # somehow here we want this list out
-        
         # now we assess if we have too many targets and
-        # only append the fields with max and min separations along with any CHECK intents
+        # only append the fields with max and min separations
+        # along with any CHECK intents to be tabulated.
         field_counts = collections.Counter(elem.intent1 for elem in rows_holder)
         if field_counts['TARGET'] > MaxTargets:
-            LOG.info('reducing list')
+            LOG.info('There are more than 5 target fields will populate importdata table with min/max separation TARGET to PHASE')
             rows.append(minfield)
             rows.append(maxfield)
             for row in rows_holder:
