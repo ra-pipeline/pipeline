@@ -25,7 +25,7 @@ def mosaicOverlapFactorMS(ms, source, spw, diameter, intent='TARGET', fwhmfactor
     Inputs:
 
              ms: The ms object from the pipeline context
-         source: The target source id or name
+         source: The target source id or name or a list of comma separated source names.
             spw: Determine the frequency based on this spw or list of spws.
        diameter: The effective antenna diameter in meters
          intent: The target source intent

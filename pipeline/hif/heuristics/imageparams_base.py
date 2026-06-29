@@ -2089,8 +2089,6 @@ class ImageParamsHeuristics:
                         if source_name.isdigit():
                             source_name = '"{}"'.format(source_name)
                         diameter = np.median([a.diameter for a in ms.antennas])
-                        # TO DO: Check if mosaic overlap calculations needs to be updated to accept source_name list
-
                         overlap_factor = mosaicoverlap.mosaicOverlapFactorMS(ms, source_name, intSpw, diameter)
                         LOG.info('Dividing by mosaic overlap improvement factor of %s corrects sensitivity for EB %s'
                                  ' Field %s SPW %s from %.3g Jy/beam to %.3g Jy/beam.'
