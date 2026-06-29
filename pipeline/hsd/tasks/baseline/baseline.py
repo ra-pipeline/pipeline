@@ -14,8 +14,6 @@ import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.vdp as vdp
 import pipeline.infrastructure.sessionutils as sessionutils
 
-from pipeline.hsd.tasks.common.inspection_util import generate_ms, inspect_reduction_group, merge_reduction_group
-
 from pipeline.domain import DataType
 from pipeline.hsd.heuristics import MaskDeviationHeuristic
 from pipeline.hsd.tasks.common.inspection_util import generate_ms, inspect_reduction_group, merge_reduction_group
@@ -27,9 +25,7 @@ from .. import common
 from ..common import compress
 from ..common import utils
 
-import pipeline.extern.sd_baseline_qa.baseline_score as bs
-
-from .typing import FitFunc, FitOrder, LineWindow
+import pipeline.hsd.tasks.baseline.baseline_score as bs
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -751,7 +747,7 @@ class SDBaseline(basetask.StandardTaskTemplate):
         # the general analysis. Perhaps this can be done at a later time.
 
         for basename, outfile in vis_map.items():
-            original_ms = next(ms.origin_ms for ms in context.observing_run.measurement_sets if ms.basename == basename)
+            original_ms = context.observing_run.get_ms(basename).origin_ms
             qa_score_dict = bs.baseline_score(results=results, context=context, file_info=(original_ms, outfile))
 
             if not qa_score_dict is None:

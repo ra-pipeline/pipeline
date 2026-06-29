@@ -9,6 +9,10 @@ from pipeline.hsd.tasks.common import qautils
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.filenamer as filenamer
+
+from pipeline.infrastructure.renderer.logger import Plot
+from pipeline.infrastructure.utils import conversion
+
 from . import display
 from ..common import compress
 from ..common import utils
@@ -24,18 +28,13 @@ if TYPE_CHECKING:
 LOG = infrastructure.logging.get_logger(__name__)
 
 
-def make_profile_heuristic_plots(context):
-    from pipeline.infrastructure.renderer.logger import Plot
-    from pipeline.infrastructure.utils import conversion
-
-
+def make_profile_heuristic_plots(results):
     # Get the context results for SDBaseline Results only
-    baseline_results = [entry for entry in context.results if entry.taskname == "hsd_baseline"]
 
     profile_heuristic = []
     keys = set()
 
-    for eb in baseline_results:
+    for eb in results:
         for score_object in eb.outcome["profile_qa_score"].values():
             for score, plot_name in zip(score_object["score"], score_object["plot_names"]):
 
@@ -236,7 +235,7 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
                 'sparsemap_{}_{}'.format(maptype.lower(), subtype.lower()): summary
             })
 
-        profile_heuristic, profile_heuristic_subpages = make_profile_heuristic_plots(context)
+        profile_heuristic, profile_heuristic_subpages = make_profile_heuristic_plots(results)
 
         # If this analysis was not done, skip it
         if (len(profile_heuristic) > 0) and profile_heuristic_subpages:
