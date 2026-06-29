@@ -20,7 +20,7 @@ from .resultobjects import FindContResult
 LOG = infrastructure.get_logger(__name__)
 
 FINDCONT_BASE_PPB = 5.0
-FINDCONT_12M_TARGET_PPB = 4.0
+FINDCONT_12M_TARGET_PPB = 3.0
 FINDCONT_7M_TARGET_PPB = 4.0
 FINDCONT_MIN_IMSIZE = 64
 

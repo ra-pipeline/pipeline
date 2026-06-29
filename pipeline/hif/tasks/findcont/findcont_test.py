@@ -114,7 +114,7 @@ def test_coarse_parameters_for_12m_scale_cell_imsize_and_taper(monkeypatch):
     assert params['imsize'] == [64, 64]
     assert len(params['uvtaper']) == 1
     assert params['uvtaper'][0].endswith('arcsec')
-    assert float(params['uvtaper'][0].replace('arcsec', '')) == pytest.approx(8.3, abs=0.2)
+    assert float(params['uvtaper'][0].replace('arcsec', '')) == pytest.approx(5.2, abs=0.2)
 
 
 def test_coarse_parameters_for_12m_above_floor_scales_imsize(monkeypatch):
@@ -135,7 +135,7 @@ def test_coarse_parameters_for_12m_above_floor_scales_imsize(monkeypatch):
     assert params['imsize'] == [87, 104]
     assert len(params['uvtaper']) == 1
     assert params['uvtaper'][0].endswith('arcsec')
-    assert float(params['uvtaper'][0].replace('arcsec', '')) == pytest.approx(7.8, abs=0.2)
+    assert float(params['uvtaper'][0].replace('arcsec', '')) == pytest.approx(4.8, abs=0.2)
 
 
 def test_coarse_parameters_for_12m_anchor_hits_2p5_at_250m(monkeypatch):
@@ -166,7 +166,7 @@ def test_coarse_parameters_for_12m_respects_context_ppb_mitigation(monkeypatch):
     assert params['imsize'] == [667, 667]
     assert len(params['uvtaper']) == 1
     assert params['uvtaper'][0].endswith('arcsec')
-    assert float(params['uvtaper'][0].replace('arcsec', '')) == pytest.approx(5.2, abs=0.2)
+    assert float(params['uvtaper'][0].replace('arcsec', '')) == pytest.approx(3.4, abs=0.2)
 
 
 def test_findcont_qa_adds_blue_note_for_coarse_fallback():
