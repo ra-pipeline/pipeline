@@ -7,6 +7,7 @@ import numpy as np
 import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.filenamer as filenamer
+from pipeline.hif.heuristics.mosaic_detection import MosaicDetectionHeuristics
 from pipeline.infrastructure import casa_tasks, casa_tools
 from pipeline.infrastructure.tablereader import find_EVLA_band
 import pipeline.infrastructure.utils as utils
@@ -20,9 +21,11 @@ LOG = infrastructure.logging.get_logger(__name__)
 class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
 
     def __init__(self, vislist, spw, observing_run, imagename_prefix='', proj_params=None, contfile=None,
-                 linesfile=None, imaging_params={}, processing_intents={}):
+                 linesfile=None, imaging_params={}, processing_intents={}, band_fields=None, band=None):
         ImageParamsHeuristics.__init__(self, vislist, spw, observing_run, imagename_prefix, proj_params, contfile,
                                        linesfile, imaging_params, processing_intents)
+        self.band_fields = band_fields or {}
+        self.band = band
         self.imaging_mode = 'VLA'
 
     def robust(self, specmode=None) -> float:
@@ -783,6 +786,8 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         """
         return True
 
+
+
     @staticmethod
     def find_good_medianbeam(psf_filename: str, field: str, spw: str):
         """Find outlier beams and calculate a good "median" restoring beam recommendation.
@@ -974,3 +979,43 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
             LOG.info(ex)
 
         return good_restoringbeam, bad_psf_channels
+
+    def field_intent_list(self, intent: str, field: str):
+        """Determine the list of (field, intent) tuples for VLA single field
+        and mosaic imaging."""
+
+        ms = self.observing_run.get_measurement_sets()[0]
+        ref_freq = [ms.get_spectral_window(spw).ref_frequency for spw in self.spwlist]
+        freq = np.mean(ref_freq)
+        mosaic_heuristics = MosaicDetectionHeuristics()
+
+        target_fields = self.band_fields.get(self.band, set())
+        # For VLA, hpbw (in arcmin) = 42.0 / observing frequency in Hz
+        hpbw = 42.0e9 / float(freq.value) * 60.0 * 60.0  # hpbw in arcseconds
+
+        mosaic_fields, single_fields = mosaic_heuristics.check_targets_for_mosaic(self.observing_run, self.vislist, target_fields, hpbw)
+
+        if not mosaic_fields:
+            return super().field_intent_list(intent=intent, field=field)
+
+        field_intent_list_temp = []
+        for mosaic_field in mosaic_fields.values():
+            for cluster in mosaic_field:
+                cluster_name = ",".join(cluster)
+                field_intent_list_temp.append(super().field_intent_list(intent=intent, field=cluster_name))
+        for single_field in single_fields.values():
+            for f in single_field:
+                field_intent_list_temp.append(super().field_intent_list(intent=intent, field=f))
+
+        mosaic_intent_list = set()
+        for element in field_intent_list_temp:
+            # Group names by intent within this set
+            intent_groups = {}
+            for name, grp_intent in element:
+                intent_groups.setdefault(grp_intent, []).append(name)
+            # Add each group as a tuple to output
+            for grp_intent, names in intent_groups.items():
+                names_str = ",".join(sorted(names))
+                mosaic_intent_list.add((names_str, grp_intent))
+
+        return mosaic_intent_list

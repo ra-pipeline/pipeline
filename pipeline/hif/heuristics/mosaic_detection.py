@@ -36,14 +36,14 @@ class MosaicDetectionHeuristics:
         return fieldnames, coordlist
 
     def check_targets_for_mosaic(
-            self, context, vislist, fieldlist, hpbw, overlap_tol=1.0,
+            self, observing_run, vislist, fieldlist, hpbw, overlap_tol=1.0,
             ) -> Tuple[Dict, Dict]:
         """Detect mosaic and single-field groups across all measurement sets by clustering overlapping pointings."""
         mosaic_groups = defaultdict(list)
         single_fields = defaultdict(list)
 
         for vis in vislist:
-            ms = context.observing_run.get_ms(vis)
+            ms = observing_run.get_ms(vis)
             fieldnames, coordlist = self._parse_field_coords(ms.fields, fieldlist)
             if len(coordlist) < 2:
                 single_fields[vis].extend(fieldnames)

@@ -850,7 +850,6 @@ class MakeImList(basetask.StandardTaskTemplate):
                     band = vla_band.get(spw.id)
                     if band is not None:
                         band_fields[band].add(field_name)
-
         elif 'ALMA' in imaging_mode:
             ref_ms = inputs.context.observing_run.get_ms(inputs.vis[0])
             band_spws = {}
@@ -881,7 +880,8 @@ class MakeImList(basetask.StandardTaskTemplate):
                         imagename_prefix = inputs.context.observing_run.get_ms(vislist[0]).session
                     else:
                         imagename_prefix = inputs.context.project_structure.ousstatus_entity_id
-
+                    # PIPE-684: bandfields and band parameters are added to heuristics to support VLA mosaic detection and
+                    # ignored in the cases other than VLA. The heuristics will return the same results as before for non-VLA cases.
                     self.heuristics = image_heuristics_factory.getHeuristics(
                         vislist=vislist,
                         spw=spw,
@@ -892,7 +892,9 @@ class MakeImList(basetask.StandardTaskTemplate):
                         linesfile=inputs.linesfile,
                         imaging_params=inputs.context.imaging_parameters,
                         processing_intents=inputs.context.processing_intents,
-                        imaging_mode=imaging_mode
+                        imaging_mode=imaging_mode,
+                        bandfields=band_fields,
+                        band=band
                     )
                     if inputs.specmode == 'cont':
                         # Make sure the spw list is sorted numerically
@@ -900,56 +902,13 @@ class MakeImList(basetask.StandardTaskTemplate):
                     else:
                         spwlist_local = spwlist
 
-                    mosaic_fields = {}
-                    single_fields = []
-                    is_cluster = False
-                    # PIPE-684: running clustering to find overlapping fields only
-                    # for VLA.
-                    if 'VLA' in imaging_mode:
-                        # VLA pipeline supports only one vis, so directly using
-                        # vislist[0]
-
-                        ms = inputs.context.observing_run.get_ms(vislist[0])
-                        ref_freq = [ms.get_spectral_window(spw).ref_frequency for spw in spwlist]
-                        freq = np.mean(ref_freq)
-
-                        mosaic_heuristics = MosaicDetectionHeuristics()
-                        target_fields = band_fields.get(band, set())
-                        # For VLA, hpbw (in arcmin) = 42.0 / observing frequency in Hz
-                        hpbw = 42.0e9 / float(freq.value) * 60.0 * 60.0  # hpbw in arcseconds
-                        mosaic_fields, single_fields = mosaic_heuristics.check_targets_for_mosaic(inputs.context, vislist, target_fields, hpbw)
-                        is_cluster = True if len(mosaic_fields) > 0 else False
-                    if is_cluster:
-                        field_intent_list_temp = []
-                        for mosaic_field in mosaic_fields.values():
-                            for cluster in mosaic_field:
-                                cluster_name = ",".join(cluster)
-                                field_intent_list_temp.append(self.heuristics.field_intent_list(intent=inputs.intent, field=cluster_name))
-                        for single_field in single_fields.values():
-                            for f in single_field:
-                                field_intent_list_temp.append(self.heuristics.field_intent_list(intent=inputs.intent, field=f))
-
-                        output_set = set()
-                        for element in field_intent_list_temp:
-                            # Group names by intent within this set
-                            intent_groups = {}
-                            for name, intent in element:
-                                intent_groups.setdefault(intent, []).append(name)
-                            # Add each group as a tuple to output
-                            for intent, names in intent_groups.items():
-                                names_str = ",".join(sorted(names))
-                                output_set.add((names_str, intent))
-                        field_intent_list = output_set
+                    # get list of field_ids/intents to be cleaned
+                    if (not repr_target_mode) or (repr_target_mode and image_repr_target):
+                        field_intent_list = self.heuristics.field_intent_list(intent=inputs.intent, field=inputs.field)
                         if not field_intent_list:
                             continue
                     else:
-                        # get list of field_ids/intents to be cleaned
-                        if (not repr_target_mode) or (repr_target_mode and image_repr_target):
-                            field_intent_list = self.heuristics.field_intent_list(intent=inputs.intent, field=inputs.field)
-                            if not field_intent_list:
-                                continue
-                        else:
-                            continue
+                        continue
 
                     # Expand cont spws
                     if inputs.specmode == 'cont':
@@ -968,9 +927,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                             # TODO: This is missing spws that got removed in hif_uvcontsub.
                             #       Need to involve the full spwlist from above.
                             ms_science_spwids = [s.id for s in ms_domain_obj.get_spectral_windows()]
-                            # TODO: check if just is_cluster is enough or need
-                            #       to update this condidtion
-                            if field_intent[0] in [f.name for f in ms_domain_obj.fields] or is_cluster:
+                            if all(f in [field.name for field in ms_domain_obj.fields] for f in field_intent[0].split(',')):
                                 try:
                                     # Get a field domain object. Make sure that it has the necessary intent. Otherwise the list of spw IDs
                                     # will not match with the available science spw IDs.
