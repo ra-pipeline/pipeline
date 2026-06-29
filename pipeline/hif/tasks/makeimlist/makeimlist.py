@@ -1270,8 +1270,9 @@ class MakeImList(basetask.StandardTaskTemplate):
                     # and the source name as the second key.
                     sorted_field_intent_list = sorted(field_intent_list, key=operator.itemgetter(1,0))
 
-                    # In case of TARGET intent place representative source first in the list.
-                    if 'TARGET' in inputs.intent:
+                    # In case of TARGET intent place representative source first in the list, except for VLA mosaic
+                    first_field_name, first_intent = sorted_field_intent_list[0]
+                    if 'TARGET' in inputs.intent and "," not in first_field_name:
                         sorted_field_intent_list = utils.place_repr_source_first(sorted_field_intent_list, repr_source)
 
                     for field_intent in sorted_field_intent_list:
