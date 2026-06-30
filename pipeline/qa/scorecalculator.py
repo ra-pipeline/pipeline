@@ -3914,6 +3914,9 @@ def score_sdimage_masked_pixels(context: Context, result: SDImagingResultItem) -
     result_item = result.outcome
     image_item = result_item['image']
     imagename = image_item.imagename
+    field = image_item.sourcename
+    spw = result_item['assoc_spws']
+    stokes = result_item['stokes']
 
     LOG.debug('imagename = {}'.format(imagename))
     with casa_tools.ImageReader(imagename) as ia:
@@ -3957,36 +3960,41 @@ def score_sdimage_masked_pixels(context: Context, result: SDImagingResultItem) -
     metric_score_threshold = 0.1
     metric_score_max = 1.0
     metric_score_min = 0.0
+    eps = 1.0E-6
 
     # convert score and threshold for logging purpose
     frac2percentage = lambda x: '{:.4g}%'.format(x * 100)
     imbasename = os.path.basename(imagename.rstrip('/'))
 
+    # force score=0.0 for inappropriate cases
     if metric_score > metric_score_max:
         # metric_score should not exceed 1.0. something wrong.
         _x = frac2percentage(metric_score_max)
-        lmsg = '{}: fraction of number of masked pixels should not exceed {}. something went wrong.'.format(imbasename, _x)
-        smsg = 'metric value out of range.'
+        _y = frac2percentage(metric_score)
+        lmsg = f'{imbasename}: fraction of number of masked pixels should not exceed {_x}. something went wrong.'
+        smsg = f'Masked image pixels ({_y}) exceeds {_x}'
         score = 0.0
     elif metric_score < metric_score_min:
-        lmsg = '{}: No pixels associated with pointing data exist. something went wrong.'.format(imbasename)
-        smsg = 'metric value out of range.'
+        lmsg = f'{imbasename}: No pixels associated with pointing data exist. something went wrong.'
+        smsg = 'No data exists.'
         score = 0.0
-    elif metric_score == metric_score_min:
-        lmsg = 'All examined pixels in image {} are valid.'.format(imbasename)
-        smsg = 'All examined pixels are valid.'
+
+    # deal with the realistic cases
+    elif abs(metric_score - metric_score_min) < eps:
+        lmsg = f'All examined pixels in image {imbasename} are valid.'
+        smsg = 'All examined image pixels are valid.'
         score = 1.0
     elif metric_score > metric_score_threshold:
         _x = frac2percentage(metric_score_threshold)
         _y = frac2percentage(metric_score)
-        lmsg = 'Fraction of masked pixels in image {} is {}, exceeding threshold value ({}).'.format(imbasename, _y, _x)
-        smsg = 'More than {} of image pixels are masked.'.format(_x)
+        lmsg = f'Fraction of masked pixels in image {imbasename} is {_y}, exceeding threshold value ({_x}).'
+        smsg = f'Masked image pixels ({_y}) exceeds threshold of {_x}.'
         score = 0.0
     else:
         # interpolate between 0.5 and 0.0
         _x = frac2percentage(metric_score)
-        lmsg = 'Fraction of masked pixels in image {} is {}.'.format(imbasename, _x)
-        smsg = '{} of image pixels are masked.'.format(_x)
+        lmsg = f'Fraction of masked pixels in image {imbasename} is {_x}.'
+        smsg = f'{_x} of image pixels are masked.'
         smax = 0.5
         mmax = 0.0
         smin = 0.0
@@ -3996,11 +4004,13 @@ def score_sdimage_masked_pixels(context: Context, result: SDImagingResultItem) -
     origin = pqa.QAOrigin(metric_name='SingleDishImageMaskedPixels',
                           metric_score=metric_score,
                           metric_units='Fraction of masked pixels in image')
+    selection = pqa.TargetDataSelection(field={field}, spw=set(spw), pol={stokes})
 
     return pqa.QAScore(score,
                        longmsg=lmsg,
                        shortmsg=smsg,
-                       origin=origin)
+                       origin=origin,
+                       applies_to=selection)
 
 
 def score_sd_line_emission_off_range_at_peak(context: Context, result: SDImagingResultItem) -> pqa.QAScore:
@@ -4022,6 +4032,8 @@ def score_sd_line_emission_off_range_at_peak(context: Context, result: SDImaging
     imageitem = result.outcome['image']
     field = imageitem.sourcename
     spw = ','.join(map(str, np.unique(imageitem.spwlist)))
+    stokes = result.outcome['stokes']
+
     if emission_off_range_at_peak:
         lmsg = (f'Field {field} Spw {spw}: '
                 'Significant off-line-range emission is detected at peak.')
@@ -4037,9 +4049,9 @@ def score_sd_line_emission_off_range_at_peak(context: Context, result: SDImaging
                           metric_score=score,
                           metric_units='')
     selection = pqa.TargetDataSelection(spw=set(result.outcome['assoc_spws']),
-                                        field=set(result.outcome['assoc_fields']),
+                                        field={field},
                                         intent={'TARGET'},
-                                        pol={'I'})
+                                        pol={stokes})
     return pqa.QAScore(score,
                        longmsg=lmsg,
                        shortmsg=smsg,
@@ -4066,6 +4078,8 @@ def score_sd_line_emission_off_range_extended(context: Context, result: SDImagin
     imageitem = result.outcome['image']
     field = imageitem.sourcename
     spw = ','.join(map(str, np.unique(imageitem.spwlist)))
+    stokes = result.outcome['stokes']
+
     if emission_off_range_extended:
         lmsg = (f'Field {field} Spw {spw}: '
                 'Significant off-line-range extended emission is detected.')
@@ -4081,9 +4095,9 @@ def score_sd_line_emission_off_range_extended(context: Context, result: SDImagin
                           metric_score=score,
                           metric_units='')
     selection = pqa.TargetDataSelection(spw=set(result.outcome['assoc_spws']),
-                                        field=set(result.outcome['assoc_fields']),
+                                        field={field},
                                         intent={'TARGET'},
-                                        pol={'I'})
+                                        pol={stokes})
     return pqa.QAScore(score,
                        longmsg=lmsg,
                        shortmsg=smsg,
@@ -4117,6 +4131,8 @@ def score_sdimage_contamination(context: Context, result: SDImagingResultItem) -
     imageitem = result.outcome['image']
     field = imageitem.sourcename
     spw = ','.join(map(str, np.unique(imageitem.spwlist)))
+    stokes = result.outcome['stokes']
+
     if contaminated:
         lmsg = (f'Field {field} Spw {spw}: '
                 'Possible astronomical line contamination was detected. '
@@ -4133,9 +4149,9 @@ def score_sdimage_contamination(context: Context, result: SDImagingResultItem) -
                           metric_score=contaminated,
                           metric_units='Sign of possible line contamination')
     selection = pqa.TargetDataSelection(spw=set(result.outcome['assoc_spws']),
-                                        field=set(result.outcome['assoc_fields']),
+                                        field={field},
                                         intent={'TARGET'},
-                                        pol={'I'})
+                                        pol={stokes})
     return pqa.QAScore(score,
                        longmsg=lmsg,
                        shortmsg=smsg,
@@ -4835,7 +4851,7 @@ def score_rasterscan_correctness_imaging_raster_analysis_incomplete(result: SDIm
     Returns:
         A list of QAScores.
     """
-    msg = 'Raster scan analysis incomplete. Skipping calculation of theoretical image RMS'
+    msg = 'Raster scan analysis incomplete. Skipping calculation of Theoretical sensitivity'
     return _score_rasterscan_correctness(result.rasterscan_heuristics_results_incomp, msg)
 
 
@@ -4851,7 +4867,7 @@ def _score_rasterscan_correctness(
         msg: short message for QA
 
     Returns:
-        A lists contains QAScore objects.
+        A list contains QAScore objects.
     """
 
     qa_scores = []  # [pqa.QAScore]
@@ -4882,7 +4898,8 @@ def _rasterscan_failed_per_eb(execblock_id:str, failed_ants: list[str], msg: str
     origin = pqa.QAOrigin(metric_name='score_rasterscan_correctness',
                         metric_score=SCORE_FAIL,
                         metric_units='raster scan correctness')
-    return pqa.QAScore(SCORE_FAIL, longmsg=longmsg, shortmsg=msg, origin=origin)
+    selection = pqa.TargetDataSelection(vis={execblock_id}, ant=set(failed_ants))
+    return pqa.QAScore(SCORE_FAIL, longmsg=longmsg, shortmsg=msg, origin=origin, applies_to=selection)
 
 
 @log_qa
