@@ -616,7 +616,9 @@ def plot_data_single_bl(msw: mswrapper_sd.MSWrapperSD, max_nwave_frac = 0.1, plo
     #Get info for minimum QA score
     min_qa_score = msw.analysis['min_qascore'].score
     min_qa_scan = list(msw.analysis['min_qascore'].applies_to.scan)[0]
-    min_qa_pol = list(msw.analysis['min_qascore'].applies_to.pol)[0]
+
+    # This isn't used anywhere and created a error when the .pol is empty.
+    #min_qa_pol = list(msw.analysis['min_qascore'].applies_to.pol)[0]
     if ((type(min_qa_scan) == str) or (type(min_qa_scan) == np.str_)) and min_qa_scan.isdigit():
         min_qa_scan = int(min_qa_scan)
 

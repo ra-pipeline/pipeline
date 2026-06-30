@@ -201,7 +201,7 @@ def calc_baseline_qascore_single(
         this_score_top = 0.80
         this_score_bottom = 0.67
     else:
-        this_score_top = 0.66
+        this_score_top = 0.6
         this_score_bottom = 0.34
 
     #output variable for QA scores
@@ -257,6 +257,7 @@ def calc_baseline_qascore_single(
             intent={'*OBSERVE_TARGET#ON_SOURCE*'},
             spw={msw.spw},
             ant={msw.antenna},
+            pol={'NA'},
             field={fieldname},
         )
 
@@ -309,6 +310,7 @@ def calc_baseline_qascore_single(
                     intent={'*OBSERVE_TARGET#ON_SOURCE*'},
                     spw={msw.spw},
                     ant={msw.antenna},
+                    pol={'NA'},
                     field={fieldname},
                 )
 
@@ -727,6 +729,7 @@ def add_non_outlier_qascores(mswCollection: dict):
                     intent={'*OBSERVE_TARGET#ON_SOURCE*'},
                     spw={msw.spw},
                     ant={msw.antenna},
+                    pol={"NA"},
                     field={fieldname},
                 )
                 comes_from = pipelineqa.QAOrigin(metric_name=reason, metric_score=0.0, metric_units='Deviation from 0')
