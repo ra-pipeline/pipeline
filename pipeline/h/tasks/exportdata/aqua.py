@@ -210,13 +210,6 @@ class AquaXmlGenerator:
         for stage_result in ordered_results:
             # Create the generic stage element
             stage_name, representative_score, subscores = _get_pipeline_stage_and_scores(stage_result)
-
-            # For hifa_importdata we have added some hidden scores as to not clutter the weblog
-            # we want to have these in the AQUA report at this time (PIPE-65)
-            # thus we reextract the scores again for that stage including hidden ones
-            if stage_name == 'hifa_importdata':
-                stage_name, representative_score, subscores = _get_pipeline_stage_and_scores(stage_result, include_hidden_scores=True)
-    
             
             stage_element = ElementTree.Element('Stage',
                                                 Number=str(stage_result.stage_number),

@@ -4535,9 +4535,9 @@ def score_separation_angles(mses: MeasurementSet, sepangles: disck) -> pqa.QASco
                                 shortmsg=shortmsg,
                                 vis=ms.basename, 
                                 origin=origin,
-                                weblog_location=pqa.WebLogLocation.HIDDEN, 
+                                weblog_location=pqa.WebLogLocation.NOWEB, 
                                 applies_to=pqa.TargetDataSelection(vis={ms.basename}, field={fieldqa}, intent={intentqa}))
-                                # weblog location can be HIDDEN - do not render it
+                                # weblog location can be NOWEB - do not render it
             scores.append(score)
                                 
     return scores
