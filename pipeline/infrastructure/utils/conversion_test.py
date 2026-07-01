@@ -335,10 +335,6 @@ params_refcode_to_skyframe = [
     ('j2000', 'fk5'),
     ('FK5', 'fk5'),
     ('fk5', 'fk5'),
-    ('JMEAN', 'altaz'),
-    ('jmean', 'altaz'),
-    ('APP', 'altaz'),
-    ('app', 'altaz'),
     ('AZEL', 'altaz'),
     ('azel', 'altaz'),
     ('AZELGEO', 'altaz'),
@@ -357,7 +353,6 @@ def test_refcode_to_skyframe(casa_frame: str, expected: str):
 
     This utility function converts CASA coordinate reference frame names to
     Astropy-compatible frame names. J2000 and FK5 both map to 'fk5', while
-    JMEAN, APP, AZEL, and AZELGEO all map to 'altaz'. Other frames are
-    lowercased directly.
+    AZEL and AZELGEO both map to 'altaz'. Other frames are lowercased directly.
     """
     assert refcode_to_skyframe(casa_frame) == expected

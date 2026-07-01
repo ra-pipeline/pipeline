@@ -14,6 +14,7 @@ import math
 import os
 import re
 import string
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -811,6 +812,19 @@ def refcode_to_skyframe(refcode: str) -> str:
         csys = cs.newcoordsys(direction=True)
         clist = csys.referencecode('dir', True)
 
+    Note on AZEL vs AZELGEO:
+
+    Astropy's AltAz frame uses the WGS84 ellipsoid normal to define the local
+    vertical, which matches CASA's AZELGEO (geodetic).  CASA's AZEL (topocentric)
+    instead uses the local gravity vertical (plumb line).  The difference between
+    the two - the deflection of the vertical - is typically a few arcseconds at
+    observatory sites.  For most pipeline purposes this is negligible, but users
+    who require sub-arcsecond precision should be aware of the distinction.
+
+    References
+    ----------
+    - casacore MDirection: https://casacore.github.io/casacore/classcasacore_1_1MDirection.html
+    - astropy AltAz: https://docs.astropy.org/en/stable/api/astropy.coordinates.AltAz.html
     """
 
     frame = refcode.lower()
@@ -818,7 +832,16 @@ def refcode_to_skyframe(refcode: str) -> str:
         return 'fk5'
     elif frame == 'b1950':
         return 'fk4'
-    elif frame in ('jmean', 'app', 'azel', 'azelgeo'):
+    elif frame in ('azel', 'azelgeo'):
+        if frame == 'azel':
+            warnings.warn(
+                "CASA's AZEL (topocentric, gravity vertical) is mapped to "
+                "astropy's AltAz which uses the WGS84 ellipsoid normal - "
+                "equivalent to CASA's AZELGEO.  The deflection of the vertical "
+                "difference is typically a few arcseconds and is negligible for "
+                "reporting purposes, but may not be for all applications!",
+                stacklevel=2,
+            )
         return 'altaz'
     else:
         return frame
