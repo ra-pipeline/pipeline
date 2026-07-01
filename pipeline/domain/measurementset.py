@@ -1669,8 +1669,11 @@ class MeasurementSet:
         """Computes azimuth and elevation of a field at a given epoch.
 
         This method uses the astropy library to convert the direction
-        of a field to azimuth and elevation (AZELGEO frame) at the time
+        of a field to azimuth and elevation (astropy AltAz frame) at the time
         specified by the epoch and location of the observatory.
+
+        Note that the astropy AltAz frame is closest to the AZELGEO frame in
+        CASA, but not exactly the same.
 
         Args:
             field : Field domain object or None.
@@ -1682,7 +1685,7 @@ class MeasurementSet:
         if field is None or field.mdirection is None:
             return None
 
-        location = utils.get_observatory_location(self.antenna_array.name)
+        location = utils.casa_to_earthlocation(self.antenna_array.name)
         obs_time = Time(epoch['m0']['value'], format='mjd', scale='utc')
 
         frame = utils.refcode_to_skyframe(field.mdirection['refer'])

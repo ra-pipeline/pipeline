@@ -15,7 +15,7 @@ from pipeline.infrastructure import casa_tools, casa_tasks
 from pipeline.infrastructure.utils import caltable_tools
 from .utils import find_ranges, dict_merge, are_equal, approx_equal, flagged_intervals, \
     get_casa_quantity, fieldname_for_casa, fieldname_clean, \
-    get_field_accessor, get_field_identifiers, get_observatory_location, get_receiver_type_for_spws, place_repr_source_first, \
+    get_field_accessor, get_field_identifiers, casa_to_earthlocation, get_receiver_type_for_spws, place_repr_source_first, \
     get_taskhistory_fromimage, list_to_str, build_refantignore, obs_midtime, compute_zenith_distance
 
 if TYPE_CHECKING:
@@ -349,25 +349,57 @@ def test_obs_midtime():
     assert mid['m0']['unit'] == 'd'
 
 
-def test_get_observatory_location():
-    """Test get_observatory_location()
+def test_casa_to_earthlocation():
+    """Test casa_to_earthlocation()
 
-    This utility function returns an EarthLocation for an observatory.
-    Uses astropy site registry with hardcoded fallback for ALMA.
+    This utility function returns an EarthLocation for an observatory
+    using the CASA observatory table.  The ALMA coordinates here are
+    hardcoded to the CASA observatory table values (building location,
+    5056.8 m WGS84).  If this breaks, the CASA table may have been
+    updated — update the values to match.
     """
     from astropy.coordinates import EarthLocation
 
-    location = get_observatory_location('ALMA')
+    location = casa_to_earthlocation('ALMA')
     assert isinstance(location, EarthLocation)
+    # CASA measures.observatory('ALMA') — observatory building location
+    assert location.x.value == 2225142.18026896752417
+    assert location.y.value == -5440307.37034856062382
+    assert location.z.value == -2481029.85187354637310
 
-    alma_geocentric = (2225122.3902694373, -5440258.9852695046, -2481007.6374628348)
-    assert (location.x.value, location.y.value, location.z.value) == alma_geocentric
+
+def test_casa_to_earthlocation_compare_astropy():
+    """Compare CASA and astropy ALMA locations.
+
+    The CASA observatory table and astropy.EarthLocation.of_site('ALMA')
+    return different coordinates: CASA gives the observatory building
+    (5056.8 m WGS84), while astropy gives the antenna array location
+    (~5000 m).  The separation is roughly 700 m (3D).  See PIPE-2936
+    and PIPE-3106 for background.
+
+    If this test starts failing because the coordinates are now *closer*,
+    or if astropy.of_site('ALMA') changes, future developers should
+    re-evaluate whether switching to astropy's built-in site registry
+    makes sense for the pipeline.
+    """
+    import numpy as np
+    from astropy.coordinates import EarthLocation
+
+    location = casa_to_earthlocation('ALMA')
+    alma = EarthLocation.of_site('ALMA')
+
+    distance = np.sqrt(
+        (location.x - alma.x)**2
+        + (location.y - alma.y)**2
+        + (location.z - alma.z)**2
+    )
+    assert distance.value == pytest.approx(680.0, abs=10)
 
 
-def test_get_observatory_location_unknown_raises():
-    """Test get_observatory_location() raises ValueError for unknown observatory."""
+def test_casa_to_earthlocation_unknown_raises():
+    """Test casa_to_earthlocation() raises ValueError for unknown observatory."""
     with pytest.raises(ValueError, match='Unknown observatory'):
-        get_observatory_location('NOT_AN_OBSERVATORY')
+        casa_to_earthlocation('NOT_AN_OBSERVATORY')
 
 
 def test_compute_zenith_distance():
@@ -403,6 +435,8 @@ def test_compute_zenith_distance_regression_set1():
     epoch = {'m0': {'unit': 'd', 'value': 60462.40688407407}, 'refer': 'UTC', 'type': 'epoch'}
     zd = compute_zenith_distance(field_direction, epoch, 'ALMA', 'AZELGEO')
     assert zd['value'] == pytest.approx(0.594852971525817)
+    # Precision requirement from PIPE-1527: 2 decimal places in degrees
+    assert zd['value'] == pytest.approx(0.594852971525817, abs=np.deg2rad(0.005))
 
 
 def test_compute_zenith_distance_regression_set2():
@@ -419,3 +453,5 @@ def test_compute_zenith_distance_regression_set2():
     epoch = {'m0': {'unit': 'd', 'value': 60462.413365185195}, 'refer': 'UTC', 'type': 'epoch'}
     zd = compute_zenith_distance(field_direction, epoch, 'ALMA', 'AZELGEO')
     assert zd['value'] == pytest.approx(0.9153820259873402)
+    # Precision requirement from PIPE-1527: 2 decimal places in degrees
+    assert zd['value'] == pytest.approx(0.9153820259873402, abs=np.deg2rad(0.005))

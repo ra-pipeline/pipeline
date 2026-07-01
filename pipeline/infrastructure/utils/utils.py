@@ -20,23 +20,22 @@ import shutil
 import string
 import tarfile
 import time
+import warnings
 from collections.abc import Iterable
 from datetime import datetime, timezone
-from functools import wraps
+from functools import lru_cache, wraps
 from numbers import Number
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import numpy as np
-import numpy.typing as npt
-from astropy.coordinates import AltAz, EarthLocation, SkyCoord
+import astropy.units as u
+from astropy.coordinates import AltAz, EarthLocation, SkyCoord, SphericalRepresentation
 from astropy.time import Time
 
 from pipeline import infrastructure
 from pipeline.infrastructure import casa_tools
 from .conversion import commafy, dequote, range_to_list, refcode_to_skyframe
-
-_ALMA_GEOCENTRIC = (2225122.3902694373, -5440258.9852695046, -2481007.6374628348)  # CASA WGS84 coords
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Collection, Iterator, Sequence
@@ -60,9 +59,9 @@ __all__ = [
     'are_equal',
     'build_refantignore',
     'clear_time_cache',
+    'casa_to_earthlocation',
     'compute_zenith_distance',
     'deduplicate',
-    'get_observatory_location',
     'dict_merge',
     'ensure_products_dir_exists',
     'export_weblog_as_tar',
@@ -1157,27 +1156,75 @@ def obs_long_lat(observatory: str) -> tuple[QuantityDict, QuantityDict]:
     return observatory['m0'], observatory['m1']
 
 
-def get_observatory_location(observatory: str) -> EarthLocation:
-    """Get EarthLocation for an observatory.
+@lru_cache(maxsize=32)
+def casa_to_earthlocation(observatory: str) -> EarthLocation:
+    """Convert a CASA observatory name to an Astropy EarthLocation.
 
-    Uses hardcoded geocentric coordinates for ALMA to match CASA's WGS84 values.
-    For other observatories, uses astropy's site registry.
+    Uses CASA's observatory table to look up the observatory position, then
+    converts it to an Astropy EarthLocation.  The CASA observatory table
+    provides positions in WGS84 (geodetic) or ITRF (geocentric) reference
+    frames. For WGS84, height is above the ellipsoid; for ITRF, the distance
+    is from the Earth's centre.
 
-    Args:
-        observatory: Name of the observatory (e.g., 'ALMA', 'VLA').
+    Caching is handled by ``functools.lru_cache`` so repeated lookups for
+    the same observatory are free after the first call.
 
-    Returns:
-        EarthLocation object for the observatory.
+    Parameters
+    ----------
+    observatory : str
+        Name of the observatory as known to ``casa_tools.measures.observatory``
+        (e.g. ``'ALMA'``, ``'VLA'``, ``'NRO'``).
 
-    Raises:
-        ValueError: If the observatory is not recognized.
+    Returns
+    -------
+    EarthLocation
+        Astropy EarthLocation for the observatory.
+
+    Raises
+    ------
+    NotImplementedError
+        If the CASA position uses a reference frame other than WGS84 or ITRF.
+
+    Notes
+    -----
+    This replaces the previous approach of hardcoding ALMA's geocentric
+    coordinates.  The CASA observatory table returns positions that may differ
+    from astropy's built-in site registry (``EarthLocation.of_site``) and from
+    the physical telescope position (CASA returns the observatory building
+    coordinates).  For ALMA the CASA height is 5056.8 m (WGS84) while astropy's
+    ``of_site('alma')`` returns 5000 m.  These differences are well below the
+    pipeline's 2-decimal-place (degree) precision requirement for zenith
+    distance (see PIPE-1527).
+
+    There is also a separately hardcoded ALMA position in
+    ``pipeline/hifa/tasks/flagging/flagdeteralma.py`` which historically used
+    the astropy ``of_site`` value; this PR consolidates it to use the same
+    CASA-based lookup.
     """
-    if observatory.upper() == 'ALMA':
-        return EarthLocation.from_geocentric(*_ALMA_GEOCENTRIC, unit='m')
+    me = casa_tools.measures
     try:
-        return EarthLocation.of_site(observatory)
-    except Exception:
-        raise ValueError(f"Unknown observatory: {observatory!r}") from None
+        casa_pos = me.observatory(observatory)
+    except Exception as exc:
+        raise ValueError(f"Unknown observatory: {observatory!r}") from exc
+    me.done()
+    if casa_pos.get('type') != 'position':
+        raise ValueError(f"Unknown observatory: {observatory!r}")
+
+    ref_frame = casa_pos['refer']
+    lon = casa_pos['m0']['value'] * u.Unit(casa_pos['m0']['unit'])
+    lat = casa_pos['m1']['value'] * u.Unit(casa_pos['m1']['unit'])
+    m2 = casa_pos['m2']['value'] * u.Unit(casa_pos['m2']['unit'])
+
+    if ref_frame == 'WGS84':
+        return EarthLocation.from_geodetic(lon=lon, lat=lat, height=m2, ellipsoid='WGS84')
+    elif ref_frame == 'ITRF':
+        spherical_coords = SphericalRepresentation(lon=lon, lat=lat, distance=m2)
+        cartesian = spherical_coords.to_cartesian()
+        return EarthLocation.from_geocentric(x=cartesian.x, y=cartesian.y, z=cartesian.z)
+    else:
+        raise NotImplementedError(
+            f"CASA reference frame '{ref_frame}' is not yet supported by this function."
+        )
 
 
 def obs_midtime(start_time: datetime, end_time: datetime) -> EpochDict:
@@ -1190,7 +1237,7 @@ def compute_zenith_distance(
         field_direction: DirectionDict,
         epoch: EpochDict,
         observatory: str,
-        coordinate_frame: str = 'AZELGEO',
+        coordinate_frame: str | None = None,
         ) -> QuantityDict:
     """Calculate zenith distance for a field at a given time and observatory.
 
@@ -1201,8 +1248,10 @@ def compute_zenith_distance(
         field_direction: CASA direction measure dictionary for the field.
         epoch: CASA epoch measure dictionary for the observation time.
         observatory: Name of the observatory (e.g., 'VLA', 'ALMA').
-        coordinate_frame: Coordinate frame for the calculation (e.g., 'AZELGEO', 'AZEL').
-            Defaults to 'AZELGEO'.
+        coordinate_frame: Deprecated.  Previously used to specify the target
+            frame (e.g., 'AZELGEO').  The function now always transforms to
+            ``AltAz`` (which matches CASA's AZELGEO).  If provided, a
+            deprecation warning is emitted and the value is ignored.
 
     Returns:
         A CASA quantity dictionary containing the zenith distance in radians.
@@ -1215,7 +1264,16 @@ def compute_zenith_distance(
         >>> zd = compute_zenith_distance(direction, epoch, 'VLA')
         >>> print(f"{zd['value']:.2f} rad")
     """
-    location = get_observatory_location(observatory)
+    if coordinate_frame is not None:
+        warnings.warn(
+            "The 'coordinate_frame' parameter is deprecated and will be "
+            "removed in a future version.  The function always transforms "
+            "to AltAz (equivalent to CASA's AZELGEO).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    location = casa_to_earthlocation(observatory)
     obs_time = Time(epoch['m0']['value'], format='mjd', scale='utc')
 
     frame = refcode_to_skyframe(field_direction['refer'])
