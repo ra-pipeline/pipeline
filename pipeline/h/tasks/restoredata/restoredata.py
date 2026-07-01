@@ -253,6 +253,10 @@ class RestoreData(basetask.StandardTaskTemplate):
 
         applied = False
 
+        if not pipemanifest:
+            LOG.warning('No manifest found. Not applying renormalization.')
+            return applied
+
         # Loop over sessions
         for index, session in enumerate(session_names):
 
