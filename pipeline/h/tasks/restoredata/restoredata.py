@@ -196,12 +196,15 @@ class RestoreData(basetask.StandardTaskTemplate):
         #   a file naming scheme is used. The latter is deprecated as it
         #   requires the exportdata / restoredata tasks to be synchronized
         #   but it is maintained for testing purposes.
+        oussid = inputs.context.get_oussid()
         if inputs.copytoraw:
-            self._do_copy_manifest_toraw('*pipeline_manifest.xml')
-            pipemanifest = self._do_get_manifest('*pipeline_manifest.xml', '*cal*pipeline_manifest.xml')
+            self._do_copy_manifest_toraw('*{oussid}*pipeline_manifest.xml')
+            pipemanifest = self._do_get_manifest(f'*{oussid}*pipeline_manifest.xml',
+                                                 f'*{oussid}*cal*pipeline_manifest.xml')
             self._do_copytoraw(pipemanifest)
         else:
-            pipemanifest = self._do_get_manifest('*pipeline_manifest.xml', '*cal*pipeline_manifest.xml')
+            pipemanifest = self._do_get_manifest(f'*{oussid}*pipeline_manifest.xml',
+                                                 f'*{oussid}*cal*pipeline_manifest.xml')
 
         # Convert ASDMS assumed to be on disk in rawdata_dir. After this step
         # has been completed the MS and MS.flagversions directories will exist
