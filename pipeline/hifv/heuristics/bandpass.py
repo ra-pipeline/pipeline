@@ -241,11 +241,11 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
         solint_smooth = f"inf,{int(Nbin)}ch"
 
         LOG.info(f"SPW {bad_spw}: median S/N={snr:.1f}, rerunning with solint='{solint_smooth}'")
-
+        append = os.path.exists(caltable)
         bandpass_task_args.update({
             'spw': str(bad_spw),
             'solint': solint_smooth,
-            'append': True,
+            'append': append,
         })
 
         job = casa_tasks.bandpass(**bandpass_task_args)
