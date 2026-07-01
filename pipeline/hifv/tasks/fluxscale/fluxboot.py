@@ -1106,7 +1106,7 @@ class Fluxboot(basetask.StandardTaskTemplate):
 
             for fieldidstring in fieldidlist:
                 fieldid = int(fieldidstring)
-                uvrangestring = uvrange(self.setjy_results, fieldidstring)
+                uvrangestring = uvrange(self.setjy_results, fieldid)
                 task_args['field'] = fieldidstring
                 task_args['uvrange'] = uvrangestring
                 task_args['selectdata'] = True
@@ -1146,7 +1146,7 @@ class Fluxboot(basetask.StandardTaskTemplate):
                 if len(fieldobjlist) > 1:
                     LOG.debug('Multiple fields match name %s, using first (id=%s)', field, fieldobjlist[0].id)
                 fieldid = fieldobjlist[0].id
-                uvrangestring = uvrange(self.setjy_results, str(fieldid))
+                uvrangestring = uvrange(self.setjy_results, fieldid)
                 task_args['uvrange'] = uvrangestring
                 task_args['selectdata'] = True
             else:
