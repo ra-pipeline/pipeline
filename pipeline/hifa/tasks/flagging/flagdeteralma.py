@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
-from astropy.coordinates import AltAz, EarthLocation, SkyCoord
+from astropy.coordinates import AltAz, SkyCoord
 from astropy.time import Time
 
 import pipeline.domain.measures as measures
@@ -791,7 +791,7 @@ def get_elevation_for_alma_scan(scan, edge):
     Returns:
         Astropy quantity corresponding to the elevation.
     """
-    alma_site = EarthLocation.from_geocentric(x=2225015.30883296, y=-5440016.41799762, z=-2481631.27428014, unit='m')
+    alma_site = utils.casa_to_earthlocation('ALMA')
     scan_field = next(iter(scan.fields))
     coords = SkyCoord(
         scan_field.mdirection['m0']['value'],  # RA
