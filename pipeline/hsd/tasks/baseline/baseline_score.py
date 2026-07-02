@@ -13,7 +13,16 @@ from pipeline.extern.sd_baseline_qa.sd_qa_utils import FailedAnalysisException
 
 LOG = infrastructure.get_logger(__name__)
 
-def _science_lines(context, results):
+def _science_lines(context, results)->list:
+    """
+    Parse context and results to extract relevant science lines.
+    Args:
+        context: single-dish pipeline context
+        results: a list of results data related to the current baseline pass
+
+    Returns: science lines list
+
+    """
     reduction_group = context.observing_run.ms_reduction_group
 
     outcome_data = [lines["channelmap_range"] for lines in results.outcome["baselined"]]
