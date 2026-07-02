@@ -12,6 +12,8 @@ import pipeline.qa.scorecalculator as qacalc
 
 from . import baseline
 
+import pipeline.hsd.tasks.baseline.baseline_score as bs
+
 if TYPE_CHECKING:
     from pipeline.infrastructure.launcher import Context
 
@@ -65,6 +67,23 @@ class SDBaselineQAHandler(pqa.QAPlugin):
         scores.extend(
             qacalc.score_sd_line_detection(context.observing_run.ms_reduction_group, result)
         )
+
+        ###
+        # Add qa_score to results
+        # result.outcome["profile_qa_score"] = {}
+
+        # We will run this for each output measurementset. It would be better to do the QA calculation above as part of
+        # the general analysis. Perhaps this can be done at a later time.
+
+        for basename, outfile in result.outcome["outfile"].items():
+            original_ms = context.observing_run.get_ms(basename).origin_ms
+            qa_score_dict = bs.baseline_score(results=result, context=context, file_info=(original_ms, outfile))
+
+            if not qa_score_dict is None:
+                result.outcome["profile_qa_score"] = {}
+                result.outcome["profile_qa_score"][outfile] = qa_score_dict
+
+        ###
 
         if result.outcome["profile_qa_score"]:
             # XX-YY profile heuristic PIPE-2961

@@ -940,6 +940,14 @@ def human_file_size(size_in_bytes: int | float) -> str:
 
 
 def set_to_data(s: set[Any | list[Any]])-> Any | list[Any]:
+    """
+    Converts a set() to a list of a single value depending on what is contained within.
+    Args:
+        s: set to be converted
+
+    Returns: returns a list ot a single value depending on what is contained within. Returns None is structure is not a set()
+
+    """
     SINGLE = 1
 
     if not isinstance(s, set):
