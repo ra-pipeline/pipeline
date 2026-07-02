@@ -97,6 +97,7 @@ line detection stage.</p>
 <li><a href="#flatnessafterbaseline">Baseline Flatness After baseline Subtraction</a></li>
 % if detail is not None:
 <li><a href="#clusteranalysis">Line Detection by Clustering Analysis</a></li>
+<li><a href="#profileheuristic"> Profile Heuristic Analysis XXYY </a></li>
 % endif
 </ul>
 % if profile_heuristic_subpages:
