@@ -739,20 +739,6 @@ class SDBaseline(basetask.StandardTaskTemplate):
             outcome=outcome
         )
 
-
-        # Add qa_score to results
-        results.outcome["profile_qa_score"] = {}
-
-        # We will run this for each output measurementset. It would be better to do the QA calculation above as part of
-        # the general analysis. Perhaps this can be done at a later time.
-
-        for basename, outfile in vis_map.items():
-            original_ms = context.observing_run.get_ms(basename).origin_ms
-            qa_score_dict = bs.baseline_score(results=results, context=context, file_info=(original_ms, outfile))
-
-            if not qa_score_dict is None:
-                results.outcome["profile_qa_score"][outfile] = qa_score_dict
-
         return results
 
     def analyse(self, result: SDBaselineResults) -> SDBaselineResults:
