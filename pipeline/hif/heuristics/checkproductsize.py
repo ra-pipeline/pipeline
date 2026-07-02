@@ -207,8 +207,9 @@ class CheckProductSizeHeuristics:
         # keep the repSpW but can throw all others
         if (self.inputs.maxcubesize != -1.0) and (maxcubesize > self.inputs.maxcubesize):
             # Check is the representative SpW is one already exceeding the cube limit
-            # if so we don't even try mitigation as we explicitiy need to keep the repr_spw
-            if cubesizes[str(repr_spw)] < self.inputs.maxcubesize:
+            # if so we don't even try mitigation as we explicitiy know the
+            # rep SpW is aleady past the hard limit
+            if cubesizes[str(repr_spw)] < self.inputs.maxcubelimit:
                 # build the mitigated spw list
                 mitigated_spws = [str(repr_spw)]
                 
@@ -220,9 +221,11 @@ class CheckProductSizeHeuristics:
                 other_cube_info = list(zip(other_cube_spws, other_cube_frequencies, other_cube_cubesizes))
                 # Sort spw list by cubesize and frequency
                 other_cube_info = sorted(other_cube_info, key=operator.itemgetter(2, 1))
-                # append the spws if below the maxcubesize
+                # check each cube now based on the maxcubelimit, which is the
+                # absolute maximum allowed to go through, this minimizes
+                # reducing the SpW unnecessarily at this stage.
                 for other_cube_spw, other_cube_frequency, other_cube_cubesizes in other_cube_info:
-                    if (cubesizes[other_cube_spw] < self.inputs.maxcubesize):
+                    if (cubesizes[other_cube_spw] < self.inputs.maxcubelimit):
                         mitigated_spws.append(other_cube_spw)
       
                 size_mitigation_parameters['spw'] = ','.join(map(str, sorted(mitigated_spws)))
@@ -247,7 +250,7 @@ class CheckProductSizeHeuristics:
 
                 LOG.info('spw mitigation leads to a maximum cube size of %s GB' % (maxcubesize))
             else:
-                LOG.info('spw mitigation cannot remove any spws: repSpW already exceeds the maxcubesize')
+                LOG.info('spw mitigation cannot remove any spws: repSpW already exceeds the maxcubelimit')
 
         # Save cube mitigated product size for logs
         cube_mitigated_productsize = total_productsize
