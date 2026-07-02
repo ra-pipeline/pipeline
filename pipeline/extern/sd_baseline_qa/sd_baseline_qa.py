@@ -257,7 +257,7 @@ def calc_baseline_qascore_single(
             intent={'*OBSERVE_TARGET#ON_SOURCE*'},
             spw={msw.spw},
             ant={msw.antenna},
-            pol={'NA'},
+            #pol={'NA'},
             field={fieldname},
         )
 
@@ -269,7 +269,7 @@ def calc_baseline_qascore_single(
             shortmsg='Baseline deviation',
             origin=comes_from,
             applies_to=applies_to,
-            hierarchy=reason
+            #hierarchy=reason
         )
 
         return msw, qascore, [qascore], 'N/A'
@@ -310,7 +310,7 @@ def calc_baseline_qascore_single(
                     intent={'*OBSERVE_TARGET#ON_SOURCE*'},
                     spw={msw.spw},
                     ant={msw.antenna},
-                    pol={'NA'},
+                    #pol={'NA'},
                     field={fieldname},
                 )
 
