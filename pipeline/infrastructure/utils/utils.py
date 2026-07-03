@@ -1327,9 +1327,8 @@ def compute_zenith_distance_vectorized_epochs(
     )
 
     altaz_frame = AltAz(obstime=obs_times, location=location)
-    coords_altaz = coords.transform_to(altaz_frame)
     with erfa_astrom.set(ErfaAstromInterpolator(300 * u.s)):
-        coords_altaz_interpolated = altaz_frame.transform_to(frame)
+        coords_altaz_interpolated = coords.transform_to(altaz_frame)
 
     zenith_distance_rad = np.pi / 2.0 - coords_altaz_interpolated.alt.rad
 
