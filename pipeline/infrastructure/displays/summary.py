@@ -1112,7 +1112,7 @@ class UVChart:
             wavelength_m = 299792458 / float(spw.max_frequency.to_units(measures.FrequencyUnits.HERTZ))
             bl_max = float(ms.antenna_array.baseline_max.length.to_units(measures.DistanceUnits.METRE))
             self.uv_max = math.ceil(1.05 * bl_max / wavelength_m)
-            
+            # PIPE-1780
             if custom_plot_flags is not None:
                 self.custom_plot_flags = custom_plot_flags
                 
@@ -1147,18 +1147,11 @@ class UVChart:
             'width': 1000
         }
         # PIPE-1780: Include additional plotting flags.
+        # FIXME hieronder: cleaning.
         if self.custom_plot_flags is not None:
-            task_args.update(self.custom_plot_flags)
             # Reduce number of channels (optimisation)
-            represent_source_spw, represent_spw_id = self._get_representative_source_and_spwid()
-            rep_spw = self.ms.get_spectral_window(represent_spw_id)
-            num_chan = len(rep_spw.channels)
-            #
-            spwPlt_txt = str(represent_spw_id)+ ":" + str(num_chan//2)
-            spwPlt_txt = spwPlt_txt + ";" + str(num_chan//4)
-            spwPlt_txt = spwPlt_txt + ";" + str( 3 * num_chan//4)
-            #
-            task_args["spw"] = spwPlt_txt
+            task_args.update(self.custom_plot_flags)
+            # task_args["avgchannel"] = ""
         #
         task = casa_tasks.plotms(**task_args)
 
