@@ -31,6 +31,7 @@ from urllib.parse import urlparse
 import numpy as np
 import astropy.units as u
 from astropy.coordinates import AltAz, EarthLocation, SkyCoord, SphericalRepresentation
+from astropy.coordinates.erfa_astrom import erfa_astrom, ErfaAstromInterpolator
 from astropy.time import Time
 
 from pipeline import infrastructure
@@ -61,6 +62,7 @@ __all__ = [
     'clear_time_cache',
     'casa_to_earthlocation',
     'compute_zenith_distance',
+    'compute_zenith_distance_vectorized_epochs',
     'deduplicate',
     'dict_merge',
     'ensure_products_dir_exists',
@@ -1279,6 +1281,59 @@ def compute_zenith_distance(
     zenith_distance_rad = np.pi / 2.0 - coords_altaz.alt.rad
 
     return {'value': zenith_distance_rad, 'unit': 'rad'}
+
+
+def compute_zenith_distance_vectorized_epochs(
+        field_direction: DirectionDict,
+        epochs: Sequence[EpochDict],
+        observatory: str,
+        ) -> list[QuantityDict]:
+    """Like compute_zenith_distance, but accepts a sequence of epochs and
+    returns a list of zenith distances. Calculation happens using the
+    astropy ErfaAstromInterpolator, which avoids recalculating the Earth
+    orientation parameters for each individual point for each epoch, which
+    the most expensive part of the coordinate transformation. See
+    https://docs.astropy.org/en/latest/coordinates/index.html#improving-performance-for-arrays-of-obstime
+
+    Args:
+        field_direction: CASA direction measure dictionary for the field.
+        epochs: Sequence of CASA epoch measure dictionaries for the observation times.
+        observatory: Name of the observatory (e.g., 'VLA', 'ALMA').
+
+    Returns:
+        A list of CASA quantity dictionaries containing the zenith distances in radians.
+
+    Examples:
+        >>> direction = {'m0': {'value': 4.18879, 'unit': 'rad'},
+        ...              'm1': {'value': 0.58534, 'unit': 'rad'},
+        ...              'refer': 'J2000', 'type': 'direction'}
+        >>> epochs = [{'m0': {'value': 58089.82, 'unit': 'd'}, 'refer': 'UTC', 'type': 'epoch'}]
+        >>> zd = compute_zenith_distance_vectorized_epochs(direction, epochs, 'VLA')
+        >>> print(f"{zd[0]['value']:.2f} rad")
+    """
+    location = casa_to_earthlocation(observatory)
+
+    obs_times = []
+    for epoch in epochs:
+        obs_times.append(Time(epoch['m0']['value'], format='mjd', scale='utc'))
+
+    frame = refcode_to_skyframe(field_direction['refer'])
+
+    coords = SkyCoord(
+        field_direction['m0']['value'],
+        field_direction['m1']['value'],
+        frame=frame,
+        unit=(field_direction['m0']['unit'], field_direction['m1']['unit']),
+    )
+
+    altaz_frame = AltAz(obstime=obs_times, location=location)
+    coords_altaz = coords.transform_to(altaz_frame)
+    with erfa_astrom.set(ErfaAstromInterpolator(300 * u.s)):
+        coords_altaz_interpolated = altaz_frame.transform_to(frame)
+
+    zenith_distance_rad = np.pi / 2.0 - coords_altaz_interpolated.alt.rad
+
+    return [{'value': zd, 'unit': 'rad'} for zd in zenith_distance_rad]
 
 
 def get_row_count(table_name: str, taql: str) -> int:

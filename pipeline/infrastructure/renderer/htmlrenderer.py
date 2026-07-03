@@ -2035,16 +2035,21 @@ def compute_zd_telmjd_for_ms(
             }
 
         # Calculate zenith distance for each unique timestamp in the field
+        epochs = []
+        obs_times = []
         for time_seconds in field.time:
             obs_time = mjd_epoch + datetime.timedelta(seconds=float(time_seconds))
-            epoch = casa_tools.measures.epoch('utc', obs_time.isoformat())
+            epochs.append(casa_tools.measures.epoch('utc', obs_time.isoformat()))
+            obs_times.append(obs_time)
 
-            # Calculate zenith distance at this timestamp
-            zd_rad = utils.compute_zenith_distance(
-                field_direction=field._mdirection,
-                epoch=epoch,
-                observatory=observatory,
-            )
+        # Calculate zenith distance at this timestamp
+        zd_rads = utils.compute_zenith_distance_vectorized_epochs(
+            field_direction=field._mdirection,
+            epochs=epochs,
+            observatory=observatory,
+        )
+
+        for zd_rad, obs_time in zip(zd_rads, obs_times):
             zd_deg = casa_tools.quanta.convert(zd_rad, 'deg')['value']
 
             data[field.id]['zd'].append(zd_deg)
