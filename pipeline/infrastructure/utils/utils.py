@@ -1313,9 +1313,8 @@ def compute_zenith_distance_vectorized_epochs(
     """
     location = casa_to_earthlocation(observatory)
 
-    obs_times = []
-    for epoch in epochs:
-        obs_times.append(Time(epoch['m0']['value'], format='mjd', scale='utc'))
+    epoch_array = np.array([epoch['m0']['value'] for epoch in epochs])
+    obs_times = Time(epoch_array, format='mjd', scale='utc')
 
     frame = refcode_to_skyframe(field_direction['refer'])
 
