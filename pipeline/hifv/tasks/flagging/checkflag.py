@@ -5,10 +5,8 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
-from pipeline.hifv.heuristics import (RflagDevHeuristic, mssel_valid,
-                                      set_add_model_column_parameters)
-from pipeline.infrastructure import (casa_tasks, casa_tools, task_registry,
-                                     utils)
+from pipeline.hifv.heuristics import RflagDevHeuristic, mssel_valid, set_add_model_column_parameters
+from pipeline.infrastructure import casa_tasks, casa_tools, task_registry, utils
 from pipeline.infrastructure.contfilehandler import contfile_to_spwsel
 
 from .displaycheckflag import checkflagSummaryChart
@@ -25,9 +23,10 @@ class CheckflagInputs(vdp.StandardInputs):
 
     checkflagmode = vdp.VisDependentProperty(default='')
     overwrite_modelcol = vdp.VisDependentProperty(default=False)
+    usecontdat = vdp.VisDependentProperty(default=True)
 
     # docstring and type hints: supplements hifv_checkflag
-    def __init__(self, context, vis=None, checkflagmode=None, overwrite_modelcol=None, growflags=None):
+    def __init__(self, context, vis=None, checkflagmode=None, overwrite_modelcol=None, growflags=None, usecontdat=None):
         """Initialize Inputs.
 
         Args:
@@ -71,6 +70,10 @@ class CheckflagInputs(vdp.StandardInputs):
                 - default=True, for 'bpd-vla', 'allcals-vla', 'bpd', and 'allcals.'
                 - default=False, for '' and 'semi'
 
+            usecontdat: If True (default), use cont.dat file if present (only for checkflagmode='target-vla')
+                to restrict flagging to specified spectral windows.
+                If False, ignore any cont.dat file and apply flagging to all spectral windows.
+
         """
         super().__init__()
         self.context = context
@@ -81,6 +84,7 @@ class CheckflagInputs(vdp.StandardInputs):
             self.growflags = self.checkflagmode not in ('', 'semi')
         else:
             self.growflags = growflags
+        self.usecontdat = usecontdat
 
 
 class CheckflagResults(basetask.Results):
@@ -199,13 +203,20 @@ class Checkflag(basetask.StandardTaskTemplate):
                                      merge='replace')
         self._executor.execute(job)
 
-        # decide on if we use cont.dat for target-vla
+        # Decide if we use cont.dat for target-vla (inputs.usecontdat is the user's request).
         use_contdat = False
         if self.inputs.checkflagmode == 'target-vla':
-            fielddict = contfile_to_spwsel(self.inputs.vis, self.inputs.context)
-            if fielddict != {}:
-                LOG.info('cont.dat file present.  Using VLA Spectral Line Heuristics for checkflagmode=target-vla.')
-                use_contdat = True
+            if self.inputs.usecontdat:
+                fielddict = contfile_to_spwsel(self.inputs.vis, self.inputs.context)
+                if fielddict != {}:
+                    LOG.info('usecontdat=True and cont.dat found: Using VLA Spectral Line Heuristics '
+                             'for checkflagmode=target-vla.')
+                    use_contdat = True
+                else:
+                    LOG.warning('usecontdat=True but no cont.dat found or empty: '
+                                'Applying flagging to all spectral windows.')
+            else:
+                LOG.info('usecontdat=False: Applying flagging to all spectral windows.')
 
         if use_contdat:
             # cont.dat is present for target-vla, do the field-by-field flagging

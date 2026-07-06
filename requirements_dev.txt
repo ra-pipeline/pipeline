@@ -1,7 +1,7 @@
 ### Pipeline Development, Testing, and Debugging Tools ###
 
 # Testing Framework
-pytest                  # Core testing framework
+pytest>=7.3             # Core testing framework
 pytest-xdist            # https://github.com/pytest-dev/pytest-xdist
 pytest-cov              # https://github.com/pytest-dev/pytest-cov
 pytest-html             # https://pypi.org/project/pytest-html/

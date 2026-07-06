@@ -1,3 +1,6 @@
+"""Result objects for the tclean pipeline task."""
+# ruff: noqa: D102, D105, D107
+
 import collections
 import copy
 import os.path
@@ -5,7 +8,6 @@ import os.path
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.utils as utils
-
 from pipeline.h.tasks.common.displays import sky as sky
 from pipeline.hif.tasks.makeimlist.cleantarget import CleanTargetInfo
 
@@ -13,6 +15,8 @@ LOG = infrastructure.get_logger(__name__)
 
 
 class BoxResult(basetask.Results):
+    """Result object for a boxing (clean mask) sub-step."""
+
     def __init__(self):
         super().__init__()
         self.threshold = None
@@ -28,6 +32,8 @@ class BoxResult(basetask.Results):
 
 
 class TcleanResult(basetask.Results):
+    """Result object for a tclean imaging task."""
+
     def __init__(self, vis=None, datacolumn=None, datatype=None, datatype_info=None,
                  sourcename=None, field_ids=None, intent=None, spw=None,
                  hm_specmode=None, specmode=None, stokes=None, multiterm=None, plotdir=None,
@@ -64,6 +70,10 @@ class TcleanResult(basetask.Results):
         self._image_min_iquv = [0.0, 0.0, 0.0, 0.0]
         self._image_max = 0.0
         self._image_max_iquv = [0.0, 0.0, 0.0, 0.0]
+        self._nonpbcor_image_min = 0.0
+        self._nonpbcor_image_min_iquv = [0.0, 0.0, 0.0, 0.0]
+        self._nonpbcor_image_max = 0.0
+        self._nonpbcor_image_max_iquv = [0.0, 0.0, 0.0, 0.0]
         self._image_rms = 0.0
         self._image_rms_iquv = [0.0, 0.0, 0.0, 0.0]
         self._image_rms_min = 0.0
@@ -105,6 +115,7 @@ class TcleanResult(basetask.Results):
         self.im_names = {}
 
     def merge_with_context(self, context):
+        """Merge result into the pipeline context."""
         # Calculated beams for later stages
         if self.synthesized_beams is not None:
             if 'recalc' in self.synthesized_beams:
@@ -130,11 +141,12 @@ class TcleanResult(basetask.Results):
         # Remove heuristics objects to avoid accumulating large amounts of unnecessary memory
         try:
             del self.inputs['image_heuristics']
-        except:
+        except Exception:
             pass
 
     def empty(self):
-        return not(self._psf or self._model or self._flux or 
+        """Return True if no imaging products have been stored yet."""
+        return not(self._psf or self._model or self._flux or
           self.iterations!={})
 
     # this is used to generate a pipeline product, not used by weblog
@@ -202,10 +214,11 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('cube_sigma_fc_chans')
 
     def set_cube_sigma_fc_chans(self, iter, cube_sigma_fc_chans):
-        '''
-        Sets sigma of cube computed from line-free channels of non-primary beam corrected cube
-        image for iter iteration step.
-        '''
+        """Sets sigma of cube.
+        
+        The sigma value is computed from line-free channels of non-primary beam
+        corrected cube image for iter iteration step.
+        """
         self.iterations[iter]['cube_sigma_fc_chans'] = cube_sigma_fc_chans
 
     @property
@@ -214,10 +227,11 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('cube_scaledMAD_fc_chans')
 
     def set_cube_scaledMAD_fc_chans(self, iter, cube_scaledMAD_fc_chans):
-        '''
-        Sets channel scaled MAD of cube computed from line-free channels of non-primary beam corrected cube
-        image for iter iteration step.
-        '''
+        """Sets channel scaled MAD of cube.
+        
+        The scaled MAD value is computed from line-free channels of non-primary beam
+        corrected cube image for iter iteration step.
+        """
         self.iterations[iter]['cube_scaledMAD_fc_chans'] = cube_scaledMAD_fc_chans
 
     @property
@@ -226,10 +240,11 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom0_fc')
 
     def set_mom0_fc(self, iter, image):
-        '''
-        Sets name of moment 0 image computed from line-free channels of non-primary beam corrected cube
-        image for iter iteration step.
-        '''
+        """Sets name of moment 0 image.
+
+        The moment map is computed from line-free channels of non-primary beam corrected
+        cubeimage for iter iteration step.
+        """
         self.iterations[iter]['mom0_fc'] = image
 
     @property
@@ -238,10 +253,11 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom8_fc')
 
     def set_mom8_fc(self, iter, image):
-        '''
-        Sets name of moment 8 image computed from line-free channels of non-primary beam corrected cube
-        image for iter iteration step.
-        '''
+        """Sets name of moment 8 image.
+         
+        The moment map is computed from line-free channels of non-primary beam corrected
+        cubeimage for iter iteration step.
+        """
         self.iterations[iter]['mom8_fc'] = image
 
     @property
@@ -250,10 +266,11 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom8_fc_image_min')
 
     def set_mom8_fc_image_min(self, iter, image_min):
-        '''
-        Sets image minimum of moment 8 image computed from line-free channels of non-primary beam corrected cube
-        image for iter iteration step.
-        '''
+        """Sets image minimum of moment 8 image.
+         
+        The moment map is computed from line-free channels of non-primary beam corrected
+        cube image for iter iteration step.
+        """
         self.iterations[iter]['mom8_fc_image_min'] = image_min
 
     @property
@@ -262,10 +279,11 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom8_fc_image_max')
 
     def set_mom8_fc_image_max(self, iter, image_max):
-        '''
-        Sets image maximum of moment 8 image computed from line-free channels of non-primary beam corrected cube
-        image for iter iteration step.
-        '''
+        """Sets image maximum of moment 8 image.
+        
+        The moment map is computed from line-free channels of non-primary beam corrected
+        cube image for iter iteration step.
+        """
         self.iterations[iter]['mom8_fc_image_max'] = image_max
 
     @property
@@ -274,10 +292,11 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom8_fc_image_median_all')
 
     def set_mom8_fc_image_median_all(self, iter, image_median_all):
-        '''
-        Sets image median of moment 8 image computed from line-free channels of non-primary beam corrected cube
-        image for iter iteration step.
-        '''
+        """Sets image median of moment 8 image.
+         
+        The moment map is computed from line-free channels of non-primary beam corrected
+        cube image for iter iteration step.
+        """
         self.iterations[iter]['mom8_fc_image_median_all'] = image_median_all
 
     @property
@@ -286,10 +305,11 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom8_fc_image_median_annulus')
 
     def set_mom8_fc_image_median_annulus(self, iter, image_median_annulus):
-        '''
-        Sets image annulus median of moment 8 image computed from line-free channels of non-primary beam corrected cube
-        image for iter iteration step.
-        '''
+        """Sets image annulus median of moment 8 image.
+         
+        The moment map is computed from line-free channels of non-primary beam corrected
+        cube image for iter iteration step.
+        """
         self.iterations[iter]['mom8_fc_image_median_annulus'] = image_median_annulus
 
     @property
@@ -298,10 +318,11 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom8_fc_image_mad')
 
     def set_mom8_fc_image_mad(self, iter, image_mad):
-        '''
-        Sets image MAD of moment 8 image computed from line-free channels of non-primary beam corrected cube
-        image for iter iteration step.
-        '''
+        """Sets image MAD of moment 8 image.
+         
+        The moment map is computed from line-free channels of non-primary beam corrected
+        cube image for iter iteration step.
+        """
         self.iterations[iter]['mom8_fc_image_mad'] = image_mad
 
     @property
@@ -310,10 +331,11 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom8_fc_peak_snr')
 
     def set_mom8_fc_peak_snr(self, iter, mom8_fc_peak_snr):
-        '''
-        Sets peak SNR of moment 8 image computed from line-free channels of non-primary beam corrected cube
-        image for iter iteration step.
-        '''
+        """Sets peak SNR of moment 8 image.
+         
+        The moment map is computed from line-free channels of non-primary beam corrected
+        cube image for iter iteration step.
+        """
         self.iterations[iter]['mom8_fc_peak_snr'] = mom8_fc_peak_snr
 
     @property
@@ -322,10 +344,11 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom8_fc_n_pixels')
 
     def set_mom8_fc_n_pixels(self, iter, n_pixels):
-        '''
-        Sets number of unmasked pixels of moment 8 image computed from line-free channels of non-primary beam corrected cube
-        image for iter iteration step.
-        '''
+        """Sets number of unmasked pixels of moment 8 image.
+         
+        The moment map is computed from line-free channels of non-primary beam corrected
+        cube image for iter iteration step.
+        """
         self.iterations[iter]['mom8_fc_n_pixels'] = n_pixels
 
     @property
@@ -334,9 +357,7 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom8_fc_frac_max_segment')
 
     def set_mom8_fc_frac_max_segment(self, iter, frac_max_segment):
-        '''
-        Sets fraction of maximum moment 8 image segment compared to overall size.
-        '''
+        """Sets fraction of maximum moment 8 image segment compared to overall size."""
         self.iterations[iter]['mom8_fc_frac_max_segment'] = frac_max_segment
 
     @property
@@ -345,9 +366,7 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom8_fc_max_segment_beams')
 
     def set_mom8_fc_max_segment_beams(self, iter, max_segment_beams):
-        '''
-        Sets size of maximum moment 8 image segment in beams.
-        '''
+        """Sets size of maximum moment 8 image segment in beams."""
         self.iterations[iter]['mom8_fc_max_segment_beams'] = max_segment_beams
 
     @property
@@ -356,10 +375,11 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom10_fc')
 
     def set_mom10_fc(self, iter, image):
-        '''
-        Sets name of moment 10 image computed from line-free channels of non-primary beam corrected cube
+        """Sets name of moment 10 image.
+        
+        The moment map is computed from line-free channels of non-primary beam corrected cube
         image for iter iteration step.
-        '''
+        """
         self.iterations[iter]['mom10_fc'] = image
 
     @property
@@ -368,10 +388,11 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom10_fc_image_min')
 
     def set_mom10_fc_image_min(self, iter, image_min):
-        '''
-        Sets image minimum of moment 10 image computed from line-free channels of non-primary beam corrected cube
-        image for iter iteration step.
-        '''
+        """Sets image minimum of moment 10 image.
+         
+        The moment map is computed from line-free channels of non-primary beam corrected
+        cube image for iter iteration step.
+        """
         self.iterations[iter]['mom10_fc_image_min'] = image_min
 
     @property
@@ -380,10 +401,11 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom10_fc_image_max')
 
     def set_mom10_fc_image_max(self, iter, image_max):
-        '''
-        Sets image maximum of moment 10 image computed from line-free channels of non-primary beam corrected cube
-        image for iter iteration step.
-        '''
+        """Sets image maximum of moment 10 image.
+        
+        The moment map is computed from line-free channels of non-primary beam corrected
+        cube image for iter iteration step.
+        """
         self.iterations[iter]['mom10_fc_image_max'] = image_max
 
     @property
@@ -392,10 +414,11 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom10_fc_image_median_all')
 
     def set_mom10_fc_image_median_all(self, iter, image_median_all):
-        '''
-        Sets image median of moment 10 image computed from line-free channels of non-primary beam corrected cube
-        image for iter iteration step.
-        '''
+        """Sets image median of moment 10 image.
+         
+        The moment map is computed from line-free channels of non-primary beam corrected
+        cube image for iter iteration step.
+        """
         self.iterations[iter]['mom10_fc_image_median_all'] = image_median_all
 
     @property
@@ -404,10 +427,11 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom10_fc_image_median_annulus')
 
     def set_mom10_fc_image_median_annulus(self, iter, image_median_annulus):
-        '''
-        Sets image annulus median of moment 10 image computed from line-free channels of non-primary beam corrected cube
-        image for iter iteration step.
-        '''
+        """Sets image annulus median of moment 10 image.
+         
+        The moment map is computed from line-free channels of non-primary beam corrected
+        cube image for iter iteration step.
+        """
         self.iterations[iter]['mom10_fc_image_median_annulus'] = image_median_annulus
 
     @property
@@ -416,10 +440,11 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom10_fc_image_mad')
 
     def set_mom10_fc_image_mad(self, iter, image_mad):
-        '''
-        Sets image MAD of moment 10 image computed from line-free channels of non-primary beam corrected cube
-        image for iter iteration step.
-        '''
+        """Sets image MAD of moment 10 image.
+         
+        The moment map is computed from line-free channels of non-primary beam corrected
+        cube image for iter iteration step.
+        """
         self.iterations[iter]['mom10_fc_image_mad'] = image_mad
 
     @property
@@ -428,10 +453,11 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom10_fc_n_pixels')
 
     def set_mom10_fc_n_pixels(self, iter, n_pixels):
-        '''
-        Sets number of unmasked pixels of moment 10 image computed from line-free channels of non-primary beam corrected cube
-        image for iter iteration step.
-        '''
+        """Sets number of unmasked pixels of moment 10 image.
+         
+        The moment map is computed from line-free channels of non-primary beam corrected
+        cube image for iter iteration step.
+        """
         self.iterations[iter]['mom10_fc_n_pixels'] = n_pixels
 
     @property
@@ -440,9 +466,7 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom8_10_fc_histogram_asymmetry')
 
     def set_mom8_10_fc_histogram_asymmetry(self, iter, histogram_asymmetry):
-        '''
-        Sets histogram asymmetry value.
-        '''
+        """Sets histogram asymmetry value."""
         self.iterations[iter]['mom8_10_fc_histogram_asymmetry'] = histogram_asymmetry
 
     @property
@@ -451,10 +475,11 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom0')
 
     def set_mom0(self, iter, image):
-        '''
-        Sets name of moment 0 image computed from all channels of non-primary beam corrected cube
-        image for iter iteration step.
-        '''
+        """Sets name of moment 0 image.
+         
+        The moment map is computed from all channels of non-primary beam corrected
+        cube image for iter iteration step.
+        """
         self.iterations[iter]['mom0'] = image
 
     @property
@@ -463,10 +488,11 @@ class TcleanResult(basetask.Results):
         return self.iterations[iters[-1]].get('mom8')
 
     def set_mom8(self, iter, image):
-        '''
-        Sets name of moment 8 image computed from all channels of non-primary beam corrected cube
-        image for iter iteration step.
-        '''
+        """Sets name of moment 8 image.
+         
+        The moment map is computed from all channels of non-primary beam corrected
+        cube image for iter iteration step.
+        """
         self.iterations[iter]['mom8'] = image
 
     @property
@@ -586,6 +612,34 @@ class TcleanResult(basetask.Results):
         self._image_max_iquv = image_max_iquv
 
     @property
+    def nonpbcor_image_min(self):
+        return self._nonpbcor_image_min
+
+    def set_nonpbcor_image_min(self, nonpbcor_image_min):
+        self._nonpbcor_image_min = nonpbcor_image_min
+
+    @property
+    def nonpbcor_image_min_iquv(self):
+        return self._nonpbcor_image_min_iquv
+
+    def set_nonpbcor_image_min_iquv(self, nonpbcor_image_min_iquv):
+        self._nonpbcor_image_min_iquv = nonpbcor_image_min_iquv
+
+    @property
+    def nonpbcor_image_max(self):
+        return self._nonpbcor_image_max
+
+    def set_nonpbcor_image_max(self, nonpbcor_image_max):
+        self._nonpbcor_image_max = nonpbcor_image_max
+
+    @property
+    def nonpbcor_image_max_iquv(self):
+        return self._nonpbcor_image_max_iquv
+
+    def set_nonpbcor_image_max_iquv(self, nonpbcor_image_max_iquv):
+        self._nonpbcor_image_max_iquv = nonpbcor_image_max_iquv
+
+    @property
     def image_rms(self):
         return self._image_rms
 
@@ -690,8 +744,8 @@ class TcleanResult(basetask.Results):
         self.iterations[iteration]['nmajordone'] = nmajordone
 
     @property
-    # Cumulative minor iteration array
     def nminordone_array(self):
+        """Cumulative minor iteration array."""
         iters = sorted(self.iterations.keys())
         if len(iters) > 0:
             return self.iterations[iters[-1]].get('nminordone_array', None)
@@ -702,8 +756,8 @@ class TcleanResult(basetask.Results):
         self.iterations[iteration]['nminordone_array'] = nminordone_array
 
     @property
-    # Cleaned peak RMS as a function of minor iteration number
     def peakresidual_array(self):
+        """Cleaned peak RMS as a function of minor iteration number."""
         iters = sorted(self.iterations.keys())
         if len(iters) > 0:
             return self.iterations[iters[-1]].get('peakresidual_array', None)
@@ -714,8 +768,8 @@ class TcleanResult(basetask.Results):
         self.iterations[iteration]['peakresidual_array'] = peakresidual_array
 
     @property
-    # Cleaned Plane id as a function of minor iteration number
     def planeid_array(self):
+        """Cleaned Plane id as a function of minor iteration number."""
         iters = sorted(self.iterations.keys())
         if len(iters) > 0:
             return self.iterations[iters[-1]].get('planeid_array', None)
@@ -726,8 +780,8 @@ class TcleanResult(basetask.Results):
         self.iterations[iteration]['planeid_array'] = planeid_array
 
     @property
-    # SummaryMinor dictionary from CASA/tclean return, as a function of minor iteration number
     def summaryminor(self):
+        """SummaryMinor dictionary from CASA/tclean return, as a function of minor iteration number."""
         iters = sorted(self.iterations.keys())
         if len(iters) > 0:
             return self.iterations[iters[-1]].get('summaryminor', None)
@@ -738,8 +792,8 @@ class TcleanResult(basetask.Results):
         self.iterations[iteration]['summaryminor'] = summaryminor
 
     @property
-    # Total cleaned flux as a function of minor iteration number
     def totalflux_array(self):
+        """Total cleaned flux as a function of minor iteration number."""
         iters = sorted(self.iterations.keys())
         if len(iters) > 0:
             return self.iterations[iters[-1]].get('totalflux_array', None)
@@ -750,8 +804,8 @@ class TcleanResult(basetask.Results):
         self.iterations[iteration]['totalflux_array'] = totalflux_array
 
     @property
-    # Fractional flux outside of clean mask
     def outmaskratio(self):
+        """Fraction of total cleaned flux outside the clean mask."""
         iters = sorted(self.iterations.keys())
         if len(iters) > 0:
             return self.iterations[iters[-1]].get('outmaskratio', None)
