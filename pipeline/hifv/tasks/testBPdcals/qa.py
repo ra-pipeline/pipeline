@@ -1,5 +1,6 @@
 import collections
 import collections.abc
+import os
 
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.pipelineqa as pqa
@@ -28,17 +29,17 @@ class testBPdcalsQAHandler(pqa.QAPlugin):
         scores = []
 
         self.antspw = collections.defaultdict(list)
-
         for bandname, bpdgain_touse in result.bpdgain_touse.items():
             if result.flaggedSolnApplycalbandpass[bandname] and result.flaggedSolnApplycaldelay[bandname]:
                 self._checkKandBsolution(result.flaggedSolnApplycaldelay[bandname], m)
                 self._checkKandBsolution(result.flaggedSolnApplycalbandpass[bandname], m)
-
-                score1 = qacalc.score_total_data_flagged_vla_bandpass(result.bpdgain_touse[bandname],
-                                                                      result.flaggedSolnApplycalbandpass[bandname]['antmedian']['fraction'])
-                score2 = qacalc.score_total_data_vla_delay(result.ktypecaltable[bandname], m)
-                scores.append(score1)
-                scores.append(score2)
+                if os.path.exists(result.bpdgain_touse[bandname]):
+                    score1 = qacalc.score_total_data_flagged_vla_bandpass(result.bpdgain_touse[bandname],
+                                                                          result.flaggedSolnApplycalbandpass[bandname]['antmedian']['fraction'])
+                    scores.append(score1)
+                if os.path.exists(result.ktypecaltable[bandname]):
+                    score2 = qacalc.score_total_data_vla_delay(result.ktypecaltable[bandname], m)
+                    scores.append(score2)
             else:
                 LOG.error('Error with bandpass and/or delay table for band {!s}.'.format(bandname))
                 scores.append(pqa.QAScore(0.0,
@@ -60,8 +61,9 @@ class testBPdcalsQAHandler(pqa.QAPlugin):
             score_refant = qacalc.score_testBPdcals_refant(vis, result.bad_refant[bandname], bandname)
             scores.append(score_refant)
 
-            score_median_delay = qacalc.score_testBPdcals_delay(vis, result.ktypecaltable[bandname], bandname)
-            scores.append(score_median_delay)
+            if os.path.exists(result.ktypecaltable[bandname]):
+                score_median_delay = qacalc.score_testBPdcals_delay(vis, result.ktypecaltable[bandname], bandname)
+                scores.append(score_median_delay)
 
         for antenna, spwlist in self.antspw.items():
             uniquespw = list(set(spwlist))

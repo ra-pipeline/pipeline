@@ -121,7 +121,8 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
         setjy_results = context.results[0].read().setjy_results
 
     BPGainTables = sorted(context.callibrary.active.get_caltable())
-    BPGainTables.append(ktypecaltable)
+    if os.path.exists(ktypecaltable):
+        BPGainTables.append(ktypecaltable)
     BPGainTables.append(bpdgain_touse)
 
     bandpass_task_args = {'vis': vis,
@@ -185,7 +186,8 @@ def do_bandpassweakbp(vis, caltable, context=None, RefAntOutput=None, spw=None, 
     minBL_for_cal = vla_minbaselineforcal()
 
     BPGainTables = sorted(context.callibrary.active.get_caltable())
-    BPGainTables.append(ktypecaltable)
+    if os.path.exists(ktypecaltable):
+        BPGainTables.append(ktypecaltable)
     BPGainTables.append(bpdgain_touse)
 
     bandpass_task_args = {'vis': vis,

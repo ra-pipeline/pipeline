@@ -225,13 +225,15 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         while fracFlaggedSolns > critfrac and flagcount < 4:
             self._do_ktype_delaycal(caltable=ktypecaltable, addcaltable=gtypecaltable,
                                     RefAntOutput=RefAntOutput, spw=','.join(spwlist))
+            flagcount += 1
+            if not os.path.exists(ktypecaltable):
+                continue
             flaggedSolnResult = getCalFlaggedSoln(ktypecaltable)
             fracFlaggedSolns = self._check_flagSolns(flaggedSolnResult, RefAntOutput)
 
             LOG.info("Fraction of flagged solutions = " + str(flaggedSolnResult['all']['fraction']))
             LOG.info("Median fraction of flagged solutions per antenna = " +
                      str(flaggedSolnResult['antmedian']['fraction']))
-            flagcount += 1
 
         LOG.info("Delay calibration complete for band {!s}".format(band))
 
@@ -266,9 +268,12 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
 
         self._do_applycal(ktypecaltable=ktypecaltable, bpdgain_touse=bpdgain_touse,
                           bpcaltable=bpcaltable, interp=interp, spw=','.join(spwlist))
-
-        flaggedSolnApplycalbandpass = getCalFlaggedSoln(bpdgain_touse)
-        flaggedSolnApplycaldelay = getCalFlaggedSoln(ktypecaltable)
+        flaggedSolnApplycalbandpass = {}
+        flaggedSolnApplycaldelay = {}
+        if os.path.exists(bpdgain_touse):
+            flaggedSolnApplycalbandpass = getCalFlaggedSoln(bpdgain_touse)
+        if os.path.exists(ktypecaltable):
+            flaggedSolnApplycaldelay = getCalFlaggedSoln(ktypecaltable)
 
         return bpdgain_touse, gtypecaltable, ktypecaltable, bpcaltable, flaggedSolnApplycalbandpass, \
                flaggedSolnApplycaldelay
@@ -357,7 +362,8 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         # ref antenna string needs to be lower case for gaincal
 
         GainTables = sorted(self.inputs.context.callibrary.active.get_caltable())
-        GainTables.append(addcaltable)
+        if os.path.exists(addcaltable):
+            GainTables.append(addcaltable)
 
         delaycal_task_args = {'vis': self.inputs.vis,
                               'caltable': caltable,
@@ -456,7 +462,8 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         # ref antenna string needs to be lower case for gaincal
 
         GainTables = sorted(self.inputs.context.callibrary.active.get_caltable())
-        GainTables.append(addcaltable)
+        if os.path.exists(addcaltable):
+            GainTables.append(addcaltable)
 
         bpdgains_task_args = {'vis': self.inputs.vis,
                               'caltable': caltable,
@@ -529,9 +536,11 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         LOG.info("Applying semi-final delay and BP calibrations to all calibrators")
 
         AllCalTables = sorted(self.inputs.context.callibrary.active.get_caltable())
-        AllCalTables.append(ktypecaltable)
+        if os.path.exists(ktypecaltable):
+            AllCalTables.append(ktypecaltable)
         # AllCalTables.append(bpdgain_touse)
-        AllCalTables.append(bpcaltable)
+        if os.path.exists(bpcaltable):
+            AllCalTables.append(bpcaltable)
 
         ntables=len(AllCalTables)
 
