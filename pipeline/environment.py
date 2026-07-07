@@ -39,9 +39,6 @@ __all__ = ['casa_version', 'casa_version_string', 'compare_casa_version', 'pipel
            'dependency_details']
 
 
-LOG = logging.get_logger(__name__)
-
-
 def _run(
     command: str,
     stdout: TextIOWrapper | StringIO | None = None,
@@ -126,9 +123,11 @@ def _load(path: str, encoding: str = 'UTF-8', on_error: AnyStr | None = None) ->
         FileNotFoundError: If the file doesn't exist.
         PermissionError: If the user lacks permission to read the file.
     """
-    with open(path, 'r', encoding=encoding, newline="") as file:
-        return file.read()
-    return on_error
+    try:
+        with open(path, 'r', encoding=encoding, newline='') as file:
+            return file.read()
+    except Exception:
+        return on_error
 
 
 class Environment(Protocol):
@@ -189,6 +188,10 @@ class Environment(Protocol):
     ulimit_files: str           # open file descriptors ulimit
     ulimit_cpu: str             # cpu time ulimit, in seconds
     ulimit_mem: str             # memory ulimit
+
+    platform_tag: str           # tightest compatible wheel platform tag, e.g. manylinux_2_39_x86_64
+    gpu_info: str               # GPU summary, e.g. "NVIDIA GeForce RTX 3090 (24 GiB), Driver 525.105.17" or "N/A"
+    python_version: str         # Python version string, e.g. 3.12.4
 
     role: str                   # MPI role
 
@@ -253,6 +256,21 @@ class CommonEnvironment:
         self.ulimit_cpu = get_ulimit([resource.RLIMIT_CPU])
         # three applicable limits for memory: RSS, heap size, and data seg size.
         self.ulimit_mem = get_ulimit([resource.RLIMIT_AS, resource.RLIMIT_RSS, resource.RLIMIT_DATA])
+
+        # tightest compatible wheel platform tag for this host
+        try:
+            from packaging.tags import sys_tags
+            self.platform_tag = next(
+                t.platform for t in sys_tags() if t.platform != 'any'
+            )
+        except Exception:
+            self.platform_tag = 'N/A'
+
+        # GPU summary via nvidia-smi
+        self.gpu_info = _get_gpu_info()
+
+        # Python version for this process
+        self.python_version = sys.version.split()[0]
 
         if not MPIEnvironment.is_mpi_enabled:
             role = 'Non-MPI Host'
@@ -754,6 +772,53 @@ casa_version_string = casatasks.version_string()
 compare_casa_version = casa_tools.utils.compare_version
 
 
+def _get_gpu_info() -> str:
+    """Return a summary string of available GPUs detected via nvidia-smi.
+
+    Queries name, driver version, and total memory for each GPU. Returns
+    'N/A' if nvidia-smi is not available or no GPUs are found.
+
+    Returns:
+        str: e.g. ``"NVIDIA GeForce RTX 3090 (24 GiB); NVIDIA GeForce RTX 3090 (24 GiB), Driver 525.105.17"``
+             or ``"N/A"``.
+    """
+    # Check if nvidia-smi is available before attempting to run it
+    if not shutil.which('nvidia-smi'):
+        return 'N/A'
+    
+    out = _safe_run(
+        'nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader,nounits',
+        on_error='',
+        log_errors=False,
+    )
+    if not out:
+        return 'N/A'
+
+    gpus = []
+    driver = ''
+    for line in out.splitlines():
+        parts = [p.strip() for p in line.split(',')]
+        if not parts:
+            continue
+        name = parts[0]
+        if len(parts) >= 2:
+            driver = parts[1]
+        if len(parts) >= 3:
+            try:
+                mem_gib = int(parts[2]) / 1024
+                gpus.append(f'{name} ({mem_gib:.0f} GiB)')
+            except ValueError:
+                gpus.append(name)
+        else:
+            gpus.append(name)
+
+    if not gpus:
+        return 'N/A'
+
+    suffix = f', Driver {driver}' if driver else ''
+    return '; '.join(gpus) + suffix
+
+
 def _get_dependency_details(package_names):
     """Get dependency package version/path."""
 
@@ -769,6 +834,12 @@ def _get_dependency_details(package_names):
 
 def _get_required_dependencies(package_name):
     """Get required package dependencies, excluding optional ones.
+
+    First attempts to read dependency metadata from the installed package.
+    If the package is not pip-installed (e.g. inserted into sys.path at
+    runtime), falls back to parsing ``requirements.txt`` from the package
+    source tree, which setuptools populates the ``dependencies`` field from
+    via the ``tool.setuptools.dynamic`` section of ``pyproject.toml``.
 
     Args:
         package_name: Name of an installed package
@@ -800,13 +871,45 @@ def _get_required_dependencies(package_name):
 
         if required_deps:
             return required_deps
-    except (ImportError, AttributeError, Exception):
+    except Exception:
+        pass
+
+    # Fallback: the package is not pip-installed (e.g. inserted into sys.path
+    # at runtime). Parse requirements.txt from the source tree, which is the
+    # file that setuptools reads for the dynamic 'dependencies' field.
+    try:
+        req_file = Path(__file__).parent.parent / 'requirements.txt'
+        required_deps = []
+        for line in req_file.read_text(encoding='utf-8').splitlines():
+            line = line.strip()
+            # skip blank lines and comments
+            if not line or line.startswith('#'):
+                continue
+            # skip lines with environment markers (sys_platform, etc.)
+            if ';' in line:
+                continue
+            match = re.match(r'^([A-Za-z0-9._-]+)', line)
+            if match:
+                required_deps.append(match.group(1))
+        if required_deps:
+            return required_deps
+    except Exception:
         pass
 
     return []
 
 
-_casa6_packages = ['numpy', 'scipy', 'matplotlib', 'casaconfig', 'casatools', 'casatasks', 'casampi', 'casaplotms']
+_casa6_packages = [
+    'casaconfig',
+    'casatools',
+    'casatasks',
+    'casashell',
+    'casampi',
+    'casaplotms',
+    'numpy',
+    'scipy',
+    'matplotlib',
+]
 dependency_details = _get_dependency_details(_casa6_packages + _get_required_dependencies('pipeline'))
 
 iers_info = utils.IERSInfo()

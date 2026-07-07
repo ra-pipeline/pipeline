@@ -1,10 +1,15 @@
 <%!
 import pipeline.infrastructure.renderer.htmlrenderer as hr
 import pipeline.domain.measures as measures
+from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure import utils
 %>
 <html>
 <body>
+<%
+cqa = casa_tools.quanta
+c_mps = int(cqa.getvalue(cqa.convert(cqa.constants('c'), 'm/s'))[0])
+%>
 
 <div class="page-header">
 	<h1>Spectral Setup Details<button class="btn btn-default pull-right" onclick="javascript:window.history.back();">Back</button></h1>
@@ -36,6 +41,7 @@ from pipeline.infrastructure import utils
 							channels_colspan = '4'
 						%>
 			            <th scope="col" colspan=${channels_colspan}>Channels ${'(%s)' % (ms.get_spectral_windows()[0].frame)}</th>
+				    <th scope="col" colspan="2">Spectral</th>
 			            <th scope="col" rowspan="2">Correlator Axis</th>
 						<!-- Omit Correlation Bits column for the ACA Spectrometer. See PIPE-1993/4 -->
 						% if ms.correlator_name != 'ALMA_ACASPEC':
@@ -62,6 +68,8 @@ from pipeline.infrastructure import utils
 					    % endif
 			        	<th>Frequency Width</th>
 			        	<th>Velocity Width</th>
+			        	<th>Frequency Resolution</th>
+			        	<th>Velocity Resolution</th>
 			        </tr>
 			    </thead>
 				<tbody>
@@ -102,7 +110,14 @@ from pipeline.infrastructure import utils
 						% endif
 					  % endif
 					  <td>${spw.channels[0].getWidth()}</td>
-					  <td>${str(measures.LinearVelocity(299792458 * spw.channels[0].getWidth().to_units(measures.FrequencyUnits.HERTZ) / spw.centre_frequency.to_units(measures.FrequencyUnits.HERTZ), measures.LinearVelocityUnits.METRES_PER_SECOND))}</td>
+					  <td>${str(measures.LinearVelocity(c_mps * spw.channels[0].getWidth().to_units(measures.FrequencyUnits.HERTZ) / spw.centre_frequency.to_units(measures.FrequencyUnits.HERTZ), measures.LinearVelocityUnits.METRES_PER_SECOND))}</td>
+					  % if spw.resolution is not None:
+					  <td>${spw.resolution}</td>
+					  <td>${str(measures.LinearVelocity(c_mps * spw.resolution.to_units(measures.FrequencyUnits.HERTZ) / spw.centre_frequency.to_units(measures.FrequencyUnits.HERTZ), measures.LinearVelocityUnits.METRES_PER_SECOND))}</td>
+					  % else:
+					  <td>N/A</td>
+					  <td>N/A</td>
+					  % endif
 					  <td>${', '.join(sorted(ms.get_data_description(spw=spw).corr_axis))}</td>
 					  <!-- Omit Correlation Bits column for the ACA Spectrometer and set to BITS_4x4 for the ACA correlator. See PIPE-1993/4 -->
 						% if ms.correlator_name != 'ALMA_ACASPEC':
@@ -171,6 +186,7 @@ from pipeline.infrastructure import utils
 							channels_colspan = '4'
 						%>
 			            <th scope="col" colspan=${channels_colspan}>Channels ${'(%s)' % (ms.get_spectral_windows()[0].frame)}</th>
+				    <th scope="col" colspan="2">Spectral</th>
 						<th scope="col" rowspan="2">Correlator Axis</th>
 						<!-- Omit Correlation Bits column for the ACA Spectrometer. See PIPE-1993/4 -->
 						% if ms.correlator_name != 'ALMA_ACASPEC':
@@ -198,6 +214,8 @@ from pipeline.infrastructure import utils
 					    % endif
 			        	<th>Frequency Width</th>
 			        	<th>Velocity Width</th>
+			        	<th>Frequency Resolution</th>
+			        	<th>Velocity Resolution</th>
 			        </tr>
 			    </thead>
 				<tbody>
@@ -235,7 +253,14 @@ from pipeline.infrastructure import utils
 						%endif
 
 						<td>${spw.channels[0].getWidth()}</td>
-						<td>${str(measures.LinearVelocity(299792458 * spw.channels[0].getWidth().to_units(measures.FrequencyUnits.HERTZ) / spw.centre_frequency.to_units(measures.FrequencyUnits.HERTZ), measures.LinearVelocityUnits.METRES_PER_SECOND))}</td>
+						<td>${str(measures.LinearVelocity(c_mps * spw.channels[0].getWidth().to_units(measures.FrequencyUnits.HERTZ) / spw.centre_frequency.to_units(measures.FrequencyUnits.HERTZ), measures.LinearVelocityUnits.METRES_PER_SECOND))}</td>
+						% if spw.resolution is not None:
+						<td>${spw.resolution}</td>
+						<td>${str(measures.LinearVelocity(c_mps * spw.resolution.to_units(measures.FrequencyUnits.HERTZ) / spw.centre_frequency.to_units(measures.FrequencyUnits.HERTZ), measures.LinearVelocityUnits.METRES_PER_SECOND))}</td>
+						% else:
+						<td>N/A</td>
+						<td>N/A</td>
+						% endif
 						<%
 							dd = ms.get_data_description(spw=spw)
 							if dd is None:

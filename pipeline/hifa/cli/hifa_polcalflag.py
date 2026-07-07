@@ -3,7 +3,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hifa.tasks.polcalflag.polcalflag.PolcalflagInputs.__init__
 @utils.cli_wrapper
-def hifa_polcalflag(vis=None):
+def hifa_polcalflag(vis=None, examineCrossPolSum=None):
     """Flag polarization calibrators.
 
     This task flags corrected visibility outliers in the polarization calibrator

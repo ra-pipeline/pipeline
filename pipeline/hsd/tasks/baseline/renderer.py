@@ -5,6 +5,7 @@ import collections
 import os
 from typing import TYPE_CHECKING
 
+from pipeline.hsd.tasks.common import qautils
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.filenamer as filenamer
@@ -14,6 +15,7 @@ from ..common import utils
 
 if TYPE_CHECKING:
     from pipeline.domain.field import Field
+    from pipeline.hsd.tasks.baseline.baseline import SDBaselineResults
     from pipeline.infrastructure.api import Results
     from pipeline.infrastructure.basetask import ResultsList
     from pipeline.infrastructure.launcher import Context
@@ -39,6 +41,34 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
             always_rerender: Always rerender the page if True. Defaults to False.
         """
         super().__init__(template, description, always_rerender)
+
+    def render(self, context: Context, result: SDBaselineResults) -> str:
+        """
+        Custom renderer for hsd_baseline()
+
+        This method aggegates the QAScores and renders the weblog,
+        then resotres the original QAScores for subsequent processes (eg. AQUA report)
+
+        Args:
+            context: Pipeline context
+            result:  SDBaselineResults object
+        Returns:
+            Rendered html document
+        """
+        # result.qa.pool will be temporary modified to aggregate the QA messages,
+        # which is required to happen on weblog but not on the AQUA report
+        # as per PIPEREQ-422.
+        # This method modifies the result object for this purpose,
+        # but the changes do not propergate to the original result or context,
+        # since they are local in render() thanks to the mechanism of PL infrastructure.
+        # Therefore there is no need to bracket the aggregation process
+        # with stashing and recovering the original result.qa.pool here.
+
+        # aggregate QA scores for weblog accordion
+        aggregator = qautils.QAScoreAggregator()
+        result.qa.pool = aggregator.aggregate_qascores(result.qa.pool)
+
+        return super().render(context, result)
 
     def update_mako_context(self, ctx: dict, context: Context, results: ResultsList) -> None:
         """Update context object for Mako template in place.

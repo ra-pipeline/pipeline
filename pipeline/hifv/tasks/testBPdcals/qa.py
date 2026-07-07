@@ -33,13 +33,16 @@ class testBPdcalsQAHandler(pqa.QAPlugin):
             if result.flaggedSolnApplycalbandpass[bandname] and result.flaggedSolnApplycaldelay[bandname]:
                 self._checkKandBsolution(result.flaggedSolnApplycaldelay[bandname], m)
                 self._checkKandBsolution(result.flaggedSolnApplycalbandpass[bandname], m)
+
                 if os.path.exists(result.bpdgain_touse[bandname]):
                     score1 = qacalc.score_total_data_flagged_vla_bandpass(result.bpdgain_touse[bandname],
                                                                           result.flaggedSolnApplycalbandpass[bandname]['antmedian']['fraction'])
                     scores.append(score1)
                 if os.path.exists(result.ktypecaltable[bandname]):
-                    score2 = qacalc.score_total_data_vla_delay(result.ktypecaltable[bandname], m)
+                    score2 = qacalc.score_total_data_vla_delay(result.ktypecaltable[bandname],
+                                                               result.inputs['vis'], bandname)
                     scores.append(score2)
+
             else:
                 LOG.error('Error with bandpass and/or delay table for band {!s}.'.format(bandname))
                 scores.append(pqa.QAScore(0.0,
@@ -72,6 +75,12 @@ class testBPdcalsQAHandler(pqa.QAPlugin):
             uniquespwlist = [str(spw) for spw in uniquespwlist]
             LOG.warning('Antenna {!s}, spws: {!s} have a flagging fraction of 1.0.'
                         ''.format(antenna, ','.join(uniquespwlist)))
+
+        # PIPE-2512: add QA score for spw solint
+        for bandname, spw_solint in result.spw_solint.items():
+            score3 = qacalc.score_spw_solint(vis, bandname, spw_solint)
+            if score3:
+                scores.append(score3)
 
         result.qa.pool.extend(scores)
 

@@ -35,6 +35,7 @@ from .casa_data import *
 from .casa_types import *
 from .conversion import *
 from .diagnostics import *
+from .flagversion_tools import *
 from .framework import *
 from .imaging import *
 from .math import *
@@ -52,6 +53,7 @@ _all_modules = [
     'casa_types',
     'conversion',
     'diagnostics',
+    'flagversion_tools',
     'framework',
     'imaging',
     'ppr',

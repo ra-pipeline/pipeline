@@ -24,7 +24,7 @@ LOG = infrastructure.get_logger(__name__)
 class MakeImListInputs(vdp.StandardInputs):
     # Must use empty data type list to allow for user override and
     # automatic determination depending on specmode, field and spw.
-    processing_data_type = []
+    processing_data_types = []
 
     # simple properties with no logic ----------------------------------------------------------------------------------
     calmaxpix = vdp.VisDependentProperty(default=300)
@@ -718,6 +718,7 @@ class MakeImList(basetask.StandardTaskTemplate):
         # or 'TARGET' is present in inputs.intent. This is a performance optimization
         # (per PIPE-2625) to prevent costly I/O operations from representative_target()
         # when not strictly required.
+
         if inputs.specmode == 'repBW' or 'TARGET' in inputs.intent:
             repr_target, repr_source, repr_spw, _, reprBW_mode, real_repr_target, _, _, _, _ = (
                 self.heuristics.representative_target()
@@ -1260,6 +1261,13 @@ class MakeImList(basetask.StandardTaskTemplate):
                     if 'TARGET' in inputs.intent:
                         sorted_field_intent_list = utils.place_repr_source_first(sorted_field_intent_list, repr_source)
 
+                    (
+                        cont_ranges_spwsel_dict,
+                        all_continuum_spwsel_dict,
+                        low_bandwidth_spwsel_dict,
+                        low_spread_spwsel_dict
+                    ) = self.heuristics.cont_ranges_spwsel()
+
                     for field_intent in sorted_field_intent_list:
                         mosweight = self.heuristics.mosweight(field_intent[1], field_intent[0])
                         for spwspec in filtered_spwlist_local:
@@ -1290,10 +1298,6 @@ class MakeImList(basetask.StandardTaskTemplate):
                             all_continuum = True
                             low_bandwidth = True
                             low_spread = True
-                            cont_ranges_spwsel_dict = {}
-                            all_continuum_spwsel_dict = {}
-                            low_bandwidth_spwsel_dict = {}
-                            low_spread_spwsel_dict = {}
                             spwsel_spwid_dict = {}
 
                             # Check if the globally selected data type is available for this field/spw combination.
@@ -1379,8 +1383,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                             target_heuristics.vislist = vislist_field_intent_spw_combinations[field_intent]['vislist']
 
                             for spwid in adjusted_spwspec.split(','):
-                                cont_ranges_spwsel_dict[spwid], all_continuum_spwsel_dict[spwid], low_bandwidth_spwsel_dict[spwid], low_spread_spwsel_dict[spwid] = target_heuristics.cont_ranges_spwsel()
-                                spwsel_spwid_dict[spwid] = cont_ranges_spwsel_dict[spwid].get(utils.dequote(field_intent[0]), {}).get(spwid, 'NONE')
+                                spwsel_spwid_dict[spwid] = cont_ranges_spwsel_dict.get(utils.dequote(field_intent[0]), {}).get(spwid, 'NONE')
 
                             no_cont_ranges = False
                             if (field_intent[1] == 'TARGET' and specmode == 'cont' and
@@ -1406,9 +1409,9 @@ class MakeImList(basetask.StandardTaskTemplate):
                                     #elif (spwsel_spwid == ''):
                                     #    LOG.warning('Empty continuum frequency range for %s, spw %s. Run hif_findcont ?' % (field_intent[0], spwid))
 
-                                all_continuum = all_continuum and all_continuum_spwsel_dict[spwid].get(utils.dequote(field_intent[0]), {}).get(spwid, False)
-                                low_bandwidth = low_bandwidth and low_bandwidth_spwsel_dict[spwid].get(utils.dequote(field_intent[0]), {}).get(spwid, False)
-                                low_spread = low_spread and low_spread_spwsel_dict[spwid].get(utils.dequote(field_intent[0]), {}).get(spwid, False)
+                                all_continuum = all_continuum and all_continuum_spwsel_dict.get(utils.dequote(field_intent[0]), {}).get(spwid, False)
+                                low_bandwidth = low_bandwidth and low_bandwidth_spwsel_dict.get(utils.dequote(field_intent[0]), {}).get(spwid, False)
+                                low_spread = low_spread and low_spread_spwsel_dict.get(utils.dequote(field_intent[0]), {}).get(spwid, False)
 
                                 if spwsel_spwid in ('ALL', 'ALLCONT', '', 'NONE'):
                                     spwsel_spwid_freqs = ''
@@ -1731,8 +1734,10 @@ class MakeImList(basetask.StandardTaskTemplate):
         Note: this is only relevant for VLA to check if we should proceed with VLA cube imaging
         """
         cube_imaging_datatypes = [
+            DataType.IM_LINE_SCIENCE,
             DataType.SELFCAL_LINE_SCIENCE,
             DataType.REGCAL_LINE_SCIENCE,
+            DataType.IM_CONTLINE_SCIENCE,
             DataType.SELFCAL_CONTLINE_SCIENCE,
             DataType.REGCAL_CONTLINE_SCIENCE,
         ]

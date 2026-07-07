@@ -50,6 +50,8 @@ class WvrgcalResult(basetask.Results):
         # various flags
         self.PHnoisy = False
         self.BPnoisy = False
+        self.PHgood = False
+        self.BPgood = False
         self.suggest_remcloud = False
 
     def merge_with_context(self, context):

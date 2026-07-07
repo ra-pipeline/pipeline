@@ -471,7 +471,9 @@ class ClusterPropertyDisplay(ClusterDisplayWorker):
         [xmin, xmax, ymin, ymax] = plt.axis()
         axes = plt.gcf().gca()
         cluster_id = 0
-        for [cx, cy, dummy, r] in sorted_properties:
+        # sorted_properties:
+        # [mean/median center, 75% percentile width, validity flag, cluster radius, mean/median width]
+        for [cx, _, _, r, cy] in sorted_properties:
             radius = r * scaling
             aspect = 1.0 / scaling
             x_base = cx
@@ -482,6 +484,8 @@ class ClusterPropertyDisplay(ClusterDisplayWorker):
         plt.xlabel('Line Center (Channel)', fontsize=11)
         plt.ylabel('Line Width (Channel)', fontsize=11)
         plt.axis([xmin - 1, xmax + 1, 0, ymax + 1])
+        axes.xaxis.get_major_formatter().set_useOffset(False)
+        axes.yaxis.get_major_formatter().set_useOffset(False)
         plt.title('Clusters in the line Center-Width space\n\nRed Oval(s) shows each clustering region. '
                  'Size of the oval represents cluster radius', fontsize=11)
 
