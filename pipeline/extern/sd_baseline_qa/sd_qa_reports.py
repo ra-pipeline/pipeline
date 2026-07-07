@@ -829,7 +829,6 @@ def makeSummaryTable_bl(
         antnames_for,
         plots_fnames,
         plfolder,
-        plot_folder = '.',
         output_file = 'sd_baseline_output/qascore_summary.csv',
         writemode = 'w',
         weblog_adress = ''

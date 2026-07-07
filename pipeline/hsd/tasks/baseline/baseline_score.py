@@ -112,7 +112,6 @@ def baseline_score(
             antnames_for=antenna_names,
             plots_fnames=plots_function_names,
             plfolder=str(working_path),
-            plot_folder=str(plot_path),
             output_file=str(working_path.joinpath(f"qa_score_summary_{date_time}.csv")),
             writemode="w",
             weblog_adress=""
