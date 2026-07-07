@@ -310,7 +310,6 @@ def calc_baseline_qascore_single(
                     intent={'*OBSERVE_TARGET#ON_SOURCE*'},
                     spw={msw.spw},
                     ant={msw.antenna},
-                    #pol={'NA'},
                     field={fieldname},
                 )
 

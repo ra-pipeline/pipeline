@@ -83,7 +83,7 @@ def baseline_score(
 
     date_time = datetime.datetime.now(datetime.UTC).strftime("%Y%d%mT%H%M%SD%f")
 
-    plot_path = pathlib.Path(context.report_dir).joinpath(f"baseline_qa_plots_{date_time}")
+    plot_path = pathlib.Path(context.report_dir).joinpath(f"stage{context.task_counter}")
 
     # This should always exist but incase
     plot_path.mkdir(parents=True, exist_ok=True)
