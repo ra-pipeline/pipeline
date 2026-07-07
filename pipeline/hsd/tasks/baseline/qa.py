@@ -43,8 +43,8 @@ class SDBaselineQAHandler(pqa.QAPlugin):
                                                 ['vis', 'field', 'spw', 'ant', 'pol'])
 
         metric_name = 'BLine.deviation'
-        qautils.registry.register_longmsg_keys(metric_name, ['vis', 'field', 'spw', 'ant', 'pol'])
-        qautils.registry.register_keys_to_aggregate(metric_name, ['vis', 'field', 'spw', 'ant', 'pol'])
+        qautils.registry.register_longmsg_keys(metric_name, ['vis', 'field', 'spw', 'ant'])
+        qautils.registry.register_keys_to_aggregate(metric_name, ['vis', 'field', 'spw', 'ant'])
 
     def handle(self, context: Context, result: result_cls) -> None:
         """Compute QA score for baseline subtraction task.
@@ -74,13 +74,13 @@ class SDBaselineQAHandler(pqa.QAPlugin):
 
         # We will run this for each output measurementset. It would be better to do the QA calculation above as part of
         # the general analysis. Perhaps this can be done at a later time.
+        result.outcome["profile_qa_score"] = {}
 
-        for basename, outfile in result.outcome["outfile"].items():
+        for basename, outfile in result.outcome["vis_map"].items():
             original_ms = context.observing_run.get_ms(basename).origin_ms
             qa_score_dict = bs.baseline_score(results=result, context=context, file_info=(original_ms, outfile))
 
-            if not qa_score_dict is None:
-                result.outcome["profile_qa_score"] = {}
+            if qa_score_dict is not None:
                 result.outcome["profile_qa_score"][outfile] = qa_score_dict
 
         ###

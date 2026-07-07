@@ -742,9 +742,9 @@ class SDBaseline(basetask.StandardTaskTemplate):
         return results
 
     def analyse(self, result: SDBaselineResults) -> SDBaselineResults:
-        """Generate measurementset domain object for output MS.
+        """Generate MeasurementSet domain object for output MS.
 
-        The method generates measumentset objects from output MSes
+        The method generates MeasumentSet objects from output MSes
         of SDBaseline task. Newly created objects are registered to
         results instance.
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import collections
 import os
+import re
 from typing import TYPE_CHECKING
 
 from pipeline.hsd.tasks.common import qautils
@@ -23,12 +24,11 @@ if TYPE_CHECKING:
     from pipeline.infrastructure.api import Results
     from pipeline.infrastructure.basetask import ResultsList
     from pipeline.infrastructure.launcher import Context
-    from pipeline.infrastructure.renderer.logger import Plot
 
 LOG = infrastructure.logging.get_logger(__name__)
 
 
-def make_profile_heuristic_plots(results):
+def make_profile_heuristic_plots(results: SDBaselineResults):
     # Get the context results for SDBaseline Results only
 
     profile_heuristic = []
@@ -239,7 +239,7 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
 
         # If this analysis was not done, skip it
         if (len(profile_heuristic) > 0) and profile_heuristic_subpages:
-            detail_page_title = f"Comparison of the Profiles between XX and YY spectra"
+            detail_page_title = "Comparison of the Profiles between XX and YY spectra"
 
             detail_renderer = basetemplates.JsonPlotRenderer(
                         'generic_x_vs_y_field_spw_ant_detail_plots.mako',
@@ -251,7 +251,7 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
             )
 
             with detail_renderer.get_file() as fileobj:
-                        fileobj.write(detail_renderer.render())
+                fileobj.write(detail_renderer.render())
 
             for field_object in sorted_fields:
                 name = field_object.clean_name
@@ -263,7 +263,6 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
                 "profile_heuristic": profile_heuristic,
                 "profile_heuristic_subpages": profile_heuristic_subpages
             })
-
 
     @staticmethod
     def _group_by_axes(plots: list[list[Plot]]) -> dict:
@@ -448,68 +447,3 @@ class SingleDishClusterPlotsRenderer(basetemplates.JsonPlotRenderer):
             plot: Plot object
         """
         d['type'] = plot.parameters['type']
-
-
-def generate_plot_object_from_name(ctx: Context, plot_name: str) -> Plot:
-    """Generate a Plot object from the name of the plot.
-
-    This function assumes that the plot name holds some metadata about the
-    plot. Expected format of plot_name is::
-
-        <vis>_<field name>_<antenna name>_Spw<spw id>_XX-YY_excess.png
-
-    Args:
-        ctx: Pipeline context.
-        plot_name: Name of the plot file.
-
-    Returns:
-        Plot object with extracted metadata. If the plot name does not match
-        the expected format, a Plot object with just the name is returned.
-    """
-    # pattern should match the name with the following format,
-    #
-    # <vis>_<field name>_<antenna name>_Spw<spw id>_XX-YY_excess.png
-    #
-    #   - vis should end with ".ms"
-    #   - field can contain any characters
-    #   - antenna should not contain "_"
-    #   - spw should be a number with 1 to 3 digits
-    #
-    pattern = re.compile(
-        r'(?P<vis>.+\.ms)_(?P<field>.+)_(?P<ant>[^_]+)_Spw(?P<spw>\d{1,3})'
-        r'_XX-YY_excess.png'
-    )
-
-    m = pattern.match(os.path.basename(plot_name))
-
-    if m:
-        vis = m.group('vis')
-        field = m.group('field')
-        antenna = m.group('ant')
-        spw = m.group('spw')
-        spw_id = int(spw)
-        ms = ctx.observing_run.get_ms(vis)
-        spw_object = ms.get_spectral_window(spw_id)
-        receiver = spw_object.band
-        field_objects = (f for f in ms.fields if f.name.strip('"') == field or f.clean_name == field)
-        field_object = next(field_objects, None)
-        assert field_object is not None
-        field_name = field_object.name
-        source = field_object.source
-        plot = Plot(
-            plot_name,
-            x_axis="freq",
-            y_axis="amp_diff",
-            field=field_name,
-            parameters={
-                'vis': vis,
-                'spw': spw,
-                'ant': antenna,
-                'source': source,
-                'receiver': [receiver]
-            }
-        )
-    else:
-        plot = Plot(plot_name)
-
-    return plot

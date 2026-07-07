@@ -1,19 +1,31 @@
+from __future__ import annotations
+
+import os
+import glob
 import datetime
 import pathlib
 import time
-
-from casatools import version_string as cversion
 
 import pipeline.extern.sd_baseline_qa.sd_baseline_qa as sd_baseline_qa
 import pipeline.extern.sd_baseline_qa.sd_qa_reports as sd_qa_reports
 
 import pipeline.infrastructure as infrastructure
 
+from pipeline.infrastructure.launcher import Context
+
 from pipeline.extern.sd_baseline_qa.sd_qa_utils import FailedAnalysisException
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pipeline.hsd.tasks.baseline.baseline import SDBaselineResults
 
 LOG = infrastructure.get_logger(__name__)
 
-def _science_lines(context, results)->list:
+def _science_lines(
+        context: Context,
+        results: SDBaselineResults
+)->list[set[str, str, list[list[float, float, bool, float, float]]]]:
     """
     Parse context and results to extract relevant science lines.
     Args:
@@ -26,7 +38,7 @@ def _science_lines(context, results)->list:
     reduction_group = context.observing_run.ms_reduction_group
 
     outcome_data = [lines["channelmap_range"] for lines in results.outcome["baselined"]]
-    lines  = [
+    lines = [
         (sub_list.field_name, sub_reduction_group.spw_id, lines) for lines, sub_list in zip(outcome_data, reduction_group.values()) for sub_reduction_group in sub_list
     ]
 
@@ -34,9 +46,9 @@ def _science_lines(context, results)->list:
 
 
 def baseline_score(
-        results,
-        context,
-        file_info
+        results: "SDBaselineResults",
+        context: Context,
+        file_info: set[str, str]
 )-> None | dict[str, list]:
     """
 
@@ -50,13 +62,13 @@ def baseline_score(
     """
 
     start_time = time.time()
-    casa_version = cversion()
 
     #  You can get the MeasurementSet name from `context.observing_run.measurement_sets(list).basename` which is a list or
     #  infile = result.outcome.outfile    gives the equivalent _bl file that tht qa code seems to accept.
     #  output directory = context.out_dir
     #  products directory = context.product_dir
     #  html/report directory = context.report_dir
+    # list[set[str, str, list[list[float, float, bool, float, float]]]]
 
     basename, baseline_file = file_info
     line_data = _science_lines(context, results)
@@ -67,11 +79,11 @@ def baseline_score(
 
     # Generally, pipeline operates in the current working directory, so we will use that as the working path.
     working_path = pathlib.Path.cwd().resolve()
-    LOG.debug(f"Current working directory: %s", working_path)
+    LOG.debug("Current working directory: %s", working_path)
 
     date_time = datetime.datetime.now(datetime.UTC).strftime("%Y%d%mT%H%M%SD%f")
 
-    plot_path = pathlib.Path(context.report_dir).joinpath(f"stage{context.task_counter}").joinpath(f"baseline_qa_plots_{date_time}")
+    plot_path = pathlib.Path(context.report_dir).joinpath(f"baseline_qa_plots_{date_time}")
 
     # This should always exist but incase
     plot_path.mkdir(parents=True, exist_ok=True)
@@ -106,12 +118,9 @@ def baseline_score(
             weblog_adress=""
         )
     except FailedAnalysisException:
-        plot_path.rmdir()
+        for png_file in glob.glob(f"{plot_path}/*_BLine_QA.png"):
+            os.remove(png_file)
+
         return None
 
-    # except Exception as error:
-    #     LOG.error(f"There was an unknown critical error in baseline_score: {error}")
-    #     plot_path.rmdir()
-    #     return None
-
-    return {"score": qa_score, "plot_names" :plots_function_names}
+    return {"score": qa_score, "plot_names": plots_function_names}

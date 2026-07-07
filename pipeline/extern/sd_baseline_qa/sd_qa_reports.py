@@ -1,19 +1,20 @@
-import os, sys
-from typing import List, Tuple, Union
-import numpy as np
-import re
+import copy
 import glob
+import os
+import re
+from typing import Union
+
+import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
+import numpy as np
 from astropy.nddata import block_reduce
 from astropy.time import Time
-import matplotlib.dates as mdates
-import casatools
-import copy
+
+import pipeline.extern.sd_baseline_qa.mswrapper_sd as mswrapper_sd
+import pipeline.extern.sd_baseline_qa.sd_qa_utils as sd_qa_utils
 
 from pipeline.infrastructure.filenamer import sanitize
-import pipeline.extern.sd_baseline_qa.sd_qa_utils as sd_qa_utils
-import pipeline.extern.sd_baseline_qa.mswrapper_sd as mswrapper_sd
+from pipeline.infrastructure.utils.conversion import set_to_data
 
 def show_heat_XYdiff(msw: mswrapper_sd.MSWrapperSD, nchanbin: int = 1, nvisbin: int = 1,
                      zrange: str = '0.9', remove_skylines: bool = False, nchanstdblock: int = 20,
@@ -847,7 +848,10 @@ def makeSummaryTable_bl(
         antenna = list(qascore.applies_to.ant)[0]
         antennaid = antnames.index(antenna)
         scan = str(list(qascore.applies_to.scan)[0]).replace(',',';')
-        pol = list(qascore.applies_to.pol)[0]
+        # pol = list(qascore.applies_to.pol)[0]
+        pol = set_to_data(qascore.applies_to.pol, keep_list=True)
+        pol = pol[0] if not pol is None else None
+
         polid = (0 if pol == 'XX' else 1)
         #Metric data value
         metric_data = qascore.origin.metric_score
@@ -867,14 +871,15 @@ def makeSummaryTable_bl(
         if not plot_fname == 'N/A':
             plot_fname = plot_fname.split('/')[-1]
         #If a PL working folder is provided, search for relevant weblog plot
-        weblogpath = os.path.join(plot_folder, 'pipeline-*/html/stage11/spectral_plot_after_subtraction_{0:s}.atmcor_{1:s}_ant{2:s}_spw{3:s}_pol{4:s}.png'.format(msorig,fieldname,str(antennaid),str(spw),str(polid)))
-        print('weblogpath: '+str(weblogpath))
-        weblogplots = glob.glob(weblogpath)
-        print('weblogplots: '+str(weblogplots))
-        if len(weblogplots) == 1:
-            weblink = os.path.join(weblog_adress, weblogplots[0])
-        else:
-            weblink = 'weblog_plot_not_found'
+        #weblogpath = os.path.join(plot_folder, 'pipeline-*/html/stage11/spectral_plot_after_subtraction_{0:s}.atmcor_{1:s}_ant{2:s}_spw{3:s}_pol{4:s}.png'.format(msorig,fieldname,str(antennaid),str(spw),str(polid)))
+        #print('weblogpath: '+str(weblogpath))
+        #weblogplots = glob.glob(weblogpath)
+        #print('weblogplots: '+str(weblogplots))
+        #if len(weblogplots) == 1:
+        #    weblink = os.path.join(weblog_adress, weblogplots[0])
+        #else:
+        #    weblink = 'weblog_plot_not_found'
+        weblink = "NA"
         fout.write(fmt.format(plfolder,msname,str(spw),antenna,scan+'('+fieldname+')',qascore.score,metric_data,plot_fname,weblink,metric_name,metric_units,message))
     fout.close()
     

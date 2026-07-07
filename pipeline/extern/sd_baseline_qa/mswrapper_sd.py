@@ -253,12 +253,32 @@ class MSWrapperSD(object):
         time_mean_scan['all'] = np.ma.mean(data, axis=2)
         time_std_scan['all'] = np.ma.std(data, axis=2)
 
-        return MSWrapperSD(fname=fname, antenna=antenna, spw=spw, npol=npol, nchan=nchan, nrows=nrows, fieldid=fieldid, column=column, onoffsel=onoffsel, spw_setup=spw_setup, data=data, weight=weight, time=tmdata, tsysdata=tsysdata, scantimesel=scantimesel, nrowscan=nrowscan, time_mean_scan=time_mean_scan, time_std_scan=time_std_scan, data_stats=None,
-            analysis=None)
+        return MSWrapperSD(
+            fname=fname,
+            antenna=antenna,
+            spw=spw,
+            npol=npol,
+            nchan=nchan,
+            nrows=nrows,
+            fieldid=fieldid,
+            column=column,
+            onoffsel=onoffsel,
+            spw_setup=spw_setup,
+            data=data,
+            weight=weight,
+            time=tmdata,
+            tsysdata=tsysdata,
+            scantimesel=scantimesel,
+            nrowscan=nrowscan,
+            time_mean_scan=time_mean_scan,
+            time_std_scan=time_std_scan,
+            data_stats=None,
+            analysis=None
+        )
 
     def average_data_per_scan(self):
-        ''' Method to average data per scan and all data, and update per-scan and all scan average arrays.
-        '''
+        """ Method to average data per scan and all data, and update per-scan and all scan average arrays.
+        """
 
         #If no data is contained in this object, just return
         if self.nrows == 0:
@@ -281,7 +301,7 @@ class MSWrapperSD(object):
 
     def filter(self, type: str = 'rowmedian', returnfit: bool = False, polydeg: int = 2, filter_order: int = 5,
               filter_cutoff: float = 0.01):
-        '''Task to apply filters to the data.
+        """Task to apply filters to the data.
         param
             msw: MSWrapperSD object, containing the data to be filtered.
             type: String telling the type of filter to apply. Options are:
@@ -297,7 +317,7 @@ class MSWrapperSD(object):
             filter_order, filter_cutoff: parameters to be used with signal.butter highpass filter.
         :return: MSWrapperSD instance (optional a tuple of a (MSWrapperSD, dict), where the dictionary
                  contains the fitted data.
-        '''
+        """
 
         #If no data is contained in this object, just return
         if self.nrows == 0:
@@ -372,4 +392,4 @@ class MSWrapperSD(object):
         if returnfit:
             return fitdata
 
-        return
+        return None

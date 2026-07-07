@@ -939,7 +939,7 @@ def human_file_size(size_in_bytes: int | float) -> str:
         return f"{human_readable_size:.1f} {unit}"
 
 
-def set_to_data(s: set[Any | list[Any]])-> Any | list[Any]:
+def set_to_data(s: set[Any | list[Any]], keep_list=False)-> Any | list[Any]:
     """
     Converts a set() to a list of a single value depending on what is contained within.
     Args:
@@ -954,8 +954,8 @@ def set_to_data(s: set[Any | list[Any]])-> Any | list[Any]:
         LOG.error(f"Invalid data type in set() conversion: {type(s)} ...")
         return None
 
-    struct = list(s)
-    if len(struct) > SINGLE:
+    struct = [None] if not s else list(s)
+    if len(struct) > SINGLE or keep_list:
         return struct
 
     return struct[0]

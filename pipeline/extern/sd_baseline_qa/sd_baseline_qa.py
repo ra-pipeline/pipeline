@@ -201,7 +201,7 @@ def calc_baseline_qascore_single(
         this_score_top = 0.80
         this_score_bottom = 0.67
     else:
-        this_score_top = 0.6
+        this_score_top = 0.67
         this_score_bottom = 0.34
 
     #output variable for QA scores
@@ -254,7 +254,7 @@ def calc_baseline_qascore_single(
         applies_to = pipelineqa.TargetDataSelection(
             vis={msname},
             scan={"All"},
-            intent={'*OBSERVE_TARGET#ON_SOURCE*'},
+            intent={'TARGET'},
             spw={msw.spw},
             ant={msw.antenna},
             #pol={'NA'},
