@@ -95,9 +95,10 @@ line detection stage.</p>
 <li><a href="#avgbeforebaseline">Averaged Spectral Data Before Baseline Subtraction</a></li>
 <li><a href="#rawafterbaseline">Raw Spectral Data After Baseline Subtraction</a></li>
 <li><a href="#flatnessafterbaseline">Baseline Flatness After baseline Subtraction</a></li>
+<li><a href="#profileheuristic"> Profile Heuristic Analysis XXYY </a></li>
 % if detail is not None:
 <li><a href="#clusteranalysis">Line Detection by Clustering Analysis</a></li>
-<li><a href="#profileheuristic"> Profile Heuristic Analysis XXYY </a></li>
+
 % endif
 </ul>
 <h2 id="rawbeforebaseline" class="jumptarget">Spectral Data Before Baseline Subtraction</h2>
