@@ -29,8 +29,6 @@ LOG = infrastructure.logging.get_logger(__name__)
 
 
 def make_profile_heuristic_plots(results: SDBaselineResults):
-    # Get the context results for SDBaseline Results only
-
     profile_heuristic = []
     keys = set()
 

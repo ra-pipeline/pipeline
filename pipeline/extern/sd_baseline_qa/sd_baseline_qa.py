@@ -482,7 +482,7 @@ def calc_baseline_qascore_single(
                 intent={'TARGET'},
                 spw={msw.spw},
                 ant={msw.antenna},
-                pol={pol},
+                pol={"NA"},
                 field={fieldname},
             )
             comes_from = pipelineqa.QAOrigin(metric_name=reason, metric_score=float(np.round(max_pXY_cont, 3)), metric_units='XX-YY Pearsons cross-correlation')
