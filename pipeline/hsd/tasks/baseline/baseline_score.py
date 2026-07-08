@@ -25,7 +25,7 @@ LOG = infrastructure.get_logger(__name__)
 def _science_lines(
         context: Context,
         results: SDBaselineResults
-)->list[set[str, str, list[list[float, float, bool, float, float]]]]:
+)->list[tuple[str, str, list[list[float, float, bool, float, float]]]]:
     """
     Parse context and results to extract relevant science lines.
     Args:
@@ -46,9 +46,9 @@ def _science_lines(
 
 
 def baseline_score(
-        results: "SDBaselineResults",
+        results: SDBaselineResults,
         context: Context,
-        file_info: set[str, str]
+        file_info: tuple[str, str]
 )-> None | dict[str, list]:
     """
 

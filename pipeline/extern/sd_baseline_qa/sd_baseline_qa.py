@@ -307,7 +307,7 @@ def calc_baseline_qascore_single(
                 applies_to = pipelineqa.TargetDataSelection(
                     vis={msname},
                     scan={scan},
-                    intent={'*OBSERVE_TARGET#ON_SOURCE*'},
+                    intent={'TARGET'},
                     spw={msw.spw},
                     ant={msw.antenna},
                     field={fieldname},
@@ -336,7 +336,7 @@ def calc_baseline_qascore_single(
                 applies_to = pipelineqa.TargetDataSelection(
                     vis={msname},
                     scan={scan},
-                    intent={'*OBSERVE_TARGET#ON_SOURCE*'},
+                    intent={'TARGET'},
                     spw={msw.spw},
                     ant={msw.antenna},
                     pol={polstr},
@@ -424,7 +424,7 @@ def calc_baseline_qascore_single(
             applies_to = pipelineqa.TargetDataSelection(
                 vis={msname},
                 scan={scan},
-                intent={'*OBSERVE_TARGET#ON_SOURCE*'},
+                intent={'TARGET'},
                 spw={msw.spw},
                 ant={msw.antenna},
                 pol={polstr},
@@ -443,7 +443,7 @@ def calc_baseline_qascore_single(
             applies_to = pipelineqa.TargetDataSelection(
                 vis={msname},
                 scan={scan},
-                intent={'*OBSERVE_TARGET#ON_SOURCE*'},
+                intent={'TARGET'},
                 spw={msw.spw},
                 ant={msw.antenna},
                 pol={polstr},
@@ -479,7 +479,7 @@ def calc_baseline_qascore_single(
             applies_to = pipelineqa.TargetDataSelection(
                 vis={msname},
                 scan={scan},
-                intent={'*OBSERVE_TARGET#ON_SOURCE*'},
+                intent={'TARGET'},
                 spw={msw.spw},
                 ant={msw.antenna},
                 pol={pol},
@@ -497,7 +497,7 @@ def calc_baseline_qascore_single(
             applies_to = pipelineqa.TargetDataSelection(
                 vis={msname},
                 scan={scan},
-                intent={'*OBSERVE_TARGET#ON_SOURCE*'},
+                intent={'TARGET'},
                 spw={msw.spw},
                 ant={msw.antenna},
                 pol={polstr},
@@ -594,7 +594,7 @@ def calc_qascores_collection(
                     applies_to = pipelineqa.TargetDataSelection(
                         vis={ms},
                         scan={triggerscan},
-                        intent={'*OBSERVE_TARGET#ON_SOURCE*'},
+                        intent={'TARGET'},
                         spw={msw.spw},
                         ant={triggerant},
                         pol={triggerpolstr},
@@ -725,7 +725,7 @@ def add_non_outlier_qascores(mswCollection: dict):
                 applies_to = pipelineqa.TargetDataSelection(
                     vis={ms},
                     scan={scan},
-                    intent={'*OBSERVE_TARGET#ON_SOURCE*'},
+                    intent={'TARGET'},
                     spw={msw.spw},
                     ant={msw.antenna},
                     #pol={"NA"},
