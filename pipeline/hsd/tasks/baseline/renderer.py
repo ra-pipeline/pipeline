@@ -35,8 +35,6 @@ def make_profile_heuristic_plots(results: SDBaselineResults):
     for eb in results:
         for score_object in eb.outcome["profile_qa_score"].values():
             for score, plot_name in zip(score_object["score"], score_object["plot_names"]):
-
-                #Plot(plot_name)
                 _plot = Plot(
                     plot_name,
                     x_axis="freq",
@@ -51,7 +49,10 @@ def make_profile_heuristic_plots(results: SDBaselineResults):
 
                 profile_heuristic.append(_plot)
 
-                keys.add(conversion.set_to_data(score.applies_to.field))
+                # The key string comes with white space such as "S PAV". This eliminates the white space
+                # and is tab proof.
+                clean_key = re.sub(r'\s+', '_', conversion.set_to_data(score.applies_to.field))
+                keys.add(clean_key)
 
     profile_heuristic_subpages = dict.fromkeys(list(keys), "")
 
