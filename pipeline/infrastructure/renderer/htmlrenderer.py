@@ -2082,6 +2082,13 @@ def compute_zd_telmjd_for_ms(
     obs_pos = me.observatory(observatory)
     me.doframe(obs_pos)
 
+    # Reusable epoch dict — just update the value before each doframe.
+    epoch_dict = {
+        'm0': {'value': 0.0, 'unit': 'd'},
+        'refer': 'UTC',
+        'type': 'epoch',
+    }
+
     for field in fields:
         if field.id not in data:
             data[field.id] = {
@@ -2094,9 +2101,10 @@ def compute_zd_telmjd_for_ms(
         field_dir = field._mdirection
 
         for time_seconds in field.time:
-            obs_time = mjd_epoch + datetime.timedelta(seconds=float(time_seconds))
-            epoch = casa_tools.measures.epoch('utc', obs_time.isoformat())
-            me.doframe(epoch)
+            # field.time is seconds since 1858-11-17 (MJD origin)
+            mjd = float(time_seconds) / 86400.0
+            epoch_dict['m0']['value'] = mjd
+            me.doframe(epoch_dict)
             me.doframe(obs_pos)
 
             # Convert field direction to horizontal coordinates
