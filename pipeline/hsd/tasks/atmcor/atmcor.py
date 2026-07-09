@@ -39,7 +39,7 @@ DEFAULT_ATMTYPE_LIST = [1, 2, 3, 4]
 class SDATMCorrectionInputs(vdp.StandardInputs):
     """Inputs class for SDATMCorrection task."""
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     parallel = sessionutils.parallel_inputs_impl()
 

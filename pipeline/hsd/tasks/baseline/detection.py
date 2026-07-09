@@ -35,7 +35,7 @@ class DetectLineInputs(vdp.StandardInputs):
     """Inputs for spectral line detection task."""
 
     # Search order of input vis
-    processing_data_type = [DataType.ATMCORR, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.ATMCORR, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     edge = vdp.VisDependentProperty(default=(0, 0))
     broadline = vdp.VisDependentProperty(default=True)

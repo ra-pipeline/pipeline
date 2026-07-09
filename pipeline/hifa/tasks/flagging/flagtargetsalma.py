@@ -10,7 +10,6 @@ import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import task_registry
-from pipeline.infrastructure.filenamer import sanitize_for_ms
 import pipeline.infrastructure.sessionutils as sessionutils
 
 # the logger for this module
@@ -40,21 +39,24 @@ class FlagTargetsALMAInputs(vdp.StandardInputs):
         filetemplate: The filename of the ASCII file that contains the flagging template.
     """
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     flagbackup = vdp.VisDependentProperty(default=False)
     template = vdp.VisDependentProperty(default=True)
 
     @vdp.VisDependentProperty
     def filetemplate(self):
-        vis_root = sanitize_for_ms(self.vis)
+        # PIPE-3003 fixed the template name. The previously used sanitize_for_ms
+        # method always used the original MS name template. Thus changing to
+        # the real MS root name.
+        vis_root = os.path.splitext(os.path.basename(self.vis))[0]
         return vis_root + '.flagtargetstemplate.txt'
 
     @vdp.VisDependentProperty
     def inpfile(self):
-        vis_root = sanitize_for_ms(self.vis)
+        vis_root = os.path.splitext(os.path.basename(self.vis))[0]
         return os.path.join(self.output_dir, vis_root + '.flagtargetscmds.txt')
-    
+
     parallel = sessionutils.parallel_inputs_impl(default=False)
 
     # docstring and type hints: supplements hifa_flagtargets

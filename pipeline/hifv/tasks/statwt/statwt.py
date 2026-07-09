@@ -2,14 +2,12 @@ import os
 import shutil
 
 import numpy as np
-
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
 from pipeline.hifv.heuristics import set_add_model_column_parameters
-from pipeline.infrastructure import (casa_tasks, casa_tools, task_registry,
-                                     utils)
+from pipeline.infrastructure import casa_tasks, casa_tools, task_registry, utils
 from pipeline.infrastructure.contfilehandler import contfile_to_spwsel
 
 LOG = infrastructure.get_logger(__name__)
@@ -20,11 +18,12 @@ LOG = infrastructure.get_logger(__name__)
 
 class StatwtInputs(vdp.StandardInputs):
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     datacolumn = vdp.VisDependentProperty(default='corrected')
     overwrite_modelcol = vdp.VisDependentProperty(default=False)
     statwtmode = vdp.VisDependentProperty(default='VLA')
+    usecontdat = vdp.VisDependentProperty(default=True)
 
     @datacolumn.postprocess
     def datacolumn(self, unprocessed):
@@ -36,7 +35,7 @@ class StatwtInputs(vdp.StandardInputs):
             return unprocessed
 
     # docstring and type hints: supplements hifv_statwt
-    def __init__(self, context, vis=None, datacolumn=None, overwrite_modelcol=None, statwtmode=None):
+    def __init__(self, context, vis=None, datacolumn=None, overwrite_modelcol=None, statwtmode=None, usecontdat=None):
         """Initialize Inputs.
 
         Args:
@@ -53,6 +52,10 @@ class StatwtInputs(vdp.StandardInputs):
                 mode is meant to be used with datacolumn='residual_data'.
                 Default is 'VLA'.
 
+            usecontdat: If True (default), use cont.dat file if present to restrict weight calculations
+                to specified spectral windows.
+                If False, ignore any cont.dat file and apply weights to all spectral windows.
+
         """
         super().__init__()
         self.context = context
@@ -60,6 +63,7 @@ class StatwtInputs(vdp.StandardInputs):
         self.datacolumn = datacolumn
         self.overwrite_modelcol = overwrite_modelcol
         self.statwtmode = statwtmode
+        self.usecontdat = usecontdat
 
 
 class StatwtResults(basetask.Results):
@@ -91,11 +95,21 @@ class Statwt(basetask.StandardTaskTemplate):
             self._check_for_modelcolumn()
 
         if self.inputs.statwtmode not in ['VLA', 'VLASS-SE']:
-            LOG.warning('Unkown mode \'%s\' was set. Known modes are [\'VLA\',\'VLASS-SE\']. '
+            LOG.warning('Unknown mode \'%s\' was set. Known modes are [\'VLA\',\'VLASS-SE\']. '
                         'Continuing in \'VLA\' mode.' % self.inputs.statwtmode)
             self.inputs.statwtmode = 'VLA'
 
-        fielddict = contfile_to_spwsel(self.inputs.vis, self.inputs.context)
+        if self.inputs.usecontdat:
+            fielddict = contfile_to_spwsel(self.inputs.vis, self.inputs.context)
+            if fielddict != {}:
+                LOG.info('usecontdat=True and cont.dat found: Using VLA Spectral Line Heuristics '
+                         'for task statwt.')
+            else:
+                LOG.warning('usecontdat=True but no cont.dat found or empty: '
+                            'Applying weights to all spectral windows.')
+        else:
+            LOG.info('usecontdat=False: Applying weights to all spectral windows.')
+            fielddict = {}
         fields = ','.join(utils.fieldname_for_casa(x) for x in fielddict) if fielddict != {} else ''
 
         wtables = {}

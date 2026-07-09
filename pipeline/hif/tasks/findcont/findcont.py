@@ -23,7 +23,7 @@ LOG = infrastructure.get_logger(__name__)
 class FindContInputs(vdp.StandardInputs):
     # Must use empty data type list to allow for user override and
     # automatic determination depending on specmode, field and spw.
-    processing_data_type = []
+    processing_data_types = []
 
     hm_perchanweightdensity = vdp.VisDependentProperty(default=None)
     hm_weighting = vdp.VisDependentProperty(default=None)
@@ -96,8 +96,8 @@ class FindCont(basetask.StandardTaskTemplate):
 
         # Check if this stage should be skipped
         if self._skip_findcont():
-            # only triggered for VLA-PI pieplein (not for ALMA)
-            result = FindContResult({}, {}, '', 0, 0, [], {})
+            # PIPE-2780/PIPE-3137: only potentially triggered in a VLA-PI workflow (not for ALMA)
+            result = FindContResult({}, {}, '', 0, 0, [], {}, skip_stage=True)
             return result
 
         # Check for size mitigation errors.

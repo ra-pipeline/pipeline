@@ -81,8 +81,7 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
         """
         Custom renderer for hsd_baseline()
 
-        This method aggegates the QAScores and renders the weblog,
-        then resotres the original QAScores for subsequent processes (eg. AQUA report)
+        This method aggegates the QAScores and renders the weblog.
 
         Args:
             context: Pipeline context

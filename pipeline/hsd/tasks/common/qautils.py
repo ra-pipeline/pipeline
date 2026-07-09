@@ -144,16 +144,16 @@ class QAScoreFormatter:
             force_update:          True to Update the longmsg even if TargetDataSelection is empty
                                        default is False which inhibits to update longmsg for an empty TargetDataSelection
         """
+        # skip formatting if the metric_name is in the excludes list
+        if qascore.origin.metric_name in registry.get_excludes():
+            return
+
         # if longmsg_keys is not specified, try to get it from the registry
         if longmsg_keys is None:
             longmsg_keys = registry.get_longmsg_keys(qascore.origin.metric_name)
             # apply all keys in TargetDataSelection if longmsg_keys still does not exist
             if longmsg_keys is None:
                 longmsg_keys = list(vars(qascore.applies_to).keys())
-
-        # skip formatting if the metric_name is in the excludes list
-        if qascore.origin.metric_name in registry.get_excludes():
-            return
 
         # inhibit formatting if 1) everything associated with longmsg_keys are empty and 2) force_update is False
         # this will prevent longmsg from being unintentionally overwritten with shortmsg
@@ -391,8 +391,10 @@ def smartsort(x: any) -> tuple[int, any]:
     """
     Auxiliary method to sort a numerical value / str mixed list
 
-    This can be used with shrted as: sorted(arr, key=smartsort)
-    Numerical values in str are coverted to float for evaluation.
+    This can be used with sorted as: sorted(arr, key=smartsort)
+    Numerical values stored as str are coverted to float for evaluation.
+    ex)
+     ['11.0', '6', '5.0deg', '4.3'] -> ['4.3', '6', '11.0', '5.0deg']
 
     Args:
         x : any value

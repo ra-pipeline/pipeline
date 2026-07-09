@@ -42,7 +42,7 @@ def sanitize_for_ms(vis_name: str) -> str:
     Returns:
         Sanitized name
     """
-    for msend in ('_target.ms', '_targets.ms', '.ms'):
+    for msend in ('_target.ms', '_targets.ms', '_targets_line.ms', '_imaging.ms', '_imaging_line.ms', '.ms'):
         if vis_name.endswith(msend):
             return sanitize_for_ms(vis_name[:-len(msend)])
     return vis_name

@@ -920,10 +920,13 @@ class SerialALMAPhcorBandpass(bandpassworker.BandpassWorker):
                 spwmap = phasespwmap.combine_spwmap(scispws)
                 LOG.info(f"{inputs.ms.basename} - combined spw map for phaseup solution: {spwmap}.")
 
+                # PIPE-2858 any combine use needs a linearPD interpolation
+                interp = 'linearPD,linear'
+                
                 # There should be only a single CalApplication, so replace that
                 # one with the modified CalApplication that includes the SpW
                 # mapping.
-                modified_calapp = callibrary.copy_calapplication(result.pool[0], spwmap=spwmap)
+                modified_calapp = callibrary.copy_calapplication(result.pool[0], spwmap=spwmap, interp=interp)
                 result.pool[0] = modified_calapp
                 result.final[0] = modified_calapp
 
