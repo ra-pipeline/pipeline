@@ -2,19 +2,18 @@ import collections.abc
 import os
 
 import pipeline.h.tasks.exportdata.aqua as aqua
-import pipeline.infrastructure.logging as logging
+import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
+import pipeline.infrastructure.renderer.rendererutils as rendererutils
 import pipeline.qa.scorecalculator as qacalc
 from . import resultobjects
 
-LOG = logging.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class WvrgcalflagQAHandler(pqa.QAPlugin):    
-    """
-    QA handler for an uncontained WvrgcalflagResults.
-    """
+    """QA handler for an uncontained WvrgcalflagResults."""
     result_cls = resultobjects.WvrgcalflagResults
     child_cls = None
 
@@ -22,10 +21,23 @@ class WvrgcalflagQAHandler(pqa.QAPlugin):
         ms_name = os.path.basename(result.inputs['vis'])
 
         # If too few unflagged antennas were left over after flagging,
-        # then return a fixed very low score:
+        # then return a fixed low score. PIPE-1868: change fixed score of 0.1 to
+        # 0.34 (yellow), or 0.67 (blue) if BPgood. Add MS name to longmsg.
         if result.too_few_wvr_post_flagging:
+            dataresult = result.flaggerresult.dataresult
+            score_too_few = (rendererutils.SCORE_THRESHOLD_WARNING + 0.01  # lowest blue
+                             if dataresult.BPgood else
+                             rendererutils.SCORE_THRESHOLD_ERROR + 0.01)   # lowest yellow
+            if dataresult.BPgood:
+                bp_ph = 'Bandpass ' + ('and Phase ' if dataresult.PHgood else '')
+                extra = bp_ph + 'calibrator atmospheric phase stability appears to be good'
+            else:
+                extra = ''
+            longmsg_too_few = f'Not enough unflagged WVR available for {ms_name}.'
+            if extra:
+                longmsg_too_few += f' {extra}'
             score_object = pqa.QAScore(
-                0.1, longmsg='Not enough unflagged WVR available',
+                score_too_few, longmsg=longmsg_too_few,
                 shortmsg='Not enough unflagged WVR', vis=ms_name)
             new_origin = pqa.QAOrigin(
                 metric_name='PhaseRmsRatio',

@@ -104,7 +104,7 @@ class ImagePreCheckResults(basetask.Results):
 
 class ImagePreCheckInputs(vdp.StandardInputs):
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     calcsb = vdp.VisDependentProperty(default=False)
     parallel = vdp.VisDependentProperty(default='automatic')
@@ -277,9 +277,10 @@ class ImagePreCheck(basetask.StandardTaskTemplate):
         field_ids = image_heuristics.field('TARGET', repr_field)
         cont_spwids = sorted(context.observing_run.virtual_science_spw_ids)
         repr_field_obj = repr_ms.get_fields(repr_field, intent='TARGET')[0]
+        cont_spwids = set(map(int, cont_spwids))
         filtered_cont_spwids = sorted(
-            [context.observing_run.real2virtual_spw_id(s.id, repr_ms) for s in repr_field_obj.valid_spws
-             if context.observing_run.real2virtual_spw_id(s.id, repr_ms) in list(map(int, cont_spwids))])
+            [virtual_spw_id for s in repr_field_obj.valid_spws
+             if 'TARGET' in s.intents and (virtual_spw_id := context.observing_run.real2virtual_spw_id(s.id, repr_ms)) in cont_spwids])
         cont_spw = ','.join(map(str, filtered_cont_spwids))
         num_cont_spw = len(filtered_cont_spwids)
 

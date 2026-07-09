@@ -270,8 +270,7 @@ class RawflagchansData(basetask.StandardTaskTemplate):
         # Take vis from inputs, and add to result.
         result.table = self.inputs.vis
 
-        LOG.info('Reading flagging view data for vis {0}'.format(
-            self.inputs.vis))
+        LOG.info('Reading flagging view data for vis %s', self.inputs.vis)
 
         # Get the MS object.
         ms = self.inputs.context.observing_run.get_ms(name=self.inputs.vis)
@@ -288,30 +287,31 @@ class RawflagchansData(basetask.StandardTaskTemplate):
         nbaselines = len(baselines)
 
         # Create a separate flagging view for each spw.
-        for spwid in map(int, self.inputs.spw.split(',')):
+        # Open the MS once for all SPW iterations to avoid repeated open/close
+        # overhead (PIPE-3089).
+        with casa_tools.MSReader(ms.name) as openms:
+            for spwid in map(int, self.inputs.spw.split(',')):
+                LOG.info('Reading flagging view data for spw %s', spwid)
 
-            LOG.info('Reading flagging view data for spw {0}'.format(spwid))
+                # Get the correlation products.
+                corrs = commonhelpermethods.get_corr_products(ms, spwid)
 
-            # Get the correlation products.
-            corrs = commonhelpermethods.get_corr_products(ms, spwid)
+                # Get the spw object from the MS and the number of channels
+                # within the spw.
+                spw = ms.get_spectral_window(spwid)
+                nchans = spw.num_channels
 
-            # Get the spw object from the MS and the number of channels
-            # within the spw.
-            spw = ms.get_spectral_window(spwid)
-            nchans = spw.num_channels
+                # Initialize the data, and number of data points
+                # used, for the flagging view.
+                data = np.zeros([len(corrs), nchans, nbaselines], complex)
+                ndata = np.zeros([len(corrs), nchans, nbaselines], int)
 
-            # Initialize the data, and number of data points
-            # used, for the flagging view.
-            data = np.zeros([len(corrs), nchans, nbaselines], complex)
-            ndata = np.zeros([len(corrs), nchans, nbaselines], int)
-
-            # Open MS and read in required data.
-            with casa_tools.MSReader(ms.name) as openms:
+                # Clear any prior selection, then apply new data selection.
                 try:
+                    openms.reset()
                     openms.msselect({'scanintent': '*%s*' % self.inputs.intent, 'spw': str(spwid)})
-                except:
+                except Exception:
                     LOG.warning('Unable to compute flagging view for spw %s' % spwid)
-                    openms.close()
                     # Continue to next spw.
                     continue
 
@@ -320,8 +320,7 @@ class RawflagchansData(basetask.StandardTaskTemplate):
                 openms.iterorigin()
                 iterating = True
                 while iterating:
-                    rec = openms.getdata(
-                        ['data', 'flag', 'antenna1', 'antenna2'])
+                    rec = openms.getdata(['data', 'flag', 'antenna1', 'antenna2'])
                     if 'data' not in rec:
                         break
 
@@ -336,44 +335,39 @@ class RawflagchansData(basetask.StandardTaskTemplate):
                         baseline2 = ant2 * (ants[-1] + 1) + ant1
 
                         for icorr in range(len(corrs)):
+                            data[icorr, :, baseline1][rec['flag'][icorr, :, row] == False] += rec['data'][
+                                icorr, :, row
+                            ][rec['flag'][icorr, :, row] == False]
 
-                            data[icorr, :, baseline1][
-                              rec['flag'][icorr, :, row] == False]\
-                              += rec['data'][icorr, :, row][
-                              rec['flag'][icorr, :, row] == False]
+                            ndata[icorr, :, baseline1][rec['flag'][icorr, :, row] == False] += 1
 
-                            ndata[icorr, :, baseline1][
-                              rec['flag'][icorr, :, row] == False] += 1
+                            data[icorr, :, baseline2][rec['flag'][icorr, :, row] == False] += rec['data'][
+                                icorr, :, row
+                            ][rec['flag'][icorr, :, row] == False]
 
-                            data[icorr, :, baseline2][
-                              rec['flag'][icorr, :, row] == False]\
-                              += rec['data'][icorr, :, row][
-                              rec['flag'][icorr, :, row] == False]
-
-                            ndata[icorr, :, baseline2][
-                              rec['flag'][icorr, :, row] == False] += 1
+                            ndata[icorr, :, baseline2][rec['flag'][icorr, :, row] == False] += 1
 
                     iterating = openms.iternext()
 
-            # Calculate the average data value, suppress any divide by 0
-            # error messages (RuntimeWarning).
-            with np.errstate(divide='ignore', invalid='ignore'):
-                data /= ndata
+                # Calculate the average data value, suppress any divide by 0
+                # error messages (RuntimeWarning).
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    data /= ndata
 
-            # Take the absolute value of the data points.
-            data = np.abs(data)
+                # Take the absolute value of the data points.
+                data = np.abs(data)
 
-            # Set flagging state to "True" wherever no data points were available.
-            flag = ndata == 0
+                # Set flagging state to "True" wherever no data points were available.
+                flag = ndata == 0
 
-            # Store data and related information for this spwid.
-            result.data[spwid] = {
-                'data': data,
-                'flag': flag,
-                'baselines': baselines,
-                'nchans': nchans,
-                'corrs': corrs
-            }
+                # Store data and related information for this spwid.
+                result.data[spwid] = {
+                    'data': data,
+                    'flag': flag,
+                    'baselines': baselines,
+                    'nchans': nchans,
+                    'corrs': corrs,
+                }
 
         return result
 
@@ -409,8 +403,7 @@ class RawflagchansView:
         # Take vis from data task results, and add to result.
         self.result.vis = dataresult.table
 
-        LOG.info('Computing flagging metrics for vis {0}'.format(
-            self.result.vis))
+        LOG.info('Computing flagging metrics for vis %s', self.result.vis)
 
         # Check if dataresult is new for current iteration, or created during
         # a previous iteration.

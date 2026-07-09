@@ -8,12 +8,14 @@ from typing import TYPE_CHECKING
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.filenamer as filenamer
+from pipeline.hsd.tasks.common import compress
+from pipeline.hsd.tasks.common import qautils
+from pipeline.hsd.tasks.common import utils
 from . import display
-from ..common import compress
-from ..common import utils
 
 if TYPE_CHECKING:
     from pipeline.domain.field import Field
+    from pipeline.hsd.tasks.baseline.baseline import SDBaselineResults
     from pipeline.infrastructure.api import Results
     from pipeline.infrastructure.basetask import ResultsList
     from pipeline.infrastructure.launcher import Context
@@ -39,6 +41,28 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
             always_rerender: Always rerender the page if True. Defaults to False.
         """
         super().__init__(template, description, always_rerender)
+
+    @qautils.aggregate_qascores
+    @qautils.sort_qascores
+    def render(self, context: Context, result: SDBaselineResults) -> str:
+        """
+        Custom renderer for hsd_baseline()
+
+        This method aggegates and sorts the QAScores, and renders the weblog,
+
+        Args:
+            context: Pipeline context
+            result:  SDBaselineResults object
+        Returns:
+            Rendered html document
+        """
+        # This method modifies the result object
+        # but the changes do not propergate to the original result or context,
+        # since they are local in render() thanks to the mechanism of PL infrastructure.
+        # Therefore there is no need to bracket the aggregation process
+        # with stashing and recovering the original result.qa.pool here.
+
+        return super().render(context, result)
 
     def update_mako_context(self, ctx: dict, context: Context, results: ResultsList) -> None:
         """Update context object for Mako template in place.
@@ -349,3 +373,5 @@ class SingleDishClusterPlotsRenderer(basetemplates.JsonPlotRenderer):
             plot: Plot object
         """
         d['type'] = plot.parameters['type']
+
+

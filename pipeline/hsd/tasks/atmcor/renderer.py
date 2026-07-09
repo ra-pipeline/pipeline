@@ -13,6 +13,7 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.renderer.logger as logger
 import pipeline.infrastructure.utils as utils
+from pipeline.hsd.tasks.common import qautils
 
 from .display import PlotmsRealVsFreqPlotter
 
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
     from pipeline.infrastructure.basetask import ResultsList
+    from pipeline.hsd.tasks.atmcor.atmcor import SDATMCorrectionResults
     from pipeline.infrastructure.launcher import Context
     from .atmcor import SDATMCorrectionResults
 
@@ -199,6 +201,27 @@ class T2_4MDetailsSingleDishATMCorRenderer(basetemplates.T2_4MDetailsDefaultRend
         uri = 'hsd_atmcor.mako'
         description = 'Apply correction for atmospheric effects'
         super().__init__(uri=uri, description=description, always_rerender=always_rerender)
+
+    @qautils.sort_qascores
+    def render(self, context: Context, result: SDATMCorrectionResults) -> str:
+        """
+        Custom renderer for hsd_atmcor()
+
+        This method sorts the QAScores with their scores, and renders the weblog,
+
+        Args:
+            context: Pipeline context
+            result:  SDATMCorrectionResults object
+        Returns:
+            Rendered html document
+        """
+        # This method modifies the result object,
+        # but the changes do not propergate to the original result or context,
+        # since they are local in render() thanks to the mechanism of PL infrastructure.
+        # Therefore there is no need to bracket the aggregation process
+        # with stashing and recovering the original result.qa.pool here.
+
+        return super().render(context, result)
 
     def update_mako_context(self,
                             mako_context: dict,

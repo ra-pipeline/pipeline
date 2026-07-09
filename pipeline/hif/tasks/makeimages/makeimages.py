@@ -1,6 +1,11 @@
+"""Task implementation for hif_makeimages: runs tclean on all pending imaging targets."""
+
 import os
+import re
 import tempfile
 from inspect import signature
+
+import numpy as np
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -8,23 +13,30 @@ import pipeline.infrastructure.daskhelpers as daskhelpers
 import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
+import pipeline.infrastructure.utils.imaging as imaging_utils
 import pipeline.infrastructure.vdp as vdp
-
 from pipeline.domain import DataType
 from pipeline.h.tasks.common.sensitivity import Sensitivity
-from pipeline.infrastructure import casa_tools, exceptions, task_registry
+from pipeline.infrastructure import casa_tools, casa_tasks, exceptions, task_registry
 
 from ..tclean import Tclean
 from ..tclean.resultobjects import TcleanResult
 from .resultobjects import MakeImagesResult
-import numpy as np
 
 LOG = infrastructure.get_logger(__name__)
 
 
 class MakeImagesInputs(vdp.StandardInputs):
+    """Inputs for hif_makeimages."""
+
     # Search order of input vis
-    processing_data_type = [DataType.SELFCAL_LINE_SCIENCE, DataType.REGCAL_LINE_SCIENCE, DataType.SELFCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [
+        DataType.SELFCAL_LINE_SCIENCE,
+        DataType.REGCAL_LINE_SCIENCE,
+        DataType.SELFCAL_CONTLINE_SCIENCE,
+        DataType.REGCAL_CONTLINE_SCIENCE,
+        DataType.REGCAL_CONTLINE_ALL,
+        DataType.RAW]
 
     calcsb = vdp.VisDependentProperty(default=False)
     cleancontranges = vdp.VisDependentProperty(default=False)
@@ -68,11 +80,11 @@ class MakeImagesInputs(vdp.StandardInputs):
         return vlass_plane_reject_dict
 
     @vdp.VisDependentProperty(null_input=['', None, {}])
-    def target_list(self):
+    def target_list(self): # noqa: D102
         return self.context.clean_list_pending
 
     @tlimit.convert
-    def tlimit(self, tlimit):
+    def tlimit(self, tlimit): # noqa: D102
         if tlimit <= 0.0:
             raise ValueError('tlimit values must be larger than 0.0')
         else:
@@ -235,11 +247,14 @@ class MakeImagesInputs(vdp.StandardInputs):
 @task_registry.set_equivalent_casa_task('hif_makeimages')
 @task_registry.set_casa_commands_comment('A list of target sources is cleaned.')
 class MakeImages(basetask.StandardTaskTemplate):
+    """Task that runs tclean on all pending imaging targets."""
+
     Inputs = MakeImagesInputs
 
     is_multi_vis_task = True
 
     def prepare(self):
+        """Execute imaging for all pending clean targets."""
         inputs = self.inputs
 
         result = MakeImagesResult()
@@ -278,11 +293,13 @@ class MakeImages(basetask.StandardTaskTemplate):
                     # Note add_result() removes 'heuristics' from worker_result
                     heuristics = target['heuristics']
                     result.add_result(worker_result, target, outcome='success')
+
                     # Export RMS of  sources
                     if self._is_target_for_sensitivity(worker_result, heuristics):
                         s = self._get_image_rms_as_sensitivity(worker_result, target, heuristics)
                         if s is not None:
                             result.sensitivities_for_aqua.append(s)
+
                     del heuristics
 
         # set of descriptions
@@ -308,17 +325,22 @@ class MakeImages(basetask.StandardTaskTemplate):
         return result
 
     def analyse(self, result):
+        """Post-process imaging results, adding VLASS metadata if applicable."""
         if self.inputs.context.imaging_mode is not None and self.inputs.context.imaging_mode.startswith('VLASS-'):
             result = self._add_vlass_metadata(result)
 
         return result
 
     def _add_vlass_metadata(self, result):
-        """Attach extra imaging metadata to Tclean results for the VLASS Coarse Cube imaging."""
+        """Attach extra imaging metadata to Tclean results for the VLASS Coarse Cube imaging and add
+        VLASS specific header keywords."""
+
         if self.inputs.context.imaging_mode != 'VLASS-SE-CUBE':
             for idx, tclean_result in enumerate(result.results):
                 target = result.targets[idx]
                 tclean_result.imaging_metadata['cutout_imsize'] = (target['misc_vlass'] or {}).get('cutout_imsize')
+                # PIPE-2461: add VLASS header keywords to images
+                self._vlass_set_miscinfo(tclean_result)
             return result
 
         vlass_plane_reject_keys_allowed = [
@@ -408,7 +430,7 @@ class MakeImages(basetask.StandardTaskTemplate):
                 target_spw = result.targets[idx]['spw']
                 if target_spw in plane_keep_dict:
                     tclean_result.imaging_metadata['keep'] = plane_keep_dict[target_spw]
-                self._vlass_cube_set_miscinfo(tclean_result)
+                self._vlass_set_miscinfo(tclean_result)
 
         # attched the metadata w.r.t the plane rejection for the plane rejection plot.
         result.metadata['vlass_cube_metadata'] = {'bmajor_list': np.array(bmajor_list),
@@ -424,28 +446,107 @@ class MakeImages(basetask.StandardTaskTemplate):
 
         return result
 
-    def _vlass_cube_set_miscinfo(self, tclean_result):
-        """Add the VLASS cube plane rejection header keyword."""
-
+    def _vlass_set_miscinfo(self, tclean_result):
+        """Add the VLASS specific header keyword."""
         imagename = tclean_result.image
-        reject = not tclean_result.imaging_metadata['keep']
+
+        if imagename is None:
+            return
+
+        reject = None
+        if 'keep' in tclean_result.imaging_metadata:
+            reject = not tclean_result.imaging_metadata['keep']
+        else:
+            reject = False
+
         imlist = utils.glob_ordered(imagename.replace('.image', '.*'))
+
+        vis_name = self.inputs.vis[0]
+        msobj = self.inputs.context.observing_run.get_ms(vis_name)
+        job = casa_tasks.flagdata(vis=vis_name, mode='summary', spwchan=True,  spw=tclean_result.spw)
+        flag_stats = self._executor.execute(job)
+        vlass_bw = 0
+        spwobj = None
+        nominal_bw = 0.0
+        chan_diff = 0.0
+        for curspw in tclean_result.spw.split(","):
+            unflaged_chan_per_spw = 0
+            for spw_chan in flag_stats['spw:channel']:
+                spw, _ = spw_chan.split(':')
+                if spw != curspw:
+                    continue
+                if flag_stats['spw:channel'][spw_chan].get('flagged', 0) != flag_stats['spw:channel'][spw_chan].get('total', 0):
+                    unflaged_chan_per_spw += 1
+
+            spwobj = msobj.get_spectral_window(curspw)
+
+            if spwobj and spwobj.bandwidth is not None:
+                nominal_bw += float(spwobj.bandwidth.value)
+            if spwobj and len(spwobj.channels.chan_freqs) > 1:
+                chan_diff = np.diff(spwobj.channels.chan_freqs)
+            if spwobj and len(spwobj.channels.chan_freqs) != 0 and np.allclose(chan_diff, chan_diff[0]):
+                chan_width = spwobj.channels.chan_widths[0]
+            else:
+                chan_width = np.median(np.abs(chan_diff))
+            vlass_bw += unflaged_chan_per_spw * chan_width
+
+        if nominal_bw == 0.0:
+            nominal_bw = None
+
+        epoch, tile, version = self._get_vlass_epoch_tile_version(imagename)
         for name in imlist:
             with casa_tools.ImageReader(name) as image:
                 info = image.miscinfo()
+                info['VLASSBWN'] = nominal_bw
                 info['VLASSRJ'] = reject
                 LOG.info('mark the image %s as reject=%r', name, reject)
+                info['VLASSSPW'] = utils.find_ranges(tclean_result.spw)
+                info['VLASSPC'] = tclean_result.inputs["phasecenter"]
+                info['VLASSPL'] = tclean_result.stokes
+                info['VLASSPT'] = tclean_result.imaging_mode
+                info['VLASSBW'] = vlass_bw
+                info['VLASSITY'] = imaging_utils.get_vlass_image_type(name)
+                info['VLASSTN'] = tile
+                info['VLASSEP'] = epoch
+                info['VLASSVR'] = version
+                if tclean_result.inputs['gridder'].lower() in ('awp2', 'awphpg'):
+                    info['VLASSWP'] = tclean_result.inputs['wprojplanes']
+                else:
+                    info['VLASSWP'] = 0
                 image.setmiscinfo(info)
 
+    def _get_vlass_epoch_tile_version(self, filename):
+        """Determine the VLASS epoch, tile name and version in the filename."""
+
+        epoch_match = re.search(r"VLASS(\d+\.\d+)", filename)
+        tilename_match = re.search(r"\.(T\d+t\d+)\.", filename)
+        version_match = re.search(r"\.v(\d+)(?:\.|$)", filename)
+        if epoch_match:
+            epoch = epoch_match.group(1)
+        else:
+            LOG.warning(f"Unable to get epoch given the filename {filename}, setting epoch to ''")
+            epoch = ''
+        if tilename_match:
+            tile = tilename_match.group(1)
+        else:
+            LOG.warning(f"Unable to get tile name given the filename {filename}, setting tile name to ''")
+            tile = ''
+        if version_match:
+            version = version_match.group(1)
+        else:
+            LOG.warning(f"Unable to get version number given the filename {filename}, setting version number to ''")
+            version = ''
+
+        return epoch, tile, version
+
     def _is_target_for_sensitivity(self, clean_result, heuristics):
-        """
-        Returns True if the clean target is one to export image sensitivity
-        Conditions to export image sensitivities are
+        """Return True if the clean target is one for which to export image sensitivity.
+
+        Conditions to export image sensitivities are:
         - cubes generated by SRDP ALMA image cube recipe (specmode='cube')
         - all target images for ALMA if not SRDP
         - reprSrc and reprSpw (all specmode)
         """
-
         # SRDP ALMA optimized cube images
         if self.inputs.context.project_structure.recipe_name == 'hifa_cubeimage':
             # only cubes
@@ -517,13 +618,17 @@ class MakeImages(basetask.StandardTaskTemplate):
         # the ia.statistics() calls (PIPE-2464). TODO: Refactor the code to have just
         # one set of statistical parameters.
         if result.stokes == 'IQUV':
-            image_rms = result.image_rms_iquv[0]
-            image_min = result.image_min_iquv[0]
-            image_max = result.image_max_iquv[0]
+            pbcor_image_rms = result.image_rms_iquv[0]
+            pbcor_image_min = result.image_min_iquv[0]
+            pbcor_image_max = result.image_max_iquv[0]
+            nonpbcor_image_min = result.nonpbcor_image_min_iquv[0]
+            nonpbcor_image_max = result.nonpbcor_image_max_iquv[0]
         else:
-            image_rms = result.image_rms
-            image_min = result.image_min
-            image_max = result.image_max
+            pbcor_image_rms = result.image_rms
+            pbcor_image_min = result.image_min
+            pbcor_image_max = result.image_max
+            nonpbcor_image_min = result.nonpbcor_image_min
+            nonpbcor_image_max = result.nonpbcor_image_max
 
         return Sensitivity(array=array,
                            intent=target['intent'],
@@ -538,21 +643,26 @@ class MakeImages(basetask.StandardTaskTemplate):
                            robust=target['robust'],
                            uvtaper=target['uvtaper'],
                            theoretical_sensitivity=cqa.quantity(result.sensitivity, 'Jy/beam'),
-                           observed_sensitivity=cqa.quantity(image_rms, 'Jy/beam'),
-                           pbcor_image_min=cqa.quantity(image_min, 'Jy/beam'),
-                           pbcor_image_max=cqa.quantity(image_max, 'Jy/beam'),
+                           observed_sensitivity=cqa.quantity(pbcor_image_rms, 'Jy/beam'),
+                           pbcor_image_min=cqa.quantity(pbcor_image_min, 'Jy/beam'),
+                           pbcor_image_max=cqa.quantity(pbcor_image_max, 'Jy/beam'),
+                           nonpbcor_image_min=cqa.quantity(nonpbcor_image_min, 'Jy/beam'),
+                           nonpbcor_image_max=cqa.quantity(nonpbcor_image_max, 'Jy/beam'),
                            imagename=result.image.replace('.pbcor', ''),
                            datatype=result.datatype)
 
 
 class CleanTaskFactory:
-    def __init__(self, inputs, executor):
+    """Factory that creates and manages SyncTask or AsyncTask instances for clean jobs."""
+
+    def __init__(self, inputs, executor): # noqa: D107
         self.__inputs = inputs
         self.__context = inputs.context
         self.__executor = executor
         self.__context_path = None
 
     def __enter__(self):
+        """Save context to disk for MPI servers if needed and return self."""
         # If there's a possibility that we'll submit MPI jobs, save the context
         # to disk ready for import by the MPI servers.
         if mpihelpers.mpiclient or daskhelpers.daskclient:
@@ -569,13 +679,12 @@ class CleanTaskFactory:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Remove the temporary context file on exit."""
         if self.__context_path and os.path.exists(self.__context_path):
             os.unlink(self.__context_path)
 
     def get_task(self, target):
-        """
-        Create and return a SyncTask or AsyncTask for the clean job required
-        to produce the clean target.
+        """Create and return a SyncTask or AsyncTask for the clean job required to produce the clean target.
 
         The current algorithm generates Tier 0 clean jobs for calibrator
         images (=AsyncTask) and Tier 1 clean jobs for target images

@@ -46,10 +46,8 @@ class DetectMissedLines:
     """Class to find lines missed during line identification"""
     def __init__( self,
                   context: Context,
-                  msobj_list: list[MeasurementSet],
-                  spwid_list: list[int],
-                  fieldid_list: list[int],
                   item: ImageItem,
+                  spw_nchan: int,
                   frequency_channel_reversed: bool = False,
                   edge: list[int] = [0, 0],
                   do_plot: bool = True ):
@@ -58,10 +56,9 @@ class DetectMissedLines:
 
         Args:
             context                    : Pipeline context
-            msobj_list                 : List of MeasurementSet objects
-            spwid_list                 : List of spectral window ids
-            fieldid_list               : List of field ids
             item                       : Image item object to be analyzed
+            spw_nchan                  : Number of spectral channels in the spectral window
+                                         (before trimming edge channels)
             frequency_channel_reversed : True if frequency channel is in reversed order (for LSB)
             edge                       : Edge parameter
             do_plot                    : Set True to make figure. Default is True
@@ -71,16 +68,14 @@ class DetectMissedLines:
               - number of channels in spectral window object and image cube are inconsistent
         """
         self.context = context
-        self.msobj_list = msobj_list
-        self.spwid_list = spwid_list
-        self.fieldid_list = fieldid_list
+        self.spwid_list = item.spwlist
         self.item = item
         self.frequency_channel_reversed = frequency_channel_reversed
         self.edge = edge
         self.do_plot = do_plot
 
         # set field name
-        self.field_name = self.msobj_list[0].get_fields( field_id=self.fieldid_list[0] )[0].name
+        self.field_name = self.item.sourcename
 
         # read image
         self.image = sd_display.SpectralImage( self.item.imagename )
@@ -101,7 +96,7 @@ class DetectMissedLines:
             self.weightdata = np.ones( np.shape( self.imagedata ) )
 
         # number of spectral channels
-        self.nchan = self.msobj_list[0].spectral_windows[self.spwid_list[0]].num_channels
+        self.nchan = spw_nchan
 
         # 4th axis of image cube is the spectrum, 'edge' channels excluded.
         if self.imagedata.shape[3] != self.nchan - sum(self.edge):
@@ -119,15 +114,27 @@ class DetectMissedLines:
         self.pixel_scale = np.abs( self.image.direction_axis( 1, unit='deg' )[2]  )  # 1: Declination
         self.beam_size = self.image.beam_size  # in degrees
 
-    def analyze( self,
-                 valid_lines: list[list[float]],
-                 linefree_ranges: list[list[int]] ) -> dict[str, bool]:
+    def analyze(
+            self,
+            valid_lines: list[list[float]],
+            linefree_ranges: list[list[int]],
+            extra_edge_channels: list[int] = [0, 0],
+            atm_channels: np.ndarray | list[bool] = []
+    ) -> dict[str, bool]:
         """
         Analyze the image cube to diagnoze missed lines
 
         Args:
             valid_lines     : List of valid lines (channels in float)
             linefree_ranges : List of line-free ranges (channels in int)
+            extra_edge_channels: Two tuple of integers of the number of
+                                 edge channels to be excluded from the
+                                 analysis. Channels specified by the tuple
+                                 are excluded in addition to the edge channels
+                                 trimmed during imaging according to the
+                                 edge parameter for hsd_baseline stage.
+            atm_channels: Channel mask for ATM feature. True means that the
+                          channel is a part of ATM feature.
         Returns:
             Dictionary with missed-line detetion results for two methods
             True if possible missed-line is detected, False if not
@@ -149,7 +156,12 @@ class DetectMissedLines:
                 [ math.floor(line_center - line_width / 2.0),
                   math.ceil(line_center + line_width / 2.0) ] )
 
-        detections = self._detect_over_deviation_threshold( line_ranges, linefree_ranges )
+        detections = self._detect_over_deviation_threshold(
+            line_ranges,
+            linefree_ranges,
+            extra_edge_channels,
+            atm_channels
+        )
 
         if detections['single_beam']:
             LOG.info( "Field {} spw {}: Significant off-line-range emission detected at peak.".format( self.field_name, self.spwid_list[0] ))
@@ -287,16 +299,28 @@ class DetectMissedLines:
                     return True
         return False
 
-    def _detect_over_deviation_threshold( self,
-                                          line_ranges: list[list[int]],
-                                          linefree_ranges: list[list[int]],
-                                          width_threshold: int = 2 ) -> bool:
+    def _detect_over_deviation_threshold(
+            self,
+            line_ranges: list[list[int]],
+            linefree_ranges: list[list[int]],
+            extra_edge_channels: list[int] = [0, 0],
+            atm_channels: np.ndarray | list[bool] = [],
+            width_threshold: int = 2
+    ) -> bool:
         """
         Search for the missed lines and create the diagnostic plot
 
         Args:
             line_ranges     : List of deteced lines in spectral channels.
             linefree_ranges : Line-free ranges in spectral channels.
+            extra_edge_channels: Two tuple of integers of the number of
+                                 edge channels to be excluded from the
+                                 analysis. Channels specified by the tuple
+                                 are excluded in addition to the edge channels
+                                 trimmed during imaging according to the
+                                 edge parameter for hsd_baseline stage.
+            atm_channels: Channel mask for ATM feature. True means that the
+                          channel is a part of ATM feature.
             width_threshold : Threshold of chunk size in pixels. default is 2.
 
         Returns:
@@ -310,7 +334,7 @@ class DetectMissedLines:
         cube = self.imagedata[:, :, 0, :].transpose(2, 1, 0)
         mask = self.imagemask[:, :, 0, :].transpose(2, 1, 0)
         weight = self.weightdata[:, :, 0, :].transpose(2, 1, 0)
-        weighted_cube = np.where( mask, np.nan, cube * weight )
+        weighted_cube = np.where(mask, np.nan, cube * weight)
 
         if self.do_plot:
             fig = figure.Figure( figsize=(16, 5) )
@@ -338,6 +362,16 @@ class DetectMissedLines:
             z_line = np.full( z_all.shape[0], np.nan )
             for line in line_ranges:
                 z_line[ line[0]:line[1]+1 ] = z_all[ line[0]:line[1]+1 ]
+
+            # invalidate edge channels
+            if extra_edge_channels[0] > 0:
+                z_linefree[:extra_edge_channels[0]] = np.nan
+            if extra_edge_channels[1] > 0:
+                z_linefree[-extra_edge_channels[1]:] = np.nan
+
+            # invalidate ATM lines
+            if len(atm_channels) > 0:
+                z_linefree[atm_channels] = np.nan
 
             # deviation/sigma of other ranges
             z_other = np.where( np.isnan( z_line ) & np.isnan( z_linefree ), z_all, np.nan )
@@ -384,7 +418,7 @@ class DetectMissedLines:
             bbox = Bbox( [[size[0] / 2, 0], [size[0], size[1]]] )
 
         # save figure to file
-        LOG.info( "Saving diagnistic plot for missed-lines to {}".format(plot_outfile) )
+        LOG.info( "Saving diagnostic plot for off-line-range emissions to {}".format(plot_outfile) )
         fig.savefig( plot_outfile, bbox_inches=bbox )
 
     def _plot( self,

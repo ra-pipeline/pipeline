@@ -18,9 +18,12 @@ import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.filenamer as filenamer
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.utils as utils
+from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.displays.summary import UVChart
 from pipeline.infrastructure.renderer.basetemplates import JsonPlotRenderer
-from ..common import flagging_renderer_utils as flagutils, mstools
+
+from ..common import flagging_renderer_utils as flagutils
+from ..common import mstools
 from ..common.displays import applycal as applycal
 
 LOG = infrastructure.logging.get_logger(__name__)
@@ -812,14 +815,18 @@ def get_brightest_field(ms, source, intent='TARGET'):
 
     # a list of (field, field flux) tuples
     mean_flux = []
-    for field in fields_for_source:
-        fluxes_for_field = []
-        for spwid in spw_ids:
-            fluxes_for_field_and_spw = mstools.compute_mean_flux(ms, field.id, spwid, intent)[0]
-            if fluxes_for_field_and_spw:
-                fluxes_for_field.append(fluxes_for_field_and_spw)
-        if fluxes_for_field:
-            mean_flux.append((field, sum(fluxes_for_field) / len(fluxes_for_field)))
+    # Open the MS once for all (field, spw) reads. This avoids paying the MS
+    # open cost (which is especially high for lazy-import MSes whose DATA column
+    # is ASDM-backed) once per combination instead of n_fields * n_spws times.
+    with casa_tools.MSReader(ms.name) as openms:
+        for field in fields_for_source:
+            fluxes_for_field = []
+            for spwid in spw_ids:
+                fluxes_for_field_and_spw = mstools.compute_mean_flux(ms, field.id, spwid, intent, ms_handle=openms)[0]
+                if fluxes_for_field_and_spw:
+                    fluxes_for_field.append(fluxes_for_field_and_spw)
+            if fluxes_for_field:
+                mean_flux.append((field, sum(fluxes_for_field) / len(fluxes_for_field)))
 
     LOG.debug('Median flux for %s targets:', intent)
     for field, field_flux in mean_flux:

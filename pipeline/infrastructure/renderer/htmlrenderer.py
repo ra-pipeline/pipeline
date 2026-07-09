@@ -342,13 +342,40 @@ class T1_1Renderer(RendererBase):
         CASA_MEMORY = "Memory available to pipeline"
         CGROUP_NUM_CPUS = "Cgroup CPU allocation"
         CGROUP_CPU_BANDWIDTH = "Cgroup CPU bandwidth"
-        CGROUP_CPU_WEIGHT = "CPU distribution within cgroup"
-        CGROUP_MEM_LIMIT = "Cgroup memory limit"
+        CGROUP_CPU_WEIGHT = 'CPU distribution within cgroup'
+        CGROUP_MEM_LIMIT = 'Cgroup memory limit'
+        PYTHON_VERSION = 'Python'
+        PLATFORM_TAG = 'Platform tag'
+        GPU_INFO = 'GPU'
 
         def description(self, ctx):
             if self is self.CASA_MEMORY:
                 return f'Memory available to {"pipeline" if utils.contains_single_dish(ctx) else "tclean"}'
             return self.value
+
+    class _LibraryVersionProp:
+        """Key for a dynamically-discovered library version row.
+
+        Acts as a drop-in replacement for an EnvironmentProperty enum member:
+        it is hashable, supports equality, and provides a description() method
+        so that EnvironmentTable can treat it uniformly.
+        """
+        __slots__ = ('_name',)
+
+        def __init__(self, name: str):
+            self._name = name
+
+        def description(self, ctx):
+            return self._name
+
+        def __hash__(self):
+            return hash(self._name)
+
+        def __eq__(self, other):
+            return isinstance(other, T1_1Renderer._LibraryVersionProp) and self._name == other._name
+
+        def __repr__(self):
+            return f'_LibraryVersionProp({self._name!r})'
 
     class EnvironmentTable:
         """
@@ -602,10 +629,24 @@ class T1_1Renderer(RendererBase):
             data_rows[props.ULIMIT_MEM].append(n.ulimit_mem)
             data_rows[props.ULIMIT_CPU].append(n.ulimit_cpu)
 
+            data_rows[props.PLATFORM_TAG].append(n.platform_tag)
+            data_rows[props.GPU_INFO].append(n.gpu_info)
+            data_rows[props.PYTHON_VERSION].append(n.python_version)
+            for pkg_name, detail in environment.dependency_details.items():
+                pkg_prop = T1_1Renderer._LibraryVersionProp(pkg_name)
+                data_rows[pkg_prop].append(detail['version'] if detail else 'N/A')
+
+        # Conditionally include GPU info row only if GPU is available
+        has_gpu = any(gpu_info and gpu_info != 'N/A' for gpu_info in data_rows[props.GPU_INFO])
+        host_info_rows = [props.HOSTNAME, props.OS, props.PLATFORM_TAG]
+        if has_gpu:
+            host_info_rows.append(props.GPU_INFO)
+        host_info_rows.extend([props.NUM_MPI_SERVERS, props.ULIMIT_FILES])
+
         tables = {
             "Host information": T1_1Renderer.EnvironmentTable(
                 ctx=ctx,
-                rows=[props.HOSTNAME, props.OS, props.NUM_MPI_SERVERS, props.ULIMIT_FILES],
+                rows=host_info_rows,
                 data=data_rows
             ),
             "CPU resources and limits": T1_1Renderer.EnvironmentTable(
@@ -620,6 +661,14 @@ class T1_1Renderer(RendererBase):
                 ctx=ctx,
                 rows=[props.HOSTNAME, props.RAM, props.SWAP, props.CGROUP_MEM_LIMIT,
                       props.ULIMIT_MEM, props.CASA_MEMORY],
+                data=data_rows
+            ),
+            "Python and library versions": T1_1Renderer.EnvironmentTable(
+                ctx=ctx,
+                rows=(
+                    [props.HOSTNAME, props.PYTHON_VERSION]
+                    + [T1_1Renderer._LibraryVersionProp(pkg) for pkg in environment.dependency_details]
+                ),
                 data=data_rows
             )
         }

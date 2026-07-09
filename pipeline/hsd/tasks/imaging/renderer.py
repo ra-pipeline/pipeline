@@ -1,3 +1,4 @@
+from __future__ import annotations
 import collections
 import os
 from typing import TYPE_CHECKING
@@ -7,13 +8,16 @@ import pipeline.infrastructure.filenamer as filenamer
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.utils as utils
+from pipeline.hsd.tasks.common import qautils
 from pipeline.infrastructure import casa_tools
 from . import resultobjects
 from . import display
 from ..common import utils as sdutils
 
 if TYPE_CHECKING:
+    from pipeline.infrastructure.launcher import Context
     from pipeline.infrastructure.renderer.logger import Plot
+    from resultobjects import SDImagingResults
 
 LOG = logging.get_logger(__name__)
 
@@ -23,7 +27,7 @@ ImageRMSTR = collections.namedtuple('ImageRMSTR', 'name frame range width theore
 class SingleDishMomentMapPlotRenderer(basetemplates.JsonPlotRenderer):
     """Custom JsonPlotRenderer for imaging plots."""
 
-    def update_json_dict(self, d: dict, plot: 'Plot') -> None:
+    def update_json_dict(self, d: dict, plot: Plot) -> None:
         """Update JSON dictionary in place.
 
         Add plot type to the dictionary.
@@ -42,6 +46,28 @@ class T2_4MDetailsSingleDishImagingRenderer(basetemplates.T2_4MDetailsDefaultRen
                  always_rerender=False):
         super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
+
+    @qautils.aggregate_qascores
+    @qautils.sort_qascores
+    def render(self, context: Context, result: SDImagingResults) -> str:
+        """
+        Custom renderer for hsd_imaging()
+
+        This method aggegates, sorts the QAScores and renders the weblog.
+
+        Args:
+            context: Pipeline context
+            result:  SDImagingResults object
+        Returns:
+            Rendered html document
+        """
+        # This method modifies the result object,
+        # but the changes do not propergate to the original result or context,
+        # since they are local in render() thanks to the mechanism of PL infrastructure.
+        # Therefore there is no need to bracket the aggregation process
+        # with stashing and recovering the original result.qa.pool here.
+
+        return super().render(context, result)
 
     def update_mako_context(self, ctx, context, results):
         # whether or not virtual spw id handling is necessary

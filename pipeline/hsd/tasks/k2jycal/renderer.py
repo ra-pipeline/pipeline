@@ -3,21 +3,24 @@ from __future__ import annotations
 
 import collections
 import os
+import re
 import shutil
 from typing import TYPE_CHECKING, Any
+import urllib.parse
 
 from numpy import percentile
 
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.utils as utils
-
+from pipeline.hsd.tasks.common import qautils
+from pipeline.hsd.tasks.common import utils as sdutils
 from . import display as display
-from ..common import utils as sdutils
 
 if TYPE_CHECKING:
     from pipeline.infrastructure.launcher import Context
     from pipeline.infrastructure.basetask import ResultsList
+    from pipeline.hsd.tasks.k2jycal.k2jycal import SDK2JyCalResults
 
 LOG = logging.get_logger(__name__)
 
@@ -41,6 +44,27 @@ class T2_4MDetailsSingleDishK2JyCalRenderer(basetemplates.T2_4MDetailsDefaultRen
         """
         super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
+
+    @qautils.sort_qascores
+    def render(self, context: Context, result: SDK2JyCalResults) -> str:
+        """
+        Custom renderer for hsd_k2jycal()
+
+        This method sorts the QAScores with their scores, and renders the weblog,
+
+        Args:
+            context: Pipeline context
+            result:  SDK2JyCalResults object
+        Returns:
+            Rendered html document
+        """
+        # This method modifies the result object,
+        # but the changes do not propergate to the original result or context,
+        # since they are local in render() thanks to the mechanism of PL infrastructure.
+        # Therefore there is no need to bracket the aggregation process
+        # with stashing and recovering the original result.qa.pool here.
+
+        return super().render(context, result)
 
     def update_mako_context(self, ctx: dict[str, Any], context: Context, results: ResultsList) -> None:
         """Update context for weblog rendering.
@@ -125,12 +149,54 @@ class T2_4MDetailsSingleDishK2JyCalRenderer(basetemplates.T2_4MDetailsDefaultRen
         for factor_list in spw_tr.values():
             row_values.extend(factor_list)
 
+        # analyse getjyperkalma log and emit warnings if needed
+        extra_logrecords_handler = logging.CapturingHandler(logging.WARNING)
+        logging.add_handler(extra_logrecords_handler)
+        try:
+            casalog_path = os.path.join(stage_dir, "casapy.log")
+            if casalog_path and os.path.exists(casalog_path):
+                with open(casalog_path, 'r') as f:
+                    db_error_message_key = "Failed to load URL: https://"
+                    msgs = filter(lambda line: db_error_message_key in line, f)
+                    db_error_urls = map(
+                        lambda line: re.search(
+                            "Failed to load URL: (https://[^ ]+)", line
+                        ).group(1),
+                        map(lambda line: line.rstrip(), msgs)
+                    )
+                    # extract unique URLs while preserving the original order
+                    for url in dict.fromkeys(db_error_urls).keys():
+                        asdm_uid = re.search(
+                            "uid://[^ ]+",
+                            urllib.parse.unquote(url)
+                        )
+                        if asdm_uid:
+                            asdm_uid = asdm_uid.group(0)
+                            endpoint_url = url.split("?")[0]
+                            LOG.warning(
+                                f"Jy/K DB access failed for EB {asdm_uid}, "
+                                f"endpoint URL {endpoint_url}"
+                            )
+        except Exception as e:
+            LOG.warning(
+                "Error occurred while analyzing casapy.log "
+                f"for Jy/K DB access errors: {e}"
+            )
+        finally:
+            logging.remove_handler(extra_logrecords_handler)
+            extra_logrecords = extra_logrecords_handler.buffer
+            # Since Mako template reverses the order of log records,
+            # order of the log records is reversed here to make them
+            # appear in the original order in the rendered page.
+            extra_logrecords.reverse()
+
         # Update the context with tables, plots, and additional info.
         ctx.update({
             'jyperk_rows': utils.merge_td_columns(row_values),
             'reffile_list': reffile_copied,
             'jyperk_plot': plots,
             'dovirtual': dovirtual,
+            'extra_logrecords': extra_logrecords,
         })
 
     @staticmethod

@@ -201,45 +201,53 @@ class FluxcalFlag(basetask.StandardTaskTemplate):
         # Loop over the list of flux calibrators and create a list of
         # lines ordered by field and spw
         fluxcal_lines = []
-        for field in flux_fields:
+        freq_cache = {}
+        with casa_tools.MSReader(inputs.ms.name) as mse:
+            for field in flux_fields:
+                # Skip if field not in solar system object line list
+                if field.name not in UserSolarSystemLineList:
+                    continue
+                LOG.info('Searching field %s for spectral lines', field.name)
 
-            # Skip if field not in solar system object line list
-            if field.name not in UserSolarSystemLineList:
-                continue
-            LOG.info('Searching field %s for spectral lines' % (field.name))
+                # Loop over the science spectral windows for that field
+                # NOTE: Use in field.valid_spws() in future
+                for spw in science_spws:
+                    # Loop over the target solar system object lines
+                    for molecule in UserSolarSystemLineList[field.name]:
+                        species = molecule[0]
+                        lines = molecule[1]
 
-            # Loop over the science spectral windows for that field
-            # NOTE: Use in field.valid_spws() in future
-            for spw in science_spws:
+                        # Loop over the lines for each molecule
+                        for line in lines:
+                            # Return channel overlap for each line
+                            chanrange = self._get_chanrange(
+                                vis=inputs.ms.name,
+                                fieldid=field.id,
+                                spwid=spw.id,
+                                minfreq=1.0e9 * line[0],
+                                maxfreq=1.0e9 * line[1],
+                                refframe='GEO',
+                                mse=mse,
+                                freq_cache=freq_cache,
+                            )
+                            if chanrange == (None, None):
+                                continue
+                            LOG.info(
+                                '    Found line %s %.3f~%.3fGHz in spw %d:%d~%d',
+                                species, line[0], line[1], spw.id, chanrange[0], chanrange[1],
+                            )
 
-                # Loop over the target solar system object lines
-                for molecule in UserSolarSystemLineList[field.name]:
-                    species = molecule[0]
-                    lines = molecule[1]
-
-                    # Loop over the lines for each molecule
-                    for line in lines:
-
-                        # Return channel overlap for each line
-                        chanrange = self._get_chanrange(
-                            vis=inputs.ms.name,
-                            fieldid=field.id, spwid=spw.id,
-                            minfreq=1.0e9*line[0],
-                            maxfreq=1.0e9*line[1],
-                            refframe='GEO')
-                        if chanrange == (None, None):
-                            continue
-                        LOG.info('    Found line %s %.3f~%.3fGHz in spw %d:%d~%d' %
-                                 (species, line[0], line[1], spw.id, chanrange[0], chanrange[1]))
-
-                        # Create the line object and add it into a list of
-                        # line objects.
-                        fluxcal_line = MolecularLine(
-                            fieldname=field.name,
-                            species=species, freqrange=(line[0], line[1]),
-                            spwid=spw.id, chanrange=chanrange,
-                            nchan=spw.num_channels)
-                        fluxcal_lines.append(fluxcal_line)
+                            # Create the line object and add it into a list of
+                            # line objects.
+                            fluxcal_line = MolecularLine(
+                                fieldname=field.name,
+                                species=species,
+                                freqrange=(line[0], line[1]),
+                                spwid=spw.id,
+                                chanrange=chanrange,
+                                nchan=spw.num_channels,
+                            )
+                            fluxcal_lines.append(fluxcal_line)
 
         # Generate the channel flagging statistics per field and spw.
         flagstats = self._newflagstats(fluxcal_lines)
@@ -480,107 +488,106 @@ class FluxcalFlag(basetask.StandardTaskTemplate):
 
         return flagcmds
 
-    def _get_chanrange(self, vis=None, fieldid=0, spwid=None, minfreq=None, maxfreq=None, refframe='TOPO'):
-        """
-        Returns a tuple containing the two channels in an spw corresponding
-           to the minimum and maximum frequency in the given ref frame
+    def _get_spw_freqs(self, vis=None, fieldid=0, spwid=None, refframe='TOPO', mse=None, freq_cache=None):
+        # freq_cache, when provided, is owned by the caller (typically prepare()) and shared
+        # across all _get_chanrange calls for the same task execution.  Pass freq_cache={} when
+        # calling this method standalone (e.g. in tests) to avoid a per-call CASA round-trip.
+        if vis is None or spwid is None:
+            raise ValueError('_get_spw_freqs : Undefined values for vis and spwid')
 
-            vis - MS name
-        fieldid - field id of the observed field for reference frame \
-                  calculations
-          spwid - id of the spw
-        minfreq - minimum freq in Hz
-        maxfreq - maximum freq in Hz
-        refframe - frequency reference frame
-        """
+        cache_key = None
+        if freq_cache is not None:
+            cache_key = (vis, fieldid, spwid, refframe)
+            if cache_key in freq_cache:
+                return freq_cache[cache_key]
 
+        if mse is not None:
+            freqs = np.asarray(mse.cvelfreqs(fieldids=[fieldid], spwids=[spwid], mode='frequency', outframe=refframe))
+        else:
+            with casa_tools.MSReader(vis) as ms_tool:
+                freqs = np.asarray(
+                    ms_tool.cvelfreqs(fieldids=[fieldid], spwids=[spwid], mode='frequency', outframe=refframe)
+                )
+
+        ascending = len(freqs) <= 1 or freqs[-1] >= freqs[0]
+        if ascending:
+            sorted_freqs = freqs
+        else:
+            # Copy to a contiguous array so searchsorted does not internally reallocate on each call.
+            sorted_freqs = freqs[::-1].copy()
+
+        freq_info = {
+            'freqs': freqs,
+            'sorted_freqs': sorted_freqs,
+            'ascending': ascending,
+        }
+        if cache_key is not None:
+            freq_cache[cache_key] = freq_info
+
+        return freq_info
+
+    def _get_chanrange(
+        self, vis=None, fieldid=0, spwid=None, minfreq=None, maxfreq=None, refframe='TOPO', mse=None, freq_cache=None
+    ):
+        """Return the channel range in an SPW that overlaps a given frequency interval.
+
+        Args:
+            vis: Path to the MeasurementSet.
+            fieldid: Field id used for reference-frame conversions.
+            spwid: Spectral window id.
+            minfreq: Lower bound of the frequency interval in Hz.
+            maxfreq: Upper bound of the frequency interval in Hz.
+            refframe: Frequency reference frame (e.g. ``'TOPO'``, ``'GEO'``).
+            mse: An already-open CASA ms tool to reuse. When provided the tool
+                is neither opened nor closed by this method. When ``None`` a
+                new tool is opened and closed internally.
+            freq_cache: Dict used to cache per-SPW frequency grids across calls.
+                Owned by the caller; pass ``{}`` when calling standalone to
+                avoid repeated CASA round-trips.
+
+        Returns:
+            A ``(lo_chan, hi_chan)`` tuple of integer channel indices, or
+            ``(None, None)`` if the frequency interval does not overlap the SPW.
+        """
         if vis is None or spwid is None or minfreq is None or maxfreq is None:
-            raise Exception('_get_chanrange : Undefined values for vis, spwid, minfreq, and maxfreq')
+            raise ValueError('_get_chanrange : Undefined values for vis, spwid, minfreq, and maxfreq')
 
         rval = (None, None)
         if minfreq > maxfreq:
             return rval
 
-        iminfreq = -1
-        imaxfreq = -1
+        freq_info = self._get_spw_freqs(
+            vis=vis, fieldid=fieldid, spwid=spwid, refframe=refframe, mse=mse, freq_cache=freq_cache
+        )
+        freqs = freq_info['freqs']
+        sorted_freqs = freq_info['sorted_freqs']
+        ascending = freq_info['ascending']
 
-        # Get frequencies
-        mse = casa_tools.ms
-        mse.open(vis)
-        a = mse.cvelfreqs(fieldids=[fieldid], spwids=[spwid], mode='frequency', outframe=refframe)
-        mse.close()
-
-        # Initialize
-        ichanmax = len(a)-1
-        ascending = True
-        lowedge = a[0]
-        ilowedge = 0
-        upedge = a[ichanmax]
-        iupedge = ichanmax
-        if ichanmax > 0 and (a[ichanmax] < a[0]):  # frequencies are descending
-            ascending = False
-            lowedge = a[ichanmax]
-            upedge = a[0]
-            ilowedge = ichanmax
-            iupedge = 0
-
-        if minfreq < lowedge:
-            if maxfreq > lowedge:
-                if maxfreq > upedge:
-                    iminfreq = ilowedge
-                    imaxfreq = iupedge
-                else:
-                    iminfreq = ilowedge
-                    # use imaxfreq from below search
-                    imaxfreq = -2
-            #else:
-                # both imaxfreq and iminfreq are -1
-        else:
-            if minfreq < upedge:
-                if maxfreq >= upedge:
-                    # take iminfreq from below search
-                    iminfreq = -2
-                    imaxfreq = iupedge
-                else:
-                    # take both iminfreq and imaxfreq from above search
-                    iminfreq = -2
-                    imaxfreq = -2
-            #else:
-                # both imaxfreq and iminfreq are -1
-
-        if ascending:
-            if iminfreq == -2:
-                for i in range(0, len(a)):
-                    if a[i] >= minfreq:
-                        iminfreq = i
-                        break
-            if imaxfreq == -2:
-                for j in range(iminfreq, len(a)):
-                    if a[j] >= maxfreq:
-                        imaxfreq = j
-                        break
-            rval = (iminfreq, imaxfreq)
-        else:
-            if iminfreq == -2:
-                for i in range(len(a)-1, -1, -1):
-                    if a[i] >= minfreq:
-                        iminfreq = i
-                        break
-            if imaxfreq == -2:
-                for j in range(iminfreq, -1, -1):
-                    if a[j] >= maxfreq:
-                        imaxfreq = j
-                        break
-
-            rval = (imaxfreq, iminfreq)
-
-        if rval == (-1, -1):
-            return None, None
-        else:
+        if len(freqs) == 0:
             return rval
 
+        lowedge = sorted_freqs[0]
+        upedge = sorted_freqs[-1]
+        if maxfreq <= lowedge or minfreq >= upedge:
+            return None, None
 
-class MolecularLine():
+        start_idx = 0 if minfreq < lowedge else int(np.searchsorted(sorted_freqs, minfreq, side='left'))
+        # Clamp end_idx to the last channel when maxfreq reaches or exceeds the upper band edge;
+        # searchsorted would return len(sorted_freqs) in that case which is out of range.
+        end_idx = (
+            len(sorted_freqs) - 1 if maxfreq >= upedge else int(np.searchsorted(sorted_freqs, maxfreq, side='left'))
+        )
+
+        if ascending:
+            rval = (start_idx, end_idx)
+        else:
+            ichanmax = len(freqs) - 1
+            rval = (ichanmax - end_idx, ichanmax - start_idx)
+
+        return rval
+
+
+class MolecularLine:
     def __init__(self, fieldname='', species='', freqrange=(), spwid=None, chanrange=(), nchan=None):
         self.fieldname = fieldname
         self.species = species
