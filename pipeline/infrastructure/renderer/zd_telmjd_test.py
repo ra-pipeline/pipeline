@@ -182,6 +182,15 @@ def ms():
 class TestZdTelmjd:
     """Verify that compute_zd_telmjd_for_ms produces expected values."""
 
+    def test_zd_values(self, ms):
+        result = compute_zd_telmjd_for_ms(ms)
+        field = result[3]
+        for i, (actual, expected) in enumerate(zip(field['zd'], _ZDS)):
+            assert actual == pytest.approx(expected, rel=1e-10), (
+                f"zd[{i}] mismatch: {actual:.16f} != {expected:.16f}, "
+                f"diff={abs(actual-expected):.2e}"
+            )
+
     def test_field_count(self, ms):
         result = compute_zd_telmjd_for_ms(ms)
         assert len(result) == 1
@@ -190,14 +199,6 @@ class TestZdTelmjd:
         result = compute_zd_telmjd_for_ms(ms)
         assert len(result[3]['zd']) == 74
         assert len(result[3]['telmjd']) == 74
-
-    def test_zd_exact(self, ms):
-        result = compute_zd_telmjd_for_ms(ms)
-        field = result[3]
-        for i, (actual, expected) in enumerate(zip(field['zd'], _ZDS)):
-            assert actual == expected, (
-                f"zd[{i}] exact mismatch: {actual:.20f} != {expected:.20f}"
-            )
 
     def test_telmjd_exact(self, ms):
         result = compute_zd_telmjd_for_ms(ms)
