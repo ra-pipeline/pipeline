@@ -47,7 +47,7 @@ class CheckProductSizeHeuristics:
             # this will assign the cubesize dict (keyed by spw) to
             # the max size for any target that uses this spw
             if cubesizes.get(target['spw']) is not None:
-                cubesizes[target['spw']] = max(cubesize[target['spw']],cubesize)
+                cubesizes[target['spw']] = max(cubesizes[target['spw']],cubesize)
             else:
                 cubesizes[target['spw']] = cubesize
             productsize = 2.0 * (mfssize + cubesize)
@@ -129,7 +129,7 @@ class CheckProductSizeHeuristics:
         # Requested image size
         original_imsize = imlist[0]['imsize']
         mitigated_imsize = original_imsize
-        print(original_imsize) # testing # note could form an output dict with metric scores already with mitigation levels
+        # print(original_imsize) # testing # note could form an output dict with metric scores already with mitigation levels
         LOG.info('Default imaging leads to a maximum cube size of %.4f GB and a product size of %.4f GB' % (maxcubesize, total_productsize))
         LOG.info('Allowed maximum cube size: %s GB. Allowed cube size limit: %s GB. Allowed maximum product size: %s GB.' % (self.inputs.maxcubesize, self.inputs.maxcubelimit, self.inputs.maxproductsize))
 
