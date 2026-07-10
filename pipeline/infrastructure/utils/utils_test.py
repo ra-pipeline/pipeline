@@ -16,7 +16,7 @@ from pipeline.infrastructure.utils import caltable_tools
 from .utils import find_ranges, dict_merge, are_equal, approx_equal, flagged_intervals, \
     get_casa_quantity, fieldname_for_casa, fieldname_clean, \
     get_field_accessor, get_field_identifiers, get_receiver_type_for_spws, place_repr_source_first, \
-    get_taskhistory_fromimage, list_to_str, build_refantignore
+    get_taskhistory_fromimage, list_to_str, build_refantignore, obs_midtime, compute_zenith_distance
 
 if TYPE_CHECKING:
     from typing import Any
@@ -331,3 +331,38 @@ def test_list_to_str_py310(value: Any, expected: str | Callable):
 def test_build_refantignore(refantignore, ignorerefant, expected):
 
     assert build_refantignore(refantignore, ignorerefant) == expected
+
+
+def test_obs_midtime():
+    """Test obs_midtime()
+
+    This utility function returns the midpoint between two datetime objects
+    as a CASA epoch measure dictionary in UTC.
+    """
+    from datetime import datetime
+    start = datetime(2020, 1, 1, 0, 0, 0)
+    end = datetime(2020, 1, 1, 1, 0, 0)  # 1 hour later
+    mid = obs_midtime(start, end)
+    assert mid['refer'] == 'UTC'
+    assert mid['type'] == 'epoch'
+    assert 'm0' in mid
+    assert mid['m0']['unit'] == 'd'
+
+
+def test_compute_zenith_distance():
+    """Test compute_zenith_distance()
+
+    This utility function calculates the zenith distance for a field at a given
+    time and observatory using CASA measures.
+    """
+    field_direction = {
+        'm0': {'value': 4.18879, 'unit': 'rad'},
+        'm1': {'value': 0.58534, 'unit': 'rad'},
+        'refer': 'J2000',
+        'type': 'direction'
+    }
+    epoch = {'m0': {'value': 58089.82, 'unit': 'd'}, 'refer': 'UTC', 'type': 'epoch'}
+    zd = compute_zenith_distance(field_direction, epoch, 'VLA')
+    assert 'value' in zd
+    assert zd['unit'] == 'rad'
+    assert 0 <= zd['value'] <= np.pi  # ZD should be in valid range [0, pi]
