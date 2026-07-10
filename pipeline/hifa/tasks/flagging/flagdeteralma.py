@@ -727,7 +727,8 @@ def lowtrans_alma(ms: MeasurementSet, mintransrepspw: float, mintransnonrepspws:
     # Initializes atmospheric profile for a defined set of atmospheric
     # parameters from PIPE-624, that are common for all scans and SpWs.
     myat = casa_tools.atmosphere
-    atmutil.init_atm(myat, altitude=5059.0, humidity=20.0, temperature=273.0, pressure=563.0, max_altitude=48.0,
+    alma_altitude = utils.casa_to_earthlocation('ALMA').height.value
+    atmutil.init_atm(myat, altitude=alma_altitude, humidity=20.0, temperature=273.0, pressure=563.0, max_altitude=48.0,
                      delta_p=5.0, delta_pm=1.1, h0=1.0, atmtype=atmutil.AtmType.tropical)
 
     # Evaluate low transmission for each SpW:
