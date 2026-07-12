@@ -4018,7 +4018,11 @@ def run_findroi_mpi(
         for source_field_ids in field_groups.values()
         for fid in source_field_ids
     }
-    field_phase_centers = imaging.get_field_phase_centers_rad(getattr(ms0, 'fields', []))
+    field_phase_centers = {
+        int(field.id): (float(field.mdirection['m0']['value']), float(field.mdirection['m1']['value']))
+        for field in getattr(ms0, 'fields', [])
+        if getattr(field, 'mdirection', None) is not None
+    }
     if not field_phase_centers:
         raise RuntimeError('No field phase centers found in pipeline context.')
     common_geometry_plan = {
