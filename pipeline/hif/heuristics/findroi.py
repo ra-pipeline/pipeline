@@ -2114,7 +2114,18 @@ def _chan_ranges_to_frame_freq_ranges_ghz(
     chan_freqs_hz: np.ndarray | None,
 ) -> list[tuple[float, float]]:
     '''Convert channel ranges into output-frame frequency ranges in GHz.'''
-    return imaging.chan_ranges_to_freq_ranges_ghz(chan_ranges, chan_freqs_hz)
+    if chan_freqs_hz is None:
+        return []
+    freq = np.asarray(chan_freqs_hz, dtype=np.float64).ravel()
+    nchan = int(freq.size)
+    if nchan == 0:
+        return []
+    out = []
+    for lo, hi in chan_ranges:
+        a, b = sorted((max(0, min(int(lo), nchan - 1)), max(0, min(int(hi), nchan - 1))))
+        f0, f1 = sorted((float(freq[a]) * 1.0e-9, float(freq[b]) * 1.0e-9))
+        out.append((f0, f1))
+    return out
 
 
 def _fmt_frame_freq_ranges(
