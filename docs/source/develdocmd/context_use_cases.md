@@ -292,6 +292,14 @@ Note: The current implementation does not handle restoring data state to a past 
 | **Summary** | Aggregation is implemented by the orchestration layer calling `result.accept(context)` for worker results; `Results.merge_with_context()` applies aggregated outputs (cal tables, image registries) into the shared `Context` in a single commit step to avoid interleaved conflicting writes. |
 | **Postcondition** | The processing state reflects the combined outcomes of all parallel workers. |
 
+**Implementation notes** — worker execution is deliberately separated from context mutation:
+
+- `TaskQueue` in `pipeline/infrastructure/mpihelpers.py` collects return values from synchronous, MPI, or Dask-backed tasks through `get_results()`. It does not itself merge those returned objects into the shared context.
+- `Tier0PipelineTask` sends a pickled context snapshot to a worker and returns the worker task's result. The worker-side context is a private copy.
+- `Tier0JobRequest` uses an executor copy with its context reference removed and executes with `merge=False`; `Executor.execute(..., merge=True)` is explicitly unavailable for that context-free executor.
+- Aggregating tasks normally collect worker results into a parent result object and then publish combined state when that parent result is accepted. For example, `makeimages` collects `TcleanResult` worker outputs into `MakeImagesResult`; `MakeImagesResult.merge_with_context()` then registers produced images in `context.sciimlist` / `context.calimlist` and updates shared imaging state.
+- For child jobs that run in-process with a context-bearing executor, `Executor.execute(job, merge=True)` commits the child result immediately by calling `result.accept(self._context)`.
+
 ---
 
 ### UC-15 — Provide Read-Only State for Reporting
@@ -342,6 +350,15 @@ QA handlers write scores to `result.qa.pool` and do not modify the shared contex
 | **Summary** | Inspection and debugging are supported by `h_save()`/`h_resume()` (pickled `Context` files), `context.results` (ordered `ResultsProxy` snapshots), and developer utilities used in tests and CI (`tests/testing_utils.py`). Weblog rendering (`pipeline/infrastructure/renderer/htmlrenderer.py`) and diagnostic helpers in `pipeline/infrastructure/basetask.py` expose per-stage timing, tracebacks, and log references so operators can inspect registered datasets (`context.observing_run`), calibrations (`context.callibrary`), and produced images (`context.sciimlist`). |
 | **Invariant** | The current processing state is inspectable at any point during execution, and sufficient information is retained to diagnose failures after the fact. |
 
+**Implementation notes** — debugging state is preserved through the same acceptance and persistence mechanisms used for normal execution:
+
+- `Results.accept(context)` records failure diagnostics by wrapping top-level acceptance failures in `FailedTaskResults`, preserving the exception, traceback, stage number, inputs, and timestamps before appending the stage result.
+- Top-level accepted results are written as `ResultsProxy` pickles under `saved_state/result-stageX.pickle`; the proxy stores only the basename so saved contexts can be moved more easily.
+- `ResultsProxy._write_stage_logs()` writes per-stage CASA log snippets into the weblog stage directory (`stageX/casapy.log`) and removes the in-memory log payload from the result pickle.
+- When DEBUG logging is enabled, `Results.accept()` also writes `saved_state/context-stageX.pickle`, a full context snapshot at the end of that stage, for developer inspection.
+- `WebLogGenerator.render(context)` temporarily replaces `context.results` with fully unpickled result objects while rendering, then restores the proxy list afterward.
+- Test and CI utilities load the most recent context for sanity checks and result extraction. They explicitly release the loaded context and run garbage collection because `Context -> ResultsProxy -> Context -> results` forms reference cycles that can otherwise retain large contexts between tests.
+
 ---
 
 ### UC-18 — Manage Telescope- and Array-Specific State
@@ -371,5 +388,15 @@ Another is ALMA TP / single-dish state, which is array-specific rather than tele
 | | |
 |-------|---------|
 | **Actor(s)** | Export tasks |
-| **Summary** | Export tasks (for example `hifa_exportdata`, `hifv_exportdata`, and the `hsdn/tasks/exportdata` implementations) consume `context.sciimlist`, `context.callibrary`, `context.project_summary`, `context.report_dir`, and `context.output_dir` to assemble deliverable bundles. The `pipeline/infrastructure/imagelibrary.py` utilities and export task code are the canonical places where exportable product lists are assembled and serialized. |
+| **Summary** | Export tasks (for example `hifa_exportdata`, `hifv_exportdata`, and the `hsd/tasks/exportdata` / `hsdn/tasks/exportdata` implementations) consume `context.sciimlist`, `context.callibrary`, `context.project_summary`, `context.project_structure`, `context.report_dir`, `context.output_dir`, `context.products_dir`, and `context.logs` to assemble deliverable bundles. The `pipeline/infrastructure/imagelibrary.py` utilities and export task code are the canonical places where exportable product lists are assembled and serialized. |
 | **Invariant** | The information needed to assemble a deliverable product package is accessible through the processing state. |
+
+**Implementation notes** — the base export task and telescope-specific subclasses assemble products from several parts of the context:
+
+- `ExportData.prepare()` creates `inputs.products_dir`, derives the OUS/status prefix from `context.get_oussid()` and `context.project_structure.recipe_name`, and exports standard OUS products from `context.logs`: PPR, weblog tarball, pipeline script, restore script, and CASA commands log.
+- `_make_lists()` builds visibility and session lists from `context.observing_run.measurement_sets`, optionally filtering MSes by whether the MS has imaging data columns.
+- Calibration and restore products are assembled from the active processing state: final flag versions, per-MS apply lists, per-session calibration table tarballs, and optionally final MS exports.
+- `_export_images()` exports calibrator and science images from the context image libraries; the manifest records calibrator and target image products separately.
+- `_make_pipe_manifest()` records CASA version, pipeline version, execution environment, recipe/procedure name, PPR, weblog, commands log, pipeline script, restore script, calibration products, MS products, and exported images using `pipeline/h/tasks/common/manifest.py`.
+- ALMA, VLA, and SD export subclasses add auxiliary products and AQUA reports, then update the manifest. These auxiliary products can include continuum/flux/antenna files, target flag templates, timetracker reports, selfcal restore resources from `context.selfcal_resources`, pipeline statistics, auxiliary caltables, and auxiliary apply files.
+- VLA export additionally handles flat-noise FITS products associated with exported target images. NRO export extends the SD path with a reduction template script and `nroscalefile.csv`, then records them in the NRO manifest.
