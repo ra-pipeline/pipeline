@@ -136,7 +136,7 @@ class CheckProductSizeHeuristics:
         # Step 1 - testing maximum cube size
         # If too large, try to mitigate via channel binning
         if (self.inputs.maxcubesize != -1.0) and (maxcubesize > self.inputs.maxcubesize):
-            LOG.info('Maximum cube size is too large. Trying nbin mitigation.')           
+            LOG.info('Maximum cube size is too large. Trying nbin mitigation.')
             nbins = []
             nbin_mitigation = False
             for spw, nchan in nchans.items():
@@ -428,7 +428,6 @@ class CheckProductSizeHeuristics:
                         break
                 # final mitigated spw list to propagate
                 size_mitigation_parameters['spw'] = ','.join(map(str, sorted(mitigated_spws)))
-                large_cube_mitigation=True # for the message to separate this spw mitigation vs in the other loops
                 LOG.info('Size mitigation: Setting (cube) spw to %s' % (size_mitigation_parameters['spw']))
 
                 # Recalculate sizes
