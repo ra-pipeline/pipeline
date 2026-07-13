@@ -776,7 +776,7 @@ def lowtrans_alma(ms: MeasurementSet, mintransrepspw: float, mintransnonrepspws:
             LOG.info(
                 f"{ms.basename}, SpW {spw.id}: fraction of data with low transmission = {n_low_trans} / {transm.size} ="
                 f" {frac_below_thresh:.2f}; this is below the max fraction of {max_frac_low_trans}, therefore"
-                f" therefore this SpW will not be flagged.")
+                f" this SpW will not be flagged.")
 
     return commands
 
