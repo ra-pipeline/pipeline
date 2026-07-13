@@ -5,8 +5,9 @@ import pytest
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.tablereader import MeasurementSetReader
 from pipeline.h.tasks.flagging import flagdeterbase
-from .flagdeteralma import (get_partialpol_spws, load_partialpols_alma, get_partialpol_flag_cmd_params,
-                            convert_params_to_commands, SerialFlagDeterALMA)
+from .flagdeteralma import (get_partialpol_spws, load_partialpols_alma, find_partialpol_flag_cmd_params,
+                            make_partialpol_flag_cmd_params, convert_params_to_commands,
+                            SerialFlagDeterALMA)
 
 
 # # Tests that depend on the pipeline-testdata repository
@@ -23,29 +24,31 @@ skip_if_no_data_repo = pytest.mark.skipif(
 MS_NAME = casa_tools.utils.resolve("pl-unittest/uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small.ms")
 MS_NAME_ALT = casa_tools.utils.resolve("pl-unittest/uid___A002_Xcfc232_X2eda_test.ms")
 PIPE1028DATA = casa_tools.utils.resolve("pl-unittest/PIPE-1028-data.npz")
+# For the full data, as stored in the file, the spw param would be spw='27:0~959'. The number of channels
+# is reduced though, see test test_params_and_commands_for_real_data()
 OUTPUT_PARTIALPOL = [
-"antenna='DA48&&DA50' spw='27:0~959' timerange='2019/12/26/00:53:32.112~2019/12/26/00:53:38.160' reason='partialpol'",
-"antenna='DA54&&DV02' spw='27:0~959' timerange='2019/12/26/00:53:32.112~2019/12/26/00:53:38.160' reason='partialpol'",
-"antenna='DV02&&DV14' spw='27:0~959' timerange='2019/12/26/00:53:32.112~2019/12/26/00:53:38.160' reason='partialpol'",
-"antenna='DV08&&DV21' spw='27:0~959' timerange='2019/12/26/00:53:32.112~2019/12/26/00:53:38.160' reason='partialpol'",
-"antenna='DA48&&DA50' spw='27:0~959' timerange='2019/12/26/00:53:38.160~2019/12/26/00:53:44.208' reason='partialpol'",
-"antenna='DA54&&DV02' spw='27:0~959' timerange='2019/12/26/00:53:38.160~2019/12/26/00:53:44.208' reason='partialpol'",
-"antenna='DA60&&DV22' spw='27:0~959' timerange='2019/12/26/00:53:38.160~2019/12/26/00:53:44.208' reason='partialpol'",
-"antenna='DA61&&DV19' spw='27:0~959' timerange='2019/12/26/00:53:38.160~2019/12/26/00:53:44.208' reason='partialpol'",
-"antenna='DV02&&DV14' spw='27:0~959' timerange='2019/12/26/00:53:38.160~2019/12/26/00:53:44.208' reason='partialpol'",
-"antenna='DV08&&DV21' spw='27:0~959' timerange='2019/12/26/00:53:38.160~2019/12/26/00:53:44.208' reason='partialpol'",
-"antenna='DV18&&DV21' spw='27:0~959' timerange='2019/12/26/00:53:38.160~2019/12/26/00:53:44.208' reason='partialpol'",
-"antenna='DA48&&DA50' spw='27:0~959' timerange='2019/12/26/00:53:44.208~2019/12/26/00:53:50.256' reason='partialpol'",
-"antenna='DA54&&DV02' spw='27:0~959' timerange='2019/12/26/00:53:44.208~2019/12/26/00:53:50.256' reason='partialpol'",
-"antenna='DA60&&DV22' spw='27:0~959' timerange='2019/12/26/00:53:44.208~2019/12/26/00:53:50.256' reason='partialpol'",
-"antenna='DV02&&DV14' spw='27:0~959' timerange='2019/12/26/00:53:44.208~2019/12/26/00:53:50.256' reason='partialpol'",
-"antenna='DV08&&DV13' spw='27:0~959' timerange='2019/12/26/00:53:44.208~2019/12/26/00:53:50.256' reason='partialpol'",
-"antenna='DV08&&DV21' spw='27:0~959' timerange='2019/12/26/00:53:44.208~2019/12/26/00:53:50.256' reason='partialpol'",
-"antenna='DA48&&DA50' spw='27:0~959' timerange='2019/12/26/00:53:50.256~2019/12/26/00:53:56.304' reason='partialpol'",
-"antenna='DA54&&DV02' spw='27:0~959' timerange='2019/12/26/00:53:50.256~2019/12/26/00:53:56.304' reason='partialpol'",
-"antenna='DA60&&DV22' spw='27:0~959' timerange='2019/12/26/00:53:50.256~2019/12/26/00:53:56.304' reason='partialpol'",
-"antenna='DV02&&DV14' spw='27:0~959' timerange='2019/12/26/00:53:50.256~2019/12/26/00:53:56.304' reason='partialpol'",
-"antenna='DV18&&DV21' spw='27:0~959' timerange='2019/12/26/00:53:50.256~2019/12/26/00:53:56.304' reason='partialpol'"
+"antenna='DA48&&DA50' spw='27:0~7' timerange='2019/12/26/00:53:32.112~2019/12/26/00:53:38.160' reason='partialpol'",
+"antenna='DA54&&DV02' spw='27:0~7' timerange='2019/12/26/00:53:32.112~2019/12/26/00:53:38.160' reason='partialpol'",
+"antenna='DV02&&DV14' spw='27:0~7' timerange='2019/12/26/00:53:32.112~2019/12/26/00:53:38.160' reason='partialpol'",
+"antenna='DV08&&DV21' spw='27:0~7' timerange='2019/12/26/00:53:32.112~2019/12/26/00:53:38.160' reason='partialpol'",
+"antenna='DA48&&DA50' spw='27:0~7' timerange='2019/12/26/00:53:38.160~2019/12/26/00:53:44.208' reason='partialpol'",
+"antenna='DA54&&DV02' spw='27:0~7' timerange='2019/12/26/00:53:38.160~2019/12/26/00:53:44.208' reason='partialpol'",
+"antenna='DA60&&DV22' spw='27:0~7' timerange='2019/12/26/00:53:38.160~2019/12/26/00:53:44.208' reason='partialpol'",
+"antenna='DA61&&DV19' spw='27:0~7' timerange='2019/12/26/00:53:38.160~2019/12/26/00:53:44.208' reason='partialpol'",
+"antenna='DV02&&DV14' spw='27:0~7' timerange='2019/12/26/00:53:38.160~2019/12/26/00:53:44.208' reason='partialpol'",
+"antenna='DV08&&DV21' spw='27:0~7' timerange='2019/12/26/00:53:38.160~2019/12/26/00:53:44.208' reason='partialpol'",
+"antenna='DV18&&DV21' spw='27:0~7' timerange='2019/12/26/00:53:38.160~2019/12/26/00:53:44.208' reason='partialpol'",
+"antenna='DA48&&DA50' spw='27:0~7' timerange='2019/12/26/00:53:44.208~2019/12/26/00:53:50.256' reason='partialpol'",
+"antenna='DA54&&DV02' spw='27:0~7' timerange='2019/12/26/00:53:44.208~2019/12/26/00:53:50.256' reason='partialpol'",
+"antenna='DA60&&DV22' spw='27:0~7' timerange='2019/12/26/00:53:44.208~2019/12/26/00:53:50.256' reason='partialpol'",
+"antenna='DV02&&DV14' spw='27:0~7' timerange='2019/12/26/00:53:44.208~2019/12/26/00:53:50.256' reason='partialpol'",
+"antenna='DV08&&DV13' spw='27:0~7' timerange='2019/12/26/00:53:44.208~2019/12/26/00:53:50.256' reason='partialpol'",
+"antenna='DV08&&DV21' spw='27:0~7' timerange='2019/12/26/00:53:44.208~2019/12/26/00:53:50.256' reason='partialpol'",
+"antenna='DA48&&DA50' spw='27:0~7' timerange='2019/12/26/00:53:50.256~2019/12/26/00:53:56.304' reason='partialpol'",
+"antenna='DA54&&DV02' spw='27:0~7' timerange='2019/12/26/00:53:50.256~2019/12/26/00:53:56.304' reason='partialpol'",
+"antenna='DA60&&DV22' spw='27:0~7' timerange='2019/12/26/00:53:50.256~2019/12/26/00:53:56.304' reason='partialpol'",
+"antenna='DV02&&DV14' spw='27:0~7' timerange='2019/12/26/00:53:50.256~2019/12/26/00:53:56.304' reason='partialpol'",
+"antenna='DV18&&DV21' spw='27:0~7' timerange='2019/12/26/00:53:50.256~2019/12/26/00:53:56.304' reason='partialpol'"
 ]
 
 
@@ -79,44 +82,78 @@ def test_load_partialpols_alma_no_data():
     assert load_partialpols_alma(ms_alt) == []
 
 
+@skip_if_no_data_repo
+def test_find_partialpol_flag_cmd_params_real_data():
+    ms = MeasurementSetReader.get_measurement_set(MS_NAME)
+    with casa_tools.TableReader(ms.name) as table:
+        assert find_partialpol_flag_cmd_params(ms, table, 0, 0, 1) == []
+
+
 # Test the partial polarization routine
-ant1 = np.array([0, 0, 1])
-ant2 = np.array([1, 2, 2])
-time = np.array([5.03825887e+09, 5.03825887e+09, 5.03825887e+09])
-interval = np.array([10.08, 10.08, 10.08])
-test_params_get_partialpol_flag_cmd_params = [
-    (np.array([[[0, 1, 0]], [[0, 0, 0]]]),
-     [{"ant1": 0, "ant2": 2, "time": 5.03825887e+09, "interval": 10.08, "channels": [0]}]),
-    (np.array([[[0, 1, 0],[0, 1, 0]], [[0, 0, 0],[0, 0, 0]]]),
-     [{"ant1": 0, "ant2": 2, "time": 5.03825887e+09, "interval": 10.08, "channels": [0, 1]}]),
-    (np.array([[[0, 1, 0],[0, 1, 0]], [[0, 1, 0],[0, 0, 0]]]),
-     [{"ant1": 0, "ant2": 2, "time": 5.03825887e+09, "interval": 10.08, "channels": [1]}]),
-    (np.array([[[0, 1, 0],[0, 1, 0],[0, 1, 0]], [[0, 1, 0],[0, 0, 0],[0, 0, 0]]]),
-     [{"ant1": 0, "ant2": 2, "time": 5.03825887e+09, "interval": 10.08, "channels": [1, 2]}]),
-    (np.array([[[0, 1, 0],[0, 1, 0],[0, 1, 0]], [[0, 1, 0],[0, 0, 0],[0, 1, 1]]]),
-     [{"ant1": 0, "ant2": 2, "time": 5.03825887e+09, "interval": 10.08, "channels": [1]},
-      {"ant1": 1, "ant2": 2, "time": 5.03825887e+09, "interval": 10.08, "channels": [2]},]),
+test_params_make_partialpol_flag_cmd_params = [
+    ([{"ANTENNA1": 0, "ANTENNA2": 2, "TIME": 5.03825887e+09, "INTERVAL": 10.08, "channels": [0], "time_unit": "s",
+       "spw": 0}], 1,
+     [{"ant1": 0, "ant2": 2, "time": 5.03825887e+09, "interval": 10.08, "channels": [0], "time_unit": "s", "spw": 0}]),
+    ([{"ANTENNA1": 0, "ANTENNA2": 1, "TIME": 5.03825887e+09, "INTERVAL": 10.08, "channels": [0, 1], "time_unit": "s",
+       "spw": 0}], 2,
+     [{"ant1": 0, "ant2": 1, "time": 5.03825887e+09, "interval": 10.08, "channels": [0, 1], "time_unit": "s", "spw":
+       0}]),
+    ([{"ANTENNA1": 0, "ANTENNA2": 0, "TIME": 5.03825887e+09, "INTERVAL": 10.08, "channels": [0], "time_unit": "s",
+       "spw": 0}], 1,
+     [{"ant1": 0, "ant2": 0, "time": 5.03825887e+09, "interval": 10.08, "channels": [0], "time_unit": "s", "spw": 0}]),
+    ([{"ANTENNA1": 1, "ANTENNA2": 0, "TIME": 5.03825887e+09, "INTERVAL": 10.08, "channels": [0, 1], "time_unit": "s",
+       "spw": 0}], 2,
+     [{"ant1": 1, "ant2": 0, "time": 5.03825887e+09, "interval": 10.08, "channels": [0, 1], "time_unit": "s",
+       "spw": 0}]),
+    ([{"ANTENNA1": 2, "ANTENNA2": 0, "TIME": 5.03825887e+09, "INTERVAL": 10.08, "channels": [1], "time_unit": "s",
+       "spw": 0},
+      {"ANTENNA1": 1, "ANTENNA2": 0, "TIME": 5.03825887e+09, "INTERVAL": 10.08, "channels": [2], "time_unit": "s",
+       "spw": 0}], 3,
+     [{"ant1": 2, "ant2": 0, "time": 5.03825887e+09, "interval": 10.08, "channels": [0, 1, 2], "time_unit": "s",
+       "spw": 0},
+      {"ant1": 1, "ant2": 0, "time": 5.03825887e+09, "interval": 10.08, "channels": [0, 1, 2], "time_unit": "s",
+       "spw": 0}]),
 ]
 
-
-@pytest.mark.parametrize("flags, expected", test_params_get_partialpol_flag_cmd_params)
-def test_get_partialpol_flag_cmd_params(flags, expected):
-    assert get_partialpol_flag_cmd_params(flags, ant1, ant2, time, interval) == expected
+@pytest.mark.parametrize("rows, num_chans, expected", test_params_make_partialpol_flag_cmd_params)
+def test_make_partialpol_flag_cmd_params_real_data(rows, num_chans, expected):
+    ms = MeasurementSetReader.get_measurement_set(MS_NAME)
+    np.testing.assert_equal(make_partialpol_flag_cmd_params(rows, num_chans), expected)
 
 
 @skip_if_no_data_repo
-def test_params_amd_commands_for_real_data():
+def test_params_and_commands_for_real_data():
     """
-    This test is not a unit test as it combines get_partialpol_flag_cmd_params and convert_params_to_commands.
+    This test is not a unit test as it combines make_partialpol_flag_cmd_params and convert_params_to_commands.
     It is a test on real data with partial polarization. The data correspond to the spw 27 of the reference
     dataset mentioned in PIPEREQ-70: uid://A002/Xe5ce70/X8b7
     """
+
     raw_data = np.load(PIPE1028DATA)
-    flags = raw_data['flags']
+    # Take a subset of channels (960). Speeds up this test from ~15s down to <4s.
+    # In practice this ALMA dataset has the same partial polarization for all the channels (PIPEREQ-70, PIPE-1028,
+    # the BDFs give per-SPW flags). In fact, only one/any channel would suffice.
+    flags = raw_data['flags'][:,0:8,:]
     ant1 = raw_data['ant1']
     ant2 = raw_data['ant2']
     time  = raw_data['time']
     interval = raw_data['interval']
+    time_unit = "s"
+    spw = 27
+
+    # A minimal 'partialpol' logic for this test dataset
+    num_pols = flags.shape[0]
+    assert num_pols == 2
+    # because for this dataset num_pols == 2, we can simply compare ==1
+    sum_is_partial = (np.sum(flags, axis=0) == 1)
+    # Find partial polarizations for any channel
+    param_sets_to_check = np.where(np.any(sum_is_partial, axis=0))[0]
+
+    rows = []
+    for row_idx in param_sets_to_check:
+        rows.append({"ANTENNA1": ant1[row_idx], "ANTENNA2": ant2[row_idx], "TIME": time[row_idx],
+                     "INTERVAL": interval[row_idx], "time_unit": time_unit, "spw": spw})
+    num_chans = flags.shape[1]
     ant_id_map = {
         0: 'DA41', 1: 'DA42', 2: 'DA43', 3: 'DA45', 4: 'DA46', 5: 'DA47', 6: 'DA48', 7: 'DA50', 8: 'DA51', 9: 'DA52',
         10: 'DA53',11: 'DA54', 12: 'DA55', 13: 'DA56', 14: 'DA57', 15: 'DA58', 16: 'DA60', 17: 'DA61', 18: 'DA62',
@@ -124,10 +161,10 @@ def test_params_amd_commands_for_real_data():
         28: 'DV11', 29: 'DV12', 30: 'DV13', 31: 'DV14', 32: 'DV15', 33: 'DV16', 34: 'DV17', 35: 'DV18', 36: 'DV19',
         37: 'DV20', 38: 'DV21', 39: 'DV22', 40: 'DV23', 41: 'DV24', 42: 'DV25'
     }
-    params = get_partialpol_flag_cmd_params(flags, ant1, ant2, time, interval)
-    updated_params = [{**d, "spw": 27, "time_unit": 's'} for d in params]
-    assert len(OUTPUT_PARTIALPOL) == len(updated_params)
-    commands = convert_params_to_commands(None, updated_params, ant_id_map=ant_id_map)
+    params = make_partialpol_flag_cmd_params(rows, num_chans)
+    # updated_params = [{**d, "spw": 27, "time_unit": 's'} for d in params]
+    assert len(OUTPUT_PARTIALPOL) == len(params)
+    commands = convert_params_to_commands(None, params, ant_id_map=ant_id_map)
     assert commands == OUTPUT_PARTIALPOL
 
 
