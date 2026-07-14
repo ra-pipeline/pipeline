@@ -42,35 +42,17 @@ class SDBaselineQAHandler(pqa.QAPlugin):
         qautils.registry.register_keys_to_aggregate(metric_name, keys)
         qautils.registry.register_longmsg_keys(metric_name, keys)
 
-        # BLine.deviation
-        metric_name = 'BLine.deviation'
-        qautils.registry.register_longmsg_keys(metric_name, ['vis', 'field', 'spw', 'ant'])
-        qautils.registry.register_keys_to_aggregate(metric_name, ['vis', 'field', 'spw', 'ant'])
-
-        # BLine.continuum.dev
-        metric_name = "BLine.continuum.dev"
-        qautils.registry.register_longmsg_keys(metric_name, ['vis', 'field', 'scan', 'spw', 'ant'])
-        qautils.registry.register_keys_to_aggregate(metric_name, ['vis', 'field', 'spw', 'ant'])
-
-        # BLine.continuum.sinusoid
-        metric_name = "BLine.continuum.sinusoid"
-        qautils.registry.register_longmsg_keys(metric_name, ['vis', 'field', 'scan', 'spw', 'ant', 'pol'])
-        qautils.registry.register_keys_to_aggregate(metric_name, ['vis', 'field', 'scan', 'spw', 'ant', 'pol'])
-
-        # BLine.scienceline.lowpXYsci
-        metric_name = "BLine.scienceline.lowpXYsci"
-        qautils.registry.register_longmsg_keys(metric_name, ['vis', 'field', 'scan', 'spw', 'ant', 'pol'])
-        qautils.registry.register_keys_to_aggregate(metric_name, ['vis', 'field', 'scan', 'spw', 'ant', 'pol'])
-
-        # BLine.scienceline.highpXYcont
-        metric_name = "BLine.scienceline.highpXYcont"
-        qautils.registry.register_longmsg_keys(metric_name, ['vis', 'field', 'scan', 'spw', 'ant', 'pol'])
-        qautils.registry.register_keys_to_aggregate(metric_name, ['vis', 'field', 'scan', 'spw', 'ant', 'pol'])
-
-        # BLine.continuum.XYrangeratio
-        metric_name = "BLine.continuum.XYrangeratio"
-        qautils.registry.register_longmsg_keys(metric_name, ['vis', 'field', 'scan', 'spw', 'ant', 'pol'])
-        qautils.registry.register_keys_to_aggregate(metric_name, ['vis', 'field', 'scan', 'spw', 'ant', 'pol'])
+        qautils.registry.register_exclues(
+            [
+                "BLine.deviation",
+                "BLine.continuum",
+                "BLine.continuum.dev",
+                "BLine.continuum.sinusoid",
+                "BLine.scienceline.lowpXYsci",
+                "BLine.scienceline.highpXYcont",
+                "BLine.continuum.XYrangeratio",
+             ]
+        )
 
     def handle(self, context: Context, result: result_cls) -> None:
         """Compute QA score for baseline subtraction task.
