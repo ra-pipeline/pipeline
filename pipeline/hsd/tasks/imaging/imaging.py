@@ -1044,6 +1044,12 @@ class SDImaging(basetask.StandardTaskTemplate):
             pp : Imaging post process parameters of prepare()
         """
         _rep_source_name, _rep_spw_id = rgp.ref_ms.get_representative_source_spw()
+
+        # PIPE-3138 prevent fallback to the first science target
+        # if representative source is not observed in the reference MS
+        if rgp.ref_ms.representative_target[0]:
+            _rep_source_name = rgp.ref_ms.representative_target[0]
+
         pp.is_representative_source_and_spw = \
             _rep_spw_id == rgp.combined.spws[REF_MS_ID] and \
             _rep_source_name == utils.dequote(rgp.source_name)

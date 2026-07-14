@@ -7,15 +7,16 @@ from typing import TYPE_CHECKING
 
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.filenamer as filenamer
-import pipeline.infrastructure.renderer.logger as logger
 import pipeline.infrastructure.logging as logging
-from ..common import utils as sdutils
+import pipeline.infrastructure.renderer.logger as logger
 import pipeline.infrastructure.utils as utils
+from pipeline.hsd.tasks.common import qautils
+from pipeline.hsd.tasks.common import utils as sdutils
 
 if TYPE_CHECKING:
     from pipeline.infrastructure import Context
+    from pipeline.hsd.tasks.baselineflag import SDBLFlagResults
     from pipeline.infrastructure.renderer.logger import Plot
-    from .baselineflag import SDBLFlagResults
 
 LOG = logging.get_logger(__name__)
 
@@ -38,6 +39,27 @@ class T2_4MDetailsBLFlagRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         """
         super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
+
+    @qautils.sort_qascores
+    def render(self, context: Context, result: SDBLFlagResults) -> str:
+        """
+        Custom renderer for hsd_imaging()
+
+        This method sorts the QAScores with their scores and renders the weblog,
+
+        Args:
+            context: Pipeline context
+            result:  SDBLFlagResults object
+        Returns:
+            Rendered html document
+        """
+        # This method modifies the result object,
+        # but the changes do not propergate to the original result or context,
+        # since they are local in render() thanks to the mechanism of PL infrastructure.
+        # Therefore there is no need to bracket the aggregation process
+        # with stashing and recovering the original result.qa.pool here.
+
+        return super().render(context, result)
 
     def update_mako_context(self, ctx: dict, context: Context, results: SDBLFlagResults):
         """

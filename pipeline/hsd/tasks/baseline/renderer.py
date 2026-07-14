@@ -3,16 +3,12 @@ from __future__ import annotations
 
 import collections
 import os
-import re
 from typing import TYPE_CHECKING
 
-from pipeline.hsd.tasks.common import qautils
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.filenamer as filenamer
-
-from pipeline.infrastructure.renderer.logger import Plot
-from pipeline.infrastructure.utils import conversion
+from pipeline.hsd.tasks.common import qautils
 
 from . import display
 from ..common import compress
@@ -24,6 +20,7 @@ if TYPE_CHECKING:
     from pipeline.infrastructure.api import Results
     from pipeline.infrastructure.basetask import ResultsList
     from pipeline.infrastructure.launcher import Context
+    from pipeline.infrastructure.renderer.logger import Plot
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -77,11 +74,13 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
         """
         super().__init__(template, description, always_rerender)
 
+    @qautils.aggregate_qascores
+    @qautils.sort_qascores
     def render(self, context: Context, result: SDBaselineResults) -> str:
         """
         Custom renderer for hsd_baseline()
 
-        This method aggegates the QAScores and renders the weblog.
+        This method aggegates and sorts the QAScores, and renders the weblog,
 
         Args:
             context: Pipeline context
@@ -89,10 +88,7 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
         Returns:
             Rendered html document
         """
-        # result.qa.pool will be temporary modified to aggregate the QA messages,
-        # which is required to happen on weblog but not on the AQUA report
-        # as per PIPEREQ-422.
-        # This method modifies the result object for this purpose,
+        # This method modifies the result object
         # but the changes do not propergate to the original result or context,
         # since they are local in render() thanks to the mechanism of PL infrastructure.
         # Therefore there is no need to bracket the aggregation process
@@ -187,7 +183,7 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
                     'cover_only': plot_cover,
                     'dovirtual': dovirtual})
 
-        # profile map before and after baseline subtraction
+        # profile map before and after baseline subtracton
         maptype_list = ['before', 'after', 'before', 'after']
         subtype_list = ['raw', 'raw', 'avg', 'flatness']
         for maptype, subtype in zip(maptype_list, subtype_list):
@@ -204,7 +200,6 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
                 plot_title = '{} Sparse Profile Map {} Baseline Subtraction'.format(datatype, maptype.lower())
             else:
                 plot_title = 'Baseline Flatness {} Baseline Subtraction'.format(maptype.lower())
-
             renderer = basetemplates.JsonPlotRenderer('generic_x_vs_y_ant_field_spw_pol_plots.mako',
                                                       context,
                                                       results,
@@ -228,39 +223,8 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
                         plot_desc = f"{datatype} sparse profile map {maptype} baseline subtraction"
                     LOG.info(f'No {plot_desc} for field {fieldobj.name}')
 
-            ctx.update({
-                'sparsemap_subpage_{}_{}'.format(maptype.lower(), subtype.lower()): subpage,
-                'sparsemap_{}_{}'.format(maptype.lower(), subtype.lower()): summary
-            })
-
-        profile_heuristic, profile_heuristic_subpages = make_profile_heuristic_plots(results)
-
-        # If this analysis was not done, skip it
-        if (len(profile_heuristic) > 0) and profile_heuristic_subpages:
-            detail_page_title = "Comparison of the Profiles between XX and YY spectra"
-
-            detail_renderer = basetemplates.JsonPlotRenderer(
-                        'generic_x_vs_y_field_spw_ant_detail_plots.mako',
-                        context,
-                        results,
-                        profile_heuristic,
-                        detail_page_title,
-                        filenamer.sanitize(f'{detail_page_title.lower()}.html')
-            )
-
-            with detail_renderer.get_file() as fileobj:
-                fileobj.write(detail_renderer.render())
-
-            for field_object in sorted_fields:
-                name = field_object.clean_name
-
-                if name is not None:
-                    profile_heuristic_subpages[name] = os.path.basename(detail_renderer.path)
-
-            ctx.update({
-                "profile_heuristic": profile_heuristic,
-                "profile_heuristic_subpages": profile_heuristic_subpages
-            })
+            ctx.update({'sparsemap_subpage_{}_{}'.format(maptype.lower(), subtype.lower()): subpage,
+                        'sparsemap_{}_{}'.format(maptype.lower(), subtype.lower()): summary})
 
     @staticmethod
     def _group_by_axes(plots: list[list[Plot]]) -> dict:
@@ -445,3 +409,5 @@ class SingleDishClusterPlotsRenderer(basetemplates.JsonPlotRenderer):
             plot: Plot object
         """
         d['type'] = plot.parameters['type']
+
+

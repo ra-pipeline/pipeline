@@ -28,6 +28,7 @@ class MakeImListInputs(vdp.StandardInputs):
 
     # simple properties with no logic ----------------------------------------------------------------------------------
     calmaxpix = vdp.VisDependentProperty(default=300)
+    minpix = vdp.VisDependentProperty(default=None)
     imagename = vdp.VisDependentProperty(default='')
     intent = vdp.VisDependentProperty(default='TARGET')
     nchan = vdp.VisDependentProperty(default=-1)
@@ -192,7 +193,7 @@ class MakeImListInputs(vdp.StandardInputs):
     # docstring and type hints: supplements hif_makeimlist
     def __init__(self, context, output_dir=None, vis=None, imagename=None, intent=None, field=None, spw=None, stokes= None,
                  contfile=None, linesfile=None, uvrange=None, specmode=None, outframe=None, hm_imsize=None,
-                 hm_cell=None, calmaxpix=None, phasecenter=None, psf_phasecenter=None, nchan=None, start=None, width=None, nbins=None,
+                 hm_cell=None, calmaxpix=None, minpix=None, phasecenter=None, psf_phasecenter=None, nchan=None, start=None, width=None, nbins=None,
                  robust=None, uvtaper=None, clearlist=None, per_eb=None, per_session=None, calcsb=None, datatype=None,
                  datacolumn=None, parallel=None, known_synthesized_beams=None, allow_wproject=False, scal=False):
         """Initialize Inputs.
@@ -270,6 +271,10 @@ class MakeImListInputs(vdp.StandardInputs):
                 Examples: '3ppb', ['0.5arcsec', '0.5arcsec']
 
             calmaxpix: Maximum image X or Y size in pixels if a calibrator is being imaged ('PHASE', 'BANDPASS', 'AMPLITUDE' or 'FLUX' intent).
+
+            minpix: Minimum image X or Y size in pixels.
+
+                Examples: 64, None
 
             phasecenter: Direction measure or field id of the image center. The default phase center is set to the mean of the field
                 directions of all fields that are to be image together.
@@ -354,6 +359,7 @@ class MakeImListInputs(vdp.StandardInputs):
         self.hm_imsize = hm_imsize
         self.hm_cell = hm_cell
         self.calmaxpix = calmaxpix
+        self.minpix = minpix
         self.phasecenter = phasecenter
         self.psf_phasecenter = psf_phasecenter
         self.nchan = nchan
@@ -1180,7 +1186,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                                     h_imsize = self.heuristics.imsize(
                                         fields=field_ids, cell=cells[spwspec],
                                         primary_beam=largest_primary_beams[spwspec],
-                                        sfpblimit=sfpblimit, centreonly=False,
+                                        sfpblimit=sfpblimit, min_pixels = inputs.minpix, centreonly=False,
                                         vislist=vislist_field_intent_spw_combinations[field_intent]['vislist'],
                                         spwspec=imsize_spwlist, intent=field_intent[1],
                                         joint_intents=inputs.intent, specmode=inputs.specmode)

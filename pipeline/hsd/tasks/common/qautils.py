@@ -5,11 +5,20 @@ QAScoreProperiesRegistry: Holds the parameters to control the behavior
 QAScoreFormatter: Holds methods to re-format QA scores
 QAScoreAggregator: Aggregates messages in QA score
 """
+from __future__ import annotations
+
 import copy
+import functools
 import math
+from operator import attrgetter
+from typing import TYPE_CHECKING, Callable
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.pipelineqa as pqa
+
+if TYPE_CHECKING:
+    from pipeline.infrastructure.api import Results
+    from pipeline.infrastructure.launcher import Context
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -385,6 +394,45 @@ class QAScoreAggregator:
                 qascores.append(qascore)
 
         return qascores
+
+
+def sort_qascores(method: Callable) -> Callable:
+    """
+    Decorator to sort QAScores with their 'score's
+
+    Args:
+        method: original method to be decorated
+    Returns:
+        wrapper method for decorating
+    """
+    @functools.wraps(method)
+    def wrapper(self, context: Context, result: Results) -> str:
+        # sort QAScores with 'score's
+        result.qa.pool.sort(key=attrgetter("score"))
+
+        return method(self, context, result)
+
+    return wrapper
+
+
+def aggregate_qascores(method: Callable) -> Callable:
+    """
+    Decorator to add a feature to aggregate QAScores
+
+    Args:
+        method: original method to be decorated
+    Returns:
+        wrapper method for decorating
+    """
+    @functools.wraps(method)
+    def wrapper(self, context: Context, result: Results) -> str:
+        # aggregate QAScores
+        aggregator = QAScoreAggregator()
+        result.qa.pool = aggregator.aggregate_qascores(result.qa.pool)
+
+        return method(self, context, result)
+
+    return wrapper
 
 
 def smartsort(x: any) -> tuple[int, any]:

@@ -51,11 +51,13 @@ class T2_4MDetailsSDApplycalRenderer(super_renderer.T2_4MDetailsApplycalRenderer
         super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
+    @qautils.aggregate_qascores
+    @qautils.sort_qascores
     def render(self, context: Context, result: ApplycalResults) -> str:
         """
         Custom renderer for hsd_applycal()
 
-        This method aggegates the QAScores and renders the weblog.
+        This method aggegates and sorts the QAScores, and renders the weblog.
 
         Args:
             context: Pipeline context
@@ -63,18 +65,11 @@ class T2_4MDetailsSDApplycalRenderer(super_renderer.T2_4MDetailsApplycalRenderer
         Returns:
             Rendered html document
         """
-        # result.qa.pool will be temporary modified to aggregate the QA messages,
-        # which is required to happen on weblog but not on the AQUA report
-        # as per PIPEREQ-422.
         # This method modifies the result object for this purpose,
         # but the changes do not propergate to the original result or context,
         # since they are local in render() thanks to the mechanism of PL infrastructure.
         # Therefore there is no need to bracket the aggregation process
         # with stashing and recovering the original result.qa.pool here.
-
-        # aggregate QA scores for weblog accordion
-        aggregator = qautils.QAScoreAggregator()
-        result.qa.pool = aggregator.aggregate_qascores(result.qa.pool)
 
         return super().render(context, result)
 
