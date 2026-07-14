@@ -42,7 +42,7 @@ class SDBaselineQAHandler(pqa.QAPlugin):
         qautils.registry.register_keys_to_aggregate(metric_name, keys)
         qautils.registry.register_longmsg_keys(metric_name, keys)
 
-        qautils.registry.register_exclues(
+        qautils.registry.register_excludes(
             [
                 "BLine.deviation",
                 "BLine.continuum",
