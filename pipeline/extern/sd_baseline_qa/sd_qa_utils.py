@@ -1137,6 +1137,7 @@ def get_mswCollection_params(mswCollection):
     mswCollectionKeys = list(mswCollection.keys())
     mskeys = (np.array(mswCollectionKeys).T)[0]
     mslist = np.unique(mskeys)
+    basenames = np.unique([x.basename for x in mswCollection.values()])
     idxfirst = {ms: np.where(mskeys == ms)[0][0] for ms in mslist}
     fieldnames = np.unique(np.array(flattenlist([mswCollection[mswCollectionKeys[idxfirst[ms]]].spw_setup['fieldname']['*OBSERVE_TARGET#ON_SOURCE*'] for ms in mslist])))
     names_for = {ms: mswCollection[mswCollectionKeys[idxfirst[ms]]].spw_setup['namesfor'] for ms in mslist}
@@ -1148,7 +1149,7 @@ def get_mswCollection_params(mswCollection):
     spwnamelist = mswCollection[mswCollectionKeys[idxfirst[mslist[0]]]].spw_setup['spwnames']
     #Some MSs could have less fields, lets create a list of the MS that do for each field
     mslist_for_fieldname = {fieldname: [ms for ms in mslist if fieldname in fieldid_for[ms].keys()] for fieldname in fieldnames}
-    return (mswCollectionKeys, mslist, idxfirst, fieldnames, names_for, fieldid_for, antnames_for, spwlist, spwnamelist, mslist_for_fieldname)
+    return (mswCollectionKeys, mslist, idxfirst, fieldnames, names_for, fieldid_for, antnames_for, spwlist, spwnamelist, mslist_for_fieldname, basenames)
 
 def consolidate_index_ranges(ranges):
     """

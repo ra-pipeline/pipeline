@@ -81,7 +81,7 @@ class MSWrapperSD(object):
         fieldid=None, column='CORRECTED_DATA', onoffsel='ON', spw_setup=None,
         data=None, weight=None, time=None, outliers=None, outlierfreq=None, outliertime=None,
         tsysdata=None, scantimesel=None, nrowscan=None, time_mean_scan=None, time_std_scan=None,
-        data_stats=None, analysis=None):
+        data_stats=None, analysis=None, basename=None):
         """
         Create a new MSWrapperSD object for the specified ms, antenna, etc.
         :param fname: measurement set filename
@@ -118,11 +118,12 @@ class MSWrapperSD(object):
         self.time_mean_scan = time_mean_scan
         self.time_std_scan = time_std_scan
         self.data_stats = data_stats
-        self.analysis = NoneSafeDict(analysis) if isinstance(analysis, dict) else None
+        self.analysis = NoneSafeDict(analysis) if isinstance(analysis, dict) else None,
+        self.basename = basename
 
 
     @staticmethod
-    def create_from_ms(fname=None, antenna=None, spw=None, fieldid=None, spw_setup=None, column='CORRECTED_DATA', onoffsel='BOTH', attach_tsys_data=True):
+    def create_from_ms(fname=None, antenna=None, spw=None, fieldid=None, spw_setup=None, column='CORRECTED_DATA', onoffsel='BOTH', attach_tsys_data=True, basename=None):
         """
         Create a new MSWrapperSD for the specified data from the MS.
 
@@ -273,7 +274,8 @@ class MSWrapperSD(object):
             time_mean_scan=time_mean_scan,
             time_std_scan=time_std_scan,
             data_stats=None,
-            analysis=None
+            analysis=None,
+            basename=basename,
         )
 
     def average_data_per_scan(self):
