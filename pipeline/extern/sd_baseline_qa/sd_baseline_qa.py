@@ -233,12 +233,10 @@ def calc_baseline_qascore_single(
     minfreq = np.min(freqs)
     maxfreq = np.max(freqs)
 
-    repBW = msw.spw_setup['representativeBandwidthinHz'] * 0.1
+    repBW = msw.spw_setup['representativeBandwidthinHz'] * MHz
 
     #Representative BW in MHz, sensitivity Goal in Jy
-    msw.analysis['sensgoal'] = msw.spw_setup['sensitivityGoalinJy'] if repBW is None else msw.spw_setup[
-                                                                                              'sensitivityGoalinJy'] * np.sqrt(
-        repBW / chansep)
+    msw.analysis['sensgoal'] = msw.spw_setup['sensitivityGoalinJy'] if repBW is None else msw.spw_setup['sensitivityGoalinJy'] * np.sqrt(repBW / chansep)
     sensgoal = msw.analysis['sensgoal']
 
     #Scan numbers
@@ -376,14 +374,14 @@ def calc_baseline_qascore_single(
                     metric_units='Deviation from 0'
                 )
 
-                # This is similar to the original code but slightly modified to accommodate the new
-                # NoneSafeDict class. The conditional is needed because the NoneSafeDict is a fudge
-                # fix to avoid a long list of if else statements.
-                _calculation = 100.0 * sinusoid_sigma[scan][pol]['n_amp'] / sensgoal if sensgoal is not None else None
-                _calculation = 1.0 if _calculation == None else _calculation
+                if sinusoid_sigma[scan][pol]['n_amp'] is None or sensgoal is None:
+                    _fraction = "NA"
+                else:
+                    _calculation = 100.0 * sinusoid_sigma[scan][pol]['n_amp'] / sensgoal
+                    _fraction = f"{_calculation:.1f}%"
 
                 message = ('{0:s}: Sinusoidal baseline deviation for spw {1:s}, antenna {2:s}, '
-                           'field {3:s}, scan {4:s}, polarization {5:s}. Amplitude {6:.1f}% of '
+                           'field {3:s}, scan {4:s}, polarization {5:s}. Amplitude {6:s} of '
                            'requested RMS, wavelength {7:.3f}MHz (nwave={8:s})').format(
                     msw.basename,
                     str(msw.spw),
@@ -391,7 +389,7 @@ def calc_baseline_qascore_single(
                     fieldname,
                     str(scan),
                     polstr,
-                    _calculation,
+                    _fraction,
                     sinusoid_sigma[scan][pol]['freqMHz'],
                     str(sinusoid_sigma[scan][pol]['nwave'])
                 )
