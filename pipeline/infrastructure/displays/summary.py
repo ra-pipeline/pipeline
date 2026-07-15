@@ -1146,13 +1146,11 @@ class UVChart:
             'height': 1000,
             'width': 1000
         }
-        # PIPE-1780: Include additional plotting flags.
-        # FIXME hieronder: cleaning.
+        # PIPE-1780: Include additional plotting flags; plot reduced
+        # number of channels(performance optimisation).
         if self.custom_plot_flags is not None:
-            # Reduce number of channels (optimisation)
             task_args.update(self.custom_plot_flags)
-            # task_args["avgchannel"] = ""
-        #
+        
         task = casa_tasks.plotms(**task_args)
 
         if not os.path.exists(self.figfile):

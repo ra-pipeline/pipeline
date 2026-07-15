@@ -268,14 +268,9 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         if utils.contains_single_dish(pipeline_context):
             uv_plots = None
         else:
-            # PIPE_1780: Custom plot parameters. #FIXME cleaning
-            # custom_plot_par = {}
-            """
+            # PIPE_1780: Custom plot parameters.
             custom_plot_par = {"avgscan": False, "avgtime": "999999",
-            "correlation":"XX,YY", "avgchannel": "",
-            "avgchannel": ""}
-            """
-            custom_plot_par = {"avgscan": False, "avgtime": "999999", "avgchannel": ""}
+                               "correlation": "XX,YY", "avgchannel": ""}
             
             uv_plots = self.create_uv_plots(context=pipeline_context, results=result, weblog_dir=weblog_dir,
                                             plot_par=custom_plot_par)
@@ -331,34 +326,38 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
     @staticmethod
     def create_uv_plots(context, results, weblog_dir, plot_par:dict=None):
         uv_plots = collections.defaultdict(list)
-
+        
         for result in results:
             vis = os.path.basename(result.inputs['vis'])
             ms  = context.observing_run.get_ms(vis)
             # PIPE-1780:
             if plot_par is not None:
-                ##### Reduce number of channels (performance opti.)
-                spw_list = ms.get_spectral_windows()
-                ## FIXME NEEDS CLEANING
-                # represent_source_spw, represent_spw_id = ms.get_representative_source_spw()
                 spw_plot_string = ""
-                for x in spw_list:
-                    id_int = x.id
-                    chan_list = x.channels
-                    l_nchan = len(chan_list)
-                    spw_plot_string = spw_plot_string+str(id_int)+":"+str(l_nchan//2)+";"+str(l_nchan//4)+";"+str((3*l_nchan)//4)+","
-                # Remove last ','
-                spw_plot_string = spw_plot_string.rstrip(",")
-                # PIPE-1780: modify plot params
-                plot_par["spw"]        = spw_plot_string
-            #
+                # Reduce number of channels (performance optim.)
+                _, rep_spw_id = ms.get_representative_source_spw()
+                id_int  = None
+                rep_spw = None
+                l_nchan = None
+                
+                if rep_spw_id is not None:
+                    id_int  = rep_spw_id
+                    l_nchan = len(ms.get_spectral_window(rep_spw_id).channels)
+                else: #rep_spw id is None (not exist). Select first available SPW.
+                    # rep_spw = ms.get_spectral_windows()[0]
+                    id_int  = ms.get_spectral_windows()[0].id #rep_spw.id
+                    l_nchan = len(ms.get_spectral_windows()[0].channels)
+                
+                # Plot a three channels to optimise image creation
+                spw_plot_string = str(id_int)+":"+str(l_nchan//2)+";"+str(l_nchan//4)+";"+str((3*l_nchan)//4)
+                plot_par["spw"] = spw_plot_string
+            
             plot = UVChart(context, ms, custom_plot_flags=plot_par, customflagged=True,
                            output_dir=weblog_dir, title_prefix="Post applycal: ").plot()
-
+            
             # PIPE-1294: only attached valid plot wrapper objects.
             if plot is not None:
                 uv_plots[vis].append(plot)
-
+            
         return uv_plots
 
     def create_science_plots(self, context, results):
