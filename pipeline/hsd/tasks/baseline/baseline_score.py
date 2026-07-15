@@ -83,7 +83,7 @@ def baseline_score(
 
     date_time = datetime.datetime.now(datetime.UTC).strftime("%Y%d%mT%H%M%SD%f")
 
-    plot_path = pathlib.Path(context.report_dir).joinpath(f"stage{context.task_counter}")
+    plot_path = pathlib.Path(context.report_dir).joinpath(f"stage{results.stage_number}")
 
     # This should always exist but incase
     plot_path.mkdir(parents=True, exist_ok=True)
@@ -109,7 +109,7 @@ def baseline_score(
 
         sd_qa_reports.makeSummaryTable_bl(
             qascore_list=qa_score,
-            antnames_for=antenna_names,
+            antnames_for={basename: antenna_names[baseline_file]},
             plots_fnames=plots_function_names,
             plfolder=str(working_path),
             output_file=str(working_path.joinpath(f"qa_score_summary_{date_time}.csv")),
@@ -118,7 +118,10 @@ def baseline_score(
         )
     except FailedAnalysisException:
         for png_file in glob.glob(f"{plot_path}/*_BLine_QA.png"):
+            import traceback
+
             os.remove(png_file)
+            LOG.info(traceback.format_exc())
 
         return None
 

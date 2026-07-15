@@ -235,8 +235,16 @@ def calc_baseline_qascore_single(
 
     repBW = msw.spw_setup['representativeBandwidthinHz'] * MHz
 
-    #Representative BW in MHz, sensitivity Goal in Jy
-    msw.analysis['sensgoal'] = msw.spw_setup['sensitivityGoalinJy'] if repBW is None else msw.spw_setup['sensitivityGoalinJy'] * np.sqrt(repBW / chansep)
+    if msw.spw_setup['sensitivityGoalinJy'] is None:
+        msw.analysis['sensgoal'] = None
+    else:
+        if msw.spw_setup['representativeBandwidthinHz'] is None:
+            repBW = None
+        else:
+            repBW = msw.spw_setup['representativeBandwidthinHz'] * MHz
+
+        #Representative BW in MHz, sensitivity Goal in Jy
+        msw.analysis['sensgoal'] = msw.spw_setup['sensitivityGoalinJy'] if repBW is None else msw.spw_setup['sensitivityGoalinJy'] * np.sqrt(repBW / chansep)
     sensgoal = msw.analysis['sensgoal']
 
     #Scan numbers
@@ -904,6 +912,7 @@ def get_ms_baseline_qascores(
         antnames_for,
         spwlist,
         spwnamelist,
+        basenames,
         mslist_for_fieldname
     ) = sd_qa_utils.get_mswCollection_params(mswCollection)
 

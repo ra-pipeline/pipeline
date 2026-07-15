@@ -708,9 +708,9 @@ def plot_data_single_bl(msw: mswrapper_sd.MSWrapperSD, max_nwave_frac = 0.1, plo
     if len(highlight_regions) > 0:
         apply_highlights(ax_left) # Add highlighted ranges
 
-    if not msw.analysis['sensgoal'] == None:
+    if not msw.analysis['sensgoal'] is None:
         #Mark sensitivity goal lines if they exist
-        if (msw.analysis != None) and ((msw.analysis['sensgoal'] <= maxdata) or (-1*msw.analysis['sensgoal'] > mindata)):
+        if (msw.analysis is not None) and ((msw.analysis['sensgoal'] <= maxdata) or (-1 * msw.analysis['sensgoal'] > mindata)):
             ax_left.plot([minfreq, maxfreq], np.ones(2)*msw.analysis['sensgoal'], ':k', label='Sensitivity Goal level')
             ax_left.plot([minfreq, maxfreq], -1.0*np.ones(2)*msw.analysis['sensgoal'], ':k')
     #Axes labels

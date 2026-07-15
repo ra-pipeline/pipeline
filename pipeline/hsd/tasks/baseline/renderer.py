@@ -88,15 +88,11 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
         Returns:
             Rendered html document
         """
-        # This method modifies the result object
-        # but the changes do not propergate to the original result or context,
+        # This method modifies the result object,
+        # but the changes do not propagate to the original result or context,
         # since they are local in render() thanks to the mechanism of PL infrastructure.
-        # Therefore there is no need to bracket the aggregation process
+        # Therefore, there is no need to bracket the aggregation process
         # with stashing and recovering the original result.qa.pool here.
-
-        # aggregate QA scores for weblog accordion
-        aggregator = qautils.QAScoreAggregator()
-        result.qa.pool = aggregator.aggregate_qascores(result.qa.pool)
 
         return super().render(context, result)
 
@@ -225,6 +221,35 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
 
             ctx.update({'sparsemap_subpage_{}_{}'.format(maptype.lower(), subtype.lower()): subpage,
                         'sparsemap_{}_{}'.format(maptype.lower(), subtype.lower()): summary})
+
+            profile_heuristic, profile_heuristic_subpages = make_profile_heuristic_plots(results)
+
+        # If this analysis was not done, skip it
+        if (len(profile_heuristic) > 0) and profile_heuristic_subpages:
+            detail_page_title = "Comparison of the Profiles between XX and YY spectra"
+
+            detail_renderer = basetemplates.JsonPlotRenderer(
+                'generic_x_vs_y_field_spw_ant_detail_plots.mako',
+                context,
+                results,
+                profile_heuristic,
+                detail_page_title,
+                filenamer.sanitize(f'{detail_page_title.lower()}.html')
+            )
+
+            with detail_renderer.get_file() as fileobj:
+                fileobj.write(detail_renderer.render())
+
+            for field_object in sorted_fields:
+                name = field_object.clean_name
+
+                if name is not None:
+                    profile_heuristic_subpages[name] = os.path.basename(detail_renderer.path)
+
+            ctx.update({
+                "profile_heuristic": profile_heuristic,
+                "profile_heuristic_subpages": profile_heuristic_subpages
+            })
 
     @staticmethod
     def _group_by_axes(plots: list[list[Plot]]) -> dict:

@@ -95,7 +95,11 @@ line detection stage.</p>
 <li><a href="#avgbeforebaseline">Averaged Spectral Data Before Baseline Subtraction</a></li>
 <li><a href="#rawafterbaseline">Raw Spectral Data After Baseline Subtraction</a></li>
 <li><a href="#flatnessafterbaseline">Baseline Flatness After baseline Subtraction</a></li>
+
+% if len(profile_heuristic) > 0:
 <li><a href="#profileheuristic"> Profile Heuristic Analysis XXYY </a></li>
+% endif
+
 % if detail is not None:
 <li><a href="#clusteranalysis">Line Detection by Clustering Analysis</a></li>
 
@@ -284,7 +288,7 @@ for baseline subtraction.</p>
             </h3>
 
          % for plot in profile_heuristic:
-            % if os.path.exists(plot.thumbnail) and plot.parameters["ant"] == profile_heuristic[0].parameters["ant"]:
+            % if os.path.exists(plot.thumbnail) and plot.parameters["ant"] == profile_heuristic[0].parameters["ant"] and plot.field == field:
                 <div class="col-md-3">
                     <div class="thumbnail">
                         <a href="${os.path.relpath(plot.abspath, pcontext.report_dir)}"

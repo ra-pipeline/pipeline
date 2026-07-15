@@ -10,6 +10,8 @@ import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as qacalc
 
+from pipeline.hsd.tasks.common import utils as sdutils
+
 from . import baseline
 
 import pipeline.hsd.tasks.baseline.baseline_score as bs
@@ -78,18 +80,19 @@ class SDBaselineQAHandler(pqa.QAPlugin):
 
         ###
         # Add qa_score to results
-        # result.outcome["profile_qa_score"] = {}
 
         # We will run this for each output measurementset. It would be better to do the QA calculation above as part of
         # the general analysis. Perhaps this can be done at a later time.
         result.outcome["profile_qa_score"] = {}
 
-        for basename, outfile in result.outcome["vis_map"].items():
-            original_ms = context.observing_run.get_ms(basename).origin_ms
-            qa_score_dict = bs.baseline_score(results=result, context=context, file_info=(original_ms, outfile))
+        is_nro = sdutils.is_nro(context)
+        if not is_nro:
+            for basename, outfile in result.outcome["vis_map"].items():
+                original_ms = context.observing_run.get_ms(basename).origin_ms
+                qa_score_dict = bs.baseline_score(results=result, context=context, file_info=(original_ms, outfile))
 
-            if qa_score_dict is not None:
-                result.outcome["profile_qa_score"][outfile] = qa_score_dict
+                if qa_score_dict is not None:
+                    result.outcome["profile_qa_score"][outfile] = qa_score_dict
 
         ###
 

@@ -105,7 +105,7 @@ class MSWrapperSD(object):
         self.fieldid = fieldid
         self.column = column
         self.onoffsel = onoffsel
-        self.spw_setup = NoneSafeDict(spw_setup) if isinstance(spw_setup, dict) else None
+        self.spw_setup = spw_setup
         self.data = data
         self.weight = weight
         self.time = time
@@ -118,7 +118,7 @@ class MSWrapperSD(object):
         self.time_mean_scan = time_mean_scan
         self.time_std_scan = time_std_scan
         self.data_stats = data_stats
-        self.analysis = NoneSafeDict(analysis) if isinstance(analysis, dict) else None,
+        self.analysis = analysis
         self.basename = basename
 
 
