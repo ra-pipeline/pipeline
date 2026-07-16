@@ -1144,12 +1144,14 @@ class SDChannelMapDisplay(SDImageDisplay):
                         continue
                     C0 = idx_vertlines[i]
                     C1 = idx_vertlines[i+1]
-                    velo = (self.extended_velocity[C0] + self.extended_velocity[C1 - 1]) / 2.0 - velocity_line_center
-                    width = abs(self.extended_velocity[C0] - self.extended_velocity[C1])
-                    Title.append('(Vel,Wid) = (%.1f, %.1f) (km/s)' % (velo, width))
+                    velo = (vel_vertlines[i] + vel_vertlines[i + 1]) / 2
+                    width = abs(vel_vertlines[i] - vel_vertlines[i + 1])
+                    Title.append(
+                        f"(Vel,Wid) = ({velo:.1f}, {width:.1f}) (km/s)"
+                    )
                     NMap += 1
-                    _mask = masked_data[:, :, C0:C1].sum(axis=2) * velocity_per_channel
-                    Map[self.NUM_CHANNELMAP-1-i] = np.flipud(_mask.transpose())
+                    _map_data = masked_data[:, :, C0:C1].sum(axis=2) * velocity_per_channel
+                    Map[self.NUM_CHANNELMAP-1-i] = np.flipud(_map_data.transpose())
                 del masked_data
                 Vmax0 = Map.max()
                 Vmin0 = Map.min()
