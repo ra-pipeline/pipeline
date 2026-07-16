@@ -1368,7 +1368,11 @@ class SDChannelMapDisplay(SDImageDisplay):
             List[float]: relative velocities for red vertical lines
         """
         # interpolate function to calculate velocities using extrapolation
-        chan2vel = interpolate.interp1d(idx_vertlines, self.extended_velocity[idx_vertlines],
+        num_velocities = len(self.extended_velocity)
+        vidx = np.array(idx_vertlines)
+        in_range_indices = vidx[np.logical_and(0 <= vidx, vidx < num_velocities - 1)]
+        assert len(in_range_indices) > 0
+        chan2vel = interpolate.interp1d(in_range_indices, self.extended_velocity[in_range_indices],
                                         bounds_error=False, fill_value='extrapolate')
 
         # get size of difference between the number of vertical lines and NUM_CHANNELMAP
