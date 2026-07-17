@@ -21,6 +21,7 @@ import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.utils as utils
 from pipeline.h.tasks.common import flagging_renderer_utils as flagutils
 from pipeline.h.tasks.common.displays import applycal as applycal
+from pipeline.hsd.tasks.common import qautils
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.renderer.logger import Plot
 
@@ -49,6 +50,28 @@ class T2_4MDetailsSDApplycalRenderer(super_renderer.T2_4MDetailsApplycalRenderer
         """
         super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
+
+    @qautils.aggregate_qascores
+    @qautils.sort_qascores
+    def render(self, context: Context, result: ApplycalResults) -> str:
+        """
+        Custom renderer for hsd_applycal()
+
+        This method aggegates and sorts the QAScores, and renders the weblog.
+
+        Args:
+            context: Pipeline context
+            result:  ApplycalResults object
+        Returns:
+            Rendered html document
+        """
+        # This method modifies the result object for this purpose,
+        # but the changes do not propergate to the original result or context,
+        # since they are local in render() thanks to the mechanism of PL infrastructure.
+        # Therefore there is no need to bracket the aggregation process
+        # with stashing and recovering the original result.qa.pool here.
+
+        return super().render(context, result)
 
     def update_mako_context(self, ctx: dict, context: Context, result: ResultsList):
         """Update mako context dict to render.
@@ -376,7 +399,7 @@ class T2_4MDetailsSDApplycalRenderer(super_renderer.T2_4MDetailsApplycalRenderer
                     summaries.append([field_name, plots_per_spw])
 
         if xy_deviation_plots_all:
-            detail_page_title = f'Amplitude difference vs frequency'
+            detail_page_title = 'Amplitude difference vs frequency'
             detail_renderer = basetemplates.JsonPlotRenderer(
                 'generic_x_vs_y_field_spw_ant_detail_plots.mako',
                 ctx,

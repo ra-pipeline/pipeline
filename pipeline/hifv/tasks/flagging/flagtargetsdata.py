@@ -22,46 +22,46 @@ __all__ = [
 class FlagtargetsdataInputs(vdp.StandardInputs):
     """Defines the input parameters for the `hifv_flagtargetsdata` pipeline task.
 
-    This class is used for flagging target data in VLA measurement sets (MSes). It 
-    extends `vdp.StandardInputs` and provides attributes and methods to manage 
+    This class is used for flagging target data in VLA measurement sets (MSes). It
+    extends `vdp.StandardInputs` and provides attributes and methods to manage
     relevant input parameters for the `flagdata` task in CASA.
 
     Attributes:
-        processing_data_type (list[DataType]): Defines the priority order of input 
+        processing_data_types (list[DataType]): Defines the priority order of input
             visibility data types.
-        flagbackup (vdp.VisDependentProperty): Determines whether a backup of the 
+        flagbackup (vdp.VisDependentProperty): Determines whether a backup of the
             flagging state should be created before applying flags. Defaults to `True`.
-        template (vdp.VisDependentProperty): Indicates whether a flagging template 
+        template (vdp.VisDependentProperty): Indicates whether a flagging template
             should be used. Defaults to `True`.
-        filetemplate (vdp.VisDependentProperty): The filename of the flagging 
-            template. This template is applied to all relevant measurement sets. 
+        filetemplate (vdp.VisDependentProperty): The filename of the flagging
+            template. This template is applied to all relevant measurement sets.
             The property is automatically derived from the `vis` input.
-        inpfile (vdp.VisDependentProperty): The full path to the flagging command 
+        inpfile (vdp.VisDependentProperty): The full path to the flagging command
             file. This file is generated based on `vis` and stored in `output_dir`.
 
     Args:
         context (object): The execution context for the pipeline.
         vis (str, optional): The name of the pre-split measurement set.
         output_dir (str, optional): The directory where output files will be stored.
-        flagbackup (bool, optional): Whether to create a backup of flagging data 
+        flagbackup (bool, optional): Whether to create a backup of flagging data
             before applying flags. Defaults to `None`, which resolves to the class default.
-        template (bool, optional): Whether to use a flagging template. Defaults to 
+        template (bool, optional): Whether to use a flagging template. Defaults to
             `None`, which resolves to the class default.
-        filetemplate (str, optional): The filename of the flagging template to use. 
+        filetemplate (str, optional): The filename of the flagging template to use.
             Flags from this template will be applied to all relevant measurement sets.
 
     Methods:
         to_casa_args(vis):
-            Converts the class attributes into a dictionary of parameters required 
+            Converts the class attributes into a dictionary of parameters required
             for the CASA `flagdata` task.
 
     """
     # Search order of input vis
     # PIPE-2313: moved REGCAL_CONTLINE_SCIENCE to end of priority in rare case that the
     # others don't exist
-    processing_data_type = [DataType.REGCAL_CONTLINE_ALL,
-                            DataType.RAW,
-                            DataType.REGCAL_CONTLINE_SCIENCE]
+    processing_data_types = [DataType.REGCAL_CONTLINE_ALL,
+                             DataType.RAW,
+                             DataType.REGCAL_CONTLINE_SCIENCE]
 
     flagbackup = vdp.VisDependentProperty(default=True)
     template = vdp.VisDependentProperty(default=True)

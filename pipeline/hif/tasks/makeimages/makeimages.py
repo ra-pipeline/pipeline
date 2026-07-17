@@ -30,7 +30,13 @@ class MakeImagesInputs(vdp.StandardInputs):
     """Inputs for hif_makeimages."""
 
     # Search order of input vis
-    processing_data_type = [DataType.SELFCAL_LINE_SCIENCE, DataType.REGCAL_LINE_SCIENCE, DataType.SELFCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [
+        DataType.SELFCAL_LINE_SCIENCE,
+        DataType.REGCAL_LINE_SCIENCE,
+        DataType.SELFCAL_CONTLINE_SCIENCE,
+        DataType.REGCAL_CONTLINE_SCIENCE,
+        DataType.REGCAL_CONTLINE_ALL,
+        DataType.RAW]
 
     calcsb = vdp.VisDependentProperty(default=False)
     cleancontranges = vdp.VisDependentProperty(default=False)
@@ -642,7 +648,7 @@ class MakeImages(basetask.StandardTaskTemplate):
                            pbcor_image_max=cqa.quantity(pbcor_image_max, 'Jy/beam'),
                            nonpbcor_image_min=cqa.quantity(nonpbcor_image_min, 'Jy/beam'),
                            nonpbcor_image_max=cqa.quantity(nonpbcor_image_max, 'Jy/beam'),
-                           imagename=result.image.replace('.pbcor', ''),
+                           imagename=imname.replace('.pbcor', ''),
                            datatype=result.datatype)
 
 

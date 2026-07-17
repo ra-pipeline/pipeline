@@ -3,8 +3,9 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hif.tasks.findcont.findcont.FindContInputs.__init__
 @utils.cli_wrapper
-def hif_findcont(vis=None, target_list=None, hm_mosweight=None, hm_perchanweightdensity=None, hm_weighting=None,
-                 datacolumn=None, parallel=None):
+def hif_findcont(vis=None, target_list=None, hm_mosweight=None,
+                 hm_perchanweightdensity=None, hm_weighting=None,
+                 hm_mode=None, datacolumn=None, parallel=None):
     """Find continuum frequency ranges for a list of specified targets.
 
     If a `cont.dat` file is not already present in the working directory, then dirty image
@@ -17,6 +18,9 @@ def hif_findcont(vis=None, target_list=None, hm_mosweight=None, hm_perchanweight
     channel ranges that are likely to be free of line emission.  Warnings are generated if
     the channel ranges contain a small fraction of the bandwidth, or sample only a limited
     extent of the spectrum.
+
+    The default mode is ``coarse``, which applies the local fast-imaging override. Use
+    ``hm_mode='normal'`` to preserve the previous-cycle behavior.
 
     If a `cont.dat` file already exists in the working directory before this task is executed,
     then it will first examine the contents. For any spw that already has frequency ranges

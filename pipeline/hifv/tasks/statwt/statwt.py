@@ -18,7 +18,7 @@ LOG = infrastructure.get_logger(__name__)
 
 class StatwtInputs(vdp.StandardInputs):
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     datacolumn = vdp.VisDependentProperty(default='corrected')
     overwrite_modelcol = vdp.VisDependentProperty(default=False)
@@ -105,8 +105,8 @@ class Statwt(basetask.StandardTaskTemplate):
                 LOG.info('usecontdat=True and cont.dat found: Using VLA Spectral Line Heuristics '
                          'for task statwt.')
             else:
-                LOG.warning('usecontdat=True but no cont.dat found or empty: '
-                            'Applying weights to all spectral windows.')
+                LOG.info('usecontdat=True but no cont.dat found or empty: '
+                         'Applying weights to all spectral windows.')
         else:
             LOG.info('usecontdat=False: Applying weights to all spectral windows.')
             fielddict = {}

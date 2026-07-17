@@ -62,7 +62,8 @@ class MakecutoutimagesResults(basetask.Results):
                     datatype=subitem['datatype'],
                     multiterm=subitem['multiterm'],
                     metadata=subitem['metadata'],
-                    imageplot=subitem['imageplot'])
+                    imageplot=subitem['imageplot'],
+                    imagename_prefix=subitem.get('imagename_prefix'))
                 if 'TARGET' in subitem['sourcetype']:
                     context.subimlist.add_item(imageitem)
             except:
@@ -74,7 +75,7 @@ class MakecutoutimagesResults(basetask.Results):
 
 class MakecutoutimagesInputs(vdp.StandardInputs):
 
-    processing_data_type = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     @vdp.VisDependentProperty
     def offsetblc(self):

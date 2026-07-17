@@ -448,7 +448,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         else:
             return threshold
 
-    def imsize(self, fields, cell, primary_beam, sfpblimit=None, max_pixels=None,
+    def imsize(self, fields, cell, primary_beam, sfpblimit=None, max_pixels=None, min_pixels=None,
                centreonly=False, vislist=None, spwspec=None, intent: str = '', joint_intents: str = '',
                specmode=None) -> list | int:
         """
@@ -468,6 +468,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         :param sfpblimit: single field primary beam response. If provided then imsize is chosen such that the image
             edge is at normalised primary beam level equals to sfpblimit.
         :param max_pixels: maximum allowed pixel count, integer. The same limit is applied along both image axes.
+        :param min_pixels: minimum allowed pixel count, integer. The same limit is applied along both image axes.
         :param centreonly: if True, then ignore the spread of field centers.
         :param vislist: list of visibility path string to be used for imaging. If not set then use all visibilities
             in the context.
@@ -478,7 +479,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         :return: two element list of pixel count along x and y image axes.
         """
         if specmode in ('cube', 'repBW'):
-            return super().imsize(fields, cell, primary_beam, sfpblimit=sfpblimit, max_pixels=max_pixels,
+            return super().imsize(fields, cell, primary_beam, sfpblimit=sfpblimit, max_pixels=max_pixels, min_pixels=min_pixels,
                                   centreonly=centreonly, vislist=vislist, intent=intent, specmode=specmode)
         else:
             if spwspec is not None:
@@ -493,7 +494,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
                     # equivalent to second minimum of the Airy diffraction pattern; m = 2.233 in theta = m*lambda/D
                     sfpblimit = 0.016
 
-            return super().imsize(fields, cell, primary_beam, sfpblimit=sfpblimit, max_pixels=max_pixels,
+            return super().imsize(fields, cell, primary_beam, sfpblimit=sfpblimit, max_pixels=max_pixels, min_pixels=min_pixels,
                                   centreonly=centreonly, vislist=vislist, intent=intent, specmode=specmode)
 
     def imagename(self, output_dir=None, intent=None, field=None, spwspec=None, specmode=None, band=None, datatype: str = None) -> str:

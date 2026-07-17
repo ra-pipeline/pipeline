@@ -324,6 +324,12 @@ class VLAAquaXmlGenerator(aqua.AquaXmlGenerator):
         ElementTree.SubElement(root, 'OusPartId').text = context.project_structure.ous_part_id
         ElementTree.SubElement(root, 'OusStatusEntityId').text = context.project_structure.ousstatus_entity_id
 
+        # add execution block IDs as comma-separated list
+        execblock_ids = context.observing_run.execblock_ids
+        execblock_ids = ', '.join(execblock_ids) if execblock_ids else UNDEFINED
+
+        ElementTree.SubElement(root, 'ExecBlockId').text = execblock_ids
+
         return root
 
     def get_calibration_topic(self, context, topic_results):

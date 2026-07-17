@@ -43,7 +43,7 @@ class SDBaselineInputs(vdp.StandardInputs):
     """Inputs for baseline subtraction task."""
 
     # Search order of input vis
-    processing_data_type = [DataType.ATMCORR, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.ATMCORR, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     infiles = vdp.VisDependentProperty(default='', null_input=['', None, [], ['']])
     spw = vdp.VisDependentProperty(default='')

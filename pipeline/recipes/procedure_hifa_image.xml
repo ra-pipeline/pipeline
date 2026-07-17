@@ -25,6 +25,12 @@
     </ProcessingCommand>
 
     <ProcessingCommand>
+        <Command xmlns="">hif_findroi</Command>
+        <ParameterSet>
+        </ParameterSet>
+    </ProcessingCommand>
+
+    <ProcessingCommand>
         <Command xmlns="">hifa_imageprecheck</Command>
         <ParameterSet>
         </ParameterSet>
@@ -49,16 +55,6 @@
     </ProcessingCommand>
 
     <ProcessingCommand>
-        <Command xmlns="">hif_makeimlist</Command>
-        <ParameterSet>
-            <Parameter>
-                <Keyword xmlns="">specmode</Keyword>
-                <Value xmlns="">mfs</Value>
-            </Parameter>
-        </ParameterSet>
-    </ProcessingCommand>
-
-    <ProcessingCommand>
         <Command xmlns="">hif_findcont</Command>
         <ParameterSet>
         </ParameterSet>
@@ -67,6 +63,16 @@
     <ProcessingCommand>
         <Command xmlns="">hif_uvcontsub</Command>
         <ParameterSet>
+        </ParameterSet>
+    </ProcessingCommand>
+
+    <ProcessingCommand>
+        <Command xmlns="">hif_makeimlist</Command>
+        <ParameterSet>
+            <Parameter>
+                <Keyword xmlns="">specmode</Keyword>
+                <Value xmlns="">mfs</Value>
+            </Parameter>
         </ParameterSet>
     </ProcessingCommand>
 

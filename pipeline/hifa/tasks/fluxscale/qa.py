@@ -17,7 +17,7 @@ import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as qacalc
 from pipeline.domain.measures import FluxDensity, FluxDensityUnits, Frequency, FrequencyUnits
-from pipeline.h.tasks.common import commonfluxresults
+from pipeline.h.tasks.common import commonfluxresults, mstools
 from pipeline.h.tasks.importdata.fluxes import ORIGIN_ANALYSIS_UTILS, ORIGIN_XML
 
 # PIPE-2901: import default values from the heuristics/snr.py instead of hardcoding in 
@@ -60,6 +60,15 @@ EXTERNAL_SOURCES = (ORIGIN_ANALYSIS_UTILS, ORIGIN_DB, ORIGIN_XML)
 TRUSTED_SOURCES = (ORIGIN_ANALYSIS_UTILS, ORIGIN_DB)
 
 
+class AmpTimeVariationCalculationError(RuntimeError):
+    """Raised when the flux calibrator amplitude-time metric cannot be calculated."""
+
+
+AmpTimeCalibratedAmplitudes = collections.namedtuple(
+    'AmpTimeCalibratedAmplitudes', 'amplitudes times antenna1 antenna2'
+)
+
+
 class GcorFluxscaleQAHandler(pqa.QAPlugin):
     result_cls = commonfluxresults.FluxCalibrationResults
     child_cls = None
@@ -77,6 +86,7 @@ class GcorFluxscaleQAHandler(pqa.QAPlugin):
         scores = [score1, score2]
 
         scores.extend(score_kspw(context, result))
+        scores.extend(_score_amp_time_variation_for_flux_calibrators(ms))
 
         result.qa.pool.extend(scores)
 
@@ -378,6 +388,186 @@ def _get_fluxes_for_field(ms: MeasurementSet, field: Field) -> list[tuple[int, f
         fluxes.append((spw.id, float(spw.mean_frequency.to_units(FrequencyUnits.HERTZ)),
                        float(fm.I.to_units(FluxDensityUnits.JANSKY))))
     return fluxes
+
+
+def _compute_amp_time_variation(amplitudes: Iterable[float]) -> float:
+    amplitudes = numpy.asarray(list(amplitudes), dtype=float)
+    amplitudes = amplitudes[numpy.isfinite(amplitudes)]
+    if amplitudes.size == 0:
+        raise ValueError('no finite amplitudes available')
+
+    median = numpy.median(amplitudes)
+    if median == 0:
+        raise ValueError('median amplitude is zero')
+
+    amp20, amp80 = numpy.percentile(amplitudes, [20, 80], method='nearest')
+    return float((amp80 - amp20) / median)
+
+
+def _score_amp_time_variation(ampvar: float) -> float:
+    threshold = 0.13
+    ymax = 0.66
+    ymin = 0.34
+
+    if ampvar <= threshold:
+        return qacalc.linear_score(ampvar, 0.0, threshold, 1.0, ymax)
+    return max(qacalc.linear_score(ampvar, threshold, 2.0 * threshold, ymax, ymin), ymin)
+
+
+def _get_amp_time_spw_candidates(snr_info: Iterable[tuple[str, float | None]]) -> list[int]:
+    if isinstance(snr_info, collections.abc.Mapping):
+        snr_items = snr_info.items()
+    else:
+        snr_items = snr_info
+
+    candidates = []
+    for spw_label, snr in snr_items:
+        if snr is None:
+            continue
+        try:
+            spw_id = int(spw_label)
+            snr_value = float(snr)
+        except (TypeError, ValueError):
+            continue
+        if numpy.isfinite(snr_value):
+            candidates.append((spw_id, snr_value))
+
+    candidates.sort(key=lambda item: item[1], reverse=True)
+    return [spw_id for spw_id, _ in candidates]
+
+
+def _get_amp_time_variation_for_candidates(spw_candidates: Iterable[int], calculate) -> tuple[int, float]:
+    for spw_id in spw_candidates:
+        try:
+            return spw_id, calculate(spw_id)
+        except ValueError:
+            continue
+
+    raise AmpTimeVariationCalculationError('Amplitude vs. time spread could not be calculated')
+
+
+def _read_amp_time_calibrated_amplitudes(ms: MeasurementSet, field: Field, spw_id: int) -> AmpTimeCalibratedAmplitudes:
+    data = mstools.read_channel_averaged_data_from_ms(
+        ms,
+        field.id,
+        spw_id,
+        'AMPLITUDE',
+        ['corrected_data', 'flag', 'time', 'antenna1', 'antenna2'],
+    )
+    if not data:
+        raise ValueError(f'{ms.basename}: no calibrated amplitude data for flux calibrator {field.name}, spw {spw_id}')
+
+    corrected_data = numpy.squeeze(data['corrected_data'], axis=1).T
+    flag = numpy.squeeze(data['flag'], axis=1).T
+    valid = numpy.logical_and(numpy.logical_not(flag), numpy.isfinite(corrected_data))
+    if not numpy.any(valid):
+        raise ValueError(
+            f'{ms.basename}: no unflagged calibrated amplitude data for flux calibrator {field.name}, spw {spw_id}'
+        )
+
+    row_indices = numpy.nonzero(valid)[0]
+    return AmpTimeCalibratedAmplitudes(
+        amplitudes=numpy.abs(corrected_data[valid]),
+        times=data['time'][row_indices],
+        antenna1=data['antenna1'][row_indices],
+        antenna2=data['antenna2'][row_indices],
+    )
+
+
+def _average_amp_time_calibrated_amplitudes_by_integration(read_result: AmpTimeCalibratedAmplitudes) -> numpy.ndarray:
+    amplitudes = numpy.asarray(read_result.amplitudes, dtype=float)
+    times = numpy.asarray(read_result.times)
+    if amplitudes.size == 0:
+        raise ValueError('no calibrated amplitudes available')
+
+    return numpy.asarray([numpy.mean(amplitudes[times == time]) for time in numpy.unique(times)], dtype=float)
+
+
+def _calculate_amp_time_variation_for_field(
+    ms: MeasurementSet,
+    field: Field,
+    spw_candidates: Iterable[int],
+) -> tuple[int, float]:
+    def calculate(spw_id: int) -> float:
+        read_result = _read_amp_time_calibrated_amplitudes(ms, field, spw_id)
+        amplitudes = _average_amp_time_calibrated_amplitudes_by_integration(read_result)
+        return _compute_amp_time_variation(amplitudes)
+
+    return _get_amp_time_variation_for_candidates(spw_candidates, calculate)
+
+
+def _make_amp_time_variation_qa_score(ms: MeasurementSet, field: Field, spw_id: int, ampvar: float) -> pqa.QAScore:
+    metric_percent = 100.0 * ampvar
+    longmsg = (
+        f'{ms.basename}: Based on the SPW with the highest S/N (spw={spw_id}), '
+        f'the Amplitude vs. time spread for the flux calibrator {field.name} is {metric_percent:.1f}% over the scan'
+    )
+    origin = pqa.QAOrigin(
+        metric_name='score_gfluxscale_amp_time_variation',
+        metric_score=metric_percent,
+        metric_units='%',
+    )
+    selection = pqa.TargetDataSelection(vis={ms.basename}, field={field.id}, spw={spw_id})
+
+    return pqa.QAScore(
+        _score_amp_time_variation(ampvar),
+        longmsg=longmsg,
+        shortmsg='Flux calibrator amplitude vs. time spread',
+        origin=origin,
+        applies_to=selection,
+    )
+
+
+def _make_amp_time_variation_fallback_qa_score(ms: MeasurementSet, field: Field) -> pqa.QAScore:
+    longmsg = f'{ms.basename}: the Amplitude vs. time spread for the flux calibrator {field.name} could not be calculated'
+    origin = pqa.QAOrigin(
+        metric_name='score_gfluxscale_amp_time_variation',
+        metric_score='N/A',
+        metric_units='%',
+    )
+    selection = pqa.TargetDataSelection(vis={ms.basename}, field={field.id})
+
+    return pqa.QAScore(
+        0.9,
+        longmsg=longmsg,
+        shortmsg='Flux calibrator amplitude vs. time spread could not be calculated',
+        origin=origin,
+        applies_to=selection,
+    )
+
+
+def _score_amp_time_variation_for_flux_calibrators(ms: MeasurementSet) -> list[pqa.QAScore]:
+    scores = []
+    for field in _get_non_sso_flux_calibrator_fields(ms):
+        try:
+            snr_info = _get_amp_time_snr_info(ms, field)
+            spw_candidates = _get_amp_time_spw_candidates(snr_info)
+            spw_id, ampvar = _calculate_amp_time_variation_for_field(ms, field, spw_candidates)
+        except AmpTimeVariationCalculationError:
+            scores.append(_make_amp_time_variation_fallback_qa_score(ms, field))
+        else:
+            scores.append(_make_amp_time_variation_qa_score(ms, field, spw_id, ampvar))
+
+    return scores
+
+
+def _get_non_sso_flux_calibrator_fields(ms: MeasurementSet) -> list[Field]:
+    fields = [
+        field for field in ms.get_fields()
+        if 'AMPLITUDE' in field.intents and not getattr(field.source, 'is_eph_obj', False)
+    ]
+    return sorted(fields, key=operator.attrgetter('id'))
+
+
+def _get_amp_time_snr_info(ms: MeasurementSet, field: Field) -> list[tuple[str, float]]:
+    spwmapping = ms.spwmaps.get(('AMPLITUDE', field.name), None)
+    if spwmapping is None and 'BANDPASS' in field.intents:
+        spwmapping = ms.spwmaps.get(('BANDPASS', field.name), None)
+    if spwmapping is None:
+        raise AmpTimeVariationCalculationError(
+            f'{ms.basename}: S/N information from hifa_spwphaseup is not available for flux calibrator {field.name}'
+        )
+    return spwmapping.snr_info
 
 
 def _get_highest_snr_measurement_and_flux_ratio(field: Field, highest_snr_spw: SpectralWindow,

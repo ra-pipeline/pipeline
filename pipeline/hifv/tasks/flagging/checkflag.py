@@ -19,7 +19,7 @@ LOG = infrastructure.get_logger(__name__)
 
 class CheckflagInputs(vdp.StandardInputs):
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     checkflagmode = vdp.VisDependentProperty(default='')
     overwrite_modelcol = vdp.VisDependentProperty(default=False)
@@ -213,8 +213,8 @@ class Checkflag(basetask.StandardTaskTemplate):
                              'for checkflagmode=target-vla.')
                     use_contdat = True
                 else:
-                    LOG.warning('usecontdat=True but no cont.dat found or empty: '
-                                'Applying flagging to all spectral windows.')
+                    LOG.info('usecontdat=True but no cont.dat found or empty: '
+                             'Applying flagging to all spectral windows.')
             else:
                 LOG.info('usecontdat=False: Applying flagging to all spectral windows.')
 

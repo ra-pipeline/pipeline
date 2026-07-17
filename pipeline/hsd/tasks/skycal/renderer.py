@@ -9,12 +9,14 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.utils as utils
 from pipeline.domain.datatable import DataTableImpl as DataTable
+from pipeline.hsd.tasks.common import qautils
 from pipeline.infrastructure import casa_tools
 from . import skycal as skycal_task
 from . import display as skycal_display
 
 if TYPE_CHECKING:
     from pipeline.domain import Field, MeasurementSet
+    from pipeline.hsd.tasks.skycal.skycal import SDSkyCalResults
     from pipeline.infrastructure.basetask import ResultsList
     from pipeline.infrastructure.launcher import Context
 
@@ -38,6 +40,27 @@ class T2_4MDetailsSingleDishSkyCalRenderer(basetemplates.T2_4MDetailsDefaultRend
         """
         super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
+
+    @qautils.sort_qascores
+    def render(self, context: Context, result: SDSkyCalResults) -> str:
+        """
+        Custom renderer for hsd_skycal()
+
+        This method sorts the QAScores and renders the weblog,
+
+        Args:
+            context: Pipeline context
+            result:  SDSkyCalResults object
+        Returns:
+            Rendered html document
+        """
+        # This method modifies the result object,
+        # but the changes do not propergate to the original result or context,
+        # since they are local in render() thanks to the mechanism of PL infrastructure.
+        # Therefore there is no need to bracket the aggregation process
+        # with stashing and recovering the original result.qa.pool here.
+
+        return super().render(context, result)
 
     def update_mako_context(self,
                             ctx: dict[str, Any],

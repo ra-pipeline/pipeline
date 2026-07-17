@@ -43,6 +43,8 @@ class TcleanResult(basetask.Results):
         self.datacolumn = datacolumn
         self.datatype = datatype
         self.datatype_info = datatype_info
+        # PIPE-3096: historically, the raw field name string (as passed to tclean's 'field' parameter,
+        # potentially including quotation marks) was assigned to this 'sourcename' attribute.
         self.sourcename = sourcename
         self.field_ids = field_ids
         self.intent = intent
@@ -134,7 +136,8 @@ class TcleanResult(basetask.Results):
 
         # Clean masks and thresholds for later stages
         if self.stokes == 'I' and (self.cleanmask not in (None, '')):
-            cleanTargetKey = CleanTargetInfo(datatype=self.datatype, field=self.sourcename, intent=self.intent, virtspw=self.spw, stokes=self.stokes, specmode=self.specmode)
+            cleanTargetKey = CleanTargetInfo(datatype=self.datatype, field=self.sourcename, intent=self.intent,
+                                             virtspw=self.spw, stokes=self.stokes, specmode=self.hm_specmode)
             context.clean_masks[cleanTargetKey] = self.cleanmask
             context.clean_thresholds[cleanTargetKey] = self.threshold
 
