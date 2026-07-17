@@ -659,12 +659,13 @@ def sep_angles_for_table(context, sepangles, sepplots):
             field2 = f'{intent2[2]} (#{intent2[1]})'
             if intent2[3] == 'deg':
                 sepvalue=round(intent2[4],2) # or 3 dp ?
-                if sepvalue > max_sep:
-                    max_sep = sepvalue
-                    maxfield = SepAng(msbasename, field1, intent1, field2, intent2[0], sepvalue, sepplots[keyu]['html'])
-                if sepvalue < min_sep:
-                    min_sep = sepvalue
-                    minfield = SepAng(msbasename, field1, intent1, field2, intent2[0], sepvalue, sepplots[keyu]['html'])
+                if intent1 == 'TARGET':
+                    if sepvalue > max_sep:
+                        max_sep = sepvalue
+                        maxfield = SepAng(msbasename, field1, intent1, field2, intent2[0], sepvalue, sepplots[keyu]['html'])
+                    if sepvalue < min_sep:
+                        min_sep = sepvalue
+                        minfield = SepAng(msbasename, field1, intent1, field2, intent2[0], sepvalue, sepplots[keyu]['html'])
                 rows_holder.append(SepAng(msbasename, field1, intent1, field2, intent2[0], sepvalue, sepplots[keyu]['html'])) # format as the input tuple
                 # Log output so all fields/intents are at least listed even if filterd below.
                 LOG.info('Separation Angle of Fields: '+field1+'('+intent1+') - '+field2+'('+intent2[0]+') is '+str(sepvalue)+' deg')
