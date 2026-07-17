@@ -117,11 +117,11 @@ def baseline_score(
             weblog_adress=""
         )
     except FailedAnalysisException:
+        import traceback
         for png_file in glob.glob(f"{plot_path}/*_BLine_QA.png"):
-            import traceback
-
             os.remove(png_file)
-            LOG.info(traceback.format_exc())
+
+        LOG.info(traceback.format_exc())
 
         return None
 

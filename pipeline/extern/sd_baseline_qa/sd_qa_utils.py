@@ -726,6 +726,9 @@ def sigma_segments(x, y, nmin = 30, pval = 0.05, sigmalimit = None, forceshape =
     y = z[~z.mask]
     x = x[~z.mask]
     #Obtain range of independent variable x
+    if len(x) == 0 or len(y) == 0:
+        return {'partitions': [], 'pcenter': [], 'sigmas': [0]}
+
     xmin = np.min(x)
     xmax = np.max(x)
     #Define initial partition as the whole range

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import collections
 import os
+import re
 from typing import TYPE_CHECKING
 
 import pipeline.infrastructure as infrastructure
@@ -25,30 +26,35 @@ if TYPE_CHECKING:
 LOG = infrastructure.logging.get_logger(__name__)
 
 
-def make_profile_heuristic_plots(results: SDBaselineResults):
+def make_profile_heuristic_plots(results: ResultsList, context: Context):
     profile_heuristic = []
     keys = set()
 
     for eb in results:
         for score_object in eb.outcome["profile_qa_score"].values():
             for score, plot_name in zip(score_object["score"], score_object["plot_names"]):
+                clean_key = re.sub(r'\s+', '_', conversion.set_to_data(score.applies_to.field))
+
+                vis = conversion.set_to_data(score.applies_to.vis)
+                ms = context.observing_run.get_ms(vis)
+
+                rspw = int(conversion.set_to_data(score.applies_to.spw))
+                vspw = context.observing_run.real2virtual_spw_id(rspw, ms)
+
                 _plot = Plot(
                     plot_name,
                     x_axis="freq",
                     y_axis="amp_diff",
-                    field=conversion.set_to_data(score.applies_to.field),
+                    field=clean_key,
                     parameters={
-                        "vis": conversion.set_to_data(score.applies_to.vis),
-                        "spw": conversion.set_to_data(score.applies_to.spw),
+                        "vis": vis,
+                        "spw": vspw,
                         "ant": conversion.set_to_data(score.applies_to.ant),
                     }
                 )
 
                 profile_heuristic.append(_plot)
 
-                # The key string comes with white space such as "S PAV". This eliminates the white space
-                # and is tab proof.
-                clean_key = re.sub(r'\s+', '_', conversion.set_to_data(score.applies_to.field))
                 keys.add(clean_key)
 
     profile_heuristic_subpages = dict.fromkeys(list(keys), "")
@@ -222,7 +228,7 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
             ctx.update({'sparsemap_subpage_{}_{}'.format(maptype.lower(), subtype.lower()): subpage,
                         'sparsemap_{}_{}'.format(maptype.lower(), subtype.lower()): summary})
 
-            profile_heuristic, profile_heuristic_subpages = make_profile_heuristic_plots(results)
+        profile_heuristic, profile_heuristic_subpages = make_profile_heuristic_plots(results=results, context=context)
 
         # If this analysis was not done, skip it
         if (len(profile_heuristic) > 0) and profile_heuristic_subpages:
@@ -240,16 +246,13 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
             with detail_renderer.get_file() as fileobj:
                 fileobj.write(detail_renderer.render())
 
-            for field_object in sorted_fields:
-                name = field_object.clean_name
+            for name in profile_heuristic_subpages.keys():
+                profile_heuristic_subpages[name] = os.path.basename(detail_renderer.path)
 
-                if name is not None:
-                    profile_heuristic_subpages[name] = os.path.basename(detail_renderer.path)
-
-            ctx.update({
-                "profile_heuristic": profile_heuristic,
-                "profile_heuristic_subpages": profile_heuristic_subpages
-            })
+        ctx.update({
+            "profile_heuristic": profile_heuristic,
+            "profile_heuristic_subpages": profile_heuristic_subpages
+        })
 
     @staticmethod
     def _group_by_axes(plots: list[list[Plot]]) -> dict:
