@@ -955,8 +955,8 @@ class SDChannelMapDisplay(SDImageDisplay):
 
         # Set data
         Map = np.zeros((self.NUM_CHANNELMAP,
-                       (self.y_max - self.y_min + 1),
-                       (self.x_max - self.x_min + 1)),
+                        (self.y_max - self.y_min + 1),
+                        (self.x_max - self.x_min + 1)),
                        dtype=np.float32)
 
         # Swap (x,y) to match the clustering result
