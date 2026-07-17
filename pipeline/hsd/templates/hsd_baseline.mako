@@ -288,7 +288,7 @@ for baseline subtraction.</p>
             </h3>
 
          % for plot in profile_heuristic:
-            % if os.path.exists(plot.thumbnail) and plot.parameters["ant"] == profile_heuristic[0].parameters["ant"] and plot.field == field:
+            % if os.path.exists(plot.thumbnail) and plot.parameters["ant"] == profile_heuristic[0].parameters["ant"] and plot.parameters["vis"] == profile_heuristic[0].parameters["vis"] and plot.field == field:
                 <div class="col-md-3">
                     <div class="thumbnail">
                         <a href="${os.path.relpath(plot.abspath, pcontext.report_dir)}"

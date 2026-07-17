@@ -243,7 +243,7 @@ class MSWrapperSD(object):
 
         # It seems that there are times when the scan list and the `scansforfield` don't line up.
         scanlist = set(scanlist).intersection(spw_setup['scantimes'])
-        scanlist = conversion.set_to_data(scanlist)
+        scanlist = conversion.set_to_data(scanlist, keep_list=True)
 
         for scan in scanlist:
             scantimesel[scan] = (tmdata >= spw_setup['scantimes'][scan][0]) & (tmdata < spw_setup['scantimes'][scan][1])
