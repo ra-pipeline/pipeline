@@ -343,7 +343,6 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                     id_int  = rep_spw_id
                     l_nchan = len(ms.get_spectral_window(rep_spw_id).channels)
                 else: #rep_spw id is None (not exist). Select first available SPW.
-                    # rep_spw = ms.get_spectral_windows()[0]
                     id_int  = ms.get_spectral_windows()[0].id #rep_spw.id
                     l_nchan = len(ms.get_spectral_windows()[0].channels)
                 
