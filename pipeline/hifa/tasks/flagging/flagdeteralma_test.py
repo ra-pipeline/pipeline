@@ -7,7 +7,7 @@ from pipeline.infrastructure.tablereader import MeasurementSetReader
 from pipeline.h.tasks.flagging import flagdeterbase
 from .flagdeteralma import (get_partialpol_spws, load_partialpols_alma, find_partialpol_flag_cmd_params,
                             make_partialpol_flag_cmd_params, convert_params_to_commands,
-                            SerialFlagDeterALMA)
+                            _run_custom_taql_query_flag_params, SerialFlagDeterALMA)
 
 
 # # Tests that depend on the pipeline-testdata repository
@@ -117,7 +117,6 @@ test_params_make_partialpol_flag_cmd_params = [
 
 @pytest.mark.parametrize("rows, num_chans, expected", test_params_make_partialpol_flag_cmd_params)
 def test_make_partialpol_flag_cmd_params_real_data(rows, num_chans, expected):
-    ms = MeasurementSetReader.get_measurement_set(MS_NAME)
     np.testing.assert_equal(make_partialpol_flag_cmd_params(rows, num_chans), expected)
 
 
@@ -166,6 +165,33 @@ def test_params_and_commands_for_real_data():
     assert len(OUTPUT_PARTIALPOL) == len(params)
     commands = convert_params_to_commands(None, params, ant_id_map=ant_id_map)
     assert commands == OUTPUT_PARTIALPOL
+
+
+@skip_if_no_data_repo
+@pytest.mark.parametrize("input_table, input_taql_query, expected_error",
+                         [(None,
+                           "irrelevant",
+                           pytest.raises(AttributeError, match="NoneType")),
+                          (MS_NAME,
+                           f"SELECT ANTENNA1, ANTENNA2, BOGUS_NONEXISTENT from {MS_NAME}",
+                           pytest.raises(RuntimeError, match="Error in TaQL command")),
+                          (MS_NAME,
+                           "SELECT ANTENNA1, ANTENNA2 from bogus_inexistent_foo.ms",
+                           pytest.raises(RuntimeError, match="Error in TaQL command")),
+                           ]
+)
+def test__run_custom_taql_query_flag_params(input_table, input_taql_query, expected_error):
+    """Very artificial test case to check the behavior of this query function in unexpectedly inconsistent or broken
+    scenarios"""
+
+    if not isinstance(input_table, str):
+        with expected_error:
+            _run_custom_taql_query_flag_params(input_table, input_taql_query)
+    else:
+        mst = MeasurementSetReader.get_measurement_set(input_table)
+        with casa_tools.TableReader(mst.name) as ms_table:
+            with expected_error:
+                _run_custom_taql_query_flag_params(ms_table, input_taql_query)
 
 
 test_params_convert_params_to_commands = [

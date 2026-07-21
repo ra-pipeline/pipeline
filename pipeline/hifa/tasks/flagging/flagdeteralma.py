@@ -658,7 +658,7 @@ def _make_taql_query_flags_partialpol(ms_path: str, ddid: int, scan_number: int,
     Returns:
         TaQL query as a string, ready to be use for example in table_tool.taql().
     """
-    taql_style_prefix = "USING STYLE PYTHON"   # To get timing info to stdout, prepent "TIME..."
+    taql_style_prefix = "USING STYLE PYTHON"   # To get timing info to stdout, prepend "TIME..."
 
     taql_where_ddi_scan = f"DATA_DESC_ID == {ddid} && SCAN_NUMBER == {scan_number}"
 
@@ -685,9 +685,9 @@ def _run_custom_taql_query_flag_params(tbt: casa_tools.TableReader, taql_query_f
         List of dicts where every dict has the entries for the ANTENNA1, ANTENNA2, TIME, INTERVAL values for every MS
         row where the condition(s) defined in the query hold.
     """
+    flag_params = []
+    query_result = tbt.taql(taql_query_flag_params)
     try:
-        query_result = tbt.taql(taql_query_flag_params)
-
         # Note: in this type of TaQL queries, ANTENNA1 will get type 'int64', which makes the CASA table tool choke in calls
         # like getcol ("Unknown CASA type")
         # The tablerow approach is more convenient for this case (produces a list ready for the next steps) and avoids
