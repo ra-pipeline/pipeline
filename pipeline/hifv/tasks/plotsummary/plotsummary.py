@@ -11,7 +11,7 @@ LOG = infrastructure.get_logger(__name__)
 
 class PlotSummaryInputs(vdp.StandardInputs):
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     # docstring and type hints: supplements hifv_plotsummary
     def __init__(self, context, vis=None):

@@ -521,6 +521,9 @@ class WvrgcalflagData(basetask.StandardTaskTemplate):
         self.bandpass_result = None
         self.nowvr_result = None
         self.qa_spw = ''
+        # PIPE-3006 updated
+        self.qa_combine = ''
+        self.qa_solint = 'int'
 
     def prepare(self):
         inputs = self.inputs
@@ -535,6 +538,8 @@ class WvrgcalflagData(basetask.StandardTaskTemplate):
         #    avoid running an exact repeat of the same task
         #  * pass along locally cached value for "qa_spw" to ensure that
         #    Wvrgcal will use the same spw list on subsequent iterations.
+        #  * PIPE-3006 pass locally caches value for "qa_combine" and
+        #    "qa_solint" to ensure Wvrgcal will use same values in repated iterations.
         wvrgcalinputs = wvrgcal.Wvrgcal.Inputs(
             context=inputs.context, output_dir=inputs.output_dir,
             vis=inputs.vis, offsetstable=inputs.offsetstable,
@@ -548,7 +553,8 @@ class WvrgcalflagData(basetask.StandardTaskTemplate):
             refant=inputs.refant, qa_intent=inputs.qa_intent,
             qa_bandpass_intent=inputs.qa_bandpass_intent,
             accept_threshold=0.0, bandpass_result=self.bandpass_result,
-            nowvr_result=self.nowvr_result, qa_spw=self.qa_spw)
+            nowvr_result=self.nowvr_result, qa_spw=self.qa_spw,
+            qa_combine=self.qa_combine, qa_solint=self.qa_solint)
         wvrgcaltask = wvrgcal.Wvrgcal(wvrgcalinputs)
         result = self._executor.execute(wvrgcaltask, merge=True)
 
@@ -557,6 +563,8 @@ class WvrgcalflagData(basetask.StandardTaskTemplate):
         self.bandpass_result = result.qa_wvr.bandpass_result
         self.nowvr_result = result.qa_wvr.nowvr_result
         self.qa_spw = result.qa_wvr.qa_spw
+        self.qa_combine = result.qa_wvr.qa_combine
+        self.qa_solint = result.qa_wvr.qa_solint
 
         # Add a top-level reference to the "No WVR" result, expected by WVR
         # renderer.

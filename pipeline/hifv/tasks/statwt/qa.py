@@ -112,6 +112,10 @@ class StatwtQAHandler(pqa.QAPlugin):
             longmsg = "Flagging increase is within normal range."
             result.qa.pool.append(pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=vis, origin=flagging_origin))
 
+        # PIPE-3046: checking if cont.dat was used and if so, adding a score for that.
+        if result.use_contdat:
+            result.qa.pool.append(qacalc.score_contdat_applied(result.inputs['vis']))
+
 
 class StatwtListQAHandler(pqa.QAPlugin):
     """

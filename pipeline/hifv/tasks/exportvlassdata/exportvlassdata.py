@@ -61,7 +61,7 @@ class ExportvlassdataResults(basetask.Results):
 
 class ExportvlassdataInputs(exportdata.ExportDataInputs):
     gainmap = vdp.VisDependentProperty(default=False)
-    processing_data_type = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     # docstring and type hints: supplements hifv_exportvlassdata
     def __init__(self, context, output_dir=None, session=None, vis=None, exportmses=None, pprfile=None, calintents=None,
@@ -427,7 +427,17 @@ class Exportvlassdata(basetask.StandardTaskTemplate):
         Check if the given vis contains any imaging data.
         """
 
-        imaging_datatypes = [DataType.SELFCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_SCIENCE, DataType.SELFCAL_LINE_SCIENCE, DataType.REGCAL_LINE_SCIENCE]
+        imaging_datatypes = [
+            DataType.IM_LINE_SCIENCE,
+            DataType.IM_CONT_SCIENCE,
+            DataType.IM_CONTLINE_SCIENCE,
+            DataType.SELFCAL_LINE_SCIENCE,
+            DataType.SELFCAL_CONT_SCIENCE,
+            DataType.SELFCAL_CONTLINE_SCIENCE,
+            DataType.REGCAL_LINE_SCIENCE,
+            DataType.REGCAL_CONT_SCIENCE,
+            DataType.REGCAL_CONTLINE_SCIENCE
+            ]
         ms_object = context.observing_run.get_ms(name=vis)
         return any(ms_object.get_data_column(datatype) for datatype in imaging_datatypes)
 

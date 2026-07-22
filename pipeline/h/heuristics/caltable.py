@@ -161,6 +161,11 @@ class GainCurvestable(CaltableNamer):
         return filenamer.GainCurvesCalibrationTable()
 
 
+class GainCurveEfficienciesCaltable(CaltableNamer):
+    def get_namer(self):
+        return filenamer.GainCurveEfficienciesCalibrationTable()
+
+
 class OpCaltable(CaltableNamer):
     def get_namer(self):
         return filenamer.OpCalibrationTable()

@@ -32,7 +32,7 @@ class SelfcalResults(basetask.Results):
 
 class SelfcalInputs(vdp.StandardInputs):
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     refantignore = vdp.VisDependentProperty(default='')
     combine = vdp.VisDependentProperty(default='spw,field')

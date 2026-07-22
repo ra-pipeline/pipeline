@@ -24,6 +24,9 @@ class T2_4MDetailsfinalcalsRenderer(baseRenderer.calsRenderer):
 
     def get_display_context(self, context, results):
         ctx = super().get_display_context(context, results)
+        # Add use_flux_cal from task inputs to template context
+        if hasattr(results, 'inputs') and 'use_flux_cal' in results.inputs:
+            ctx['use_flux_cal'] = results.inputs['use_flux_cal']
         return ctx
 
 

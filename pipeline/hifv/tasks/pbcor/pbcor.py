@@ -21,7 +21,7 @@ class PbcorResults(basetask.Results):
 
 class PbcorInputs(vdp.StandardInputs):
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     # docstring and type hints: supplements hifv_pbcor
     def __init__(self, context, vis=None):

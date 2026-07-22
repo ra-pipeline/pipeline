@@ -354,11 +354,11 @@ except:
                 %endif
 
 
-                %if image_info[k].pbcor is not None:
+                %if image_info[k].non_pbcor_minmax is not None:
                 <tr>
                     <th>flatnoise image max / min</th>
                     %for k in range(j, min(j+4, field_block_indices[i+1])):
-                    <td>${image_info[k].pbcor}</td>
+                    <td>${image_info[k].non_pbcor_minmax}</td>
                     %endfor
                 </tr>
                 %endif  

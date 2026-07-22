@@ -28,6 +28,7 @@ class HanningInputs(vdp.StandardInputs):
     """
     maser_detection = vdp.VisDependentProperty(default=True)
     spws_to_smooth = vdp.VisDependentProperty(default=None)
+    keep_original = vdp.VisDependentProperty(default=False)
 
     # docstring and type hints: supplements hifv_hanning
     def __init__(
@@ -36,6 +37,7 @@ class HanningInputs(vdp.StandardInputs):
             vis: str | None = None,
             maser_detection: bool | None = None,
             spws_to_smooth: str | None = None,
+            keep_original: bool | None = None,
             ):
         """
         Args:
@@ -49,12 +51,17 @@ class HanningInputs(vdp.StandardInputs):
 
                 Example: '1,2~4,7' indicates spws 1, 2, 3, 4, and 7 should be smoothed.
 
+            keep_original: If True, rename the original MS to ``<vis>.original`` instead
+                of deleting it after Hanning smoothing.  Not exposed to the CLI.
+                Defaults to False.
+
         """
         super().__init__()
         self.context = context
         self.vis = vis
         self.maser_detection = maser_detection
         self.spws_to_smooth = spws_to_smooth
+        self.keep_original = keep_original
 
         if self.spws_to_smooth is not None:
             self.spws_to_smooth = conversion.range_to_list(self.spws_to_smooth)
@@ -202,8 +209,13 @@ class Hanning(basetask.StandardTaskTemplate):
             if not os.path.exists(temp_ms):
                 raise RuntimeError(f'Expected output {temp_ms} was not created')
 
-            LOG.info("Removing original VIS %s", self.inputs.vis)
-            shutil.rmtree(self.inputs.vis)
+            if self.inputs.keep_original:
+                original_backup = f'{self.inputs.vis}.original'
+                LOG.info("Preserving original MS as %s", original_backup)
+                os.rename(self.inputs.vis, original_backup)
+            else:
+                LOG.info("Removing original MS %s", self.inputs.vis)
+                shutil.rmtree(self.inputs.vis)
 
             LOG.info("Renaming %s to %s", temp_ms, self.inputs.vis)
             os.rename(temp_ms, self.inputs.vis)

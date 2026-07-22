@@ -33,7 +33,7 @@ class ValidateLineInputs(vdp.StandardInputs):
     """Inputs class for line validation tasks."""
 
     # Search order of input vis
-    processing_data_type = [DataType.ATMCORR, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.ATMCORR, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     edge = vdp.VisDependentProperty(default=(0, 0))
     nsigma = vdp.VisDependentProperty(default=3.0)

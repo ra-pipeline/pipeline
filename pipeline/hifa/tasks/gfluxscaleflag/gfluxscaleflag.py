@@ -123,13 +123,16 @@ class GfluxscaleflagInputs(vdp.StandardInputs):
     # tooManyIntegrationsFraction
     tmint = vdp.VisDependentProperty(default=0.085)
 
+    # Whether to examine the XY+YX sum for multi-scan full-polarization data.
+    examineCrossPolSum = vdp.VisDependentProperty(default=False)
+
     parallel = sessionutils.parallel_inputs_impl(default=False)
 
     # docstring and type hints: supplements hifa_gfluxscaleflag
     def __init__(self, context, output_dir=None, vis=None, intent=None, field=None, spw=None, solint=None,
                  phaseupsolint=None, minsnr=None, refant=None, antnegsig=None, antpossig=None, tmantint=None,
                  tmint=None, tmbl=None, antblnegsig=None, antblpossig=None, relaxed_factor=None, niter=None,
-                 parallel=None):
+                 parallel=None, examineCrossPolSum=None):
         """Initialize Inputs.
 
         Args:
@@ -226,6 +229,9 @@ class GfluxscaleflagInputs(vdp.StandardInputs):
 
                 Default: ``None`` (equivalent to ``False``)
 
+            examineCrossPolSum: Whether to examine the XY+YX sum for multi-scan full-polarization data. Defaults to
+                False, so only XX+YY is evaluated because the cross-pol sum can be non-flat when Stokes I is stable.
+
         """
         super().__init__()
 
@@ -256,6 +262,7 @@ class GfluxscaleflagInputs(vdp.StandardInputs):
         self.antblpossig = antblpossig
         self.relaxed_factor = relaxed_factor
         self.niter = niter
+        self.examineCrossPolSum = examineCrossPolSum
         self.parallel = parallel
 
 
@@ -318,7 +325,8 @@ class SerialGfluxscaleflag(basetask.StandardTaskTemplate):
                 antnegsig=inputs.antnegsig, antpossig=inputs.antpossig,
                 tmantint=inputs.tmantint, tmint=inputs.tmint, tmbl=inputs.tmbl,
                 antblnegsig=inputs.antblnegsig, antblpossig=inputs.antblpossig,
-                relaxed_factor=inputs.relaxed_factor, niter=inputs.niter)
+                relaxed_factor=inputs.relaxed_factor, niter=inputs.niter,
+                examineCrossPolSum=inputs.examineCrossPolSum)
             caftask = correctedampflag.Correctedampflag(cafinputs)
             cafresult = self._executor.execute(caftask)
 

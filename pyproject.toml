@@ -163,6 +163,7 @@ addopts = [
     "-v",  # verbose output
 ]
 junit_family = "legacy"
+tmp_path_retention_policy = "none"
 
 # Pixi Configuration
 

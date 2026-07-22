@@ -1,27 +1,28 @@
+"""VLA-specific AQUA XML report generation for the pipeline."""
+# ruff: noqa: D017
+
 import datetime
-import numpy
 import operator
 import os
 import xml.etree.ElementTree as ElementTree
 from xml.etree.ElementTree import ParseError
 
-import pipeline.domain.measures as measures
-import pipeline.infrastructure.logging as logging
-import pipeline.infrastructure.launcher as launcher
+import numpy
 
+import pipeline.domain.measures as measures
 import pipeline.h.tasks.exportdata.aqua as aqua
+import pipeline.infrastructure.launcher as launcher
+import pipeline.infrastructure.logging as logging
 from pipeline import environment
-from pipeline.h.tasks.exportdata.aqua import UNDEFINED, export_to_disk
 from pipeline.h.tasks.common import flagging_renderer_utils as flagutils
+from pipeline.h.tasks.exportdata.aqua import UNDEFINED, export_to_disk
 from pipeline.infrastructure import utils
 
 LOG = logging.get_logger(__name__)
 
 
 def aqua_report_from_file(context_file, aqua_file):
-    """
-    Create AQUA report from a context file on disk.
-    """
+    """Create AQUA report from a context file on disk."""
     # Restore context from file
     LOG.info('Opening context file: {!s}'.format(context_file))
     context = launcher.Pipeline(context=context_file).context
@@ -31,9 +32,9 @@ def aqua_report_from_file(context_file, aqua_file):
 
 
 def aqua_test_report_from_local_file(context_file, aqua_file):
-    """
-    Test AQUA report generation.
-    The pipeline context file and web log directory must be in the same local directry
+    """Test AQUA report generation.
+
+    The pipeline context file and web log directory must be in the same local directory.
     """
     LOG.info('Opening context file: {!s} for test'.format(context_file))
     context = launcher.Pipeline(context=context_file, path_overrides={'name': os.path.splitext(context_file)[0],
@@ -43,9 +44,7 @@ def aqua_test_report_from_local_file(context_file, aqua_file):
 
 
 def aqua_report_from_context(context, aqua_file):
-    """
-    Create AQUA report from a context object.
-    """
+    """Create AQUA report from a context object."""
     LOG.info('Recipe name: %s' % 'Unknown')
     LOG.info('    Number of stages: %d' % context.task_counter)
 
@@ -58,17 +57,13 @@ def aqua_report_from_context(context, aqua_file):
 
 
 class VLAAquaXmlGenerator(aqua.AquaXmlGenerator):
-    """
-    Class for creating the AQUA pipeline report
-    """
+    """Class for creating the AQUA pipeline report."""
 
-    def __init__(self):
+    def __init__(self):  # noqa: D107
         super().__init__()
 
     def get_report_xml(self, context):
-        """
-        generate XML report
-        """
+        """Generate XML report."""
         report = super().get_report_xml(context)
         report.append(self.get_processing_environment())
         report.append(self.get_calibrators(context))
@@ -80,9 +75,7 @@ class VLAAquaXmlGenerator(aqua.AquaXmlGenerator):
         return report
 
     def get_processing_environment(self):
-        """
-        return XML for processing environment
-        """
+        """Return XML for processing environment."""
         root = ElementTree.Element('ProcessingEnvironment')
         nodes = environment.cluster_details()
         nx = ElementTree.Element("ExecutionMode")
@@ -111,9 +104,7 @@ class VLAAquaXmlGenerator(aqua.AquaXmlGenerator):
         return root
 
     def get_calibrators(self, context):
-        """
-        return XML for calibrators
-        """
+        """Return XML for calibrators."""
         mslist = context.observing_run.get_measurement_sets()
         root = ElementTree.Element("Calibrators")
 
@@ -142,9 +133,7 @@ class VLAAquaXmlGenerator(aqua.AquaXmlGenerator):
         return root
 
     def get_source_intents(self, ms, source):
-        """
-        return XML for source intents
-        """
+        """Return XML for source intents."""
         source_intents = None
         for s in ms.sources:
             if s.name == source:
@@ -153,9 +142,7 @@ class VLAAquaXmlGenerator(aqua.AquaXmlGenerator):
         return source_intents
 
     def get_science_spws(self, context):
-        """
-        return XML for science SPWs
-        """
+        """Return XML for science SPWs."""
         mslist = context.observing_run.get_measurement_sets()
         root = ElementTree.Element("ScienceSPWs")
         for ms in mslist:
@@ -179,9 +166,7 @@ class VLAAquaXmlGenerator(aqua.AquaXmlGenerator):
         return root
 
     def get_scans(self, context):
-        """
-        return XML for scan information
-        """
+        """Return XML for scan information."""
         mslist = context.observing_run.get_measurement_sets()
         root = ElementTree.Element("Scans")
         for ms in mslist:
@@ -199,9 +184,7 @@ class VLAAquaXmlGenerator(aqua.AquaXmlGenerator):
         return root
 
     def get_observation_summary(self, context):
-        """
-        return XML for observation summary
-        """
+        """Return XML for observation summary."""
         mslist = context.observing_run.get_measurement_sets()
         root = ElementTree.Element("ObservationSummary")
 
@@ -285,9 +268,7 @@ class VLAAquaXmlGenerator(aqua.AquaXmlGenerator):
         return root
 
     def get_flagged_fraction(self, context):
-        """
-        return flagged fraction
-        """
+        """Return flagged fraction."""
         flagdata_results = []
         output_dict = {}
 
@@ -318,10 +299,7 @@ class VLAAquaXmlGenerator(aqua.AquaXmlGenerator):
         return output_dict
 
     def get_stwt_flagged_fraction(self, context):
-        """
-            return flagged fraction in hifv_statwt task
-        """
-
+        """Return flagged fraction in hifv_statwt task."""
         output_dict = {}
         statwt_results = []
         for result in context.results:
@@ -337,6 +315,7 @@ class VLAAquaXmlGenerator(aqua.AquaXmlGenerator):
         return output_dict
 
     def get_project_structure(self, context):
+        """Return project structure XML extended with VLA OUS entity IDs."""
         # get base XML from base class
         root = super().get_project_structure(context)
 
@@ -345,9 +324,16 @@ class VLAAquaXmlGenerator(aqua.AquaXmlGenerator):
         ElementTree.SubElement(root, 'OusPartId').text = context.project_structure.ous_part_id
         ElementTree.SubElement(root, 'OusStatusEntityId').text = context.project_structure.ousstatus_entity_id
 
+        # add execution block IDs as comma-separated list
+        execblock_ids = context.observing_run.execblock_ids
+        execblock_ids = ', '.join(execblock_ids) if execblock_ids else UNDEFINED
+
+        ElementTree.SubElement(root, 'ExecBlockId').text = execblock_ids
+
         return root
 
     def get_calibration_topic(self, context, topic_results):
+        """Return calibration topic XML extended with VLA flux measurements."""
         # get base XML from base class
         xml_root = super().get_calibration_topic(context, topic_results)
 
@@ -360,6 +346,7 @@ class VLAAquaXmlGenerator(aqua.AquaXmlGenerator):
         return xml_root
 
     def get_dataset_topic(self, context, topic_results):
+        """Return dataset topic XML extended with VLA flux measurements from importdata."""
         # get base XML from base class
         xml_root = super().get_dataset_topic(context, topic_results)
 
@@ -379,9 +366,7 @@ class VLAAquaXmlGenerator(aqua.AquaXmlGenerator):
         return xml_root
 
     def get_sensitivity(self, context):
-        """
-            return xml for image sensitivity
-        """
+        """Return xml for image sensitivity."""
         root = ElementTree.Element("Imaging")
 
         for result in context.results:
@@ -412,6 +397,8 @@ class VLAAquaXmlGenerator(aqua.AquaXmlGenerator):
                     ("effective_bw", nx),
                     ("pbcor_image_min", nx),
                     ("pbcor_image_max", nx),
+                    ("nonpbcor_image_min", nx),
+                    ("nonpbcor_image_max", nx),
                     ("theoretical_sensitivity", nx if index < len(topic.results) else None),
                 ]
                 for tag, nx in nested_tags:
@@ -458,9 +445,7 @@ class VLAAquaXmlGenerator(aqua.AquaXmlGenerator):
         return root
 
     def get_checkproductsize(self, context):
-        """
-            return xml for data volume
-        """
+        """Return xml for data volume."""
         root = ElementTree.Element("DataVolume")
         nx = ElementTree.Element("ProductsDirectory", Units="MB")
         size_products_dir = utils.get_directory_size(context.products_dir)
@@ -493,8 +478,7 @@ class VLAAquaXmlGenerator(aqua.AquaXmlGenerator):
         return root
 
     def get_imaging_topic(self, context, topic_results):
-        """
-        Get the XML for the imaging topic.
+        """Get the XML for the imaging topic.
 
         :param context: pipeline context
         :param topic_results: list of Results for this topic
@@ -513,8 +497,7 @@ class VLAAquaXmlGenerator(aqua.AquaXmlGenerator):
 
 
 def flux_xml_for_stages(context, results, accessor_dict):
-    """
-    Get the XML for flux measurements contained in a list of results.
+    """Get the XML for flux measurements contained in a list of results.
 
     This function is a higher-order function; it expects to be given a dict
     of accessor functions, which it uses to access the flux measurements and
@@ -549,8 +532,7 @@ def flux_xml_for_stages(context, results, accessor_dict):
 
 
 def xml_for_flux_stage(context, stage_results, origin, accessor, score_accessor):
-    """
-    Get the XML for all flux measurements contained in a ResultsList.
+    """Get the XML for all flux measurements contained in a ResultsList.
 
     :param context: pipeline context
     :param stage_results: ResultList containing flux results to summarise
@@ -573,8 +555,7 @@ def xml_for_flux_stage(context, stage_results, origin, accessor, score_accessor)
 
 
 def xml_for_extracted_flux_measurements(all_measurements, ms):
-    """
-    Get the XML for a set of flux measurements extracted from a Result.
+    """Get the XML for a set of flux measurements extracted from a Result.
 
     :param all_measurements: flux measurements dict.
     :param ms: measurement set
@@ -601,7 +582,7 @@ def xml_for_extracted_flux_measurements(all_measurements, ms):
                     flux = getattr(measurement, stokes)
                     flux_jy = flux.to_units(measures.FluxDensityUnits.JANSKY)
                     flux_jy = '{:.3f}'.format(flux_jy)
-                except:
+                except Exception:
                     continue
 
                 try:
@@ -611,7 +592,7 @@ def xml_for_extracted_flux_measurements(all_measurements, ms):
                         unc_jy = '{:.6f}'.format(unc_jy)
                     else:
                         unc_jy = ''
-                except:
+                except Exception:
                     unc_jy = ''
 
                 xml = ElementTree.Element('FluxMeasurement',
@@ -628,11 +609,11 @@ def xml_for_extracted_flux_measurements(all_measurements, ms):
 
 
 def _hifa_preimagecheck_sensitivity_exporter(stage_results):
-    # XML exporter expects this function to return a list of dictionaries
-    l = []
+    """Return a list of dictionaries for XML exporter."""
+    _l = []
     for result in stage_results:
-        l.extend(result.sensitivities_for_aqua)
-    return l
+        _l.extend(result.sensitivities_for_aqua)
+    return _l
 
 
 aqua.TASK_NAME_TO_SENSITIVITY_EXPORTER['hifa_imageprecheck'] = _hifa_preimagecheck_sensitivity_exporter

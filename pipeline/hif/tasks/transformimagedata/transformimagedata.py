@@ -68,7 +68,7 @@ class TransformimagedataResults(basetask.Results):
 
 class TransformimagedataInputs(mssplit.MsSplitInputs):
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     clear_pointing = vdp.VisDependentProperty(default=True)
     modify_weights = vdp.VisDependentProperty(default=False)

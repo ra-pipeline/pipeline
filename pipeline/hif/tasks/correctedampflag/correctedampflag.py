@@ -417,7 +417,7 @@ class CorrectedampflagInputs(vdp.StandardInputs):
     CorrectedampflagInputs defines the inputs for the Correctedampflag pipeline task.
     """
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
     # Lower sigma threshold for identifying outliers as a result of "bad
     # baselines" and/or "bad antennas" within baselines (across all
     # timestamps); equivalent to:
@@ -478,10 +478,13 @@ class CorrectedampflagInputs(vdp.StandardInputs):
     # tooManyIntegrationsFraction
     tmint = vdp.VisDependentProperty(default=0.085)
 
+    # Whether to examine the XY+YX sum for multi-scan full-polarization data.
+    examineCrossPolSum = vdp.VisDependentProperty(default=False)
+
     # docstring and type hints: supplements hif_correctedampflag
     def __init__(self, context, output_dir=None, vis=None, intent=None, field=None, spw=None, antnegsig=None,
                  antpossig=None, tmantint=None, tmint=None, tmbl=None, antblnegsig=None, antblpossig=None,
-                 relaxed_factor=None, niter=None):
+                 relaxed_factor=None, niter=None, examineCrossPolSum=None):
         """Initialize Inputs.
 
         Args:
@@ -527,6 +530,9 @@ class CorrectedampflagInputs(vdp.StandardInputs):
             niter: Maximum number of times to iterate on evaluation of flagging heuristics. If an iteration results in no new flags, then
                 subsequent iterations are skipped.
 
+            examineCrossPolSum: Whether to examine the XY+YX sum for multi-scan full-polarization data. Defaults to
+                False, so only XX+YY is evaluated because the cross-pol sum can be non-flat when Stokes I is stable.
+
         """
         super().__init__()
 
@@ -551,6 +557,7 @@ class CorrectedampflagInputs(vdp.StandardInputs):
         self.antblpossig = antblpossig
         self.relaxed_factor = relaxed_factor
         self.niter = niter
+        self.examineCrossPolSum = examineCrossPolSum
 
 
 @task_registry.set_equivalent_casa_task('hif_correctedampflag')
@@ -946,9 +953,9 @@ class Correctedampflag(basetask.StandardTaskTemplate):
         ncorrs = len(corr_type)
 
         # CAS-12011: For multi-scan observations, analyze the mean of the
-        # metric for XX and YY, and for XY and YX (if ncorrs = 4). Combine the
-        # flagging state of the individual correlations by only marking the
-        # mean metric as flagged where both individual contributing
+        # metric for XX and YY. Optionally analyze XY and YX (if ncorrs = 4).
+        # Combine the flagging state of the individual correlations by only
+        # marking the mean metric as flagged where both individual contributing
         # correlations are marked as flagged (by floor-dividing by 2).
         if nscans > 1:
             cmetric_mask = np.ma.array(cmetric_all, mask=flag_all)
@@ -961,15 +968,22 @@ class Correctedampflag(basetask.StandardTaskTemplate):
                 col_sel = [corr_type.index('XX'), corr_type.index('YY')]
                 cmetric_copol = np.ma.mean(cmetric_mask[col_sel, :], axis=0, keepdims=True)
                 flag_copol = np.sum(flag_all[col_sel, :], axis=0, keepdims=True) // 2
-                # Create mean of XY and YX polarization, and combine flags.
-                col_sel = [corr_type.index('XY'), corr_type.index('YX')]
-                cmetric_crosspol = np.ma.mean(cmetric_mask[col_sel, :], axis=0, keepdims=True)
-                flag_crosspol = np.sum(flag_all[col_sel, :], axis=0, keepdims=True) // 2
-                # Create new scalar difference array with the mean data, and
-                # corresponding flagging array.
-                cmetric_all = np.concatenate((cmetric_copol, cmetric_crosspol), axis=0)
-                flag_all = np.concatenate((flag_copol, flag_crosspol), axis=0)
-                ncorrs = 2
+                if inputs.examineCrossPolSum:
+                    # Create mean of XY and YX polarization, and combine flags.
+                    col_sel = [corr_type.index('XY'), corr_type.index('YX')]
+                    cmetric_crosspol = np.ma.mean(cmetric_mask[col_sel, :], axis=0, keepdims=True)
+                    flag_crosspol = np.sum(flag_all[col_sel, :], axis=0, keepdims=True) // 2
+                    # Create new scalar difference array with the mean data,
+                    # and corresponding flagging array.
+                    cmetric_all = np.concatenate((cmetric_copol, cmetric_crosspol), axis=0)
+                    flag_all = np.concatenate((flag_copol, flag_crosspol), axis=0)
+                    ncorrs = 2
+                else:
+                    # PIPE-2956: by default, avoid the multi-scan cross-pol
+                    # sum because it can be non-flat when Stokes I is stable.
+                    cmetric_all = cmetric_copol
+                    flag_all = flag_copol
+                    ncorrs = 1
             # PIPE-2631: cast from MaskedArray back to regular Numpy array to
             # avoid Numpy warnings in heuristics below (that use regular Numpy
             # functions that ignore mask); heuristics below already select for

@@ -469,13 +469,11 @@ class SerialFlagDeterALMASingleDish(flagdeterbase.FlagDeterBase):
 
         heuristic = PointingOutlierHeuristics()
 
-        for field, antenna in itertools.product(target_fields, antennas):
+        for field in target_fields:
             # data selection
-            field_antenna_flag = np.logical_and(
-                field_id_all == field.id,
-                antenna_id_all == antenna.id
+            selection = np.logical_and(
+                valid_on_source, field_id_all == field.id
             )
-            selection = np.logical_and(valid_on_source, field_antenna_flag)
             rows = np.where(selection)[0]
             ra = ra_all[selection]
             dec = dec_all[selection]
@@ -485,27 +483,39 @@ class SerialFlagDeterALMASingleDish(flagdeterbase.FlagDeterBase):
 
             outlier_mask = np.where(np.logical_not(heuristic_result.mask))[0]
             if len(outlier_mask) > 0:
-                outliers = rows[outlier_mask]
-                LOG.info(
-                    'MS "%s" field "%s" antenna "%s": %d pointing outliers detected',
-                    msname, field.name, antenna.name, len(outliers)
-                )
-                LOG.debug("Outliers: %s", outliers)
-                separations = heuristic_result.dist[outlier_mask]
-                timerange_list = datatable_rowid_to_timerange(
-                    datatable, rows[outlier_mask]
-                )
-                outliers_for_field = PointingOutlierStats(
-                        heuristic_result.cx, heuristic_result.cy,
-                        heuristic_result.med_dist, heuristic_result.factor,
-                        outliers, timerange_list, separations
+                outliers_all = rows[outlier_mask]
+                for antenna in antennas:
+                    antenna_mask = antenna_id_all[outliers_all] == antenna.id
+
+                    if np.all(np.logical_not(antenna_mask)):
+                        LOG.debug(
+                            'MS "%s" field "%s" antenna "%s": no pointing outliers detected',
+                            msname, field.name, antenna.name
+                        )
+                        continue
+
+                    outliers = outliers_all[antenna_mask]
+                    LOG.info(
+                        'MS "%s" field "%s" antenna "%s": %d pointing outliers detected',
+                        msname, field.name, antenna.name, len(outliers)
                     )
-                outlier_stats[(field.id, antenna.id)] = outliers_for_field
+                    LOG.debug("Outliers: %s", outliers)
+                    separations = heuristic_result.dist[outlier_mask]
+                    timerange_list = datatable_rowid_to_timerange(
+                        datatable, rows[outlier_mask]
+                    )
+                    outliers_for_field = PointingOutlierStats(
+                            heuristic_result.cx, heuristic_result.cy,
+                            heuristic_result.med_dist, heuristic_result.factor,
+                            outliers, timerange_list, separations
+                        )
+                    outlier_stats[(field.id, antenna.id)] = outliers_for_field
             else:
-                LOG.debug(
-                    'MS "%s" field "%s" antenna "%s": no outliers detected',
-                    msname, field.name, antenna.name
-                )
+                for antenna in antennas:
+                    LOG.debug(
+                        'MS "%s" field "%s" antenna "%s": no pointing outliers detected',
+                        msname, field.name, antenna.name
+                    )
 
         return outlier_stats
 

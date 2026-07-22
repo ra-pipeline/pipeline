@@ -1,8 +1,7 @@
-class Sensitivity(dict):
+class Sensitivity(dict):  # noqa: D100
+    """Sensitivity template definition."""
 
-    '''Sensitivity template definition.'''
-
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs):  # noqa: D107
         self['array'] = None                   # string
         self['intent'] = None                  # string
         self['field'] = None                   # string
@@ -19,6 +18,8 @@ class Sensitivity(dict):
         self['effective_bw'] = None            # quanta
         self['pbcor_image_min'] = None         # quanta
         self['pbcor_image_max'] = None         # quanta
+        self['nonpbcor_image_min'] = None      # quanta
+        self['nonpbcor_image_max'] = None      # quanta
         self['imagename'] = None               # string
         self['datatype'] = None                # string
 

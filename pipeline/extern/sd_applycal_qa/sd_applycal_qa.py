@@ -1,14 +1,13 @@
-import os, sys
-from typing import List, Tuple, Union
+import os
+from typing import List, Tuple
 import numpy as np
 import copy
 import pickle
 from itertools import product
-import matplotlib.dates as mdates
-import casatools
 from scipy.stats import mstats
 
 import pipeline.infrastructure.pipelineqa as pqa
+from pipeline.infrastructure.renderer import rendererutils
 from . import mswrapper_sd
 from . import sd_qa_utils
 from . import sd_qa_reports
@@ -243,6 +242,20 @@ def qascorefunc(nsigma: float, score_top: float = 0.67, score_bottom: float = 0.
 
     return max(score_top - (score_top - score_bottom)*(nsigma - nsigma_threshold)/(nsigma_bottom - nsigma_threshold), score_bottom)
 
+def sanitize_attributes(s: pqa.TargetDataSelection) -> pqa.TargetDataSelection:
+    """
+    Convert NumPy objects in the attributes to native Python objects
+
+    Args:
+        s: TargetDataSelection object
+    Returns:
+        sanitized TargetDataSelection
+    """
+    d = copy.deepcopy(s)
+    for k in vars(s):
+        setattr(d, k, {x.item() if isinstance(x, np.generic) else x for x in getattr(s, k)})
+    return d
+
 def outlier_detection(msw: mswrapper_sd.MSWrapperSD, thresholds: dict = default_thresholds, plot_output_path: str = '.',
                     plot_sciline: str = 'on-detection', weblog_output_path: str = '.') -> Tuple[mswrapper_sd.MSWrapperSD, pqa.QAScore, list, list]:
     '''Function that calculates the applycal QA score for a given dataset msw.
@@ -289,17 +302,39 @@ def outlier_detection(msw: mswrapper_sd.MSWrapperSD, thresholds: dict = default_
     if nrows == 0:
         #Create objects to create QAscore
         reason = 'XX-YY.deviation'
-        applies_to = pqa.TargetDataSelection(vis={msname}, field={fieldname}, scan={'all'}, intent={'*OBSERVE_TARGET#ON_SOURCE*'}, spw={msw.spw}, ant={msw.antenna}, pol={'N/A'})
+        applies_to = sanitize_attributes(
+            pqa.TargetDataSelection(vis={msname},
+                                    field={fieldname},
+                                    intent={'TARGET'},
+                                    spw={msw.spw},
+                                    ant={msw.antenna})
+            )
         comes_from = pqa.QAOrigin(metric_name=reason, metric_score=0.0, metric_units='n-sigma deviation')
-        qascore = pqa.QAScore(1.0, longmsg=f'{msname}: All data flagged for spw {msw.spw}, antenna {msw.antenna} in scan all (field {fieldname}).', shortmsg='XX-YY v/s Frequency deviation', origin=comes_from, applies_to=applies_to, hierarchy=reason)
+        # (tentative)  shortmsg change for this QAScore should be reflected to sd_qa_reports.py
+        qascore = pqa.QAScore(1.0,
+                              longmsg=f'{msname}: All data flagged for spw {msw.spw}, antenna {msw.antenna} in scan all (field {fieldname}).',
+                              shortmsg='Data is fully flagged',
+                              origin=comes_from,
+                              applies_to=applies_to)
         return (msw, qascore, [qascore], 'N/A')
 
     #If this is Pol XX only dataset, return default QA score of 1.0
     if npol == 1:
         reason = 'XX-YY.deviation'
-        applies_to = pqa.TargetDataSelection(vis={msname}, field={fieldname}, scan={'all'}, intent={'*OBSERVE_TARGET#ON_SOURCE*'}, spw={msw.spw}, ant={msw.antenna}, pol={0})
+        applies_to = sanitize_attributes(
+            pqa.TargetDataSelection(vis={msname},
+                                    field={fieldname},
+                                    intent={'TARGET'},
+                                    spw={msw.spw},
+                                    ant={msw.antenna})
+            )
         comes_from = pqa.QAOrigin(metric_name=reason, metric_score=0.0, metric_units='n-sigma deviation')
-        thisqascore = pqa.QAScore(1.0, longmsg=f'{msname}: Only XX polarization available, no XX-YY QA possible for spw {msw.spw}, antenna {msw.antenna} in scan all.', shortmsg='XX-YY v/s Frequency deviation', origin=comes_from, applies_to=applies_to, hierarchy=reason)
+        # (tentative)  shortmsg change for this QAScore should be reflected to sd_qa_reports.py
+        thisqascore = pqa.QAScore(1.0,
+                                  longmsg=f'{msname}: Only XX polarization available, no XX-YY QA possible for spw {msw.spw}, antenna {msw.antenna} in scan all.',
+                                  shortmsg='Only one polarization in data',
+                                  origin=comes_from,
+                                  applies_to=applies_to)
         return (msw, thisqascore, [thisqascore], 'N/A')
 
     #Create 2D outlier map initialized
@@ -359,9 +394,20 @@ def outlier_detection(msw: mswrapper_sd.MSWrapperSD, thresholds: dict = default_
         if dataX_fully_flagged and dataY_fully_flagged:
             #Create objects to create QAscore
             reason = 'XX-YY.deviation'
-            applies_to = pqa.TargetDataSelection(vis={msname}, field={fieldname}, scan={scan}, intent={'*OBSERVE_TARGET#ON_SOURCE*'}, spw={msw.spw}, ant={msw.antenna}, pol={'N/A'})
+            applies_to = sanitize_attributes(
+                pqa.TargetDataSelection(vis={msname},
+                                        field={fieldname},
+                                        scan={scan},
+                                        intent={'TARGET'},
+                                        spw={msw.spw},
+                                        ant={msw.antenna})
+                )
             comes_from = pqa.QAOrigin(metric_name=reason, metric_score=0.0, metric_units='n-sigma deviation')
-            thisqascore = pqa.QAScore(1.0, longmsg=f'{msname}: All data flagged for spw {msw.spw}, antenna {msw.antenna} in scan {scan} (field {fieldname}).', shortmsg='XX-YY v/s Frequency deviation', origin=comes_from, applies_to=applies_to, hierarchy=reason)
+            thisqascore = pqa.QAScore(1.0,
+                                      longmsg=f'{msname}: All data flagged for spw {msw.spw}, antenna {msw.antenna} in scan {scan} (field {fieldname}).',
+                                      shortmsg='Scan is fully flagged',
+                                      origin=comes_from,
+                                      applies_to=applies_to)
             qascores_scans.append(thisqascore)
             analysis[scan] = None
             if qascore_lowest == 1.0:
@@ -372,9 +418,21 @@ def outlier_detection(msw: mswrapper_sd.MSWrapperSD, thresholds: dict = default_
             flaggedpol = 'XX 'if dataX_fully_flagged else 'YY'
             #Create objects to create QAscore
             reason = 'XX-YY.deviation'
-            applies_to = pqa.TargetDataSelection(vis={msname}, field={fieldname}, scan={scan}, intent={'*OBSERVE_TARGET#ON_SOURCE*'}, spw={msw.spw}, ant={msw.antenna}, pol={flaggedpol})
+            applies_to = sanitize_attributes(
+                pqa.TargetDataSelection(vis={msname},
+                                        field={fieldname},
+                                        scan={scan},
+                                        intent={'TARGET'},
+                                        spw={msw.spw},
+                                        ant={msw.antenna},
+                                        pol={flaggedpol})
+                )
             comes_from = pqa.QAOrigin(metric_name=reason, metric_score=0.0, metric_units='n-sigma deviation')
-            thisqascore = pqa.QAScore(0.34, longmsg=f'{msname}: Data flagged for one polarization only for spw {msw.spw}, antenna {msw.antenna} in scan {scan} (field {fieldname}), pol {flaggedpol}.', shortmsg='XX-YY v/s Frequency deviation', origin=comes_from, applies_to=applies_to, hierarchy=reason)
+            thisqascore = pqa.QAScore(0.34,
+                                      longmsg=f'{msname}: Data fully flagged for one polarization only for spw {msw.spw}, antenna {msw.antenna} in scan {scan} (field {fieldname}), pol {flaggedpol}.',
+                                      shortmsg='Scan is fully flagged for one polarization',
+                                      origin=comes_from,
+                                      applies_to=applies_to)
             qascores_scans.append(thisqascore)
             analysis[scan] = None
             if qascore_lowest < 0.34:
@@ -415,16 +473,20 @@ def outlier_detection(msw: mswrapper_sd.MSWrapperSD, thresholds: dict = default_
         #Texts for message
         if any_detection and ((pr_x[0] > pr_y[0]) or (has_trecX_outliers and not has_trecY_outliers)):
             badpol = 'XX'
+            badpol_set = {'XX'}
             badtrec = '. Also detected in the Trec[XX] table.'
         elif any_detection and ((pr_x[0] < pr_y[0]) or (not has_trecX_outliers and has_trecY_outliers)):
             badpol = 'YY'
+            badpol_set = {'YY'}
             badtrec = '. Also detected in the Trec[YY] table.'
         elif any_detection and has_trecX_outliers and has_trecY_outliers:
             badpol = 'not identified'
+            badpol_set = {'XX', 'YY'}
             badtrec = '. Also detected in the Trec[XX] and Trec[YY] tables.'
         else:
             pr_x, pr_y = [0.0, 0.0], [0.0, 0.0]
             badpol = 'N/A'
+            badpol_set = set()
 
         #Calculate max of outlier strength relative to range of data for report, use on-data and calcualte
         #percentage of deviation relative to RMS
@@ -438,44 +500,65 @@ def outlier_detection(msw: mswrapper_sd.MSWrapperSD, thresholds: dict = default_
 
         #Create objects to create QAscore
         reason = 'XX-YY.deviation'
-        applies_to = pqa.TargetDataSelection(vis={msname}, field={fieldname}, scan={scan}, intent={'*OBSERVE_TARGET#ON_SOURCE*'}, spw={msw.spw}, ant={msw.antenna}, pol={badpol})
         comes_from = pqa.QAOrigin(metric_name=reason, metric_score=nsigma_ondata, metric_units='n-sigma deviation')
 
-        #QA score value evaluation
-        if has_data_outliers and (has_trecX_outliers or has_trecY_outliers) and (peak_outlier_percent >= thresholds['min_freq_dev_percent']):
-            #Case where actual outliers were found, put a yellow QA score
-            qascore_value = qascorefunc(nsigma_ondata, score_top = 0.67, score_bottom = 0.34, nsigma_threshold = thresholds['X-Y_freq_dev'], nsigma_bottom = thresholds['nsigma_bottom'])
-            longmsg = 'XX-YY large deviation outlier in data and Trec table for spw {0:d}, antenna {1:s}, polarization {2:s} in scan {3:s} (field {4:s})'.format(msw.spw, msw.antenna, badpol, str(scan), fieldname)
-            #longmsg = 'XX-YY deviation outlier ({0:.1f}% of RMS) at {1:.3f}-sigma for spw {2:d}, antenna {3:s}, polarization {4:s} in scan {5:s} (field {6:s}) {7:s}; nsigma Trec: {8:.3f},{9:.3f}; width: {10:.2f}%'.format(peak_outlier_percent, nsigma_ondata, msw.spw, msw.antenna, badpol, str(scan), fieldname, badtrec, nsigma_trecX, nsigma_trecY, width_bw_percent)
-            #Mark outliers in outlier array for plotting
+        # QA score value evaluation
+        if has_data_outliers and peak_outlier_percent >= thresholds['min_freq_dev_percent']:
+            applies_to = sanitize_attributes(
+                pqa.TargetDataSelection(vis={msname},
+                                        field={fieldname},
+                                        scan={scan},
+                                        intent={'TARGET'},
+                                        spw={msw.spw},
+                                        ant={msw.antenna},
+                                        pol=badpol_set)
+            )
+            if has_trecX_outliers or has_trecY_outliers:
+                # Case where actual outliers were found, put a yellow QA score
+                score_top, score_bottom = rendererutils.SCORE_THRESHOLD_WARNING, rendererutils.SCORE_THRESHOLD_ERROR + 0.01
+                shortmsg = 'XX-YY deviation outliers in data and Trec table'
+                longmsg = f'XX-YY large deviation outlier in data and Trec table for spw {msw.spw}, antenna {msw.antenna}, polarization {badpol} in scan {str(scan)} (field {fieldname})'
+            else:
+                # Non outliers case only, put a blue QA score
+                score_top, score_bottom = rendererutils.SCORE_THRESHOLD_SUBOPTIMAL, rendererutils.SCORE_THRESHOLD_WARNING + 0.01
+                shortmsg = 'XX-YY deviation outliers in data'
+                longmsg = f'XX-YY deviation for spw {msw.spw}, antenna {msw.antenna}, polarization {badpol} in scan {str(scan)} (field {fieldname})'
+            # calculate qascore value
+            qascore_value = qascorefunc(nsigma_ondata,
+                                        score_top=score_top,
+                                        score_bottom=score_bottom,
+                                        nsigma_threshold=thresholds['X-Y_freq_dev'],
+                                        nsigma_bottom=thresholds['nsigma_bottom'])
+            # Mark outliers in outlier array for plotting
             if scan != 'all':
                 for row in np.where(msw.scantimesel[scan])[0]:
-                    msw.outliers[:,row] = outlier_data
+                    msw.outliers[:, row] = outlier_data
             else:
                 for row in range(nrows):
-                    msw.outliers[:,row] = outlier_data
-        elif has_data_outliers and not(has_trecX_outliers or has_trecY_outliers):
-            #Non outliers case only, put a blue QA score
-            qascore_value = qascorefunc(nsigma_ondata, score_top = 0.9, score_bottom = 0.68, nsigma_threshold = thresholds['X-Y_freq_dev'], nsigma_bottom = thresholds['nsigma_bottom'])
-            longmsg = 'XX-YY deviation for spw {0:d}, antenna {1:s}, polarization {2:s} in scan {3:s} (field {4:s})'.format(msw.spw, msw.antenna, badpol, str(scan), fieldname)
-            #longmsg = 'XX-YY polarization difference ({0:.1f}% of RMS) at {1:.3f}-sigma for spw {2:d}, antenna {3:s}, polarization {4:s} in scan {5:s} (field {6:s}), likely due to atmosphere instability, check deviation mask at baseline subtraction; nsigma Trec: {7:.3f},{8:.3f}; width: {9:.2f}%'.format(peak_outlier_percent, nsigma_ondata, msw.spw, msw.antenna, badpol, str(scan), fieldname, nsigma_trecX, nsigma_trecY, width_bw_percent)
-            #Mark outliers in outlier array for plotting
-            if scan != 'all':
-                for row in np.where(msw.scantimesel[scan])[0]:
-                    msw.outliers[:,row] = outlier_data
-            else:
-                for row in range(nrows):
-                    msw.outliers[:,row] = outlier_data
+                    msw.outliers[:, row] = outlier_data
         else:
-            #Case of no outliers and no information
+            applies_to = sanitize_attributes(
+                pqa.TargetDataSelection(vis={msname},
+                                        field={fieldname},
+                                        scan={scan},
+                                        intent={'TARGET'},
+                                        spw={msw.spw},
+                                        ant={msw.antenna})
+            )
+            # Case of no outliers and no information
             qascore_value = 1.0
-            longmsg = 'No significant XX-YY polarization difference detected for spw {0:d}, antenna {1:s} in scan {2:s} (field {3:s})'.format(msw.spw, msw.antenna, str(scan), fieldname)
+            shortmsg = 'No significant XX-YY differences'
+            longmsg = f'No significant XX-YY differences detected for spw {msw.spw}, antenna {msw.antenna} in scan {str(scan)} (field {fieldname})'
 
         if qascore_value <= qascore_lowest:
             qascore_lowest = qascore_value
             idx_lowest = k
 
-        thisqascore = pqa.QAScore(qascore_value, longmsg=f"{msname}: {longmsg}", shortmsg='XX-YY v/s Frequency deviation', origin=comes_from, applies_to=applies_to, hierarchy=reason)
+        thisqascore = pqa.QAScore(qascore_value,
+                                  longmsg=f"{msname}: {longmsg}",
+                                  shortmsg=shortmsg,
+                                  origin=comes_from,
+                                  applies_to=applies_to)
         qascores_scans.append(thisqascore)
 
         analysis[scan] = {'ondata': ondata_results, 'trecX': trecX_results, 'trecY': trecY_results,

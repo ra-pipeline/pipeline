@@ -570,7 +570,7 @@ class DiffGaincal(basetask.StandardTaskTemplate):
                         scan=scan_group,
                         caltable=caltable,
                         append=table_exists,
-                    )
+                    )           
         return result
 
     def _do_phasecal_for_diffgain_reference(self) -> tuple[common.GaincalResults, dict[IntentField, SpwMapping]]:
@@ -698,8 +698,11 @@ class DiffGaincal(basetask.StandardTaskTemplate):
             if combine_spw:
                 dg_srcspws = self.inputs.ms.get_spectral_windows(intent=intent)
                 dg_spwmap = combine_spwmap(dg_srcspws)
+                # PIPE-2858 use linearPD when spw combined is triggered
+                interp = 'linearPD,linear'
             else:
                 dg_spwmap = []
+                interp = 'linear,linear'
                 
             # Prior to registering this caltable into the local context, set
             # overrides in the CalApplication:
@@ -707,7 +710,9 @@ class DiffGaincal(basetask.StandardTaskTemplate):
                 'calwt': False,
                 'intent': intent,
                 'spwmap': dg_spwmap,
+                'interp': interp,
             }
+           
             modified_calapp = callibrary.copy_calapplication(phasecal_result.pool[0], **calapp_overrides)
             phasecal_result.pool[0] = modified_calapp
             phasecal_result.final[0] = modified_calapp
@@ -724,6 +729,7 @@ class DiffGaincal(basetask.StandardTaskTemplate):
                 'calwt': False,
                 'intent': 'TARGET,CHECK',
                 'spwmap': dg_spwmap,
+                'interp': interp,
             }
             modified_calapp = callibrary.copy_calapplication(phasecal_result.pool[0], **calapp_overrides)
             phasecal_result.pool[0] = modified_calapp

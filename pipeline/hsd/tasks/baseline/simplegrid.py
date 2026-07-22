@@ -35,7 +35,7 @@ class SDSimpleGriddingInputs(vdp.StandardInputs):
     """Inputs class for simple gridding task."""
 
     # Search order of input vis
-    processing_data_type = [DataType.ATMCORR, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.ATMCORR, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     nplane = vdp.VisDependentProperty(default=3)
 

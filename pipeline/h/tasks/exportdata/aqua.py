@@ -1,6 +1,4 @@
-"""
-Prototype pipeline AQUA report generator
-
+"""Prototype pipeline AQUA report generator.
 
 Definitions
     Metrics are physical quantities, e.g. phase rms improvement resulting from
@@ -46,11 +44,11 @@ Future Technical Solutions
 """
 from __future__ import annotations
 
+import copy
 import datetime
 import itertools
 import operator
 import os
-import copy
 import xml.etree.ElementTree as ElementTree
 from typing import TYPE_CHECKING
 from xml.dom import minidom
@@ -80,8 +78,7 @@ TASK_NAME_TO_SENSITIVITY_EXPORTER = {}
 
 
 def register_aqua_metric(fn):
-    """
-    Register a 'QA metric to XML' conversion function.
+    """Register a 'QA metric to XML' conversion function.
 
     This function can also be used as a decorator.
 
@@ -93,14 +90,10 @@ def register_aqua_metric(fn):
 
 
 class AquaXmlGenerator:
-    """
-    Class to create the XML for an AQUA pipeline report.
-    """
+    """Class to create the XML for an AQUA pipeline report."""
 
     def get_report_xml(self, context):
-        """
-        Create and return the AQUA report XML for the results stored in a
-        context.
+        """Create and return the AQUA report XML for the results stored in a context.
 
         :param context: pipeline context to parse
         :return: root XML Element of AQUA report
@@ -137,8 +130,7 @@ class AquaXmlGenerator:
         return root
 
     def get_project_structure(self, context):
-        """
-        Get the project structure element.
+        """Get the project structure element.
 
         Given the current data flow it is unclear how the report generator
         generator will acquire the entity id of the original processing
@@ -163,8 +155,7 @@ class AquaXmlGenerator:
         return root
 
     def get_qa_summary(self, context):
-        """
-        Get the AQUA summary XML element.
+        """Get the AQUA summary XML element.
 
         :param context: pipeline context
         :return: XML summarising execution
@@ -195,8 +186,7 @@ class AquaXmlGenerator:
         return root
 
     def get_per_stage_qa(self, context, all_results):
-        """
-        Get the XML for all stages.
+        """Get the XML for all stages.
 
         :param context: pipeline context
         :param all_results: all Results for this pipeline run
@@ -244,13 +234,11 @@ class AquaXmlGenerator:
         return xml_root
 
     def _get_xml_for_qa_metric(self, qa_score):
-        """
-        Generate XML element for QA metric
+        """Generate XML element for QA metric.
 
         :param qa_score: QAScore
         :return: XML element
         """
-
         # create a pseudo registry for the generic XML generator
         generic_registry = {GenericMetricXmlGenerator()}
 
@@ -260,8 +248,7 @@ class AquaXmlGenerator:
             return self._get_xml_for_qa_scores([qa_score], generic_registry)
 
     def _get_xml_for_qa_data_selection(self, qa_score):
-        """
-        Generate XML element for QA data selection
+        """Generate XML element for QA data selection.
 
         :param qa_score: QAScore
         :return: XML element
@@ -299,8 +286,7 @@ class AquaXmlGenerator:
         return [ElementTree.Element('DataSelection', Asdm=Asdm, Session=Session, Spw=Spw, Intent=Intent, **extra_attributes)]
 
     def _get_xml_for_qa_scores(self, items, registry) -> list[ElementTree.Element]:
-        """
-        Generate the XML elements for a list of QA scores.
+        """Generate the XML elements for a list of QA scores.
 
         :param items: List of QAScores
         :param registry: List of XML generator functions
@@ -324,8 +310,7 @@ class AquaXmlGenerator:
         return elements
 
     def get_topics_qa(self, context, all_results):
-        """
-        Get the XML for all results, divided into sections by topic.
+        """Get the XML for all results, divided into sections by topic.
 
         :param context: pipeline context
         :param all_results: all Results for this pipeline run
@@ -358,8 +343,7 @@ class AquaXmlGenerator:
         return root
 
     def get_calibration_topic(self, context, topic_results):
-        """
-        Get the XML for the calibration topic.
+        """Get the XML for the calibration topic.
 
         :param context: pipeline context
         :param topic_results: List of Results for this topic
@@ -369,8 +353,7 @@ class AquaXmlGenerator:
         return self._xml_for_topic('Calibration', context, topic_results)
 
     def get_dataset_topic(self, context, topic_results):
-        """
-        Get the XML for the dataset topic.
+        """Get the XML for the dataset topic.
 
         :param context: pipeline context
         :param topic_results: List of Results for this topic
@@ -380,8 +363,7 @@ class AquaXmlGenerator:
         return self._xml_for_topic('Dataset', context, topic_results)
 
     def get_flagging_topic(self, context, topic_results):
-        """
-        Get the XML for the flagging topic.
+        """Get the XML for the flagging topic.
 
         :param context: pipeline context
         :param topic_results: List of Results for this topic
@@ -391,8 +373,7 @@ class AquaXmlGenerator:
         return self._xml_for_topic('Flagging', context, topic_results)
 
     def get_imaging_topic(self, context, topic_results):
-        """
-        Get the XML for the imaging topic.
+        """Get the XML for the imaging topic.
 
         :param context: pipeline context
         :param topic_results: List of Results for this topic
@@ -420,10 +401,7 @@ class AquaXmlGenerator:
 
 
 def export_to_disk(report, filename):
-    """
-    Convert an XML document to a nicely formatted XML string and save it in a
-    file.
-    """
+    """Convert an XML document to a nicely formatted XML string and save it in a file."""
     xmlstr = ElementTree.tostring(report, 'utf-8')
 
     # Reformat it to prettyprint style
@@ -436,8 +414,7 @@ def export_to_disk(report, filename):
 
 
 def vis_to_asdm(vispath):
-    """
-    Get the expected ASDM name from the path of a measurement set.
+    """Get the expected ASDM name from the path of a measurement set.
 
     :param vispath: path to convert
     :return: expected name of ASDM for MS
@@ -446,8 +423,7 @@ def vis_to_asdm(vispath):
 
 
 def xml_generator_for_metric(qa_label, value_spec):
-    """
-    Return a function that converts a matching QAScore to XML.
+    """Return a function that converts a matching QAScore to XML.
 
     :param qa_label: QA metric label to match
     :param value_spec: string format spec for how to format metric value
@@ -465,12 +441,11 @@ def xml_generator_for_metric(qa_label, value_spec):
 
 
 class MetricXmlGenerator:
-    """
-    Creates a AQUA report XML element for QA scores.
-    """
+    """Creates a AQUA report XML element for QA scores."""
 
     def __init__(self, metric_name, formatters=None):
-        """
+        """Initialize with metric name and optional attribute formatters.
+
         The constructor accepts an optional dict of string formatters: functions
         that accept a string and return a formatted string. If this argument is
         not supplied, the default formatter keys and formatter functions applied
@@ -495,12 +470,12 @@ class MetricXmlGenerator:
             self.attr_formatters.update(formatters)
 
     def __call__(self, qa_scores: list[QAScore]) -> list[ElementTree.Element | None]:
+        """Apply metric formatters to qa_scores and return XML elements."""
         scores_to_process = self.filter(qa_scores)
         return [self.to_xml(score) for score in scores_to_process]
 
     def handles(self, metric_name: str) -> bool:
-        """
-        Returns True if this class can generate XML for the given metric.
+        """Return True if this class can generate XML for the given metric.
 
         :param metric_name: name of metric
         :return: True if metric handled by this class
@@ -508,8 +483,7 @@ class MetricXmlGenerator:
         return metric_name == self.metric_name
 
     def filter(self, qa_scores: list[QAScore]) -> list[QAScore]:
-        """
-        Reduce a list of entries to those entries that require XML to be generated.
+        """Reduce a list of entries to those entries that require XML to be generated.
 
         :param qa_scores: List of QAScores
         :return: List of QAScores
@@ -517,8 +491,7 @@ class MetricXmlGenerator:
         return qa_scores
 
     def to_xml(self, qa_score: QAScore) -> ElementTree.Element | None:
-        """
-        Return the XML representation of a QA score and associated metric.
+        """Return the XML representation of a QA score and associated metric.
 
         :param qa_score: QA score to convert
         :return: XML element
@@ -541,15 +514,14 @@ class MetricXmlGenerator:
 
 
 class LowestScoreMetricXmlGenerator(MetricXmlGenerator):
-    """
-    Metric XML Generator that only returns XML for the lowest QA score that it
-    handles.
-    """
+    """Metric XML Generator that only returns XML for the lowest QA score that it handles."""
 
     def __init__(self, metric_name, formatters=None):
+        """Initialize with metric_name and optional formatters."""
         super().__init__(metric_name, formatters)
 
     def filter(self, qa_scores):
+        """Return only the entry with the lowest QA score."""
         handled = [(vis, qa_score) for vis, qa_score in qa_scores
                    if self.handles(qa_score.origin.metric_name)]
 
@@ -561,23 +533,24 @@ class LowestScoreMetricXmlGenerator(MetricXmlGenerator):
 
 
 class GenericMetricXmlGenerator(MetricXmlGenerator):
-    """
-    Metric XML Generator that processes any score it is given, formatting the
-    metric value to 3dp.
+    """Metric XML Generator.
+     
+    This processes any score it is given, formatting the metric value to 3dp.
     """
 
     def __init__(self):
+        """Initialize with 3dp value formatter."""
         # format all processed entries to 3dp
         formatters = {'Value': _create_value_formatter('{:0.3f}')}
         super().__init__('Generic metric', formatters)
 
     def handles(self, _):
+        """Return True for any metric name."""
         return True
 
 
 def _create_trimmed_formatter(format_spec, trim=0):
-    """
-    Create a function that formats values as a percent.
+    """Create a function that formats values as a percent.
 
     :param format_spec: string format specification to apply
     :param trim: number of characters to trim
@@ -596,8 +569,7 @@ def _create_trimmed_formatter(format_spec, trim=0):
 
 
 def _create_value_formatter(format_spec):
-    """
-    Create a function that applies a string format spec.
+    """Create a function that applies a string format spec.
 
     This function return a function that accepts one argument and returns the
     string formatted according to the given string format specification. If
@@ -617,17 +589,18 @@ def _create_value_formatter(format_spec):
             # Handle lists of metrics and other possible flavors with a string
             # representation.
             return str(val)
-        except:
+        except Exception:
             return UNDEFINED
 
     return f
 
 
 def _get_pipeline_stage_and_scores(result, include_hidden_scores=False):
-    """
-    Get the CASA equivalent task name which is stored by the infrastructure
-    as  <task_name> (<arg1> = <value1>, ...). Also get the representative
-    scores and the subscores. Optionally also include hidden scores.
+    """Get the CASA equivalent task name and associated QA scores.
+
+    The task name is stored by the infrastructure as
+    ``<task_name> (<arg1> = <value1>, ...)``. Also gets the representative
+    scores and the subscores. Optionally also includes hidden scores.
     """
     stage_name = result.pipeline_casa_task.split('(')[0]
     if include_hidden_scores:
@@ -639,8 +612,7 @@ def _get_pipeline_stage_and_scores(result, include_hidden_scores=False):
 
 
 def sensitivity_xml_for_stages(context, results, name=''):
-    """
-    Get the XML for all sensitivities reported by all tasks.
+    """Get the XML for all sensitivities reported by all tasks.
 
     :param context: pipeline context
     :param results: all results for the imaging topic
@@ -664,8 +636,7 @@ def sensitivity_xml_for_stages(context, results, name=''):
 
 
 def xml_for_sensitivity_stage(context, stage_results, exporter, name):
-    """
-    Translate the sensitivity dictionaries contained in a task result to XML.
+    """Translate the sensitivity dictionaries contained in a task result to XML.
 
     :param context: pipeline context
     :param stage_results: hifa_preimagecheck result
@@ -693,8 +664,7 @@ def xml_for_sensitivity_stage(context, stage_results, exporter, name):
 
 
 def xml_for_sensitivity(d, stage_name):
-    """
-    Return the XML representation for a sensitivity dictionary.
+    """Return the XML representation for a sensitivity dictionary.
 
     :param d: sensitivity dict
     :return: XML element
@@ -710,7 +680,7 @@ def xml_for_sensitivity(d, stage_name):
             is_representative = 'N/A'
         else:
             is_representative = str(d['is_representative'])
-    except:
+    except Exception:
         is_representative = 'N/A'
 
     try:
@@ -719,7 +689,7 @@ def xml_for_sensitivity(d, stage_name):
         else:
             bandwidth = qa.quantity(d['bandwidth'])
             bandwidth_hz = value(qa.convert(bandwidth, 'Hz'))
-    except:
+    except Exception:
         bandwidth_hz = 'N/A'
 
     try:
@@ -727,7 +697,7 @@ def xml_for_sensitivity(d, stage_name):
         effective_bw_hz = value(qa.convert(effective_bw, 'Hz'))
         if effective_bw_hz == '0.0':
             effective_bw_hz = 'N/A'
-    except:
+    except Exception:
         effective_bw_hz = 'N/A'
 
     try:
@@ -736,7 +706,7 @@ def xml_for_sensitivity(d, stage_name):
         else:
             major = qa.quantity(d['beam']['major'])
             major_arcsec = value(qa.convert(major, 'arcsec'))
-    except:
+    except Exception:
         major_arcsec = 'N/A'
 
     try:
@@ -745,7 +715,7 @@ def xml_for_sensitivity(d, stage_name):
         else:
             minor = qa.quantity(d['beam']['minor'])
             minor_arcsec = value(qa.convert(minor, 'arcsec'))
-    except:
+    except Exception:
         minor_arcsec = 'N/A'
 
     try:
@@ -754,7 +724,7 @@ def xml_for_sensitivity(d, stage_name):
         else:
             cell_x = qa.quantity(d['cell'][0])
             cell_x_arcsec = value(qa.convert(cell_x, 'arcsec'))
-    except:
+    except Exception:
         cell_x_arcsec = 'N/A'
 
     try:
@@ -763,7 +733,7 @@ def xml_for_sensitivity(d, stage_name):
         else:
             cell_y = qa.quantity(d['cell'][1])
             cell_y_arcsec = value(qa.convert(cell_y, 'arcsec'))
-    except:
+    except Exception:
         cell_y_arcsec = 'N/A'
 
     try:
@@ -772,7 +742,7 @@ def xml_for_sensitivity(d, stage_name):
         else:
             positionangle = qa.quantity(d['beam']['positionangle'])
             positionangle_deg = value(qa.convert(positionangle, 'deg'))
-    except:
+    except Exception:
         positionangle_deg = 'N/A'
 
     try:
@@ -781,8 +751,8 @@ def xml_for_sensitivity(d, stage_name):
         else:
             observed_sensitivity = qa.quantity(d['observed_sensitivity'])
             observed_sensitivity_jy_per_beam = value(qa.convert(observed_sensitivity, 'Jy/beam'))
-    except:
-        sensitivity_jy_per_beam  = 'N/A'
+    except Exception:
+        observed_sensitivity_jy_per_beam  = 'N/A'
 
     try:
         if d['pbcor_image_min'] is None:
@@ -790,7 +760,7 @@ def xml_for_sensitivity(d, stage_name):
         else:
             pbcor_image_min = qa.quantity(d['pbcor_image_min'])
             pbcor_image_min_jy_per_beam = value(qa.convert(pbcor_image_min, 'Jy/beam'))
-    except:
+    except Exception:
         pbcor_image_min_jy_per_beam = 'N/A'
 
     try:
@@ -799,15 +769,33 @@ def xml_for_sensitivity(d, stage_name):
         else:
             pbcor_image_max = qa.quantity(d['pbcor_image_max'])
             pbcor_image_max_jy_per_beam = value(qa.convert(pbcor_image_max, 'Jy/beam'))
-    except:
+    except Exception:
         pbcor_image_max_jy_per_beam = 'N/A'
+
+    try:
+        if d['nonpbcor_image_min'] is None:
+            image_min_jy_per_beam = 'N/A'
+        else:
+            image_min = qa.quantity(d['nonpbcor_image_min'])
+            image_min_jy_per_beam = value(qa.convert(image_min, 'Jy/beam'))
+    except Exception:
+        image_min_jy_per_beam = 'N/A'
+
+    try:
+        if d['nonpbcor_image_max'] is None:
+            image_max_jy_per_beam = 'N/A'
+        else:
+            image_max = qa.quantity(d['nonpbcor_image_max'])
+            image_max_jy_per_beam = value(qa.convert(image_max, 'Jy/beam'))
+    except Exception:
+        image_max_jy_per_beam = 'N/A'
 
     try:
         if d['imagename'] is None:
             imagename = 'N/A'
         else:
             imagename = d['imagename']
-    except:
+    except Exception:
         imagename = 'N/A'
 
     try:
@@ -824,7 +812,7 @@ def xml_for_sensitivity(d, stage_name):
         else:
             theoretical_sensitivity = qa.quantity(d['theoretical_sensitivity'])
             theoretical_sensitivity_jy_per_beam = value(qa.convert(theoretical_sensitivity, 'Jy/beam'))
-    except:
+    except Exception:
         theoretical_sensitivity_jy_per_beam = 'N/A'
 
     try:
@@ -832,7 +820,7 @@ def xml_for_sensitivity(d, stage_name):
             datatype = 'N/A'
         else:
             datatype = d['datatype']
-    except:
+    except Exception:
         datatype = 'N/A'
 
     xml = ElementTree.Element('Sensitivity',
@@ -862,6 +850,8 @@ def xml_for_sensitivity(d, stage_name):
         IsRepresentative=is_representative,
         PbcorImageMinJyPerBeam=pbcor_image_min_jy_per_beam,
         PbcorImageMaxJyPerBeam=pbcor_image_max_jy_per_beam,
+        ImageMinJyPerBeam=image_min_jy_per_beam,
+        ImageMaxJyPerBeam=image_max_jy_per_beam,
         ImageName=imagename,
         DataType=datatype
       )

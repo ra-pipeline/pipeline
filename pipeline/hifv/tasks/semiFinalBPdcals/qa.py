@@ -22,7 +22,8 @@ class semiFinalBPdcalsQAHandler(pqa.QAPlugin):
         # 5%-60% of data flagged  --> 1 to 0
         # > 60%  of data flagged  --> 0
 
-        m = context.observing_run.get_ms(result.inputs['vis'])
+        vis = result.inputs['vis']
+        m = context.observing_run.get_ms(vis)
 
         scores = []
 
@@ -48,11 +49,18 @@ class semiFinalBPdcalsQAHandler(pqa.QAPlugin):
                 LOG.error('Error with bandpass and/or delay table for band {!s}.'.format(bandname))
                 scores = [pqa.QAScore(0.0, longmsg='No flagging stats about the bandpass table or info in delay table.',
                                       shortmsg='Bandpass or delay table problem.')]
+
         if result.bpdgain_touse:
             # if >50% of spws are flagged: score <0.5
             score3 = qacalc.score_flagged_ant_spw(result.inputs['vis'], result.flaggedSolnApplycaldelay)
             if len(score3) > 0:
                 scores.extend(score3)
+
+        # PIPE-2512: add QA score for spw solint
+        for bandname, spw_solint in result.spw_solint.items():
+            score4 = qacalc.score_spw_solint(vis, bandname, spw_solint)
+            if score4:
+                scores.append(score4)
 
         result.qa.pool.extend(scores)
 

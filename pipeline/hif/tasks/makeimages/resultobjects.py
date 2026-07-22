@@ -4,8 +4,10 @@ import os.path
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.imagelibrary as imagelibrary
 import pipeline.infrastructure.utils as utils
-
+from pipeline import infrastructure
 from pipeline.hif.tasks.makeimlist.cleantarget import CleanTargetInfo
+
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class MakeImagesResult(basetask.Results):
@@ -48,13 +50,14 @@ class MakeImagesResult(basetask.Results):
                     multiterm=result.multiterm,
                     metadata=result.imaging_metadata,
                     imaging_params=img_params,  # imaging parameters for each iteration
-                    imageplot=result.imageplot)
+                    imageplot=result.imageplot,
+                    imagename_prefix=result.inputs['image_heuristics'].imagename_prefix)
                 if 'TARGET' in result.intent:
                     context.sciimlist.add_item(imageitem, self.overwrite_on_export)
                 else:
                     context.calimlist.add_item(imageitem, self.overwrite_on_export)
-            except:
-                pass
+            except Exception as ex:
+                LOG.debug('Failed to add imageitem to context from %s: %s', result, ex)
 
         # Save quantities in the context for later stages
         skip_recalc = False
@@ -79,7 +82,8 @@ class MakeImagesResult(basetask.Results):
 
             # Clean masks and thresholds for later stages
             if result.stokes == 'I' and (result.cleanmask not in (None, '')):
-                cleanTargetKey = CleanTargetInfo(datatype=result.datatype, field=result.sourcename, intent=result.intent, virtspw=result.spw, stokes=result.stokes, specmode=result.specmode)
+                cleanTargetKey = CleanTargetInfo(datatype=result.datatype, field=result.sourcename,
+                                                 intent=result.intent, virtspw=result.spw, stokes=result.stokes, specmode=result.hm_specmode)
                 context.clean_masks[cleanTargetKey] = result.cleanmask
                 context.clean_thresholds[cleanTargetKey] = result.threshold
 

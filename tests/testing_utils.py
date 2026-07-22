@@ -24,6 +24,9 @@ if TYPE_CHECKING:
 
 LOG = infrastructure.logging.get_logger(__name__)
 
+# Set by the autouse fixture in conftest.py to the current test function name.
+_current_test_name: str | None = None
+
 
 def ensure_working_dir(pt: PipelineTester) -> None:
     """Ensure the working directory exists for a PipelineTester instance.
@@ -122,6 +125,8 @@ class PipelineTester:
         self.expectedoutput_file = expectedoutput_file
         if output_dir:
             self.output_dir = output_dir
+        elif _current_test_name:
+            self.output_dir = _current_test_name
         elif self.project_id:
             self.output_dir = f'{self.project_id}__{self.visname[0]}_test_output'
         else:

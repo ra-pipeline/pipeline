@@ -6,7 +6,7 @@ import pipeline.h.cli.utils as utils
 def hifa_wvrgcal(vis=None, caltable=None, offsetstable=None, hm_toffset=None, toffset=None, segsource=None,
                  sourceflag=None, hm_tie=None, tie=None, nsol=None, disperse=None, wvrflag=None, hm_smooth=None,
                  smooth=None, scale=None, maxdistm=None, minnumants=None, mingoodfrac=None, refant=None, qa_intent=None,
-                 qa_bandpass_intent=None, qa_spw=None, accept_threshold=None):
+                 qa_bandpass_intent=None, qa_spw=None, qa_combine=None, qa_solint=None, accept_threshold=None):
     """Generate a gain table based on Water Vapor Radiometer (WVR) data.
 
     Generate a gain table based on the Water Vapor Radiometer data in each vis

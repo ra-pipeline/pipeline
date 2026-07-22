@@ -34,7 +34,7 @@ class MaskLineInputs(vdp.StandardInputs):
     """Inputs for mask creation task."""
 
     # Search order of input vis
-    processing_data_type = [DataType.ATMCORR, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.ATMCORR, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     window = vdp.VisDependentProperty(default=[])
     windowmode = vdp.VisDependentProperty(default='replace')

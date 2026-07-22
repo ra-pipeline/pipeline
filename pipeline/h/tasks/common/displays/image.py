@@ -576,18 +576,12 @@ class ImageDisplay:
 class _SentinelMap(Colormap):
     """Utility class for plotting sentinel pixels in colours."""
 
-    def __init__(self, cmap, sentinels={}):
-        """
-        Constructor.
-
-        Keyword arguments:
-        """
-        self.name = 'SentinelMap'
+    def __init__(self, cmap, sentinels=None):
+        super().__init__("SentinelMap", cmap.N)
         cmap._init()
         self.cmap = cmap
         self._lut = cmap._lut
-        self.N = cmap.N
-        self.sentinels = sentinels
+        self.sentinels = sentinels if sentinels is not None else {}
         self._isinit = True
 
     def __call__(self, scaledData, alpha=1.0, bytes=False):
@@ -625,8 +619,8 @@ class _SentinelMap(Colormap):
 class _SentinelNorm(Normalize):
     """Normalise but leave sentinel values unchanged."""
 
-    def __init__(self, vmin=None, vmax=None, clip=True, sentinels=[]):
-        self.sentinels = sentinels
+    def __init__(self, vmin=None, vmax=None, clip=True, sentinels=None):
+        self.sentinels = sentinels if sentinels is not None else []
         super().__init__(vmin, vmax, clip)
 
     def __call__(self, value, clip=None):

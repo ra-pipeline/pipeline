@@ -12,7 +12,7 @@ LOG = infrastructure.get_logger(__name__)
 class GainCurvesInputs(vdp.StandardInputs):
     @vdp.VisDependentProperty
     def caltable(self):
-        namer = caltable_heuristic.GainCurvestable()
+        namer = caltable_heuristic.GainCurveEfficienciesCaltable()
         casa_args = self._get_task_args(ignore=('caltable',))
         return namer.calculate(output_dir=self.output_dir, stage=self.context.stage, **casa_args)
 
@@ -29,7 +29,7 @@ class GainCurvesInputs(vdp.StandardInputs):
 
     def to_casa_args(self):
         args = super().to_casa_args()
-        args['caltype'] = 'gc'
+        args['caltype'] = 'gceff'
         return args
 
 
@@ -45,7 +45,7 @@ class GainCurves(basetask.StandardTaskTemplate):
 
         callist = []
         calto = callibrary.CalTo(vis=inputs.vis)
-        calfrom = callibrary.CalFrom(gencal_args['caltable'], caltype='gc', interp='', calwt=False)
+        calfrom = callibrary.CalFrom(gencal_args['caltable'], caltype='gceff', interp='', calwt=False)
         calapp = callibrary.CalApplication(calto, calfrom)
         callist.append(calapp)
 

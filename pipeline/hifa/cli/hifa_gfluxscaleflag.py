@@ -5,7 +5,7 @@ import pipeline.h.cli.utils as utils
 @utils.cli_wrapper
 def hifa_gfluxscaleflag(vis=None, intent=None, phaseupsolint=None, solint=None, minsnr=None, refant=None,
                         antnegsig=None, antpossig=None, tmantint=None, tmint=None, tmbl=None, antblnegsig=None,
-                        antblpossig=None, relaxed_factor=None, niter=None, parallel=None):
+                        antblpossig=None, relaxed_factor=None, niter=None, parallel=None, examineCrossPolSum=None):
     """Flag the flux, diffgain, phase calibrators and check source.
 
     This task computes the flagging heuristics on the flux, diffgain, and phase
