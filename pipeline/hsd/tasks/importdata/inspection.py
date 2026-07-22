@@ -538,15 +538,20 @@ class SDInspection:
                 field_map[target.id] = target.id
                 continue
 
+            # first, check if target field serves reference as well
             for reference in reference_fields:
                 reference_name = reference.name
                 LOG.debug('reference name: \'%s\'' % reference_name)
-#                 tpattern = '^%s_[0-9]$'%(target_name)
-#                 rpattern = '^%s_[0-9]$'%(reference_name)
                 if target_name == reference_name:
                     field_map[target.id] = reference.id
-                elif _check_offsource_fieldname_maching(reference_name, target_name):
-                    field_map[target.id] = reference.id
+
+            # if not matched, search for absolute OFF
+            if target.id not in field_map:
+                for reference in reference_fields:
+                    reference_name = reference.name
+                    if _check_offsource_fieldname_maching(reference_name, target_name):
+                        field_map[target.id] = reference.id
+
         calibration_strategy = {'tsys': do_tsys_transfer,
                                 'tsys_strategy': spwmap,
                                 'calmode': calibration_type,
