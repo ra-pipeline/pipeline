@@ -534,11 +534,7 @@ class SDInspection:
             target_name = target.name
             LOG.debug('target name: \'%s\'' % target_name)
 
-            if len(reference_fields) == 0:
-                field_map[target.id] = target.id
-                continue
-
-            # first, check if target field serves reference as well
+            # first, check if target field serves as reference too
             for reference in reference_fields:
                 reference_name = reference.name
                 LOG.debug('reference name: \'%s\'' % reference_name)
@@ -551,6 +547,10 @@ class SDInspection:
                     reference_name = reference.name
                     if _check_offsource_fieldname_maching(reference_name, target_name):
                         field_map[target.id] = reference.id
+
+            # if no match, use target field itself as reference
+            if target.id not in field_map:
+                field_map[target.id] = target.id
 
         calibration_strategy = {'tsys': do_tsys_transfer,
                                 'tsys_strategy': spwmap,
