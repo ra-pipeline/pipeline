@@ -32,6 +32,10 @@ class TargetflagQAHandler(pqa.QAPlugin):
             scores = [pqa.QAScore(0.0, longmsg='No flag summary statistics',
                                   shortmsg='Flag Summary off')]
 
+        # PIPE-3046: checking if cont.dat was used and if so, adding a score for that.
+        if result.use_contdat:
+            scores.append(qacalc.score_contdat_applied(result.inputs['vis']))
+
         result.qa.pool[:] = scores
 
 
@@ -96,7 +100,9 @@ class CheckflagQAHandler(pqa.QAPlugin):
             LOG.error('No flag summary statistics.')
             scores = [pqa.QAScore(0.0, longmsg='No flag summary statistics',
                                   shortmsg='Flag Summary off')]
-
+        # PIPE-3046: checking if cont.dat was used and if so, adding a score for that.
+        if result.use_contdat:
+            scores.append(qacalc.score_contdat_applied(result.inputs['vis']))
         result.qa.pool[:] = scores
 
 

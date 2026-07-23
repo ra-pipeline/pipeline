@@ -67,7 +67,7 @@ class StatwtInputs(vdp.StandardInputs):
 
 
 class StatwtResults(basetask.Results):
-    def __init__(self, jobs=None, flag_summaries=[], wtables={}):
+    def __init__(self, jobs=None, flag_summaries=[], wtables={}, use_contdat=False):
 
         if jobs is None:
             jobs = []
@@ -76,6 +76,7 @@ class StatwtResults(basetask.Results):
         self.jobs = jobs
         self.summaries = flag_summaries
         self.wtables = wtables
+        self.use_contdat = use_contdat
 
     def __repr__(self):
         s = 'Statwt results:\n'
@@ -98,12 +99,13 @@ class Statwt(basetask.StandardTaskTemplate):
             LOG.warning('Unknown mode \'%s\' was set. Known modes are [\'VLA\',\'VLASS-SE\']. '
                         'Continuing in \'VLA\' mode.' % self.inputs.statwtmode)
             self.inputs.statwtmode = 'VLA'
-
+        use_contdat = False
         if self.inputs.usecontdat:
             fielddict = contfile_to_spwsel(self.inputs.vis, self.inputs.context)
             if fielddict != {}:
                 LOG.info('usecontdat=True and cont.dat found: Using VLA Spectral Line Heuristics '
                          'for task statwt.')
+                use_contdat = True
             else:
                 LOG.info('usecontdat=True but no cont.dat found or empty: '
                          'Applying weights to all spectral windows.')
@@ -131,7 +133,7 @@ class Statwt(basetask.StandardTaskTemplate):
         job = casa_tasks.flagmanager(vis=self.inputs.vis, mode='save', versionname='rfi_flagged_statwt', merge='replace', comment='flagversion after running hifv_statwt()')
         self._executor.execute(job)
 
-        return StatwtResults(jobs=[statwt_result], flag_summaries=flag_summaries, wtables=wtables)
+        return StatwtResults(jobs=[statwt_result], flag_summaries=flag_summaries, wtables=wtables, use_contdat=use_contdat)
 
     def analyse(self, results):
         return results

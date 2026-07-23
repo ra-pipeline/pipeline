@@ -88,7 +88,7 @@ class CheckflagInputs(vdp.StandardInputs):
 
 
 class CheckflagResults(basetask.Results):
-    def __init__(self, jobs=None, results=None, summaries=None, vis_averaged=None, dataselect=None):
+    def __init__(self, jobs=None, results=None, summaries=None, vis_averaged=None, dataselect=None, use_contdat=False):
 
         if jobs is None:
             jobs = []
@@ -108,6 +108,7 @@ class CheckflagResults(basetask.Results):
         self.summaries = summaries
         self.vis_averaged = vis_averaged
         self.dataselect = dataselect
+        self.use_contdat = use_contdat
 
     def __repr__(self):
         s = 'Checkflag (rflag mode) results:\n'
@@ -259,6 +260,7 @@ class Checkflag(basetask.StandardTaskTemplate):
                                        'scan': scanselect,
                                        'intent': intentselect,
                                        'spw': self.sci_spws}
+        checkflag_result.use_contdat = use_contdat
 
         return checkflag_result
 
