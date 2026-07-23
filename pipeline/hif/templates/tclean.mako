@@ -359,7 +359,7 @@ except:
                 <tr>
                     <th>pbcor image max / min</th>
                     %for k in range(j, min(j+4, field_block_indices[i+1])):
-                        <td style="width:250px;">${image_info[k].pbcor}</td>
+                        <td style="width:250px;">${image_info[k].pbcor_minmax}</td>
                     %endfor
                 </tr>
                 <tr>

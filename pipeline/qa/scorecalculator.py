@@ -118,7 +118,8 @@ __all__ = ['score_polintents',                                # ALMA specific
            'score_testBPdcals_dts_ants',
            'score_testBPdcals_refant',
            'score_testBPdcals_delay',
-           'score_spw_solint']
+           'score_spw_solint',
+           'score_contdat_applied']
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -3577,8 +3578,8 @@ def score_multiply(scores_list):
 def score_sd_skycal_elevation_difference(
     ms: MeasurementSet,
     resultdict: dict,
-    threshold: float = 3.0
-) -> pqa.QAScore | None:
+    el_threshold: float,
+) -> list[pqa.QAScore]:
     """
     Compute QA score based on elevation difference between ON and OFF scans.
 
@@ -3591,17 +3592,17 @@ def score_sd_skycal_elevation_difference(
         ms: MeasurementSet object
         resultdict: A dictionary containing elevation difference results
                     for each field, antenna, and spw.
-        threshold: Elevation difference threshold in degrees for scoring.
+        el_threshold: Elevation difference threshold in degrees for scoring.
 
     Returns:
         A QAScore object representing the QA score based on elevation
         difference, or None if no valid metric score is available.
     """
     field_ids = list(resultdict.keys())
-    metric_score = []
-    el_threshold = threshold
-    lmsg_list = []
+    qascores = []
+    
     for field_id in field_ids:
+        metric_score = []
         field = ms.fields[field_id]
         if field_id not in resultdict:
             continue
@@ -3617,57 +3618,34 @@ def score_sd_skycal_elevation_difference(
                 if len(preceding) > 0:
                     max_pred = np.abs(preceding).max()
                     metric_score.append(max_pred)
-                    if max_pred >= el_threshold:
-                        warned_antennas.add(antenna_id)
                 if len(subsequent) > 0:
                     max_subq = np.abs(subsequent).max()
                     metric_score.append(max_subq)
-                    if max_subq >= el_threshold:
-                        warned_antennas.add(antenna_id)
-                LOG.debug('field {} antenna {} spw {} metric_score {}'.format(field_id, antenna_id, spw_id, metric_score))
 
-        if len(warned_antennas) > 0:
-            antenna_names = ', '.join([ms.antennas[a].name for a in warned_antennas])
-            lmsg_list.append(
-                'field {} (antennas {})'.format(field.name, antenna_names)
-            )
+                max_metric_score = np.max(metric_score)
+                if max_metric_score < el_threshold:
+                    score = 1.0
+                    ant = []
+                    shortmsg = f'Elevation difference between ON and OFF is within {el_threshold} deg.'
+                    longmsg = f'{shortmsg} for {ms.basename}: Field {field.name}'
+                else:
+                    score = 0.8
+                    ant = [ms.antennas[antenna_id].name]
+                    shortmsg = f'Elevation difference between ON and OFF exceeds {el_threshold} deg.'
+                    longmsg = f'{shortmsg} for {ms.basename}: Field {field.name} Antenna {ant}'
 
-    if len(lmsg_list) > 0:
-        longmsg = 'Elevation difference between ON and OFF exceeds threshold ({}deg) for {}: {}'.format(
-            el_threshold,
-            ms.basename,
-            ', '.join(lmsg_list)
-        )
-    else:
-        longmsg = 'Elevation difference between ON and OFF is below threshold ({}deg) for {}'.format(
-            el_threshold,
-            ms.basename
-        )
+                selection = pqa.TargetDataSelection(vis={ms.basename},
+                                                    field={field.name},
+                                                    ant=set(ant))
+                origin = pqa.QAOrigin(metric_name='OnOffElevationDifference',
+                                      metric_score=float(max_metric_score),
+                                      metric_units='deg')
 
-    # CAS-11054: it is decided that we do not calculate QA score based on elevation difference for Cycle 6
-    # PIPE-246: we implement QA score based on elevation difference for Cycle 7.
-    #           requirement is that score is 0.8 if elevation difference is larger than 3deg.
-    # make sure threshold is 3deg
-    assert el_threshold == 3.0
+                qascore = pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg,
+                                      origin=origin, applies_to=selection )
+                qascores.append(qascore)
 
-    if len(metric_score) == 0:
-        # no valid metric score, skip scoring
-        LOG.info("No valid elevation difference data found. Skipping QA scoring.")
-        return None
-
-    max_metric_score = np.max(metric_score)
-    # lower the score if elevation difference exceeds 3deg
-    score = 1.0 if max_metric_score < el_threshold else 0.8
-    origin = pqa.QAOrigin(metric_name='OnOffElevationDifference',
-                          metric_score=max_metric_score,
-                          metric_units='deg')
-
-    if score < 1.0:
-        shortmsg = 'Elevation difference between ON and OFF exceeds {}deg'.format(el_threshold)
-    else:
-        shortmsg = 'Elevation difference between ON and OFF is below {}deg'.format(el_threshold)
-
-    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, vis=ms.basename)
+    return qascores
 
 
 def log_edge_channels(
@@ -5679,3 +5657,29 @@ def score_spw_solint(vis: str, band: str, spw_solint: dict)-> pqa.QAScore | None
         )
 
     return qascore
+
+# PIPE-3046: adding QA score 1 if cont.dat is applied
+@log_qa
+def score_contdat_applied(vis: str)-> pqa.QAScore:
+    """Evaluate QA score based on whether cont.dat is applied"""
+
+    score = 1.0
+    longmsg = f"'cont.dat' file is present. Using VLA Spectral Line Heuristics for checkflagmode=target-vla."
+    shortmsg = f"cont.dat is applied"
+    origin = pqa.QAOrigin(
+        metric_name='score_contdat_applied',
+        metric_score=score,
+        metric_units=''
+    )
+
+    applies_to = pqa.TargetDataSelection(
+        vis={vis}
+    )
+
+    return pqa.QAScore(
+        score,
+        longmsg=longmsg,
+        shortmsg=shortmsg,
+        origin=origin,
+        applies_to=applies_to
+    )
