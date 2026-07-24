@@ -3176,13 +3176,11 @@ def score_sd_line_detection(
             and target selection.
         """
         ms_str = f'EB {ms_name}' if ms_name else ""
-        field_str = f'Field {field}' if field else ""
-        spw_str = 'Spw ' + ', '.join(map(str, sorted(spws))) if spws else ""
-        ant_str = 'Antenna ' + ', '.join(sorted(ants)) if ants else ""
+        field_str = f', Field {field}' if field else ""
+        spw_str = ', Spw ' + ', '.join(map(str, sorted(spws))) if spws else ""
+        ant_str = ', Antenna ' + ', '.join(sorted(ants)) if ants else ""
         shortmsg = f'{msg}.'
-        keys = ", ".join(filter(None, [ms_str, field_str, spw_str, ant_str]))
-        longmsg = f'{msg} in {keys}.' if ms_name or field or spws or ants else shortmsg
-        LOG.info( "###@@ longmsg={}".format(longmsg))
+        longmsg = f'{msg} in {ms_str}{field_str}{spw_str}{ant_str}.' if ms_name or field or spws or ants else shortmsg
         origin = pqa.QAOrigin(metric_name='score_sd_line_detection',
                               metric_score=metric_val,
                               metric_units=metric_units)
@@ -3223,14 +3221,14 @@ def score_sd_line_detection(
     # Process each baseline for line detection and DM
     for bl in result.outcome['baselined']:
         reduction_group_id = bl['group_id']
-        reduction_group_desc = reduction_group[reduction_group_id]
+        reduction_group_desc = context.observing_run.ms_reduction_group[reduction_group_id]
         member_list = bl['members']
         field_name = reduction_group_desc.field_name
 
         # vspw_id and sideband are uniform among all the members in a reduction_group
         rgm = reduction_group_desc[member_list[0]]
         vspw_id = context.observing_run.real2virtual_spw_id(rgm.spw.id, rgm.ms)
-        sideband = int(rgm.spw.sideband)  # sideband is 1 for USB, -1 for LSB,  rgm.spw.sideband is str
+        sideband = rgm.spw.sideband  # sideband is 1 for USB, -1 for LSB,  rgm.spw.sideband is str
 
         nchan = reduction_group_desc.nchan
         # PIPE-2959/PIPE-2964 use channelmap_range for QA evaluation
