@@ -67,6 +67,7 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
         rows = []
         for field in sorted(set(ranges_dict.keys())):
+            row_field = self.wrap_long_str(field)
             for spw in map(str, sorted(map(int, set(ranges_dict[field].keys())))):
                 momdiffsnr = self._get_momdiffsnr(result, field, spw)
                 plotfile = self._get_plotfile(context, result, field, spw)
@@ -83,7 +84,7 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                     flags_for_spw = []
 
                 if ranges_for_spw in non_detection:
-                    rows.append(TR(field='<b>{:s}</b>'.format(field), spw=spw, min='None', max='',
+                    rows.append(TR(field='<b>{:s}</b>'.format(row_field), spw=spw, min='None', max='',
                                    frame='None', status=status, momdiffsnr=-999.0, spectrum=plotfile, jointmask=jointmaskplot))
                 else:
                     raw_ranges_for_spw = [item['range'] for item in ranges_for_spw if isinstance(item, dict)]
@@ -104,7 +105,7 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                         # units of cont_ranges values
                         min_freq = measures.Frequency(range_min).str_to_precision(5)
                         max_freq = measures.Frequency(range_max).str_to_precision(5)
-                        rows.append(TR(field='<b>{:s}</b>'.format(field), spw=spw, min=min_freq, max=max_freq, frame=refer, status=status,
+                        rows.append(TR(field='<b>{:s}</b>'.format(row_field), spw=spw, min=min_freq, max=max_freq, frame=refer, status=status,
                                        momdiffsnr=momdiffsnr, spectrum=plotfile, jointmask=jointmaskplot))
 
         return utils.merge_td_columns(rows), rows
@@ -203,3 +204,23 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 '</a>'.format(**html_args))
 
         return html
+
+    def wrap_long_str(self, item_str, length=50):
+        '''Wraps a long string by inserting newline escape sequence(s).
+
+        :param item_str: comma separated list of items (string)
+        :param length: maximum number of characters in a text line (integer)
+        '''
+        if len(item_str) > length:
+            item_list = item_str.split(',')
+            # An item may have more digits/characters, and commas also contribute to the
+            # string length limit. If the modulo of the string created from the first n
+            # elements is larger than that of the first n+1 elements, then the line length
+            # limit has been reached and a linebreak is inserted.
+            wrapped_item_str = ['%s' % item_list[i] if len(','.join(item_list[0:i])) % length <
+                                len(','.join(item_list[0:i + 1])) % length else '\n%s' % item_list[i]
+                                for i in range(len(item_list) - 1)] + [item_list[-1]]
+
+            return ','.join(wrapped_item_str)
+        else:
+            return item_str
