@@ -539,18 +539,26 @@ class SDInspection:
                 reference_name = reference.name
                 LOG.debug('reference name: \'%s\'' % reference_name)
                 if target_name == reference_name:
+                    LOG.debug('matched: \'%s\'' % reference_name)
                     field_map[target.id] = reference.id
+                    break
+            else:
+                # this block will be effective when the observation
+                # uses absolute OFF where ON and OFF have their own
+                # fields (no break in the above loop)
 
-            # if not matched, search for absolute OFF
-            if target.id not in field_map:
+                # fallback to target field itself if no match is
+                # found in the following loop
+                field_map.setdefault(target.id, target.id)
+
+                # search for absolute OFF
                 for reference in reference_fields:
                     reference_name = reference.name
+                    LOG.debug('reference name: \'%s\'' % reference_name)
                     if _check_offsource_fieldname_maching(reference_name, target_name):
+                        LOG.debug('matched: \'%s\'' % reference_name)
                         field_map[target.id] = reference.id
-
-            # if no match, use target field itself as reference
-            if target.id not in field_map:
-                field_map[target.id] = target.id
+                        break
 
         calibration_strategy = {'tsys': do_tsys_transfer,
                                 'tsys_strategy': spwmap,
