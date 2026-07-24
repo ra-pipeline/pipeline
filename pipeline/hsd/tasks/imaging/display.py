@@ -827,28 +827,6 @@ class SDChannelMapDisplay(SDImageDisplay):
     NvPanel = 3
     NUM_CHANNELMAP = NhPanel * NvPanel
 
-    @functools.cached_property
-    def extended_velocity( self ) -> np.ndarray:
-        """
-        Extend self.velocity for 1 channel to cover edge cases
-
-        Added for PIPE-2683.
-        In some cases, the code tries to lookup the velocity value at 1 channel beyond
-        the array range, in order to determine the (upper) boundary of an edge channel.
-        To cover this case, an extended velocity array is prepared by extrapolating
-        for 1 channel.
-
-        Returns:
-            extended ndarray of velocities
-        """
-        assert len(self.velocity) > 1
-
-        extended_velocity = np.append(
-            self.velocity,
-            self.velocity[-1] + ( self.velocity[-1] - self.velocity[-2] )
-        )
-        return extended_velocity
-
     def plot(self) -> list[logger.Plot]:
         """Create list of channel maps.
 
@@ -1370,11 +1348,11 @@ class SDChannelMapDisplay(SDImageDisplay):
             List[float]: relative velocities for red vertical lines
         """
         # interpolate function to calculate velocities using extrapolation
-        num_velocities = len(self.extended_velocity)
+        num_velocities = len(self.velocity)
         vidx = np.array(idx_vertlines)
-        in_range_indices = vidx[np.logical_and(0 <= vidx, vidx < num_velocities - 1)]
+        in_range_indices = vidx[np.logical_and(0 <= vidx, vidx < num_velocities)]
         assert len(in_range_indices) > 0
-        chan2vel = interpolate.interp1d(in_range_indices, self.extended_velocity[in_range_indices],
+        chan2vel = interpolate.interp1d(in_range_indices, self.velocity[in_range_indices],
                                         bounds_error=False, fill_value='extrapolate')
 
         # get size of difference between the number of vertical lines and NUM_CHANNELMAP
