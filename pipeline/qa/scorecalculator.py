@@ -3176,11 +3176,12 @@ def score_sd_line_detection(
             and target selection.
         """
         ms_str = f'EB {ms_name}' if ms_name else ""
-        field_str = f', Field {field}' if field else ""
-        spw_str = ', Spw ' + ', '.join(map(str, sorted(spws))) if spws else ""
-        ant_str = ', Antenna ' + ', '.join(sorted(ants)) if ants else ""
+        field_str = f'Field {field}' if field else ""
+        spw_str = 'Spw ' + ', '.join(map(str, sorted(spws))) if spws else ""
+        ant_str = 'Antenna ' + ', '.join(sorted(ants)) if ants else ""
         shortmsg = f'{msg}.'
-        longmsg = f'{msg} in {ms_str}{field_str}{spw_str}{ant_str}.' if ms_name or field or spws or ants else shortmsg
+        keys = ", ".join(filter(None, [ms_str, field_str, spw_str, ant_str]))
+        longmsg = f'{msg} in {keys}.' if ms_name or field or spws or ants else shortmsg
         origin = pqa.QAOrigin(metric_name='score_sd_line_detection',
                               metric_score=metric_val,
                               metric_units=metric_units)
