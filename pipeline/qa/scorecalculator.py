@@ -3222,14 +3222,14 @@ def score_sd_line_detection(
     # Process each baseline for line detection and DM
     for bl in result.outcome['baselined']:
         reduction_group_id = bl['group_id']
-        reduction_group_desc = context.observing_run.ms_reduction_group[reduction_group_id]
+        reduction_group_desc = reduction_group[reduction_group_id]
         member_list = bl['members']
         field_name = reduction_group_desc.field_name
 
         # vspw_id and sideband are uniform among all the members in a reduction_group
         rgm = reduction_group_desc[member_list[0]]
         vspw_id = context.observing_run.real2virtual_spw_id(rgm.spw.id, rgm.ms)
-        sideband = rgm.spw.sideband  # sideband is 1 for USB, -1 for LSB,  rgm.spw.sideband is str
+        sideband = int(rgm.spw.sideband)  # sideband is 1 for USB, -1 for LSB,  rgm.spw.sideband is str
 
         nchan = reduction_group_desc.nchan
         # PIPE-2959/PIPE-2964 use channelmap_range for QA evaluation
