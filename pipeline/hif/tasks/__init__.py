@@ -4,6 +4,7 @@ from .bandpass import BandpassMode, ChannelBandpass, PhcorBandpass
 from .correctedampflag import Correctedampflag
 from .checkproductsize import CheckProductSize
 from .findcont import FindCont
+from .findroi import FindROI
 from .fluxscale import Fluxscale
 from .gaincal import GaincalMode, GTypeGaincal, GSplineGaincal, KTypeGaincal
 from .lowgainflag import Lowgainflag

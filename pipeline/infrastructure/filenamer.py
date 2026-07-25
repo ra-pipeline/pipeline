@@ -573,6 +573,10 @@ class CalibrationTable(NamingTemplate):
         """
         return self.extension('gc')
 
+    def gceff_cal(self):
+        """Set the filename extension as appropriate for a gceff calibration."""
+        return self.extension('gceff')
+
     def rq_cal(self):
         """Set the filename extension as appropriate for a rq
         calibration.
@@ -866,6 +870,10 @@ class GainCurvesCalibrationTable(CalibrationTable):
         super().__init__(other)
         self.gc_cal()
 
+class GainCurveEfficienciesCalibrationTable(CalibrationTable):
+    def __init__(self, other=None):
+        super().__init__(other)
+        self.gceff_cal()
 
 class RqCalibrationTable(CalibrationTable):
     def __init__(self, other=None):

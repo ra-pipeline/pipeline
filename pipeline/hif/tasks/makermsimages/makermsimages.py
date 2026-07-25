@@ -54,7 +54,8 @@ class MakermsimagesResults(basetask.Results):
                     datatype=rmsitem['datatype'],
                     multiterm=rmsitem['multiterm'],
                     metadata=rmsitem['metadata'],
-                    imageplot=rmsitem['imageplot'])
+                    imageplot=rmsitem['imageplot'],
+                    imagename_prefix=rmsitem.get('imagename_prefix'))
                 if 'TARGET' in rmsitem['sourcetype']:
                     context.rmsimlist.add_item(imageitem)
             except:
