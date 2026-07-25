@@ -362,7 +362,7 @@ def plot_tsys_scans(ms: MeasurementSet, source: Source, figfile: str) -> None:
     """
     LOG.info("Creating Tsys plot for source %s.", source.name)
     # Retrieve correct Tsys field for source based on mapping
-    tsys_field = select_tsys_field(ms, source)
+    tsys_fields = select_tsys_fields(ms, source)
 
     # Retrieve TARGET field positions and configurations
     fields = [f for f in source.fields if not is_tsys_only(f)]
@@ -371,7 +371,9 @@ def plot_tsys_scans(ms: MeasurementSet, source: Source, figfile: str) -> None:
     mean_direction = radec_to_direction(mean_ra, mean_dec)
 
     # Calculate Tsys scans offset to apply to plot
-    tsys_scans_dict = tsys_scans_radec(ms, mean_direction, tsys_field)
+    tsys_scans_dict = tsys_scans_radec(ms, mean_direction, tsys_fields[0])
+    for additional_tsys in tsys_fields[1:]:
+        tsys_scans_dict = tsys_scans_dict | tsys_scans_radec(ms, mean_direction, tsys_fields[0])
 
     # Create Tsys scans plot
     fig, ax, fontsize = create_figure(delta_ra, delta_dec, beam_diameters)
@@ -459,7 +461,7 @@ def label_format(x: float, _: Any) -> str:
     return formatted
 
 
-def select_tsys_field(
+def select_tsys_fields(
         ms: MeasurementSet,
         source: Source,
         ) -> Field:
@@ -496,16 +498,18 @@ def select_tsys_field(
     for field_str in tsys_fields:
         field_str_clean = field_str.strip().strip('"')
         if field_str_clean.isdigit() and int(field_str_clean) in src_by_id:
-            return src_by_id[int(field_str_clean)]
+            return [src_by_id[int(field_str_clean)]]
         if field_str_clean in src_by_name:
-            return src_by_name[field_str_clean]
+            return [src_by_name[field_str_clean]]
         # PIPE-2869: Partial name match
         for name in src_by_name:
             if field_str_clean.startswith(name):
-                return ms.get_fields(name=field_str)[0]
+                return [ms.get_fields(name=field_str)[0]]
 
-    # If truly nothing matched, raise a clear error instead of returning a wrong field silently.
-    raise LookupError(f"No Tsys field match for Tsys fields: {tsys_fields}")
+    # If nothing matched, return all fields;
+    # it would be better to return the nearest,
+    # but we don't have the dev. effort
+    return [ms.get_fields(name=x)[0] for x in tsys_fields]
 
 
 def is_tsys_only(field: Field) -> bool:
