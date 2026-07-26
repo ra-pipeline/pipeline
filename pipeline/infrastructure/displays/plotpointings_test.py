@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from pipeline.domain import Field, MeasurementSet, Source
-from pipeline.infrastructure.displays.plotpointings import select_tsys_field
+from pipeline.infrastructure.displays.plotpointings import select_tsys_fields
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -114,6 +114,6 @@ def test_select_tsys_field(case: tuple[MeasurementSet, Source, Field | None]) ->
     ms, source, expected = case
     if expected is None:
         with pytest.raises(LookupError):
-            select_tsys_field(ms, source)
+            select_tsys_fields(ms, source)
     else:
-        assert select_tsys_field(ms, source) == expected
+        assert select_tsys_fields(ms, source) == expected

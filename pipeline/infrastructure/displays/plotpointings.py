@@ -372,9 +372,12 @@ def plot_tsys_scans(ms: MeasurementSet, source: Source, figfile: str) -> None:
 
     # Calculate Tsys scans offset to apply to plot
     tsys_scans_dict = tsys_scans_radec(ms, mean_direction, tsys_fields[0])
+    LOG.debug(" %d scans found for tsys field %s.", len(tsys_scans_dict), tsys_fields[0].name)
     for additional_tsys in tsys_fields[1:]:
-        tsys_scans_dict = tsys_scans_dict | tsys_scans_radec(ms, mean_direction, additional_tsys)
-
+        additional_dict = tsys_scans_radec(ms, mean_direction, additional_tsys)
+        LOG.debug(" %d additional scans found for tsys field %s.", len(additional_dict), additional_tsys.name)
+        tsys_scans_dict = tsys_scans_dict | additional_dict
+        
     # Create Tsys scans plot
     fig, ax, fontsize = create_figure(delta_ra, delta_dec, beam_diameters)
     plot_dict = compute_element_locs(
