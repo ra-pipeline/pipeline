@@ -373,7 +373,7 @@ def plot_tsys_scans(ms: MeasurementSet, source: Source, figfile: str) -> None:
     # Calculate Tsys scans offset to apply to plot
     tsys_scans_dict = tsys_scans_radec(ms, mean_direction, tsys_fields[0])
     for additional_tsys in tsys_fields[1:]:
-        tsys_scans_dict = tsys_scans_dict | tsys_scans_radec(ms, mean_direction, tsys_fields[0])
+        tsys_scans_dict = tsys_scans_dict | tsys_scans_radec(ms, mean_direction, additional_tsys)
 
     # Create Tsys scans plot
     fig, ax, fontsize = create_figure(delta_ra, delta_dec, beam_diameters)
