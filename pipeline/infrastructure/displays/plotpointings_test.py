@@ -116,4 +116,4 @@ def test_select_tsys_field(case: tuple[MeasurementSet, Source, Field | None]) ->
         with pytest.raises(LookupError):
             select_tsys_fields(ms, source)
     else:
-        assert select_tsys_fields(ms, source) == expected
+        assert select_tsys_fields(ms, source)[0] == expected
