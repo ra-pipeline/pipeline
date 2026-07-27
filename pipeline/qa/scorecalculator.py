@@ -4560,7 +4560,7 @@ def score_polcal_results(session_name: str, caltables: list) -> pqa.QAScore:
     return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin)
 
 @log_qa
-def score_separation_angles(mses: MeasurementSet, sepangles: disck) -> pqa.QAScore:
+def score_separation_angles(mses: MeasurementSet, sepangles: dict) -> list[pqa.QAScore]:
     """
     The current heuristic exists only to 
     reports the separation angles between the TARGET
