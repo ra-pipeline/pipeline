@@ -243,11 +243,12 @@ class CleanBase(basetask.StandardTaskTemplate):
             plotdir = os.path.join(inputs.context.report_dir,
                                    'stage%s' % inputs.context.stage.split('_')[0])
             field_ids = inputs.heuristics.field(inputs.intent, inputs.field)
+            sourcename = inputs.heuristics.get_sourcename(inputs.vis, inputs.field, inputs.intent)
             result = TcleanResult(vis=inputs.vis,
                                   datacolumn=inputs.datacolumn,
                                   datatype=inputs.datatype,
                                   datatype_info=inputs.datatype_info,
-                                  sourcename=inputs.field,
+                                  sourcename=sourcename,
                                   field_ids=field_ids,
                                   intent=inputs.intent,
                                   spw=inputs.spw,
@@ -773,7 +774,7 @@ class CleanBase(basetask.StandardTaskTemplate):
                     name_list = ['{}.{}'.format(im_name, mterm) for mterm in ['tt0', 'tt1']]
             for name in name_list:
                 if os.path.exists(name):
-                    imageheader.set_miscinfo(name=name, spw=inputs.spw, virtspw=virtspw, field=inputs.field,
+                    imageheader.set_miscinfo(name=name, spw=inputs.spw, virtspw=virtspw, field=result.sourcename,
                                              datatype=inputs.datatype, type=im_type, iter=iter,
                                              intent=inputs.intent, specmode=inputs.hm_specmode,
                                              robust=inputs.robust, weighting=inputs.weighting,

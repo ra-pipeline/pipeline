@@ -203,7 +203,7 @@ except:
 
                     <tr>
                         <th>flatnoise image max / min</th>
-                        <td>${row.pbcor}</td>
+                        <td>${row.non_pbcor_minmax}</td>
                     </tr>
 
                     <tr>

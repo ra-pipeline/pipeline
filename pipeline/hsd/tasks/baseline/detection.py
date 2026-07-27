@@ -220,7 +220,8 @@ class DetectLine(basetask.StandardTaskTemplate):
 
             result = DetectLineResults(task=self.__class__,
                                        success=True,
-                                       outcome={'signals': detect_signal})
+                                       outcome={'signals': detect_signal,
+                                                'flagged_edges': [0, 0]})
 
             return result
 

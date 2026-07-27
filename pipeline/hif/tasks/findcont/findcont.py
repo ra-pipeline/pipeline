@@ -12,7 +12,6 @@ import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
-from pipeline.hif.heuristics import imageparams_factory
 from pipeline.hif.tasks.makeimlist import makeimlist
 from pipeline.hif.heuristics import findcont
 from pipeline.infrastructure import casa_tasks, casa_tools, task_registry
@@ -34,6 +33,21 @@ class FindContInputs(vdp.StandardInputs):
     datacolumn = vdp.VisDependentProperty(default='')
     parallel = vdp.VisDependentProperty(default='automatic')
 
+    @vdp.VisDependentProperty
+    def field(self):
+        if 'field' in self.context.size_mitigation_parameters:
+            return self.context.size_mitigation_parameters['field']
+        return ''
+
+    @field.convert
+    def field(self, val):
+        if not isinstance(val, (str, type(None))):
+            # PIPE-1881: allow field names that mistakenly get casted into non-string datatype by
+            # recipereducer (utils.string_to_val) and executeppr (XmlObjectifier.castType)
+            LOG.warning('The field selection input %r is not a string and will be converted.', val)
+            val = str(val)
+        return val
+
     @hm_mode.convert
     def hm_mode(self, value):
         allowed = ('coarse', 'normal')
@@ -46,7 +60,8 @@ class FindContInputs(vdp.StandardInputs):
 
     # docstring and type hints: supplements hif_findcont
     def __init__(self, context, output_dir=None, vis=None, target_list=None, hm_mosweight=None,
-                 hm_perchanweightdensity=None, hm_weighting=None, hm_mode=None, datacolumn=None, parallel=None):
+                 hm_perchanweightdensity=None, hm_weighting=None, hm_mode=None,
+                 field=None, datacolumn=None, parallel=None):
         """Initialize Inputs.
 
         Args:
@@ -61,6 +76,7 @@ class FindContInputs(vdp.StandardInputs):
                 Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
 
             target_list: Dictionary specifying targets to be imaged; blank will read list from context.
+                If target_list is specified, it takes precedence and the field parameter is ignored.
 
             hm_mosweight: Mosaic weighting. Defaults to '' to enable the automatic heuristics calculation.
                 Can be set to True or False manually.
@@ -72,6 +88,10 @@ class FindContInputs(vdp.StandardInputs):
 
             hm_mode: Continuum-finding imaging mode. "coarse" applies the new fast local override
                 and "normal" preserves the previous-cycle behavior.
+
+            field: Field selection to limit continuum finding to specific fields. Defaults to empty string,
+                which will process all fields. Can be used to restrict processing to a subset of fields.
+                Only used if target_list is not specified.
 
             datacolumn: Data column to image. Only to be used for manual overriding when the automatic choice by data type is not appropriate.
 
@@ -91,6 +111,7 @@ class FindContInputs(vdp.StandardInputs):
         self.hm_perchanweightdensity = hm_perchanweightdensity
         self.hm_weighting = hm_weighting
         self.hm_mode = hm_mode
+        self.field = field
         self.datacolumn = datacolumn
         self.parallel = parallel
 
@@ -191,10 +212,10 @@ class FindCont(basetask.StandardTaskTemplate):
             # Get list of fields and spw to work on from makeimlist call
 
             # Create makeimlist inputs
-            makeimlist_inputs = makeimlist.MakeImListInputs(inputs.context, vis=inputs.vis)
+            makeimlist_inputs = makeimlist.MakeImListInputs(
+                inputs.context, vis=inputs.vis, intent='TARGET', field=inputs.field, specmode='mfs'
+            )
             makeimlist_inputs.datatype = selected_datatype.name
-            makeimlist_inputs.intent = 'TARGET'
-            makeimlist_inputs.specmode = 'mfs'
             # PIPE-107 requests using a fixed robust value of 1.0
             makeimlist_inputs.robust = 1.0
             makeimlist_inputs.clearlist = True

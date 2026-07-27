@@ -137,9 +137,8 @@ def _compute_median_snr(caltable: str) -> dict:
 
 
 def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypecaltable=None,
-                bpdgain_touse=None, solint=None, append=None, executor=None):
-    """Run CASA task bandpass"""
-
+                bpdgain_touse=None, solint=None, append=None, executor=None, solnorm=None):
+    """Run CASA task bandpass."""
     m = context.observing_run.get_ms(vis)
     bandpass_field_select_string = context.evla['msinfo'][m.name].bandpass_field_select_string
     bandpass_scan_select_string = context.evla['msinfo'][m.name].bandpass_scan_select_string
@@ -167,7 +166,7 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
                           'refant': ','.join(RefAntOutput),
                           'minblperant': minBL_for_cal,
                           'minsnr': 5.0,
-                          'solnorm': False,
+                          'solnorm': solnorm,
                           'bandtype': 'B',
                           'fillgaps': 0,
                           'smodel': [],
@@ -255,9 +254,8 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
 
 
 def do_bandpassweakbp(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypecaltable=None,
-                      bpdgain_touse=None, solint=None, append=None):
-    """Run CASA task bandpass"""
-
+                      bpdgain_touse=None, solint=None, append=None, solnorm=None):
+    """Run CASA task bandpass."""
     m = context.observing_run.get_ms(vis)
     bandpass_field_select_string = context.evla['msinfo'][m.name].bandpass_field_select_string
     bandpass_scan_select_string = context.evla['msinfo'][m.name].bandpass_scan_select_string
@@ -280,7 +278,7 @@ def do_bandpassweakbp(vis, caltable, context=None, RefAntOutput=None, spw=None, 
                           'refant': ','.join(RefAntOutput),
                           'minblperant': minBL_for_cal,
                           'minsnr': 5.0,
-                          'solnorm': False,
+                          'solnorm': solnorm,
                           'bandtype': 'B',
                           'fillgaps': 0,
                           'smodel': [],
@@ -298,13 +296,13 @@ def do_bandpassweakbp(vis, caltable, context=None, RefAntOutput=None, spw=None, 
 
 
 def weakbp(vis, caltable, context=None, RefAntOutput=None, ktypecaltable=None,
-           bpdgain_touse=None, solint=None, append=None, executor=None, spw=''):
+           bpdgain_touse=None, solint=None, append=None, executor=None, spw='', solnorm=None):
 
     m = context.observing_run.get_ms(vis)
     channels = m.get_vla_numchan()  # Number of channels before averaging
 
     bpjob = do_bandpassweakbp(vis, caltable, context=context, spw=spw, RefAntOutput=RefAntOutput,
-                              ktypecaltable=ktypecaltable, bpdgain_touse=bpdgain_touse, solint='inf', append=False)
+                              ktypecaltable=ktypecaltable, bpdgain_touse=bpdgain_touse, solint='inf', append=False, solnorm=solnorm)
     executor.execute(bpjob)
     (largechunk, spwids) = computeChanFlag(vis, caltable, context)
     # print largechunk, spwids

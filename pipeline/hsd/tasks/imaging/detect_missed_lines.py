@@ -153,8 +153,9 @@ class DetectMissedLines:
                 ( line_center, line_width ) = ( line[0], line[1] )
                 line_center -= self.edge[0]
             line_ranges.append(
-                [ math.floor(line_center - line_width / 2.0),
-                  math.ceil(line_center + line_width / 2.0) ] )
+                [ max(0, math.floor(line_center - line_width / 2.0)),
+                  min(self.nchan-sum(self.edge)-1,
+                      math.ceil(line_center + line_width / 2.0)) ] )
 
         detections = self._detect_over_deviation_threshold(
             line_ranges,

@@ -45,12 +45,13 @@ class T2_4MDetailsSingleDishK2JyCalRenderer(basetemplates.T2_4MDetailsDefaultRen
         super().__init__(
             uri=uri, description=description, always_rerender=always_rerender)
 
+    @qautils.aggregate_qascores
     @qautils.sort_qascores
     def render(self, context: Context, result: SDK2JyCalResults) -> str:
         """
         Custom renderer for hsd_k2jycal()
 
-        This method sorts the QAScores with their scores, and renders the weblog,
+        This method aggregates and sorts the QAScores with their scores, and renders the weblog,
 
         Args:
             context: Pipeline context
@@ -59,7 +60,7 @@ class T2_4MDetailsSingleDishK2JyCalRenderer(basetemplates.T2_4MDetailsDefaultRen
             Rendered html document
         """
         # This method modifies the result object,
-        # but the changes do not propergate to the original result or context,
+        # but the changes do not propagate to the original result or context,
         # since they are local in render() thanks to the mechanism of PL infrastructure.
         # Therefore there is no need to bracket the aggregation process
         # with stashing and recovering the original result.qa.pool here.

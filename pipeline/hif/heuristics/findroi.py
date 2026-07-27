@@ -2114,7 +2114,18 @@ def _chan_ranges_to_frame_freq_ranges_ghz(
     chan_freqs_hz: np.ndarray | None,
 ) -> list[tuple[float, float]]:
     '''Convert channel ranges into output-frame frequency ranges in GHz.'''
-    return imaging.chan_ranges_to_freq_ranges_ghz(chan_ranges, chan_freqs_hz)
+    if chan_freqs_hz is None:
+        return []
+    freq = np.asarray(chan_freqs_hz, dtype=np.float64).ravel()
+    nchan = int(freq.size)
+    if nchan == 0:
+        return []
+    out = []
+    for lo, hi in chan_ranges:
+        a, b = sorted((max(0, min(int(lo), nchan - 1)), max(0, min(int(hi), nchan - 1))))
+        f0, f1 = sorted((float(freq[a]) * 1.0e-9, float(freq[b]) * 1.0e-9))
+        out.append((f0, f1))
+    return out
 
 
 def _fmt_frame_freq_ranges(
@@ -4018,7 +4029,11 @@ def run_findroi_mpi(
         for source_field_ids in field_groups.values()
         for fid in source_field_ids
     }
-    field_phase_centers = imaging.get_field_phase_centers_rad(getattr(ms0, 'fields', []))
+    field_phase_centers = {
+        int(field.id): (float(field.mdirection['m0']['value']), float(field.mdirection['m1']['value']))
+        for field in getattr(ms0, 'fields', [])
+        if getattr(field, 'mdirection', None) is not None
+    }
     if not field_phase_centers:
         raise RuntimeError('No field phase centers found in pipeline context.')
     common_geometry_plan = {

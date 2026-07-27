@@ -5,7 +5,7 @@ import pipeline.h.cli.utils as utils
 @utils.cli_wrapper
 def hif_findcont(vis=None, target_list=None, hm_mosweight=None,
                  hm_perchanweightdensity=None, hm_weighting=None,
-                 hm_mode=None, datacolumn=None, parallel=None):
+                 hm_mode=None, field=None, datacolumn=None, parallel=None):
     """Find continuum frequency ranges for a list of specified targets.
 
     If a `cont.dat` file is not already present in the working directory, then dirty image
@@ -36,5 +36,9 @@ def hif_findcont(vis=None, target_list=None, hm_mosweight=None,
         1. Perform continuum frequency range detection for all science targets and spws:
 
         >>> hif_findcont()
+
+        2. Perform continuum frequency range detection for a specific field:
+
+        >>> hif_findcont(field='M51')
 
     """

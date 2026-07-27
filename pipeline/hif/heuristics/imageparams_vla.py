@@ -25,6 +25,44 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
                                        linesfile, imaging_params, processing_intents)
         self.imaging_mode = 'VLA'
 
+    def get_sourcename(
+        self, vislist: list[str] | str, fieldlist: list[str] | str, intent: str, as_list: bool = False  # noqa: ARG002
+    ) -> list[str] | str:
+        """Get source name(s) from a measurement set list for given field and intent selections.
+
+        For VLA, return field names from the field selection (string field name), normalized and deduplicated,
+        in the requested format (list if as_list=True, else comma-separated string).
+
+        Args:
+            vislist: Measurement set file path(s). Accepted for API compatibility but not used,
+                as field selection is already validated upstream.
+            fieldlist: Field name(s) to normalize and return.
+            intent: Observation intent. Accepted for API compatibility but not used, as field
+                selection is already validated upstream.
+            as_list: If True, return deduplicated field names as list; otherwise as comma-separated string.
+
+        Returns:
+            List of field names if as_list=True, otherwise comma-separated string of field names.
+
+        Note: Unlike the base class, ALMA/VLA assume fieldlist contains pre-resolved
+        field names (not IDs) and don't filter by intent, as field selection has
+        already been validated upstream.
+        """
+        # Normalize fieldlist to a list
+        if isinstance(fieldlist, str):
+            normalized_field_list = [f.strip() for f in fieldlist.split(',') if f.strip()]
+        else:
+            normalized_field_list = fieldlist if fieldlist else []
+
+        # Deduplicate
+        deduplicated = utils.deduplicate(normalized_field_list)
+
+        # Return in requested format
+        if as_list:
+            return deduplicated
+        else:
+            return ','.join(deduplicated)
+
     def robust(self, specmode=None) -> float:
         """Tclean robust parameter heuristics.
         See PIPE-680 and CASR-543"""

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import collections
 import os
-import re
 from typing import TYPE_CHECKING
 
 import pipeline.infrastructure as infrastructure
@@ -86,7 +85,7 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
         """
         Custom renderer for hsd_baseline()
 
-        This method aggegates and sorts the QAScores, and renders the weblog,
+        This method aggregates and sorts the QAScores, and renders the weblog,
 
         Args:
             context: Pipeline context
@@ -94,6 +93,8 @@ class T2_4MDetailsSingleDishBaselineRenderer(basetemplates.T2_4MDetailsDefaultRe
         Returns:
             Rendered html document
         """
+        # This method modifies the result object
+        # but, the changes do not propagate to the original result or context,
         # This method modifies the result object,
         # but the changes do not propagate to the original result or context,
         # since they are local in render() thanks to the mechanism of PL infrastructure.

@@ -36,7 +36,7 @@ class T2_4MDetailsFlagDeterAlmaSdRenderer(super_renderer.T2_4MDetailsFlagDeterBa
             Rendered html document
         """
         # This method modifies the result object,
-        # but the changes do not propergate to the original result or context,
+        # but the changes do not propagate to the original result or context,
         # since they are local in render() thanks to the mechanism of PL infrastructure.
         # Therefore there is no need to bracket the aggregation process
         # with stashing and recovering the original result.qa.pool here.

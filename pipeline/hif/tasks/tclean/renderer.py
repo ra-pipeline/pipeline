@@ -29,8 +29,8 @@ _VALID_CHARS = f'_.-{string.ascii_letters}{string.digits}'
 ImageRow = collections.namedtuple('ImageInfo', (
     'vis field fieldname intent spw spwnames pol stokes_label frequency_label frequency beam beam_pa sensitivity '
     'cleaning_threshold_label cleaning_threshold initial_nsigma_mad_label initial_nsigma_mad '
-    'final_nsigma_mad_label final_nsigma_mad residual_ratio non_pbcor_label non_pbcor '
-    'pbcor score fractional_bw_label fractional_bw aggregate_bw_label aggregate_bw aggregate_bw_num '
+    'final_nsigma_mad_label final_nsigma_mad residual_ratio non_pbcor_label non_pbcor non_pbcor_minmax '
+    'pbcor_minmax score fractional_bw_label fractional_bw aggregate_bw_label aggregate_bw aggregate_bw_num '
     'nsigma_label nsigma vis_amp_ratio_label vis_amp_ratio  '
     'image_file datatype datatype_info nchan plot qa_url iterdone stopcode stopreason '
     'chk_pos_offset chk_frac_beam_offset chk_fitflux chk_fitpeak_fitflux_ratio img_snr '
@@ -418,10 +418,26 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                             r_image_rms/sp_scale, r_image_rms_min/sp_scale, r_image_rms_max/sp_scale, sp_str+brightness_unit)
 
                 #
+                # none-pbcor image min / max cell
+                #
+                if r.nonpbcor_image_max is None or r.nonpbcor_image_min is None:
+                    row_non_pbcor_minmax = '-'
+                else:
+                    if stokes_parameters != ['I']:
+                        r_nonpbcor_image_max = r.nonpbcor_image_max_iquv[stokes_indices[pol]]
+                        r_nonpbcor_image_min = r.nonpbcor_image_min_iquv[stokes_indices[pol]]
+                    else:
+                        r_nonpbcor_image_max = r.nonpbcor_image_max
+                        r_nonpbcor_image_min = r.nonpbcor_image_min
+                    sp_str, sp_scale = utils.get_si_prefix(r_nonpbcor_image_max, lztol=0)
+                    row_non_pbcor_minmax = '{:.3g} / {:.3g} {}'.format(r_nonpbcor_image_max/sp_scale,
+                                                            r_nonpbcor_image_min/sp_scale, sp_str+brightness_unit)
+
+                #
                 # pbcor image max / min cell
                 #
                 if r.image_max is None or r.image_min is None:
-                    row_pbcor = '-'
+                    row_pbcor_minmax = '-'
                 else:
                     if stokes_parameters != ['I']:
                         r_image_max = r.image_max_iquv[stokes_indices[pol]]
@@ -430,8 +446,8 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                         r_image_max = r.image_max
                         r_image_min = r.image_min
                     sp_str, sp_scale = utils.get_si_prefix(r_image_max, lztol=0)
-                    row_pbcor = '{:.3g} / {:.3g} {}'.format(r_image_max/sp_scale,
-                                                            r_image_min/sp_scale, sp_str+brightness_unit)
+                    row_pbcor_minmax = '{:.3g} / {:.3g} {}'.format(r_image_max/sp_scale,
+                                                                   r_image_min/sp_scale, sp_str+brightness_unit)
 
                 #
                 # fractional bandwidth calculation
@@ -644,7 +660,8 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                     residual_ratio=row_residual_ratio,
                     non_pbcor_label=non_pbcor_label,
                     non_pbcor=row_non_pbcor,
-                    pbcor=row_pbcor,
+                    non_pbcor_minmax=row_non_pbcor_minmax,
+                    pbcor_minmax=row_pbcor_minmax,
                     score=row_score,
                     fractional_bw_label=row_fractional_bw_label,
                     fractional_bw=row_fractional_bw,
@@ -1362,14 +1379,14 @@ class T2_4MDetailsTcleanVlassCubeRenderer(basetemplates.T2_4MDetailsDefaultRende
                             r_image_rms/sp_scale, r_image_rms_min/sp_scale, r_image_rms_max/sp_scale, sp_str+brightness_unit)
 
                 #
-                # un-pbcor image max / min cell
+                # non-pbcor image min / max cell
+                # Uses locally calculated per-stokes statistics for compatibility
+                # with the initial VLASS IQ imaging workflow
                 #
-                if r.image_max is None or r.image_min is None:
-                    row_pbcor = '-'
-                else:
-                    sp_str, sp_scale = utils.get_si_prefix(image_max, lztol=0)
-                    row_pbcor = '{:.3g} / {:.3g} {}'.format(image_max/sp_scale,
-                                                            image_min/sp_scale, sp_str+brightness_unit)
+                sp_str, sp_scale = utils.get_si_prefix(image_max, lztol=0)
+                row_non_pbcor_minmax = '{:.3g} / {:.3g} {}'.format(image_max/sp_scale,
+                                                        image_min/sp_scale, sp_str+brightness_unit)
+                row_pbcor_minmax = '-'
 
                 #
                 # fractional bandwidth calculation
@@ -1618,7 +1635,8 @@ class T2_4MDetailsTcleanVlassCubeRenderer(basetemplates.T2_4MDetailsDefaultRende
                     residual_ratio=row_residual_ratio,
                     non_pbcor_label=non_pbcor_label,
                     non_pbcor=row_non_pbcor,
-                    pbcor=row_pbcor,
+                    non_pbcor_minmax=row_non_pbcor_minmax,
+                    pbcor_minmax=row_pbcor_minmax,
                     score=row_score,
                     fractional_bw_label=row_fractional_bw_label,
                     fractional_bw=row_fractional_bw,
