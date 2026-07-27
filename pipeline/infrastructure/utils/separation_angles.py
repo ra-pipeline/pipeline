@@ -12,7 +12,6 @@ from pipeline.infrastructure import casa_tools
 
 if TYPE_CHECKING:
     from pipeline.domain import MeasurementSet
-    from pipeline.infrastructure.basetask import Results
     
 LOG = infrastructure.logging.get_logger(__name__)
 
