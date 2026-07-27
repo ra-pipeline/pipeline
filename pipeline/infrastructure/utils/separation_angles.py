@@ -39,6 +39,7 @@ def ms_separation_angles(
         field_dict = {}  # dict per ms
         mosaic_dict = {}
         ephemeris_dict = {}
+        mosaic_target = False
         field_tars = [field for field in msuse.get_fields(intent=main_intent)]
         # object will continually list ALL fields even if the same name (mosaic)
 
@@ -223,13 +224,13 @@ def is_mosaic(
 def is_eph_obj(msin, field_name):
     """ Method to check if the field object is an ephemeris or not
     as this needs a different extraction of the coordinates"""
-    is_eph_obj = False
+    is_eph_object = False
     #LOG.info('testing if ephem') # testing only 
     # can simply pass name to get fields and check the source property
-    is_eph_obj = msin.get_fields(field_name)[0].source.is_eph_obj  # just get first field with that name - if a mosaic there can be many 'field' objects
+    is_eph_object = msin.get_fields(field_name)[0].source.is_eph_obj  # just get first field with that name - if a mosaic there can be many 'field' objects
 
     
-    return is_eph_obj
+    return is_eph_object
 
 
 def get_median_separation(msin, fieldname, phasedir, eph_field):
@@ -279,7 +280,7 @@ def get_median_separation(msin, fieldname, phasedir, eph_field):
 
     unit_use = np.unique(cal_unit) # should all be the same, could use [0] also
     if len(unit_use) > 1:
-        LOG.warn('There is more than one unit used for the separation of fields')
+        LOG.warning('There is more than one unit used for the separation of fields')
         # we don't want to give anything back
         med_sepangle={'unit':'n/a', 'value':'n/a'}  # is there a better way to deal with this? 
        
@@ -294,7 +295,7 @@ def get_median_separation(msin, fieldname, phasedir, eph_field):
 ## static function associated only with spwphaseup
 ## to a common function 
 
-def derive_phase_to_target_check_mapping(ms: MeasurementSet) -> Dict[str, Set]:
+def derive_phase_to_target_check_mapping(ms: MeasurementSet) -> dict[str, set]:
     """
     Derive mapping between PHASE calibrator fields (by name) and
     corresponding fields (by name) with TARGET / CHECK intent that these

@@ -649,6 +649,8 @@ def sep_angles_for_table(context, sepangles, sepplots):
         rows_holder=[] # to get all but allow filtering if too many targets
         max_sep = 0.0
         min_sep = 99.0
+        maxfield = ""
+        minfield = ""
         for primary, secondaries in sepangles[keyu].items():
             # primary will be intent, fieldid, fieldname
             # secondaries is another dict with intent, fieldid, fieldname as key, and a dict as the value with unit and value.

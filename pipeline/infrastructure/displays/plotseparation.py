@@ -10,12 +10,10 @@ from matplotlib.patches import Polygon
 from matplotlib.ticker import FuncFormatter
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import lines, patches, ticker
-from scipy import interpolate
+from matplotlib import lines
 
 from pipeline import infrastructure
-from pipeline.domain import measures, unitformat
-from pipeline.h.heuristics.tsysfieldmap import get_intent_to_tsysfield_map
+from pipeline.domain import unitformat
 from pipeline.infrastructure import utils
 from pipeline.infrastructure.casa_tools import quanta
 from pipeline.domain.measures import ArcUnits, EquatorialArc
@@ -26,7 +24,7 @@ if TYPE_CHECKING:
     from matplotlib.text import Text
     from numpy.typing import NDArray
     from numpy import floating
-    from pipeline.domain import Field, MeasurementSet, Source 
+    from pipeline.domain import MeasurementSet, Source 
     
 LOG = infrastructure.logging.get_logger(__name__)
 

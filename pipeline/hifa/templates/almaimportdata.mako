@@ -11,13 +11,13 @@
         <thead>
 	    <tr>
 	        <th>Measurement Set</th>
-                <th>Field</th>
-                <th>Intent</th>
-                <th>Field</th>
-                <th>Intent</th>
-                <th>Separation angle (deg)</th>
-		<th>Separation angle plot
-            </tr>
+            <th>Field</th>
+            <th>Intent</th>
+            <th>Field</th>
+            <th>Intent</th>
+            <th>Separation angle (deg)</th>
+		    <th>Separation angle plot</th>
+        </tr>
 	</thead>
 	<tbody>
     % for tr in sepangle_table:
@@ -30,7 +30,7 @@
 	</tbody>
 </table>
 % else:
-    <p>No information available on intent separation angles.
+    <p>No information available on intent separation angles.</p>
 % endif
 
 <h3>Parallactic Angle Ranges</h3>

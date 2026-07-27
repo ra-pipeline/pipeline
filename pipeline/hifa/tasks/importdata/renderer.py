@@ -46,6 +46,8 @@ class T2_4MDetailsALMAImportDataRenderer(renderer.T2_4MDetailsImportDataRenderer
             # where is this from PIPE-836 removed the equivalant parang_ranges
             # from almaimportdata ? 
             sep_table = rendererutils.sep_angles_for_table(pipeline_context, result.sep_angles, sepang_plots) # context is context, result is from QA 
+        else:
+            sep_table = []  
 
 
         mako_context.update({
