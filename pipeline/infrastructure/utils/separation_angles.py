@@ -3,7 +3,6 @@
 # Do not evaluate type annotations at definition time.
 from __future__ import annotations
 
-import itertools
 from typing import TYPE_CHECKING
 import numpy as np
 from pipeline import infrastructure
