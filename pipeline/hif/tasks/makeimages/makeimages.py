@@ -648,7 +648,7 @@ class MakeImages(basetask.StandardTaskTemplate):
                            pbcor_image_max=cqa.quantity(pbcor_image_max, 'Jy/beam'),
                            nonpbcor_image_min=cqa.quantity(nonpbcor_image_min, 'Jy/beam'),
                            nonpbcor_image_max=cqa.quantity(nonpbcor_image_max, 'Jy/beam'),
-                           imagename=result.image.replace('.pbcor', ''),
+                           imagename=imname.replace('.pbcor', ''),
                            datatype=result.datatype)
 
 

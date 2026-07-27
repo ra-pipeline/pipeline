@@ -25,6 +25,44 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
                                        linesfile, imaging_params, processing_intents)
         self.imaging_mode = 'VLA'
 
+    def get_sourcename(
+        self, vislist: list[str] | str, fieldlist: list[str] | str, intent: str, as_list: bool = False  # noqa: ARG002
+    ) -> list[str] | str:
+        """Get source name(s) from a measurement set list for given field and intent selections.
+
+        For VLA, return field names from the field selection (string field name), normalized and deduplicated,
+        in the requested format (list if as_list=True, else comma-separated string).
+
+        Args:
+            vislist: Measurement set file path(s). Accepted for API compatibility but not used,
+                as field selection is already validated upstream.
+            fieldlist: Field name(s) to normalize and return.
+            intent: Observation intent. Accepted for API compatibility but not used, as field
+                selection is already validated upstream.
+            as_list: If True, return deduplicated field names as list; otherwise as comma-separated string.
+
+        Returns:
+            List of field names if as_list=True, otherwise comma-separated string of field names.
+
+        Note: Unlike the base class, ALMA/VLA assume fieldlist contains pre-resolved
+        field names (not IDs) and don't filter by intent, as field selection has
+        already been validated upstream.
+        """
+        # Normalize fieldlist to a list
+        if isinstance(fieldlist, str):
+            normalized_field_list = [f.strip() for f in fieldlist.split(',') if f.strip()]
+        else:
+            normalized_field_list = fieldlist if fieldlist else []
+
+        # Deduplicate
+        deduplicated = utils.deduplicate(normalized_field_list)
+
+        # Return in requested format
+        if as_list:
+            return deduplicated
+        else:
+            return ','.join(deduplicated)
+
     def robust(self, specmode=None) -> float:
         """Tclean robust parameter heuristics.
         See PIPE-680 and CASR-543"""
@@ -448,7 +486,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         else:
             return threshold
 
-    def imsize(self, fields, cell, primary_beam, sfpblimit=None, max_pixels=None,
+    def imsize(self, fields, cell, primary_beam, sfpblimit=None, max_pixels=None, min_pixels=None,
                centreonly=False, vislist=None, spwspec=None, intent: str = '', joint_intents: str = '',
                specmode=None) -> list | int:
         """
@@ -468,6 +506,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         :param sfpblimit: single field primary beam response. If provided then imsize is chosen such that the image
             edge is at normalised primary beam level equals to sfpblimit.
         :param max_pixels: maximum allowed pixel count, integer. The same limit is applied along both image axes.
+        :param min_pixels: minimum allowed pixel count, integer. The same limit is applied along both image axes.
         :param centreonly: if True, then ignore the spread of field centers.
         :param vislist: list of visibility path string to be used for imaging. If not set then use all visibilities
             in the context.
@@ -478,7 +517,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         :return: two element list of pixel count along x and y image axes.
         """
         if specmode in ('cube', 'repBW'):
-            return super().imsize(fields, cell, primary_beam, sfpblimit=sfpblimit, max_pixels=max_pixels,
+            return super().imsize(fields, cell, primary_beam, sfpblimit=sfpblimit, max_pixels=max_pixels, min_pixels=min_pixels,
                                   centreonly=centreonly, vislist=vislist, intent=intent, specmode=specmode)
         else:
             if spwspec is not None:
@@ -493,7 +532,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
                     # equivalent to second minimum of the Airy diffraction pattern; m = 2.233 in theta = m*lambda/D
                     sfpblimit = 0.016
 
-            return super().imsize(fields, cell, primary_beam, sfpblimit=sfpblimit, max_pixels=max_pixels,
+            return super().imsize(fields, cell, primary_beam, sfpblimit=sfpblimit, max_pixels=max_pixels, min_pixels=min_pixels,
                                   centreonly=centreonly, vislist=vislist, intent=intent, specmode=specmode)
 
     def imagename(self, output_dir=None, intent=None, field=None, spwspec=None, specmode=None, band=None, datatype: str = None) -> str:
