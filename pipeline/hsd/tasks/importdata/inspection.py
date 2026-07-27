@@ -555,7 +555,7 @@ class SDInspection:
                 for reference in reference_fields:
                     reference_name = reference.name
                     LOG.debug('reference name: \'%s\'' % reference_name)
-                    if _check_offsource_fieldname_maching(reference_name, target_name):
+                    if _check_offsource_fieldname_matching(reference_name, target_name):
                         LOG.debug('matched: \'%s\'' % reference_name)
                         field_map[target.id] = reference.id
                         break
@@ -617,7 +617,7 @@ class SDInspection:
 #         return match
 
 
-def _check_offsource_fieldname_maching(name1: str, name2: str) -> bool:
+def _check_offsource_fieldname_matching(name1: str, name2: str) -> bool:
     """
     Return True if two fieldnames follow the naming rule of OFF SOURCE.
 
