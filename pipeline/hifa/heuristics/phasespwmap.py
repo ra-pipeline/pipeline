@@ -7,7 +7,7 @@ import pipeline.infrastructure.utils as utils
 from pipeline.domain import SpectralWindow
 from pipeline.infrastructure import casa_tools
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 IntentField = collections.namedtuple('IntentField', 'intent field')
 SpwMapping = collections.namedtuple('SpwMapping', 'combine spwmap snr_info snr_threshold_used solint gaintype calc_snr_info')
