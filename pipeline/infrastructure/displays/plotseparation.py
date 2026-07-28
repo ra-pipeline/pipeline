@@ -24,9 +24,11 @@ if TYPE_CHECKING:
     from matplotlib.text import Text
     from numpy.typing import NDArray
     from numpy import floating
-    from pipeline.domain import MeasurementSet, Source 
+    from pipeline.domain import MeasurementSet 
     
 LOG = infrastructure.logging.get_logger(__name__)
+
+TITLE_FONT_SIZE = 12
 
 def plot_separations(
         ms: MeasurementSet,
@@ -54,7 +56,7 @@ def plot_separations(
     xmax = title_text.get_window_extent(fig.canvas.get_renderer()).xmax
     figwidth = fig.canvas.get_width_height()[0]
     if xmax > figwidth:
-        title_text.set_fontsize(title_font_size * figwidth / (2*xmax-figwidth))
+        title_text.set_fontsize(TITLE_FONT_SIZE * figwidth / (2*xmax-figwidth))
 
     fig.savefig(figfile, dpi=dpi)
     plt.close(fig)
@@ -251,8 +253,7 @@ def configure_labels(
         title text: The matplotlib format text of the title.
     """        
     title_string = f'{vis}\n Separation from PHASE - {field_name}(#{field_id})  '
-    title_font_size = 12
-    title_text = ax.set_title(title_string, size=title_font_size)
+    title_text = ax.set_title(title_string, size=TITLE_FONT_SIZE)
 
     # Axes labels
     ra_string = r'{:02d}$^{{\rm h}}${:02d}$^{{\rm m}}${:02.3f}$^{{\rm s}}$'.format(
@@ -289,7 +290,7 @@ def add_to_plot(
         fields: list,
         delta_ra: NDArray,
         delta_dec: NDArray
-        ) -> Tuple[dict,dict]:
+        ) -> tuple[dict, dict]:
     """Loop over list of field objects and plot the position
     offsets from the first phase calibrator field
 
@@ -356,7 +357,7 @@ def make_plus_patch(
         xpos: float,
         ypos: float,
         len_sym: float
-        ) -> List : # (of lists?)
+        ) -> list:
     """Produce a plus symbol outline to act as the plot symbol
     for the separation angle plots between INTENTS. Plus
     symbol is assumed to be symetric 
@@ -393,9 +394,9 @@ def make_plus_patch(
     return xyvertex
 
 def consolidate_labels(
-        field_ra_dec: List,
+        field_ra_dec: list,
         overlap: float = 0.9
-        ) -> Tuple:
+        ) -> tuple:
     """ Function to take the list (of lists) of the field object, delta ra and  
     delta dec positions of the TARGET intents that are plotted and consolidate 
     the lables and adjust where those labels will be positions for overlapping

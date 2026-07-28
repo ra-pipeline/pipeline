@@ -122,7 +122,7 @@ def ms_separation_angles(
                     else:
                         phase_intent_dir = phfield_use.mdirection # dont convert, it is what it is
 
-                    if mosaic_target:
+                    if mosaic_dict[field_use.name]:
                         # do the mosaic calc
                         cal_sep = get_median_separation(msuse, field_use.name, phase_intent_dir, ephemeris_dict[field_use.name])
                     else:    
