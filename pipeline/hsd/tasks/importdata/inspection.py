@@ -5,7 +5,7 @@ import os
 import re
 from typing import TYPE_CHECKING, Any
 
-import numpy
+import numpy as np
 import pipeline.infrastructure as infrastructure
 from pipeline.hsd.heuristics.rasterscan import RasterScanHeuristicsResult, RasterScanHeuristicsFailure
 from pipeline.hsd.tasks.common.inspection_util import (inspect_reduction_group,
@@ -137,7 +137,7 @@ class SDInspection:
                 LOG.info('Adding time table for Reduction Group %s (ms %s antenna %s spw %s field_id %s)' %
                          (group_id, ms.basename, ant, spw, field_id))
                 datatable.set_timetable(ant, spw, None, time_group_list[ant][spw][field_id],
-                                        numpy.array(time_group[0]), numpy.array(time_group[1]),
+                                        np.array(time_group[0]), np.array(time_group[1]),
                                         ms=ms.basename, field_id=field_id)
         datatable.exportdata(minimal=False)
 
@@ -266,7 +266,7 @@ class SDInspection:
         return by_antenna, by_spw, by_field
 
     def _group_data(self, datatable: DataTableImpl, position_group_id: int, time_group_id_small: int, time_group_id_large: int,
-                    startrow: int=0, nrow: int=-1) -> dict[str, numpy.array | dict[int, Any]]:
+                    startrow: int=0, nrow: int=-1) -> dict[str, np.array | dict[int, Any]]:
         """Inspect DataTable and generate time and position groups.
 
         Args:
@@ -304,16 +304,16 @@ class SDInspection:
         time_heuristic2 = heuristics.GroupByTime2()
         merge_heuristic2 = heuristics.MergeGapTables2()
         raster_heuristic = heuristics.RasterScanHeuristic()
-        ra = numpy.asarray(datatable.getcol('RA'))
-        dec = numpy.asarray(datatable.getcol('DEC'))
-        offset_ra = numpy.asarray(datatable.getcol('OFS_RA'))
-        offset_dec = numpy.asarray(datatable.getcol('OFS_DEC'))
-#         row = numpy.asarray(datatable.getcol('ROW'))
-        elapsed = numpy.asarray(datatable.getcol('ELAPSED'))
-        beam = numpy.asarray(datatable.getcol('BEAM'))
-        posgrp = numpy.zeros(datatable.nrow, dtype=numpy.int32) - 1
-        timegrp = [numpy.zeros(datatable.nrow, dtype=numpy.int32) - 1,
-                   numpy.zeros(datatable.nrow, dtype=numpy.int32) - 1]
+        ra = np.asarray(datatable.getcol('RA'))
+        dec = np.asarray(datatable.getcol('DEC'))
+        offset_ra = np.asarray(datatable.getcol('OFS_RA'))
+        offset_dec = np.asarray(datatable.getcol('OFS_DEC'))
+#         row = np.asarray(datatable.getcol('ROW'))
+        elapsed = np.asarray(datatable.getcol('ELAPSED'))
+        beam = np.asarray(datatable.getcol('BEAM'))
+        posgrp = np.zeros(datatable.nrow, dtype=np.int32) - 1
+        timegrp = [np.zeros(datatable.nrow, dtype=np.int32) - 1,
+                   np.zeros(datatable.nrow, dtype=np.int32) - 1]
         posgrp_rep = {}
         posgrp_list = {}
         timegrp_list = {}
@@ -370,16 +370,16 @@ class SDInspection:
                     timegrp_list[ant][spw][field_id] = None
 
                     # for (pol,vpol) in self.by_pol.items():
-                    id_list = numpy.fromiter(vant & vspw & vfield, dtype=numpy.int32)
+                    id_list = np.fromiter(vant & vspw & vfield, dtype=np.int32)
                     if len(id_list) == 0:
                         continue
                     id_list.sort()
                     LOG.debug('id_list=%s' % id_list)
-#                     row_sel = numpy.take(row, id_list)
-                    ra_sel = numpy.take(ra, id_list)
-                    dec_sel = numpy.take(dec, id_list)
-                    time_sel = numpy.take(elapsed, id_list)
-                    beam_sel = numpy.take(beam, id_list)
+#                     row_sel = np.take(row, id_list)
+                    ra_sel = np.take(ra, id_list)
+                    dec_sel = np.take(dec, id_list)
+                    time_sel = np.take(elapsed, id_list)
+                    beam_sel = np.take(beam, id_list)
 
                     # new GroupByPosition with translation
                     update_pos = (last_ra is None or
@@ -422,8 +422,8 @@ class SDInspection:
                     if pattern == 'RASTER' and self.hm_rasterscan == 'direction':
                         LOG.info('Performing RasterScanHeuristics for raster scan pattern')
                         try:
-                            sra_sel = numpy.take(offset_ra, id_list)
-                            sdec_sel = numpy.take(offset_dec, id_list)
+                            sra_sel = np.take(offset_ra, id_list)
+                            sdec_sel = np.take(offset_dec, id_list)
                             merge_table, merge_gap = raster_heuristic(sra_sel, sdec_sel)
                             raster_heuristic_ok = True
                         except RasterScanHeuristicsFailure as e:
@@ -534,19 +534,32 @@ class SDInspection:
             target_name = target.name
             LOG.debug('target name: \'%s\'' % target_name)
 
-            if len(reference_fields) == 0:
-                field_map[target.id] = target.id
-                continue
-
+            # first, check if target field serves as reference too
             for reference in reference_fields:
                 reference_name = reference.name
                 LOG.debug('reference name: \'%s\'' % reference_name)
-#                 tpattern = '^%s_[0-9]$'%(target_name)
-#                 rpattern = '^%s_[0-9]$'%(reference_name)
                 if target_name == reference_name:
+                    LOG.debug('matched: \'%s\'' % reference_name)
                     field_map[target.id] = reference.id
-                elif _check_offsource_fieldname_maching(reference_name, target_name):
-                    field_map[target.id] = reference.id
+                    break
+            else:
+                # this block will be effective when the observation
+                # uses absolute OFF where ON and OFF have their own
+                # fields (no break in the above loop)
+
+                # fallback to target field itself if no match is
+                # found in the following loop
+                field_map.setdefault(target.id, target.id)
+
+                # search for absolute OFF
+                for reference in reference_fields:
+                    reference_name = reference.name
+                    LOG.debug('reference name: \'%s\'' % reference_name)
+                    if _check_offsource_fieldname_matching(reference_name, target_name):
+                        LOG.debug('matched: \'%s\'' % reference_name)
+                        field_map[target.id] = reference.id
+                        break
+
         calibration_strategy = {'tsys': do_tsys_transfer,
                                 'tsys_strategy': spwmap,
                                 'calmode': calibration_type,
@@ -604,7 +617,7 @@ class SDInspection:
 #         return match
 
 
-def _check_offsource_fieldname_maching(name1: str, name2: str) -> bool:
+def _check_offsource_fieldname_matching(name1: str, name2: str) -> bool:
     """
     Return True if two fieldnames follow the naming rule of OFF SOURCE.
 
