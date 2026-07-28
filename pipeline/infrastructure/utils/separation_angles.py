@@ -34,27 +34,24 @@ def ms_separation_angles(
     
     for msuse in mses:
 
-        phase_target_check_pairing = derive_phase_to_target_check_mapping(msuse) 
+        phase_target_check_pairing = derive_phase_to_target_check_mapping(msuse)
         # returns a dict that is formatted as {PHASENAME: {TARGETNAME, TARGET2NAME, CHECKNAME}}, ie. names are a set
         field_dict = {}  # dict per ms
         mosaic_dict = {}
         ephemeris_dict = {}
-        mosaic_target = False
         field_tars = [field for field in msuse.get_fields(intent=main_intent)]
         # object will continually list ALL fields even if the same name (mosaic)
 
         # get the unique TARGET names and test if they are part of a mosaic
         field_name_unique = np.unique([field.name for field in field_tars])
         for field_unq in field_name_unique:
-            mosaic_target =  is_mosaic(msuse, field_unq)
-            mosaic_dict[field_unq]=mosaic_target
-            ephemeris_target = is_eph_obj(msuse, field_unq)
-            ephemeris_dict[field_unq]=ephemeris_target
-            
+            mosaic_dict[field_unq] = is_mosaic(msuse, field_unq)
+            ephemeris_dict[field_unq] = is_eph_obj(msuse, field_unq)
+
         # generally have only one PHASE and one CHECK
         # but lists allow to loop if otherwise (rare case but does happen)
         field_phase = [field for field in msuse.get_fields(intent='PHASE')]
-        field_check =  [field for field in msuse.get_fields(intent='CHECK')]
+        field_check = [field for field in msuse.get_fields(intent='CHECK')]
         
         
         for field_use in field_tars:  # this will still loop all fields - same name etc
