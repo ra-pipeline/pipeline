@@ -73,7 +73,8 @@ except Exception:
 AU_DAY_TO_M_S = 1731.45683633 * 1000.0
 _DEFAULT_FINDROI_CONFIG = {
     'timebin_sec': 240.0,
-    'min_nchan': 128,
+    # Sanity check to avoid accidentally running on fully averaged science-tagged SPWs.
+    'min_nchan': 5,
     'npix': 256,
     'fov_pb_mult': 1.5,
     'ref_sigma': 3.0,
@@ -555,9 +556,9 @@ def get_ddid_spw_inventory(vis: str, ms: Any) -> list[dict[str, Any]]:
 def select_science_ddids(
     inv: list[dict[str, Any]],
     science_spw_ids: set[int],
-    min_nchan: int = 128,
+    min_nchan: int = 5,
 ) -> list[int]:
-    '''Select science DDIDs using pipeline science SPWs plus local row-count filtering.'''
+    '''Select science DDIDs using pipeline science SPWs plus a small averaged-data sanity check.'''
     out = []
     for r in inv:
         if int(r['spw_id']) not in science_spw_ids:
