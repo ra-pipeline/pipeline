@@ -11,6 +11,8 @@ import numpy as np
 from pipeline import infrastructure
 from pipeline.infrastructure import basetask, casa_tasks, casa_tools, filenamer, utils
 from pipeline.infrastructure.renderer import logger
+from pipeline.infrastructure.displays import plotseparation
+import collections
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -566,6 +568,132 @@ def make_parang_plots(
         parang_plots[session_name]['html'] = html
 
     return parang_plots
+
+def make_separation_plots(
+        context: Context,
+        result: Results,
+) -> dict:
+    """
+    Create TARGET(s) to PHASE and CHECK calibrator 
+    separation angle plots for each measurement set.
+    """
+    # PIPE-65
+    
+    sepang_plots = {}
+    stage_id = f'stage{result.stage_number}'
+    ous_id = context.project_structure.ousstatus_entity_id
+    # get ms from context
+    mses = context.observing_run.measurement_sets
+    
+    for msuse in mses:
+        ms_name = msuse.name
+        LOG.info(f'Generating intent separation angle plot for {ms_name}')
+        sanitised_filename_component = filenamer.sanitize(f'{ous_id}_{ms_name}') 
+        plot_name = os.path.join(context.report_dir, stage_id, f'{sanitised_filename_component}_separation_angle.png')
+
+        # call the plotting code, it will make a plot 
+        plotseparation.plot_separations(msuse, plot_name)
+
+        sepang_plots[ms_name] = {}
+        sepang_plots[ms_name]['name'] = plot_name
+
+        # create a plot object so we can produce the thumbnail
+        plot_obj = logger.Plot(plot_name)
+
+        fullsize_relpath = get_relative_url(context.report_dir, stage_id, plot_name)
+        thumbnail_relpath = os.path.relpath(plot_obj.thumbnail, os.path.abspath(context.report_dir))
+        title = 'Separation of Target Phase Check intents for {}'.format(ms_name)
+
+        html_args = {
+            'fullsize': fullsize_relpath,
+            'thumbnail': thumbnail_relpath,
+            'title': title,
+            'alt': title,
+            'rel': 'separation-angle-plots'
+        }
+
+        html = ('<a href="{fullsize}"'
+                '   title="{title}"'
+                '   data-fancybox="{rel}"'
+                '   data-caption="{title}">'
+                '    <img data-src="{thumbnail}"'
+                '         title="{title}"'
+                '         alt="{alt}"'
+                '         class="lazyload img-responsive">'
+                '</a>'.format(**html_args))
+
+        
+        # as below with parallactic angle plots
+        sepang_plots[ms_name]['html'] = html
+    
+    return sepang_plots        
+
+
+def sep_angles_for_table(context, sepangles, sepplots):
+    """ 
+    Make a correct list object for the table to 
+    read and display the TARGET(s) to PHASE and CHECK calibrators
+    separation angle table.
+    """
+    # PIPE-65
+    
+    SepAng = collections.namedtuple('SepAng', 'ms field1 intent1 field2 intent2 sepang sepplot') 
+    MaxTargets = 5
+    # result.sep_angles is the dict as sepangles
+    # main key is measurementset ms
+    # then intent, fieldid, fieldname
+    # need to make tuple table
+    rows = []
+    for keyu in sepangles.keys(): 
+        msbasename = keyu
+        rows_holder=[] # to get all but allow filtering if too many targets
+        max_sep = 0.0
+        min_sep = 99.0
+        maxfield = ""
+        minfield = ""
+        for primary, secondaries in sepangles[keyu].items():
+            # primary will be intent, fieldid, fieldname
+            # secondaries is another dict with intent, fieldid, fieldname as key, and a dict as the value with unit and value.
+            intent1 = primary[0]
+            field1 = f'{primary[2]} (#{primary[1]})' # can use other string process like -->>  f"{field} (#{fieldid})"
+            # pull the items into a tuple
+            intent2 = [(fld2,id2,nm2,ang['unit'],ang['value']) for (fld2,id2,nm2),ang in secondaries.items()][0] # only item per secondary
+            field2 = f'{intent2[2]} (#{intent2[1]})'
+            if intent2[3] == 'deg':
+                sepvalue=round(intent2[4],2) # or 3 dp ?
+                if intent1 == 'TARGET':
+                    if sepvalue > max_sep:
+                        max_sep = sepvalue
+                        maxfield = SepAng(msbasename, field1, intent1, field2, intent2[0], sepvalue, sepplots[keyu]['html'])
+                    if sepvalue < min_sep:
+                        min_sep = sepvalue
+                        minfield = SepAng(msbasename, field1, intent1, field2, intent2[0], sepvalue, sepplots[keyu]['html'])
+                rows_holder.append(SepAng(msbasename, field1, intent1, field2, intent2[0], sepvalue, sepplots[keyu]['html'])) # format as the input tuple
+                # Log output so all fields/intents are at least listed even if filtered below.
+                LOG.info('Separation Angle of Fields: '+field1+'('+intent1+') - '+field2+'('+intent2[0]+') is '+str(sepvalue)+' deg')
+            else:
+                rows_holder.append(SepAng(msbasename, field1, intent1, field2, intent2[0], 'n/a', 'n/a')) # if there is an issue with unit or something return n/a
+                LOG.info('Separation Angle of Fields: '+field1+'('+intent1+') - '+field2+'('+intent2[0]+') is n/a')
+
+        # now we assess if we have too many targets and
+        # only append the fields with max and min separations
+        # along with any CHECK intents to be tabulated.
+        field_counts = collections.Counter(elem.intent1 for elem in rows_holder)
+        if field_counts['TARGET'] > MaxTargets:
+            LOG.info('There are more than 5 target fields will populate importdata table with min/max separation TARGET to PHASE')
+            rows.append(minfield)
+            rows.append(maxfield)
+            for row in rows_holder:
+                if row.intent1 == 'CHECK':
+                    rows.append(row)
+        # otherwise append all information
+        else:
+            for row in rows_holder:
+                rows.append(row)
+                    
+
+    return utils.merge_td_columns(rows)   
+
 
 
 def get_multiple_line_string(values: Iterable[Any], str_format: str = '{}', separator: str = '<br>') -> str:
