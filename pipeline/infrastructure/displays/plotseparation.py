@@ -123,7 +123,7 @@ def get_field_object(
     PHASE cal, CHECK source (if present) and TARGET(s)
 
     Args:
-        ms: MesurementSet object
+        ms: MeasurementSet object
     
     Returns:
         fields: flattened list of the field objects in order for PHASE, CHECK, TARGET(s)
@@ -132,7 +132,7 @@ def get_field_object(
     phase_fld = [fld for fld in ms.get_fields(intent='PHASE')]
     check_fld =[fld for fld in ms.get_fields(intent='CHECK')] 
     target_fld = [fld for fld in ms.get_fields(intent='TARGET')] 
-    target_fld_final = [] # use to only append the targets we plot, e.g. mosaic is a single positon with name mosaic
+    target_fld_final = [] # use to only append the targets we plot, e.g. mosaic is a single position with name mosaic
     
     # if we have a mosaic, just pass the first position, append later name of 'mosaic'
     unique_tars = np.unique([fld.name for fld in target_fld])
@@ -155,7 +155,7 @@ def get_field_object(
 def get_position_offsets(
         fields: list
         ) -> tuple[NDArray[floating], NDArray[floating], NDArray[floating], NDArray[floating]]: # returns two arrays
-    """Extract the relavant RA and DEC directions and compute the 
+    """Extract the relevant RA and DEC directions and compute the 
     offsets with respect to the first in the list of fields positions for plotting
 
     Args:
@@ -163,8 +163,8 @@ def get_position_offsets(
         fields: A list of Field objects including the non Tsys-only fields.
 
     Returns:
-        delta_ra: difference in ra values w.r.t the first field positon in radians for each field.
-        delta_dec: difference in dec values w.r.t the first field posiion in radians for each field.
+        delta_ra: difference in ra values w.r.t the first field position in radians for each field.
+        delta_dec: difference in dec values w.r.t the first field position in radians for each field.
     """
     
     ra  = np.array([quanta.convert(f.mdirection['m0']['value'], 'rad')['value'] for f in fields])
@@ -360,7 +360,7 @@ def make_plus_patch(
         ) -> list:
     """Produce a plus symbol outline to act as the plot symbol
     for the separation angle plots between INTENTS. Plus
-    symbol is assumed to be symetric 
+    symbol is assumed to be symmetric 
 
     Args:
         xpos: x-axes central position as a float
@@ -441,7 +441,7 @@ def consolidate_labels(
                 for index_sec in range(index_pri+1, len(field_ra_dec[0])):
                     if index_sec not in index_out:
                         # if the position is between the extremeties of those in the holder
-                        # acconting for the overlap, then the field is overlapping
+                        # accounting for the overlap, then the field is overlapping
                         if ((field_ra_dec[1][index_sec] > min(hold_lab_ra)-overlap) and \
                            (field_ra_dec[1][index_sec] < max(hold_lab_ra) +overlap))   and \
                            ((field_ra_dec[2][index_sec] > min(hold_lab_dec) -overlap) and \
@@ -482,7 +482,7 @@ def consolidate_labels(
                 lab_dec.append(hold_lab_dec[0])
                 lab_loc.append('center')
         #else:
-        #    LOG.info(' the field index '+str(index_pri)+' is alerdy overlapping something, bypass this primary loop') # testing
+        #    LOG.info(' the field index '+str(index_pri)+' is already overlapping something, bypass this primary loop') # testing
 
     return zip(field_ids, lab_ra, lab_dec, lab_loc)
 

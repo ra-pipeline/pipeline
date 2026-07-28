@@ -4605,7 +4605,7 @@ def score_separation_angles(mses: MeasurementSet, sepangles: dict) -> list[pqa.Q
                 longmsg = 'For %s the %s %s to %s %s separation angle cannot be extracted'%(ms.basename, intent1, field1, intent2[0], field2)
                 shortmsg = ' %s to %s is n/a'%(field1, field2)
                 reportsep='n/a'
-            # for QA scrore data selection
+            # for QA score data selection
             fieldqa = field1+','+field2
             intentqa = intent1+','+intent2[0]
                 

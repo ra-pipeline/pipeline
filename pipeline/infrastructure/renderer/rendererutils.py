@@ -669,7 +669,7 @@ def sep_angles_for_table(context, sepangles, sepplots):
                         min_sep = sepvalue
                         minfield = SepAng(msbasename, field1, intent1, field2, intent2[0], sepvalue, sepplots[keyu]['html'])
                 rows_holder.append(SepAng(msbasename, field1, intent1, field2, intent2[0], sepvalue, sepplots[keyu]['html'])) # format as the input tuple
-                # Log output so all fields/intents are at least listed even if filterd below.
+                # Log output so all fields/intents are at least listed even if filtered below.
                 LOG.info('Separation Angle of Fields: '+field1+'('+intent1+') - '+field2+'('+intent2[0]+') is '+str(sepvalue)+' deg')
             else:
                 rows_holder.append(SepAng(msbasename, field1, intent1, field2, intent2[0], 'n/a', 'n/a')) # if there is an issue with unit or something return n/a

@@ -30,7 +30,7 @@ def ms_separation_angles(
     sep_dict = {}  # should this be a collections.dict ? 
     main_intent = 'TARGET'
 
-    LOG.info('Computing the separaton angles of fields with the TARGET(s)')
+    LOG.info('Computing the separation angles of fields with the TARGET(s)')
     
     for msuse in mses:
 
@@ -89,7 +89,7 @@ def ms_separation_angles(
                 if refdir == 'B1950' or refdir == 'J2000':
                     main_intent_dir = cme.measure(field_use.mdirection, 'ICRS') # this converts
                 elif refdir == 'ICRS':
-                    main_intent_dir = field_use.mdirection # dont need to conver ICRS already and cme takes ages
+                    main_intent_dir = field_use.mdirection # don't need to convert ICRS, already in correct frame
                 else:
                     main_intent_dir = field_use.mdirection # dont convert anything
 
@@ -103,7 +103,7 @@ def ms_separation_angles(
                 
             # technically should be only one phase - the way the loop is written for each target we 're-get' the
             # phase values again - the other coding alternative is loop TAR, PH, CH separate then loop over the
-            # stored value. This is anyway fast enuigh (seconds) that I don't believe the investment of
+            # stored value. This is anyway fast enough (seconds) that I don't believe the investment of
             # and alternative logic loop is required
             
             phcount=0
@@ -118,9 +118,9 @@ def ms_separation_angles(
                     if refdir == 'B1950' or refdir == 'J2000':
                         phase_intent_dir = cme.measure(phfield_use.mdirection, 'ICRS') # this converts
                     elif refdir == 'ICRS':
-                        phase_intent_dir = phfield_use.mdirection # dont need to conver ICRS already and cme takes ages
+                        phase_intent_dir = phfield_use.mdirection # don't need to convert ICRS, already in correct frame
                     else:
-                        phase_intent_dir = phfield_use.mdirection # dont convert, it is what it is
+                        phase_intent_dir = phfield_use.mdirection # don't convert, use direction as-is
 
                     if mosaic_dict[field_use.name]:
                         # do the mosaic calc
@@ -133,7 +133,7 @@ def ms_separation_angles(
                 else:
                     continue # next one in the phase loop
                 
-                if phcount > 1:   # shoudlnt happen but add this log for now
+                if phcount > 1:   # shouldn't happen but add this log for now
                     LOG.info('There is more than one Phase cal for the allowed fields') # testing only - need to check with a multi-phasecal PL-able project
 
 
@@ -147,7 +147,7 @@ def ms_separation_angles(
             if refdir == 'B1950' or refdir == 'J2000':
                 check_intent_dir = cme.measure(chkfield_use.mdirection, 'ICRS') # this converts
             elif refdir == 'ICRS':
-                check_intent_dir = chkfield_use.mdirection # dont need to conver ICRS already and cme takes ages
+                check_intent_dir = chkfield_use.mdirection # don't need to convert ICRS, already in correct frame
             else:
                 check_intent_dir = chkfield_use.mdirection # dont convert, it is what it is
 
@@ -164,9 +164,9 @@ def ms_separation_angles(
                     if refdir == 'B1950' or refdir == 'J2000':
                         phase_intent_dir = cme.measure(phfield_use.mdirection, 'ICRS') # this converts
                     elif refdir == 'ICRS':
-                        phase_intent_dir = phfield_use.mdirection # dont need to conver ICRS already and cme takes ages
+                        phase_intent_dir = phfield_use.mdirection # don't need to convert ICRS, already in correct frame
                     else:
-                        phase_intent_dir = phfield_use.mdirection # dont convert, it is what it is     
+                        phase_intent_dir = phfield_use.mdirection # don't convert, use direction as-is
                     cal_sep = cme.separation(check_intent_dir, phase_intent_dir)  # measures dict with a 'value' and 'unit' (deg)
                     field_dict[('CHECK',chkfield_use.id,chkfield_use.name)] = {('PHASE', phfield_use.id, phfield_use.name): cal_sep}
                 else:
@@ -206,7 +206,7 @@ def is_mosaic(
     fld_obj = ms.get_fields(intent='TARGET')
     field_str_list = [fld.id for fld in fld_obj if
                       field_name.replace(' ', '') == fld.name.replace(' ','')]
-                     # note matching string used fromm imageparams_base code
+                     # note matching string used from imageparams_base code
 
     field_str_list = ','.join(str(fld_id) for fld_id in field_str_list)
 
@@ -236,7 +236,7 @@ def is_eph_obj(msin, field_name):
 def get_median_separation(msin, fieldname, phasedir, eph_field):
     """
     To get all separation angles for a mosaic field
-    and simply use the median - this is sufficent
+    and simply use the median - this is sufficient
     for the phase referencing table
 
     NOTE - in comparing with methods in "imageparams_base.py"
@@ -259,18 +259,18 @@ def get_median_separation(msin, fieldname, phasedir, eph_field):
             if refdir == 'B1950' or refdir == 'J2000':
                 main_intent_dir = cme.measure(fldu.mdirection, 'ICRS') # this converts
             elif refdir == 'ICRS':
-                main_intent_dir = fldu.mdirection # dont need to conver ICRS already and cme takes ages
+                main_intent_dir = fldu.mdirection # don't need to convert ICRS, already in correct frame
             else:
-                main_intent_dir = fldu.mdirection # dont convert, it is what it is
+                main_intent_dir = fldu.mdirection # don't convert, use direction as-is
         else:  # is a mosaic of an ephemeris 
             LOG.info('Is an ephemeris mosaic - using source direction')
             refdir = cme.getref(fldu.source.direction)
             
-            # calcalte the positons
+            # calculate the positions
             if refdir == 'B1950' or refdir == 'J2000':
                 main_intent_dir = cme.measure(fldu.source.direction, 'ICRS') # this converts
             elif refdir == 'ICRS':
-                main_intent_dir = fldu.source.direction # dont need to conver ICRS already and cme takes ages
+                main_intent_dir = fldu.source.direction # don't need to convert ICRS, already in correct frame
             else:
                 main_intent_dir = fldu.source.direction # dont convert, it is what it is
                     
