@@ -49,9 +49,8 @@ def get_intent_to_tsysfield_map(ms: MeasurementSet, is_single_dish: bool) -> dic
     return converted
 
 
-def get_tsys_fields_for_intent(ms: MeasurementSet, intent: str, exclude_intents: str | None = None) -> set[str]:
-    """
-    Returns the identity of the Tsys field(s) for an intent.
+def get_tsys_fields_for_intent(ms: MeasurementSet, intent: str, exclude_intents: str | None = None) -> list[str]:
+    """Return the identity of the Tsys field(s) for an intent.
 
     Args:
         ms: MS to analyse.
@@ -60,7 +59,7 @@ def get_tsys_fields_for_intent(ms: MeasurementSet, intent: str, exclude_intents:
             be covered by the Tsys field.
 
     Returns:
-        Set of field identifiers corresponding to given intent, while not
+        Insertion-ordered list of unique field identifiers corresponding to given intent, while not
         associated with intents (optionally) given by ``exclude_intents``.
     """
     # In addition to the science intent scan, a field must also have a Tsys
@@ -104,13 +103,14 @@ def get_tsys_fields_for_intent(ms: MeasurementSet, intent: str, exclude_intents:
                                    for pointing in mosaic_fields
                                    for f in pointing.source.fields if 'ATMOSPHERE' in f.intents]
 
-    r = {field.id for field in intent_fields_with_tsys}
-    r.update({field.id for field in tsys_fields_for_mosaics})
-
     # when field names are not unique, as is usually the case for science
     # mosaics, then we must reference the numeric field ID instead
     field_identifiers = utils.get_field_identifiers(ms)
-    return {field_identifiers[i] for i in r}
+
+    # Preserve insertion order while deduplicating
+    all_fields = [field_identifiers[field.id] for field in intent_fields_with_tsys]
+    all_fields.extend(field_identifiers[field.id] for field in tsys_fields_for_mosaics)
+    return utils.deduplicate(all_fields)
 
 
 def get_solution_map(ms: MeasurementSet, is_single_dish: bool) -> list[GainfieldMapping]:
@@ -129,11 +129,14 @@ def get_solution_map(ms: MeasurementSet, is_single_dish: bool) -> list[Gainfield
     def f(intent, exclude: str | None = None) -> str:
         if ',' in intent:
             head, tail = intent.split(',', 1)
-            # the 'if o' test filters out results for intents that do not have
-            # fields, e.g., PHASE for SD data
-            # de-deuplicate list before joining as a string
-            tsys_fields = utils.deduplicate(o for o in (f(head, exclude=exclude), f(tail, exclude=exclude)) if o)
-            return ','.join(tsys_fields)
+            # Split comma-separated results into individual fields and deduplicate
+            # at the field ID level (not at the string level)
+            all_fields = []
+            for field_str in (f(head, exclude=exclude), f(tail, exclude=exclude)):
+                if field_str:
+                    all_fields.extend(field_str.split(','))
+            unique_fields = utils.deduplicate(all_fields)
+            return ','.join(unique_fields)
         return ','.join(str(s) for s in get_tsys_fields_for_intent(ms, intent, exclude_intents=exclude))
 
     # return different gainfield maps for single dish and interferometric
