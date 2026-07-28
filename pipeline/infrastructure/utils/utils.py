@@ -763,6 +763,18 @@ def open_with_lock(filename: str, mode: str = 'r', *args: Any, **kwargs: Any) ->
 
     finally:
         if lock_acquired:
+            # Flush buffer and sync to disk before releasing lock to ensure
+            # other processes see complete/consistent data. Critical for
+            # distributed filesystems like Lustre under concurrent MPI access.
+            # Only needed for write operations.
+            if 'w' in mode or 'a' in mode or '+' in mode:
+                try:
+                    fd.flush()
+                    os.fsync(fd.fileno())
+                    LOG.debug('Flushed and synced %s to disk before releasing lock', filename)
+                except OSError as ex:
+                    LOG.error('CRITICAL: Failed to flush/sync %s before releasing lock: %s. Data may be incomplete!', filename, ex)
+
             try:
                 fcntl.flock(fd, fcntl.LOCK_UN)
                 LOG.debug('Successfully released lock on %s', filename)

@@ -349,8 +349,7 @@ def plot_mosaic_source(ms: MeasurementSet, source: Source, figfile: str) -> None
 
 
 def plot_tsys_scans(ms: MeasurementSet, source: Source, figfile: str) -> None:
-    """
-    Produce a plot of the Tsys scans relative to the target pointings.
+    """Produce a plot of the Tsys scans relative to the target pointings.
 
     Args:
         ms: MeasurementSet object.
@@ -363,6 +362,9 @@ def plot_tsys_scans(ms: MeasurementSet, source: Source, figfile: str) -> None:
     LOG.info("Creating Tsys plot for source %s.", source.name)
     # Retrieve correct Tsys field for source based on mapping
     tsys_field = select_tsys_field(ms, source)
+    if tsys_field is None:
+        LOG.warning("No Tsys field found for source %s, skipping Tsys plot.", source.name)
+        return
 
     # Retrieve TARGET field positions and configurations
     fields = [f for f in source.fields if not is_tsys_only(f)]
@@ -372,12 +374,13 @@ def plot_tsys_scans(ms: MeasurementSet, source: Source, figfile: str) -> None:
 
     # Calculate Tsys scans offset to apply to plot
     tsys_scans_dict = tsys_scans_radec(ms, mean_direction, tsys_field)
+    LOG.debug(" %d scans found for tsys field %s.", len(tsys_scans_dict), tsys_field.name)
 
     # Create Tsys scans plot
     fig, ax, fontsize = create_figure(delta_ra, delta_dec, beam_diameters)
     plot_dict = compute_element_locs(
         fields, delta_ra, delta_dec, dish_diameters, beam_diameters, tsys_scans_dict=tsys_scans_dict,
-        )
+    )
     legend_labels, legend_colors = add_elements_to_plot(ax, plot_dict, fontsize=fontsize)
 
     # Add title, legend, and labels
@@ -462,30 +465,29 @@ def label_format(x: float, _: Any) -> str:
 def select_tsys_field(
         ms: MeasurementSet,
         source: Source,
-        ) -> Field:
-    """
-    Pick the best-matching Tsys field for a given source.
+) -> Field | None:
+    """Pick the best-matching Tsys field for a given source.
 
     Selection order (stop at first non-empty result):
       1) Exact ID match among the source's fields
       2) Exact NAME match among the source's fields (case-insensitive configurable)
       3) Partial NAME match to account for prefix/suffix additions
+      4) Nearest field by angular separation
 
     Args:
         ms: MeasurementSet object.
         source: Source object.
 
     Returns:
-        A Field object of the associated Tsys field.
-
-    Raises:
-        LookupError if no Tsys fields are found or if no Tsys field is matched to the source.
+        A Field object of the associated Tsys field, or None if no Tsys fields are
+        found in the mapping for TARGET intent.
     """
     # Retrieve correct Tsys field for source based on mapping
     is_sd = ms.array_name == 'TP'
     tsys_fields = get_intent_to_tsysfield_map(ms, is_single_dish=is_sd)['TARGET'].split(',')
-    if not tsys_fields:
-        raise LookupError('No Tsys fields associated with TARGET.')
+    if not any(x.strip() for x in tsys_fields):
+        LOG.warning('No Tsys fields associated with TARGET for source %s.', source.name)
+        return None
 
     # Precompute lookup structures
     src_fields = source.fields
@@ -504,8 +506,13 @@ def select_tsys_field(
             if field_str_clean.startswith(name):
                 return ms.get_fields(name=field_str)[0]
 
-    # If truly nothing matched, raise a clear error instead of returning a wrong field silently.
-    raise LookupError(f"No Tsys field match for Tsys fields: {tsys_fields}")
+    # If nothing matched, return the nearest Tsys field by angular separation to the source
+    candidate_fields = [ms.get_fields(name=x)[0] for x in tsys_fields if x.strip()]
+    src_ra = np.mean([direction_to_radec(f.mdirection)[0] for f in src_fields])
+    src_dec = np.mean([direction_to_radec(f.mdirection)[1] for f in src_fields])
+    return min(candidate_fields, key=lambda f: angular_separation(
+        src_ra, src_dec, *direction_to_radec(f.mdirection), in_arcsecs=False,
+    ))
 
 
 def is_tsys_only(field: Field) -> bool:

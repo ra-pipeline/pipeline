@@ -485,6 +485,7 @@ class CalFrom:
         'tecim': 16,
         'kcross': 17,
         'otf': 18,
+        'gceff': 19,
     }
 
     CALTYPE_TO_VISCAL = {

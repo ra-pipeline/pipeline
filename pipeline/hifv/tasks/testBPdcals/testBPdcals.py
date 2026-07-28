@@ -87,7 +87,8 @@ class testBPdcalsResults(basetask.Results):
                  shortsol1=None, vis=None, bpdgain_touse=None, gtypecaltable=None,
                  ktypecaltable=None, bpcaltable=None, flaggedSolnApplycalbandpass=None,
                  flaggedSolnApplycaldelay=None, result_amp=None, result_phase=None,
-                 amp_collection=None, phase_collection=None, num_antennas=None, ignorerefant=None, bad_refant=None):
+                 amp_collection=None, phase_collection=None, num_antennas=None, ignorerefant=None, bad_refant=None,
+                 spw_solint=None):
         """
         Args:
             vis(str): String name of the measurement set
@@ -108,6 +109,7 @@ class testBPdcalsResults(basetask.Results):
             phase_collection(Dict): Bad deformatters phase weblog table per band
             num_antennas(Dict):  Number of antennas (same per band, but included for weblog formatting)
             ignorerefant(List):  List of antennas removed if a baseband is determined to be bad for >50% of antennas.
+            spw_solint(Dict): Dictionary of solints per spw per band
 
         """
 
@@ -151,6 +153,7 @@ class testBPdcalsResults(basetask.Results):
         self.phase_collection = phase_collection
         self.num_antennas = num_antennas
         self.bad_refant = bad_refant
+        self.spw_solint = spw_solint if spw_solint is not None else {}
 
     def merge_with_context(self, context):
         m = context.observing_run.get_ms(self.vis)
@@ -210,6 +213,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
         phase_collection_perband = defaultdict(list)
         num_antennas_perband = len(m.antennas)
         bad_refant = {}  # PIPE-2580: used for QA score
+        spw_solint_perband = {}
         for band, spwlist in band2spw.items():
             bad_refant[band] = []
             for i in [0, 1, 2]:
@@ -223,7 +227,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
                     raise
                 LOG.debug("    RUNNING FIRST PART TESTBPDCALS    ")
                 gain_solint1perband, shortsol1perband, vis, bpdgain_tousename, gtypecaltablename, ktypecaltablename, bpcaltablename, \
-                flaggedSolnApplycalbandpassperband, flaggedSolnApplycaldelayperband, refant = self._do_testBPdcals(band, spwlist)
+                flaggedSolnApplycalbandpassperband, flaggedSolnApplycaldelayperband, refant, spw_solint = self._do_testBPdcals(band, spwlist)
 
                 """
                 If an entire baseband is determined to be bad for >50% of antennas,
@@ -286,6 +290,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
             amp_collection[band] = amp_collection_perband
             phase_collection[band] = phase_collection_perband
             num_antennas[band] = num_antennas_perband
+            spw_solint_perband[band] = spw_solint
 
         return testBPdcalsResults(gain_solint1=gain_solint1, shortsol1=shortsol1, vis=vis,
                                   bpdgain_touse=bpdgain_touse, gtypecaltable=gtypecaltable,
@@ -294,7 +299,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
                                   flaggedSolnApplycaldelay=flaggedSolnApplycaldelay, result_amp=result_amp,
                                   result_phase=result_phase, amp_collection=amp_collection,
                                   phase_collection=phase_collection,
-                                  num_antennas=num_antennas, ignorerefant=self.ignorerefant, bad_refant=bad_refant)
+                                  num_antennas=num_antennas, ignorerefant=self.ignorerefant, bad_refant=bad_refant, spw_solint=spw_solint_perband)
 
     def analyse(self, results):
         """Determine the best parameters by analysing the given jobs before returning any final jobs to execute.
@@ -328,6 +333,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
             flaggedSolnApplycalbandpass(Dict):  returned from getCalFlaggedSoln for bpdgain_tous
             flaggedSolnApplycaldelay(Dict): returned from getCalFlaggedSoln for ktypecaltable
             RefAntOutput(str):  Reference antenna used
+            spw_solint(Dict): Dictionary of solints per spw
 
         """
 
@@ -490,6 +496,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
             LOG.info("Using short solint = {!s} for band {!s}".format(str(gain_solint1), band))
 
         LOG.info("Doing test bandpass calibration for band {!s}".format(band))
+        spw_solint = {}
 
         if self.inputs.weakbp:
             # LOG.info("USING WEAKBP HEURISTICS")
@@ -499,7 +506,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
         else:
             # LOG.info("Using REGULAR heuristics")
             interp = ''
-            do_bandpass(self.inputs.vis, bpcaltable, context=self.inputs.context, RefAntOutput=RefAntOutput,
+            spw_solint = do_bandpass(self.inputs.vis, bpcaltable, context=self.inputs.context, RefAntOutput=RefAntOutput,
                         spw=','.join(spwlist), ktypecaltable=ktypecaltable, bpdgain_touse=bpdgain_touse,
                         solint='inf', append=False, executor=self._executor)
 
@@ -529,7 +536,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
         flaggedSolnApplycaldelay = getCalFlaggedSoln(ktypecaltable)
 
         return gain_solint1, shortsol1, self.inputs.vis, bpdgain_touse, gtypecaltable,\
-               ktypecaltable, bpcaltable, flaggedSolnApplycalbandpass, flaggedSolnApplycaldelay, RefAntOutput[0]
+               ktypecaltable, bpcaltable, flaggedSolnApplycalbandpass, flaggedSolnApplycaldelay, RefAntOutput[0], spw_solint
 
     def _do_gtype_delaycal(self, caltable: str = None, RefAntOutput: list[str] = None, spwlist: list[str] = []) -> bool:
         """Perform a G-Type delay calibration with CASA task gaincal

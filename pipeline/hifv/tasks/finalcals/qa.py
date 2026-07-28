@@ -22,7 +22,8 @@ class FinalcalsQAHandler(pqa.QAPlugin):
         # 5%-60% of data flagged  --> 1 to 0
         # > 60%  of data flagged  --> 0
 
-        m = context.observing_run.get_ms(result.inputs['vis'])
+        vis = result.inputs['vis']
+        m = context.observing_run.get_ms(vis)
 
         if result.flaggedSolnApplycalbandpass and result.flaggedSolnApplycaldelay:
             self._checkKandBsolution(result.flaggedSolnApplycaldelay, m)
@@ -36,6 +37,12 @@ class FinalcalsQAHandler(pqa.QAPlugin):
             LOG.error('Error with bandpass and/or delay table.')
             scores = [pqa.QAScore(0.0, longmsg='No flagging stats about the bandpass table or info in delay table.',
                                   shortmsg='Bandpass or delay table problem.')]
+
+        # PIPE-2512: add QA score for spw solint
+        for bandname, spw_solint in result.spw_solint.items():
+            score3 = qacalc.score_spw_solint(vis, bandname, spw_solint)
+            if score3:
+                scores.append(score3)
 
         result.qa.pool.extend(scores)
 

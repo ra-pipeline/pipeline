@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pipeline.hsd.tasks.common import qautils
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.pipelineqa as pqa
@@ -22,6 +23,22 @@ class SDBaselineQAHandler(pqa.QAPlugin):
 
     result_cls = baseline.SDBaselineResults
     child_cls = None
+
+    def __init__(self):
+        """
+        register the parameters for longmsg formatter and aggregator
+        """
+        # register the properties for 'score_sd_line_detection'
+        metric_name = 'score_sd_line_detection'
+        keys = ['vis', 'field', 'spw', 'ant', 'pol']
+        qautils.registry.register_longmsg_keys(metric_name, keys)
+        qautils.registry.register_keys_to_aggregate(metric_name, keys)
+
+        # register the properties for 'score_sd_baseline_quality'
+        metric_name = 'score_sd_baseline_quality'
+        keys = ['vis', 'field', 'spw', 'ant', 'pol']
+        qautils.registry.register_keys_to_aggregate(metric_name, keys)
+        qautils.registry.register_longmsg_keys(metric_name, keys)
 
     def handle(self, context: Context, result: result_cls) -> None:
         """Compute QA score for baseline subtraction task.
@@ -45,6 +62,10 @@ class SDBaselineQAHandler(pqa.QAPlugin):
             qacalc.score_sd_line_detection(context.observing_run.ms_reduction_group, result)
         )
 
+        # reformat the messages and append to result.qa.pool
+        formatter = qautils.QAScoreFormatter()
+        for qascore in scores:
+            formatter.update_longmsg(qascore)
         result.qa.pool.extend(scores)
 
 

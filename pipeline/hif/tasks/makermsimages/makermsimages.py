@@ -54,7 +54,8 @@ class MakermsimagesResults(basetask.Results):
                     datatype=rmsitem['datatype'],
                     multiterm=rmsitem['multiterm'],
                     metadata=rmsitem['metadata'],
-                    imageplot=rmsitem['imageplot'])
+                    imageplot=rmsitem['imageplot'],
+                    imagename_prefix=rmsitem.get('imagename_prefix'))
                 if 'TARGET' in rmsitem['sourcetype']:
                     context.rmsimlist.add_item(imageitem)
             except:
@@ -66,7 +67,7 @@ class MakermsimagesResults(basetask.Results):
 
 class MakermsimagesInputs(vdp.StandardInputs):
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     # docstring and type hints: supplements hif_makermsimages
     def __init__(self, context, vis=None):

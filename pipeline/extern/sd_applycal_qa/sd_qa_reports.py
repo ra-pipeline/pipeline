@@ -610,7 +610,15 @@ def makeSummaryTable(qascore_list, plots_fnames, plfolder, working_folder = '.',
         msname = list(qascore.applies_to.vis)[0]
         spw = list(qascore.applies_to.spw)[0]
         antenna = list(qascore.applies_to.ant)[0]
-        scan = str(list(qascore.applies_to.scan)[0]).replace(',',';')
+        # --- tentative patch to prevent crashing (PIPE-3055)
+        #     be sure to follow the changes to shortmsg if it happens in sd_applycal_qa.py
+        # scan = str(list(qascore.applies_to.scan)[0]).replace(',',';')
+        if len(qascore.applies_to.scan) == 0 and \
+           (qascore.shortmsg == "Data is fully flagged" or qascore.shortmsg == "Only one polarization in data"):
+            scan = "all"
+        else:
+            scan = str(list(qascore.applies_to.scan)[0]).replace(',',';')
+        # --- end of tentative patch to prevent crashing
         #Metric data value
         metric_data = qascore.origin[1]
         #Search For Trec info and find maximum value
