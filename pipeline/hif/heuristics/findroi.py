@@ -284,9 +284,9 @@ def _resolve_pipeline_vis_list(context: Any, vis: Any) -> list[str]:
     if vis not in (None, '', [], ['']):
         return resolve_vis_list(vis)
     datatypes = [
-        DataType.SELFCAL_CONTLINE_SCIENCE,
         DataType.REGCAL_CONTLINE_SCIENCE,
         DataType.REGCAL_CONTLINE_ALL,
+        DataType.SELFCAL_CONTLINE_SCIENCE,
         DataType.RAW,
     ]
     ms_objects, selected_datatype = context.observing_run.get_measurement_sets_of_type(
@@ -326,6 +326,46 @@ def _findroi_antenna_selections(context: Any, vis_list: list[str], intent: str =
             raise RuntimeError(f'No {intent} antenna selection determined for hif_findroi vis={vis}.')
         selections[vis] = ','.join(map(str, antenna_id_list)) + '&'
     return selections
+
+
+def _findroi_image_heuristics(context: Any, vis_list: list[str]) -> Any:
+    '''Create imaging heuristics matching hif_makeimlist data-availability checks.'''
+    canonical_vis_list = [_context_ms_for_vis(context, vis).name for vis in vis_list]
+    project_structure = getattr(context, 'project_structure', None)
+    imagename_prefix = '' if project_structure is None else getattr(project_structure, 'ousstatus_entity_id', '')
+    return imageparams_factory.ImageParamsHeuristicsFactory.getHeuristics(
+        vislist=canonical_vis_list,
+        spw='',
+        observing_run=context.observing_run,
+        imagename_prefix=imagename_prefix,
+        proj_params=getattr(context, 'project_performance_parameters', None),
+        contfile=None,
+        linesfile=None,
+        imaging_params=getattr(context, 'imaging_parameters', None),
+        processing_intents=getattr(context, 'processing_intents', None),
+        imaging_mode='ALMA',
+    )
+
+
+def _findroi_has_unflagged_data(
+    heuristics: Any,
+    vis: str,
+    field_name: str,
+    spw_id: int,
+) -> bool | None:
+    '''Mirror hif_makeimlist fully-flagged detection for one EB/field/SPW selection.'''
+    try:
+        result = heuristics.has_data(field_intent_list=[(field_name, 'TARGET')], spwspec=str(spw_id), vislist=[vis])
+    except Exception as exc:
+        LOG.warning(
+            'Could not determine whether data for EB %s, field %s, spw %s is completely flagged. Exception: %s',
+            os.path.basename(vis),
+            field_name,
+            spw_id,
+            str(exc),
+        )
+        return None
+    return bool(result.get((field_name, 'TARGET'), False))
 
 
 def _field_task_arg(field: str | int | list[int | str] | tuple[int | str, ...] | None) -> str | int | None:
@@ -4021,6 +4061,7 @@ def run_findroi_mpi(
         field_info = context_field_info
         field_groups = field_info['groups']
     antenna_selections_by_vis = _findroi_antenna_selections(context, vis_list, intent='TARGET')
+    data_heuristics = _findroi_image_heuristics(context, vis_list)
     science_spws, science_rows = _science_spw_metadata_from_inventory(vis_list[0], ms0, inv, sci)
     dt_inventory = time.perf_counter() - t_inv
     source_names_by_id = {int(k): str(v) for k, v in field_info.get('source_names', {}).items()}
@@ -4059,6 +4100,22 @@ def run_findroi_mpi(
 
     args = []
     for ddid, spw_name, virtual_spw_id in sci_spw:
+        field_names = [field_names_by_id.get(int(fid), str(fid))
+                       for field_ids in field_groups.values() for fid in field_ids]
+        has_unflagged_data = False
+        has_inconclusive_probe = False
+        for vis_name in vis_list:
+            for field_name in field_names:
+                probe_result = _findroi_has_unflagged_data(data_heuristics, vis_name, field_name, int(virtual_spw_id))
+                if probe_result is True:
+                    has_unflagged_data = True
+                elif probe_result is False:
+                    LOG.warning('Data for EB {}, field {}, spw {} is completely flagged.'.format(
+                        os.path.basename(vis_name), field_name, virtual_spw_id))
+                else:
+                    has_inconclusive_probe = True
+        if not has_unflagged_data and not has_inconclusive_probe:
+            continue
         spw_ids_by_vis = _real_spw_ids_by_vis(
             context,
             vis_list,
