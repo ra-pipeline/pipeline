@@ -1,7 +1,6 @@
 """Provide a class to store logical representation of field."""
 from __future__ import annotations
 
-import datetime
 import pprint
 from typing import TYPE_CHECKING
 
@@ -10,7 +9,7 @@ from pipeline.infrastructure import casa_tools, utils
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
-    from pipeline.infrastructure.utils.casa_types import DirectionDict, EpochDict, QuantityDict
+    from pipeline.infrastructure.utils.casa_types import DirectionDict, EpochDict
 
 _pprinter = pprint.PrettyPrinter(width=1e99)
 
