@@ -417,7 +417,7 @@ class CorrectedampflagInputs(vdp.StandardInputs):
     CorrectedampflagInputs defines the inputs for the Correctedampflag pipeline task.
     """
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
     # Lower sigma threshold for identifying outliers as a result of "bad
     # baselines" and/or "bad antennas" within baselines (across all
     # timestamps); equivalent to:

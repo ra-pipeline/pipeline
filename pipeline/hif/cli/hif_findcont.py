@@ -3,8 +3,9 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hif.tasks.findcont.findcont.FindContInputs.__init__
 @utils.cli_wrapper
-def hif_findcont(vis=None, target_list=None, hm_mosweight=None, hm_perchanweightdensity=None, hm_weighting=None,
-                 datacolumn=None, parallel=None):
+def hif_findcont(vis=None, target_list=None, hm_mosweight=None,
+                 hm_perchanweightdensity=None, hm_weighting=None,
+                 hm_mode=None, field=None, datacolumn=None, parallel=None):
     """Identify line-free continuum frequency ranges for each science target and spw.
 
     Creates dirty image cubes at native channel resolution (using ``robust=1`` for optimal line
@@ -37,6 +38,9 @@ def hif_findcont(vis=None, target_list=None, hm_mosweight=None, hm_perchanweight
     are not re-analyzed; only spws not listed are processed. The resulting ``cont.dat`` file (LSRK
     frequency ranges) is used by subsequent :py:func:`hif_uvcontsub <hif_uvcontsub>` and :py:func:`hif_makeimages <hif_makeimages>` stages.
 
+    The default mode is ``coarse``, which applies the local fast-imaging override. Use
+    ``hm_mode='normal'`` to preserve the previous-cycle behavior.
+
     .. figure:: /figures/guide-img029.png
        :scale: 60%
        :alt: Example findContinuum plots
@@ -53,5 +57,9 @@ def hif_findcont(vis=None, target_list=None, hm_mosweight=None, hm_perchanweight
         1. Identify continuum frequency ranges for all science targets and spws:
 
         >>> hif_findcont()
+
+        2. Perform continuum frequency range detection for a specific field:
+
+        >>> hif_findcont(field='M51')
 
     """

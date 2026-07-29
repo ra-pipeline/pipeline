@@ -4,7 +4,7 @@ rsc_path = ""
 
 <%inherit file="t2-4m_details-base.mako"/>
 
-<%block name="title">Create Science Targets Continuum+Line Measurement Sets for Imaging</%block>
+<%block name="title">Create Science Targets Measurement Sets for Imaging</%block>
 
 <h2>Results</h2>
 

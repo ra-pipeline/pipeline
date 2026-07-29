@@ -132,7 +132,7 @@ class SelfcalInputs(vdp.StandardInputs):
     # potentially we could allow REGCAL_CONTLINE_ALL here (e.g. tmp ms splitted from 'corrected' data column),
     # but there is no space for applying final selfcal solutions to the data.
 
-    processing_data_type = [DataType.REGCAL_CONT_SCIENCE, DataType.REGCAL_CONTLINE_SCIENCE]
+    processing_data_types = [DataType.REGCAL_CONT_SCIENCE, DataType.REGCAL_CONTLINE_SCIENCE]
 
     field = vdp.VisDependentProperty(default='')
 
@@ -613,12 +613,12 @@ class Selfcal(basetask.StandardTaskTemplate):
         inputs = self.inputs
         if inputs.vis in (None, [], ''):
             # If no suitable datatype, by-pass the hif_selfcal stage.
-            required_data_type_desc = ', '.join(dt.name for dt in SelfcalInputs.processing_data_type)
+            required_data_type_desc = ', '.join(dt.name for dt in SelfcalInputs.processing_data_types)
 
             LOG.warning('No data matching any of the required datatypes: %s; '
                         'please review the registered MS datatype information.',
                         required_data_type_desc)
-                
+
             return SelfcalResults([], None, None, None, False)
 
         if not isinstance(inputs.vis, list):

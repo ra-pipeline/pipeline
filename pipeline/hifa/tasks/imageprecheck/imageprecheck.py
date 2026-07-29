@@ -104,7 +104,7 @@ class ImagePreCheckResults(basetask.Results):
 
 class ImagePreCheckInputs(vdp.StandardInputs):
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     calcsb = vdp.VisDependentProperty(default=False)
     parallel = vdp.VisDependentProperty(default='automatic')

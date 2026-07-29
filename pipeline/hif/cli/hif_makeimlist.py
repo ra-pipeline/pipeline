@@ -6,7 +6,7 @@ import pipeline.h.cli.utils as utils
 def hif_makeimlist(vis=None, imagename=None, intent=None, field=None,
                    spw=None, stokes=None, contfile=None, linesfile=None,
                    uvrange=None, specmode=None, outframe=None, hm_imsize=None,
-                   hm_cell=None, calmaxpix=None, phasecenter=None,
+                   hm_cell=None, calmaxpix=None, minpix=None, phasecenter=None,
                    nchan=None, start=None, width=None, nbins=None,
                    robust=None, uvtaper=None, clearlist=None, per_eb=None,
                    per_session=None, calcsb=None, datatype=None, datacolumn=None,
