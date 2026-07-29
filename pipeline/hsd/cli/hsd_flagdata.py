@@ -22,7 +22,7 @@ def hsd_flagdata(vis=None, autocorr=None, shadow=None, scan=None,
     - **Template flags**: flags from user-provided ``*flagtemplate.txt`` files.
     - **Shadow**: antennas shadowed by others.
     - **Unwanted intents**: scans with intents not required for processing.
-    - **Autocorrelation**: always disabled (autocorrelations are not used for SD).
+    - **Autocorrelation**: always disabled.
     - **Edge channels**: leading/trailing channels of each spw.
     - **Pointing outlier** (PL2025+): safety-net flag for OFF positions not removed by online
       flags, which would otherwise cause map creation to crash. A map-size threshold is computed
