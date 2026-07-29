@@ -245,7 +245,12 @@ class MakeImListInputs(vdp.StandardInputs):
                 specmode='repBW' produce an LSRK frequency cube at
                 representative channel width
 
-            outframe: velocity frame of output image (LSRK, '' for automatic) (not implemented)
+            outframe: Velocity frame of the output image. Use ``'LSRK'`` or
+                ``''`` for automatic selection.
+
+                Note:
+                    This parameter is reserved for future development and has
+                    no effect in the current release.
 
             hm_imsize: Image X and Y size in pixels or PB level for single fields. The explicit sizes must be even and divisible by 2,3,5,7 only.
                 The default values are derived as follows:
