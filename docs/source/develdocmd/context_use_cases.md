@@ -32,12 +32,13 @@ The canonical flow through the context is:
 - MPI distribution: `pipeline/infrastructure/mpihelpers.py`
 - QA framework: `pipeline/infrastructure/pipelineqa.py`, `pipeline/qa/`
 - Weblog renderer: `pipeline/infrastructure/renderer/htmlrenderer.py`
+- Product export and manifests: `pipeline/h/tasks/exportdata/`, `pipeline/hif/tasks/exportdata/`, `pipeline/hifv/tasks/exportdata/`, `pipeline/hsd/tasks/exportdata/`, `pipeline/h/tasks/common/manifest.py`
 
 ---
 
 ## 2. Use Cases
 
-Each use case below is mapped directly to current code paths and concrete runtime behavior found in this repository. The goal is to describe what the context must do and where that capability is implemented today (modules, classes, or functions). Implementation notes follow each use case and reference the exact symbols and files that implement or exercise the behavior.
+Each use case summary describes the required capability and observable behavior without prescribing its implementation. Implementation notes follow each use case and document how the current pipeline realizes that behavior, including exact symbols and files where useful. Keeping those two parts distinct mirrors the requirements and supplementary-analysis documents maintained for the RADPS context work.
 
 The following fields are used in each use case:
 
@@ -53,10 +54,10 @@ The following fields are used in each use case:
 | | |
 |-------|---------|
 | **Actor(s)** | Data import task, any downstream task, heuristics, renderers, QA handlers |
-| **Summary** | Import tasks under `pipeline/h/*_importdata` populate observation metadata into `context.observing_run` (MS objects, SPWs, fields, scans). Downstream code queries this metadata via `context.observing_run.get_ms(...)`, `context.observing_run.measurement_sets`, and related helpers. Derived datasets (calibrated/averaged subsets) are registered on the domain objects rather than mutating original MS objects. |
-| **Invariant** | All populated datasets and derived dataset records remain queryable for the lifetime of the session without repeating the import process. |
+| **Summary** | The context must make observation metadata (datasets, spectral windows, fields, antennas, scans, and time ranges) available to subsequent processing steps. When processing produces derived or transformed datasets, downstream consumers must be able to distinguish them from their source datasets and determine their lineage. Metadata products produced during import must remain available for reuse by later stages. |
+| **Invariant** | Observation metadata for datasets in the accepted processing state remains queryable for the lifetime of the session unless it is intentionally replaced by a subsequent accepted result. |
 
-**Implementation notes** — `context.observing_run` holds the observation metadata and is the most frequently queried attribute of the context:
+**Implementation notes** — Import tasks under `pipeline/h/*_importdata` populate the MS objects and related observation metadata held by `context.observing_run`, which is the most frequently queried attribute of the context:
 
 - `context.observing_run.get_ms(name=vis)` — resolve an MS by filename
 - `context.observing_run.measurement_sets` — all registered MS objects
@@ -64,6 +65,8 @@ The following fields are used in each use case:
 - Provenance attributes: `start_datetime`, `end_datetime`, `project_ids`, `schedblock_ids`, `execblock_ids`, `observers`
 
 The MS objects stored by `context.observing_run` carry information about scans, fields, SPWs, antennas, reference antenna ordering, etc. Tasks read per-MS state like `ms.reference_antenna`, `ms.session`, `ms.start_time`, `ms.origin_ms`.
+
+Transformed datasets are generally represented by new `MeasurementSet` domain objects. Tasks such as `h_mssplit`, `hif_mstransform`, `hifv_mstransform`, and `hif_transformimagedata` propagate the source object's `origin_ms` value to the new object before the accepted result adds it to `context.observing_run`. This preserves a source reference for derived datasets, but the current implementation does not retain every dataset object immutably: replace-mode transforms can remove the source entry, and rerunning tasks such as single-dish baseline/atmospheric correction or `hif_uvcontsub` can replace a previously registered output with the same name.
 
 For the single-dish pipeline, this use case also includes per-MS `DataTable` products referenced through `context.observing_run.ms_datatable_name`. These are not just raw imported metadata tables: they persist row-level metadata and derived quantities used by downstream SD tasks. During SD import, the reader populates `DataTable` columns such as `RA`, `DEC`, `AZ`, `EL`, `SHIFT_RA`, `SHIFT_DEC`, `OFS_RA`, and `OFS_DEC`, including coordinate conversions into the pipeline's chosen celestial frame (for example ICRS) so later imaging, gridding, plotting, and QA code can reuse those values efficiently.
 
@@ -73,14 +76,16 @@ For the single-dish pipeline, this use case also includes per-MS `DataTable` pro
 | | |
 |-------|---------|
 | **Actor(s)** | Calibration tasks, imaging tasks, heuristics
-| **Summary** | The code implements cross-MS lookup via `context.observing_run` utilities: virtual SPW mapping (`virtual2real_spw_id` / `real2virtual_spw_id`) and type-aware filters (`get_measurement_sets_of_type(...)`). Downstream calibration and imaging tasks call these helpers directly to resolve SPWs, fields, and MS-level selections across heterogeneous datasets. |
-| **Postcondition** | Downstream tasks can resolve applicable metadata across registered MSes using a unified identifier scheme, and can look up MSes and data columns by data type.
+| **Summary** | When multiple MSes are available, downstream tasks must be able to identify corresponding metadata elements across them even when the MSes use different native numbering. Tasks must also be able to find MSes and associated data columns by data type.
+| **Postcondition** | Downstream tasks can resolve corresponding metadata across the available MSes and can find MSes and data columns by data type.
 
 **Implementation notes** - `context.observing_run` handles the virtual spw mapping, as well as filtering MSes by type:
 
 - `context.observing_run.get_measurement_sets_of_type(dtypes)` — filter by data type (RAW, REGCAL_CONTLINE_ALL, BASELINED, etc.)
 - `context.observing_run.virtual2real_spw_id(vspw, ms)` / `real2virtual_spw_id(...)` — translate between abstract pipeline SPW IDs and CASA-native IDs
 - `context.observing_run.virtual_science_spw_ids` — virtual SPW catalog
+
+Calibration and imaging tasks call these helpers directly when resolving SPWs and MS-level selections across datasets.
 
 ---
 
@@ -89,7 +94,7 @@ For the single-dish pipeline, this use case also includes per-MS `DataTable` pro
 | | |
 |-------|---------|
 | **Actor(s)** | Initialization, any task, report generators |
-| **Summary** | Project-level metadata is populated by initialization and PPR executors (`executeppr()` / `executevlappr()`), is stored in `context.project_summary`, `context.project_structure`, and `context.project_performance_parameters`, and is read by heuristics and reporters (see `pipeline/infrastructure/executeppr.py`, `pipeline/infrastructure/executevlappr.py`, and `pipeline/infrastructure/launcher.py`). |
+| **Summary** | The context must store project-level metadata (proposal code, PI, telescope, desired sensitivities, etc.) and make it available to all components, e.g., for decision-making in heuristics and to label outputs in reports. |
 | **Invariant** | Project metadata is available for the lifetime of the processing session. |
 
 **Implementation notes** — project metadata (properties of the observation program such as PI, targeted sensitivities, beam requirements) is set during initialization or import, is not modified after import, and is read many times:
@@ -101,6 +106,8 @@ For the single-dish pipeline, this use case also includes per-MS `DataTable` pro
 - `context.set_state('ProjectStructure', 'recipe_name', value)` — used by `recipereducer.reduce()` and SD heuristics
 - `context.processing_intents` — set by `Pipeline` during initialization
 
+The initialization and PPR paths are implemented in `pipeline/infrastructure/launcher.py`, `pipeline/infrastructure/executeppr.py`, and `pipeline/infrastructure/executevlappr.py`; downstream heuristics and report generators read the resulting project metadata.
+
 ---
 
 ### UC-04 — Register, Query, and Update Calibration State
@@ -108,7 +115,7 @@ For the single-dish pipeline, this use case also includes per-MS `DataTable` pro
 | | |
 |-------|---------|
 | **Actor(s)** | Calibration tasks, export tasks, restore tasks, report generators |
-| **Summary** | Calibration workflows register and query cal tables through `context.callibrary` (see `context.callibrary.add()`, `context.callibrary.active.get_caltable()`, `context.callibrary.unregister_calibrations()`), which records application scope and provenance; tasks query the callibrary to find applicable calibrations for selections. Atomic registration/de-registration is handled by callibrary primitives and `CalApplication` objects. |
+| **Summary** | The context must allow calibration tasks to register and update solutions and to record both the coverage where a solution applies and the source(s) from which it was derived. Downstream tasks must be able to query for all calibrations applicable to a given data selection. The context must distinguish between calibrations pending application and those already applied. Registration must support registering multiple calibrations atomically as part of a single operation, and it must also support de-registration/removal of trial or reverted calibrations so alternative solutions can be tested or failed attempts rolled back. |
 | **Invariant** | Calibration state is queryable and correctly scoped to data selections, and can be updated as processing progresses. |
 
 **Implementation notes** — `context.callibrary` is the primary cross-stage communication channel for calibration workflows:
@@ -118,6 +125,8 @@ For the single-dish pipeline, this use case also includes per-MS `DataTable` pro
 - Backed by `CalApplication` → `CalTo` / `CalFrom` objects with interval trees for efficient matching.
  - The callibrary also supports de-registration of trial or reverted calibrations via predicate-based removal.
 
+These APIs mutate the in-process context; they do not provide a transactional store or an atomic commit boundary across multiple calls.
+
 ---
 
 ### UC-05 — Manage Imaging State
@@ -125,12 +134,12 @@ For the single-dish pipeline, this use case also includes per-MS `DataTable` pro
 | | |
 |-------|---------|
 | **Actor(s)** | Imaging tasks, downstream heuristics, and export tasks |
-| **Summary** | Imaging/planning tasks (`makeimlist`, `editimlist`) and execution tasks (`makeimages`, `tclean`) populate and consume imaging state via context attributes (for example `clean_list_pending`, `imaging_parameters`, `synthesized_beams`, `size_mitigation_parameters`). These attributes are written/read by imaging helpers and heuristics across `pipeline/h*` tasks and imaging utilities. |
+| **Summary** | The context must allow imaging state — target lists, imaging parameters, masks, thresholds, and sensitivity estimates — to be computed by one step and read or refined by later steps. Multiple steps may contribute to a progressively refined imaging configuration. |
 | **Invariant** | Imaging state reflects contributions from all completed imaging-related stages, and is available for reading or refinement by subsequent stages. |
 
 Imaging workflows consist of two separate phases: a lightweight planning phase (for example, `makeimlist`, `editimlist`) that assembles imaging instructions, target lists, and imaging-mode heuristics and a computationally intensive execution phase (for example, `makeimages`) that performs the heavy imaging work.
 
-**Implementation notes** — imaging state is stored as ad-hoc attributes on the context object with no formal schema. Defensive `hasattr()` checks appear throughout the code to guard against attributes that may not yet exist:
+**Implementation notes** — imaging state is stored as ad-hoc attributes on the context object with no formal schema. Planning, execution, and heuristic implementations under `pipeline/h*` read and update these attributes. Defensive `hasattr()` checks appear throughout the code to guard against attributes that may not yet exist:
 
 | Attribute | Written by | Read by |
 |---|---|---|
@@ -150,10 +159,10 @@ Imaging workflows consist of two separate phases: a lightweight planning phase (
 | | |
 |-------|---------|
 | **Actor(s)** | Imaging tasks, export tasks, report generators |
-| **Summary** | Image registries are explicit lists on the context (`context.sciimlist`, `context.calimlist`, `context.rmsimlist`, `context.subimlist`) populated by imaging and export tasks (e.g., `makeimages`, `exportdata`) so downstream tasks and reporters can discover produced image products by type. |
-| **Invariant** | Produced image products are registered by type and remain queryable for downstream processing, reporting, and export. |
+| **Summary** | The context must allow produced science, calibrator, RMS, and sub-product images to be recorded and discovered by later tasks. |
+| **Invariant** | Produced image products remain identifiable by type and available for downstream processing, reporting, and export. |
 
-**Implementation notes** — image libraries provide typed registries:
+**Implementation notes** — image libraries in `pipeline/infrastructure/imagelibrary.py` provide typed registries. Imaging tasks such as `makeimages` populate them, and downstream processing, reporting, and export code reads them to discover products by category:
 
 - `context.sciimlist` — science images
 - `context.calimlist` — calibrator images
@@ -167,12 +176,13 @@ Imaging workflows consist of two separate phases: a lightweight planning phase (
 | | |
 |-------|---------|
 | **Actor(s)** | Workflow orchestration layer, tasks, pipeline operators |
-| **Summary** | Execution progress is tracked by fields set during task execution (`context.stage`, `context.task_counter`, `context.subtask_counter`) by the `Executor` and `StandardTaskTemplate` in `pipeline/infrastructure/basetask.py` and by driver entrypoints in `pipeline/h/cli/`. These fields, together with `context.results`, provide an ordered record that is preserved on save/resume. |
+| **Summary** | The context must track which processing stage is currently executing and maintain a stable, ordered record of completed stages. Stage identity and ordering must remain coherent across session saves and resumes. |
 | **Invariant** | The currently executing stage is identifiable and completed stages are recorded in stable order. |
 
 **Implementation notes:**
 
-- `context.stage`, `context.task_counter`, `context.subtask_counter` track progress
+- `Executor` and `StandardTaskTemplate` in `pipeline/infrastructure/basetask.py` update `context.stage`, `context.task_counter`, and `context.subtask_counter` during execution.
+- The ordered `context.results` collection records completed stages and is preserved when the context is saved.
 
 ---
 
@@ -181,12 +191,14 @@ Imaging workflows consist of two separate phases: a lightweight planning phase (
 | | |
 |-------|---------|
 | **Actor(s)** | Report generators, pipeline operators, workflow orchestration layer |
-| **Summary** | Per-stage execution records are captured as `ResultsProxy` objects (see `pipeline/infrastructure/basetask.py`) and appended to `context.results` via `Results.accept()` / `Results.merge_with_context()`. Results proxies are pickled to disk to bound memory and carry timing, traceback, invocation arguments, and outcome metadata for reporting and resume. |
-| **Invariant** | Each completed stage retains its full execution record — identity, outcome, timing, traceback, and invocation arguments — for the lifetime of the session. |
+| **Summary** | The context must preserve a complete execution record for each completed stage, including timing, traceback information, outcomes, and the arguments used to invoke it. This record must support reporting, post-mortem diagnosis of failures, and resumption after interruption. |
+| **Invariant** | Each completed stage retains its full execution record, including identity, outcome, timing, traceback, and invocation arguments, for the lifetime of the session. |
 
-**Implementation notes:**
+**Implementation notes** — `Results` and `ResultsProxy` are implemented in `pipeline/infrastructure/basetask.py`:
 
-- `context.results` holds an ordered list of `ResultsProxy` objects which are proxied to disk to bound memory
+- `Results.accept()` appends each completed stage result to the ordered `context.results` collection as a `ResultsProxy`.
+- Result objects carry invocation arguments, outcomes, traceback information, and timestamps used by reporting, debugging, and resume workflows.
+- `ResultsProxy` writes each stage result to disk to bound memory and reloads it on demand.
 - Timetracker integration provides per-stage timing data
 - Results proxies store basenames for portability
 
@@ -197,10 +209,10 @@ Imaging workflows consist of two separate phases: a lightweight planning phase (
 | | |
 |-------|---------|
 | **Actor(s)** | Any task producing output, downstream tasks |
-| **Summary** | Tasks publish outputs by returning `Results` objects which are merged into the shared `Context` via `Results.accept()` / `Results.merge_with_context()`; this path updates `context.callibrary`, image registries, and context attributes so downstream stages can consume published outputs without inspecting raw result objects. |
+| **Summary** | When a task produces outputs that change the processing state (e.g., new calibrations, updated flag summaries, image products, revised parameters), the context must provide a mechanism for those outputs to become available to subsequent processing steps before they execute. UC-04, UC-05, UC-06, and UC-16 are specific instances of this pattern. |
 | **Postcondition** | Downstream tasks can access the propagated processing state they need. |
 
-**Implementation notes** — the intended primary mechanism in the current pipeline is immediate propagation through context state updated during result acceptance. Over time, some workflows also came to inspect recorded results (`context.results`) directly. Both patterns exist in the codebase, but the second should be understood as an accreted pattern rather than the original design intent.
+**Implementation notes** — tasks return `Results` objects whose `Results.accept()` path invokes `Results.merge_with_context()` to update shared context state. This immediate propagation is the intended primary mechanism in the current pipeline. Over time, some workflows also came to inspect recorded results (`context.results`) directly. Both patterns exist in the codebase, but the second should be understood as an accreted pattern rather than the original design intent.
 
 1. **Immediate state propagation** — `Results.merge_with_context(context)` updates calibration library, image libraries, and dedicated context attributes such as `clean_list_pending`, `clean_list_info`, `synthesized_beams`, `size_mitigation_parameters`, `selfcal_targets`, and `selfcal_resources` so later tasks can access the current processing state directly without parsing another task's results object.
 2. **Recorded-result inspection** — some tasks read `context.results` to find outputs from earlier stages when those outputs are needed from the recorded results rather than from merged shared state. This pattern introduces coupling to recipe order or to another task's result class structure. For example:
@@ -215,9 +227,9 @@ Imaging workflows consist of two separate phases: a lightweight planning phase (
 | | |
 |-------|---------|
 | **Actor(s)** | Aggregate tasks, child tasks, task execution framework |
-| **Summary** | The `StandardTaskTemplate` / `Executor` pattern provides a transient workspace: `StandardTaskTemplate.execute()` executes child tasks against a pickled copy of the inputs/context and `Executor.execute(job, merge=True)` commits a child's `Results` via `result.accept(context)`. Temporary mutations are discarded unless explicitly merged. |
-| **Invariant** | State changes made while executing against a temporary child-task context do not escape that workspace unless they are explicitly accepted and merged. |
-| **Postcondition** | When a child task finishes, the enclosing task retains only the accepted state changes; unaccepted mutations to the temporary workspace are discarded. |
+| **Summary** | Within a stage, child tasks must be able to evaluate tentative changes to calibration and other processing state without changing the enclosing stage's accepted state. |
+| **Invariant** | Tentative child-task changes do not affect the accepted processing state unless the enclosing task accepts them. |
+| **Postcondition** | When a child task finishes, only its accepted state changes are available to subsequent processing. |
 
 **Implementation notes** — the current framework implements this behavior in `pipeline/infrastructure/basetask.py`:
 
@@ -233,8 +245,8 @@ Imaging workflows consist of two separate phases: a lightweight planning phase (
 
 | | |
 |-------|---------|
-| **Actor(s)** | Operations / automated processing (PPR-driven batch), pipeline developer / power user (interactive), recipe executor |
-| **Summary** | Multiple drivers converge on the same `Pipeline`/`Context` objects: interactive CLI wrappers under `pipeline/h/cli/`, PPR executors (`pipeline/infrastructure/executeppr.py`, `executevlappr.py`), and `recipereducer.py`. The context is populated and resumed by these drivers and must retain driver-injected metadata (e.g., `context.project_structure`) so downstream tasks behave consistently. |
+| **Actor(s)** | Automated processing operator, interactive pipeline user, recipe executor |
+| **Summary** | The processing state must remain consistent and usable regardless of which orchestration driver created or resumed it. Non-interactive and interactive drivers must be able to supply run metadata, control partial execution, and stop or resume processing. |
 | **Invariant** | Processing state is consistent and usable regardless of which orchestration driver created or resumed it, and success/failure signals are produced when appropriate. |
 
 **Implementation notes** — multiple entry points converge on the same task execution path:
@@ -242,7 +254,7 @@ Imaging workflows consist of two separate phases: a lightweight planning phase (
 - **Task-driven**: direct task calls via CLI wrappers in `pipeline/h/cli/`
 - **Command-list-driven**: PPR and XML procedure commands via `executeppr.py` / `executevlappr.py` and `recipereducer.py`
 
-They differ in how inputs are specified, how session paths are selected, and how resume is initiated, but the persisted context is the same.
+They differ in how inputs are specified, how session paths are selected, and how resume is initiated, but the persisted context is the same. Driver-supplied metadata, such as `context.project_structure`, remains available to downstream tasks through that common context.
 
 ---
 
@@ -251,15 +263,17 @@ They differ in how inputs are specified, how session paths are selected, and how
 | | |
 |-------|---------|
 | **Actor(s)** | Pipeline operator, workflow orchestration layer, pipeline developer |
-| **Summary** | Serialization is performed by `h_save()` / `h_resume()` (CLI wrappers) which pickle the `Context` object to `<context.name>.context` and later restore it. Per-stage results are proxied to disk (result-stageX.pickle) to reduce in-memory size. The restore path is implemented in `pipeline/h/cli/h_resume.py` and `launcher.Pipeline` initialization logic. |
-| **Postcondition** | After restore, the processing state is operationally equivalent to the saved state for supported resume workflows, and processing can continue from the specified point, assuming the data files are in a state consistent with the snapshot used to create the saved context. |
+| **Summary** | The complete processing state must be preservable and later recoverable so processing can resume from the preserved point. Some context-owned references can be relocated, but associated data files and paths must be made consistent with the preserved state before processing resumes. Backward compatibility across pipeline releases is not guaranteed. |
+| **Postcondition** | After recovery, the processing state is operationally equivalent to the preserved state for supported resume workflows, and processing can continue from the specified point when the associated data files are consistent with that state. |
 
 **Implementation notes:**
 
 - `h_save()` pickles the whole context to `<context.name>.context`
-- `h_resume(filename)` loads a `.context` file, defaulting to the most recent context file available if `filename` is `None` or `last` is used.
+- `h_resume(filename)` in `pipeline/h/cli/h_resume.py` loads a `.context` file, defaulting to the most recent context file available if `filename` is `None` or `last` is used.
 - Per-stage results are proxied to disk (`saved_state/result-stageX.pickle`) to keep the in-memory context smaller
 - Used by driver-managed breakpoint/resume (`executeppr(..., bpaction='resume')`) and developer debugging workflows
+
+Relocation support is partial rather than automatic. `ResultsProxy` stores only each result pickle's basename and reconstructs its path from the loaded context's `output_dir` and `name`; `products_dir` is also stored relative to `output_dir`. The lower-level `launcher.Pipeline` loader accepts `path_overrides` that can replace selected context properties after loading, but `h_resume()` does not expose those overrides or recompute all dependent paths. Dataset paths and any external data state must therefore already be valid or be adjusted/restored separately before processing continues.
 
 Note: The current implementation does not handle restoring data state to a past processing state and as such does not have a built-in, robust "true resume". If the data directory needs to be restored to match a saved context snapshot, this must be done manually (e.g. via having created a snapshot of the data at an earlier stage, and then restoring this state) before resuming.
 
@@ -270,7 +284,7 @@ Note: The current implementation does not handle restoring data state to a past 
 | | |
 |-------|---------|
 | **Actor(s)** | Workflow orchestration layer, parallel worker processes |
-| **Summary** | Parallel workers obtain context snapshots via `pipeline/infrastructure/mpihelpers.py` which pickles the context and task args to share with workers. Worker-side startup loads the pickled context and adjusts local paths (e.g., `context.logs['casa_commands']`) before executing tasks. This read-only snapshot model is the current distribution mechanism. |
+| **Summary** | When work is distributed across parallel workers, each worker must efficiently receive a consistent view of the observation metadata, calibration state, and other processing state required for its work. |
 | **Postcondition** | After distribution, each worker has a consistent view of the processing state for the duration of its work. |
 
 **Implementation notes** — `pipeline/infrastructure/mpihelpers.py`, class `Tier0PipelineTask`:
@@ -289,7 +303,7 @@ Note: The current implementation does not handle restoring data state to a past 
 | | |
 |-------|---------|
 | **Actor(s)** | Workflow orchestration layer |
-| **Summary** | Aggregation is implemented by the orchestration layer calling `result.accept(context)` for worker results; `Results.merge_with_context()` applies aggregated outputs (cal tables, image registries) into the shared `Context` in a single commit step to avoid interleaved conflicting writes. |
+| **Summary** | After parallel workers complete, the context must collect their individual results and incorporate them into the shared processing state. The aggregation must be safe (no conflicting concurrent writes) and complete before the next sequential step begins. |
 | **Postcondition** | The processing state reflects the combined outcomes of all parallel workers. |
 
 **Implementation notes** — worker execution is deliberately separated from context mutation:
@@ -300,6 +314,8 @@ Note: The current implementation does not handle restoring data state to a past 
 - Aggregating tasks normally collect worker results into a parent result object and then publish combined state when that parent result is accepted. For example, `makeimages` collects `TcleanResult` worker outputs into `MakeImagesResult`; `MakeImagesResult.merge_with_context()` then registers produced images in `context.sciimlist` / `context.calimlist` and updates shared imaging state.
 - For child jobs that run in-process with a context-bearing executor, `Executor.execute(job, merge=True)` commits the child result immediately by calling `result.accept(self._context)`.
 
+This serial acceptance avoids concurrent worker writes, but it is not a transactional commit mechanism.
+
 ---
 
 ### UC-15 — Provide Read-Only State for Reporting
@@ -307,7 +323,7 @@ Note: The current implementation does not handle restoring data state to a past 
 | | |
 |-------|---------|
 | **Actor(s)** | Report generators (weblog, quality reports, reproducibility scripts, pipeline statistics) |
-| **Summary** | Reporting uses `WebLogGenerator.render(context)` in `pipeline/infrastructure/renderer/htmlrenderer.py`, which unpickles `context.results` proxies and reads `context.observing_run`, `context.project_summary`, `context.report_dir`, and `context.output_dir` to assemble pages and report artifacts. |
+| **Summary** | The context must provide read-only access to the observation metadata, project metadata, execution history (including per-stage domain-specific outputs such as flag summaries and plot references), QA outcomes, log references, and path information needed to generate reporting products such as weblogs, quality reports, reproducibility scripts, and pipeline statistics. |
 | **Postcondition** | Reports accurately reflect the processing state at the time of generation. |
 
 **Implementation notes** — `WebLogGenerator.render(context)` in `pipeline/infrastructure/renderer/htmlrenderer.py`:
@@ -326,7 +342,7 @@ Note: The current implementation does not handle restoring data state to a past 
 | | |
 |-------|---------|
 | **Actor(s)** | QA scoring framework, report generators |
-| **Summary** | After `Results.accept()` the QA framework (`pipeline/infrastructure/pipelineqa.py`) invokes `pipelineqa.qa_registry.do_qa(context, result)`. Handlers call `context.observing_run.get_ms(vis)` and inspect `context.imaging_mode` / `context.project_structure` to compute `QAScore` objects appended to `result.qa.pool`. |
+| **Summary** | After each processing step completes, the context must make the relevant processing state available to QA handlers so they can evaluate the outcome against quality thresholds, which may depend on e.g. telescope, project parameters, or observation properties. The resulting quality scores must be recorded and remain retrievable for reporting. |
 | **Postcondition** | Quality scores are associated with the relevant processing step and accessible to reports. |
 
 **Implementation notes** — after `merge_with_context()`, `accept()` triggers `pipelineqa.qa_registry.do_qa(context, result)`:
@@ -347,7 +363,7 @@ QA handlers write scores to `result.qa.pool` and do not modify the shared contex
 | | |
 |-------|---------|
 | **Actor(s)** | Pipeline developer, pipeline operator, CI harnesses |
-| **Summary** | Inspection and debugging are supported by `h_save()`/`h_resume()` (pickled `Context` files), `context.results` (ordered `ResultsProxy` snapshots), and developer utilities used in tests and CI (`tests/testing_utils.py`). Weblog rendering (`pipeline/infrastructure/renderer/htmlrenderer.py`) and diagnostic helpers in `pipeline/infrastructure/basetask.py` expose per-stage timing, tracebacks, and log references so operators can inspect registered datasets (`context.observing_run`), calibrations (`context.callibrary`), and produced images (`context.sciimlist`). |
+| **Summary** | The context must allow an operator to inspect the current processing state, including which datasets and calibrations are available, how many steps have completed, and what their outcomes were. Sufficient state must remain available after a failure for post-mortem analysis. |
 | **Invariant** | The current processing state is inspectable at any point during execution, and sufficient information is retained to diagnose failures after the fact. |
 
 **Implementation notes** — debugging state is preserved through the same acceptance and persistence mechanisms used for normal execution:
@@ -357,7 +373,7 @@ QA handlers write scores to `result.qa.pool` and do not modify the shared contex
 - `ResultsProxy._write_stage_logs()` writes per-stage CASA log snippets into the weblog stage directory (`stageX/casapy.log`) and removes the in-memory log payload from the result pickle.
 - When DEBUG logging is enabled, `Results.accept()` also writes `saved_state/context-stageX.pickle`, a full context snapshot at the end of that stage, for developer inspection.
 - `WebLogGenerator.render(context)` temporarily replaces `context.results` with fully unpickled result objects while rendering, then restores the proxy list afterward.
-- Test and CI utilities load the most recent context for sanity checks and result extraction. They explicitly release the loaded context and run garbage collection because `Context -> ResultsProxy -> Context -> results` forms reference cycles that can otherwise retain large contexts between tests.
+- Test and CI utilities in `tests/testing_utils.py` load the most recent context for sanity checks and result extraction. They explicitly release the loaded context and run garbage collection because `Context -> ResultsProxy -> Context -> results` forms reference cycles that can otherwise retain large contexts between tests.
 
 ---
 
@@ -366,7 +382,7 @@ QA handlers write scores to `result.qa.pool` and do not modify the shared contex
 | | |
 |-------|---------|
 | **Actor(s)** | Telescope-specific tasks and heuristics, array-specific tasks and heuristics |
-| **Summary** | Telescope- and array-specific state is implemented in a mixture of dynamic sidecars and domain-model extensions: `context.evla` (VLA-specific sidecar created by `hifv_importdata` and consumed by VLA calibration tasks), ALMA single-dish extensions under `context.observing_run` (e.g., `ms_datatable_name`, `ms_reduction_group`, per-MS `DataTable` objects), and task-specific heuristics in the `pipeline/h*` task implementations. Generic components read these extensions via their documented helpers rather than assuming their presence. |
+| **Summary** | The context must support conditional telescope-specific and array-specific extensions to the processing state. These extensions must be available to the tasks and heuristics that need them, including cases where one array mode within a telescope family has materially different state requirements from another. Generic pipeline components must not depend on or require knowledge of those telescope- or array-specific extensions. |
 | **Invariant** | Telescope- and array-specific extensions are present only for runs that require them, available to the tasks that need them, and are never assumed by shared pipeline code. |
 
 **Implementation notes** — the current codebase shows at least two different forms of telescope-/array-specific state.
@@ -388,10 +404,10 @@ Another is ALMA TP / single-dish state, which is array-specific rather than tele
 | | |
 |-------|---------|
 | **Actor(s)** | Export tasks |
-| **Summary** | Export tasks (for example `hifa_exportdata`, `hifv_exportdata`, and the `hsd/tasks/exportdata` / `hsdn/tasks/exportdata` implementations) consume `context.sciimlist`, `context.callibrary`, `context.project_summary`, `context.project_structure`, `context.report_dir`, `context.output_dir`, `context.products_dir`, and `context.logs` to assemble deliverable bundles. The `pipeline/infrastructure/imagelibrary.py` utilities and export task code are the canonical places where exportable product lists are assembled and serialized. |
+| **Summary** | The context must make the datasets, calibration state, image products, reports, scripts, path information, project identifiers, and any other information needed for export available through the processing state so export tasks can assemble them into a deliverable product package. |
 | **Invariant** | The information needed to assemble a deliverable product package is accessible through the processing state. |
 
-**Implementation notes** — the base export task and telescope-specific subclasses assemble products from several parts of the context:
+**Implementation notes** — the base export task and telescope-specific implementations under `pipeline/h/tasks/exportdata/`, `pipeline/hif/tasks/exportdata/`, `pipeline/hifv/tasks/exportdata/`, `pipeline/hsd/tasks/exportdata/`, and `pipeline/hsdn/tasks/exportdata/` assemble products from several parts of the context. Image-product registries are provided by `pipeline/infrastructure/imagelibrary.py`, and manifest serialization is implemented in `pipeline/h/tasks/common/manifest.py`:
 
 - `ExportData.prepare()` creates `inputs.products_dir`, derives the OUS/status prefix from `context.get_oussid()` and `context.project_structure.recipe_name`, and exports standard OUS products from `context.logs`: PPR, weblog tarball, pipeline script, restore script, and CASA commands log.
 - `_make_lists()` builds visibility and session lists from `context.observing_run.measurement_sets`, optionally filtering MSes by whether the MS has imaging data columns.
