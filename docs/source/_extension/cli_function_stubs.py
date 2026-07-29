@@ -67,7 +67,7 @@ STUB_TEMPLATE_REGULAR = """\
 _TOCTREE_MARKER = '.. cli_function_stubs toctree'
 
 
-def _is_class_based_task(mod_name: str, func_name: str) -> bool:
+def _is_class_based_task(func_name: str) -> bool:
     """Check if a function is a class-based task wrapper.
 
     Uses the task_registry approach (same as cli_wrapper) to determine if
@@ -129,7 +129,7 @@ def _generate_cli_function_stubs(app: Sphinx) -> None:
             escaped = name.replace('_', r'\_')
             
             # Choose template based on whether it's a class-based task
-            is_class_based = _is_class_based_task(mod_name, name)
+            is_class_based = _is_class_based_task(name)
             template = STUB_TEMPLATE_CLASS_BASED if is_class_based else STUB_TEMPLATE_REGULAR
             
             content = template.format(
