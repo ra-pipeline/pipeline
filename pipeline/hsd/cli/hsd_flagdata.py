@@ -27,7 +27,6 @@ def hsd_flagdata(vis=None, autocorr=None, shadow=None, scan=None,
     - **Pointing outlier** (PL2025+): safety-net flag for OFF positions not removed by online
       flags, which would otherwise cause map creation to crash. A map-size threshold is computed
       and data points outside it are flagged.
-    - **Low transmission**: channels with poor atmospheric transmission.
 
     Notes:
         QA scoring:
