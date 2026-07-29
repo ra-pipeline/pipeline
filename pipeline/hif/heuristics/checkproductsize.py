@@ -246,6 +246,10 @@ class CheckProductSizeHeuristics:
             makeimlist_result = makeimlist_task.prepare()
             known_synthesized_beams = makeimlist_result.synthesized_beams
             imlist = makeimlist_result.targets
+            # now also re-get spws, because in multi-target multi-spctral spec setups dropping
+            # a target can be the same as dropping a spw. Without reassigning the spw again
+            # the PL would crash as the spw mitigation list is build from 'spws'
+            spws = list({i['spw'] for i in imlist})
             cubesizes, maxcubesize, productsizes, total_productsize = self.calculate_sizes(imlist)
             LOG.info('field / target mitigation leads to product size of %.4f GB' % (total_productsize))
 
