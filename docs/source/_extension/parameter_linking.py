@@ -7,10 +7,13 @@ This extension post-processes HTML files after the build to:
 This creates clickable links from function signature parameters to their documentation.
 """
 
+import logging
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from bs4 import BeautifulSoup
+
+logger = logging.getLogger(__name__)
 
 
 def process_html_file(filepath: Path) -> bool:
@@ -65,8 +68,8 @@ def process_html_file(filepath: Path) -> bool:
                 f.write(str(soup))
             return True
 
-    except Exception as e:
-        print(f'Warning: Could not process {filepath}: {e}')
+    except (OSError, AttributeError, ValueError) as e:
+        logger.warning('parameter_linking: could not process %s: %s', filepath, e)
 
     return False
 
@@ -257,7 +260,7 @@ def process_all_html_files(app, exception):
     if not html_files:
         return
 
-    print(f'\n[parameter_linking] Processing {len(html_files)} HTML files for parameter links...')
+    logger.info('parameter_linking: processing %d HTML files for parameter links...', len(html_files))
 
     modified_count = 0
     for html_file in html_files:
@@ -265,10 +268,10 @@ def process_all_html_files(app, exception):
             modified_count += 1
 
     if modified_count > 0:
-        print(f'[parameter_linking] Added parameter links to {modified_count} files')
+        logger.info('parameter_linking: added parameter links to %d files', modified_count)
 
 
-def setup(app) -> Dict[str, Any]:
+def setup(app) -> dict[str, Any]:
     """Setup the Sphinx extension.
 
     Args:
