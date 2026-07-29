@@ -2105,7 +2105,6 @@ def compute_zd_telmjd_for_ms(
             mjd = float(time_seconds) / 86400.0
             epoch_dict['m0']['value'] = mjd
             me.doframe(epoch_dict)
-            me.doframe(obs_pos)
 
             # Convert field direction to horizontal coordinates
             horizontal = me.measure(field_dir, 'AZELGEO')
