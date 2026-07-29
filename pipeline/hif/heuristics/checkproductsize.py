@@ -351,7 +351,7 @@ class CheckProductSizeHeuristics:
         large_cube_mitigation = False
         if (self.inputs.maxcubelimit != -1) or (self.inputs.maxproductsize != -1.0):
             # prepare dictionaries to hold oversize and overlimit cubesize (PIPE-3127) SpW lists
-            LOG.info(' *** These are the initial spws listed: < %s >'%(','.join(spws)))
+            LOG.info('*** These are the initial spws listed: < %s >'%(','.join(spws)))
             spw_oversizes = dict([(i, 0) for i in spws])
             spw_overlimit = dict([(i, 0) for i in spws])
             
@@ -370,13 +370,20 @@ class CheckProductSizeHeuristics:
             # - spw are oversize
             # - total products were too big
             # - cubesize > maxcubelimit
+
+            # create a separate list for spw that are over the maxcubelimit:
+            overlimit_spws = [spw for spw, n in spw_overlimit.items() if n>0]
+            if overlimit_spws != []:
+                LOG.info('*** These spws are over the maxcubelimit: < %s >'%(',').join(overlimit_spws))
+            # create a specific oversize spw list that explicitly excludes any overlimit spws that exceeded the maxcubelimit
+            oversize_spws = [spw for spw, n in spw_oversizes.items() if n>0 and spw not in overlimit_spws]
+            if oversize_spws != []:
+                LOG.info('*** These spws are in [0.5,1]*maxcubelimit: < %s >'%(',').join(oversize_spws))
+            
             if ([n != 0 for n in spw_oversizes.values()].count(True) > 1) or \
                ((total_productsize > self.inputs.maxproductsize) and (self.inputs.maxproductsize != -1)) or \
                ((maxcubesize > self.inputs.maxcubelimit) and (self.inputs.maxcubelimit != -1)):
-                # create a separate list for spw that are over the maxcubelimit:
-                overlimit_spws = [spw for spw, n in spw_overlimit.items() if n>0]
-                if overlimit_spws != []:
-                    LOG.info('*** These spws are over the maxcubelimit:<  %s  >'%(',').join(overlimit_spws))
+
                 # PIPE-3127 move the main step 1 exit clause here when checking if the representative SpW is over this limit as we will not continue
                 if str(repr_spw) in overlimit_spws:
                     LOG.error('Maximum cube size cannot be mitigated. Remaining factor with the maxcubesize is: %.4f' % (maxcubesize / self.inputs.maxcubesize))
@@ -392,13 +399,10 @@ class CheckProductSizeHeuristics:
                        known_synthesized_beams                    
 
                 # if the maxcubelimit error did not trigger we can continue the spw filtering as below
-                # create a specific oversize spw list that explicitly excludes any overlimit spws that exceeded the maxcubelimit
-                oversize_spws = [spw for spw, n in spw_oversizes.items() if n>0 and spw not in overlimit_spws]
-
+                
                 # Imaging will make at least one large cube if there are any
                 # if the repSpW is an oversize cube, it is added, else the first index spw of the list                
                 if oversize_spws != []:
-                    LOG.info('*** These spws are over the oversize criteria :<  %s  >'%(',').join(oversize_spws))                
                     large_cube_mitigation=True # to trigger specifically the large cube spw mitigation message
                     LOG.info('At least one cube size exceeded the large cube limit. Only one large SpW will be imaged.')                                        
                     if str(repr_spw) in oversize_spws:
