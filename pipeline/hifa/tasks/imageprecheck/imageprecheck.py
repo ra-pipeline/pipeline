@@ -60,7 +60,7 @@ class ImagePreCheckResults(basetask.Results):
 
     def merge_with_context(self, context):
         """
-        See :method:`~pipeline.infrastructure.api.Results.merge_with_context`
+        See :meth:`~pipeline.infrastructure.api.Results.merge_with_context`
         """
         # Calculated sensitivities for later stages
         if self.per_spw_cont_sensitivities_all_chan is not None:

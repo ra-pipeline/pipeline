@@ -16,11 +16,13 @@ build:
     - texlive-fonts-recommended
   # Build commands for HTML and PDF
   commands:
-    - curl -fsSL https://pixi.sh/install.sh | bash
+    - git fetch --unshallow
+    - git fetch --tags
+    - curl -fsSL https://pixi.sh/install.sh | PIXI_VERSION=v0.70.2 bash
     - $HOME/.pixi/bin/pixi install -e docs
     - mkdir -p ~/.casa/data
     - $HOME/.pixi/bin/pixi run -e docs build-docs
     - $HOME/.pixi/bin/pixi run -e docs build-pdf
-    - mkdir --parents _readthedocs/html/ _readthedocs/pdf/
-    - cp --recursive docs/_build/html/* _readthedocs/html/
-    - cp --recursive docs/_build/latex/*.pdf _readthedocs/pdf/
+    - mkdir --parents $READTHEDOCS_OUTPUT/html/ $READTHEDOCS_OUTPUT/pdf/
+    - cp --recursive docs/_build/html/* $READTHEDOCS_OUTPUT/html/
+    - cp --recursive docs/_build/latex/*.pdf $READTHEDOCS_OUTPUT/pdf/

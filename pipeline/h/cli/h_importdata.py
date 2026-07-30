@@ -16,9 +16,6 @@ def h_importdata(vis=None, session=None, asis=None, process_caldevice=None, over
     conversion step is skipped, and the existing MS will be imported
     instead.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Load an ASDM list in the ../rawdata subdirectory into the context"
 

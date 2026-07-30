@@ -4,9 +4,10 @@
 #	export pythonbin=${casa_dir}/bin/python3
 PYTHON := $(if $(pythonbin),$(pythonbin),python3)
 
-SPHINXOPTS    = -v # -j auto
+SPHINXOPTS    = -v -j auto
+# SPHINXOPTS    = -v -j auto -b coverage
+# SPHINXOPTS    = -v
 SPHINXBUILD   = ${PYTHON} -msphinx
-#SPHINXOPTS    = -v -j auto -b coverage
 SPHINXPROJ    = pipeline_docs
 SOURCEDIR     = source
 BUILDDIR      = _build
@@ -43,9 +44,15 @@ taskapidoc:
 html_docs:
 	@rm -rf ${SOURCEDIR}/_apidoc
 	# @make apidoc
-	@rm -rf ${BUILDDIR}/html ${BUILDDIR}/doctrees 
+	@rm -rf ${BUILDDIR}/html ${BUILDDIR}/doctrees
 	@rm -rf ${SOURCEDIR}/_autosummary*
 	@rm -rf ${SOURCEDIR}/_automodapi
+	@make html
+	@rm -rf casa-*.log ${SOURCEDIR}/casa-*log
+
+# Incremental build: keeps doctrees and autosummary stubs — much faster for iterative dev.
+# Run html_docs at least once first to generate stubs.
+html_fast:
 	@make html
 	@rm -rf casa-*.log ${SOURCEDIR}/casa-*log
 

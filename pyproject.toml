@@ -201,8 +201,8 @@ six = ">=1.17"
 casampi = { version = ">=0.5.5", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 casaplotms = { version = ">=2.5.3", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 casaplotserver = { version = ">=1.8.2", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
-casatasks = { version = ">=6.6.6", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
-casatools = { version = ">=6.6.6", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+casatasks = { version = ">=6.7.4.2", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+casatools = { version = ">=6.7.4.2", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 
 [tool.pixi.system-requirements]
 # Sets the minimum macOS runtime to 15.0 (floor, not a build filter).
@@ -243,30 +243,8 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
 # Fetch/update CASA runtime data
 fetch-casarundata = "python -c 'import casatools'"
 
-# Build docs (full clean rebuild)
-build-docs = { cmd = "make html_docs", cwd = "docs" }
-
-# Incremental docs build — reuses doctrees and autosummary stubs (much faster for dev)
-build-docs-fast = { cmd = "make html_fast", cwd = "docs" }
-
-# Build PDF (LaTeX) docs
-build-pdf = { cmd = "make latexpdf", cwd = "docs" }
-
 # --------------------------------------------------------------------------
-# Feature: CASA ver6.7.1-dev/snapshot — Python 3.12
-# --------------------------------------------------------------------------
-
-[tool.pixi.feature.casa671-py312]
-platforms = ["linux-64", "osx-arm64"]
-
-[tool.pixi.feature.casa671-py312.dependencies]
-python = "3.12.*"
-
-[tool.pixi.feature.casa671-py312.pypi-dependencies]
-casashell = { version = "==6.7.1.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
-
-# --------------------------------------------------------------------------
-# Feature: CASA ver6.7.4-dev/snapshot — Python 3.12
+# Feature: CASA ver6.7.4 (PL2026-CASA branch) — Python 3.12
 # casatools/casatasks/numpy etc. will be installed as indirect dependencies
 # of casashell; no need to specify them here.
 # --------------------------------------------------------------------------
@@ -281,7 +259,7 @@ python = "3.12.*"
 casashell = { version = "==6.7.4.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 
 # --------------------------------------------------------------------------
-# Feature: CASA ver6.7.5-dev/snapshot — Python 3.12/3.13
+# Feature: CASA ver6.7.5.* (latest release branch) — Python 3.12/3.13
 # --------------------------------------------------------------------------
 
 [tool.pixi.feature.casa675-py312]
@@ -304,6 +282,29 @@ python = "3.13.*"
 casashell = { version = "==6.7.5.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 
 # --------------------------------------------------------------------------
+# Feature: CASA ver6.7.6 (master branch) — Python 3.12/3.13
+# --------------------------------------------------------------------------
+
+[tool.pixi.feature.casa676-py312]
+platforms = ["linux-64", "osx-arm64"]
+
+[tool.pixi.feature.casa676-py312.dependencies]
+python = "3.12.*"
+
+[tool.pixi.feature.casa676-py312.pypi-dependencies]
+casashell = { version = "==6.7.6.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+
+[tool.pixi.feature.casa676-py313]
+# Note: bdsf is not available on osx-arm64 for cp313; skipped via requirements.txt marker
+platforms = ["linux-64", "osx-arm64"]
+
+[tool.pixi.feature.casa676-py313.dependencies]
+python = "3.13.*"
+
+[tool.pixi.feature.casa676-py313.pypi-dependencies]
+casashell = { version = "==6.7.6.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+
+# --------------------------------------------------------------------------
 # Feature: Docs build extras
 # --------------------------------------------------------------------------
 
@@ -312,16 +313,25 @@ platforms = ["linux-64", "osx-arm64"]
 
 [tool.pixi.feature.docs.dependencies]
 python = "3.12.*"
-pandoc = "*"             # required by nbsphinx (Jupyter notebook → RST conversion)
+pandoc = "*"      # required by nbsphinx (Jupyter notebook → RST conversion)
 
 [tool.pixi.feature.docs.pypi-dependencies]
-casashell = { version = "==6.7.5.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 pipeline = { path = ".", editable = true, extras = ["docs"] }
 
+[tool.pixi.feature.docs.tasks]
+# Build docs (full clean rebuild)
+build-docs = { cmd = "make html_docs", cwd = "docs" }
+# Incremental docs build — reuses doctrees and autosummary stubs (much faster for dev)
+build-docs-fast = { cmd = "make html_fast", cwd = "docs" }
+# Build PDF (LaTeX) docs
+build-pdf = { cmd = "make latexpdf", cwd = "docs" }
+
 [tool.pixi.environments]
-default = { features = ["casa675-py312"], solve-group = "casa675-py312" }
-docs = { features = ["docs"], solve-group = "casa675-py312" }
-casa671-py312 = { features = ["casa671-py312"] }
+# default + docs share a solve-group so the docs build always uses the same locked deps as the default runtime
+default = { features = ["casa674-py312"], solve-group = "casa674-py312" }
+docs = { features = ["docs"], solve-group = "casa674-py312" }
 casa674-py312 = { features = ["casa674-py312"] }
-casa675-py312 = { features = ["casa675-py312"], solve-group = "casa675-py312" }
+casa675-py312 = { features = ["casa675-py312"] }
 casa675-py313 = { features = ["casa675-py313"] }
+casa676-py312 = { features = ["casa676-py312"] }
+casa676-py313 = { features = ["casa676-py313"] }
