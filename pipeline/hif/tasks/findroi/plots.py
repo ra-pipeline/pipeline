@@ -131,20 +131,20 @@ def _spw_title(spw_meta: dict[str, Any]) -> str:
     return f'SPW {spw_id}{suffix}'
 
 
-def _region_label(
-    x: np.ndarray,
-    lo_chan: int,
-    hi_chan: int,
-    peak_snr: float,
-    freq_axis: bool,
-) -> str:
-    if not freq_axis:
-        return f'ch {lo_chan}~{hi_chan}\npeak {peak_snr:.1f} sigma'
+def _region_label(peak_snr: float) -> str:
+    return f'peak {peak_snr:.1f} σ'
 
-    lo_freq = float(x[max(0, min(lo_chan, len(x) - 1))])
-    hi_freq = float(x[max(0, min(hi_chan, len(x) - 1))])
-    lo_freq, hi_freq = sorted((lo_freq, hi_freq))
-    return f'{lo_freq:.5f}-{hi_freq:.5f} GHz\nch {lo_chan}~{hi_chan}; peak {peak_snr:.1f} sigma'
+
+def _add_channel_axis(ax: Any, x: np.ndarray, nchan: int) -> None:
+    """Add channel-number ticks above a frequency-based spectrum axis."""
+    channel_ax = ax.twiny()
+    channel_ax.set_xlim(ax.get_xlim())
+    n_ticks = min(7, max(nchan, 1))
+    channel_ticks = np.unique(np.linspace(0, max(nchan - 1, 0), n_ticks, dtype=int))
+    channel_ax.set_xticks([x[idx] for idx in channel_ticks])
+    channel_ax.set_xticklabels([str(idx) for idx in channel_ticks])
+    channel_ax.set_xlabel('Channel')
+    channel_ax.tick_params(axis='x', pad=4)
 
 
 def _linewidth_note(spw_meta: dict[str, Any], block: dict[str, Any]) -> str | None:
@@ -173,7 +173,7 @@ def _linewidth_note(spw_meta: dict[str, Any], block: dict[str, Any]) -> str | No
             fwhm_kms_f = None
     else:
         fwhm_kms_f = None
-    parts = [f'FWHM: {fwhm_chan_i} ch']
+    parts = [f'Auto-FWHM: {fwhm_chan_i} ch']
     if fwhm_mhz is not None and np.isfinite(fwhm_mhz):
         parts.append(f'{fwhm_mhz:.3f} MHz')
     if fwhm_kms_f is not None and np.isfinite(fwhm_kms_f):
@@ -340,7 +340,7 @@ def plot_evidence_with_lines(
 
     spw_keys = _plot_spw_keys(res, spw_key)
     n = len(spw_keys)
-    fig, axes = plt.subplots(n, 1, figsize=(12, max(2.5, 2.2 * n)), sharex=False)
+    fig, axes = plt.subplots(n, 1, figsize=(12, max(5.0, 4.4 * n)), sharex=False)
     axes = [axes] if n == 1 else list(axes)
     panel_limits = []
     if min_neg_region_snr is None:
@@ -371,8 +371,6 @@ def plot_evidence_with_lines(
             xlabel = 'Frequency (GHz)'
             freq_axis = True
         ax.plot(x, evid, color='black', lw=1.0, label='Evidence')
-        ax.axhline(float(min_region_snr), color='firebrick', linestyle='--', lw=0.8, alpha=0.7)
-        ax.axhline(-float(min_neg_region_snr), color='royalblue', linestyle='--', lw=0.8, alpha=0.7)
         roi = block.get('roi_detected') or {}
         line_ranges_all = roi.get('line_ranges', [])
         peak_snr_all = roi.get('line_range_peakSNR', [])
@@ -403,11 +401,10 @@ def plot_evidence_with_lines(
             ymin = float(np.nanmin(evid))
         else:
             ymax, ymin = 1.0, 0.0
-        ymax = max(ymax, float(min_region_snr))
-        ymin = min(ymin, -float(min_neg_region_snr))
         yrange = max(ymax - ymin, 1.0)
         if nchan > 0:
             ax.set_xlim(float(x[0]), float(x[-1]))
+        _add_channel_axis(ax, x, nchan)
 
         # Keep bars and labels inside panel top with some headroom.
         bar_y0 = ymax + 0.02 * yrange
@@ -478,7 +475,7 @@ def plot_evidence_with_lines(
             ax.text(
                 mid,
                 y_text,
-                _region_label(x, lo_chan, hi_chan, line_peak_snr[i], freq_axis),
+                _region_label(line_peak_snr[i]),
                 ha='center',
                 va='bottom',
                 fontsize=region_label_fontsize,
@@ -512,7 +509,7 @@ def plot_evidence_with_lines(
             ax.text(
                 mid,
                 y_text,
-                _region_label(x, lo_chan, hi_chan, neg_line_peak_snr[i], freq_axis),
+                _region_label(neg_line_peak_snr[i]),
                 ha='center',
                 va='bottom',
                 fontsize=region_label_fontsize,
@@ -526,13 +523,13 @@ def plot_evidence_with_lines(
         )
         y_bot = ymin - 0.06 * yrange
         panel_limits.append((y_bot, y_top))
-        ax.set_title(_spw_title(spw_meta))
+        ax.set_title(f'{source_name} | SPW {spw_meta.get("spw_id", spw_key)} Evidence Spectrum (LSRK frame)')
         ax.set_ylabel(r'Evidence [$\sigma$]')
         lw_note = _linewidth_note(spw_meta, block)
         if lw_note:
             ax.text(
                 0.01,
-                0.98,
+                0.93,
                 lw_note,
                 transform=ax.transAxes,
                 ha='left',
@@ -545,7 +542,7 @@ def plot_evidence_with_lines(
         if qc_note:
             ax.text(
                 0.01,
-                0.88,
+                0.80,
                 qc_note,
                 transform=ax.transAxes,
                 ha='left',
@@ -556,7 +553,7 @@ def plot_evidence_with_lines(
             )
         ax.grid(alpha=0.2)
     if axes:
-        axes[-1].set_xlabel(xlabel)
+        axes[-1].set_xlabel('Frequency (GHz, LSRK)' if xlabel == 'Frequency (GHz)' else xlabel)
         common_ymin = min(limit[0] for limit in panel_limits)
         common_ymax = max(limit[1] for limit in panel_limits)
         for ax in axes:
@@ -565,14 +562,9 @@ def plot_evidence_with_lines(
             Line2D([0], [0], color='black', lw=1.0, label='Evidence'),
             Line2D([0], [0], color='firebrick', lw=3.0, label='Positive ROI'),
             Line2D([0], [0], color='royalblue', lw=3.0, label='Negative ROI'),
-            Line2D([0], [0], color='dimgray', linestyle='--', lw=0.8,
-                   label=(f'+/- detection threshold '
-                          f'(+{float(min_region_snr):g}/-{float(min_neg_region_snr):g} sigma)')),
         ]
         axes[0].legend(handles=legend_handles, loc='upper right', fontsize='small')
-    level = 'source-level' if field_id is None else f'field {field_id}'
-    fig.suptitle(f'{source_name} evidence with line ranges ({level})')
-    fig.tight_layout(rect=(0, 0, 1, 0.98))
+    fig.tight_layout()
     return True
 
 

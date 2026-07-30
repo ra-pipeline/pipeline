@@ -9,6 +9,9 @@ import pipeline.infrastructure.renderer.logger as logger
 SourceSummaryRow = collections.namedtuple('SourceSummaryRow', 'source spw_summary roi_summary')
 ArtifactLink = collections.namedtuple('ArtifactLink', 'label href')
 PlotLink = collections.namedtuple('PlotLink', 'field spw href thumbnail')
+PlotGroup = collections.namedtuple('PlotGroup', 'field plots')
+
+FINDROI_THUMBNAIL_SIZE = '750x564'
 
 
 class T2_4MDetailsFindROIRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
@@ -64,6 +67,12 @@ class T2_4MDetailsFindROIRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                     href, thumbnail = None, None
                 plot_links.append(PlotLink(field, paths.get('spw_id', spw_key), href, thumbnail))
 
+        plot_groups = []
+        for plot in plot_links:
+            if not plot_groups or plot_groups[-1].field != plot.field:
+                plot_groups.append(PlotGroup(plot.field, []))
+            plot_groups[-1].plots.append(plot)
+
         no_valid_source_spw = (
             not any(plot.href for plot in plot_links)
             and (
@@ -84,6 +93,7 @@ class T2_4MDetailsFindROIRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             'summary_rows': summary_rows,
             'artifact_links': artifact_links,
             'plot_links': plot_links,
+            'plot_groups': plot_groups,
             'plot_message': plot_message,
             'errors': result.errors,
         })
@@ -104,6 +114,6 @@ class T2_4MDetailsFindROIRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             return None
 
         full_path = os.path.join(report_dir, href)
-        thumbnail_path = logger.Plot.create_thumbnail(full_path)
+        thumbnail_path = logger.Plot.create_thumbnail(full_path, thumbnail_size=FINDROI_THUMBNAIL_SIZE)
         thumbnail = os.path.relpath(thumbnail_path, report_dir)
         return href, thumbnail
