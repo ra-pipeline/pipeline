@@ -50,6 +50,15 @@ def _spw_order(res: dict[str, Any]) -> list[str]:
     return sorted(keys, key=lambda x: int(x))
 
 
+def _plot_spw_keys(res: dict[str, Any], spw_key: str | None) -> list[str]:
+    if spw_key is None:
+        return _spw_order(res)
+    key = str(spw_key)
+    if key not in res['inventory']['science_spws']:
+        raise KeyError(f'Unknown science SPW {spw_key!r}')
+    return [key]
+
+
 def _resolve_source_name(res: dict[str, Any], source_name: str | None, source_id: int | None) -> str:
     srcs = res['inventory']['sources']
     if source_name is not None:
@@ -72,10 +81,11 @@ def has_valid_source_spw(
     res: dict[str, Any],
     source_name: str,
     field_id: int | None = None,
+    spw_key: str | None = None,
 ) -> bool:
     """Return whether a source has at least one non-empty spectrum product."""
-    for spw_key in _spw_order(res):
-        src_spw = _source_spw_block(res, source_name, spw_key)
+    for key in _plot_spw_keys(res, spw_key):
+        src_spw = _source_spw_block(res, source_name, key)
         if not src_spw:
             continue
         try:
@@ -196,9 +206,12 @@ def plot_spectra_by_spw(
     source_id: int | None = None,
     field_id: int | None = None,
     use_snr: bool = True,
-) -> None:
+    spw_key: str | None = None,
+) -> bool:
     source_name = _resolve_source_name(res, source_name, source_id)
-    spw_keys = _spw_order(res)
+    if not has_valid_source_spw(res, source_name, field_id, spw_key):
+        return False
+    spw_keys = _plot_spw_keys(res, spw_key)
     n = len(spw_keys)
     fig, axes = plt.subplots(n, 1, figsize=(12, max(2.5, 2.2 * n)), sharex=False)
     axes = [axes] if n == 1 else list(axes)
@@ -262,6 +275,7 @@ def plot_spectra_by_spw(
     level = 'source-level' if field_id is None else f'field {field_id}'
     fig.suptitle(f'{source_name} spectra per spw ({level})')
     fig.tight_layout()
+    return True
 
 
 def plot_moment0_by_spw(
@@ -269,9 +283,15 @@ def plot_moment0_by_spw(
     source_name: str | None = None,
     source_id: int | None = None,
     field_id: int | None = None,
-) -> None:
+    spw_key: str | None = None,
+) -> bool:
     source_name = _resolve_source_name(res, source_name, source_id)
-    spw_keys = [k for k in _spw_order(res) if _source_spw_block(res, source_name, k)]
+    spw_keys = [
+        key for key in _plot_spw_keys(res, spw_key)
+        if has_valid_source_spw(res, source_name, field_id, key)
+    ]
+    if not spw_keys:
+        return False
     n = len(spw_keys)
     ncols = min(3, n) if n else 1
     nrows = int(np.ceil(n / ncols)) if n else 1
@@ -301,6 +321,7 @@ def plot_moment0_by_spw(
     level = 'source-level' if field_id is None else f'field {field_id}'
     fig.suptitle(f'moment0 per spw ({source_name}, {level})')
     fig.tight_layout()
+    return True
 
 
 def plot_evidence_with_lines(
@@ -311,12 +332,13 @@ def plot_evidence_with_lines(
     min_region_snr: float = 7.0,
     min_neg_region_snr: float | None = None,
     region_label_fontsize: int | str | None = None,
+    spw_key: str | None = None,
 ) -> bool:
     source_name = _resolve_source_name(res, source_name, source_id)
-    if not has_valid_source_spw(res, source_name, field_id):
+    if not has_valid_source_spw(res, source_name, field_id, spw_key):
         return False
 
-    spw_keys = _spw_order(res)
+    spw_keys = _plot_spw_keys(res, spw_key)
     n = len(spw_keys)
     fig, axes = plt.subplots(n, 1, figsize=(12, max(2.5, 2.2 * n)), sharex=False)
     axes = [axes] if n == 1 else list(axes)
