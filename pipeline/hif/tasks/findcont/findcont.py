@@ -51,6 +51,8 @@ def _imaging_summary_entry(makeimlist_inputs, target, spwid):
         'robust': target.get('robust'),
         'uvtaper': target.get('uvtaper'),
         'mosweight': None,
+        'perchanweightdensity': None,
+        'nbins': target.get('nbin'),
         'status': 'Not imaged',
     }
 
@@ -521,6 +523,8 @@ class FindCont(basetask.StandardTaskTemplate):
                         'robust': robust,
                         'uvtaper': uvtaper,
                         'mosweight': mosweight,
+                        'perchanweightdensity': perchanweightdensity,
+                        'nbins': target.get('nbin'),
                         'status': 'Dirty cube',
                     })
 
