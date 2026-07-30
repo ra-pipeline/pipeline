@@ -8,7 +8,7 @@ import pipeline.infrastructure.renderer.logger as logger
 
 SourceSummaryRow = collections.namedtuple('SourceSummaryRow', 'source spw_summary roi_summary')
 ArtifactLink = collections.namedtuple('ArtifactLink', 'label href')
-PlotLink = collections.namedtuple('PlotLink', 'field spw href thumbnail')
+PlotLink = collections.namedtuple('PlotLink', 'field spw href thumbnail positive_roi_ranges')
 PlotGroup = collections.namedtuple('PlotGroup', 'field plots')
 
 FINDROI_THUMBNAIL_SIZE = '500x376'
@@ -50,6 +50,7 @@ class T2_4MDetailsFindROIRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
         plot_links = []
         summary_plots = result.artifacts.get('summary_plots') or {}
+        roi_dat_ranges = self._read_roi_dat_ranges(result.artifacts.get('roi_dat'))
         for field, spw_plots in sorted(summary_plots.items()):
             for spw_key, paths in sorted(spw_plots.items(), key=lambda item: int(item[0])):
                 for path in (
@@ -65,7 +66,10 @@ class T2_4MDetailsFindROIRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                     href, thumbnail = evidence
                 else:
                     href, thumbnail = None, None
-                plot_links.append(PlotLink(field, paths.get('spw_id', spw_key), href, thumbnail))
+                spw = str(paths.get('spw_id', spw_key))
+                plot_links.append(
+                    PlotLink(field, spw, href, thumbnail, roi_dat_ranges.get((field, spw), []))
+                )
 
         plot_groups = []
         for plot in plot_links:
@@ -117,3 +121,26 @@ class T2_4MDetailsFindROIRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         thumbnail_path = logger.Plot.create_thumbnail(full_path, thumbnail_size=FINDROI_THUMBNAIL_SIZE)
         thumbnail = os.path.relpath(thumbnail_path, report_dir)
         return href, thumbnail
+
+    @staticmethod
+    def _read_roi_dat_ranges(path):
+        if not path or not os.path.exists(path):
+            return {}
+
+        ranges = {}
+        field = None
+        spw = None
+        with open(path, encoding='ascii') as handle:
+            for raw_line in handle:
+                line = raw_line.strip()
+                if not line:
+                    continue
+                if line.startswith('Field: '):
+                    field = line[len('Field: '):]
+                    spw = None
+                elif line.startswith('SpectralWindow: '):
+                    spw = line[len('SpectralWindow: '):]
+                    ranges[(field, spw)] = []
+                elif field is not None and spw is not None:
+                    ranges[(field, spw)].append(line)
+        return ranges

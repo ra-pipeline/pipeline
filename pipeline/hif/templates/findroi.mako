@@ -8,7 +8,7 @@
     <tr>
       <th>Field</th>
       <th>Selected / Successful / Failed Science SPWs</th>
-      <th>Products with Line ROI / Continuum Ranges</th>
+      <th>SPWs with Line ROI / Continuum Ranges</th>
     </tr>
   </thead>
   <tbody>
@@ -43,6 +43,7 @@
       <th>Field</th>
       <th>SPW</th>
       <th>Evidence Spectrum</th>
+      <th>Positive ROI Ranges</th>
     </tr>
   </thead>
   <tbody>
@@ -64,6 +65,15 @@
           </a>
         % else:
           No evidence spectrum available
+        % endif
+        </td>
+        <td>
+        % if plot.positive_roi_ranges:
+          % for roi_range in plot.positive_roi_ranges:
+            ${roi_range}<br>
+          % endfor
+        % else:
+          No ROI.dat entry
         % endif
         </td>
       </tr>
