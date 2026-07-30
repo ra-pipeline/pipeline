@@ -46,24 +46,28 @@
     </tr>
   </thead>
   <tbody>
-  % for plot in plot_links:
-    <tr>
-      <td>${plot.field}</td>
-      <td>${plot.spw}</td>
-      <td>
-      % if plot.href:
-        <a href="${plot.href}"
-           data-fancybox="findroi_evidence"
-           data-caption="${plot.field} SPW ${plot.spw} evidence spectrum">
-          <img class="lazyload img-responsive"
-               data-src="${plot.thumbnail}"
-               alt="${plot.field} SPW ${plot.spw} evidence spectrum">
-        </a>
-      % else:
-        No evidence spectrum available
+  % for group in plot_groups:
+    % for row_index, plot in enumerate(group.plots):
+      <tr>
+      % if row_index == 0:
+        <td rowspan="${len(group.plots)}">${group.field}</td>
       % endif
-      </td>
-    </tr>
+        <td>${plot.spw}</td>
+        <td>
+        % if plot.href:
+          <a href="${plot.href}"
+             data-fancybox="findroi_evidence"
+             data-caption="${plot.field} SPW ${plot.spw} evidence spectrum">
+            <img class="lazyload img-responsive"
+                 data-src="${plot.thumbnail}"
+                 alt="${plot.field} SPW ${plot.spw} evidence spectrum">
+          </a>
+        % else:
+          No evidence spectrum available
+        % endif
+        </td>
+      </tr>
+    % endfor
   % endfor
   </tbody>
 </table>
