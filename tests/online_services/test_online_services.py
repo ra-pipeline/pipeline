@@ -29,6 +29,7 @@ import json
 import ssl
 import urllib.parse
 import urllib.request
+from pathlib import Path
 from xml.dom import minidom
 
 import certifi
@@ -36,40 +37,29 @@ import functools
 import pytest
 
 # ===========================================================================
-# Reference values
-# (obtained by running the live services; fixed historical queries that will
-# never change because they reference past observations / fixed dates)
+# Reference values  (loaded from reference_values.json)
+# To refresh after a deliberate service change:
+#   python tests/online_services/update_references.py
 # ===========================================================================
 
-# Flux service: J1427-4206 on 27-March-2013 at 87 GHz
-# Source: queried from asa.alma.cl/sc/flux on 2026-07-30
-FLUX_REF_J1427_DENSITY: float = 7.7245263249054075   # Jy
-FLUX_REF_J1427_SPIX: float = -0.359656945792801
-FLUX_REF_TOLERANCE: float = 1e-3   # relative tolerance for floating-point comparison
+_REF = json.loads((Path(__file__).parent / 'reference_values.json').read_text())
 
-# Jy/K service: uid://A002/X85c183/X36f  (hsd_calimage regression dataset)
-# Source: queried from asa.alma.cl/science/jy-kelvins on 2026-07-30
-# 3 antennas (DA61, PM03, PM04) × 4 SPWs → 12 entries total
-JYPERK_REF_FACTOR_COUNT: int = 12
-JYPERK_REF_FACTORS: dict[int, float] = {
-    17: 43.768,
-    19: 43.776,
-    21: 43.824,
-    23: 43.834,
-}
-JYPERK_REF_ANTENNAS: set[str] = {'DA61', 'PM03', 'PM04'}
+_flux_lq = _REF['flux_service']['liveness_query']
+_flux_rq = _REF['flux_service']['real_query']
+_jk      = _REF['jyperk_service']
+_ap      = _REF['antpos_service']
 
-# Antenna position service: uid://A002/Xc46ab2/X15ae  (PPR regression dataset)
-# Source: queried from asa.alma.cl/uncertainties-service on 2026-07-30
-# Returns a dict  {antenna_name: [X_ITRF, Y_ITRF, Z_ITRF]}  (metres)
-# Note: the total number of antennas with corrections can grow as the service
-# is updated; only the coordinates of a stable reference antenna are checked.
-ANTPOS_REF_UID = 'uid://A002/Xc46ab2/X15ae'
-ANTPOS_REF_CM05_XYZ: tuple[float, float, float] = (
-    2225063.5458056196,
-    -5440128.204003837,
-    -2481550.0793935717,
-)
+FLUX_REF_J1427_DENSITY: float = _flux_lq['flux_density_jy']
+FLUX_REF_J1427_SPIX: float    = _flux_lq['spectral_index']
+FLUX_REF_TOLERANCE: float     = _flux_lq['tolerance_relative']
+
+JYPERK_REF_FACTOR_COUNT: int       = _jk['expected_entry_count']
+JYPERK_REF_FACTORS: dict[int, float] = {int(k): v for k, v in _jk['factors_by_spwid'].items()}
+JYPERK_REF_ANTENNAS: set[str]      = set(_jk['expected_antennas'])
+
+ANTPOS_REF_UID: str                              = _ap['test_uid']
+ANTPOS_REF_POSITIONS: dict[str, list[float]]     = _ap['itrf_positions']
+ANTPOS_REF_TOLERANCE_M: float                    = _ap['tolerance_metres']
 
 # ---------------------------------------------------------------------------
 # Shared SSL context
@@ -124,10 +114,13 @@ FLUX_REAL_PARAMS = {
     'CATALOGUE': '5',
 }
 
-# Fields we expect the service to return for a successful measurement
+# Full set of fields the service returns — kept in sync with reference_values.json
 FLUX_EXPECTED_FIELD_NAMES = {
-    'SourceName', 'FluxDensity', 'SpectralIndex',
-    'Date', 'Frequency', 'StatusCode',
+    'StatusCode', 'SourceName', 'Frequency', 'Date',
+    'FluxDensity', 'FluxDensityError',
+    'SpectralIndex', 'SpectralIndexError',
+    'DataConditions', 'Nearest Measurement Date',
+    'Verbose', 'Version',
 }
 
 
@@ -180,16 +173,6 @@ class TestFluxService:
         assert not missing, f'Missing fields in response: {missing}'
 
     @pytest.mark.parametrize('base_url', [FLUX_SERVICE_PRIMARY, FLUX_SERVICE_BACKUP])
-    def test_real_observation_query(self, base_url: str) -> None:
-        """J1957-3845 on 14-August-2023 at Band 6 returns a plausible flux density."""
-        result = _query_flux_service(base_url, FLUX_REAL_PARAMS)
-        assert result, 'No data rows returned'
-        flux_str = result.get('FluxDensity')
-        assert flux_str is not None, 'FluxDensity is missing or None'
-        flux = float(flux_str)
-        assert 0.0 < flux < 100.0, f'Flux density out of plausible range (0, 100 Jy): {flux}'
-
-    @pytest.mark.parametrize('base_url', [FLUX_SERVICE_PRIMARY, FLUX_SERVICE_BACKUP])
     def test_spectral_index_numeric(self, base_url: str) -> None:
         """SpectralIndex returned for the liveness source is a finite number."""
         result = _query_flux_service(base_url, FLUX_LIVENESS_PARAMS)
@@ -204,27 +187,81 @@ class TestFluxService:
         result = _query_flux_service(base_url, FLUX_LIVENESS_PARAMS)
         source_name = result.get('SourceName', '')
         assert source_name, 'SourceName is empty'
-        # The service may normalise the name; at minimum it should be non-empty
         assert len(source_name) > 0
 
     @pytest.mark.parametrize('base_url', [FLUX_SERVICE_PRIMARY, FLUX_SERVICE_BACKUP])
-    def test_reference_flux_values(self, base_url: str) -> None:
-        """J1427-4206 / 27-March-2013 / 87 GHz returns the known reference flux and spix.
+    def test_date_echoed(self, base_url: str) -> None:
+        """Service echoes back the queried date in the Date field."""
+        result = _query_flux_service(base_url, FLUX_LIVENESS_PARAMS)
+        echoed = result.get('Date', '')
+        queried = FLUX_LIVENESS_PARAMS['DATE']
+        assert echoed == queried, f'Date echoed {echoed!r} != queried {queried!r}'
 
-        These are fixed historical values: the date and source are in the past so the
-        service result will never change.  Tolerance is 0.1% relative.
+    @pytest.mark.parametrize('base_url,ref', [
+        (FLUX_SERVICE_PRIMARY, _flux_lq),
+    ])
+    def test_reference_all_liveness_fields(self, base_url: str, ref: dict) -> None:
+        """Liveness query on primary endpoint returns ALL reference values within tolerance (tol 0.1% relative).
+
+        Checks: StatusCode, FluxDensity, FluxDensityError, SpectralIndex,
+                SpectralIndexError, DataConditions, NearestMeasurementDate.
         """
         result = _query_flux_service(base_url, FLUX_LIVENESS_PARAMS)
-        flux = float(result['FluxDensity'])
-        spix = float(result['SpectralIndex'])
-        rel_flux_err = abs(flux - FLUX_REF_J1427_DENSITY) / FLUX_REF_J1427_DENSITY
-        assert rel_flux_err < FLUX_REF_TOLERANCE, (
-            f'FluxDensity {flux} differs from reference {FLUX_REF_J1427_DENSITY} '
-            f'by {rel_flux_err:.2e} (tol {FLUX_REF_TOLERANCE})'
+        tol = ref['tolerance_relative']
+
+        assert result.get('StatusCode') == ref['expected_status_code'], (
+            f"StatusCode {result.get('StatusCode')!r} != {ref['expected_status_code']!r}"
         )
-        assert abs(spix - FLUX_REF_J1427_SPIX) < 1e-6, (
-            f'SpectralIndex {spix} differs from reference {FLUX_REF_J1427_SPIX}'
+        assert result.get('DataConditions') == ref['data_conditions'], (
+            f"DataConditions {result.get('DataConditions')!r} != {ref['data_conditions']!r}"
         )
+        nmd = float(result['Nearest Measurement Date'])
+        assert abs(nmd - ref['nearest_measurement_date_days']) < 1.0, (
+            f"Nearest Measurement Date {nmd} != ref {ref['nearest_measurement_date_days']}"
+        )
+        for field, ref_key in (
+            ('FluxDensity',       'flux_density_jy'),
+            ('FluxDensityError',  'flux_density_error_jy'),
+            ('SpectralIndex',     'spectral_index'),
+            ('SpectralIndexError','spectral_index_error'),
+        ):
+            got = float(result[field])
+            ref_val = ref[ref_key]
+            rel_err = abs(got - ref_val) / abs(ref_val) if ref_val != 0 else abs(got)
+            assert rel_err < tol, (
+                f'{field}: {got} vs ref {ref_val}, rel err {rel_err:.2e} (tol {tol})'
+            )
+
+    @pytest.mark.parametrize('base_url,ref', [
+        (FLUX_SERVICE_PRIMARY, _flux_rq),
+    ])
+    def test_reference_all_real_query_fields(self, base_url: str, ref: dict) -> None:
+        """Real query on primary endpoint returns ALL reference values within tolerance."""
+        result = _query_flux_service(base_url, FLUX_REAL_PARAMS)
+        tol = ref['tolerance_relative']
+
+        assert result.get('StatusCode') == ref['expected_status_code'], (
+            f"StatusCode {result.get('StatusCode')!r} != {ref['expected_status_code']!r}"
+        )
+        assert result.get('DataConditions') == ref['data_conditions'], (
+            f"DataConditions {result.get('DataConditions')!r} != {ref['data_conditions']!r}"
+        )
+        nmd = float(result['Nearest Measurement Date'])
+        assert abs(nmd - ref['nearest_measurement_date_days']) < 1.0, (
+            f"Nearest Measurement Date {nmd} != ref {ref['nearest_measurement_date_days']}"
+        )
+        for field, ref_key in (
+            ('FluxDensity',       'flux_density_jy'),
+            ('FluxDensityError',  'flux_density_error_jy'),
+            ('SpectralIndex',     'spectral_index'),
+            ('SpectralIndexError','spectral_index_error'),
+        ):
+            got = float(result[field])
+            ref_val = ref[ref_key]
+            rel_err = abs(got - ref_val) / abs(ref_val) if ref_val != 0 else abs(got)
+            assert rel_err < tol, (
+                f'{field}: {got} vs ref {ref_val}, rel err {rel_err:.2e} (tol {tol})'
+            )
 
 
 # ===========================================================================
@@ -294,6 +331,30 @@ class TestJyPerKService:
         rows = payload.get('data', {}).get('factors', [])
         assert len(rows) > 0, (
             f'{label}: no factor entries in data.factors from {url}'
+        )
+
+    @pytest.mark.parametrize('label,base_url', list(JYPERK_ENDPOINTS.items()))
+    def test_length_field_consistent(self, label: str, base_url: str) -> None:
+        """data.length matches the actual number of factor entries."""
+        url = _jyperk_url(base_url, JYPERK_TEST_UID)
+        raw = _get(url, timeout=60.0)
+        payload = json.loads(raw)
+        data = payload.get('data', {})
+        reported = data.get('length')
+        actual = len(data.get('factors', []))
+        assert reported == actual, (
+            f'{label}: data.length={reported} but len(factors)={actual}'
+        )
+
+    @pytest.mark.parametrize('label,base_url', list(JYPERK_ENDPOINTS.items()))
+    def test_query_uid_echoed(self, label: str, base_url: str) -> None:
+        """query.uid in the response matches the UID that was requested."""
+        url = _jyperk_url(base_url, JYPERK_TEST_UID)
+        raw = _get(url, timeout=60.0)
+        payload = json.loads(raw)
+        echoed_uid = payload.get('query', {}).get('uid')
+        assert echoed_uid == JYPERK_TEST_UID, (
+            f'{label}: query.uid echoed {echoed_uid!r} != requested {JYPERK_TEST_UID!r}'
         )
 
     @pytest.mark.parametrize('label,base_url', list(JYPERK_ENDPOINTS.items()))
@@ -443,17 +504,25 @@ class TestAntposService:
                 )
 
     def test_reference_values(self) -> None:
-        """uid://A002/Xc46ab2/X15ae: CM05 ITRF position matches reference (tol 1 mm)."""
+        """uid://A002/Xc46ab2/X15ae: all antenna ITRF positions match reference (tol 1 mm)."""
         data = _query_antpos(ANTPOS_REF_UID)
         assert isinstance(data, dict), f'Expected dict, got {type(data).__name__}'
         assert len(data) >= 1, 'No antenna corrections returned'
-        assert 'CM05' in data, f'Reference antenna CM05 missing; got {list(data)}'
-        x, y, z = data['CM05']
-        rx, ry, rz = ANTPOS_REF_CM05_XYZ
-        tol_m = 1e-3   # 1 mm
-        assert abs(x - rx) < tol_m, f'CM05 X: {x} vs ref {rx}'
-        assert abs(y - ry) < tol_m, f'CM05 Y: {y} vs ref {ry}'
-        assert abs(z - rz) < tol_m, f'CM05 Z: {z} vs ref {rz}'
+        missing_ants = set(ANTPOS_REF_POSITIONS) - set(data)
+        assert not missing_ants, (
+            f'Antennas missing from response: {sorted(missing_ants)}'
+        )
+        failures: list[str] = []
+        for ant, (rx, ry, rz) in ANTPOS_REF_POSITIONS.items():
+            x, y, z = data[ant]
+            for coord, got, ref in (('X', x, rx), ('Y', y, ry), ('Z', z, rz)):
+                err = abs(got - ref)
+                if err >= ANTPOS_REF_TOLERANCE_M:
+                    failures.append(
+                        f'{ant} {coord}: got {got}, ref {ref}, err {err:.6f} m '
+                        f'(tol {ANTPOS_REF_TOLERANCE_M} m)'
+                    )
+        assert not failures, 'ITRF position mismatches:\n' + '\n'.join(failures)
 
     def test_search_auto_parameter(self) -> None:
         """search=auto parameter is accepted without error."""
