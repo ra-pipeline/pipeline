@@ -21,6 +21,40 @@ from .resultobjects import FindContResult
 LOG = infrastructure.get_logger(__name__)
 
 
+def _pixels_per_beam(makeimlist_inputs, target):
+    """Return the effective PPB value without changing the target structure."""
+    if makeimlist_inputs is not None:
+        hm_cell = makeimlist_inputs.get_spw_hm_cell(target['spw'])
+        if isinstance(hm_cell, str) and 'ppb' in hm_cell:
+            return float(hm_cell.split('ppb')[0])
+        return 5.0
+
+    for key in ('ppb', 'pixperbeam', 'hm_cell', 'cell'):
+        value = target.get(key)
+        if isinstance(value, str) and 'ppb' in value:
+            return float(value.split('ppb')[0])
+        if isinstance(value, (int, float)):
+            return float(value)
+    return None
+
+
+def _imaging_summary_entry(makeimlist_inputs, target, spwid):
+    return {
+        'field': target.get('field'),
+        'spw': spwid,
+        'datatype': target.get('datatype_info', target.get('datatype')),
+        'phasecenter': target.get('phasecenter'),
+        'ppb': _pixels_per_beam(makeimlist_inputs, target),
+        'cell': target.get('cell'),
+        'imsize': target.get('imsize'),
+        'weighting': None,
+        'robust': target.get('robust'),
+        'uvtaper': target.get('uvtaper'),
+        'mosweight': None,
+        'status': 'Not imaged',
+    }
+
+
 class FindContInputs(vdp.StandardInputs):
     # Must use empty data type list to allow for user override and
     # automatic determination depending on specmode, field and spw.
@@ -202,6 +236,8 @@ class FindCont(basetask.StandardTaskTemplate):
         known_synthesized_beams = inputs.context.synthesized_beams
 
         findcont_heuristics = findcont.FindContHeuristics()
+        makeimlist_inputs = None
+        imaging_summary = []
 
         if inputs.target_list:
             # Note that the deepcopy is necessary to avoid changing the
@@ -250,6 +286,8 @@ class FindCont(basetask.StandardTaskTemplate):
             for spwid in target['spw'].split(','):
                 source_name = utils.dequote(target['field'])
                 spw_name = context.observing_run.virtual_science_spw_ids[int(spwid)]
+                summary = _imaging_summary_entry(makeimlist_inputs, target, spwid)
+                imaging_summary.append(summary)
 
                 # get continuum ranges dict for this source, also setting it if accessed for first time
                 source_continuum_ranges = result_cont_ranges.setdefault(source_name, {})
@@ -258,6 +296,7 @@ class FindCont(basetask.StandardTaskTemplate):
                 cont_ranges_source_spw = cont_ranges['fields'].setdefault(source_name, {}).setdefault(spwid, {'spwname': spw_name, 'ranges': [], 'flags': []})
 
                 if len(cont_ranges_source_spw['ranges']) > 0:
+                    summary['status'] = 'Existing continuum selection'
                     LOG.info('Using existing selection {!r} for field {!s}, '
                              'spw {!s}'.format(cont_ranges_source_spw['ranges'], source_name, spwid))
                     source_continuum_ranges[spwid] = {
@@ -328,6 +367,7 @@ class FindCont(basetask.StandardTaskTemplate):
                     # Use only the current spw ID here !
                     if0, if1, channel_width = image_heuristics.freq_intersection(vislist, target['field'], target['intent'], spwid, frame)
                     if (if0 == -1) or (if1 == -1):
+                        summary['status'] = 'No common frequency intersection'
                         LOG.error('No %s frequency intersect among selected MSs for Field %s '
                                   'SPW %s' % (frame, target['field'], spwid))
                         cont_ranges['fields'][source_name][spwid]['spwname'] = spw_name
@@ -475,6 +515,15 @@ class FindCont(basetask.StandardTaskTemplate):
                     else:
                         usepointing = None
 
+                    summary.update({
+                        'weighting': weighting,
+                        'phasecenter': phasecenter,
+                        'robust': robust,
+                        'uvtaper': uvtaper,
+                        'mosweight': mosweight,
+                        'status': 'Dirty cube',
+                    })
+
                     job = casa_tasks.tclean(vis=vislist, imagename=findcont_basename, datacolumn=datacolumn,
                                             antenna=antenna, spw=real_spwsel,
                                             intent=utils.to_CASA_intent(inputs.ms[0], target['intent']),
@@ -564,6 +613,7 @@ class FindCont(basetask.StandardTaskTemplate):
                 num_total += 1
 
         result = FindContResult(result_cont_ranges, cont_ranges, joint_mask_names, num_found, num_total, single_range_channel_fractions, momDiffSNRs)
+        result.imaging_summary = imaging_summary
 
         return result
 
