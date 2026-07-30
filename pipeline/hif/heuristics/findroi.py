@@ -253,6 +253,14 @@ def _ensure_row_chan_pol(
     return np.transpose(arr, (ax_row, ax_chan, ax_pol))
 
 
+def _stokes_i_corr_indices(corr_axis: list[str] | tuple[str, ...] | None) -> list[int] | None:
+    """Return the ALMA linear parallel-hand indices used to form Stokes I."""
+    if not corr_axis:
+        return None
+    # ALMA uses linear products; circular polarization needs future support.
+    return [idx for idx, corr in enumerate(corr_axis) if str(corr).upper() in ('XX', 'YY')]
+
+
 def resolve_vis_list(vis: str | list[str] | tuple[str, ...]) -> list[str]:
     '''Resolve a vis input into a list of MS paths.'''
     if isinstance(vis, (list, tuple)):
@@ -2950,6 +2958,7 @@ def _read_regridded_fields(
     regridded_ms: str,
     field_ids: list[int],
     datacolumn: str = 'DATA',
+    corr_axis: tuple[str, ...] | None = None,
 ) -> dict[int, dict[str, np.ndarray]]:
     '''Read multiple fields from one regridded MS in a single table query.'''
     # Record bulk table-read timings when profiling is enabled.
@@ -2969,20 +2978,26 @@ def _read_regridded_fields(
 
     data = sub.getcol(datacolumn)
     data = _ensure_row_chan_pol(data, nrows)
-    v = np.mean(data, axis=2).astype(np.complex64, copy=False)
+    stokes_i_indices = _stokes_i_corr_indices(corr_axis)
+    if stokes_i_indices:
+        v = np.mean(data[:, :, stokes_i_indices], axis=2).astype(np.complex64, copy=False)
+    else:
+        v = np.mean(data, axis=2).astype(np.complex64, copy=False)
 
     colnames = sub.colnames()
     if 'SIGMA' in colnames:
         sig = np.asarray(sub.getcol('SIGMA'))
         if sig.ndim == 2 and sig.shape[0] != nrows and sig.shape[1] == nrows:
             sig = sig.T
-        sig_r = np.mean(sig, axis=1)
+        sig_values = sig[:, stokes_i_indices] if stokes_i_indices else sig
+        sig_r = np.mean(sig_values, axis=1)
         w_r = (1.0 / np.maximum(sig_r, 1e-30) ** 2).astype(np.float64)
     elif 'WEIGHT' in colnames:
         wt = np.asarray(sub.getcol('WEIGHT'))
         if wt.ndim == 2 and wt.shape[0] != nrows and wt.shape[1] == nrows:
             wt = wt.T
-        w_r = np.maximum(np.mean(wt, axis=1), 0.0).astype(np.float64)
+        wt_values = wt[:, stokes_i_indices] if stokes_i_indices else wt
+        w_r = np.maximum(np.mean(wt_values, axis=1), 0.0).astype(np.float64)
     else:
         w_r = np.ones((nrows,), dtype=np.float64)
 
@@ -3391,6 +3406,7 @@ def _process_spw(
     ddid: int,
     spw_name: str,
     spw_ids_by_vis: dict[str, int] | None,
+    corr_axis_by_vis: dict[str, tuple[str, ...]] | None,
     fallback_spw_id: int,
     field_groups: dict[int, list[int]],
     antenna_selections_by_vis: dict[str, str] | None = None,
@@ -3497,7 +3513,11 @@ def _process_spw(
                 regridded_ms, _, _ = ms_cache[cache_key]
                 source_regridded_ms_paths.setdefault(int(source_id), []).append(str(regridded_ms))
             t_read_fields = time.perf_counter()
-            chunks_by_field = _read_regridded_fields(regridded_ms, fids)
+            chunks_by_field = _read_regridded_fields(
+                regridded_ms,
+                fids,
+                corr_axis=corr_axis_by_vis.get(vis) if corr_axis_by_vis else None,
+            )
             _profile_logf(tmp_dir, 'process_spw bulk_read spw=%s eb=%s source=%s n_fields=%s dt=%.3f', spw_name, eb_idx, source_id, len(fids), (time.perf_counter() - t_read_fields))
             for field_id, chunk in chunks_by_field.items():
                 spectra_by_source[source_id].setdefault(field_id, []).append(chunk)
@@ -4123,8 +4143,20 @@ def run_findroi_mpi(
             virtual_spw_id=virtual_spw_id,
             fallback_spw_id=int(ddid_rows[int(ddid)]['spw_id']),
         )
+        corr_axis_by_vis = {}
+        for vis_name in vis_list:
+            real_spw_id = int(spw_ids_by_vis.get(
+                vis_name,
+                spw_ids_by_vis.get(os.path.basename(os.path.normpath(vis_name)), int(ddid_rows[int(ddid)]['spw_id'])),
+            ))
+            ms = _context_ms_for_vis(context, vis_name)
+            data_description = ms.get_data_description(spw=real_spw_id)
+            corr_axis_by_vis[vis_name] = tuple(
+                str(corr) for corr in getattr(data_description, 'corr_axis', ())
+            )
         args.append((
-            vis_list, ddid, spw_name, spw_ids_by_vis, int(ddid_rows[int(ddid)]['spw_id']), field_groups,
+            vis_list, ddid, spw_name, spw_ids_by_vis, corr_axis_by_vis,
+            int(ddid_rows[int(ddid)]['spw_id']), field_groups,
             antenna_selections_by_vis,
             source_names_by_id, field_names_by_id,
             common_geometry_plan, project_outframes, field_phase_centers, field_ephemeris_paths, products_dir, dish_diameter_m,
