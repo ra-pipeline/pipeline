@@ -2647,6 +2647,11 @@ def _save_default_summary_plots(
         token = _sanitize_token(source_name)
         per_source: dict[str, str] = {}
         try:
+            if not fplots.has_valid_source_spw(results, source_name):
+                per_source['evidence_status'] = 'no_valid_source_spw'
+                out[source_name] = per_source
+                continue
+
             fplots.plot_spectra_by_spw(results, source_name=source_name, field_id=None, use_snr=True)
             fig = plt.gcf()
             p_spectra = os.path.join(products_dir, f'findroi_source-{token}_spectra.png')

@@ -7,6 +7,7 @@ import os
 import pickle
 from typing import Any
 
+from matplotlib.lines import Line2D
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -67,6 +68,26 @@ def _source_spw_block(res: dict[str, Any], source_name: str, spw_key: str) -> di
     return res.get('products', {}).get('fields', {}).get(source_name, {}).get(spw_key)
 
 
+def has_valid_source_spw(
+    res: dict[str, Any],
+    source_name: str,
+    field_id: int | None = None,
+) -> bool:
+    """Return whether a source has at least one non-empty spectrum product."""
+    for spw_key in _spw_order(res):
+        src_spw = _source_spw_block(res, source_name, spw_key)
+        if not src_spw:
+            continue
+        try:
+            block = _select_product_block(src_spw, field_id)
+        except (KeyError, TypeError):
+            continue
+        evidence = (block.get('spectra') or {}).get('evidence')
+        if evidence is not None and np.asarray(evidence).size > 0:
+            return True
+    return False
+
+
 def _pick_field_id(src_spw_block: dict[str, Any]) -> int | None:
     per_field = src_spw_block.get('per_field', {})
     if not per_field:
@@ -89,6 +110,31 @@ def _channel_to_freq_ghz(spw_meta: dict[str, Any], nchan: int) -> np.ndarray | N
     idx = np.arange(nchan, dtype=np.float64)
     x_hz = float(ref_freq_hz) + (idx - 0.5 * (nchan - 1)) * float(chan_width_hz)
     return x_hz * 1.0e-9
+
+
+def _spw_title(spw_meta: dict[str, Any]) -> str:
+    """Return a compact SPW title while retaining band and baseband context."""
+    spw_id = spw_meta.get('spw_id', '?')
+    name = str(spw_meta.get('spw_name', ''))
+    compact_parts = [part for part in name.split('#') if part.startswith(('BB_', 'SW-'))]
+    suffix = f" | {' | '.join(compact_parts)}" if compact_parts else ''
+    return f'SPW {spw_id}{suffix}'
+
+
+def _region_label(
+    x: np.ndarray,
+    lo_chan: int,
+    hi_chan: int,
+    peak_snr: float,
+    freq_axis: bool,
+) -> str:
+    if not freq_axis:
+        return f'ch {lo_chan}~{hi_chan}\npeak {peak_snr:.1f} sigma'
+
+    lo_freq = float(x[max(0, min(lo_chan, len(x) - 1))])
+    hi_freq = float(x[max(0, min(hi_chan, len(x) - 1))])
+    lo_freq, hi_freq = sorted((lo_freq, hi_freq))
+    return f'{lo_freq:.5f}-{hi_freq:.5f} GHz\nch {lo_chan}~{hi_chan}; peak {peak_snr:.1f} sigma'
 
 
 def _linewidth_note(spw_meta: dict[str, Any], block: dict[str, Any]) -> str | None:
@@ -181,7 +227,7 @@ def plot_spectra_by_spw(
             ax.set_xlim(float(x[0]), float(x[-1]))
         ax.plot(x, spec, color='darkslateblue', lw=1.0, label='reference')
         ax.plot(x, mw, color='firebrick', lw=1.0, label='mom0-weighted')
-        ax.set_title(f"spw {spw_meta['spw_id']} {spw_meta['spw_name']}")
+        ax.set_title(_spw_title(spw_meta))
         ax.set_ylabel(ylabel)
         lw_note = _linewidth_note(spw_meta, block)
         if lw_note:
@@ -249,7 +295,7 @@ def plot_moment0_by_spw(
             continue
         img = np.load(mom0_path)
         im = ax.imshow(img, origin='lower')
-        ax.set_title(f"spw {spw_meta['spw_id']} {spw_meta['spw_name']}")
+        ax.set_title(_spw_title(spw_meta))
         fig.colorbar(im, ax=ax, shrink=0.8)
 
     level = 'source-level' if field_id is None else f'field {field_id}'
@@ -265,12 +311,18 @@ def plot_evidence_with_lines(
     min_region_snr: float = 7.0,
     min_neg_region_snr: float | None = None,
     region_label_fontsize: int | str | None = None,
-) -> None:
+) -> bool:
     source_name = _resolve_source_name(res, source_name, source_id)
+    if not has_valid_source_spw(res, source_name, field_id):
+        return False
+
     spw_keys = _spw_order(res)
     n = len(spw_keys)
     fig, axes = plt.subplots(n, 1, figsize=(12, max(2.5, 2.2 * n)), sharex=False)
     axes = [axes] if n == 1 else list(axes)
+    panel_limits = []
+    if min_neg_region_snr is None:
+        min_neg_region_snr = float(min_region_snr)
 
     for ax, spw_key in zip(axes, spw_keys):
         spw_meta = res['inventory']['science_spws'][spw_key]
@@ -278,8 +330,15 @@ def plot_evidence_with_lines(
         if not src_spw:
             ax.axis('off')
             continue
-        block = _select_product_block(src_spw, field_id)
-        evid = block['spectra']['evidence']
+        try:
+            block = _select_product_block(src_spw, field_id)
+        except (KeyError, TypeError):
+            ax.axis('off')
+            continue
+        evid = (block.get('spectra') or {}).get('evidence')
+        if evid is None or np.asarray(evid).size == 0:
+            ax.axis('off')
+            continue
         nchan = len(evid)
         x = _channel_to_freq_ghz(spw_meta, nchan)
         if x is None:
@@ -289,7 +348,9 @@ def plot_evidence_with_lines(
         else:
             xlabel = 'Frequency (GHz)'
             freq_axis = True
-        ax.plot(x, evid, color='black', lw=1.0, label='evidence')
+        ax.plot(x, evid, color='black', lw=1.0, label='Evidence')
+        ax.axhline(float(min_region_snr), color='firebrick', linestyle='--', lw=0.8, alpha=0.7)
+        ax.axhline(-float(min_neg_region_snr), color='royalblue', linestyle='--', lw=0.8, alpha=0.7)
         roi = block.get('roi_detected') or {}
         line_ranges_all = roi.get('line_ranges', [])
         peak_snr_all = roi.get('line_range_peakSNR', [])
@@ -305,8 +366,6 @@ def plot_evidence_with_lines(
             if np.isfinite(snr) and snr >= float(min_region_snr):
                 line_ranges.append(region)
                 line_peak_snr.append(snr)
-        if min_neg_region_snr is None:
-            min_neg_region_snr = float(min_region_snr)
         neg_line_ranges = []
         neg_line_peak_snr = []
         for i, region in enumerate(neg_line_ranges_all):
@@ -322,6 +381,8 @@ def plot_evidence_with_lines(
             ymin = float(np.nanmin(evid))
         else:
             ymax, ymin = 1.0, 0.0
+        ymax = max(ymax, float(min_region_snr))
+        ymin = min(ymin, -float(min_neg_region_snr))
         yrange = max(ymax - ymin, 1.0)
         if nchan > 0:
             ax.set_xlim(float(x[0]), float(x[-1]))
@@ -395,7 +456,7 @@ def plot_evidence_with_lines(
             ax.text(
                 mid,
                 y_text,
-                f'{lo_chan}~{hi_chan}',
+                _region_label(x, lo_chan, hi_chan, line_peak_snr[i], freq_axis),
                 ha='center',
                 va='bottom',
                 fontsize=region_label_fontsize,
@@ -429,7 +490,7 @@ def plot_evidence_with_lines(
             ax.text(
                 mid,
                 y_text,
-                f'{lo_chan}~{hi_chan}',
+                _region_label(x, lo_chan, hi_chan, neg_line_peak_snr[i], freq_axis),
                 ha='center',
                 va='bottom',
                 fontsize=region_label_fontsize,
@@ -442,8 +503,8 @@ def plot_evidence_with_lines(
             neg_bar_base + (neg_level_max_used + 1) * level_dy + 2.0 * label_dy,
         )
         y_bot = ymin - 0.06 * yrange
-        ax.set_ylim(y_bot, y_top)
-        ax.set_title(f"spw {spw_meta['spw_id']} {spw_meta['spw_name']}")
+        panel_limits.append((y_bot, y_top))
+        ax.set_title(_spw_title(spw_meta))
         ax.set_ylabel(r'Evidence [$\sigma$]')
         lw_note = _linewidth_note(spw_meta, block)
         if lw_note:
@@ -474,9 +535,23 @@ def plot_evidence_with_lines(
         ax.grid(alpha=0.2)
     if axes:
         axes[-1].set_xlabel(xlabel)
+        common_ymin = min(limit[0] for limit in panel_limits)
+        common_ymax = max(limit[1] for limit in panel_limits)
+        for ax in axes:
+            ax.set_ylim(common_ymin, common_ymax)
+        legend_handles = [
+            Line2D([0], [0], color='black', lw=1.0, label='Evidence'),
+            Line2D([0], [0], color='firebrick', lw=3.0, label='Positive ROI'),
+            Line2D([0], [0], color='royalblue', lw=3.0, label='Negative ROI'),
+            Line2D([0], [0], color='dimgray', linestyle='--', lw=0.8,
+                   label=(f'+/- detection threshold '
+                          f'(+{float(min_region_snr):g}/-{float(min_neg_region_snr):g} sigma)')),
+        ]
+        axes[0].legend(handles=legend_handles, loc='upper right', fontsize='small')
     level = 'source-level' if field_id is None else f'field {field_id}'
     fig.suptitle(f'{source_name} evidence with line ranges ({level})')
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0, 1, 0.98))
+    return True
 
 
 def main() -> None:
