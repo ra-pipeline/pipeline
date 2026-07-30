@@ -3,11 +3,12 @@ import os
 import shutil
 
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
+import pipeline.infrastructure.renderer.logger as logger
 
 
 SummaryRow = collections.namedtuple('SummaryRow', 'metric value')
 ArtifactLink = collections.namedtuple('ArtifactLink', 'label href')
-PlotLink = collections.namedtuple('PlotLink', 'source label href')
+PlotLink = collections.namedtuple('PlotLink', 'source href thumbnail')
 
 
 class T2_4MDetailsFindROIRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
@@ -43,20 +44,43 @@ class T2_4MDetailsFindROIRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 artifact_links.append(ArtifactLink(label, href))
 
         plot_links = []
-        for source, paths in sorted((result.artifacts.get('summary_plots') or {}).items()):
-            for label, path in (
-                ('Spectra', paths.get('spectra_png')),
-                ('Moment 0', paths.get('moment0_png')),
-                ('Evidence', paths.get('evidence_png')),
+        summary_plots = result.artifacts.get('summary_plots') or {}
+        for source, paths in sorted(summary_plots.items()):
+            # Keep all generated plots in the stage output, but only expose the
+            # evidence spectrum in the main weblog view.
+            for path in (
+                paths.get('spectra_png'),
+                paths.get('moment0_png'),
             ):
-                href = self._copy_artifact(path, weblog_dir, pipeline_context.report_dir)
-                if href:
-                    plot_links.append(PlotLink(source, label, href))
+                self._copy_artifact(path, weblog_dir, pipeline_context.report_dir)
+
+            evidence = self._copy_plot(
+                paths.get('evidence_png'), weblog_dir, pipeline_context.report_dir
+            )
+            if evidence:
+                href, thumbnail = evidence
+                plot_links.append(PlotLink(source, href, thumbnail))
+
+        no_valid_source_spw = (
+            not plot_links
+            and (
+                not int(result.summary.get('n_source_spws', 0))
+                or any(
+                    paths.get('evidence_status') == 'no_valid_source_spw'
+                    for paths in summary_plots.values()
+                )
+            )
+        )
+        plot_message = (
+            'No valid source/SPW combinations were available for plotting.'
+            if no_valid_source_spw else None
+        )
 
         mako_context.update({
             'summary_rows': summary_rows,
             'artifact_links': artifact_links,
             'plot_links': plot_links,
+            'plot_message': plot_message,
             'errors': result.errors,
         })
 
@@ -68,3 +92,14 @@ class T2_4MDetailsFindROIRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         if os.path.abspath(path) != os.path.abspath(dest):
             shutil.copy2(path, dest)
         return os.path.relpath(dest, report_dir)
+
+    @staticmethod
+    def _copy_plot(path, weblog_dir, report_dir):
+        href = T2_4MDetailsFindROIRenderer._copy_artifact(path, weblog_dir, report_dir)
+        if href is None:
+            return None
+
+        full_path = os.path.join(report_dir, href)
+        thumbnail_path = logger.Plot.create_thumbnail(full_path)
+        thumbnail = os.path.relpath(thumbnail_path, report_dir)
+        return href, thumbnail
