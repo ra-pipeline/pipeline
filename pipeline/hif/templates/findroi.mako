@@ -33,7 +33,7 @@
 </div>
 % endif
 
-<h2>Per-Field Evidence Spectra</h2>
+<h2>Evidence Spectra and Detected ROI</h2>
 % if plot_message:
 <p>${plot_message}</p>
 % elif plot_links:

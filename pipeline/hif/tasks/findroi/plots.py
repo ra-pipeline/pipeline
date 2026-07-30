@@ -135,7 +135,7 @@ def _region_label(peak_snr: float) -> str:
     return f'peak {peak_snr:.1f} σ'
 
 
-def _add_channel_axis(ax: Any, x: np.ndarray, nchan: int) -> None:
+def _add_channel_axis(ax: Any, x: np.ndarray, nchan: int, fontsize: float) -> None:
     """Add channel-number ticks above a frequency-based spectrum axis."""
     channel_ax = ax.twiny()
     channel_ax.set_xlim(ax.get_xlim())
@@ -143,8 +143,59 @@ def _add_channel_axis(ax: Any, x: np.ndarray, nchan: int) -> None:
     channel_ticks = np.unique(np.linspace(0, max(nchan - 1, 0), n_ticks, dtype=int))
     channel_ax.set_xticks([x[idx] for idx in channel_ticks])
     channel_ax.set_xticklabels([str(idx) for idx in channel_ticks])
-    channel_ax.set_xlabel('Channel')
-    channel_ax.tick_params(axis='x', pad=4)
+    channel_ax.set_xlabel('Channel', fontsize=fontsize)
+    channel_ax.tick_params(axis='x', labelsize=fontsize, pad=4)
+
+
+def _add_legend_avoiding_annotations(
+    fig: Any,
+    ax: Any,
+    handles: list[Line2D],
+    annotations: list[Any],
+    fontsize: float,
+) -> None:
+    """Place the legend where it does not cover ROI or metadata annotations."""
+    locations = ('upper right', 'lower right', 'upper left', 'lower left', 'center right', 'center left')
+    legend = None
+    for location in locations:
+        if legend is not None:
+            legend.remove()
+        legend = ax.legend(handles=handles, loc=location, fontsize=fontsize)
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        legend_bbox = legend.get_window_extent(renderer)
+        if not any(legend_bbox.overlaps(annotation.get_window_extent(renderer)) for annotation in annotations):
+            return
+
+
+def _move_metadata_away_from_roi(
+    fig: Any,
+    metadata: list[Any],
+    roi_annotations: list[Any],
+) -> None:
+    """Move metadata text if its rendered box overlaps a detected ROI label."""
+    if not metadata or not roi_annotations:
+        return
+    alternate_positions = ((0.01, 0.85), (0.01, 0.72), (0.58, 0.95), (0.58, 0.72))
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    for annotation in metadata:
+        original_position = annotation.get_position()
+        for position in (original_position,) + alternate_positions:
+            annotation.set_position(position)
+            fig.canvas.draw()
+            annotation_bbox = annotation.get_window_extent(renderer)
+            overlaps_roi = any(
+                annotation_bbox.overlaps(roi.get_window_extent(renderer)) for roi in roi_annotations
+            )
+            overlaps_metadata = any(
+                other is not annotation and annotation_bbox.overlaps(other.get_window_extent(renderer))
+                for other in metadata
+            )
+            if not overlaps_roi and not overlaps_metadata:
+                break
+        else:
+            annotation.set_position(original_position)
 
 
 def _linewidth_note(spw_meta: dict[str, Any], block: dict[str, Any]) -> str | None:
@@ -340,9 +391,16 @@ def plot_evidence_with_lines(
 
     spw_keys = _plot_spw_keys(res, spw_key)
     n = len(spw_keys)
-    fig, axes = plt.subplots(n, 1, figsize=(12, max(5.0, 4.4 * n)), sharex=False)
+    fig, axes = plt.subplots(n, 1, figsize=(12, max(4.0, 3.5 * n)), sharex=False)
     axes = [axes] if n == 1 else list(axes)
     panel_limits = []
+    roi_annotations = {id(ax): [] for ax in axes}
+    metadata_annotations = {id(ax): [] for ax in axes}
+    plot_fontsize = float(plt.rcParams.get('font.size', 10.0)) + 1.0
+    title_fontsize = float(plt.rcParams.get('axes.titlesize', 12.0)) + 1.0
+    label_fontsize = float(plt.rcParams.get('axes.labelsize', 10.0)) + 1.0
+    if region_label_fontsize is None:
+        region_label_fontsize = plot_fontsize
     if min_neg_region_snr is None:
         min_neg_region_snr = float(min_region_snr)
 
@@ -404,7 +462,7 @@ def plot_evidence_with_lines(
         yrange = max(ymax - ymin, 1.0)
         if nchan > 0:
             ax.set_xlim(float(x[0]), float(x[-1]))
-        _add_channel_axis(ax, x, nchan)
+        _add_channel_axis(ax, x, nchan, label_fontsize)
 
         # Keep bars and labels inside panel top with some headroom.
         bar_y0 = ymax + 0.02 * yrange
@@ -445,9 +503,6 @@ def plot_evidence_with_lines(
             neg_level_last_hi[level] = max(neg_level_last_hi[level], hi)
             neg_levels_by_index[idx] = level
 
-        if region_label_fontsize is None:
-            region_label_fontsize = plt.rcParams.get('axes.labelsize', 'medium')
-
         level_max_used = 0
         for i, (lo, hi) in enumerate(line_ranges):
             level = int(levels_by_index.get(i, 0))
@@ -472,7 +527,7 @@ def plot_evidence_with_lines(
                 mid = 0.5 * (lo_plot + hi_plot)
             ax.hlines(bar_y, lo_plot, hi_plot, color='firebrick', lw=3)
             y_text = bar_y + label_dy
-            ax.text(
+            annotation = ax.text(
                 mid,
                 y_text,
                 _region_label(line_peak_snr[i]),
@@ -480,6 +535,7 @@ def plot_evidence_with_lines(
                 va='bottom',
                 fontsize=region_label_fontsize,
             )
+            roi_annotations[id(ax)].append(annotation)
 
         neg_bar_base = bar_y0 + (level_max_used + 1) * level_dy + 0.025 * yrange
         neg_level_max_used = 0
@@ -506,7 +562,7 @@ def plot_evidence_with_lines(
                 mid = 0.5 * (lo_plot + hi_plot)
             ax.hlines(bar_y, lo_plot, hi_plot, color='royalblue', lw=3)
             y_text = bar_y + label_dy
-            ax.text(
+            annotation = ax.text(
                 mid,
                 y_text,
                 _region_label(neg_line_peak_snr[i]),
@@ -515,6 +571,7 @@ def plot_evidence_with_lines(
                 fontsize=region_label_fontsize,
                 color='royalblue',
             )
+            roi_annotations[id(ax)].append(annotation)
 
         y_top = max(
             ymax + 0.18 * yrange,
@@ -523,48 +580,69 @@ def plot_evidence_with_lines(
         )
         y_bot = ymin - 0.06 * yrange
         panel_limits.append((y_bot, y_top))
-        ax.set_title(f'{source_name} | SPW {spw_meta.get("spw_id", spw_key)} Evidence Spectrum (LSRK frame)')
-        ax.set_ylabel(r'Evidence [$\sigma$]')
+        ax.set_title(
+            f'{source_name} | SPW {spw_meta.get("spw_id", spw_key)} Evidence Spectrum (LSRK frame)',
+            fontsize=title_fontsize,
+        )
+        ax.set_ylabel(r'Evidence [$\sigma$]', fontsize=label_fontsize)
         lw_note = _linewidth_note(spw_meta, block)
         if lw_note:
-            ax.text(
+            annotation = ax.text(
                 0.01,
-                0.93,
+                0.95,
                 lw_note,
                 transform=ax.transAxes,
                 ha='left',
                 va='top',
-                fontsize=plt.rcParams.get('axes.labelsize', 'medium'),
+                fontsize=plot_fontsize,
                 color='dimgray',
                 bbox={'boxstyle': 'round,pad=0.2', 'facecolor': 'white', 'alpha': 0.6, 'edgecolor': 'none'},
             )
+            metadata_annotations[id(ax)].append(annotation)
         qc_note = _roi_qc_note(block)
         if qc_note:
-            ax.text(
+            annotation = ax.text(
                 0.01,
-                0.80,
+                0.85,
                 qc_note,
                 transform=ax.transAxes,
                 ha='left',
                 va='top',
-                fontsize=plt.rcParams.get('axes.labelsize', 'medium'),
+                fontsize=plot_fontsize,
                 color='dimgray',
                 bbox={'boxstyle': 'round,pad=0.2', 'facecolor': 'white', 'alpha': 0.55, 'edgecolor': 'none'},
             )
+            metadata_annotations[id(ax)].append(annotation)
         ax.grid(alpha=0.2)
     if axes:
-        axes[-1].set_xlabel('Frequency (GHz, LSRK)' if xlabel == 'Frequency (GHz)' else xlabel)
+        axes[-1].set_xlabel(
+            'Frequency (GHz, LSRK)' if xlabel == 'Frequency (GHz)' else xlabel,
+            fontsize=label_fontsize,
+        )
         common_ymin = min(limit[0] for limit in panel_limits)
         common_ymax = max(limit[1] for limit in panel_limits)
         for ax in axes:
             ax.set_ylim(common_ymin, common_ymax)
+            ax.tick_params(axis='both', labelsize=plot_fontsize)
         legend_handles = [
             Line2D([0], [0], color='black', lw=1.0, label='Evidence'),
             Line2D([0], [0], color='firebrick', lw=3.0, label='Positive ROI'),
             Line2D([0], [0], color='royalblue', lw=3.0, label='Negative ROI'),
         ]
-        axes[0].legend(handles=legend_handles, loc='upper right', fontsize='small')
     fig.tight_layout()
+    if axes:
+        _move_metadata_away_from_roi(
+            fig,
+            metadata_annotations[id(axes[0])],
+            roi_annotations[id(axes[0])],
+        )
+        _add_legend_avoiding_annotations(
+            fig,
+            axes[0],
+            legend_handles,
+            roi_annotations[id(axes[0])] + metadata_annotations[id(axes[0])],
+            plot_fontsize,
+        )
     return True
 
 

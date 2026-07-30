@@ -11,7 +11,7 @@ ArtifactLink = collections.namedtuple('ArtifactLink', 'label href')
 PlotLink = collections.namedtuple('PlotLink', 'field spw href thumbnail')
 PlotGroup = collections.namedtuple('PlotGroup', 'field plots')
 
-FINDROI_THUMBNAIL_SIZE = '750x564'
+FINDROI_THUMBNAIL_SIZE = '500x376'
 
 
 class T2_4MDetailsFindROIRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
