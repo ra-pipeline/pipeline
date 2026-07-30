@@ -14,6 +14,10 @@ on:
   schedule:
     # Run every 6 hours
     - cron: '0 */6 * * *'
+  pull_request:
+    paths:
+      - 'tests/online_services/**'
+      - '.github/workflows/alma_online_services.yml'
   workflow_dispatch:
     inputs:
       pytest_extra_args:
