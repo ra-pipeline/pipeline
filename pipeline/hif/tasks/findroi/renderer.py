@@ -6,7 +6,7 @@ import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.renderer.logger as logger
 
 
-SummaryRow = collections.namedtuple('SummaryRow', 'metric value')
+SourceSummaryRow = collections.namedtuple('SourceSummaryRow', 'source spw_summary roi_summary')
 ArtifactLink = collections.namedtuple('ArtifactLink', 'label href')
 PlotLink = collections.namedtuple('PlotLink', 'source href thumbnail')
 
@@ -21,15 +21,17 @@ class T2_4MDetailsFindROIRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         weblog_dir = os.path.join(pipeline_context.report_dir, f'stage{result.stage_number}')
         os.makedirs(weblog_dir, exist_ok=True)
 
+        selected_spws = result.summary.get('n_selected_spws', result.summary.get('n_spws', 0))
+        successful_spws = result.summary.get('n_successful_spws', result.summary.get('n_spws', 0))
+        failed_spws = result.summary.get('n_failed_spws', 0)
+        spw_summary = f'{selected_spws}/{successful_spws}/{failed_spws}'
         summary_rows = [
-            SummaryRow('Sources', result.summary.get('n_sources', 0)),
-            SummaryRow('Selected science SPWs', result.summary.get('n_selected_spws', result.summary.get('n_spws', 0))),
-            SummaryRow('Successful science SPWs', result.summary.get('n_successful_spws', result.summary.get('n_spws', 0))),
-            SummaryRow('Failed science SPWs', result.summary.get('n_failed_spws', 0)),
-            SummaryRow('Source/SPW products', result.summary.get('n_source_spws', 0)),
-            SummaryRow('Products with line ROI', result.summary.get('n_roi_with_lines', 0)),
-            SummaryRow('Products with continuum ranges', result.summary.get('n_roi_with_continuum', 0)),
-            SummaryRow('Total runtime (s)', result.summary.get('total_run_s', '')),
+            SourceSummaryRow(
+                row.get('source', ''),
+                spw_summary,
+                f"{row.get('n_roi_with_lines', 0)}/{row.get('n_roi_with_continuum', 0)}",
+            )
+            for row in result.summary.get('source_summaries', [])
         ]
 
         artifact_links = []
