@@ -14,7 +14,7 @@ ipympl
 nodejs
 
 # Sphinx and Extensions
-furo                    # https://pradyunsg.me/furo/       
+furo>=2024.1.29         # https://pradyunsg.me/furo/
 sphinx_rtd_theme 
 sphinxcontrib-bibtex
 sphinx-astrorefs        # https://github.com/jobovy/sphinx-astrorefs

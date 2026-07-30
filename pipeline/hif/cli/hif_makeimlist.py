@@ -11,40 +11,41 @@ def hif_makeimlist(vis=None, imagename=None, intent=None, field=None,
                    robust=None, uvtaper=None, clearlist=None, per_eb=None,
                    per_session=None, calcsb=None, datatype=None, datacolumn=None,
                    allow_wproject=None, parallel=None):
-    """Compute list of clean images to be produced.
+    """Compute the list of images to be produced in the next :py:func:`hif_makeimages <hif_makeimages>` call.
 
-    Generate a list of images to be cleaned. By default, the list will include
-    one image per science target per spw. Calibrator targets can be selected
-    by setting appropriate values for ``intent``.
+    Determines image parameters (cell size, image size, spectral mode, etc.) for each target/spw and
+    populates the pipeline context imaging list. The WebLog reports the chosen parameters.
 
-    By default, the output image cell size is set to the minimum cell size
-    consistent with the UV coverage.
+    In standard ALMA interferometric recipes the task is invoked multiple times for different imaging
+    purposes by setting the ``intent`` and ``specmode`` parameters accordingly:
 
-    By default, the image size in pixels is set to values determined by the
-    cell size and the primary beam size. If a calibrator is being
-    imaged (intents 'PHASE', 'BANDPASS', 'FLUX' or 'AMPLITUDE') then the
-    image dimensions are limited to 'calmaxpix' pixels.
+    - **Calibrators** (``intent='PHASE,BANDPASS,AMPLITUDE,POLARIZATION,DIFFGAINREF,DIFFGAINSRC'``): per-spw
+      MFS continuum images, with image dimensions limited to ``calmaxpix`` pixels.
+    - **Polarization calibrator** (polcal recipes): per-spw MFS images of the polarization calibrator.
+    - **Check source**: per-spw MFS image of the check source.
+    - **Per-spw continuum** (``specmode='cont'``): aggregate MFS continuum images combining multiple spws.
+    - **Aggregate continuum** (``specmode='cont'``): using continuum channel selections from ``cont.dat``.
+    - **Spectral cube** (``specmode='cube'``): per-spw cubes for science targets.
+    - **Representative bandwidth cube**: cube over the representative bandwidth.
 
-    By default, science target images are cubes and calibrator target images
-    are mfs. Science target images may be mosaics or single fields.
+    The cell size is set to the minimum consistent with the UV coverage. The image size is set from the
+    cell size and primary beam size. If ``clearlist=True`` (default) any existing imaging list entries
+    for the same intent are replaced.
 
-    Returns:
-        The results object for the pipeline task is returned.
+    Notes:
+        QA = fraction of images successfully added to the list compared to the total expected.
 
     Examples:
-        1. Make a list of science target images to be cleaned, one image per science
-        spw.
+        1. Make a list of science target images to be cleaned, one image per science spw:
 
         >>> hif_makeimlist()
 
-        2. Make a list of PHASE and BANDPASS calibrator targets to be imaged,
-        one image per science spw.
+        2. Make a list of PHASE and BANDPASS calibrator targets to be imaged, one image per science spw:
 
         >>> hif_makeimlist(intent='PHASE,BANDPASS')
 
-        3. Make a list of PHASE calibrator images observed in spw 1, images limited to
-        50 pixels on a side.
+        3. Make a list of PHASE calibrator images observed in spw 1, images limited to 50 pixels on a side:
 
-        >>> hif_makeimlist(intent='PHASE',spw='1',calmaxpix=50)
+        >>> hif_makeimlist(intent='PHASE', spw='1', calmaxpix=50)
 
     """

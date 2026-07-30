@@ -6,9 +6,6 @@ import pipeline.h.cli.utils as utils
 def hifv_tecmaps(vis=None):
     """Base tecmaps task
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Basic tecmaps task:
 

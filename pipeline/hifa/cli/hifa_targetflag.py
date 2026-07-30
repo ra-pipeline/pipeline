@@ -24,6 +24,15 @@ def hifa_targetflag(vis=None, parallel=None):
     Also, to avoid confusion in mosaics and single field surveys, the amp vs. uv distance
     plots only show field IDs with new flags.
 
+    .. figure:: /figures/guide-img006.png
+       :scale: 60%
+       :alt: Example of flagging outliers in science target visibility amplitudes
+
+       Example of flagging high outliers in the calibrated science target visibility amplitudes.
+
+    Notes:
+        QA = 1 - (fraction of data newly flagged).
+
     Returns:
         The results object for the pipeline task is returned.
 
