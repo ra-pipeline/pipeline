@@ -396,9 +396,10 @@ def plot_evidence_with_lines(
     panel_limits = []
     roi_annotations = {id(ax): [] for ax in axes}
     metadata_annotations = {id(ax): [] for ax in axes}
-    plot_fontsize = float(plt.rcParams.get('font.size', 10.0)) + 1.0
-    title_fontsize = float(plt.rcParams.get('axes.titlesize', 12.0)) + 1.0
-    label_fontsize = float(plt.rcParams.get('axes.labelsize', 10.0)) + 1.0
+    base_fontsize = float(plt.rcParams.get('font.size', 10.0))
+    plot_fontsize = base_fontsize + 1.0
+    title_fontsize = base_fontsize + 2.0
+    label_fontsize = base_fontsize + 1.0
     if region_label_fontsize is None:
         region_label_fontsize = plot_fontsize
     if min_neg_region_snr is None:
