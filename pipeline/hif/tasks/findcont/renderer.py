@@ -57,6 +57,7 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 isinstance(entry, dict) and entry.get('status') == 'Dirty cube'
                 for entry in raw_imaging_summary
             ),
+            'imaging_skip_reason': self._get_imaging_skip_reason(raw_imaging_summary),
         })
 
         weblog_dir = os.path.join(pipeline_context.report_dir,
@@ -93,6 +94,21 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 mosweight=self._format_summary_value(entry.get('mosweight')),
             ))
         return rows
+
+    @staticmethod
+    def _get_imaging_skip_reason(imaging_summary):
+        statuses = {
+            entry.get('status')
+            for entry in imaging_summary
+            if isinstance(entry, dict) and entry.get('status')
+        }
+        if statuses == {'Existing continuum selection'}:
+            return 'No dirty-cube imaging was required because continuum ranges were already available.'
+        if statuses == {'No common frequency intersection'}:
+            return 'No dirty-cube imaging was performed because no common frequency intersection was available.'
+        if statuses <= {'Existing continuum selection', 'No common frequency intersection'}:
+            return 'No dirty-cube imaging was required because continuum ranges were already available or no common frequency intersection was found.'
+        return 'No continuum-finding dirty-cube imaging was performed for this result.'
 
     @staticmethod
     def _format_summary_value(value, separator=', '):

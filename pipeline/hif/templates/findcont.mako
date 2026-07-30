@@ -7,21 +7,19 @@
 
 %if findcont_mode is None:
     <div class="alert alert-info">
-        <strong>hif_findcont imaging mode: NOT AVAILABLE</strong><br>
-        The imaging mode is not recorded in this result.
+        hif_findcont imaging mode: NOT AVAILABLE. The imaging mode is not recorded in this result.
     </div>
 %elif not imaging_performed:
     <div class="alert alert-info">
-        <strong>hif_findcont imaging mode: ${findcont_mode.upper()} (hm_mode='${findcont_mode}')</strong><br>
-        No continuum-finding dirty-cube imaging was performed for this result.
+        hif_findcont imaging mode: ${findcont_mode.upper()} (hm_mode='${findcont_mode}'). ${imaging_skip_reason}
     </div>
 %elif findcont_mode == 'normal':
     <div class="alert alert-info">
-        <strong>hif_findcont imaging mode: NORMAL (hm_mode='normal')</strong>
+        hif_findcont imaging mode: NORMAL (hm_mode='normal')
     </div>
 %else:
     <div class="alert alert-info">
-        <strong>hif_findcont imaging mode: COARSE (hm_mode='coarse')</strong>
+        hif_findcont imaging mode: COARSE (hm_mode='coarse')
     </div>
 %endif
 
