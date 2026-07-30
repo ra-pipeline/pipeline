@@ -150,5 +150,23 @@ class T2_4MDetailsFindROIRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                     spw = line[len('SpectralWindow: '):]
                     ranges[(field, spw)] = []
                 elif field is not None and spw is not None:
-                    ranges[(field, spw)].append(line)
+                    ranges[(field, spw)].append(T2_4MDetailsFindROIRenderer._format_roi_dat_range(line))
         return ranges
+
+    @staticmethod
+    def _format_roi_dat_range(line):
+        """Shorten displayed ROI frequency bounds without changing ROI.dat."""
+        if line == 'NONE':
+            return line
+
+        frequency, separator, suffix = line.partition('GHz')
+        if not separator or '~' not in frequency:
+            return line
+
+        lower, _, upper = frequency.partition('~')
+
+        def truncate(value):
+            whole, decimal, fraction = value.partition('.')
+            return f'{whole}{decimal}{fraction[:5]}' if decimal else value
+
+        return f'{truncate(lower)} ~ {truncate(upper)} GHz{suffix}'
