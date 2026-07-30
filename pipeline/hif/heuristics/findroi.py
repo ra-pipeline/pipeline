@@ -2631,58 +2631,77 @@ def _science_spw_metadata_from_inventory(
 def _save_default_summary_plots(
     results: dict[str, Any],
     products_dir: str,
-) -> dict[str, dict[str, str]]:
-    '''Generate and save per-source summary plots; return artifact paths.'''
+) -> dict[str, dict[str, dict[str, str]]]:
+    '''Generate and save per-field, per-SPW summary plots; return artifact paths.'''
     import matplotlib.pyplot as plt
     from pipeline.hif.tasks.findroi import plots as fplots
     plt.ioff()
 
     os.makedirs(products_dir, exist_ok=True)
-    out: dict[str, dict[str, str]] = {}
+    out: dict[str, dict[str, dict[str, str]]] = {}
     cfg = results.get('metadata', {}).get('config', {})
     pos_thr = float(cfg.get('pos_evidence_thr', cfg.get('evidence_thr', 7.0)))
     neg_thr = float(cfg.get('neg_evidence_thr', 7.0))
     source_names = sorted(results.get('products', {}).get('fields', {}).keys())
+    spw_keys = sorted(results.get('inventory', {}).get('science_spws', {}), key=lambda key: int(key))
     for source_name in source_names:
-        token = _sanitize_token(source_name)
-        per_source: dict[str, str] = {}
-        try:
-            if not fplots.has_valid_source_spw(results, source_name):
-                per_source['evidence_status'] = 'no_valid_source_spw'
-                out[source_name] = per_source
+        field_token = _sanitize_token(source_name)
+        per_source: dict[str, dict[str, str]] = {}
+        for spw_key in spw_keys:
+            spw_id = int(spw_key)
+            per_spw: dict[str, str] = {'spw_id': str(spw_id)}
+            if not fplots.has_valid_source_spw(results, source_name, spw_key=spw_key):
+                per_spw['evidence_status'] = 'no_valid_source_spw'
+                per_source[spw_key] = per_spw
                 continue
 
-            fplots.plot_spectra_by_spw(results, source_name=source_name, field_id=None, use_snr=True)
-            fig = plt.gcf()
-            p_spectra = os.path.join(products_dir, f'findroi_source-{token}_spectra.png')
-            fig.savefig(p_spectra, dpi=160, bbox_inches='tight')
-            plt.close(fig)
-            per_source['spectra_png'] = p_spectra
+            base = f'findroi_field-{field_token}_spw-{spw_id}'
+            try:
+                if fplots.plot_spectra_by_spw(
+                    results, source_name=source_name, field_id=None, use_snr=True, spw_key=spw_key
+                ):
+                    fig = plt.gcf()
+                    p_spectra = os.path.join(products_dir, f'{base}_spectra.png')
+                    fig.savefig(p_spectra, dpi=160, bbox_inches='tight')
+                    plt.close(fig)
+                    per_spw['spectra_png'] = p_spectra
+            except Exception as exc:
+                LOG.warning('Failed to generate spectra plot for field %s spw %s: %s', source_name, spw_id, exc)
+                plt.close('all')
 
-            fplots.plot_moment0_by_spw(results, source_name=source_name, field_id=None)
-            fig = plt.gcf()
-            p_mom0 = os.path.join(products_dir, f'findroi_source-{token}_moment0.png')
-            fig.savefig(p_mom0, dpi=160, bbox_inches='tight')
-            plt.close(fig)
-            per_source['moment0_png'] = p_mom0
+            try:
+                if fplots.plot_moment0_by_spw(
+                    results, source_name=source_name, field_id=None, spw_key=spw_key
+                ):
+                    fig = plt.gcf()
+                    p_mom0 = os.path.join(products_dir, f'{base}_moment0.png')
+                    fig.savefig(p_mom0, dpi=160, bbox_inches='tight')
+                    plt.close(fig)
+                    per_spw['moment0_png'] = p_mom0
+            except Exception as exc:
+                LOG.warning('Failed to generate moment0 plot for field %s spw %s: %s', source_name, spw_id, exc)
+                plt.close('all')
 
-            fplots.plot_evidence_with_lines(
-                results,
-                source_name=source_name,
-                field_id=None,
-                min_region_snr=pos_thr,
-                min_neg_region_snr=neg_thr,
-            )
-            fig = plt.gcf()
-            p_evidence = os.path.join(products_dir, f'findroi_source-{token}_evidence.png')
-            fig.savefig(p_evidence, dpi=160, bbox_inches='tight')
-            plt.close(fig)
-            per_source['evidence_png'] = p_evidence
+            try:
+                if fplots.plot_evidence_with_lines(
+                    results,
+                    source_name=source_name,
+                    field_id=None,
+                    min_region_snr=pos_thr,
+                    min_neg_region_snr=neg_thr,
+                    spw_key=spw_key,
+                ):
+                    fig = plt.gcf()
+                    p_evidence = os.path.join(products_dir, f'{base}_evidence.png')
+                    fig.savefig(p_evidence, dpi=160, bbox_inches='tight')
+                    plt.close(fig)
+                    per_spw['evidence_png'] = p_evidence
+            except Exception as exc:
+                LOG.warning('Failed to generate evidence plot for field %s spw %s: %s', source_name, spw_id, exc)
+                plt.close('all')
 
-            out[source_name] = per_source
-        except Exception as exc:
-            LOG.warning('Failed to generate default hif_findroi summary plots for source %s: %s', source_name, exc)
-            plt.close('all')
+            per_source[spw_key] = per_spw
+        out[source_name] = per_source
     return out
 
 

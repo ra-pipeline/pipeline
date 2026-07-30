@@ -6,7 +6,7 @@
 <table class="table table-bordered table-striped">
   <thead>
     <tr>
-      <th>Source</th>
+      <th>Field</th>
       <th>Selected / Successful / Failed Science SPWs</th>
       <th>Products with Line ROI / Continuum Ranges</th>
     </tr>
@@ -33,29 +33,35 @@
 </div>
 % endif
 
-<h2>Per-Source Evidence Spectra</h2>
+<h2>Per-Field Evidence Spectra</h2>
 % if plot_message:
 <p>${plot_message}</p>
 % elif plot_links:
 <table class="table table-bordered table-striped">
   <thead>
     <tr>
-      <th>Source</th>
+      <th>Field</th>
+      <th>SPW</th>
       <th>Evidence Spectrum</th>
     </tr>
   </thead>
   <tbody>
   % for plot in plot_links:
     <tr>
-      <td>${plot.source}</td>
+      <td>${plot.field}</td>
+      <td>${plot.spw}</td>
       <td>
+      % if plot.href:
         <a href="${plot.href}"
            data-fancybox="findroi_evidence"
-           data-caption="${plot.source} evidence spectrum">
+           data-caption="${plot.field} SPW ${plot.spw} evidence spectrum">
           <img class="lazyload img-responsive"
                data-src="${plot.thumbnail}"
-               alt="${plot.source} evidence spectrum">
+               alt="${plot.field} SPW ${plot.spw} evidence spectrum">
         </a>
+      % else:
+        No evidence spectrum available
+      % endif
       </td>
     </tr>
   % endfor

@@ -8,7 +8,7 @@ import pipeline.infrastructure.renderer.logger as logger
 
 SourceSummaryRow = collections.namedtuple('SourceSummaryRow', 'source spw_summary roi_summary')
 ArtifactLink = collections.namedtuple('ArtifactLink', 'label href')
-PlotLink = collections.namedtuple('PlotLink', 'source href thumbnail')
+PlotLink = collections.namedtuple('PlotLink', 'field spw href thumbnail')
 
 
 class T2_4MDetailsFindROIRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
@@ -47,34 +47,36 @@ class T2_4MDetailsFindROIRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
         plot_links = []
         summary_plots = result.artifacts.get('summary_plots') or {}
-        for source, paths in sorted(summary_plots.items()):
-            # Keep all generated plots in the stage output, but only expose the
-            # evidence spectrum in the main weblog view.
-            for path in (
-                paths.get('spectra_png'),
-                paths.get('moment0_png'),
-            ):
-                self._copy_artifact(path, weblog_dir, pipeline_context.report_dir)
+        for field, spw_plots in sorted(summary_plots.items()):
+            for spw_key, paths in sorted(spw_plots.items(), key=lambda item: int(item[0])):
+                for path in (
+                    paths.get('spectra_png'),
+                    paths.get('moment0_png'),
+                ):
+                    self._copy_artifact(path, weblog_dir, pipeline_context.report_dir)
 
-            evidence = self._copy_plot(
-                paths.get('evidence_png'), weblog_dir, pipeline_context.report_dir
-            )
-            if evidence:
-                href, thumbnail = evidence
-                plot_links.append(PlotLink(source, href, thumbnail))
+                evidence = self._copy_plot(
+                    paths.get('evidence_png'), weblog_dir, pipeline_context.report_dir
+                )
+                if evidence:
+                    href, thumbnail = evidence
+                else:
+                    href, thumbnail = None, None
+                plot_links.append(PlotLink(field, paths.get('spw_id', spw_key), href, thumbnail))
 
         no_valid_source_spw = (
-            not plot_links
+            not any(plot.href for plot in plot_links)
             and (
                 not int(result.summary.get('n_source_spws', 0))
                 or any(
                     paths.get('evidence_status') == 'no_valid_source_spw'
-                    for paths in summary_plots.values()
+                    for spw_plots in summary_plots.values()
+                    for paths in spw_plots.values()
                 )
             )
         )
         plot_message = (
-            'No valid source/SPW combinations were available for plotting.'
+            'No valid field/SPW combinations were available for plotting.'
             if no_valid_source_spw else None
         )
 
