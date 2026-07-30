@@ -100,7 +100,7 @@ _DEFAULT_FINDROI_CONFIG = {
     'uv_taper_auto': True,
     'uv_taper_sigma_uv': None,
     'uv_taper_fwhm_cell': 2.0,
-    'roi_thresh': 7.0,
+    'roi_thresh': 5.0,
     'roi_cont_thresh': 7.0,
     'tmp_overwrite': True,
     'save_moment0': True,
