@@ -443,6 +443,7 @@ def plot_evidence_with_lines(
         region_label_fontsize = plot_fontsize
     if min_neg_region_snr is None:
         min_neg_region_snr = float(min_region_snr)
+    absorption_evidence_plotted = False
 
     for ax, spw_key in zip(axes, spw_keys):
         _disable_axis_offsets(ax)
@@ -469,6 +470,20 @@ def plot_evidence_with_lines(
         else:
             xlabel = 'Frequency (GHz)'
             freq_axis = True
+        absorption_evidence = (block.get('spectra') or {}).get('evidence_negative')
+        if absorption_evidence is not None:
+            absorption_evidence = np.asarray(absorption_evidence)
+            if absorption_evidence.size == nchan:
+                ax.plot(
+                    x,
+                    absorption_evidence,
+                    color='lightskyblue',
+                    linestyle='--',
+                    lw=1.0,
+                    alpha=0.9,
+                    label='Absorption evidence',
+                )
+                absorption_evidence_plotted = True
         ax.plot(x, evid, color='black', lw=1.0, label='Evidence')
         roi = block.get('roi_detected') or {}
         line_ranges_all = roi.get('line_ranges', [])
@@ -670,6 +685,14 @@ def plot_evidence_with_lines(
             Line2D([0], [0], color='firebrick', lw=3.0, label='Positive ROI'),
             Line2D([0], [0], color='royalblue', lw=3.0, label='Negative ROI'),
         ]
+        if absorption_evidence_plotted:
+            legend_handles.insert(
+                1,
+                Line2D(
+                    [0], [0], color='lightskyblue', lw=1.0, linestyle='--',
+                    label='Absorption evidence',
+                ),
+            )
     fig.tight_layout()
     if axes:
         _move_metadata_away_from_roi(

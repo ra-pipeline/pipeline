@@ -2,6 +2,8 @@
 
 <%block name="title">Find Regions of Interest</%block>
 
+<p>This task quickly searches the selected science field/SPW combinations for candidate spectral-line regions of interest. For each combination, the data are first imaged using a lightweight, nearest-neighbor-gridded coarse dirty cube. The task then constructs a joint evidence spectrum from multiple independent methods of spectral extraction, estimates the characteristic line width, convolves the evidence spectrum with kernels spanning that width, and applies positive and negative detection thresholds of +5&sigma; and -7&sigma;, respectively. The stage pickle file contains the complete candidate-line dictionary used by this task. Candidate line and continuum frequency ranges are written to <code>ROI.dat</code> and <code>ROIcont.dat</code>; the summary and evidence plots below provide a field/SPW-level view of the results.</p>
+
 <h2>Summary</h2>
 <table class="table table-bordered table-striped">
   <thead>
