@@ -476,7 +476,7 @@ def plot_evidence_with_lines(
             if absorption_evidence.size == nchan:
                 ax.plot(
                     x,
-                    absorption_evidence,
+                    -absorption_evidence,
                     color='lightskyblue',
                     linestyle='--',
                     lw=1.0,
