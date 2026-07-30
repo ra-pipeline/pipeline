@@ -2639,6 +2639,7 @@ def _save_default_summary_plots(
 
     os.makedirs(products_dir, exist_ok=True)
     out: dict[str, dict[str, dict[str, str]]] = {}
+    plot_failure_count = 0
     cfg = results.get('metadata', {}).get('config', {})
     pos_thr = float(cfg.get('pos_evidence_thr', cfg.get('evidence_thr', 7.0)))
     neg_thr = float(cfg.get('neg_evidence_thr', 7.0))
@@ -2665,9 +2666,12 @@ def _save_default_summary_plots(
                     fig.savefig(p_spectra, dpi=160, bbox_inches='tight')
                     plt.close(fig)
                     per_spw['spectra_png'] = p_spectra
+                else:
+                    plot_failure_count += 1
             except Exception as exc:
                 LOG.warning('Failed to generate spectra plot for field %s spw %s: %s', source_name, spw_id, exc)
                 plt.close('all')
+                plot_failure_count += 1
 
             try:
                 if fplots.plot_moment0_by_spw(
@@ -2678,9 +2682,12 @@ def _save_default_summary_plots(
                     fig.savefig(p_mom0, dpi=160, bbox_inches='tight')
                     plt.close(fig)
                     per_spw['moment0_png'] = p_mom0
+                else:
+                    plot_failure_count += 1
             except Exception as exc:
                 LOG.warning('Failed to generate moment0 plot for field %s spw %s: %s', source_name, spw_id, exc)
                 plt.close('all')
+                plot_failure_count += 1
 
             try:
                 if fplots.plot_evidence_with_lines(
@@ -2696,12 +2703,19 @@ def _save_default_summary_plots(
                     fig.savefig(p_evidence, dpi=160, bbox_inches='tight')
                     plt.close(fig)
                     per_spw['evidence_png'] = p_evidence
+                    per_spw['evidence_status'] = 'ok'
+                else:
+                    per_spw['evidence_status'] = 'evidence_plot_failed'
+                    plot_failure_count += 1
             except Exception as exc:
                 LOG.warning('Failed to generate evidence plot for field %s spw %s: %s', source_name, spw_id, exc)
                 plt.close('all')
+                per_spw['evidence_status'] = 'evidence_plot_failed'
+                plot_failure_count += 1
 
             per_source[spw_key] = per_spw
         out[source_name] = per_source
+    results.setdefault('metadata', {}).setdefault('counts', {})['plot_failures'] = int(plot_failure_count)
     return out
 
 
@@ -4643,6 +4657,7 @@ def summarize_stage_product(stage_product: dict[str, Any]) -> dict[str, Any]:
         'n_selected_spws': int(counts.get('selected_spws', len(spws))),
         'n_successful_spws': int(counts.get('successful_spws', len(spws))),
         'n_failed_spws': int(counts.get('failed_spws', 0)),
+        'n_plot_failures': int(counts.get('plot_failures', 0)),
         'n_source_spws': int(n_source_spws),
         'n_roi_with_lines': int(n_roi_with_lines),
         'n_roi_with_continuum': int(n_roi_with_cont),

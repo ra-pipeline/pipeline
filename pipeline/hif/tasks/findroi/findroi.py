@@ -72,10 +72,13 @@ class FindROI(basetask.StandardTaskTemplate):
             )
         except Exception as exc:
             LOG.exception('hif_findroi failed; returning a non-fatal result so the pipeline can continue.')
-            return FindROIResult(errors=[f'hif_findroi failed: {exc}'])
+            return FindROIResult(errors=[f'hif_findroi failed: {exc}'], fatal_error=True)
 
         if stage_product is None:
-            return FindROIResult(errors=['No successful hif_findroi SPW results were produced.'])
+            return FindROIResult(
+                errors=['No successful hif_findroi SPW results were produced.'],
+                fatal_error=True,
+            )
 
         artifacts = copy.deepcopy(stage_product.get('metadata', {}).get('artifacts', {}))
         errors = list(stage_product.get('metadata', {}).get('errors', []))

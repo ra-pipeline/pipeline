@@ -59,12 +59,16 @@
           <a href="${plot.href}"
              data-fancybox="findroi_evidence"
              data-caption="${plot.field} SPW ${plot.spw} evidence spectrum">
-            <img class="lazyload img-responsive"
-                 data-src="${plot.thumbnail}"
-                 alt="${plot.field} SPW ${plot.spw} evidence spectrum">
+          <img class="lazyload img-responsive"
+               data-src="${plot.thumbnail}"
+               alt="${plot.field} SPW ${plot.spw} evidence spectrum">
           </a>
+        % elif plot.evidence_status == 'evidence_plot_failed':
+          Evidence spectrum plotting failed; spectrum data is available.
+        % elif plot.evidence_status == 'no_valid_source_spw':
+          No valid field/SPW combination; no spectrum was available to plot.
         % else:
-          No evidence spectrum available
+          No evidence spectrum was available for this field/SPW.
         % endif
         </td>
         <td>

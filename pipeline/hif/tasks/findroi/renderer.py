@@ -8,7 +8,9 @@ import pipeline.infrastructure.renderer.logger as logger
 
 SourceSummaryRow = collections.namedtuple('SourceSummaryRow', 'source spw_summary roi_summary')
 ArtifactLink = collections.namedtuple('ArtifactLink', 'label href')
-PlotLink = collections.namedtuple('PlotLink', 'field spw href thumbnail positive_roi_ranges')
+PlotLink = collections.namedtuple(
+    'PlotLink', 'field spw href thumbnail positive_roi_ranges evidence_status'
+)
 PlotGroup = collections.namedtuple('PlotGroup', 'field plots')
 
 FINDROI_THUMBNAIL_SIZE = '500x376'
@@ -68,7 +70,14 @@ class T2_4MDetailsFindROIRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                     href, thumbnail = None, None
                 spw = str(paths.get('spw_id', spw_key))
                 plot_links.append(
-                    PlotLink(field, spw, href, thumbnail, roi_dat_ranges.get((field, spw), []))
+                    PlotLink(
+                        field,
+                        spw,
+                        href,
+                        thumbnail,
+                        roi_dat_ranges.get((field, spw), []),
+                        paths.get('evidence_status'),
+                    )
                 )
 
         plot_groups = []
@@ -77,15 +86,14 @@ class T2_4MDetailsFindROIRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 plot_groups.append(PlotGroup(plot.field, []))
             plot_groups[-1].plots.append(plot)
 
+        all_no_valid_source_spw = bool(plot_links) and all(
+            plot.evidence_status == 'no_valid_source_spw' for plot in plot_links
+        )
         no_valid_source_spw = (
             not any(plot.href for plot in plot_links)
             and (
                 not int(result.summary.get('n_source_spws', 0))
-                or any(
-                    paths.get('evidence_status') == 'no_valid_source_spw'
-                    for spw_plots in summary_plots.values()
-                    for paths in spw_plots.values()
-                )
+                or all_no_valid_source_spw
             )
         )
         plot_message = (
