@@ -26,7 +26,7 @@ LOG = logging.get_logger(__name__)
 
 TR = collections.namedtuple('TR', 'field spw min max frame status momdiffsnr spectrum jointmask')
 ImagingTR = collections.namedtuple(
-    'ImagingTR', 'field spw datatype phasecenter ppb cell imsize weighting robust uvtaper mosweight'
+    'ImagingTR', 'field spw datatype phasecenter ppb cell imsize weighting robust uvtaper mosweight perchanweightdensity nbins'
 )
 
 
@@ -90,8 +90,10 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 imsize=self._format_summary_value(entry.get('imsize'), separator=' x '),
                 weighting=self._format_summary_value(entry.get('weighting')),
                 robust=self._format_summary_value(entry.get('robust')),
-                uvtaper=self._format_summary_value(entry.get('uvtaper')),
+                uvtaper=self._format_summary_value(entry.get('uvtaper'), empty_value='None'),
                 mosweight=self._format_summary_value(entry.get('mosweight')),
+                perchanweightdensity=self._format_summary_value(entry.get('perchanweightdensity')),
+                nbins=self._format_summary_value(entry.get('nbins')),
             ))
         return rows
 
@@ -111,9 +113,9 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         return 'No continuum-finding dirty-cube imaging was performed for this result.'
 
     @staticmethod
-    def _format_summary_value(value, separator=', '):
+    def _format_summary_value(value, separator=', ', empty_value='Not available'):
         if value in (None, '', [], {}):
-            return 'Not available'
+            return empty_value
         if isinstance(value, (list, tuple)):
             return separator.join(map(str, value))
         if isinstance(value, float) and value.is_integer():

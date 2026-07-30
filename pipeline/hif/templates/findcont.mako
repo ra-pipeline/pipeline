@@ -39,6 +39,8 @@
                 <th>Robust</th>
                 <th>UV taper</th>
                 <th>mosweight</th>
+                <th>perchanweightdensity</th>
+                <th>nbins</th>
             </tr>
         </thead>
         <tbody>
@@ -55,6 +57,8 @@
                 <td>${row.robust}</td>
                 <td>${row.uvtaper}</td>
                 <td>${row.mosweight}</td>
+                <td>${row.perchanweightdensity}</td>
+                <td>${row.nbins}</td>
             </tr>
         %endfor
         </tbody>
