@@ -45,7 +45,7 @@
       <th>Field</th>
       <th>SPW</th>
       <th>Evidence Spectrum</th>
-      <th>Positive ROI Ranges</th>
+      <th>ROI Ranges</th>
     </tr>
   </thead>
   <tbody>
