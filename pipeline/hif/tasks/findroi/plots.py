@@ -470,20 +470,23 @@ def plot_evidence_with_lines(
         else:
             xlabel = 'Frequency (GHz)'
             freq_axis = True
+        absorption_trace = None
         absorption_evidence = (block.get('spectra') or {}).get('evidence_negative')
         if absorption_evidence is not None:
             absorption_evidence = np.asarray(absorption_evidence)
             if absorption_evidence.size == nchan:
-                ax.plot(
-                    x,
-                    -absorption_evidence,
-                    color='lightskyblue',
-                    linestyle='--',
-                    lw=1.0,
-                    alpha=0.9,
-                    label='Absorption evidence',
-                )
-                absorption_evidence_plotted = True
+                absorption_trace = -np.maximum(absorption_evidence, 0.0)
+                if np.any(np.isfinite(absorption_trace)):
+                    ax.plot(
+                        x,
+                        absorption_trace,
+                        color='lightskyblue',
+                        linestyle='--',
+                        lw=1.0,
+                        alpha=0.9,
+                        label='Absorption evidence',
+                    )
+                    absorption_evidence_plotted = True
         ax.plot(x, evid, color='black', lw=1.0, label='Evidence')
         roi = block.get('roi_detected') or {}
         line_ranges_all = roi.get('line_ranges', [])
@@ -510,9 +513,15 @@ def plot_evidence_with_lines(
                 neg_line_ranges.append(region)
                 neg_line_peak_snr.append(snr)
 
-        if len(evid) and np.any(np.isfinite(evid)):
-            ymax = float(np.nanmax(evid))
-            ymin = float(np.nanmin(evid))
+        plot_values = [np.asarray(evid)]
+        if absorption_trace is not None:
+            plot_values.append(absorption_trace)
+        finite_values = [values[np.isfinite(values)] for values in plot_values]
+        finite_values = [values for values in finite_values if values.size]
+        if finite_values:
+            finite_values = np.concatenate(finite_values)
+            ymax = float(np.max(finite_values))
+            ymin = float(np.min(finite_values))
         else:
             ymax, ymin = 1.0, 0.0
         yrange = max(ymax - ymin, 1.0)
