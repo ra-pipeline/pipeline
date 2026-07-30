@@ -122,22 +122,19 @@ def _channel_to_freq_ghz(spw_meta: dict[str, Any], nchan: int) -> np.ndarray | N
     return x_hz * 1.0e-9
 
 
-def _spw_title(spw_meta: dict[str, Any]) -> str:
-    """Return a compact SPW title while retaining band and baseband context."""
-    spw_id = spw_meta.get('spw_id', '?')
-    name = str(spw_meta.get('spw_name', ''))
-    compact_parts = [part for part in name.split('#') if part.startswith(('BB_', 'SW-'))]
-    suffix = f" | {' | '.join(compact_parts)}" if compact_parts else ''
-    return f'SPW {spw_id}{suffix}'
-
-
 def _region_label(peak_snr: float) -> str:
     return f'peak {peak_snr:.1f} σ'
+
+
+def _disable_axis_offsets(ax: Any) -> None:
+    """Prevent Matplotlib from displaying hidden additive offsets on either axis."""
+    ax.ticklabel_format(axis='both', useOffset=False)
 
 
 def _add_channel_axis(ax: Any, x: np.ndarray, nchan: int, fontsize: float) -> None:
     """Add channel-number ticks above a frequency-based spectrum axis."""
     channel_ax = ax.twiny()
+    _disable_axis_offsets(channel_ax)
     channel_ax.set_xlim(ax.get_xlim())
     n_ticks = min(7, max(nchan, 1))
     channel_ticks = np.unique(np.linspace(0, max(nchan - 1, 0), n_ticks, dtype=int))
@@ -264,14 +261,20 @@ def plot_spectra_by_spw(
         return False
     spw_keys = _plot_spw_keys(res, spw_key)
     n = len(spw_keys)
-    fig, axes = plt.subplots(n, 1, figsize=(12, max(2.5, 2.2 * n)), sharex=False)
+    fig, axes = plt.subplots(n, 1, figsize=(12, max(4.0, 3.5 * n)), sharex=False)
     axes = [axes] if n == 1 else list(axes)
+    metadata_annotations = {id(ax): [] for ax in axes}
+    base_fontsize = float(plt.rcParams.get('font.size', 10.0))
+    plot_fontsize = base_fontsize + 1.0
+    title_fontsize = base_fontsize + 2.0
+    label_fontsize = base_fontsize + 1.0
 
     ykey_ref = 'reference_sum_snr' if use_snr else 'reference_sum_raw'
     ykey_mw = 'moment0_weighted_sum_snr' if use_snr else 'moment0_weighted_sum_raw'
     ylabel = r'SNR [$\sigma$]' if use_snr else 'Intensity'
 
     for ax, spw_key in zip(axes, spw_keys):
+        _disable_axis_offsets(ax)
         spw_meta = res['inventory']['science_spws'][spw_key]
         src_spw = _source_spw_block(res, source_name, spw_key)
         if not src_spw:
@@ -291,41 +294,58 @@ def plot_spectra_by_spw(
             ax.set_xlim(float(x[0]), float(x[-1]))
         ax.plot(x, spec, color='darkslateblue', lw=1.0, label='reference')
         ax.plot(x, mw, color='firebrick', lw=1.0, label='mom0-weighted')
-        ax.set_title(_spw_title(spw_meta))
-        ax.set_ylabel(ylabel)
+        ax.set_title(
+            f'{source_name} | SPW {spw_meta.get("spw_id", spw_key)} Spectra (LSRK frame)',
+            fontsize=title_fontsize,
+        )
+        ax.set_ylabel(ylabel, fontsize=label_fontsize)
+        if x is not None and xlabel == 'Frequency (GHz)':
+            _add_channel_axis(ax, x, nchan, label_fontsize)
         lw_note = _linewidth_note(spw_meta, block)
         if lw_note:
-            ax.text(
+            annotation = ax.text(
                 0.01,
-                0.98,
+                0.95,
                 lw_note,
                 transform=ax.transAxes,
                 ha='left',
                 va='top',
-                fontsize=plt.rcParams.get('axes.labelsize', 'medium'),
+                fontsize=plot_fontsize,
                 color='dimgray',
                 bbox={'boxstyle': 'round,pad=0.2', 'facecolor': 'white', 'alpha': 0.6, 'edgecolor': 'none'},
             )
+            metadata_annotations[id(ax)].append(annotation)
         qc_note = _roi_qc_note(block)
         if qc_note:
-            ax.text(
+            annotation = ax.text(
                 0.01,
-                0.88,
+                0.85,
                 qc_note,
                 transform=ax.transAxes,
                 ha='left',
                 va='top',
-                fontsize=plt.rcParams.get('axes.labelsize', 'medium'),
+                fontsize=plot_fontsize,
                 color='dimgray',
                 bbox={'boxstyle': 'round,pad=0.2', 'facecolor': 'white', 'alpha': 0.55, 'edgecolor': 'none'},
             )
+            metadata_annotations[id(ax)].append(annotation)
         ax.grid(alpha=0.2)
+        ax.tick_params(axis='both', labelsize=plot_fontsize)
+    legend_ax = None
+    handles = []
     if axes:
-        axes[0].legend(loc='upper right')
-        axes[-1].set_xlabel(xlabel)
-    level = 'source-level' if field_id is None else f'field {field_id}'
-    fig.suptitle(f'{source_name} spectra per spw ({level})')
+        legend_ax = next((ax for ax in axes if ax.lines), axes[0])
+        handles, _ = legend_ax.get_legend_handles_labels()
+        axes[-1].set_xlabel(xlabel, fontsize=label_fontsize)
     fig.tight_layout()
+    if legend_ax is not None and handles:
+        _add_legend_avoiding_annotations(
+            fig,
+            legend_ax,
+            handles,
+            metadata_annotations[id(legend_ax)],
+            plot_fontsize,
+        )
     return True
 
 
@@ -346,10 +366,14 @@ def plot_moment0_by_spw(
     n = len(spw_keys)
     ncols = min(3, n) if n else 1
     nrows = int(np.ceil(n / ncols)) if n else 1
-    fig, axes = plt.subplots(nrows, ncols, figsize=(4.6 * ncols, 3.7 * nrows))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(5.5 * ncols, 4.5 * nrows))
     axes = np.atleast_1d(axes).ravel()
+    base_fontsize = float(plt.rcParams.get('font.size', 10.0))
+    plot_fontsize = base_fontsize + 1.0
+    title_fontsize = base_fontsize + 2.0
 
     for i, ax in enumerate(axes):
+        _disable_axis_offsets(ax)
         if i >= n:
             ax.axis('off')
             continue
@@ -362,15 +386,30 @@ def plot_moment0_by_spw(
         if not mom0_path or not os.path.exists(mom0_path):
             ax.text(0.5, 0.5, 'no moment0', ha='center', va='center')
             ax.set_axis_off()
-            ax.set_title(f"spw {spw_meta['spw_id']}")
+            ax.set_title(
+                f'{source_name} | SPW {spw_meta.get("spw_id", spw_key)} Moment 0',
+                fontsize=title_fontsize,
+            )
             continue
         img = np.load(mom0_path)
-        im = ax.imshow(img, origin='lower')
-        ax.set_title(_spw_title(spw_meta))
-        fig.colorbar(im, ax=ax, shrink=0.8)
+        finite_values = np.asarray(img)[np.isfinite(img)]
+        if finite_values.size:
+            vmax = float(np.max(finite_values))
+            vmin = -0.1 * vmax
+            if vmin >= vmax:
+                vmin = float(np.min(finite_values))
+        else:
+            vmin, vmax = 0.0, 1.0
+        im = ax.imshow(img, origin='lower', vmin=vmin, vmax=vmax)
+        ax.set_title(
+            f'{source_name} | SPW {spw_meta.get("spw_id", spw_key)} Moment 0',
+            fontsize=title_fontsize,
+        )
+        colorbar = fig.colorbar(im, ax=ax, shrink=0.8)
+        _disable_axis_offsets(colorbar.ax)
+        colorbar.ax.tick_params(labelsize=plot_fontsize)
 
-    level = 'source-level' if field_id is None else f'field {field_id}'
-    fig.suptitle(f'moment0 per spw ({source_name}, {level})')
+        ax.tick_params(axis='both', labelsize=plot_fontsize)
     fig.tight_layout()
     return True
 
@@ -406,6 +445,7 @@ def plot_evidence_with_lines(
         min_neg_region_snr = float(min_region_snr)
 
     for ax, spw_key in zip(axes, spw_keys):
+        _disable_axis_offsets(ax)
         spw_meta = res['inventory']['science_spws'][spw_key]
         src_spw = _source_spw_block(res, source_name, spw_key)
         if not src_spw:
