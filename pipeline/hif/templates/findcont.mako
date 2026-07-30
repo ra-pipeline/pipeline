@@ -17,18 +17,15 @@
     </div>
 %elif findcont_mode == 'normal':
     <div class="alert alert-info">
-        <strong>hif_findcont imaging mode: NORMAL (hm_mode='normal')</strong><br>
-        The normal imaging setup is being used (rather than 'coarse'), preserving the pre-2026 release imaging behavior. See the Imaging Summary below for the effective imaging parameters.
+        <strong>hif_findcont imaging mode: NORMAL (hm_mode='normal')</strong>
     </div>
 %else:
     <div class="alert alert-info">
-        <strong>hif_findcont imaging mode: COARSE (hm_mode='coarse')</strong><br>
-        The default coarse imaging setup is being used for continuum finding. It is optimized for processing speed; see the Imaging Summary below for the effective pixels-per-beam and other imaging parameters.
+        <strong>hif_findcont imaging mode: COARSE (hm_mode='coarse')</strong>
     </div>
 %endif
 
 %if imaging_summary:
-    <h2>Imaging Summary</h2>
     <div class="table-responsive">
     <table class="table table-bordered table-striped table-condensed">
         <thead>
@@ -43,8 +40,7 @@
                 <th>Weighting</th>
                 <th>Robust</th>
                 <th>UV taper</th>
-                <th>Mosaic weight</th>
-                <th>Status</th>
+                <th>mosweight</th>
             </tr>
         </thead>
         <tbody>
@@ -61,7 +57,6 @@
                 <td>${row.robust}</td>
                 <td>${row.uvtaper}</td>
                 <td>${row.mosweight}</td>
-                <td>${row.status}</td>
             </tr>
         %endfor
         </tbody>

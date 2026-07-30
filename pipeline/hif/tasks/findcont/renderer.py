@@ -26,7 +26,7 @@ LOG = logging.get_logger(__name__)
 
 TR = collections.namedtuple('TR', 'field spw min max frame status momdiffsnr spectrum jointmask')
 ImagingTR = collections.namedtuple(
-    'ImagingTR', 'field spw datatype phasecenter ppb cell imsize weighting robust uvtaper mosweight status'
+    'ImagingTR', 'field spw datatype phasecenter ppb cell imsize weighting robust uvtaper mosweight'
 )
 
 
@@ -91,7 +91,6 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 robust=self._format_summary_value(entry.get('robust')),
                 uvtaper=self._format_summary_value(entry.get('uvtaper')),
                 mosweight=self._format_summary_value(entry.get('mosweight')),
-                status=self._format_summary_value(entry.get('status')),
             ))
         return rows
 
