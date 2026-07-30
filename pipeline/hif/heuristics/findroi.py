@@ -4595,14 +4595,28 @@ def summarize_stage_product(stage_product: dict[str, Any]) -> dict[str, Any]:
     n_source_spws = 0
     n_roi_with_lines = 0
     n_roi_with_cont = 0
-    for spw_map in fields.values():
+    source_summaries = []
+    for source_name in sorted(fields):
+        spw_map = fields[source_name]
+        source_n_source_spws = 0
+        source_n_roi_with_lines = 0
+        source_n_roi_with_cont = 0
         for spw_block in spw_map.values():
             n_source_spws += 1
+            source_n_source_spws += 1
             roi = (spw_block.get('source_aggregate') or {}).get('roi_detected') or {}
             if roi.get('line_ranges') or roi.get('neg_line_ranges'):
                 n_roi_with_lines += 1
+                source_n_roi_with_lines += 1
             if roi.get('cont_ranges'):
                 n_roi_with_cont += 1
+                source_n_roi_with_cont += 1
+        source_summaries.append({
+            'source': source_name,
+            'n_source_spws': int(source_n_source_spws),
+            'n_roi_with_lines': int(source_n_roi_with_lines),
+            'n_roi_with_continuum': int(source_n_roi_with_cont),
+        })
     timing = stage_product.get('metadata', {}).get('timing', {})
     return {
         'n_sources': int(len(fields)),
@@ -4613,5 +4627,6 @@ def summarize_stage_product(stage_product: dict[str, Any]) -> dict[str, Any]:
         'n_source_spws': int(n_source_spws),
         'n_roi_with_lines': int(n_roi_with_lines),
         'n_roi_with_continuum': int(n_roi_with_cont),
+        'source_summaries': source_summaries,
         'total_run_s': timing.get('total_run_s'),
     }

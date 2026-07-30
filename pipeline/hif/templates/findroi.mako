@@ -4,11 +4,19 @@
 
 <h2>Summary</h2>
 <table class="table table-bordered table-striped">
+  <thead>
+    <tr>
+      <th>Source</th>
+      <th>Selected / Successful / Failed Science SPWs</th>
+      <th>Products with Line ROI / Continuum Ranges</th>
+    </tr>
+  </thead>
   <tbody>
   % for row in summary_rows:
     <tr>
-      <th>${row.metric}</th>
-      <td>${row.value}</td>
+      <td>${row.source}</td>
+      <td>${row.spw_summary}</td>
+      <td>${row.roi_summary}</td>
     </tr>
   % endfor
   </tbody>
