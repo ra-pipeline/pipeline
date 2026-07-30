@@ -170,6 +170,8 @@ tmp_path_retention_policy = "none"
 [tool.pixi.workspace]
 # 'nodefaults' is not needed as Pixi does not implicitly add the defaults (Anaconda) channel
 channels = ["conda-forge"]
+# The inline "Rich Platforms" syntax (with OS version constraints) requires Pixi >= v0.71.0
+# Ref: https://pixi.sh/latest/features/rich-platforms/
 platforms = ["linux-64", { platform = "osx-arm64", osx = "15.0" }]
 
 # Common dependencies (shared by ALL environments via solve-groups)
