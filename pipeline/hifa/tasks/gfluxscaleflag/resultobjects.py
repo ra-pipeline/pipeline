@@ -21,7 +21,7 @@ class GfluxscaleflagResults(basetask.Results):
 
     def merge_with_context(self, context):
         """
-        See :method:`~pipeline.api.Results.merge_with_context`
+        See :meth:`~pipeline.api.Results.merge_with_context`
         """
         # This task has nothing to merge into the context. The
         # task is assumed to be followed by a call to

@@ -45,7 +45,7 @@ def hif_editimlist(
     width=None,
     vlass_plane_reject_ms=None,
 ):
-    """Add to a list of images to be produced with ``hif_makeimages``.
+    """Add to a list of images to be produced with :py:func:`hif_makeimages <hif_makeimages>`.
 
     Returns:
         The results object for the pipeline task is returned.

@@ -45,9 +45,6 @@ def hifv_restoredata(vis=None, session=None, products_dir=None, copytoraw=None, 
     - restores the final calibration tables for each MS
     - applies the calibration tables to each MS
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Restore the pipeline results for a single ASDM in a single session:
 

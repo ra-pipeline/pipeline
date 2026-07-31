@@ -6,40 +6,39 @@ import pipeline.h.cli.utils as utils
 def hifa_gfluxscaleflag(vis=None, intent=None, phaseupsolint=None, solint=None, minsnr=None, refant=None,
                         antnegsig=None, antpossig=None, tmantint=None, tmint=None, tmbl=None, antblnegsig=None,
                         antblpossig=None, relaxed_factor=None, niter=None, parallel=None, examineCrossPolSum=None):
-    """Flag the flux, diffgain, phase calibrators and check source.
+    """Flag outlier visibilities in the flux, diffgain, and phase calibrators and check source.
 
-    This task computes the flagging heuristics on the flux, diffgain, and phase
-    calibrators and the check source, by calling hif_correctedampflag which
-    looks for outlier visibility points by statistically examining the scalar
-    difference of corrected amplitudes minus model amplitudes, and flags those
-    outliers. The philosophy is that only outlier data points that have remained
-    outliers after calibration will be flagged. The heuristic works equally well
-    on resolved calibrators and point sources because it is not performing a
-    vector difference, and thus is not sensitive to nulls in the flux density
-    vs. uvdistance domain. Note that the phase of the data is not assessed.
+    Performs a temporary calibration using the spw mapping/combine parameters established in
+    :py:func:`hifa_spwphaseup <hifa_spwphaseup>` (with ``solint`` always 'int' and ``gaintype`` always 'G' for the phase-up, and
+    ``solint='inf'`` and ``gaintype='T'`` for the amplitude solutions), then identifies and flags outlier
+    visibilities by statistically examining the scalar difference of calibrated amplitudes minus model
+    amplitudes. Only amplitude outliers are flagged; the phase of the data is not assessed.
 
-    In further detail, the workflow is as follows: a snapshot of the flagging
-    state is preserved at the start, a preliminary phase and amplitude gaincal
-    solution is solved and applied, the flagging heuristics are run and
-    any outliers are marked for flagging, the flagging state is restored from the
-    snapshot. If any outliers were found, then these are flagged. Plots are
-    generated at two points in this workflow: after preliminary phase and
-    amplitude calibration but before flagging heuristics are run, and after
-    flagging heuristics have been run and applied. If no points were flagged,
-    the 'after' plots are not generated or displayed. The score for this stage
-    is the standard data flagging score, which depends on the fraction of data
-    flagged.
+    The heuristics differ slightly between multi-scan calibrators (typically the phase calibrator and
+    sometimes the check source) and single-scan calibrators.
 
-    The preliminary phase solutions use the mapping/combine and gaintype options
-    as established in hifa_spwphaseup.
+    The workflow is:
 
+    1. Snapshot the current flagging state.
+    2. Solve and apply preliminary phase and amplitude calibration.
+    3. Run flagging heuristics; identify outlier visibilities.
+    4. Restore the flagging state from the snapshot.
+    5. Apply any newly identified flags.
+
+    The WebLog shows amplitude vs. uv-distance and amplitude vs. time plots before flagging and (if any
+    flags were found) after flagging.
+
+    Notes:
+        For each intent, the QA sub-score = 1 - (fraction of data newly flagged). The final stage QA score
+        is the product of all per-intent sub-scores. For example, if AMPLITUDE has 10% newly flagged and
+        PHASE has 40% newly flagged, the total score is (1 - 0.1) x (1 - 0.4) = 0.54.
 
     Returns:
         The results object for the pipeline task is returned.
 
     Examples:
-        1. run with recommended settings to create flux scale calibration with flagging
-        using recommended thresholds:
+        1. Run with recommended settings to create flux scale calibration with flagging using recommended
+        thresholds:
 
         >>> hifa_gfluxscaleflag()
 

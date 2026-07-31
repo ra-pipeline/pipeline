@@ -47,7 +47,7 @@ class SelfcalResults(basetask.Results):
         self.selfcal_resources = selfcal_resources
 
     def merge_with_context(self, context):
-        """See :method:`~pipeline.infrastructure.api.Results.merge_with_context`."""
+        """See :meth:`~pipeline.infrastructure.api.Results.merge_with_context`."""
 
         # save selfcal results into the Pipeline context
         if context.selfcal_targets:

@@ -1,37 +1,99 @@
-/* === Layout === */
-.wy-nav-content {
-    max-width: none;
+/* =============================================================================
+   Furo theme customisations
+   =========================================================================== */
+
+/* --- Releases table: smaller font ----------------------------------------- */
+
+table.small-font-table {
+    font-size: 0.8rem;
 }
 
-.wy-nav-top,
-.wy-nav-search {
-    background: #a09f9f;
+/* --- Left sidebar width --------------------------------------------------- */
+
+:root {
+    --sidebar-width: 15rem;
+    /* default is 15rem; increase as needed */
 }
 
-.wy-nav-side {
-    background: #ffffff;
+/* --- Right TOC collapse toggle -------------------------------------------- */
+
+/* The toggle button sits on the left edge of the TOC drawer.
+   position: fixed keeps it vertically centred while scrolling. */
+.toc-toggle-btn {
+    position: fixed;
+    top: 50vh;
+    transform: translateY(-50%);
+    z-index: 51;
+
+    width: 1.1rem;
+    height: 2.5rem;
+    padding: 0;
+
+    border: 1px solid var(--color-background-border);
+    border-right: none;
+    border-radius: 0.3rem 0 0 0.3rem;
+
+    background: var(--color-background-secondary);
+    color: var(--color-foreground-secondary);
+    cursor: pointer;
+    font-size: 0.65rem;
+    line-height: 1;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    transition: background 0.15s ease, color 0.15s ease;
 }
 
-.wy-menu-vertical a {
-    color: black;
+.toc-toggle-btn:hover {
+    background: var(--color-background-hover);
+    color: var(--color-foreground-primary);
 }
 
-.wy-menu-vertical a:hover {
-    background-color: #e6e6e6;
+/* The toggle button sits on the left edge of the TOC drawer. */
+.toc-drawer {
+    position: relative;
+    transition: width 0.2s ease, min-width 0.2s ease;
 }
 
-ul {
-    display: inline;
-}
+/* Wide-screen collapse logic — only on screens where Furo shows the inline TOC
+   (>82em). On smaller screens Furo uses its own overlay; the toggle is hidden. */
+@media (min-width: 82em) {
 
-/* === Table Overrides === */
-@media screen and (min-width: 767px) {
-    .wy-table-responsive table td {
-        white-space: normal !important;
+    /* Pages with no local TOC: automatically expand content into the empty right
+       column — same layout as the manually-collapsed state, no button needed. */
+    .main:has(.toc-drawer.no-toc) .content {
+        width: auto !important;
+        max-width: 77rem !important;
     }
 
-    .wy-table-responsive {
-        overflow: visible !important;
+    /* Shrink the drawer to zero; keep overflow visible so the toggle button
+       remains clickable outside the collapsed zero-width box. */
+    .toc-drawer.toc-collapsed {
+        width: 0 !important;
+        min-width: 0 !important;
+        overflow: visible;
+    }
+
+    .toc-drawer.toc-collapsed .toc-sticky {
+        display: none;
+    }
+
+    /* Grow content by exactly the TOC width (15em) so the freed space is
+       absorbed into the text area.  Nothing else moves — the sidebar, the
+       remaining viewport space, and the content's own padding (0 3em) all
+       stay identical. */
+    .main.toc-collapsed .content {
+        width: auto !important;
+        max-width: 77rem !important;
+    }
+}
+
+/* Hide the toggle on small screens — Furo handles the TOC via overlay there. */
+@media (max-width: 82em) {
+    .toc-toggle-btn {
+        display: none !important;
     }
 }
 
@@ -58,55 +120,148 @@ div.nboutput.container div.output_area {
     margin-bottom: 1em;
 }
 
-/* === Typography === */
-/* Base font size and line height */
-body {
-    font-size: 14px;
-    line-height: 1.5;
+/* === Mermaid reset-zoom button === */
+.mermaid-zoom-wrapper {
+    position: relative;
+    display: inline-block;
+    width: 100%;
 }
 
-/* Target the pre tag inside the Pygments highlight div */
-.highlight pre {
-    font-size: 14px !important;
-    line-height: 1.5 !important;
+.mermaid-reset-btn {
+    position: absolute;
+    top: 0.4rem;
+    right: 1.0rem;
+    z-index: 10;
+
+    width: 1.6rem;
+    height: 1.6rem;
+    padding: 0;
+
+    border: 1px solid var(--color-background-border);
+    border-radius: 0.25rem;
+    background: var(--color-background-secondary);
+    color: var(--color-foreground-secondary);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    opacity: 0.5;
+    transition: opacity 0.15s ease;
 }
 
-/* Headings - proportional sizing */
-h1 {
-    font-size: 1.8em;
+.mermaid-zoom-wrapper:hover .mermaid-reset-btn {
+    opacity: 1;
 }
 
-h2 {
-    font-size: 1.5em;
+/* Hide Sphinx/Furo attribution in footer, keep copyright */
+.bottom-of-page .left-details {
+    font-size: 0 !important;
+    visibility: hidden !important;
 }
 
-h3 {
-    font-size: 1.3em;
+.bottom-of-page .left-details .copyright {
+    font-size: 0.81rem !important;
+    visibility: visible !important;
 }
 
-h4 {
-    font-size: 1.1em;
+/* --- Slightly reduce global font size ------------------------------------ */
+/* Setting on :root scales all rem-based sizes (Furo uses rem extensively).   */
+:root {
+    font-size: 93.75%;
+    /* browser default 16px × 93.75% ≈ 15px */
 }
 
+/* =============================================================================
+   Option 1: Subtle Section Styling for Visual Distinction (Minimal)
+   =========================================================================== */
 
-/* Body text, Paragraphs, and List items */
-.rst-content,
-.rst-content p,
-.rst-content li,
-.rst-content dd,
-.rst-content blockquote {
-    font-size: 14px;
-    line-height: 1.5;
+/* --- Function signature styling -------------------------------------------- */
+/* Add subtle background to distinguish function signature from content */
+dt.sig {
+    background-color: var(--color-highlight-on-white, #f0f0f8);
+    padding: 0.75rem;
+    margin: 1rem 0;
+    border-radius: 0.25rem;
+    border-left: 2px solid var(--color-brand-primary, #0066cc);
 }
 
-/* Code Blocks - needing !important to override Pygments */
-.rst-content .highlight pre {
-    font-size: 12px !important;
-    line-height: 1.5 !important;
+/* Dark mode support for signature */
+@media (prefers-color-scheme: dark) {
+    dt.sig {
+        background-color: #1a1a2e;
+        border-left-color: #4a7fbf;
+    }
 }
 
-/* Inline code literals */
-.rst-content code,
-.rst-content tt {
-    font-size: 85%;
+/* --- Field list headers (Parameters, Returns, Examples, etc.) ------------- */
+/* Add subtle styling to section headers - slightly different from code blocks */
+dl.field-list>dt {
+    background-color: var(--color-background-secondary, #fafafa);
+    padding: 0.25rem 0.5rem;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-background-border, #e0e0e0);
+    font-weight: 500;
+}
+
+/* Dark mode support for field list headers */
+@media (prefers-color-scheme: dark) {
+    dl.field-list>dt {
+        background-color: #2a2a3a;
+        border-bottom-color: #3a3a4a;
+    }
+}
+
+/* --- Field list content (dd) ---------------------------------------------- */
+/* Improved spacing between sections */
+dl.field-list>dd {
+    margin-bottom: 1.5rem;
+}
+
+/* --- Section headings (Notes, Examples, See Also, etc.) ------------------- */
+/* Style docstring section headings (rendered as p.rubric) to match field-list  */
+p.rubric {
+    background-color: var(--color-background-secondary, #fafafa);
+    padding: 0.25rem 0.5rem;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-background-border, #e0e0e0);
+    font-weight: 500;
+}
+
+/* Dark mode support for section headings */
+@media (prefers-color-scheme: dark) {
+    p.rubric {
+        background-color: #2a2a3a;
+        border-bottom-color: #3a3a4a;
+    }
+}
+
+/* --- Layout width adjustments for wide screens ---------------------------- */
+@media (min-width: 67.5em) {
+    .page {
+        max-width: none;
+        width: 100%;
+    }
+
+    /* Let the sidebar drawer extend to the far left edge of the viewport
+       so its background fills the entire left empty space.
+       With calc(50% - 31rem), the navigation container (15rem), content (62rem),
+       and TOC drawer (15rem) are centered symmetrically in the viewport. */
+    .sidebar-drawer {
+        width: calc(50% - 34rem);
+        min-width: var(--sidebar-width, 15rem);
+        max-width: none;
+        flex-shrink: 0;
+    }
+
+    .sidebar-container {
+        width: var(--sidebar-width, 15rem);
+    }
+
+    /* Let content stretch cleanly inside .main up to 62rem */
+    .content {
+        flex: 1;
+        width: auto !important;
+        max-width: 62rem;
+    }
 }

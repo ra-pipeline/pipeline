@@ -49,14 +49,15 @@ jobs:
           fetch-tags: true
 
       - name: Install Pixi
-        uses: prefix-dev/setup-pixi@v0.8.8
+        uses: prefix-dev/setup-pixi@v0.9.6
         with:
-          pixi-version: v0.63.2
+          pixi-version: v0.70.2
           environments: ${{ inputs.pixi_env }}
           # Caching is disabled to always use the latest dev snapshots on demand.
           cache: false
           # To enable caching in future, set `cache: true` and define an appropriate cache key,
           # for example: v1-${{ runner.os }}-${{ inputs.pixi_env }}.
+          locked: false
           activate-environment: ${{ inputs.pixi_env }}
 
       - name: Enable post-link scripts
