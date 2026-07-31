@@ -130,8 +130,10 @@ class CheckProductSizeHeuristics:
         original_imsize = imlist[0]['imsize']
         mitigated_imsize = original_imsize
         # print(original_imsize) # testing # note could form an output dict with metric scores already with mitigation levels
-        LOG.info('Default imaging leads to a maximum cube size of %.4f GB and a product size of %.4f GB' % (maxcubesize, total_productsize))
-        LOG.info('Allowed maximum cube size: %s GB. Allowed cube size limit: %s GB. Allowed maximum product size: %s GB.' % (self.inputs.maxcubesize, self.inputs.maxcubelimit, self.inputs.maxproductsize))
+        LOG.info('Default imaging leads to a maximum cube size of %.4f GB and a product size of %.4f GB',
+                 maxcubesize, total_productsize)
+        LOG.info('Allowed maximum cube size: %s GB. Allowed cube size limit: %s GB. Allowed maximum product size: %s GB.',
+                 self.inputs.maxcubesize, self.inputs.maxcubelimit, self.inputs.maxproductsize)
 
         # Step 1 - testing maximum cube size
         # If too large, try to mitigate via channel binning
@@ -219,10 +221,11 @@ class CheckProductSizeHeuristics:
         # PIPE-3127
         # If still too large, final check and if no mitigation possible then warn - SpW filtering will occur later, but do not error
         if (self.inputs.maxcubesize != -1.0) and (maxcubesize > self.inputs.maxcubesize):
-            LOG.info('Maximum cube size cannot be mitigated. Remaining factor with the maxcubesize is: %.4f.'%(maxcubesize / self.inputs.maxcubesize))
-            LOG.info('SpW filtering will occur if maximum cube size is greater than limit of %s GB.' %(self.inputs.maxcubelimit))
+            LOG.info('Maximum cube size cannot be mitigated. Remaining factor with the maxcubesize is: %.4f.',
+                     maxcubesize / self.inputs.maxcubesize)
+            LOG.info('SpW filtering will occur if maximum cube size is greater than limit of %s GB.',
+                     self.inputs.maxcubelimit)
 
-            
         # Step 2 mitigation for total product size
         # If product size too large, try reducing number of fields / targets
         if (self.inputs.maxproductsize != -1.0) and (total_productsize > self.inputs.maxproductsize) and (nfields > 1):
@@ -351,20 +354,19 @@ class CheckProductSizeHeuristics:
         large_cube_mitigation = False
         if (self.inputs.maxcubelimit != -1) or (self.inputs.maxproductsize != -1.0):
             # prepare dictionaries to hold oversize and overlimit cubesize (PIPE-3127) SpW lists
-            LOG.info('*** These are the initial spws listed: < %s >'%(','.join(spws)))
+            LOG.info('These are the initial spws listed: %s', ', '.join(spws))
             spw_oversizes = dict([(i, 0) for i in spws])
             spw_overlimit = dict([(i, 0) for i in spws])
-            
+
             # now loop all targets in the imlist and their spws
             for target in imlist:
                 # if any cubes are over the 0.5 limit then set these to be oversize
                 # any target can cause a spw to be oversize even if other targets of that spw are not oversized
                 if (cubesizes[target['spw']] > 0.5 * self.inputs.maxcubelimit) and (self.inputs.maxcubelimit != -1):
-                    spw_oversizes[target['spw']] += 1  
+                    spw_oversizes[target['spw']] += 1
                 # if any cubes are over the maxcubelimit then set them to be overlimit
                 if (cubesizes[target['spw']] > self.inputs.maxcubelimit) and (self.inputs.maxcubelimit != -1):
-                    spw_overlimit[target['spw']] += 1  
-
+                    spw_overlimit[target['spw']] += 1
 
             # logic clause for the spw filtering loops
             # - spw are oversize
@@ -372,39 +374,44 @@ class CheckProductSizeHeuristics:
             # - cubesize > maxcubelimit
 
             # create a separate list for spw that are over the maxcubelimit:
-            overlimit_spws = [spw for spw, n in spw_overlimit.items() if n>0]
-            if overlimit_spws != []:
-                LOG.info('*** These spws are over the maxcubelimit: < %s >'%(',').join(overlimit_spws))
+            overlimit_spws = [spw for spw, n in spw_overlimit.items() if n > 0]
+            if overlimit_spws:
+                LOG.info('These spws are over the maxcubelimit: %s', ', '.join(overlimit_spws))
             # create a specific oversize spw list that explicitly excludes any overlimit spws that exceeded the maxcubelimit
-            oversize_spws = [spw for spw, n in spw_oversizes.items() if n>0 and spw not in overlimit_spws]
-            if oversize_spws != []:
-                LOG.info('*** These spws are in [0.5,1]*maxcubelimit: < %s >'%(',').join(oversize_spws))
-            
+            oversize_spws = [spw for spw, n in spw_oversizes.items() if n > 0 and spw not in overlimit_spws]
+            if oversize_spws:
+                LOG.info('These spws are in [0.5, 1]*maxcubelimit: %s', ', '.join(oversize_spws))
+
             if ([n != 0 for n in spw_oversizes.values()].count(True) > 1) or \
                ((total_productsize > self.inputs.maxproductsize) and (self.inputs.maxproductsize != -1)) or \
                ((maxcubesize > self.inputs.maxcubelimit) and (self.inputs.maxcubelimit != -1)):
 
-                # PIPE-3127 move the main step 1 exit clause here when checking if the representative SpW is over this limit as we will not continue
+                # PIPE-3127: move the main step 1 exit clause here — if the representative SpW is over
+                # the hard limit, SPW filtering cannot help and we must abort.
                 if str(repr_spw) in overlimit_spws:
-                    LOG.error('Maximum cube size cannot be mitigated. Remaining factor with the maxcubesize is: %.4f' % (maxcubesize / self.inputs.maxcubesize))
-                    LOG.error('The representative SpW (%s) cube size is larger than the limit of %s'%(repr_spw,self.inputs.maxcubelimit))
+                    LOG.error('Maximum cube size cannot be mitigated. Remaining factor with the maxcubesize is: %.4f',
+                              maxcubesize / self.inputs.maxcubesize)
+                    LOG.error('The representative SpW (%s) cube size is larger than the limit of %s GB',
+                              repr_spw, self.inputs.maxcubelimit)
                     return size_mitigation_parameters, \
-                       original_maxcubesize, original_productsize, \
-                       cube_mitigated_productsize, \
-                       maxcubesize, total_productsize, \
-                       original_imsize, mitigated_imsize, \
-                       True, \
-                       {'longmsg': 'Cube size could not be mitigated. Remaining factor: %.4f and the representative SpW cube size is larger than the limit of %s GB.' % (maxcubesize / self.inputs.maxcubesize, self.inputs.maxcubelimit), \
-                        'shortmsg': 'Cube size could not be mitigated'}, \
-                       known_synthesized_beams                    
+                        original_maxcubesize, original_productsize, \
+                        cube_mitigated_productsize, \
+                        maxcubesize, total_productsize, \
+                        original_imsize, mitigated_imsize, \
+                        True, \
+                        {'longmsg': 'Cube size could not be mitigated. Remaining factor: %.4f and the '
+                                    'representative SpW cube size is larger than the limit of %s GB.' %
+                                    (maxcubesize / self.inputs.maxcubesize, self.inputs.maxcubelimit),
+                         'shortmsg': 'Cube size could not be mitigated'}, \
+                        known_synthesized_beams
 
                 # if the maxcubelimit error did not trigger we can continue the spw filtering as below
-                
+
                 # Imaging will make at least one large cube if there are any
-                # if the repSpW is an oversize cube, it is added, else the first index spw of the list                
-                if oversize_spws != []:
-                    large_cube_mitigation=True # to trigger specifically the large cube spw mitigation message
-                    LOG.info('At least one cube size exceeded the large cube limit. Only one large SpW will be imaged.')                                        
+                # if the repSpW is an oversize cube, it is added, else the first index spw of the list
+                if oversize_spws:
+                    large_cube_mitigation = True  # to trigger specifically the large cube spw mitigation message
+                    LOG.info('At least one cube size exceeded the large cube limit. Only one large SpW will be imaged.')
                     if str(repr_spw) in oversize_spws:
                         large_cube_spw = str(repr_spw)
                     else:
@@ -419,10 +426,10 @@ class CheckProductSizeHeuristics:
                 if str(repr_spw) not in oversize_spws:
                     mitigated_spws.append(str(repr_spw))
                     mitigated_productsize += productsizes[str(repr_spw)]
-                    
+
                 # Add other small cubes regardless of which initial clause got to this point
                 # i.e. oversize cube, total productsize, or maxcubesize
-                other_small_cube_spws = [spw for spw, n in spw_oversizes.items() if n==0 and spw != str(repr_spw)]
+                other_small_cube_spws = [spw for spw, n in spw_oversizes.items() if n == 0 and spw != str(repr_spw)]
                 small_cube_frequencies = [frequencies[spw] for spw in other_small_cube_spws]
                 small_cube_productsizes = [productsizes[spw] for spw in other_small_cube_spws]
                 small_cube_info = list(zip(other_small_cube_spws, small_cube_frequencies, small_cube_productsizes))
@@ -436,7 +443,7 @@ class CheckProductSizeHeuristics:
                         break
                 # final mitigated spw list to propagate
                 size_mitigation_parameters['spw'] = ','.join(map(str, sorted(mitigated_spws)))
-                LOG.info('Size mitigation: Setting (cube) spw to %s' % (size_mitigation_parameters['spw']))
+                LOG.info('Size mitigation: Setting (cube) spw to %s', size_mitigation_parameters['spw'])
 
                 # Recalculate sizes
                 makeimlist_inputs.spw = size_mitigation_parameters['spw']
@@ -454,16 +461,17 @@ class CheckProductSizeHeuristics:
                 imlist = makeimlist_result.targets
                 cubesizes, maxcubesize, productsizes, total_productsize = self.calculate_sizes(imlist)
                 # Save cube mitigated product size for logs
-                cube_mitigated_productsize = total_productsize                
-                LOG.info('SpW mitigation leads to a maximum cube size of %.4f GB' % (maxcubesize))                
-                LOG.info('SpW mitigation leads to product size of %.4f GB' % (total_productsize))
+                cube_mitigated_productsize = total_productsize
+                LOG.info('SpW mitigation leads to a maximum cube size of %.4f GB', maxcubesize)
+                LOG.info('SpW mitigation leads to product size of %.4f GB', total_productsize)
 
         # Final logging statements
         # Step 1 already exited above if rep SpW exceeded the limit, but we can still have repr spw as a large cube (PIPE-3127)
         if (self.inputs.maxcubesize != -1.0) and (maxcubesize > self.inputs.maxcubesize):
             if maxcubesize < self.inputs.maxcubelimit:
-                LOG.info('Maximum cube size cannot be mitigated. Remaining factor with the maxcubesize is: %.4f.'%(maxcubesize / self.inputs.maxcubesize))
-                LOG.info('But the maximum cube size is smaller than limit of %s GB.' % (self.inputs.maxcubelimit))
+                LOG.info('Maximum cube size cannot be mitigated. Remaining factor with the maxcubesize is: %.4f.',
+                         maxcubesize / self.inputs.maxcubesize)
+                LOG.info('But the maximum cube size is smaller than limit of %s GB.', self.inputs.maxcubelimit)
         # Step 2 cause on total product size to exit                      
         if (self.inputs.maxproductsize != -1.0) and (total_productsize > self.inputs.maxproductsize):
             LOG.error('Product size cannot be mitigated. Remaining factor: %.4f.' % (total_productsize / self.inputs.maxproductsize / nfields))
