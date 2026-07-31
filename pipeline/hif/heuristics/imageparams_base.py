@@ -1257,7 +1257,7 @@ class ImageParamsHeuristics:
 
         return imsize
 
-    def imsize(self, fields, cell, primary_beam, sfpblimit=None, max_pixels=None,
+    def imsize(self, fields, cell, primary_beam, sfpblimit=None, max_pixels=None, min_pixels=None,
                centreonly=False, vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None):
         """
         Image size heuristics for single fields and mosaics. The pixel count along x and y image dimensions
@@ -1269,6 +1269,7 @@ class ImageParamsHeuristics:
         :param sfpblimit: single field primary beam response. If provided then imsize is chosen such that the image
             edge is at normalised primary beam level equals to sfpblimit.
         :param max_pixels: maximum allowed pixel count, integer. The same limit is applied along both image axes.
+        :param min_pixels: minimum allowed pixel count, integer. The same limit is applied along both image axes.
         :param centreonly: if True, then ignore the spread of field centers.
         :param vislist: list of visibility path string to be used for imaging. If not set then use all visibilities
             in the context.
@@ -1334,6 +1335,10 @@ class ImageParamsHeuristics:
         if max_pixels is not None:
             nxpix = min(nxpix, max_pixels)
             nypix = min(nypix, max_pixels)
+
+        if min_pixels is not None:
+            nxpix = max(nxpix, min_pixels)
+            nypix = max(nypix, min_pixels)
 
         # set nxpix, nypix to next highest 'composite number'
         csu = casa_tools.synthesisutils
@@ -1552,19 +1557,19 @@ class ImageParamsHeuristics:
 
         return ref_field_ids
 
-    def calc_topo_ranges(self, inputs):
-        """Calculate TOPO ranges for hif_tclean inputs.
+    def calc_ms_frame_ranges(self, inputs):
+        """Calculate MS native frequency frame ranges for hif_tclean inputs.
 
         Note: we might consider consolidating this with the similar code in contfilehelper.
         """
 
-        spw_topo_freq_param_lists = []
-        spw_topo_chan_param_lists = []
-        spw_topo_freq_param_dict = collections.defaultdict(dict)
-        spw_topo_chan_param_dict = collections.defaultdict(dict)
+        spw_ms_frame_freq_param_lists = []
+        spw_ms_frame_chan_param_lists = []
+        spw_ms_frame_freq_param_dict = collections.defaultdict(dict)
+        spw_ms_frame_chan_param_dict = collections.defaultdict(dict)
         p = re.compile(r'([\d.]*)(~)([\d.]*)(\D*)')
-        total_topo_freq_ranges = []
-        topo_freq_ranges = []
+        total_ms_frame_freq_ranges = []
+        ms_frame_freq_ranges = []
         num_channels = []
 
         meTool = casa_tools.measures
@@ -1594,7 +1599,7 @@ class ImageParamsHeuristics:
                 max_frequency = float(spw_info.max_frequency.to_units(measures.FrequencyUnits.GIGAHERTZ))
 
                 # Save spw width
-                total_topo_freq_ranges.append((min_frequency, max_frequency))
+                total_ms_frame_freq_ranges.append((min_frequency, max_frequency))
 
                 if 'spw%s' % (spwid) in inputs.spwsel_lsrk:
                     if (inputs.spwsel_lsrk['spw%s' % (spwid)] not in ('ALL', 'ALLCONT', '', 'NONE')):
@@ -1602,49 +1607,49 @@ class ImageParamsHeuristics:
                         if (refer in ('LSRK', 'SOURCE', 'REST')):
                             # Convert to TOPO
                             spw_name = self.observing_run.virtual_science_spw_ids[int(spwid)]
-                            topo_freq_selections, topo_chan_selections, aggregate_spw_lsrk_bw = contfile_handler.to_topo(inputs.spwsel_lsrk['spw%s' % (spwid)], inputs.vis, ref_field_ids, spwid, self.observing_run, spw_name)
-                            spw_topo_freq_param_lists.append(['%s:%s' % (spwid, topo_freq_selection.split()[0]) for topo_freq_selection in topo_freq_selections])
-                            spw_topo_chan_param_lists.append(['%s:%s' % (spwid, topo_chan_selection.split()[0]) for topo_chan_selection in topo_chan_selections])
+                            ms_frame_freq_selections, ms_frame_chan_selections, aggregate_spw_lsrk_bw, ms_frame = contfile_handler.to_ms_frame(inputs.spwsel_lsrk['spw%s' % (spwid)], inputs.vis, ref_field_ids, spwid, self.observing_run, spw_name)
+                            spw_ms_frame_freq_param_lists.append(['%s:%s' % (spwid, ms_frame_freq_selection.split()[0]) for ms_frame_freq_selection in ms_frame_freq_selections])
+                            spw_ms_frame_chan_param_lists.append(['%s:%s' % (spwid, ms_frame_chan_selection.split()[0]) for ms_frame_chan_selection in ms_frame_chan_selections])
                             for i in range(len(inputs.vis)):
-                                spw_topo_freq_param_dict[os.path.basename(inputs.vis[i])][spwid] = topo_freq_selections[i].split()[0]
-                                spw_topo_chan_param_dict[os.path.basename(inputs.vis[i])][spwid] = topo_chan_selections[i].split()[0]
+                                spw_ms_frame_freq_param_dict[os.path.basename(inputs.vis[i])][spwid] = ms_frame_freq_selections[i].split()[0]
+                                spw_ms_frame_chan_param_dict[os.path.basename(inputs.vis[i])][spwid] = ms_frame_chan_selections[i].split()[0]
                             # Count only one selection !
-                            for topo_freq_range in topo_freq_selections[0].split(';'):
-                                f1, sep, f2, unit = p.findall(topo_freq_range)[0]
-                                topo_freq_ranges.append((float(f1), float(f2)))
+                            for ms_frame_freq_range in ms_frame_freq_selections[0].split(';'):
+                                f1, sep, f2, unit = p.findall(ms_frame_freq_range)[0]
+                                ms_frame_freq_ranges.append((float(f1), float(f2)))
                         else:
                             LOG.warning('Cannot convert {!s} frequency selection properly to TOPO. Using plain ranges for all MSs.'.format(refer))
-                            spw_topo_freq_param_lists.append(['%s:%s' % (spwid, freq_selection)] * len(inputs.vis))
+                            spw_ms_frame_freq_param_lists.append(['%s:%s' % (spwid, freq_selection)] * len(inputs.vis))
                             # TODO: Need to derive real channel ranges
-                            spw_topo_chan_param_lists.append(['%s:0~%s' % (spwid, spw_info.num_channels - 1)] * len(inputs.vis))
+                            spw_ms_frame_chan_param_lists.append(['%s:0~%s' % (spwid, spw_info.num_channels - 1)] * len(inputs.vis))
                             for i in range(len(inputs.vis)):
-                                spw_topo_freq_param_dict[os.path.basename(inputs.vis[i])][spwid] = freq_selection.split()[0]
+                                spw_ms_frame_freq_param_dict[os.path.basename(inputs.vis[i])][spwid] = freq_selection.split()[0]
                                 # TODO: Need to derive real channel ranges
-                                spw_topo_chan_param_dict[os.path.basename(inputs.vis[i])][spwid] = '0~%d' % (spw_info.num_channels - 1)
+                                spw_ms_frame_chan_param_dict[os.path.basename(inputs.vis[i])][spwid] = '0~%d' % (spw_info.num_channels - 1)
                             # Count only one selection !
                             aggregate_spw_lsrk_bw = '0.0GHz'
                             for freq_range in freq_selection.split(';'):
                                 f1, sep, f2, unit = p.findall(freq_range)[0]
-                                topo_freq_ranges.append((float(f1), float(f2)))
+                                ms_frame_freq_ranges.append((float(f1), float(f2)))
                                 delta_f = qaTool.sub('%s%s' % (f2, unit), '%s%s' % (f1, unit))
                                 aggregate_spw_lsrk_bw = qaTool.add(aggregate_spw_lsrk_bw, delta_f)
                     else:
-                        spw_topo_freq_param_lists.append([spwid] * len(inputs.vis))
-                        spw_topo_chan_param_lists.append([spwid] * len(inputs.vis))
+                        spw_ms_frame_freq_param_lists.append([spwid] * len(inputs.vis))
+                        spw_ms_frame_chan_param_lists.append([spwid] * len(inputs.vis))
                         for msname in inputs.vis:
-                            spw_topo_freq_param_dict[os.path.basename(msname)][spwid] = ''
-                            spw_topo_chan_param_dict[os.path.basename(msname)][spwid] = ''
-                        topo_freq_ranges.append((min_frequency, max_frequency))
+                            spw_ms_frame_freq_param_dict[os.path.basename(msname)][spwid] = ''
+                            spw_ms_frame_chan_param_dict[os.path.basename(msname)][spwid] = ''
+                        ms_frame_freq_ranges.append((min_frequency, max_frequency))
                         aggregate_spw_lsrk_bw = '%.10fGHz' % (max_frequency - min_frequency)
                         if (inputs.spwsel_lsrk['spw%s' % (spwid)] not in ('ALL', 'ALLCONT')) and (inputs.intent == 'TARGET') and (inputs.specmode in ('mfs', 'cont') and self.warn_missing_cont_ranges()):
                             LOG.warning('No continuum frequency selection for Target Field %s SPW %s' % (inputs.field, spwid))
                 else:
-                    spw_topo_freq_param_lists.append([spwid] * len(inputs.vis))
-                    spw_topo_chan_param_lists.append([spwid] * len(inputs.vis))
+                    spw_ms_frame_freq_param_lists.append([spwid] * len(inputs.vis))
+                    spw_ms_frame_chan_param_lists.append([spwid] * len(inputs.vis))
                     for msname in inputs.vis:
-                        spw_topo_freq_param_dict[os.path.basename(msname)][spwid] = ''
-                        spw_topo_chan_param_dict[os.path.basename(msname)][spwid] = ''
-                    topo_freq_ranges.append((min_frequency, max_frequency))
+                        spw_ms_frame_freq_param_dict[os.path.basename(msname)][spwid] = ''
+                        spw_ms_frame_chan_param_dict[os.path.basename(msname)][spwid] = ''
+                    ms_frame_freq_ranges.append((min_frequency, max_frequency))
                     aggregate_spw_lsrk_bw = '%.10fGHz' % (max_frequency - min_frequency)
                     if (inputs.intent == 'TARGET') and (inputs.specmode in ('mfs', 'cont') and self.warn_missing_cont_ranges()):
                         LOG.warning('No continuum frequency selection for Target Field %s SPW %s' % (inputs.field, spwid))
@@ -1653,20 +1658,20 @@ class ImageParamsHeuristics:
 
             aggregate_lsrk_bw = qaTool.add(aggregate_lsrk_bw, aggregate_spw_lsrk_bw)
 
-        spw_topo_freq_param = [','.join(spwsel_per_ms) for spwsel_per_ms in [[spw_topo_freq_param_list_per_ms[i] for spw_topo_freq_param_list_per_ms in spw_topo_freq_param_lists] for i in range(len(inputs.vis))]]
-        spw_topo_chan_param = [','.join(spwsel_per_ms) for spwsel_per_ms in [[spw_topo_chan_param_list_per_ms[i] for spw_topo_chan_param_list_per_ms in spw_topo_chan_param_lists] for i in range(len(inputs.vis))]]
+        spw_ms_frame_freq_param = [','.join(spwsel_per_ms) for spwsel_per_ms in [[spw_ms_frame_freq_param_list_per_ms[i] for spw_ms_frame_freq_param_list_per_ms in spw_ms_frame_freq_param_lists] for i in range(len(inputs.vis))]]
+        spw_ms_frame_chan_param = [','.join(spwsel_per_ms) for spwsel_per_ms in [[spw_ms_frame_chan_param_list_per_ms[i] for spw_ms_frame_chan_param_list_per_ms in spw_ms_frame_chan_param_lists] for i in range(len(inputs.vis))]]
 
         # Calculate total bandwidth
-        total_topo_bw = '0.0GHz'
-        for total_topo_freq_range in utils.merge_ranges(total_topo_freq_ranges):
-            total_topo_bw = qaTool.add(total_topo_bw, qaTool.sub('%.10fGHz' % (float(total_topo_freq_range[1])), '%.10fGHz' % (float(total_topo_freq_range[0]))))
+        total_ms_frame_bw = '0.0GHz'
+        for total_ms_frame_freq_range in utils.merge_ranges(total_ms_frame_freq_ranges):
+            total_ms_frame_bw = qaTool.add(total_ms_frame_bw, qaTool.sub('%.10fGHz' % (float(total_ms_frame_freq_range[1])), '%.10fGHz' % (float(total_ms_frame_freq_range[0]))))
 
         # Calculate aggregate selected bandwidth
-        aggregate_topo_bw = '0.0GHz'
-        for topo_freq_range in utils.merge_ranges(topo_freq_ranges):
-            aggregate_topo_bw = qaTool.add(aggregate_topo_bw, qaTool.sub('%.10fGHz' % (float(topo_freq_range[1])), '%.10fGHz' % (float(topo_freq_range[0]))))
+        aggregate_ms_frame_bw = '0.0GHz'
+        for ms_frame_freq_range in utils.merge_ranges(ms_frame_freq_ranges):
+            aggregate_ms_frame_bw = qaTool.add(aggregate_ms_frame_bw, qaTool.sub('%.10fGHz' % (float(ms_frame_freq_range[1])), '%.10fGHz' % (float(ms_frame_freq_range[0]))))
 
-        return spw_topo_freq_param, spw_topo_chan_param, spw_topo_freq_param_dict, spw_topo_chan_param_dict, total_topo_bw, aggregate_topo_bw, aggregate_lsrk_bw
+        return spw_ms_frame_freq_param, spw_ms_frame_chan_param, spw_ms_frame_freq_param_dict, spw_ms_frame_chan_param_dict, total_ms_frame_bw, aggregate_ms_frame_bw, aggregate_lsrk_bw
 
     def get_channel_flags(self, msname, field, spw):
         """
@@ -1904,7 +1909,7 @@ class ImageParamsHeuristics:
         return SCF, physicalBW_of_1chan, effectiveBW_of_1chan, approximateEffectiveBW
 
     def calc_sensitivities(
-            self, vis, field, intent, spw, nbin, spw_topo_chan_param_dict, specmode, gridder, cell, imsize, weighting, robust, uvtaper,
+            self, vis, field, intent, spw, nbin, spw_ms_frame_chan_param_dict, specmode, gridder, cell, imsize, weighting, robust, uvtaper,
             center_only=False, known_sensitivities={},
             force_calc=False, calc_reffreq=False):
         """Compute sensitivity estimate using CASA.
@@ -1957,10 +1962,10 @@ class ImageParamsHeuristics:
                             chansel = '%d~%d' % (int(spw_do.num_channels / 2.0), int(spw_do.num_channels / 2.0))
                             nchan_sel = 1
                     else:
-                        if spw_topo_chan_param_dict.get(os.path.basename(msname), False):
-                            if spw_topo_chan_param_dict[os.path.basename(msname)].get(str(intSpw), '') != '':
+                        if spw_ms_frame_chan_param_dict.get(os.path.basename(msname), False):
+                            if spw_ms_frame_chan_param_dict[os.path.basename(msname)].get(str(intSpw), '') != '':
                                 # Use continuum frequency selection
-                                chansel = spw_topo_chan_param_dict[os.path.basename(msname)][str(intSpw)]
+                                chansel = spw_ms_frame_chan_param_dict[os.path.basename(msname)][str(intSpw)]
                                 nchan_sel = np.sum([c[1]-c[0]+1 for c in [list(map(int, sel.split('~')))
                                                                           for sel in chansel.split(';')]])
                             else:
@@ -2098,7 +2103,7 @@ class ImageParamsHeuristics:
             eb_spw_weights = 1.0 / np.array(sensitivities) ** 2
             sens_freq = np.sum(np.array(sens_freqs)*eb_spw_weights)/np.sum(eb_spw_weights)
 
-            if specmode == 'cont' and spw_topo_chan_param_dict == {}:
+            if specmode == 'cont' and spw_ms_frame_chan_param_dict == {}:
                 # Correct for spw frequency overlaps
                 agg_bw = cqa.getvalue(cqa.convert(self.aggregate_bandwidth(list(map(int, spw.split(',')))), 'Hz'))
                 # because agg_bw is a one-element Numpy array from the output of quanta tools calls, both
