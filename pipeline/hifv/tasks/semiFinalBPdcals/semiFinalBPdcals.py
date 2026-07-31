@@ -229,7 +229,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
                                     RefAntOutput=RefAntOutput, spw=','.join(spwlist))
             flagcount += 1
             if not os.path.exists(ktypecaltable):
-                continue
+                break
             flaggedSolnResult = getCalFlaggedSoln(ktypecaltable)
             fracFlaggedSolns = self._check_flagSolns(flaggedSolnResult, RefAntOutput)
 

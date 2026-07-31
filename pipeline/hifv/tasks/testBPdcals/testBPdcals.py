@@ -404,7 +404,7 @@ class testBPdcals(basetask.StandardTaskTemplate):
             self._do_ktype_delaycal(caltable=ktypecaltable, addcaltable=gtypecaltable,
                                     RefAntOutput=RefAntOutput, spw=','.join(spwlist))
             if not os.path.exists(ktypecaltable):
-                continue
+                break
             flaggedSolnResult = getCalFlaggedSoln(ktypecaltable)
             (fracFlaggedSolns, RefAntOutput) = self._check_flagSolns(flaggedSolnResult, RefAntOutput)
             LOG.info("Fraction of flagged solutions = " + str(flaggedSolnResult['all']['fraction']))
@@ -443,7 +443,6 @@ class testBPdcals(basetask.StandardTaskTemplate):
         gain_solint1 = solint
         shortsol1 = soltime
 
-        flaggedSolnApplycalbandpass = {}
         flaggedSolnApplycalbandpass = {}
         if fracFlaggedSolns1 > 0.05:
             soltime = soltimes[1]
