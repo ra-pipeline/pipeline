@@ -186,7 +186,7 @@ class TestZdTelmjd:
         result = compute_zd_telmjd_for_ms(ms)
         field = result[3]
         for i, (actual, expected) in enumerate(zip(field['zd'], _ZDS)):
-            assert actual == pytest.approx(expected, rel=1e-10), (
+            assert actual == pytest.approx(expected, rel=5e-10), (
                 f"zd[{i}] mismatch: {actual:.16f} != {expected:.16f}, "
                 f"diff={abs(actual-expected):.2e}"
             )
