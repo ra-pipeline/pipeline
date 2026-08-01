@@ -470,8 +470,8 @@ def select_tsys_field(
 
     Selection order (stop at first non-empty result):
       1) Exact ID match among the source's fields
-      2) Exact NAME match among the source's fields (case-insensitive configurable)
-      3) Partial NAME match to account for prefix/suffix additions
+      2) Exact NAME match among the source's fields
+      3) Partial NAME match to account for suffix additions
       4) Nearest field by angular separation
 
     Args:
@@ -484,35 +484,62 @@ def select_tsys_field(
     """
     # Retrieve correct Tsys field for source based on mapping
     is_sd = ms.array_name == 'TP'
+    # PIPE-3163/PIPE-3175: get_intent_to_tsysfield_map() should return properly auto-quoted field identifiers.
     tsys_fields = get_intent_to_tsysfield_map(ms, is_single_dish=is_sd)['TARGET'].split(',')
-    if not any(x.strip() for x in tsys_fields):
-        LOG.warning('No Tsys fields associated with TARGET for source %s.', source.name)
+    tsys_fields = [x.strip() for x in tsys_fields if x.strip()]
+    if not tsys_fields:
+        LOG.warning('No Tsys fields associated with TARGET in %s.', ms.name)
         return None
 
     # Precompute lookup structures
     src_fields = source.fields
     src_by_id = {f.id: f for f in src_fields}
-    src_by_name = {f.name.strip().strip('"'): f for f in src_fields}
+    src_by_name = {f.name: f for f in src_fields}
 
     # ID or name match to a source field
-    for field_str in tsys_fields:
-        field_str_clean = field_str.strip().strip('"')
-        if field_str_clean.isdigit() and int(field_str_clean) in src_by_id:
-            return src_by_id[int(field_str_clean)]
-        if field_str_clean in src_by_name:
-            return src_by_name[field_str_clean]
-        # PIPE-2869: Partial name match
-        for name in src_by_name:
-            if field_str_clean.startswith(name):
-                return ms.get_fields(name=field_str)[0]
+    for tsys_field_identifier in tsys_fields:
+        if tsys_field_identifier.isdigit():
+            if int(tsys_field_identifier) in src_by_id:
+                return src_by_id[int(tsys_field_identifier)]
+        else:
+            if tsys_field_identifier in src_by_name:
+                return src_by_name[tsys_field_identifier]
+            # PIPE-2869: Partial name match
+            for name in src_by_name:
+                if tsys_field_identifier.strip('"').startswith(name.strip('"')):
+                    fields = ms.get_fields(name=tsys_field_identifier)
+                    if fields:
+                        return fields[0]
 
     # If nothing matched, return the nearest Tsys field by angular separation to the source
-    candidate_fields = [ms.get_fields(name=x)[0] for x in tsys_fields if x.strip()]
+    candidate_fields = []
+    for tsys_field_identifier in tsys_fields:
+        if tsys_field_identifier.isdigit():
+            # Numeric ID that wasn't in source fields (already checked in early matching)
+            fields = ms.get_fields(field_id=int(tsys_field_identifier))
+            if fields:
+                candidate_fields.extend(fields)
+            else:
+                LOG.warning('Tsys field ID %s not found in MS', tsys_field_identifier)
+        else:
+            fields = ms.get_fields(name=tsys_field_identifier)
+            if fields:
+                candidate_fields.extend(fields)
+            else:
+                LOG.warning('Tsys field name %s not found in MS', tsys_field_identifier)
+
+    if not candidate_fields:
+        LOG.warning('No valid Tsys candidate fields found for source %s', source.name)
+        return None
+
     src_ra = np.mean([direction_to_radec(f.mdirection)[0] for f in src_fields])
     src_dec = np.mean([direction_to_radec(f.mdirection)[1] for f in src_fields])
-    return min(candidate_fields, key=lambda f: angular_separation(
-        src_ra, src_dec, *direction_to_radec(f.mdirection), in_arcsecs=False,
-    ))
+    # return closest candidate - this should be what applycal does with "nearest"
+    # Use (distance, field_id) tuple to break ties deterministically
+    return min(
+        candidate_fields,
+        key=lambda f: (angular_separation(src_ra, src_dec, *direction_to_radec(f.mdirection), in_arcsecs=False), f.id),
+    )
 
 
 def is_tsys_only(field: Field) -> bool:
