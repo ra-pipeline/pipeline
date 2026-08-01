@@ -253,12 +253,7 @@ def _ensure_row_chan_pol(
     return np.transpose(arr, (ax_row, ax_chan, ax_pol))
 
 
-def _stokes_i_corr_indices(corr_axis: list[str] | tuple[str, ...] | None) -> list[int] | None:
-    """Return the ALMA linear parallel-hand indices used to form Stokes I."""
-    if not corr_axis:
-        return None
-    # ALMA uses linear products; circular polarization needs future support.
-    return [idx for idx, corr in enumerate(corr_axis) if str(corr).upper() in ('XX', 'YY')]
+
 
 
 def resolve_vis_list(vis: str | list[str] | tuple[str, ...]) -> list[str]:
@@ -2996,7 +2991,6 @@ def _read_regridded_fields(
     regridded_ms: str,
     field_ids: list[int],
     datacolumn: str = 'DATA',
-    corr_axis: tuple[str, ...] | None = None,
 ) -> dict[int, dict[str, np.ndarray]]:
     '''Read multiple fields from one regridded MS in a single table query.'''
     # Record bulk table-read timings when profiling is enabled.
@@ -3016,7 +3010,19 @@ def _read_regridded_fields(
 
     data = sub.getcol(datacolumn)
     data = _ensure_row_chan_pol(data, nrows)
-    stokes_i_indices = _stokes_i_corr_indices(corr_axis)
+
+    tb_aux = _get_tb()
+    tb_aux.open(os.path.join(regridded_ms, 'DATA_DESCRIPTION'))
+    pol_id = tb_aux.getcell('POLARIZATION_ID', 0)
+    tb_aux.close()
+    
+    tb_aux.open(os.path.join(regridded_ms, 'POLARIZATION'))
+    corr_types = tb_aux.getcell('CORR_TYPE', pol_id)
+    tb_aux.close()
+    
+    # CASA Stokes enums for parallel hands: RR=5, LL=8, XX=9, YY=12
+    stokes_i_indices = [idx for idx, corr in enumerate(corr_types) if corr in (5, 8, 9, 12)]
+
     if stokes_i_indices:
         v = np.mean(data[:, :, stokes_i_indices], axis=2).astype(np.complex64, copy=False)
     else:
@@ -3444,7 +3450,6 @@ def _process_spw(
     ddid: int,
     spw_name: str,
     spw_ids_by_vis: dict[str, int] | None,
-    corr_axis_by_vis: dict[str, tuple[str, ...]] | None,
     fallback_spw_id: int,
     field_groups: dict[int, list[int]],
     antenna_selections_by_vis: dict[str, str] | None = None,
@@ -3554,7 +3559,6 @@ def _process_spw(
             chunks_by_field = _read_regridded_fields(
                 regridded_ms,
                 fids,
-                corr_axis=corr_axis_by_vis.get(vis) if corr_axis_by_vis else None,
             )
             _profile_logf(tmp_dir, 'process_spw bulk_read spw=%s eb=%s source=%s n_fields=%s dt=%.3f', spw_name, eb_idx, source_id, len(fids), (time.perf_counter() - t_read_fields))
             for field_id, chunk in chunks_by_field.items():
@@ -4181,19 +4185,8 @@ def run_findroi_mpi(
             virtual_spw_id=virtual_spw_id,
             fallback_spw_id=int(ddid_rows[int(ddid)]['spw_id']),
         )
-        corr_axis_by_vis = {}
-        for vis_name in vis_list:
-            real_spw_id = int(spw_ids_by_vis.get(
-                vis_name,
-                spw_ids_by_vis.get(os.path.basename(os.path.normpath(vis_name)), int(ddid_rows[int(ddid)]['spw_id'])),
-            ))
-            ms = _context_ms_for_vis(context, vis_name)
-            data_description = ms.get_data_description(spw=real_spw_id)
-            corr_axis_by_vis[vis_name] = tuple(
-                str(corr) for corr in getattr(data_description, 'corr_axis', ())
-            )
         args.append((
-            vis_list, ddid, spw_name, spw_ids_by_vis, corr_axis_by_vis,
+            vis_list, ddid, spw_name, spw_ids_by_vis,
             int(ddid_rows[int(ddid)]['spw_id']), field_groups,
             antenna_selections_by_vis,
             source_names_by_id, field_names_by_id,
