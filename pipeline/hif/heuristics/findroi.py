@@ -3024,7 +3024,10 @@ def _read_regridded_fields(
     stokes_i_indices = [idx for idx, corr in enumerate(corr_types) if corr in (5, 8, 9, 12)]
 
     if stokes_i_indices:
-        v = np.mean(data[:, :, stokes_i_indices], axis=2).astype(np.complex64, copy=False)
+        v = np.zeros(data.shape[:2], dtype=np.complex64)
+        for idx in stokes_i_indices:
+            v += data[:, :, idx]
+        v /= len(stokes_i_indices)
     else:
         v = np.mean(data, axis=2).astype(np.complex64, copy=False)
 
@@ -3033,15 +3036,26 @@ def _read_regridded_fields(
         sig = np.asarray(sub.getcol('SIGMA'))
         if sig.ndim == 2 and sig.shape[0] != nrows and sig.shape[1] == nrows:
             sig = sig.T
-        sig_values = sig[:, stokes_i_indices] if stokes_i_indices else sig
-        sig_r = np.mean(sig_values, axis=1)
+        if stokes_i_indices:
+            sig_r = np.zeros(sig.shape[0], dtype=sig.dtype)
+            for idx in stokes_i_indices:
+                sig_r += sig[:, idx]
+            sig_r /= len(stokes_i_indices)
+        else:
+            sig_r = np.mean(sig, axis=1)
         w_r = (1.0 / np.maximum(sig_r, 1e-30) ** 2).astype(np.float64)
     elif 'WEIGHT' in colnames:
         wt = np.asarray(sub.getcol('WEIGHT'))
         if wt.ndim == 2 and wt.shape[0] != nrows and wt.shape[1] == nrows:
             wt = wt.T
-        wt_values = wt[:, stokes_i_indices] if stokes_i_indices else wt
-        w_r = np.maximum(np.mean(wt_values, axis=1), 0.0).astype(np.float64)
+        if stokes_i_indices:
+            wt_r = np.zeros(wt.shape[0], dtype=wt.dtype)
+            for idx in stokes_i_indices:
+                wt_r += wt[:, idx]
+            wt_r /= len(stokes_i_indices)
+        else:
+            wt_r = np.mean(wt, axis=1)
+        w_r = np.maximum(wt_r, 0.0).astype(np.float64)
     else:
         w_r = np.ones((nrows,), dtype=np.float64)
 
