@@ -123,9 +123,23 @@ def case_nearest_fallback() -> tuple[MeasurementSet, Source, dict[str, str], Fie
     return ms, f_target.source, {"TARGET": "TsysNear,TsysFar"}, f_near
 
 
+def case_numeric_id_fallback() -> tuple[MeasurementSet, Source, dict[str, str], Field]:
+    """Fallback with numeric field IDs instead of names."""
+    f_target = Field(0, "TargetName", 0, np.ndarray(1), _make_direction(0.0, 0.0))
+    f_target.intents = {"TARGET"}
+    f_tsys = Field(10, "TsysName", 1, np.ndarray(1), _make_direction(0.01, 0.0))
+    f_tsys.intents = {"ATMOSPHERE"}
+    ms = make_ms("test7.ms", "12M", [
+        make_source(0, "TargetName", [f_target]),
+        make_source(10, "TsysName", [f_tsys]),
+    ])
+    # Pass field ID as string, not name - fallback should match by numeric ID
+    return ms, f_target.source, {"TARGET": "10"}, f_tsys
+
+
 @pytest.fixture(
-    params=[case_same_id, case_same_name, case_partial_name, case_no_valid_tsys_field, case_double_quote_name, case_nearest_fallback],
-    ids=["same-id", "same-name", "partial-name", "no-valid-tsys-field", "double-quote-name", "nearest-fallback"],
+    params=[case_same_id, case_same_name, case_partial_name, case_no_valid_tsys_field, case_double_quote_name, case_nearest_fallback, case_numeric_id_fallback],
+    ids=["same-id", "same-name", "partial-name", "no-valid-tsys-field", "double-quote-name", "nearest-fallback", "numeric-id-fallback"],
 )
 def case(request) -> tuple[MeasurementSet, Source, dict[str, str], Field | None]:
     return request.param()
