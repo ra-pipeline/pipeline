@@ -157,7 +157,7 @@ version = build_version.split('+')[0]
 
 # remove -detached suffix as readthedocs always uses git checkout --force to create a
 # detached state
-build_version_short = build_version.removesuffix('-detached')
+build_version_short = build_version.removesuffix('-detached').removesuffix('-dirty')
 
 # General information about the project.
 project = f'Pipeline ({version})'
