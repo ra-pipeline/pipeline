@@ -346,7 +346,6 @@ class T2_4MDetailsSDApplycalRenderer(super_renderer.T2_4MDetailsApplycalRenderer
                 x for x in xy_deviation_qa
                 if "Data is fully flagged" not in x.shortmsg
                    and "Scan is fully flagged" not in x.shortmsg
-                   and "Scan is fully flagged for one polarization" not in x.shortmsg
             ]
 
             # get the xy-deviation plots
