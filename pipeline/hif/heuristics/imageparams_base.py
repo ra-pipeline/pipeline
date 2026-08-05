@@ -920,7 +920,7 @@ class ImageParamsHeuristics:
         # If the image center is outside of the mosaic pointings, calculate a PSF phase center
         # pointing to the nearest field. Both the actual and the PSF phase centers are returned.
         if shift_to_nearest_field:
-            nearest_field_to_center = self.center_field_ids(vislist, field_names[0], intent, phase_center)[0]
+            nearest_field_to_center = self.center_field_ids(vislist, field_names, intent, phase_center)[0]
             ms = self.observing_run.get_ms(name=vislist[0])
             nearest = ms.get_fields(field_id=nearest_field_to_center)[0].mdirection
             if primary_beam:
@@ -1554,13 +1554,16 @@ class ImageParamsHeuristics:
 
         return 0.5
 
-    def center_field_ids(self, msnames, field, intent, phasecenter, exclude_intent=None):
+    def center_field_ids(self, msnames, fields, intent, phasecenter, exclude_intent=None):
 
         """Get per-MS IDs of field closest to the phase center."""
 
         meTool = casa_tools.measures
         qaTool = casa_tools.quanta
         ref_field_ids = []
+
+        if isinstance(fields, str):
+            fields = [fields]
 
         # Phase center coordinates
         pc_direc = meTool.source(phasecenter)
@@ -1569,9 +1572,9 @@ class ImageParamsHeuristics:
             try:
                 ms_obj = self.observing_run.get_ms(msname)
                 if exclude_intent is None:
-                    field_ids = [f.id for f in ms_obj.fields if (f.name == field) and (intent in f.intents)]
+                    field_ids = [f.id for f in ms_obj.fields if (f.name in fields) and (intent in f.intents)]
                 else:
-                    field_ids = [f.id for f in ms_obj.fields if (f.name == field) and (intent in f.intents) and (exclude_intent not in f.intents)]
+                    field_ids = [f.id for f in ms_obj.fields if (f.name in fields) and (intent in f.intents) and (exclude_intent not in f.intents)]
                 separations = [qaTool.getvalue(meTool.separation(pc_direc, f.mdirection)) for f in ms_obj.fields if f.id in field_ids]
                 ref_field_ids.append(field_ids[separations.index(min(separations))])
             except:
