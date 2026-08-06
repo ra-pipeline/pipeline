@@ -137,9 +137,25 @@ def case_numeric_id_fallback() -> tuple[MeasurementSet, Source, dict[str, str], 
     return ms, f_target.source, {"TARGET": "10"}, f_tsys
 
 
+def case_numeric_name_auto_quoted() -> tuple[MeasurementSet, Source, dict[str, str], Field]:
+    """Field name is digits-only string, will be auto-quoted by CASA (e.g., '123' -> '"123"')."""
+    f_tsys = Field(0, '1', 0, np.ndarray(1), _make_direction(0.0, 0.0))
+    f_tsys.intents = {"ATMOSPHERE", "PHASE"}
+    f_target = Field(1, '0', 1, np.ndarray(1), _make_direction(0.01, 0.0))
+    f_target.intents = {"TARGET"}
+    ms = make_ms("test8.ms", "12M", [
+        make_source(0, '1', [f_tsys]),
+        make_source(1, '0', [f_target]),
+    ])
+    # gainfield_map uses unquoted form; field name stored as quoted in MS
+    return ms, f_target.source, {"TARGET": '"1"'}, f_tsys
+
+
 @pytest.fixture(
-    params=[case_same_id, case_same_name, case_partial_name, case_no_valid_tsys_field, case_double_quote_name, case_nearest_fallback, case_numeric_id_fallback],
-    ids=["same-id", "same-name", "partial-name", "no-valid-tsys-field", "double-quote-name", "nearest-fallback", "numeric-id-fallback"],
+    params=[case_same_id, case_same_name, case_partial_name, case_no_valid_tsys_field, case_double_quote_name,
+            case_nearest_fallback, case_numeric_id_fallback, case_numeric_name_auto_quoted],
+    ids=["same-id", "same-name", "partial-name", "no-valid-tsys-field", "double-quote-name",
+         "nearest-fallback", "numeric-id-fallback", "numeric-name-auto-quoted"],
 )
 def case(request) -> tuple[MeasurementSet, Source, dict[str, str], Field | None]:
     return request.param()
