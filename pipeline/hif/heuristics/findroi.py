@@ -19,7 +19,7 @@ from pipeline.domain import DataType
 from pipeline.hif.heuristics import imageparams_factory
 from pipeline.infrastructure import casa_tasks, casa_tools
 from pipeline.infrastructure.filenamer import PipelineProductNameBuilder
-from pipeline.infrastructure.utils import imaging
+from pipeline.infrastructure.utils import relative_path
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -4027,7 +4027,6 @@ def run_findroi_mpi(
     if evidence_thr is not None:
         pos_evidence_thr = float(evidence_thr)
     if tmp_dir:
-        tmp_dir = os.path.abspath(tmp_dir)
         if tmp_overwrite and os.path.isdir(tmp_dir):
             shutil.rmtree(tmp_dir)
         os.makedirs(tmp_dir, exist_ok=True)
@@ -4624,8 +4623,8 @@ def run_findroi_mpi(
 
 
 def default_tmp_dir(context: Any, output_dir: str | None) -> str:
-    root = output_dir or getattr(context, 'output_dir', '.') or '.'
-    return os.path.abspath(os.path.join(root, 'findroi_workdir'))
+    root = output_dir or getattr(context, 'output_dir') or '.'
+    return relative_path(os.path.join(root, 'findroi_workdir'))
 
 
 def summarize_stage_product(stage_product: dict[str, Any]) -> dict[str, Any]:
