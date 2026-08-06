@@ -3521,7 +3521,7 @@ def score_checksources(mses, fieldname, spwid, imagename, rms, gfluxscale, gflux
             offset_metric = beams
             if beams > 0.30:
                 warnings.append('large fitted offset of %.2f marcsec and %.2f synth beam' % (offset, beams))
-        
+
         #PIPE-3042: fitflux score and QA message based on gfluxscale are not used anymore, so they are removed.
         fitpeak_score = 0.0
         fitpeak_metric = 'N/A'
@@ -3536,11 +3536,11 @@ def score_checksources(mses, fieldname, spwid, imagename, rms, gfluxscale, gflux
             fitpeak_metric = chk_fitpeak_fitflux_ratio
             if chk_fitpeak_fitflux_ratio < 0.7:
                 warnings.append('low Fitted [Peak Intensity / Flux Density] Ratio of %.2f' % (chk_fitpeak_fitflux_ratio))
-        
+
         #PIPE-3042: fitflux score is not used anymore and the aggregated QA is minimum of offset_score and peak_fitflux score,
         #both of which is >0.33 and <1.0, so we just need to use min(offset_score, peak_fitflux score) for QA score
         score = min(offset_score,fitpeak_score)
-        
+
         metric_score = [offset_metric, fitpeak_metric]
         metric_units = '%s, %s' % (offset_unit, fitpeak_unit)
 
@@ -3602,17 +3602,16 @@ def score_sd_skycal_elevation_difference(
     """
     field_ids = list(resultdict.keys())
     qascores = []
-    
+
     for field_id in field_ids:
-        metric_score = []
         field = ms.fields[field_id]
         if field_id not in resultdict:
             continue
 
         eldiffant = resultdict[field_id]
-        warned_antennas = set()
         for antenna_id, eldiff in eldiffant.items():
             for spw_id, eld in eldiff.items():
+                metric_score = []
                 preceding = eld.eldiff0
                 subsequent = eld.eldiff1
                 max_pred = None
@@ -3623,6 +3622,12 @@ def score_sd_skycal_elevation_difference(
                 if len(subsequent) > 0:
                     max_subq = np.abs(subsequent).max()
                     metric_score.append(max_subq)
+
+                if len(metric_score) == 0:
+                    # no valid metric score
+                    # this typically happens when ON_SOURCE data are
+                    # fully flagged while valid OFF_SOURCE data exist
+                    continue
 
                 max_metric_score = np.max(metric_score)
                 if max_metric_score < el_threshold:
@@ -4569,9 +4574,9 @@ def score_polcal_results(session_name: str, caltables: list) -> pqa.QAScore:
 @log_qa
 def score_separation_angles(mses: MeasurementSet, sepangles: dict) -> list[pqa.QAScore]:
     """
-    The current heuristic exists only to 
+    The current heuristic exists only to
     reports the separation angles between the TARGET
-    (and CHECK) intents to the PHASE intent for 
+    (and CHECK) intents to the PHASE intent for
     each measurement set
 
     Args:
@@ -4615,7 +4620,7 @@ def score_separation_angles(mses: MeasurementSet, sepangles: dict) -> list[pqa.Q
             # for QA score data selection
             fieldqa = field1+','+field2
             intentqa = intent1+','+intent2[0]
-                
+
             origin = pqa.QAOrigin(metric_name='report_separation_angles',
                           metric_score=reportsep, # this is the value not a 0 to 1 score
                           metric_units='degrees')
@@ -4623,13 +4628,13 @@ def score_separation_angles(mses: MeasurementSet, sepangles: dict) -> list[pqa.Q
             score = pqa.QAScore(score,
                                 longmsg=longmsg,
                                 shortmsg=shortmsg,
-                                vis=ms.basename, 
+                                vis=ms.basename,
                                 origin=origin,
-                                weblog_location=pqa.WebLogLocation.NOWEB, 
+                                weblog_location=pqa.WebLogLocation.NOWEB,
                                 applies_to=pqa.TargetDataSelection(vis={ms.basename}, field={fieldqa}, intent={intentqa}))
                                 # weblog location can be NOWEB - do not render it
             scores.append(score)
-                                
+
     return scores
 
 
@@ -5490,7 +5495,7 @@ def score_testBPdcals_delay(vis: str, caltable: str, bandname: str) -> pqa.QASco
 def score_flagged_ant_spw(vis:str, flaggedSolnApplycaldelay:dict) -> [pqa.QAScore]:
     """
         Calculates score for testBPdcals
-        if > 50% of spws in a baseband on a majority of antennas newly flagged 
+        if > 50% of spws in a baseband on a majority of antennas newly flagged
         then score < 0.5
         The flaggedSolnApplycaldelay dictionary is structured as follows:
         flaggedSolnApplycaldelay = {
