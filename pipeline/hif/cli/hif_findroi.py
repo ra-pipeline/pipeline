@@ -12,9 +12,6 @@ def hif_findroi(vis=None, field=None, spw=None, parallel=None):
     files, summary plots, and exported findROI resources for later downstream
     discovery through pipeline context.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Run with recommended settings after importdata:
 
