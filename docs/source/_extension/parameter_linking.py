@@ -106,7 +106,13 @@ def find_parameter_items(dd_element):
 
 
 def add_parameter_anchors(param_items):
-    """Add ID anchors to parameter documentation items.
+    """Add ID anchors to parameter documentation items and make param names clickable.
+    
+    This function transforms Napoleon-rendered parameter documentation from:
+        <li><p><strong>name</strong> -- <p>description</p><p>Examples: ...</p></li>
+    
+    Into inline format with clickable anchors:
+        <li id="param-name"><a><strong>name</strong></a> <strong>:</strong> description<p>Examples: ...</p></li>
 
     Args:
         param_items: List of li elements containing parameter docs
@@ -119,12 +125,61 @@ def add_parameter_anchors(param_items):
     for li in param_items:
         # Find the parameter name (in strong tag)
         strong = li.find('strong')
-        if strong:
-            param_name = strong.get_text().strip()
-            if param_name:
-                # Add ID to the li element
-                li['id'] = f'param-{param_name}'
-                param_names.add(param_name)
+        if not strong or not strong.get_text().strip():
+            continue
+            
+        param_name = strong.get_text().strip()
+        
+        # Add ID anchor to the li element for URL fragment linking
+        li['id'] = f'param-{param_name}'
+        param_names.add(param_name)
+        
+        # Wrap parameter name in clickable anchor for easy copying
+        new_link = li.new_tag('a', href=f'#param-{param_name}')
+        new_link['class'] = 'param-name-link'
+        strong.wrap(new_link)
+        
+        # Step 1: Flatten <p> parent wrapper around parameter name
+        # Napoleon sometimes wraps: <p><strong>name</strong> -- desc</p>
+        # We want: <strong>name</strong> -- desc (inline, no block element)
+        first_p = strong.find_parent('p')
+        if first_p and first_p.parent == li:
+            for child in list(first_p.children):
+                first_p.insert_before(child)
+            first_p.extract()
+        
+        # Step 2: Replace ' -- ' separator with ' <strong>:</strong> '
+        # This makes the colon bold and visually clearer
+        for text_node in li.find_all(string=True):
+            if text_node.parent.name != 'strong' and ' -- ' in str(text_node):
+                parts = str(text_node).split(' -- ', 1)
+                parent = text_node.parent
+                node_index = list(parent.children).index(text_node)
+                text_node.extract()
+                
+                # Insert: "text " + <strong>:</strong> + " remaining text"
+                parent.insert(node_index, parts[0])
+                parent.insert(node_index + 1, ' ')
+                
+                strong_tag = li.new_tag('strong')
+                strong_tag.string = ':'
+                parent.insert(node_index + 2, strong_tag)
+                
+                parent.insert(node_index + 3, ' ' + parts[1])
+                break
+        
+        # Step 3: Flatten first <p> sibling (the description paragraph)
+        # Structure after Step 1 & 2: <a><strong>name</strong></a> <strong>:</strong> <p>description</p><p>Examples:</p>
+        # We want: <a><strong>name</strong></a> <strong>:</strong> description<p>Examples:</p>
+        # Only flatten the FIRST <p> (description), preserve subsequent <p> tags (section headers)
+        anchor = strong.parent
+        for sibling in list(anchor.next_siblings):
+            if hasattr(sibling, 'name') and sibling.name == 'p':
+                # Flatten by moving children out and removing the <p> wrapper
+                for child in list(sibling.children):
+                    sibling.insert_before(child)
+                sibling.extract()
+                break  # Stop after first <p> to preserve "Examples:", "Options:", etc.
 
     return param_names
 
@@ -202,22 +257,52 @@ a.param-link:hover {
     text-decoration: underline;
 }
 
-/* Highlight parameter when targeted via URL hash */
+/* Parameter name links (in parameter documentation) */
+a.param-name-link {
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+a.param-name-link:hover {
+    text-decoration: underline;
+    color: var(--color-brand-primary, #0066cc);
+}
+
+/* Highlight parameter when targeted via URL hash - fades after 3 seconds */
 li[id^="param-"]:target {
-    background-color: var(--color-highlighted-background, #ffc);
     border-left: 3px solid var(--color-brand-primary, #0066cc);
     padding-left: 0.5em;
     margin-left: -0.5em;
-    transition: background-color 0.3s ease;
+    animation: highlight-fade 3s ease-out;
+}
+
+@keyframes highlight-fade {
+    0% { 
+        background-color: var(--color-highlighted-background, #fffacd);
+    }
+    100% { 
+        background-color: transparent;
+    }
 }
 
 /* Furo theme compatibility */
 html[data-theme="light"] li[id^="param-"]:target {
-    background-color: #fffacd;
+    animation: highlight-fade-light 3s ease-out;
 }
 
 html[data-theme="dark"] li[id^="param-"]:target {
-    background-color: #3a3a2a;
+    animation: highlight-fade-dark 3s ease-out;
+}
+
+@keyframes highlight-fade-light {
+    0% { background-color: #fffacd; }
+    100% { background-color: transparent; }
+}
+
+@keyframes highlight-fade-dark {
+    0% { background-color: #3a3a2a; }
+    100% { background-color: transparent; }
 }
 """
 
