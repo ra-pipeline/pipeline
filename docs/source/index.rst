@@ -7,9 +7,7 @@
    :caption: Basics
 
    overview
-   dependencies
    releases
-   timeline
    qa
    references
 
@@ -24,8 +22,20 @@
 .. toctree::
    :hidden:
    :maxdepth: 2
+   :caption: User Guides
+
+   ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>
+   VLA Processing <https://science.nrao.edu/facilities/vla/data-processing>
+   users_guide/helper_files
+   users_guide/weights
+
+.. toctree::
+   :hidden:
+   :maxdepth: 2
    :caption: Developer Guide
 
+   timeline
+   dependencies
    devel/setup/index
    devel/usage/index
    devel/process/index

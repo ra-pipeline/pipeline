@@ -5,28 +5,41 @@ Pipeline
 |Docs Pages| |Docs RTD| |Test Unit| |Codecov Unit|
 
 .. important::
-
-  This is the **internal developer documentation** for the Pipeline project.
-  It provides *up-to-date and version-controlled* supplementary technical information to complement the official Pipeline portals from `ALMA <https://almascience.nrao.edu/processing/science-pipeline>`_ and `VLA <https://science.nrao.edu/facilities/vla/data-processing>`_.
-  Pipeline development is a collaborative effort led by `NRAO`_, `ESO`_, and `NAOJ`_, with additional contributions from `MPIfR`_, `NOVA`_ (from 2026), and `UKATC`_ (until 2025) under contract to `ESO`_.
+    This site provides *up-to-date and version-controlled* information, *automatically generated from the code repository*, to complement the official Pipeline portals from `ALMA <https://almascience.nrao.edu/processing/science-pipeline>`_ and `VLA <https://science.nrao.edu/facilities/vla/data-processing>`_.
+    
+    Pipeline documentation is in transition, and not all content is migrated here - the table below clarifies where to find different content. Some content is intended for Users, and some for Developers, but naturally there is significant overlap.
+       
+    Pipeline development is a collaborative effort led by `NRAO`_, `ESO`_, and `NAOJ`_, with additional contributions from `MPIfR`_, `NOVA`_ (from 2026), and `UKATC`_ (until 2025) under contract to `ESO`_.
 
 
 
 Official Repository
---------------------
+-------------------
 
-The official public repository is accessible here:  
+The official public code repository is accessible here:  
 - `Open Bitbucket @ NRAO - PIPE <https://open-bitbucket.nrao.edu/projects/PIPE>`_
 
-Highlights
-----------
+Documentation Components
+-----------------------
 
-This documentation is automatically generated from the main repository and includes:
- 
-  * :doc:`Past Pipeline Releases <releases>`
-  * :doc:`Pipeline Dependencies <dependencies>`
-  * :doc:`Running Pipeline <develdocmd/usage/running_pipeline>`
-  * The latest Pipeline task reference manual: `PDF <https://pipe-docs.readthedocs.io/_/downloads/en/latest/pdf/>`_ :doc:`HTML <apisummary>`
+============================================  ======================
+Content                                       Location
+============================================  ======================
+Past releases, all observatories              :doc:`Releases <releases>` (here)
+Past releases used for ALMA data processing   `ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>`_ (ALMA portal)
+--------------------------------------------  ----------------------
+ALMA User's Guide                             `ALMA Processing  <https://almascience.nrao.edu/processing/science-pipeline>`_ (ALMA portal)
+VLA User's Guide                              `VLA Processing <https://science.nrao.edu/facilities/vla/data-processing>`_ (NRAO site)
+How to run the pipeline as a user             in the User's guides
+Imaging weights (previously in User's Guide)  :doc:`Imaging Weights <users_guide/weights>` (here)
+--------------------------------------------  ----------------------  
+Documentation and API for each task           `PDF <https://pipe-docs.readthedocs.io/_/downloads/en/latest/pdf/>`_ :doc:`HTML <apisummary>` (here)
+Reference Manual                              replaced by previous line; old versions on `ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>`_ page
+--------------------------------------------  ----------------------
+How to run the pipeline as a developer        :doc:`Running Pipeline <devel/usage/running_pipeline>` (here)
+Pipeline Dependencies                         :doc:`Dependencies <dependencies>` (here)
+============================================  ======================
+
 
 .. _NRAO: http://www.nrao.edu  
 .. _ESO: https://www.eso.org  
