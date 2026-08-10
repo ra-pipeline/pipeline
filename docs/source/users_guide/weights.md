@@ -1,7 +1,7 @@
 # Imaging weights in cubes
 
 Since CASA 5.6, the calculation of imaging weights for cubes can be performed either per-channel or for all channels, according to the `tclean`
-:py:func:`tclean <tclean>`
+<!--:py:func:`tclean <tclean>`-->
 parameter `perchanweightdensity`. This can have significant effects on the image produced. Users should be aware of these effects when creating new images, either using pipeline tasks or with `tclean`. For a detailed description, see https://casadocs.readthedocs.io/en/stable/notebooks/synthesis_imaging.html.
 
 ## History of weighting parameter choices
