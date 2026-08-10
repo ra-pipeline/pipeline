@@ -22,9 +22,10 @@
 .. toctree::
    :hidden:
    :maxdepth: 2
-   :caption: ALMA User's Guide
+   :caption: User's Guides
 
-   ALMA Portal <https://almascience.nrao.edu/processing/science-pipeline>
+   ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>
+   VLA Processing <https://science.nrao.edu/facilities/vla/data-processing>
 
 .. toctree::
    :hidden:
