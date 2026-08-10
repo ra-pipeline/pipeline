@@ -106,7 +106,7 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',
     'sphinx.ext.githubpages',
-    # 'sphinx.ext.intersphinx',
+    'sphinx.ext.intersphinx',
     'sphinx.ext.inheritance_diagram',
     'sphinx_automodapi.automodapi',
     'sphinx_automodapi.smart_resolver',
@@ -359,18 +359,19 @@ automodsumm_inherited_members = False
 
 # -- intersphinx
 
-# intersphinx_mapping = {
-#     'python': ('https://docs.python.org/3',(None, 'python-inv.txt')),
-#     'astropy': ('http://docs.astropy.org/en/latest/', None),
-#     'pyerfa': ('https://pyerfa.readthedocs.io/en/stable/', None),
-#     'pytest': ('https://pytest.readthedocs.io/en/stable/', None),
-#     'ipython': ('https://ipython.readthedocs.io/en/stable/', None),
-#     'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
-#     'sphinx_automodapi': ('https://sphinx-automodapi.readthedocs.io/en/stable/', None),
-#     'packagetemplate': ('http://docs.astropy.org/projects/package-template/en/latest/', None),
-#     'h5py': ('http://docs.h5py.org/en/stable/', None),
-#     "sphinx": ("https://www.sphinx-doc.org/en/master/", None),
-# }
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', (None, 'python-inv.txt')),
+    'casadocs': ('https://casadocs.readthedocs.io/en/stable/', None),
+    # 'astropy': ('http://docs.astropy.org/en/latest/', None),
+    # 'pyerfa': ('https://pyerfa.readthedocs.io/en/stable/', None),
+    # 'pytest': ('https://pytest.readthedocs.io/en/stable/', None),
+    # 'ipython': ('https://ipython.readthedocs.io/en/stable/', None),
+    # 'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
+    # 'sphinx_automodapi': ('https://sphinx-automodapi.readthedocs.io/en/stable/', None),
+    # 'packagetemplate': ('http://docs.astropy.org/projects/package-template/en/latest/', None),
+    # 'h5py': ('http://docs.h5py.org/en/stable/', None),
+    # "sphinx": ("https://www.sphinx-doc.org/en/master/\", None),
+}
 # intersphinx_disabled_reftypes = ["*"]
 
 # sphinxcontrib.bibtex/sphinx-astrorefs

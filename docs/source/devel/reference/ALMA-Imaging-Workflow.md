@@ -33,7 +33,7 @@
     - hm_cleaning ('rms')
     - maxncleans
 
-  - run hif_tclean per imaging target (HPC: one job per calibrator image or parallel=True for tclean for intent='TARGET')
+  - run hif_tclean per imaging target (HPC: one job per calibrator image, or parallel=True for {func}`CASA/tclean <casatasks.imaging.tclean>` when imaging scientific targets)
 
 - hif_tclean
 
