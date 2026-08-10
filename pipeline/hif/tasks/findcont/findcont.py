@@ -1,6 +1,8 @@
 import collections
 import copy
 import os
+import re
+from enum import Enum
 
 import numpy as np
 
@@ -21,24 +23,58 @@ from .resultobjects import FindContResult
 LOG = infrastructure.get_logger(__name__)
 
 
-def _pixels_per_beam(makeimlist_inputs, target):
-    """Return the effective PPB value without changing the target structure."""
+class ImagingStatus(Enum):
+    """Status values for imaging summary entries."""
+    NOT_IMAGED = 'Not imaged'
+    DIRTY_CUBE = 'Dirty cube'
+    EXISTING_SELECTION = 'Existing continuum selection'
+    NO_INTERSECTION = 'No common frequency intersection'
+
+
+def _pixels_per_beam(
+    makeimlist_inputs: makeimlist.MakeImListInputs | None, target: dict
+) -> float | None:
+    """Return the effective PPB value without changing the target structure.
+
+    Args:
+        makeimlist_inputs: Optional makeimlist inputs object.
+        target: Target configuration dictionary.
+
+    Returns:
+        Pixels-per-beam value or None if not found.
+    """
     if makeimlist_inputs is not None:
-        hm_cell = makeimlist_inputs.get_spw_hm_cell(target['spw'])
-        if isinstance(hm_cell, str) and 'ppb' in hm_cell:
-            return float(hm_cell.split('ppb')[0])
+        hm_cell = makeimlist_inputs.get_spw_hm_cell(target.get('spw'))
+        if isinstance(hm_cell, str):
+            match = re.search(r'(\d+\.?\d*)\s*ppb', hm_cell, re.IGNORECASE)
+            if match:
+                return float(match.group(1))
         return 5.0
 
     for key in ('ppb', 'pixperbeam', 'hm_cell', 'cell'):
         value = target.get(key)
-        if isinstance(value, str) and 'ppb' in value:
-            return float(value.split('ppb')[0])
-        if isinstance(value, (int, float)):
+        if isinstance(value, str):
+            match = re.search(r'(\d+\.?\d*)\s*ppb', value, re.IGNORECASE)
+            if match:
+                return float(match.group(1))
+        elif isinstance(value, (int, float)):
             return float(value)
     return None
 
 
-def _imaging_summary_entry(makeimlist_inputs, target, spwid):
+def _imaging_summary_entry(
+    makeimlist_inputs: makeimlist.MakeImListInputs | None, target: dict, spwid: str
+) -> dict:
+    """Build imaging parameter dict for weblog display.
+
+    Args:
+        makeimlist_inputs: Optional makeimlist inputs object.
+        target: Target configuration dictionary.
+        spwid: Spectral window ID as string.
+
+    Returns:
+        Dictionary with imaging parameters for rendering.
+    """
     return {
         'field': target.get('field'),
         'spw': spwid,
@@ -53,7 +89,7 @@ def _imaging_summary_entry(makeimlist_inputs, target, spwid):
         'mosweight': None,
         'perchanweightdensity': None,
         'nbins': target.get('nbin'),
-        'status': 'Not imaged',
+        'status': ImagingStatus.NOT_IMAGED.value,
     }
 
 
@@ -198,25 +234,30 @@ class FindCont(basetask.StandardTaskTemplate):
                 result = FindContResult({}, {}, '', 0, 0, [], {})
                 return result
 
-            LOG.info(f'Using data type {selected_datatype.name} for continuum finding.')
+            LOG.info('Using data type %s for continuum finding.', selected_datatype.name)
             if selected_datatype == DataType.RAW:
                 LOG.warning('Falling back to raw data for continuum finding.')
 
             columns = list(ms_objects_and_columns.values())
             if not all(column == columns[0] for column in columns):
                 LOG.warning(
-                    f'Data type based column selection changes among MSes: {",".join(f"{k.basename}: {v}" for k, v in ms_objects_and_columns.items())}.')
+                    'Data type based column selection changes among MSes: %s',
+                    ','.join(f'{k.basename}: {v}' for k, v in ms_objects_and_columns.items())
+                )
 
             if datacolumn != '':
                 LOG.info(
-                    f'Manual override of datacolumn to {datacolumn}. Data type based datacolumn would have been "{"data" if columns[0] == "DATA" else "corrected"}".')
+                    'Manual override of datacolumn to %s. Data type based datacolumn would have been "%s".',
+                    datacolumn,
+                    'data' if columns[0] == 'DATA' else 'corrected'
+                )
             else:
                 if columns[0] == 'DATA':
                     datacolumn = 'data'
                 elif columns[0] == 'CORRECTED_DATA':
                     datacolumn = 'corrected'
                 else:
-                    LOG.warning(f'Unknown column name {columns[0]}')
+                    LOG.warning('Unknown column name %s', columns[0])
                     datacolumn = ''
 
             inputs.vis = [k.basename for k in ms_objects_and_columns.keys()]
@@ -298,7 +339,7 @@ class FindCont(basetask.StandardTaskTemplate):
                 cont_ranges_source_spw = cont_ranges['fields'].setdefault(source_name, {}).setdefault(spwid, {'spwname': spw_name, 'ranges': [], 'flags': []})
 
                 if len(cont_ranges_source_spw['ranges']) > 0:
-                    summary['status'] = 'Existing continuum selection'
+                    summary['status'] = ImagingStatus.EXISTING_SELECTION.value
                     LOG.info('Using existing selection {!r} for field {!s}, '
                              'spw {!s}'.format(cont_ranges_source_spw['ranges'], source_name, spwid))
                     source_continuum_ranges[spwid] = {
@@ -369,7 +410,7 @@ class FindCont(basetask.StandardTaskTemplate):
                     # Use only the current spw ID here !
                     if0, if1, channel_width = image_heuristics.freq_intersection(vislist, target['field'], target['intent'], spwid, frame)
                     if (if0 == -1) or (if1 == -1):
-                        summary['status'] = 'No common frequency intersection'
+                        summary['status'] = ImagingStatus.NO_INTERSECTION.value
                         LOG.error('No %s frequency intersect among selected MSs for Field %s '
                                   'SPW %s' % (frame, target['field'], spwid))
                         cont_ranges['fields'][source_name][spwid]['spwname'] = spw_name
@@ -525,7 +566,7 @@ class FindCont(basetask.StandardTaskTemplate):
                         'mosweight': mosweight,
                         'perchanweightdensity': perchanweightdensity,
                         'nbins': target.get('nbin'),
-                        'status': 'Dirty cube',
+                        'status': ImagingStatus.DIRTY_CUBE.value,
                     })
 
                     job = casa_tasks.tclean(vis=vislist, imagename=findcont_basename, datacolumn=datacolumn,
