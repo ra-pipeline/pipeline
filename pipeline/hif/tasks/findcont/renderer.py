@@ -25,6 +25,9 @@ LOG = logging.get_logger(__name__)
 
 
 TR = collections.namedtuple('TR', 'field spw min max frame status momdiffsnr spectrum jointmask')
+ImagingTR = collections.namedtuple(
+    'ImagingTR', 'field spw datatype phasecenter ppb cell imsize weighting robust uvtaper mosweight perchanweightdensity nbins'
+)
 
 
 class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
@@ -41,8 +44,21 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         result = results[0]
 
         table_rows, raw_rows = self._get_table_rows(pipeline_context, result)
+        inputs = getattr(result, 'inputs', {}) or {}
+        mode = inputs.get('hm_mode') if inputs.get('hm_mode') in ('coarse', 'normal') else None
+        raw_imaging_summary = getattr(result, 'imaging_summary', []) or []
 
-        mako_context.update({'table_rows': table_rows, 'raw_rows': raw_rows})
+        mako_context.update({
+            'table_rows': table_rows,
+            'raw_rows': raw_rows,
+            'findcont_mode': mode,
+            'imaging_summary': self._get_imaging_summary(result),
+            'imaging_performed': any(
+                isinstance(entry, dict) and entry.get('status') == 'Dirty cube'
+                for entry in raw_imaging_summary
+            ),
+            'imaging_skip_reason': self._get_imaging_skip_reason(raw_imaging_summary),
+        })
 
         weblog_dir = os.path.join(pipeline_context.report_dir,
                                   'stage%s' % results[0].stage_number)
@@ -58,6 +74,53 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             shutil.copy(contdat_filename, weblog_dir)
 
         mako_context.update({'contdat_path_link': contdat_path_link})
+
+    def _get_imaging_summary(self, result):
+        rows = []
+        for entry in getattr(result, 'imaging_summary', []) or []:
+            if not isinstance(entry, dict):
+                continue
+            rows.append(ImagingTR(
+                field=self._format_summary_value(entry.get('field')),
+                spw=self._format_summary_value(entry.get('spw')),
+                datatype=self._format_summary_value(entry.get('datatype')),
+                phasecenter=self._format_summary_value(entry.get('phasecenter')),
+                ppb=self._format_summary_value(entry.get('ppb')),
+                cell=self._format_summary_value(entry.get('cell')),
+                imsize=self._format_summary_value(entry.get('imsize'), separator=' x '),
+                weighting=self._format_summary_value(entry.get('weighting')),
+                robust=self._format_summary_value(entry.get('robust')),
+                uvtaper=self._format_summary_value(entry.get('uvtaper'), empty_value='None'),
+                mosweight=self._format_summary_value(entry.get('mosweight')),
+                perchanweightdensity=self._format_summary_value(entry.get('perchanweightdensity')),
+                nbins=self._format_summary_value(entry.get('nbins')),
+            ))
+        return rows
+
+    @staticmethod
+    def _get_imaging_skip_reason(imaging_summary):
+        statuses = {
+            entry.get('status')
+            for entry in imaging_summary
+            if isinstance(entry, dict) and entry.get('status')
+        }
+        if statuses == {'Existing continuum selection'}:
+            return 'No dirty-cube imaging was required because continuum ranges were already available.'
+        if statuses == {'No common frequency intersection'}:
+            return 'No dirty-cube imaging was performed because no common frequency intersection was available.'
+        if statuses <= {'Existing continuum selection', 'No common frequency intersection'}:
+            return 'No dirty-cube imaging was required because continuum ranges were already available or no common frequency intersection was found.'
+        return 'No continuum-finding dirty-cube imaging was performed for this result.'
+
+    @staticmethod
+    def _format_summary_value(value, separator=', ', empty_value='Not available'):
+        if value in (None, '', [], {}):
+            return empty_value
+        if isinstance(value, (list, tuple)):
+            return separator.join(map(str, value))
+        if isinstance(value, float) and value.is_integer():
+            return str(int(value))
+        return str(value)
 
     def _get_table_rows(self, context, result):
         ranges_dict = result.result_cont_ranges
