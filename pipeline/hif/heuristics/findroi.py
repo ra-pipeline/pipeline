@@ -4569,7 +4569,7 @@ def run_findroi_mpi(
     if save_results_path:
         t_save = time.perf_counter()
         with open(save_results_path, 'wb') as fh:
-            pickle.dump(results, fh, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(_findroi_pickle_payload(results, tmp_dir), fh, protocol=pickle.HIGHEST_PROTOCOL)
         final_save_s = float(time.perf_counter() - t_save)
         save_results_total_s += final_save_s
         # The timing metadata itself requires one final sync write; use the measured
@@ -4579,7 +4579,7 @@ def run_findroi_mpi(
         run_timing['total_run_s'] = float((time.perf_counter() - t_run) + final_save_s)
         results['metadata']['timing'] = copy.deepcopy(run_timing)
         with open(save_results_path, 'wb') as fh:
-            pickle.dump(results, fh, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(_findroi_pickle_payload(results, tmp_dir), fh, protocol=pickle.HIGHEST_PROTOCOL)
     else:
         run_timing['save_results_s'] = float(save_results_total_s)
         run_timing['total_run_s'] = float(time.perf_counter() - t_run)
@@ -4589,7 +4589,7 @@ def run_findroi_mpi(
     # alongside the product files, while the authoritative results pickle lives at
     # save_results_path and carries the final timing metadata.
     with open(export_results_path, 'wb') as fh:
-        pickle.dump(results, fh, protocol=pickle.HIGHEST_PROTOCOL)
+        pickle.dump(_findroi_pickle_payload(results, tmp_dir), fh, protocol=pickle.HIGHEST_PROTOCOL)
     if os.path.exists(products_tar_path):
         os.remove(products_tar_path)
     t_tar = time.perf_counter()
@@ -4601,7 +4601,7 @@ def run_findroi_mpi(
         run_timing['total_run_s'] = float(time.perf_counter() - t_run)
         results['metadata']['timing'] = copy.deepcopy(run_timing)
         with open(save_results_path, 'wb') as fh:
-            pickle.dump(results, fh, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(_findroi_pickle_payload(results, tmp_dir), fh, protocol=pickle.HIGHEST_PROTOCOL)
         _rank_logf(
             tmp_dir,
             '[run] finalized results to %s (save=%.2fs tar=%.2fs tar_bytes=%s total=%.2fs)',
@@ -4619,6 +4619,29 @@ def run_findroi_mpi(
 def default_tmp_dir(context: Any, output_dir: str | None) -> str:
     root = output_dir or getattr(context, 'output_dir', '.') or '.'
     return os.path.abspath(os.path.join(root, 'findroi_workdir'))
+
+
+def _findroi_pickle_payload(value: Any, tmp_dir: str | None) -> Any:
+    """Return a pickle-safe copy with absolute path strings removed."""
+    root = os.path.abspath(tmp_dir) if tmp_dir else None
+    if isinstance(value, str):
+        if not os.path.isabs(value):
+            return value
+        path = os.path.abspath(value)
+        if root:
+            try:
+                if os.path.commonpath((path, root)) == root:
+                    return os.path.relpath(path, root)
+            except ValueError:
+                pass
+        return os.path.basename(path)
+    if isinstance(value, dict):
+        return {key: _findroi_pickle_payload(item, tmp_dir) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_findroi_pickle_payload(item, tmp_dir) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_findroi_pickle_payload(item, tmp_dir) for item in value)
+    return value
 
 
 def summarize_stage_product(stage_product: dict[str, Any]) -> dict[str, Any]:
