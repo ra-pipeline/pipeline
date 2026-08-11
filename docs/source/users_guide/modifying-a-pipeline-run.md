@@ -4,11 +4,11 @@
 
 ## Pipeline re-processing considerations
 
-As a rule, it does not make sense to rerun the `casa_pipescript.py` exactly as delivered, since this will merely reproduce the calibrated MeasurementSet (which for IF Pipeline calibrated data is much more easily generated using `scriptForPI.py` or `casa_piperestorescript.py` to "restore" the calibration, as described in {ref}`Archived scripts <sec-allscripts>` above) and/or already-delivered products. Instead, it is likely that the user may want to redo the calibration after some modifications or produce modified imaging products. This section describes a few of the more common calibration and imaging changes for both the IF and SD Pipeline tasks. See the [ALMA Pipeline Reference Manual](https://almascience.nrao.edu/processing/Reference_Manual_2025.1.pdf) for more complete details on the pipeline tasks and their inputs.
+As a rule, it does not make sense to rerun the `casa_pipescript.py` exactly as delivered, since this will merely reproduce the calibrated MeasurementSet (which for IF Pipeline calibrated data is much more easily generated using `scriptForPI.py` or `casa_piperestorescript.py` to "restore" the calibration, as described in {ref}`Archived scripts <sec-allscripts>` above) and/or already-delivered products. Instead, it is likely that the user may want to redo the calibration after some modifications or produce modified imaging products. This section describes a few of the more common calibration and imaging changes for both the IF and SD Pipeline tasks. See the task API pages for more complete details on the pipeline tasks and their inputs.
 
-Re-running the pipeline can be very resource-intensive, both from a compute-time and disk-space perspective. For the compute time, an idea of how long the pipeline took when can be inferred from the WebLog (using the **Execution Duration** shown on the top of the "Home" page of the WebLog — <span style="color:red">see the WebLog Home page figure — Pipeline WebLog section</span> for an example, or the **Task Execution Statistics** that are listed for each task in the "By Task" part of the WebLog — <span style="color:red">see e.g. the "By Task" page figure — Pipeline WebLog section</span>. Those times, however, reflect the run times using the ALMA Operations processing clusters, which have ≳ 256 GB RAM, and likely use parallel processing (multi-core) for imaging. Concerning disk space, to re-run SD or IF pipeline calibration, it is advisable to have a system with at least 8 GB RAM, and 50 – 75 GB free disk space per ASDM. To re-run the IF imaging pipeline, it is advisable to have a system with ≥64 GB RAM, and the available disk space needs to be 10 – 100 times the expected size of the final imaging products.
+Re-running the pipeline can be very resource-intensive, both from a compute-time and disk-space perspective. For the compute time, an idea of how long the pipeline took when can be inferred from the WebLog (using the **Execution Duration** shown on the top of the "Home" page of the WebLog — see {ref}`the WebLog Home Page example <fig-homepage>` for an example, or the **Task Execution Statistics** that are listed for each task in the "By Task" part of the WebLog — see e.g. {ref}`the By Task summary view <fig-bytaskpage>`. Those times, however, reflect the run times using the ALMA Operations processing clusters, which have ≳ 256 GB RAM, and likely use parallel processing (multi-core) for imaging. Concerning disk space, to re-run SD or IF pipeline calibration, it is advisable to have a system with at least 8 GB RAM, and 50 – 75 GB free disk space per ASDM. To re-run the IF imaging pipeline, it is advisable to have a system with ≥64 GB RAM, and the available disk space needs to be 10 – 100 times the expected size of the final imaging products.
 
-The above resource requirements for the IF imaging pipeline are rather daunting. However, in practice, it is unlikely that the imaging pipeline commands would need to be rerun in their entirety. It would be much quicker and demand much less computing resources to only image the sources and or spectral windows (spw) or channels of interest, at an appropriate spectral resolution, and often a reduced spectral range. This can be done by finding the corresponding {func}`CASA/tclean <casatasks.imaging.tclean>` command in the provided `casa_commands.log` file, modifying it as desired, and running it in CASA. These commands work on the MeasurementSet created by the pipeline {ref}`hif_mstransform <pipeline-tasks:hif_mstransform>` command, so that part of the imaging script would need to be run first.
+The above resource requirements for the IF imaging pipeline are rather daunting. However, in practice, it is unlikely that the imaging pipeline commands would need to be rerun in their entirety. It would be much quicker and demand much less computing resources to only image the sources and or spectral windows (spw) or channels of interest, at an appropriate spectral resolution, and often a reduced spectral range. This can be done by finding the corresponding {func}`CASA/tclean <casatasks.imaging.tclean>` command in the provided `casa_commands.log` file, modifying it as desired, and running it in CASA. These commands work on the MeasurementSet created by the pipeline {func}`hif_mstransform <pipeline.hif.cli.hif_mstransform>` command, so that part of the imaging script would need to be run first.
 
 Please contact ALMA via the [ALMA Helpdesk](https://help.almascience.org/) if assistance is needed with data reprocessing.
 
@@ -34,7 +34,7 @@ In the **rawdata/** directory:
 
 In the **working/** directory:
 - Modify the pipeline "helper" files as desired (e.g. editing the `*flagtemplate.txt` file to add any additional flags — see {ref}`Description of Pipeline Helper Text Files <sec-helperfiledescription>` for other options).
-- Edit `casa_pipescript.py` to only include the pipeline steps you wish to repeat (e.g. commenting out the {ref}`hif_findcont <pipeline-tasks:hif_findcont>` or imaging steps, which are very computationally expensive).
+- Edit `casa_pipescript.py` to only include the pipeline steps you wish to repeat (e.g. commenting out the {func}`hif_findcont <pipeline.hif.cli.hif_findcont>` or imaging steps, which are very computationally expensive).
 - Start the version of CASA containing Pipeline using `casa --pipeline`
 - You are now ready to run the script by typing `execfile('casa_pipescript.py')`. Alternatively, you can sequentially execute individual commands from `casa_pipescript.py`, stopping at any point to run other CASA commands ({func}`CASA/plotms <casaplotms.plotms>`, etc).
 
@@ -44,11 +44,11 @@ In the **working/** directory:
 
 The pipeline calibration commands can be modified to produce different results.
 
-For instance, problematic datasets (ASDMs) can be excluded from the processing by editing the `vis=` and `session=` lists in {ref}`hifa_importdata <pipeline-tasks:hifa_importdata>` or {ref}`hsd_importdata <pipeline-tasks:hsd_importdata>` tasks in the `casa_pipescript.py` script.
+For instance, problematic datasets (ASDMs) can be excluded from the processing by editing the `vis=` and `session=` lists in {func}`hifa_importdata <pipeline.hifa.cli.hifa_importdata>` or {func}`hsd_importdata <pipeline.hsd.cli.hsd_importdata>` tasks in the `casa_pipescript.py` script.
 
 As a second example, a user-specified prioritized reference antenna list can be specified via the `refant` parameter in calibration tasks, over-riding the pipeline reference antenna heuristics, by passing the desired refant list. E.g. `hifa_bandpass(refant='DV06,DV07')`
 
-See the [ALMA Pipeline Reference Manual](https://almascience.nrao.edu/processing/Reference_Manual_2025.1.pdf) for more options.
+See the task API pages for more options.
 
 Another use case is to keep the default pipeline commands, but to change the values in the Pipeline "helper" text files to e.g. change the flux scaling, or update antenna positions (see {ref}`Description of Pipeline Helper Text Files <sec-helperfiledescription>` for details). The new values will be used when the relevant `hif_` commands are run.
 
@@ -56,14 +56,15 @@ Another use case is to keep the default pipeline commands, but to change the val
 
 The pipeline imaging commands can be modified to produce different products. Typical reasons for re-imaging include:
 
-- Imaging improvements to be gained from interactively editing an emission specific clean mask and cleaning more deeply. The pipeline generates a clean mask automatically (<span style="color:red">see the `hif_makeimages` (general) task description for specifics — Interferometric pipeline tasks section</span>). Cases with moderate to strong emission (or absorption) can benefit from deeper clean with additional interactive clean masking, with the most affected property being the integrated flux density.
+- Imaging improvements to be gained from interactively editing an emission specific clean mask and cleaning more deeply. The pipeline generates a clean mask automatically (see the {func}`hif_makeimages <pipeline.hif.cli.hif_makeimages>` (general) task description for specifics).
+Cases with moderate to strong emission (or absorption) can benefit from deeper clean with additional interactive clean masking, with the most affected property being the integrated flux density.
 - Non-optimal continuum ranges. The pipeline uses heuristics that attempt to identify continuum channels over a very broad range of science target line properties. Particularly for strong line forests (hot-cores) and occasionally for TDM continuum projects the pipeline ranges can be non-optimal — too much in the first case and too little in the second.
 
 Other science goal driven reprocessing needs may include:
 - Desire to use wide image channels in imaging to increase the signal-to-noise ratio (SNR) of cubes.
 - Desire to use a different Briggs `robust` image weighting than the default value of `robust`=0.5 (smaller value = smaller beam, poorer SNR; larger value = larger beam, better SNR).
 - Desire to uv-taper images to increase the SNR for extended emission.
-- Desire to use different continuum frequency ranges than determined by the pipeline, by modifying the `cont.dat` file ({ref}`cont.dat (IF imaging pipeline) <sec-cont-dat>`).
+- Desire to use different continuum frequency ranges than determined by the pipeline, by modifying the `cont.dat` file ({ref}`cont.dat <sec-cont-dat>`).
 
 Some re-imaging examples are given in a "CASA Guide" at
 <https://casaguides.nrao.edu/index.php/ALMA_Imaging_Pipeline_Reprocessing>.
@@ -104,6 +105,6 @@ If a script named `scriptForFluxCalibration.py` is present in the **script/** di
 
 ## The Pipeline Context
 
-It is recommended to always run the Pipeline using python scripts. New Pipeline runs/scripts need to be initialized using `h_init` in order to create an empty pipeline **Context** object.
+It is recommended to always run the Pipeline using python scripts. New Pipeline runs/scripts need to be initialized using {func}`h_init <pipeline.h.cli.h_init>` in order to create an empty pipeline **Context** object.
 
-If the script is modified to only run a subset of the pipeline tasks, the **Context** should be saved after the last task by using `h_save`. To resume the run, use `h_resume` to load the saved **Context** before executing any pipeline tasks. See the [ALMA Pipeline Reference Manual](https://almascience.nrao.edu/processing/Reference_Manual_2025.1.pdf) for more information.
+If the script is modified to only run a subset of the pipeline tasks, the **Context** should be saved after the last task by using {func}`h_save <pipeline.h.cli.h_save>`. To resume the run, use {func}`h_resume <pipeline.h.cli.h_resume>` to load the saved **Context** before executing any pipeline tasks. See detailed pages on the internal API for more information.

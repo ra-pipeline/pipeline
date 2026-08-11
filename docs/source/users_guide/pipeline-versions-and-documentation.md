@@ -20,7 +20,7 @@ Note that you may need to provide the full path to `casa` in the `mpicasa` comma
 
 ## Pipeline-related Documentation
 
-The User documentation currently relating to the Pipeline is also available from the Overview and Pipeline section of the Science Portal referenced above. This includes the **ALMA Science Pipeline User's Guide** (this document), and the [ALMA Pipeline Reference Manual](https://almascience.nrao.edu/processing/Reference_Manual_2025.1.pdf) (a detailed description of individual Pipeline tasks parameters).
+The officially accepted user documentation for the ALMA Pipeline is listed on the Overview and Pipeline section of the Science Portal referenced above. This includes the **ALMA Science Pipeline User's Guide**, and the **ALMA Pipeline Reference Manual** (a detailed description of individual Pipeline tasks parameters).  Those used to be separate documents, but are now part hosted on this site.
 
 Examples of common re-imaging modifications to the IF pipeline script are given at:
 <https://casaguides.nrao.edu/index.php/ALMA_Imaging_Pipeline_Reprocessing>
@@ -31,7 +31,7 @@ In addition, Chapters 10, 11, and 13 of the [ALMA Technical Handbook](https://al
 
 ## Pipeline and CASA Versions
 
-The pipeline heuristic tasks have a specific version number, and are bundled with a specific version of CASA. These versions are reported in the README file that is archived with the pipeline data products, and are also reported on the Home page of the WebLog for each pipeline-processed dataset (<span style="color:red">see the WebLog Home page figure — Pipeline WebLog section</span> for an example).
+The pipeline heuristic tasks have a specific version number, and are bundled with a specific version of CASA. These versions are reported in the README file that is archived with the pipeline data products, and are also reported on the Home page of the WebLog for each pipeline-processed dataset (see {ref}`the WebLog Home Page example <fig-homepage>`).
 
 CASA produces numerous releases, but only the versions listed in the table on the Science Portal <http://almascience.org/processing/> have been scientifically validated, are accepted for operations, and are supported by ALMA. That table additionally lists the versions which can be used to restore previously pipeline-calibrated archival visibility data.
 
@@ -84,17 +84,17 @@ The ones likely to be of most interest to users are highlighted in bold.
 | wcwidth | 0.2.6 | 0.2.6 | 0.2.13 |
 | wheel | 0.41.2 | — | — |
 
-<sup>a</sup> contained the CASA task <span style="color:red">`wvrgcal` (legacy `almatasks` package — see ambiguous-links list)</span>, which has been migrated to {func}`CASA/wvrgcal <casatasks.calibration.wvrgcal>` in PL2025.
+<sup>a</sup> contained the CASA task `wvrgcal` (legacy `almatasks` package), which was migrated to {func}`CASA/wvrgcal <casatasks.calibration.wvrgcal>` in PL2025.
 
 ## Pipeline and CASA tasks
 
 (sec-pipelinecasa)=
-The pipeline heuristics are written as python functions appearing with a `hif_` or `hifa_` (for interferometric) or `hsd_` (for single-dish) prefix. They can be viewed and executed within CASA just as any python function (if one has launched CASA with "--pipeline"). For example, one can view the possible inputs for the task {ref}`hifa_importdata <pipeline-tasks:hifa_importdata>` by typing `?hifa_importdata`.
+The pipeline heuristics are written as python functions appearing with a `hif_` or `hifa_` (for interferometric) or `hsd_` (for single-dish) prefix. They can be viewed and executed within CASA just as any python function (if one has launched CASA with "--pipeline"). For example, one can view the possible inputs for the task {func}`hifa_importdata <pipeline.hifa.cli.hifa_importdata>` by typing `?hifa_importdata`.
 
-The pipeline heuristics use CASA tasks wherever possible to perform the data reduction or imaging. E.g. the pipeline bandpass calibration & flagging task {ref}`hifa_bandpassflag <pipeline-tasks:hifa_bandpassflag>` calls the CASA {func}`CASA/bandpass <casatasks.calibration.bandpass>` task, and the interferometric imaging task {ref}`hif_makeimages <pipeline-tasks:hif_makeimages_general>` calls the CASA imaging task {func}`CASA/tclean <casatasks.imaging.tclean>`.
+The pipeline heuristics use CASA tasks wherever possible to perform the data reduction or imaging. E.g. the pipeline bandpass calibration & flagging task {func}`hifa_bandpassflag <pipeline.hifa.cli.hifa_bandpassflag>` calls the CASA {func}`CASA/bandpass <casatasks.calibration.bandpass>` task, and the interferometric imaging task {func}`hif_makeimages <pipeline.hif.cli.hif_makeimages>` calls the CASA imaging task {func}`CASA/tclean <casatasks.imaging.tclean>`.
 
 The standard pipeline processing recipes are deterministic and should always give the same result for the same data, if run on the same hardware allocation (number of cores, memory). However, the CASA pipeline tasks are designed to be highly flexible, so that they can have the default inputs over-ridden with user-specified values, or be added, subtracted, or rearranged to produce alternative processing recipes. This enables a manual "mix and match" mode for data reduction and imaging that combines standard CASA pipeline tasks with other CASA commands or python code to produce scripts that are better tuned to the idiosyncrasies of a specific dataset. The exact pipeline commands that will reproduce the standard recipe are delivered with each dataset, in a script called `member.<mous_uid>.<recipe>.casa_pipescript.py` (see {ref}`The Pipeline processing script <sec-pipescriptintro>` below). One can edit and add to that script to implement "mixed mode" processing.
 
-Some common "manual mode" modifications are presented in {ref}`Pipeline re-processing considerations <sec-pipescriptreprocess>` below. A complete list of the variables for each pipeline task is given in the [ALMA Pipeline Reference Manual](https://almascience.nrao.edu/processing/Reference_Manual_2025.1.pdf).
+Some common "manual mode" modifications are presented in {ref}`Pipeline re-processing considerations <sec-pipescriptreprocess>` below. A complete list of the variables for each pipeline task is given in the API sections of this site.
 
-This document, along with the [ALMA Pipeline Reference Manual](https://almascience.nrao.edu/processing/Reference_Manual_2025.1.pdf), describe key aspects of the pipeline tasks. Important changes to other CASA tasks are documented in the Release Notes for the corresponding CASA release, available from the CASA page <https://casa.nrao.edu>.
+This documentation describes key aspects of the pipeline tasks. Important changes to other CASA tasks are documented in the Release Notes for the corresponding CASA release, available from the CASA page <https://casa.nrao.edu>.

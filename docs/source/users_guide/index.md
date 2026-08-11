@@ -10,6 +10,9 @@ pipeline-versions-and-documentation
 data-processing-files
 modifying-a-pipeline-run
 helper-text-files
+pipeline-weblog
+hifa_polcalimage-recipe
+hsd_calimage-recipe
 weights
 ```
 ```
