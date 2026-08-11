@@ -1,13 +1,11 @@
 # Imaging weights in cubes
 
-Since CASA 5.6, the calculation of imaging weights for cubes can be performed either per-channel or for all channels, according to the `tclean`
-<!--:py:func:`tclean <tclean>`-->
-parameter `perchanweightdensity`. This can have significant effects on the image produced. Users should be aware of these effects when creating new images, either using pipeline tasks or with `tclean`. For a detailed description, see https://casadocs.readthedocs.io/en/stable/notebooks/synthesis_imaging.html.
+Since CASA 5.6, the calculation of imaging weights for cubes can be performed either per-channel or for all channels, according to the {func}`CASA/tclean <casatasks.imaging.tclean>` parameter `perchanweightdensity`. This can have significant effects on the image produced. Users should be aware of these effects when creating new images, either using pipeline tasks or with {func}`CASA/tclean <casatasks.imaging.tclean>`. For a detailed description, see https://casadocs.readthedocs.io/en/stable/notebooks/synthesis_imaging.html.
 
 ## History of weighting parameter choices
 
-* The `tclean` `perchanweightdensity` parameter was effectively False in CASA 5.4, the Cycle 6 pipeline, and all prior versions of CASA and pipeline (the parameter did not exist prior to CASA 5.5.0).
-* As of CASA 5.6.0 (i.e. the version used for ALMA Cycle 7 data reduction), `perchanweightdensity=True` is the default in `tclean`.
+* The {func}`CASA/tclean <casatasks.imaging.tclean>` `perchanweightdensity` parameter was effectively False in CASA 5.4, the Cycle 6 pipeline, and all prior versions of CASA and pipeline (the parameter did not exist prior to CASA 5.5.0).
+* As of CASA 5.6.0 (i.e. the version used for ALMA Cycle 7 data reduction), `perchanweightdensity=True` is the default in {func}`CASA/tclean <casatasks.imaging.tclean>`.
 * ALMA decided that the Cycle 7 and 2020.1 Imaging Pipelines would create cubes with `perchanweightdensity=False` (consistent with all previous versions of the imaging PL).
 * For PL2021, PLWG developed the new `briggsbwtaper` weighting to be used with `perchanweightdensity=True`
 * `briggsbwtaper` is only applicable to cube imaging, and `briggs` remains the default weighting scheme for mfs imaging.
