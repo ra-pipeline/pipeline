@@ -21,13 +21,12 @@
 
 .. toctree::
    :hidden:
-   :maxdepth: 2
+   :maxdepth: 3
    :caption: User Guides
 
-   ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>
-   VLA Processing <https://science.nrao.edu/facilities/vla/data-processing>
-   users_guide/helper_files
-   users_guide/weights
+   users_guide/index
+   ALMA old <https://almascience.nrao.edu/processing/science-pipeline>
+   VLA <https://science.nrao.edu/facilities/vla/data-processing>
 
 .. toctree::
    :hidden:
