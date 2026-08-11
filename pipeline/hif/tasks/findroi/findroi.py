@@ -19,7 +19,7 @@ LOG = infrastructure.get_logger(__name__)
 class FindROIInputs(vdp.StandardInputs):
     """Inputs for the hif_findroi stage."""
 
-    processing_data_type = [
+    processing_data_types = [
         DataType.REGCAL_CONTLINE_SCIENCE,
         DataType.REGCAL_CONTLINE_ALL,
         DataType.SELFCAL_CONTLINE_SCIENCE,
