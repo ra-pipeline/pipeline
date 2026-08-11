@@ -19,10 +19,10 @@ LOG = infrastructure.get_logger(__name__)
 class FindROIInputs(vdp.StandardInputs):
     """Inputs for the hif_findroi stage."""
 
-    processing_data_type = [
-        DataType.SELFCAL_CONTLINE_SCIENCE,
+    processing_data_types = [
         DataType.REGCAL_CONTLINE_SCIENCE,
         DataType.REGCAL_CONTLINE_ALL,
+        DataType.SELFCAL_CONTLINE_SCIENCE,
         DataType.RAW,
     ]
 
@@ -60,18 +60,25 @@ class FindROI(basetask.StandardTaskTemplate):
         tmp_dir = heuristics.default_tmp_dir(inputs.context, inputs.output_dir)
         LOG.info('Writing hif_findroi artifacts under %s', tmp_dir)
 
-        stage_product = heuristics.run_findroi_mpi(
-            vis=inputs.vis,
-            context=inputs.context,
-            executor=self._executor.copy(exclude_context=True),
-            field=inputs.field,
-            spw=inputs.spw,
-            tmp_dir=tmp_dir,
-            parallel=inputs.parallel,
-        )
+        try:
+            stage_product = heuristics.run_findroi_mpi(
+                vis=inputs.vis,
+                context=inputs.context,
+                executor=self._executor.copy(exclude_context=True),
+                field=inputs.field,
+                spw=inputs.spw,
+                tmp_dir=tmp_dir,
+                parallel=inputs.parallel,
+            )
+        except Exception as exc:
+            LOG.exception('hif_findroi failed; returning a non-fatal result so the pipeline can continue.')
+            return FindROIResult(errors=[f'hif_findroi failed: {exc}'], fatal_error=True)
 
         if stage_product is None:
-            return FindROIResult(errors=['No successful hif_findroi SPW results were produced.'])
+            return FindROIResult(
+                errors=['No successful hif_findroi SPW results were produced.'],
+                fatal_error=True,
+            )
 
         artifacts = copy.deepcopy(stage_product.get('metadata', {}).get('artifacts', {}))
         errors = list(stage_product.get('metadata', {}).get('errors', []))
