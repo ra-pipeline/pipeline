@@ -71,7 +71,7 @@ def hifa_timegaincal(vis=None, calamptable=None, calphasetable=None, offsetstabl
     time; if the instrument is stable, these should scatter about zero with no drift.
 
     .. figure:: /figures/PL2025_hifa_timegaincal_allinone.png
-       :scale: 60%
+       :width: 60%
        :alt: Gain solution workflow for hifa_timegaincal
 
        Gain solution workflow. Each box shows when ``combine='spw'`` may have been

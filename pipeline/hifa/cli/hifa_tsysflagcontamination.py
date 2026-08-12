@@ -44,7 +44,7 @@ def hifa_tsysflagcontamination(
        are shown in red. The right panel shows the difference corrected by the atmospheric model.
 
     .. figure:: /figures/uid___A002_X11c688d_Xad31.ms.tsyscontamination_spw22_field2.png
-       :scale: 60%
+       :width: 60%
        :alt: Diagnostic plot for hifa_tsysflagcontamination
 
        Example diagnostic plot. Left panel: averaged Tsys profile toward science fields (blue)

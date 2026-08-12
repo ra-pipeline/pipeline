@@ -23,13 +23,13 @@ def hifa_bandpassflag(vis=None, caltable=None, intent=None, field=None, spw=None
     and after flagging. If no data were flagged, the 'after' plots are not generated.
 
     .. figure:: /figures/guide-img022.png
-       :scale: 60%
+       :width: 60%
        :alt: Before bandpass flagging
 
        Before flagging: example of outlier amplitudes.
 
     .. figure:: /figures/guide-img023.png
-       :scale: 60%
+       :width: 60%
        :alt: After bandpass flagging
 
        After flagging: the same data with outlier visibilities removed.

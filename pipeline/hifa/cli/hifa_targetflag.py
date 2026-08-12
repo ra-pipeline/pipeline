@@ -25,7 +25,7 @@ def hifa_targetflag(vis=None, parallel=None):
     plots only show field IDs with new flags.
 
     .. figure:: /figures/guide-img006.png
-       :scale: 60%
+       :width: 60%
        :alt: Example of flagging outliers in science target visibility amplitudes
 
        Example of flagging high outliers in the calibrated science target visibility amplitudes.

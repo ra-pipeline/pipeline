@@ -22,7 +22,7 @@ def hsd_imaging(mode=None, restfreq=None, infiles=None, field=None, spw=None):
       giving 8x8 spectra by default. Magenta lines show atmospheric transmission.
 
     .. figure:: /figures/guide-img043.png
-       :scale: 60%
+       :width: 60%
        :alt: Example profile map
 
        Example of the profile map.
@@ -33,7 +33,7 @@ def hsd_imaging(mode=None, restfreq=None, infiles=None, field=None, spw=None):
       velocity range (15 bins by default).
 
     .. figure:: /figures/guide-img044.png
-       :scale: 60%
+       :width: 60%
        :alt: Example channel map
 
        Example of a channel map.
@@ -50,7 +50,7 @@ def hsd_imaging(mode=None, restfreq=None, infiles=None, field=None, spw=None):
       SNR threshold = 5 for "extended").
 
     .. figure:: /figures/missedlines.png
-       :scale: 60%
+       :width: 60%
        :alt: Diagnostic plot for possible missed line channels
 
        Example diagnostic plot for possible missed line channels.

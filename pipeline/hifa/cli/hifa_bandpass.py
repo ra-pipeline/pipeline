@@ -28,7 +28,7 @@ def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, an
         The logical workflow is illustrated below:
 
         .. figure:: /figures/PL2025_hifa_bandpass_phaseup.png
-           :scale: 60%
+           :width: 60%
            :alt: Workflow for hifa_bandpass temporal phase-up
 
            The logical workflow for the temporal phase-up process used in the

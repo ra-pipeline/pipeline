@@ -16,7 +16,7 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
     :py:func:`hifa_spwphaseup <hifa_spwphaseup>` performs two functions:
 
     .. figure:: /figures/PL2025_lowSNR_spwphaseup_v1.png
-       :scale: 60%
+       :width: 60%
        :alt: Logic flowchart for spw phase-up strategy
 
        Logic flowchart for determining the temporal gain strategy. Extends
@@ -133,7 +133,7 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
     outliers are found above 50 deg, a reassessment is made excluding them.
 
     .. figure:: /figures/hifa_spwphaseup_phasedeco_PL2022.png
-       :scale: 60%
+       :width: 60%
        :alt: Phase decoherence plots
 
        Example phase decoherence plots (phase RMS vs. baseline length). Semi-transparent
