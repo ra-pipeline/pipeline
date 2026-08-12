@@ -65,7 +65,7 @@ class FindContInputs(vdp.StandardInputs):
     target_list = vdp.VisDependentProperty(null_input=['', None, {}], default=[])
     hm_perchanweightdensity = vdp.VisDependentProperty(default=None)
     hm_weighting = vdp.VisDependentProperty(default=None)
-    hm_mode = vdp.VisDependentProperty(default='coarse')
+    hm_mode = vdp.VisDependentProperty(default='normal')
     datacolumn = vdp.VisDependentProperty(default='')
     parallel = vdp.VisDependentProperty(default='automatic')
 
@@ -122,8 +122,11 @@ class FindContInputs(vdp.StandardInputs):
 
             hm_weighting: Weighting scheme (natural,uniform,briggs,briggsabs[experimental],briggsbwtaper[experimental])
 
-            hm_mode: Continuum-finding imaging mode. "coarse" applies the new fast local override
+            hm_mode: Continuum-finding imaging mode. "coarse" applies the new fast local override  with
+                reduced pixels-per-beam sampling to optimize processing speed
                 and "normal" preserves the previous-cycle behavior.
+
+                Default: ``'normal'``
 
             field: Field selection to limit continuum finding to specific fields. Defaults to empty string,
                 which will process all fields. Can be used to restrict processing to a subset of fields.
