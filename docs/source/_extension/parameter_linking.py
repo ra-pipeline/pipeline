@@ -83,8 +83,21 @@ def find_parameter_items(dd_element):
     Returns:
         List of li elements containing parameter docs, or None if not found
     """
-    # Look for field-list containing Parameters
+    # Look for field-list containing Parameters in the standard location (inside dd)
     field_list = dd_element.find('dl', class_='field-list')
+    
+    # If not found inside dd, check if it was promoted to a top-level section by toc_sections.py
+    if not field_list:
+        # Check if there is a section id="parameters" in the document
+        soup = dd_element.find_parent('html') or dd_element.find_parent('body') or dd_element.find_parent()
+        # Find the root object
+        while soup.parent:
+            soup = soup.parent
+            
+        param_section = soup.find('section', id='parameters')
+        if param_section:
+            field_list = param_section.find('dl', class_='field-list')
+
     if not field_list:
         return None
 
