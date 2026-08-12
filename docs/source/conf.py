@@ -120,6 +120,7 @@ extensions = [
     'cli_function_stubs',
     'parameter_linking',
     'sphinxcontrib.lightbox2',
+    'toc_sections',
 ]
 
 add_module_names = False
