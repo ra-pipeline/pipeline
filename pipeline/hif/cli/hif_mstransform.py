@@ -21,9 +21,6 @@ def hif_mstransform(vis=None, outputvis=None, field=None, intent=None, spw=None,
     Notes:
         QA = 1.0 if the new MS is successfully created; 0.0 otherwise.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Split all science target data:
 

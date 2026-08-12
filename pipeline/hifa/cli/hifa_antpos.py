@@ -41,9 +41,6 @@ def hifa_antpos(vis=None, caltable=None, hm_antpos=None, antenna=None, offsets=N
         QA = 1.0 if no antenna position corrections were needed. QA = 0.9 if one or more antenna positions
         were corrected.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Correct the position of antenna 'DV05' for all the visibility files in a
         single pipeline run:

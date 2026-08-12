@@ -71,9 +71,6 @@ def hifa_tsysflagcontamination(
 
         Not applied in diffgain or full-pol recipes.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Flag Tsys line contamination using currently recommended parameters:
 

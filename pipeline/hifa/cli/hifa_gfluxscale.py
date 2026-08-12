@@ -87,9 +87,6 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
         For very low SNR, the longer ``solint`` used in the phase-up can cause phase decoherence to be
         'baked in', artificially biasing amplitude gains upward and producing an incorrect flux scale.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Compute flux values for the phase calibrator using model data from the amplitude calibrator:
 

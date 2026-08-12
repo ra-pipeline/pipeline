@@ -40,9 +40,6 @@ def hifa_restoredata(vis=None, session=None, products_dir=None, copytoraw=None, 
     6. Restores the final calibration tables for each MS.
     7. Applies the calibration tables to each MS.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Restore the pipeline results for a single ASDM in a single session:
 

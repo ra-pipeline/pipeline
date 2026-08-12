@@ -58,9 +58,6 @@ def hifa_flagdata(vis=None, autocorr=None, shadow=None, tolerance=None, scan=Non
         range could not be calculated for a spw. For Low Transmission flagging: 1.0 if no spw is flagged, 0.9 if
         a non-representative spw is flagged, 0.33 if the representative spw is flagged.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Do basic flagging on a MeasurementSet:
 

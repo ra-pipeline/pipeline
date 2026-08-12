@@ -17,9 +17,6 @@ def hifa_wvrgcal(vis=None, caltable=None, offsetstable=None, hm_toffset=None, to
     ``accept_threshold`` then the wvr gain table is not accepted into the
     context for subsequent use.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Compute the WVR calibration for all the MeasurementSets:
 

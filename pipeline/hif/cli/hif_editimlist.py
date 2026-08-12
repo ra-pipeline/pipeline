@@ -47,6 +47,4 @@ def hif_editimlist(
 ):
     """Add to a list of images to be produced with :py:func:`hif_makeimages <hif_makeimages>`.
 
-    Returns:
-        The results object for the pipeline task is returned.
     """

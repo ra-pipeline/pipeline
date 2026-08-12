@@ -67,9 +67,6 @@ def hifa_renorm(vis=None, createcaltable=None, threshold=None, spw=None, exclude
         - Bands 9 and 10 receive a fixed QA = 0.9 (blue) regardless of R_f.
         - If R_f is erroneous or unrealistic (< 1 or > 2.5), an additional QA message is issued.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Run with recommended settings to assess the need for an ALMA amplitude renormalization
         correction.

@@ -153,9 +153,6 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
 
         The overall stage score is the lowest of the gain calibration QA and the phase decoherence QA.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Compute the default spectral window map and the per spectral window phase offsets:
 

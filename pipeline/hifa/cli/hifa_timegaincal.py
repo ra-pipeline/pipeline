@@ -95,9 +95,6 @@ def hifa_timegaincal(vis=None, calamptable=None, calphasetable=None, offsetstabl
           calibration). If the spw is not mapped, offsets should calibrate out, and a corresponding
           message is shown.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Compute standard per scan gain solutions that will be used to calibrate the target:
 

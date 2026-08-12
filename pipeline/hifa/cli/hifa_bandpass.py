@@ -81,9 +81,6 @@ def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, an
             >= the subband width.
         -   If no issues are found or the data is not BLC FDM, the score is 1.0.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Run with recommended settings:
 

@@ -25,9 +25,6 @@ def hifa_lock_refant(vis=None, unregister_spwphaseup=None):
     Notes:
         Only used in polarization recipes.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Lock the refant list for all MSes in pipeline context:
 
