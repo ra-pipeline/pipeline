@@ -125,23 +125,23 @@ Pipeline tasks have QA scores associated with them in order to quantify the qual
 :widths: 20 20 60
 :header-rows: 1
 
-* - Score
+* - Score ($S$)
   - Color
   - Meaning
-* - >0.90–1.00
-  - Green
+* - $0.90 < S \leq 1.00$
+  - <span style="color: #1a7a3c; font-weight: bold">Green</span>
   - No issues identified
-* - >0.66–0.90
-  - Blue
+* - $0.66 < S \leq 0.90$
+  - <span style="color: #1a5fa8; font-weight: bold">Blue</span>
   - No serious issues identified, but a note has been added
-* - >0.33–0.66
-  - Yellow
+* - $0.33 < S \leq 0.66$
+  - <span style="color: #b8860b; font-weight: bold">Yellow</span>
   - QA warning triggered; carefully inspect the results for this stage
-* - 0.00–0.33
-  - Red
+* - $0.00 \leq S \leq 0.33$
+  - <span style="color: #c0392b; font-weight: bold">Red</span>
   - Serious issue; may not meet quality standards
 ```
 
-The failure to calculate a QA score results in a red score of -0.1. The individual QA scores and associated messages appear at the top of each task WebLog page. If there is more than one QA score and message, this section is expandable by clicking on the "All QA Scores" link (see the {func}`hifa_tsysflag <pipeline.hifa.cli.hifa_tsysflag>` task page example above).
+The failure to calculate a QA score results in a <span style="color: #c0392b; font-weight: bold">red</span> score of -0.1. The individual QA scores and associated messages appear at the top of each task WebLog page. If there is more than one QA score and message, this section is expandable by clicking on the "All QA Scores" link (see the {func}`hifa_tsysflag <pipeline.hifa.cli.hifa_tsysflag>` task page example above).
 
 A detailed description of the IF Pipeline QA scores and their motivation is given in Sec. 7 of [Hunter et al. 2023](https://ui.adsabs.harvard.edu/abs/2023PASP..135g4501H/abstract). Any changes to the scores since the date of that paper will be included in the by-task API pages here.
