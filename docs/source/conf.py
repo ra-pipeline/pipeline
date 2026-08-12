@@ -119,6 +119,7 @@ extensions = [
     'IPython.sphinxext.ipython_directive',
     'cli_function_stubs',
     'parameter_linking',
+    'sphinxcontrib.lightbox2',
 ]
 
 add_module_names = False
