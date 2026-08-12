@@ -85,21 +85,36 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
       If the PI-requested bandwidth for sensitivity is significantly coarser (> 4x) than the native correlator channel
       width, an additional cube is created at the PI-requested bandwidth.
 
-    **Common Task Functionality**:
+    The following common task functionality applies to all imaging stages:
 
-    - **Image Coordinates**: Images are centered on the ICRS equinox 2000 position requested in the Observing Tool, evaluated at the epoch of observation for objects with proper motion. For irregular mosaics, the ``psfphasecenter`` is explicitly set.
+    - **Image Coordinates**
+      In all imaging stages, the image is centered on the ICRS equinox 2000 position requested in the
+      Observing Tool, or the ICRS ephemeris direction evaluated at the time of first integration for
+      ephemeris objects. For objects with non-zero proper motion or parallax, the coordinates are ICRS
+      equinox 2000 but for the epoch of observation. The difference between the Source direction and
+      Field direction shown in the WebLog reflects this parallax/proper motion term.
+      
+      For irregular mosaics, the ``psfphasecenter`` is explicitly set to prevent poor PSFs or ``tclean`` failures.
 
       .. figure:: /figures/psfphasecenter.png
          :alt: PSF phase center for irregular mosaics
 
          Irregularly shaped mosaics are automatically handled by setting the ``tclean`` ``psfphasecenter`` parameter.
 
-    - **Full Polarization**: Stokes IQUV images use the mask and ``tclean`` threshold from the corresponding Stokes I imaging stage.
+    - **Full Polarization IQUV Imaging**
+      In polarization recipes, full polarization Stokes IQUV images are made. The mask and ``tclean`` threshold
+      from the corresponding Stokes I imaging stage are carried forward and used (with a fallback to no mask
+      and recomputed thresholds if not found). This mask is only displayed in the Stokes I WebLog.
     
-    - **Automasking**:
-      Images are deconvolved using ``tclean`` with the ``auto-multithresh`` auto-masking algorithm.
-      For continuum imaging, if auto-masking prunes all regions, a fallback mask at the 0.3 primary beam response level is used.
-      The ``auto-multithresh`` parameters depend on array and configuration:
+    - **Automatic Clean Boxes (Automasking)**
+      Images are deconvolved using ``tclean`` with the ``auto-multithresh`` auto-masking algorithm (Kepley et al. 2020),
+      which mimics interactive cleaning. The masking threshold is the greater of the values calculated based on the
+      residual rms noise and sidelobe levels. For continuum imaging, if the algorithm prunes all regions (which can
+      happen for compact, high-SNR emission), ``tclean`` is run again using a fallback clean mask corresponding to
+      the area above a fraction of the primary beam response (default 0.3). To save time, this fallback is not done
+      for cube imaging.
+      
+      The auto-masking parameters vary based on the array and the 75th percentile baseline length (b75):
 
       .. code-block:: text
 
@@ -111,7 +126,7 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
           negativethreshold 0.0/15.0  0.0/7.0        0.0/7.0          0.0/7.0
           fastnoise         False     False          False            True
 
-      *(Note: negativethreshold is 0.0 for continuum and the higher value for line imaging).*
+      *(Note: negativethreshold is 0.0 for continuum and the higher value for line imaging. fastnoise=True uses a simple median absolute deviation; fastnoise=False uses the Chauvenet method).*
 
     - **Cleaning Threshold and Dynamic Range**:
       Images are cleaned to `2 x (predicted rms noise) x (dynamic range correction factor)`.
