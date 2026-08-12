@@ -48,19 +48,19 @@ Pipeline Dependencies                         :doc:`Dependencies <dependencies>`
 .. _NOVA: https://nova-astronomy.nl/  
 .. _NAOJ: https://www.nao.ac.jp  
 
-.. |Docs Pages| image:: https://img.shields.io/github/actions/workflow/status/r-xue/pipeline/build-gh-pages.yml?style=plastic&logo=githubactions&label=docs-pages
-  :target: https://github.com/r-xue/pipeline/actions/workflows/build-gh-pages.yml
+.. |Docs Pages| image:: https://img.shields.io/github/actions/workflow/status/ra-pipeline/pipeline/build-gh-pages.yml?style=plastic&logo=githubactions&label=docs-pages
+  :target: https://github.com/ra-pipeline/pipeline/actions/workflows/build-gh-pages.yml
   :alt: Docs: GH-Pages-Status
 
 .. |Docs RTD| image:: https://img.shields.io/readthedocs/pipe-docs?style=plastic&logo=readthedocs&label=docs-rtd
   :target: https://pipe-docs.readthedocs.io/en/latest/?badge=latest
   :alt: Docs: RTD-Status
 
-.. |Test Unit| image:: https://img.shields.io/github/actions/workflow/status/r-xue/pipeline/test-unit.yml?style=plastic&logo=githubactions&label=test-unit
-  :target: https://github.com/r-xue/pipeline/actions/workflows/test-unit.yml
+.. |Test Unit| image:: https://img.shields.io/github/actions/workflow/status/ra-pipeline/pipeline/test-unit-pixi.yml?style=plastic&logo=githubactions&label=test-unit
+  :target: https://github.com/ra-pipeline/pipeline/actions/workflows/test-unit-pixi.yml
   :alt: Test: GH-Test-Unit-Status
 
-.. |Codecov Unit| image:: https://img.shields.io/codecov/c/github/r-xue/pipeline?style=plastic&label=codecov-unit
-  :target: https://app.codecov.io/github/r-xue/pipeline
+.. |Codecov Unit| image:: https://img.shields.io/codecov/c/github/ra-pipeline/pipeline?style=plastic&label=codecov-unit
+  :target: https://app.codecov.io/github/ra-pipeline/pipeline
   :alt: Test: Codecov-Unit-Status
 

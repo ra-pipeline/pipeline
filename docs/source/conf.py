@@ -430,7 +430,7 @@ nbsphinx_prolog = r"""
 
         .. _nbsphinx: https://nbsphinx.readthedocs.io/
         .. _Jupyter: https://jupyter.org/
-        .. _{{ docname }}: https://github.com/r-xue/pipeline/blob/gh-pages/html/{{ docname }}
+        .. _{{ docname }}: https://github.com/ra-pipeline/pipeline/blob/gh-pages/html/{{ docname }}
     
 
 .. raw:: latex
