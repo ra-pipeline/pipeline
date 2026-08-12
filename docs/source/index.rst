@@ -25,8 +25,8 @@
    :caption: User Guides
 
    users_guide/index
-   ALMA old <https://almascience.nrao.edu/processing/science-pipeline>
-   VLA <https://science.nrao.edu/facilities/vla/data-processing>
+   VLA Pipeline User's Guide <https://science.nrao.edu/facilities/vla/data-processing>
+   Nobeyama Pipeline User's Guide <https://www.nro.nao.ac.jp/projects/45m/data/otf/#casa>
 
 .. toctree::
    :hidden:
