@@ -45,7 +45,26 @@ CASA relies on earth Geodetic information to determine the geometry of the array
 (fig-processingenv)=
 **Processing Environment popup window**
 
-![Processing Environment popup window](processing_env_2024.png)
+<!-- markdownlint-disable MD033 -->
+<div style="display: flex; justify-content: center; align-items: flex-start; gap: 15px; width: 100%;">
+  <div style="flex: 1; text-align: center;">
+
+```{image} weblog_runtime_env1.png
+:width: 100%
+:align: center
+```
+
+  </div>
+  <div style="flex: 1; text-align: center;">
+
+```{image} weblog_runtime_env2.png
+:width: 100%
+:align: center
+```
+
+  </div>
+</div>
+<!-- markdownlint-enable MD033 -->
 
 The **Observation Summary** table lists all the MeasurementSets included in the pipeline processing, grouped by observing "sessions". The Observing Mode (StandardInterferometry, StandardSingleDish, BandToBandInterferometry, etc.) is noted for the session.
 Each MeasurementSet is calibrated independently by the pipeline. For data that have been run through the imaging stages of the pipeline, three MS will be listed — the original one including all data and spectral windows, a targets.ms containing only calibrated continuum+line science target data, and a targets_line.ms containing only calibrated continuum-subtracted science target line data. The table provides a quick overview of the ALMA receiver band used, the number of antennas, the start/end date and time, the time spent on source, the array minimum and maximum baseline length, the rms baseline length and the size of that MeasurementSet. To view the observational setup of each MeasurementSet in more detail, click on the name of it to go to its overview page.
