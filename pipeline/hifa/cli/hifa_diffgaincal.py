@@ -92,7 +92,7 @@ def hifa_diffgaincal(vis=None, flagging_frac_limit=None, hm_spwmapmode=None, mis
        of the band-to-band offset - the group of scans, as to meet an SNR of 5.0. If this SNR threshold is not met,
        spw combination is triggered.
     2. A temporary ``gaincal`` shows that (i) not all spw solutions are made; (ii) the fraction of flagged solutions
-       exceeds 0.7 of the total solutions, and (iii) the fraction of missing scans exceeds 0.7 of the expected scans.
+       exceeds 0.5 of the total solutions, and (iii) the fraction of missing scans exceeds 0.7 of the expected scans.
 
     Notes:
         QA sub-scores:
