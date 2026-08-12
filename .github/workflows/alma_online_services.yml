@@ -1,0 +1,122 @@
+# Regression tests for ALMA pipeline online services (time-based schedule)
+#
+# Services tested:
+#   1. ALMA Flux Calibration Service      (almascience.org/sc/flux + asa.alma.cl backup)
+#   2. Jy/K Conversion Factor Service     (jy-kelvins, all 4 regional mirrors)
+#   3. Antenna Position Corrections       (asa.alma.cl/uncertainties-service)
+#
+# Schedule: every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
+# Can also be triggered manually via workflow_dispatch.
+
+name: ALMA Online Services Regression
+
+on:
+  schedule:
+    # Run every 6 hours
+    - cron: '0 */6 * * *'
+  pull_request:
+    paths:
+      - 'tests/online_services/**'
+      - '.github/workflows/alma_online_services.yml'
+  workflow_dispatch:
+    inputs:
+      pytest_extra_args:
+        description: 'Extra pytest arguments (e.g. -k test_liveness)'
+        required: false
+        default: ''
+
+jobs:
+  regression:
+    name: Test ALMA online services
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest certifi
+          # No pipeline/CASA install needed; test uses stdlib + certifi only
+          # Per-request timeouts are set inside _get(); no pytest-timeout plugin required
+
+      - name: Run online service regression tests
+        env:
+          # Allow overriding service URLs via environment variables
+          # (mirrors pipeline's utils.get_valid_url logic)
+          FLUX_SERVICE_URL: ${{ vars.FLUX_SERVICE_URL || '' }}
+          FLUX_SERVICE_URL_BACKUP: ${{ vars.FLUX_SERVICE_URL_BACKUP || '' }}
+          ANTPOS_SERVICE_URL: ${{ vars.ANTPOS_SERVICE_URL || '' }}
+          JYPERKDB_URL: ${{ vars.JYPERKDB_URL || '' }}
+        run: |
+          mkdir -p test-results
+          python -m pytest tests/online_services/test_online_services.py \
+            --noconftest \
+            -v \
+            --tb=short \
+            --junit-xml=test-results/junit.xml \
+            ${{ github.event.inputs.pytest_extra_args }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ github.run_id }}
+          path: test-results/junit.xml
+          retention-days: 90
+
+      - name: Write job summary
+        if: always()
+        run: |
+          python - <<'EOF'
+          import xml.etree.ElementTree as ET, os
+
+          path = 'test-results/junit.xml'
+          ghs = os.environ.get('GITHUB_STEP_SUMMARY', '')
+          out = open(ghs, 'a') if ghs else None
+
+          def write(line=''):
+              print(line)
+              if out:
+                  out.write(line + '\n')
+
+          if not os.path.exists(path):
+              write('No junit.xml produced – pytest may have crashed before writing results.')
+          else:
+              root = ET.parse(path).getroot()
+              suite = root if root.tag == 'testsuite' else root.find('testsuite')
+              tests    = int(suite.get('tests',    0))
+              failures = int(suite.get('failures', 0))
+              errors   = int(suite.get('errors',   0))
+              skipped  = int(suite.get('skipped',  0))
+              passed   = tests - failures - errors - skipped
+
+              status = 'All passing' if (failures + errors) == 0 else 'Failures detected'
+              write(f'## ALMA Online Services – {status}')
+              write()
+              write(f'| Passed | Failed | Errors | Skipped | Total |')
+              write(f'|--------|--------|--------|---------|-------|')
+              write(f'| {passed} | {failures} | {errors} | {skipped} | {tests} |')
+
+              if failures + errors > 0:
+                  write()
+                  write('### Failed tests')
+                  write()
+                  for tc in suite.iter('testcase'):
+                      fail = tc.find('failure') or tc.find('error')
+                      if fail is not None:
+                          name = f"{tc.get('classname', '')}.{tc.get('name', '')}"
+                          msg  = (fail.get('message') or '').splitlines()[0][:120]
+                          write(f'- `{name}` — {msg}')
+
+          if out:
+              out.close()
+          EOF

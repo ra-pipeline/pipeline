@@ -170,7 +170,9 @@ tmp_path_retention_policy = "none"
 [tool.pixi.workspace]
 # 'nodefaults' is not needed as Pixi does not implicitly add the defaults (Anaconda) channel
 channels = ["conda-forge"]
-platforms = ["linux-64", "osx-arm64"]
+# The inline "Rich Platforms" syntax (with OS version constraints) requires Pixi >= v0.71.0
+# Ref: https://pixi.sh/latest/features/rich-platforms/
+platforms = ["linux-64", { platform = "osx-arm64", osx = "15.0" }]
 
 # Common dependencies (shared by ALL environments via solve-groups)
 
@@ -204,11 +206,6 @@ casaplotserver = { version = ">=1.8.2", index = "https://casa-pip.nrao.edu/repos
 casatasks = { version = ">=6.7.4.2", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 casatools = { version = ">=6.7.4.2", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 
-[tool.pixi.system-requirements]
-# Sets the minimum macOS runtime to 15.0 (floor, not a build filter).
-# Older wheels (e.g., macOS 14.0) are still selected when no newer build exists,
-# as macOS binaries are forward-compatible.
-macos = "15.0"
 
 [tool.pixi.tasks]
 # Run unit tests with coverage
@@ -250,7 +247,6 @@ fetch-casarundata = "python -c 'import casatools'"
 # --------------------------------------------------------------------------
 
 [tool.pixi.feature.casa674-py312]
-platforms = ["linux-64", "osx-arm64"]
 
 [tool.pixi.feature.casa674-py312.dependencies]
 python = "3.12.*"
@@ -263,7 +259,6 @@ casashell = { version = "==6.7.4.*", index = "https://casa-pip.nrao.edu/reposito
 # --------------------------------------------------------------------------
 
 [tool.pixi.feature.casa675-py312]
-platforms = ["linux-64", "osx-arm64"]
 
 [tool.pixi.feature.casa675-py312.dependencies]
 python = "3.12.*"
@@ -273,7 +268,6 @@ casashell = { version = "==6.7.5.*", index = "https://casa-pip.nrao.edu/reposito
 
 [tool.pixi.feature.casa675-py313]
 # Note: bdsf is not available on osx-arm64 for cp313; skipped via requirements.txt marker
-platforms = ["linux-64", "osx-arm64"]
 
 [tool.pixi.feature.casa675-py313.dependencies]
 python = "3.13.*"
@@ -286,7 +280,6 @@ casashell = { version = "==6.7.5.*", index = "https://casa-pip.nrao.edu/reposito
 # --------------------------------------------------------------------------
 
 [tool.pixi.feature.casa676-py312]
-platforms = ["linux-64", "osx-arm64"]
 
 [tool.pixi.feature.casa676-py312.dependencies]
 python = "3.12.*"
@@ -296,7 +289,6 @@ casashell = { version = "==6.7.6.*", index = "https://casa-pip.nrao.edu/reposito
 
 [tool.pixi.feature.casa676-py313]
 # Note: bdsf is not available on osx-arm64 for cp313; skipped via requirements.txt marker
-platforms = ["linux-64", "osx-arm64"]
 
 [tool.pixi.feature.casa676-py313.dependencies]
 python = "3.13.*"
@@ -309,7 +301,6 @@ casashell = { version = "==6.7.6.*", index = "https://casa-pip.nrao.edu/reposito
 # --------------------------------------------------------------------------
 
 [tool.pixi.feature.docs]
-platforms = ["linux-64", "osx-arm64"]
 
 [tool.pixi.feature.docs.dependencies]
 python = "3.12.*"
