@@ -281,3 +281,15 @@ figure, .figure {
     padding: 4px;
     margin-bottom: 1.5em;
 }
+
+/* =============================================================================
+   Figure Captions
+   =========================================================================== */
+/* Distinguish figure captions from normal body text */
+figure figcaption, .figure figcaption, .caption-text {
+    font-size: 0.9em;
+    color: var(--color-foreground-muted, #666);
+    text-align: center;
+    margin-top: 0.5em;
+    line-height: 1.4;
+}
