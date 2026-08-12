@@ -265,3 +265,19 @@ p.rubric {
         max-width: 62rem;
     }
 }
+
+/* =============================================================================
+   Image & Screenshot Drop Shadows
+   =========================================================================== */
+/* Add a subtle drop-shadow to embedded screenshots to distinguish them from the background */
+figure img, .figure img {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+    border-radius: 4px;
+    border: 1px solid var(--color-background-border, #e0e0e0);
+}
+
+/* Ensure the shadow doesn't get cut off */
+figure, .figure {
+    padding: 4px;
+    margin-bottom: 1.5em;
+}
