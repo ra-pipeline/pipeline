@@ -121,12 +121,26 @@ Most sub-pages have further links in order to access a more detailed view of the
 (sec-qascores)=
 Pipeline tasks have QA scores associated with them in order to quantify the quality of the dataset and the calibration. These scores are designed to inform data inspection as part of the ALMA quality assurance or "QA2" process. When there are multiple QA heuristics for a stage (each with its own QA score), or scores are calculated separately for each ASDM in an observation, the overall task QA score is taken as the lowest of all computed scores. Valid QA scores have values between 0.0 and 1.0 and are colorized according to the following table:
 
-| Score | Color | Meaning |
-|---|---|---|
-| >0.90–1.00 | Green | No issues identified |
-| >0.66–0.90 | Blue | No serious issues identified, but a note has been added |
-| >0.33–0.66 | Yellow | QA warning triggered; carefully inspect the results for this stage |
-| 0.00–0.33 | Red | Serious issue; may not meet quality standards |
+```{list-table}
+:widths: 20 20 60
+:header-rows: 1
+
+* - Score
+  - Color
+  - Meaning
+* - >0.90–1.00
+  - Green
+  - No issues identified
+* - >0.66–0.90
+  - Blue
+  - No serious issues identified, but a note has been added
+* - >0.33–0.66
+  - Yellow
+  - QA warning triggered; carefully inspect the results for this stage
+* - 0.00–0.33
+  - Red
+  - Serious issue; may not meet quality standards
+```
 
 The failure to calculate a QA score results in a red score of -0.1. The individual QA scores and associated messages appear at the top of each task WebLog page. If there is more than one QA score and message, this section is expandable by clicking on the "All QA Scores" link (see the {func}`hifa_tsysflag <pipeline.hifa.cli.hifa_tsysflag>` task page example above).
 

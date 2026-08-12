@@ -10,13 +10,30 @@ Since CASA 5.6, the calculation of imaging weights for cubes can be performed ei
 * For PL2021, PLWG developed the new `briggsbwtaper` weighting to be used with `perchanweightdensity=True`
 * `briggsbwtaper` is only applicable to cube imaging, and `briggs` remains the default weighting scheme for mfs imaging.
 
-| Pipeline version | weighting default | perchanweightdensity default |
-| :--- | :--- | :--- |
-| CASA<5.6 | natural | effectively False |
-| C6 pipeline | briggs | effectively False |
-| CASA≥5.6 | natural | True |
-| C7 Pipeline <br> PL2020 | briggs | False |
-| ≥PL2021 | briggsbwtaper | True |
+```{list-table}
+:widths: 33 33 33
+:header-rows: 1
+:class: small-font-table
+
+* - Pipeline version
+  - weighting default
+  - perchanweightdensity default
+* - CASA<5.6
+  - natural
+  - effectively False
+* - C6 pipeline
+  - briggs
+  - effectively False
+* - CASA≥5.6
+  - natural
+  - True
+* - C7 Pipeline <br> PL2020
+  - briggs
+  - False
+* - ≥PL2021
+  - briggsbwtaper
+  - True
+```
 
 ##  Summary of the effects of weighting scheme choices
 
