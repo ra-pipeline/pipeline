@@ -104,9 +104,6 @@ def hifa_diffgaincal(vis=None, flagging_frac_limit=None, hm_spwmapmode=None, mis
 
         Only used in band-to-band (diffgain) recipes.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Derive SpW phase offsets from differential gain calibrator.
 

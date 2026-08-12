@@ -34,9 +34,6 @@ def hifa_importdata(vis=None, session=None, asis=None, process_caldevice=None, o
         for any spw is from the ASDM, 0.5 if the query returned a warning or had a value older than 14 days,
         otherwise 1.0. A QA score of 0.60 results if the parallactic angle coverage is less than 60 degrees.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Load an ASDM list in the ../rawdata subdirectory into the context:
 

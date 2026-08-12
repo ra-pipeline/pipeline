@@ -3,7 +3,7 @@ import pipeline.infrastructure.launcher as launcher
 from . import cli
 
 
-def h_resume(filename: str | None = None):
+def h_resume(filename: str | None = None) -> launcher.Context:
     """Restore a saved pipeline state.
 
     Restores a named pipeline state from disk, allowing a suspended pipeline reduction session to be resumed.
@@ -11,9 +11,6 @@ def h_resume(filename: str | None = None):
     Args:
         filename: Saved pipeline state name. If set to ``'last'`` or left as ``None``, the most recently saved state
             ending with ``'.context'`` will be restored.
-
-    Returns:
-        The pipeline `context` object.
 
     Examples:
         Resume the last saved session:

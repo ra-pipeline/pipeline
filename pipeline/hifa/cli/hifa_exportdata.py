@@ -34,9 +34,6 @@ def hifa_exportdata(vis=None, session=None, imaging_products_only=None, exportms
         QA = 1.0 if all standard products were successfully copied to the ``products/`` directory;
         QA = 0.0 otherwise.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Export the pipeline results for a single session:
 

@@ -30,9 +30,6 @@ def hifa_session_refant(vis=None, phase_threshold=None):
 
         Only used in polarization recipes.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Compute a single common reference antenna per session:
 

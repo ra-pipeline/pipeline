@@ -60,9 +60,6 @@ def hifa_wvrgcalflag(vis=None, caltable=None, offsetstable=None, hm_toffset=None
 
         The final stage score is the lowest score across all MeasurementSets.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Compute the WVR calibration for all the MeasurementSets:
 

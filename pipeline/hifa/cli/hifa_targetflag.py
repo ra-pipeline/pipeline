@@ -33,9 +33,6 @@ def hifa_targetflag(vis=None, parallel=None):
     Notes:
         QA = 1 - (fraction of data newly flagged).
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Run with recommended settings to flag outliers in science target(s):
 

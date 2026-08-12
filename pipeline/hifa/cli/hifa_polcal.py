@@ -44,9 +44,6 @@ def hifa_polcal(vis=None, minpacov=None, solint_chavg=None, vs_stats=None, vs_th
 
         Only used in polarization recipes.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Compute the polarization calibrations:
 

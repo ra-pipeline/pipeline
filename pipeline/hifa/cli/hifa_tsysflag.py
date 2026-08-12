@@ -66,9 +66,6 @@ def hifa_tsysflag(vis=None, caltable=None,
         for fractions between 5% and 50%. An additional score of 0.8 is assigned if any spw has an antenna that is
         fully flagged.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Flag Tsys measurements using currently recommended tests:
 
