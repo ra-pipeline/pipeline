@@ -23,7 +23,7 @@ def hsd_importdata(vis=None, session=None, hm_rasterscan=None, parallel=None, as
     additional set of pointing plots with ephemeris correction is produced.
 
     .. figure:: /figures/guide-img034.png
-       :scale: 60%
+       :width: 60%
        :alt: Telescope Pointing detail page
 
        The detailed page of Telescope Pointing on the MS summary page.

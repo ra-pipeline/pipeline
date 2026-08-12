@@ -78,7 +78,7 @@ def hifa_diffgaincal(vis=None, flagging_frac_limit=None, hm_spwmapmode=None, mis
     The gaincal workflow and low SNR logical flow are shown in the figure below.
 
     .. figure:: /figures/PL2025_hifa_diffgaincal_incHeuristic.png
-       :scale: 60%
+       :width: 60%
        :alt: Gain solution workflow for hifa_diffgaincal
 
        Left: gain solution workflow with low-SNR heuristic before each ``gaincal``.

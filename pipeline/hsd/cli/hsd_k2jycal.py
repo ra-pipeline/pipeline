@@ -22,7 +22,7 @@ def hsd_k2jycal(dbservice=None, endpoint=None, reffile=None,
       are plotted as individual points labeled with their EB name.
 
     .. figure:: /figures/jy2k.png
-       :scale: 60%
+       :width: 60%
        :alt: Jy/K conversion factor plots
 
        Plots of Jy/K conversion factors. (a) Fewer than 5 EBs: scatter plot.

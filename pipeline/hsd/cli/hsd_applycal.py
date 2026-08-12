@@ -18,7 +18,7 @@ def hsd_applycal(vis=None, field=None, intent=None, spw=None, antenna=None,
       or polarization leakages.
 
     .. figure:: /figures/XX-YY.png
-       :scale: 60%
+       :width: 60%
        :alt: XX-YY polarization difference heuristic plots
 
        Heuristic plots for amplitude difference between two polarizations.

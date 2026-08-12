@@ -27,7 +27,7 @@ def hifa_polcal(vis=None, minpacov=None, solint_chavg=None, vs_stats=None, vs_th
     - Real vs. imaginary component of the calibrated polarization calibrator (XX, YY, XY, YX)
 
     .. figure:: /figures/polcal.png
-       :scale: 60%
+       :width: 60%
        :alt: WebLog QA for hifa_polcal
 
        Example of the WebLog QA for the ``hifa_polcal`` stage.

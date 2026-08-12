@@ -51,7 +51,7 @@ def hifa_wvrgcalflag(vis=None, caltable=None, offsetstable=None, hm_toffset=None
           the scoring tree shown below.
 
         .. figure:: /figures/hifa_wvrgcalflag_scoring_PL2023.png
-           :scale: 60%
+           :width: 60%
            :alt: QA scoring workflow for hifa_wvrgcalflag
 
            QA scoring workflow showing initial and secondary scoring criteria, the resulting

@@ -34,7 +34,7 @@ def hifa_renorm(vis=None, createcaltable=None, threshold=None, spw=None, exclude
     across fields being averaged together.
 
     .. figure:: /figures/hifa_renorm_PL2022.png
-       :scale: 60%
+       :width: 60%
        :alt: WebLog for hifa_renorm
 
        WebLog for the ``hifa_renorm`` stage. Table rows highlighted blue indicate values
@@ -42,14 +42,14 @@ def hifa_renorm(vis=None, createcaltable=None, threshold=None, spw=None, exclude
        renormalization spectra per field/spw.
 
     .. figure:: /figures/hifa_renorm_PDF_PL2022.png
-       :scale: 60%
+       :width: 60%
        :alt: Renormalization PDF diagnostic screenshot
 
        PDF screenshot for an EB/target/spw where renormalization is applied. The CO line
        causes atypically high scaling > 1.25 (25%).
 
     .. figure:: /figures/hifa_renorm_PDFwithATM_PL2022.png
-       :scale: 60%
+       :width: 60%
        :alt: Renormalization PDF with atmospheric exclusion
 
        PDF where atmospheric regions are automatically excluded (semi-opaque grey).
