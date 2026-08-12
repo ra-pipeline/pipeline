@@ -1,4 +1,4 @@
-## `hifa_polcalimage` Processing Recipe
+# `hifa_polcalimage` Processing Recipe
 
 The following is the ordered list of pipeline processing commands executed by the `hifa_polcalimage` recipe, as defined in `procedure_hifa_polcalimage.xml`.
 
