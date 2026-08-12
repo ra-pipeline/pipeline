@@ -270,7 +270,7 @@ p.rubric {
    Image & Screenshot Drop Shadows
    =========================================================================== */
 /* Add a subtle drop-shadow to embedded screenshots to distinguish them from the background */
-figure img, .figure img {
+figure img, .figure img, a[data-lightbox] img {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
     border-radius: 4px;
     border: 1px solid var(--color-background-border, #e0e0e0);
