@@ -163,7 +163,7 @@ build_version_short = build_version.removesuffix('-detached').removesuffix('-dir
 # General information about the project.
 project = f'Pipeline ({version})'
 html_title = f'Pipeline ({version})'
-author = 'Pipeline Dev. Team'
+author = 'Pipeline Contributors'
 copyright = f'2020–{datetime.now(timezone.utc).year}, {author}, build: {build_version_short}'
 
 # The version info for the project you're documenting, acts as replacement
