@@ -16,29 +16,45 @@ Pipeline
 Official Repository
 -------------------
 
-The official public code repository is accessible here:  
-- `Open Bitbucket @ NRAO - PIPE <https://open-bitbucket.nrao.edu/projects/PIPE>`_
+The official public code repository is accessible here:  - `Open Bitbucket @ NRAO - PIPE <https://open-bitbucket.nrao.edu/projects/PIPE>`_
 
 Documentation Components
------------------------
+------------------------
 
-============================================  ======================
-Content                                       Location
-============================================  ======================
-Past releases, all observatories              :doc:`Releases <releases>` (here)
-Past releases used for ALMA data processing   `ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>`_ (ALMA portal)
---------------------------------------------  ----------------------
-ALMA User's Guide                             `ALMA Processing  <https://almascience.nrao.edu/processing/science-pipeline>`_ (ALMA portal)
-VLA User's Guide                              `VLA Processing <https://science.nrao.edu/facilities/vla/data-processing>`_ (NRAO site)
-How to run the pipeline as a user             in the User's guides
-Imaging weights (previously in User's Guide)  :doc:`Imaging Weights <users_guide/weights>` (here)
---------------------------------------------  ----------------------  
-Documentation and API for each task           `PDF <https://pipe-docs.readthedocs.io/_/downloads/en/latest/pdf/>`_ :doc:`HTML <apisummary>` (here)
-Reference Manual                              replaced by previous line; old versions on `ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>`_ page
---------------------------------------------  ----------------------
-How to run the pipeline as a developer        :doc:`Running Pipeline <devel/usage/running_pipeline>` (here)
-Pipeline Dependencies                         :doc:`Dependencies <dependencies>` (here)
-============================================  ======================
+.. list-table::
+   :header-rows: 1
+   :widths: 40 40
+   :class: pipedocs-frontpage
+
+   * - Content
+     - Location
+   * - Past releases, all observatories
+     - :doc:`Releases <releases>`
+   * - Past releases used for ALMA processing
+     - `ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>`__ (ALMA site)
+   * - ALMA User's Guide :sup:`1`
+     - :doc:`ALMA User's Guide <users_guide/index>`
+   * - VLA User's Guide
+     - `VLA Processing <https://science.nrao.edu/facilities/vla/data-processing>`__ (NRAO site)
+   * - Nobeyama User's Guide
+     - `Nobeyama User's Guide <https://www.nro.nao.ac.jp/projects/45m/data/otf/#casa>`__ (NRO site)
+   * - How to run the pipeline as a user
+     - :doc:`Quick Start <users_guide/quick-start>`
+   * - Imaging weights
+     - :doc:`Imaging Weights <users_guide/weights>`
+   * - Documentation and API for each task :sup:`2`
+     - `PDF <https://pipe-docs.readthedocs.io/_/downloads/en/latest/pdf/>`__ :doc:`HTML <apisummary>`
+   * - How to run the pipeline as a developer
+     - :doc:`Running Pipeline <devel/usage/running_pipeline>`
+   * - Pipeline Dependencies
+     - :doc:`Dependencies <dependencies>`
+
+
+
+:sup:`1` \ previous versions were in pdf form at `ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>`__
+     
+:sup:`2` \ previously the Reference Manual in pdf form at `ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>`__
+
 
 
 .. _NRAO: http://www.nrao.edu  

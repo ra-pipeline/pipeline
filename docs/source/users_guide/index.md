@@ -1,4 +1,4 @@
-# ALMA User's Guide
+# ALMA Pipeline User's Guide
 
 ```{toctree}
 :maxdepth: 1
