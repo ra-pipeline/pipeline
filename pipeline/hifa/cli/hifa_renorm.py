@@ -9,7 +9,12 @@ def hifa_renorm(vis=None, createcaltable=None, threshold=None, spw=None, exclude
 
     When bright astronomical lines are present in the autocorrelations of science targets, the ALMA
     correlator's amplitude normalization can be incorrect, leading to under-scaled amplitudes in the
-    affected channels. This task creates per-channel renormalization spectra (scaling spectra) and,
+    affected channels. Amore complete description of ALMA’s amplitude normalization and the effects of
+    bright emission lines can be found here: `KB623 <https://help.almascience.org/kb/articles/623>`__.
+    In brief, the effect occurs when there is bright enough line emission to be strong in a single-dish
+    spectrum of the source.
+    
+    This task creates per-channel renormalization spectra (scaling spectra) and,
     optionally, stores them in a Tsys-like calibration table to be applied during :func:`~pipeline.hif.cli.hif_applycal`.
     (Prior to PL2024 the correction was applied by editing the MS directly.)
 

@@ -44,6 +44,12 @@ def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, an
         fewer than 8 channels, the interval is set to one-eighth of the
         bandwidth, and the result is assigned a QA subscore of 0.70.
 
+        Since PL2024, the `hm_auto_fillgaps` parameter, if set to True (which is the default in the
+        calibration recipes), causes the `fillgaps` parameter of the underlying :func:`~casatasks.calibration.bandpass` task to
+        be set to 1/4 of each spw width, allowing the user to interpolate across a celestial
+        spectral feature in the bandpass calibrator spectrum. It also avoids gaps due to strong
+        atmospheric lines where the SNR of the solution fails to meet the threshold.
+
         **WebLog Output and QA Metrics**
 
         The WebLog for this stage includes plots of amplitude and phase vs.
@@ -65,13 +71,19 @@ def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, an
         -   A QA sub-score of 0.9 is assigned if spws were combined in the
             phase-up step (from PL2025).
 
+        There are also links to a sub-page that shows the corresponding plots of the
+        bandpass solutions on a per-ms/spw/antenna basis, also with the atmospheric transmission
+        curve overlaid. There are fields to filter these plots by ms/spw/antenna, and at the
+        top is a histogram of the QA values.
+    
+
         **BLC FDM Subband QA (PL2025+)**
 
         For data from FDM spectral windows using the Baseline Correlator (BLC),
         a new QA assesses anomalous features (e.g., offsets, jumps) at subband
         edges (effective width 58.59375 MHz). The score is based on five
         heuristics (two for phase, three for amplitude) per spw, antenna, and
-        polarization that check for noisy subbands, offsets between subbands,
+        polarization that check for high dispersion subbands, offsets between subbands,
         and large amplitude spikes.
 
         -   If any heuristic is triggered, the QA score is between 0.35 and 0.65,

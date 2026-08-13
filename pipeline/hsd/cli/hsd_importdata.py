@@ -36,11 +36,13 @@ def hsd_importdata(vis=None, session=None, hm_rasterscan=None, parallel=None, as
     Notes:
         QA scoring:
 
-        - 1.0 if ATMOSPHERE intents are present.
-        - 1.0 if a single continuous observing session is present.
-        - 1.0 if all source coordinates are available.
-        - -0.5 if existing processing history is detected.
-        - -0.5 if existing model data is detected.
+        - 1.0 if ATMOSPHERE intents are present for all MS, else score = fractional number of MS missing that intent.
+        - 1.0 if a single continuous observing session (<2h) is present, else 0.5.
+        - 1.0 if all source coordinates are available, else score = fractional number of MS with zero source coordinates.
+        - 0.5 if existing processing history is detected.
+        - 0.5 if existing model data is detected.
+        - IERS table covers observation duration: QA score = 1.0 if observation duration is fully covered by IERS table, QA score = 0.9 if observation duration is not fully covered by IERS table, but within 3 months from the IERS coverage, QA score = 0.5 if observation duration is not fully covered by IERS table and deviates from the IERS coverage, QA score = 0.3 if observation duration is not fully covered by IERS nor IERSPredict.
+        - QA score = 0.8 if analysis of antenna pointing data fails, otherwise 1.0.
 
     Examples:
         1. Load ASDMs from the ``../rawdata`` directory into the context:
