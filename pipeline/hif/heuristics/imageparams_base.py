@@ -1959,7 +1959,7 @@ class ImageParamsHeuristics:
 
         field_ids = self.field(intent, field, vislist=vis)  # list of strings with comma separated IDs per MS
         phasecenter, _ = self.phasecenter(field_ids, vislist=vis)  # string
-        center_field_ids = self.center_field_ids(vis, field, intent, phasecenter)  # list of integer IDs per MS
+        center_field_ids = self.center_field_ids(vis, field.split(","), intent, phasecenter)  # list of integer IDs per MS
         for ms_index, msname in enumerate(vis):
             ms = self.observing_run.get_ms(name=msname)
             for intSpw in map(int, spw.split(',')):
