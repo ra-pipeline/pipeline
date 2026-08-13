@@ -81,7 +81,32 @@ def cli_wrapper(func: Callable) -> Callable:
 
         return results
 
+    # Strip Sphinx cross-reference markup from the docstring so it looks clean
+    # in the terminal when users run `help(task)` or `?task`.
+    if func.__doc__:
+        import re
+        clean_doc = func.__doc__
+
+        # 1. Strip Sphinx cross-reference roles (e.g., :func:`~...h_init` -> `h_init`)
+        clean_doc = re.sub(r':[a-zA-Z0-9_:]+:`~?(?:[a-zA-Z0-9_./\-]+\.)?([a-zA-Z0-9_\-]+)`', r'`\1`', clean_doc)
+        clean_doc = re.sub(r':[a-zA-Z0-9_:]+:`([^<`]+?)\s*<[^>]+>`', r'`\1`', clean_doc)
+
+        # 2. Strip `.. figure::` and its options, leaving only the caption
+        clean_doc = re.sub(r'^\s*\.\. figure::.*\n(?:^\s*:.*:\s*.*\n)*', '', clean_doc, flags=re.MULTILINE)
+
+        # 3. Strip `.. list-table:: TITLE` and its options, replacing with just the TITLE
+        clean_doc = re.sub(r'^\s*\.\. list-table::\s*(.*?)\n(?:^\s*:.*:\s*.*\n)*', r'\1\n', clean_doc, flags=re.MULTILINE)
+
+        # 4. Strip `.. code-block:: text`
+        clean_doc = re.sub(r'^\s*\.\. code-block::.*\n', '', clean_doc, flags=re.MULTILINE)
+
+        # Modify the original function's docstring so that IPython's `?`
+        # (which unwraps decorators) sees the cleaned version.
+        func.__doc__ = clean_doc
+        wrapper.__doc__ = clean_doc
+
     return wrapper
+
 
 @contextlib.contextmanager
 def set_contextvar(var: ContextVar, value: Any) -> Generator[None, None, None]:
@@ -91,6 +116,7 @@ def set_contextvar(var: ContextVar, value: Any) -> Generator[None, None, None]:
         yield
     finally:
         var.reset(token)
+
 
 def get_context():
     """Retrieve the current pipeline context."""
