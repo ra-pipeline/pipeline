@@ -48,23 +48,26 @@ tracks the latest supported CASA snapshot.
 * - Environment
   - CASA version
   - Python
-* - `default` (alias: `casa675-py312`)
-  - 6.7.5
+* - `default` (alias: `casa674-py312`)
+  - 6.7.4
   - 3.12
-* - `casa675-py313`
-  - 6.7.5
+* - `casa676-py312`
+  - 6.7.6
+  - 3.12
+* - `casa676-py313`
+  - 6.7.6
   - 3.13 (linux-64 + osx-arm64)
-* - `casa675-py312`
-  - 6.7.5
+* - `casa677-py312`
+  - 6.7.7
   - 3.12
+* - `casa677-py313`
+  - 6.7.7
+  - 3.13 (linux-64 + osx-arm64)
 * - `casa674-py312`
   - 6.7.4
   - 3.12
-* - `casa671-py312`
-  - 6.7.1
-  - 3.12
 * - `docs`
-  - 6.7.5
+  - 6.7.4
   - 3.12 (docs extras)
 ```
 
@@ -339,15 +342,15 @@ To share or reproduce a pixi environment via conda, export it with:
 
 ```bash
 # Export default environment (reads from pixi.lock)
-pixi project export conda-environment > environment_casa675_py312.yml
+pixi project export conda-environment > environment_casa674_py312.yml
 
 # Export a specific environment
-pixi project export conda-environment -e casa671-py312 > environment_casa671_py312.yml
+pixi project export conda-environment -e casa677-py312 > environment_casa677_py312.yml
 
 # From outside the source tree
 pixi project export conda-environment \
   --manifest-path /path/to/pipeline/pyproject.toml \
-  -e casa675-py312
+  -e casa677-py312
 ```
 
 > **Note:** The exported YAML contains pinned conda-managed packages from
