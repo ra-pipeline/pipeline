@@ -24,12 +24,23 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
 
     1. Phase-up calibration is performed for all science spws for each calibrator field using the spw
        mapping/combine parameters and ``solint``/``gaintype`` established in :func:`~pipeline.hifa.cli.hifa_spwphaseup`.
+       If there are other intents, e.g. BANDPASS, DIFFGAIN, that share the same field as the AMPLITUDE and
+       are observed in different scans, then the phase-up is explicitly only performed on the intent
+       AMPLITUDE and effectively only that observing scan. Generally, ALMA uses the same field for
+       BANDPASS and AMPLITUDE and it is usually observed in the same scan. During the gaincal processes for
+       each field, if there are multiple fields per INTENT and/or more than one Spectral Spec (tuning setup)
+       then a new caltable is created each time. Note than the phase solutions for the check source(s)
+       are saved and are shown in :func:`~pipeline.hifa.cli.hifa_timegaincal`. in the plot of Diagnostic Phase vs. time.
     2. Amplitude-only solutions are computed (with ``gaintype='T'``, combining polarisations), pre-applying
-       the phase solutions.
+       the phase solutions.  ``gaintype='T'`` allows polarized calibrators to have differing flux densities
+       in their calibrated XX and YY visibilities, and thereby avoids introducing any false polarization
+       into the science targets. Again, if there are other intents that are the same field as the AMPLITUDE,
+       only the AMPLITUDE intent is explicitly solved. For those intents that are the same field as the
+       AMPLITUDE, a :func:`~casatasks.calibration.setjy` call is made to correctly set the flux scale.
     3. Obvious outlier amplitude solutions are identified and flagged in the caltable.
     4. The flux scale is transferred from the reference calibrators to the transfer calibrators using
        ``refspwmap`` for windows without data in the reference calibrators.
-    5. The computed flux density values are written to the MODEL_DATA column via ``setjy``.
+    5. The computed flux density values are written to the MODEL_DATA column via :func:`~casatasks.calibration.setjy`.
 
     The WebLog lists the derived flux scale factors and calibrated flux densities (measured by vector-averaged
     calibrated visibility amplitude) for all non-amplitude calibrators, together with the ALMA Source Catalog
@@ -84,6 +95,12 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
         in some spws causing amplitude noise bias, or atmospheric absorption lines). Check :func:`~pipeline.hif.cli.hif_applycal`
         to determine whether any low score represents a real science target issue.
 
+
+        High values in the Flagged data summary table on the WebLog page are indicative of low SNR achieved
+        on the corresponding object, even after attempting the best calibration possible according to the :func:`~pipeline.hifa.cli.hifa_spwphaseup` low SNR cascade. In all cases, the percentages in both the before and after columns will naturally be higher
+        than the corresponding values seen on the later hif_applycal stage because in that stage the phase solutions are
+        scan-based, thus have higher SN.
+    
         For very low SNR, the longer ``solint`` used in the phase-up can cause phase decoherence to be
         'baked in', artificially biasing amplitude gains upward and producing an incorrect flux scale.
 
