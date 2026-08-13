@@ -32,6 +32,7 @@ Contributors and Affiliations
 - László Szűcs (NRAO, 2020-2021)
 - Patrick Bos (NOVA, 2026-current)
 - Patrick Sheehan (NRAO, 2022-current)
+- Ryan Loomis (NRAO, 2020-current)
 - Remy Indebetouw (NRAO, 2005-current)
 - Rui Xue (NRAO, 2020-current)
 - Shawn Booth (NRAO, 2024-current)

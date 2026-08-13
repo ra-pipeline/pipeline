@@ -8,9 +8,6 @@ def hif_setjy(vis=None, field=None, intent=None, spw=None, model=None,
               spix=None, scalebychan=None, standard=None):
     """Fill the model column with calibrated visibilities.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Set the model flux densities for all the amplitude calibrators:
 

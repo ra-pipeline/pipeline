@@ -61,7 +61,7 @@ class CheckflagInputs(vdp.StandardInputs):
                   lowering the thresholds for spws with RFI to be closer to the RFI-free
                   thresholds, and catches more of the RFI.
                 - Mode 'vlass-imaging' is similar to 'target-vlass', except that it executes on the split off target
-                  data, intent='*TARGET', datacolumn='data' and uses a timedevscale of 4.0.
+                  data, intent='\\*TARGET', datacolumn='data' and uses a timedevscale of 4.0.
 
             overwrite_modelcol: Always write the model column, even if it already exists.
 
@@ -88,7 +88,7 @@ class CheckflagInputs(vdp.StandardInputs):
 
 
 class CheckflagResults(basetask.Results):
-    def __init__(self, jobs=None, results=None, summaries=None, vis_averaged=None, dataselect=None):
+    def __init__(self, jobs=None, results=None, summaries=None, vis_averaged=None, dataselect=None, use_contdat=False):
 
         if jobs is None:
             jobs = []
@@ -108,6 +108,7 @@ class CheckflagResults(basetask.Results):
         self.summaries = summaries
         self.vis_averaged = vis_averaged
         self.dataselect = dataselect
+        self.use_contdat = use_contdat
 
     def __repr__(self):
         s = 'Checkflag (rflag mode) results:\n'
@@ -213,8 +214,8 @@ class Checkflag(basetask.StandardTaskTemplate):
                              'for checkflagmode=target-vla.')
                     use_contdat = True
                 else:
-                    LOG.warning('usecontdat=True but no cont.dat found or empty: '
-                                'Applying flagging to all spectral windows.')
+                    LOG.info('usecontdat=True but no cont.dat found or empty: '
+                             'Applying flagging to all spectral windows.')
             else:
                 LOG.info('usecontdat=False: Applying flagging to all spectral windows.')
 
@@ -259,6 +260,7 @@ class Checkflag(basetask.StandardTaskTemplate):
                                        'scan': scanselect,
                                        'intent': intentselect,
                                        'spw': self.sci_spws}
+        checkflag_result.use_contdat = use_contdat
 
         return checkflag_result
 

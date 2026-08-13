@@ -17,9 +17,6 @@ def hifv_mstransform(vis=None, outputvis=None, outputvis_for_line=None, field=No
     spectral line spws in the input MeasurementSet, an MS for science target line imaging
     will also be produced, which will end in _targets.ms.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Create a science target MS from the corrected column in the input MS:
 

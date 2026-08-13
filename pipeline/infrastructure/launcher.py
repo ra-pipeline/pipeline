@@ -30,6 +30,10 @@ LOG = logging.get_logger(__name__)
 MIN_CASA_REVISION = [6, 7, 4, 2]
 # maximum allowed CASA revision. Set to 0 or None to disable
 MAX_CASA_REVISION = None
+# discouraged CASA revision range [start_inclusive, end_inclusive]: versions that are known to have
+# issues but are not hard-blocked. Set to None to disable.
+# Current range: casatasks.getjyperkalma is not implemented in CASA 6.7.5 (see PIPE-2967/CAS-14704).
+DISCOURAGED_CASA_REVISION_RANGE = ([6, 7, 5, 0], [6, 7, 6, 0])
 
 # Define the thread-safe context variable here for the current task executaton state
 current_task_name = contextvars.ContextVar('current_task_name', default=None)
@@ -140,14 +144,15 @@ class Context:
         self.clean_list_pending = []  # CAS-10146
         self.clean_masks = {}  # PIPE-2464
         self.clean_thresholds = {}  # PIPE-2464
-        self.contfile: str | None = None
+        self.contfile: str | None = 'cont.dat' # PIPE-3131 starts with an intrinsic hif_makeimlist call which does not populate this name. It needs to be initialized here.
         self.imaging_mode: str | None = None  # PIPE-592
         self.imaging_parameters = {}  # CAS-10146
-        self.linesfile: str | None = None
+        self.linesfile: str | None = 'lines.dat'
         self.per_spw_cont_sensitivities_all_chan = {'robust': None, 'uvtaper': None}  # CAS-11211
         self.rmsimlist = imagelibrary.ImageLibrary()  # CAS-9632
         self.sciimlist = imagelibrary.ImageLibrary()
         self.selfcal_resources: list[str] = []  # PIPE-1802
+        self.findroi_resources: list[str] = []  # PIPE-3136
         self.selfcal_targets = []  # PIPE-1802
         self.size_mitigation_parameters = {}  # CAS-9255
         self.subimlist = imagelibrary.ImageLibrary()  # CAS-10345
@@ -296,13 +301,19 @@ class Pipeline:
         # our expected minimum and maximum
         if casa_version_check is True:
             if MIN_CASA_REVISION and environment.compare_casa_version('<', MIN_CASA_REVISION):
-                msg = ('Minimum CASA revision for the pipeline is %s, '
-                       'got CASA %s.' % (MIN_CASA_REVISION, environment.casa_version))
-                LOG.critical(msg)
+                LOG.critical('Minimum CASA revision for the pipeline is %s, got CASA %s.',
+                             MIN_CASA_REVISION, environment.casa_version)
             if MAX_CASA_REVISION and environment.compare_casa_version('>', MAX_CASA_REVISION):
-                msg = ('Maximum CASA revision for the pipeline is %s, '
-                       'got CASA %s.' % (MAX_CASA_REVISION, environment.casa_version))
-                LOG.critical(msg)
+                LOG.critical('Maximum CASA revision for the pipeline is %s, got CASA %s.',
+                             MAX_CASA_REVISION, environment.casa_version)
+            if DISCOURAGED_CASA_REVISION_RANGE:
+                excl_min, excl_max = DISCOURAGED_CASA_REVISION_RANGE
+                in_excluded = (not environment.compare_casa_version('<', excl_min)
+                               and not environment.compare_casa_version('>', excl_max))
+                if in_excluded:
+                    LOG.warning('CASA revision %s is in the discouraged range %s to %s; '
+                                'known issues may affect pipeline results.',
+                                environment.casa_version, excl_min, excl_max)
 
         # if no previous context was specified, create a new context for the
         # given measurement set

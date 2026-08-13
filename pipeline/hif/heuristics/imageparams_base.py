@@ -1257,7 +1257,7 @@ class ImageParamsHeuristics:
 
         return imsize
 
-    def imsize(self, fields, cell, primary_beam, sfpblimit=None, max_pixels=None,
+    def imsize(self, fields, cell, primary_beam, sfpblimit=None, max_pixels=None, min_pixels=None,
                centreonly=False, vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None):
         """
         Image size heuristics for single fields and mosaics. The pixel count along x and y image dimensions
@@ -1269,6 +1269,7 @@ class ImageParamsHeuristics:
         :param sfpblimit: single field primary beam response. If provided then imsize is chosen such that the image
             edge is at normalised primary beam level equals to sfpblimit.
         :param max_pixels: maximum allowed pixel count, integer. The same limit is applied along both image axes.
+        :param min_pixels: minimum allowed pixel count, integer. The same limit is applied along both image axes.
         :param centreonly: if True, then ignore the spread of field centers.
         :param vislist: list of visibility path string to be used for imaging. If not set then use all visibilities
             in the context.
@@ -1334,6 +1335,10 @@ class ImageParamsHeuristics:
         if max_pixels is not None:
             nxpix = min(nxpix, max_pixels)
             nypix = min(nypix, max_pixels)
+
+        if min_pixels is not None:
+            nxpix = max(nxpix, min_pixels)
+            nypix = max(nypix, min_pixels)
 
         # set nxpix, nypix to next highest 'composite number'
         csu = casa_tools.synthesisutils

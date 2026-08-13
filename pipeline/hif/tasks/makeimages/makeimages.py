@@ -152,7 +152,7 @@ class MakeImagesInputs(vdp.StandardInputs):
 
             hm_maxpsffraction: PSF fraction that marks the minimum depth of cleaning in the minor cycle
 
-            hm_weighting: Weighting scheme (natural,uniform,briggs,briggsabs[experimental],briggsbwtaper[experimental])
+            hm_weighting: Weighting scheme (natural,uniform,briggs,briggsabs[experimental],briggsbwtaper)
 
             hm_cleaning: Pipeline cleaning mode
 
@@ -648,7 +648,7 @@ class MakeImages(basetask.StandardTaskTemplate):
                            pbcor_image_max=cqa.quantity(pbcor_image_max, 'Jy/beam'),
                            nonpbcor_image_min=cqa.quantity(nonpbcor_image_min, 'Jy/beam'),
                            nonpbcor_image_max=cqa.quantity(nonpbcor_image_max, 'Jy/beam'),
-                           imagename=result.image.replace('.pbcor', ''),
+                           imagename=imname.replace('.pbcor', ''),
                            datatype=result.datatype)
 
 
