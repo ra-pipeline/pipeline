@@ -81,6 +81,55 @@ pixi run -e casa671-py312 test-unit
 
 ## Available tasks
 
+### `casa` — launch interactive CASA shell
+
+Launches an interactive CASA shell (`casashell`) for interactive data inspection,
+testing, and development.
+
+```bash
+pixi run casa
+
+# With a specific CASA version
+pixi run -e casa677-py312 casa
+```
+
+---
+
+### `update-data` — update CASA configuration and runtime data
+
+Updates CASA configuration, measures tables, and other runtime artifacts.
+Combines three operations: `--update-all`, `--summary`, and `--current-data`.
+
+```bash
+pixi run update-data
+```
+
+---
+
+### `casampi` — launch CASA with MPI support
+
+Launches CASA in MPI mode with proper safety flags for parallel processing.
+Default: 4 processes. Override with environment variable `CASA_NPROCS`.
+
+**Configuration:**
+- Disables InfiniBand (`--mca btl ^openib`)
+- Binds to all available threads (`--bind-to none`)
+- Sets thread affinity and suppresses pmix warnings
+- Environment: `OMP_NUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1` (prevents oversubscription)
+
+```bash
+# Launch with default 4 processes
+pixi run casampi
+
+# Override process count
+CASA_NPROCS=8 pixi run casampi
+
+# Use with a specific CASA version
+CASA_NPROCS=8 pixi run -e casa677-py312 casampi
+```
+
+---
+
 ### `test-unit` — unit tests with coverage
 
 Runs all unit tests (any `*_test.py` file under `pipeline/`) using
@@ -160,18 +209,6 @@ pixi run test-pltest1
 # or from anywhere, pointing at the manifest
 cd /my/workdir
 pixi run --manifest-path /path/to/pipeline/pyproject.toml test-pltest1
-```
-
----
-
-### `fetch-casarundata` — initialize CASA runtime data
-
-Triggers the first-time download of CASA runtime data (measures tables, etc.)
-by importing `casatools`.  Run once after `pixi install` or after switching to
-a new CASA version.
-
-```bash
-pixi run fetch-casarundata
 ```
 
 ---
@@ -399,6 +436,15 @@ in the export.
 * - Task
   - Command
   - Output cwd
+* - Launch CASA shell
+  - `pixi run casa`
+  - interactive
+* - Update CASA data
+  - `pixi run update-data`
+  - varies
+* - Launch CASA MPI (4 processes)
+  - `CASA_NPROCS=8 pixi run casampi`
+  - interactive
 * - Unit tests
   - `pixi run test-unit`
   - `$INIT_CWD` (invocation dir)
@@ -408,9 +454,6 @@ in the export.
 * - Single ALMA-IF test
   - `pixi run test-pltest1`
   - `$INIT_CWD` (invocation dir)
-* - Init CASA runtime data
-  - `pixi run fetch-casarundata`
-  - project root
 * - Build docs (clean)
   - `pixi run build-docs`
   - `docs/`

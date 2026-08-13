@@ -208,6 +208,51 @@ casatools = { version = ">=6.7.4.2", index = "https://casa-pip.nrao.edu/reposito
 
 
 [tool.pixi.tasks]
+
+# --------------------------------------------------------------------------
+# CASA Runtime & Environment — Simple Tasks
+# --------------------------------------------------------------------------
+
+# Launch interactive CASA shell
+[tool.pixi.tasks.casa]
+cmd = "python -m casashell"
+
+[tool.pixi.tasks.casa.env]
+PYTHONWARNINGS = "ignore::SyntaxWarning"
+
+# Update CASA data (configuration and runtime artifacts)
+update-data = "python -m casaconfig --update-all && python -m casaconfig --summary && python -m casaconfig --current-data"
+
+# --------------------------------------------------------------------------
+# CASA Runtime & Environment — Complex Tasks
+# --------------------------------------------------------------------------
+
+# Launch CASA with MPI support (for parallel workflows)
+[tool.pixi.tasks.casampi]
+description = "Launch CASA MPI with safety flags. Override ranks with CASA_NPROCS (default: 4)."
+cmd = """\
+sh -c 'mpirun -display-allocation -display-map -oversubscribe \
+--mca btl ^openib --mca btl_vader_single_copy_mechanism none --bind-to none \
+-x FI_PROVIDER -x OMP_NUM_THREADS -x OPENBLAS_NUM_THREADS \
+-x PATH -x PYTHONNOUSERSITE \
+-n ${CASA_NPROCS:-4} \
+python -m casashell "$@"' _\
+"""
+
+[tool.pixi.tasks.casampi.env]
+PYTHONWARNINGS = "ignore::SyntaxWarning"
+FI_PROVIDER = "^psm3"
+PMIX_MCA_pcompress_base_silence_warning = "1"
+OMP_PLACES = "threads"
+OMP_PROC_BIND = "false"
+OMP_NUM_THREADS = "1"
+OPENBLAS_NUM_THREADS = "1"
+PYTHONNOUSERSITE = "1"
+
+# --------------------------------------------------------------------------
+# Testing Tasks
+# --------------------------------------------------------------------------
+
 # Run unit tests with coverage
 test-unit = """
 cd $INIT_CWD && \
@@ -237,8 +282,6 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
   -c "import pytest; pytest.main(['$PIXI_PROJECT_ROOT/tests/regression/fast/alma_if_fast_test.py::test_uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small__PPR__regression'])"
 """
 
-# Fetch/update CASA runtime data
-fetch-casarundata = "python -c 'import casatools'"
 
 # --------------------------------------------------------------------------
 # Feature: CASA ver6.7.4 (PL2026-CASA branch) — Python 3.12
