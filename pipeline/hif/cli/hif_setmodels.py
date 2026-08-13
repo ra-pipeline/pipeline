@@ -9,7 +9,7 @@ def hif_setmodels(vis=None, reference=None, refintent=None, transfer=None, trans
 
     The model flux density of the amplitude calibrator is set, either from an internal CASA model (solar system
     objects), or from the results of observatory calibrator monitoring (quasars) which ultimately appear in the file
-    ``flux.csv`` (see :py:func:`hifa_importdata <hifa_importdata>`). These flux densities are listed on the WebLog page, along with plots of
+    ``flux.csv`` (see :func:`~pipeline.hifa.cli.hifa_importdata`). These flux densities are listed on the WebLog page, along with plots of
     the amplitude calibrator as a function of uv distance (which is useful to assess resolved solar system objects).
     If the bandpass calibrator is distinct from the amplitude calibrator and is a frequently monitored quasar, its
     model is also set at this stage.

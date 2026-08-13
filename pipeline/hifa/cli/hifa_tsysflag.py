@@ -14,7 +14,7 @@ def hifa_tsysflag(vis=None, caltable=None,
                   parallel=None):
     """Flag deviant system temperatures in the Tsys calibration table.
 
-    Flags erroneous Tsys measurements in the calibration table created by :py:func:`h_tsyscal <h_tsyscal>`. Detected anomalies include
+    Flags erroneous Tsys measurements in the calibration table created by :func:`~pipeline.h.cli.h_tsyscal`. Detected anomalies include
     anomalously high Tsys over an entire spectral window, spikes or 'birdies', and discrepant spectral shape as a
     function of frequency. The WebLog provides details for each kind of flagging performed and plots all Tsys
     spectra after flagging. If a Tsys flag template file is provided via the ``filetemplate`` parameter, those

@@ -16,7 +16,7 @@ def hif_selfcal(vis=None, field=None, spw=None, contfile=None, hm_imsize=None, h
 
     Attempts phase-only self-calibration on each science target for which the estimated SNR per-EB
     per-antenna exceeds 3. The task channels-averages the science data to 15.625 MHz, flags
-    line channels (from :py:func:`hif_findcont <hif_findcont>`), splits each source into a temporary MS, and then
+    line channels (from :func:`~pipeline.hif.cli.hif_findcont`), splits each source into a temporary MS, and then
     iterates through a series of gain solution intervals.
 
     The pipeline tracks multiple data type labels to manage regular and self-calibrated data:

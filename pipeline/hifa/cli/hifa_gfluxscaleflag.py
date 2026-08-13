@@ -9,7 +9,7 @@ def hifa_gfluxscaleflag(vis=None, intent=None, phaseupsolint=None, solint=None, 
     """Flag outlier visibilities in the flux, diffgain, and phase calibrators and check source.
 
     Performs a temporary calibration using the spw mapping/combine parameters established in
-    :py:func:`hifa_spwphaseup <hifa_spwphaseup>` (with ``solint`` always 'int' and ``gaintype`` always 'G' for the phase-up, and
+    :func:`~pipeline.hifa.cli.hifa_spwphaseup` (with ``solint`` always 'int' and ``gaintype`` always 'G' for the phase-up, and
     ``solint='inf'`` and ``gaintype='T'`` for the amplitude solutions), then identifies and flags outlier
     visibilities by statistically examining the scalar difference of calibrated amplitudes minus model
     amplitudes. Only amplitude outliers are flagged; the phase of the data is not assessed.

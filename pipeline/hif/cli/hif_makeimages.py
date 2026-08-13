@@ -11,7 +11,7 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
                    hm_maxpsffraction=None, hm_weighting=None, hm_cleaning=None, tlimit=None, drcorrect=None, masklimit=None,
                    cleancontranges=None, calcsb=None, hm_mosweight=None, overwrite_on_export=None, vlass_plane_reject_im=None,
                    parallel=None):
-    """Create cleaned images from the target list populated by :py:func:`hif_makeimlist <hif_makeimlist>`.
+    """Create cleaned images from the target list populated by :func:`~pipeline.hif.cli.hif_makeimlist`.
 
     In standard ALMA interferometric recipes, this task is invoked multiple times for different imaging
     purposes. The scenarios include:
@@ -211,7 +211,7 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
         significant decoherence.
 
     Examples:
-        1. Compute clean results for all imaging targets defined in a previous :py:func:`hif_makeimlist <hif_makeimlist>` call:
+        1. Compute clean results for all imaging targets defined in a previous :func:`~pipeline.hif.cli.hif_makeimlist` call:
 
         >>> hif_makeimages()
 

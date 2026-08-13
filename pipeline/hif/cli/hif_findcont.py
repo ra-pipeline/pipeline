@@ -20,7 +20,7 @@ def hif_findcont(vis=None, target_list=None, hm_mosweight=None,
     2. **Pre-smoothing**: A boxcar smoothing kernel is applied to the mean spectrum prior to
        analysis. For Cycle 10+ data the kernel width is derived from the
        ``spectralDynamicRangeBandwidth`` ASDM attribute. For older data it is based on the
-       ``nbin`` factor from the preceding :py:func:`hif_makeimlist <hif_makeimlist>` stage, with additional heuristics
+       ``nbin`` factor from the preceding :func:`~pipeline.hif.cli.hif_makeimlist` stage, with additional heuristics
        to skip smoothing for wide + narrow spw combinations, already-labeled continuum spws,
        and cases of strong line emission (peak SNR > 10: nbin limited to 2 for 12m, 3 for 7m).
     3. **Moment-difference contamination check**: Line-free channels are used to form ``mom8fc``
@@ -36,7 +36,7 @@ def hif_findcont(vis=None, target_list=None, hm_mosweight=None,
 
     If a ``cont.dat`` file already exists in the working directory, spws with pre-defined ranges
     are not re-analyzed; only spws not listed are processed. The resulting ``cont.dat`` file (LSRK
-    frequency ranges) is used by subsequent :py:func:`hif_uvcontsub <hif_uvcontsub>` and :py:func:`hif_makeimages <hif_makeimages>` stages.
+    frequency ranges) is used by subsequent :func:`~pipeline.hif.cli.hif_uvcontsub` and :func:`~pipeline.hif.cli.hif_makeimages` stages.
 
     The default mode is ``coarse``, which applies the local fast-imaging override. Use
     ``hm_mode='normal'`` to preserve the previous-cycle behavior.

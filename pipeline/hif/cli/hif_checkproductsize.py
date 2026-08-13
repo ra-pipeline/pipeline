@@ -74,7 +74,7 @@ def hif_checkproductsize(vis=None, maxcubesize=None, maxcubelimit=None, maxprodu
 
         When the cube or product size cannot be mitigated, the warning "QA Maximum cube size cannot be mitigated" 
         will appear at the top of the hif_checkproductsize stage, and the pipeline will stop in the first 
-        :py:func:`hif_makeimlist <hif_makeimlist>` (cube) stage with the message: "Error! Size mitigation had failed. 
+        :func:`~pipeline.hif.cli.hif_makeimlist` (cube) stage with the message: "Error! Size mitigation had failed. 
         Will not create any clean targets."
 
     Examples:

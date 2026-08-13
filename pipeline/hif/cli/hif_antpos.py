@@ -5,7 +5,7 @@ import pipeline.h.cli.utils as utils
 def hif_antpos(vis=None, caltable=None, hm_antpos=None, antenna=None, offsets=None, antposfile=None):
     """Derive antenna position calibration tables for a list of MeasurementSets.
 
-    The :py:func:`hif_antpos <hif_antpos>` task corrects the antenna positions recorded in the ASDMs using
+    The :func:`~pipeline.hif.cli.hif_antpos` task corrects the antenna positions recorded in the ASDMs using
     updated antenna position calibration information determined after the
     observation.
 

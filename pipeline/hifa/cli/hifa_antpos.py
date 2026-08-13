@@ -7,7 +7,7 @@ def hifa_antpos(vis=None, caltable=None, hm_antpos=None, antenna=None, offsets=N
                 threshold=None, snr=None, search=None):
     """Derive and apply antenna position corrections for a list of MeasurementSets.
 
-    The :py:func:`hifa_antpos <hifa_antpos>` task corrects antenna positions recorded in the ASDMs using
+    The :func:`~pipeline.hifa.cli.hifa_antpos` task corrects antenna positions recorded in the ASDMs using
     updated calibration information obtained after the observation. Corrections can
     be input by hand, read from a file on disk, or by querying an ALMA database service.
 

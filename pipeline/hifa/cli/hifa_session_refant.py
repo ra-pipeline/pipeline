@@ -12,7 +12,7 @@ def hifa_session_refant(vis=None, phase_threshold=None):
     The selection algorithm:
 
     1. Rank all antennas by the product of their per-EB rankings (based on flagging fraction and central
-       location in the array, as in :py:func:`hif_refant <hif_refant>`).
+       location in the array, as in :func:`~pipeline.hif.cli.hif_refant`).
     2. Starting from the highest-ranked antenna, perform a ``gaincal`` with ``solint='int'``, ``calmode='p'``,
        ``gaintype='G'``, ``minsnr=3`` on all PHASE intent scans for each EB.
     3. Check the resulting caltable to see if the reference antenna ever changes. Choose the first antenna for
@@ -22,7 +22,7 @@ def hifa_session_refant(vis=None, phase_threshold=None):
        phase was non-zero, meaning another refant was used). The total number of possible solutions is
        N_EBs x N_spws x N_integrations x N_pol.
 
-    If a single refant was requested via :py:func:`hif_refant <hif_refant>` in the PPR, a warning is generated indicating that
+    If a single refant was requested via :func:`~pipeline.hif.cli.hif_refant` in the PPR, a warning is generated indicating that
     only one antenna is common across all MSes.
 
     Notes:
