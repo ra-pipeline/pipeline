@@ -3,8 +3,10 @@ Created on 24 Aug 2015
 
 @author: sjw
 """
+
 import collections
 import copy
+import math
 import operator
 import os
 import shutil
@@ -21,10 +23,15 @@ import pipeline.h.tasks.common.displays as displays
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.utils import math as utils_math
 
+from .findcont import ImagingStatus
+
 LOG = logging.get_logger(__name__)
 
 
 TR = collections.namedtuple('TR', 'field spw min max frame status momdiffsnr spectrum jointmask')
+ImagingTR = collections.namedtuple(
+    'ImagingTR', 'field spw datatype phasecenter ppb cell imsize weighting robust uvtaper mosweight perchanweightdensity nbins'
+)
 
 
 class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
@@ -33,16 +40,29 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                  description='Detect continuum frequency ranges',
                  always_rerender=False):
         super().__init__(uri=uri,
-                                                           description=description,
-                                                           always_rerender=always_rerender)
+                         description=description,
+                         always_rerender=always_rerender)
 
     def update_mako_context(self, mako_context, pipeline_context, results):
         # as a multi-vis task, there's only one result for FindCont
         result = results[0]
 
         table_rows, raw_rows = self._get_table_rows(pipeline_context, result)
+        inputs = getattr(result, 'inputs', {}) or {}
+        mode = inputs.get('hm_mode') if inputs.get('hm_mode') in ('coarse', 'normal') else None
+        raw_imaging_summary = getattr(result, 'imaging_summary', []) or []
 
-        mako_context.update({'table_rows': table_rows, 'raw_rows': raw_rows})
+        mako_context.update({
+            'table_rows': table_rows,
+            'raw_rows': raw_rows,
+            'findcont_mode': mode,
+            'imaging_summary': self._get_imaging_summary(result),
+            'imaging_performed': any(
+                isinstance(entry, dict) and entry.get('status') == ImagingStatus.DIRTY_CUBE.value
+                for entry in raw_imaging_summary
+            ),
+            'imaging_skip_reason': self._get_imaging_skip_reason(raw_imaging_summary),
+        })
 
         weblog_dir = os.path.join(pipeline_context.report_dir,
                                   'stage%s' % results[0].stage_number)
@@ -50,14 +70,105 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         # copy cont.dat file across to weblog directory
         contdat_filename = 'cont.dat'
         contdat_weblink = os.path.join('stage%s' % results[0].stage_number, contdat_filename)
-        contdat_path_link = '<a href="{!s}" class="replace-pre" data-title="{!s}">View</a>' \
-                            ' or <a href="{!s}" download="{!s}">download</a> {!s} file.'.format(contdat_weblink, contdat_filename,
-                                                                                                contdat_weblink, contdat_weblink, contdat_filename)
+        contdat_path_link = (
+            '<a href="{!s}" class="replace-pre" data-title="{!s}">View</a>'
+            ' or <a href="{!s}" download="{!s}">download</a> {!s} file.'
+        ).format(
+            contdat_weblink,
+            contdat_filename,
+            contdat_weblink,
+            contdat_weblink,
+            contdat_filename,
+        )
         if os.path.exists(contdat_filename):
             LOG.trace('Copying %s to %s' % (contdat_filename, weblog_dir))
             shutil.copy(contdat_filename, weblog_dir)
 
         mako_context.update({'contdat_path_link': contdat_path_link})
+
+    def _get_imaging_summary(self, result) -> list[ImagingTR]:
+        """Format imaging_summary list into display rows.
+
+        Args:
+            result: Task result object containing imaging_summary attribute.
+
+        Returns:
+            List of ImagingTR namedtuples for rendering.
+        """
+        rows = []
+        for entry in getattr(result, 'imaging_summary', []) or []:
+            if not isinstance(entry, dict):
+                continue
+            rows.append(ImagingTR(
+                field=self._format_summary_value(entry.get('field')),
+                spw=self._format_summary_value(entry.get('spw')),
+                datatype=self._format_summary_value(entry.get('datatype')),
+                phasecenter=self._format_summary_value(entry.get('phasecenter')),
+                ppb=self._format_summary_value(entry.get('ppb')),
+                cell=self._format_summary_value(entry.get('cell')),
+                imsize=self._format_summary_value(entry.get('imsize'), separator=' x '),
+                weighting=self._format_summary_value(entry.get('weighting')),
+                robust=self._format_summary_value(entry.get('robust')),
+                uvtaper=self._format_summary_value(entry.get('uvtaper'), empty_value='None'),
+                mosweight=self._format_summary_value(entry.get('mosweight')),
+                perchanweightdensity=self._format_summary_value(entry.get('perchanweightdensity')),
+                nbins=self._format_summary_value(entry.get('nbins')),
+            ))
+        return rows
+
+    @staticmethod
+    def _get_imaging_skip_reason(imaging_summary: list[dict]) -> str:
+        """Determine skip reason from imaging summary statuses.
+
+        Args:
+            imaging_summary: List of imaging summary entry dictionaries.
+
+        Returns:
+            Human-readable message explaining why imaging was skipped.
+        """
+        statuses = {
+            entry.get('status')
+            for entry in imaging_summary
+            if isinstance(entry, dict) and entry.get('status')
+        }
+        if statuses == {ImagingStatus.EXISTING_SELECTION.value}:
+            return 'No dirty-cube imaging was required because continuum ranges were already available.'
+        if statuses == {ImagingStatus.NO_INTERSECTION.value}:
+            return 'No dirty-cube imaging was performed because no common frequency intersection was available.'
+        # Check if all statuses are in the set of non-imaging reasons (subset check)
+        if statuses.issubset({ImagingStatus.EXISTING_SELECTION.value, ImagingStatus.NO_INTERSECTION.value}):
+            return (
+                'No dirty-cube imaging was required because continuum ranges were already available '
+                'or no common frequency intersection was found.'
+            )
+        return 'No continuum-finding dirty-cube imaging was performed for this result.'
+
+    @staticmethod
+    def _format_summary_value(
+        value, separator: str = ', ', empty_value: str = 'Not available'
+    ) -> str:
+        """Normalize values for display in summary table.
+
+        Args:
+            value: Value to format (can be any type).
+            separator: String to join list/tuple elements.
+            empty_value: String to display for empty values.
+
+        Returns:
+            Formatted string representation of value.
+        """
+        if value in (None, '', [], {}):
+            return empty_value
+        if isinstance(value, (list, tuple)):
+            return separator.join(map(str, value))
+        if isinstance(value, float):
+            if math.isnan(value):
+                return 'NaN'
+            if math.isinf(value):
+                return '+Inf' if value > 0 else '-Inf'
+            if value.is_integer():
+                return str(int(value))
+        return str(value)
 
     def _get_table_rows(self, context, result):
         ranges_dict = result.result_cont_ranges
