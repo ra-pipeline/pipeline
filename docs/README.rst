@@ -64,8 +64,8 @@ Documentation Components
 .. _NOVA: https://nova-astronomy.nl/  
 .. _NAOJ: https://www.nao.ac.jp  
 
-.. |Docs Pages| image:: https://img.shields.io/github/actions/workflow/status/ra-pipeline/pipeline/build-gh-pages.yml?style=plastic&logo=githubactions&label=docs-pages
-  :target: https://github.com/ra-pipeline/pipeline/actions/workflows/build-gh-pages.yml
+.. |Docs Pages| image:: https://img.shields.io/github/actions/workflow/status/ra-pipeline/pipeline/build-gh-pages-pixi.yml?style=plastic&logo=githubactions&label=docs-pages
+  :target: https://github.com/ra-pipeline/pipeline/actions/workflows/build-gh-pages-pixi.yml
   :alt: Docs: GH-Pages-Status
 
 .. |Docs RTD| image:: https://img.shields.io/readthedocs/pipe-docs?style=plastic&logo=readthedocs&label=docs-rtd
