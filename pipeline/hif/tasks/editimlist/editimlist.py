@@ -50,7 +50,7 @@ LOG = infrastructure.get_logger(__name__)
 
 class EditimlistInputs(vdp.StandardInputs):
     # Search order of input vis
-    processing_data_type = [
+    processing_data_types = [
         DataType.SELFCAL_LINE_SCIENCE,
         DataType.REGCAL_LINE_SCIENCE,
         DataType.SELFCAL_CONTLINE_SCIENCE,
@@ -326,13 +326,13 @@ class EditimlistInputs(vdp.StandardInputs):
                 When providing a dictionary, supported keys are:
 
                 - ``exclude_spw`` (str, default ``''``): Comma-separated list of spectral
-                windows to exclude from rejection consideration (always preserved).
+                  windows to exclude from rejection consideration (always preserved).
 
                 - ``flagpct_thresh`` (float, default ``0.9``): Flagging percentage threshold
-                per field for triggering plane rejection.
+                  per field for triggering plane rejection.
 
                 - ``nfield_thresh`` (int, default ``12``): Minimum number of fields that must
-                exceed the flagging threshold before rejecting the plane.
+                  exceed the flagging threshold before rejecting the plane.
 
             cycleniter_final_image_nomask:
 

@@ -12,12 +12,12 @@ from importlib.resources import files
 
 import mako.lookup
 
-import pipeline.infrastructure.logging
+import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.renderer.templates
 
 from .registry import RendererRegistry
 
-LOG = pipeline.infrastructure.logging.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 # enumerations for registering web log renderers
@@ -36,7 +36,7 @@ def _get_template_lookup():
     # Remove temporary Mako codegen directory on termination of Python process
     atexit.register(lambda: shutil.rmtree(tmpdir, ignore_errors=True))
 
-    templates_path = str(files(pipeline.infrastructure.renderer.templates.__name__))
+    templates_path = str(files(infrastructure.renderer.templates.__name__))
     lookup = mako.lookup.TemplateLookup(
         directories=[templates_path], module_directory=tmpdir, input_encoding='utf-8', default_filters=['decode.utf8']
     )

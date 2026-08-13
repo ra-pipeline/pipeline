@@ -1,6 +1,8 @@
 import collections
 import copy
 import os
+import re
+from enum import Enum
 
 import numpy as np
 
@@ -12,6 +14,7 @@ import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
+from pipeline.hif.tasks.makeimlist import makeimlist
 from pipeline.hif.heuristics import findcont
 from pipeline.infrastructure import casa_tasks, casa_tools, task_registry
 
@@ -20,26 +23,117 @@ from .resultobjects import FindContResult
 LOG = infrastructure.get_logger(__name__)
 
 
+class ImagingStatus(Enum):
+    """Status values for imaging summary entries."""
+    NOT_IMAGED = 'Not imaged'
+    DIRTY_CUBE = 'Dirty cube'
+    EXISTING_SELECTION = 'Existing continuum selection'
+    NO_INTERSECTION = 'No common frequency intersection'
+
+
+def _pixels_per_beam(
+    makeimlist_inputs: makeimlist.MakeImListInputs | None, target: dict
+) -> float | None:
+    """Return the effective PPB value without changing the target structure.
+
+    Args:
+        makeimlist_inputs: Optional makeimlist inputs object.
+        target: Target configuration dictionary.
+
+    Returns:
+        Pixels-per-beam value or None if not found.
+    """
+    if makeimlist_inputs is not None:
+        hm_cell = makeimlist_inputs.get_spw_hm_cell(target.get('spw'))
+        if isinstance(hm_cell, str):
+            match = re.search(r'(\d+\.?\d*)\s*ppb', hm_cell, re.IGNORECASE)
+            if match:
+                return float(match.group(1))
+        return 5.0
+
+    for key in ('ppb', 'pixperbeam', 'hm_cell', 'cell'):
+        value = target.get(key)
+        if isinstance(value, str):
+            match = re.search(r'(\d+\.?\d*)\s*ppb', value, re.IGNORECASE)
+            if match:
+                return float(match.group(1))
+        elif isinstance(value, (int, float)):
+            return float(value)
+    return None
+
+
+def _imaging_summary_entry(
+    makeimlist_inputs: makeimlist.MakeImListInputs | None, target: dict, spwid: str
+) -> dict:
+    """Build imaging parameter dict for weblog display.
+
+    Args:
+        makeimlist_inputs: Optional makeimlist inputs object.
+        target: Target configuration dictionary.
+        spwid: Spectral window ID as string.
+
+    Returns:
+        Dictionary with imaging parameters for rendering.
+    """
+    return {
+        'field': target.get('field'),
+        'spw': spwid,
+        'datatype': target.get('datatype_info', target.get('datatype')),
+        'phasecenter': target.get('phasecenter'),
+        'ppb': _pixels_per_beam(makeimlist_inputs, target),
+        'cell': target.get('cell'),
+        'imsize': target.get('imsize'),
+        'weighting': None,
+        'robust': target.get('robust'),
+        'uvtaper': target.get('uvtaper'),
+        'mosweight': None,
+        'perchanweightdensity': None,
+        'nbins': target.get('nbin'),
+        'status': ImagingStatus.NOT_IMAGED.value,
+    }
+
+
 class FindContInputs(vdp.StandardInputs):
     # Must use empty data type list to allow for user override and
     # automatic determination depending on specmode, field and spw.
-    processing_data_type = []
+    processing_data_types = []
 
+    target_list = vdp.VisDependentProperty(null_input=['', None, {}], default=[])
     hm_perchanweightdensity = vdp.VisDependentProperty(default=None)
     hm_weighting = vdp.VisDependentProperty(default=None)
+    hm_mode = vdp.VisDependentProperty(default='coarse')
     datacolumn = vdp.VisDependentProperty(default='')
     parallel = vdp.VisDependentProperty(default='automatic')
 
-    @vdp.VisDependentProperty(null_input=['', None, {}])
-    def target_list(self):
-        # Note that the deepcopy is necessary to avoid changing the
-        # context's clean_list inadvertently when removing the heuristics
-        # objects from the inputs' clean_list.
-        return copy.deepcopy(self.context.clean_list_pending)
+    @vdp.VisDependentProperty
+    def field(self):
+        if 'field' in self.context.size_mitigation_parameters:
+            return self.context.size_mitigation_parameters['field']
+        return ''
+
+    @field.convert
+    def field(self, val):
+        if not isinstance(val, (str, type(None))):
+            # PIPE-1881: allow field names that mistakenly get casted into non-string datatype by
+            # recipereducer (utils.string_to_val) and executeppr (XmlObjectifier.castType)
+            LOG.warning('The field selection input %r is not a string and will be converted.', val)
+            val = str(val)
+        return val
+
+    @hm_mode.convert
+    def hm_mode(self, value):
+        allowed = ('coarse', 'normal')
+        if value not in allowed:
+            m = ', '.join(('{!r}'.format(i) for i in allowed))
+            raise ValueError(
+                'Value not in allowed value set ({!s}): {!r}'.format(m, value)
+            )
+        return value
 
     # docstring and type hints: supplements hif_findcont
     def __init__(self, context, output_dir=None, vis=None, target_list=None, hm_mosweight=None,
-                 hm_perchanweightdensity=None, hm_weighting=None, datacolumn=None, parallel=None):
+                 hm_perchanweightdensity=None, hm_weighting=None, hm_mode=None,
+                 field=None, datacolumn=None, parallel=None):
         """Initialize Inputs.
 
         Args:
@@ -54,6 +148,7 @@ class FindContInputs(vdp.StandardInputs):
                 Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
 
             target_list: Dictionary specifying targets to be imaged; blank will read list from context.
+                If target_list is specified, it takes precedence and the field parameter is ignored.
 
             hm_mosweight: Mosaic weighting. Defaults to '' to enable the automatic heuristics calculation.
                 Can be set to True or False manually.
@@ -62,6 +157,13 @@ class FindContInputs(vdp.StandardInputs):
                 Defaults to '' to enable the automatic heuristics calculation. Can be set to True or False manually.
 
             hm_weighting: Weighting scheme (natural,uniform,briggs,briggsabs[experimental],briggsbwtaper[experimental])
+
+            hm_mode: Continuum-finding imaging mode. "coarse" applies the new fast local override
+                and "normal" preserves the previous-cycle behavior.
+
+            field: Field selection to limit continuum finding to specific fields. Defaults to empty string,
+                which will process all fields. Can be used to restrict processing to a subset of fields.
+                Only used if target_list is not specified.
 
             datacolumn: Data column to image. Only to be used for manual overriding when the automatic choice by data type is not appropriate.
 
@@ -80,6 +182,8 @@ class FindContInputs(vdp.StandardInputs):
         self.hm_mosweight = hm_mosweight
         self.hm_perchanweightdensity = hm_perchanweightdensity
         self.hm_weighting = hm_weighting
+        self.hm_mode = hm_mode
+        self.field = field
         self.datacolumn = datacolumn
         self.parallel = parallel
 
@@ -96,8 +200,8 @@ class FindCont(basetask.StandardTaskTemplate):
 
         # Check if this stage should be skipped
         if self._skip_findcont():
-            # only triggered for VLA-PI pieplein (not for ALMA)
-            result = FindContResult({}, {}, '', 0, 0, [], {})
+            # PIPE-2780/PIPE-3137: only potentially triggered in a VLA-PI workflow (not for ALMA)
+            result = FindContResult({}, {}, '', 0, 0, [], {}, skip_stage=True)
             return result
 
         # Check for size mitigation errors.
@@ -130,30 +234,86 @@ class FindCont(basetask.StandardTaskTemplate):
                 result = FindContResult({}, {}, '', 0, 0, [], {})
                 return result
 
-            LOG.info(f'Using data type {str(selected_datatype).split(".")[-1]} for continuum finding.')
+            LOG.info('Using data type %s for continuum finding.', selected_datatype.name)
             if selected_datatype == DataType.RAW:
                 LOG.warning('Falling back to raw data for continuum finding.')
 
             columns = list(ms_objects_and_columns.values())
             if not all(column == columns[0] for column in columns):
                 LOG.warning(
-                    f'Data type based column selection changes among MSes: {",".join(f"{k.basename}: {v}" for k, v in ms_objects_and_columns.items())}.')
+                    'Data type based column selection changes among MSes: %s',
+                    ','.join(f'{k.basename}: {v}' for k, v in ms_objects_and_columns.items())
+                )
 
             if datacolumn != '':
                 LOG.info(
-                    f'Manual override of datacolumn to {datacolumn}. Data type based datacolumn would have been "{"data" if columns[0] == "DATA" else "corrected"}".')
+                    'Manual override of datacolumn to %s. Data type based datacolumn would have been "%s".',
+                    datacolumn,
+                    'data' if columns[0] == 'DATA' else 'corrected'
+                )
             else:
                 if columns[0] == 'DATA':
                     datacolumn = 'data'
                 elif columns[0] == 'CORRECTED_DATA':
                     datacolumn = 'corrected'
                 else:
-                    LOG.warning(f'Unknown column name {columns[0]}')
+                    LOG.warning('Unknown column name %s', columns[0])
                     datacolumn = ''
 
             inputs.vis = [k.basename for k in ms_objects_and_columns.keys()]
+        else:
+            if not datacolumn:
+                raise ValueError('Specifying a vis list requires defining a data column too.')
 
-        findcont_heuristics = findcont.FindContHeuristics(context)
+            # Assuming that all MSes have the same datatype in the given
+            # column we read the datatype from the first in the list
+            ref_ms = context.observing_run.get_ms(inputs.vis[0])
+            if datacolumn.upper() == 'DATA':
+                datacolumn_dict_value = 'DATA'
+            elif datacolumn.upper() in ('CORRECTED', 'CORRECTED_DATA'):
+                datacolumn_dict_value = 'CORRECTED_DATA'
+            else:
+                raise ValueError(f'Unknown datacolumn value "{datacolumn}"')
+            selected_datatype = [k for k,v in ref_ms.data_column.items() if v == datacolumn_dict_value][0]
+
+        known_synthesized_beams = inputs.context.synthesized_beams
+
+        findcont_heuristics = findcont.FindContHeuristics()
+        makeimlist_inputs = None
+        imaging_summary = []
+
+        if inputs.target_list:
+            # Note that the deepcopy is necessary to avoid changing the
+            # clean_list inadvertently when removing the heuristics
+            # objects from the inputs' clean_list.
+            imlist = copy.deepcopy(inputs.target_list)
+        else:
+            # Get list of fields and spw to work on from makeimlist call
+
+            # Create makeimlist inputs
+            makeimlist_inputs = makeimlist.MakeImListInputs(
+                inputs.context, vis=inputs.vis, intent='TARGET', field=inputs.field, specmode='mfs'
+            )
+            makeimlist_inputs.datatype = selected_datatype.name
+            # PIPE-107 requests using a fixed robust value of 1.0
+            makeimlist_inputs.robust = 1.0
+            makeimlist_inputs.clearlist = True
+            makeimlist_inputs.known_synthesized_beams = known_synthesized_beams
+
+            if inputs.hm_mode == 'coarse':
+                if inputs.context.project_summary.telescope == 'ALMA':
+                    makeimlist_inputs.hm_cell, \
+                    makeimlist_inputs.uvtaper, \
+                    makeimlist_inputs.minpix, \
+                    makeimlist_inputs.mosweight = \
+                        findcont_heuristics.coarse_mode_params(inputs)
+                else:
+                    LOG.info('coarse mode only implemented for ALMA')
+
+            # Create imlist
+            makeimlist_task = makeimlist.MakeImList(makeimlist_inputs)
+            makeimlist_result = makeimlist_task.prepare()
+            imlist = makeimlist_result.targets
 
         contfile_handler = contfilehandler.ContFileHandler(context.contfile)
         cont_ranges = contfile_handler.read()
@@ -165,10 +325,12 @@ class FindCont(basetask.StandardTaskTemplate):
         num_found = 0
         num_total = 0
         single_range_channel_fractions = []
-        for i, target in enumerate(inputs.target_list):
+        for i, target in enumerate(imlist):
             for spwid in target['spw'].split(','):
                 source_name = utils.dequote(target['field'])
                 spw_name = context.observing_run.virtual_science_spw_ids[int(spwid)]
+                summary = _imaging_summary_entry(makeimlist_inputs, target, spwid)
+                imaging_summary.append(summary)
 
                 # get continuum ranges dict for this source, also setting it if accessed for first time
                 source_continuum_ranges = result_cont_ranges.setdefault(source_name, {})
@@ -177,6 +339,7 @@ class FindCont(basetask.StandardTaskTemplate):
                 cont_ranges_source_spw = cont_ranges['fields'].setdefault(source_name, {}).setdefault(spwid, {'spwname': spw_name, 'ranges': [], 'flags': []})
 
                 if len(cont_ranges_source_spw['ranges']) > 0:
+                    summary['status'] = ImagingStatus.EXISTING_SELECTION.value
                     LOG.info('Using existing selection {!r} for field {!s}, '
                              'spw {!s}'.format(cont_ranges_source_spw['ranges'], source_name, spwid))
                     source_continuum_ranges[spwid] = {
@@ -206,7 +369,11 @@ class FindCont(basetask.StandardTaskTemplate):
                         mosweight = image_heuristics.mosweight(target['intent'], target['field'])
 
                     # Determine weighting and perchanweightdensity parameters
-                    if inputs.hm_weighting in (None, ''):
+                    if inputs.hm_mode == 'coarse':
+                        weighting = 'briggs'
+                        perchanweightdensity = False
+                        mosweight = False
+                    elif inputs.hm_weighting in (None, ''):
                         weighting = image_heuristics.weighting('cube')
                         perchanweightdensity = image_heuristics.perchanweightdensity('cube')
                     else:
@@ -243,6 +410,7 @@ class FindCont(basetask.StandardTaskTemplate):
                     # Use only the current spw ID here !
                     if0, if1, channel_width = image_heuristics.freq_intersection(vislist, target['field'], target['intent'], spwid, frame)
                     if (if0 == -1) or (if1 == -1):
+                        summary['status'] = ImagingStatus.NO_INTERSECTION.value
                         LOG.error('No %s frequency intersect among selected MSs for Field %s '
                                   'SPW %s' % (frame, target['field'], spwid))
                         cont_ranges['fields'][source_name][spwid]['spwname'] = spw_name
@@ -366,7 +534,9 @@ class FindCont(basetask.StandardTaskTemplate):
                         specmode = 'cube'
 
                     # PIPE-107 requests using a fixed robust value of 1.0.
-                    robust = 1.0
+                    # PIPE-3131 introduced the intrinsic hif_makeimlist call
+                    # where this robust value is being used.
+                    robust = target['robust']
 
                     if target['uvrange'] not in (None, [], ''):
                         uvrange = target['uvrange']
@@ -387,6 +557,17 @@ class FindCont(basetask.StandardTaskTemplate):
                         usepointing = target['usepointing']
                     else:
                         usepointing = None
+
+                    summary.update({
+                        'weighting': weighting,
+                        'phasecenter': phasecenter,
+                        'robust': robust,
+                        'uvtaper': uvtaper,
+                        'mosweight': mosweight,
+                        'perchanweightdensity': perchanweightdensity,
+                        'nbins': target.get('nbin'),
+                        'status': ImagingStatus.DIRTY_CUBE.value,
+                    })
 
                     job = casa_tasks.tclean(vis=vislist, imagename=findcont_basename, datacolumn=datacolumn,
                                             antenna=antenna, spw=real_spwsel,
@@ -477,6 +658,7 @@ class FindCont(basetask.StandardTaskTemplate):
                 num_total += 1
 
         result = FindContResult(result_cont_ranges, cont_ranges, joint_mask_names, num_found, num_total, single_range_channel_fractions, momDiffSNRs)
+        result.imaging_summary = imaging_summary
 
         return result
 

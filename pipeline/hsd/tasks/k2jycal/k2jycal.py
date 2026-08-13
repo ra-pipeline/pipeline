@@ -462,7 +462,6 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
                 status = False : Failed to create caltable
         """
         inputs = self.inputs
-        status = None
 
         task_args = common_params.copy()
         task_args['infile'] = inputs.reffile
@@ -487,7 +486,10 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
                 job = casa_tasks.gencal(**task_args)
                 try:
                     self._executor.execute(job)
-                    status = os.path.exists(task_args['caltable'])
+                    if os.path.exists(task_args['caltable']):
+                        status = None
+                    else:
+                        status = False
                 except Exception as e:
                     LOG.error( "{}: Failed to create caltable from CSV file: {}".format(inputs.vis, e) )
                     status = False
@@ -498,7 +500,7 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
 
         1. Define factors actually used and analyze if the factors are provided to all relevant data in MS.
         2. Check if caltables in the pool exist to validate the CalApplication, and register valid CalApplication's to final
-        attribute.
+           attribute.
 
         Args:
             result: SDK2JyCalResults instance

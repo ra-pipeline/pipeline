@@ -7,9 +7,6 @@ def hif_transformimagedata(vis=None, outputvis=None, field=None, intent=None, sp
                            timebin=None, replace=None, clear_pointing=None, modify_weights=None, wtmode=None):
     """Extract fields for the desired VLASS image to a new MS and reset weights if desired.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Basic transformimagedata task
 

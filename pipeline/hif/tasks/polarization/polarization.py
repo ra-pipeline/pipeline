@@ -17,7 +17,7 @@ class PolarizationResults(basetask.Results):
 
     def merge_with_context(self, context):
         """
-        See :method:`~pipeline.infrastructure.api.Results.merge_with_context`
+        See :meth:`~pipeline.infrastructure.api.Results.merge_with_context`
         """
         if not self.final:
             LOG.warning('No polarization results')
@@ -70,6 +70,7 @@ class Polarization(basetask.StandardTaskTemplate):
         polcal(vis='vlass3C286.ms', caltable='vlass3C286.D_1', field='1', refant='ea20', poltype='Df+QU',
                gaintable=['vlass3C286.antpos', 'vlass3C286.K', 'vlass3C286.B', 'vlass3C286.Gp', 'vlass3C286.Ga',
                           'vlass3C286.Kx_1'], gainfield=['', '', '', '1', '1', ''],
+
                spwmap=[[], spwmapK, [], [], [], []])
         '''
 

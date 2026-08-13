@@ -24,11 +24,13 @@ class VlaMstransformInputs(mst.MstransformInputs):
         vis_root = os.path.splitext(self.vis)[0]
         return vis_root + '_targets.ms'
 
+    outframe = vdp.VisDependentProperty(default=None)
+    regridms = vdp.VisDependentProperty(default=None)
     spw_line = vdp.VisDependentProperty(default='')
     omit_contline_ms = vdp.VisDependentProperty(default=False)
 
     # docstring and type hints: supplements hifv_mstransform
-    def __init__(self, context, output_dir=None, vis=None, outputvis=None, field=None, intent=None, spw=None,
+    def __init__(self, context, output_dir=None, vis=None, outputvis=None, outframe=None, regridms=None, field=None, intent=None, spw=None,
                  spw_line=None, chanbin=None, timebin=None, outputvis_for_line=None, omit_contline_ms=None):
         """Initialize Inputs.
 
@@ -52,6 +54,10 @@ class VlaMstransformInputs(mst.MstransformInputs):
                 Examples:
                     - ``outputvis='ngc5921_targets_cont.ms'``
                     - ``outputvis=['ngc5921a_targets_cont.ms', 'ngc5921b_targets_cont.ms', 'ngc5921c_targets_cont.ms']``
+
+            outframe: The frequency frame of the output MeasurementSets
+
+            regridms: Flag for frame changes                    
 
             field: Select fields name(s) or id(s) to transform. Only fields with data matching the intent will be selected.
 
@@ -87,7 +93,8 @@ class VlaMstransformInputs(mst.MstransformInputs):
             omit_contline_ms: If ``True``, don't make the contline ms (_targets.ms). Only make cont MS (_targets_cont.ms). Default is ``False``.
 
         """
-        super().__init__(context, output_dir, vis, outputvis, field, intent, spw, chanbin, timebin)
+        super().__init__(context, output_dir=output_dir, vis=vis, outputvis=outputvis, outframe=outframe,
+                         regridms=regridms, field=field, intent=intent, spw=spw, chanbin=chanbin, timebin=timebin)
         self.spw_line = spw_line
         self.outputvis = outputvis
         self.outputvis_for_line = outputvis_for_line
@@ -104,12 +111,10 @@ class VlaMstransform(mst.SerialMstransform):
         # Run CASA task to create the output MS for continuum data
         mstransform_args = inputs.to_casa_args()
 
-        # Remove input member variables that don't belong as input to the mstransform task
-        mstransform_args.pop('outputvis_for_line', None)
-        mstransform_args.pop('spw_line', None)
-        mstransform_args.pop('omit_contline_ms', None)
-        mstransform_args.pop('parallel', None)
-        
+        # Remove input member variables that don't belong as input to casatasks/mstransform
+        for key in ('outputvis_for_line', 'spw_line', 'omit_contline_ms'):
+            mstransform_args.pop(key, None)
+
         mstransform_job = casa_tasks.mstransform(**mstransform_args)
 
         try:
@@ -124,7 +129,7 @@ class VlaMstransform(mst.SerialMstransform):
         mst.SerialMstransform._update_history(inputs.vis, inputs.outputvis)
 
         if not self.inputs.omit_contline_ms:
-            # Create output MS for line data (_target.ms)
+            # Create output MS for cont+line data (_target.ms)
             self._create_targets_ms(inputs, mstransform_args)
 
         # Create the results structure

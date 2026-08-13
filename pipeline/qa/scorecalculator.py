@@ -83,6 +83,7 @@ __all__ = ['score_polintents',                                # ALMA specific
            'score_polcal_leakage',                            # ALMA IF specific
            'score_polcal_residual_pol',                       # ALMA IF specific
            'score_polcal_results',                            # ALMA IF specific
+           'score_separation_angles',                         # ALMA IF specific
            'score_file_exists',
            'score_path_exists',
            'score_flags_exist',
@@ -118,7 +119,8 @@ __all__ = ['score_polintents',                                # ALMA specific
            'score_testBPdcals_dts_ants',
            'score_testBPdcals_refant',
            'score_testBPdcals_delay',
-           'score_spw_solint']
+           'score_spw_solint',
+           'score_contdat_applied']
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -1824,14 +1826,25 @@ def score_wvrgcal(ms_name, dataresult):
 
 
 @log_qa
-def score_sdtotal_data_flagged(label, frac_flagged):
+def score_sdtotal_data_flagged(frac_flagged: float,
+                               ms_name: str | None = None,
+                               field: str | None = None,
+                               spw: int | None = None ) -> pqa.QAScore:
     """
     Calculate a score for the flagging task based on the total fraction of
     data flagged.
 
-    0%-5% flagged   -> 1
-    5%-50% flagged  -> 0.5
-    50-100% flagged -> 0
+    0%-5% flagged   -> 1.0
+    5%-50% flagged  -> liearly interpolated between 1.0 and 0.0
+    50-100% flagged -> 0.0
+
+    Args:
+        frac_flagged : flagged fraction
+        ms_name : MS name
+        field : field name
+        spw : spectral window ID
+    Returns:
+        QAScore object
     """
     if frac_flagged > 0.5:
         score = 0
@@ -1839,15 +1852,20 @@ def score_sdtotal_data_flagged(label, frac_flagged):
         score = linear_score(frac_flagged, 0.05, 0.5, 1.0, 0.5)
 
     percent = 100.0 * frac_flagged
-    longmsg = '%0.2f%% of data in %s was newly flagged' % (percent, label)
-    shortmsg = '%0.2f%% data flagged' % percent
-
+    label = f'{ms_name} Field {field} Spw {spw}' if ms_name else f'Field {field} Spw {spw}'
+    longmsg = f'{percent:.2f}% of data in {label} was newly flagged'
+    shortmsg = f'{percent:.2f}% of data newly flagged'
     origin = pqa.QAOrigin(metric_name='score_sdtotal_data_flagged',
                           metric_score=frac_flagged,
                           metric_units='Fraction of data newly flagged')
 
-    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=None, origin=origin)
+    selection = pqa.TargetDataSelection(
+        vis={ms_name} if ms_name is not None else None,
+        field={field} if field is not None else None,
+        spw={spw} if spw is not None else None
+    )
 
+    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=selection)
 
 @log_qa
 def score_sdtotal_data_flagged_old(name, ant, spw, pol, frac_flagged, field=None):
@@ -3496,21 +3514,8 @@ def score_checksources(mses, fieldname, spwid, imagename, rms, gfluxscale, gflux
             offset_metric = beams
             if beams > 0.30:
                 warnings.append('large fitted offset of %.2f marcsec and %.2f synth beam' % (offset, beams))
-
-        fitflux_score = 0.0
-        fitflux_metric = 'N/A'
-        fitflux_unit = 'fitflux/refflux'
-        if gfluxscale is None:
-            warnings.append('undefined gfluxscale result')
-        elif gfluxscale == 0.0:
-            warnings.append('gfluxscale value of 0.0 mJy')
-        else:
-            chk_fitflux_gfluxscale_ratio = fitflux * 1000. / gfluxscale
-            fitflux_score = max(0.33, 1.0 - abs(1.0 - chk_fitflux_gfluxscale_ratio))
-            fitflux_metric = chk_fitflux_gfluxscale_ratio
-            if chk_fitflux_gfluxscale_ratio < 0.8:
-                warnings.append('low [Fitted / gfluxscale] Flux Density Ratio of %.2f' % (chk_fitflux_gfluxscale_ratio))
-
+        
+        #PIPE-3042: fitflux score and QA message based on gfluxscale are not used anymore, so they are removed.
         fitpeak_score = 0.0
         fitpeak_metric = 'N/A'
         fitpeak_unit = 'fitpeak/fitflux'
@@ -3524,23 +3529,17 @@ def score_checksources(mses, fieldname, spwid, imagename, rms, gfluxscale, gflux
             fitpeak_metric = chk_fitpeak_fitflux_ratio
             if chk_fitpeak_fitflux_ratio < 0.7:
                 warnings.append('low Fitted [Peak Intensity / Flux Density] Ratio of %.2f' % (chk_fitpeak_fitflux_ratio))
-
-        snr_msg = ''
-        if gfluxscale is not None and gfluxscale_err is not None:
-            if gfluxscale_err != 0.0:
-                chk_gfluxscale_snr = gfluxscale / gfluxscale_err
-                if chk_gfluxscale_snr < 20.:
-                    snr_msg = ', however, the S/N of the gfluxscale measurement is low'
-
-        if any(np.array([offset_score, fitflux_score, fitpeak_score]) < 1.0):
-            score = math.sqrt(offset_score * fitflux_score * fitpeak_score)
-        else:
-            score = offset_score * fitflux_score * fitpeak_score
-        metric_score = [offset_metric, fitflux_metric, fitpeak_metric]
-        metric_units = '%s, %s, %s' % (offset_unit, fitflux_unit, fitpeak_unit)
+        
+        #PIPE-3042: fitflux score is not used anymore and the aggregated QA is minimum of offset_score and peak_fitflux score,
+        #both of which is >0.33 and <1.0, so we just need to use min(offset_score, peak_fitflux score) for QA score
+        score = min(offset_score,fitpeak_score)
+        
+        metric_score = [offset_metric, fitpeak_metric]
+        metric_units = '%s, %s' % (offset_unit, fitpeak_unit)
 
         if warnings != []:
-            longmsg = 'EB %s field %s spwid %d: has a %s%s' % (msnames, fieldname, spwid, ' and a '.join(warnings), snr_msg)
+            #PIPE-3042: QA message based on gfluxscale is not used anymore
+            longmsg = 'EB %s field %s spwid %d: has a %s' % (msnames, fieldname, spwid, ' and a '.join(warnings))
         else:
             if score <= 0.9:
                 longmsg = 'EB %s field %s spwid %d: Check source fit not optimal' % (msnames, fieldname, spwid)
@@ -3574,8 +3573,8 @@ def score_multiply(scores_list):
 def score_sd_skycal_elevation_difference(
     ms: MeasurementSet,
     resultdict: dict,
-    threshold: float = 3.0
-) -> pqa.QAScore | None:
+    el_threshold: float,
+) -> list[pqa.QAScore]:
     """
     Compute QA score based on elevation difference between ON and OFF scans.
 
@@ -3588,17 +3587,17 @@ def score_sd_skycal_elevation_difference(
         ms: MeasurementSet object
         resultdict: A dictionary containing elevation difference results
                     for each field, antenna, and spw.
-        threshold: Elevation difference threshold in degrees for scoring.
+        el_threshold: Elevation difference threshold in degrees for scoring.
 
     Returns:
         A QAScore object representing the QA score based on elevation
         difference, or None if no valid metric score is available.
     """
     field_ids = list(resultdict.keys())
-    metric_score = []
-    el_threshold = threshold
-    lmsg_list = []
+    qascores = []
+    
     for field_id in field_ids:
+        metric_score = []
         field = ms.fields[field_id]
         if field_id not in resultdict:
             continue
@@ -3614,57 +3613,34 @@ def score_sd_skycal_elevation_difference(
                 if len(preceding) > 0:
                     max_pred = np.abs(preceding).max()
                     metric_score.append(max_pred)
-                    if max_pred >= el_threshold:
-                        warned_antennas.add(antenna_id)
                 if len(subsequent) > 0:
                     max_subq = np.abs(subsequent).max()
                     metric_score.append(max_subq)
-                    if max_subq >= el_threshold:
-                        warned_antennas.add(antenna_id)
-                LOG.debug('field {} antenna {} spw {} metric_score {}'.format(field_id, antenna_id, spw_id, metric_score))
 
-        if len(warned_antennas) > 0:
-            antenna_names = ', '.join([ms.antennas[a].name for a in warned_antennas])
-            lmsg_list.append(
-                'field {} (antennas {})'.format(field.name, antenna_names)
-            )
+                max_metric_score = np.max(metric_score)
+                if max_metric_score < el_threshold:
+                    score = 1.0
+                    ant = []
+                    shortmsg = f'Elevation difference between ON and OFF is within {el_threshold} deg.'
+                    longmsg = f'{shortmsg} for {ms.basename}: Field {field.name}'
+                else:
+                    score = 0.8
+                    ant = [ms.antennas[antenna_id].name]
+                    shortmsg = f'Elevation difference between ON and OFF exceeds {el_threshold} deg.'
+                    longmsg = f'{shortmsg} for {ms.basename}: Field {field.name} Antenna {ant}'
 
-    if len(lmsg_list) > 0:
-        longmsg = 'Elevation difference between ON and OFF exceeds threshold ({}deg) for {}: {}'.format(
-            el_threshold,
-            ms.basename,
-            ', '.join(lmsg_list)
-        )
-    else:
-        longmsg = 'Elevation difference between ON and OFF is below threshold ({}deg) for {}'.format(
-            el_threshold,
-            ms.basename
-        )
+                selection = pqa.TargetDataSelection(vis={ms.basename},
+                                                    field={field.name},
+                                                    ant=set(ant))
+                origin = pqa.QAOrigin(metric_name='OnOffElevationDifference',
+                                      metric_score=float(max_metric_score),
+                                      metric_units='deg')
 
-    # CAS-11054: it is decided that we do not calculate QA score based on elevation difference for Cycle 6
-    # PIPE-246: we implement QA score based on elevation difference for Cycle 7.
-    #           requirement is that score is 0.8 if elevation difference is larger than 3deg.
-    # make sure threshold is 3deg
-    assert el_threshold == 3.0
+                qascore = pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg,
+                                      origin=origin, applies_to=selection )
+                qascores.append(qascore)
 
-    if len(metric_score) == 0:
-        # no valid metric score, skip scoring
-        LOG.info("No valid elevation difference data found. Skipping QA scoring.")
-        return None
-
-    max_metric_score = np.max(metric_score)
-    # lower the score if elevation difference exceeds 3deg
-    score = 1.0 if max_metric_score < el_threshold else 0.8
-    origin = pqa.QAOrigin(metric_name='OnOffElevationDifference',
-                          metric_score=max_metric_score,
-                          metric_units='deg')
-
-    if score < 1.0:
-        shortmsg = 'Elevation difference between ON and OFF exceeds {}deg'.format(el_threshold)
-    else:
-        shortmsg = 'Elevation difference between ON and OFF is below {}deg'.format(el_threshold)
-
-    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, vis=ms.basename)
+    return qascores
 
 
 def log_edge_channels(
@@ -4583,6 +4559,72 @@ def score_polcal_results(session_name: str, caltables: list) -> pqa.QAScore:
 
     return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin)
 
+@log_qa
+def score_separation_angles(mses: MeasurementSet, sepangles: dict) -> list[pqa.QAScore]:
+    """
+    The current heuristic exists only to 
+    reports the separation angles between the TARGET
+    (and CHECK) intents to the PHASE intent for 
+    each measurement set
+
+    Args:
+        mses: the measurement set name to use as the key
+        for the separation angle dictionary
+        sepangles: dictionary of separations angles
+
+    Returns:
+        QAScore object
+    """
+
+    # holds the final list of QA scores
+    scores: list[pqa.QAScore] = []
+
+    # Sort to ensure presentation consistency
+    mses = sorted(mses, key=lambda ms: ms.basename)
+    for ms in mses:
+        # filter the dict
+        for primary, secondaries in sepangles[ms.basename].items():
+            # primary will be intent, fieldid, fieldname
+            # secondaries is another dict with intent, fieldid, fieldname as key,
+            # and a dict as the value with unit and value
+            intent1 = primary[0]
+            field1 = f'{primary[2]}' # can use other string process like -->>  f"{field} (#{fieldid})"
+            # pull the items into a tuple
+            intent2 = [(fld2,id2,nm2,ang['unit'],ang['value']) for (fld2,id2,nm2),ang in secondaries.items()][0] # only item per secondary
+            field2 = f'{intent2[2]}'
+            if intent2[3] == 'deg':
+                sepvalue=round(intent2[4],2) # or 3 dp ?
+                # do the score
+                score = 1.0
+                longmsg = 'For %s the %s %s to %s %s separation angle is %s deg'%(ms.basename, intent1, field1, intent2[0], field2, str(sepvalue))
+                shortmsg = ' %s to %s is %s'%(field1, field2, str(sepvalue))
+                reportsep=str(sepvalue)
+            else:
+                # do the score
+                score = 0.90
+                longmsg = 'For %s the %s %s to %s %s separation angle cannot be extracted'%(ms.basename, intent1, field1, intent2[0], field2)
+                shortmsg = ' %s to %s is n/a'%(field1, field2)
+                reportsep='n/a'
+            # for QA score data selection
+            fieldqa = field1+','+field2
+            intentqa = intent1+','+intent2[0]
+                
+            origin = pqa.QAOrigin(metric_name='report_separation_angles',
+                          metric_score=reportsep, # this is the value not a 0 to 1 score
+                          metric_units='degrees')
+
+            score = pqa.QAScore(score,
+                                longmsg=longmsg,
+                                shortmsg=shortmsg,
+                                vis=ms.basename, 
+                                origin=origin,
+                                weblog_location=pqa.WebLogLocation.NOWEB, 
+                                applies_to=pqa.TargetDataSelection(vis={ms.basename}, field={fieldqa}, intent={intentqa}))
+                                # weblog location can be NOWEB - do not render it
+            scores.append(score)
+                                
+    return scores
+
 
 @log_qa
 def score_fluxservice(result: ALMAImportDataResults) -> list[pqa.QAScore]:
@@ -5058,7 +5100,7 @@ def score_amp_vs_time_plots(context: Context, result: SDApplycalResults) -> list
         longmsg_success = f'{shortmsg_success} for EB {vis}, SPW {spwid}'
         shortmsg_failed = 'Failed to create calibrated amplitude vs time plot'
         longmsg_failed = f'{shortmsg_failed} for EB {vis}, SPW {spwid}'
-        shortmsg_empty = 'No target data about calibrated amplitude vs time plot'
+        shortmsg_empty = 'No data for calibrated amplitude vs time plot'
         longmsg_empty = f'{shortmsg_empty} for EB {vis}, SPW {spwid}'
         sumflagged = 0
         sumtotal = 0
@@ -5103,7 +5145,7 @@ def score_amp_vs_time_plots(context: Context, result: SDApplycalResults) -> list
                                   metric_units='Score based on quality of calibrated amp vs time plots')
             applies_to = pqa.TargetDataSelection(vis={vis},
                                                  spw={spwid},
-                                                 intent={'OBSERVE_TARGET#ON_SOURCE'},
+                                                 intent={'TARGET'},
                                                  ant={ant})
             scores.append(pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=applies_to))
 
@@ -5676,3 +5718,29 @@ def score_spw_solint(vis: str, band: str, spw_solint: dict)-> pqa.QAScore | None
         )
 
     return qascore
+
+# PIPE-3046: adding QA score 1 if cont.dat is applied
+@log_qa
+def score_contdat_applied(vis: str)-> pqa.QAScore:
+    """Evaluate QA score based on whether cont.dat is applied"""
+
+    score = 1.0
+    longmsg = f"'cont.dat' file is present. Using VLA Spectral Line Heuristics for checkflagmode=target-vla."
+    shortmsg = f"cont.dat is applied"
+    origin = pqa.QAOrigin(
+        metric_name='score_contdat_applied',
+        metric_score=score,
+        metric_units=''
+    )
+
+    applies_to = pqa.TargetDataSelection(
+        vis={vis}
+    )
+
+    return pqa.QAScore(
+        score,
+        longmsg=longmsg,
+        shortmsg=shortmsg,
+        origin=origin,
+        applies_to=applies_to
+    )

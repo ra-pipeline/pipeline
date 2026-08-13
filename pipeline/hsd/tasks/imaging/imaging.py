@@ -66,8 +66,8 @@ class SDImagingInputs(vdp.StandardInputs):
     """Inputs for imaging task class."""
 
     # Search order of input vis
-    processing_data_type = [DataType.BASELINED, DataType.ATMCORR,
-                            DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.BASELINED, DataType.ATMCORR,
+                             DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     infiles = vdp.VisDependentProperty(default='', null_input=['', None, [], ['']])
     spw = vdp.VisDependentProperty(default='')
@@ -132,7 +132,7 @@ class SDImagingInputs(vdp.StandardInputs):
         #       to confine the change into single file to avoid unexpected
         #       side effect.
         _, _datatype = self.context.observing_run.get_measurement_sets_of_type(
-            self.processing_data_type, msonly=False
+            self.processing_data_types, msonly=False
         )
         return _datatype
 
@@ -1044,6 +1044,12 @@ class SDImaging(basetask.StandardTaskTemplate):
             pp : Imaging post process parameters of prepare()
         """
         _rep_source_name, _rep_spw_id = rgp.ref_ms.get_representative_source_spw()
+
+        # PIPE-3138 prevent fallback to the first science target
+        # if representative source is not observed in the reference MS
+        if rgp.ref_ms.representative_target[0]:
+            _rep_source_name = rgp.ref_ms.representative_target[0]
+
         pp.is_representative_source_and_spw = \
             _rep_spw_id == rgp.combined.spws[REF_MS_ID] and \
             _rep_source_name == utils.dequote(rgp.source_name)

@@ -325,9 +325,14 @@ class LowgainflagData(basetask.StandardTaskTemplate):
         # Do the bandpass steps
         bpcal_result, solint, combine = self._do_initial_bandpass()
 
+        # PIPE-3139/PIPE-2601 check if combine was used
+        # if so we need to make a phase diff solve, before the
+        # postbandpass_phaseup
+        if combine:
+            gpdiff_result = self._do_postbandpass_phasediff()
+            
         # Do the phase-up
         gpcal_result = self._do_postbandpass_phaseup(solint, combine)
-
 
         # Do the amplitude gains
         gacal_result, gatable, table_available = self._do_postbandpass_ampgains()
@@ -366,7 +371,7 @@ class LowgainflagData(basetask.StandardTaskTemplate):
         if inputs.ms.antenna_array.name == 'ALMA':
             bpcal_inputs = bandpass_alma.SerialALMAPhcorBandpass.Inputs(
                 context=inputs.context, vis=inputs.vis, intent=inputs.intent,
-                spw=inputs.spw, refant=inputs.refant)
+                spw=inputs.spw, refant=inputs.refant, phaseupsnr=5, bpsnr=20)
             bpcal_task = bandpass_alma.SerialALMAPhcorBandpass(bpcal_inputs)
             bpcal_result = self._executor.execute(bpcal_task, merge=False)
         else:
@@ -389,7 +394,38 @@ class LowgainflagData(basetask.StandardTaskTemplate):
             solint, combine = self._get_prebandpass_phaseup_params(bpcal_result)
 
         return bpcal_result, solint, combine
-        
+
+    def _do_postbandpass_phasediff(self):
+        """ 
+        This method is responsible for doing the post
+        bandpass solve for the phasediff in the case if it 
+        needed prior to postbandpass_phaseup. It is required
+        only if combine='spw', because a phasediff is required
+        to align the phases of all SpW to allow combination.
+        The bandpass in local context will be applied and then a phase
+        gain caltable is made.
+       
+        returns the gpdiff result but it is registered here
+        """
+
+        inputs = self.inputs
+
+        # Calculate gain phase offsets (PIPE-3139)
+        # PIPE-2601 added the use of combine, so a phasediff (single somve per spw)
+        # is required to align all SpWs before postbandpass_phaseup
+        gpdiff_inputs = gaincal.GTypeGaincal.Inputs(context=inputs.context, vis=inputs.vis, intent=inputs.intent,
+                                                   spw=inputs.spw, refant=inputs.refant, calmode='p', minsnr=2.0,
+                                                   solint='inf')
+        gpdiff_task = gaincal.GTypeGaincal(gpdiff_inputs)
+        gpdiff_result = self._executor.execute(gpdiff_task, merge=False)
+        if not gpdiff_result.final:
+            LOG.warning("No phase offset solution computed for {}".format(inputs.ms.basename))
+        else:
+            gpdiff_result.accept(inputs.context)
+
+        # pass the result back in case any subsequent or future code want this
+        return gpdiff_result
+
     def _do_postbandpass_phaseup(self, solint, combine):
         """ 
         This method is responsible for doing the post
@@ -427,10 +463,12 @@ class LowgainflagData(basetask.StandardTaskTemplate):
             if combine:
                 spwmap = inputs.ms.get_spectral_windows(task_arg=inputs.spw, science_windows_only=True)
                 combspwmapheur = combine_spwmap(spwmap)
-
+                
                 LOG.info('Using combined spw map %s for ALMA phaseup', combspwmapheur)
 
-                modified_calapp = callibrary.copy_calapplication(gpcal_result.pool[0], spwmap=combspwmapheur)
+                # and interpolation for any solves after should be linearPD
+                interp = 'linearPD,linear'
+                modified_calapp = callibrary.copy_calapplication(gpcal_result.pool[0], spwmap=combspwmapheur, interp=interp)
                 gpcal_result.pool[0] = modified_calapp
                 gpcal_result.final[0] = modified_calapp
             gpcal_result.accept(inputs.context)

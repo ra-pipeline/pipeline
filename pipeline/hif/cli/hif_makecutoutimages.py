@@ -6,9 +6,6 @@ import pipeline.h.cli.utils as utils
 def hif_makecutoutimages(vis=None, offsetblc=None, offsettrc=None):
     """Cutout central 1 sq. degree from VLASS QL, SE, and Coarse Cube images.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Basic makecutoutimages task
 
