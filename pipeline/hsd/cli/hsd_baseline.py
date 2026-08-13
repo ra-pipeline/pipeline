@@ -132,10 +132,11 @@ def hsd_baseline(
         **Spectral line detection**:
 
         - QA = 1.0 if no edge-line and main line is narrow.
+        - QA = 0.88 if the deviation mask overlaps with spectral or atmospheric lines.
+        - QA = 0.80 if no spectral lines are detected.
+        - QA = 0.65 if a deviation mask exists but does not overlap spectral or atmospheric lines.
         - QA = 0.60 if no edge-line and main line is wide.
         - QA = 0.55 if edge-line detected (regardless of main line width).
-        - QA = 0.80 if no spectral lines are detected.
-        - QA = 0.88 if the deviation mask overlaps with spectral or atmospheric lines.
 
         **Baseline flatness** (MAX(mean) - MIN(mean) vs. sigma):
 

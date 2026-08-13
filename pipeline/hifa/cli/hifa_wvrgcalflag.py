@@ -11,7 +11,7 @@ def hifa_wvrgcalflag(vis=None, caltable=None, offsetstable=None, hm_toffset=None
     """Generate and apply a WVR phase correction table, flagging antennas with bad radiometers.
 
     Water Vapor Radiometer (WVR) sky brightness temperature measurements in four sub-bands surrounding the
-    183 GHz water line are converted by the CASA task ``wvrgcal`` into a phase correction table. The phase
+    183 GHz water line are converted by the CASA task :func:`~casatasks.calibration.wvrgcal` into a phase correction table. The phase
     rms during observation of the bandpass calibrator, measured with and without the WVR correction, is used
     to (1) detect poorly performing WVR units on individual antennas and (2) determine whether the overall
     WVR correction is beneficial.
@@ -37,7 +37,8 @@ def hifa_wvrgcalflag(vis=None, caltable=None, offsetstable=None, hm_toffset=None
 
     The WebLog shows the effects of the phase correction, which antennas (if any) had their WVR data flagged,
     per-antenna path-length RMS ('RMS') and channel-to-channel discrepancy ('Disc') values, and a warning if
-    the correction is not helpful enough to apply.
+    the correction is not helpful enough to apply.  See additional description of the calculated quantities
+    in the CASA documentation for :func:`~casatasks.calibration.wvrgcal`.
 
     Notes:
         QA is produced per MS via a two-stage metric:
