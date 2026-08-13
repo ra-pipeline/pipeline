@@ -466,3 +466,6 @@ myst_linkify_fuzzy_links = False
 # myst-NB
 
 nb_execution_mode = 'off'
+
+# Disable appending parentheses to functions and methods cross-references
+add_function_parentheses = False

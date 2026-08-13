@@ -62,7 +62,7 @@ def hifa_fluxcalflag(vis=None, field=None, intent=None, spw=None, threshold=None
 
     The WebLog reports if any flagging was required, and if this resulted in the need to use a spw-map. If more than
     75% of a given spw is flagged on the flux calibrator for the above lines, then a reference spw-map
-    (``refspwmap``) is calculated and stored in the pipeline context so that later in :py:func:`hifa_gfluxscale <hifa_gfluxscale>`, the
+    (``refspwmap``) is calculated and stored in the pipeline context so that later in :func:`~pipeline.hifa.cli.hifa_gfluxscale`, the
     ``fluxscale`` task will transfer the flux scale from the nearest other spw.
 
     Additional spectral ranges to flag can be manually specified via the ``linesfile`` parameter. The file format
