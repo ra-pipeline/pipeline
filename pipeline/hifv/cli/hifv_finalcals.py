@@ -6,9 +6,6 @@ import pipeline.h.cli.utils as utils
 def hifv_finalcals(vis=None, weakbp=None, refantignore=None, refant=None, use_flux_cal=None):
     """Compute final gain calibration tables.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Create the final calibration tables to be applied to the data in the VLA CASA pipeline:
 

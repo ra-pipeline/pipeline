@@ -9,27 +9,40 @@ def hsd_flagdata(vis=None, autocorr=None, shadow=None, scan=None,
                  filetemplate=None, pointing=None, filepointing=None, incompleteraster=None,
                  hm_tbuff=None, tbuff=None, qa0=None, qa2=None, parallel=None,
                  flagbackup=None):
-    """Do basic flagging of a list of MeasurementSets.
+    """Apply deterministic flagging to single-dish MeasurementSets.
 
-    The hsd_flagdata data performs basic flagging operations on a list of
-    MeasurementSets including:
+    Performs a sequence of flagging operations on each MS. The WebLog shows the percentage of
+    flagged data per MS for each agent. The ``Before Task`` column reports the percentage of data
+    already flagged by binary data flagging (BDF) prior to this task. The reasons for flagging are
+    also displayed visually as a function of time.
 
-    - applying online flags
-    - applying a flagging template
-    - shadowed antenna data flagging
-    - scan-based flagging by intent or scan number
-    - edge channel flagging
+    Flagging agents applied:
 
-    Returns:
-        The results object for the pipeline task is returned.
+    - **Online flags**: flags provided by the online system.
+    - **Template flags**: flags from user-provided ``*flagtemplate.txt`` files.
+    - **Shadow**: antennas shadowed by others.
+    - **Unwanted intents**: scans with intents not required for processing.
+    - **Autocorrelation**: always disabled.
+    - **Edge channels**: leading/trailing channels of each spw.
+    - **Pointing outlier** (PL2025+): safety-net flag for OFF positions not removed by online
+      flags, which would otherwise cause map creation to crash. A map-size threshold is computed
+      and data points outside it are flagged.
+
+    Notes:
+        QA scoring:
+
+        - Score = 0 if flag fraction >= 60%; Score = 1 if flag fraction <= 5%; linearly
+          interpolated between 0 and 1 for fractions 5%-60%. Applies to ``online``, ``shadow``,
+          ``qa0``, ``qa2``, ``before``, and ``template`` flagging agents.
+        - Pointing outlier QA (PL2025+): 1.0 if no pointing outliers detected; 0.83 if outliers
+          detected.
 
     Examples:
-        1. Do basic flagging on a MeasurementSet
+        1. Do basic flagging on a MeasurementSet:
 
         >>> hsd_flagdata()
 
-        2. Do basic flagging on a MeasurementSet flagging additional scans selected
-        by number as well.
+        2. Do basic flagging and flag additional scans selected by number:
 
         >>> hsd_flagdata(scannumber='13,18')
 

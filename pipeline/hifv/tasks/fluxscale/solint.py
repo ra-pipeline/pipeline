@@ -561,7 +561,7 @@ class Solint(basetask.StandardTaskTemplate):
                 search_results[i] = longest_scan / (solint_integer_integrations + i * integration_time) - int(longest_scan / (solint_integer_integrations + i * integration_time))
             longsolint = solint_integer_integrations + np.argmax(search_results) * integration_time
         else:
-            if durations:
+            if len(durations) != 0:
                 longsolint = (np.max(durations)) * 1.01
                 LOG.warning("Using alternate long solint calculation.")
             else:

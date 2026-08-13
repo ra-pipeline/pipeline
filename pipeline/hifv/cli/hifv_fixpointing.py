@@ -6,9 +6,6 @@ import pipeline.h.cli.utils as utils
 def hifv_fixpointing(vis=None):
     """Base fixpointing task.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Basic fixpointing task:
 

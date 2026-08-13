@@ -72,9 +72,6 @@ def hifa_bpsolint(vis=None, field=None, intent=None, spw=None, phaseupsnr=None, 
       order to preserve enough frequency intervals to capture the atmospheric
       line.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Estimate the phaseup gain time interval and the bandpass frequency
         interval required to match the desired signal-to-noise for bandpass

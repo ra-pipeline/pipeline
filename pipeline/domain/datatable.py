@@ -236,6 +236,7 @@ class DataTableImpl(object):
 
     row layout: [Row, Scan, IF, Pol, Beam, Date, Time, ElapsedTime,
                    0,    1,  2,   3,    4,    5,    6,            7,
+
                  Exptime, RA, DEC, Az, El, nchan, Tsys, TargetName,
                        8,  9,  10, 11, 12,    13,   14,         15,
                  Statistics, Flags, PermanentFlags, SummaryFlag, Nmask, MaskList, NoChange, Ant]
@@ -249,6 +250,7 @@ class DataTableImpl(object):
     PermanentFlags: DataTable[ID][18] =
                 [WeatherFlag, TsysFlag, UserFlag]
                            0,        1,        2
+
     Note for Flags: 1 is valid, 0 is invalid
     """
 

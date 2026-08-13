@@ -6,9 +6,6 @@ import pipeline.h.cli.utils as utils
 def hifv_statwt(vis=None, datacolumn=None, overwrite_modelcol=None, statwtmode=None, usecontdat=None):
     """Compute statistical weights and write them to measurement set.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Statistical weighting of the visibilities:
 

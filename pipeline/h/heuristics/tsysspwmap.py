@@ -23,7 +23,7 @@ from pipeline.infrastructure import casa_tools
 if TYPE_CHECKING:
     from pipeline.domain.measurementset import MeasurementSet
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 def trim_spw_map(spw_map: list[int]) -> list[int]:

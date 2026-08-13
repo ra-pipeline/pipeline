@@ -18,9 +18,6 @@ def hif_correctedampflag(
     sensitive to nulls in the flux density vs. uvdistance domain. Note that the phase of
     the data is not assessed.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         Run default flagging on bandpass calibrator with recommended settings:
 

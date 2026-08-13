@@ -10,33 +10,46 @@ def hsd_atmcor(
         infiles=None, antenna=None, parallel=None,
         field=None, spw=None, pol=None
 ):
+    """Apply offline ATM correction for residual atmospheric effects in calibrated single-dish spectra.
 
-    """Apply offline ATM correction to the data.
+    Corrects residual atmospheric line features in the science target spectra caused by incomplete
+    sky calibration due to elevation differences between ON_SOURCE and OFF_SOURCE measurements.
+    The correction is based on the atmospheric model described in :cite:`2021PASP..133c4504S`.
 
-    The hsd_atmcor task provides the capability of offline correction of
-    residual atmospheric features in the calibrated single-dish spectra
-    originated from incomplete calibration mainly due to a difference of
-    elevation angles between ON_SOURCE and OFF_SOURCE measurements.
+    By default (``atmtype='auto'``), the pipeline evaluates all four standard atmospheric models
+    and selects the best fit:
 
-    Optimal atmospheric model is automatically determined by default
-    (atmtype = 'auto'). You may specify desired atmospheric model by giving
-    either single integer (apply to all EBs) or a list of integers (models
-    per EB) to atmtype parameter. Please see parameter description for the
-    meanings of integer values.
+    - ``atmtype=1``: tropical
+    - ``atmtype=2``: mid-latitude summer
+    - ``atmtype=3``: mid-latitude winter
+    - ``atmtype=4``: subarctic summer
 
-    Returns:
-        The results object for the pipeline task is returned.
+    All models use a fixed temperature gradient (``dTem_dh=-5.6 K/km``) and fixed water vapour
+    scale height (``h0=2 km``). If user-defined parameters are provided, the automatic model
+    selection is disabled.
+
+    The WebLog shows a list of the calibrated MSs with the selected model parameters (``atmType``,
+    ``h0``, ``dTem_dh``) and integrated spectra (amplitude vs. frequency) after correction;
+    magenta curves show the atmospheric transmission. Spectra before correction can be found on the
+    :py:func:`hsd_applycal <hsd_applycal>` WebLog page.
+
+    Notes:
+        QA scoring:
+
+        - QA = 1.0 if ATM correction is successfully applied.
+        - QA = N/A if ATM correction is not applied.
+        - QA = 0.0 if an error occurs during the correction.
 
     Examples:
-        1. Basic usage
+        1. Apply ATM correction with automatic model selection:
 
         >>> hsd_atmcor()
 
-        2. Specify atmospheric model and data selection
+        2. Specify an atmospheric model and data selection:
 
         >>> hsd_atmcor(atmtype=1, antenna='PM03,PM04', field='*Sgr*,M100')
 
-        3. Specify atmospheric model per EB (atmtype 1 for 1st EB, 2 for 2nd EB)
+        3. Specify a different model per EB:
 
         >>> hsd_atmcor(atmtype=[1, 2])
 

@@ -87,7 +87,7 @@ class TaskTimeTracker:
 
                 # PIPE-2848: no explict db.sync() is required at the end as it will be taken care
                 # of by contextmanager:
-                # see: https://docs.python.org/3.10/library/shelve.html#shelve.Shelf.sync
+                # see: https://docs.python.org/3.12/library/shelve.html#shelve.Shelf.sync
                 db[db_key][stage_number] = tes
         except OSError as e:
             LOG.info('timetracker database I/O error: %s', e)

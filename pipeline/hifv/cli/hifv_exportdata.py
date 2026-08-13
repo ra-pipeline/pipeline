@@ -23,9 +23,6 @@ def hifv_exportdata(vis=None, session=None, imaging_products_only=None, exportms
     - a tar file containing the file web log
     - a text file containing the final list of CASA commands
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Export the pipeline results for a single session to the data products
         directory:

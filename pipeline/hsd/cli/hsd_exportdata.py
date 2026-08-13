@@ -4,26 +4,25 @@ import pipeline.h.cli.utils as utils
 # docstring and type hints: inherits from h.tasks.exportdata.exportdata.ExportDataInputs.__init__
 @utils.cli_wrapper
 def hsd_exportdata(pprfile=None, targetimages=None, products_dir=None):
-    """Prepare single dish data for export.
+    """Export single-dish pipeline products to the ``products/`` directory.
 
-    The hsd_exportdata task exports the data defined in the pipeline context
-    and exports it to the data products directory, converting and or packing
-    it as necessary.
+    Moves calibration tables, images (FITS format), and other pipeline products from the pipeline
+    ``working/`` directory to the ``products/`` directory.
 
-    The current version of the task exports the following products
+    The following products are exported:
 
-    - a FITS image for each selected science target source image
-    - a tar file per ASDM containing the final flags version and blparam
-    - a tar file containing the file web log
+    - FITS images for each selected science target source.
+    - A tar file per ASDM containing the final flag versions and baseline parameter (``blparam``)
+      tables.
+    - A tar file containing the WebLog.
 
-    Returns:
-        The results object for the pipeline task is returned.
+    Notes:
+        QA = 1.0 if all products were successfully exported; QA = 0.0 otherwise.
 
     Examples:
-        1. Export the pipeline results for a single session to the data products
-        directory
+        1. Export pipeline results to the data products directory:
 
-        >>> !mkdir ../products
-        >>> hsd_exportdata (products_dir='../products')
+        >>> import os; os.makedirs('../products', exist_ok=True)
+        >>> hsd_exportdata(products_dir='../products')
 
     """

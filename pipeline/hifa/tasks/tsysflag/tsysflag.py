@@ -100,6 +100,12 @@ class TsysflagInputs(tsysflag.TsysflagInputs):
                 template. If the template flags file is undefined, a name of the form
                 'msname.flagtsystemplate.txt' is assumed.
 
+            parallel: Process multiple MeasurementSets in parallel using the casampi parallelization framework.
+
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``None`` (equivalent to ``False``)
+
         """
         super().__init__(
             context=context, output_dir=output_dir, vis=vis, caltable=caltable,

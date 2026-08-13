@@ -30,6 +30,10 @@ LOG = logging.get_logger(__name__)
 MIN_CASA_REVISION = [6, 7, 4, 2]
 # maximum allowed CASA revision. Set to 0 or None to disable
 MAX_CASA_REVISION = None
+# discouraged CASA revision range [start_inclusive, end_inclusive]: versions that are known to have
+# issues but are not hard-blocked. Set to None to disable.
+# Current range: casatasks.getjyperkalma is not implemented in CASA 6.7.5 (see PIPE-2967/CAS-14704).
+DISCOURAGED_CASA_REVISION_RANGE = ([6, 7, 5, 0], [6, 7, 6, 0])
 
 # Define the thread-safe context variable here for the current task executaton state
 current_task_name = contextvars.ContextVar('current_task_name', default=None)
@@ -297,13 +301,19 @@ class Pipeline:
         # our expected minimum and maximum
         if casa_version_check is True:
             if MIN_CASA_REVISION and environment.compare_casa_version('<', MIN_CASA_REVISION):
-                msg = ('Minimum CASA revision for the pipeline is %s, '
-                       'got CASA %s.' % (MIN_CASA_REVISION, environment.casa_version))
-                LOG.critical(msg)
+                LOG.critical('Minimum CASA revision for the pipeline is %s, got CASA %s.',
+                             MIN_CASA_REVISION, environment.casa_version)
             if MAX_CASA_REVISION and environment.compare_casa_version('>', MAX_CASA_REVISION):
-                msg = ('Maximum CASA revision for the pipeline is %s, '
-                       'got CASA %s.' % (MAX_CASA_REVISION, environment.casa_version))
-                LOG.critical(msg)
+                LOG.critical('Maximum CASA revision for the pipeline is %s, got CASA %s.',
+                             MAX_CASA_REVISION, environment.casa_version)
+            if DISCOURAGED_CASA_REVISION_RANGE:
+                excl_min, excl_max = DISCOURAGED_CASA_REVISION_RANGE
+                in_excluded = (not environment.compare_casa_version('<', excl_min)
+                               and not environment.compare_casa_version('>', excl_max))
+                if in_excluded:
+                    LOG.warning('CASA revision %s is in the discouraged range %s to %s; '
+                                'known issues may affect pipeline results.',
+                                environment.casa_version, excl_min, excl_max)
 
         # if no previous context was specified, create a new context for the
         # given measurement set

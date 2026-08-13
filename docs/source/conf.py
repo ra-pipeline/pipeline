@@ -29,6 +29,9 @@ else:
     # Use the ancestry path if "pipeline_src" is not set.
     sys.path.insert(0, os.path.abspath('../../'))
 
+# Make local extensions importable.
+sys.path.insert(0, os.path.abspath('_extension'))
+
 try:
     import pipeline
     from pipeline.h.tasks import ImportData
@@ -66,6 +69,14 @@ except ImportError as error:
     print(error.__class__.__name__ + ': ' + error.message)
     pass
 
+
+def setup(app):
+    # Raise docutils substitution line-length limit (default 10 000) so that
+    # the Task inheritance diagram substitution (~14 500 chars) is not dropped.
+    app.connect('builder-inited',
+                lambda app: app.env.settings.update({'line_length_limit': 20_000}))
+
+
 # -- General configuration ---------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
@@ -78,9 +89,9 @@ extensions = [
     # --------
     # https://docs.readthedocs.io/en/stable/guides/jupyter.html#using-notebooks-in-other-formats
     # option 1 # better integration with intersphinx
-    'myst_nb',
+    'myst_nb',  # Handles both notebooks and plain markdown files
     # option 2 # https://github.com/executablebooks/MyST-NB/issues/421
-    # 'myst_parser',
+    # 'myst_parser',  # Not needed with myst_nb
     # 'nbsphinx',
     # ---------
     'sphinx.ext.autodoc',
@@ -94,9 +105,8 @@ extensions = [
     'sphinxcontrib.mermaid',
     'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',
-    'sphinx.ext.coverage',
     'sphinx.ext.githubpages',
-    # 'sphinx.ext.intersphinx',
+    'sphinx.ext.intersphinx',
     'sphinx.ext.inheritance_diagram',
     'sphinx_automodapi.automodapi',
     'sphinx_automodapi.smart_resolver',
@@ -107,9 +117,14 @@ extensions = [
     'sphinx_copybutton',
     'IPython.sphinxext.ipython_console_highlighting',
     'IPython.sphinxext.ipython_directive',
+    'cli_function_stubs',
+    'parameter_linking',
+    'sphinxcontrib.lightbox2',
+    'toc_sections',
 ]
 
 add_module_names = False
+autosectionlabel_prefix_document = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -118,8 +133,8 @@ templates_path = ['_templates']
 smartquotes = False
 
 # The suffix(es) of source filenames.
-# You can specify multiple suffix as a list of string:
-
+# MyST parser handles both .rst and .md files automatically when enabled
+# (myst_nb and myst_parser both register .md suffix)
 # source_suffix = {
 #    '.rst': 'restructuredtext',
 #    '.md': 'markdown',
@@ -144,11 +159,12 @@ version = build_version.split('+')[0]
 
 # remove -detached suffix as readthedocs always uses git checkout --force to create a
 # detached state
-build_version_short = build_version.removesuffix('-detached')
+build_version_short = build_version.removesuffix('-detached').removesuffix('-dirty')
 
 # General information about the project.
-project = f'Pipeline \n ({version})'
-author = 'Pipeline Dev. Team'
+project = f'Pipeline ({version})'
+html_title = f'Pipeline ({version})'
+author = 'Pipeline Contributors'
 copyright = f'2020–{datetime.now(timezone.utc).year}, {author}, build: {build_version_short}'
 
 # The version info for the project you're documenting, acts as replacement
@@ -190,28 +206,11 @@ copybutton_only_copy_prompt_lines = True
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'sphinx_rtd_theme'
+html_theme = 'furo'
 
-# Theme options are theme-specific and customize the look and feel of a
-# theme further.  For a list of options available for each theme, see the
-# documentation.
-#
+# Theme options for furo; empty dict means all defaults (including default fonts).
 html_theme_options = {
-    'logo_only': False,
-    'prev_next_buttons_location': 'bottom',
-    'style_external_links': False,
-    'vcs_pageview_mode': '',
-    'style_nav_header_background': 'gray',
-    'flyout_display': 'attached',
-    'version_selector': True,
-    'language_selector': True,
-    # 'display_version': True, # deprecated
-    # Toc options
-    'collapse_navigation': True,
-    'sticky_navigation': True,
-    'navigation_depth': 4,
-    'includehidden': True,
-    'titles_only': False,
+    'footer_icons': [],
 }
 # html_logo = "_static/favicon.ico"
 html_favicon = '_static/favicon-16x16.png'
@@ -220,10 +219,12 @@ html_favicon = '_static/favicon-16x16.png'
 # so a file named "default.css" will override the builtin "default.css".
 html_static_path = ['_static']
 html_css_files = ['custom_theme.css']
+html_js_files = ['furo_layout.js']
 
 # -- Options for Mermaid output ---------------------------------------
 
 mermaid_d3_zoom = True
+myst_fence_as_directive = ['mermaid']
 
 # -- Options for HTMLHelp output ---------------------------------------
 
@@ -296,12 +297,8 @@ texinfo_documents = [
 
 # -- Sidebars
 
-html_sidebars = {
-    '**': ['localtoc.html'],  # not allowed if using the 'furo' theme
-    'search': [],
-    'genindex': [],
-    'py-modindex': [],
-}
+# furo provides its own sidebar; custom per-page sidebars are not supported
+html_sidebars = {}
 
 # -- napoleon
 
@@ -315,24 +312,41 @@ napoleon_use_admonition_for_notes = False
 napoleon_use_admonition_for_references = False
 napoleon_use_ivar = False
 napoleon_use_param = True
-napoleon_use_rtype = True
+napoleon_use_rtype = False
 napoleon_attr_annotations = True
 
 
 verbatimwrapslines = False
 html_show_sourcelink = True
 autosummary_generate = True
-autosummary_generate_overwrite = autosummary_generate
+autosummary_generate_overwrite = False  # only write stubs that don't exist yet; speeds up incremental builds
 
 # https://www.sphinx-doc.org/en/master/usage/extensions/autosummary.html#confval-autosummary_ignore_module_all
-autosummary_imported_members = True
-autosummary_ignore_module_all = False  # respect `__alll__` in autosummary to get clean output
+# Avoid documenting re-imported names (typing.Any, datatype.DataType, domain.MeasurementSet, ...) as
+# attributes of every module that does `from ... import X`. Without this, each `from typing import Any`
+# registers `pipeline.<pkg>.Any` as a documented attribute, producing dozens of ambiguous cross-reference
+# targets and a huge slow-down of the `writing output...` phase. Re-exports listed in a module's __all__
+# are still emitted because `autosummary_ignore_module_all = False`.
+autosummary_imported_members = False
+autosummary_ignore_module_all = False  # respect `__all__` in autosummary to get clean output
 
-# autodoc_mock_imports = ["pipeline"]
+# Suppress duplicate-target warnings from the python domain. The pipeline package legitimately re-exports
+# many classes (Context, MeasurementSet, SpectralWindow, Field, Source, Antenna, DataType, ...) at both
+# the package and submodule level. Sphinx still resolves these refs (smart_resolver picks one), but
+# rendering the multi-KB warning text once per occurrence dominated wall time during `writing output...`.
+suppress_warnings = ['ref.python']
+
+autodoc_mock_imports = [
+    "casaconfig",
+    "casaplotms",
+    "casashell",
+    "casatasks",
+    "casatools",
+]
 # autodoc_default_options = ['members']
 
-# Optionally, could disable type hints for the cleaner-look task refernece PDF
-autodoc_typehints = 'signature'  # 'none'
+# Move type hints from signature to parameter descriptions for cleaner display
+autodoc_typehints = 'description'  # 'signature' or 'none'
 
 autodoc_default_options = {
     # other options
@@ -347,18 +361,19 @@ automodsumm_inherited_members = False
 
 # -- intersphinx
 
-# intersphinx_mapping = {
-#     'python': ('https://docs.python.org/3',(None, 'python-inv.txt')),
-#     'astropy': ('http://docs.astropy.org/en/latest/', None),
-#     'pyerfa': ('https://pyerfa.readthedocs.io/en/stable/', None),
-#     'pytest': ('https://pytest.readthedocs.io/en/stable/', None),
-#     'ipython': ('https://ipython.readthedocs.io/en/stable/', None),
-#     'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
-#     'sphinx_automodapi': ('https://sphinx-automodapi.readthedocs.io/en/stable/', None),
-#     'packagetemplate': ('http://docs.astropy.org/projects/package-template/en/latest/', None),
-#     'h5py': ('http://docs.h5py.org/en/stable/', None),
-#     "sphinx": ("https://www.sphinx-doc.org/en/master/", None),
-# }
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', (None, 'python-inv.txt')),
+    'casadocs': ('https://casadocs.readthedocs.io/en/stable/', None),
+    # 'astropy': ('http://docs.astropy.org/en/latest/', None),
+    # 'pyerfa': ('https://pyerfa.readthedocs.io/en/stable/', None),
+    # 'pytest': ('https://pytest.readthedocs.io/en/stable/', None),
+    # 'ipython': ('https://ipython.readthedocs.io/en/stable/', None),
+    # 'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
+    # 'sphinx_automodapi': ('https://sphinx-automodapi.readthedocs.io/en/stable/', None),
+    # 'packagetemplate': ('http://docs.astropy.org/projects/package-template/en/latest/', None),
+    # 'h5py': ('http://docs.h5py.org/en/stable/', None),
+    # "sphinx": ("https://www.sphinx-doc.org/en/master/\", None),
+}
 # intersphinx_disabled_reftypes = ["*"]
 
 # sphinxcontrib.bibtex/sphinx-astrorefs
@@ -416,7 +431,7 @@ nbsphinx_prolog = r"""
 
         .. _nbsphinx: https://nbsphinx.readthedocs.io/
         .. _Jupyter: https://jupyter.org/
-        .. _{{ docname }}: https://github.com/r-xue/pipeline/blob/gh-pages/html/{{ docname }}
+        .. _{{ docname }}: https://github.com/ra-pipeline/pipeline/blob/gh-pages/html/{{ docname }}
     
 
 .. raw:: latex

@@ -19,10 +19,10 @@ LOG = infrastructure.get_logger(__name__)
 class FindROIInputs(vdp.StandardInputs):
     """Inputs for the hif_findroi stage."""
 
-    processing_data_type = [
-        DataType.SELFCAL_CONTLINE_SCIENCE,
+    processing_data_types = [
         DataType.REGCAL_CONTLINE_SCIENCE,
         DataType.REGCAL_CONTLINE_ALL,
+        DataType.SELFCAL_CONTLINE_SCIENCE,
         DataType.RAW,
     ]
 
@@ -40,6 +40,39 @@ class FindROIInputs(vdp.StandardInputs):
         spw=None,
         parallel=None,
     ):
+        """Initialize inputs for the FindROI task.
+
+        Args:
+            context: Pipeline context object containing state information.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            vis: The list of input MeasurementSets. Defaults to the list of
+                MeasurementSets specified in the hifa_importdata task.
+                '': use all MeasurementSets in the context
+
+                Examples: 'uid___A001_2c3_1.ms', ['uid___A001_2c3_1.ms', 'uid___A001_2c3_2.ms']
+
+            field: Science target field selection for spectral-line region of
+                interest detection. Defaults to ``'target'``, which will process
+                all fields with TARGET intent. Can be restricted to a subset of
+                fields by specifying field names or IDs.
+
+            spw: Spectral window selection for processing. Defaults to empty
+                string, which will process all science spectral windows. Use
+                CASA-style spectral window selection to restrict to specific
+                spectral windows.
+
+            parallel: Use parallel processing with the casampi parallelization
+                framework to distribute spectral window processing across multiple
+                mpi processes.
+
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``'automatic'`` (automatically enabled if multiple
+                spectral windows are detected and parallel execution is available).
+        """
         super().__init__()
         self.context = context
         self.output_dir = output_dir
@@ -60,18 +93,25 @@ class FindROI(basetask.StandardTaskTemplate):
         tmp_dir = heuristics.default_tmp_dir(inputs.context, inputs.output_dir)
         LOG.info('Writing hif_findroi artifacts under %s', tmp_dir)
 
-        stage_product = heuristics.run_findroi_mpi(
-            vis=inputs.vis,
-            context=inputs.context,
-            executor=self._executor.copy(exclude_context=True),
-            field=inputs.field,
-            spw=inputs.spw,
-            tmp_dir=tmp_dir,
-            parallel=inputs.parallel,
-        )
+        try:
+            stage_product = heuristics.run_findroi_mpi(
+                vis=inputs.vis,
+                context=inputs.context,
+                executor=self._executor.copy(exclude_context=True),
+                field=inputs.field,
+                spw=inputs.spw,
+                tmp_dir=tmp_dir,
+                parallel=inputs.parallel,
+            )
+        except Exception as exc:
+            LOG.exception('hif_findroi failed; returning a non-fatal result so the pipeline can continue.')
+            return FindROIResult(errors=[f'hif_findroi failed: {exc}'], fatal_error=True)
 
         if stage_product is None:
-            return FindROIResult(errors=['No successful hif_findroi SPW results were produced.'])
+            return FindROIResult(
+                errors=['No successful hif_findroi SPW results were produced.'],
+                fatal_error=True,
+            )
 
         artifacts = copy.deepcopy(stage_product.get('metadata', {}).get('artifacts', {}))
         errors = list(stage_product.get('metadata', {}).get('errors', []))

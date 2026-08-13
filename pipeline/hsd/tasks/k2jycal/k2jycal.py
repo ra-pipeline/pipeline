@@ -500,7 +500,7 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
 
         1. Define factors actually used and analyze if the factors are provided to all relevant data in MS.
         2. Check if caltables in the pool exist to validate the CalApplication, and register valid CalApplication's to final
-        attribute.
+           attribute.
 
         Args:
             result: SDK2JyCalResults instance

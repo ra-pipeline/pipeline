@@ -448,6 +448,7 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         Create science plots for result
 
         Create science plots for result.
+
         Args:
             context:            Pipeline Context
             result:             Applycal Results

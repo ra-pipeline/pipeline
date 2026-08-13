@@ -28,7 +28,7 @@ class BandpassflagResults(basetask.Results):
 
     def merge_with_context(self, context):
         """
-        See :method:`~pipeline.api.Results.merge_with_context`
+        See :meth:`~pipeline.api.Results.merge_with_context`
         """
         # Update reference antennas for MS.
         ms = context.observing_run.get_ms(name=self.vis)

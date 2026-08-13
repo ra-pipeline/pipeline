@@ -8,9 +8,6 @@ def hifv_opcal(vis=None, caltable=None):
     Args:
         vis: List of input visibility data.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Load an ASDM list in the ../rawdata subdirectory into the context:
 

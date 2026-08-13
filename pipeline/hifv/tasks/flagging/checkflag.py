@@ -61,7 +61,7 @@ class CheckflagInputs(vdp.StandardInputs):
                   lowering the thresholds for spws with RFI to be closer to the RFI-free
                   thresholds, and catches more of the RFI.
                 - Mode 'vlass-imaging' is similar to 'target-vlass', except that it executes on the split off target
-                  data, intent='*TARGET', datacolumn='data' and uses a timedevscale of 4.0.
+                  data, intent='\\*TARGET', datacolumn='data' and uses a timedevscale of 4.0.
 
             overwrite_modelcol: Always write the model column, even if it already exists.
 

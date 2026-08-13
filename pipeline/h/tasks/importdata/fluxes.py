@@ -17,7 +17,7 @@ from pipeline.infrastructure.utils import dequote, open_with_lock
 
 from ..common import commonfluxresults
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 ORIGIN_XML = 'Source.xml'
 ORIGIN_ANALYSIS_UTILS = 'analysisUtils'

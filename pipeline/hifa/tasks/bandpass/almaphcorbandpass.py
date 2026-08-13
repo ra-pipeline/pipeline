@@ -168,7 +168,10 @@ class ALMAPhcorBandpassInputs(bandpassmode.BandpassModeInputs):
 
             phaseupmaxsolint: Maximum phase correction solution interval (in
                 seconds) allowed in very low-SNR cases. Used only when
-                ``hm_phaseup='snr'``.
+                ``hm_phaseup='snr'``. Note that in limiting cases, the
+                interval can slightly exceed this value as an integer
+                number of integrations must be used (e.g., if integration
+                time is 6.048s, ten integrations is 60.48s).
 
                 Example: ``phaseupmaxsolint=60.0``
 
@@ -178,8 +181,9 @@ class ALMAPhcorBandpassInputs(bandpassmode.BandpassModeInputs):
 
                 Example: ``phaseupsolint='300s'``
 
-            phaseupsnr: The required SNR for the phaseup solution. Used to calculate
-                the phaseup time solint, and only if ``hm_phaseup='snr'``.
+            phaseupsnr: The target signal-to-noise ratio for the temporal
+                phase-up. Used to calculate the phaseup time solint, and
+                only if ``hm_phaseup='snr'``.
 
                 Example: ``phaseupsnr=10.0``
 
@@ -207,14 +211,11 @@ class ALMAPhcorBandpassInputs(bandpassmode.BandpassModeInputs):
 
                 Example: ``hm_bandpass='snr'``
 
-            solint: Time and channel solution intervals in CASA syntax.
-                Default is solint='inf', which is used when
-                ``hm_bandpass='fixed'``.
-                If ``hm_bandpass='snr'``, then the task will attempt
-                to compute and use an optimal SNR-based solint (and warn
-                if this solint is not good enough).
-                If ``hm_bandpass='smoothed'``, the task will override
-                the spectral solint with bandwidth/maxchannels.
+            solint: The solution interval for the gain calibration. The
+                value is computed based on achieving the ``phaseupsnr``
+                for all spectral windows (spws). It is increased
+                incrementally in units of the integration time up to
+                ``phaseupmaxsolint``. Defaults to ``'int'``.
 
                 Example: ``solint='int'``
 
@@ -252,14 +253,12 @@ class ALMAPhcorBandpassInputs(bandpassmode.BandpassModeInputs):
 
                 Example: ``unregister_existing=True``
 
-            hm_auto_fillgaps: If True, then the ``hm_bandpass`` = 'snr' or 'smoothed'
-                modes, that solve bandpass per SpW, are performed with
-                CASA bandpass task parameter 'fillgaps' set to a quarter
-                of the respective SpW bandwidth (in channels).
-                If False, then these bandpass solves will use
-                fillgaps=0.
-                The ``hm_bandpass='fixed'`` mode is unaffected by
-                ``hm_auto_fillgaps`` and always uses fillgaps=0.
+            hm_auto_fillgaps: If True, sets the ``fillgaps`` parameter of
+                the underlying CASA ``bandpass`` task to 1/4 of each spw
+                width. This allows interpolation across celestial
+                spectral features in the bandpass calibrator spectrum and
+                avoids gaps due to strong atmospheric lines. Defaults to
+                True in calibration recipes.
 
             caltable: List of names for the output calibration tables. Defaults
                 to the standard pipeline naming convention.
@@ -287,8 +286,10 @@ class ALMAPhcorBandpassInputs(bandpassmode.BandpassModeInputs):
 
             antenna: Set of data selection antenna IDs
 
-            combine: Data axes to combine for solving. Axes are ``''``, ``'scan'``,
-                ``'spw'``, ``'field'`` or any comma-separated combination.
+            combine: The ``combine`` parameter for the CASA ``bandpass``
+                task. If ``solint`` is not ``'int'``, this is changed
+                from the default ``'scan'`` to ``'scan,spw'`` to combine
+                all spws, improving the SNR.
 
                 Example: ``combine='scan,field'``
 

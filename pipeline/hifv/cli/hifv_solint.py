@@ -9,9 +9,6 @@ def hifv_solint(vis=None, limit_short_solint=None, refantignore=None, refant=Non
     The hifv_solint task determines different solution intervals. Note that the short solint value is switched to 'int' when
     the minimum solution interval corresponds to one integration.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Determines different solution intervals:
 

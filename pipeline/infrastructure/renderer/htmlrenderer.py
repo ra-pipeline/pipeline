@@ -2070,11 +2070,24 @@ def compute_zd_telmjd_for_ms(
         offset from `mjd_epoch` (1858-11-17).
         Format: {field_id: {'zd': [zd1, zd2, ...], 'telmjd': [dt1, dt2, ...]}}
     """
-
     data = {}
     fields = ms.get_fields(intent='TARGET')
     observatory = ms.antenna_array.name
     mjd_epoch = datetime.datetime(1858, 11, 17, tzinfo=datetime.timezone.utc)
+
+    me = casa_tools.measures
+
+    # Observatory position frame is the same for all fields/timestamps.
+    # Set it once outside all loops.
+    obs_pos = me.observatory(observatory)
+    me.doframe(obs_pos)
+
+    # Reusable epoch dict — just update the value before each doframe.
+    epoch_dict = {
+        'm0': {'value': 0.0, 'unit': 'd'},
+        'refer': 'UTC',
+        'type': 'epoch',
+    }
 
     for field in fields:
         if field.id not in data:
@@ -2083,21 +2096,24 @@ def compute_zd_telmjd_for_ms(
                 'telmjd': [],
             }
 
-        # Calculate zenith distance for each unique timestamp in the field
+        zd_list = data[field.id]['zd']
+        tm_list = data[field.id]['telmjd']
+        field_dir = field._mdirection
+
         for time_seconds in field.time:
+            # field.time is seconds since 1858-11-17 (MJD origin)
+            mjd = float(time_seconds) / 86400.0
+            epoch_dict['m0']['value'] = mjd
+            me.doframe(epoch_dict)
+
+            # Convert field direction to horizontal coordinates
+            horizontal = me.measure(field_dir, 'AZELGEO')
+            zd_rad = np.pi / 2.0 - horizontal['m1']['value']
+            zd_deg = float(np.degrees(zd_rad))
+
             obs_time = mjd_epoch + datetime.timedelta(seconds=float(time_seconds))
-            epoch = casa_tools.measures.epoch('utc', obs_time.isoformat())
-
-            # Calculate zenith distance at this timestamp
-            zd_rad = utils.compute_zenith_distance(
-                field_direction=field._mdirection,
-                epoch=epoch,
-                observatory=observatory,
-            )
-            zd_deg = casa_tools.quanta.convert(zd_rad, 'deg')['value']
-
-            data[field.id]['zd'].append(zd_deg)
-            data[field.id]['telmjd'].append(obs_time)
+            zd_list.append(zd_deg)
+            tm_list.append(obs_time)
 
     return data
 

@@ -159,28 +159,32 @@ def fluxservice(
         LOG.warning('Could not parse source catalogue response')
         raise
 
+    fields = dom.getElementsByTagName('FIELD')
+    field_names = [field.getAttribute('name') for field in fields]
+    output_fields = {
+        'statuscode': 'StatusCode',
+        'sourcename': 'SourceName',
+        'dbfrequency': 'Frequency',
+        'date': 'Date',
+        'fluxdensity': 'FluxDensity',
+        'fluxdensityerror': 'FluxDensityError',
+        'spectralindex': 'SpectralIndex',
+        'spectralindexerror': 'SpectralIndexError',
+        'dataconditions': 'DataConditions',
+        'ageOfNearestMonitorPoint': 'Nearest Measurement Date',
+        'version': 'Version',
+        'clarification': 'Clarification',
+    }
+
     rowdict = {}
     for node in dom.getElementsByTagName('TR'):
         row = node.getElementsByTagName('TD')
-        rl = len(row)
-        rowdict['statuscode'] = row[0].childNodes[0].nodeValue
-        if rl == 13:
-            try:
-                rowdict['clarification'] = row[1].childNodes[0].nodeValue
-            except IndexError:
-                rowdict['clarification'] = None
-        else:
-            rowdict['clarification'] = None
-        rowdict['sourcename'] = row[rl-11].childNodes[0].nodeValue
-        rowdict['dbfrequency'] = row[rl-10].childNodes[0].nodeValue
-        rowdict['date'] = row[rl-9].childNodes[0].nodeValue
-        rowdict['fluxdensity'] = row[rl-8].childNodes[0].nodeValue
-        rowdict['fluxdensityerror'] = row[rl-7].childNodes[0].nodeValue
-        rowdict['spectralindex'] = row[rl-6].childNodes[0].nodeValue
-        rowdict['spectralindexerror'] = row[rl-5].childNodes[0].nodeValue
-        rowdict['dataconditions'] = row[rl-4].childNodes[0].nodeValue
-        rowdict['ageOfNearestMonitorPoint'] = row[rl-3].childNodes[0].nodeValue
-        rowdict['version'] = row[rl-1].childNodes[0].nodeValue
+        row_values = {
+            field_name: cell.childNodes[0].nodeValue if cell.childNodes else None
+            for field_name, cell in zip(field_names, row)
+        }
+        for output_key, field_name in output_fields.items():
+            rowdict[output_key] = row_values.get(field_name)
         rowdict['url'] = url
 
     return rowdict

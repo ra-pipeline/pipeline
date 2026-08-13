@@ -5,7 +5,7 @@ import pipeline.h.cli.utils as utils
 def hif_antpos(vis=None, caltable=None, hm_antpos=None, antenna=None, offsets=None, antposfile=None):
     """Derive antenna position calibration tables for a list of MeasurementSets.
 
-    The `hif_antpos` task corrects the antenna positions recorded in the ASDMs using
+    The :py:func:`hif_antpos <hif_antpos>` task corrects the antenna positions recorded in the ASDMs using
     updated antenna position calibration information determined after the
     observation.
 
@@ -25,9 +25,6 @@ def hif_antpos(vis=None, caltable=None, hm_antpos=None, antenna=None, offsets=No
     in the pipeline context and applied to the raw visibility data, on the fly to
     generate other calibration tables, or permanently to generate calibrated
     visibilities for imaging.
-
-    Returns:
-        The results object for the pipeline task is returned.
 
     Examples:
         1. Correct the position of antenna 5 for all the visibility files in a single

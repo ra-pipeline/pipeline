@@ -152,7 +152,7 @@ class MakeImagesInputs(vdp.StandardInputs):
 
             hm_maxpsffraction: PSF fraction that marks the minimum depth of cleaning in the minor cycle
 
-            hm_weighting: Weighting scheme (natural,uniform,briggs,briggsabs[experimental],briggsbwtaper[experimental])
+            hm_weighting: Weighting scheme (natural,uniform,briggs,briggsabs[experimental],briggsbwtaper)
 
             hm_cleaning: Pipeline cleaning mode
 

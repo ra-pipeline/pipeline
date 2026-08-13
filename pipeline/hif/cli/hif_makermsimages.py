@@ -6,9 +6,6 @@ import pipeline.h.cli.utils as utils
 def hif_makermsimages(vis=None):
     """Create RMS images for VLASS data.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Basic makermsimages task
 
