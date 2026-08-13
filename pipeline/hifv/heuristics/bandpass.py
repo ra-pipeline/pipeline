@@ -226,6 +226,9 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
     # re-run the low-SNR SPWs individually with smoothing
     for bad_spw in low_snr_spws:
         snr = median_snrs[bad_spw]
+        # if S/N is very low, skip this SPW
+        if math.isclose(snr, 0.0, abs_tol=1e-6):
+            continue
         nchan = m.get_spectral_window(bad_spw).num_channels
         if nchan < 16:
             continue
