@@ -33,9 +33,6 @@ def hifa_gfluxscaleflag(vis=None, intent=None, phaseupsolint=None, solint=None, 
         is the product of all per-intent sub-scores. For example, if AMPLITUDE has 10% newly flagged and
         PHASE has 40% newly flagged, the total score is (1 - 0.1) x (1 - 0.4) = 0.54.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Run with recommended settings to create flux scale calibration with flagging using recommended
         thresholds:

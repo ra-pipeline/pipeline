@@ -76,9 +76,6 @@ def hifa_fluxcalflag(vis=None, field=None, intent=None, spw=None, threshold=None
         on the incremental amount of flagging: 0.0 if the flag fraction is >=50%, 1.0 if <=5%, linearly
         interpolated in between.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Locate known lines in any solar system object flux calibrators:
 

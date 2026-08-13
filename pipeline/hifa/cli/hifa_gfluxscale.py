@@ -15,7 +15,7 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
     The workflow (as illustrated in the WebLog logic diagram):
 
     .. figure:: /figures/PL2025_hifa_gfluxscale_all.png
-       :scale: 60%
+       :width: 60%
        :alt: Logical flow in hifa_gfluxscale
 
        Logical flow in ``hifa_gfluxscale``. Each box represents one ``gaincal``
@@ -36,14 +36,14 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
     values. Plots of amplitude vs. uv distance are shown.
 
     .. figure:: /figures/guide-img024.png
-       :scale: 60%
+       :width: 60%
        :alt: Limited uv ranges for resolved calibrators
 
        Example of limited uv ranges for deriving the flux scale on resolved
        solar system objects.
 
     .. figure:: /figures/guide-img025.png
-       :scale: 60%
+       :width: 60%
        :alt: Derived vs. catalog flux density plot
 
        Examples of derived vs. catalog flux density plots and associated QA
@@ -86,9 +86,6 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
 
         For very low SNR, the longer ``solint`` used in the phase-up can cause phase decoherence to be
         'baked in', artificially biasing amplitude gains upward and producing an incorrect flux scale.
-
-    Returns:
-        The results object for the pipeline task is returned.
 
     Examples:
         1. Compute flux values for the phase calibrator using model data from the amplitude calibrator:

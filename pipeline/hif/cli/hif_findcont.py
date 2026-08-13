@@ -42,7 +42,7 @@ def hif_findcont(vis=None, target_list=None, hm_mosweight=None,
     ``hm_mode='normal'`` to preserve the previous-cycle behavior.
 
     .. figure:: /figures/guide-img029.png
-       :scale: 60%
+       :width: 60%
        :alt: Example findContinuum plots
 
        Two examples: entire spectral window identified as continuum (left) and two

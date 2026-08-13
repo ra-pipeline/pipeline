@@ -18,9 +18,6 @@ def hifa_polcalflag(vis=None, examineCrossPolSum=None):
         QA = 1 - (fraction of data newly flagged). An additional score of 0.8 is assigned if any spw has
         an antenna that is fully flagged.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Run with recommended settings to flag visibility outliers in the polarization calibrator data:
 

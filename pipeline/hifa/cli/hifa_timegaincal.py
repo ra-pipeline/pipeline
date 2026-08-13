@@ -71,7 +71,7 @@ def hifa_timegaincal(vis=None, calamptable=None, calphasetable=None, offsetstabl
     time; if the instrument is stable, these should scatter about zero with no drift.
 
     .. figure:: /figures/PL2025_hifa_timegaincal_allinone.png
-       :scale: 60%
+       :width: 60%
        :alt: Gain solution workflow for hifa_timegaincal
 
        Gain solution workflow. Each box shows when ``combine='spw'`` may have been
@@ -94,9 +94,6 @@ def hifa_timegaincal(vis=None, calamptable=None, calphasetable=None, offsetstabl
         - The above scores are decreased by 0.1 if the spw was mapped (phase offsets may affect
           calibration). If the spw is not mapped, offsets should calibrate out, and a corresponding
           message is shown.
-
-    Returns:
-        The results object for the pipeline task is returned.
 
     Examples:
         1. Compute standard per scan gain solutions that will be used to calibrate the target:

@@ -44,7 +44,7 @@ def hifa_tsysflagcontamination(
        are shown in red. The right panel shows the difference corrected by the atmospheric model.
 
     .. figure:: /figures/uid___A002_X11c688d_Xad31.ms.tsyscontamination_spw22_field2.png
-       :scale: 60%
+       :width: 60%
        :alt: Diagnostic plot for hifa_tsysflagcontamination
 
        Example diagnostic plot. Left panel: averaged Tsys profile toward science fields (blue)
@@ -70,9 +70,6 @@ def hifa_tsysflagcontamination(
         - QA = -0.1 if the task did not run correctly.
 
         Not applied in diffgain or full-pol recipes.
-
-    Returns:
-        The results object for the pipeline task is returned.
 
     Examples:
         1. Flag Tsys line contamination using currently recommended parameters:

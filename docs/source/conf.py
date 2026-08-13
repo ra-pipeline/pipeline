@@ -106,7 +106,7 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',
     'sphinx.ext.githubpages',
-    # 'sphinx.ext.intersphinx',
+    'sphinx.ext.intersphinx',
     'sphinx.ext.inheritance_diagram',
     'sphinx_automodapi.automodapi',
     'sphinx_automodapi.smart_resolver',
@@ -119,6 +119,8 @@ extensions = [
     'IPython.sphinxext.ipython_directive',
     'cli_function_stubs',
     'parameter_linking',
+    'sphinxcontrib.lightbox2',
+    'toc_sections',
 ]
 
 add_module_names = False
@@ -162,7 +164,7 @@ build_version_short = build_version.removesuffix('-detached').removesuffix('-dir
 # General information about the project.
 project = f'Pipeline ({version})'
 html_title = f'Pipeline ({version})'
-author = 'Pipeline Dev. Team'
+author = 'Pipeline Contributors'
 copyright = f'2020–{datetime.now(timezone.utc).year}, {author}, build: {build_version_short}'
 
 # The version info for the project you're documenting, acts as replacement
@@ -359,18 +361,19 @@ automodsumm_inherited_members = False
 
 # -- intersphinx
 
-# intersphinx_mapping = {
-#     'python': ('https://docs.python.org/3',(None, 'python-inv.txt')),
-#     'astropy': ('http://docs.astropy.org/en/latest/', None),
-#     'pyerfa': ('https://pyerfa.readthedocs.io/en/stable/', None),
-#     'pytest': ('https://pytest.readthedocs.io/en/stable/', None),
-#     'ipython': ('https://ipython.readthedocs.io/en/stable/', None),
-#     'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
-#     'sphinx_automodapi': ('https://sphinx-automodapi.readthedocs.io/en/stable/', None),
-#     'packagetemplate': ('http://docs.astropy.org/projects/package-template/en/latest/', None),
-#     'h5py': ('http://docs.h5py.org/en/stable/', None),
-#     "sphinx": ("https://www.sphinx-doc.org/en/master/", None),
-# }
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', (None, 'python-inv.txt')),
+    'casadocs': ('https://casadocs.readthedocs.io/en/stable/', None),
+    # 'astropy': ('http://docs.astropy.org/en/latest/', None),
+    # 'pyerfa': ('https://pyerfa.readthedocs.io/en/stable/', None),
+    # 'pytest': ('https://pytest.readthedocs.io/en/stable/', None),
+    # 'ipython': ('https://ipython.readthedocs.io/en/stable/', None),
+    # 'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
+    # 'sphinx_automodapi': ('https://sphinx-automodapi.readthedocs.io/en/stable/', None),
+    # 'packagetemplate': ('http://docs.astropy.org/projects/package-template/en/latest/', None),
+    # 'h5py': ('http://docs.h5py.org/en/stable/', None),
+    # "sphinx": ("https://www.sphinx-doc.org/en/master/\", None),
+}
 # intersphinx_disabled_reftypes = ["*"]
 
 # sphinxcontrib.bibtex/sphinx-astrorefs
@@ -428,7 +431,7 @@ nbsphinx_prolog = r"""
 
         .. _nbsphinx: https://nbsphinx.readthedocs.io/
         .. _Jupyter: https://jupyter.org/
-        .. _{{ docname }}: https://github.com/r-xue/pipeline/blob/gh-pages/html/{{ docname }}
+        .. _{{ docname }}: https://github.com/ra-pipeline/pipeline/blob/gh-pages/html/{{ docname }}
     
 
 .. raw:: latex

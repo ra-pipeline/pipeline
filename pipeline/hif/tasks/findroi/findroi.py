@@ -40,6 +40,39 @@ class FindROIInputs(vdp.StandardInputs):
         spw=None,
         parallel=None,
     ):
+        """Initialize inputs for the FindROI task.
+
+        Args:
+            context: Pipeline context object containing state information.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            vis: The list of input MeasurementSets. Defaults to the list of
+                MeasurementSets specified in the hifa_importdata task.
+                '': use all MeasurementSets in the context
+
+                Examples: 'uid___A001_2c3_1.ms', ['uid___A001_2c3_1.ms', 'uid___A001_2c3_2.ms']
+
+            field: Science target field selection for spectral-line region of
+                interest detection. Defaults to ``'target'``, which will process
+                all fields with TARGET intent. Can be restricted to a subset of
+                fields by specifying field names or IDs.
+
+            spw: Spectral window selection for processing. Defaults to empty
+                string, which will process all science spectral windows. Use
+                CASA-style spectral window selection to restrict to specific
+                spectral windows.
+
+            parallel: Use parallel processing with the casampi parallelization
+                framework to distribute spectral window processing across multiple
+                mpi processes.
+
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``'automatic'`` (automatically enabled if multiple
+                spectral windows are detected and parallel execution is available).
+        """
         super().__init__()
         self.context = context
         self.output_dir = output_dir

@@ -53,7 +53,7 @@ def hif_selfcal(vis=None, field=None, spw=None, contfile=None, hm_imsize=None, h
     before/after images and gain solutions per EB and antenna.
 
     .. figure:: /figures/selfcal_weblog.png
-       :scale: 60%
+       :width: 60%
        :alt: Self-calibration WebLog
 
        Example WebLog. The 'List of Self-cal Targets' table shows targets, imaging

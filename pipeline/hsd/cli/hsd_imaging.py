@@ -22,7 +22,7 @@ def hsd_imaging(mode=None, restfreq=None, infiles=None, field=None, spw=None):
       giving 8x8 spectra by default. Magenta lines show atmospheric transmission.
 
     .. figure:: /figures/guide-img043.png
-       :scale: 60%
+       :width: 60%
        :alt: Example profile map
 
        Example of the profile map.
@@ -33,7 +33,7 @@ def hsd_imaging(mode=None, restfreq=None, infiles=None, field=None, spw=None):
       velocity range (15 bins by default).
 
     .. figure:: /figures/guide-img044.png
-       :scale: 60%
+       :width: 60%
        :alt: Example channel map
 
        Example of a channel map.
@@ -50,7 +50,7 @@ def hsd_imaging(mode=None, restfreq=None, infiles=None, field=None, spw=None):
       SNR threshold = 5 for "extended").
 
     .. figure:: /figures/missedlines.png
-       :scale: 60%
+       :width: 60%
        :alt: Diagnostic plot for possible missed line channels
 
        Example diagnostic plot for possible missed line channels.
@@ -60,15 +60,16 @@ def hsd_imaging(mode=None, restfreq=None, infiles=None, field=None, spw=None):
       A warning is issued if the negative peak < -4 x standard deviation.
 
     Notes:
-        Three QA scores are computed:
+        Four QA scores are computed:
 
         - **Masking**: QA = 1.0 if no pixels in the pointing area are masked; QA = 0.5 if any
           pixels are masked; QA = 0.0 if >= 10% of pixels in the pointing area are masked
           (linearly interpolated between 0 and 0.5).
         - **Contamination**: QA = 0.65 if possible astronomical line contamination is detected
           in the continuum channel selection.
-        - **Missed line channels** (PL2025+): QA = 0.60 if significant off-line-range emission
+        - **Missed line channels**: QA = 0.60 if significant off-line-range emission
           is detected; QA = 1.0 otherwise.
+        - **Comparison of observed and theoretical sensitivities**: QA = 1.0 if observed sensitivity agrees with theoretical senstiivity (0.9 < observed sensitivity/theoretical sensitivity < 1.6); QA = 0.5 if observed sensitivity deviates from theoretical sensitivity.
 
     Examples:
         1. Generate images with default settings:
