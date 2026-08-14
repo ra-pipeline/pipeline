@@ -154,11 +154,19 @@ smartquotes = False
 master_doc = 'index'
 
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#confval-release
-release = build_version = pipeline.environment.pipeline_revision  # used on the PDF cover
+# `build_version`: The raw, full pipeline revision (e.g. "2026.2.1.16+g64967c159-detached")
+build_version = pipeline.environment.pipeline_revision
+
+# `version`: The base short string (e.g. "2026.2.1.16").
+# Replaces |version| in texts. Used below for the HTML navbar (`project`) and browser tab (`html_title`).
 version = build_version.split('+')[0]
 
-# remove -detached suffix as readthedocs always uses git checkout --force to create a
-# detached state
+# `release`: Replaces |release| in texts. Crucially, the LaTeX builder injects this exactly onto the PDF Cover Page.
+# We set it to `version` so the PDF cover gets the clean, short string without messy git hashes.
+release = version
+
+# `build_version_short`: Removes -detached suffix (as RTD uses `git checkout --force`).
+# Used exclusively for the `copyright` string below, which appears in the footer of every HTML page.
 build_version_short = build_version.removesuffix('-detached').removesuffix('-dirty')
 
 # General information about the project.

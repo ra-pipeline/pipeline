@@ -43,7 +43,7 @@ Documentation Components
    * - Imaging weights
      - :doc:`Imaging Weights <users_guide/weights>`
    * - Documentation and API for each task :sup:`2`
-     - `PDF <https://pipe-docs.readthedocs.io/_/downloads/en/latest/pdf/>`__ :doc:`HTML <apisummary>`
+     - `PDF <taskdocs.pdf>`__ :doc:`HTML <apisummary>`
    * - How to run the pipeline as a developer
      - :doc:`Running Pipeline <devel/usage/running_pipeline>`
    * - Pipeline Dependencies
