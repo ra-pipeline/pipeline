@@ -846,7 +846,7 @@ class MakeImList(basetask.StandardTaskTemplate):
             vislists = list(sessionutils.group_vislist_into_sessions(inputs.context, inputs.vis).values())
         else:
             vislists = [inputs.vis]
-
+        band_fields = defaultdict(set)
         if 'VLA' in imaging_mode:
             ref_ms = inputs.context.observing_run.get_ms(inputs.vis[0])
             vla_band = ref_ms.get_vla_spw2band()
@@ -855,7 +855,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                 if str(k) in spwlist:
                     band_spws.setdefault(v, []).append(k)
             fields = ref_ms.get_fields()
-            band_fields = defaultdict(set)
+
             for field in fields:
                 field_name = field.name
                 for spw in field.valid_spws:
