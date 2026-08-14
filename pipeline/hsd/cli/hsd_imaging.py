@@ -13,7 +13,7 @@ def hsd_imaging(mode=None, restfreq=None, infiles=None, field=None, spw=None):
 
     The WebLog for this stage includes:
 
-    - **Image sensitivity table**: achieved rms per spw/source and theoretical rms accounting
+    - **Image sensitivity table**: achieved sensitivity per spw/source and theoretical sensitivity accounting
       for the flagging fraction.
     - **Profile maps**: three types are shown in the WebLog — a simplified combined-image
       map per spw (front page), a simplified per-antenna map (click ``Spectral Window``), and
@@ -56,7 +56,7 @@ def hsd_imaging(mode=None, restfreq=None, infiles=None, field=None, spw=None):
        Example diagnostic plot for possible missed line channels.
 
     - **Contamination plots**: Peak S/N map, mask map (pixels with S/N < 10% of peak), and
-      masked-averaged spectrum (red = masked-pixel average, grey = peak S/N position spectrum).
+      masked-averaged spectrum (red = masked-pixel average, grey = peak S/N position spectrum, light purple = edge or atmospheric line channels which are ignored).
       A warning is issued if the negative peak < -4 x standard deviation.
 
     Notes:

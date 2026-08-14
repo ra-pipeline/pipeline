@@ -14,8 +14,8 @@ def hsd_importdata(vis=None, session=None, hm_rasterscan=None, parallel=None, as
     Telescope pointing plots are generated and available from the MS Summary page (Home -- MS name
     -- ``Telescope Pointing``). Two plot types are shown:
 
-    - On-source positions only.
-    - All positions including OFF positions.
+    - ON-source positions only.
+    - All positions including OFF-source positions.
 
     In these plots: the red circle indicates the beam size at the starting position of the raster
     scan; the red dot marks the last scan position; the green line represents antenna slewing
