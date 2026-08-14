@@ -284,7 +284,9 @@ latex_use_modindex = False
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass
 # [howto, manual, or own class]).
-latex_documents = [('latex', 'taskdocs.tex', 'Pipeline Tasks Reference Manual', 'pipeline team', 'manual')]
+latex_documents = [
+    ('latex', 'taskdocs.tex', 'ALMA/VLA/NRO Pipeline: Task Reference Manual', 'Pipeline Contributors', 'manual')
+]
 
 
 # -- Options for manual page output ------------------------------------
