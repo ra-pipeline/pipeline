@@ -83,9 +83,12 @@ def cli_wrapper(func: Callable) -> Callable:
 
     # Strip Sphinx cross-reference markup from the docstring so it looks clean
     # in the terminal when users run `help(task)` or `?task`.
+    # Note: Preserve the original docstring for Sphinx documentation; only clean
+    # it for terminal display (IPython `?`, `help()`).
     if func.__doc__:
         import re
-        clean_doc = func.__doc__
+        original_doc = func.__doc__
+        clean_doc = original_doc
 
         # 1. Strip Sphinx cross-reference roles (e.g., :func:`~...h_init` -> `h_init`)
         clean_doc = re.sub(r':[a-zA-Z0-9_:]+:`~?(?:[a-zA-Z0-9_./\-]+\.)?([a-zA-Z0-9_\-]+)`', r'`\1`', clean_doc)
@@ -100,9 +103,9 @@ def cli_wrapper(func: Callable) -> Callable:
         # 4. Strip `.. code-block:: text`
         clean_doc = re.sub(r'^\s*\.\. code-block::.*\n', '', clean_doc, flags=re.MULTILINE)
 
-        # Modify the original function's docstring so that IPython's `?`
-        # (which unwraps decorators) sees the cleaned version.
-        func.__doc__ = clean_doc
+        # Keep original for Sphinx introspection; only clean the wrapper for terminal display.
+        # Sphinx sees func.__doc__ during doc generation; IPython `?` sees wrapper.__doc__.
+        func.__doc__ = original_doc
         wrapper.__doc__ = clean_doc
 
     return wrapper
