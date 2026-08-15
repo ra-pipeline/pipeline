@@ -5,7 +5,7 @@
 A few of the more consequential ALMA interferometric and single-dish changes from this period:
 
 
-- **New QA scoring for single-dish imaging and calibration.** Several new or reworked QA metrics landed for the single-dish (`hsd`) pipeline, including an image-RMS-ratio-based score for `hsd_imaging` ([PIPE-2958](https://open-jira.nrao.edu/browse/PIPE-2958)) and aggregated multi-stage QA messaging for `hsd_k2jycal`/`hsd_atmcor`/`hsd_blflag` ([PIPE-3143](https://open-jira.nrao.edu/browse/PIPE-3143), [PIPE-3054](https://open-jira.nrao.edu/browse/PIPE-3054)).
+- **New QA scoring for single-dish imaging and calibration.** Several new or reworked QA metrics landed for the single-dish (`hsd`) pipeline, including an image-sensitivity-ratio-based score for `hsd_imaging` ([PIPE-2958](https://open-jira.nrao.edu/browse/PIPE-2958)) and aggregated multi-stage QA messaging for `hsd_k2jycal`/`hsd_atmcor`/`hsd_blflag` ([PIPE-3143](https://open-jira.nrao.edu/browse/PIPE-3143), [PIPE-3054](https://open-jira.nrao.edu/browse/PIPE-3054)).
 
 - **New amplitude-time QA metric for ALMA flux scaling.** `hifa_gfluxscale` gained a new amplitude-vs-time QA metric to catch flux-calibration problems earlier ([PIPE-2553](https://open-jira.nrao.edu/browse/PIPE-2553)).
 
@@ -57,8 +57,8 @@ Once a RADPS cube imager is available, a clean transition can be made to image c
 
 ## Single Dish 
 
-- **New image-quality QA score for `hsd_imaging`**, based on the ratio of observed to theoretical image RMS. ([PIPE-2958](https://open-jira.nrao.edu/browse/PIPE-2958))
-- **Aggregated QA messaging across `hsd_k2jycal`, `hsd_atmcor`, and `hsd_blflag`**, combining messages that share a metric and value into a single, clearer report. ([PIPE-3143](https://open-jira.nrao.edu/browse/PIPE-3143), [PIPE-3054](https://open-jira.nrao.edu/browse/PIPE-3054))
+- **New image-quality QA score for `hsd_imaging`**, based on the ratio of observed to theoretical image sensitivity. ([PIPE-2958](https://open-jira.nrao.edu/browse/PIPE-2958))
+- **Aggregated QA messaging across `hsd_skycal`, `hsd_k2jycal`, `hsd_applycal`, `hsd_atmcor`, `hsd_baseline`, `hsd_blflag`, and `hsd_imaging`**, combining messages that share a metric and value into a single, clearer report. ([PIPE-3143](https://open-jira.nrao.edu/browse/PIPE-3143), [PIPE-3054](https://open-jira.nrao.edu/browse/PIPE-3054), [PIPE-3055](https://open-jira.nrao.edu/browse/PIPE-3055), [PIPE-3104](https://open-jira.nrao.edu/browse/PIPE-3104))
 - **New sinusoid-fitting option for `hsd_baseline`.** ([PIPE-2893](https://open-jira.nrao.edu/browse/PIPE-2893))
 - **`hsd_imaging` now ignores edge channels and atmospheric-line-overlapped channels** when computing QA. ([PIPE-3092](https://open-jira.nrao.edu/browse/PIPE-3092), [PIPE-2946](https://open-jira.nrao.edu/browse/PIPE-2946))
 - `hsd_baseline` line-width estimation switched to the 75th percentile as a representative value. ([PIPE-2964](https://open-jira.nrao.edu/browse/PIPE-2964), [PIPE-2959](https://open-jira.nrao.edu/browse/PIPE-2959))
