@@ -5,7 +5,7 @@
 A few of the more consequential ALMA interferometric and single-dish changes from this period:
 
 
-- **New QA scoring for single-dish imaging and calibration.** Several new or reworked QA metrics landed for the single-dish (`hsd`) pipeline, including an image-sensitivity-ratio-based score for `hsd_imaging` ([PIPE-2958](https://open-jira.nrao.edu/browse/PIPE-2958)) and aggregated multi-stage QA messaging for `hsd_k2jycal`/`hsd_atmcor`/`hsd_blflag` ([PIPE-3143](https://open-jira.nrao.edu/browse/PIPE-3143), [PIPE-3054](https://open-jira.nrao.edu/browse/PIPE-3054)).
+- **New QA scoring for single-dish imaging and calibration.** Several new or reworked QA metrics landed for the single-dish (`hsd`) pipeline, including an image-sensitivity-ratio-based score for `hsd_imaging` ([PIPE-2958](https://open-jira.nrao.edu/browse/PIPE-2958)) and aggregated multi-stage QA messaging for `hsd_skycal`/`hsd_k2jycal`/`hsd_applycal`/`hsd_atmcor`/`hsd_baseline`/`hsd_blflag`/`hsd_imaging` ([PIPE-3143](https://open-jira.nrao.edu/browse/PIPE-3143), [PIPE-3054](https://open-jira.nrao.edu/browse/PIPE-3054), [PIPE-3055](https://open-jira.nrao.edu/browse/PIPE-3055), [PIPE-3104](https://open-jira.nrao.edu/browse/PIPE-3104)).
 
 - **New amplitude-time QA metric for ALMA flux scaling.** `hifa_gfluxscale` gained a new amplitude-vs-time QA metric to catch flux-calibration problems earlier ([PIPE-2553](https://open-jira.nrao.edu/browse/PIPE-2553)).
 
