@@ -11,7 +11,7 @@
 
 alma-science-pipeline
 quick-start
-whats-new
+whats-new-2026
 pipeline-versions-and-documentation
 data-processing-files
 modifying-a-pipeline-run
