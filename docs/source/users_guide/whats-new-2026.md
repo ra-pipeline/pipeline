@@ -33,17 +33,26 @@ Frame regridding and hif_findroi are the first steps of a multi-year process -- 
 ---
 ---
 
-## Detailed list: IF Imaging & Continuum Subtraction
+## Detailed list: IF Multi-EB Calibration and Imaging 
 
 - **New {func}`hif_findroi <pipeline.hif.cli.hif_findroi>` region-of-interest task** added to the ALMA imaging recipe templates, with a `field` parameter for targeted use and later refactored to read polarization data directly from the MS. ([PIPE-3151](https://open-jira.nrao.edu/browse/PIPE-3151), [PIPE-3149](https://open-jira.nrao.edu/browse/PIPE-3149), [PIPE-3196](https://open-jira.nrao.edu/browse/PIPE-3196), [PIPE-3164](https://open-jira.nrao.edu/browse/PIPE-3164), [PIPE-3156](https://open-jira.nrao.edu/browse/PIPE-3156))
 - **New {func}`hif_mstransform <pipeline.hif.cli.hif_mstransform>` re-gridding mode** that creates imaging MSes re-gridded to the native frequency frame, plus a new `per_spw` splitting option. ([PIPE-3003](https://open-jira.nrao.edu/browse/PIPE-3003), [PIPE-2955](https://open-jira.nrao.edu/browse/PIPE-2955))
-- **{func}`hif_findcont <pipeline.hif.cli.hif_findcont>` heuristics extended:** added `mosweight` support and a requirement that `datacolumn` be set for multi-MS vis lists ([PIPE-3131](https://open-jira.nrao.edu/browse/PIPE-3131)); additional exposed parameters for continuum-finding control ([PIPE-3197](https://open-jira.nrao.edu/browse/PIPE-3197), [PIPE-3159](https://open-jira.nrao.edu/browse/PIPE-3159)); switched to using `uvrange` ([PIPE-2617](https://open-jira.nrao.edu/browse/PIPE-2617)); fixed a `skip_stage` bug that could produce a blank `cont.dat` ([PIPE-3137](https://open-jira.nrao.edu/browse/PIPE-3137), [PIPE-2255](https://open-jira.nrao.edu/browse/PIPE-2255)); `findContinuum.py` updated to v9.6 ([PIPE-2766](https://open-jira.nrao.edu/browse/PIPE-2766)).
+- **{func}`hif_findcont <pipeline.hif.cli.hif_findcont>` new `coarse` mode** introduced, with fewer pixels-per-beam, and a mild uvtaper.  This reduces the runtime of the stage without significantly changing the results. If in some particular case, one wants to recover precisely the previous behaviour, or test the outcome with full-resolution dirty cubes, the mode can simply be changed to `normal` instead of `coarse`.
+
+  <img src="12m_findcont_timing_scatter.png"
+       width="35%"
+       alt="reduction of hifa_findcont runtime with coarse mode"><br>
+  Shorter runtimes in `coarse` (new) mode vs `normal` (old) for a representative set of test data.
+
+
+- **{func}`hif_findcont <pipeline.hif.cli.hif_findcont>` other heuristics extended:** added `mosweight` support and a requirement that `datacolumn` be set for multi-MS vis lists ([PIPE-3131](https://open-jira.nrao.edu/browse/PIPE-3131)); additional exposed parameters for continuum-finding control ([PIPE-3197](https://open-jira.nrao.edu/browse/PIPE-3197), [PIPE-3159](https://open-jira.nrao.edu/browse/PIPE-3159)); switched to using `uvrange` ([PIPE-2617](https://open-jira.nrao.edu/browse/PIPE-2617)); fixed a `skip_stage` bug that could produce a blank `cont.dat` ([PIPE-3137](https://open-jira.nrao.edu/browse/PIPE-3137), [PIPE-2255](https://open-jira.nrao.edu/browse/PIPE-2255)); `findContinuum.py` updated to v9.6 ([PIPE-2766](https://open-jira.nrao.edu/browse/PIPE-2766)).
 - **`cont.dat` UX improvements:** the weblog now notes when a `cont.dat` file is present, and the "no cont.dat found" log message was downgraded from warning to info. ([PIPE-3046](https://open-jira.nrao.edu/browse/PIPE-3046), [PIPE-3145](https://open-jira.nrao.edu/browse/PIPE-3145))
 - **Per-EB image naming propagated correctly** through `ImageItem` via the new `imagename_prefix` field. ([PIPE-3074](https://open-jira.nrao.edu/browse/PIPE-3074), [PIPE-2465](https://open-jira.nrao.edu/browse/PIPE-2465))
-- Removed the mosaic-mode QA score from {func}`hif_selfcal <pipeline.hif.cli.hif_selfcal>` ([PIPE-3147](https://open-jira.nrao.edu/browse/PIPE-3147)); removed clean-mask deletion between continuum TARGET imaging iterations ([PIPE-3078](https://open-jira.nrao.edu/browse/PIPE-3078)); removed serial model-write enforcement for the `mosaic` gridder ([PIPE-3025](https://open-jira.nrao.edu/browse/PIPE-3025)); fixed a `CleanTargetInfo` specmode mismatch affecting representative-bandwidth imaging ([PIPE-3128](https://open-jira.nrao.edu/browse/PIPE-3128)).
-- Single-pol data now uses a `T`-gaintable for inf_EB self-calibration trials. ([PIPE-2908](https://open-jira.nrao.edu/browse/PIPE-2908))
+- Removed the mosaic-is-new-mode QA score from {func}`hif_selfcal <pipeline.hif.cli.hif_selfcal>` ([PIPE-3147](https://open-jira.nrao.edu/browse/PIPE-3147)); removed clean-mask deletion between continuum TARGET imaging iterations ([PIPE-3078](https://open-jira.nrao.edu/browse/PIPE-3078)); removed serial model-write enforcement for the `mosaic` gridder ([PIPE-3025](https://open-jira.nrao.edu/browse/PIPE-3025)); fixed a `CleanTargetInfo` specmode mismatch affecting representative-bandwidth imaging ([PIPE-3128](https://open-jira.nrao.edu/browse/PIPE-3128)).
+- Single-pol data now uses a `T`-gaintable for inf_EB self-calibration trials, fixing a failure mode for single-polarization datasets ([PIPE-2908](https://open-jira.nrao.edu/browse/PIPE-2908))
 
-## Detailed list: IF Calibration
+
+## Detailed list: IF 1-EB Calibration
 
 - **New amplitude-time QA metric** for {func}`hifa_gfluxscale <pipeline.hifa.cli.hifa_gfluxscale>`, aimed at catching flux-calibration outliers earlier. ([PIPE-2553](https://open-jira.nrao.edu/browse/PIPE-2553))
   The two kinds of behaviour that this metric has been tuned to detect are shown here:
@@ -61,11 +70,18 @@ Frame regridding and hif_findroi are the first steps of a multi-year process -- 
 - **Phasecentre parsing now accepts implicit and explicit units.** ([PIPE-2881](https://open-jira.nrao.edu/browse/PIPE-2881))
 - Polarization calibration recipe fix: a second {func}`hifa_bandpass <pipeline.hifa.cli.hifa_bandpass>` run after {func}`hifa_lockrefant <pipeline.hifa.cli.hifa_lockrefant>` no longer runs unnecessarily. ([PIPE-3016](https://open-jira.nrao.edu/browse/PIPE-3016))
 - {func}`hifa_diffgaincal <pipeline.hifa.cli.hifa_diffgaincal>` B2B-offset calibration switched to `linearPD` when spectral windows are combined, and its caltable-appending logic for multi-scan groups was simplified. ([PIPE-2858](https://open-jira.nrao.edu/browse/PIPE-2858), [PIPE-2915](https://open-jira.nrao.edu/browse/PIPE-2915))
+- In the process, the pipeline team found and a CASA bug [CAS-14703](https://open-jira.nrao.edu/browse/CAS-14703) that caused discrete jumps in phase when linearPD was used:
+
+  <img src="CAS-14703-uid___A002_X12e7c09_X430e.ms.hifa_timegaincal.s18_8.spw17_19_21_23.solintinf.gpcal.offsets.tbl-spw17-antDA41-phase_vs_time.png"  width="40%">
+  Phase offsets visible in the {func}`hifa_timegaincal <pipeline.hifa.cli.hifa_timegaincal>` `Phase offsets` plots in the Weblog, prior to [CAS-14703](https://open-jira.nrao.edu/browse/CAS-14703))
+
 - {func}`hifa_polcal <pipeline.hifa.cli.hifa_polcal>` switched to `doquantiles=False` in {func}`CASA/visstat <casatasks.information.visstat>` calls. ([PIPE-2166](https://open-jira.nrao.edu/browse/PIPE-2166), [PIPE-3070](https://open-jira.nrao.edu/browse/PIPE-3070))
 - {func}`hifa_flagdata <pipeline.hifa.cli.hifa_flagdata>`'s FDM-spw detection heuristic now uses `msmd.almaspws`. ([PIPE-2320](https://open-jira.nrao.edu/browse/PIPE-2320))
 - Fixed a bug where the flux calibrator's other intents could produce a bad QA score. ([PIPE-2833](https://open-jira.nrao.edu/browse/PIPE-2833))
 - Fixed a caltable-registration issue in the local pipeline context for {func}`CASA/gaincal <casatasks.calibration.gaincal>`-family tasks. ([PIPE-2752](https://open-jira.nrao.edu/browse/PIPE-2752))
-- **New `PHgood`/`BPgood` QA flags for WVR gain calibration** ({func}`hifa_wvrgcal <pipeline.hifa.cli.hifa_wvrgcal>`), with an updated score calculation. ([PIPE-1868](https://open-jira.nrao.edu/browse/PIPE-1868))
+- **New `PHgood`/`BPgood` QA flags for WVR gain calibration** ({func}`hifa_wvrgcal <pipeline.hifa.cli.hifa_wvrgcal>`), with an updated score calculation. ([PIPE-1868](https://open-jira.nrao.edu/browse/PIPE-1868)) for ACA data with insufficient PM antennas: this will increase the number of "Fast Lane" autodeliveries.
+
+
 
 ## Detailed List: Single Dish 
 
@@ -87,17 +103,21 @@ Frame regridding and hif_findroi are the first steps of a multi-year process -- 
 - **`hsd` QA-message aggregation** across related stages, sorted consistently by score/color. ([PIPE-2988](https://open-jira.nrao.edu/browse/PIPE-2988), [PIPE-3152](https://open-jira.nrao.edu/browse/PIPE-3152), [PIPE-3104](https://open-jira.nrao.edu/browse/PIPE-3104))
 - **New amplitude-time QA metric for ALMA flux scaling.** ([PIPE-2553](https://open-jira.nrao.edu/browse/PIPE-2553))
 - **Weblog environment page** now reports Python and library versions, platform tag, and GPU info. ([PIPE-2644](https://open-jira.nrao.edu/browse/PIPE-2644))
+
+  <img src="PIPE-2644-popup.png" width="40%"><br>
+  Screen shot including new third-party library versions used in a pipeline run.
+
 - `qautils.py` spectral-window sorting improved to accommodate scan number and a new exclude feature. ([PIPE-3055](https://open-jira.nrao.edu/browse/PIPE-3055))
 - Fixed an AQUA report formatting error caused by single-string `vis` specifications. ([PIPE-3034](https://open-jira.nrao.edu/browse/PIPE-3034))
-- Fixed a random grey background color bug in weblog plots, and clean-mask island contours switched from vector to raster boundary plotting for large images. ([PIPE-2807](https://open-jira.nrao.edu/browse/PIPE-2807), [PIPE-2982](https://open-jira.nrao.edu/browse/PIPE-2982))
+- Fixed a random grey background color bug in weblog plots, and clean-mask island contours switched from vector to raster boundary plotting for large images, to reduce spikes in RAM use ([PIPE-2807](https://open-jira.nrao.edu/browse/PIPE-2807), [PIPE-2982](https://open-jira.nrao.edu/browse/PIPE-2982))
 - Weblog rendering-duration tracking reverted to the earlier, more restricted approach after regressions. ([PIPE-2014](https://open-jira.nrao.edu/browse/PIPE-2014))
 - `pipeline.__version__` string-derivation approach reverted after proving unreliable, and the `-dirty` build-version suffix was removed for cleaner documentation output. ([PIPE-2880](https://open-jira.nrao.edu/browse/PIPE-2880), [PIPE-3195](https://open-jira.nrao.edu/browse/PIPE-3195))
 
 ## Detailed list: Performance & Scalability
 
 - **Improved memory management**: garbage collection is now triggered after clearing internal caches to reduce peak memory use. ([PIPE-3061](https://open-jira.nrao.edu/browse/PIPE-3061))
-- **MS-open optimization extended** to {func}`hif_correctedampflag <pipeline.hif.cli.hif_correctedampflag>`, {func}`hif_rawflagchans <pipeline.hif.cli.hif_rawflagchans>`, and {func}`hifa_gfluxscale <pipeline.hifa.cli.hifa_gfluxscale>`, and virtual-spw lookups in {func}`hif_imageprecheck <pipeline.hif.cli.hif_imageprecheck>` are now precomputed rather than recalculated. ([PIPE-3085](https://open-jira.nrao.edu/browse/PIPE-3085), [PIPE-3090](https://open-jira.nrao.edu/browse/PIPE-3090))
-- `estimate_SNR`/`estimate_near_field_SNR` refactored to avoid writing large temporary images. ([PIPE-2937](https://open-jira.nrao.edu/browse/PIPE-2937))
+- **MS-open optimization extended** to {func}`hif_correctedampflag <pipeline.hif.cli.hif_correctedampflag>`, {func}`hif_rawflagchans <pipeline.hif.cli.hif_rawflagchans>`, and {func}`hifa_gfluxscale <pipeline.hifa.cli.hifa_gfluxscale>`, and virtual-spw lookups in {func}`hif_imageprecheck <pipeline.hif.cli.hif_imageprecheck>` are now precomputed rather than recalculated. ([PIPE-3085](https://open-jira.nrao.edu/browse/PIPE-3085))
+- `estimate_SNR`/`estimate_near_field_SNR` in {func}`hif_selfcal <pipeline.hif.cli.hif_selfcal>` refactored to avoid writing large temporary images. ([PIPE-2937](https://open-jira.nrao.edu/browse/PIPE-2937))
 - `compute_zd_telmjd_for_ms` sped up while preserving identical output. ([PIPE-3088](https://open-jira.nrao.edu/browse/PIPE-3088))
 - `memray` is now the recommended tool for memory profiling, replacing the unmaintained `memory_profiler`. ([PIPE-2998](https://open-jira.nrao.edu/browse/PIPE-2998))
 - Dask cluster lifecycle management improved to reduce resource contention. ([PIPE-2375](https://open-jira.nrao.edu/browse/PIPE-2375), [PIPE-2884](https://open-jira.nrao.edu/browse/PIPE-2884)–[PIPE-2887](https://open-jira.nrao.edu/browse/PIPE-2887))
@@ -129,6 +149,7 @@ Frame regridding and hif_findroi are the first steps of a multi-year process -- 
 
 Beyond the items above, this period included a long tail of smaller bug fixes and cleanups:
 
+- Fixed a bug that could lead to incorrect sensitivity reported for aggregate bandwidth in {func}`hifa_imageprecheck <pipeline.hifa.cli.image_precheck>` ([PIPE-3090](https://open-jira.nrao.edu/browse/PIPE-3090))
 - Fixes to {func}`hif_editimlist <pipeline.hif.cli.hif_editimlist>`/{func}`hifa_imageprecheck <pipeline.hifa.cli.hifa_imageprecheck>` field-selection and phase-offset logic. ([PIPE-3138](https://open-jira.nrao.edu/browse/PIPE-3138), [PIPE-3139](https://open-jira.nrao.edu/browse/PIPE-3139), [PIPE-3163](https://open-jira.nrao.edu/browse/PIPE-3163))
 - Corrections to sky-position and zenith-distance utilities using the CASA Measures framework. ([PIPE-2472](https://open-jira.nrao.edu/browse/PIPE-2472))
 - An MPI race condition fixed in concurrent `flux.csv` access. ([PIPE-3099](https://open-jira.nrao.edu/browse/PIPE-3099))
@@ -147,7 +168,6 @@ The remaining ALMA-interferometric and single-dish tickets from this period, not
 - {func}`hif_applycal <pipeline.hif.cli.hif_applycal>` QA-outlier intent handling and a `QA_mode` switch change. ([PIPE-2716](https://open-jira.nrao.edu/browse/PIPE-2716))
 - Atmosphere line-fitting mapped to fit frequencies directly, plus follow-ups. ([PIPE-2845](https://open-jira.nrao.edu/browse/PIPE-2845), [PIPE-2103](https://open-jira.nrao.edu/browse/PIPE-2103))
 - `gaincalSNR` updated for compatibility with `snr.py`. ([PIPE-2901](https://open-jira.nrao.edu/browse/PIPE-2901))
-- Support for multiple sources carrying the flux-calibration intent. ([PIPE-2904](https://open-jira.nrao.edu/browse/PIPE-2904))
 - A flagging fraction-limit adjustment. ([PIPE-2932](https://open-jira.nrao.edu/browse/PIPE-2932))
 - `flaggedSolnApplycaldelay` restructured into a dictionary. ([PIPE-2582](https://open-jira.nrao.edu/browse/PIPE-2582))
 - A science-scan spw-selection and coverage warning. ([PIPE-2584](https://open-jira.nrao.edu/browse/PIPE-2584))
