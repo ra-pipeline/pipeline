@@ -51,7 +51,7 @@ def hifa_wvrgcalflag(vis=None, caltable=None, offsetstable=None, hm_toffset=None
           the scoring tree shown below.
 
         .. figure:: /figures/hifa_wvrgcalflag_scoring_PL2023.png
-           :scale: 60%
+           :width: 60%
            :alt: QA scoring workflow for hifa_wvrgcalflag
 
            QA scoring workflow showing initial and secondary scoring criteria, the resulting
@@ -59,9 +59,6 @@ def hifa_wvrgcalflag(vis=None, caltable=None, offsetstable=None, hm_toffset=None
            instructions for QA analysts reviewing the WebLog.
 
         The final stage score is the lowest score across all MeasurementSets.
-
-    Returns:
-        The results object for the pipeline task is returned.
 
     Examples:
         1. Compute the WVR calibration for all the MeasurementSets:

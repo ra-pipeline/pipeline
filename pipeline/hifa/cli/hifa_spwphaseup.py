@@ -9,14 +9,14 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
                     refant=None, minblperant=None, minsnr=None, unregister_existing=None):
     """Compute phase calibration spw map and per spw phase offsets.
 
-    :py:func:`hifa_spwphaseup <hifa_spwphaseup>` computes the spw map for phase calibration, and derives
+    :func:`~pipeline.hifa.cli.hifa_spwphaseup` computes the spw map for phase calibration, and derives
     phase offsets as a function of spectral window using high signal-to-noise
     calibration observations. Previous calibrations are applied on the fly.
 
-    :py:func:`hifa_spwphaseup <hifa_spwphaseup>` performs two functions:
+    :func:`~pipeline.hifa.cli.hifa_spwphaseup` performs two functions:
 
     .. figure:: /figures/PL2025_lowSNR_spwphaseup_v1.png
-       :scale: 60%
+       :width: 60%
        :alt: Logic flowchart for spw phase-up strategy
 
        Logic flowchart for determining the temporal gain strategy. Extends
@@ -26,8 +26,8 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
     - Determines the spectral window mapping or combination mode, gaintype and
       solint, for each independent bandpass, amplitude, diffgain, phase and check
       source, to use when solving the phaseup (phase as a function of time) in
-      subsequent stages (mapping mode and gaintype in :py:func:`hifa_gfluxscaleflag <hifa_gfluxscaleflag>`, all
-      parameters for :py:func:`hifa_gfluxscale <hifa_gfluxscale>` and :py:func:`hifa_timegaincal <hifa_timegaincal>`), and when applying those solutions
+      subsequent stages (mapping mode and gaintype in :func:`~pipeline.hifa.cli.hifa_gfluxscaleflag`, all
+      parameters for :func:`~pipeline.hifa.cli.hifa_gfluxscale` and :func:`~pipeline.hifa.cli.hifa_timegaincal`), and when applying those solutions
       to targets.
 
     - Computes the per-spectral-window phase offset table that will be applied
@@ -80,7 +80,7 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
       the signal-to-noise required to be met before increasing solint above ``'int'``
       is reduced to ``intphasesnrmin``.
 
-    If ``hm_spwmapmode='combine'``, :py:func:`hifa_spwphaseup <hifa_spwphaseup>` maps all the science windows
+    If ``hm_spwmapmode='combine'``, :func:`~pipeline.hifa.cli.hifa_spwphaseup` maps all the science windows
     to a single science spectral window. For example, if the list of science
     spectral windows is ``[9, 11, 13, 15]`` then all the science spectral windows
     in the data will be combined and mapped to the science window ``9`` in the
@@ -123,7 +123,7 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
 
     **Phase decoherence assessment**
 
-    Using the bandpass phase-up solutions from :py:func:`hifa_bandpass <hifa_bandpass>`, the baseline-based phase RMS is reconstructed
+    Using the bandpass phase-up solutions from :func:`~pipeline.hifa.cli.hifa_bandpass`, the baseline-based phase RMS is reconstructed
     for each antenna relative to the reference antenna. For each baseline the phase RMS is calculated over
     the entire bandpass scan (total-time) and also over a period equal to the phase referencing cycle time.
     The median phase RMS of all baselines longer than the 80th percentile is reported in the WebLog table.
@@ -133,7 +133,7 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
     outliers are found above 50 deg, a reassessment is made excluding them.
 
     .. figure:: /figures/hifa_spwphaseup_phasedeco_PL2022.png
-       :scale: 60%
+       :width: 60%
        :alt: Phase decoherence plots
 
        Example phase decoherence plots (phase RMS vs. baseline length). Semi-transparent
@@ -152,9 +152,6 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
         These thresholds are shown as coloured horizontal lines in the phase decoherence plots.
 
         The overall stage score is the lowest of the gain calibration QA and the phase decoherence QA.
-
-    Returns:
-        The results object for the pipeline task is returned.
 
     Examples:
         1. Compute the default spectral window map and the per spectral window phase offsets:

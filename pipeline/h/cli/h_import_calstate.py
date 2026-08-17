@@ -13,9 +13,6 @@ def h_import_calstate(filename):
     Args:
         filename: Name of the saved calibration state
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Import a calibration state from disk.
 

@@ -170,7 +170,9 @@ tmp_path_retention_policy = "none"
 [tool.pixi.workspace]
 # 'nodefaults' is not needed as Pixi does not implicitly add the defaults (Anaconda) channel
 channels = ["conda-forge"]
-platforms = ["linux-64", "osx-arm64"]
+# The inline "Rich Platforms" syntax (with OS version constraints) requires Pixi >= v0.71.0
+# Ref: https://pixi.sh/latest/features/rich-platforms/
+platforms = ["linux-64", { platform = "osx-arm64", osx = "15.0" }]
 
 # Common dependencies (shared by ALL environments via solve-groups)
 
@@ -204,13 +206,86 @@ casaplotserver = { version = ">=1.8.2", index = "https://casa-pip.nrao.edu/repos
 casatasks = { version = ">=6.7.4.2", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 casatools = { version = ">=6.7.4.2", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 
-[tool.pixi.system-requirements]
-# Sets the minimum macOS runtime to 15.0 (floor, not a build filter).
-# Older wheels (e.g., macOS 14.0) are still selected when no newer build exists,
-# as macOS binaries are forward-compatible.
-macos = "15.0"
 
 [tool.pixi.tasks]
+
+# --------------------------------------------------------------------------
+# CASA Runtime & Environment — Simple Tasks
+# --------------------------------------------------------------------------
+
+# Update CASA data (configuration and runtime artifacts)
+update-data = "python -m casaconfig --update-all && python -m casaconfig --summary && python -m casaconfig --current-data"
+
+# --------------------------------------------------------------------------
+# Testing Tasks
+# --------------------------------------------------------------------------
+
+# Run unit tests with coverage
+test-unit = """
+cd $INIT_CWD && \
+PYTHONNOUSERSITE=1 python -m pytest \
+  -n logical --max-worker-restart=1 \
+  --junitxml=unit-results.xml \
+  --cov=pipeline --cov-append --cov-report=html --cov-report=xml \
+  $PIXI_PROJECT_ROOT/pipeline/
+"""
+
+# Run fast regression tests in a serial CASA session (xdist, no mpi)
+test-regression = """
+cd $INIT_CWD && \
+OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+  python -m pytest -n 12 --dist worksteal \
+  -m \"not mpi\" \
+  --junitxml=regression-results.xml \
+  --cov=pipeline --cov-append --cov-report=html --cov-report=xml \
+  $PIXI_PROJECT_ROOT/tests/regression/fast/
+"""
+
+# Run a single small ALMA-IF fast regression test (pltest1)
+test-pltest1 = """
+cd $INIT_CWD && \
+OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+  python -m casashell --nogui --log2term \
+  -c \"import pytest; pytest.main(['$PIXI_PROJECT_ROOT/tests/regression/fast/alma_if_fast_test.py::test_uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small__PPR__regression'])\"
+"""
+
+# --------------------------------------------------------------------------
+# Subsection Tasks (complex configurations)
+# --------------------------------------------------------------------------
+
+# Launch interactive CASA shell
+[tool.pixi.tasks.casa]
+cmd = "python -m casashell"
+
+[tool.pixi.tasks.casa.env]
+PYTHONWARNINGS = "ignore::SyntaxWarning"
+
+# Launch CASA with MPI support (for parallel workflows)
+[tool.pixi.tasks.casampi]
+description = "Launch CASA MPI with safety flags. Override ranks with CASA_NPROCS (default: 4)."
+cmd = """\
+sh -c 'mpirun -display-allocation -display-map -oversubscribe \
+--mca btl ^openib --mca btl_vader_single_copy_mechanism none --bind-to none \
+-x FI_PROVIDER -x OMP_NUM_THREADS -x OPENBLAS_NUM_THREADS \
+-x PATH -x PYTHONNOUSERSITE \
+-n ${CASA_NPROCS:-4} \
+python -m casashell "$@"' _\
+"""
+
+[tool.pixi.tasks.casampi.env]
+PYTHONWARNINGS = "ignore::SyntaxWarning"
+FI_PROVIDER = "^psm3"
+PMIX_MCA_pcompress_base_silence_warning = "1"
+OMP_PLACES = "threads"
+OMP_PROC_BIND = "false"
+OMP_NUM_THREADS = "1"
+OPENBLAS_NUM_THREADS = "1"
+PYTHONNOUSERSITE = "1"
+
+# --------------------------------------------------------------------------
+# Testing Tasks
+# --------------------------------------------------------------------------
+
 # Run unit tests with coverage
 test-unit = """
 cd $INIT_CWD && \
@@ -240,8 +315,6 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
   -c "import pytest; pytest.main(['$PIXI_PROJECT_ROOT/tests/regression/fast/alma_if_fast_test.py::test_uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small__PPR__regression'])"
 """
 
-# Fetch/update CASA runtime data
-fetch-casarundata = "python -c 'import casatools'"
 
 # --------------------------------------------------------------------------
 # Feature: CASA ver6.7.4 (PL2026-CASA branch) — Python 3.12
@@ -250,7 +323,6 @@ fetch-casarundata = "python -c 'import casatools'"
 # --------------------------------------------------------------------------
 
 [tool.pixi.feature.casa674-py312]
-platforms = ["linux-64", "osx-arm64"]
 
 [tool.pixi.feature.casa674-py312.dependencies]
 python = "3.12.*"
@@ -259,34 +331,10 @@ python = "3.12.*"
 casashell = { version = "==6.7.4.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 
 # --------------------------------------------------------------------------
-# Feature: CASA ver6.7.5.* (latest release branch) — Python 3.12/3.13
-# --------------------------------------------------------------------------
-
-[tool.pixi.feature.casa675-py312]
-platforms = ["linux-64", "osx-arm64"]
-
-[tool.pixi.feature.casa675-py312.dependencies]
-python = "3.12.*"
-
-[tool.pixi.feature.casa675-py312.pypi-dependencies]
-casashell = { version = "==6.7.5.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
-
-[tool.pixi.feature.casa675-py313]
-# Note: bdsf is not available on osx-arm64 for cp313; skipped via requirements.txt marker
-platforms = ["linux-64", "osx-arm64"]
-
-[tool.pixi.feature.casa675-py313.dependencies]
-python = "3.13.*"
-
-[tool.pixi.feature.casa675-py313.pypi-dependencies]
-casashell = { version = "==6.7.5.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
-
-# --------------------------------------------------------------------------
-# Feature: CASA ver6.7.6 (master branch) — Python 3.12/3.13
+# Feature: CASA ver6.7.6 (latest release branch) — Python 3.12/3.13
 # --------------------------------------------------------------------------
 
 [tool.pixi.feature.casa676-py312]
-platforms = ["linux-64", "osx-arm64"]
 
 [tool.pixi.feature.casa676-py312.dependencies]
 python = "3.12.*"
@@ -296,7 +344,6 @@ casashell = { version = "==6.7.6.*", index = "https://casa-pip.nrao.edu/reposito
 
 [tool.pixi.feature.casa676-py313]
 # Note: bdsf is not available on osx-arm64 for cp313; skipped via requirements.txt marker
-platforms = ["linux-64", "osx-arm64"]
 
 [tool.pixi.feature.casa676-py313.dependencies]
 python = "3.13.*"
@@ -305,11 +352,31 @@ python = "3.13.*"
 casashell = { version = "==6.7.6.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 
 # --------------------------------------------------------------------------
+# Feature: CASA ver6.7.7.* (master branch) — Python 3.12/3.13
+# --------------------------------------------------------------------------
+
+[tool.pixi.feature.casa677-py312]
+
+[tool.pixi.feature.casa677-py312.dependencies]
+python = "3.12.*"
+
+[tool.pixi.feature.casa677-py312.pypi-dependencies]
+casashell = { version = "==6.7.7.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+
+[tool.pixi.feature.casa677-py313]
+# Note: bdsf is not available on osx-arm64 for cp313; skipped via requirements.txt marker
+
+[tool.pixi.feature.casa677-py313.dependencies]
+python = "3.13.*"
+
+[tool.pixi.feature.casa677-py313.pypi-dependencies]
+casashell = { version = "==6.7.7.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+
+# --------------------------------------------------------------------------
 # Feature: Docs build extras
 # --------------------------------------------------------------------------
 
 [tool.pixi.feature.docs]
-platforms = ["linux-64", "osx-arm64"]
 
 [tool.pixi.feature.docs.dependencies]
 python = "3.12.*"
@@ -331,7 +398,7 @@ build-pdf = { cmd = "make latexpdf", cwd = "docs" }
 default = { features = ["casa674-py312"], solve-group = "casa674-py312" }
 docs = { features = ["docs"], solve-group = "casa674-py312" }
 casa674-py312 = { features = ["casa674-py312"] }
-casa675-py312 = { features = ["casa675-py312"] }
-casa675-py313 = { features = ["casa675-py313"] }
 casa676-py312 = { features = ["casa676-py312"] }
 casa676-py313 = { features = ["casa676-py313"] }
+casa677-py312 = { features = ["casa677-py312"] }
+casa677-py313 = { features = ["casa677-py313"] }
