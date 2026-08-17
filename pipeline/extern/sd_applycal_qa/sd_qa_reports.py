@@ -472,6 +472,7 @@ def plot_data(msw: mswrapper_sd.MSWrapperSD, thresholds: Union[dict, None] = Non
     fig.set_size_inches(10, 8)
     #Upper section, data
     ax1 = plt.subplot(111)
+    data_plotted = []
     for k, scan in enumerate(scanlist):
         if msw.analysis[scan] is None:
             continue
@@ -490,23 +491,28 @@ def plot_data(msw: mswrapper_sd.MSWrapperSD, thresholds: Union[dict, None] = Non
             plt.plot(freqs[sciline], msw.analysis[scan]['ondata']['normdata'][sciline], 'sk', label='Sci.Line Chan')
         elif (np.sum(sciline) > 0):
             plt.plot(freqs[sciline], msw.analysis[scan]['ondata']['normdata'][sciline], 'sk')
+        data_plotted.append(k)
 
-    plt.legend(loc='upper left', ncol=3, fontsize='x-small', title='XX-YY data')
-    #Y-axis
-    plt.ylabel('(XX-YY)/sigma (data norm. excess)')
-    #X-axis
-    plt.xlabel('Freq [GHz]')
-    plt.xlim(minfreq, maxfreq)
+    if len(data_plotted) > 0:
+        plt.legend(loc='upper left', ncol=3, fontsize='x-small', title='XX-YY data')
+        #Y-axis
+        plt.ylabel('(XX-YY)/sigma (data norm. excess)')
+        #X-axis
+        plt.xlabel('Freq [GHz]')
+        plt.xlim(minfreq, maxfreq)
 
-    #write titles and detections info
-    title = f'{msname}, {fieldname}, {antenna_id}:{msw.antenna}, Spw {msw.spw}'
-    if len(detmsg) > 0:
-        title = title + '\nOutliers '+detmsg
-    plt.suptitle(title)
-    #Save file and return filename
-    filename = f'{plot_output_path}/{msname}_{fieldname}_{msw.antenna}_Spw{msw.spw}_XX-YY_excess.png'
-    print('Plot filename: '+str(filename))
-    plt.savefig(filename, bbox_inches='tight')
+        #write titles and detections info
+        title = f'{msname}, {fieldname}, {antenna_id}:{msw.antenna}, Spw {msw.spw}'
+        if len(detmsg) > 0:
+            title = title + '\nOutliers '+detmsg
+        plt.suptitle(title)
+        #Save file and return filename
+        filename = f'{plot_output_path}/{msname}_{fieldname}_{msw.antenna}_Spw{msw.spw}_XX-YY_excess.png'
+        print('Plot filename: '+str(filename))
+        plt.savefig(filename, bbox_inches='tight')
+    else:
+        filename = "N/A"
+
     plt.close()
 
     return filename

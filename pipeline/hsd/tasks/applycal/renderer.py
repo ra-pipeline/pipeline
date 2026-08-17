@@ -339,15 +339,6 @@ class T2_4MDetailsSDApplycalRenderer(super_renderer.T2_4MDetailsApplycalRenderer
                 if x.origin.metric_name == 'XX-YY.deviation'
             ]
 
-            # exclude QA scores for heavily flagged data,
-            # i.e., all data are flagged or data for either
-            # of the polarizations are fully flagged
-            xy_deviation_qa_exclude_flagged_cases = [
-                x for x in xy_deviation_qa
-                if "All data flagged" not in x.longmsg
-                   and "Data flagged for one polarization" not in x.longmsg
-            ]
-
             # get the xy-deviation plots
             xy_deviation_plots = [
                 generate_plot_object_from_name(ctx, plot_name)
@@ -374,7 +365,7 @@ class T2_4MDetailsSDApplycalRenderer(super_renderer.T2_4MDetailsApplycalRenderer
                         qa_for_field_spw = sorted(
                             filter(
                                 lambda x: spw_id in x.applies_to.spw and field_name in x.applies_to.field,
-                                xy_deviation_qa_exclude_flagged_cases
+                                xy_deviation_qa
                             ),
                             key=lambda x: x.score
                         )
@@ -382,20 +373,26 @@ class T2_4MDetailsSDApplycalRenderer(super_renderer.T2_4MDetailsApplycalRenderer
                             # no useful QA/plots for this field and spw
                             continue
 
-                        worst_score = qa_for_field_spw[0]
-                        antenna = worst_score.applies_to.ant.pop()
-                        LOG.debug(
-                            "vis %s, field %s, spw %s, antenna %s, worst score %s",
-                            vis, field_name, spw, antenna, worst_score.score
-                        )
-                        plot_name = filenamer.sanitize(
-                            f"{vis}_{field_name}_{antenna}_Spw{spw_id}_XX-YY_excess.png"
-                        )
-                        plot = next(filter(
-                            lambda x: x.basename == plot_name,
-                            xy_deviation_plots
-                        ))
-                        plots_per_spw.append(plot)
+                        for s in qa_for_field_spw:
+                            antenna = list(s.applies_to.ant)[0]
+                            plot_name = filenamer.sanitize(
+                                f"{vis}_{field_name}_{antenna}_Spw{spw_id}_XX-YY_excess.png"
+                            )
+                            for p in xy_deviation_plots:
+                                if p.basename == plot_name:
+                                    plot = p
+                                    break
+                            else:
+                                plot = None
+
+                            if plot:
+                                LOG.debug(
+                                    "vis %s, field %s, spw %s, antenna %s, score %s",
+                                    vis, field_name, spw, antenna, s.score
+                                )
+                                plots_per_spw.append(plot)
+                                break
+
                     summaries.append([field_name, plots_per_spw])
 
         if xy_deviation_plots_all:
