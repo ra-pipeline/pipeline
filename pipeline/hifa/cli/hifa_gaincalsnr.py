@@ -51,9 +51,6 @@ def hifa_gaincalsnr(vis=None, field=None, intent=None, spw=None, bwedgefrac=None
     - The QA score is based on how many signal-to-noise estimates greater than
       the requested signal-to-noise ratio can be computed.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Estimate the per scan gaincal solution sensitivities and signal to noise
         ratios for all the science spectral windows:

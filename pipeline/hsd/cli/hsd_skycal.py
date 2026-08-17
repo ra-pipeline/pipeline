@@ -20,7 +20,7 @@ def hsd_skycal(calmode=None, fraction=None, noff=None,
     and elevation difference between ON_SOURCE and OFF_SOURCE vs. time.
 
     .. figure:: /figures/guide-img035.png
-       :scale: 60%
+       :width: 60%
        :alt: OFF spectrum example
 
        Example of an OFF spectrum. Different antennas are shown in different colours;

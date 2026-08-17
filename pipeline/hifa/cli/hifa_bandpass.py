@@ -28,11 +28,11 @@ def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, an
         The logical workflow is illustrated below:
 
         .. figure:: /figures/PL2025_hifa_bandpass_phaseup.png
-           :scale: 60%
+           :width: 60%
            :alt: Workflow for hifa_bandpass temporal phase-up
 
            The logical workflow for the temporal phase-up process used in the
-           :py:func:`hifa_bandpassflag <hifa_bandpassflag>` and :py:func:`hifa_bandpass <hifa_bandpass>` tasks that compute the
+           :func:`~pipeline.hifa.cli.hifa_bandpassflag` and :func:`~pipeline.hifa.cli.hifa_bandpass` tasks that compute the
            `gaincal` `solint` and `combine` parameters.
 
         **Frequency Interval Calculation**
@@ -80,9 +80,6 @@ def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, an
             is narrow (< 125 MHz) or if low SNR requires a frequency interval
             >= the subband width.
         -   If no issues are found or the data is not BLC FDM, the score is 1.0.
-
-    Returns:
-        The results object for the pipeline task is returned.
 
     Examples:
         1. Run with recommended settings:

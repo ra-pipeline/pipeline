@@ -15,6 +15,7 @@ class FindROIResult(basetask.Results):
         summary: dict[str, Any] | None = None,
         errors: list[str] | None = None,
         findroi_resources: list[str] | None = None,
+        fatal_error: bool = False,
     ) -> None:
         super().__init__()
         self.stage_product_path = stage_product_path
@@ -22,6 +23,7 @@ class FindROIResult(basetask.Results):
         self.summary = summary or {}
         self.errors = errors or []
         self.findroi_resources = findroi_resources
+        self.fatal_error = bool(fatal_error)
 
     def merge_with_context(self, context: Any) -> None:
         """Register exported findroi resources for later downstream discovery."""
