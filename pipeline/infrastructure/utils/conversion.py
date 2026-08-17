@@ -946,7 +946,7 @@ def set_to_data(s: set[Any | list[Any]], keep_list: bool = False)-> Any | list[A
         s: set to be converted
         keep_list: if True, the set() is returned as a list
 
-    Returns: returns a list to a single value depending on what is contained within. Returns None is structure is not a set()
+    Returns: returns a list to a single value depending on what is contained within. Returns None if structure is not a set()
 
     """
     SINGLE = 1
