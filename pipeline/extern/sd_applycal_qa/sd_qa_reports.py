@@ -428,17 +428,17 @@ def plot_data_trec(msw: mswrapper_sd.MSWrapperSD, thresholds: Union[dict, None] 
     return filename
 
 def plot_data(msw: mswrapper_sd.MSWrapperSD, thresholds: Union[dict, None] = None, plot_output_path: str = '.',
-                  colorlist: Union[list, str] = 'auto', detmsg: str = '') -> str:
+              colorlist: Union[list, str] = 'auto', detmsg: str = '') -> str:
     '''Task used the diagnostic plot of ON-source XX-YY data for pipeline weblog.
     param:
         msw: MSWrapperSD object with the data to be plotted
         thresholds (dict): Dictionary containing the thresholds used in the QA analysis of the dataset.
-        plot_output_path (str): Path to the output plot image file.
+        plot_output_path (str): Path to the directory where the output plot image file will be saved.
         colorlist (str or list): Either list of colors to use for each Trec curve, or 'auto' to assign
                                  random colors.
         detmsg (str): Detail message (optional) to be put under the title of the plot.
     Returns:
-        List of filenames of produced plots
+        Filename of the produced plot or "N/A" if no data was plotted
     '''
 
     #List of science scan list
