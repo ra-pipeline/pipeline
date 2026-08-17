@@ -55,7 +55,7 @@ def hifa_timegaincal(vis=None, calamptable=None, calphasetable=None, offsetstabl
       and drifts of the spw-spw offsets as a function of time, but if the SNR
       is very low, such offsets will not be able to detected.
 
-    Good candidate reference antennas were determined using the :py:func:`hif_refant <hif_refant>` task.
+    Good candidate reference antennas were determined using the :func:`~pipeline.hif.cli.hif_refant` task.
     During all solutions for standard observing modes, the reference antenna can
     change flexibly. For polarization observations a good, un-flagged common
     reference antenna is found and locked in time. For band-to-band observations,
@@ -71,7 +71,7 @@ def hifa_timegaincal(vis=None, calamptable=None, calphasetable=None, offsetstabl
     time; if the instrument is stable, these should scatter about zero with no drift.
 
     .. figure:: /figures/PL2025_hifa_timegaincal_allinone.png
-       :scale: 60%
+       :width: 60%
        :alt: Gain solution workflow for hifa_timegaincal
 
        Gain solution workflow. Each box shows when ``combine='spw'`` may have been
@@ -94,9 +94,6 @@ def hifa_timegaincal(vis=None, calamptable=None, calphasetable=None, offsetstabl
         - The above scores are decreased by 0.1 if the spw was mapped (phase offsets may affect
           calibration). If the spw is not mapped, offsets should calibrate out, and a corresponding
           message is shown.
-
-    Returns:
-        The results object for the pipeline task is returned.
 
     Examples:
         1. Compute standard per scan gain solutions that will be used to calibrate the target:

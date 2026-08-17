@@ -7,7 +7,7 @@ Pipeline recipes are the operational instructions that define data processing wo
 
 ```{list-table}
 :header-rows: 1
-:widths: 35 50 15
+:class: small-font-table
 
 * - Recipe/Template
   - Description
@@ -37,6 +37,9 @@ Pipeline recipes are the operational instructions that define data processing wo
 * - procedure_hifa_polcalimage_totalintensity.xml
   - "Polarization friendly" ALMA interferometric calibration + target imaging
   - [PIPE-606] / [PIPE-1976]
+* - procedure_hifa_polimage.xml
+  - ALMA polarization interferometric target imaging
+  - [PIPE-2466]
 * - procedure_hifa_cal_diffgain.xml
   - ALMA interferometric calibration for differential gain mode observations
     (Band-to-Band or Bandwidth Switching)
@@ -57,7 +60,7 @@ Pipeline recipes are the operational instructions that define data processing wo
 
 ```{list-table}
 :header-rows: 1
-:widths: 35 50 15
+:class: small-font-table
 
 * - Recipe/Template
   - Description
@@ -71,7 +74,7 @@ Pipeline recipes are the operational instructions that define data processing wo
 
 ```{list-table}
 :header-rows: 1
-:widths: 35 50 15
+:class: small-font-table
 
 * - Recipe/Template
   - Description
@@ -85,7 +88,7 @@ Pipeline recipes are the operational instructions that define data processing wo
 
 ```{list-table}
 :header-rows: 1
-:widths: 35 50 15
+:class: small-font-table
 
 * - Recipe/Template
   - Description
@@ -93,6 +96,9 @@ Pipeline recipes are the operational instructions that define data processing wo
 * - procedure_hifv.xml
   - VLA PI calibration
   - N/A
+* - procedure_hifv_nofluxcal.xml
+  - VLA PI calibration without flux calibration
+  - [PIPE-3117] / [PIPE-3118]
 * - procedure_hifv_contimage.xml
   - VLA PI target continuum imaging. Input is a calibrated MS.
   - [PIPE-784]
@@ -134,7 +140,7 @@ Pipeline recipes are the operational instructions that define data processing wo
 
 ```{list-table}
 :header-rows: 1
-:widths: 35 50 15
+:class: small-font-table
 
 * - Recipe/Template
   - Description
@@ -175,6 +181,9 @@ Pipeline recipes are the operational instructions that define data processing wo
 [PIPE-2277]: https://open-jira.nrao.edu/browse/PIPE-2277
 [PIPE-2295]: https://open-jira.nrao.edu/browse/PIPE-2295
 [PIPE-2296]: https://open-jira.nrao.edu/browse/PIPE-2296
+[PIPE-2466]: https://open-jira.nrao.edu/browse/PIPE-2466
+[PIPE-3117]: https://open-jira.nrao.edu/browse/PIPE-3117
+[PIPE-3118]: https://open-jira.nrao.edu/browse/PIPE-3118
 [CAS-9625]: https://open-jira.nrao.edu/browse/CAS-9625
 [CAS-9631]: https://open-jira.nrao.edu/browse/CAS-9631
 [CAS-10763]: https://open-jira.nrao.edu/browse/CAS-10763
