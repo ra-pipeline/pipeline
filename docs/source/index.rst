@@ -25,7 +25,9 @@
    :caption: User Guides
 
    users_guide/index
+   users_guide/known_issues
    VLA Pipeline User's Guide <https://science.nrao.edu/facilities/vla/data-processing>
+   VLA Pipeline Known Issues <https://science.nrao.edu/facilities/vla/data-processing/pipeline#autotoc-item-autotoc-32>
    Nobeyama Pipeline User's Guide <https://www.nro.nao.ac.jp/projects/45m/data/otf/#casa>
 
 .. toctree::

@@ -13,6 +13,17 @@ Pipeline
 
 
 
+Citing Pipeline and CASA
+------------------------
+Please acknowledge Pipeline and CASA use in your publications, in a format similar to this:
+   ``Data were calibrated using the ALMA Pipeline version 2025.1.0.37 and CASA 6.6.6-18 (Hunter et al. 2023, CASA team 2022).  Calibrated visibilities were downloaded from the ALMA archive and restored, after which the CASA tclean task was used to image those visibilities.``
+
+* `Hunter et al. 2023 <https://ui.adsabs.harvard.edu/abs/2023PASP..135g4501H/abstract>`__  is only appropriate for the ALMA Interferometric pipeline.
+* `CASA team 2022 <https://iopscience.iop.org/article/10.1088/1538-3873/ac9642>`__ is appropriate for all data processing.
+* Please adjust the wording to reflect your workflow: for example if you recalibrated data yourself using the pipeline or CASA, or if you directly used the images provided in the archive, please say so.
+* If you used the `AUDI <https://science.nrao.edu/srdp/science-ready-data-products-srdp-for-alma>`__ services at NRAO, please add ``This work makes use of advanced data products generated with services operated by the National Radio Astronomy Observatory.`` and a reference to `Lacy et al. 2020 <https://ui.adsabs.harvard.edu/abs/2020ASPC..527..519L/abstract>`__
+
+
 Official Repository
 -------------------
 
