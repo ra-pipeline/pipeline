@@ -925,13 +925,11 @@ class PlotAntsChart:
         plotwidth = max(xmax-xmin, ymax-ymin) * 6./10.  # extra 1/10 is the margin
         (xcenter, ycenter) = ((xmin+xmax)/2., (ymin+ymax)/2.)
         if xlimit is None:
-            # subpl.set_xlim(xcenter-plotwidth, xcenter+plotwidth)
-            subpl.set_xlim(xcenter[0]-plotwidth[0], xcenter[0]+plotwidth[0])
+            subpl.set_xlim(xcenter-plotwidth, xcenter+plotwidth)
         else:
             subpl.set_xlim(xlimit[0], xlimit[1])
         if ylimit is None:
-            # subpl.set_ylim(ycenter-plotwidth, ycenter+plotwidth)
-            subpl.set_ylim(ycenter[0]-plotwidth[0], ycenter[0]+plotwidth[0])
+            subpl.set_ylim(ycenter-plotwidth, ycenter+plotwidth)
         else:
             subpl.set_ylim(ylimit[0], ylimit[1])
 
