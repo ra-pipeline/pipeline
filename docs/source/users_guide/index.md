@@ -20,6 +20,7 @@ pipeline-weblog
 hifa_polcalimage-recipe
 hsd_calimage-recipe
 weights
+known_issues
 ```
 ```
 
