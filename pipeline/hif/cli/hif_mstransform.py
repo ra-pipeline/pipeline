@@ -9,7 +9,7 @@ def hif_mstransform(vis=None, outputvis=None, field=None, intent=None, spw=None,
 
     For each execution block, calibrated visibilities for the science targets are split from the
     CORRECTED column of the regular-calibrated MS, or from the data column of the
-    self-calibrated MS, using the ``mstransform`` CASA task. The output MS is named
+    self-calibrated MS, using the :func:`~casatasks.manipulation.mstransform` CASA task. The output MS is named
     with ``*targets.ms`` and is listed on the front WebLog page. At this stage the ``targets.ms``
     contains only the calibrated continuum and line emission data (no continuum subtraction yet).
     By default, all science target data is copied to the new MS.
@@ -20,9 +20,6 @@ def hif_mstransform(vis=None, outputvis=None, field=None, intent=None, spw=None,
 
     Notes:
         QA = 1.0 if the new MS is successfully created; 0.0 otherwise.
-
-    Returns:
-        The results object for the pipeline task is returned.
 
     Examples:
         1. Split all science target data:

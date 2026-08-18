@@ -19,6 +19,67 @@ optimize processing speed; the default hm_mode='normal' preserves the
 previous-cycle imaging behavior. The effective imaging parameters, including
 pixels per beam, are shown below.</p>
 
+%if findcont_mode is None:
+    <div class="alert alert-info">
+        hif_findcont imaging mode: NOT AVAILABLE. The imaging mode is not recorded in this result.
+    </div>
+%elif not imaging_performed:
+    <div class="alert alert-info">
+        hif_findcont imaging mode: ${findcont_mode.upper()} (hm_mode='${findcont_mode}'). ${imaging_skip_reason}
+    </div>
+%elif findcont_mode == 'normal':
+    <div class="alert alert-info">
+        hif_findcont imaging mode: NORMAL (hm_mode='normal')
+    </div>
+%else:
+    <div class="alert alert-info">
+        hif_findcont imaging mode: COARSE (hm_mode='coarse')
+    </div>
+%endif
+
+%if imaging_summary:
+    <div class="table-responsive">
+    <table class="table table-bordered table-striped table-condensed">
+        <thead>
+            <tr>
+                <th>Field</th>
+                <th>Spw</th>
+                <th>Data type</th>
+                <th>Phase center</th>
+                <th>Pixels per beam</th>
+                <th>Cell</th>
+                <th>Image size</th>
+                <th>Weighting</th>
+                <th>Robust</th>
+                <th>UV taper</th>
+                <th>mosweight</th>
+                <th>perchanweightdensity</th>
+                <th>nbins</th>
+            </tr>
+        </thead>
+        <tbody>
+        %for row in imaging_summary:
+            <tr>
+                <td>${row.field}</td>
+                <td>${row.spw}</td>
+                <td>${row.datatype}</td>
+                <td>${row.phasecenter}</td>
+                <td>${row.ppb}</td>
+                <td>${row.cell}</td>
+                <td>${row.imsize}</td>
+                <td>${row.weighting}</td>
+                <td>${row.robust}</td>
+                <td>${row.uvtaper}</td>
+                <td>${row.mosweight}</td>
+                <td>${row.perchanweightdensity}</td>
+                <td>${row.nbins}</td>
+            </tr>
+        %endfor
+        </tbody>
+    </table>
+    </div>
+%endif
+
 % if not table_rows:
     <p>There are no continuum finding results.
 % else:

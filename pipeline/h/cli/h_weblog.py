@@ -1,7 +1,7 @@
 from pipeline import show_weblog
 
 
-def h_weblog(relpath=None):
+def h_weblog(relpath=None) -> None:
     """Open the pipeline weblog in a browser tab or window.
 
     Args:
@@ -9,9 +9,6 @@ def h_weblog(relpath=None):
             in a child directory of the CASA working directory. If relpath
             is left unspecified, the most recent weblog will be located and
             displayed.
-
-    Returns:
-        None
 
     Examples:
         1. Open pipeline weblog in a browser:

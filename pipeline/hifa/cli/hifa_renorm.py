@@ -10,7 +10,7 @@ def hifa_renorm(vis=None, createcaltable=None, threshold=None, spw=None, exclude
     When bright astronomical lines are present in the autocorrelations of science targets, the ALMA
     correlator's amplitude normalization can be incorrect, leading to under-scaled amplitudes in the
     affected channels. This task creates per-channel renormalization spectra (scaling spectra) and,
-    optionally, stores them in a Tsys-like calibration table to be applied during :py:func:`hif_applycal <hif_applycal>`.
+    optionally, stores them in a Tsys-like calibration table to be applied during :func:`~pipeline.hif.cli.hif_applycal`.
     (Prior to PL2024 the correction was applied by editing the MS directly.)
 
     The algorithm compares the autocorrelations of the bandpass calibrator (assumed line-free) to those
@@ -34,7 +34,7 @@ def hifa_renorm(vis=None, createcaltable=None, threshold=None, spw=None, exclude
     across fields being averaged together.
 
     .. figure:: /figures/hifa_renorm_PL2022.png
-       :scale: 60%
+       :width: 60%
        :alt: WebLog for hifa_renorm
 
        WebLog for the ``hifa_renorm`` stage. Table rows highlighted blue indicate values
@@ -42,14 +42,14 @@ def hifa_renorm(vis=None, createcaltable=None, threshold=None, spw=None, exclude
        renormalization spectra per field/spw.
 
     .. figure:: /figures/hifa_renorm_PDF_PL2022.png
-       :scale: 60%
+       :width: 60%
        :alt: Renormalization PDF diagnostic screenshot
 
        PDF screenshot for an EB/target/spw where renormalization is applied. The CO line
        causes atypically high scaling > 1.25 (25%).
 
     .. figure:: /figures/hifa_renorm_PDFwithATM_PL2022.png
-       :scale: 60%
+       :width: 60%
        :alt: Renormalization PDF with atmospheric exclusion
 
        PDF where atmospheric regions are automatically excluded (semi-opaque grey).
@@ -66,9 +66,6 @@ def hifa_renorm(vis=None, createcaltable=None, threshold=None, spw=None, exclude
         - R_f >= 2.5:  QA = 0.66 -- yellow
         - Bands 9 and 10 receive a fixed QA = 0.9 (blue) regardless of R_f.
         - If R_f is erroneous or unrealistic (< 1 or > 2.5), an additional QA message is issued.
-
-    Returns:
-        The results object for the pipeline task is returned.
 
     Examples:
         1. Run with recommended settings to assess the need for an ALMA amplitude renormalization
