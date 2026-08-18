@@ -8,6 +8,7 @@ Created on 24 Oct 2014
 from __future__ import annotations
 
 import collections
+import itertools
 import os
 import re
 from typing import TYPE_CHECKING
@@ -374,22 +375,21 @@ class T2_4MDetailsSDApplycalRenderer(super_renderer.T2_4MDetailsApplycalRenderer
                             continue
 
                         for s in qa_for_field_spw:
-                            antenna = list(s.applies_to.ant)[0]
-                            plot_name = filenamer.sanitize(
-                                f"{vis}_{field_name}_{antenna}_Spw{spw_id}_XX-YY_excess.png"
-                            )
-                            for p in xy_deviation_plots:
+                            for p, antenna in itertools.product(xy_deviation_plots, s.applies_to.ant):
+                                plot_name = filenamer.sanitize(
+                                    f"{vis}_{field_name}_{antenna}_Spw{spw_id}_XX-YY_excess.png"
+                                )
                                 if p.basename == plot_name:
+                                    LOG.debug(
+                                        "vis %s, field %s, spw %s, antenna %s, score %s",
+                                        vis, field_name, spw, antenna, s.score
+                                    )
                                     plot = p
                                     break
                             else:
                                 plot = None
 
                             if plot:
-                                LOG.debug(
-                                    "vis %s, field %s, spw %s, antenna %s, score %s",
-                                    vis, field_name, spw, antenna, s.score
-                                )
                                 plots_per_spw.append(plot)
                                 break
 
