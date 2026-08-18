@@ -3,6 +3,22 @@
 
 <%block name="title">Find Continuum</%block>
 
+<p>
+For each target and spectral window without a pre-existing continuum selection,
+this stage creates a dirty cube to search for spectral-line emission or
+absorption and identify channel ranges least likely to be contaminated. In the
+default path, the cube uses Briggs weighting with robust=1.0. Joint spatial
+masks are formed from moment images and refined using moment-difference
+contamination checks; spectra extracted from those masks are then analyzed for
+line features. Starting with the 2026 release, the target-imaging setup
+formerly produced by <code>hif_makeimlist</code> is generated internally by
+<code>hif_findcont</code>. Custom target-imaging setups can be supplied via the
+<code>target_list</code> parameter. Additionally, starting in the 2026 release,
+a new hm_mode='coarse' option allows use of reduced pixels-per-beam sampling to
+optimize processing speed; the default hm_mode='normal' preserves the
+previous-cycle imaging behavior. The effective imaging parameters, including
+pixels per beam, are shown below.</p>
+
 % if not table_rows:
     <p>There are no continuum finding results.
 % else:
