@@ -942,9 +942,11 @@ class PlotAntsChart:
         #    # around (0, 0).
         #    pos = (pos[0]+480., pos[1]-14380., pos[2])
 
-        pos = [[antenna.offset['longitude offset']['value']],
-               [antenna.offset['latitude offset']['value']],
-               [antenna.offset['elevation offset']['value']]]
+        pos = [
+            antenna.offset['longitude offset']['value'],
+            antenna.offset['latitude offset']['value'],
+            antenna.offset['elevation offset']['value'],
+        ]
 
         return np.array(pos)
 
