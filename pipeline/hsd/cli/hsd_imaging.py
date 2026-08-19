@@ -47,7 +47,8 @@ def hsd_imaging(mode=None, restfreq=None, infiles=None, field=None, spw=None):
     - **Diagnostic plots for possible missed line channels** (PL2025+): generated when line
       emission is detected outside the line ranges from
       :func:`~pipeline.hsd.cli.hsd_baseline` (SNR threshold = 7 for "single peak" and
-      SNR threshold = 5 for "extended").
+      SNR threshold = 5 for "extended"). The cyan ranges and magenta lines indicate the detected line ranges at :func:`~pipeline.hsd.cli.hsd_baseline` and the deviation mask, respectively. 
+      The channels exceeding the thresholds are highlighted with the red points.
 
     .. figure:: /figures/missedlines.png
        :width: 60%
@@ -58,6 +59,10 @@ def hsd_imaging(mode=None, restfreq=None, infiles=None, field=None, spw=None):
     - **Contamination plots**: Peak S/N map, mask map (pixels with S/N < 10% of peak), and
       masked-averaged spectrum (red = masked-pixel average, grey = peak S/N position spectrum, light purple = edge or atmospheric line channels which are ignored).
       A warning is issued if the negative peak < -4 x standard deviation.
+      
+      .. figure:: /figures/contamination.png
+       :width: 60%
+       :alt: Contamination plot.
 
     Notes:
         Four QA scores are computed:
