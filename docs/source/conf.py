@@ -194,7 +194,16 @@ language = 'en'
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This patterns also effect to html_static_path and html_extra_path
+# Default behavior
 exclude_patterns = ['_build', '**.ipynb_checkpoints', 'Thumbs.db', '.DS_Store']
+
+if os.environ.get('BUILD_INTERNAL_DOCS') == '1':
+    tags.add('internal')
+    project = project + ' (INTERNAL)'
+else:
+    # PUBLIC BUILD: Exclude developer-only files/folders
+    # Note: adjust this list based on what internal docs actually exist
+    exclude_patterns.extend(['devel/*', 'internal_notes/*', 'inheritance.rst'])
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'default'  # 'sphinx', 'github-dark', ' default'

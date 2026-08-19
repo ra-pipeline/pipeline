@@ -17,7 +17,14 @@
    :caption: API Reference
 
    apisummary
-   inheritance
+
+.. only:: internal
+
+   .. toctree::
+      :hidden:
+      :maxdepth: 3
+
+      inheritance
 
 .. toctree::
    :hidden:
