@@ -39,8 +39,13 @@ def hif_findcont(vis=None, target_list=None, hm_mosweight=None,
     are not re-analyzed; only spws not listed are processed. The resulting ``cont.dat`` file (LSRK
     frequency ranges) is used by subsequent :func:`~pipeline.hif.cli.hif_uvcontsub` and :func:`~pipeline.hif.cli.hif_makeimages` stages.
 
-    The default mode is ``coarse``, which applies the local fast-imaging override, which is the default
-    in ALMA recipes starting in Cycle 13. Use ``hm_mode='normal'`` to preserve the previous-cycle behavior.
+    Using ``hm_mode='coarse'`` applies the fast-imaging override with reduced
+    pixels-per-beam sampling to optimize processing speed. The default mode is
+    ``hm_mode='normal'`` to preserve the behavior prior to ALMA Cycle 13.
+
+    .. note::
+       Starting from ALMA Cycle 13, standard ALMA recipes use ``hm_mode='coarse'``
+       by default at the recipe workflow level.
 
     .. figure:: /figures/guide-img029.png
        :width: 60%

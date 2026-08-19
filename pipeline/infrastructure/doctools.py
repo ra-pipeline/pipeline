@@ -94,12 +94,37 @@ def inherit_docstring(task_class: basetask.StandardTaskTemplate, cli_task: Calla
         while hasattr(base_func, '__wrapped__'):
             base_func = base_func.__wrapped__
 
+        # PIPE-2738: Protect reST directives that break docstring_inheritance parser.
+        # The docstring_inheritance library parses Google-style docstrings, which
+        # use "Note:" and "Notes:" as standard section headers. When it encounters
+        # a Sphinx ".. note::" directive, it mistakenly identifies it as a section
+        # header, extracts its contents, and reconstructs it with a single colon
+        # (i.e. ".. note:") and stripped indentation. This completely breaks the
+        # Sphinx HTML rendering. We temporarily rename the directive to hide it
+        # from the parser, just like it already ignores unknown sections like ".. figure::".
+        original_doc = base_func.__doc__ or ""
+        protected_doc = original_doc.replace(".. note::", "___PROTECTED_NOTE___")
+        base_func.__doc__ = protected_doc
+
         # inherit docstring from Inputs's constructor
         inherit_google_docstring(inputs_class.__init__.__doc__, base_func)
+
+        # Restore protected directives
+        if base_func.__doc__:
+            base_func.__doc__ = base_func.__doc__.replace("___PROTECTED_NOTE___", ".. note::")
 
         # copy docstring to outermost wrapper function
         cli_task.__doc__ = base_func.__doc__
     else:
         # if cli_task is not wrapped, simply inherit docstring
         # from Inputs's constructor
+
+        # Protect reST directives (see explanation in the block above)
+        original_doc = cli_task.__doc__ or ""
+        protected_doc = original_doc.replace(".. note::", "___PROTECTED_NOTE___")
+        cli_task.__doc__ = protected_doc
+
         inherit_google_docstring(inputs_class.__init__.__doc__, cli_task)
+
+        if cli_task.__doc__:
+            cli_task.__doc__ = cli_task.__doc__.replace("___PROTECTED_NOTE___", ".. note::")

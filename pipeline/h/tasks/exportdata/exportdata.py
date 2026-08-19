@@ -737,7 +737,7 @@ class ExportData(basetask.StandardTaskTemplate):
             # PIPE-3136: Save hif_findroi resources
             for findroi_resource in findroi_resources_list:
                 if os.path.exists(findroi_resource):
-                    tar.add(findroi_resource, arcname=findroi_resource)
+                    tar.add(findroi_resource, arcname=os.path.basename(findroi_resource))
                     LOG.info('Saving auxiliary data product %s in %s', findroi_resource, tarfilename)
 
             # PIPE-2094: Save pipeline statistics file
