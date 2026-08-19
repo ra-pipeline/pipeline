@@ -22,9 +22,10 @@ hsd_calimage-recipe
 weights
 known_issues
 ```
-```
 
+:::{admonition} Acknowledgment
 ALMA, an international astronomy facility, is a partnership of ESO (representing its member states),
 NSF (USA) and NINS (Japan), together with NRC (Canada), NSC and ASIAA (Taiwan), and
 KASI (Republic of Korea), in cooperation with the Republic of Chile. The Joint ALMA Observatory is
 operated by ESO, AUI/NRAO and NAOJ.
+:::

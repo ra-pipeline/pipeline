@@ -208,6 +208,7 @@ copybutton_prompt_is_regexp = True
 copybutton_remove_prompts = True
 copybutton_copy_empty_lines = False
 copybutton_only_copy_prompt_lines = True
+copybutton_exclude = ".linenos, .gp, .go, pre.mermaid, div.mermaid, .mermaid"
 
 # -- Options for HTML output -------------------------------------------
 
@@ -232,6 +233,9 @@ html_js_files = ['furo_layout.js']
 # -- Options for Mermaid output ---------------------------------------
 
 mermaid_d3_zoom = True
+mermaid_include_elk = True
+mermaid_include_zenuml = False
+mermaid_height = '1000px'
 myst_fence_as_directive = ['mermaid']
 
 # -- Options for HTMLHelp output ---------------------------------------
