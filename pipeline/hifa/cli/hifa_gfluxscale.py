@@ -14,6 +14,9 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
 
     The workflow (as illustrated in the WebLog logic diagram):
 
+    .. mermaid:: /figures/PL2025_hifa_gfluxscale_all.mmd
+       :zoom:
+
     .. figure:: /figures/PL2025_hifa_gfluxscale_all.png
        :width: 60%
        :alt: Logical flow in hifa_gfluxscale

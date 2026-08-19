@@ -70,6 +70,9 @@ def hifa_timegaincal(vis=None, calamptable=None, calphasetable=None, offsetstabl
     short-solint solutions. Phase offset plots (one per spw) show the residual per-spw phase offsets vs.
     time; if the instrument is stable, these should scatter about zero with no drift.
 
+    .. mermaid:: /figures/PL2025_hifa_timegaincal_allinone.mmd
+       :zoom:
+
     .. figure:: /figures/PL2025_hifa_timegaincal_allinone.png
        :width: 60%
        :alt: Gain solution workflow for hifa_timegaincal

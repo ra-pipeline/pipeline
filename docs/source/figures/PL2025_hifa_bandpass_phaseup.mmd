@@ -1,0 +1,18 @@
+flowchart TB
+
+    A("Compute SNR per spw") --> B("Compute solint per spw to achieve SNR=20")
+    B --> C{"is max(solint)<br><= 'int'"}
+    
+    C -->|YES| D("Do phaseup: Run gaincal: 'p', 'int' per spw")
+    C -->|NO| E("Compute solint for aggregate bandwidth to achieve SNR=20")
+    
+    E --> F("Create spw Offset: Run gaincal: 'p', 'inf' per spw")
+    F --> G{"is aggBw. solint<br><= 'int'"}
+    
+    G -->|YES| H("Create final phaseup: preapply spw offset - Run gaincal: 'p', 'int' combine='spw'")
+    G -->|NO| I("Round solint up to next nearest multiple of the integration time ( >'int')")
+    
+    I --> J{"is aggBw. solint<br>< 60s"}
+    
+    J -->|YES| K("Create final phase up: preapply spw offset - Run gaincal: 'p', 'solint' combine='spw'")
+    J -->|NO| L("Create final phaseup: preapply spw offset - Run gaincal: 'p', '60s' combine='spw'")

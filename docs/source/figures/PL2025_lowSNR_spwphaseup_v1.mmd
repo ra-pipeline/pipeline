@@ -1,0 +1,95 @@
+%%{init: {"flowchart": {"defaultRenderer": "elk"}} }%%
+flowchart TB
+    classDef default fill:#fff,stroke:#333,stroke-width:1px,color:#000;
+    classDef greenBox fill:#e8f5e9,stroke:#2e7d32,stroke-width:1px,color:#000;
+    classDef blueBox fill:#e3f2fd,stroke:#1565c0,stroke-width:1px,color:#000;
+    classDef amberBox fill:#fff3e0,stroke:#e65100,stroke-width:1px,color:#000;
+    classDef yellowPill fill:#ffebcc,stroke:#d4a373,stroke-width:1px,color:#000;
+    classDef noteClass fill:none,stroke:none,color:#000;
+
+    %% 1. Compact Setup & SNR Determination
+    Init("<div style='white-space:nowrap;'>Calculate theoretical SNR per spw/field<br><i>(BP, AMP, DGC, PHASE, CHECK)</i></div>")
+    RunGC("<div style='white-space:nowrap;'>Per field: Run gaincal & compute<br>median SNR per spw from gaintables</div>")
+    ValidSNR{"Valid gaintable<br>SNRs?"}
+
+    Init --> RunGC
+    RunGC --> ValidSNR
+
+    SetCalc("Set to calculated SNR")
+    SetComp("Set to gaintable SNR")
+
+    ValidSNR -- NO --> SetCalc
+    ValidSNR -- YES --> SetComp
+
+    %% 2. Decision Cascade
+    D1{"All spws<br>SNR &gt; thresh?"}
+    D2{"Any spw<br>SNR &gt; thresh?"}
+    
+    SetCalc --> D1
+    D1 -- YES --> Out1
+    D1 -- NO --> D2
+    SetComp --> D2
+
+    SetComb("Set combine='spw',<br>recompute agg BW SNR")
+    D3{"Agg BW<br>SNR &gt; thresh?"}
+
+    D2 -- YES --> Out2
+    D2 -- NO --> SetComb
+    SetComb --> D3
+
+    SetGainT("Set gaintype='T',<br>recompute agg BW SNR")
+    D4{"Agg BW + Pols<br>SNR &gt; thresh?"}
+
+    D3 -- YES --> Out3
+    D3 -- NO --> SetGainT
+    SetGainT --> D4
+
+    D_AMP{"Field is<br>AMP?"}
+    D4 -- YES --> Out4
+    D4 -- NO --> D_AMP
+
+    %% AMP Path
+    LowerThresh("Lower threshold to 3.0")
+    D5{"Agg BW + Pols<br>SNR &gt; 3.0?"}
+
+    D_AMP -- YES --> LowerThresh
+    LowerThresh --> D5
+
+    %% Non-AMP Path
+    CompSolint("Compute solint (&gt;int)")
+    D_Solint{"solint &lt; limit?"}
+
+    D_AMP -- NO --> CompSolint
+    CompSolint --> D_Solint
+
+    %% 3. Compact 2-Line Outcome Cards
+    Out1("<b>(1) Per-spw solve</b><br>gaintype='G', solint='int'"):::greenBox
+    Out2("<b>(2) Spw mapping</b><br>gaintype='G', solint='int'"):::greenBox
+    Out3("<b>(3) combine='spw'</b><br>gaintype='G', solint='int'"):::blueBox
+    Out4("<b>(4) combine='spw'</b><br>gaintype='T', solint='int'"):::blueBox
+    Out5("<b>(5) combine='spw'</b><br>gaintype='T', solint='solint'"):::blueBox
+    Out6("<b>(6) combine='spw' (fallback)</b><br>gaintype='T', solint='max solint'"):::amberBox
+
+    D_Solint -- YES --> Out5
+    D_Solint -- NO --> Out6
+
+    %% 4. Diagnostic & QA
+    DiagGC("<div style='white-space:nowrap;'>Run diagnostic gaincal<br><i>(p, inf / solint, gaintype, combine)</i></div>")
+
+    Out1 & Out2 & Out3 & Out4 & Out5 & Out6 --> DiagGC
+    D5 -- YES --> DiagGC
+
+    D_QA{"Median SNR in caltable<br>&gt; 0.75 &times; thresh?"}
+    DiagGC --> D_QA
+
+    Warning("Generate warning &<br>reduce subscore"):::amberBox
+    Ret([return]):::yellowPill
+
+    D_QA -- YES --> Ret
+    D_QA -- NO --> Warning
+    Warning --> Ret
+
+    %% 5. Thresholds & Limits Footer
+    NotesNode["<div style='text-align:left; min-width:750px; font-size:12px; line-height:1.5;'><b><u>THRESHOLDS & LIMITS:</u></b><br>• <b>SNR threshold:</b> 32 (PHASE/CHECK) w.r.t. 'inf' timescale; 5 (BP, DGC, AMP) w.r.t. 'int' timescale.<br>• <b>solint limit:</b> 1/2 scan (PHASE/CHECK); 60s (BP, AMP, DGC).</div>"]:::noteClass
+
+    DiagGC ~~~ NotesNode

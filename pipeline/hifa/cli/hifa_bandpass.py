@@ -34,6 +34,10 @@ def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, an
 
         The logical workflow is illustrated below:
 
+        .. mermaid:: /figures/PL2025_hifa_bandpass_phaseup.mmd
+           :align: center
+
+
         .. figure:: /figures/PL2025_hifa_bandpass_phaseup.png
            :width: 60%
            :alt: Workflow for hifa_bandpass temporal phase-up

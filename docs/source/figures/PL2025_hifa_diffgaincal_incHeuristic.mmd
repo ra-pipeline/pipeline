@@ -1,0 +1,76 @@
+flowchart TD
+    classDef default fill:#fff,stroke:#000,stroke-width:1px,color:#000;
+    classDef yellowPill fill:#ffebcc,stroke:#d4a373,stroke-width:1px,color:#000;
+    classDef noteClass fill:none,stroke:none,color:#000;
+
+    subgraph Main["Operational Sequence"]
+        direction TD
+        %% Left Component
+        Y1(["Run low SNR heuristic for DIFFGAINREF per scan"]):::yellowPill
+        Y2(["Run low SNR heuristic for DIFFGAINSRC per scan group"]):::yellowPill
+        Y3(["Run low SNR heuristic for DIFFGAINSRC per scan"]):::yellowPill
+
+        Box1("gaincal: s17_3 <b>reference</b> DIFFGAINREF, p solint = 'inf', gaintype = 'G', <span style='color:gray'>combine = 'spw'</span>")
+        Box2("gaincal: s17_5 <b>offset</b> DIFFGAINSRC, p, solint = 'inf', gaintype = 'G', scan, combine = 'scan<span style='color:gray'>,spw</span>', spwmap")
+        Box3("gaincal: s17_7 <b>residual</b> DIFFGAINSRC, p solint = 'inf', gaintype = 'G', <span style='color:gray'>combine = 'spw'</span>, spwmap")
+
+        Ret(["return"])
+
+        Y1 --> Box1
+        
+        Box1 --> Box2
+        Box1 --> Y2
+        Y2 --> Box2
+        
+        Box2 --> Box3
+        Box2 --> Y3
+        Y3 --> Box3
+        
+        Box3 --> Ret
+
+        Box1 -->|"preapply this table"| Box2
+        Box1 -->|"preapply this table"| Box3
+
+        linkStyle 8 stroke:red,stroke-width:2px,color:red;
+        linkStyle 9 stroke:red,stroke-width:2px,color:red;
+    end
+
+    subgraph Heuristic["Low SNR Heuristic Logic"]
+        direction TD
+        %% Right Component
+        S1(["Start low SNR<br>heuristic"]):::yellowPill
+
+        D1{"combine='spw' in<br>hifa_spwphaseup?"}
+        H1("Make temp Gaintable<br>Run gaincal per spw:<br>'p', 'inf', 'G',<br>combine='scan'")
+        R1("Compute SNR<br>per scan or group")
+        D2{"expected SNR<br>&lt; threshold?"}
+        D3{"spw missing<br>in gaintable?"}
+        D4{"flagged solutions<br>&gt; 70%?"}
+        D5{"missing scans<br>&gt; 70%?"}
+        R2("set combine='spw'")
+        End(["end"]):::yellowPill
+
+        S1 --> D1
+        D1 -- NO --> H1
+        D1 -- YES --> R1
+        R1 --> D2
+        D2 -- YES --> H1
+        D2 -- NO --> R2
+        H1 --> D3
+        D3 -- NO --> D4
+        D3 -- YES --> R2
+        D4 -- NO --> D5
+        D4 -- YES --> R2
+        D5 -- NO --> End
+        D5 -- YES --> R2
+        R2 --> End
+    end
+
+    %% Notes
+    NotesNode["<div style='text-align:left; min-width:750px; font-size:13px; line-height:1.4;'><u>Notes:</u>  <i>combine = 'spw'</i> option is greyed out to indicate it is dependent on the low SNR heuristic outcome.  <i>spwmap</i> is required from reference to offset to map the LF to HF spws. This can also change if spw combination is used.  <i>scan</i> is provided to select the relevant scans as part of an observed group during the band-to-band offset solve.  For each box the low SNR heuristic is performed, which is why intermediate temporary gaintables will have incremented the table name number.</div>"]:::noteClass
+
+    Main ~~~ NotesNode
+    Heuristic ~~~ NotesNode
+
+    style Main fill:none,stroke:#333,stroke-width:1px;
+    style Heuristic fill:none,stroke:#333,stroke-width:1px;

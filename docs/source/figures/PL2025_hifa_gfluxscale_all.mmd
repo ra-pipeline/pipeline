@@ -1,0 +1,42 @@
+flowchart TB
+    classDef default fill:#fff,stroke:#000,stroke-width:1px,color:#000;
+    classDef dashedBox fill:#fff,stroke:#000,stroke-width:1px,stroke-dasharray: 5 5,color:#000;
+    classDef noteClass fill:none,stroke:none,color:#000;
+
+    %% Left column (Phase solves)
+    L1["gaincal: s16_4<br>BP/AMP, p<br><i>combine, solint,<br>gaintype</i>"]
+    L2["gaincal: s16_5<br>CHECK, p<br><i>combine, solint,<br>gaintype</i>"]
+    L3["gaincal: s16_5<br>PHASE, p<br><i>combine, solint,<br>gaintype</i>"]
+    L4["gaincal: s16_6<br>DIFFGAIN, p<br><i>combine, solint,<br>gaintype</i>"]:::dashedBox
+
+    %% Right column (Amplitude solves)
+    R1["gaincal: s16_7<br>BP/AMP, T, a<br><i>solint = 'inf',<br>spwmap</i>"]
+    R2["gaincal: s16_7<br>CHECK, T, a<br><i>solint = 'inf',<br>spwmap</i>"]
+    R3["gaincal: s16_7<br>PHASE, T, a<br><i>solint = 'inf',<br>spwmap</i>"]
+    R4["gaincal: s16_7<br>DIFFGAIN, T, a<br><i>solint = 'inf',<br>spwmap</i>"]:::dashedBox
+
+    Ret([return])
+
+    %% Operational sequence (Black arrows)
+    L1 --> L2
+    L2 --> L3
+    L3 --> L4
+    L4 --> R1
+    R1 --> R2
+    R2 --> R3
+    R3 --> R4
+    R4 --> Ret
+
+    %% Preapply tables (Red arrows)
+    L1 --> R1
+    L2 --> R2
+    L3 --> R3
+    L4 --> R4
+
+    linkStyle 8,9,10,11 stroke:red,stroke-width:2px;
+
+    %% Notes and Legend spanning the bottom
+    NotesNode["<div style='text-align:left; min-width:700px; font-size:13px; line-height:1.5;'><b><u>LEGEND:</u></b><br>• <span style='color:red;'><b>&rarr; Red Arrow:</b></span> 'preapply this table'<br>• <b>&rarr; Black Arrow:</b> Order of operational sequence<br><br><b><u>Notes:</u></b><br>• <i>combine, solint, gaintype, spwmap</i> parameters are established independently for the intents/fields in <i>hifa_spwphaseup</i>.<br>• Order of solves can be swapped between intents/fields after the initial AMPLITUDE.<br>• <b>Per-field / tuning loop:</b> For each box where there is &gt;1 field and/or &gt;1 spectral tuning: 'repeat the gaincal for each calibrator field (of the same intent) and for each tuning'. Where the field changes the table number is incremented.<br>• <b>Dashed box:</b> indicates an optional intent (DIFFGAIN) used in band-to-band observations only.</div>"]:::noteClass
+
+    L4 ~~~ NotesNode
+    R4 ~~~ NotesNode

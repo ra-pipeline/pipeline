@@ -77,6 +77,9 @@ def hifa_diffgaincal(vis=None, flagging_frac_limit=None, hm_spwmapmode=None, mis
     As of PL2025, low-SNR heuristics allow ``combine='spw'`` to be used in any of the three solve steps.
     The gaincal workflow and low SNR logical flow are shown in the figure below.
 
+    .. mermaid:: /figures/PL2025_hifa_diffgaincal_incHeuristic.mmd
+       :zoom:
+
     .. figure:: /figures/PL2025_hifa_diffgaincal_incHeuristic.png
        :width: 60%
        :alt: Gain solution workflow for hifa_diffgaincal

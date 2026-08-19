@@ -15,6 +15,9 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
 
     :func:`~pipeline.hifa.cli.hifa_spwphaseup` performs two functions:
 
+    .. mermaid:: /figures/PL2025_lowSNR_spwphaseup_v1.mmd
+       :zoom:
+
     .. figure:: /figures/PL2025_lowSNR_spwphaseup_v1.png
        :width: 60%
        :alt: Logic flowchart for spw phase-up strategy

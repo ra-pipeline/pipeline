@@ -251,7 +251,9 @@ html_js_files = [
 mermaid_d3_zoom = True
 mermaid_include_elk = True
 mermaid_include_zenuml = False
-mermaid_height = '1000px'
+mermaid_height = '1200px'
+mermaid_version = '11.17.0'
+mermaid_elk_version = '0.2.3'
 myst_fence_as_directive = ['mermaid']
 
 # -- Options for HTMLHelp output ---------------------------------------

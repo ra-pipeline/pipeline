@@ -1,0 +1,60 @@
+flowchart TD
+    classDef default fill:#fff,stroke:#000,stroke-width:1px,color:#000;
+    classDef dashedBox fill:#fff,stroke:#000,stroke-width:1px,stroke-dasharray: 5 5,color:#000;
+    classDef noteClass fill:none,stroke:none,color:#000;
+
+    %% Column 1
+    B1["gaincal: s17_2<br>PHASE, p, inf<br><i>combine, gaintype</i><br><span style='color:green;'>used in hif_applycal</span>"]
+    B2["gaincal*: s17_2<br>BP/AMP/<span style='color:gray;'>DIFFGAINREF</span>, p, inf<br><i>combine, gaintype</i><br><span style='color:blue;'>used only for plots</span>"]
+    B3["gaincal: s17_3<br>BP/AMP/<span style='color:gray;'>DIFFGAIN</span>/<span style='color:gray;'>POL</span>, p<br><i>combine, solint,<br>gaintype, spwmap</i><br><span style='color:green;'>used in hif_applycal</span>"]
+
+    %% Column 2
+    B4["gaincal: s17_4<br>PHASE, p<br><i>combine, solint,<br>gaintype, spwmap</i><br><span style='color:blue;'>also shown in plots</span>"]
+    B5["gaincal: s17_5<br>PHASE, T, a, inf,<br><i>spwmap</i><br><span style='color:green;'>used in hif_applycal</span>"]
+    B6["gaincal: s17_5<br>BP/AMP/<span style='color:gray;'>DIFFGAIN</span>/<span style='color:gray;'>POL</span>, T, a, inf,<br><i>spwmap</i><br><span style='color:green;'>used in hif_applycal</span>"]
+
+    %% Column 3
+    B7["gaincal: s17_6<br>PHASE, T, a, <i>solint</i>,<br><i>spwmap</i><br><span style='color:blue;'>used only for plots</span>"]
+    B8["gaincal: s17_6<br>BP/AMP/<span style='color:gray;'>DIFFGAIN</span>/<span style='color:gray;'>POL</span>, T, a, <i>solint**</i>,<br><i>spwmap</i><br><span style='color:blue;'>used only for plots</span>"]
+
+    %% Column 4 & 5
+    B9["gaincal: s17_7<br>PHASE, p<br><i>solint, gaintype,<br>spwmap,<br>combine='spw'</i>"]:::dashedBox
+    B10["gaincal: s17.offset<br>PHASE, G, p<br>inf, <i>spwmap</i>,<br><b>combine=''</b><br><span style='color:blue;'>used in plots and QA</span>"]
+    B11["gaincal: s17.offset<br>BP/AMP/<span style='color:gray;'>DIFFGAIN</span>/<span style='color:gray;'>POL</span>, G, p<br>inf, <i>spwmap</i>,<br><b>combine=''</b><br><span style='color:blue;'>used only for plots</span>"]
+
+    Ret([return])
+
+    %% Operational sequence (Black arrows)
+    B1 --> B2
+    B2 --> B3
+    B3 --> B4
+    B4 --> B5
+    B5 --> B6
+    B6 --> B7
+    B7 --> B8
+    B8 --> B9
+    B9 --> B10
+    B10 --> B11
+    B11 --> Ret
+
+    %% Preapply tables (Solid Red arrows)
+    B4 --> B5
+    B4 --> B7
+    B3 --> B6
+    B3 --> B8
+    B3 --> B11
+
+    %% Conditional Preapply paths (Dotted / Dashed Red arrows)
+    B4 -. "If combine='spw' already performed (skip dashed)" .-> B10
+    B9 -. "If combine='spw' not performed yet" .-> B10
+
+    linkStyle 11,12,13,14,15 stroke:red,stroke-width:2px;
+    linkStyle 16,17 stroke:red,stroke-width:2px,stroke-dasharray: 4 4,color:red;
+
+    %% Notes and Legend
+    NotesNode["<div style='text-align:left; min-width:800px; font-size:12px; line-height:1.5;'><b><u>LEGEND:</u></b><br>• <span style='color:red;'><b>&rarr; Red Arrow (solid / dashed / dotted):</b></span> 'preapply this table'<br>• <b>&rarr; Black Arrow:</b> Order of operational sequence<br><br><b><u>Notes:</u></b><br>• <i>combine, solint, gaintype, spwmap</i> parameters are established independently for the intents/fields in <i>hifa_spwphaseup</i>. <i>spwmap</i> can be left empty.<br>• <b>*</b> For this solve the parameter are those established exclusively from the PHASE calibrator.<br>• <b>**</b> For this solve <i>solint</i> is that established from the PHASE calibrator.<br>• <b>DIFFGAIN</b> = both DIFFGAINREF and DIFFGAINSRC.<br>• Grayed out intents are optional depending on the type of observation.<br>• Order of solves can be swapped between intents/fields listed in a box.<br>• Multiple gaincal calls can be repeated for each box that repeats over multiple Spectral Spec for that field, or where allowed multiple fields for the same intent. In some cases the table number will be incrementally increased.<br>• <b>Conditional combine='spw' logic:</b> If combine='spw' was not performed already, complete the stage in the dashed box (s17_7) and use that in a pre-apply (dashed red arrow). If combine='spw' was performed already, use the dotted red arrow pre-apply directly from s17_4 and skip the dashed box solve.<br>• <b>Strictly forcing per spw solve:</b> Enforced on the s17.offset stages (combine='').</div>"]:::noteClass
+
+    B3 ~~~ NotesNode
+    B6 ~~~ NotesNode
+    B8 ~~~ NotesNode
+    B11 ~~~ NotesNode
