@@ -18,6 +18,7 @@ Citing Pipeline and CASA
 Please acknowledge Pipeline and CASA use in your publications, in a format similar to this:
    ``Data were calibrated using the ALMA Pipeline version 2025.1.0.37 and CASA 6.6.6-18 (Hunter et al. 2023, CASA team 2022).  Calibrated visibilities were downloaded from the ALMA archive and restored, after which the CASA tclean task was used to image those visibilities.``
 
+* CASA and the Pipeline are distinct software packages, albeit often packaged together, so citing both version numbers is important.  See :doc:`Overview <overview>` for more details.   Pipeline and CASA versions are available for your processed data in the Weblog for all data, in the README that comes from the ALMA archive with downloads, in the QA2 report that comes with ALMA and LAVA deliveries, and in the email PIs receive for VLA data. 
 * `Hunter et al. 2023 <https://ui.adsabs.harvard.edu/abs/2023PASP..135g4501H/abstract>`__  is only appropriate for the ALMA Interferometric pipeline.
 * `CASA team 2022 <https://iopscience.iop.org/article/10.1088/1538-3873/ac9642>`__ is appropriate for all data processing.
 * Please adjust the wording to reflect your workflow: for example if you recalibrated data yourself using the pipeline or CASA, or if you directly used the images provided in the archive, please say so.
@@ -40,7 +41,7 @@ Documentation Components
    * - Content
      - Location
    * - ALMA User's Guide :sup:`1`
-     - :doc:`ALMA User's Guide <users_guide/index>`
+     - `PDF <users_guide.pdf>`__ :doc:`HTML <users_guide/index>`
    * - ALMA Pipeline Known Issues :sup:`2`
      - :doc:`ALMA Known Issues <users_guide/known_issues>`
    * - VLA User's Guide
@@ -64,11 +65,11 @@ Documentation Components
 
 
 
-:sup:`1` \ previous versions were in pdf form at `ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>`__
+:sup:`1` previous versions were in pdf form at `ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>`__
      
-:sup:`2` \ previously hosted on <casaguides <https://casaguides.nrao.edu/index.php/ALMA_Pipeline_Known_Issues>`__
+:sup:`2` previously hosted on `casaguides <https://casaguides.nrao.edu/index.php/ALMA_Pipeline_Known_Issues>`__
 
-:sup:`3` \ previously the Reference Manual in pdf form at `ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>`__
+:sup:`3` previously the Reference Manual in pdf form at `ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>`__
 
 
 
