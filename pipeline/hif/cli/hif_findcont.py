@@ -27,19 +27,20 @@ def hif_findcont(vis=None, target_list=None, hm_mosweight=None,
        and ``mom0fc`` images; the scaled-subtracted ``momDiff`` image peak SNR is computed.
        If ``momDiffSNR > 8`` (or > 11.5 for high-atm-variation spws), contamination is likely.
        Two remediation paths are tried: **Amend Mask** (logic code starts with ``A``) or
-       **Only Extra Mask** (code starts with ``E``). Further steps include channel intersection,
-       extra-mask, and ``autoLower`` (``X``, ``Y``) iterations. The final logic path code and
-       momDiffSNR are shown in the plot legend and the WebLog table.
+       **Only Extra Mask** (code starts with ``E``). Further steps include channel intersection (code ``I``),
+       extra-mask, and up to two rounds of ``autoLower`` (codes ``X`` and ``Y``) iterations. The final logic path code is
+       shown in the plot legend, and the momDiffSNR is shown there and in the WebLog table.
     4. **AllContinuum check**: If a single range covers >= 92.5% of the channels (>= 91% for
        spws with < 75 channels), the spw is declared ``AllContinuum`` and no cube is subsequently
-       cleaned.
+       cleaned. Note that the ``AllContinuum`` assessment is performed prior to the search for (and exclusion of) large gaps in the baseline (blue) points.
+       Thus, results with a single range can be narrower than this threshold and still be labelled as ``AllContinuum``.
 
     If a ``cont.dat`` file already exists in the working directory, spws with pre-defined ranges
     are not re-analyzed; only spws not listed are processed. The resulting ``cont.dat`` file (LSRK
     frequency ranges) is used by subsequent :func:`~pipeline.hif.cli.hif_uvcontsub` and :func:`~pipeline.hif.cli.hif_makeimages` stages.
 
-    The default mode is ``coarse``, which applies the local fast-imaging override. Use
-    ``hm_mode='normal'`` to preserve the previous-cycle behavior.
+    The default mode is ``coarse``, which applies the local fast-imaging override, which is the default
+    in ALMA recipes starting in Cycle 13. Use ``hm_mode='normal'`` to preserve the previous-cycle behavior.
 
     .. figure:: /figures/guide-img029.png
        :width: 60%
