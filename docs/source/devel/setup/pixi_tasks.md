@@ -237,10 +237,26 @@ pixi run build-docs-fast
 
 ---
 
-### `build-pdf` — build PDF (LaTeX) documentation
+### `build-pdfs` — build all PDF (LaTeX) documentation
 
 ```bash
-pixi run build-pdf
+pixi run build-pdfs
+```
+
+---
+
+### `build-pdf-taskdocs` — build Task Reference Manual PDF
+
+```bash
+pixi run build-pdf-taskdocs
+```
+
+---
+
+### `build-pdf-userguide` — build User's Guide PDF
+
+```bash
+pixi run build-pdf-userguide
 ```
 
 ---
@@ -460,7 +476,13 @@ in the export.
 * - Build docs (fast)
   - `pixi run build-docs-fast`
   - `docs/`
-* - Build PDF docs
-  - `pixi run build-pdf`
+* - Build all PDF docs
+  - `pixi run build-pdfs`
+  - `docs/`
+* - Build Task Reference PDF
+  - `pixi run build-pdf-taskdocs`
+  - `docs/`
+* - Build User's Guide PDF
+  - `pixi run build-pdf-userguide`
   - `docs/`
 ```

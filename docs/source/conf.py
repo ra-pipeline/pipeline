@@ -251,6 +251,10 @@ latex_elements = {
     'geometry': r'\usepackage[top=1.0in, bottom=1.0in, left=0.5in, right=0.5in]{geometry}',
     'preamble': r"""
   \usepackage{hyperref}
+  \usepackage{amssymb}
+  \DeclareUnicodeCharacter{2264}{\ensuremath{\le}}
+  \DeclareUnicodeCharacter{2265}{\ensuremath{\ge}}
+  \DeclareUnicodeCharacter{2273}{\ensuremath{\gtrsim}}
   % \usepackage{extsizes} % required to use font sizes other than 10, 11, or 12pt
   \usepackage{longtable}
   \setcounter{tocdepth}{1}
@@ -285,7 +289,8 @@ latex_use_modindex = False
 # (source start file, target name, title, author, documentclass
 # [howto, manual, or own class]).
 latex_documents = [
-    ('latex', 'taskdocs.tex', 'ALMA/VLA/NRO Pipeline: Task Reference Manual', 'Pipeline Contributors', 'manual')
+    ('task_reference', 'taskdocs.tex', 'ALMA/VLA/NRO Pipeline: Task Reference Manual', 'Pipeline Contributors', 'manual'),
+    ('users_guide/index', 'users_guide.tex', 'ALMA Science Pipeline User’s Guide', 'Pipeline Contributors', 'manual'),
 ]
 
 

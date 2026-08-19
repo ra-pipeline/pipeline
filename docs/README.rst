@@ -41,7 +41,7 @@ Documentation Components
    * - Content
      - Location
    * - ALMA User's Guide :sup:`1`
-     - :doc:`ALMA User's Guide <users_guide/index>`
+     - `PDF <users_guide.pdf>`__ :doc:`HTML <users_guide/index>`
    * - ALMA Pipeline Known Issues :sup:`2`
      - :doc:`ALMA Known Issues <users_guide/known_issues>`
    * - VLA User's Guide
@@ -65,11 +65,11 @@ Documentation Components
 
 
 
-:sup:`1` \ previous versions were in pdf form at `ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>`__
+:sup:`1` previous versions were in pdf form at `ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>`__
      
-:sup:`2` \ previously hosted on <casaguides <https://casaguides.nrao.edu/index.php/ALMA_Pipeline_Known_Issues>`__
+:sup:`2` previously hosted on `casaguides <https://casaguides.nrao.edu/index.php/ALMA_Pipeline_Known_Issues>`__
 
-:sup:`3` \ previously the Reference Manual in pdf form at `ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>`__
+:sup:`3` previously the Reference Manual in pdf form at `ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>`__
 
 
 
