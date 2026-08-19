@@ -72,7 +72,7 @@ Frame regridding and hif_findroi are the first steps of a multi-year process -- 
 - {func}`hifa_diffgaincal <pipeline.hifa.cli.hifa_diffgaincal>` B2B-offset calibration switched to `linearPD` when spectral windows are combined, and its caltable-appending logic for multi-scan groups was simplified. ([PIPE-2858](https://open-jira.nrao.edu/browse/PIPE-2858), [PIPE-2915](https://open-jira.nrao.edu/browse/PIPE-2915))
 - In the process, the pipeline team found and a CASA bug [CAS-14703](https://open-jira.nrao.edu/browse/CAS-14703) that caused discrete jumps in phase when linearPD was used:
 
-  <img src="CAS-14703-uid___A002_X12e7c09_X430e.ms.hifa_timegaincal.s18_8.spw17_19_21_23.solintinf.gpcal.offsets.tbl-spw17-antDA41-phase_vs_time.png"  width="40%">
+  <img src="CAS-14703-phase_vs_time.png"  width="40%">
   Phase offsets visible in the {func}`hifa_timegaincal <pipeline.hifa.cli.hifa_timegaincal>` `Phase offsets` plots in the Weblog, prior to [CAS-14703](https://open-jira.nrao.edu/browse/CAS-14703))
 
 - {func}`hifa_polcal <pipeline.hifa.cli.hifa_polcal>` switched to `doquantiles=False` in {func}`CASA/visstat <casatasks.information.visstat>` calls. ([PIPE-2166](https://open-jira.nrao.edu/browse/PIPE-2166), [PIPE-3070](https://open-jira.nrao.edu/browse/PIPE-3070))

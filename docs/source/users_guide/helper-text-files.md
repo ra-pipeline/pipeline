@@ -1,7 +1,7 @@
 (sec-helperfiledescription)=
 # Description of Pipeline "Helper" Text Files
 
-As mentioned in {ref}`Pipeline "Helper" text files <sec-helperfileintro>`, both the IF and SD pipeline use a number of text files that are read by various pipeline tasks (as indicated by comments `##` in the example {ref}`Single Dish <fig-sdcasapipescript>` and {ref}`IF <fig-if-casapipescript>` `casa_pipescript.py` figures), and which affect the pipeline results (e.g. by applying manually identified flags or by updating calibrator fluxes or antenna positions before calculating the calibration tables). These files are particularly useful for users to over-ride the default pipeline behavior when re-running the pipeline at home, as described in the following section. Below we describe all of the currently available control files, identifying whether they are used by the IF pipeline, SD pipeline, or both in the subsection heading.
+As mentioned in {ref}`Pipeline "Helper" text files <sec-helperfileintro>`, both the IF and SD pipeline use a number of text files that are read by various pipeline tasks (as indicated by comments `##` in the example {ref}`Single Dish <fig-sdcasapipescript>` and {ref}`IF <fig-if-casapipescript>` `casa_pipescript.py`), and which affect the pipeline results (e.g. by applying manually identified flags or by updating calibrator fluxes or antenna positions before calculating the calibration tables). These files are particularly useful for users to over-ride the default pipeline behavior when re-running the pipeline at home, as described in the following section. Below we describe all of the currently available control files, identifying whether they are used by the IF pipeline, SD pipeline, or both in the subsection heading.
 
 ## `flux.csv` (IF Pipeline)
 
