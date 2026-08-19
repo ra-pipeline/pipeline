@@ -22,10 +22,11 @@ build:
     - $HOME/.pixi/bin/pixi install -e docs
     - mkdir -p ~/.casa/data
     - $HOME/.pixi/bin/pixi run -e docs build-docs
-    - $HOME/.pixi/bin/pixi run -e docs build-pdf
+    - $HOME/.pixi/bin/pixi run -e docs build-pdfs
     - mkdir --parents $READTHEDOCS_OUTPUT/html/ $READTHEDOCS_OUTPUT/pdf/
     - cp --recursive docs/_build/html/* $READTHEDOCS_OUTPUT/html/
     # RTD's official pdf/ staging folder (for the RTD downloads widget)
-    - cp --recursive docs/_build/latex/*.pdf $READTHEDOCS_OUTPUT/pdf/
+    - cp docs/_build/latex/taskdocs.pdf $READTHEDOCS_OUTPUT/pdf/
     # html/ folder (for relative links in README and offline viewing)
     - cp docs/_build/latex/taskdocs.pdf $READTHEDOCS_OUTPUT/html/
+    - cp docs/_build/latex/users_guide.pdf $READTHEDOCS_OUTPUT/html/

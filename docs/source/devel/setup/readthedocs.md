@@ -52,7 +52,7 @@ pixi run -e docs build-docs
 pixi run -e docs build-docs-fast
 
 # PDF build
-pixi run -e docs build-pdf
+pixi run -e docs build-pdfs
 ```
 
 The HTML output is written to `docs/_build/html/`. Open `docs/_build/html/index.html` in a browser to preview the result.
