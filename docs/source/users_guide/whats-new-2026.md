@@ -85,7 +85,7 @@ when a gain table ends up fully flagged.
 a regression run showed the phase-offset table was being dropped before the
 phase-up solve introduced by PIPE-2601, worsening flagging for a clear
 low-SNR case; the missing solve step and SNR trigger levels were corrected.
-![Screenshot 2026-06-10 at 6.06.05 PM.png](whatsnew/Screenshot%202026-06-10%20at%206.06.05%E2%80%AFPM.png)
+![screenshot_2026-06-10.png](whatsnew/screenshot_2026-06-10.png)
 
 **Polarization calibration recipe fix.**
 [PIPE-3016](https://open-jira.nrao.edu/browse/PIPE-3016) unregisters the
@@ -368,7 +368,7 @@ confusion between real and virtual spw IDs in `baseline/worker.py`.
 fitting-function option to
 {func}`hsd_baseline <pipeline.hsd.cli.hsd_baseline>`, with a new
 `wavenumber` parameter (list/per-spw/per-EB inputs supported).
-![Screenshot 2026-02-20 at 11.46.50.png](whatsnew/Screenshot%202026-02-20%20at%2011.46.50.png)
+![screenshot_2026-02-20.png](whatsnew/screenshot_2026-02-20.png)
 
 **Imaging QA / diagnostics.**
 [PIPE-2946](https://open-jira.nrao.edu/browse/PIPE-2946) and
@@ -524,7 +524,7 @@ the proposed per-EB Fast Feedback calibration workflow.
 [PIPE-2489](https://open-jira.nrao.edu/browse/PIPE-2489) fixes image names
 in the AQUA report's `<Sensitivity>` entries to include the multiterm
 extension instead of just the base name.
-![Screenshot 2026-07-10 at 9.43.58 AM.png](whatsnew/Screenshot%202026-07-10%20at%209.43.58%E2%80%AFAM.png)
+![screenshot_2026-07-10.png](whatsnew/screenshot_2026-07-10.png)
 [PIPE-3014](https://open-jira.nrao.edu/browse/PIPE-3014) extends the AQUA
 report's imaging statistics to cover Stokes Q, U and V target images for
 polarization-calibration runs, not just Stokes I.
