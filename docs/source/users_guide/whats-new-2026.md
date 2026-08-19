@@ -5,19 +5,6 @@ This document summarizes ALMA Pipeline development on the
 repository between October 2025 and August 2026, targeting release
 **2026.2.0**.
 
-**Scope and methodology.** The ticket list is the result of the JIRA query
-`project = PIPE AND fixVersion = 2026.2.0 AND labels = ALMA-Pipeline2026 AND
-labels not in (VLA-Pipeline2026, VLASS-Pipeline2026) AND summary !~ clone AND
-summary !~ regression AND summary !~ update`, plus 33 tickets that the strict
-label exclusion would otherwise have dropped solely because they are
-cross-labeled for the shared ALMA/VLA imaging codebase (including the LSRK
-imaging-frame refactor and most of the {func}`hif_findcont <pipeline.hif.cli.hif_findcont>` improvements) — added
-back in by explicit request. 151 tickets in total were triaged into the
-sections below; every ambiguous categorization and grouping call was
-reviewed and confirmed before this draft was written. Bitbucket history
-comes from ragdoll's existing local PR index (not a live query), matched to
-tickets via the `PIPE-####` key in each PR title.
-
 ---
 
 ## Highlights
@@ -26,7 +13,7 @@ tickets via the `PIPE-####` key in each PR title.
   stage, {func}`hif_findroi <pipeline.hif.cli.hif_findroi>`, identifies
   likely source regions ahead of continuum/line imaging using a fast
   algorithm developed under PIPEREQ-414, and has been wired into the ALMA
-  imaging recipes. See [IF imaging heuristics](#hif_findroi).
+  imaging recipes. See {ref}`IF imaging heuristics <hif_findroi>`.
 - **Imaging moves to an LSRK-frame MS ahead of continuum/line separation.**
   {func}`hif_mstransform <pipeline.hif.cli.hif_mstransform>` now produces the
   measurement sets used for imaging in the LSRK frame, and
@@ -34,58 +21,60 @@ tickets via the `PIPE-####` key in each PR title.
   {func}`hif_makeimlist <pipeline.hif.cli.hif_makeimlist>` /
   {func}`hif_makeimages <pipeline.hif.cli.hif_makeimages>` were updated to
   consume the new frame and data types. See
-  [IF imaging heuristics](#lsrk-refactor).
+  {ref}`IF imaging heuristics <lsrk-refactor>`.
 - **`findContinuum` updated to v9.6** with a round of robustness and
   parameter-passing fixes (`uvrange` propagation, empty-baseline crash
-  guards, y-axis limits) — see [IF imaging heuristics](#findcontinuum).
+  guards, y-axis limits) — see {ref}`IF imaging heuristics <findcontinuum>`.
 - **QA-message aggregation rolled out across most SD stages** so that
   repeated warnings for the same metric/score collapse into a single
   accordion entry in the weblog, matching the IF weblog style — see
-  [SD weblog/QA](#sd-weblog-qa).
+  {ref}`SD weblog/QA <sd-weblog-qa>`.
 - **Low-SNR bandpass/gain heuristics extended** to {func}`hif_lowgainflag <pipeline.hif.cli.hif_lowgainflag>` and
   {func}`hifa_wvrgcalflag <pipeline.hifa.cli.hifa_wvrgcalflag>`, reusing the `combine='spw'` + `interp='linearPD'`
   low-SNR machinery introduced for PL2025 — see
-  [IF calibration heuristics](#if-calibration).
+  {ref}`IF calibration heuristics <if-calibration>`.
 - **Several QA-score thresholds were re-tuned** (percent-flagged,
   newly-flagged, check-source fit, RepBW mom8fc) based on an analysis of
   "slow lane" false positives, aiming to route more good data through the
-  ALMA FastLane — see [IF weblog/QA](#if-weblog-qa).
+  ALMA FastLane — see {ref}`IF weblog/QA <if-weblog-qa>`.
 - **Single-dish imaging switches from `pseudoI` to true Stokes I** imaging,
   simplifying the weight-handling pipeline — see
-  [SD heuristics](#sd-heuristics).
+  {ref}`SD heuristics <sd-heuristics>`.
 - **Documentation restructuring**: CLI docstrings extracted from the User
   Guide, a new getting-started guide, and a live dependency specification —
-  see [Documentation](#documentation).
+  see {ref}`Documentation <documentation>`.
 
 ---
 
+(if-calibration)=
 ## IF calibration heuristic changes
-<a id="if-calibration"></a>
 
-*(not weblog or QA — see [IF weblog/QA](#if-weblog-qa) for score/plot changes
+*(not weblog or QA — see {ref}`IF weblog/QA <if-weblog-qa>` for score/plot changes
 to these same tasks)*
 
 **Low-SNR bandpass/gain heuristics extended to more stages.**
-[PIPE-2601](https://open-jira.nrao.edu/browse/PIPE-2601) switches
-{func}`hif_lowgainflag <pipeline.hif.cli.hif_lowgainflag>` to use the ALMA
-phase-up bandpass code from
-{func}`hifa_bandpass <pipeline.hifa.cli.hifa_bandpass>` instead of the
-generic worker, so its quick precomputed bandpass check benefits from the
-same low-SNR spw-combination logic as the main calibration.
-[PIPE-2858](https://open-jira.nrao.edu/browse/PIPE-2858) generalizes the rule
-that any solve using `combine='spw'` for CHECK/PHASE intents must be applied
-with `interp='linearPD'`, fixing mismatched interpolation across
-{func}`hifa_bandpassflag <pipeline.hifa.cli.hifa_bandpassflag>`, {func}`hifa_bandpass <pipeline.hifa.cli.hifa_bandpass>`, {func}`hifa_gfluxscale <pipeline.hifa.cli.hifa_gfluxscale>`, {func}`hifa_diffgaincal <pipeline.hifa.cli.hifa_diffgaincal>`
-and {func}`hifa_timegaincal <pipeline.hifa.cli.hifa_timegaincal>`.
-[PIPE-3006](https://open-jira.nrao.edu/browse/PIPE-3006) lets
-{func}`hifa_wvrgcalflag <pipeline.hifa.cli.hifa_wvrgcalflag>` fall back to
-the low-SNR gaincal-phaseup/bandpass heuristic per spw instead of crashing
-when a gain table ends up fully flagged.
-[PIPE-3139](https://open-jira.nrao.edu/browse/PIPE-3139) is a follow-up fix:
-a regression run showed the phase-offset table was being dropped before the
-phase-up solve introduced by PIPE-2601, worsening flagging for a clear
-low-SNR case; the missing solve step and SNR trigger levels were corrected.
-![screenshot_2026-06-10.png](whatsnew/screenshot_2026-06-10.png)
+The `combine='spw'` + `interp='linearPD'` low-SNR bandpass/phase-up
+heuristic developed for PL2025 was extended across more of the calibration
+recipe: {func}`hif_lowgainflag <pipeline.hif.cli.hif_lowgainflag>` now
+reuses the ALMA phase-up bandpass code from
+{func}`hifa_bandpass <pipeline.hifa.cli.hifa_bandpass>` instead of a generic
+worker; the `interp='linearPD'` rule was generalized to every stage that can
+trigger a `combine='spw'` solve for CHECK/PHASE intents
+({func}`hifa_bandpassflag <pipeline.hifa.cli.hifa_bandpassflag>`,
+{func}`hifa_bandpass <pipeline.hifa.cli.hifa_bandpass>`,
+{func}`hifa_gfluxscale <pipeline.hifa.cli.hifa_gfluxscale>`,
+{func}`hifa_diffgaincal <pipeline.hifa.cli.hifa_diffgaincal>`,
+{func}`hifa_timegaincal <pipeline.hifa.cli.hifa_timegaincal>`); and
+{func}`hifa_wvrgcalflag <pipeline.hifa.cli.hifa_wvrgcalflag>` gained the same
+per-spw low-SNR fallback instead of crashing when a gain table ends up fully
+flagged. A regression introduced along the way — a phase-offset solve step
+dropped ahead of the new phase-up, which had worsened flagging for a clear
+low-SNR case — was subsequently corrected.
+![Screenshot_2026-06-10_at_6.06.05_PM.png](whatsnew/Screenshot_2026-06-10_at_6.06.05_PM.png)
+*Tickets: [PIPE-2601](https://open-jira.nrao.edu/browse/PIPE-2601),
+[PIPE-2858](https://open-jira.nrao.edu/browse/PIPE-2858),
+[PIPE-3006](https://open-jira.nrao.edu/browse/PIPE-3006),
+[PIPE-3139](https://open-jira.nrao.edu/browse/PIPE-3139).*
 
 **Polarization calibration recipe fix.**
 [PIPE-3016](https://open-jira.nrao.edu/browse/PIPE-3016) unregisters the
@@ -124,11 +113,11 @@ antenna-position query fails.
 {func}`visstat <casatasks.information.visstat>` to `doquantiles=False`
 inside {func}`hifa_polcal <pipeline.hifa.cli.hifa_polcal>` for a runtime improvement, where the statistics used
 allow it.
-[PIPE-2915](https://open-jira.nrao.edu/browse/PIPE-2915) and
-[PIPE-2932](https://open-jira.nrao.edu/browse/PIPE-2932) fix
-{func}`hifa_diffgaincal <pipeline.hifa.cli.hifa_diffgaincal>` crashing or
-over-flagging target solutions when one of the two band-to-band offset scan
-groups is fully flagged.
+{func}`hifa_diffgaincal <pipeline.hifa.cli.hifa_diffgaincal>` no longer
+crashes or over-flags TARGET/CHECK solutions when one of the two
+band-to-band offset scan groups ends up fully flagged.
+*Tickets: [PIPE-2915](https://open-jira.nrao.edu/browse/PIPE-2915),
+[PIPE-2932](https://open-jira.nrao.edu/browse/PIPE-2932).*
 
 **Import/data-handling fixes.**
 [PIPE-3002](https://open-jira.nrao.edu/browse/PIPE-3002) fixes an
@@ -146,11 +135,12 @@ than relying on fixed field ordering.
 heuristic to use `msmd.almaspws()` instead of a channel-count threshold that
 misclassified some Cycle 10 4×4-bit-correlation spws as TDM.
 ![FDMspws.png](whatsnew/FDMspws.png)
-[PIPE-2947](https://open-jira.nrao.edu/browse/PIPE-2947) and
-[PIPE-3115](https://open-jira.nrao.edu/browse/PIPE-3115) fix
-{func}`hifa_tsysflagcontamination <pipeline.hifa.cli.hifa_tsysflagcontamination>` crashes: a NaN-handling incompatibility with
-newer scipy `savgol_filter`, and a regex that assumed measurement set names
-always start with `uid`.
+{func}`hifa_tsysflagcontamination <pipeline.hifa.cli.hifa_tsysflagcontamination>`
+crashes were fixed for two independent causes: a NaN-handling incompatibility
+with newer scipy `savgol_filter` versions, and a regex that assumed
+measurement set names always start with `uid`.
+*Tickets: [PIPE-2947](https://open-jira.nrao.edu/browse/PIPE-2947),
+[PIPE-3115](https://open-jira.nrao.edu/browse/PIPE-3115).*
 
 **Performance.**
 [PIPE-3085](https://open-jira.nrao.edu/browse/PIPE-3085) reduces redundant
@@ -160,94 +150,94 @@ MS once per field × spw × EB.
 
 ---
 
+(if-imaging)=
 ## IF imaging heuristic changes
-<a id="if-weblog-qa"></a><a id="hif_findroi"></a>
 
 *(not weblog or QA)*
 
+(hif_findroi)=
 **{func}`hif_findroi <pipeline.hif.cli.hif_findroi>`: a new region-of-interest stage.**
-[PIPE-3149](https://open-jira.nrao.edu/browse/PIPE-3149) introduces
-{func}`hif_findroi <pipeline.hif.cli.hif_findroi>`, a new imaging stage
-implementing a fast region-of-interest identification routine researched
-under PIPEREQ-414, and adds it to the ALMA imaging recipes
-([PIPE-3151](https://open-jira.nrao.edu/browse/PIPE-3151)). Follow-up work
-improved its weblog view
-([PIPE-3150](https://open-jira.nrao.edu/browse/PIPE-3150)), fixed field
-phase-center extraction lost in a merge conflict
-([PIPE-3155](https://open-jira.nrao.edu/browse/PIPE-3155)), fixed
-band-to-band and polarization-calibration failures
-([PIPE-3162](https://open-jira.nrao.edu/browse/PIPE-3162)), added its output
-tarball to the auxiliary export products
-([PIPE-3136](https://open-jira.nrao.edu/browse/PIPE-3136)), hid absolute
-filesystem paths that were leaking into exported pickles
-([PIPE-3191](https://open-jira.nrao.edu/browse/PIPE-3191)), and reviewed the
-knock-on recipe-template changes
-([PIPE-3156](https://open-jira.nrao.edu/browse/PIPE-3156)).
+A new imaging stage, `hif_findroi`, implements a fast region-of-interest
+identification routine researched under PIPEREQ-414 and has been added to
+the ALMA imaging recipes. Follow-up work improved its weblog view, fixed
+field phase-center extraction lost in a merge conflict, fixed band-to-band
+and polarization-calibration failures, added its output tarball to the
+auxiliary export products, hid absolute filesystem paths that were leaking
+into exported pickles, and reviewed the knock-on recipe-template changes.
 ![weblogOverview.png](whatsnew/weblogOverview.png)
+*Tickets: [PIPE-3149](https://open-jira.nrao.edu/browse/PIPE-3149),
+[PIPE-3151](https://open-jira.nrao.edu/browse/PIPE-3151),
+[PIPE-3150](https://open-jira.nrao.edu/browse/PIPE-3150),
+[PIPE-3155](https://open-jira.nrao.edu/browse/PIPE-3155),
+[PIPE-3162](https://open-jira.nrao.edu/browse/PIPE-3162),
+[PIPE-3136](https://open-jira.nrao.edu/browse/PIPE-3136),
+[PIPE-3191](https://open-jira.nrao.edu/browse/PIPE-3191),
+[PIPE-3156](https://open-jira.nrao.edu/browse/PIPE-3156).*
 
+(lsrk-refactor)=
 **LSRK-frame imaging MS refactor.**
-<a id="lsrk-refactor"></a>
-[PIPE-3003](https://open-jira.nrao.edu/browse/PIPE-3003) reworks the new
-imaging workflow so that
-{func}`hif_mstransform <pipeline.hif.cli.hif_mstransform>` produces the
-measurement sets used for imaging (`REGCAL_CONTLINE_SCIENCE` /
-`IM_CONTLINE_SCIENCE` / `IM_LINE_SCIENCE` data types) already regridded to
-the **LSRK** frame, rather than leaving that to individual imaging stages.
-[PIPE-3057](https://open-jira.nrao.edu/browse/PIPE-3057) updates
+The new imaging workflow was reworked end-to-end around an LSRK-frame
+imaging measurement set:
+{func}`hif_mstransform <pipeline.hif.cli.hif_mstransform>` now produces the
+MS used for imaging (`REGCAL_CONTLINE_SCIENCE` / `IM_CONTLINE_SCIENCE` /
+`IM_LINE_SCIENCE` data types) already regridded to the **LSRK** frame,
+rather than leaving that to individual imaging stages;
 {func}`hif_uvcontsub <pipeline.hif.cli.hif_uvcontsub>`, which previously
-assumed a fixed TOPO-MS / LSRK-or-SOURCE-`cont.dat` combination, to work
-correctly against the new LSRK-frame imaging MS.
-[PIPE-3053](https://open-jira.nrao.edu/browse/PIPE-3053) updates
-{func}`hif_makeimlist <pipeline.hif.cli.hif_makeimlist>` and
-{func}`hif_makeimages <pipeline.hif.cli.hif_makeimages>` to accept the new
-imaging data types, falling back to the legacy `targets`/`targets_line` MS
-when the new ones aren't present.
-[PIPE-2952](https://open-jira.nrao.edu/browse/PIPE-2952) fixes a related
-multi-day slowdown in {func}`hif_uvcontsub <pipeline.hif.cli.hif_uvcontsub>` seen during VLA restores when product
-mitigation had limited continuum finding to a handful of fields.
-[PIPE-2955](https://open-jira.nrao.edu/browse/PIPE-2955) explored (declined)
-a parallel per-spw split for {func}`hif_mstransform <pipeline.hif.cli.hif_mstransform>`.
+assumed a fixed TOPO-MS / LSRK-or-SOURCE-`cont.dat` combination, was updated
+to work correctly against the new LSRK-frame MS; and
+{func}`hif_makeimlist <pipeline.hif.cli.hif_makeimlist>` /
+{func}`hif_makeimages <pipeline.hif.cli.hif_makeimages>` were updated to
+accept the new data types, falling back to the legacy
+`targets`/`targets_line` MS when the new ones aren't present. A related
+multi-day `hif_uvcontsub` slowdown seen during VLA restores (when product
+mitigation had limited continuum finding to a handful of fields) was also
+fixed; a parallel per-spw split for `hif_mstransform` was explored and
+declined.
+*Tickets: [PIPE-3003](https://open-jira.nrao.edu/browse/PIPE-3003),
+[PIPE-3057](https://open-jira.nrao.edu/browse/PIPE-3057),
+[PIPE-3053](https://open-jira.nrao.edu/browse/PIPE-3053),
+[PIPE-2952](https://open-jira.nrao.edu/browse/PIPE-2952),
+[PIPE-2955](https://open-jira.nrao.edu/browse/PIPE-2955).*
 
+(findcontinuum)=
 **`findContinuum` improvements (v9.6).**
-<a id="findcontinuum"></a>
-[PIPE-2766](https://open-jira.nrao.edu/browse/PIPE-2766) is the PL2026
-umbrella ticket for continuum-detection work, updating `findContinuum.py` to
-v9.6.
-[PIPE-2617](https://open-jira.nrao.edu/browse/PIPE-2617) fixes
-{func}`hif_findcont <pipeline.hif.cli.hif_findcont>` to actually honor a
-`uvrange` set by a prior {func}`hif_makeimlist <pipeline.hif.cli.hif_makeimlist>`, which it previously dropped.
-[PIPE-3131](https://open-jira.nrao.edu/browse/PIPE-3131) has {func}`hif_findcont <pipeline.hif.cli.hif_findcont>`
-call {func}`hif_makeimlist <pipeline.hif.cli.hif_makeimlist>` intrinsically
-rather than depending on recipe task ordering, adding a `coarse`/`normal`
-mode switch; after user feedback,
-[PIPE-3209](https://open-jira.nrao.edu/browse/PIPE-3209) reverted the
-default `hm_mode` back to `'normal'`.
-[PIPE-3164](https://open-jira.nrao.edu/browse/PIPE-3164) exposes a `field`
-parameter on {func}`hif_findcont <pipeline.hif.cli.hif_findcont>` for the AUDI/VUDI workflow.
-[PIPE-3103](https://open-jira.nrao.edu/browse/PIPE-3103) and
-[PIPE-3107](https://open-jira.nrao.edu/browse/PIPE-3107) fix crashes
-(`nanmedian`/`np.min` on an empty channel selection) in edge cases with very
-few baseline channels.
-[PIPE-850](https://open-jira.nrao.edu/browse/PIPE-850) revisits the
-automatic y-axis limits so bright/maser lines don't leave excessive white
-space in the continuum-fit plot.
-[PIPE-3102](https://open-jira.nrao.edu/browse/PIPE-3102) closes a file
-handle in `findContinuum.py`'s `is_binary()` helper to stop a
-`ResourceWarning`.
+`findContinuum.py` was updated to v9.6 under the PL2026 continuum-detection
+umbrella ticket. End result:
+{func}`hif_findcont <pipeline.hif.cli.hif_findcont>` now honors a `uvrange`
+set by a prior {func}`hif_makeimlist <pipeline.hif.cli.hif_makeimlist>`
+(previously dropped); it calls `hif_makeimlist` intrinsically instead of
+depending on recipe task ordering, gaining a `coarse`/`normal` mode switch
+that — after user feedback — defaults to `'normal'` (matching pre-refactor
+behavior); it exposes a `field` parameter for the AUDI/VUDI workflow; two
+crashes on edge cases with very few baseline channels
+(`nanmedian`/`np.min` on an empty channel selection) were fixed; the
+automatic y-axis limits were revisited so bright/maser lines don't leave
+excessive white space in the continuum-fit plot; and a stray unclosed file
+handle was closed.
 ![page513.png](whatsnew/page513.png)
+*Tickets: [PIPE-2766](https://open-jira.nrao.edu/browse/PIPE-2766),
+[PIPE-2617](https://open-jira.nrao.edu/browse/PIPE-2617),
+[PIPE-3131](https://open-jira.nrao.edu/browse/PIPE-3131),
+[PIPE-3209](https://open-jira.nrao.edu/browse/PIPE-3209),
+[PIPE-3164](https://open-jira.nrao.edu/browse/PIPE-3164),
+[PIPE-3103](https://open-jira.nrao.edu/browse/PIPE-3103),
+[PIPE-3107](https://open-jira.nrao.edu/browse/PIPE-3107),
+[PIPE-850](https://open-jira.nrao.edu/browse/PIPE-850),
+[PIPE-3102](https://open-jira.nrao.edu/browse/PIPE-3102).*
 
 **Selfcal fixes.**
 [PIPE-2908](https://open-jira.nrao.edu/browse/PIPE-2908) fixes
 {func}`hif_selfcal <pipeline.hif.cli.hif_selfcal>` dropping all solutions
 for mosaics with single-polarization data, caused by an interaction between
 two earlier fixes.
-[PIPE-2929](https://open-jira.nrao.edu/browse/PIPE-2929),
-[PIPE-2937](https://open-jira.nrao.edu/browse/PIPE-2937) and
-[PIPE-2982](https://open-jira.nrao.edu/browse/PIPE-2982) fix selfcal
-failing on field names containing a slash, reduce large temporary-image I/O
-in the near-field SNR estimator that could pressure node memory, and cut
-excessive memory use in the clean-mask island boundary rendering for large
-images.
+A batch of related selfcal robustness fixes (landed together) addressed:
+failure on field names containing a slash; large temporary-image I/O in the
+near-field SNR estimator that could pressure node memory under concurrent
+selfcal workers; and excessive memory use in the clean-mask island boundary
+rendering for large images.
+*Tickets: [PIPE-2929](https://open-jira.nrao.edu/browse/PIPE-2929),
+[PIPE-2937](https://open-jira.nrao.edu/browse/PIPE-2937),
+[PIPE-2982](https://open-jira.nrao.edu/browse/PIPE-2982).*
 [PIPE-3147](https://open-jira.nrao.edu/browse/PIPE-3147) removes an
 outdated "mosaic is a new mode" QA message.
 [PIPE-2866](https://open-jira.nrao.edu/browse/PIPE-2866) corrects
@@ -258,25 +248,28 @@ serial-model-write workaround for a {func}`tclean <casatasks.imaging.tclean>` mo
 now that CASA 6.6.5 has fixed it upstream.
 
 **Other imaging fixes.**
-[PIPE-3074](https://open-jira.nrao.edu/browse/PIPE-3074),
-[PIPE-3096](https://open-jira.nrao.edu/browse/PIPE-3096) and
-[PIPE-3128](https://open-jira.nrao.edu/browse/PIPE-3128) fix a cluster of
-multi-EB / polarization-imaging bugs in
-{func}`hif_makeimages <pipeline.hif.cli.hif_makeimages>`: check-source
-products from all EBs (not just the last) are now exported and
+A cluster of multi-EB / polarization-imaging bugs in
+{func}`hif_makeimages <pipeline.hif.cli.hif_makeimages>` were fixed:
+check-source products from all EBs (not just the last) are now exported and
 deduplicated, full-polarization imaging correctly reuses the
 Stokes-I-derived clean mask/threshold, and the polarization repBW Stokes
 IQUV image now inherits the repBW Stokes I mask/threshold.
+*Tickets: [PIPE-3074](https://open-jira.nrao.edu/browse/PIPE-3074),
+[PIPE-3096](https://open-jira.nrao.edu/browse/PIPE-3096),
+[PIPE-3128](https://open-jira.nrao.edu/browse/PIPE-3128).*
+
 [PIPE-3090](https://open-jira.nrao.edu/browse/PIPE-3090) fixes a duplicated
 virtual-spw list in {func}`hifa_imageprecheck <pipeline.hifa.cli.hifa_imageprecheck>` that was biasing the aggregate
 bandwidth sensitivity estimate low.
-[PIPE-2812](https://open-jira.nrao.edu/browse/PIPE-2812) and
-[PIPE-3127](https://open-jira.nrao.edu/browse/PIPE-3127) fix
+
 {func}`hif_checkproductsize <pipeline.hif.cli.hif_checkproductsize>` spw
-logic after a single-spw field drop, and add spectral-window filtering to
-the max-cube-size/max-product-size mitigation steps so oversized data can
-still be partially imaged instead of failing mitigation outright.
+logic was fixed after a single-spw field drop, then extended with
+spectral-window filtering in the max-cube-size/max-product-size mitigation
+steps, so oversized data can still be partially imaged instead of failing
+mitigation outright.
 ![PL2026_size_mitigation_flowchart_NEW-1.png](whatsnew/PL2026_size_mitigation_flowchart_NEW-1.png)
+*Tickets: [PIPE-2812](https://open-jira.nrao.edu/browse/PIPE-2812),
+[PIPE-3127](https://open-jira.nrao.edu/browse/PIPE-3127).*
 [PIPE-2909](https://open-jira.nrao.edu/browse/PIPE-2909) lets cube imaging
 continue with a truncated channel grid instead of failing when a
 user-specified frequency grid extends beyond the spw coverage.
@@ -286,21 +279,22 @@ from the pbcor/non-pbcor separation in PIPE-2073.
 
 ---
 
+(sd-heuristics)=
 ## SD heuristic changes
-<a id="sd-heuristics"></a>
 
 *(not weblog or QA)*
 
 **Imaging: migration to true Stokes I.**
-[PIPE-2490](https://open-jira.nrao.edu/browse/PIPE-2490) and
-[PIPE-2671](https://open-jira.nrao.edu/browse/PIPE-2671) switch
-{func}`hsd_imaging <pipeline.hsd.cli.hsd_imaging>` from `stokes="pseudoI"`
-to the now-equivalent `stokes="I"` (following a CASA-side behavior change,
-CAS-9957/CAS-14444).
-[PIPE-2491](https://open-jira.nrao.edu/browse/PIPE-2491) then skips the
-`WeightMS` subtask's weight-column manipulation entirely, since it produces
-values consistent with what {func}`sdbaseline <casatasks.single.sdbaseline>` already sets, improving imaging
-performance.
+{func}`hsd_imaging <pipeline.hsd.cli.hsd_imaging>` now images with
+`stokes="I"` instead of the previous `stokes="pseudoI"` workaround, now that
+a CASA-side behavior change (CAS-9957/CAS-14444) makes the two equivalent.
+That migration in turn let the `WeightMS` subtask's weight-column
+manipulation be skipped entirely, since it produces values consistent with
+what {func}`sdbaseline <casatasks.single.sdbaseline>` already sets —
+improving imaging performance.
+*Tickets: [PIPE-2490](https://open-jira.nrao.edu/browse/PIPE-2490),
+[PIPE-2671](https://open-jira.nrao.edu/browse/PIPE-2671),
+[PIPE-2491](https://open-jira.nrao.edu/browse/PIPE-2491).*
 
 **Skycal / atmospheric-correction fixes.**
 [PIPE-2565](https://open-jira.nrao.edu/browse/PIPE-2565) fixes the
@@ -343,22 +337,17 @@ incorrectly reporting a successful Jy/K database access when
 `dbservice=False`.
 
 **Baseline-fitting heuristics.**
-[PIPE-2776](https://open-jira.nrao.edu/browse/PIPE-2776) cleans up
-double/missing periods and inconsistent punctuation in {func}`hsd_baseline <pipeline.hsd.cli.hsd_baseline>`'s "By
-Topic" QA messages, aligning the style with the IF weblog.
-[PIPE-2894](https://open-jira.nrao.edu/browse/PIPE-2894) adds a channel axis
-to the top panel of the sparse profile map (already done in the Nobeyama
-Pipeline).
 [PIPE-3161](https://open-jira.nrao.edu/browse/PIPE-3161) improves the
 {func}`hsd_baseline <pipeline.hsd.cli.hsd_baseline>` QA messages to report the virtual spw (not the real,
 per-MS spw) for line-detection scores, avoiding confusing MS-specific
 numbering in multi-MS runs.
 ![dev_virtual_spw_stage11.png](whatsnew/dev_virtual_spw_stage11.png)
-[PIPE-2959](https://open-jira.nrao.edu/browse/PIPE-2959) and
-[PIPE-2964](https://open-jira.nrao.edu/browse/PIPE-2964) fix wide/edge line
-QA not triggering, and switch the representative line width used for
-clustering to the 75th percentile of the detected cluster rather than the
-central value, which was underestimating width.
+Wide/edge line QA not triggering was fixed, and the representative line
+width used for clustering was switched to the 75th percentile of the
+detected cluster rather than the central value, which had been
+underestimating width.
+*Tickets: [PIPE-2959](https://open-jira.nrao.edu/browse/PIPE-2959),
+[PIPE-2964](https://open-jira.nrao.edu/browse/PIPE-2964).*
 [PIPE-2695](https://open-jira.nrao.edu/browse/PIPE-2695) fixes
 {func}`hsd_baseline <pipeline.hsd.cli.hsd_baseline>` crashing when k-means clustering is attempted with fewer
 line detections than requested clusters.
@@ -368,21 +357,19 @@ confusion between real and virtual spw IDs in `baseline/worker.py`.
 fitting-function option to
 {func}`hsd_baseline <pipeline.hsd.cli.hsd_baseline>`, with a new
 `wavenumber` parameter (list/per-spw/per-EB inputs supported).
-![screenshot_2026-02-20.png](whatsnew/screenshot_2026-02-20.png)
+![Screenshot_2026-02-20_at_11.46.50.png](whatsnew/Screenshot_2026-02-20_at_11.46.50.png)
 
 **Imaging QA / diagnostics.**
-[PIPE-2946](https://open-jira.nrao.edu/browse/PIPE-2946) and
-[PIPE-3092](https://open-jira.nrao.edu/browse/PIPE-3092) reduce false-positive
-QA warnings for contamination and missed-line-channel diagnostic plots by
-excluding edge channels and ATM-line-overlapping channels from the metric.
-[PIPE-2958](https://open-jira.nrao.edu/browse/PIPE-2958) adds a new QA score
-based on the ratio of observed to theoretical image RMS.
+False-positive QA warnings for contamination diagnostic plots were reduced
+by excluding edge channels and ATM-line-overlapping channels from the
+metric; the same technique was then applied to the missed-line-channel
+diagnostic plots.
+*Tickets: [PIPE-2946](https://open-jira.nrao.edu/browse/PIPE-2946),
+[PIPE-3092](https://open-jira.nrao.edu/browse/PIPE-3092).*
 [PIPE-3160](https://open-jira.nrao.edu/browse/PIPE-3160) and
 [PIPE-3109](https://open-jira.nrao.edu/browse/PIPE-3109) fix `IndexError`
 crashes generating the channel-map and missed-line diagnostic plots when a
 clustering-derived line range extends outside the valid channel bounds.
-[PIPE-3141](https://open-jira.nrao.edu/browse/PIPE-3141) fixes an inverted
-channel range for the moment map in LSB data.
 [PIPE-2399](https://open-jira.nrao.edu/browse/PIPE-2399) fixes inconsistent
 display of flagged data at the {func}`hsd_blflag <pipeline.hsd.cli.hsd_blflag>` stage — flagged points above
 the threshold line were sometimes rendered as unflagged.
@@ -408,9 +395,6 @@ attribute was always `vis` instead of `infiles`.
 per-beam XX/YY image products specific to the NRO Pipeline.
 [PIPE-2718](https://open-jira.nrao.edu/browse/PIPE-2718) is a refactor of
 {func}`hsd_applycal <pipeline.hsd.cli.hsd_applycal>` display/QA code for filename consistency and simplification.
-[PIPE-2988](https://open-jira.nrao.edu/browse/PIPE-2988) sorts weblog QA
-messages within the same color band by score, so the lowest score in each
-band is easy to spot (a PLWG request from PIPEREQ-424).
 [PIPE-2754](https://open-jira.nrao.edu/browse/PIPE-2754) and
 [PIPE-2857](https://open-jira.nrao.edu/browse/PIPE-2857) fix a trivial
 selected-table-object bug causing inconsistent ATM-cal data, and a
@@ -420,8 +404,8 @@ randomly-changing color map in the XX-YY difference plot.
 
 ---
 
+(if-weblog-qa)=
 ## IF weblog and QA changes
-<a id="if-weblog-qa-full"></a>
 
 Organized by weblog stage/page, following the curated PL2026 weblog
 checklist and the
@@ -467,7 +451,7 @@ meant for main-array-scale failures.
 issues in the {func}`hifa_wvrgcalflag <pipeline.hifa.cli.hifa_wvrgcalflag>` weblog table and plots (intent/field
 ordering that changed between CASA versions, and inconsistent per-antenna
 ordering) — this shares root-cause work with the PIPE-901
-deterministic-ordering initiative (see [Infrastructure](#infrastructure)).
+deterministic-ordering initiative (see {ref}`Infrastructure <infrastructure>`).
 ![2022.1.01778.S_after.png](whatsnew/2022.1.01778.S_after.png)
 
 **{func}`hifa_bandpass <pipeline.hifa.cli.hifa_bandpass>` / {func}`hifa_gfluxscale <pipeline.hifa.cli.hifa_gfluxscale>`.**
@@ -511,12 +495,12 @@ reruns is now fixed.
 {func}`hif_makeimages <pipeline.hif.cli.hif_makeimages>` polarization Stokes IQUV image inheritance and repBW
 mask/threshold fixes are covered together with the underlying imaging
 changes in
-[IF imaging heuristics](#if-weblog-qa) (PIPE-3074/PIPE-3096/PIPE-3128).
+{ref}`IF imaging heuristics <if-imaging>` (PIPE-3074/PIPE-3096/PIPE-3128).
 
 ---
 
+(aqua)=
 ### AQUA report
-<a id="aqua"></a>
 
 [PIPE-2470](https://open-jira.nrao.edu/browse/PIPE-2470) adds ASDM/EB UIDs
 to the Project Structure section of `pipeline_aquareport.xml`, to support
@@ -524,7 +508,7 @@ the proposed per-EB Fast Feedback calibration workflow.
 [PIPE-2489](https://open-jira.nrao.edu/browse/PIPE-2489) fixes image names
 in the AQUA report's `<Sensitivity>` entries to include the multiterm
 extension instead of just the base name.
-![screenshot_2026-07-10.png](whatsnew/screenshot_2026-07-10.png)
+![Screenshot_2026-07-10_at_9.43.58_AM.png](whatsnew/Screenshot_2026-07-10_at_9.43.58_AM.png)
 [PIPE-3014](https://open-jira.nrao.edu/browse/PIPE-3014) extends the AQUA
 report's imaging statistics to cover Stokes Q, U and V target images for
 polarization-calibration runs, not just Stokes I.
@@ -541,8 +525,8 @@ existing PB-corrected value, useful for evaluating self-calibration.
 
 ---
 
+(sd-weblog-qa)=
 ## SD weblog and QA changes
-<a id="sd-weblog-qa"></a>
 
 Organized by weblog stage/page, following the
 [`hsd_calimage` recipe](https://pipe-docs.readthedocs.io/en/docs-update-pl2026/users_guide/hsd_calimage-recipe.html)
@@ -564,18 +548,34 @@ is deliberately left for separate treatment since its QA involves nested
 aggregation that doesn't fit the common pattern.
 ![m100_stage7_accordion.png](whatsnew/m100_stage7_accordion.png)
 
+**QA scoring and message ordering.**
+[PIPE-2958](https://open-jira.nrao.edu/browse/PIPE-2958) adds a new QA score
+based on the ratio of observed to theoretical image RMS at the
+{func}`hsd_imaging <pipeline.hsd.cli.hsd_imaging>` stage.
+[PIPE-2988](https://open-jira.nrao.edu/browse/PIPE-2988) sorts weblog QA
+messages within the same color band by score, so the lowest score in each
+band is easy to spot (a PLWG request from PIPEREQ-424).
+
 **{func}`hsd_baseline <pipeline.hsd.cli.hsd_baseline>` weblog.**
 [PIPE-2867](https://open-jira.nrao.edu/browse/PIPE-2867) fixes a
 "spectral"/"spectra" typo in the averaged-spectrum caption.
+[PIPE-2776](https://open-jira.nrao.edu/browse/PIPE-2776) cleans up
+double/missing periods and inconsistent punctuation in `hsd_baseline`'s "By
+Topic" QA messages, aligning the style with the IF weblog.
+[PIPE-2894](https://open-jira.nrao.edu/browse/PIPE-2894) adds a channel axis
+to the top panel of the sparse profile map (already done in the Nobeyama
+Pipeline).
 [PIPE-3047](https://open-jira.nrao.edu/browse/PIPE-3047) adds an
 explanatory caption to the missed-line-channel diagnostic plots at the
 {func}`hsd_imaging <pipeline.hsd.cli.hsd_imaging>` stage, describing the
 single-peak/extended detection thresholds and the plot's color coding.
 ![idea.png](whatsnew/idea.png)
+[PIPE-3141](https://open-jira.nrao.edu/browse/PIPE-3141) fixes an inverted
+channel range for the `hsd_imaging` moment-map plot in LSB data.
 
 **Tsys scan plot (shared page).**
 [PIPE-2869](https://open-jira.nrao.edu/browse/PIPE-2869) — see
-[IF weblog/QA](#if-weblog-qa) above; this fix applies to the same
+{ref}`IF weblog/QA <if-weblog-qa>` above; this fix applies to the same
 `TsysScansChart` shared by both recipes.
 
 ### AQUA report
@@ -587,12 +587,12 @@ unique per MOUS; this turned out to be an SD-specific bug in how the
 representative source is picked (handling of representative source in the
 wider pipeline codebase is out of scope for this fix and needs separate
 IF/SD discussion). See also the general-purpose AQUA-report changes in
-[IF weblog/QA → AQUA report](#aqua), which apply to both recipes.
+{ref}`IF weblog/QA → AQUA report <aqua>`, which apply to both recipes.
 
 ---
 
+(documentation)=
 ## Documentation
-<a id="documentation"></a>
 
 Tracked under the **Documentation PL2026** epic
 ([PIPE-2738](https://open-jira.nrao.edu/browse/PIPE-2738)).
@@ -624,8 +624,8 @@ argument names surfaced during documentation review:
 
 ---
 
+(infrastructure)=
 ## Infrastructure and performance
-<a id="infrastructure"></a>
 
 Tracked under the **Refactor/Infra PL2026**
 ([PIPE-2736](https://open-jira.nrao.edu/browse/PIPE-2736)),
@@ -672,11 +672,11 @@ around ASDM import, guarding against stateful cross-talk between imports.
 `ResourceWarning` from an unclosed file handle in `environment.py` at
 startup, and [PIPE-3015](https://open-jira.nrao.edu/browse/PIPE-3015)
 fixes a similar unclosed-file-handle issue in `rendererutils.num_lines()`.
-[PIPE-1669](https://open-jira.nrao.edu/browse/PIPE-1669) and
-[PIPE-707](https://open-jira.nrao.edu/browse/PIPE-707) investigate and
-scope Pipeline compatibility with modular CASA and a standard Python
-interpreter (no significant blockers identified; the main open question is
-the restore-script interface).
+Pipeline compatibility with modular CASA and a standard Python interpreter
+was investigated and scoped: no significant blockers were identified, and
+the main open question is the restore-script interface.
+*Tickets: [PIPE-1669](https://open-jira.nrao.edu/browse/PIPE-1669),
+[PIPE-707](https://open-jira.nrao.edu/browse/PIPE-707).*
 
 **Build, packaging and testing.**
 [PIPE-2906](https://open-jira.nrao.edu/browse/PIPE-2906),
@@ -697,14 +697,3 @@ legacy `hifacal.py`, `hifatargets.py` and `hsd.py` modules.
 bug between the `fluxscale`/`setmodel` `transfer` field pre-check logic.
 [PIPE-3079](https://open-jira.nrao.edu/browse/PIPE-3079) documents the
 pipeline context object's use cases and proposes improvements to it.
-
----
-
-## Ambiguous-category and grouping decisions
-
-For traceability, the categorization judgment calls made during drafting
-(all reviewed and confirmed) are recorded in
-`reports/data/classified_tickets.json` (per-ticket `category`/`subcategory`,
-with a `classification_note` on weak-signal or manually-overridden calls)
-and `reports/data/groups.json` (which tickets were combined into a single
-feature entry, and why).
