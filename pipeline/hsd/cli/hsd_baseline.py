@@ -82,7 +82,7 @@ def hsd_baseline(
     have a single time-domain group with detected emission; cyan cells have more than one.
 
     .. figure:: /figures/guide-img037.png
-       :width: 60%
+       :width: 50%
        :alt: Clustering detection
 
        Clustering detection step.
@@ -95,7 +95,7 @@ def hsd_baseline(
     - **Questionable** if ``Nmember/Nspectra > 0.2``
 
     .. figure:: /figures/guide-img038.png
-       :width: 60%
+       :width: 50%
        :alt: Clustering validation
 
        Clustering validation step.
@@ -104,7 +104,7 @@ def hsd_baseline(
     isolated single-line candidates and reinforce detections supported by neighboring cells.
 
     .. figure:: /figures/guide-img039.png
-       :width: 60%
+       :width: 50%
        :alt: Clustering smoothing
 
        Clustering smoothing step.
@@ -114,14 +114,14 @@ def hsd_baseline(
     spectra in validated cells and applied to each individual spectrum.
 
     .. figure:: /figures/guide-img040.png
-       :width: 60%
+       :width: 50%
        :alt: Mask range calculation
 
        Mask range calculation — in blue squares the mask
        range is interpolated from validated cells.
 
     .. figure:: /figures/guide-img041.png
-       :width: 60%
+       :width: 50%
        :alt: Clustering final
 
        Clustering final example.
