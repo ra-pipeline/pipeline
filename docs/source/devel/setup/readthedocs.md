@@ -56,3 +56,17 @@ pixi run -e docs build-pdfs
 ```
 
 The HTML output is written to `docs/_build/html/`. Open `docs/_build/html/index.html` in a browser to preview the result.
+
+### Building the Internal Variant
+
+The pipeline documentation supports an "internal" variant that includes developer-only notes and sections (such as this one). By default, the public build excludes these files. To build and preview the internal variant locally, prepend your build command with the `BUILD_INTERNAL_DOCS=1` environment variable. 
+
+```console
+# Build the internal variant (overwrites the default _build/html directory)
+BUILD_INTERNAL_DOCS=1 pixi run -e docs build-docs-fast
+
+# Alternatively, build into a separate directory to preserve your public build cache
+BUILD_INTERNAL_DOCS=1 pixi run -e docs make -C docs html_fast BUILDDIR=_build_internal
+```
+
+When building on Read the Docs, the custom `.readthedocs.yaml` configuration executes a double-build. It first generates the public site, then automatically runs the internal build and places the output in a hidden `/internal/` subfolder (e.g., `https://<project-url>/en/latest/internal/`).
