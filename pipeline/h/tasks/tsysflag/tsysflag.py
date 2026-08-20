@@ -765,7 +765,7 @@ class TsysflagView:
         self.ms = ms
 
         # Get the spws from the tsystable.
-        tsysspws = {row.get('SPECTRAL_WINDOW_ID') for row in tsystable.rows}
+        tsysspws = utils.deduplicate([row.get('SPECTRAL_WINDOW_ID') for row in tsystable.rows])
 
         # Get the Tsys spw map by retrieving it from the first tsys CalFrom
         # that is present in the callibrary. We need to know the Tsys mapping
