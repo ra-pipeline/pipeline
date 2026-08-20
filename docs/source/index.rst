@@ -7,6 +7,7 @@
    :caption: Basics
 
    overview
+   acknowledgement
    releases
    qa
    references
