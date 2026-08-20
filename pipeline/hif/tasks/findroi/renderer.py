@@ -41,8 +41,6 @@ class T2_4MDetailsFindROIRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
         artifact_links = []
         for label, key in (
-            # Use actual filename from artifact path for each file type
-            ('Full stage product pickle', 'results_pickle'),
             ('ROI.dat', 'roi_dat'),
             ('ROIcont.dat', 'roi_cont_dat'),
         ):
