@@ -41,3 +41,5 @@ build:
     # html/ folder (for relative links in README and offline viewing)
     - cp docs/_build/latex/taskdocs.pdf $READTHEDOCS_OUTPUT/html/
     - cp docs/_build/latex/users_guide.pdf $READTHEDOCS_OUTPUT/html/
+    - cp docs/_build/latex/taskdocs.pdf $READTHEDOCS_OUTPUT/html/internal/
+    - cp docs/_build/latex/users_guide.pdf $READTHEDOCS_OUTPUT/html/internal/

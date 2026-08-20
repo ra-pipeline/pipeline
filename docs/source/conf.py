@@ -121,6 +121,7 @@ extensions = [
     'parameter_linking',
     'sphinxcontrib.lightbox2',
     'toc_sections',
+    'jira_links',
 ]
 
 add_module_names = False

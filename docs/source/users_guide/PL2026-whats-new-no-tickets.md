@@ -13,7 +13,7 @@ repository between October 2025 and August 2026, targeting release
 - **{func}`hif_findroi <pipeline.hif.cli.hif_findroi>`: a new fast region-of-interest stage.** A new imaging
  stage, {func}`hif_findroi <pipeline.hif.cli.hif_findroi>`, identifies
  likely source regions ahead of continuum/line imaging using a fast
- algorithm developed under PIPEREQ-414, and has been wired into the ALMA
+ algorithm developed under {jira}`PIPEREQ-414`, and has been wired into the ALMA
  imaging recipes. See {ref}`IF imaging heuristics <hif_findroi>`.
 - **Imaging moves to an LSRK-frame MS ahead of continuum/line separation.**
  {func}`hif_mstransform <pipeline.hif.cli.hif_mstransform>` now produces the
@@ -151,7 +151,7 @@ MS once per field × spw × EB.
 (hif_findroi)=
 **{func}`hif_findroi <pipeline.hif.cli.hif_findroi>`: a new region-of-interest stage.**
 A new imaging stage, `hif_findroi`, implements a fast region-of-interest
-identification routine researched under PIPEREQ-414 and has been added to
+identification routine researched under {jira}`PIPEREQ-414` and has been added to
 the ALMA imaging recipes. Follow-up work improved its weblog view, fixed
 field phase-center extraction lost in a merge conflict, fixed band-to-band
 and polarization-calibration failures, added its output tarball to the
@@ -387,7 +387,7 @@ These changes shift the
 {func}`hifa_flagdata <pipeline.hifa.cli.hifa_flagdata>` and the
 "newly flagged" score for
 {func}`hif_applycal <pipeline.hif.cli.hif_applycal>` upward, based on an
-analysis (PIPEREQ-399 item 3) showing the old thresholds were flagging too
+analysis ({jira}`PIPEREQ-399` item 3) showing the old thresholds were flagging too
 many good datasets yellow instead of blue, keeping more data eligible for
 ALMA's FastLane without materially increasing bad data reaching PIs.
 This change adds the
@@ -424,7 +424,7 @@ coarser RepBW resolution pulls line emission into the continuum-frequency
 ranges, when the full-resolution cube for the same spw/source scored well.
 ![RepBW mom8fc QA examples](whatsnew/PIPE-3082examples.png)
 This change similarly re-tunes
-the check-source-fit QA aggregation function (PIPEREQ-399 item 3).
+the check-source-fit QA aggregation function ({jira}`PIPEREQ-399` item 3).
 
 **Determinism / ordering.**
 This change replaces `list(set(...))`
@@ -502,7 +502,7 @@ based on the ratio of observed to theoretical image RMS at the
 {func}`hsd_imaging <pipeline.hsd.cli.hsd_imaging>` stage.
 This change sorts weblog QA
 messages within the same color band by score, so the lowest score in each
-band is easy to spot (a PLWG request from PIPEREQ-424).
+band is easy to spot (a PLWG request from {jira}`PIPEREQ-424`).
 
 **{func}`hsd_baseline <pipeline.hsd.cli.hsd_baseline>` weblog.**
 This change fixes a
