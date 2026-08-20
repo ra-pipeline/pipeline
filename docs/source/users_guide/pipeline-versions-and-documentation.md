@@ -43,7 +43,7 @@ Note that each CASA release often includes one or more updates to the third-part
 The ones likely to be of most interest to users are highlighted in bold.
 
 ```{list-table} Changes to third-party Python modules in CASA
-:widths: 25 25 25 25
+:widths: 25 25 25 25 25
 :header-rows: 1
 :class: small-font-table
 
@@ -51,71 +51,89 @@ The ones likely to be of most interest to users are highlighted in bold.
   - 6.5.4py3.8 (PL2023)
   - 6.6.1py3.8 (PL2024)
   - 6.6.6py3.10 (PL2025)
+  - 6.7.4py3.12 (PL2026)
 * - almatasks<sup>a</sup>
   - 1.6.1
   - 1.7.1
+  - —
   - —
 * - **Astropy**
   - 5.2.1
   - 5.2.2
   - 6.1.7
+  - 7.2.0
 * - attrs
   - 22.2.0
+  - —
   - —
   - —
 * - backcall
   - 0.2.0
   - 0.2.0
   - —
+  - —
 * - bdsf
   - 1.10.2
   - 1.10.3
   - 1.13.0.post2
+  - 1.14.1
 * - cachetools
   - 5.2.0
   - 5.3.1
   - 5.5.2
+  - 6.2.6
 * - casaconfig
   - —
   - —
   - 1.1.1
+  - 1.4.0
 * - certifi
   - 2022.12.07
   - 2023.07.22
   - 2024.7.4
+  - 2026.1.4
 * - csscompressor
   - 0.9.5
   - 0.9.5
   - 0.9.5
+  - —
 * - cycler
   - 0.11.0
   - 0.11.0
+  - 0.12.1
   - 0.12.1
 * - decorator
   - 5.1.1
   - 5.1.1
   - 5.1.1
+  - 5.2.1
 * - grpcio
   - 1.29.0
   - 1.26.0
   - 1.66.0
+  - 1.76.0
 * - intervaltree
   - 3.1.0
   - 3.1.0
   - 3.1.0
+  - 3.2.1
 * - ipython
   - 7.15.0
   - 7.34.0
   - 8.26.0
+  - 9.9.0
 * - jedi
   - 0.18.2
   - 0.19.0
   - 0.19.1
+  - 0.19.2
 * - kiwisolver
   - 1.4.4
   - 1.4.5
   - 1.4.5
+  - 1.4.9
 * - logutils
+  - 0.3.5
   - 0.3.5
   - 0.3.5
   - 0.3.5
@@ -123,43 +141,54 @@ The ones likely to be of most interest to users are highlighted in bold.
   - 1.2.4
   - 1.2.4
   - 1.3.10
+  - 1.4.1
 * - **Matplotlib**
   - 3.3.3
   - 3.5.0
   - 3.9.2
+  - 3.10.8
 * - mpi4py
   - 3.1.3
   - 3.1.5
   - 3.1.5
+  - 4.1.0
 * - **NumPy**
   - 1.23.5
   - 1.24.4
   - 2.0.1
+  - 2.3.5
 * - Open MPI
   - 1.10.4
+  - 5.0.1
   - 5.0.1
   - 5.0.1
 * - packaging
   - 23.0
   - 23.1
   - 24.1
+  - 25.0
 * - parso
   - 0.8.3
   - 0.8.3
   - 0.8.4
+  - 0.8.5
 * - pip
   - 23.0.1
   - 22.3.1
   - 22.3.1
+  - 24.0
 * - pluggy
   - 1.0.0
   - 1.3.0
   - 1.5.0
+  - 1.6.0
 * - prompt_toolkit
   - 3.0.36
   - 3.0.39
   - 3.0.47
+  - 3.0.52
 * - ps_mem
+  - 3.14
   - 3.14
   - 3.14
   - 3.14
@@ -167,15 +196,19 @@ The ones likely to be of most interest to users are highlighted in bold.
   - 0.8.0
   - 0.7.0
   - 0.7.0
+  - 0.7.0
 * - Pygments
   - 2.14.0
   - 2.26.1
   - 2.28.0
+  - 2.19.2
 * - pyparsing
   - 3.0.9
   - 3.1.1
   - 3.1.2
+  - 3.3.1
 * - pypubsub
+  - 4.0.3
   - 4.0.3
   - 4.0.3
   - 4.0.3
@@ -183,30 +216,37 @@ The ones likely to be of most interest to users are highlighted in bold.
   - 7.2.1
   - 7.4.2
   - 8.3.2
+  - 9.0.2
 * - pytz
   - 2022.7.1
   - 2023.3.1
   - 2024.1
+  - 2025.2
 * - **SciPy**
   - 1.10.0
   - 1.10.1
   - 1.14.1
+  - 1.17.0
 * - setuptools
   - 56.0.0
   - 70.1.1
   - 65.5.0
+  - 80.9.0
 * - traitlets
   - 5.8.1
   - 5.10.0
+  - 5.14.3
   - 5.14.3
 * - wcwidth
   - 0.2.6
   - 0.2.6
   - 0.2.13
+  - 0.2.14
 * - wheel
   - 0.41.2
   - —
   - —
+  - 0.45.1
 ```
 
 <sup>a</sup> contained the CASA task `wvrgcal` (legacy `almatasks` package), which was migrated to {func}`casatasks.wvrgcal <casatasks.calibration.wvrgcal>` in PL2025.
