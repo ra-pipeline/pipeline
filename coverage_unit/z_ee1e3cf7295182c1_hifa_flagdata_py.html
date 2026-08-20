@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Coverage for pipeline/hifa/cli/hifa_flagdata.py: 100.00%</title>
+    <link rel="icon" sizes="32x32" href="favicon_32_cb_c827f16f.png">
+    <link rel="stylesheet" href="style_cb_4667309f.css" type="text/css">
+    <script src="coverage_html_cb_dd2e7eb5.js" defer></script>
+</head>
+<body class="pyfile">
+<header>
+    <div class="content">
+        <h1>
+            <span class="text">Coverage for </span><b>pipeline<span class="sep">/</span>hifa<span class="sep">/</span>cli<span class="sep">/</span>hifa_flagdata.py</b>:
+            <span class="pc_cov">100.00%</span>
+        </h1>
+        <aside id="help_panel_wrapper">
+            <input id="help_panel_state" type="checkbox">
+            <label for="help_panel_state">
+                <img id="keyboard_icon" src="keybd_closed_cb_900cfef5.png" alt="Show/hide keyboard shortcuts">
+            </label>
+            <div id="help_panel">
+                <p class="legend">Shortcuts on this page</p>
+                <div class="keyhelp">
+                    <p>
+                        <kbd>r</kbd>
+                        <kbd>m</kbd>
+                        <kbd>x</kbd>
+                        <kbd>p</kbd>
+                        &nbsp; toggle line displays
+                    </p>
+                    <p>
+                        <kbd>j</kbd>
+                        <kbd>k</kbd>
+                        &nbsp; next/prev highlighted chunk
+                    </p>
+                    <p>
+                        <kbd>0</kbd> &nbsp; (zero) top of page
+                    </p>
+                    <p>
+                        <kbd>1</kbd> &nbsp; (one) first highlighted chunk
+                    </p>
+                    <p>
+                        <kbd>[</kbd>
+                        <kbd>]</kbd>
+                        &nbsp; prev/next file
+                    </p>
+                    <p>
+                        <kbd>u</kbd> &nbsp; up to the index
+                    </p>
+                    <p>
+                        <kbd>?</kbd> &nbsp; show/hide this help
+                    </p>
+                </div>
+            </div>
+        </aside>
+        <h2>
+            <span class="text">2 statements &nbsp;</span>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">2<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">0<span class="text"> missing</span></button>
+            <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">1<span class="text"> excluded</span></button>
+            <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">0<span class="text"> partial</span></button>
+        </h2>
+        <p class="text">
+            <a id="prevFileLink" class="nav" href="z_ee1e3cf7295182c1_hifa_exportdata_py.html">&#xab; prev</a> &nbsp; &nbsp;
+            <a id="indexLink" class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
+            <a id="nextFileLink" class="nav" href="z_ee1e3cf7295182c1_hifa_flagtargets_py.html">&#xbb; next</a>
+            &nbsp; &nbsp; &nbsp;
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
+            created at 2026-08-20 16:14 +0000
+        </p>
+        <aside class="hidden">
+            <button type="button" class="button_next_chunk" data-shortcut="j"></button>
+            <button type="button" class="button_prev_chunk" data-shortcut="k"></button>
+            <button type="button" class="button_top_of_page" data-shortcut="0"></button>
+            <button type="button" class="button_first_chunk" data-shortcut="1"></button>
+            <button type="button" class="button_prev_file" data-shortcut="["></button>
+            <button type="button" class="button_next_file" data-shortcut="]"></button>
+            <button type="button" class="button_to_index" data-shortcut="u"></button>
+            <button type="button" class="button_show_hide_help" data-shortcut="?"></button>
+        </aside>
+    </div>
+</header>
+<main id="source">
+    <p class="exc show_exc"><span class="n"><a id="t1" href="#t1">1</a></span><span class="t"><span class="key">import</span> <span class="nam">pipeline</span><span class="op">.</span><span class="nam">h</span><span class="op">.</span><span class="nam">cli</span><span class="op">.</span><span class="nam">utils</span> <span class="key">as</span> <span class="nam">utils</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t2" href="#t2">2</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t3" href="#t3">3</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t4" href="#t4">4</a></span><span class="t"><span class="com"># docstring and type hints: inherits from hifa.tasks.flagging.flagdeteralma.FlagDeterALMAInputs.__init__</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t5" href="#t5">5</a></span><span class="t"><span class="op">@</span><span class="nam">utils</span><span class="op">.</span><span class="nam">cli_wrapper</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t6" href="#t6">6</a></span><span class="t"><span class="key">def</span> <span class="nam">hifa_flagdata</span><span class="op">(</span><span class="nam">vis</span><span class="op">=</span><span class="key">None</span><span class="op">,</span> <span class="nam">autocorr</span><span class="op">=</span><span class="key">None</span><span class="op">,</span> <span class="nam">shadow</span><span class="op">=</span><span class="key">None</span><span class="op">,</span> <span class="nam">tolerance</span><span class="op">=</span><span class="key">None</span><span class="op">,</span> <span class="nam">scan</span><span class="op">=</span><span class="key">None</span><span class="op">,</span> <span class="nam">scannumber</span><span class="op">=</span><span class="key">None</span><span class="op">,</span> <span class="nam">intents</span><span class="op">=</span><span class="key">None</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t7" href="#t7">7</a></span><span class="t">                  <span class="nam">edgespw</span><span class="op">=</span><span class="key">None</span><span class="op">,</span> <span class="nam">fracspw</span><span class="op">=</span><span class="key">None</span><span class="op">,</span> <span class="nam">fracspwfps</span><span class="op">=</span><span class="key">None</span><span class="op">,</span> <span class="nam">online</span><span class="op">=</span><span class="key">None</span><span class="op">,</span> <span class="nam">partialpol</span><span class="op">=</span><span class="key">None</span><span class="op">,</span> <span class="nam">lowtrans</span><span class="op">=</span><span class="key">None</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t8" href="#t8">8</a></span><span class="t">                  <span class="nam">mintransrepspw</span><span class="op">=</span><span class="key">None</span><span class="op">,</span> <span class="nam">mintransnonrepspws</span><span class="op">=</span><span class="key">None</span><span class="op">,</span> <span class="nam">fileonline</span><span class="op">=</span><span class="key">None</span><span class="op">,</span> <span class="nam">template</span><span class="op">=</span><span class="key">None</span><span class="op">,</span> <span class="nam">filetemplate</span><span class="op">=</span><span class="key">None</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t9" href="#t9">9</a></span><span class="t">                  <span class="nam">hm_tbuff</span><span class="op">=</span><span class="key">None</span><span class="op">,</span> <span class="nam">tbuff</span><span class="op">=</span><span class="key">None</span><span class="op">,</span> <span class="nam">qa0</span><span class="op">=</span><span class="key">None</span><span class="op">,</span> <span class="nam">qa2</span><span class="op">=</span><span class="key">None</span><span class="op">,</span> <span class="nam">flagbackup</span><span class="op">=</span><span class="key">None</span><span class="op">,</span> <span class="nam">parallel</span><span class="op">=</span><span class="key">None</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t10" href="#t10">10</a></span><span class="t">    <span class="str">&quot;&quot;&quot;Do metadata based flagging of a list of MeasurementSets.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t11" href="#t11">11</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t12" href="#t12">12</a></span><span class="t"><span class="str">    The ``hifa_flagdata`` task performs basic flagging operations on a list of MeasurementSets including:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t13" href="#t13">13</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t14" href="#t14">14</a></span><span class="t"><span class="str">    - applying online flags (XML format, including QA0 flags for antenna pointing calibration failures)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t15" href="#t15">15</a></span><span class="t"><span class="str">    - applying a flagging template</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t16" href="#t16">16</a></span><span class="t"><span class="str">    - partial polarization flagging</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t17" href="#t17">17</a></span><span class="t"><span class="str">    - autocorrelation data flagging</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t18" href="#t18">18</a></span><span class="t"><span class="str">    - shadowed antenna data flagging</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t19" href="#t19">19</a></span><span class="t"><span class="str">    - scan-based flagging by intent or scan number</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t20" href="#t20">20</a></span><span class="t"><span class="str">    - edge channel flagging, as needed</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t21" href="#t21">21</a></span><span class="t"><span class="str">    - low atmospheric transmission flagging</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t22" href="#t22">22</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t23" href="#t23">23</a></span><span class="t"><span class="str">    The WebLog page shows whether any data in these categories were flagged (a check mark means yes, an X means no).</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t24" href="#t24">24</a></span><span class="t"><span class="str">    The Flagged data summary table shows the percentage of flagged data per MS. The ``Before Task`` column contains</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t25" href="#t25">25</a></span><span class="t"><span class="str">    only the effect of the Binary Data Flags (BDF) from the correlator applied during :func:`~pipeline.hifa.cli.hifa_importdata`. The</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t26" href="#t26">26</a></span><span class="t"><span class="str">    additional flags are applied in the order of columns shown in the table, with each column reflecting the</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t27" href="#t27">27</a></span><span class="t"><span class="str">    additional amount of data flagged when applying that flag reason.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t28" href="#t28">28</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t29" href="#t29">29</a></span><span class="t"><span class="str">    The Low Transmission flagging agent flags spws whose transmission across 60% of their bandwidth is less than</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t30" href="#t30">30</a></span><span class="t"><span class="str">    10% on non-representative spws and less than 5% on the representative spw. This heuristic can be disabled with</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t31" href="#t31">31</a></span><span class="t"><span class="str">    the boolean value ``lowtrans`` in the PPR. The thresholds can be adjusted via ``mintransnonrepspws`` (default</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t32" href="#t32">32</a></span><span class="t"><span class="str">    10%) and ``mintransrepspw`` (default 5%). The following fixed meteorological values are used to avoid</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t33" href="#t33">33</a></span><span class="t"><span class="str">    susceptibility to faulty weather station values: pressure=563 mb, altitude=5059 m, temperature=273 K,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t34" href="#t34">34</a></span><span class="t"><span class="str">    maxAltitude=48 km, humidity=20%, water vapor scale height h0=1.0 km, initial pressure step dP=5.0 mb, and</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t35" href="#t35">35</a></span><span class="t"><span class="str">    multiplicative factor dPm=1.1. The PWV is the actual median across the EB; the airmass is the mean of the</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t36" href="#t36">36</a></span><span class="t"><span class="str">    first and final integration of the scan.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t37" href="#t37">37</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t38" href="#t38">38</a></span><span class="t"><span class="str">    About the spectral window edge channel flagging:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t39" href="#t39">39</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t40" href="#t40">40</a></span><span class="t"><span class="str">    - For TDM spectral windows, a number of edge channels are always flagged, according to the ``fracspw`` and</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t41" href="#t41">41</a></span><span class="t"><span class="str">      ``fracspwfps`` parameters (the latter operates only on spectral windows with 62, 124, or 248 channels). With</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t42" href="#t42">42</a></span><span class="t"><span class="str">      the default setting of ``fracspw``, the number of channels flagged on each edge is 2, 4, or 8 for 64, 128,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t43" href="#t43">43</a></span><span class="t"><span class="str">      or 256-channel spectral windows, respectively.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t44" href="#t44">44</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t45" href="#t45">45</a></span><span class="t"><span class="str">    - For most FDM spectral windows, no edge flagging is done. The only exceptions are ACA spectral windows that</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t46" href="#t46">46</a></span><span class="t"><span class="str">      encroach too close to the baseband edge. Channels that lie closer to the baseband edge than the following</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t47" href="#t47">47</a></span><span class="t"><span class="str">      values are flagged: 62.5, 40, 20, 10, and 5 MHz for spectral windows with bandwidths of 1000, 500, 250, 125,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t48" href="#t48">48</a></span><span class="t"><span class="str">      and 62.5 MHz, respectively. A warning is generated in the weblog if flagging occurs due to proximity to the</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t49" href="#t49">49</a></span><span class="t"><span class="str">      baseband edge. By definition, 2000 MHz spectral windows always encroach the baseband edge on both sides, and</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t50" href="#t50">50</a></span><span class="t"><span class="str">      thus are always flagged on both sides in order to achieve 1875 MHz bandwidth (flagged by 62.5 MHz on each</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t51" href="#t51">51</a></span><span class="t"><span class="str">      side); thus no warning is generated.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t52" href="#t52">52</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t53" href="#t53">53</a></span><span class="t"><span class="str">    Notes:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t54" href="#t54">54</a></span><span class="t"><span class="str">        **QA Scoring**</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t55" href="#t55">55</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t56" href="#t56">56</a></span><span class="t"><span class="str">        The QA score based on BDF+QA0+online+template+shadow flags: 0.0 if the flag fraction is &gt;=60%, 1.0 if</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t57" href="#t57">57</a></span><span class="t"><span class="str">        &lt;=5%, linearly interpolated in between. An additional QA score of 0.8 results if the baseband frequency</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t58" href="#t58">58</a></span><span class="t"><span class="str">        range could not be calculated for a spw. For Low Transmission flagging: 1.0 if no spw is flagged, 0.9 if</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t59" href="#t59">59</a></span><span class="t"><span class="str">        a non-representative spw is flagged, 0.33 if the representative spw is flagged.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t60" href="#t60">60</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t61" href="#t61">61</a></span><span class="t"><span class="str">    Examples:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t62" href="#t62">62</a></span><span class="t"><span class="str">        1. Do basic flagging on a MeasurementSet:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t63" href="#t63">63</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t64" href="#t64">64</a></span><span class="t"><span class="str">        &gt;&gt;&gt; hifa_flagdata()</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t65" href="#t65">65</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t66" href="#t66">66</a></span><span class="t"><span class="str">        2. Do basic flagging on a MeasurementSet flagging additional scans selected</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t67" href="#t67">67</a></span><span class="t"><span class="str">        by number as well:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t68" href="#t68">68</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t69" href="#t69">69</a></span><span class="t"><span class="str">        &gt;&gt;&gt; hifa_flagdata(scannumber=&#x27;13,18&#x27;)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t70" href="#t70">70</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t71" href="#t71">71</a></span><span class="t"><span class="str">    &quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
+</main>
+<footer>
+    <div class="content">
+        <p>
+            <a class="nav" href="z_ee1e3cf7295182c1_hifa_exportdata_py.html">&#xab; prev</a> &nbsp; &nbsp;
+            <a class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
+            <a class="nav" href="z_ee1e3cf7295182c1_hifa_flagtargets_py.html">&#xbb; next</a>
+            &nbsp; &nbsp; &nbsp;
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
+            created at 2026-08-20 16:14 +0000
+        </p>
+    </div>
+</footer>
+</body>
+</html>
