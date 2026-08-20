@@ -150,7 +150,7 @@ class ImageParamsHeuristics:
 
         return primary_beam_size
 
-    def cont_ranges_spwsel(self):
+    def cont_ranges_spwsel(self, mosaic_sources=[]):
         """Determine spw selection parameters to exclude lines for mfs and cont images."""
 
         # initialize lookup dictionary for all possible source names
@@ -158,17 +158,24 @@ class ImageParamsHeuristics:
         all_continuum_spwsel = {}
         low_bandwidth_spwsel = {}
         low_spread_spwsel = {}
+        source_names = []
+
         for ms_ref in self.observing_run.get_measurement_sets():
-            for source_name in [s.name for s in ms_ref.sources]:
-                cont_ranges_spwsel[source_name] = {}
-                all_continuum_spwsel[source_name] = {}
-                low_bandwidth_spwsel[source_name] = {}
-                low_spread_spwsel[source_name] = {}
-                for spwid in self.spwids:
-                    cont_ranges_spwsel[source_name][str(spwid)] = 'NONE'
-                    all_continuum_spwsel[source_name][str(spwid)] = False
-                    low_bandwidth_spwsel[source_name][str(spwid)] = False
-                    low_spread_spwsel[source_name][str(spwid)] = False
+            source_names.extend(s.name for s in ms_ref.sources)
+
+        if mosaic_sources:
+            source_names.extend(mosaic_sources)
+
+        for source_name in source_names:
+            cont_ranges_spwsel[source_name] = {}
+            all_continuum_spwsel[source_name] = {}
+            low_bandwidth_spwsel[source_name] = {}
+            low_spread_spwsel[source_name] = {}
+            for spwid in self.spwids:
+                cont_ranges_spwsel[source_name][str(spwid)] = 'NONE'
+                all_continuum_spwsel[source_name][str(spwid)] = False
+                low_bandwidth_spwsel[source_name][str(spwid)] = False
+                low_spread_spwsel[source_name][str(spwid)] = False
 
         contfile = self.contfile if self.contfile is not None else ''
         linesfile = self.linesfile if self.linesfile is not None else ''
@@ -1604,7 +1611,7 @@ class ImageParamsHeuristics:
         pc_direc = meTool.source(inputs.phasecenter)
 
         # Get per-MS IDs of field closest to the phase center
-        ref_field_ids = self.center_field_ids(inputs.vis, inputs.field, inputs.intent, pc_direc)
+        ref_field_ids = self.center_field_ids(inputs.vis, inputs.field.split(","), inputs.intent, pc_direc)
 
         # Get a cont file handler for the conversion to TOPO
         contfile_handler = contfilehandler.ContFileHandler(self.contfile)

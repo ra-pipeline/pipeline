@@ -1287,16 +1287,23 @@ class MakeImList(basetask.StandardTaskTemplate):
                     if 'TARGET' in inputs.intent and "," not in first_field_name:
                         sorted_field_intent_list = utils.place_repr_source_first(sorted_field_intent_list, repr_source)
 
+                    # PIPE-684: cont_ranges_spwsel method iterates over sources from ms. However, it doesnt account for
+                    # mosaic sources. So, creating list of mosaic sources and passing it to the method to get the correct spwsel for mosaic sources.
+                    mosaic_source = []
+                    for field_intent in sorted_field_intent_list:
+                        if len(field_intent[0].split(',')) > 1:
+                            mosaic_source.append(field_intent[0])
                     (
                         cont_ranges_spwsel_dict,
                         all_continuum_spwsel_dict,
                         low_bandwidth_spwsel_dict,
                         low_spread_spwsel_dict
-                    ) = self.heuristics.cont_ranges_spwsel()
+                    ) = self.heuristics.cont_ranges_spwsel(mosaic_source)
 
                     for field_intent in sorted_field_intent_list:
                         # TODO: PIPE-684: check if mosweight needs to be updated for comma seperated fields
                         mosweight = self.heuristics.mosweight(field_intent[1], field_intent[0])
+
                         for spwspec in filtered_spwlist_local:
                             # Start with original vis list
                             vislist_field_intent_spw_combinations[field_intent]['vislist'] = original_vislist_field_intent_spw_combinations[field_intent]['vislist']
