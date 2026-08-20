@@ -9,7 +9,7 @@ def hifa_restoredata(vis=None, session=None, products_dir=None, copytoraw=None, 
 
     Restores flagged and calibrated MeasurementSets from archived ASDMs and pipeline flagging and
     calibration data products. This task is called at the beginning of the imaging-only pipeline
-    recipe (not in the combined cal+imaging recipe, where :py:func:`hifa_importdata <hifa_importdata>` is used instead).
+    recipe (not in the combined cal+imaging recipe, where :func:`~pipeline.hifa.cli.hifa_importdata` is used instead).
 
     When importing the ASDM and converting it to a MeasurementSet (MS), if the output MS already
     exists in the output directory the ``importasdm`` conversion step is skipped and the existing

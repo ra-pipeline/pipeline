@@ -15,15 +15,24 @@ def hif_applycal(vis=None, field=None, intent=None, spw=None, antenna=None, para
     calibrated data as a function of time and frequency. To reduce processing time, target plots include
     only the representative target (and for mosaics, only the brightest field).
 
-    An additional per-antenna QA score is computed from the calibrated Amplitude vs. Frequency and Phase
-    vs. Frequency plots for each calibrator. For each antenna a linear function is fitted to the data per
-    scan per polarisation, and the slope/offset is compared to the equivalent fit for all antennas. As of
-    PL2025 outliers must exceed set thresholds (10% or 10% per 2 GHz for amplitude offset/slope, or 6 deg or
-    6 deg per 2 GHz for phase offset/slope) to generate a QA message. Details of deviant antennas are reported
-    in the expandable QA messages at the top of the page and in an ``applycalQA_outliers.txt`` file. Note
+    Outliers in these plots can indicate remaining bad data, particularly for sources that were
+    self-calibrated (i.e. all calibrators except for check sources).  To help identify these, an additional
+    per-antenna QA score is computed from the calibrated Amplitude vs. Frequency and Phase vs. Frequency
+    plots for each calibrator. For each antenna a linear function is fitted to the data per scan per
+    polarisation, and the slope/offset is compared to the equivalent fit for all antennas. Outliers must
+    exceed set thresholds (10% or 10% per 2 GHz for amplitude offset/slope, or 6 deg or 6 deg per 2 GHz
+    for phase offset/slope) to generate a QA message. Details of deviant antennas are reported in the
+    expandable QA messages at the top of the page and in an ``applycalQA_outliers.txt`` file. Note
     that amplitude-frequency offsets symmetric in XX/YY and phase-frequency offsets for CHECK sources are
     excluded from the outlier QA.
 
+    It is important to note that not all reported outliers are (1) visible in the corresponding plots in
+    hif_applycal (which are averaged over all scans), or (2) consequential to the final products (since the
+    mean calibration solutions are still robust and adequate to calibrate the final data). However, if
+    problems with the calibration are subsequently found, these messages provide clues on where to look
+    for problems. For data that are delivered as QA2 Pass, one can assume that the data reviewers have
+    checked these messages and concluded that the overall calibration is not significantly compromised.
+    
     A uv-coverage plot (before and after calibration flags) is provided for the representative source and
     spw.
 

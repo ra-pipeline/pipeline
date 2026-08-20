@@ -55,7 +55,7 @@ def hifa_timegaincal(vis=None, calamptable=None, calphasetable=None, offsetstabl
       and drifts of the spw-spw offsets as a function of time, but if the SNR
       is very low, such offsets will not be able to detected.
 
-    Good candidate reference antennas were determined using the :py:func:`hif_refant <hif_refant>` task.
+    Good candidate reference antennas were determined using the :func:`~pipeline.hif.cli.hif_refant` task.
     During all solutions for standard observing modes, the reference antenna can
     change flexibly. For polarization observations a good, un-flagged common
     reference antenna is found and locked in time. For band-to-band observations,

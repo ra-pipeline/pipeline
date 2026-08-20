@@ -12,7 +12,7 @@ def hifa_exportdata(vis=None, session=None, imaging_products_only=None, exportms
     pipeline ``working/`` directory to the ``products/`` directory. For combined calibration and
     imaging runs, an intermediate calibration-only WebLog tar file is also created.
 
-    If the :py:func:`hifa_polcal <hifa_polcal>` recipe is not specified in the pipeline context in ``casa_pipescript.py``,
+    If the :func:`~pipeline.hifa.cli.hifa_polcal` recipe is not specified in the pipeline context in ``casa_pipescript.py``,
     the polarization calibrator image FITS files are not exported in this step.
 
     The following products are exported:
@@ -22,7 +22,7 @@ def hifa_exportdata(vis=None, session=None, imaging_products_only=None, exportms
     - a text file per ASDM/MS containing the final calibration apply list
     - a FITS image for each selected calibrator source image
     - a FITS image for each selected science target source image (imaging runs only)
-    - a ``cont.dat`` file from :py:func:`hif_findcont <hif_findcont>` (imaging runs only)
+    - a ``cont.dat`` file from :func:`~pipeline.hif.cli.hif_findcont` (imaging runs only)
     - a tar file per session containing the caltables for that session
     - a tar file containing the WebLog
     - a text file containing the final list of CASA commands

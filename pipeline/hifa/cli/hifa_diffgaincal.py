@@ -86,7 +86,7 @@ def hifa_diffgaincal(vis=None, flagging_frac_limit=None, hm_spwmapmode=None, mis
 
     The heuristic is triggered if:
     
-    1. ``combine='spw'`` was triggered as required for the phase-up (in :py:func:`hifa_spwphaseup <hifa_spwphaseup>`
+    1. ``combine='spw'`` was triggered as required for the phase-up (in :func:`~pipeline.hifa.cli.hifa_spwphaseup`
        for the DIFFGAIN intent - using the relevant REF or the SRC). The previously computed SNR and ``solint``
        are used to calculate whether spw combination is required for the scan based phase solves, or in the case
        of the band-to-band offset - the group of scans, as to meet an SNR of 5.0. If this SNR threshold is not met,

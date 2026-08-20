@@ -11,10 +11,10 @@ def hif_makeimlist(vis=None, imagename=None, intent=None, field=None,
                    robust=None, uvtaper=None, clearlist=None, per_eb=None,
                    per_session=None, calcsb=None, datatype=None, datacolumn=None,
                    allow_wproject=None, parallel=None):
-    """Compute the list of images to be produced in the next :py:func:`hif_makeimages <hif_makeimages>` call.
+    """Compute the list of images to be produced in the next :func:`~pipeline.hif.cli.hif_makeimages` call.
 
     This stage determines image parameters (image size, cell size, etc.) to be used in the subsequent
-    :py:func:`hif_makeimages <hif_makeimages>` stage, and reports them on the WebLog page. 
+    :func:`~pipeline.hif.cli.hif_makeimages` stage, and reports them on the WebLog page. 
     The ``specmode`` can be ``'mfs'`` for per-spw continuum multi-frequency synthesis images,
     ``'cont'`` for aggregate mfs continuum images of several spectral windows, or ``'cube'`` for spectral cubes.
     The first time the task is run in standard recipes is in preparation for making per-spw mfs images

@@ -31,7 +31,7 @@ def hsd_atmcor(
     The WebLog shows a list of the calibrated MSs with the selected model parameters (``atmType``,
     ``h0``, ``dTem_dh``) and integrated spectra (amplitude vs. frequency) after correction;
     magenta curves show the atmospheric transmission. Spectra before correction can be found on the
-    :py:func:`hsd_applycal <hsd_applycal>` WebLog page.
+    :func:`~pipeline.hsd.cli.hsd_applycal` WebLog page.
 
     Notes:
         QA scoring:

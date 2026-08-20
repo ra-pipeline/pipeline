@@ -22,7 +22,7 @@ def hifa_flagdata(vis=None, autocorr=None, shadow=None, tolerance=None, scan=Non
 
     The WebLog page shows whether any data in these categories were flagged (a check mark means yes, an X means no).
     The Flagged data summary table shows the percentage of flagged data per MS. The ``Before Task`` column contains
-    only the effect of the Binary Data Flags (BDF) from the correlator applied during :py:func:`hifa_importdata <hifa_importdata>`. The
+    only the effect of the Binary Data Flags (BDF) from the correlator applied during :func:`~pipeline.hifa.cli.hifa_importdata`. The
     additional flags are applied in the order of columns shown in the table, with each column reflecting the
     additional amount of data flagged when applying that flag reason.
 
