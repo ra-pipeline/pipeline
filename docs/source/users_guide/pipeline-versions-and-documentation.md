@@ -209,14 +209,14 @@ The ones likely to be of most interest to users are highlighted in bold.
   - —
 ```
 
-<sup>a</sup> contained the CASA task `wvrgcal` (legacy `almatasks` package), which was migrated to {func}`CASA/wvrgcal <casatasks.calibration.wvrgcal>` in PL2025.
+<sup>a</sup> contained the CASA task `wvrgcal` (legacy `almatasks` package), which was migrated to {func}`casatasks.wvrgcal <casatasks.calibration.wvrgcal>` in PL2025.
 
 ## Pipeline and CASA tasks
 
 (sec-pipelinecasa)=
-The pipeline heuristics are written as python functions appearing with a `hif_` or `hifa_` (for interferometric) or `hsd_` (for single-dish) prefix. They can be viewed and executed within CASA just as any python function (if one has launched CASA with "--pipeline"). For example, one can view the possible inputs for the task {func}`hifa_importdata <pipeline.hifa.cli.hifa_importdata>` by typing `?hifa_importdata`.
+The pipeline heuristics are written as python functions appearing with a `hif_` or `hifa_` (for interferometric) or `hsd_` (for single-dish) prefix. They can be viewed and executed within CASA just as any python function (if one has launched CASA with "--pipeline"). For example, one can view the possible inputs for the task {func}`~pipeline.hifa.cli.hifa_importdata` by typing `?hifa_importdata`.
 
-The pipeline heuristics use CASA tasks wherever possible to perform the data reduction or imaging. E.g. the pipeline bandpass calibration & flagging task {func}`hifa_bandpassflag <pipeline.hifa.cli.hifa_bandpassflag>` calls the CASA {func}`CASA/bandpass <casatasks.calibration.bandpass>` task, and the interferometric imaging task {func}`hif_makeimages <pipeline.hif.cli.hif_makeimages>` calls the CASA imaging task {func}`CASA/tclean <casatasks.imaging.tclean>`.
+The pipeline heuristics use CASA tasks wherever possible to perform the data reduction or imaging. E.g. the pipeline bandpass calibration & flagging task {func}`~pipeline.hifa.cli.hifa_bandpassflag` calls the CASA {func}`~casatasks.calibration.bandpass` task, and the interferometric imaging task {func}`~pipeline.hif.cli.hif_makeimages` calls the CASA imaging task {func}`~casatasks.imaging.tclean`.
 
 The standard pipeline processing recipes are deterministic and should always give the same result for the same data, if run on the same hardware allocation (number of cores, memory). However, the CASA pipeline tasks are designed to be highly flexible, so that they can have the default inputs over-ridden with user-specified values, or be added, subtracted, or rearranged to produce alternative processing recipes. This enables a manual "mix and match" mode for data reduction and imaging that combines standard CASA pipeline tasks with other CASA commands or python code to produce scripts that are better tuned to the idiosyncrasies of a specific dataset. The exact pipeline commands that will reproduce the standard recipe are delivered with each dataset, in a script called `member.<mous_uid>.<recipe>.casa_pipescript.py` (see {ref}`The Pipeline processing script <sec-pipescriptintro>` below). One can edit and add to that script to implement "mixed mode" processing.
 
