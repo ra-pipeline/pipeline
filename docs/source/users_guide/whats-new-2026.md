@@ -70,7 +70,12 @@ per-spw low-SNR fallback instead of crashing when a gain table ends up fully
 flagged. A regression introduced along the way — a phase-offset solve step
 dropped ahead of the new phase-up, which had worsened flagging for a clear
 low-SNR case — was subsequently corrected.
-![Screenshot_2026-06-10_at_6.06.05_PM.png](whatsnew/Screenshot_2026-06-10_at_6.06.05_PM.png)
+```{figure} whatsnew/Screenshot_2026-06-10_at_6.06.05_PM.png
+---
+width: 688px
+align: center
+---
+```
 *Tickets: {jira}`PIPE-2601`,
 {jira}`PIPE-2858`,
 {jira}`PIPE-3006`,
@@ -83,7 +88,12 @@ polarization-calibration recipe, so the second
 {func}`~pipeline.hifa.cli.hifa_bandpass` call (after
 {func}`~pipeline.hifa.cli.hifa_lock_refant`) no longer pre-applies a now-stale table computed with a
 possibly different reference antenna.
-![Polcal_bandpass_after_lockrefant_unregister.png](whatsnew/Polcal_bandpass_after_lockrefant_unregister.png)
+```{figure} whatsnew/Polcal_bandpass_after_lockrefant_unregister.png
+---
+width: 1062px
+align: center
+---
+```
 
 **Cross-pol examination for polarization/flux calibrators.**
 {jira}`PIPE-2956` adds an
@@ -93,7 +103,12 @@ possibly different reference antenna.
 `correctedampflag`) to control whether cross-polarization data are examined
 for multi-scan calibrators — a Band 2 dataset showed the original
 same-scan-only assumption from PIPE-607 was too simplistic.
-![Band2run.png](whatsnew/Band2run.png)
+```{figure} whatsnew/Band2run.png
+---
+width: 1062px
+align: center
+---
+```
 
 **Robustness fixes.**
 {jira}`PIPE-2752` refines heuristics
@@ -134,7 +149,12 @@ than relying on fixed field ordering.
 {func}`~pipeline.hifa.cli.hifa_flagdata` FDM-spw detection
 heuristic to use `msmd.almaspws()` instead of a channel-count threshold that
 misclassified some Cycle 10 4×4-bit-correlation spws as TDM.
-![FDMspws.png](whatsnew/FDMspws.png)
+```{figure} whatsnew/FDMspws.png
+---
+width: 1062px
+align: center
+---
+```
 {func}`~pipeline.hifa.cli.hifa_tsysflagcontamination`
 crashes were fixed for two independent causes: a NaN-handling incompatibility
 with newer scipy `savgol_filter` versions, and a regex that assumed
@@ -164,7 +184,12 @@ field phase-center extraction lost in a merge conflict, fixed band-to-band
 and polarization-calibration failures, added its output tarball to the
 auxiliary export products, hid absolute filesystem paths that were leaking
 into exported pickles, and reviewed the knock-on recipe-template changes.
-![weblogOverview.png](whatsnew/weblogOverview.png)
+```{figure} whatsnew/weblogOverview.png
+---
+width: 900px
+align: center
+---
+```
 *Tickets: {jira}`PIPE-3149`,
 {jira}`PIPE-3151`,
 {jira}`PIPE-3150`,
@@ -214,7 +239,12 @@ crashes on edge cases with very few baseline channels
 automatic y-axis limits were revisited so bright/maser lines don't leave
 excessive white space in the continuum-fit plot; and a stray unclosed file
 handle was closed.
-![page513.png](whatsnew/page513.png)
+```{figure} whatsnew/page513.png
+---
+width: 1062px
+align: center
+---
+```
 *Tickets: {jira}`PIPE-2766`,
 {jira}`PIPE-2617`,
 {jira}`PIPE-3131`,
@@ -267,7 +297,12 @@ logic was fixed after a single-spw field drop, then extended with
 spectral-window filtering in the max-cube-size/max-product-size mitigation
 steps, so oversized data can still be partially imaged instead of failing
 mitigation outright.
-![PL2026_size_mitigation_flowchart_NEW-1.png](whatsnew/PL2026_size_mitigation_flowchart_NEW-1.png)
+```{figure} whatsnew/PL2026_size_mitigation_flowchart_NEW-1.png
+---
+width: 1062px
+align: center
+---
+```
 *Tickets: {jira}`PIPE-2812`,
 {jira}`PIPE-3127`.*
 {jira}`PIPE-2909` lets cube imaging
@@ -341,7 +376,12 @@ incorrectly reporting a successful Jy/K database access when
 {func}`~pipeline.hsd.cli.hsd_baseline` QA messages to report the virtual spw (not the real,
 per-MS spw) for line-detection scores, avoiding confusing MS-specific
 numbering in multi-MS runs.
-![dev_virtual_spw_stage11.png](whatsnew/dev_virtual_spw_stage11.png)
+```{figure} whatsnew/dev_virtual_spw_stage11.png
+---
+width: 800px
+align: center
+---
+```
 Wide/edge line QA not triggering was fixed, and the representative line
 width used for clustering was switched to the 75th percentile of the
 detected cluster rather than the central value, which had been
@@ -357,7 +397,12 @@ confusion between real and virtual spw IDs in `baseline/worker.py`.
 fitting-function option to
 {func}`~pipeline.hsd.cli.hsd_baseline`, with a new
 `wavenumber` parameter (list/per-spw/per-EB inputs supported).
-![Screenshot_2026-02-20_at_11.46.50.png](whatsnew/Screenshot_2026-02-20_at_11.46.50.png)
+```{figure} whatsnew/Screenshot_2026-02-20_at_11.46.50.png
+---
+width: 800px
+align: center
+---
+```
 
 **Imaging QA / diagnostics.**
 False-positive QA warnings for contamination diagnostic plots were reduced
@@ -440,7 +485,12 @@ ALMA's FastLane without materially increasing bad data reaching PIs.
 {jira}`PIPE-2716` adds the
 calibration intent to `applycalQA_outliers.txt` so outlying data points can
 be traced back to their scan/intent.
-![FlaggingQAmods.png](whatsnew/FlaggingQAmods.png)
+```{figure} whatsnew/FlaggingQAmods.png
+---
+width: 800px
+align: center
+---
+```
 
 **{func}`~pipeline.hifa.cli.hifa_wvrgcalflag`.**
 {jira}`PIPE-1868` changes the
@@ -452,7 +502,12 @@ issues in the {func}`~pipeline.hifa.cli.hifa_wvrgcalflag` weblog table and plots
 ordering that changed between CASA versions, and inconsistent per-antenna
 ordering) — this shares root-cause work with the PIPE-901
 deterministic-ordering initiative (see {ref}`Infrastructure <infrastructure>`).
-![2022.1.01778.S_after.png](whatsnew/2022.1.01778.S_after.png)
+```{figure} whatsnew/2022.1.01778.S_after.png
+---
+width: 1062px
+align: center
+---
+```
 
 **{func}`~pipeline.hifa.cli.hifa_bandpass` / {func}`~pipeline.hifa.cli.hifa_gfluxscale`.**
 {jira}`PIPE-2845` is a set of
@@ -469,7 +524,12 @@ SemiPass candidate.
 cube QA so the `mom8fc` subscore doesn't turn yellow purely because the
 coarser RepBW resolution pulls line emission into the continuum-frequency
 ranges, when the full-resolution cube for the same spw/source scored well.
-![PIPE-3082examples.png](whatsnew/PIPE-3082examples.png)
+```{figure} whatsnew/PIPE-3082examples.png
+---
+width: 1062px
+align: center
+---
+```
 {jira}`PIPE-3042` similarly re-tunes
 the check-source-fit QA aggregation function ({jira}`PIPEREQ-399` item 3).
 
@@ -489,7 +549,12 @@ scan plot: pre-Cycle-3 data no longer attempts (and fails) to plot
 `ON_SOURCE`/`TEST` intents that didn't exist yet, and a non-deterministic
 offset-position calculation that made the plot change between identical
 reruns is now fixed.
-![main-source2_tsys_scans.png](whatsnew/main-source2_tsys_scans.png)
+```{figure} whatsnew/main-source2_tsys_scans.png
+---
+width: 625px
+align: center
+---
+```
 
 **Polarization-specific weblog.**
 {func}`~pipeline.hif.cli.hif_makeimages` polarization Stokes IQUV image inheritance and repBW
@@ -508,7 +573,12 @@ the proposed per-EB Fast Feedback calibration workflow.
 {jira}`PIPE-2489` fixes image names
 in the AQUA report's `<Sensitivity>` entries to include the multiterm
 extension instead of just the base name.
-![Screenshot_2026-07-10_at_9.43.58_AM.png](whatsnew/Screenshot_2026-07-10_at_9.43.58_AM.png)
+```{figure} whatsnew/Screenshot_2026-07-10_at_9.43.58_AM.png
+---
+width: 938px
+align: center
+---
+```
 {jira}`PIPE-3014` extends the AQUA
 report's imaging statistics to cover Stokes Q, U and V target images for
 polarization-calibration runs, not just Stokes I.
@@ -546,7 +616,12 @@ turn to
 ({jira}`PIPE-3143`) — {func}`~pipeline.hsd.cli.hsd_skycal`
 is deliberately left for separate treatment since its QA involves nested
 aggregation that doesn't fit the common pattern.
-![m100_stage7_accordion.png](whatsnew/m100_stage7_accordion.png)
+```{figure} whatsnew/m100_stage7_accordion.png
+---
+width: 938px
+align: center
+---
+```
 
 **QA scoring and message ordering.**
 {jira}`PIPE-2958` adds a new QA score
@@ -569,7 +644,12 @@ Pipeline).
 explanatory caption to the missed-line-channel diagnostic plots at the
 {func}`~pipeline.hsd.cli.hsd_imaging` stage, describing the
 single-peak/extended detection thresholds and the plot's color coding.
-![idea.png](whatsnew/idea.png)
+```{figure} whatsnew/idea.png
+---
+width: 812px
+align: center
+---
+```
 {jira}`PIPE-3141` fixes an inverted
 channel range for the `hsd_imaging` moment-map plot in LSB data.
 

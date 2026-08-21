@@ -119,7 +119,6 @@ extensions = [
     'IPython.sphinxext.ipython_directive',
     'cli_function_stubs',
     'parameter_linking',
-    'sphinxcontrib.lightbox2',
     'toc_sections',
     'jira_links',
 ]
@@ -237,8 +236,15 @@ html_favicon = '_static/favicon-16x16.png'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will override the builtin "default.css".
 html_static_path = ['_static']
-html_css_files = ['custom_theme.css']
-html_js_files = ['furo_layout.js']
+html_css_files = [
+    'custom_theme.css',          # Custom theme overrides (loads last for CSS cascade priority)
+    'viewerjs/viewer.min.css',   # Viewer.js stylesheet (MIT)
+]
+html_js_files = [
+    'viewerjs/viewer.min.js',    # Viewer.js image viewer & inspection library (MIT)
+    'viewer_init.js',            # Auto-binds Viewer.js to all documentation figures/images
+    'furo_layout.js',            # Theme layout enhancements (TOC drawer toggle, Mermaid reset)
+]
 
 # -- Options for Mermaid output ---------------------------------------
 
