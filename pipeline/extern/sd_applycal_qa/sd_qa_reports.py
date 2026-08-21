@@ -472,7 +472,7 @@ def plot_data(msw: mswrapper_sd.MSWrapperSD, thresholds: Union[dict, None] = Non
     fig.set_size_inches(10, 8)
     #Upper section, data
     ax1 = plt.subplot(111)
-    data_plotted = []
+    data_plotted = False
     for k, scan in enumerate(scanlist):
         if msw.analysis[scan] is None:
             continue
@@ -491,9 +491,9 @@ def plot_data(msw: mswrapper_sd.MSWrapperSD, thresholds: Union[dict, None] = Non
             plt.plot(freqs[sciline], msw.analysis[scan]['ondata']['normdata'][sciline], 'sk', label='Sci.Line Chan')
         elif (np.sum(sciline) > 0):
             plt.plot(freqs[sciline], msw.analysis[scan]['ondata']['normdata'][sciline], 'sk')
-        data_plotted.append(k)
+        data_plotted = True
 
-    if len(data_plotted) > 0:
+    if data_plotted:
         plt.legend(loc='upper left', ncol=3, fontsize='x-small', title='XX-YY data')
         #Y-axis
         plt.ylabel('(XX-YY)/sigma (data norm. excess)')
