@@ -12,9 +12,10 @@ Please acknowledge Pipeline and CASA use in your publications, in a format simil
 * Please adjust the wording to reflect your workflow: for example if you recalibrated data yourself using the pipeline or CASA, or if you directly used the images provided in the archive, please say so.
 
 * There are many ways that data is delivered.  Some have the versions indicated in additional places, and some request that you acknowledge those services as well:
-  * The ALMA archive: versions included in the README and QA2 report
-  * The NRAO archive
-  * VLA PI data delivery: versions included in the email
-  * North American ALMA "LAVA" calibrated data service: versions included in the QA2 report
-  * East Asia and Europe calibrate data service through the helpdesk
-  * NRAO [AUDI](https://science.nrao.edu/srdp/science-ready-data-products-srdp-for-alma) services: please add ``This work makes use of advanced data products generated with services operated by the National Radio Astronomy Observatory.`` and a reference to [Lacy et al. 2020](https://ui.adsabs.harvard.edu/abs/2020ASPC..527..519L/abstract)
+  * The ALMA archive: versions included in the README and QA2 report.
+  * The NRAO archive.
+  * VLA PI data delivery: versions included in the email.
+  * North American ALMA "LAVA" calibrated data service: versions included in the QA2 report.
+  * East Asia calibrated data service: please add ``This work makes use of calibrated data products generated with services provided by the East Asian ALMA regional center (EA ARC) operated by NAOJ together with ASIAA and KASI.``
+  * [Europe](https://almascience.eso.org/local-news/requesting-calibrated-measurement-sets-in-europe) calibrated data service.
+  * NRAO [AUDI](https://science.nrao.edu/srdp/science-ready-data-products-srdp-for-alma) services: please add ``This work makes use of advanced data products generated with services operated by the National Radio Astronomy Observatory.`` and a reference to [Lacy et al. 2020](https://ui.adsabs.harvard.edu/abs/2020ASPC..527..519L/abstract).
