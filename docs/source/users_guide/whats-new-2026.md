@@ -268,7 +268,7 @@ mitigation logic with a spectral-window filtering assessment triggered
 as part of the max-cube-size/limit and max-product-size steps, such that oversized data can still be partially imaged, including
 only some spws, instead of failing mitigation outright due to the largest cube.
 {jira}`PIPE-2812` A fix was also implemented due to dropping single-spw fields. 
-![PL2026_size_mitigation_final.png](whatsnew/PL2026_size_mitigation_final.png)
+![PL2026_size_mitigation_flowchart_final.png](whatsnew/PL2026_size_mitigation_flowchart_final.png)
 
 {jira}`PIPE-2909` lets cube imaging
 continue with a truncated channel grid instead of failing when a
