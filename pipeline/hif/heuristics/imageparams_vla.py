@@ -1064,7 +1064,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
 
         target_fields = self.band_fields.get(self.band, set())
         # For VLA, hpbw (in arcmin) = 42.0 / observing frequency in Hz
-        hpbw = 42.0e9 / float(freq.value) * 60.0 * 60.0  # hpbw in arcseconds
+        hpbw = 42.0e9 / float(freq.value) * 60.0  # hpbw in arcseconds
 
         mosaic_fields, single_fields = mosaic_heuristics.check_targets_for_mosaic(self.observing_run, self.vislist, target_fields, hpbw)
 
