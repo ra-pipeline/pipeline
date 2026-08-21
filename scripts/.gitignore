@@ -1,0 +1,5 @@
+# personal calibPipeIF.py configs (see config.example.toml) -- these live
+# right here alongside calibPipeIF.py, never commit your own.
+# (config.example.toml itself is intentionally NOT matched by these.)
+config.toml
+config-*.toml

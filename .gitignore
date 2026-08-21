@@ -202,3 +202,7 @@ docs/source/references/pipeline-resolved.bib
 
 # Pixi environments and local state
 .pixi/
+
+# personal calibPipeIF.py configs (see scripts/config.example.toml)
+scripts/config.toml
+scripts/config-*.toml
