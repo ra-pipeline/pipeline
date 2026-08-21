@@ -503,22 +503,47 @@ def get_task_result_count(context: Context, taskname: str = 'hif_makeimages') ->
 
 
 def place_repr_source_first(itemlist: list[str] | list[tuple], repr_source: str) -> list[str] | list[tuple]:
+    """Reorder a list to place the representative source first.
+
+    Moves the representative source to the front of a list containing either source
+    names (strings) or tuples/lists with source name as the first element. If the
+    representative source is not found in the list, returns the list unchanged.
+
+    Args:
+        itemlist: List of source names or tuples with source name as first element.
+        repr_source: The source name to place first (may be quoted).
+
+    Returns:
+        Reordered list with representative source first, or original list if not found.
+
+    Raises:
+        TypeError: If list items are not strings, tuples, or lists.
+
+    Note:
+        Source names are compared after removing quotes via dequote() to handle
+        quoted source names properly.
     """
-    Place representative source first in a list of source names
-    or tuples with source name as first tuple element.
-    """
-    try:
-        itemtype = type(itemlist[0])
-        if itemtype is str:
-            repr_source_index = [dequote(item) for item in itemlist].index(dequote(repr_source))
-        elif itemtype is tuple or itemtype is list:
-            repr_source_index = [dequote(item[0]) for item in itemlist].index(dequote(repr_source))
-        else:
-            raise Exception('Cannot handle items of type {}'.format(itemtype))
-        repr_source_entry = itemlist.pop(repr_source_index)
-        itemlist = [repr_source_entry] + itemlist
-    except ValueError:
-        LOG.warning('Could not reorder field list to place representative source first')
+    if not itemlist:
+        return itemlist
+
+    if isinstance(itemlist[0], str):
+        dequoted_items = [dequote(item) for item in itemlist]
+    elif isinstance(itemlist[0], (tuple, list)):
+        dequoted_items = [dequote(item[0]) for item in itemlist]
+    else:
+        raise TypeError(f'Cannot handle items of type {type(itemlist[0])}')
+
+    dequoted_repr_source = dequote(repr_source)
+
+    # If repr_source is not in itemlist, return itemlist untouched
+    if dequoted_repr_source not in dequoted_items:
+        LOG.debug('Representative source %s not found in item list, returning list untouched', repr_source)
+        return itemlist
+
+    # Find and reorder
+    repr_source_index = dequoted_items.index(dequoted_repr_source)
+    repr_source_entry = itemlist.pop(repr_source_index)
+    itemlist = [repr_source_entry] + itemlist
 
     return itemlist
 

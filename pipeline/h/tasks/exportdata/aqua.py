@@ -674,7 +674,7 @@ def xml_for_sensitivity(d, stage_name):
     qa = casa_tools.quanta
 
     def value(quanta):
-        return str(qa.getvalue(quanta)[0])
+        return str(qa.getvalue(quanta).item())
 
     try:
         if d['is_representative'] is None:
