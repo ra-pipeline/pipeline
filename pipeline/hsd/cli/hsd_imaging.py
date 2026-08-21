@@ -48,7 +48,7 @@ def hsd_imaging(mode=None, restfreq=None, infiles=None, field=None, spw=None):
       emission is detected outside the line ranges from
       :func:`~pipeline.hsd.cli.hsd_baseline` (SNR threshold = 7 for "single peak" and
       SNR threshold = 5 for "extended"). The cyan ranges and magenta lines indicate the detected line ranges at :func:`~pipeline.hsd.cli.hsd_baseline` and the deviation mask, respectively. 
-      The channels exceeding the thresholds are highlighted with the red points.
+      The channels exceeding the thresholds are highlighted with the red points. If there is no missed line emission, these plots will not appear in WebLog. Details are described in Appendix of this page.
 
     .. figure:: /figures/missedlines.png
        :width: 60%
@@ -84,5 +84,22 @@ def hsd_imaging(mode=None, restfreq=None, infiles=None, field=None, spw=None):
         2. Generate images for the amplitude calibrator with specific parameters:
 
         >>> hsd_imaging(mode='ampcal', field='*Sgr*,M100', spw='17,19')
+        
+        
+       Appendix:
+       There are two diagnostics methods: ``single peak'' analysis and ``extended'' analysis, which work per spw and per source at the imaging level, that is, on the image cube derived from combined-MS data.
+       
+       For the ``single peak'' analysis, the spatial location of the maximum value in the data cube is determined, and denoted as $(x_p,y_p)$. 
+       The ``single peak'' spectrum is calculated by multiplying a weighted cube (``cube $\times$ weight'') by a beam pattern centered at $(x_p,y_p)$ and integrated along the spatial axes of the cube. 
+       The noise level of this spectrum is determined by $\sigma=1.4826\times$ the median absolute deviation of the values outside the line ranges and masked regions. The heuristic detects possible missing line emission if the ``single peak'' spectrum is over the threshold of $7\sigma$.
+       
+       In the ``extended'' analysis, a cube mask with the same shape as the image cube is created with a value of zero or one depending on whether or not the value in the image cube is larger than ``Observed RMS'' $\times7$, respectively. 
+       This mask is extended by convolving it at each channel with the beam and resetting it to one if the convolved mask is $> 0.5$; otherwise, it stays at 0. 
+       This convolved cube mask is multiplied by the image cube, and the ``extended'' spectra is obtained by integrating in the spatial direction. 
+       The noise levels of the ``extended'' spectra are determined by $\sigma=1.4826\times$ the median absolute deviation of the values outside the line ranges and masked regions. 
+       The heuristic detects possible missing line emission if the ``extended'' spectrum is over the threshold of $5 \sigma$.
+       For both the ``extended'' and ``single peak'' analysis, spectral features whose FWHM is narrower than 3 pixels are ignored.
+       
+        
 
     """

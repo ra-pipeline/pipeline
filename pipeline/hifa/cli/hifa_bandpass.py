@@ -18,12 +18,19 @@ def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, an
     Notes:
         **Temporal Phase-Up Workflow**
 
-        As of PL2025, the `solint` and `combine` options are computed to achieve the
-        target `phaseupsnr`. If `solint` is not `'int'`, the `combine` parameter is
-        set to `'scan,spw'` to combine data from all spectral windows, thereby
+        As of PL2025, internal `solint` and `combine` options are computed to achieve the
+        target ``phaseupsnr``. The `solint` is calculated based on the SNR for each spw.
+        If `solint` per spw is not `'int'`, the `combine` parameter is
+        set to `'spw'` as to combine data from all spectral windows, thereby
         improving SNR. In this case, a temporary `gaincal` solution is made to
         obtain per-spw phase-offsets to align the phases of all spws. The
-        `solint` is then calculated based on the SNR for the aggregate bandwidth.
+        `solint` is then recalculated based on the SNR for the aggregate bandwidth.
+        If `solint` is still not `'int'` but is less than ``phaseupmaxsolint``, an
+        integer multiple of the integration time is used, rounded-up from the computed `solint`.
+        For `solint` exceeding ``phaseupmaxsolint`` the value is capped at the nearest
+        rounded-up integer factor multiple of the integration time. In these cases the ``phaseupsnr`` is
+        not met. The final `solint`  can marginally exceed ``phaseupmaxsolint`` if the whole
+        number of integrations just passes the limit, e.g. 10 x 6.048s = 60.48s.
 
         The logical workflow is illustrated below:
 

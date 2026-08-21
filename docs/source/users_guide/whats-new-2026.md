@@ -292,19 +292,19 @@ IQUV image now inherits the repBW Stokes I mask/threshold.
 virtual-spw list in {func}`~pipeline.hifa.cli.hifa_imageprecheck` that was biasing the aggregate
 bandwidth sensitivity estimate low.
 
-{func}`~pipeline.hif.cli.hif_checkproductsize` spw
-logic was fixed after a single-spw field drop, then extended with
-spectral-window filtering in the max-cube-size/max-product-size mitigation
-steps, so oversized data can still be partially imaged instead of failing
-mitigation outright.
-```{figure} whatsnew/PL2026_size_mitigation_flowchart_NEW-1.png
+**Spectral Window filtering image cube mitigation.**
+{jira}`PIPE-3127` extends the *{func}`~pipeline.hif.cli.hif_checkproductsize`
+mitigation logic with a spectral-window filtering assessment triggered
+as part of the max-cube-size/limit and max-product-size steps, such that oversized data can still be partially imaged, including
+only some spws, instead of failing mitigation outright due to the largest cube.
+{jira}`PIPE-2812` A fix was also implemented due to dropping single-spw fields.
+```{figure} whatsnew/PL2026_size_mitigation_flowchart_final.png
 ---
 width: 1062px
 align: center
 ---
 ```
-*Tickets: {jira}`PIPE-2812`,
-{jira}`PIPE-3127`.*
+
 {jira}`PIPE-2909` lets cube imaging
 continue with a truncated channel grid instead of failing when a
 user-specified frequency grid extends beyond the spw coverage.

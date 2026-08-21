@@ -3,7 +3,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hif.tasks.checkproductsize.checkproductsize.CheckProductSizeInputs.__init__
 @utils.cli_wrapper
-def hif_checkproductsize(vis=None, output_dir=None, maxcubesize=None, maxcubelimit=None, maxproductsize=None, maximsize=None,
+def hif_checkproductsize(vis=None, maxcubesize=None, maxcubelimit=None, maxproductsize=None, maximsize=None,
                          calcsb=None, parallel=None):
     """Mitigate imaging cube product sizes to fit within specified thresholds.
 
@@ -49,11 +49,11 @@ def hif_checkproductsize(vis=None, output_dir=None, maxcubesize=None, maxcubelim
         d. If still too large, issue a warning that spectral window filtering will occur (later) if ``max(cubesize) > maxcubelimit``,
            cascade continues to step 2.
 
-    - **Step 2** (If ``productsize > maxproductsize``):
+    - **Step 2** (If ``total_productsize > maxproductsize``):
 
         a. If the number of science targets (single fields or mosaics) is greater than 1, reduce the number of targets 
-           to be imaged until ``productsize < maxproductsize``. The representative target is always retained.
-        b. If still too large, repeat steps 1a, 1b, and 1c, recalculating ``productsize`` each time.
+           to be imaged until ``total_productsize < maxproductsize``. The representative target is always retained.
+        b. If still too large, repeat steps 1a, 1b, and 1c, recalculating ``total_productsize`` each time.
         c. If still too large, issue a warning that spectral window filtering will occur (later) to reduce ``total_productsize``,
            cascade continues to step 3.
 
@@ -62,19 +62,21 @@ def hif_checkproductsize(vis=None, output_dir=None, maxcubesize=None, maxcubelim
         a. If the cube of the representative spectral window exceeds ``maxcubelimit`` stop with an error.
            The maximum cube size cannot be mitigated.
         b. If there are cubes with sizes > 0.5 * ``maxcubelimit``, but below ``maxcubelimit``, then restrict
-           the number of these large cubes to be cleaned to 1. The cube encompassing the representative frequency
-           is always retained. If the representative spw cube is not a large cube, one other large cube is retained.
-           Cubes exceeding ``maxcubelimit`` are not imaged.
-        c. Starting with the cube from (b), if the cube encompassing the representative frequency is not 
-           already included to be imaged, add it to the spw list. Subsequently, add spws to be imaged starting
-           with the smallest ``cubesize``, summing until the ``maxproductsize`` is reached.
+           the number of these large cubes to be cleaned to 1. If the cube encompassing the representative frequency
+           is not a large cube, a different spw large cube is retained. If not already, 
+           the cube encompassing the representative frequency is retained.
+           Cubes exceeding ``maxcubelimit`` are excluded and therefore not imaged.
+        c. If ``total_productsze`` exceeds ``maxproductsize`` after the initial spw filtering, stop with an error.
+           The total product size cannot be mitigated.
+        d. Continuing with the cube(s) from (b), iteratively add spws to be imaged starting
+           with the smallest ``cubesize``, summing the ``total_productsize`` until the ``maxproductsize`` is reached.
 
     - **Step 4** (Limit many science targets):
 
         a. For projects with more than 30 science targets to be imaged and over 960 channels summed over all spws,
            issue a warning that imaging will take a substantial time.
 
-    .. figure:: /figures/PL2026_size_mitigation_final.png
+    .. figure:: /figures/PL2026_size_mitigation_flowchart_final.png
        :alt: Check product size mitigation cascade
 
        Workflow diagram indicating the image mitigation cascade. Colors are used to highlight certain workflow
