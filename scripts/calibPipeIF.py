@@ -1,5 +1,10 @@
-#!/usr/bin/env python3
+#!/home/casa/packages/RHEL8/release/current/bin/python3
 # -*- coding: utf-8 -*-
+
+# sadly, I can't find a remotely modern version of python on the cluster,
+# so I have to use my own.
+# #!/usr/bin/env python3
+
 
 def usage():
     print("\nUsage: calibPipeIF.py [options]")

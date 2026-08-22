@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/casa/packages/RHEL8/release/current/bin/python3
 """Submit a batch of calibPipeIF.py runs to slurm, one per line of a pipefile.
 
 Each non-comment line of the pipefile is "<mous_uid> [recipe]" (recipe
@@ -71,8 +71,8 @@ def job_name(pipejob):
     mous = ""
     for tok in pipejob.split():
         if "mous" in tok:
-            mous = tok.split("=", 1)[-1]
-            mous = mous.replace("uid___A00", "").strip("/").replace("/", "_")
+            mous = tok.split("=", 1)[-1][11:]
+            mous=mous.strip("/").replace("/", "_")
             break
     date = time.strftime("%Y-%m-%d")
     return f"{mous}_{date}"
@@ -150,7 +150,8 @@ def main():
             print("    " + " ".join(cmd))
             subprocess.run(cmd, check=True)
         finally:
-            os.unlink(sbatch_path)
+            continue
+            #os.unlink(sbatch_path)
 
         print("Waiting 5 seconds to minimize directory naming collision risk")
         time.sleep(5)
