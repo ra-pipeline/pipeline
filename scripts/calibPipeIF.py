@@ -312,8 +312,6 @@ def main():
     else:
         procedure_short="hifa_"+recipe
 
-    # pipeversion=getoutput("cd $SCIPIPE_HEURISTICS; svnversion")
-    pipeversion='need to implement git command'
     heuristics=os.environ["SCIPIPE_HEURISTICS"].rstrip("/")
     branch=heuristics.split("/")[-1]
     casaroot=os.environ["CASA_ROOT"].rstrip("/")
@@ -410,7 +408,7 @@ def main():
 # info
     print("Requested: ")
     print("MOUS "+mous_uid)
-    print("PL   "+branch+" version "+pipeversion)
+    print("PL   "+branch)
     print("CASA "+casaroot)
     if flag_and_go:
         if len(oldpprfile)>0:
@@ -1037,7 +1035,7 @@ print("end of SACM-fixes script")
     mylog.close()
     print("Ran: ")
     print("MOUS "+mous_uid)
-    print("PL   "+branch+" version "+pipeversion)
+    print("PL   "+branch)
     print("CASA "+casaroot)
     print("output in " + ppmr_dir)
 
