@@ -112,3 +112,13 @@ otherwise be nondeterministic (the temp sbatch script's random path,
 `calibPipeIF.py`'s absolute location) are normalized to `<SBATCH_SCRIPT>`/
 `<CALIBPIPEIF>`/`<CONFIG>` placeholders before comparison, so the reference
 file works regardless of where this checkout lives.
+
+`tests/test_calibPipeIF.py` never calls the real `pipelineMakeRequest` or
+`casa`; it fakes both out and records the ordered sequence of
+pipelineMakeRequest/copy/casa calls calibPipeIF.py makes against a fake
+pipeline-output directory tree built under a temp dir, checking it against
+`tests/reference/calibpipeif_calls.txt` — again the actual spec, review/diff
+it directly. The `shutil.copy`/`shutil.copytree` calls that copy old
+`--flag` products into the new run's working dir are still allowed to run
+for real — they're harmless against the throwaway fixture tree — but are
+also recorded into the same sequence.

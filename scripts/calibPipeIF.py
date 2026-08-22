@@ -1040,4 +1040,5 @@ print("end of SACM-fixes script")
     print("output in " + ppmr_dir)
 
 
-main()
+if __name__ == "__main__":
+    main()
