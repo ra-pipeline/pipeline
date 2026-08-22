@@ -150,8 +150,7 @@ def main():
             print("    " + " ".join(cmd))
             subprocess.run(cmd, check=True)
         finally:
-            continue
-            #os.unlink(sbatch_path)
+            os.unlink(sbatch_path)
 
         print("Waiting 5 seconds to minimize directory naming collision risk")
         time.sleep(5)

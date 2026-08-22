@@ -95,3 +95,20 @@ Not ported: the interactive-shell `PS1` prompt decoration from
 `env_core2.sh` (irrelevant to a batch driver), and `new_pmr.sh` (unseen
 during this rewrite — if you relied on it, extend
 `envconfig.build_environment`).
+
+## Testing
+
+```
+python3 -m unittest discover -s tests -v
+```
+
+`tests/test_runbatch.py` never calls the real `sbatch`/`hostname`; it patches
+`subprocess.run` to capture what *would* have been submitted and checks it
+against `tests/reference/sbatch_commands.txt` — that file is the actual spec
+these tests check against (the exact sbatch command line and the sbatch
+script content, one block per scenario), so review/diff it directly rather
+than the test code when checking correctness. Two things that would
+otherwise be nondeterministic (the temp sbatch script's random path,
+`calibPipeIF.py`'s absolute location) are normalized to `<SBATCH_SCRIPT>`/
+`<CALIBPIPEIF>`/`<CONFIG>` placeholders before comparison, so the reference
+file works regardless of where this checkout lives.
