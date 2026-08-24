@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import os
+import shutil
 import numpy as np
 from typing import TYPE_CHECKING, Any
 
@@ -316,7 +317,7 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
         caltable_status = None
 
         if not os.path.exists(vis):
-            LOG.error( "Could not find MS '{}'".format(vis) )
+            LOG.error(f"Could not find MS '{vis}'")
             return SDK2JyCalResults(os.path.basename(vis))
         vis = os.path.basename(vis)
 
@@ -326,11 +327,21 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
                                          inputs=inputs.to_casa_args())
         common_params = inputs.to_casa_args()
 
+        # overwrite caltable if it exists
+        caltable = common_params['caltable']
+        if os.path.exists(caltable):
+            LOG.info(f"Overwriting existing caltable {caltable}")
+            if os.path.isdir(caltable):
+                shutil.rmtree(caltable)
+            else:
+                os.remove(caltable)
+
         # create caltable and extract data for pipeline
         caltable_status = self._create_caltable(common_params)
         if caltable_status is False:
             LOG.error("No Jy/K scaling factors available")
             return SDK2JyCalResults(os.path.basename(vis))
+
         factors_used = self._extract_factors( inputs.context, vis, common_params['caltable'], caltable_status )
         if factors_used is None:
             LOG.error("MS and caltable are inconsistent")
