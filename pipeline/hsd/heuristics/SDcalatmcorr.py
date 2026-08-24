@@ -691,76 +691,34 @@ def getAntennaFlagFrac(ms, fieldid, spwid, spwsetup):
     antflag_frac = [antflag[spwsetup['antnames'][antid]]['flagged']/antflag[spwsetup['antnames'][antid]]['total'] for antid in spwsetup['antids']]
     return antflag_frac
 
-def getCalAtmData(ms: str, spws: list, spwsetup: dict):
-    '''Funtion to extract Tsys, Trec, Tatm and tau data from the ASDM's CALATMOSPHERE table.
-    param:
+
+def getTau(ms: str, spws: list, spwsetup: dict) -> dict:
+    """Extract tau data from ASDM's CalAtmosphere table.
+
+    Args:
         ms: MS filename
         spws: List of SPWs to load
         spwsetup: Dictionary of metadata obtained from getSpecSetup()
-    '''
 
-    tb = casa_tools.table
-    #Open CALATMOSPHERE table
-    tb.open(os.path.join(ms, 'ASDM_CALATMOSPHERE'))
-    #Get weather parameters
-    LOG.debug("Start reading weather parameters from ASDM_CALATMOSPHERE table")
-    tground_all = tb.getcol('groundTemperature')
-    pground_all = tb.getcol('groundPressure')
-    hground_all = tb.getcol('groundRelHumidity')
-    LOG.debug("Done reading weather parameters from ASDM_CALATMOSPHERE table")
-    #Get the spectra of the ATM measurements
-    tmatm_all = {}
-    tsys = {}
-    trec = {}
+    Returns:
+        Frequency-dependent tau data for SPWs specified by spws
+    """
     tau = {}
-    antatm = {}
-    for spwid in spws:
-        minfreq = np.min(spwsetup[spwid]['chanfreqs'])
-        maxfreq = np.max(spwsetup[spwid]['chanfreqs'])
-        midfreq = 0.5*(minfreq+maxfreq)
-        samebbspw = [s for s in spwsetup['spwlist'] if spwsetup[s]['BBname'] == spwsetup[spwid]['BBname']]
-        subtb = tb.query('basebandName=="{0:s}" && syscalType=="TEMPERATURE_SCALE"'.format(str(spwsetup[spwid]['BBname'])))
-        tmatm_all[spwid] = tb.getcol('startValidTime')
-        #Get frequency vector and find section belonging to this SPW
-        fullfreq = subtb.getcell('frequencySpectrum', 0)
-        sectionmid = []
-        freqsection = []
-        chansec = []
-        chanidx = 0
-        for s in samebbspw:
-            chansec.append([chanidx,chanidx+spwsetup[s]['nchan']])
-            section = fullfreq[chanidx:chanidx+spwsetup[s]['nchan']]
-            chanidx += spwsetup[s]['nchan']
-            sectionmid.append(np.mean(section))
-            freqsection.append(section)
-        thissection = np.argsort(np.abs(np.array(sectionmid) - midfreq))[0]
-        freq = freqsection[thissection]
-        order = np.argsort(freq)
-        startchan = chansec[thissection][0]
-        endchan = chansec[thissection][1]
-        #Load Tsys and Trx tables
-        auxtsys = [subtb.getcell('tSysSpectrum', i) for i in range(subtb.nrows())]
-        auxtrec = [subtb.getcell('tRecSpectrum', i) for i in range(subtb.nrows())]
-        npols = auxtsys[0].shape[0]
-        nrowstsys = len(auxtsys)
-        tsys[spwid] = np.zeros((npols, spwsetup[spwid]['nchan'], nrowstsys))
-        trec[spwid] = np.zeros((npols, spwsetup[spwid]['nchan'], nrowstsys))
-        #Resample the curves to match the frequency of the data SPWs
-        for pol in range(npols):
-            for row in range(nrowstsys):
-                tsysfit = CubicSpline(freq[order], auxtsys[row][pol][startchan:endchan][order], bc_type='not-a-knot')
-                trecfit = CubicSpline(freq[order], auxtrec[row][pol][startchan:endchan][order], bc_type='not-a-knot')
-                tsys[spwid][pol,:,row] = tsysfit(spwsetup[spwid]['chanfreqs'])
-                trec[spwid][pol,:,row] = trecfit(spwsetup[spwid]['chanfreqs'])
-        antatm[spwid] = subtb.getcol('antennaName')
-        #To get the skyline list, pick index of first antenna, first entry of tau, for the first polarization
-        #Resample according to the same procedure used for Tsys and Trx
-        auxtau = subtb.getcell('tauSpectrum', 0)[0]
-        taufit = CubicSpline(freq[order], auxtau[startchan:endchan][order], bc_type='not-a-knot')
-        tau[spwid] = taufit(spwsetup[spwid]['chanfreqs'])
-    tb.close()
+    with casa_tools.TableReader(os.path.join(ms, 'ASDM_CALATMOSPHERE')) as tb:
+        for spwid in spws:
+            bb_name = spwsetup[spwid]["BBname"]
+            try:
+                subtb = tb.query(f'basebandName=="{bb_name}" && syscalType=="TEMPERATURE_SCALE"')
+                fullfreq = subtb.getcell('frequencySpectrum', 0)
+                # To get the skyline list, pick index of first antenna,
+                # first entry of tau, for the first polarization
+                auxtau = subtb.getcell('tauSpectrum', 0)[0]
+            finally:
+                subtb.close()
+            taufit = CubicSpline(fullfreq, auxtau, bc_type='not-a-knot')
+            tau[spwid] = taufit(spwsetup[spwid]['chanfreqs'])
 
-    return (tground_all, pground_all, hground_all, tmatm_all, tsys, trec, tau, antatm)
+    return tau
 
 def makeNANmetrics(fieldid, spwid, nmodels):
     ''' Returns a dummy metric resuls table used when the metrics cannot be really calculated, in order
@@ -1195,8 +1153,7 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
     tb.close()
 
     #Open CALATMOSPHERE table
-    (tground_all, pground_all, hground_all, tmatm_all, tsys, trec, tau, antatm) = getCalAtmData(ms, spws, spwsetup)
-    tmatm = np.unique(tmatm_all[spws[0]])
+    tau = getTau(ms, spws, spwsetup)
 
     #Search for sky lines
     skylines = {}
@@ -1272,15 +1229,6 @@ def atmcorr(ms, datacolumn = 'CORRECTED_DATA', iant = 'auto', atmtype = 1,
         bestmodels = defmodel
         fitstatus = 'defaultmodel'
         return (bestmodels, models, metrics, fitstatus, spwstoprocess, metricskylineids)
-
-    pwv, tground, pground, hground = [], [], [], []
-    for tt in tmatm:
-        deltat = abs(tmpwv_all-tt)
-        pwv.append(np.median(pwv_all[deltat==deltat.min()]))
-        tground.append(np.median(tground_all[tmatm_all==tt]))
-        pground.append(np.median(pground_all[tmatm_all==tt]))
-        hground.append(np.median(hground_all[tmatm_all==tt]))
-        LOG.info('PWV = %fm, T = %fK, P = %fPa, H = %f%% at %s' % (pwv[-1], tground[-1], pground[-1], hground[-1], qa.time('%fs' % tt, form='fits')[0]))
 
     ################################################################
     ### Looping over spws

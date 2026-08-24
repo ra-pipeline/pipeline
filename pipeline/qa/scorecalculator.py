@@ -3210,7 +3210,7 @@ def score_sd_line_detection(
 
                 spwsetup = sdatm.getSpecSetup(rgm.ms.basename)
                 spws = list(map(int, spwsetup['spwlist']))
-                tau = sdatm.getCalAtmData(rgm.ms.basename, spws, spwsetup)[-2]
+                tau = sdatm.getTau(rgm.ms.basename, spws, spwsetup)
                 skylines = {spw: sdatm.getskylines(tau[spw], spw, spwsetup, fraclevel=0.3, minpeaklevel=0.05) for spw in spws}
                 atm_masks[ms] = {spw: sdatm.skysel(skylines[spw], linestouse='all') for spw in spws}
 
