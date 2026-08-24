@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING
 import numpy as np
 from astropy.stats import sigma_clip
 from matplotlib import figure
-from matplotlib.transforms import Bbox
 from scipy.ndimage import convolve, label
 from scipy.stats import median_abs_deviation
 
@@ -26,7 +25,6 @@ if TYPE_CHECKING:
     from numpy import floating
     from numpy.typing import NDArray
 
-    from pipeline.domain import MeasurementSet
     from pipeline.hsd.tasks.common import sdtyping
     from pipeline.infrastructure import Context
     from pipeline.infrastructure.imagelibrary import ImageItem
@@ -44,13 +42,13 @@ SIGMA_CLIPPING_MAX_ITERATIONS = 3
 
 class DetectMissedLines:
     """Class to find lines missed during line identification"""
-    def __init__( self,
-                  context: Context,
-                  item: ImageItem,
-                  spw_nchan: int,
-                  frequency_channel_reversed: bool = False,
-                  edge: list[int] = [0, 0],
-                  do_plot: bool = True ):
+    def __init__(self,
+                 context: Context,
+                 item: ImageItem,
+                 spw_nchan: int,
+                 frequency_channel_reversed: bool = False,
+                 edge: list[int] = [0, 0],
+                 do_plot: bool = True):
         """
         Construct DetectMissedLines instance
 
@@ -78,22 +76,22 @@ class DetectMissedLines:
         self.field_name = self.item.sourcename
 
         # read image
-        self.image = sd_display.SpectralImage( self.item.imagename )
-        self.imagedata = copy.deepcopy( self.image.data )     # copying to increase performance
-        self.imagemask = copy.deepcopy( self.image.mask )
+        self.image = sd_display.SpectralImage(self.item.imagename)
+        self.imagedata = copy.deepcopy(self.image.data)     # copying to increase performance
+        self.imagemask = copy.deepcopy(self.image.mask)
 
         # read weight (assume weight=1.0 if associated weight file is not found)
         weightname = self.item.imagename + ".weight"
-        if os.path.exists( weightname ):
-            self.weightdata = copy.deepcopy( sd_display.SpectralImage( weightname ).data )
+        if os.path.exists(weightname):
+            self.weightdata = copy.deepcopy(sd_display.SpectralImage(weightname).data)
             # check array shapes of image and weight
             if self.imagedata.shape != self.weightdata.shape:
                 raise ValueError(
-                    "Demensions of image ({}) and weight ({}) do not match".format(self.item.imagename, weightname )
+                    "Demensions of image ({}) and weight ({}) do not match".format(self.item.imagename, weightname)
                 )
         else:
-            LOG.warning( "Weight file {} not found. Assuming weight=1.0 for all pixels.".format( weightname ) )
-            self.weightdata = np.ones( np.shape( self.imagedata ) )
+            LOG.warning("Weight file {} not found. Assuming weight=1.0 for all pixels.".format(weightname))
+            self.weightdata = np.ones(np.shape(self.imagedata))
 
         # number of spectral channels
         self.nchan = spw_nchan
@@ -107,11 +105,11 @@ class DetectMissedLines:
 
         # frequency and channel conversion
         (refpix, refval, increment) = self.image.spectral_axis(unit='GHz')
-        self.frequency = np.array([refval + increment * (ch - refpix) for ch in range(self.nchan - sum(self.edge))] )  # in GHz
+        self.frequency = np.array([refval + increment * (ch - refpix) for ch in range(self.nchan - sum(self.edge))])  # in GHz
         self.frequency_frame = self.image.frequency_frame
 
         # pixel scale and beam size
-        self.pixel_scale = np.abs( self.image.direction_axis( 1, unit='deg' )[2]  )  # 1: Declination
+        self.pixel_scale = np.abs(self.image.direction_axis( 1, unit='deg' )[2] )  # 1: Declination
         self.beam_size = self.image.beam_size  # in degrees
 
     def analyze(
@@ -147,15 +145,15 @@ class DetectMissedLines:
             # Also note that 'edge' parameters are in the order BEFORE flipping for sidebands.
             # (NOT in frequency order)
             if self.frequency_channel_reversed:  # LSB
-                ( line_center, line_width ) = ( self.nchan - line[0] - 1.0, line[1] )
+                (line_center, line_width) = (self.nchan - line[0] - 1.0, line[1])
                 line_center -= self.edge[1]
             else:  # USB
-                ( line_center, line_width ) = ( line[0], line[1] )
+                (line_center, line_width) = (line[0], line[1])
                 line_center -= self.edge[0]
             line_ranges.append(
-                [ max(0, math.floor(line_center - line_width / 2.0)),
-                  min(self.nchan-sum(self.edge)-1,
-                      math.ceil(line_center + line_width / 2.0)) ] )
+                [max(0, math.floor(line_center - line_width / 2.0)),
+                 min(self.nchan-sum(self.edge)-1,
+                     math.ceil(line_center + line_width / 2.0))])
 
         detections = self._detect_over_deviation_threshold(
             line_ranges,
@@ -165,17 +163,17 @@ class DetectMissedLines:
         )
 
         if detections['single_beam']:
-            LOG.info( "Field {} spw {}: Significant off-line-range emission detected at peak.".format( self.field_name, self.spwid_list[0] ))
+            LOG.info("Field {} spw {}: Significant off-line-range emission detected at peak.".format( self.field_name, self.spwid_list[0]))
         else:
-            LOG.info( "Field {} spw {}: No significant off-line-range emission detected at peak.".format( self.field_name, self.spwid_list[0] ))
+            LOG.info("Field {} spw {}: No significant off-line-range emission detected at peak.".format( self.field_name, self.spwid_list[0]))
 
         if detections['moment_mask']:
-            LOG.info( "Field {} spw {}: Significant off-line-range extended emission detected.".format( self.field_name, self.spwid_list[0] ))
+            LOG.info("Field {} spw {}: Significant off-line-range extended emission detected.".format( self.field_name, self.spwid_list[0]))
         else:
-            LOG.info( "Field {} spw {}: No significant off-line-range extended emission detected.".format( self.field_name, self.spwid_list[0] ))
+            LOG.info("Field {} spw {}: No significant off-line-range extended emission detected.".format( self.field_name, self.spwid_list[0]))
         return detections
 
-    def _sigma_estimation( self, data: NDArray[floating], sigma: float, maxiters: int ) -> float:
+    def _sigma_estimation(self, data: NDArray[floating], sigma: float, maxiters: int) -> float:
         """
         Estimate the standard deviation of a sigma clipped 'data'
 
@@ -186,15 +184,15 @@ class DetectMissedLines:
         Returns:
             estimated sigma value
         """
-        clipped_data = sigma_clip( data, sigma=sigma, maxiters=maxiters,
-                                   cenfunc='median', stdfunc='mad_std',
-                                   axis=None, masked=False, return_bounds=False )
-        sigma = median_abs_deviation( clipped_data, nan_policy='omit', scale='normal' )
+        clipped_data = sigma_clip(data, sigma=sigma, maxiters=maxiters,
+                                  cenfunc='median', stdfunc='mad_std',
+                                  axis=None, masked=False, return_bounds=False)
+        sigma = median_abs_deviation(clipped_data, nan_policy='omit', scale='normal')
 
         return sigma
 
-    def _mask_spec( self, weighted_cube: sdtyping.NpArray3D,
-                    mask_limit: float = MASK_LIMIT ) -> tuple[sdtyping.NpArray1D, float]:
+    def _mask_spec(self, weighted_cube: sdtyping.NpArray3D,
+                   mask_limit: float = MASK_LIMIT) -> tuple[sdtyping.NpArray1D, float]:
         """
         Calculate the metric with moment_mask method
 
@@ -205,28 +203,28 @@ class DetectMissedLines:
             Projected 1-D spectrum
             Standard deviation of the spectrum
         """
-        sigma = self._sigma_estimation( weighted_cube,
-                                        SIGMA_CLIPPING_THRESHOLD, SIGMA_CLIPPING_MAX_ITERATIONS )
+        sigma = self._sigma_estimation(weighted_cube,
+                                       SIGMA_CLIPPING_THRESHOLD, SIGMA_CLIPPING_MAX_ITERATIONS)
         mask_cube = weighted_cube > mask_limit * sigma
 
         beamsize_pix = self.beam_size / self.pixel_scale
-        ksize = 2 * int( 2.5 * beamsize_pix ) + 1
+        ksize = 2 * int(2.5 * beamsize_pix) + 1
 
-        x, y = np.indices( ( ksize, ksize ) )
-        x0 = y0 = ( ksize - 1 ) / 2.0
-        r2 = ( y - y0 ) * ( y - y0 ) + ( x - x0 ) * ( x - x0 )
+        x, y = np.indices((ksize, ksize))
+        x0 = y0 = (ksize - 1) / 2.0
+        r2 = (y - y0) * (y - y0) + (x - x0) * (x - x0)
         s2 = beamsize_pix * beamsize_pix / (8.0 * math.log(2.0))     # FWHM -> sigma conversion
-        kbeam = np.exp( -r2 / ( 2 * s2 ) )
+        kbeam = np.exp(-r2 / (2 * s2))
 
         cmask = convolve(input=mask_cube, weights=kbeam[np.newaxis, :], mode='constant')
-        image_mask = np.sum( np.array( cmask > .5, dtype=int ), axis=0 )
-        masked_spectrum = np.nanmean( weighted_cube * ( image_mask[np.newaxis, :] > 0 ), axis=(1, 2) )
-        sigma_mm = self._sigma_estimation( masked_spectrum,
-                                           SIGMA_CLIPPING_THRESHOLD, SIGMA_CLIPPING_MAX_ITERATIONS )
+        image_mask = np.sum(np.array(cmask > .5, dtype=int), axis=0)
+        masked_spectrum = np.nanmean(weighted_cube * (image_mask[np.newaxis, :] > 0), axis=(1, 2))
+        sigma_mm = self._sigma_estimation(masked_spectrum,
+                                          SIGMA_CLIPPING_THRESHOLD, SIGMA_CLIPPING_MAX_ITERATIONS)
 
         return masked_spectrum, sigma_mm
 
-    def _beam_weight( self, center: tuple[float, float] ) -> sdtyping.NpArray2D:
+    def _beam_weight(self, center: tuple[float, float]) -> sdtyping.NpArray2D:
         """
         Calculate a 2D-gaussian beam for beam weighting
 
@@ -235,14 +233,14 @@ class DetectMissedLines:
         Returns:
             2D gaussian beam with a beam size
         """
-        x, y = np.indices( (self.image.ny, self.image.nx) )
+        x, y = np.indices((self.image.ny, self.image.nx))
         beamsize_pix = self.beam_size / self.pixel_scale
-        r2 = ( y - center[1] ) * ( y - center[1] ) + ( x - center[0] ) * ( x - center[0] )
+        r2 = (y - center[1]) * (y - center[1]) + (x - center[0]) * (x - center[0])
         s2 = beamsize_pix * beamsize_pix / (8.0 * math.log(2.0))     # FWHM -> sigma conversion
 
-        return np.exp( -r2 / ( 2 * s2 ) )
+        return np.exp(-r2 / (2 * s2))
 
-    def _extract_beam_spec( self, weighted_cube: sdtyping.NpArray3D, center: tuple[float, float] ) -> sdtyping.NpArray1D:
+    def _extract_beam_spec(self, weighted_cube: sdtyping.NpArray3D, center: tuple[float, float]) -> sdtyping.NpArray1D:
         """
         Project the beam weighted image cube to a 1-D spectrum
 
@@ -251,14 +249,14 @@ class DetectMissedLines:
         Returns:
             projected 1-D spectrum
         """
-        beam_weight = self._beam_weight( center )
+        beam_weight = self._beam_weight(center)
         product = beam_weight[np.newaxis, :, :] * weighted_cube
 
-        return np.nanmean( product, axis=(1, 2) ) / np.nanmean( beam_weight )
+        return np.nanmean(product, axis=(1, 2)) / np.nanmean(beam_weight)
 
-    def _max_spec( self,
-                   weighted_cube: sdtyping.NpArray3D,
-                   center: tuple[float, float] | None = None ) -> tuple[sdtyping.NpArray1D, float]:
+    def _max_spec(self,
+                  weighted_cube: sdtyping.NpArray3D,
+                  center: tuple[float, float] | None = None) -> tuple[sdtyping.NpArray1D, float]:
         """
         Calculate the metric with single_beam detection
 
@@ -275,12 +273,12 @@ class DetectMissedLines:
         """
         if center is None:
             chmax, x0, y0 = np.unravel_index(np.nanargmax(weighted_cube), np.shape(weighted_cube))
-        sb = self._extract_beam_spec( weighted_cube, ( x0, y0 ) )
+        sb = self._extract_beam_spec(weighted_cube, (x0, y0))
         sigma_sb = median_abs_deviation(sb, nan_policy='omit', scale='normal')
 
         return sb, sigma_sb
 
-    def _detect_excess( self, z_linefree, dev_threshold: float, width_threshold: float ) -> bool:
+    def _detect_excess(self, z_linefree, dev_threshold: float, width_threshold: float) -> bool:
         """
         detect excesses: find channels which exceed deviation_threshold
 
@@ -291,12 +289,12 @@ class DetectMissedLines:
         Returns:
             True if excess is detected, False if not
         """
-        if np.nanmax( z_linefree ) > dev_threshold:
+        if np.nanmax(z_linefree) > dev_threshold:
             labeling_half_maximum, n_labels = label(z_linefree > dev_threshold / 2)
 
             # search for wide 'chunks', which are wider than width_threshold
-            for idx in range( 1, n_labels ):
-                if np.sum( labeling_half_maximum == idx ) > width_threshold:
+            for idx in range(1, n_labels):
+                if np.sum(labeling_half_maximum == idx) > width_threshold:
                     return True
         return False
 
@@ -329,7 +327,7 @@ class DetectMissedLines:
             True if wide enough missed lines are detected, False if not.
         """
         # width_threshold is 2 or more
-        width_threshold = max( width_threshold, 2 )
+        width_threshold = max(width_threshold, 2)
 
         # calculate the weighted cube
         cube = self.imagedata[:, :, 0, :].transpose(2, 1, 0)
@@ -338,31 +336,31 @@ class DetectMissedLines:
         weighted_cube = np.where(mask, np.nan, cube * weight)
 
         if self.do_plot:
-            fig = figure.Figure( figsize=(16, 5) )
-            ax = { 'single_beam': fig.add_axes( (0.05, 0.1, 0.43, 0.85) ),
-                   'moment_mask': fig.add_axes( (0.55, 0.1, 0.43, 0.85) ) }
+            fig = figure.Figure(figsize=(16, 5))
+            ax = {'single_beam': fig.add_axes((0.05, 0.1, 0.43, 0.85)),
+                  'moment_mask': fig.add_axes((0.55, 0.1, 0.43, 0.85))}
 
-        detections = { 'single_beam': False, 'moment_mask': False }
+        detections = {'single_beam': False, 'moment_mask': False}
 
         mask_modes = {
             'single_beam': (self._max_spec, DEVIATION_THRESHOLD_SINGLE_BEAM),
             'moment_mask': (self._mask_spec, DEVIATION_THRESHOLD_MOMENT_MASK)
         }
         for mask_mode, (spec_func, dev_threshold) in mask_modes.items():
-            f2, sigma = spec_func( weighted_cube )
+            f2, sigma = spec_func(weighted_cube)
 
             # deviation/sigma (Z-scores)
             z_all = f2 / sigma
 
             # deviation/sigma of line-free ranges
-            z_linefree = np.full( z_all.shape[0], np.nan )
+            z_linefree = np.full(z_all.shape[0], np.nan)
             for linefree in linefree_ranges:
-                z_linefree[ linefree[0]:linefree[1]+1 ] = z_all[ linefree[0]:linefree[1]+1 ]
+                z_linefree[linefree[0]:linefree[1]+1] = z_all[linefree[0]:linefree[1]+1]
 
             # deviation/sigma of line ranges
-            z_line = np.full( z_all.shape[0], np.nan )
+            z_line = np.full(z_all.shape[0], np.nan)
             for line in line_ranges:
-                z_line[ line[0]:line[1]+1 ] = z_all[ line[0]:line[1]+1 ]
+                z_line[line[0]:line[1]+1 ] = z_all[ line[0]:line[1]+1]
 
             # invalidate edge channels
             if extra_edge_channels[0] > 0:
@@ -375,20 +373,21 @@ class DetectMissedLines:
                 z_linefree[atm_channels] = np.nan
 
             # deviation/sigma of other ranges
-            z_other = np.where( np.isnan( z_line ) & np.isnan( z_linefree ), z_all, np.nan )
+            z_other = np.where( np.isnan(z_line) & np.isnan(z_linefree), z_all, np.nan)
 
             # find channels which exceed deviation_threshold
-            detections[mask_mode] = self._detect_excess( z_linefree, dev_threshold, width_threshold )
+            detections[mask_mode] = self._detect_excess(z_linefree, dev_threshold, width_threshold)
             if self.do_plot and detections[mask_mode]:
-                self._plot( ax[mask_mode],
-                            line_ranges, z_linefree, z_other,
-                            dev_threshold, mask_mode )
+                self._plot(detections[mask_mode],
+                           ax[mask_mode],
+                           line_ranges, z_linefree, z_other,
+                           dev_threshold, mask_mode)
         if self.do_plot:
-            self._finalize_plot( fig, detections )
+            self._finalize_plot(fig, detections)
 
         return detections
 
-    def _finalize_plot( self, fig: figure.Figure, detections: list[bool] ):
+    def _finalize_plot(self, fig: figure.Figure, detections: list[bool]):
         """
         trim-off unused space in the figure and save to png file
 
@@ -397,43 +396,35 @@ class DetectMissedLines:
             detections: missed line detection results for each methods
         """
         # return if no detetions
-        if not any( detections.values() ):
+        if not any(detections.values()):
             return
 
         # create the stage_dir if needed but does not yet exist
         stage_dir = os.path.join(self.context.report_dir,
                                  f'stage{self.context.task_counter}')
-        os.makedirs( stage_dir, exist_ok=True )
+        os.makedirs(stage_dir, exist_ok=True)
 
         # filename
-        plot_outfile = os.path.join( stage_dir, "{}.missedlines.png".format( self.item.imagename ))
-
-        # trim figure depending on detections
-        size = fig.get_size_inches()
-        if all(detections.values()):
-            bbox = Bbox( [[0, 0], [size[0], size[1]]] )
-            fig.savefig( plot_outfile )
-        elif detections['single_beam']:
-            bbox = Bbox( [[0, 0], [size[0] / 2, size[1]]] )
-        else:
-            bbox = Bbox( [[size[0] / 2, 0], [size[0], size[1]]] )
+        plot_outfile = os.path.join(stage_dir, "{}.missedlines.png".format( self.item.imagename))
 
         # save figure to file
-        LOG.info( "Saving diagnostic plot for off-line-range emissions to {}".format(plot_outfile) )
-        fig.savefig( plot_outfile, bbox_inches=bbox )
+        LOG.info("Saving diagnostic plot for off-line-range emissions to {}".format(plot_outfile))
+        fig.savefig(plot_outfile)
 
-    def _plot( self,
-               ax: axes.Axes,
-               line_ranges: list[list[int]],
-               z_linefree: sdtyping.NpArray1D,
-               z_other: sdtyping.NpArray1D,
-               dev_threshold: float,
-               mask_mode: str ):
+    def _plot(self,
+              detection: bool,
+              ax: axes.Axes,
+              line_ranges: list[list[int]],
+              z_linefree: sdtyping.NpArray1D,
+              z_other: sdtyping.NpArray1D,
+              dev_threshold: float,
+              mask_mode: str):
         """
         Create the plot to diagnose the missed-lines
 
         Args:
-            stage_dir     : Stage directory of weblog
+            detection     : missed line detection result
+            ax            : axes to plot
             line_range    : List of spectral channels of line ranges
             z_linefree    : deviation/sigma of line-free ranges
             z_other       : deviation/sigma of other ranges
@@ -442,48 +433,52 @@ class DetectMissedLines:
         Raises:
             ValueError for unkown mask_mode
         """
-        # calculate the boundaries of the frequency bins (to prepare for axes.stairs())
-        increment = self.frequency[1] - self.frequency[0]
-        frequency_boundaries = [ freq - increment / 2.0 for freq in self.frequency ] \
-            + [ self.frequency[-1] + increment / 2.0 ]
+        if detection:
+            # calculate the boundaries of the frequency bins (to prepare for axes.stairs())
+            increment = self.frequency[1] - self.frequency[0]
+            frequency_boundaries = [freq - increment / 2.0 for freq in self.frequency] \
+                + [self.frequency[-1] + increment / 2.0]
 
-        # draw the full spectrum in gray
-        ax.stairs( z_linefree, frequency_boundaries,
-                   color='gray', label=None, baseline=None )
+            # draw the full spectrum in gray
+            ax.stairs(z_linefree, frequency_boundaries,
+                      color='gray', label=None, baseline=None)
 
-        # overdraw other parts in magenta (masked range)
-        if not np.all( np.isnan(z_other) ):
-            ax.stairs( z_other, frequency_boundaries,
-                       color='magenta', label='masked', baseline=None )
+            # overdraw other parts in magenta (masked range)
+            if not np.all(np.isnan(z_other)):
+                ax.stairs(z_other, frequency_boundaries,
+                          color='magenta', label='masked', baseline=None)
 
-        # paint the line ranges
-        for idx, line in enumerate( line_ranges ):
-            label = "line range" if idx == 0 else None
-            ax.axvspan( self.frequency[line[0]] - increment/2.0,
-                        self.frequency[line[1]] + increment/2.0,
-                        color='cyan', alpha=0.3, label=label )
+            # paint the line ranges
+            for idx, line in enumerate( line_ranges ):
+                label = "line range" if idx == 0 else None
+                ax.axvspan(self.frequency[line[0]] - increment/2.0,
+                           self.frequency[line[1]] + increment/2.0,
+                           color='cyan', alpha=0.3, label=label)
 
-        # mark the excesses
-        z_excess = np.where( z_linefree > dev_threshold, z_linefree, np.nan )
-        ax.scatter( self.frequency, z_excess, color='red', marker='.',
-                    label='excess' )
+            # mark the excesses
+            z_excess = np.where(z_linefree > dev_threshold, z_linefree, np.nan)
+            ax.scatter(self.frequency, z_excess, color='red', marker='.',
+                       label='excess' )
 
-        # draw the threshold line
-        ax.hlines( dev_threshold, np.min(self.frequency), np.max(self.frequency),
-                   linestyle='dotted', color='blue', label=None )
-        ax.text( self.frequency[0] + ( self.frequency[-1] - self.frequency[0] ) * 0.03,
-                 dev_threshold, "threshold", va='top', color='blue', fontstyle='italic' )
+            # draw the threshold line
+            ax.hlines(dev_threshold, np.min(self.frequency), np.max(self.frequency),
+                      linestyle='dotted', color='blue', label=None)
+            ax.text(self.frequency[0] + (self.frequency[-1] - self.frequency[0]) * 0.03,
+                    dev_threshold, "threshold", va='top', color='blue', fontstyle='italic')
 
-        # figure parameters
-        ax.set_xlim( frequency_boundaries[0], frequency_boundaries[-1] )
-        ax.set_ylim( 1.1 * np.nanmin( z_linefree ),
-                     1.1 * np.nanmax( z_linefree ) )
-        ax.set_xlabel( 'frequency (GHz) {}'.format(self.frequency_frame) )
-        ax.set_ylabel( 'deviation / sigma' )
-        ax.tick_params( direction='in' )
-        ax.legend( fontsize='small', ncols=3, loc='best', bbox_to_anchor=(0, 0, 1.0, 0.1) )
-        ax.grid()
-        ax.get_xaxis().get_major_formatter().set_useOffset(False)
+            # figure parameters
+            ax.set_xlim(frequency_boundaries[0], frequency_boundaries[-1])
+            ax.set_ylim(1.1 * np.nanmin( z_linefree),
+                        1.1 * np.nanmax( z_linefree))
+            ax.set_xlabel('frequency (GHz) {}'.format(self.frequency_frame))
+            ax.set_ylabel('deviation / sigma')
+            ax.tick_params( direction='in')
+            ax.legend(fontsize='small', ncols=3, loc='best', bbox_to_anchor=(0, 0, 1.0, 0.1))
+            ax.grid()
+            ax.get_xaxis().get_major_formatter().set_useOffset(False)
+        else:
+            ax.set_axis_off()
+            ax.text(0.5, 0.5, "No significant off-line-range\nemission is detected", ha='center', fontsize='large')
 
         # figure title
         match mask_mode:
@@ -492,6 +487,6 @@ class DetectMissedLines:
             case 'moment_mask':
                 mode = "extended"
             case _:
-                raise ValueError( "Unknown mask_mode {}".format(mask_mode) )
+                raise ValueError("Unknown mask_mode {}".format(mask_mode))
         plot_title = "Field:{} spw:{} ({})".format( self.field_name, self.spwid_list[0], mode )
         ax.set_title( plot_title )
