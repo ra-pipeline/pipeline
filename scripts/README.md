@@ -69,6 +69,35 @@ By default a run is quiet (only the return code is checked); pass
 `--verbose` to log the subprocess's output line-by-line to the calibPipeIF
 log file.
 
+### Interactive shell use
+
+`calibpipe_env.sh` sets up an interactive shell to call
+`pipelineMakeRequest`/`casa` directly instead of going through
+`calibPipeIF.py`. `source` it (works from bash or zsh) and it sets the
+CASA/pipeline environment variables directly in your current shell:
+
+```
+source calibpipe_env.sh --env=main
+pipelineMakeRequest ...
+casa ...
+```
+
+It takes the same `--config=`/`--env=`/`--subdir=` flags as
+`calibPipeIF.py`. Running it directly (instead of sourcing it) just prints a
+reminder, since it has nothing to modify in that case.
+
+The actual TOML parsing and environment construction (a pure-bash port of
+`envconfig.py`'s resolution logic, kept in sync with it by hand) lives in
+`calibpipe_env_resolve.sh` next to it -- `calibpipe_env.sh` is a thin,
+POSIX-portable dispatcher that always runs that script under an explicit
+`bash` subprocess (regardless of which shell you sourced it from) and
+`eval`s its output, because bash and zsh disagree on array indexing and a
+few other things a naively-sourced bash script would get wrong under zsh.
+Call `calibpipe_env_resolve.sh` directly (`bash calibpipe_env_resolve.sh
+--env=main`) for scripting, or with `--print-env` to dump plain `KEY=value`
+lines for inspection or diffing against `calibPipeIF.py --env=<name>
+--print-env`.
+
 `--semipass=<EB_uid>`/`--onlysemipass=<EB_uid>` process specific EBs
 (comma-delimited `uid://...` list) by running `analysisUtils.asdmExport`
 (when not using `--flag`) and patching the generated PPR via
