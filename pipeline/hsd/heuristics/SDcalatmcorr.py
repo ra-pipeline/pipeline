@@ -715,7 +715,10 @@ def getTau(ms: str, spws: list, spwsetup: dict) -> dict:
                 auxtau = subtb.getcell('tauSpectrum', 0)[0]
             finally:
                 subtb.close()
-            taufit = CubicSpline(fullfreq, auxtau, bc_type='not-a-knot')
+
+            x, sort_idx = np.unique(fullfreq, return_index=True)
+            y = auxtau[sort_idx]
+            taufit = CubicSpline(x, y, bc_type='not-a-knot')
             tau[spwid] = taufit(spwsetup[spwid]['chanfreqs'])
 
     return tau
