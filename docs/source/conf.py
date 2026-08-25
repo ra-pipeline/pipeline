@@ -200,6 +200,11 @@ exclude_patterns = ['_build', '**.ipynb_checkpoints', 'Thumbs.db', '.DS_Store']
 if os.environ.get('BUILD_INTERNAL_DOCS') == '1':
     tags.add('internal')
     project = project + ' (INTERNAL)'
+    # Prevent search engines and crawlers from indexing internal pages
+    html_meta = {
+        'robots': 'noindex, nofollow, noarchive, nosnippet',
+        'googlebot': 'noindex, nofollow, noarchive, nosnippet',
+    }
 else:
     # PUBLIC BUILD: Exclude developer-only files/folders
     # Note: adjust this list based on what internal docs actually exist
