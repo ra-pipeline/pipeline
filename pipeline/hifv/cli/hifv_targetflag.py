@@ -6,9 +6,6 @@ import pipeline.h.cli.utils as utils
 def hifv_targetflag(vis=None, intents=None):
     """Targetflag.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Run rflag on both the science targets and calibrators:
 

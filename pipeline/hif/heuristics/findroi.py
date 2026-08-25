@@ -19,7 +19,7 @@ from pipeline.domain import DataType
 from pipeline.hif.heuristics import imageparams_factory
 from pipeline.infrastructure import casa_tasks, casa_tools
 from pipeline.infrastructure.filenamer import PipelineProductNameBuilder
-from pipeline.infrastructure.utils import imaging
+from pipeline.infrastructure.utils import relative_path
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -73,7 +73,8 @@ except Exception:
 AU_DAY_TO_M_S = 1731.45683633 * 1000.0
 _DEFAULT_FINDROI_CONFIG = {
     'timebin_sec': 240.0,
-    'min_nchan': 128,
+    # Sanity check to avoid accidentally running on fully averaged science-tagged SPWs.
+    'min_nchan': 5,
     'npix': 256,
     'fov_pb_mult': 1.5,
     'ref_sigma': 3.0,
@@ -99,7 +100,7 @@ _DEFAULT_FINDROI_CONFIG = {
     'uv_taper_auto': True,
     'uv_taper_sigma_uv': None,
     'uv_taper_fwhm_cell': 2.0,
-    'roi_thresh': 7.0,
+    'roi_thresh': 5.0,
     'roi_cont_thresh': 7.0,
     'tmp_overwrite': True,
     'save_moment0': True,
@@ -252,6 +253,9 @@ def _ensure_row_chan_pol(
     return np.transpose(arr, (ax_row, ax_chan, ax_pol))
 
 
+
+
+
 def resolve_vis_list(vis: str | list[str] | tuple[str, ...]) -> list[str]:
     '''Resolve a vis input into a list of MS paths.'''
     if isinstance(vis, (list, tuple)):
@@ -284,9 +288,9 @@ def _resolve_pipeline_vis_list(context: Any, vis: Any) -> list[str]:
     if vis not in (None, '', [], ['']):
         return resolve_vis_list(vis)
     datatypes = [
-        DataType.SELFCAL_CONTLINE_SCIENCE,
         DataType.REGCAL_CONTLINE_SCIENCE,
         DataType.REGCAL_CONTLINE_ALL,
+        DataType.SELFCAL_CONTLINE_SCIENCE,
         DataType.RAW,
     ]
     ms_objects, selected_datatype = context.observing_run.get_measurement_sets_of_type(
@@ -326,6 +330,46 @@ def _findroi_antenna_selections(context: Any, vis_list: list[str], intent: str =
             raise RuntimeError(f'No {intent} antenna selection determined for hif_findroi vis={vis}.')
         selections[vis] = ','.join(map(str, antenna_id_list)) + '&'
     return selections
+
+
+def _findroi_image_heuristics(context: Any, vis_list: list[str]) -> Any:
+    '''Create imaging heuristics matching hif_makeimlist data-availability checks.'''
+    canonical_vis_list = [_context_ms_for_vis(context, vis).name for vis in vis_list]
+    project_structure = getattr(context, 'project_structure', None)
+    imagename_prefix = '' if project_structure is None else getattr(project_structure, 'ousstatus_entity_id', '')
+    return imageparams_factory.ImageParamsHeuristicsFactory.getHeuristics(
+        vislist=canonical_vis_list,
+        spw='',
+        observing_run=context.observing_run,
+        imagename_prefix=imagename_prefix,
+        proj_params=getattr(context, 'project_performance_parameters', None),
+        contfile=None,
+        linesfile=None,
+        imaging_params=getattr(context, 'imaging_parameters', None),
+        processing_intents=getattr(context, 'processing_intents', None),
+        imaging_mode='ALMA',
+    )
+
+
+def _findroi_has_unflagged_data(
+    heuristics: Any,
+    vis: str,
+    field_name: str,
+    spw_id: int,
+) -> bool | None:
+    '''Mirror hif_makeimlist fully-flagged detection for one EB/field/SPW selection.'''
+    try:
+        result = heuristics.has_data(field_intent_list=[(field_name, 'TARGET')], spwspec=str(spw_id), vislist=[vis])
+    except Exception as exc:
+        LOG.warning(
+            'Could not determine whether data for EB %s, field %s, spw %s is completely flagged. Exception: %s',
+            os.path.basename(vis),
+            field_name,
+            spw_id,
+            str(exc),
+        )
+        return None
+    return bool(result.get((field_name, 'TARGET'), False))
 
 
 def _field_task_arg(field: str | int | list[int | str] | tuple[int | str, ...] | None) -> str | int | None:
@@ -515,9 +559,9 @@ def get_ddid_spw_inventory(vis: str, ms: Any) -> list[dict[str, Any]]:
 def select_science_ddids(
     inv: list[dict[str, Any]],
     science_spw_ids: set[int],
-    min_nchan: int = 128,
+    min_nchan: int = 5,
 ) -> list[int]:
-    '''Select science DDIDs using pipeline science SPWs plus local row-count filtering.'''
+    '''Select science DDIDs using pipeline science SPWs plus a small averaged-data sanity check.'''
     out = []
     for r in inv:
         if int(r['spw_id']) not in science_spw_ids:
@@ -2114,7 +2158,18 @@ def _chan_ranges_to_frame_freq_ranges_ghz(
     chan_freqs_hz: np.ndarray | None,
 ) -> list[tuple[float, float]]:
     '''Convert channel ranges into output-frame frequency ranges in GHz.'''
-    return imaging.chan_ranges_to_freq_ranges_ghz(chan_ranges, chan_freqs_hz)
+    if chan_freqs_hz is None:
+        return []
+    freq = np.asarray(chan_freqs_hz, dtype=np.float64).ravel()
+    nchan = int(freq.size)
+    if nchan == 0:
+        return []
+    out = []
+    for lo, hi in chan_ranges:
+        a, b = sorted((max(0, min(int(lo), nchan - 1)), max(0, min(int(hi), nchan - 1))))
+        f0, f1 = sorted((float(freq[a]) * 1.0e-9, float(freq[b]) * 1.0e-9))
+        out.append((f0, f1))
+    return out
 
 
 def _fmt_frame_freq_ranges(
@@ -2571,53 +2626,91 @@ def _science_spw_metadata_from_inventory(
 def _save_default_summary_plots(
     results: dict[str, Any],
     products_dir: str,
-) -> dict[str, dict[str, str]]:
-    '''Generate and save per-source summary plots; return artifact paths.'''
+) -> dict[str, dict[str, dict[str, str]]]:
+    '''Generate and save per-field, per-SPW summary plots; return artifact paths.'''
     import matplotlib.pyplot as plt
     from pipeline.hif.tasks.findroi import plots as fplots
     plt.ioff()
 
     os.makedirs(products_dir, exist_ok=True)
-    out: dict[str, dict[str, str]] = {}
+    out: dict[str, dict[str, dict[str, str]]] = {}
+    plot_failure_count = 0
     cfg = results.get('metadata', {}).get('config', {})
     pos_thr = float(cfg.get('pos_evidence_thr', cfg.get('evidence_thr', 7.0)))
     neg_thr = float(cfg.get('neg_evidence_thr', 7.0))
     source_names = sorted(results.get('products', {}).get('fields', {}).keys())
+    spw_keys = sorted(results.get('inventory', {}).get('science_spws', {}), key=lambda key: int(key))
     for source_name in source_names:
-        token = _sanitize_token(source_name)
-        per_source: dict[str, str] = {}
-        try:
-            fplots.plot_spectra_by_spw(results, source_name=source_name, field_id=None, use_snr=True)
-            fig = plt.gcf()
-            p_spectra = os.path.join(products_dir, f'findroi_source-{token}_spectra.png')
-            fig.savefig(p_spectra, dpi=160, bbox_inches='tight')
-            plt.close(fig)
-            per_source['spectra_png'] = p_spectra
+        field_token = _sanitize_token(source_name)
+        per_source: dict[str, dict[str, str]] = {}
+        for spw_key in spw_keys:
+            spw_id = int(spw_key)
+            per_spw: dict[str, str] = {'spw_id': str(spw_id)}
+            if not fplots.has_valid_source_spw(results, source_name, spw_key=spw_key):
+                per_spw['evidence_status'] = 'no_valid_source_spw'
+                per_source[spw_key] = per_spw
+                continue
 
-            fplots.plot_moment0_by_spw(results, source_name=source_name, field_id=None)
-            fig = plt.gcf()
-            p_mom0 = os.path.join(products_dir, f'findroi_source-{token}_moment0.png')
-            fig.savefig(p_mom0, dpi=160, bbox_inches='tight')
-            plt.close(fig)
-            per_source['moment0_png'] = p_mom0
+            base = f'findroi_field-{field_token}_spw-{spw_id}'
+            try:
+                if fplots.plot_spectra_by_spw(
+                    results, source_name=source_name, field_id=None, use_snr=True, spw_key=spw_key
+                ):
+                    fig = plt.gcf()
+                    p_spectra = os.path.join(products_dir, f'{base}_spectra.png')
+                    fig.savefig(p_spectra, dpi=160, bbox_inches='tight')
+                    plt.close(fig)
+                    per_spw['spectra_png'] = p_spectra
+                else:
+                    plot_failure_count += 1
+            except Exception as exc:
+                LOG.warning('Failed to generate spectra plot for field %s spw %s: %s', source_name, spw_id, exc)
+                plt.close('all')
+                plot_failure_count += 1
 
-            fplots.plot_evidence_with_lines(
-                results,
-                source_name=source_name,
-                field_id=None,
-                min_region_snr=pos_thr,
-                min_neg_region_snr=neg_thr,
-            )
-            fig = plt.gcf()
-            p_evidence = os.path.join(products_dir, f'findroi_source-{token}_evidence.png')
-            fig.savefig(p_evidence, dpi=160, bbox_inches='tight')
-            plt.close(fig)
-            per_source['evidence_png'] = p_evidence
+            try:
+                if fplots.plot_moment0_by_spw(
+                    results, source_name=source_name, field_id=None, spw_key=spw_key
+                ):
+                    fig = plt.gcf()
+                    p_mom0 = os.path.join(products_dir, f'{base}_moment0.png')
+                    fig.savefig(p_mom0, dpi=160, bbox_inches='tight')
+                    plt.close(fig)
+                    per_spw['moment0_png'] = p_mom0
+                else:
+                    plot_failure_count += 1
+            except Exception as exc:
+                LOG.warning('Failed to generate moment0 plot for field %s spw %s: %s', source_name, spw_id, exc)
+                plt.close('all')
+                plot_failure_count += 1
 
-            out[source_name] = per_source
-        except Exception as exc:
-            LOG.warning('Failed to generate default hif_findroi summary plots for source %s: %s', source_name, exc)
-            plt.close('all')
+            try:
+                if fplots.plot_evidence_with_lines(
+                    results,
+                    source_name=source_name,
+                    field_id=None,
+                    min_region_snr=pos_thr,
+                    min_neg_region_snr=neg_thr,
+                    spw_key=spw_key,
+                ):
+                    fig = plt.gcf()
+                    p_evidence = os.path.join(products_dir, f'{base}_evidence.png')
+                    fig.savefig(p_evidence, dpi=160, bbox_inches='tight')
+                    plt.close(fig)
+                    per_spw['evidence_png'] = p_evidence
+                    per_spw['evidence_status'] = 'ok'
+                else:
+                    per_spw['evidence_status'] = 'evidence_plot_failed'
+                    plot_failure_count += 1
+            except Exception as exc:
+                LOG.warning('Failed to generate evidence plot for field %s spw %s: %s', source_name, spw_id, exc)
+                plt.close('all')
+                per_spw['evidence_status'] = 'evidence_plot_failed'
+                plot_failure_count += 1
+
+            per_source[spw_key] = per_spw
+        out[source_name] = per_source
+    results.setdefault('metadata', {}).setdefault('counts', {})['plot_failures'] = int(plot_failure_count)
     return out
 
 
@@ -2917,20 +3010,52 @@ def _read_regridded_fields(
 
     data = sub.getcol(datacolumn)
     data = _ensure_row_chan_pol(data, nrows)
-    v = np.mean(data, axis=2).astype(np.complex64, copy=False)
+
+    tb_aux = _get_tb()
+    tb_aux.open(os.path.join(regridded_ms, 'DATA_DESCRIPTION'))
+    pol_id = tb_aux.getcell('POLARIZATION_ID', 0)
+    tb_aux.close()
+    
+    tb_aux.open(os.path.join(regridded_ms, 'POLARIZATION'))
+    corr_types = tb_aux.getcell('CORR_TYPE', pol_id)
+    tb_aux.close()
+    
+    # CASA Stokes enums for parallel hands: RR=5, LL=8, XX=9, YY=12
+    stokes_i_indices = [idx for idx, corr in enumerate(corr_types) if corr in (5, 8, 9, 12)]
+
+    if stokes_i_indices:
+        v = np.zeros(data.shape[:2], dtype=np.complex64)
+        for idx in stokes_i_indices:
+            v += data[:, :, idx]
+        v /= len(stokes_i_indices)
+    else:
+        v = np.mean(data, axis=2).astype(np.complex64, copy=False)
 
     colnames = sub.colnames()
     if 'SIGMA' in colnames:
         sig = np.asarray(sub.getcol('SIGMA'))
         if sig.ndim == 2 and sig.shape[0] != nrows and sig.shape[1] == nrows:
             sig = sig.T
-        sig_r = np.mean(sig, axis=1)
+        if stokes_i_indices:
+            sig_r = np.zeros(sig.shape[0], dtype=sig.dtype)
+            for idx in stokes_i_indices:
+                sig_r += sig[:, idx]
+            sig_r /= len(stokes_i_indices)
+        else:
+            sig_r = np.mean(sig, axis=1)
         w_r = (1.0 / np.maximum(sig_r, 1e-30) ** 2).astype(np.float64)
     elif 'WEIGHT' in colnames:
         wt = np.asarray(sub.getcol('WEIGHT'))
         if wt.ndim == 2 and wt.shape[0] != nrows and wt.shape[1] == nrows:
             wt = wt.T
-        w_r = np.maximum(np.mean(wt, axis=1), 0.0).astype(np.float64)
+        if stokes_i_indices:
+            wt_r = np.zeros(wt.shape[0], dtype=wt.dtype)
+            for idx in stokes_i_indices:
+                wt_r += wt[:, idx]
+            wt_r /= len(stokes_i_indices)
+        else:
+            wt_r = np.mean(wt, axis=1)
+        w_r = np.maximum(wt_r, 0.0).astype(np.float64)
     else:
         w_r = np.ones((nrows,), dtype=np.float64)
 
@@ -3445,7 +3570,10 @@ def _process_spw(
                 regridded_ms, _, _ = ms_cache[cache_key]
                 source_regridded_ms_paths.setdefault(int(source_id), []).append(str(regridded_ms))
             t_read_fields = time.perf_counter()
-            chunks_by_field = _read_regridded_fields(regridded_ms, fids)
+            chunks_by_field = _read_regridded_fields(
+                regridded_ms,
+                fids,
+            )
             _profile_logf(tmp_dir, 'process_spw bulk_read spw=%s eb=%s source=%s n_fields=%s dt=%.3f', spw_name, eb_idx, source_id, len(fids), (time.perf_counter() - t_read_fields))
             for field_id, chunk in chunks_by_field.items():
                 spectra_by_source[source_id].setdefault(field_id, []).append(chunk)
@@ -3899,7 +4027,6 @@ def run_findroi_mpi(
     if evidence_thr is not None:
         pos_evidence_thr = float(evidence_thr)
     if tmp_dir:
-        tmp_dir = os.path.abspath(tmp_dir)
         if tmp_overwrite and os.path.isdir(tmp_dir):
             shutil.rmtree(tmp_dir)
         os.makedirs(tmp_dir, exist_ok=True)
@@ -4010,6 +4137,7 @@ def run_findroi_mpi(
         field_info = context_field_info
         field_groups = field_info['groups']
     antenna_selections_by_vis = _findroi_antenna_selections(context, vis_list, intent='TARGET')
+    data_heuristics = _findroi_image_heuristics(context, vis_list)
     science_spws, science_rows = _science_spw_metadata_from_inventory(vis_list[0], ms0, inv, sci)
     dt_inventory = time.perf_counter() - t_inv
     source_names_by_id = {int(k): str(v) for k, v in field_info.get('source_names', {}).items()}
@@ -4018,7 +4146,11 @@ def run_findroi_mpi(
         for source_field_ids in field_groups.values()
         for fid in source_field_ids
     }
-    field_phase_centers = imaging.get_field_phase_centers_rad(getattr(ms0, 'fields', []))
+    field_phase_centers = {
+        int(field.id): (float(field.mdirection['m0']['value']), float(field.mdirection['m1']['value']))
+        for field in getattr(ms0, 'fields', [])
+        if getattr(field, 'mdirection', None) is not None
+    }
     if not field_phase_centers:
         raise RuntimeError('No field phase centers found in pipeline context.')
     common_geometry_plan = {
@@ -4044,6 +4176,22 @@ def run_findroi_mpi(
 
     args = []
     for ddid, spw_name, virtual_spw_id in sci_spw:
+        field_names = [field_names_by_id.get(int(fid), str(fid))
+                       for field_ids in field_groups.values() for fid in field_ids]
+        has_unflagged_data = False
+        has_inconclusive_probe = False
+        for vis_name in vis_list:
+            for field_name in field_names:
+                probe_result = _findroi_has_unflagged_data(data_heuristics, vis_name, field_name, int(virtual_spw_id))
+                if probe_result is True:
+                    has_unflagged_data = True
+                elif probe_result is False:
+                    LOG.warning('Data for EB {}, field {}, spw {} is completely flagged.'.format(
+                        os.path.basename(vis_name), field_name, virtual_spw_id))
+                else:
+                    has_inconclusive_probe = True
+        if not has_unflagged_data and not has_inconclusive_probe:
+            continue
         spw_ids_by_vis = _real_spw_ids_by_vis(
             context,
             vis_list,
@@ -4051,7 +4199,8 @@ def run_findroi_mpi(
             fallback_spw_id=int(ddid_rows[int(ddid)]['spw_id']),
         )
         args.append((
-            vis_list, ddid, spw_name, spw_ids_by_vis, int(ddid_rows[int(ddid)]['spw_id']), field_groups,
+            vis_list, ddid, spw_name, spw_ids_by_vis,
+            int(ddid_rows[int(ddid)]['spw_id']), field_groups,
             antenna_selections_by_vis,
             source_names_by_id, field_names_by_id,
             common_geometry_plan, project_outframes, field_phase_centers, field_ephemeris_paths, products_dir, dish_diameter_m,
@@ -4474,8 +4623,8 @@ def run_findroi_mpi(
 
 
 def default_tmp_dir(context: Any, output_dir: str | None) -> str:
-    root = output_dir or getattr(context, 'output_dir', '.') or '.'
-    return os.path.abspath(os.path.join(root, 'findroi_workdir'))
+    root = output_dir or getattr(context, 'output_dir') or '.'
+    return relative_path(os.path.join(root, 'findroi_workdir'))
 
 
 def summarize_stage_product(stage_product: dict[str, Any]) -> dict[str, Any]:
@@ -4485,14 +4634,28 @@ def summarize_stage_product(stage_product: dict[str, Any]) -> dict[str, Any]:
     n_source_spws = 0
     n_roi_with_lines = 0
     n_roi_with_cont = 0
-    for spw_map in fields.values():
+    source_summaries = []
+    for source_name in sorted(fields):
+        spw_map = fields[source_name]
+        source_n_source_spws = 0
+        source_n_roi_with_lines = 0
+        source_n_roi_with_cont = 0
         for spw_block in spw_map.values():
             n_source_spws += 1
+            source_n_source_spws += 1
             roi = (spw_block.get('source_aggregate') or {}).get('roi_detected') or {}
             if roi.get('line_ranges') or roi.get('neg_line_ranges'):
                 n_roi_with_lines += 1
+                source_n_roi_with_lines += 1
             if roi.get('cont_ranges'):
                 n_roi_with_cont += 1
+                source_n_roi_with_cont += 1
+        source_summaries.append({
+            'source': source_name,
+            'n_source_spws': int(source_n_source_spws),
+            'n_roi_with_lines': int(source_n_roi_with_lines),
+            'n_roi_with_continuum': int(source_n_roi_with_cont),
+        })
     timing = stage_product.get('metadata', {}).get('timing', {})
     return {
         'n_sources': int(len(fields)),
@@ -4500,8 +4663,10 @@ def summarize_stage_product(stage_product: dict[str, Any]) -> dict[str, Any]:
         'n_selected_spws': int(counts.get('selected_spws', len(spws))),
         'n_successful_spws': int(counts.get('successful_spws', len(spws))),
         'n_failed_spws': int(counts.get('failed_spws', 0)),
+        'n_plot_failures': int(counts.get('plot_failures', 0)),
         'n_source_spws': int(n_source_spws),
         'n_roi_with_lines': int(n_roi_with_lines),
         'n_roi_with_continuum': int(n_roi_with_cont),
+        'source_summaries': source_summaries,
         'total_run_s': timing.get('total_run_s'),
     }

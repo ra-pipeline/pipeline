@@ -38,9 +38,6 @@ def cli_wrapper(func: Callable) -> Callable:
     Args:
         func: The Pipeline task function to wrap.
 
-    Returns:
-        The decorated function that returns task results.
-
     Note:
         The decorated function should focus on its docstring and parameter
         definitions. This wrapper handles the execution logic and the implementation of

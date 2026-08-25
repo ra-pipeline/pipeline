@@ -224,16 +224,19 @@ class QAScoreAggregator:
     def update_origin(self,
                       destination: pqa.QAScore,
                       qascores: list[pqa.QAScore],
-                      matched_idxes: list[int]):
+                      matched_idxes: list[int],
+                      metric_scores_func: Callable[[list[float]], float] | None = None):
         """
         Update origin of a QA score to accommodate aggregated metric_scores
 
         The aggregation will simply concatinate the metric scores with commas
 
         Args:
-            destination:   QA score to update origin field
-            qascores:      List of QA scores
-            matched_idxes: List of indexes of QA scores to aggregate
+            destination:        QA score to update origin field
+            qascores:           List of QA scores
+            matched_idxes:      List of indexes of QA scores to aggregate
+            metric_scores_func: Function to calculate the metric_score when aggregating.
+                                Default is None, which concatenates the metric_scores as a string.
         """
         names   = [qascores[idx].origin.metric_name for idx in matched_idxes]
         mscores = [qascores[idx].origin.metric_score for idx in matched_idxes]
@@ -241,7 +244,10 @@ class QAScoreAggregator:
 
         assert len(set(names)) == 1
         assert len(set(units)) == 1
-        newscore = ", ".join(str(s) for s in mscores)
+        if metric_scores_func is None:
+            newscore = ", ".join(str(s) for s in mscores)
+        else:
+            newscore = metric_scores_func(mscores)
         new_origin = pqa.QAOrigin(metric_name=names[0],
                                   metric_score=newscore,
                                   metric_units=units[0])
@@ -264,7 +270,9 @@ class QAScoreAggregator:
                    for key in keys_to_compare)
 
     def _aggregate_qascores(self,
-                            qascores: list[pqa.QAScore], metric_name: str) -> list[pqa.QAScore]:
+                            qascores: list[pqa.QAScore],
+                            metric_name: str,
+                            metric_scores_func: Callable[[list[float]], float] | None = None) -> list[pqa.QAScore]:
         """
         Aggregate and recompose longmsg-es of QA scores with specified metric_name
 
@@ -278,6 +286,8 @@ class QAScoreAggregator:
         Args:
             qascores:    list of QA scores
             metric_name: metric_name to target
+            metric_scores_func: Function to calculate the metric_score when aggregating.
+                                Default is None, which concatenates the metric_scores as a string.
         Returns:
             Aggregated QA scores
         """
@@ -325,6 +335,7 @@ class QAScoreAggregator:
 
                 # skip if none of the keys of 'keys_to_aggregate' exist in target_qascore
                 if all(len(getattr(target_qascore.applies_to, key)) == 0 for key in keys_to_aggregate):
+                    formatter.update_longmsg(target_qascore)
                     continue
 
                 # now the target qascore is selected
@@ -348,7 +359,7 @@ class QAScoreAggregator:
                 if len(matched_idxes) > 1:
                     # replace the first matched QAScore with the aggregated one, remove the other matches
                     setattr(qascores[matched_idxes[0]].applies_to, key, set().union(*matched_keys))
-                    self.update_origin(qascores[matched_idxes[0]], qascores, matched_idxes)
+                    self.update_origin(qascores[matched_idxes[0]], qascores, matched_idxes, metric_scores_func=metric_scores_func)
                     formatter.update_longmsg(qascores[matched_idxes[0]])
                     # remove
                     for idx in reversed(matched_idxes[1:]):   # remove in reversed order to conserve the index
@@ -358,7 +369,9 @@ class QAScoreAggregator:
 
         return qascores
 
-    def aggregate_qascores(self, orig_qascores: list[pqa.QAScore]) -> list[pqa.QAScore]:
+    def aggregate_qascores(self,
+                           orig_qascores: list[pqa.QAScore],
+                           metric_scores_func: Callable[[list[float]], float] | None = None) -> list[pqa.QAScore]:
         """
         Aggregate QA scores
 
@@ -369,6 +382,8 @@ class QAScoreAggregator:
 
         Args:
             orig_qascores: Original list of QA scores
+            metric_scores_func: Function to calculate the metric_score when aggregating.
+                                Default is None, which concatenates the metric_scores as a string.
         Returns:
             Aggregated List of QA scores (and, if requested, the original QA scores with WegLogLocation.HIDDEN)
         """
@@ -385,7 +400,7 @@ class QAScoreAggregator:
 
         # actual aggregation for each metric_name
         for metric_name in metric_names:
-            qascores = self._aggregate_qascores(qascores, metric_name)
+            qascores = self._aggregate_qascores(qascores, metric_name, metric_scores_func=metric_scores_func)
 
         # attach original qascores if requested
         if self.preserve_original:

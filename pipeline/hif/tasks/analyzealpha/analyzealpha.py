@@ -29,7 +29,7 @@ class AnalyzealphaResults(basetask.Results):
 
     def merge_with_context(self, context: Context) -> None:
         """
-        See :method:`~pipeline.infrastructure.api.Results.merge_with_context`
+        See :meth:`~pipeline.infrastructure.api.Results.merge_with_context`
         """
         return
 

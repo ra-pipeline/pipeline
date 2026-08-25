@@ -121,13 +121,7 @@ c_mps = int(cqa.getvalue(cqa.convert(cqa.constants('c'), 'm/s'))[0])
 					  <td>${', '.join(sorted(ms.get_data_description(spw=spw).corr_axis))}</td>
 					  <!-- Omit Correlation Bits column for the ACA Spectrometer and set to BITS_4x4 for the ACA correlator. See PIPE-1993/4 -->
 						% if ms.correlator_name != 'ALMA_ACASPEC':
-							% if spw.correlation_bits and spw.correlation_bits != "UNKNOWN":
-								<td>${spw.correlation_bits}</td>
-							% elif ms.correlator_name == 'ALMA_ACA':
-								<td>BITS_4x4</td>
-							% else:
-								<td>Unknown</td>
-							% endif
+							<td>${hr.format_correlation_bits(ms, spw)}</td>
 						% endif
 					  <td>${spw.band}</td>
                       <%
@@ -271,13 +265,7 @@ c_mps = int(cqa.getvalue(cqa.convert(cqa.constants('c'), 'm/s'))[0])
 						<td>${polarizations}</td>
 						<!-- Omit Correlation Bits column for the ACA Spectrometer. See PIPE-1993/4 -->
 						% if ms.correlator_name != 'ALMA_ACASPEC':
-							% if spw.correlation_bits and spw.correlation_bits != "UNKNOWN":
-								<td>${spw.correlation_bits}</td>
-							% elif ms.correlator_name == 'ALMA_ACA':
-								<td>BITS_4x4</td>
-							% else:
-								<td>Unknown</td>
-							% endif
+							<td>${hr.format_correlation_bits(ms, spw)}</td>
 						% endif
 						<td>${spw.band}</td>
                         <%

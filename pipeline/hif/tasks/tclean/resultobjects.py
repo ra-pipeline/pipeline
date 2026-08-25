@@ -43,8 +43,11 @@ class TcleanResult(basetask.Results):
         self.datacolumn = datacolumn
         self.datatype = datatype
         self.datatype_info = datatype_info
-        # PIPE-3096: historically, the raw field name string (as passed to tclean's 'field' parameter,
-        # potentially including quotation marks) was assigned to this 'sourcename' attribute.
+        # PIPE-3096: historically, the raw field name string (as passed to tclean's 'field'
+        # parameter, potentially including quotation marks) was assigned to this 'sourcename'
+        # attribute for ALMA and VLA. The VLASS workflow introduced the use of a list of
+        # selection strings (one per MS) for 'field', which will be flattened and deduplicated
+        # to a single string for the 'sourcename' attribute.
         self.sourcename = sourcename
         self.field_ids = field_ids
         self.intent = intent

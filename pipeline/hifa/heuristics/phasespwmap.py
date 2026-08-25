@@ -7,7 +7,7 @@ import pipeline.infrastructure.utils as utils
 from pipeline.domain import SpectralWindow
 from pipeline.infrastructure import casa_tools
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 IntentField = collections.namedtuple('IntentField', 'intent field')
 SpwMapping = collections.namedtuple('SpwMapping', 'combine spwmap snr_info snr_threshold_used solint gaintype calc_snr_info')
@@ -148,7 +148,7 @@ def simple_n2wspwmap(scispws: list[SpectralWindow], maxnarrowbw: str, maxbwfrac:
 
     # Convert the maximum narrow bandwidth to the correct format
     maxnbw = quanta.convert(quanta.quantity(maxnarrowbw), 'Hz')
-    maxnbw = measures.Frequency(quanta.getvalue(maxnbw)[0], measures.FrequencyUnits.HERTZ)
+    maxnbw = measures.Frequency(quanta.getvalue(maxnbw).item(), measures.FrequencyUnits.HERTZ)
 
     # Find a matching spw each science spw
     matchedspws = []

@@ -9,9 +9,6 @@ def hifv_vlasetjy(vis=None, field=None, intent=None, spw=None, model=None, reffi
 
     The hifv_vlasetjy task does an initial run of setjy on the vis.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Initial run of setjy:
 
