@@ -13,13 +13,13 @@ We thank you for additionally acknowledging Pipeline and CASA use in your public
 * [Hunter et al. 2023](https://ui.adsabs.harvard.edu/abs/2023PASP..135g4501H/abstract)  is only appropriate to cite for the ALMA Interferometric pipeline.
 * [CASA team 2022](https://iopscience.iop.org/article/10.1088/1538-3873/ac9642) is appropriate to cite for all data processing.
 
-* Please adjust the wording to reflect your workflow: for example if you recalibrated data yourself using the pipeline or CASA, or if you directly used the images provided in the archive, please say so.
+* Please adjust the wording to reflect your workflow: for example if you recalibrated data yourself using the pipeline or CASA, or if you directly used the images provided in the ALMA Science Archive, please say so.
 
 * There are many ways that data is delivered.  Some have the versions indicated in additional places, and some suggest that you acknowledge those services as well:
-  * The ALMA archive: versions included in the README and QA2 report.
+  * The ALMA Science Archive (ASA): versions included in the README and QA2 report.
   * The NRAO archive.
   * VLA PI data delivery: versions included in the email.
   * North American ALMA "LAVA" calibrated data service: versions included in the QA2 report.
   * East Asia calibrated data service: it would be appreciated if you add ``This work makes use of calibrated data products generated with services provided by the East Asian ALMA regional center (EA ARC) operated by NAOJ together with ASIAA and KASI.``
-  * [Europe](https://almascience.eso.org/local-news/requesting-calibrated-measurement-sets-in-europe) calibrated data service.
+  * Europe: The CalMS service of the European ARC, see [here](https://almascience.org/tools/eu-arc-network/the-european-arc-calms-service).
   * NRAO [AUDI](https://science.nrao.edu/srdp/science-ready-data-products-srdp-for-alma) services: it would be appreciated if you add ``This work makes use of advanced data products generated with services operated by the National Radio Astronomy Observatory.`` and a reference to [Lacy et al. 2020](https://ui.adsabs.harvard.edu/abs/2020ASPC..527..519L/abstract).
