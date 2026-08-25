@@ -26,6 +26,7 @@ build:
     - $HOME/.pixi/bin/pixi run -e docs build-docs
     - mkdir --parents $READTHEDOCS_OUTPUT/html/ $READTHEDOCS_OUTPUT/pdf/
     - cp --recursive docs/_build/html/* $READTHEDOCS_OUTPUT/html/
+    - cp docs/source/_static/robots.txt $READTHEDOCS_OUTPUT/html/robots.txt
     
     # 2. Build INTERNAL docs
     # By using a separate BUILDDIR, we keep a separate doctree cache.
