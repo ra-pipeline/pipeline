@@ -75,6 +75,59 @@ def hsd_baseline(
 
        Example of baseline flatness evaluation.
 
+    .. only:: internal
+
+       **Clustering analysis** for spectral line detection (developer plots, hidden by default;
+       enable with ``plotlevel='all'`` in ``h_init``):
+
+       *Detection*: grid cells with emission exceeding the threshold are identified. Yellow cells
+       have a single time-domain group with detected emission; cyan cells have more than one.
+
+       .. figure:: /figures/guide-img037.png
+          :width: 50%
+          :alt: Clustering detection
+
+          Clustering detection step.
+
+       *Validation*: for each grid cell the ratio of spectra containing detected emission lines
+       (``Nmember``) to total spectra in the cell (``Nspectra``) is computed:
+
+       - **Validated** if ``Nmember/Nspectra > 0.5``
+       - **Marginally validated** if ``Nmember/Nspectra > 0.3``
+       - **Questionable** if ``Nmember/Nspectra > 0.2``
+
+       .. figure:: /figures/guide-img038.png
+          :width: 50%
+          :alt: Clustering validation
+
+          Clustering validation step.
+
+       *Smoothing*: the per-cell ratio is convolved with a Gaussian-like grid function to suppress
+       isolated single-line candidates and reinforce detections supported by neighboring cells.
+
+       .. figure:: /figures/guide-img039.png
+          :width: 50%
+          :alt: Clustering smoothing
+
+          Clustering smoothing step.
+
+       *Mask region determination*: in the validated area after smoothing, mask channel ranges are
+       computed over the spatial domain by inter/extrapolating the mask ranges of the averaged
+       spectra in validated cells and applied to each individual spectrum.
+
+       .. figure:: /figures/guide-img040.png
+          :width: 50%
+          :alt: Mask range calculation
+
+          Mask range calculation — in blue squares the mask
+          range is interpolated from validated cells.
+
+       .. figure:: /figures/guide-img041.png
+          :width: 50%
+          :alt: Clustering final
+
+          Clustering final example.
+
     Notes:
         Three QA scores are computed:
 
