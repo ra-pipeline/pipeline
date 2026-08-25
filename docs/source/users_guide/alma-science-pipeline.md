@@ -2,7 +2,7 @@
 
 ## Purpose of this document
 
-This document describes how to obtain the ALMA Pipeline, how to use it to calibrate and image ALMA interferometric (IF) and single-dish (SD) data, and a description of the Pipeline WebLog (collection of web pages with detailed diagnostic information describing the data and pipeline heuristics applied to each dataset). Since interferometric and single-dish data are calibrated and imaged using different procedures and diagnostics, their recalibration procedures and WebLogs are described separately.
+This document describes how to obtain the ALMA Pipeline, how to use it to calibrate and image ALMA interferometric (IF) and single-dish (SD) data, and a description of the Pipeline WebLog (collection of web pages with detailed diagnostic information describing the data and pipeline heuristics applied to each dataset). Since interferometric and single-dish data are calibrated and imaged using different procedures and diagnostics, their calibration procedures and WebLogs are described separately.
 
 <!--
 This document is applicable for the Cycle 12 version (2025.1.0) of the ALMA Pipeline that is packaged with a CASA 6.6.6 Python 3.10 monolithic release.
