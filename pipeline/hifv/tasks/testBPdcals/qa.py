@@ -23,6 +23,9 @@ class testBPdcalsQAHandler(pqa.QAPlugin):
         # < 5%   of data flagged  --> 1
         # 5%-60% of data flagged  --> 1 to 0
         # > 60%  of data flagged  --> 0
+        # 
+        # Note: With PIPE-3064 fix, calibration tables may be missing if a band is fully flagged.
+        # We score independently for each available table rather than failing entirely.
 
         m = context.observing_run.get_ms(result.inputs['vis'])
         vis = result.inputs['vis']
@@ -30,24 +33,41 @@ class testBPdcalsQAHandler(pqa.QAPlugin):
 
         self.antspw = collections.defaultdict(list)
         for bandname, bpdgain_touse in result.bpdgain_touse.items():
-            if result.flaggedSolnApplycalbandpass[bandname] and result.flaggedSolnApplycaldelay[bandname]:
+            # Check each table independently for availability
+            has_bandpass_solution = (bandname in result.flaggedSolnApplycalbandpass and 
+                                     result.flaggedSolnApplycalbandpass[bandname])
+            has_delay_solution = (bandname in result.flaggedSolnApplycaldelay and 
+                                 result.flaggedSolnApplycaldelay[bandname])
+
+            # Process K-type (delay) calibration solution if available
+            if has_delay_solution:
                 self._checkKandBsolution(result.flaggedSolnApplycaldelay[bandname], m)
+            
+            # Process B-type (bandpass) calibration solution if available
+            if has_bandpass_solution:
                 self._checkKandBsolution(result.flaggedSolnApplycalbandpass[bandname], m)
 
-                if os.path.exists(result.bpdgain_touse[bandname]):
-                    score1 = qacalc.score_total_data_flagged_vla_bandpass(result.bpdgain_touse[bandname],
-                                                                          result.flaggedSolnApplycalbandpass[bandname]['antmedian']['fraction'])
-                    scores.append(score1)
-                if os.path.exists(result.ktypecaltable[bandname]):
-                    score2 = qacalc.score_total_data_vla_delay(result.ktypecaltable[bandname],
-                                                               result.inputs['vis'], bandname)
-                    scores.append(score2)
+            # Score bandpass solutions if both flagged solution data and table file exist
+            if has_bandpass_solution and os.path.exists(result.bpdgain_touse[bandname]):
+                score1 = qacalc.score_total_data_flagged_vla_bandpass(result.bpdgain_touse[bandname],
+                                                                      result.flaggedSolnApplycalbandpass[bandname]['antmedian']['fraction'])
+                scores.append(score1)
+            elif not has_bandpass_solution:
+                LOG.warning('Bandpass calibration table missing for band %s (band may be fully flagged).', bandname)
 
-            else:
-                LOG.error('Error with bandpass and/or delay table for band {!s}.'.format(bandname))
+            # Score delay solutions if both flagged solution data and table file exist
+            if has_delay_solution and os.path.exists(result.ktypecaltable[bandname]):
+                score2 = qacalc.score_total_data_vla_delay(result.ktypecaltable[bandname],
+                                                           result.inputs['vis'], bandname)
+                scores.append(score2)
+            elif not has_delay_solution:
+                LOG.warning('Delay calibration table missing for band %s (band may be fully flagged).', bandname)
+
+            # Flag error only if BOTH are missing (indicates real problem)
+            if not has_bandpass_solution and not has_delay_solution:
                 scores.append(pqa.QAScore(0.0,
-                                          longmsg='No flagging stats about the bandpass table or info in delay table.',
-                                          shortmsg='Bandpass or delay table problem.'))
+                                          longmsg='Band {!s}: Both delay (K-type) and bandpass (B-type) calibration tables missing. Band is likely fully flagged.'.format(bandname),
+                                          shortmsg='Band {!s}: K-type and B-type calibration tables missing (fully flagged).'.format(bandname)))
 
             # get a QA score for flagging
             # 0%   of data flagged  --> 1
@@ -73,8 +93,7 @@ class testBPdcalsQAHandler(pqa.QAPlugin):
             uniquespwlist = [int(spw) for spw in uniquespw]
             uniquespwlist.sort()
             uniquespwlist = [str(spw) for spw in uniquespwlist]
-            LOG.warning('Antenna {!s}, spws: {!s} have a flagging fraction of 1.0.'
-                        ''.format(antenna, ','.join(uniquespwlist)))
+            LOG.warning('Antenna %s, spws: %s have a flagging fraction of 1.0.', antenna, ','.join(uniquespwlist))
 
         # PIPE-2512: add QA score for spw solint
         for bandname, spw_solint in result.spw_solint.items():
