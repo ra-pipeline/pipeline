@@ -228,6 +228,7 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
         snr = median_snrs[bad_spw]
         # if S/N is very low, skip this SPW
         if math.isclose(snr, 0.0, abs_tol=1e-6):
+            LOG.warning("SPW %s: median S/N ≈ 0, skipping bandpass re-run", bad_spw)
             continue
         nchan = m.get_spectral_window(bad_spw).num_channels
         if nchan < 16:
