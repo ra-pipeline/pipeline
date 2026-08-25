@@ -81,13 +81,13 @@ class StatwtQAHandler(pqa.QAPlugin):
 
         if variance > mean**2:
             score = min(rendererutils.SCORE_THRESHOLD_SUBOPTIMAL, score)
-            shortmsg = "'Weight Variance greater than Square of Mean"
+            shortmsg = "Weight Variance greater than Square of Mean"
             longmsg = "Weight Variance greater than Square of Mean."
             result.qa.pool.append(pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=vis, origin=variance_origin))
 
         logvar = np.log10(variance)
         score = max(1 - (logvar/5.9)**4, 0.0)
-        if score <= rendererutils.SCORE_THRESHOLD_SUBOPTIMAL:
+        if score < 0.5:
             shortmsg = "Very high weight variance"
             longmsg = "Very high weight variance."
         else:
