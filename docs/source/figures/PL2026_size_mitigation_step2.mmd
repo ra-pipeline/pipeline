@@ -1,0 +1,59 @@
+%%{init: {"flowchart": {"defaultRenderer": "elk"}} }%%
+flowchart LR
+    classDef default fill:#fff,stroke:#333,stroke-width:1px,color:#000;
+    classDef warning fill:#fff3e0,stroke:#e65100,stroke-width:1px,color:#000;
+    classDef pill fill:#ffebcc,stroke:#d4a373,stroke-width:1px,color:#000;
+    classDef jump fill:#e3f2fd,stroke:#1565c0,stroke-width:1px,color:#000,stroke-dasharray: 5 5;
+
+    subgraph P2b["2b: PB & Cell size reduction"]
+        From2a("⤴ From 2a"):::jump --> S2_PB("try PB reduction
+ (same as step 1)")
+        S2_PostPB{"still >
+ maxproductsize?"}
+        S2_Cell("try cell size reduction
+ (same as step 1)")
+        S2_PostCell{"still >
+ maxproductsize?"}
+        S2_Warn("warn:
+ spw filtering will occur"):::warning
+        
+        S2_PB --> S2_PostPB
+        S2_PostPB --> |Yes| S2_Cell
+        S2_Cell --> S2_PostCell
+        S2_PostCell --> |Yes| S2_Warn
+        
+        S2_PostPB --> |No| Skip2("→ Step 3"):::pill
+        S2_PostCell --> |No| Skip2
+        S2_Warn --> Skip2
+    end
+
+    subgraph P2a["2a: Target reduction & Nbin"]
+        PrevStep(["from Step 1"]):::pill --> S2_Entry
+        S2_Entry{"total_productsize > maxproductsize?"}
+        S2_DT{"# targets
+ > 1?"}
+        S2_ReduceT("remove targets (keep repTarget)<br>until productsize < maxproductsize")
+        S2_PostT{"still >
+ maxproductsize?"}
+        S2_Nbin("try nbin
+ (same as step 1)")
+        S2_PostNbin{"still >
+ maxproductsize?"}
+        
+        S2_Entry --> |Yes| S2_DT
+        S2_DT --> |Yes| S2_ReduceT
+        S2_DT --> |No| S2_Nbin
+        S2_ReduceT --> S2_PostT
+        S2_PostT --> |Yes| S2_Nbin
+        S2_Nbin --> S2_PostNbin
+        
+        S2_PostNbin --> |Yes| Goto2b("Next: 2b ⤵"):::jump
+        S2_Entry --> |No| Skip1("→ Step 3"):::pill
+        S2_PostT --> |No| Skip1
+        S2_PostNbin --> |No| Skip1
+    end
+
+
+
+    style P2a fill:none,stroke:#bbb,stroke-width:1px,stroke-dasharray: 4 2;
+    style P2b fill:none,stroke:#bbb,stroke-width:1px,stroke-dasharray: 4 2;

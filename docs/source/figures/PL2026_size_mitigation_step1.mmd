@@ -1,0 +1,74 @@
+%%{init: {"flowchart": {"defaultRenderer": "elk"}} }%%
+flowchart LR
+    classDef default fill:#fff,stroke:#333,stroke-width:1px,color:#000;
+    classDef warning fill:#fff3e0,stroke:#e65100,stroke-width:1px,color:#000;
+    classDef pill fill:#ffebcc,stroke:#d4a373,stroke-width:1px,color:#000;
+    classDef jump fill:#e3f2fd,stroke:#1565c0,stroke-width:1px,color:#000,stroke-dasharray: 5 5;
+
+
+    subgraph P3["1c: Cell size reduction & Warning"]
+        From1b("⤴ From 1b"):::jump --> S1_Cell("hm_cell: 3.25 ppb (robust=+2) else 3.0 ppb")
+        S1_PostCell{"still >
+ maxcubesize?"}
+        S1_Warn("warn: spw filtering will occur"):::warning
+
+        S1_Cell --> S1_PostCell
+        S1_PostCell --> |Yes| S1_Warn
+        
+        S1_PostCell --> |No| Skip3("→ Step 2"):::pill
+        S1_Warn --> Skip3
+    end
+
+    subgraph P2["1b: FOV / Primary beam reduction"]
+        From1a("⤴ From 1a"):::jump --> S1_DM{"mosaic?"}
+        S1_NoPB("no PB reduction")
+        S1_PB("PB = exp(ln(0.2) &times; maxcubesize/cubesize) &times; 1.02<br>cap at 0.7; round(PB, 2)")
+        S1_PostPB{"still >
+ maxcubesize?"}
+
+        S1_DM --> |Yes| S1_NoPB
+        S1_DM --> |No| S1_PB
+        S1_PB --> S1_PostPB
+        S1_NoPB --> S1_PostPB
+        
+        S1_PostPB --> |Yes| Goto1c("Next: 1c ⤵"):::jump
+        S1_PostPB --> |No| Skip2("→ Step 2"):::pill
+    end  
+
+    subgraph P1["1a: Channel binning (nbin)"]
+        Start([Begin]):::pill --> S1_Entry
+        S1_Entry{"cubesize >
+ maxcubesize?"}
+        S1_DC{"nchan in
+ [3840, 7680]?"}
+        S1_DS{"nchan in
+ [480, 960, 1920]?"}
+        S1_DOA{"online avg?"}
+        S1_Nbin("nbin = 2")
+        S1_NoNbin("no nbin")
+        S1_PostNbin{"still >
+ maxcubesize?"}
+
+        S1_Entry --> |Yes| S1_DC
+        S1_DC --> |Yes| S1_Nbin
+        S1_DC --> |No| S1_DS
+        S1_DS --> |Yes| S1_DOA
+        S1_DS --> |No| S1_NoNbin
+        S1_DOA --> |No| S1_Nbin
+        S1_DOA --> |Yes| S1_NoNbin
+        S1_Nbin --> S1_PostNbin
+        S1_NoNbin --> S1_PostNbin
+        
+        S1_PostNbin --> |Yes| Goto1b("Next: 1b ⤵"):::jump
+        S1_Entry --> |No| Skip1("→ Step 2"):::pill
+        S1_PostNbin --> |No| Skip1
+    end
+
+
+
+
+  
+
+    style P1 fill:none,stroke:#bbb,stroke-width:1px,stroke-dasharray: 4 2;
+    style P2 fill:none,stroke:#bbb,stroke-width:1px,stroke-dasharray: 4 2;
+    style P3 fill:none,stroke:#bbb,stroke-width:1px,stroke-dasharray: 4 2;

@@ -359,3 +359,13 @@ figure figcaption, .figure figcaption, .caption-text {
 figure img, .figure img, article img:not(.no-zoom):not(.brand-logo) {
     cursor: zoom-in;
 }
+
+
+/* Auto-fit Mermaid diagrams to content height, avoiding fixed-height whitespace */
+pre.mermaid > svg,
+.mermaid-container > pre > svg,
+div.mermaid > svg {
+    height: auto !important;
+    max-height: 1200px;
+    width: 100% !important;
+}

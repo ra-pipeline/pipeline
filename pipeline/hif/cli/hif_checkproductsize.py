@@ -76,13 +76,24 @@ def hif_checkproductsize(vis=None, maxcubesize=None, maxcubelimit=None, maxprodu
         a. For projects with more than 30 science targets to be imaged and over 960 channels summed over all spws,
            issue a warning that imaging will take a substantial time.
 
+    .. mermaid:: /figures/PL2026_size_mitigation_overview.mmd
+       :zoom:
+
+    .. mermaid:: /figures/PL2026_size_mitigation_step1.mmd
+       :zoom:
+
+    .. mermaid:: /figures/PL2026_size_mitigation_step2.mmd
+       :zoom:
+
+    .. mermaid:: /figures/PL2026_size_mitigation_step34.mmd
+       :zoom:
+
     .. figure:: /figures/PL2026_size_mitigation_flowchart_final.png
        :alt: Check product size mitigation cascade
 
        Workflow diagram indicating the image mitigation cascade. Colors are used to highlight certain workflow
        nodes, e.g. green represents an action to mitigate the image cube, yellow represents a decision using the
-       various size limits, orange relates to warnings, red is a fail. 
-       . 
+       various size limits, orange relates to warnings, red is a fail.
 
     .. figure:: /figures/guide-img028.png
        :alt: Check product size mitigation example

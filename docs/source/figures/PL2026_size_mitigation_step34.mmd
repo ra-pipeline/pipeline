@@ -1,0 +1,54 @@
+%%{init: {"flowchart": {"defaultRenderer": "elk"}} }%%
+flowchart LR
+    classDef default fill:#fff,stroke:#333,stroke-width:1px,color:#000;
+    classDef warning fill:#fff3e0,stroke:#e65100,stroke-width:1px,color:#000;
+    classDef error fill:#ffebee,stroke:#c62828,stroke-width:1px,color:#000;
+    classDef pill fill:#ffebcc,stroke:#d4a373,stroke-width:1px,color:#000;
+    classDef jump fill:#e3f2fd,stroke:#1565c0,stroke-width:1px,color:#000,stroke-dasharray: 5 5;
+
+
+
+    subgraph Step4["Step 4: Long-run warning"]
+        From3("⤴ From 3"):::jump --> S4_D{"nfields > 30 AND<br>sum(nchan) > 960?"}
+        S4_Warn("warn: imaging will take<br>a substantial time"):::warning
+
+        S4_D --> |Yes| S4_Warn
+        S4_D --> |No| EndNode([End]):::pill
+        S4_Warn --> EndNode
+    end    
+
+    subgraph P3b["3b: Product size iteration"]
+        From3a("⤴ From 3a"):::jump --> S3_DProd{"productsize >
+ maxproductsize?"}
+        S3_ErrProd("ERROR: productsize<br>cannot be mitigated"):::error
+        S3_Iter("iteratively add spws (smallest first)<br>until productsize < maxproductsize")
+        
+        S3_DProd --> |Yes| S3_ErrProd
+        S3_DProd --> |No| S3_Iter
+        S3_Iter --> Goto4b("Next: Step 4 ⤵"):::jump
+    end
+
+    subgraph P3a["3a: Cube size check"]
+        PrevStep(["from Step 2"]):::pill --> S3_Entry
+        S3_Entry{"cubes > maxcubelimit<br>OR productsize > maxproductsize?"}
+        S3_DRep{"repSpw cube
+ > maxcubelimit?"}
+        S3_ErrCube("ERROR: cubesize<br>cannot be mitigated"):::error
+        S3_DLarge{"any cubes > 0.5 &times; maxcubelimit?"}
+        S3_Limit("exclude cubes > maxcubelimit<br>limit large cubes to 1 (keep repSpw)")
+        S3_Keep("keep repSpw")
+        
+        S3_Entry --> |Yes| S3_DRep
+        S3_DRep --> |Yes| S3_ErrCube
+        S3_DRep --> |No| S3_DLarge
+        S3_DLarge --> |Yes| S3_Limit
+        S3_DLarge --> |No| S3_Keep
+        
+        S3_Limit --> Goto3b("Next: 3b ⤵"):::jump
+        S3_Keep --> Goto3b
+        S3_Entry --> |No| Goto4("Next: Step 4 ⤵"):::jump
+    end
+
+    style P3a fill:none,stroke:#bbb,stroke-width:1px,stroke-dasharray: 4 2;
+    style P3b fill:none,stroke:#bbb,stroke-width:1px,stroke-dasharray: 4 2;
+    style Step4 fill:none,stroke:#888,stroke-width:1px;
