@@ -21,12 +21,12 @@ LOG = infrastructure.logging.get_logger(__name__)
 class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
 
     def __init__(self, vislist, spw, observing_run, imagename_prefix='', proj_params=None, contfile=None,
-                 linesfile=None, imaging_params={}, processing_intents={}, band_fields=None, band=None):
+                 linesfile=None, imaging_params={}, processing_intents={}):
         ImageParamsHeuristics.__init__(self, vislist, spw, observing_run, imagename_prefix, proj_params, contfile,
                                        linesfile, imaging_params, processing_intents)
-        self.band_fields = band_fields or {}
-        self.band = band
         self.imaging_mode = 'VLA'
+        # Lazy-initialized cache for fields observed with current spws
+        self._fields_for_spws_cache = None
 
     def get_sourcename(
         self, vislist: list[str] | str, fieldlist: list[str] | str, intent: str, as_list: bool = False  # noqa: ARG002
@@ -1053,6 +1053,33 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
 
         return good_restoringbeam, bad_psf_channels
 
+    def _get_fields_for_current_spws(self) -> set[str]:
+        """Get field names observed with the current spectral windows.
+        
+        Directly uses the spws in self.spwlist to find which fields were observed,
+        avoiding the indirection of deriving band first.
+        
+        Returns:
+            Set of field names observed with any of the current spws.
+        """
+        if self._fields_for_spws_cache is not None:
+            return self._fields_for_spws_cache
+
+        fields = set()
+        ref_ms = self.observing_run.get_ms(self.vislist[0])
+
+        # Get the set of spw IDs we're currently imaging
+        spw_ids = {spw.id for spw in self.spwlist}
+
+        # Find all fields observed with any of these spws
+        for field in ref_ms.get_fields():
+            field_spw_ids = {spw.id for spw in field.valid_spws}
+            if spw_ids & field_spw_ids:  # Intersection: any overlap?
+                fields.add(field.name)
+
+        self._fields_for_spws_cache = fields
+        return fields
+
     def field_intent_list(self, intent: str, field: str):
         """Determine the list of (field, intent) tuples for VLA single field
         and mosaic imaging."""
@@ -1062,8 +1089,10 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         freq = np.mean(ref_freq)
         mosaic_heuristics = MosaicDetectionHeuristics()
 
-        target_fields = self.band_fields.get(self.band, set())
-        # For VLA, hpbw (in arcmin) = 42.0 / observing frequency in Hz
+        # Get fields observed with current spws (direct spw→field relationship)
+        target_fields = self._get_fields_for_current_spws()
+
+        # For VLA, hpbw (in arcseconds) = 42.0e9 / observing frequency in Hz * 60.0
         hpbw = 42.0e9 / float(freq.value) * 60.0  # hpbw in arcseconds
 
         mosaic_fields, single_fields = mosaic_heuristics.check_targets_for_mosaic(self.observing_run, self.vislist, target_fields, hpbw)

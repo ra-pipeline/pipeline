@@ -21,7 +21,7 @@ class ImageParamsHeuristicsFactory:
     """Imaging heuristics factory class."""
 
     @staticmethod
-    def getHeuristics(vislist, spw, observing_run, imagename_prefix='', proj_params=None, contfile=None, linesfile=None, imaging_params={}, processing_intents={}, imaging_mode='ALMA', bandfields=None, band=None):
+    def getHeuristics(vislist, spw, observing_run, imagename_prefix='', proj_params=None, contfile=None, linesfile=None, imaging_params={}, processing_intents={}, imaging_mode='ALMA'):
         if imaging_mode == 'ALMA':
             # ALMA standard
             return ImageParamsHeuristicsALMA(vislist, spw, observing_run, imagename_prefix, proj_params, contfile, linesfile, imaging_params, processing_intents)
@@ -33,7 +33,7 @@ class ImageParamsHeuristicsFactory:
             return ImageParamsHeuristicsALMASrdp(vislist, spw, observing_run, imagename_prefix, proj_params, contfile, linesfile, imaging_params, processing_intents)
         if imaging_mode in ['VLA', 'JVLA', 'EVLA']:  # VLA but not VLASS
             # VLA-PI standard
-            return ImageParamsHeuristicsVLA(vislist, spw, observing_run, imagename_prefix, proj_params, contfile, linesfile, imaging_params, processing_intents, bandfields, band)
+            return ImageParamsHeuristicsVLA(vislist, spw, observing_run, imagename_prefix, proj_params, contfile, linesfile, imaging_params, processing_intents)
         if imaging_mode in ['VLA-SCAL', 'JVLA-SCAL', 'EVLA-SCAL']:
             # VLA-PI self-calibration
             return ImageParamsHeuristicsVLAScal(vislist, spw, observing_run, imagename_prefix, proj_params, contfile, linesfile, imaging_params, processing_intents)

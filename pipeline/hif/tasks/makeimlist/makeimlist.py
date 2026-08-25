@@ -3,7 +3,6 @@ import operator
 import os
 
 import numpy as np
-from collections import defaultdict
 
 import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
@@ -15,7 +14,6 @@ from pipeline.domain import DataType
 from pipeline.hif.heuristics import imageparams_factory
 from pipeline.hif.tasks.makeimages.resultobjects import MakeImagesResult
 from pipeline.infrastructure import casa_tools, task_registry
-from pipeline.hif.heuristics.mosaic_detection import MosaicDetectionHeuristics
 
 from .cleantarget import CleanTarget, CleanTargetInfo
 from .resultobjects import MakeImListResult
@@ -846,7 +844,7 @@ class MakeImList(basetask.StandardTaskTemplate):
             vislists = list(sessionutils.group_vislist_into_sessions(inputs.context, inputs.vis).values())
         else:
             vislists = [inputs.vis]
-        band_fields = defaultdict(set)
+
         if 'VLA' in imaging_mode:
             ref_ms = inputs.context.observing_run.get_ms(inputs.vis[0])
             vla_band = ref_ms.get_vla_spw2band()
@@ -854,14 +852,6 @@ class MakeImList(basetask.StandardTaskTemplate):
             for k, v in vla_band.items():
                 if str(k) in spwlist:
                     band_spws.setdefault(v, []).append(k)
-            fields = ref_ms.get_fields()
-
-            for field in fields:
-                field_name = field.name
-                for spw in field.valid_spws:
-                    band = vla_band.get(spw.id)
-                    if band is not None:
-                        band_fields[band].add(field_name)
         elif 'ALMA' in imaging_mode:
             ref_ms = inputs.context.observing_run.get_ms(inputs.vis[0])
             band_spws = {}
@@ -892,8 +882,6 @@ class MakeImList(basetask.StandardTaskTemplate):
                         imagename_prefix = inputs.context.observing_run.get_ms(vislist[0]).session
                     else:
                         imagename_prefix = inputs.context.project_structure.ousstatus_entity_id
-                    # PIPE-684: bandfields and band parameters are added to heuristics to support VLA mosaic detection and
-                    # ignored in the cases other than VLA. The heuristics will return the same results as before for non-VLA cases.
                     self.heuristics = image_heuristics_factory.getHeuristics(
                         vislist=vislist,
                         spw=spw,
@@ -904,9 +892,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                         linesfile=inputs.linesfile,
                         imaging_params=inputs.context.imaging_parameters,
                         processing_intents=inputs.context.processing_intents,
-                        imaging_mode=imaging_mode,
-                        bandfields=band_fields,
-                        band=band
+                        imaging_mode=imaging_mode
                     )
                     if inputs.specmode == 'cont':
                         # Make sure the spw list is sorted numerically
@@ -1195,9 +1181,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                             for spwspec in min_freq_spwlist:
 
                                 try:
-
                                     field_ids = self.heuristics.field(field_intent[1], field_intent[0], vislist=vislist_field_intent_spw_combinations[field_intent]['vislist'])
-
                                     # Image size (FOV) may be determined depending on the fractional bandwidth of the
                                     # selected spectral windows. In continuum spectral mode pass the spw list string
                                     # to imsize heuristics (used only for VLA), otherwise pass None to disable the feature.
@@ -1303,7 +1287,6 @@ class MakeImList(basetask.StandardTaskTemplate):
                     for field_intent in sorted_field_intent_list:
                         # TODO: PIPE-684: check if mosweight needs to be updated for comma seperated fields
                         mosweight = self.heuristics.mosweight(field_intent[1], field_intent[0])
-
                         for spwspec in filtered_spwlist_local:
                             # Start with original vis list
                             vislist_field_intent_spw_combinations[field_intent]['vislist'] = original_vislist_field_intent_spw_combinations[field_intent]['vislist']
@@ -1553,7 +1536,6 @@ class MakeImList(basetask.StandardTaskTemplate):
 
                                 reffreq = target_heuristics.reffreq(deconvolver, inputs.specmode, spwsel)
                                 target_heuristics.imaging_params['allow_wproject'] = inputs.allow_wproject
-
                                 gridder = target_heuristics.gridder(field_intent[1], field_intent[0], spwspec=actual_spwspec)
 
                                 # Get field-specific uvrange value
