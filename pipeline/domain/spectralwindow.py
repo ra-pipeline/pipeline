@@ -391,7 +391,7 @@ class SpectralWindow:
         self.bandwidth = measures.Frequency(bandwidth, measures.FrequencyUnits.HERTZ)
 
         ref_freq_hz = casa_tools.quanta.convertfreq(ref_freq['m0'], 'Hz')
-        ref_freq_val = casa_tools.quanta.getvalue(ref_freq_hz)[0]
+        ref_freq_val = casa_tools.quanta.getvalue(ref_freq_hz).item()
         self.ref_frequency = measures.Frequency(ref_freq_val, measures.FrequencyUnits.HERTZ)
         self._ref_frequency_frame = ref_freq['refer']
 

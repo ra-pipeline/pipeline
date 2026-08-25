@@ -19,7 +19,7 @@ def hifa_tsysflagcontamination(
     Identifies and flags channel ranges in the Tsys spectrum where astronomical line emission is detected.
     Differences in line emission profiles due to variations in spatial position and spectral resolution between
     the Tsys spectrum and the autocorrelation spectrum can introduce mis-calibration in the affected channels.
-    This task corrects the Tsys contamination; :py:func:`hifa_renorm <hifa_renorm>` handles the corresponding autocorrelation issue.
+    This task corrects the Tsys contamination; :func:`~pipeline.hifa.cli.hifa_renorm` handles the corresponding autocorrelation issue.
 
     The heuristics compare Tsys spectra from CALIBRATE_ATMOSPHERE scans toward the science source (and
     sometimes the phase calibrator) against the Tsys spectrum from the bandpass calibrator. The hypothesis is
@@ -36,7 +36,7 @@ def hifa_tsysflagcontamination(
 
     The WebLog report shows three sections:
 
-    1. Tsys plots similar to those from :py:func:`h_tsyscal <h_tsyscal>` / :py:func:`hifa_tsysflag <hifa_tsysflag>` but with the detected contaminated
+    1. Tsys plots similar to those from :func:`~pipeline.h.cli.h_tsyscal` / :func:`~pipeline.hifa.cli.hifa_tsysflag` but with the detected contaminated
        ranges already flagged.
     2. Diagnostic plots — a two-panel graph per source (CALIBRATE_ATMOSPHERE intent), per spw, per EB.
        The left panel shows the averaged Tsys toward the science fields (blue), toward the bandpass (orange),
@@ -60,7 +60,7 @@ def hifa_tsysflagcontamination(
         - QA = 0.6 with a warning message in any of the following cases:
 
           - 'Large difference between the bandpass telluric line and...' — an uncorrected telluric residual
-            may also appear in the autocorrelations and may need manual flagging in :py:func:`hifa_renorm <hifa_renorm>`.
+            may also appear in the autocorrelations and may need manual flagging in :func:`~pipeline.hifa.cli.hifa_renorm`.
           - 'Astronomical contamination covering a wide frequency range...' — the identified range is too
             wide to be reliable; no flagging was done.
           - 'Large residuals...' — the hypothesis that Tsys profiles should be similar is not fulfilled;

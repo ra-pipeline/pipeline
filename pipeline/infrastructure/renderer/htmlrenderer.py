@@ -43,6 +43,22 @@ if TYPE_CHECKING:
 LOG = infrastructure.logging.get_logger(__name__)
 
 
+def format_correlation_bits(ms, spw):
+    """Format the correlation-bits value for the Spectral Setup Details weblog page."""
+    correlation_bits = spw.correlation_bits
+
+    if correlation_bits == 'UNKNOWN':
+        return 'Unknown'
+
+    if correlation_bits:
+        return correlation_bits
+
+    if ms.correlator_name == 'ALMA_ACA':
+        return 'BITS_4x4'
+
+    return 'Unknown'
+
+
 def get_task_description(result_obj, context, include_stage=True):
     if not isinstance(result_obj, (list, basetask.ResultsList)):
         return get_task_description([result_obj, ], context)
@@ -991,12 +1007,12 @@ class T2_1DetailsRenderer:
         zd = [zd_val for field_data in data.values() for zd_val in field_data['zd']]
         telmjd = [time.timestamp() for field_data in data.values() for time in field_data['telmjd']]
         # Retrieve min, average, and max zenith angle measurements and corresponding timestamps
-        zd_min, zd_avg, zd_max = np.min(zd), np.average(zd), np.max(zd)
-        telmjd_min, telmjd_avg, telmjd_max = telmjd[zd.index(zd_min)], np.average(telmjd), telmjd[zd.index(zd_max)]
-
-        # Create zenith angle vs time plot
-        task = summary.ZDTELMJDChart(context, ms, data)
-        zd_vs_telmjd_plot = task.plot()
+        if len(zd) > 0:
+            zd_min, zd_avg, zd_max = np.min(zd), np.average(zd), np.max(zd)
+            telmjd_min, telmjd_avg, telmjd_max = telmjd[zd.index(zd_min)], np.average(telmjd), telmjd[zd.index(zd_max)]
+        else:
+            zd_min = zd_avg = zd_max = None
+            telmjd_min = telmjd_avg = telmjd_max = None
 
         dirname = os.path.join('session%s' % ms.session, ms.basename)
 
@@ -1065,23 +1081,22 @@ class T2_1DetailsRenderer:
             'weather_plot'    : weather_plot,
             'pwv_plot'        : pwv_plot,
             'azel_plot'       : azel_plot,
-            'el_vs_time_plot' : el_vs_time_plot,
-            'zd_telmjd_plot'  : zd_vs_telmjd_plot,
-            'is_singledish'   : utils.contains_single_dish(context),
-            'pointing_plot'   : pointing_plot,
-            'el_min'          : el_min,
-            'el_max'          : el_max,
-            'zd_min'          : round(zd_min, 2),
-            'zd_avg'          : round(zd_avg, 2),
-            'zd_max'          : round(zd_max, 2),
-            'telmjd_min'      : utils.format_datetime(
+            'el_vs_time_plot': el_vs_time_plot,
+            'is_singledish': utils.contains_single_dish(context),
+            'pointing_plot': pointing_plot,
+            'el_min': el_min,
+            'el_max': el_max,
+            'zd_min': round(zd_min, 2) if zd_min is not None else None,
+            'zd_avg': round(zd_avg, 2) if zd_avg is not None else None,
+            'zd_max': round(zd_max, 2) if zd_max is not None else None,
+            'telmjd_min': utils.format_datetime(
                 datetime.datetime.fromtimestamp(telmjd_min, tz=datetime.timezone.utc)
-                ),
-            'telmjd_avg'      : utils.format_datetime(
-                datetime.datetime.fromtimestamp(telmjd_avg, tz=datetime.timezone.utc)),
-            'telmjd_max'      : utils.format_datetime(
-                datetime.datetime.fromtimestamp(telmjd_max, tz=datetime.timezone.utc)),
-            'vla_basebands'   : vla_basebands
+            ) if telmjd_min is not None else None,
+            'telmjd_avg': utils.format_datetime(
+                datetime.datetime.fromtimestamp(telmjd_avg, tz=datetime.timezone.utc)) if telmjd_avg is not None else None,
+            'telmjd_max': utils.format_datetime(
+                datetime.datetime.fromtimestamp(telmjd_max, tz=datetime.timezone.utc)) if telmjd_max is not None else None,
+            'vla_basebands': vla_basebands
         }
 
     @classmethod
@@ -1266,8 +1281,11 @@ class T2_2_4Renderer(T2_2_XRendererBase):
         el_vs_time_plot = task.plot()
 
         data = compute_zd_telmjd_for_ms(ms)
-        task = summary.ZDTELMJDChart(context, ms, data)
-        zd_vs_telmjd_plot = task.plot()
+        if data:
+            task = summary.ZDTELMJDChart(context, ms, data)
+            zd_vs_telmjd_plot = task.plot()
+        else:
+            zd_vs_telmjd_plot = None
 
         # Create U-V plot, if necessary.
         if utils.contains_single_dish(context):

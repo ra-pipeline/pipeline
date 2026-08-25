@@ -590,6 +590,10 @@ class Tclean(cleanbase.CleanBase):
         # For ALMA this is already done at the hif_makeimlist step. For VLASS
         # this does not (yet) happen in hif_editimlist.
         sourcename = self.image_heuristics.get_sourcename(inputs.vis, inputs.field, inputs.intent)
+        # PIPE-3169: dequote the sourcename to avoid potential issues with the cont_ranges_spwsel dictionary 
+        # key lookup, if the heuristics method itself does not dequote the sourcename. This is a temporary fix
+        # until the heuristics code is updated to handle quotations consistently.
+        sourcename = utils.dequote(sourcename)
 
         if inputs.spwsel_lsrk == {}:
             all_continuum = True

@@ -204,8 +204,8 @@ class AntennaArray:
             Function to return the position difference along the attr axis between two
             antennas. 
             """
-            v1 = qa.getvalue(ant1.offset[attr])[0]
-            v2 = qa.getvalue(ant2.offset[attr])[0]
+            v1 = qa.getvalue(ant1.offset[attr]).item()
+            v2 = qa.getvalue(ant2.offset[attr]).item()
             return v1-v2
 
         for (ant1, ant2) in itertools.combinations(antennas, 2):
