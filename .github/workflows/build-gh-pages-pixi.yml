@@ -67,7 +67,11 @@ jobs:
     # Only deploy if the push came from the specific branch / ubuntu-latest
     if: github.ref == 'refs/heads/main'
     permissions:
-      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Download Artifacts
         uses: actions/download-artifact@v4
@@ -75,8 +79,11 @@ jobs:
           name: documentation-ubuntu-latest
           path: site_content
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: site_content
+          path: site_content
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
