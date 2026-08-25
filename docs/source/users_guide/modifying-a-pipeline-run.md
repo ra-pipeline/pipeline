@@ -34,7 +34,7 @@ In the **rawdata/** directory:
 
 In the **working/** directory:
 - Modify the pipeline "helper" files as desired (e.g. editing the `*flagtemplate.txt` file to add any additional flags — see {ref}`Description of Pipeline Helper Text Files <sec-helperfiledescription>` for other options).
-- Edit `casa_pipescript.py` to only include the pipeline steps you wish to repeat (e.g. commenting out the {func}`~pipeline.hif.cli.hif_findcont` or imaging steps, which are very computationally expensive).
+- Edit `casa_pipescript.py` to only include the pipeline steps you wish to repeat (e.g. commenting out the {func}`~pipeline.hif.cli.hif_findcont` or imaging steps, which are very computationally expensive), and to point to the raw ASDMs in the rawdata directory by specifying vis = "../rawdata/uid..." in the hifa_importdata stage for each execution block (EB). 
 - Start the version of CASA containing Pipeline using `casa --pipeline`
 - You are now ready to run the script by typing `execfile('casa_pipescript.py')`. Alternatively, you can sequentially execute individual commands from `casa_pipescript.py`, stopping at any point to run other CASA commands ({func}`~casaplotms.plotms`, etc).
 
