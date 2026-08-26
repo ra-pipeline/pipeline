@@ -1167,17 +1167,22 @@ def score_vla_agents(ms, summaries):
             qascore_list.append(pqa.QAScore(score_val, longmsg=msg, shortmsg=msg, origin=origin))
 
     # PIPE-2576: Part-2: if clipping > 1% with spectral line window
-    # indentified, score < 0.5
+    # identified, score scales from 0.3 to 0 based on clipping fraction
+    # PIPE-3216: Scale score based on flag fraction to enable proper sorting
     is_continuum_only = True
     for flag_stat in summaries:
         if flag_stat['name'] == 'clip':
             for spw_id in flag_stat['spw'].keys():
                 spw = ms.get_spectral_window(spw_id)
-                flag_fraction = flag_stat['spw'][spw_id]['flagged'] / flag_stat['spw'][spw_id]['total']
+                total = flag_stat['spw'][spw_id]['total']
+                if total == 0:
+                    continue
+                flag_fraction = flag_stat['spw'][spw_id]['flagged'] / total
                 if spw.specline_window and is_continuum_only:
                     is_continuum_only = False
                 if spw.specline_window and flag_fraction > 0.01:
-                    score_val = 0.3
+                    # Scale score linearly from 0.3 (low clipping) to 0 (full clipping)
+                    score_val = max(0.0, 0.3 * (1 - flag_fraction))
                     msg = f'Clipping {flag_fraction:.2%} in spectral line spw {spw_id}.'
                     origin = pqa.QAOrigin(
                         metric_name='score_flagdata',
@@ -1186,19 +1191,27 @@ def score_vla_agents(ms, summaries):
                     )
                     qascore_list.append(pqa.QAScore(score_val, longmsg=msg, shortmsg=msg, origin=origin))
 
-    # PIPE-2576: Part-3:  if clipping > 5% with continuum line window
+    # PIPE-2576: Part-3:  if clipping > 5% with continuum window
+    # identified, score scales from 0.3 to 0 based on clipping fraction
+    # PIPE-3216: Apply per-spw scoring for continuum windows with same scaling
     for flag_stat in summaries:
         if flag_stat['name'] == 'clip' and is_continuum_only:
-            flag_fraction = flag_stat['flagged'] / flag_stat['total']
-            if flag_fraction > 0.05:
-                score_val = 0.3
-                msg = f'Clipping {flag_fraction:.2%} in continuum spw(s).'
-                origin = pqa.QAOrigin(
-                    metric_name='score_flagdata',
-                    metric_score=score_val,
-                    metric_units='Fraction of data that is flagged in clipping',
-                )
-                qascore_list.append(pqa.QAScore(score_val, longmsg=msg, shortmsg=msg, origin=origin))
+            for spw_id in flag_stat['spw'].keys():
+                spw = ms.get_spectral_window(spw_id)
+                total = flag_stat['spw'][spw_id]['total']
+                if total == 0:
+                    continue
+                flag_fraction = flag_stat['spw'][spw_id]['flagged'] / total
+                if flag_fraction > 0.05:
+                    # Scale score linearly from 0.3 (low clipping) to 0 (full clipping)
+                    score_val = max(0.0, 0.3 * (1 - flag_fraction))
+                    msg = f'Clipping {flag_fraction:.2%} in continuum spw {spw_id}.'
+                    origin = pqa.QAOrigin(
+                        metric_name='score_flagdata',
+                        metric_score=score_val,
+                        metric_units='Fraction of data that is flagged in clipping',
+                    )
+                    qascore_list.append(pqa.QAScore(score_val, longmsg=msg, shortmsg=msg, origin=origin))
 
     # PIPE-2576: Part-4: if total flagging >30%, score < 0.5
     if summaries:
