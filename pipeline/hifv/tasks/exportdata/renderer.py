@@ -32,8 +32,7 @@ class T2_4MDetailsVLAExportDataRenderer(basetemplates.T2_4MDetailsDefaultRendere
             r.targetimages_aux_merged = self._merge_image_table(targetimages, 'auxfitsfiles')
 
     def _merge_image_table(self, image_list, fitsfiles_key):
-        """
-        Convert image data to merged table rows using merge_td_columns.
+        """Convert image data to merged table rows using merge_td_columns.
 
         Args:
             image_list: List of image dictionaries containing sourcename, sourcetype, spwlist, and fitsfiles
@@ -46,10 +45,10 @@ class T2_4MDetailsVLAExportDataRenderer(basetemplates.T2_4MDetailsDefaultRendere
         for image in image_list:
             for fitsfile in image.get(fitsfiles_key, []):
                 rows.append((
-                    image.get('sourcename', ''),
+                    utils.wrap_long_str(image.get('sourcename', ''), newline='<br>'),
                     image.get('sourcetype', ''),
                     image.get('spwlist', ''),
-                    os.path.basename(fitsfile)
+                    os.path.basename(fitsfile),
                 ))
 
         # Apply merge_td_columns to merge identical values in first 3 columns
