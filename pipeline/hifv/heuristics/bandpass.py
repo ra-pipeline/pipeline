@@ -234,6 +234,10 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
     # re-run the low-SNR SPWs individually with smoothing
     for bad_spw in low_snr_spws:
         snr = median_snrs[bad_spw]
+        # if S/N is very low, skip this SPW
+        if math.isclose(snr, 0.0, abs_tol=1e-6):
+            LOG.warning("SPW %s: median S/N ≈ 0, skipping bandpass re-run", bad_spw)
+            continue
         nchan = m.get_spectral_window(bad_spw).num_channels
         if nchan < 16:
             continue
@@ -248,11 +252,11 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
         solint_smooth = f"inf,{int(Nbin)}ch"
 
         LOG.info(f"SPW {bad_spw}: median S/N={snr:.1f}, rerunning with solint='{solint_smooth}'")
-
+        append = os.path.exists(caltable)
         bandpass_task_args.update({
             'spw': str(bad_spw),
             'solint': solint_smooth,
-            'append': True,
+            'append': append,
         })
 
         job = casa_tasks.bandpass(**bandpass_task_args)
