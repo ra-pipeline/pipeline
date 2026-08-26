@@ -7,7 +7,7 @@ import pipeline.infrastructure.renderer.logger as logger
 
 
 SourceSummaryRow = collections.namedtuple('SourceSummaryRow', 'source spw_summary roi_summary')
-ArtifactLink = collections.namedtuple('ArtifactLink', 'label href')
+ArtifactLink = collections.namedtuple('ArtifactLink', 'label href filename is_viewable')
 PlotLink = collections.namedtuple(
     'PlotLink', 'field spw href thumbnail positive_roi_ranges evidence_status'
 )
@@ -41,14 +41,16 @@ class T2_4MDetailsFindROIRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
         artifact_links = []
         for label, key in (
-            ('Full stage product pickle', 'results_pickle'),
-            ('FindROI products tar', 'findroi_products_tar'),
             ('ROI.dat', 'roi_dat'),
             ('ROIcont.dat', 'roi_cont_dat'),
         ):
             href = self._copy_artifact(result.artifacts.get(key), weblog_dir, pipeline_context.report_dir)
             if href:
-                artifact_links.append(ArtifactLink(label, href))
+                # Extract actual filename from href path
+                actual_filename = os.path.basename(href)
+                # Determine if file is viewable based on extension (text files only)
+                is_viewable = any(actual_filename.endswith(ext) for ext in ('.dat', '.txt', '.csv'))
+                artifact_links.append(ArtifactLink(label, href, actual_filename, is_viewable))
 
         plot_links = []
         summary_plots = result.artifacts.get('summary_plots') or {}

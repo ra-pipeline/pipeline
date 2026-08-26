@@ -1088,12 +1088,13 @@ class UVChart:
     # search for sources with other intents
     preferred_intent_order = ['TARGET', 'AMPLITUDE', 'BANDPASS', 'PHASE']
 
-    def __init__(self, context, ms, customflagged=False, output_dir=None, title_prefix=None):
+    def __init__(self, context, ms, custom_plot_flags:dict=None, customflagged=False, output_dir=None, title_prefix=None):
         self.context = context
         self.ms = ms
         self.customflagged = customflagged
         self.figfile = self._get_figfile(output_dir=output_dir)
-
+        self.custom_plot_flags = None
+        
         # Get spw_id, field, field_name, and intent to plot.
         self.spw_id, self.field, self.field_name, self.intent = self._get_spwid_and_field()
 
@@ -1111,7 +1112,10 @@ class UVChart:
             wavelength_m = 299792458 / float(spw.max_frequency.to_units(measures.FrequencyUnits.HERTZ))
             bl_max = float(ms.antenna_array.baseline_max.length.to_units(measures.DistanceUnits.METRE))
             self.uv_max = math.ceil(1.05 * bl_max / wavelength_m)
-
+            # PIPE-1780
+            if custom_plot_flags is not None:
+                self.custom_plot_flags = custom_plot_flags
+                
     def plot(self):
         if DISABLE_PLOTMS:
             LOG.debug('Disabling UV coverage plot due to problems with plotms')
@@ -1142,7 +1146,11 @@ class UVChart:
             'height': 1000,
             'width': 1000
         }
-
+        # PIPE-1780: Include additional plotting flags; plot reduced
+        # number of channels(performance optimisation).
+        if self.custom_plot_flags is not None:
+            task_args.update(self.custom_plot_flags)
+        
         task = casa_tasks.plotms(**task_args)
 
         if not os.path.exists(self.figfile):
