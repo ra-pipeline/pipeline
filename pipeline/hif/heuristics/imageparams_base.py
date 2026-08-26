@@ -165,7 +165,7 @@ class ImageParamsHeuristics:
             source_names.extend(s.name for s in ms_ref.sources)
 
         contfile = self.contfile if self.contfile is not None else ''
-        
+
         # Also collect field names from contfile (handles composite mosaic sources created by heuristics).
         # VLA mosaics use composite field names (e.g., "Field_A,Field_B") in contfile
         # that don't exist individually in MS source table.
@@ -192,7 +192,7 @@ class ImageParamsHeuristics:
 
         # read and merge continuum regions if contfile exists
         if contfile_handler is not None:
-            LOG.info('Using continuum frequency ranges from %s to calculate continuum frequency selections.' % (contfile))
+            LOG.info('Using continuum frequency ranges from %s to calculate continuum frequency selections.', contfile)
 
             # Collect the merged the ranges
             for field_name in cont_ranges_spwsel:
@@ -202,7 +202,7 @@ class ImageParamsHeuristics:
 
         # alternatively read and merge line regions and calculate continuum regions
         elif os.path.isfile(linesfile):
-            LOG.info('Using line frequency ranges from %s to calculate continuum frequency selections.' % (linesfile))
+            LOG.info('Using line frequency ranges from %s to calculate continuum frequency selections.', linesfile)
 
             p = re.compile(r'([\d.]*)(~)([\d.]*)(\D*)')
             try:

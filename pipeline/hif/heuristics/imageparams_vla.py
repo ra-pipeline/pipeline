@@ -3,14 +3,13 @@ import re
 import traceback
 
 import numpy as np
-
 import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.filenamer as filenamer
+import pipeline.infrastructure.utils as utils
 from pipeline.hif.heuristics.mosaic_detection import MosaicDetectionHeuristics
 from pipeline.infrastructure import casa_tasks, casa_tools
 from pipeline.infrastructure.tablereader import find_EVLA_band
-import pipeline.infrastructure.utils as utils
 
 from .auto_selfcal.selfcal_helpers import estimate_near_field_SNR, estimate_SNR
 from .imageparams_base import ImageParamsHeuristics
@@ -859,8 +858,6 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         """
         return True
 
-
-
     @staticmethod
     def find_good_medianbeam(psf_filename: str, field: str, spw: str):
         """Find outlier beams and calculate a good "median" restoring beam recommendation.
@@ -1080,14 +1077,24 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         self._fields_for_spws_cache = fields
         return fields
 
-    def field_intent_list(self, intent: str, field: str):
-        """Determine the list of (field, intent) tuples for VLA single field
-        and mosaic imaging."""
+    def field_intent_list(self, intent: str, field: str) -> set[tuple[str, str]]:
+        """Determine the list of (field, intent) tuples for VLA single field and mosaic imaging.
 
+        Detects mosaic observations by clustering overlapping pointings using spatial analysis.
+        For mosaics, returns comma-separated field names. For single fields, returns individual
+        field names.
+
+        Args:
+            intent: Observation intent to filter by.
+            field: Field selection (may be unused if auto-detecting from spws).
+
+        Returns:
+            Set of (field_names, intent) tuples where field_names may be comma-separated
+            for mosaic groups.
+        """
         ms = self.observing_run.get_measurement_sets()[0]
         ref_freq = [ms.get_spectral_window(spw).ref_frequency for spw in self.spwlist]
         freq = np.mean(ref_freq)
-        mosaic_heuristics = MosaicDetectionHeuristics()
 
         # Get fields observed with current spws (direct spw→field relationship)
         target_fields = self._get_fields_for_current_spws()
@@ -1095,20 +1102,30 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         # For VLA, hpbw (in arcseconds) = 42.0e9 / observing frequency in Hz * 60.0
         hpbw = 42.0e9 / float(freq.value) * 60.0  # hpbw in arcseconds
 
-        mosaic_fields, single_fields = mosaic_heuristics.check_targets_for_mosaic(self.observing_run, self.vislist, target_fields, hpbw)
+        # Detect mosaics using spatial clustering
+        mosaic_fields, single_fields = MosaicDetectionHeuristics.check_targets_for_mosaic(
+            self.observing_run, self.vislist, target_fields, hpbw
+        )
 
+        # If no mosaics detected, use default behavior
         if not mosaic_fields:
             return super().field_intent_list(intent=intent, field=field)
 
+        # Collect all field-intent tuples from parent class
         field_intent_list_temp = []
+
+        # Process mosaic clusters (comma-separated field names)
         for mosaic_field in mosaic_fields.values():
             for cluster in mosaic_field:
-                cluster_name = ",".join(cluster)
+                cluster_name = ','.join(cluster)
                 field_intent_list_temp.append(super().field_intent_list(intent=intent, field=cluster_name))
+
+        # Process single fields
         for single_field in single_fields.values():
             for f in single_field:
                 field_intent_list_temp.append(super().field_intent_list(intent=intent, field=f))
 
+        # Group field names by intent and create final set
         mosaic_intent_list = set()
         for element in field_intent_list_temp:
             # Group names by intent within this set
@@ -1117,7 +1134,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
                 intent_groups.setdefault(grp_intent, []).append(name)
             # Add each group as a tuple to output
             for grp_intent, names in intent_groups.items():
-                names_str = ",".join(sorted(names))
+                names_str = ','.join(sorted(names))
                 mosaic_intent_list.add((names_str, grp_intent))
 
         return mosaic_intent_list

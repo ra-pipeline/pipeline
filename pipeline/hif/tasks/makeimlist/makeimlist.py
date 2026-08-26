@@ -3,7 +3,6 @@ import operator
 import os
 
 import numpy as np
-
 import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -1452,6 +1451,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                                                                         specmode=specmode, band=band, datatype=datatype_suffix)
                             else:
                                 imagename = inputs.imagename
+
                             if inputs.nbins != '' and inputs.specmode != 'cont':
                                 nbin_items = inputs.nbins.split(',')
                                 nbins_dict = {}
@@ -1514,11 +1514,9 @@ class MakeImList(basetask.StandardTaskTemplate):
 
                                 drcorrect, maxthreshold = self._get_drcorrect_maxthreshold(
                                     field_intent[0], actual_spwspec, local_selected_datatype_str)
-
                                 target_heuristics.imaging_params['maxthreshold'] = maxthreshold
                                 nfrms_multiplier = self._get_nfrms_multiplier(
                                     field_intent[0], actual_spwspec, local_selected_datatype_str)
-
                                 target_heuristics.imaging_params['nfrms_multiplier'] = nfrms_multiplier
 
                                 deconvolver, nterms = self._get_deconvolver_nterms(field_intent[0], field_intent[1],
