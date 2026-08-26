@@ -512,6 +512,22 @@ reports `UNKNOWN`, but the pipeline wasn't passing that through).
 <br>
 <br>
 <br>
+**{func}`~pipeline.hifa.cli.hifa_importdata` Intent Separation Angles.**
+{jira}`PIPE-65` adds a table and plot into the WebLog as to provide the separation angles between the
+respective TARGET and PHASE and PHASE and CHECK intents. If there are >5 TARGETs,
+the table reports only the least and most distant from the PHASE calibrator. For mosaics,
+a median field position is used, while the source name is suffixed with "mosaic".
+A large plus symbol represents each intent, while field IDs are annotated.  
+```{figure} whatsnew/PIPE65_importdata_PL2026_new.png
+---
+width: 1062px
+align: center
+---
+```
+
+<br>
+<br>
+
 **{func}`~pipeline.hifa.cli.hifa_flagdata` / {func}`~pipeline.hif.cli.hif_applycal` QA-score re-tuning.**
 {jira}`PIPE-3036` and
 {jira}`PIPE-3037` shift the
