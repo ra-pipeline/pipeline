@@ -109,6 +109,7 @@ def test_getTau_partial():
                  |=========|---------------------------------|
       tau chan: 128           100                            0
                  |-------------|=============================|
+
     If the bug emerges, resulting tau will be negative.
     """
     tau_base = get_reference_tau()
