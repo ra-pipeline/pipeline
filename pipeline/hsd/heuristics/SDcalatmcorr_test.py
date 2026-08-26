@@ -105,10 +105,10 @@ def test_getTau_partial():
     is shown below. "=" indicates selected channels.
 
     freq (LSB): low                                         high
-      spw chan:  99        0
-                 |=========|---------------------------------|
-      tau chan: 127            99                            0
-                 |-------------|=============================|
+      spw chan:  99     0
+      (1024ch)   |======|------------------------------------|
+      tau chan:                99                            0
+      (128ch)    |-------------|=============================|
 
     If the bug emerges, resulting tau will be negative.
     """
