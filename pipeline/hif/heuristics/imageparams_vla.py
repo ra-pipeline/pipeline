@@ -1052,10 +1052,10 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
 
     def _get_fields_for_current_spws(self) -> set[str]:
         """Get field names observed with the current spectral windows.
-        
-        Directly uses the spws in self.spwlist to find which fields were observed,
+
+        Directly uses the spw IDs in self.spwids to find which fields were observed,
         avoiding the indirection of deriving band first.
-        
+
         Returns:
             Set of field names observed with any of the current spws.
         """
@@ -1066,7 +1066,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         ref_ms = self.observing_run.get_ms(self.vislist[0])
 
         # Get the set of spw IDs we're currently imaging
-        spw_ids = {spw.id for spw in self.spwlist}
+        spw_ids = self.spwids
 
         # Find all fields observed with any of these spws
         for field in ref_ms.get_fields():
@@ -1093,14 +1093,22 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
             for mosaic groups.
         """
         ms = self.observing_run.get_measurement_sets()[0]
-        ref_freq = [ms.get_spectral_window(spw).ref_frequency for spw in self.spwlist]
-        freq = np.mean(ref_freq)
+        ref_freqs = [
+            float(ms.get_spectral_window(spwid).ref_frequency.to_units(measures.FrequencyUnits.HERTZ))
+            for spwid in self.spwids
+            if ms.get_spectral_window(spwid) is not None
+        ]
+
+        if not ref_freqs:
+            return super().field_intent_list(intent=intent, field=field)
+
+        freq_hz = float(np.mean(ref_freqs))
 
         # Get fields observed with current spws (direct spw→field relationship)
         target_fields = self._get_fields_for_current_spws()
 
         # For VLA, hpbw (in arcseconds) = 42.0e9 / observing frequency in Hz * 60.0
-        hpbw = 42.0e9 / float(freq.value) * 60.0  # hpbw in arcseconds
+        hpbw = (42.0e9 / freq_hz) * 60.0  # hpbw in arcseconds
 
         # Detect mosaics using spatial clustering
         mosaic_fields, single_fields = MosaicDetectionHeuristics.check_targets_for_mosaic(
