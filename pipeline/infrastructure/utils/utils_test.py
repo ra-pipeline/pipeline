@@ -16,7 +16,7 @@ from pipeline.infrastructure.utils import caltable_tools
 from .utils import find_ranges, dict_merge, are_equal, approx_equal, flagged_intervals, \
     get_casa_quantity, fieldname_for_casa, fieldname_clean, \
     get_field_accessor, get_field_identifiers, get_receiver_type_for_spws, place_repr_source_first, \
-    get_taskhistory_fromimage, list_to_str, build_refantignore
+    get_taskhistory_fromimage, list_to_str, build_refantignore, wrap_long_str
 
 if TYPE_CHECKING:
     from typing import Any
@@ -331,3 +331,19 @@ def test_list_to_str_py310(value: Any, expected: str | Callable):
 def test_build_refantignore(refantignore, ignorerefant, expected):
 
     assert build_refantignore(refantignore, ignorerefant) == expected
+
+
+@pytest.mark.parametrize(
+    "item_str, kwargs, expected",
+    [
+        ("short_field", {}, "short_field"),
+        ("field1,field2,field3", {"length": 50}, "field1,field2,field3"),
+        ("field_alpha,field_beta,field_gamma,field_delta", {"length": 20, "newline": "\n"}, "field_alpha,\nfield_beta,field_gamma,field_delta"),
+        ("field_alpha,field_beta,field_gamma,field_delta", {"length": 20, "newline": "<br>"}, "field_alpha,<br>field_beta,field_gamma,field_delta"),
+    ]
+)
+def test_wrap_long_str(item_str, kwargs, expected):
+    """Test wrap_long_str() and verify it is exported in pipeline.infrastructure.utils."""
+    import pipeline.infrastructure.utils as utils
+    assert hasattr(utils, "wrap_long_str")
+    assert wrap_long_str(item_str, **kwargs) == expected

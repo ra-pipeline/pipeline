@@ -90,6 +90,7 @@ __all__ = [
     'remove_trailing_string',
     'string_to_val',
     'validate_url',
+    'wrap_long_str',
 ]
 
 # Import TypedDict definitions from centralized module for type checking only
