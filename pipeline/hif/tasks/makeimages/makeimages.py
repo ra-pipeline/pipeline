@@ -282,9 +282,16 @@ class MakeImages(basetask.StandardTaskTemplate):
                 try:
                     worker_result = task.get_result()
                 except exceptions.PipelineException as ex:
-                    error_msg = ('Cleaning failure for field {!s}, intent {!s}, specmode {!s}, spw {!s}. '
-                                 'Exception from hif_tclean: {!s}'.format(
-                                 target['field'], target['intent'], target['specmode'], target['spw'], ex))
+                    error_msg = (
+                        'Cleaning failure for field {!s}, intent {!s}, specmode {!s}, spw {!s}. '
+                        'Exception from hif_tclean: {!s}'.format(
+                            utils.condense_field_names(target['field']),
+                            target['intent'],
+                            target['specmode'],
+                            target['spw'],
+                            ex,
+                        )
+                    )
                     worker_result = TcleanResult()
                     worker_result.qa.pool.append(pqa.QAScore(0.34, longmsg=error_msg, shortmsg='Cleaning failure'))
                     result.add_result(worker_result, target, outcome='failure')

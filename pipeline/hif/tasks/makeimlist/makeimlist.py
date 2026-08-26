@@ -1000,7 +1000,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                                             valid_data[vis][field_intent][str(observed_spwid)] = self.heuristics.has_data(field_intent_list=[field_intent], spwspec=observed_spwid, vislist=[vis])[field_intent]
                                             if not valid_data[vis][field_intent][str(observed_spwid)] and vis in observed_vis_list:
                                                 LOG.warning('Data for EB {}, field {}, spw {} is completely flagged.'.format(
-                                                    os.path.basename(vis), field_intent[0], observed_spwid))
+                                                    os.path.basename(vis), utils.condense_field_names(field_intent[0]), observed_spwid))
                                             # Aggregated value per vislist (replace with lookup pattern later)
                                             if str(observed_spwid) not in valid_data[str(vislist)][field_intent]:
                                                 valid_data[str(vislist)][field_intent][str(observed_spwid)] = valid_data[vis][field_intent][str(observed_spwid)]
