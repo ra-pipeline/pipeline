@@ -24,24 +24,24 @@ repository between October 2025 and August 2026, targeting release
   {ref}`IF imaging heuristics <lsrk-refactor>`.
 - **`findContinuum` updated to v9.6** with a round of robustness and
   parameter-passing fixes (`uvrange` propagation, empty-baseline crash
-  guards, y-axis limits) ? see {ref}`IF imaging heuristics <findcontinuum>`.
+  guards, y-axis limits) - see {ref}`IF imaging heuristics <findcontinuum>`.
 - **QA-message aggregation rolled out across most SD stages** so that
   repeated warnings for the same metric/score collapse into a single
-  accordion entry in the weblog, matching the IF weblog style ? see
+  accordion entry in the weblog, matching the IF weblog style - see
   {ref}`SD weblog/QA <sd-weblog-qa>`.
 - **Low-SNR bandpass/gain heuristics extended** to {func}`~pipeline.hif.cli.hif_lowgainflag` and
   {func}`~pipeline.hifa.cli.hifa_wvrgcalflag`, reusing the `combine='spw'` + `interp='linearPD'`
-  low-SNR machinery introduced for PL2025 ? see
+  low-SNR machinery introduced for PL2025 - see
   {ref}`IF calibration heuristics <if-calibration>`.
 - **Several QA-score thresholds were re-tuned** (percent-flagged,
   newly-flagged, check-source fit, RepBW mom8fc) based on an analysis of
   "slow lane" false positives, aiming to route more good data through the
-  ALMA FastLane ? see {ref}`IF weblog/QA <if-weblog-qa>`.
+  ALMA FastLane - see {ref}`IF weblog/QA <if-weblog-qa>`.
 - **Single-dish imaging switches from `pseudoI` to true Stokes I** imaging,
-  simplifying the weight-handling pipeline ? see
+  simplifying the weight-handling pipeline - see
   {ref}`SD heuristics <sd-heuristics>`.
 - **Documentation restructuring**: CLI docstrings extracted from the User
-  Guide, a new getting-started guide, and a live dependency specification ?
+  Guide, a new getting-started guide, and a live dependency specification -
   see {ref}`Documentation <documentation>`.
 
 ---
@@ -49,7 +49,7 @@ repository between October 2025 and August 2026, targeting release
 (if-calibration)=
 ## IF calibration heuristic changes
 
-*(not weblog or QA ? see {ref}`IF weblog/QA <if-weblog-qa>` for score/plot changes
+*(not weblog or QA - see {ref}`IF weblog/QA <if-weblog-qa>` for score/plot changes
 to these same tasks)*
 
 **Low-SNR bandpass/gain heuristics extended to more stages.**
@@ -67,9 +67,9 @@ trigger a `combine='spw'` solve for BANDPASS/AMPLITUDE/CHECK/PHASE intents
 {func}`~pipeline.hifa.cli.hifa_timegaincal`); and
 {func}`~pipeline.hifa.cli.hifa_wvrgcalflag` gained the same
 per-spw low-SNR fallback instead of crashing when a gain table ends up fully
-flagged. A regression introduced along the way ? a phase-offset solve step
+flagged. A regression introduced along the way - a phase-offset solve step
 dropped ahead of the new phase-up, which had worsened flagging for a clear
-low-SNR case ? was subsequently corrected.
+low-SNR case - was subsequently corrected.
 ```{figure} whatsnew/Screenshot_2026-06-10_at_6.06.05_PM.png
 ---
 width: 688px
@@ -106,7 +106,7 @@ align: center
 {func}`~pipeline.hifa.cli.hifa_polcalflag` and
 {func}`~pipeline.hifa.cli.hifa_gfluxscaleflag` (via
 `correctedampflag`) to control whether cross-polarization data are examined
-for multi-scan calibrators ? a Band 2 dataset showed the original
+for multi-scan calibrators - a Band 2 dataset showed the original
 same-scan-only assumption from PIPE-607 was too simplistic.
 ```{figure} whatsnew/Band2run.png
 ---
@@ -248,7 +248,7 @@ umbrella ticket. End result:
 set by a prior {func}`~pipeline.hif.cli.hif_makeimlist`
 (previously dropped); it calls `hif_makeimlist` intrinsically instead of
 depending on recipe task ordering, gaining a `coarse`/`normal` mode switch
-that ? after user feedback ? defaults to `'normal'` (matching pre-refactor
+that - after user feedback - defaults to `'normal'` (matching pre-refactor
 behavior); it exposes a `field` parameter for the AUDI/VUDI workflow; two
 crashes on edge cases with very few baseline channels
 (`nanmedian`/`np.min` on an empty channel selection) were fixed; the
@@ -349,7 +349,7 @@ from the pbcor/non-pbcor separation in PIPE-2073.
 a CASA-side behavior change (CAS-9957/CAS-14444) makes the two equivalent.
 That migration in turn let the `WeightMS` subtask's weight-column
 manipulation be skipped entirely, since it produces values consistent with
-what {func}`~casatasks.single.sdbaseline` already sets ?
+what {func}`~casatasks.single.sdbaseline` already sets -
 improving imaging performance.
 *Tickets: {jira}`PIPE-2490`,
 {jira}`PIPE-2671`,
@@ -372,7 +372,7 @@ a metric has no valid values.
 {jira}`PIPE-2945` stops
 {func}`~pipeline.hsd.cli.hsd_skycal` from crashing the whole run
 when it fails to generate a sky caltable for just one of several science
-targets ? it now flags the affected rows and continues processing the rest
+targets - it now flags the affected rows and continues processing the rest
 (with a secondary fix to how the AQUA report reflects the affected metric).
 {jira}`PIPE-2774` revisits the
 `atmtype` selection algorithm in
@@ -448,7 +448,7 @@ diagnostic plots.
 crashes generating the channel-map and missed-line diagnostic plots when a
 clustering-derived line range extends outside the valid channel bounds.
 {jira}`PIPE-2399` fixes inconsistent
-display of flagged data at the {func}`~pipeline.hsd.cli.hsd_blflag` stage ? flagged points above
+display of flagged data at the {func}`~pipeline.hsd.cli.hsd_blflag` stage - flagged points above
 the threshold line were sometimes rendered as unflagged.
 {jira}`PIPE-3192` fixes the
 {func}`~pipeline.hsd.cli.hsd_exportdata` weblog page not
@@ -479,7 +479,7 @@ per-beam XX/YY image products specific to the NRO Pipeline.
 selected-table-object bug causing inconsistent ATM-cal data, and a
 randomly-changing color map in the XX-YY difference plot.
 {jira}`PIPE-2954` fixes a misspelling
-("futher" ? "further") in a warning message.
+("futher" - "further") in a warning message.
 
 ---
 
@@ -537,12 +537,12 @@ align: center
 **{func}`~pipeline.hifa.cli.hifa_wvrgcalflag`.**
 {jira}`PIPE-1868` changes the
 WVRGCALFLAG score for ACA data with insufficient PM antennas from red to
-yellow ? a single flagged PM antenna could previously trigger a red score
+yellow - a single flagged PM antenna could previously trigger a red score
 meant for main-array-scale failures.
 {jira}`PIPE-1316` fixes two ordering
 issues in the {func}`~pipeline.hifa.cli.hifa_wvrgcalflag` weblog table and plots (intent/field
 ordering that changed between CASA versions, and inconsistent per-antenna
-ordering) ? this shares root-cause work with the PIPE-901
+ordering) - this shares root-cause work with the PIPE-901
 deterministic-ordering initiative (see {ref}`Infrastructure <infrastructure>`).
 ```{figure} whatsnew/2022.1.01778.S_after.png
 ---
@@ -663,7 +663,7 @@ turn to
 {func}`~pipeline.hsd.cli.hsd_imaging`
 ({jira}`PIPE-3104`), and finally
 `hsd_k2jycal`, {func}`~pipeline.hsd.cli.hsd_atmcor` and {func}`~pipeline.hsd.cli.hsd_blflag` together
-({jira}`PIPE-3143`) ? {func}`~pipeline.hsd.cli.hsd_skycal`
+({jira}`PIPE-3143`) - {func}`~pipeline.hsd.cli.hsd_skycal`
 is deliberately left for separate treatment since its QA involves nested
 aggregation that doesn't fit the common pattern.
 ```{figure} whatsnew/m100_stage7_accordion.png
@@ -708,7 +708,7 @@ align: center
 channel range for the `hsd_imaging` moment-map plot in LSB data.
 
 **Tsys scan plot (shared page).**
-{jira}`PIPE-2869` ? see
+{jira}`PIPE-2869` - see
 {ref}`IF weblog/QA <if-weblog-qa>` above; this fix applies to the same
 `TsysScansChart` shared by both recipes.
 
@@ -716,12 +716,12 @@ channel range for the `hsd_imaging` moment-map plot in LSB data.
 
 {jira}`PIPE-3138` fixes the AQUA
 report containing sensitivity estimates for more than one
-`IsRepresentative = True` target ? the representative source should be
+`IsRepresentative = True` target - the representative source should be
 unique per MOUS; this turned out to be an SD-specific bug in how the
 representative source is picked (handling of representative source in the
 wider pipeline codebase is out of scope for this fix and needs separate
 IF/SD discussion). See also the general-purpose AQUA-report changes in
-{ref}`IF weblog/QA ? AQUA report <aqua>`, which apply to both recipes.
+{ref}`IF weblog/QA - AQUA report <aqua>`, which apply to both recipes.
 
 ---
 
@@ -751,9 +751,9 @@ in the codebase, maintained as part of the normal PR review process.
 task-level parallelization), which had been inconsistently documented.
 {jira}`PIPE-2870` fixes two wrong CLI
 argument names surfaced during documentation review:
-`hm_resolvecals` ? `hm_resolvedcals` in
+`hm_resolvecals` - `hm_resolvedcals` in
 {func}`~pipeline.hifa.cli.hifa_gfluxscale`, and
-`linesfiles` ? `linesfile` in
+`linesfiles` - `linesfile` in
 {func}`~pipeline.hifa.cli.hifa_fluxcalflag`.
 
 ---
@@ -784,7 +784,7 @@ timestamp-renames the earlier one, sometimes within seconds).
 
 **Timing/performance instrumentation.**
 {jira}`PIPE-2014` improves the
-timing statistics recorded in `timetracker.json` and the weblog ? the
+timing statistics recorded in `timetracker.json` and the weblog - the
 previous "Execution Duration" on the OUS splash page under-counted because
 that page renders before weblog-rendering time is included.
 
