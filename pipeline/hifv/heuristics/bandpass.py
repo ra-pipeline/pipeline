@@ -229,7 +229,10 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
         job = casa_tasks.bandpass(**bandpass_task_args)
         executor.execute(job)
     else:
-        LOG.warning("No SPWs with median S/N ≥ 50, so skipping bandpass run.")
+        LOG.warning(
+            'All SPWs have low median S/N (< 50). Skipping initial high-S/N bandpass solving; '
+            'will attempt to solve each SPW individually with smoothing.'
+        )
     spw_solint = {}
     # re-run the low-SNR SPWs individually with smoothing
     for bad_spw in low_snr_spws:
