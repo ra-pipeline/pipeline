@@ -704,6 +704,7 @@ def getTau(ms: str, spws: list, spwsetup: dict) -> dict:
         Frequency-dependent tau data for SPWs specified by spws
     """
     tau = {}
+    interpolator_cache = {}
     with casa_tools.TableReader(os.path.join(ms, 'ASDM_CALATMOSPHERE')) as tb:
         for spwid in spws:
             bb_name = spwsetup[spwid]["BBname"]
@@ -720,7 +721,9 @@ def getTau(ms: str, spws: list, spwsetup: dict) -> dict:
 
             x, sort_idx = np.unique(fullfreq, return_index=True)
             y = auxtau[sort_idx]
-            taufit = CubicSpline(x, y, bc_type='not-a-knot')
+            if bb_name not in interpolator_cache:
+                interpolator_cache[bb_name] = CubicSpline(x, y, bc_type='not-a-knot')
+            taufit = interpolator_cache[bb_name]
             tau[spwid] = taufit(spwsetup[spwid]['chanfreqs'])
 
     return tau
