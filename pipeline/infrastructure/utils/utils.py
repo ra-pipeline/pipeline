@@ -1141,6 +1141,47 @@ def list_to_str(value: list[Number | str] | NDArray) -> str:
     return ret
 
 
+def wrap_long_str(item_str: str, length: int = 50, newline: str = '\n') -> str:
+    r"""Wraps a long string by inserting newline escape sequences.
+
+    Splits a comma-separated string into multiple lines when it exceeds
+    the specified length limit. Uses modulo arithmetic to detect when
+    adding the next item would wrap past the line length boundary.
+
+    Args:
+        item_str: Comma separated list of items.
+        length: Maximum number of characters in a text line.
+        newline: String to insert for line breaks (e.g., '\n' or '</br>').
+
+    Returns:
+        String with newlines inserted to respect line length limit.
+    """
+    if len(item_str) <= length:
+        return item_str
+
+    item_list = item_str.split(',')
+    wrapped_items = []
+
+    # Process all items except the last one
+    for i in range(len(item_list) - 1):
+        # Check if adding the next item would exceed the line length limit
+        # by comparing the modulo of the string length before and after adding the item
+        current_length_mod = len(','.join(item_list[0:i])) % length
+        next_length_mod = len(','.join(item_list[0 : i + 1])) % length
+
+        if current_length_mod < next_length_mod:
+            # Line length limit not reached yet
+            wrapped_items.append(item_list[i])
+        else:
+            # Line length limit reached, insert linebreak
+            wrapped_items.append(f'{newline}{item_list[i]}')
+
+    # Add the last item without condition
+    wrapped_items.append(item_list[-1])
+
+    return ','.join(wrapped_items)
+
+
 def validate_url(url: str) -> bool:
     """Validates whether a given URL is properly formatted.
 

@@ -1266,9 +1266,10 @@ class MakeImList(basetask.StandardTaskTemplate):
                     # and the source name as the second key.
                     sorted_field_intent_list = sorted(field_intent_list, key=operator.itemgetter(1,0))
 
-                    # In case of TARGET intent place representative source first in the list, except for VLA mosaic
-                    first_field_name, first_intent = sorted_field_intent_list[0]
-                    if 'TARGET' in inputs.intent and "," not in first_field_name:
+                    # In case of TARGET intent place representative source first in the list, except for composite sources
+                    # Check if any field is a composite source (e.g., VLA mosaic with comma-separated field names)
+                    has_composite_source = any("," in field_name for field_name, intent in sorted_field_intent_list)
+                    if 'TARGET' in inputs.intent and not has_composite_source:
                         sorted_field_intent_list = utils.place_repr_source_first(sorted_field_intent_list, repr_source)
 
                     (

@@ -37,27 +37,6 @@ def check_all_targets(result_obj, key, none_values):
     '''
 
     return any([target.get(key, None) not in none_values + [None] for r in result_obj for target in r.targets])
-
-
-def wrap_long_str(item_str, length=50):
-    '''Wraps a long string by inserting newline escape sequence(s).
-
-    :param item_str: comma separated list of items (string)
-    :param length: maximum number of characters in a text line (integer)
-    '''
-    if len(item_str) > length:
-        item_list = item_str.split(',')
-        # An item may have more digits/characters, and commas also contribute to the
-        # string length limit. If the modulo of the string created from the first n
-        # elements is larger than that of the first n+1 elements, then the line length
-        # limit has been reached and a linebreak is inserted.
-        wrapped_item_str = ['%s' % item_list[i] if len(','.join(item_list[0:i])) % length <
-                            len(','.join(item_list[0:i + 1])) % length else '</br> %s' % item_list[i]
-                            for i in range(len(item_list) - 1)] + [item_list[-1]]
-
-        return ','.join(wrapped_item_str)
-    else:
-        return item_str
 %>
 
 <%inherit file="t2-4m_details-base.mako"/>
@@ -139,7 +118,7 @@ This task had an error!
 %for r in result:
     %for target in r.targets:
             <tr>
-                <td>${wrap_long_str(target['field'])}</td>
+                <td>${utils.wrap_long_str(target['field'], newline='<br>')}</td>
                 <td>${target['intent']}</td>
                 <td>${utils.find_ranges(target['spw'])}</td>
                 <td>${target['datatype_info']}</td>
