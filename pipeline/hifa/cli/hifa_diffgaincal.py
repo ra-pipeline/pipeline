@@ -19,13 +19,13 @@ def hifa_diffgaincal(vis=None, flagging_frac_limit=None, hm_spwmapmode=None, mis
     observation. In very long observations, there may be a group of scans
     occurring during the middle.
 
-    The task first performs a temporary phase solution on the "low" frequency
+    The task first performs a temporary phase solution on the low frequency
     "reference" data using ``solint='inf'``. Next, the "phase offset" solution
-    using the "high" frequency "on-source" data is made using scan combination.
+    using the high frequency "on-source" data is made with scan combination.
     Separately combining those scan encompassing the "start" and "end" DIFFGAIN
     blocks respectively. The "reference" gaintable is also pre-applied. Finally,
-    temporary "residual" phase solutions are produced using the "high" frequency
-    data using ``solint='inf'`` while both the "reference" and "phase offset"
+    temporary "residual" phase solutions are produced using the high frequency
+    data with ``solint='inf'`` while both the "reference" and "phase offset"
     phase solutions are pre-applied.
 
     The "residual" solutions are designed as to scatter about zero degrees phase
@@ -79,7 +79,7 @@ def hifa_diffgaincal(vis=None, flagging_frac_limit=None, hm_spwmapmode=None, mis
             - 0.66 if phase `parameter` >=70 deg
 
         :func:`~pipeline.hifa.cli.hifa_diffgaincal` is only used in band-to-band (diffgain) recipes, but other 
-        required pipeline tasks are otherwise DIFFGAIN-aware and handle band-to-band data correctly.
+        required pipeline tasks are DIFFGAIN-aware and handle band-to-band data correctly.
 
     Examples:
         1. Derive SpW phase offsets from differential gain calibrator.
