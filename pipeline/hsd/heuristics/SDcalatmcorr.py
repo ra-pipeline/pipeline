@@ -707,6 +707,7 @@ def getTau(ms: str, spws: list, spwsetup: dict) -> dict:
     with casa_tools.TableReader(os.path.join(ms, 'ASDM_CALATMOSPHERE')) as tb:
         for spwid in spws:
             bb_name = spwsetup[spwid]["BBname"]
+            subtb = None
             try:
                 subtb = tb.query(f'basebandName=="{bb_name}" && syscalType=="TEMPERATURE_SCALE"')
                 fullfreq = subtb.getcell('frequencySpectrum', 0)
@@ -714,7 +715,8 @@ def getTau(ms: str, spws: list, spwsetup: dict) -> dict:
                 # first entry of tau, for the first polarization
                 auxtau = subtb.getcell('tauSpectrum', 0)[0]
             finally:
-                subtb.close()
+                if subtb:
+                    subtb.close()
 
             x, sort_idx = np.unique(fullfreq, return_index=True)
             y = auxtau[sort_idx]
