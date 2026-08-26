@@ -236,7 +236,7 @@ class ImagePreCheck(basetask.StandardTaskTemplate):
         user_maxAllowedBeamAxialRatio = maxAllowedBeamAxialRatio
 
         # Use user selected angular resolution for calculation, if specified
-        if cqa.getvalue(userAngResolution)[0] != 0.0:
+        if cqa.getvalue(userAngResolution).item() != 0.0:
             minAcceptableAngResolution = user_minAcceptableAngResolution
             maxAcceptableAngResolution = user_maxAcceptableAngResolution
             maxAllowedBeamAxialRatio = user_maxAllowedBeamAxialRatio

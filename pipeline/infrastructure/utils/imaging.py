@@ -422,7 +422,7 @@ def velocity_to_frequency(velocity: dict | str, restfreq: dict | str) -> dict | 
     cqa = casa_tools.quanta
     light_speed = float(cqa.getvalue(cqa.convert(cqa.constants('c'), 'km/s'))[0])
     velocity = float(cqa.getvalue(cqa.convert(cqa.quantity(velocity), 'km/s'))[0])
-    val = float(cqa.getvalue(restfreq)[0]) * (1 - velocity / light_speed)
+    val = float(cqa.getvalue(restfreq).item()) * (1 - velocity / light_speed)
     unit = cqa.getunit(restfreq)
     frequency = cqa.tos(cqa.quantity(val, unit))
     return frequency

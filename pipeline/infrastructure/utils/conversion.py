@@ -233,7 +233,7 @@ def get_epoch_as_datetime(epoch: dict) -> datetime.datetime:
     t = mt.getvalue(epoch_utc)['m0']
     t = qt.sub(t, base_time)
     t = qt.convert(t, 's')
-    t = datetime.datetime.fromtimestamp(qt.getvalue(t)[0], datetime.timezone.utc)
+    t = datetime.datetime.fromtimestamp(qt.getvalue(t).item(), datetime.timezone.utc)
 
     return t
 

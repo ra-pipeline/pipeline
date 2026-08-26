@@ -1355,7 +1355,12 @@ class BaselineSubtractionQualityManager(BaselineSubtractionDataManager):
                         'Applied %s times larger number of bins instead.',
                         self.ms.basename, ant_id, spw_id, ipol, stat.nbin_factor
                     )
-                quality_stat = QualityStat(vis=os.path.basename(self.ms.origin_ms), field=source_name, spw=virtual_spw_id, ant=self.ms.antennas[ant_id].name, pol=sd_polmap[ipol], stat=[stat])
+                quality_stat = QualityStat(vis=os.path.basename(self.ms.origin_ms),
+                                           field=source_name,
+                                           spw=spw_id,
+                                           ant=self.ms.antennas[ant_id].name,
+                                           pol=sd_polmap[ipol],
+                                           stat=[stat])
                 baseline_quality_stat.append(quality_stat)
             else:
                 LOG.warning(
