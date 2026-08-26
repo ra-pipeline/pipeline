@@ -203,6 +203,13 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
         executor.execute(job)
 
     # PIPE-2512:  Re-run bandpass for low-S/N SPWs with smoothing
+    # PIPE-3064: Check if caltable exists (may not if band is fully flagged)
+    if not os.path.exists(caltable):
+        LOG.warning(
+            'Bandpass calibration table %s does not exist (band may be fully flagged). Skipping S/N analysis.', caltable
+        )
+        return {}
+
     median_snrs = _compute_median_snr(caltable)
     low_snr_spws = [spw for spw, snr in median_snrs.items() if snr < 50.0]
     good_snr_spws = [spw for spw, snr in median_snrs.items() if snr >= 50.0]
