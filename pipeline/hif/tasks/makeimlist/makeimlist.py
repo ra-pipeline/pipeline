@@ -1271,18 +1271,12 @@ class MakeImList(basetask.StandardTaskTemplate):
                     if 'TARGET' in inputs.intent and "," not in first_field_name:
                         sorted_field_intent_list = utils.place_repr_source_first(sorted_field_intent_list, repr_source)
 
-                    # PIPE-684: cont_ranges_spwsel method iterates over sources from ms. However, it doesnt account for
-                    # mosaic sources. So, creating list of mosaic sources and passing it to the method to get the correct spwsel for mosaic sources.
-                    mosaic_source = []
-                    for field_intent in sorted_field_intent_list:
-                        if len(field_intent[0].split(',')) > 1:
-                            mosaic_source.append(field_intent[0])
                     (
                         cont_ranges_spwsel_dict,
                         all_continuum_spwsel_dict,
                         low_bandwidth_spwsel_dict,
                         low_spread_spwsel_dict
-                    ) = self.heuristics.cont_ranges_spwsel(mosaic_source)
+                    ) = self.heuristics.cont_ranges_spwsel()
 
                     for field_intent in sorted_field_intent_list:
                         # TODO: PIPE-684: check if mosweight needs to be updated for comma seperated fields
@@ -1410,10 +1404,6 @@ class MakeImList(basetask.StandardTaskTemplate):
                                             ' caution.')
                                 no_cont_ranges = True
 
-                            if "," in field_intent[0]:
-                                tmpfield = utils.dequote(field_intent[0].split(",")[0])
-                            else:
-                                tmpfield = utils.dequote(field_intent[0])
                             for spwid in adjusted_spwspec.split(','):
                                 spwsel_spwid = spwsel_spwid_dict[spwid]
                                 if 'ALMA' in imaging_mode and field_intent[1] == 'TARGET' and specmode in ('mfs', 'cont') and not no_cont_ranges:
@@ -1522,11 +1512,11 @@ class MakeImList(basetask.StandardTaskTemplate):
                                            for v in filtered_vislist]
 
                                 drcorrect, maxthreshold = self._get_drcorrect_maxthreshold(
-                                    tmpfield, actual_spwspec, local_selected_datatype_str)
+                                    field_intent[0], actual_spwspec, local_selected_datatype_str)
 
                                 target_heuristics.imaging_params['maxthreshold'] = maxthreshold
                                 nfrms_multiplier = self._get_nfrms_multiplier(
-                                    tmpfield, actual_spwspec, local_selected_datatype_str)
+                                    field_intent[0], actual_spwspec, local_selected_datatype_str)
 
                                 target_heuristics.imaging_params['nfrms_multiplier'] = nfrms_multiplier
 

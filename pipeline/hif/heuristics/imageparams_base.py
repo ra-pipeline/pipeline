@@ -150,7 +150,7 @@ class ImageParamsHeuristics:
 
         return primary_beam_size
 
-    def cont_ranges_spwsel(self, mosaic_sources=[]):
+    def cont_ranges_spwsel(self):
         """Determine spw selection parameters to exclude lines for mfs and cont images."""
 
         # initialize lookup dictionary for all possible source names
@@ -160,11 +160,22 @@ class ImageParamsHeuristics:
         low_spread_spwsel = {}
         source_names = []
 
+        # Collect MS source names
         for ms_ref in self.observing_run.get_measurement_sets():
             source_names.extend(s.name for s in ms_ref.sources)
 
-        if mosaic_sources:
-            source_names.extend(mosaic_sources)
+        contfile = self.contfile if self.contfile is not None else ''
+        
+        # Also collect field names from contfile (handles composite mosaic sources created by heuristics).
+        # VLA mosaics use composite field names (e.g., "Field_A,Field_B") in contfile
+        # that don't exist individually in MS source table.
+        contfile_handler = None
+        if os.path.isfile(contfile):
+            contfile_handler = contfilehandler.ContFileHandler(contfile, warn_nonexist=True)
+            source_names.extend(contfile_handler.cont_ranges.get('fields', {}).keys())
+
+        # Deduplicate source names (same source can appear in multiple MSes or in both MS and contfile)
+        source_names = utils.deduplicate(source_names)
 
         for source_name in source_names:
             cont_ranges_spwsel[source_name] = {}
@@ -177,14 +188,11 @@ class ImageParamsHeuristics:
                 low_bandwidth_spwsel[source_name][str(spwid)] = False
                 low_spread_spwsel[source_name][str(spwid)] = False
 
-        contfile = self.contfile if self.contfile is not None else ''
         linesfile = self.linesfile if self.linesfile is not None else ''
 
         # read and merge continuum regions if contfile exists
-        if os.path.isfile(contfile):
+        if contfile_handler is not None:
             LOG.info('Using continuum frequency ranges from %s to calculate continuum frequency selections.' % (contfile))
-
-            contfile_handler = contfilehandler.ContFileHandler(contfile, warn_nonexist=True)
 
             # Collect the merged the ranges
             for field_name in cont_ranges_spwsel:
@@ -740,7 +748,7 @@ class ImageParamsHeuristics:
                         for scan in ms.scans
                         if field_intent[1] in scan.intents and
                         any(f in [fld.name for fld in scan.fields] for f in field_names_to_check)
-                        ]
+                    ]
 
                     if scanids != []:
                         scanids = ','.join(scanids)
