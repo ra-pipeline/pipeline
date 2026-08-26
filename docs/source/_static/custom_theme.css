@@ -354,8 +354,13 @@ figure figcaption, .figure figcaption, .caption-text {
 }
 
 /* =============================================================================
-   Viewer.js Cursor
+   Viewer.js Image Zoom Overrides & Fixes
    ============================================================================= */
+/* Prevent Viewer.js from collapsing body height or triggering scroll-to-top in Furo theme */
+body.viewer-open {
+    overflow: visible !important;
+}
+
 figure img, .figure img, article img:not(.no-zoom):not(.brand-logo) {
     cursor: zoom-in;
 }

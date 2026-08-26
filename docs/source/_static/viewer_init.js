@@ -17,13 +17,19 @@
         var container = document.querySelector('article') || document.querySelector('.content') || document.querySelector('main') || document.body;
         if (!container) return;
 
-        // Prevent parent <a> tags on figures from navigating away
-        var figureLinks = container.querySelectorAll('figure a.image-reference, .figure a.image-reference, figure a.reference, .figure a.reference');
-        figureLinks.forEach(function (link) {
-            link.addEventListener('click', function (e) {
-                e.preventDefault();
-            });
-        });
+        // Intercept clicks on any <a> tag wrapping a zoomable image to prevent page navigation / scroll jump
+        container.addEventListener('click', function (e) {
+            var img = e.target.closest('img');
+            if (img && !img.classList.contains('no-zoom') && !img.classList.contains('brand-logo') && !img.classList.contains('icon')) {
+                var parentLink = img.closest('a');
+                if (parentLink) {
+                    e.preventDefault();
+                }
+            }
+        }, true);
+
+        var savedScrollX = 0;
+        var savedScrollY = 0;
 
         // Initialize Viewer on the document content container
         new Viewer(container, {
@@ -33,6 +39,31 @@
                     return false;
                 }
                 return true;
+            },
+            // Disable focus stealing to prevent the browser from rolling/scrolling the background page to top
+            focus: false,
+            // Preserve scroll position when viewer opens/closes
+            show: function () {
+                savedScrollX = window.scrollX || window.pageXOffset || document.documentElement.scrollLeft || 0;
+                savedScrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
+            },
+            shown: function () {
+                if ((window.scrollY || window.pageYOffset || 0) !== savedScrollY) {
+                    window.scrollTo({
+                        left: savedScrollX,
+                        top: savedScrollY,
+                        behavior: 'instant'
+                    });
+                }
+            },
+            hidden: function () {
+                if ((window.scrollY || window.pageYOffset || 0) !== savedScrollY) {
+                    window.scrollTo({
+                        left: savedScrollX,
+                        top: savedScrollY,
+                        behavior: 'instant'
+                    });
+                }
             },
             // Use high-resolution source from parent <a> link if available
             url: function (img) {
