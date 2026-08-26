@@ -86,14 +86,14 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
         mako_context.update({'contdat_path_link': contdat_path_link})
 
-    def _get_imaging_summary(self, result) -> list[ImagingTR]:
-        """Format imaging_summary list into display rows.
+    def _get_imaging_summary(self, result) -> list[tuple[str, ...]]:
+        """Format imaging_summary list into merged display rows.
 
         Args:
             result: Task result object containing imaging_summary attribute.
 
         Returns:
-            List of ImagingTR namedtuples for rendering.
+            List of tuples containing merged HTML <td> elements for rendering.
         """
         rows = []
         for entry in getattr(result, 'imaging_summary', []) or []:
@@ -114,7 +114,7 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 perchanweightdensity=self._format_summary_value(entry.get('perchanweightdensity')),
                 nbins=self._format_summary_value(entry.get('nbins')),
             ))
-        return rows
+        return utils.merge_td_columns(rows)
 
     @staticmethod
     def _get_imaging_skip_reason(imaging_summary: list[dict]) -> str:
