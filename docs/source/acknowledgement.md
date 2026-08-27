@@ -20,6 +20,6 @@ We thank you for additionally acknowledging Pipeline and CASA use in your public
   * The NRAO archive.
   * VLA PI data delivery: versions included in the email.
   * North American ALMA "LAVA" calibrated data service: versions included in the QA2 report.
-  * East Asia calibrated data service: it would be appreciated if you add ``This work makes use of calibrated data products generated with services provided by the East Asian ALMA regional center (EA ARC) operated by NAOJ together with ASIAA and KASI.``
+  * East Asia calibrated data service: it would be appreciated if you add ``This work makes use of calibrated data products generated with services provided by the East Asian ALMA Regional Center (EA ARC) operated by NAOJ together with ASIAA and KASI.``
   * Europe: The CalMS service of the European ARC, see [here](https://almascience.org/tools/eu-arc-network/the-european-arc-calms-service).
   * NRAO [AUDI](https://science.nrao.edu/srdp/science-ready-data-products-srdp-for-alma) services: it would be appreciated if you add ``This work makes use of advanced data products generated with services operated by the National Radio Astronomy Observatory.`` and a reference to [Lacy et al. 2020](https://ui.adsabs.harvard.edu/abs/2020ASPC..527..519L/abstract).
