@@ -34,6 +34,11 @@ def hifa_diffgaincal(vis=None, flagging_frac_limit=None, hm_spwmapmode=None, mis
     should be within +/-50 deg. There should be no significant offset or outlier
     solutions from the base zero degree phase. QA sub-scores are described below.
 
+    For all solves ``refantmode='strict'`` is used, such that the reference 
+    antenna as established in :func:`~pipeline.hif.cli.hif_refant` cannot be swapped
+    when data are flagged. If solutions are poor, one should investigate fixing
+    the reference antenna.
+
     .. list-table:: Diffgain Phase Correction and Residuals
        :widths: 1 1
 

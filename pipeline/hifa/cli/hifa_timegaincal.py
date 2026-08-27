@@ -65,7 +65,7 @@ def hifa_timegaincal(vis=None, calamptable=None, calphasetable=None, offsetstabl
     change flexibly. For polarization observations a good, un-flagged common
     reference antenna is found and locked in time :func:`~pipeline.hifa.cli.hifa_lock_refant`.
     For band-to-band observations, the PHASE intent per scan solutions using
-    ``solint='inf'`` also enforce ``refantmode='strict'``such that only the
+    ``solint='inf'`` also enforce ``refantmode='strict'`` such that only the
     initially selected reference antenna is used. 
 
 
