@@ -106,12 +106,13 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
         For very low SNR (low scores), the use of long ``solint`` in the phase-up can cause phase decoherence to be
         'baked in', artificially biasing amplitude gains upward and producing an incorrect flux scale.
 
-        Amplitude stability QA: 
-        A QA score is calculated for any non-SSO amplitude calibrator, using the baseline-averaged calibrated visibility amplitude vs. time behavior during the scan. 
-        If the spread of the amplitudes between the 1st and last quintiles is greater than 13% of the median amplitude, then a QA score of 0.66 is given, 
-        decreasing linearly with a larger amplitude spread to a minimum score of 0.34 when the spread is greater than 26% of the median amplitude. 
-        Low scores in this metric may indicate that the observing conditions are too unstable to trust the flux transfer from the amplitude 
-        calibrator to the science fields. 
+        One QA score is computed for non-SSO AMPLITUDE calibrators:
+ 
+        1. **Amplitude stability**: A QA score is calculated using the baseline-averaged calibrated visibility amplitude vs. time behavior during the scan. 
+           If the spread of the amplitudes between the 1st and last quintiles is greater than 13% of the median amplitude, then a QA score of 0.66 is given, 
+           decreasing linearly with a larger amplitude spread to a minimum score of 0.34 when the spread is greater than 26% of the median amplitude. 
+           Low scores in this metric may indicate that the observing conditions are too unstable to trust the flux transfer from the amplitude 
+           calibrator to the science fields. 
 
 
     Examples:
