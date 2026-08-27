@@ -65,6 +65,7 @@ Running the script additionally through {func}`~pipeline.hsd.cli.hsd_blflag` com
 Running the script through the {func}`~pipeline.hsd.cli.hsd_imaging` command will additionally create:
 - native resolution images per spectral window, antenna, and source.
 
+(sec-piperestore)=
 ### Results from running the IF `casapiperestorescript.py`
 
 - A calibrated MS for each ASDM with a name like `uid___A002_Xe50c9e_X1297.ms`, containing all sources including calibrators, with calibrated data in the CORRECTED column.
