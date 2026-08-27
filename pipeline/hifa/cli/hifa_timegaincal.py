@@ -92,7 +92,7 @@ def hifa_timegaincal(vis=None, calamptable=None, calphasetable=None, offsetstabl
 
         - If the standard deviation of all offsets over all antennas (sigma_off) for a spw > 15 deg: QA = 0.82
           (too noisy to assess; no further tests).
-        - Otherwise, QA = 0.5 if any of the following holds:
+        - Otherwise, if any of the following holds:
 
           - Maximum offset > 30 deg or > 6 x sigma_off
           - Mean offset > 30 deg or > 6 x sigma_off / sqrt(N_ant)

@@ -96,7 +96,6 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
         in some spws causing amplitude noise bias, or atmospheric absorption lines). Check :func:`~pipeline.hif.cli.hif_applycal`
         to determine whether any low score represents a real science target issue.
 
-
         High values in the Flagged data summary table on the WebLog page are indicative of low SNR achieved
         on the corresponding object, even after attempting the best calibration possible according to 
         the :func:`~pipeline.hifa.cli.hifa_spwphaseup` low SNR cascade. In all cases, the percentages in both the before and 

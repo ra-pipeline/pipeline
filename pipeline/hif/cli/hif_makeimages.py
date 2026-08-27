@@ -33,9 +33,8 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
     - **Check Source Images**
       After creating per-EB, per-spw images of all check sources, the pipeline performs a Gaussian fit and evaluates
       positional offsets and flux ratios. Check source imaging uses the dynamic range modifiers for science targets.
-      An additional QA score is computed as the geometric mean of three sub-scores based on positional offset, decorrelation
-      (peak/total flux), and flux scale transfer.
-
+      An additional QA score is computed as the minimum of  the following two subscore: a positional offset subscore calculated from the difference between the position of the peak in the image to the checksources’ catalogued position in units of the synthesized beam (QA_offset=max[0.33, 1-min(1, offset/beam)] ), and a decorrelation subscore calculated from ratio of the fitted peak intensity to the fitted total flux density (QA_decorrelation=max[0.33, 1-abs{1-Peak/flux} ] ). Low values of this score can indicate potential problems with phase transfer between the phase calibrator and science targets, but are less diagnostic at low signal to noise, or the more distant the check source is from the phase calibrator compared to the target
+    
       .. figure:: /figures/checksrc_table.png
          :alt: Check source QA table
 
@@ -43,7 +42,7 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
 
     - **Target Per-spw Continuum Images**
       Cleaned continuum images are created for each spectral window using the continuum frequency ranges determined
-      from ``hif_findcont``, the ``robust`` value from ``hifa_imageprecheck``, and any size mitigation from ``hif_checkproductsize``.
+      from :func:`~pipeline.hif.cli.hif_findcont`, the ``robust`` value from :func:`~pipeline.hifa.cli.hifa_imageprecheck`, and any size mitigation from :func:`~pipeline.hif.cli.hif_checkproductsize`.
 
       .. figure:: /figures/guide-img030.png
          :alt: Target per-spw continuum images
@@ -63,9 +62,9 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
       Cleaned continuum-subtracted cubes are created for each science target and spectral window at the native
       channel resolution (unless channel binning was selected). Only non-continuum channels are cleaned.
       For cube imaging, an additional QA score assesses line contamination in line-free channels
-      by computing ``mom8_fc`` (max along freq axis) and ``mom10_fc`` (min) images. A penalty applies
-      if the synthesized beam shape deviates significantly across the cube.
-
+      by computing ``mom8_fc`` (max along the frequency axis considering only the channels identified in
+      :func:`~pipeline.hif.cli.hif_findcont`) and ``mom10_fc`` (min) images.
+    
       .. figure:: /figures/hif_makeimages_cube_weblog.png
          :alt: Cube imaging WebLog
 
@@ -84,6 +83,7 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
     - **Representative Bandwidth Target Cube**
       If the PI-requested bandwidth for sensitivity is significantly coarser (> 4x) than the native correlator channel
       width, an additional cube is created at the PI-requested bandwidth.
+      For this cube, the line contamination QA score is restricted to a minimum value of 0.67.
 
     The following common task functionality applies to all imaging stages:
 
@@ -207,9 +207,6 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
           of the theoretical noise and the DR correction factor. QA = 1.0 if that ratio <= 1.0;
           QA = 0.0 if >= 5.0; linearly scaled between 1 and 5.
         
-        Low QA scores for non-Check source calibrators may indicate the need for additional flagging and/or
-        significant decoherence.
-
     Examples:
         1. Compute clean results for all imaging targets defined in a previous :func:`~pipeline.hif.cli.hif_makeimlist` call:
 
