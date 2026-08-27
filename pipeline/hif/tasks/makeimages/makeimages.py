@@ -29,14 +29,10 @@ LOG = infrastructure.get_logger(__name__)
 class MakeImagesInputs(vdp.StandardInputs):
     """Inputs for hif_makeimages."""
 
-    # Search order of input vis
-    processing_data_types = [
-        DataType.SELFCAL_LINE_SCIENCE,
-        DataType.REGCAL_LINE_SCIENCE,
-        DataType.SELFCAL_CONTLINE_SCIENCE,
-        DataType.REGCAL_CONTLINE_SCIENCE,
-        DataType.REGCAL_CONTLINE_ALL,
-        DataType.RAW]
+    # The vis parameters are passed in via the clean target list
+    # generated in other tasks. Specifying any default here would
+    # render misleading vis selections in the weblog (PIPE-3052, PIPE-3231).
+    processing_data_types = []
 
     calcsb = vdp.VisDependentProperty(default=False)
     cleancontranges = vdp.VisDependentProperty(default=False)
