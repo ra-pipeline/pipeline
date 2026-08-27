@@ -1169,6 +1169,9 @@ def score_vla_agents(ms, summaries):
     # PIPE-2576: Part-2: if clipping > 1% with spectral line window
     # identified, score scales from 0.3 to 0 based on clipping fraction
     # PIPE-3216: Scale score based on flag fraction to enable proper sorting
+    # Collect spectral line and continuum scores separately to sort within each category
+    spectral_line_scores = []
+    continuum_scores = []
     is_continuum_only = True
     for flag_stat in summaries:
         if flag_stat['name'] == 'clip':
@@ -1189,7 +1192,7 @@ def score_vla_agents(ms, summaries):
                         metric_score=score_val,
                         metric_units='Fraction of data that is flagged in clipping',
                     )
-                    qascore_list.append(pqa.QAScore(score_val, longmsg=msg, shortmsg=msg, origin=origin))
+                    spectral_line_scores.append(pqa.QAScore(score_val, longmsg=msg, shortmsg=msg, origin=origin))
 
     # PIPE-2576: Part-3:  if clipping > 5% with continuum window
     # identified, score scales from 0.3 to 0 based on clipping fraction
@@ -1211,7 +1214,14 @@ def score_vla_agents(ms, summaries):
                         metric_score=score_val,
                         metric_units='Fraction of data that is flagged in clipping',
                     )
-                    qascore_list.append(pqa.QAScore(score_val, longmsg=msg, shortmsg=msg, origin=origin))
+                    continuum_scores.append(pqa.QAScore(score_val, longmsg=msg, shortmsg=msg, origin=origin))
+
+    # Sort each category internally by score (ascending) so higher clipping (lower scores) appears first
+    spectral_line_scores.sort(key=lambda x: x.score)
+    continuum_scores.sort(key=lambda x: x.score)
+    # Add spectral line scores first, then continuum scores
+    qascore_list.extend(spectral_line_scores)
+    qascore_list.extend(continuum_scores)
 
     # PIPE-2576: Part-4: if total flagging >30%, score < 0.5
     if summaries:
