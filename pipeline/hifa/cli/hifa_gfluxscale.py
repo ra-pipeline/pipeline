@@ -98,12 +98,21 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
 
 
         High values in the Flagged data summary table on the WebLog page are indicative of low SNR achieved
-        on the corresponding object, even after attempting the best calibration possible according to the :func:`~pipeline.hifa.cli.hifa_spwphaseup` low SNR cascade. In all cases, the percentages in both the before and after columns will naturally be higher
-        than the corresponding values seen on the later hif_applycal stage because in that stage the phase solutions are
-        scan-based, and thus have a higher SNR.
+        on the corresponding object, even after attempting the best calibration possible according to 
+        the :func:`~pipeline.hifa.cli.hifa_spwphaseup` low SNR cascade. In all cases, the percentages in both the before and 
+        after columns will naturally be higher than the corresponding values seen on the later hif_applycal stage because in
+        that stage the phase solutions are scan-based, and thus have a higher SNR.
     
-        For very low SNR, the longer ``solint`` used in the phase-up can cause phase decoherence to be
+        For very low SNR (low scores), the use of long ``solint`` in the phase-up can cause phase decoherence to be
         'baked in', artificially biasing amplitude gains upward and producing an incorrect flux scale.
+
+        Amplitude stability QA: 
+        A QA score is calculated for any non-SSO amplitude calibrator, using the baseline-averaged calibrated visibility amplitude vs. time behavior during the scan. 
+        If the spread of the amplitudes between the 1st and last quintiles is greater than 13% of the median amplitude, then a QA score of 0.66 is given, 
+        decreasing linearly with a larger amplitude spread to a minimum score of 0.34 when the spread is greater than 26% of the median amplitude. 
+        Low scores in this metric may indicate that the observing conditions are too unstable to trust the flux transfer from the amplitude 
+        calibrator to the science fields. 
+
 
     Examples:
         1. Compute flux values for the phase calibrator using model data from the amplitude calibrator:
