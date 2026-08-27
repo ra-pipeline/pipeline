@@ -30,7 +30,7 @@ def hifa_diffgaincal(vis=None, flagging_frac_limit=None, hm_spwmapmode=None, mis
 
     The "residual" solutions are designed as to scatter about zero degrees phase
     with no drift, as shown in the figure below (right panel). The "residuals"
-    not limited by SNR should ideally be within +/-30 deg; good-conditions data
+    not limited by SNR should ideally be within +/-30 deg; acceptable-conditions data
     should be within +/-50 deg. There should be no significant offset or outlier
     solutions from the base zero degree phase. QA sub-scores are described below.
 

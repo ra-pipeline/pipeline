@@ -1,3 +1,4 @@
+(sec-acknowledgement)=
 Citing Pipeline and CASA
 ------------------------
 If you use ALMA **data** in your publications, you must include the official acknowledgement text found [here](https://almascience.eso.org/alma-data/publication-acknowledgement).
