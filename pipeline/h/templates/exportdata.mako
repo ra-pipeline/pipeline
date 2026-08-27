@@ -1,5 +1,6 @@
 <%!
 import os
+import pipeline.infrastructure.utils as utils
 %>
 
 <%inherit file="t2-4m_details-base.mako"/>
@@ -163,7 +164,7 @@ import os
     %for calimage in r.calimages[0]:
         %for fitsfile in calimage['fitsfiles']:
           <tr>
-              <td>${calimage['sourcename']}</td>
+              <td>${utils.wrap_long_str(calimage['sourcename'], newline='<br>')}</td>
               <td>${calimage['sourcetype']}</td>
               <td>${calimage['spwlist']}</td>
               <td>${os.path.basename(fitsfile)}</td>
@@ -192,7 +193,7 @@ import os
     %for calimage in r.calimages[0]:
         %for fitsfile in calimage['auxfitsfiles']:
           <tr>
-              <td>${calimage['sourcename']}</td>
+              <td>${utils.wrap_long_str(calimage['sourcename'], newline='<br>')}</td>
               <td>${calimage['sourcetype']}</td>
               <td>${calimage['spwlist']}</td>
               <td>${os.path.basename(fitsfile)}</td>
@@ -221,7 +222,7 @@ import os
     %for targetimage in r.targetimages[0]:
         %for fitsfile in targetimage['fitsfiles']:
           <tr>
-              <td>${targetimage['sourcename']}</td>
+              <td>${utils.wrap_long_str(targetimage['sourcename'], newline='<br>')}</td>
               <td>${targetimage['sourcetype']}</td>
               <td>${targetimage['spwlist']}</td>
               <td>${os.path.basename(fitsfile)}</td>
@@ -250,7 +251,7 @@ import os
     %for targetimage in r.targetimages[0]:
         %for fitsfile in targetimage['auxfitsfiles']:
           <tr>
-              <td>${targetimage['sourcename']}</td>
+              <td>${utils.wrap_long_str(targetimage['sourcename'], newline='<br>')}</td>
               <td>${targetimage['sourcetype']}</td>
               <td>${targetimage['spwlist']}</td>
               <td>${os.path.basename(fitsfile)}</td>
