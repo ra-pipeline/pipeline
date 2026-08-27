@@ -9,14 +9,14 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
                     refant=None, minblperant=None, minsnr=None, unregister_existing=None):
     """Compute phase calibration spw map/combine mode, solution parameters, per spw phase offsets and phase decoherence.
 
-    :func:`~pipeline.hifa.cli.hifa_spwphaseup` performs two main functions, and a third to report the (de)coherence likelihood:
+    :func:`~pipeline.hifa.cli.hifa_spwphaseup` performs three main functions:
 
     - Determines the spectral window mapping or combination mode, ``gaintype`` and
       ``solint``, for each independent BANDPASS, AMPLITUDE, DIFFGAIN, PHASE and CHECK
       source, to use when specifically solving the phaseup - phase as a function of (short, ideally integration)
-      time - in subsequent stages (mapping mode and gaintype used in :func:`~pipeline.hifa.cli.hifa_gfluxscaleflag`,
-      combine mode tracked in :func:`~pipeline.hifa.cli.hifa_diffgaincal` for band-to-band modes, all parameters
-      used in :func:`~pipeline.hifa.cli.hifa_gfluxscale` and :func:`~pipeline.hifa.cli.hifa_timegaincal`).
+      time - in subsequent stages (mapping mode and gaintype are used in :func:`~pipeline.hifa.cli.hifa_gfluxscaleflag`,
+      combine mode is used in :func:`~pipeline.hifa.cli.hifa_diffgaincal` for band-to-band modes, all parameters
+      are used in :func:`~pipeline.hifa.cli.hifa_gfluxscale` and :func:`~pipeline.hifa.cli.hifa_timegaincal`).
 
     - Computes the per spectral window phase offset table (using
       the BANDPASS calibrator by default) that will be applied
@@ -38,23 +38,24 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
     - Compute the per-spw SNR for each intent based on a temporary phaseup gain
       calibration using ``solint='inf'`` for the PHASE and CHECK intents, or
       ``solint='int'`` otherwise, and ``gaintype='G'``. These computed SNR
-      values override the use of the estimated values unless none are found.
+      values override the use of the estimated values unless there is a problem creating
+      the temporary table.
 
-    - If all SNR calculations fail, then subsequent heuristics are skipped, warnings
+    - If both SNR calculations fail, then subsequent heuristics are skipped, warnings
       are printed, and the mapping mode falls back to a narrow-to-wide. The narrow-to-wide
       maps narrow spws to the nearest wide spw.
 
     - Compare the SNR for all spectral windows compared to ``phasesnr``
-      for the PHASE or CHECK intents, and``intphasesnr`` for the other
+      for the PHASE or CHECK intents, and ``intphasesnr`` for the other
       intents. The PHASE and CHECK intents are referenced to a ``solint='inf'``
       and ``phasesnr`` while ``intphasesnr`` is used for other intents and
       reference to gaincal solutions using ``solint='int'``. The ideal ``solint``
       for phaseup is 'int', as part of which the workflow will establish, yet
       the PHASE and CHECK intents are referenced to ``solint='inf'``
       as these intents can be too weak such that initial estimates using
-      ``solint='int'`` in `gaincal` could fail.
+      ``solint='int'`` in :func:`~casatasks.calibration.gaincal` could fail.
     
-      - If the SNR of all spws, per intent is greater than the respective ``phasesnr``
+      - If the SNR of all spws for a given intent is greater than the respective ``phasesnr``
         or ``intphasesnr`` then (1) set ``solint='int'`` and ``gaintype='G'``.
 
       - If the SNR of only some spws are greater than the value of
@@ -68,7 +69,7 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
         the respective ``phasesnr`` or ``intphasesnr``, then (3) set ``combine='spw'``,
         ``solint='int'`` and ``gaintype='G'``.
 
-      - If the aggregate bandwidth SNR is still not enough, change the ``gaintype`` as to
+      - If the aggregate bandwidth SNR is still not enough, change the ``gaintype`` to ``'T'`` to
         combine polarizations. Then, if the SNR is above ``phasesnr`` or ``intphasesnr``
         for the selected intent, use (4) ``combine='spw'``, ``solint='int'`` and ``gaintype='T'``.
         In the case that the intent is AMPLITUDE, the ``intphasesnr`` threshold is lowered to
@@ -101,7 +102,7 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
     in the data will be combined and mapped to the science window ``9`` in the
     combined phase vs time calibration table. Establishing ``solint`` and ``gaintype`` begins
     from point (3). If no SNRs are found, then the PHASE and CHECK
-    intents will default to a ``solint`` of 1/4of one quarter of the scan time ('inf'/4)
+    intents will default to a ``solint`` of one quarter of the scan time ('inf'/4)
     and ``gaintype='T'``, while other intents use ``solint='int'`` and ``gaintype='G'``. 
 
     If ``hm_spwmapmode='simple'``, the default ``solint='int'`` and ``gaintype='G'``

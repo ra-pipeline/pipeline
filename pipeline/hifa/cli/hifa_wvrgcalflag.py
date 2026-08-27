@@ -61,6 +61,10 @@ def hifa_wvrgcalflag(vis=None, caltable=None, offsetstable=None, hm_toffset=None
 
         The final stage score is the lowest score across all MeasurementSets.
 
+        For ACA data with 12m antennas added in for calibration, there is an additional QA score:
+        ACA data with insufficient PM antennas will produce a yellow score QA = 0.34, unless the phase RMS
+        is <1 radian over the corrected BANDPASS scan, then Blue QA = 0.67
+
     Examples:
         1. Compute the WVR calibration for all the MeasurementSets:
 
