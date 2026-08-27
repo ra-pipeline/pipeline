@@ -1,5 +1,40 @@
 # ALMA Pipeline Known Issues
 
+
+## PL2026
+
+**2026.2.0.XX**
+
+### CASA
+
+1. In {func}`~casatasks.imaging.tclean` `briggsbwtaper`, the fractional bandwidth is calculated per-chunk, so parallelizing with different breadth gives different answers ([CAS-14520](https://open-jira.nrao.edu/browse/CAS-14520) and {jira}`PIPE-2832`).
+2. **{func}`~pipeline.hifa.cli.hifa_wvrgcalflag`** will crash on source names that are integers because the CASA task [wvrgcal](https://casadocs.readthedocs.io/en/v6.6.6/api/tt/casatasks.calibration.wvrgcal.html) no longer supports them ([CAS-14850](https://open-jira.nrao.edu/browse/CAS-14850)).
+
+### Both Pipelines
+
+### Interferometric Pipeline
+
+1. **{func}`~pipeline.hif.cli.hif_uvcontsub`** will not skip spws that have "NONE" in cont.dat. This situation doesn't arise in operations, but could arise if someone manually edits cont.dat ({jira}`PIPE-1898`)
+2. If the check source is so faint that no gain solutions can be found, then **{func}`~pipeline.hifa.cli.hifa_gfluxscale`** will crash ({jira}`PIPE-1468`).
+3. In (i) the polcal recipe and in (ii) the B2B recipe, if the selected session reference antenna is fully flagged on any spw by hifa_gfluxscaleflag, then **{func}`~pipeline.hifa.cli.hifa_gfluxscale`** will crash. The workaround is to set a different reference antenna (or list of reference antennas) in the {func}`~pipeline.hif.cli.hif_refant` task in the PPR ({jira}`PIPE-1664`).
+4. On the Spectral Setup weblog page, multi-target datasets with multiple tunings not observed in all targets will not show the Transition names for spws associated with tunings beyond the first tuning ({jira}`PIPE-1909`).
+5. In **{func}`~pipeline.hifa.cli.hifa_spwphaseup`**, (i) if the refant drops out for the majority of solutions, then the Median Phase RMS assessment cannot be made; (ii) if there is low SNR in the bandpass solutions and the refant jumps in phase, then some antennas can incorrectly be identified as outliers by the Median Phase RMS assessment.
+6. **{func}`~pipeline.hifa.cli.hifa_gfluxscaleflag`** crashes on MOUS with EBs that straddle Cycle 2 and Cycle 3 ({jira}`PIPE-2691`).
+7. The aggregate bandwidth listed on continuum **{func}`~pipeline.hif.cli.hif_makeimages`** pages does not account for the deterministic flagging of edge channels on TDM spws ({jira}`PIPE-2349`) and it does not account for spw overlap ({jira}`PIPEREQ-37`).
+8. The **{func}`~pipeline.hifa.cli.hifa_tsysflagcontamination`** stage does not work for the B2B and full-polarization observing modes ({jira}`PIPE-2407`).
+9. If ``combine='spw'`` is used in gaincal calls, pipeline will crash in **{func}`~pipeline.hifa.cli.hifa_gfluxscale`** if the lowest index spw is fully flagged ({jira}`PIPE-128`).
+10. In some B2B data, where DIFFGAIN cal == BP cal, QA will give a red warning in **{func}`~pipeline.hifa.cli.hifa_gfluxscale`** but the stage and results are correct ({jira}`PIPE-2204`).
+11. **{func}`~pipeline.hif.cli.hif_selfcal`** does not properly handle (or fails on) cases of multi-EB datasets where a spw is missing from some EBs ({jira}`PIPE-2770`).
+12. **{func}`~pipeline.hifa.cli.hifa_spwphaseup`** may incorrectly conclude for single-pol data that using "gaintype=T" could eke out enough SNR to use solint=int ({jira}`PIPE-2840`).
+13. In rare cases of old data (Cycle 1), chantol needs to be increased in **{func}`~pipeline.h.cli.h_tsyscal`** in the PPR in order for tsysspwmap to succeed on all spws ({jira}`PIPE-1440`).
+
+### Single Dish Pipeline
+
+
+
+
+---
+
 ## PL2025
 
 **2025.1.0.35**
