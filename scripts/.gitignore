@@ -3,3 +3,5 @@
 # (config.example.toml itself is intentionally NOT matched by these.)
 config.toml
 config-*.toml
+batch*err
+batch*out
