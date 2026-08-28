@@ -457,7 +457,7 @@ class MakeImages(basetask.StandardTaskTemplate):
 
         imlist = utils.glob_ordered(imagename.replace('.image', '.*'))
 
-        vis_name = self.inputs.vis[0]
+        vis_name = tclean_result.vis[0]
         msobj = self.inputs.context.observing_run.get_ms(vis_name)
         job = casa_tasks.flagdata(vis=vis_name, mode='summary', spwchan=True,  spw=tclean_result.spw)
         flag_stats = self._executor.execute(job)
