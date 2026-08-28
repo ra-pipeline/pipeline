@@ -70,12 +70,6 @@ per-spw low-SNR fallback instead of crashing when a gain table ends up fully
 flagged. A regression introduced along the way - a phase-offset solve step
 dropped ahead of the new phase-up, which had worsened flagging for a clear
 low-SNR case - was subsequently corrected.
-```{figure} whatsnew/Screenshot_2026-06-10_at_6.06.05_PM.png
----
-width: 688px
-align: center
----
-```
 *Tickets: {jira}`PIPE-2601`,
 {jira}`PIPE-2858`,
 {jira}`PIPE-3006`,
@@ -90,12 +84,6 @@ polarization-calibration recipe, so the second
 {func}`~pipeline.hifa.cli.hifa_bandpass` call (after
 {func}`~pipeline.hifa.cli.hifa_lock_refant`) no longer pre-applies a now-stale table computed with a
 possibly different reference antenna.
-```{figure} whatsnew/Polcal_bandpass_after_lockrefant_unregister.png
----
-width: 1062px
-align: center
----
-```
 <br>
 <br>
 <br>
@@ -106,17 +94,11 @@ align: center
 {func}`~pipeline.hifa.cli.hifa_polcalflag` and
 {func}`~pipeline.hifa.cli.hifa_gfluxscaleflag` (via
 `correctedampflag`) to control whether cross-polarization data are examined
-for multi-scan calibrators - a Band 2 dataset showed the original
-same-scan-only assumption from PIPE-607 was too simplistic.
-```{figure} whatsnew/Band2run.png
----
-width: 1062px
-align: center
----
-```
-<br>
-<br>
-<br>
+for multi-scan calibrators - i.e. although XX+YY is flat in time, XY+YX is sometimes not:
+| XX, YY | XX+YY | XY, YX |
+|---|---|---|
+|  <img src="whatsnew/spw25copol.png">  |  <img src="whatsnew/spw25stokesI.png">  |  <img src="whatsnew/spw25.png">  |
+
 
 **Robustness fixes.**
 {jira}`PIPE-2752` refines heuristics
@@ -159,12 +141,6 @@ than relying on fixed field ordering.
 {func}`~pipeline.hifa.cli.hifa_flagdata` FDM-spw detection
 heuristic to use `msmd.almaspws()` instead of a channel-count threshold that
 misclassified some Cycle 10 4×4-bit-correlation spws as TDM.
-```{figure} whatsnew/FDMspws.png
----
-width: 1062px
-align: center
----
-```
 {func}`~pipeline.hifa.cli.hifa_tsysflagcontamination`
 crashes were fixed for two independent causes: a NaN-handling incompatibility
 with newer scipy `savgol_filter` versions, and a regex that assumed
@@ -208,8 +184,7 @@ align: center
 {jira}`PIPE-3155`,
 {jira}`PIPE-3162`,
 {jira}`PIPE-3136`,
-{jira}`PIPE-3191`,
-{jira}`PIPE-3156`.*
+{jira}`PIPE-3191`.*
 <br>
 <br>
 <br>
@@ -306,6 +281,7 @@ Stokes-I-derived clean mask/threshold, and the polarization repBW Stokes
 IQUV image now inherits the repBW Stokes I mask/threshold.
 *Tickets: {jira}`PIPE-3074`,
 {jira}`PIPE-3096`,
+{jira}`PIPE-3018`,
 {jira}`PIPE-3128`.*
 
 {jira}`PIPE-3090` fixes a duplicated
@@ -402,22 +378,6 @@ incorrectly reporting a successful Jy/K database access when
 <br>
 <br>
 **Baseline-fitting heuristics.**
-{jira}`PIPE-3161` improves the
-{func}`~pipeline.hsd.cli.hsd_baseline` QA messages to report the virtual spw (not the real,
-per-MS spw) for line-detection scores, avoiding confusing MS-specific
-numbering in multi-MS runs.
-```{figure} whatsnew/dev_virtual_spw_stage11.png
----
-width: 800px
-align: center
----
-```
-Wide/edge line QA not triggering was fixed, and the representative line
-width used for clustering was switched to the 75th percentile of the
-detected cluster rather than the central value, which had been
-underestimating width.
-*Tickets: {jira}`PIPE-2959`,
-{jira}`PIPE-2964`.*
 {jira}`PIPE-2695` fixes
 {func}`~pipeline.hsd.cli.hsd_baseline` crashing when k-means clustering is attempted with fewer
 line detections than requested clusters.
@@ -427,38 +387,6 @@ confusion between real and virtual spw IDs in `baseline/worker.py`.
 fitting-function option to
 {func}`~pipeline.hsd.cli.hsd_baseline`, with a new
 `wavenumber` parameter (list/per-spw/per-EB inputs supported).
-```{figure} whatsnew/Screenshot_2026-02-20_at_11.46.50.png
----
-width: 800px
-align: center
----
-```
-<br>
-<br>
-
-**Imaging QA / diagnostics.**
-False-positive QA warnings for contamination diagnostic plots were reduced
-by excluding edge channels and ATM-line-overlapping channels from the
-metric; the same technique was then applied to the missed-line-channel
-diagnostic plots.
-*Tickets: {jira}`PIPE-2946`,
-{jira}`PIPE-3092`.*
-{jira}`PIPE-3160` and
-{jira}`PIPE-3109` fix `IndexError`
-crashes generating the channel-map and missed-line diagnostic plots when a
-clustering-derived line range extends outside the valid channel bounds.
-{jira}`PIPE-2399` fixes inconsistent
-display of flagged data at the {func}`~pipeline.hsd.cli.hsd_blflag` stage - flagged points above
-the threshold line were sometimes rendered as unflagged.
-{jira}`PIPE-3192` fixes the
-{func}`~pipeline.hsd.cli.hsd_exportdata` weblog page not
-being generated properly.
-{jira}`PIPE-3194` fixes a recurrence
-of a previously-fixed (PIPE-2789) bug where some panels of the
-{func}`~pipeline.hsd.cli.hsd_applycal` XX-YY amplitude-difference-vs-frequency plot were empty.
-{jira}`PIPE-2920` fixes the pointing
-outlier log message reporting its separation in the wrong unit (arcsec
-instead of deg, inconsistent with the QA score message).
 <br>
 <br>
 
@@ -486,13 +414,6 @@ randomly-changing color map in the XX-YY difference plot.
 (if-weblog-qa)=
 ## IF weblog and QA changes
 
-Organized by weblog stage/page, following the curated PL2026 weblog
-checklist and the
-[`hifa_polcalimage` recipe](https://pipe-docs.readthedocs.io/en/docs-update-pl2026/users_guide/hifa_polcalimage-recipe.html)
-order.
-<br>
-<br>
-<br>
 **Environment / landing page.**
 {jira}`PIPE-2644` adds Python and
 third-party library version info (and optionally GPU hardware specs) to the
@@ -509,6 +430,11 @@ existing channel-width columns.
 Correlation Bits column incorrectly showing `BITS_4x4` for old ALMA data
 where that value is not actually known (CASA's `msmd.corrbit()` correctly
 reports `UNKNOWN`, but the pipeline wasn't passing that through).
+<br>
+<br>
+<br>
+**Per-MS overview / Sky Setup.**
+{jira}`PIPE-2472` adds the zenith angle and MJD of the observation.
 <br>
 <br>
 <br>
@@ -541,12 +467,6 @@ ALMA's FastLane without materially increasing bad data reaching PIs.
 {jira}`PIPE-2716` adds the
 calibration intent to `applycalQA_outliers.txt` so outlying data points can
 be traced back to their scan/intent.
-```{figure} whatsnew/FlaggingQAmods.png
----
-width: 800px
-align: center
----
-```
 <br>
 <br>
 
@@ -554,18 +474,12 @@ align: center
 {jira}`PIPE-1868` changes the
 WVRGCALFLAG score for ACA data with insufficient PM antennas from red to
 yellow - a single flagged PM antenna could previously trigger a red score
-meant for main-array-scale failures.
+meant for 12m-array failures.
 {jira}`PIPE-1316` fixes two ordering
 issues in the {func}`~pipeline.hifa.cli.hifa_wvrgcalflag` weblog table and plots (intent/field
 ordering that changed between CASA versions, and inconsistent per-antenna
 ordering) - this shares root-cause work with the PIPE-901
 deterministic-ordering initiative (see {ref}`Infrastructure <infrastructure>`).
-```{figure} whatsnew/2022.1.01778.S_after.png
----
-width: 1062px
-align: center
----
-```
 <br>
 <br>
 
@@ -581,19 +495,19 @@ SemiPass candidate.
 <br>
 <br>
 
-**{func}`~pipeline.hif.cli.hif_makeimages` (calibrator / check-source / target).**
+**{func}`~pipeline.hifa.cli.hifa_timegaincal`.**
+{jira}`PIPE-3026/3028` changes the score of the phase offset QA so that phase offsets for spw that are not mapped get scores of 0.75 (blue) instead of 0.50 (yellow), since such offsets should calibrate out. 
+<br>
+<br>
+
+**{func}`~pipeline.hif.cli.hif_makeimages` (repBW).**
 {jira}`PIPE-3082` changes the RepBW
-cube QA so the `mom8fc` subscore doesn't turn yellow purely because the
-coarser RepBW resolution pulls line emission into the continuum-frequency
-ranges, when the full-resolution cube for the same spw/source scored well.
-```{figure} whatsnew/PIPE-3082examples.png
----
-width: 1062px
-align: center
----
-```
-{jira}`PIPE-3042` similarly re-tunes
-the check-source-fit QA aggregation function ({jira}`PIPEREQ-399` item 3).
+cube QA so the `mom8fc` subscore doesn't turn yellow. 
+<br>
+<br>
+
+**{func}`~pipeline.hif.cli.hif_makeimages` (check source).**
+{jira}`PIPE-3042`​ changes the check source fitting QA to consider only the positional offset and peak to integrated flux subscores.
 <br>
 <br>
 
@@ -613,20 +527,8 @@ scan plot: pre-Cycle-3 data no longer attempts (and fails) to plot
 `ON_SOURCE`/`TEST` intents that didn't exist yet, and a non-deterministic
 offset-position calculation that made the plot change between identical
 reruns is now fixed.
-```{figure} whatsnew/main-source2_tsys_scans.png
----
-width: 625px
-align: center
----
-```
 <br>
 <br>
-
-**Polarization-specific weblog.**
-{func}`~pipeline.hif.cli.hif_makeimages` polarization Stokes IQUV image inheritance and repBW
-mask/threshold fixes are covered together with the underlying imaging
-changes in
-{ref}`IF imaging heuristics <if-imaging>` (PIPE-3074/PIPE-3096/PIPE-3128).
 
 ---
 
@@ -691,6 +593,26 @@ align: center
 <br>
 <br>
 
+{jira}`PIPE-3161` improves the
+{func}`~pipeline.hsd.cli.hsd_baseline` QA messages to report the virtual spw (not the real,
+per-MS spw) for line-detection scores, avoiding confusing MS-specific
+numbering in multi-MS runs.
+```{figure} whatsnew/dev_virtual_spw_stage11.png
+---
+width: 800px
+align: center
+---
+```
+Wide/edge line QA not triggering was fixed, and the representative line
+width used for clustering was switched to the 75th percentile of the
+detected cluster rather than the central value, which had been
+underestimating width.
+*Tickets: {jira}`PIPE-2959`,
+{jira}`PIPE-2964`.*
+
+<br>
+<br>
+
 **QA scoring and message ordering.**
 {jira}`PIPE-2958` adds a new QA score
 based on the ratio of observed to theoretical image RMS at the
@@ -727,6 +649,35 @@ channel range for the `hsd_imaging` moment-map plot in LSB data.
 {jira}`PIPE-2869` - see
 {ref}`IF weblog/QA <if-weblog-qa>` above; this fix applies to the same
 `TsysScansChart` shared by both recipes.
+
+**Imaging QA / diagnostics.**
+False-positive QA warnings for contamination diagnostic plots were reduced
+by excluding edge channels and ATM-line-overlapping channels from the
+metric; the same technique was then applied to the missed-line-channel
+diagnostic plots.
+*Tickets: {jira}`PIPE-2946`,
+{jira}`PIPE-3092`.*
+{jira}`PIPE-3160` and
+{jira}`PIPE-3109` fix `IndexError`
+crashes generating the channel-map and missed-line diagnostic plots when a
+clustering-derived line range extends outside the valid channel bounds.
+{jira}`PIPE-2399` fixes inconsistent
+display of flagged data at the {func}`~pipeline.hsd.cli.hsd_blflag` stage - flagged points above
+the threshold line were sometimes rendered as unflagged.
+{jira}`PIPE-3192` fixes the
+{func}`~pipeline.hsd.cli.hsd_exportdata` weblog page not
+being generated properly.
+{jira}`PIPE-3194` fixes a recurrence
+of a previously-fixed (PIPE-2789) bug where some panels of the
+{func}`~pipeline.hsd.cli.hsd_applycal` XX-YY amplitude-difference-vs-frequency plot were empty.
+{jira}`PIPE-2920` fixes the pointing
+outlier log message reporting its separation in the wrong unit (arcsec
+instead of deg, inconsistent with the QA score message).
+<br>
+<br>
+
+
+
 
 ### AQUA report
 
