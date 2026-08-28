@@ -19,7 +19,7 @@ from pipeline.domain import DataType
 from pipeline.hif.heuristics import imageparams_factory
 from pipeline.infrastructure import casa_tasks, casa_tools
 from pipeline.infrastructure.filenamer import PipelineProductNameBuilder
-from pipeline.infrastructure.utils import relative_path
+from pipeline.infrastructure.utils import list_to_str, relative_path
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -332,44 +332,99 @@ def _findroi_antenna_selections(context: Any, vis_list: list[str], intent: str =
     return selections
 
 
-def _findroi_image_heuristics(context: Any, vis_list: list[str]) -> Any:
-    '''Create imaging heuristics matching hif_makeimlist data-availability checks.'''
-    canonical_vis_list = [_context_ms_for_vis(context, vis).name for vis in vis_list]
-    project_structure = getattr(context, 'project_structure', None)
-    imagename_prefix = '' if project_structure is None else getattr(project_structure, 'ousstatus_entity_id', '')
-    return imageparams_factory.ImageParamsHeuristicsFactory.getHeuristics(
-        vislist=canonical_vis_list,
-        spw='',
-        observing_run=context.observing_run,
-        imagename_prefix=imagename_prefix,
-        proj_params=getattr(context, 'project_performance_parameters', None),
-        contfile=None,
-        linesfile=None,
-        imaging_params=getattr(context, 'imaging_parameters', None),
-        processing_intents=getattr(context, 'processing_intents', None),
-        imaging_mode='ALMA',
-    )
+def _findroi_flag_availability(
+    context: Any,
+    vis_list: list[str],
+    virtual_spw_ids: list[int],
+    field_names: list[str],
+    antenna_selections_by_vis: dict[str, str],
+) -> dict[int, bool | None]:
+    '''Return aggregate per-SPW availability from selected MS flags.
 
+    ``True`` means at least one selected visibility sample is unflagged across the
+    input EBs. ``False`` means every selected sample is flagged or absent. ``None``
+    means that at least one relevant MS could not be checked; callers fail open in
+    that case.
+    '''
+    requested_spws = {int(value) for value in virtual_spw_ids}
+    available: set[int] = set()
+    inconclusive: set[int] = set()
+    selected_names = {str(name) for name in field_names}
 
-def _findroi_has_unflagged_data(
-    heuristics: Any,
-    vis: str,
-    field_name: str,
-    spw_id: int,
-) -> bool | None:
-    '''Mirror hif_makeimlist fully-flagged detection for one EB/field/SPW selection.'''
-    try:
-        result = heuristics.has_data(field_intent_list=[(field_name, 'TARGET')], spwspec=str(spw_id), vislist=[vis])
-    except Exception as exc:
-        LOG.warning(
-            'Could not determine whether data for EB %s, field %s, spw %s is completely flagged. Exception: %s',
-            os.path.basename(vis),
-            field_name,
-            spw_id,
-            str(exc),
-        )
-        return None
-    return bool(result.get((field_name, 'TARGET'), False))
+    for vis in vis_list:
+        if available == requested_spws:
+            break
+        ms = _context_ms_for_vis(context, vis)
+        antenna_ids = [
+            int(value)
+            for value in antenna_selections_by_vis[vis].rstrip('&').split(',')
+            if value
+        ]
+
+        field_ids = sorted({
+            int(field.id)
+            for field in getattr(ms, 'fields', [])
+            if str(getattr(field, 'name', '')) in selected_names
+        })
+        scan_ids = sorted({
+            int(scan.id)
+            for scan in getattr(ms, 'scans', [])
+            if 'TARGET' in getattr(scan, 'intents', set())
+            and any(str(getattr(field, 'name', '')) in selected_names for field in getattr(scan, 'fields', []))
+        })
+
+        if not field_ids or not scan_ids or not antenna_ids:
+            continue
+
+        virtual_spw_by_real_spw: dict[int, int] = {}
+        for virtual_spw_id in requested_spws - available:
+            real_spw_id = context.observing_run.virtual2real_spw_id(virtual_spw_id, ms)
+            if real_spw_id is None:
+                continue
+            virtual_spw_by_real_spw[int(real_spw_id)] = virtual_spw_id
+
+        virtual_spw_by_ddid = {
+            int(data_description.id): virtual_spw_by_real_spw[int(data_description.spw.id)]
+            for data_description in getattr(ms, 'data_descriptions', [])
+            if getattr(data_description, 'spw', None) is not None
+            and int(data_description.spw.id) in virtual_spw_by_real_spw
+        }
+
+        if not virtual_spw_by_ddid:
+            continue
+
+        query = ' && '.join((
+            f'DATA_DESC_ID IN {list_to_str(sorted(virtual_spw_by_ddid))}',
+            f'FIELD_ID IN {list_to_str(field_ids)}',
+            f'SCAN_NUMBER IN {list_to_str(scan_ids)}',
+            f'ANTENNA1 IN {list_to_str(antenna_ids)}',
+            f'ANTENNA2 IN {list_to_str(antenna_ids)}',
+            'NOT FLAG_ROW',
+            'NOT ALL(FLAG)',
+        ))
+        try:
+            with casa_tools.TableReader(ms.name) as table:
+                selected = table.query(query)
+                try:
+                    unflagged_ddids = set(np.asarray(selected.getcol('DATA_DESC_ID'), dtype=int).ravel())
+                finally:
+                    selected.done()
+        except Exception as exc:
+            LOG.warning(
+                'Could not inspect FLAG data for EB %s. Exception: %s',
+                os.path.basename(vis),
+                str(exc),
+            )
+            inconclusive.update(virtual_spw_by_ddid.values())
+            continue
+
+        for ddid in unflagged_ddids:
+            available.add(virtual_spw_by_ddid[int(ddid)])
+
+    return {
+        spw_id: True if spw_id in available else (None if spw_id in inconclusive else False)
+        for spw_id in sorted(requested_spws)
+    }
 
 
 def _field_task_arg(field: str | int | list[int | str] | tuple[int | str, ...] | None) -> str | int | None:
@@ -4137,7 +4192,6 @@ def run_findroi_mpi(
         field_info = context_field_info
         field_groups = field_info['groups']
     antenna_selections_by_vis = _findroi_antenna_selections(context, vis_list, intent='TARGET')
-    data_heuristics = _findroi_image_heuristics(context, vis_list)
     science_spws, science_rows = _science_spw_metadata_from_inventory(vis_list[0], ms0, inv, sci)
     dt_inventory = time.perf_counter() - t_inv
     source_names_by_id = {int(k): str(v) for k, v in field_info.get('source_names', {}).items()}
@@ -4146,6 +4200,13 @@ def run_findroi_mpi(
         for source_field_ids in field_groups.values()
         for fid in source_field_ids
     }
+    flag_availability = _findroi_flag_availability(
+        context,
+        vis_list,
+        [int(virtual_spw_id) for _, _, virtual_spw_id in sci_spw],
+        list(field_names_by_id.values()),
+        antenna_selections_by_vis,
+    )
     field_phase_centers = {
         int(field.id): (float(field.mdirection['m0']['value']), float(field.mdirection['m1']['value']))
         for field in getattr(ms0, 'fields', [])
@@ -4176,22 +4237,13 @@ def run_findroi_mpi(
 
     args = []
     for ddid, spw_name, virtual_spw_id in sci_spw:
-        field_names = [field_names_by_id.get(int(fid), str(fid))
-                       for field_ids in field_groups.values() for fid in field_ids]
-        has_unflagged_data = False
-        has_inconclusive_probe = False
-        for vis_name in vis_list:
-            for field_name in field_names:
-                probe_result = _findroi_has_unflagged_data(data_heuristics, vis_name, field_name, int(virtual_spw_id))
-                if probe_result is True:
-                    has_unflagged_data = True
-                elif probe_result is False:
-                    LOG.warning('Data for EB {}, field {}, spw {} is completely flagged.'.format(
-                        os.path.basename(vis_name), field_name, virtual_spw_id))
-                else:
-                    has_inconclusive_probe = True
-        if not has_unflagged_data and not has_inconclusive_probe:
+        availability = flag_availability[int(virtual_spw_id)]
+        if availability is False:
+            LOG.warning('No unflagged data found for selected fields in spw %s; skipping.', virtual_spw_id)
             continue
+        if availability is None:
+            LOG.warning('Could not determine whether selected data for spw %s are completely flagged; proceeding.',
+                        virtual_spw_id)
         spw_ids_by_vis = _real_spw_ids_by_vis(
             context,
             vis_list,
