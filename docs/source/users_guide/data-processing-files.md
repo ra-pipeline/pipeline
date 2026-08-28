@@ -81,7 +81,7 @@ It is often desirable to subsequently run the first few steps of the imaging pip
 6. next, run {func}`~pipeline.hif.cli.hif_makeimlist`(specmode="mfs");
 {func}`~pipeline.hif.cli.hif_findcont`(). It should use your existing `cont.dat` and not have to recalculate anything.
 7. finally, run {func}`~pipeline.hif.cli.hif_uvcontsub`(). Now your `*.targets_line.ms` will have continuum-subtracted line visibilities in the DATA column.
-8. If self-calibration was applied during the original processing, it can be recovered by running {func}`~pipeline.hif.cli.hif_selfcal`(). This will re-apply existing solutions and store them in the CORRECTED_DATA column.
+8. If self-calibration was applied during the original processing, it can be recovered by running {func}`~pipeline.hif.cli.hif_selfcal`(). This will re-apply existing solutions and store them in the CORRECTED_DATA column. Note that `*.targets.ms` must be created first, since the calibration tables created by {func}`~pipeline.hif.cli.hif_selfcal` refer to `*.targets.ms` and not the original measurement sets.
 
 ## The Pipeline processing script: `casa_pipescript.py`
 
