@@ -7,7 +7,7 @@ If you use ALMA **data** in your publications, you must include the official ack
 
 We thank you for additionally acknowledging Pipeline and CASA use in your publications, in a format similar to this:
 
-   ```Data were calibrated using the ALMA Pipeline version 2025.1.0.37 and CASA 6.6.6-18 (Hunter et al. 2023, CASA team 2022).  Calibrated visibilities were downloaded from the ALMA archive and restored, after which the CASA tclean task was used to image those visibilities.```
+   ```Data were calibrated using the ALMA Pipeline version 2025.1.0.37 and CASA 6.6.6-18 (Hunter et al. 2023, CASA team 2022).  Calibrated visibilities were downloaded from the ALMA Science Archive and restored, after which the CASA tclean task was used to image those visibilities.```
 
 * CASA and the Pipeline are distinct software packages, albeit often packaged together, so citing both version numbers is important.  See {ref}`Overview <sec-overview>` for more details.
 * Pipeline and CASA versions are available for your processed data in the Weblog for all data.
