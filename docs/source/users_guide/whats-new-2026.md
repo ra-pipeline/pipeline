@@ -512,7 +512,7 @@ cube QA so the `mom8fc` subscore doesn't turn yellow.
 <br>
 
 **{func}`~pipeline.hif.cli.hif_makeimages` (check source).**
-{jira}`PIPE-3042`​ changes the check source fitting QA to consider only the positional offset and peak to integrated flux subscores.
+{jira}`PIPE-3042` changes the check source fitting QA to consider only the positional offset and peak to integrated flux subscores.
 <br>
 <br>
 
