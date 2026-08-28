@@ -17,7 +17,7 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.mpihelpers as mpihelpers
 from pipeline.domain import DataType
 from pipeline.hif.heuristics import imageparams_factory
-from pipeline.infrastructure import casa_tasks, casa_tools
+from pipeline.infrastructure import casa_tasks, casa_tools, utils
 from pipeline.infrastructure.filenamer import PipelineProductNameBuilder
 from pipeline.infrastructure.utils import relative_path
 
@@ -4175,21 +4175,31 @@ def run_findroi_mpi(
     )
 
     args = []
+    target_field_names = utils.deduplicate(
+        field_names_by_id.get(int(fid), str(fid))
+        for field_ids in field_groups.values()
+        for fid in field_ids
+    )
     for ddid, spw_name, virtual_spw_id in sci_spw:
-        field_names = [field_names_by_id.get(int(fid), str(fid))
-                       for field_ids in field_groups.values() for fid in field_ids]
         has_unflagged_data = False
         has_inconclusive_probe = False
         for vis_name in vis_list:
-            for field_name in field_names:
+            for field_name in target_field_names:
                 probe_result = _findroi_has_unflagged_data(data_heuristics, vis_name, field_name, int(virtual_spw_id))
                 if probe_result is True:
                     has_unflagged_data = True
+                    break
                 elif probe_result is False:
-                    LOG.warning('Data for EB {}, field {}, spw {} is completely flagged.'.format(
-                        os.path.basename(vis_name), field_name, virtual_spw_id))
+                    LOG.warning(
+                        'Data for EB %s, field %s, spw %s is completely flagged.',
+                        os.path.basename(vis_name),
+                        field_name,
+                        virtual_spw_id,
+                    )
                 else:
                     has_inconclusive_probe = True
+            if has_unflagged_data:
+                break
         if not has_unflagged_data and not has_inconclusive_probe:
             continue
         spw_ids_by_vis = _real_spw_ids_by_vis(
