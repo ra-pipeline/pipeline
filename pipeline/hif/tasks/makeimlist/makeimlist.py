@@ -174,7 +174,8 @@ class MakeImListInputs(vdp.StandardInputs):
     def get_spw_hm_imsize(self, spwlist):
         """If possible obtain spwlist specific hm_imsize, otherwise return generic value.
 
-        TODO: refactor and make hif_checkproductsize() (or a new task) spwlist aware."""
+        TODO: refactor and make hif_checkproductsize() (or a new task) spwlist aware.
+        """
         mitigated_hm_imsize = None
         if 'TARGET' in self.intent and 'hm_imsize' in self.context.size_mitigation_parameters:
             mitigated_hm_imsize = self.context.size_mitigation_parameters['hm_imsize']
@@ -195,7 +196,7 @@ class MakeImListInputs(vdp.StandardInputs):
                  hm_cell=None, calmaxpix=None, minpix=None, phasecenter=None, psf_phasecenter=None, nchan=None, start=None, width=None, nbins=None,
                  robust=None, uvtaper=None, clearlist=None, per_eb=None, per_session=None, calcsb=None, datatype=None,
                  datacolumn=None, parallel=None, known_synthesized_beams=None, allow_wproject=False, scal=False):
-        """Initialize Inputs.
+        r"""Initialize Inputs.
 
         Args:
             context: Pipeline context object containing state information.
@@ -343,7 +344,7 @@ class MakeImListInputs(vdp.StandardInputs):
 
             allow_wproject: Allow the wproject heuristics for imaging
 
-            scal:
+            scal: Set the imaging heuristics to self-calibration mode (*-SCAL).
 
         """
         self.context = context
