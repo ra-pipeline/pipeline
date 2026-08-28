@@ -66,7 +66,7 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
       are assessed by creating moment 8 (maximum value along the frequency axis) and
       moment 10 (minimum value along the frequency axis) images of the line-free ranges of the cube,
       referred to as the ``mom8_fc`` and ``mom10_fc`` images.  In an ideal case, these
-      images will only contain noise.  To test this, three metrics are calculated (see \S7.4.3 of [Hunter et al. 2023](https://ui.adsabs.harvard.edu/abs/2023PASP..135g4501H/abstract)):
+      images will only contain noise.  To test this, three metrics are calculated (see \S7.4.3 of :cite:`2023PASP..135g4501H`): 
       ``PeakSNR`` = the peak above the median in the ``mom8_fc`` image compared to the median absolute
       deviation (MAD) measured in the line-free channels of the cube; ``HistAsym`` = the difference
       between the absolute value of the intensity histogram constructed from the ``mom8_fc`` image
