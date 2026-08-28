@@ -89,6 +89,11 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
       contamination (the data reducer will do so if they deem it appropriate), or use different
       channel ranges when making moment images.
       
+      There is a final possible modification to the QA scores for cubes, based on whether there are
+      significant deviations in the synthesized beam shape: If the major axis differs by more than a
+      factor of two from the median of all channels, the QA score is reduced by 0.11. If more than
+      10 channels are deviant, the QA score is reduced by 0.34.
+
     
       .. figure:: /figures/hif_makeimages_cube_weblog.png
          :alt: Cube imaging WebLog
