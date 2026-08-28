@@ -8,9 +8,11 @@ import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.sessionutils as sessionutils
 import pipeline.infrastructure.tablereader as tablereader
+import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
 from pipeline.hif.heuristics.auto_selfcal.selfcal_helpers import get_calinfo_from_ms
+from pipeline.hsd.tasks.common.inspection_util import generate_ms, inspect_reduction_group, merge_reduction_group
 from pipeline.infrastructure import casa_tasks, exceptions, mpihelpers, task_registry
 from pipeline.infrastructure.mpihelpers import TaskQueue
 
@@ -43,6 +45,7 @@ class MstransformInputs(vdp.StandardInputs):
         DataType.REGCAL_LINE_SCIENCE: DataType.IM_LINE_SCIENCE,
         DataType.SELFCAL_CONTLINE_SCIENCE: DataType.IM_CONTLINE_SCIENCE,
         DataType.SELFCAL_LINE_SCIENCE: DataType.IM_LINE_SCIENCE,
+        DataType.ATMCORR: DataType.IM_LINE_SCIENCE,
         None: None
         }
 
@@ -68,7 +71,7 @@ class MstransformInputs(vdp.StandardInputs):
     @vdp.VisDependentProperty
     def outputvis(self):
         vis_root = os.path.splitext(self.vis)[0]
-        if self.input_data_type == DataType.REGCAL_CONTLINE_ALL:
+        if self.input_data_type in [DataType.REGCAL_CONTLINE_ALL, DataType.ATMCORR]:
             return vis_root + '_targets.ms'
         elif self.input_data_type in [DataType.SELFCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_SCIENCE]:
             return vis_root.replace('_targets', '_imaging') + '.ms'
@@ -328,6 +331,14 @@ class SerialMstransform(basetask.StandardTaskTemplate):
             LOG.debug('Error creating output MS %s' % (os.path.basename(result.outputvis)))
             return result
 
+        if utils.contains_single_dish(self.inputs.context):
+            ref_ms = self.inputs.context.observing_run.get_ms(result.vis)
+            new_ms = generate_ms(result.outputvis, ref_ms=ref_ms)
+            new_ms.set_data_column(DataType.IM_LINE_SCIENCE, 'DATA')
+            result.mses.append(new_ms)
+
+            return result
+
         # Import the new measurement set.
         to_import = os.path.relpath(result.outputvis)
         observing_run = tablereader.ObservingRunReader.get_observing_run(to_import)
@@ -391,6 +402,12 @@ class MstransformResults(basetask.Results):
             calto = callibrary.CalTo(vis=ms.name)
             LOG.info('Registering {} with callibrary'.format(ms.name))
             context.callibrary.add(calto, [])
+
+        # for single dish
+        if utils.contains_single_dish(context):
+            for ms in self.mses:
+                reduction_group = inspect_reduction_group(ms)
+                merge_reduction_group(target, reduction_group)
 
     def _make_template_flagfile(self, outfile, titlestr):
         # Create a new file if overwrite is true and the file
@@ -465,8 +482,9 @@ class Mstransform(sessionutils.ParallelTemplate):
         data_types_groups = [
             [DataType.SELFCAL_LINE_SCIENCE, DataType.SELFCAL_CONTLINE_SCIENCE],
             [DataType.REGCAL_LINE_SCIENCE, DataType.REGCAL_CONTLINE_SCIENCE],
+            [DataType.ATMCORR],
             [DataType.REGCAL_CONTLINE_ALL]
-            ]
+        ]
         vis_list = []
         data_type_list = []
         found_data_type_group = False
