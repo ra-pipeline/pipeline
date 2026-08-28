@@ -60,10 +60,35 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
 
     - **Target Cubes**
       Cleaned continuum-subtracted cubes are created for each science target and spectral window at the native
-      channel resolution (unless channel binning was selected). Only non-continuum channels are cleaned.
-      For cube imaging, an additional QA score assesses line contamination in line-free channels
-      by computing ``mom8_fc`` (max along the frequency axis considering only the channels identified in
-      :func:`~pipeline.hif.cli.hif_findcont`) and ``mom10_fc`` (min) images.
+      channel resolution (unless channel binning was selected). 
+
+      The line-free spectral ranges determined by :func:`~pipeline.hif.cli.hif_findcont`
+      are assessed by creating moment 8 (maximum value along the frequency axis) and
+      moment 10 (minimum value along the frequency axis) images of the line-free ranges of the cube,
+      referred to as the ``mom8_fc`` and ``mom10_fc`` images.  In an ideal case, these
+      images will only contain noise.  To test this, three metrics are calculated (see \S7.4.3 of [Hunter et al. 2023](https://ui.adsabs.harvard.edu/abs/2023PASP..135g4501H/abstract)):
+      ``PeakSNR`` = the peak above the median in the ``mom8_fc`` image compared to the median absolute
+      deviation (MAD) measured in the line-free channels of the cube; ``HistAsym`` = the difference
+      between the absolute value of the intensity histogram constructed from the ``mom8_fc`` image
+      with that constructed from the ``mom10_fc`` image; and ``MaxSeg`` = the largest "segment" of
+      contiguous pixels with values above a threshold in the ``mom8_fc`` image. If ``PeakSNR`` > 5 and
+      ``HistAsym`` > 0.2, or if ``PeakSNR`` > 3.5 and ``HistAsym`` > 0.05 and ``MaxSeg`` > 1 beam area,
+      then the QA score is the minimum of 0.65 and the value of an error function between 0.33 and 1.0
+      based on the fraction of the image represented by the largest segment (resulting in lower QA
+      scores for larger segments). 
+
+      These scores are defined to identify if there is noticeable emission in the ``mom8_fc`` image,
+      but that does not necessarily mean that something has gone wrong with continuum subtraction or
+      cube imaging. It could be that there is spectrally unresolved line emission, or a line forest,
+      or that there are low SNR features that are missed by the :func:`~pipeline.hif.cli.hif_findcont` algorithm.
+      Yellow QA scores identify cases that merit manual examination (by looking at spectra through
+      the cube at locations of peaks in the ``mom8_fc`` image).  *In the majority of cases, the cubes
+      with poor values of this QA score do not need to be regenerated,* because a small change in the
+      continuum ranges will have little to no effect on uv-based continuum subtraction. But in some
+      cases one may want to create a new aggregate continuum image to avoid potential line
+      contamination (the data reducer will do so if they deem it appropriate), or use different
+      channel ranges when making moment images.
+      
     
       .. figure:: /figures/hif_makeimages_cube_weblog.png
          :alt: Cube imaging WebLog
@@ -206,6 +231,8 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
         - Third score = ratio of non-pbcor noise-annulus rms (0.3-0.2 PB level) to the product
           of the theoretical noise and the DR correction factor. QA = 1.0 if that ratio <= 1.0;
           QA = 0.0 if >= 5.0; linearly scaled between 1 and 5.
+
+        Additional QA is calculated for specific types of imaging (cube, check source, etc) as detailed above.
         
     Examples:
         1. Compute clean results for all imaging targets defined in a previous :func:`~pipeline.hif.cli.hif_makeimlist` call:
