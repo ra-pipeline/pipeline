@@ -76,7 +76,13 @@ low-SNR case - was subsequently corrected.
 {jira}`PIPE-3139`.*
 <br>
 <br>
+**SNR computation refactor**
+The effective number of antennas used in sensitivity scaling
+was refactored to use Nant-3 from VLA Memo 135 (Cornwell 1981)
+i.e. solution noise is infinite for a 3 antenna array.
+*Tickets: {jira}`PIPE-2901`.*
 <br>
+<br>	
 **Polarization calibration recipe fix.**
 {jira}`PIPE-3016` unregisters the
 first spw-spw phase-offset table after the initial round of the
@@ -84,7 +90,6 @@ polarization-calibration recipe, so the second
 {func}`~pipeline.hifa.cli.hifa_bandpass` call (after
 {func}`~pipeline.hifa.cli.hifa_lock_refant`) no longer pre-applies a now-stale table computed with a
 possibly different reference antenna.
-<br>
 <br>
 <br>
 
