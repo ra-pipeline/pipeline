@@ -52,6 +52,12 @@ repository between October 2025 and August 2026, targeting release
 *(not weblog or QA - see {ref}`IF weblog/QA <if-weblog-qa>` for score/plot changes
 to these same tasks)*
 
+**Source Catalog Bailout**
+When {func}`~pipeline.hifa.cli.hifa_importdata` is called with ``dbservices=True``,
+if both test queries to the Source Catalog survey fail, the pipeline will halt. ({jira}`PIPE-2127`)
+<br>
+<br>
+
 **Low-SNR bandpass/gain heuristics extended to more stages.**
 The `combine='spw'` + `interp='linearPD'` low-SNR bandpass/phase-up
 heuristic developed for PL2025 was extended across more of the calibration
@@ -92,7 +98,6 @@ polarization-calibration recipe, so the second
 possibly different reference antenna.
 <br>
 <br>
-
 **Cross-pol examination for polarization/flux calibrators.**
 {jira}`PIPE-2956` adds an
 `examineCrossPolSum` parameter to
@@ -103,7 +108,6 @@ for multi-scan calibrators - i.e. although XX+YY is flat in time, XY+YX is somet
 | XX, YY | XX+YY | XY, YX |
 |---|---|---|
 |  <img src="whatsnew/spw25copol.png">  |  <img src="whatsnew/spw25stokesI.png">  |  <img src="whatsnew/spw25.png">  |
-
 
 **Robustness fixes.**
 {jira}`PIPE-2752` refines heuristics

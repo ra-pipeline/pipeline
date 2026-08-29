@@ -92,7 +92,7 @@ The format of the `uid*antennapos.json` file is shown in the example below. It c
 (fig-jsonantennaposfile)=
 **Example of a `uid*antennapos.json` file used by the interferometric pipeline (one per EB)**
 
-File lists the total positions for each antenna, which are converted into corrections to be applied to the values written into the MS by the {func}`~casatasks.calibration.gaincal` task.
+File lists the total positions for each antenna, which are converted into corrections to be applied to the values written into the MS by the {func}`~casatasks.calibration.gaincal` task (Note: additional fields may be present in more recently created files due to CASA updates).
 
 ```json
 {
@@ -234,5 +234,6 @@ SpectralWindow: 29 X1913589666#ALMA_RB_06#BB_4#SW-01#FULL_RES
 The behavior of {func}`~pipeline.hif.cli.hif_findcont` and the subsequent continuum subtraction and continuum and line imaging commands is as follows:
 
 1. If the SpectralWindow line in `cont.dat` is followed by one or more frequency ranges, {func}`~pipeline.hif.cli.hif_findcont` will not run its heuristics on the spw. The task {func}`~pipeline.hif.cli.hif_uvcontsub` will use these frequency ranges to fit and subtract the continuum from this spw. Subsequent continuum images will include only these frequency ranges for this spw, and the spw line cubes will be made from the continuum subtracted data.
-2. If the SpectralWindow line exists, but is not followed by any ranges, {func}`~pipeline.hif.cli.hif_findcont` will not run its heuristics on the spw (if the delivered `cont.dat` file contains spw entries without ranges, this indicates that the {func}`~pipeline.hif.cli.hif_findcont` task failed to find any continuum frequency ranges). The task {func}`~pipeline.hif.cli.hif_uvcontsub` will currently assume this is an all continuum case and fit using all channels. This is supposed to be changed in future pipeline versions to skip fitting and writing the spw to the line cube. Subsequent continuum images will include the full frequency range for this spw (logging a message in the WebLog), and the spw line cubes will have had a continuum subtraction performed using all channels which may offset any line emission. Cube imaging "FC" moment map computation will fail due to the missing continuum ranges.
+2. If the SpectralWindow line exists, but is not followed by any ranges, {func}`~pipeline.hif.cli.hif_findcont` will not run its heuristics on the spw (if the delivered `cont.dat` file contains spw entries without ranges, this indicates that the {func}`~pipeline.hif.cli.hif_findcont` task failed to find any continuum frequency ranges). The task {func}`~pipeline.hif.cli.hif_uvcontsub` will currently assume this is an "all continuum" case and fit using all channels. 
+Subsequent continuum images will include the full frequency range for this spw (logging a message in the WebLog), and the spw line cubes will have had a continuum subtraction performed using all channels. Cube imaging "FC" moment map computation may fail due to the missing continuum ranges.
 3. If a spw is missing from `cont.dat` when {func}`~pipeline.hif.cli.hif_findcont` is run, then it will try to find the frequency ranges, and these will be used to make subsequent continuum images, and for continuum subtraction.

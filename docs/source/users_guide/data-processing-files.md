@@ -3,7 +3,7 @@
 ## Archived scripts
 
 (sec-allscripts)=
-There are several scripts that are archived with ALMA data deliveries. These are described in the document **ALMA QA2 Data Products** (sometimes cycle-specific) available from the `ALMA Science Portal <https://almascience.nrao.edu/processing/science-pipeline>`_ under the "Processing" tab. The particular scripts for a specific dataset should also be described in the QA2 report archived with the data products. This report will vary based on how the data were processed (pipeline calibrated & imaged; pipeline calibrated & manually imaged; manually calibrated & pipeline imaged, manually calibrated & manually imaged).
+There are several scripts that are archived with ALMA data deliveries. These are described in the document **ALMA QA2 Data Products** (sometimes cycle-specific) available from the `ALMA Science Portal <https://almascience.org>` under the "Processing" tab. The particular scripts for a specific dataset should also be described in the QA2 report archived with the data products. This report will vary based on how the data were processed (pipeline calibrated & imaged; pipeline calibrated & manually imaged; manually calibrated & pipeline imaged, manually calibrated & manually imaged).
 
 The scripts produced by the pipeline are archived with the data and have file names like:
 `member.<mous_uid>.<recipe>.casa_pipescript.py` and `member.<mous_uid>.<recipe>.casa_piperestorescript.py`.
@@ -155,9 +155,10 @@ try:
     hifa_imageprecheck()
     hif_checkproductsize(maxcubesize=40.0, maxcubelimit=60.0, maxproductsize=500.0)
     hifa_exportdata()
+    # Start of imaging pipeline commands
     hif_mstransform()
     hifa_flagtargets() # uses *flagtargettemplate.txt
-    hif_makeimlist(specmode='mfs') # uses cont.dat
+    hif_findroi()
     hif_findcont() # modifies cont.dat
     hif_uvcontsub()
     hif_makeimages() # uses cont.dat
@@ -174,6 +175,7 @@ try:
     hif_makeimages()
     hif_makeimlist(specmode='repBW', datatype='selfcal')
     hif_makeimages()
+    hifa_exportdata()
 finally:
     h_save()
 ```
