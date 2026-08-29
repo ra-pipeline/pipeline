@@ -22,7 +22,7 @@ repository between October 2025 and August 2026, targeting release
   {func}`~pipeline.hif.cli.hif_makeimages` were updated to
   consume the new frame and data types. See
   {ref}`IF imaging heuristics <lsrk-refactor>`.
-- **`findContinuum` updated to v9.6** with a round of robustness and
+- **Continuum finding task updated with a round of robustness and
   parameter-passing fixes (`uvrange` propagation, empty-baseline crash
   guards, y-axis limits) - see {ref}`IF imaging heuristics <findcontinuum>`.
 - **QA-message aggregation rolled out across most SD stages** so that
@@ -225,7 +225,7 @@ declined.
 <br>
 <br>
 (findcontinuum)=
-**`findContinuum` improvements (v9.6).**
+**Improvements to continuum finding.**
 `findContinuum.py` was updated to v9.6 under the PL2026 continuum-detection
 umbrella ticket. End result:
 {func}`~pipeline.hif.cli.hif_findcont` now honors a `uvrange`
