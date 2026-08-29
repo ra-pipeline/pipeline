@@ -1,13 +1,10 @@
 # Low signal-to-noise workflow
 
-To observe with the ALMA telescope a Principal Investigator (user)
-must apply, via a proposal and observing setup using the web-based
-[Observing Tool](https://almascience.eso.org/proposing/observing-tool),
-to investigate their specific science target(s), The observatory is responsible
-for correctly observing each project using the required calibrators, at least
-the BANDPASS, AMPLITUDE and PHASE intents for standard interferometric observations.
-As part of ongoing observatory tasks, fluxes are monitored and stored in a
-source catalogue for various calibrators (e.g. [ALMA source catalogue](https://almascience.eso.org/sc/)).
+When users propose to use ALMA via the [Observing Tool](https://almascience.eso.org/proposing/observing-tool), the default will be to use "observatory calibration".
+In such a case, the observatory is responsible for selecting and observing appropriate calibrators
+(BANDPASS, AMPLITUDE and PHASE intents for standard interferometric observations).
+As part of ongoing observatory tasks, fluxes of quasars are monitored and stored in a
+([ALMA source catalogue](https://almascience.eso.org/sc/)).
 When running a project at the telescope the control software will assess the
 project and will select the calibrators for the observation. This is the point
 where a low signal-to-noise (SNR) workflow can begin, and one which the ({doc}`ALMA Pipeline <../overview>`)
@@ -19,25 +16,19 @@ is designed to handle.
 For a given ALMA observation the integration and scan durations for calibrators are preset as are the
 initially required signal-to-noise values such that calibration will be successful. Calibrator sources are
 selected as to be strong enough as to provide sufficient signal for antenna based calibration solves. 
-When considering the complexities of the observing setup - the spectral-window setup,
-the position of the target(s) on the sky, the proximity of calibrators to the target(s) -
-if the calibrator is not strong enough it will have a low SNR. We refer to non-SSO calibrators only, i.e. quasars.
-
-If there are no candidate calibrators available, again when running an observation at ALMA,
-the control software will change strategy to select a best calibrator based upon
-the combination of spectral windows. The ability to combine spectral windows in
-calibration is part of the ALMA Pipeline low SNR calibration workflow. 
+For targets in some parts of the sky, there may not be a bright enough quasar close enough to the target to achieve the necessary signal-to-noise in each individual spectral window.
+The control software will then instead search for appropriate quasars assuming that the spectral windows can be combined in calibration by the ALMA Pipeline low SNR calibration workflow.
 
 Despite the calibrator monitoring employed at ALMA, given that the thousands of calibrators are quasars and can
-vary, it is possible that the fluxes are lower than expected (and assumed at runtime when selected).
-Thus, calibrators can fall into a low SNR category even if they were not initially.
+vary, it is possible that the fluxes are lower than was assumed at runtime when selected.
+Thus, calibrators can fall into a low SNR category even if they were not initially expected to.
 In some cases already low SNR calibrators can become even weaker, i.e. 'very' low SNR and the ALMA Pipeline will employ
 specific low SNR workflow heuristics as to calibrate, as best as feasibly possible, the observations.
 
 
 ## Typical low SNR observations
-A large percentage of all ALMA observations are perfectly standard and never invoke a low SNR workflow.
-Those that do fall into the below categories:
+A large percentage of all ALMA observations have bright calibrators and do not invoke any low SNR workflow.
+Those that do typically fall into the following categories:
 
 - High frequency (Band 9 and 10) observations on the 12 m array.
 - Higher frequency observations (>Band 7) with the ACA.
@@ -49,8 +40,7 @@ Those that do fall into the below categories:
 The situation is specifically worse for higher frequency bands because the quasars used for calibration
 naturally have a decreasing flux with increasing frequency. There are fewer and fewer
 strong calibrators distributed over the entire sky, and thus finding calibrators that
-are always the high SNR for any given science target it not feasible. The issue is also
-compounded by limits on the separation angle between science target(s) and some calibrators, e.g. PHASE.
+have high SNR for any given science target it not feasible.
 
 ## Pipeline low SNR workflow
 
@@ -64,7 +54,7 @@ tasks as to make the best judgement in performing phase based solves, as detaile
   The phaseup process used is that encoded for {func}`~pipeline.hifa.cli.hifa_bandpass`, but with a
   ``phaseupsnr=5``. The lower SNR limit, compared with {func}`~pipeline.hifa.cli.hifa_bandpass` is to
   use ``combine='spw'`` where absolutely required, but avoid unnecessary time averaging through use of longer ``solint``.
-  If the WVR application improves the data, this task registers only the WVR solutions into the Pipeline context.
+  If the WVR application improves the data, this task registers only the WVR solutions into the Pipeline context (the temporary phase and bandpass tables are discarded because better ones will be created later).
 
 - {func}`~pipeline.hif.cli.hif_lowgainflag`: In order to flag the low amplitude gain solutions, phaseup on the BANDPASS intent is required as a pre-apply.
   Again, this necessitates a pre-bandpass phaseup and a bandpass temporary solution. The phaseup process used is that encoded for

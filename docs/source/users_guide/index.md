@@ -20,6 +20,7 @@ helper-text-files
 pipeline-weblog
 hifa_polcalimage-recipe
 hsd_calimage-recipe
+lowSNR-workflow
 weights
 known_issues
 ```
