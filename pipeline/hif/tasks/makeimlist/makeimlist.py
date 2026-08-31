@@ -305,7 +305,9 @@ class MakeImListInputs(vdp.StandardInputs):
 
             uvtaper: uv-taper on outer baselines
 
-            clearlist: Clear any existing target list
+            clearlist: If True (default), replace the current pending imaging list
+                and associated information. If False, append the new entries to
+                the existing pending imaging list.
 
             per_eb: Make an image target per EB
 

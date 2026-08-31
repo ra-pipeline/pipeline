@@ -64,8 +64,9 @@ def hif_makeimlist(vis=None, imagename=None, intent=None, field=None,
       are imaged at the PI's requested resolution.
 
     The cell size is set to the minimum consistent with the UV coverage. The image size is set from the
-    cell size and primary beam size. If ``clearlist=True`` (default), any existing imaging list entries
-    for the same intent are replaced.
+    cell size and primary beam size. If ``clearlist=True`` (default), the current pending imaging list
+    and associated information are replaced before the new entries are written. Replacement is not
+    limited to entries with the same intent.
 
     Notes:
         QA = fraction of images successfully added to the list compared to the total expected.
