@@ -40,7 +40,7 @@ Those that do typically fall into the following categories:
 The situation is specifically worse for higher frequency bands because the quasars used for calibration
 naturally have a decreasing flux with increasing frequency. There are fewer and fewer
 strong calibrators distributed over the entire sky, and thus finding calibrators that
-have high SNR for any given science target it not feasible.
+have high SNR for any given science target is not feasible.
 
 ## Pipeline low SNR workflow
 
@@ -51,21 +51,22 @@ tasks as to make the best judgement in performing phase based solves, as detaile
   WVR application, phase solutions are generated with and without WVR for both the BANDPASS and PHASE
   intents and subsequently compared. However, prior to these, the data must have a bandpass calibration
   pre-applied, and in order to solve the bandpass, the BANDPASS intent phaseup must first be performed.
-  The phaseup process used is that encoded for {func}`~pipeline.hifa.cli.hifa_bandpass`, but with a
+  The phaseup process used is that encoded for {func}`~pipeline.hifa.cli.hifa_bandpass` (`almaphcorbandpass.py`), but with a
   ``phaseupsnr=5``. The lower SNR limit, compared with {func}`~pipeline.hifa.cli.hifa_bandpass` is to
   use ``combine='spw'`` where absolutely required, but avoid unnecessary time averaging through use of longer ``solint``.
   If the WVR application improves the data, this task registers only the WVR solutions into the Pipeline context (the temporary phase and bandpass tables are discarded because better ones will be created later).
 
 - {func}`~pipeline.hif.cli.hif_lowgainflag`: In order to flag the low amplitude gain solutions, phaseup on the BANDPASS intent is required as a pre-apply.
   Again, this necessitates a pre-bandpass phaseup and a bandpass temporary solution. The phaseup process used is that encoded for
-  {func}`~pipeline.hifa.cli.hifa_bandpass` using ``phaseupsnr=5``. 
+  {func}`~pipeline.hifa.cli.hifa_bandpass` (`almaphcorbandpass.py`) using ``phaseupsnr=5``. 
 
 - {func}`~pipeline.hifa.cli.hifa_bandpassflag`: Prior to investigating amplitude based flags, the bandpass must be solved for,
   that also requires the pre-apply of the phaseup for the BANDPASS intent. {func}`~pipeline.hifa.cli.hifa_bandpassflag`
   directly calls the {func}`~pipeline.hifa.cli.hifa_bandpass`
   task for this process and then makes the flagging assessment on the results.
 
-- {func}`~pipeline.hifa.cli.hifa_bandpass` : The bandpass must be solved with sufficient SNR such that when
+- {func}`~pipeline.hifa.cli.hifa_bandpass` : The main process is encoded in the ``hifa/tasks/bandpass/almaphcorbandpass.py`` function.
+  The bandpass must be solved with sufficient SNR such that when
   the solution is applied to a science target(s) additional noise is not imparted, and therefore does not prohibit
   the detection of weak spectral features. {func}`~pipeline.hifa.cli.hifa_bandpass` uses a default ``bpsnr=50``
   which is the required SNR per solved channel, if this is not met then channel binning for the bandpass solution

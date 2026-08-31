@@ -63,7 +63,8 @@ The `combine='spw'` + `interp='linearPD'` low-SNR bandpass/phase-up
 heuristic developed for PL2025 was extended across more of the calibration
 recipe: {func}`~pipeline.hif.cli.hif_lowgainflag` now
 reuses the ALMA phase-up bandpass code from
-{func}`~pipeline.hifa.cli.hifa_bandpass` instead of a generic
+{func}`~pipeline.hifa.cli.hifa_bandpass` (`hifa/tasks/bandpass/almaphcorbandpass.py`)
+instead of a generic
 worker; the `interp='linearPD'` rule was generalized to every stage that can
 trigger a `combine='spw'` solve for BANDPASS/AMPLITUDE/CHECK/PHASE intents
 ({func}`~pipeline.hifa.cli.hifa_bandpassflag`,
