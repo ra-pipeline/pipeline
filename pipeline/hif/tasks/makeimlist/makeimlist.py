@@ -207,7 +207,7 @@ class MakeImListInputs(vdp.StandardInputs):
             vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the <hifa,hifv>_importdata task.
                 "": use all MeasurementSets in the context
 
-                Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
+                Examples: 'ngc5921.ms', ['ngc5921a.ms', 'ngc5921b.ms', 'ngc5921c.ms']
 
             imagename: Prefix for output image names, "" for automatic.
 
