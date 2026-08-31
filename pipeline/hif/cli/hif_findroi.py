@@ -19,8 +19,8 @@ def hif_findroi(vis=None, field=None, spw=None, parallel=None):
 
     The task produces a native stage-product pickle, ROI and continuum-range
     DAT files, summary plots, and a tarball containing these products. The
-    resources are retained in the pipeline context and can be included in the
-    auxiliary products by ``hifa_exportdata``.
+    result is registered in ``context.findroi_resources`` for inspection and
+    can be included in the auxiliary products by ``hifa_exportdata``.
 
     The WebLog reports which field/SPW combinations were selected, completed
     successfully, or failed. A completed task does not necessarily mean that
