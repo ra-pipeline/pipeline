@@ -174,14 +174,19 @@ MS once per field × spw × EB.
 *(not weblog or QA)*
 
 (hif_findroi)=
-**{func}`~pipeline.hif.cli.hif_findroi`: a new region-of-interest stage.**
-A new imaging stage, `hif_findroi`, implements a fast region-of-interest
-identification routine researched under {jira}`PIPEREQ-414` and has been added to
-the ALMA imaging recipes. Follow-up work improved its weblog view, fixed
-field phase-center extraction lost in a merge conflict, fixed band-to-band
-and polarization-calibration failures, added its output tarball to the
-auxiliary export products, hid absolute filesystem paths that were leaking
-into exported pickles, and reviewed the knock-on recipe-template changes.
+**{func}`~pipeline.hif.cli.hif_findroi`: an experimental region-of-interest stage.**
+
+{func}`~pipeline.hif.cli.hif_findroi` is an experimental PL2026 stage that
+provides a fast search for candidate spectral-line regions in ALMA science
+target data. It records the results as auxiliary findROI resources in
+`findroi_workdir` and produces a native stage-product pickle, ROI and
+continuum-range DAT files, summary plots, and a tarball containing these
+products. The result is registered in `context.findroi_resources` for
+inspection and can be included in the auxiliary products by
+`hifa_exportdata`. The WebLog reports selected, successful, and failed
+field/SPW combinations and includes summary and evidence plots. Standard PL2026
+imaging and continuum-processing stages do not currently use these ROI results
+automatically.
 ```{figure} whatsnew/weblogOverview.png
 ---
 width: 900px
