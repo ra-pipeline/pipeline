@@ -22,16 +22,24 @@ def hifa_wvrgcalflag(vis=None, caltable=None, offsetstable=None, hm_toffset=None
 
     For each qualifying MS the workflow is:
 
-    1. Generate a gain table from the WVR data.
+    1. Generate a gain table from the WVR data (:func:`~casatasks.calibration.wvrgcal`).
     2. Apply the WVR calibration to the data specified by ``flag_intent``; compute per-scan flagging views
        showing the ratio ``phase-rms(with WVR) / phase-rms(without WVR)`` — a ratio < 1 indicates
-       improvement.
+       improvement. In order to create the ratios a phaseup gaintable for each ``flag_intent`` is necessary, 
+       with and without WVR applied. First, a temporary bandpass table must be applied, also requiring an 
+       initial phaseup of the BANDPASS intent.
+       Since PL2026 this process now utilizes the low SNR heuristic from :func:`~pipeline.hifa.cli.hifa_bandpass` 
+       (``almaphcorbandpass.py``) that can trigger ``combine='spw'`` if any spectral window has a phaseup SNR
+       lower than ``phaseupsnr=5``. Note in the case that ``combine='spw'`` then a phase offset solve must
+       be pre-applied, this is made for each spw using ``solint='inf'``. If combine is not required the ratios 
+       will only be assessed for the spectral window with the highest SNR. 
     3. Search the views for antennas with anomalously high ratios. If found, recalculate the WVR calibration
        with those antennas excluded (``wvrflag``), interpolating results from nearby antennas within
        ``maxdistm`` (default: 500 m) provided at least ``minnumants`` (default: 2) are available.
     4. If after flagging the remaining WVR-equipped antennas fall below the count/fraction thresholds,
        reject the WVR caltable and do not use it in subsequent calibration.
-    5. If the overall QA score exceeds ``accept_threshold`` the WVR caltable is merged into the context.
+    5. If the overall QA score exceeds ``accept_threshold`` the WVR caltable is merged into the context. 
+       All other temporary calibration tables are discarded.
 
     For heterogeneous arrays, 7-m (CM) antennas are never removed from the reference antenna list.
 
