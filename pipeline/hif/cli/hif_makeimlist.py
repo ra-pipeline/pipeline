@@ -82,7 +82,12 @@ def hif_makeimlist(vis=None, imagename=None, intent=None, field=None,
     limited to entries with the same intent.
 
     Notes:
-        QA = fraction of images successfully added to the list compared to the total expected.
+        QA includes a primary score based on the fraction of expected imaging
+        targets successfully added to the list. Task errors and size-mitigation
+        errors receive a score of 0.0; when no clean targets are expected, the
+        primary score becomes ``None``. Aggregate continuum targets also
+        receive an additional score indicating whether continuum ranges were
+        found for their spectral windows.
 
     Examples:
         1. Make a list of science target images to be cleaned, one image per science spw:
