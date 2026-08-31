@@ -66,9 +66,15 @@ def hif_makeimlist(vis=None, imagename=None, intent=None, field=None,
       ``robust`` value from ``hifa_imageprecheck`` and any mitigation from ``hif_checkproductsize``.
 
     - **Representative Bandwidth Target Cube**
-      If the PI-requested spectral resolution (bandwidth for sensitivity) is at least 4x larger than the correlator
-      channel width, then in addition to cubes created at that correlator width, the representative source and spw
-      are imaged at the PI's requested resolution.
+      The representative-bandwidth heuristic first determines whether the
+      PI-requested bandwidth is represented by aggregate continuum imaging,
+      per-spw continuum imaging, or a separate representative-bandwidth cube.
+      No separate RepBW cube is created when the requested bandwidth is
+      classified as covered by aggregate (``specmode='cont'``) or per-spw
+      (``specmode='mfs'``) continuum imaging. Otherwise, a separate RepBW cube
+      is created when the requested bandwidth is strictly greater than four
+      times the default cube channel width after any ``hif_checkproductsize``
+      channel binning.
 
     The cell size is set to the minimum consistent with the UV coverage. The image size is set from the
     cell size and primary beam size. If ``clearlist=True`` (default), the current pending imaging list
