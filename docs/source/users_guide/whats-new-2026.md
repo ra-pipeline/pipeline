@@ -192,6 +192,7 @@ automatically.
 width: 900px
 align: center
 ---
+Example hif_findroi WebLog summary and spectral ROI evidence view. The displayed ROI products are still experimental and are not automatically consumed by standard downstream tasks in PL2026.
 ```
 *Tickets: {jira}`PIPE-3149`,
 {jira}`PIPE-3151`,

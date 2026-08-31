@@ -33,6 +33,14 @@ def hif_findroi(vis=None, field=None, spw=None, parallel=None):
     task, the reported QA score is hard-floored at 0.9, with the WebLog message
     recording the underlying score.
 
+    .. figure:: /users_guide/whatsnew/weblogOverview.png
+       :width: 900px
+       :alt: Example hif_findroi WebLog summary and spectral ROI evidence view
+
+       Example hif_findroi WebLog summary and spectral ROI evidence view. The
+       displayed ROI products are still experimental and are not automatically
+       consumed by standard downstream tasks in PL2026.
+
     Examples:
         1. Run with recommended settings after importdata:
 
