@@ -300,9 +300,15 @@ IQUV image now inherits the repBW Stokes I mask/threshold.
 {jira}`PIPE-3018`,
 {jira}`PIPE-3128`.*
 
-{jira}`PIPE-3090` fixes a duplicated
-virtual-spw list in {func}`~pipeline.hifa.cli.hifa_imageprecheck` that was biasing the aggregate
-bandwidth sensitivity estimate low.
+**{func}`~pipeline.hifa.cli.hifa_imageprecheck`: corrected aggregate sensitivity calculation.**
+{jira}`PIPE-3090` fixes a numerical-correctness bug in the aggregate
+continuum sensitivity calculation. For some datasets, representative-target
+field metadata could cause the same virtual science SPW to appear more than
+once, particularly when the representative target had observations with both
+`TARGET` and `ATMOSPHERE` intents. The sensitivity calculation treated
+repeated entries as independent contributions, producing an artificially low,
+over-optimistic sensitivity estimate. The corrected implementation uses a
+unique list of `TARGET`-intent virtual SPWs.
 <br>
 <br>
 <br>
