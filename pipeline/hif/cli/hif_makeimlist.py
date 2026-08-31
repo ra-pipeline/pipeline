@@ -17,6 +17,13 @@ def hif_makeimlist(vis=None, imagename=None, intent=None, field=None,
     :func:`~pipeline.hif.cli.hif_makeimages` stage, and reports them on the WebLog page. 
     The ``specmode`` can be ``'mfs'`` for per-spw continuum multi-frequency synthesis images,
     ``'cont'`` for aggregate mfs continuum images of several spectral windows, or ``'cube'`` for spectral cubes.
+    If ``specmode`` is not specified, it defaults to ``'cube'`` for
+    ``intent='TARGET'`` and to ``'mfs'`` for other intents. Standard ALMA
+    recipes override this default when aggregate continuum, polarization,
+    check-source, or representative-bandwidth products are required.
+    When ``datatype`` is not specified, the task selects the first available
+    matching data type from the preference order associated with the requested
+    intent and ``specmode``.
     The first time the task is run in standard recipes is in preparation for making per-spw mfs images
     of the calibrators. The cell and imsize is chosen separately per band, so that more appropriate choices are
     made for multi-band data including BandToBandInterferometry.
