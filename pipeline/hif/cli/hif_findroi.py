@@ -22,6 +22,17 @@ def hif_findroi(vis=None, field=None, spw=None, parallel=None):
     resources are retained in the pipeline context and can be included in the
     auxiliary products by ``hifa_exportdata``.
 
+    The WebLog reports which field/SPW combinations were selected, completed
+    successfully, or failed. A completed task does not necessarily mean that
+    every requested combination produced a valid ROI. Inspect the per-SPW
+    status and evidence plots when evaluating the result. Stage-level errors
+    and cases with no selected science SPWs have an underlying QA score of 0.0.
+    Plotting failures can reduce the underlying QA score to at most 0.5 when
+    ROI results are otherwise available, and are likewise reported in the
+    WebLog message. For ALMA Cycle 13 due to the experimental nature of the
+    task, the reported QA score is hard-floored at 0.9, with the WebLog message
+    recording the underlying score.
+
     Examples:
         1. Run with recommended settings after importdata:
 
