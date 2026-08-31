@@ -158,7 +158,7 @@ try:
     # Start of imaging pipeline commands
     hif_mstransform()
     hifa_flagtargets() # uses *flagtargettemplate.txt
-    hif_findroi()
+    hif_findroi() # experimental for PL2026, diagnostic-only
     hif_findcont() # modifies cont.dat
     hif_uvcontsub()
     hif_makeimages() # uses cont.dat
