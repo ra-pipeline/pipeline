@@ -65,8 +65,9 @@ class FindROIInputs(vdp.StandardInputs):
             spw: Spectral-window selection. By default, all science spectral
                 windows associated with the selected ``TARGET`` fields are
                 considered. CASA-style spectral-window selections may be used
-                to restrict the search. Fully flagged spectral windows are
-                skipped.
+                to restrict the search. Fully flagged field/SPW combinations
+                are skipped; spectral windows are also omitted if no selected
+                field has usable data.
 
             parallel: Enable MPI-based parallel processing. With the default
                 ``'automatic'`` setting, parallel processing is enabled when

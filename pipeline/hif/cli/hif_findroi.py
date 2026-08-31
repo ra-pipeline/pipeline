@@ -15,7 +15,8 @@ def hif_findroi(vis=None, field=None, spw=None, parallel=None):
     By default, the task processes the science target fields and science
     spectral windows available in the pipeline context, normally after
     ``hifa_importdata``. Use ``field`` and ``spw`` to restrict the search.
-    Fully flagged spectral windows are skipped.
+    Fully flagged field/SPW combinations are skipped; spectral windows are also
+    omitted if no selected field has usable data.
 
     The task produces a native stage-product pickle, ROI and continuum-range
     DAT files, summary plots, and a tarball containing these products. The
