@@ -309,9 +309,11 @@ class MakeImListInputs(vdp.StandardInputs):
                 and associated information. If False, append the new entries to
                 the existing pending imaging list.
 
-            per_eb: Make an image target per EB
+            per_eb: Make an image target per EB. This option is mutually
+                exclusive with ``per_session``.
 
-            per_session: Make an image target per session
+            per_session: Make an image target per session. This option is
+                mutually exclusive with ``per_eb``.
 
             calcsb: Force (re-)calculation of sensitivities and beams
 
