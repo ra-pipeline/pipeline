@@ -30,18 +30,19 @@ def hifa_imageprecheck(vis=None, desired_angular_resolution=None, calcsb=None, p
     imageprecheck; later imaging stages calculate image geometry from the selected beam and current imaging inputs.
 
     Notes:
-        QA score based on fit between the predicted synthesized beam and the PI-requested angular resolution
-        (AR) range:
+        QA is based on the predicted synthesized beam area relative to the
+        PI-requested angular-resolution area range:
 
-        - QA = 1.0 (green): both major and minor axes within the AR range with ``robust=+0.5``.
-        - QA = 0.85 (blue): both axes within the AR range with a ``robust`` value other than +0.5.
-        - QA = 0.50 (yellow): at least one axis outside the AR range but the beam area within the
-          area range corresponding to the PI-requested AR range.
-        - QA = 0.25 (red): beam area falls outside the PI-requested AR area range for all ``robust``
-          values, meaning imaging products are unlikely to meet PI goals.
+        - QA = 1.0 (green): no beam goal is available, or the ``robust=+0.5`` beam
+          area is within the requested range.
+        - QA = 0.85 (blue): a non-default ``robust`` value produces a beam area within
+          the requested range.
+        - QA = 0.25 (red): no tested ``robust`` value produces an acceptable beam area,
+          the beam is too large or too small, or the requested area falls in a gap
+          between the available ``robust`` choices.
 
-        An additional factor of 1.0 vs. 0.5 is applied based on whether representative target/frequency
-        information was successfully identified.
+        The beam axial ratios are reported in the WebLog but are not used as an
+        independent selection criterion.
 
     Examples:
         1. Run with default settings to select the best robust parameter prior to imaging:
