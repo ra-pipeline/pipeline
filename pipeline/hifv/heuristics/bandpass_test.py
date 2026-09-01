@@ -1,11 +1,12 @@
 """Unit tests for the pipeline/hifv/heuristics/bandpass.py module."""
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, Mock
 
 from pipeline.hifv.heuristics.bandpass import is_high_frequency_band
 from pipeline.hifv.tasks.testBPdcals.testBPdcals import testBPdcalsInputs
 from pipeline.hifv.tasks.semiFinalBPdcals.semiFinalBPdcals import semiFinalBPdcalsInputs
 from pipeline.hifv.tasks.finalcals.finalcals import FinalcalsInputs
+from pipeline.infrastructure.launcher import Context
 
 
 @pytest.mark.parametrize(
@@ -73,7 +74,7 @@ def test_is_high_frequency_band_by_spw_frequency():
 
 def test_task_inputs_bpsolint_mode_defaults():
     """Test that bpsolint_mode defaults to 'auto' across task inputs classes."""
-    context = MagicMock()
+    context = Mock(spec=Context)
 
     test_inputs = testBPdcalsInputs(context=context, vis='test.ms')
     assert test_inputs.bpsolint_mode == 'auto'
@@ -88,7 +89,7 @@ def test_task_inputs_bpsolint_mode_defaults():
 @pytest.mark.parametrize("mode", ['auto', 'on', 'off'])
 def test_task_inputs_bpsolint_mode_custom(mode):
     """Test setting custom bpsolint_mode values on task inputs classes."""
-    context = MagicMock()
+    context = Mock(spec=Context)
 
     test_inputs = testBPdcalsInputs(context=context, vis='test.ms', bpsolint_mode=mode)
     assert test_inputs.bpsolint_mode == mode
