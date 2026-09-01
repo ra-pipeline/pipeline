@@ -33,9 +33,6 @@ def hifa_imageprecheck(vis=None, desired_angular_resolution=None, calcsb=None, p
         An additional factor of 1.0 vs. 0.5 is applied based on whether representative target/frequency
         information was successfully identified.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Run with default settings to select the best robust parameter prior to imaging:
 

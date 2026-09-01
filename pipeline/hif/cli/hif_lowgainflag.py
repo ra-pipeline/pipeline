@@ -34,9 +34,6 @@ def hif_lowgainflag(vis=None, intent=None, spw=None, refant=None, flag_nmedian=N
         and 1 for fractions between 5% and 50%. An additional score of 0.8 is assigned if any spw has an
         antenna that is fully flagged.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Flag antennas with low or high gain using recommended thresholds:
 

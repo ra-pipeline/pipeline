@@ -7,9 +7,7 @@
    :caption: Basics
 
    overview
-   dependencies
    releases
-   timeline
    qa
    references
 
@@ -23,9 +21,20 @@
 
 .. toctree::
    :hidden:
+   :maxdepth: 3
+   :caption: User Guides
+
+   users_guide/index
+   VLA Pipeline User's Guide <https://science.nrao.edu/facilities/vla/data-processing>
+   Nobeyama Pipeline User's Guide <https://www.nro.nao.ac.jp/projects/45m/data/otf/#casa>
+
+.. toctree::
+   :hidden:
    :maxdepth: 2
    :caption: Developer Guide
 
+   timeline
+   dependencies
    devel/setup/index
    devel/usage/index
    devel/process/index

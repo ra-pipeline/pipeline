@@ -22,7 +22,7 @@ def hifa_flagdata(vis=None, autocorr=None, shadow=None, tolerance=None, scan=Non
 
     The WebLog page shows whether any data in these categories were flagged (a check mark means yes, an X means no).
     The Flagged data summary table shows the percentage of flagged data per MS. The ``Before Task`` column contains
-    only the effect of the Binary Data Flags (BDF) from the correlator applied during :py:func:`hifa_importdata <hifa_importdata>`. The
+    only the effect of the Binary Data Flags (BDF) from the correlator applied during :func:`~pipeline.hifa.cli.hifa_importdata`. The
     additional flags are applied in the order of columns shown in the table, with each column reflecting the
     additional amount of data flagged when applying that flag reason.
 
@@ -57,9 +57,6 @@ def hifa_flagdata(vis=None, autocorr=None, shadow=None, tolerance=None, scan=Non
         <=5%, linearly interpolated in between. An additional QA score of 0.8 results if the baseband frequency
         range could not be calculated for a spw. For Low Transmission flagging: 1.0 if no spw is flagged, 0.9 if
         a non-representative spw is flagged, 0.33 if the representative spw is flagged.
-
-    Returns:
-        The results object for the pipeline task is returned.
 
     Examples:
         1. Do basic flagging on a MeasurementSet:

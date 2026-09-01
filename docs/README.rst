@@ -5,28 +5,57 @@ Pipeline
 |Docs Pages| |Docs RTD| |Test Unit| |Codecov Unit|
 
 .. important::
-
-  This is the **internal developer documentation** for the Pipeline project.
-  It provides *up-to-date and version-controlled* supplementary technical information to complement the official Pipeline portals from `ALMA <https://almascience.nrao.edu/processing/science-pipeline>`_ and `VLA <https://science.nrao.edu/facilities/vla/data-processing>`_.
-  Pipeline development is a collaborative effort led by `NRAO`_, `ESO`_, and `NAOJ`_, with additional contributions from `MPIfR`_, `NOVA`_ (from 2026), and `UKATC`_ (until 2025) under contract to `ESO`_.
+    This site provides *up-to-date and version-controlled* information, *automatically generated from the code repository*, to complement the official Pipeline portals from `ALMA <https://almascience.nrao.edu/processing/science-pipeline>`_ and `VLA <https://science.nrao.edu/facilities/vla/data-processing>`_.
+    
+    Pipeline documentation is in transition, and not all content is migrated here - the table below clarifies where to find different content. Some content is intended for Users, and some for Developers, but naturally there is significant overlap.
+       
+    Pipeline development is a collaborative effort led by `NRAO`_, `ESO`_, and `NAOJ`_, with additional contributions from `MPIfR`_, `NOVA`_ (from 2026), and `UKATC`_ (until 2025) under contract to `ESO`_.
 
 
 
 Official Repository
---------------------
+-------------------
 
-The official public repository is accessible here:  
-- `Open Bitbucket @ NRAO - PIPE <https://open-bitbucket.nrao.edu/projects/PIPE>`_
+The official public code repository is accessible here:  - `Open Bitbucket @ NRAO - PIPE <https://open-bitbucket.nrao.edu/projects/PIPE>`_
 
-Highlights
-----------
+Documentation Components
+------------------------
 
-This documentation is automatically generated from the main repository and includes:
- 
-  * :doc:`Past Pipeline Releases <releases>`
-  * :doc:`Pipeline Dependencies <dependencies>`
-  * :doc:`Running Pipeline <develdocmd/usage/running_pipeline>`
-  * The latest Pipeline task reference manual: `PDF <https://pipe-docs.readthedocs.io/_/downloads/en/latest/pdf/>`_ :doc:`HTML <apisummary>`
+.. list-table::
+   :header-rows: 1
+   :widths: 40 40
+   :class: pipedocs-frontpage
+
+   * - Content
+     - Location
+   * - Past releases, all observatories
+     - :doc:`Releases <releases>`
+   * - Past releases used for ALMA processing
+     - `ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>`__ (ALMA site)
+   * - ALMA User's Guide :sup:`1`
+     - :doc:`ALMA User's Guide <users_guide/index>`
+   * - VLA User's Guide
+     - `VLA Processing <https://science.nrao.edu/facilities/vla/data-processing>`__ (NRAO site)
+   * - Nobeyama User's Guide
+     - `Nobeyama User's Guide <https://www.nro.nao.ac.jp/projects/45m/data/otf/#casa>`__ (NRO site)
+   * - How to run the pipeline as a user
+     - :doc:`Quick Start <users_guide/quick-start>`
+   * - Imaging weights
+     - :doc:`Imaging Weights <users_guide/weights>`
+   * - Documentation and API for each task :sup:`2`
+     - `PDF <https://pipe-docs.readthedocs.io/_/downloads/en/latest/pdf/>`__ :doc:`HTML <apisummary>`
+   * - How to run the pipeline as a developer
+     - :doc:`Running Pipeline <devel/usage/running_pipeline>`
+   * - Pipeline Dependencies
+     - :doc:`Dependencies <dependencies>`
+
+
+
+:sup:`1` \ previous versions were in pdf form at `ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>`__
+     
+:sup:`2` \ previously the Reference Manual in pdf form at `ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>`__
+
+
 
 .. _NRAO: http://www.nrao.edu  
 .. _ESO: https://www.eso.org  
@@ -35,19 +64,19 @@ This documentation is automatically generated from the main repository and inclu
 .. _NOVA: https://nova-astronomy.nl/  
 .. _NAOJ: https://www.nao.ac.jp  
 
-.. |Docs Pages| image:: https://img.shields.io/github/actions/workflow/status/r-xue/pipeline/build-gh-pages.yml?style=plastic&logo=githubactions&label=docs-pages
-  :target: https://github.com/r-xue/pipeline/actions/workflows/build-gh-pages.yml
+.. |Docs Pages| image:: https://img.shields.io/github/actions/workflow/status/ra-pipeline/pipeline/build-gh-pages.yml?style=plastic&logo=githubactions&label=docs-pages
+  :target: https://github.com/ra-pipeline/pipeline/actions/workflows/build-gh-pages.yml
   :alt: Docs: GH-Pages-Status
 
 .. |Docs RTD| image:: https://img.shields.io/readthedocs/pipe-docs?style=plastic&logo=readthedocs&label=docs-rtd
   :target: https://pipe-docs.readthedocs.io/en/latest/?badge=latest
   :alt: Docs: RTD-Status
 
-.. |Test Unit| image:: https://img.shields.io/github/actions/workflow/status/r-xue/pipeline/test-unit.yml?style=plastic&logo=githubactions&label=test-unit
-  :target: https://github.com/r-xue/pipeline/actions/workflows/test-unit.yml
+.. |Test Unit| image:: https://img.shields.io/github/actions/workflow/status/ra-pipeline/pipeline/test-unit-pixi.yml?style=plastic&logo=githubactions&label=test-unit
+  :target: https://github.com/ra-pipeline/pipeline/actions/workflows/test-unit-pixi.yml
   :alt: Test: GH-Test-Unit-Status
 
-.. |Codecov Unit| image:: https://img.shields.io/codecov/c/github/r-xue/pipeline?style=plastic&label=codecov-unit
-  :target: https://app.codecov.io/github/r-xue/pipeline
+.. |Codecov Unit| image:: https://img.shields.io/codecov/c/github/ra-pipeline/pipeline?style=plastic&label=codecov-unit
+  :target: https://app.codecov.io/github/ra-pipeline/pipeline
   :alt: Test: Codecov-Unit-Status
 

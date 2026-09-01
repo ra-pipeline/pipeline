@@ -15,9 +15,6 @@ def hif_gaincal(vis=None, caltable=None, field=None, intent=None, spw=None, ante
     Good candidate reference antennas can be determined using the hif_refant
     task.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         Compute standard per scan gain solutions that will be used to calibrate
         the target:

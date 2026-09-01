@@ -233,6 +233,10 @@
     <ProcessingCommand>
         <Command xmlns="">hif_findcont</Command>
         <ParameterSet>
+            <Parameter>
+                <Keyword xmlns="">hm_mode</Keyword>
+                <Value xmlns="">coarse</Value>
+            </Parameter>
         </ParameterSet>
     </ProcessingCommand>
 

@@ -211,6 +211,54 @@ dl.field-list>dt {
     }
 }
 
+/* Hide redundant field list headers if we promoted them to actual sections (via toc_sections.py) */
+section#parameters > dl.field-list > dt:first-child,
+section#examples > dl.field-list > dt:first-child {
+    display: none;
+}
+
+/* --- Promoted docstring section headings (Parameters, Returns, Notes, Examples) ---
+   These were rubrics/field-lists promoted to <section><h2> for TOC anchoring.
+   Override the default h2 style to match the original subtle rubric appearance. */
+section#parameters > h2,
+section#returns > h2,
+section#notes > h2,
+section#examples > h2 {
+    /* Match the subtle rubric/field-list label style */
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-foreground-secondary, #555);
+    background-color: var(--color-background-secondary, #fafafa);
+    padding: 0.25rem 0.5rem;
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-background-border, #e0e0e0);
+    border-radius: 0;
+    /* Suppress the default h2 anchor/¶ link visibility */
+}
+
+section#parameters > h2 .headerlink,
+section#returns > h2 .headerlink,
+section#notes > h2 .headerlink,
+section#examples > h2 .headerlink {
+    font-size: 0.75rem;
+    opacity: 0.4;
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+    section#parameters > h2,
+    section#returns > h2,
+    section#notes > h2,
+    section#examples > h2 {
+        color: var(--color-foreground-secondary, #aaa);
+        background-color: #2a2a3a;
+        border-bottom-color: #3a3a4a;
+    }
+}
+
 /* --- Field list content (dd) ---------------------------------------------- */
 /* Improved spacing between sections */
 dl.field-list>dd {
@@ -264,4 +312,32 @@ p.rubric {
         width: auto !important;
         max-width: 62rem;
     }
+}
+
+/* =============================================================================
+   Image & Screenshot Drop Shadows
+   =========================================================================== */
+/* Add a subtle drop-shadow to embedded screenshots to distinguish them from the background */
+figure img, .figure img, a[data-lightbox] img {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+    border-radius: 4px;
+    border: 1px solid var(--color-background-border, #e0e0e0);
+}
+
+/* Ensure the shadow doesn't get cut off */
+figure, .figure {
+    padding: 4px;
+    margin-bottom: 1.5em;
+}
+
+/* =============================================================================
+   Figure Captions
+   =========================================================================== */
+/* Distinguish figure captions from normal body text */
+figure figcaption, .figure figcaption, .caption-text {
+    font-size: 0.9em;
+    color: var(--color-foreground-muted, #666);
+    text-align: center;
+    margin-top: 0.5em;
+    line-height: 1.4;
 }

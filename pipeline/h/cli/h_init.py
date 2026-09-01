@@ -15,11 +15,11 @@ def h_init(
 ) -> launcher.Context:
     """Initialize the pipeline state and context.
 
-    :py:func:`h_init <h_init>` must be called before any other pipeline task. The pipeline
+    :func:`~pipeline.h.cli.h_init` must be called before any other pipeline task. The pipeline
     can be initialized in one of two ways: by creating a new pipeline
-    state (:py:func:`h_init <h_init>`) or be loading a saved pipeline state (:py:func:`h_resume <h_resume>`).
+    state (:func:`~pipeline.h.cli.h_init`) or be loading a saved pipeline state (:func:`~pipeline.h.cli.h_resume`).
 
-    :py:func:`h_init <h_init>` creates an empty pipeline context but does not load visibility data
+    :func:`~pipeline.h.cli.h_init` creates an empty pipeline context but does not load visibility data
     into the context. Any of the pipeline `h*_importdata` tasks can be used to load data.
 
     Args:

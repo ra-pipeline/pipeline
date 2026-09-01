@@ -29,7 +29,7 @@ def hsd_baseline(
     coordinates of all pointings in that grid cell.
 
     .. figure:: /figures/hsd_baseline_representative.png
-       :scale: 60%
+       :width: 60%
        :alt: Representative position determination
 
        Examples of how representative positions are determined. Blue points are all
@@ -37,10 +37,10 @@ def hsd_baseline(
        representative positions (nearest valid pointing to the averaged coordinates).
 
     .. figure:: /figures/guide-img036.jpg
-       :scale: 60%
+       :width: 60%
        :alt: hsd_baseline WebLog page
 
-       Example of the :py:func:`hsd_baseline <hsd_baseline>` WebLog page showing the first three spectral
+       Example of the :func:`~pipeline.hsd.cli.hsd_baseline` WebLog page showing the first three spectral
        grid rows (before subtraction, averaged, after subtraction) for one spw.
 
     Detailed per-antenna spectral maps can be accessed from the detail pages by clicking the
@@ -70,7 +70,7 @@ def hsd_baseline(
     spectral rms ``sigma``.
 
     .. figure:: /figures/guide-image-new-baselineflatness.png
-       :scale: 60%
+       :width: 60%
        :alt: Baseline flatness evaluation
 
        Example of baseline flatness evaluation.
@@ -82,7 +82,7 @@ def hsd_baseline(
     have a single time-domain group with detected emission; cyan cells have more than one.
 
     .. figure:: /figures/guide-img037.png
-       :scale: 60%
+       :width: 60%
        :alt: Clustering detection
 
        Clustering detection step.
@@ -95,7 +95,7 @@ def hsd_baseline(
     - **Questionable** if ``Nmember/Nspectra > 0.2``
 
     .. figure:: /figures/guide-img038.png
-       :scale: 60%
+       :width: 60%
        :alt: Clustering validation
 
        Clustering validation step.
@@ -104,7 +104,7 @@ def hsd_baseline(
     isolated single-line candidates and reinforce detections supported by neighboring cells.
 
     .. figure:: /figures/guide-img039.png
-       :scale: 60%
+       :width: 60%
        :alt: Clustering smoothing
 
        Clustering smoothing step.
@@ -114,14 +114,14 @@ def hsd_baseline(
     spectra in validated cells and applied to each individual spectrum.
 
     .. figure:: /figures/guide-img040.png
-       :scale: 60%
+       :width: 60%
        :alt: Mask range calculation
 
        Mask range calculation — in blue squares the mask
        range is interpolated from validated cells.
 
     .. figure:: /figures/guide-img041.png
-       :scale: 60%
+       :width: 60%
        :alt: Clustering final
 
        Clustering final example.
@@ -147,7 +147,7 @@ def hsd_baseline(
         line ranges is detected (triggering deviation masks).
 
     Warning:
-        :py:func:`hsd_baseline <hsd_baseline>` overwrites results from previous runs. If processing spws separately,
+        :func:`~pipeline.hsd.cli.hsd_baseline` overwrites results from previous runs. If processing spws separately,
         each spw must be taken through to the imaging stage before the next spw is processed::
 
             hsd_baseline(spw='0'); hsd_blflag(spw='0'); hsd_imaging(spw='0')

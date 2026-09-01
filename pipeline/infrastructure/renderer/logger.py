@@ -48,7 +48,7 @@ if mogrify_path:
     if os.path.exists(convert_path):
         LOG.trace('Using convert executable at \'%s\' to generate '
                   'thumbnails' % convert_path)
-        THUMBNAIL_CMD = lambda full, thumb : (convert_path, full, '-thumbnail', '250x188', thumb)
+        THUMBNAIL_CMD = lambda full, thumb, size : (convert_path, full, '-thumbnail', size, thumb)
 
 if THUMBNAIL_CMD is None and platform.system() == 'Darwin':
     # macOS only: fallback to sips if ImageMagick, e.g. from MacPorts or Homebrew is not found on macOS. sips is a system
@@ -57,7 +57,7 @@ if THUMBNAIL_CMD is None and platform.system() == 'Darwin':
     if sips_path:
         LOG.trace('Using sips executable at \'%s\' to generate thumbnails'
                   % sips_path)
-        THUMBNAIL_CMD = lambda full, thumb : (sips_path, '-Z', '250', '--out', thumb, full)
+        THUMBNAIL_CMD = lambda full, thumb, size : (sips_path, '-Z', size.split('x')[0], '--out', thumb, full)
 
 if THUMBNAIL_CMD is None:
     LOG.warning('Could not find the ImageMagick \'convert\' or macOS \'sips\' command. '
@@ -358,11 +358,12 @@ class Plot:
         return Plot.create_thumbnail(self.abspath)
 
     @staticmethod
-    def create_thumbnail(image_path: str | Path) -> str:
+    def create_thumbnail(image_path: str | Path, thumbnail_size: str = '250x188') -> str:
         """Creates a scaled-down thumbnail from a given image file.
 
         Args:
             image_path: The absolute path to the original image file.
+            thumbnail_size: Maximum thumbnail size passed to the image converter.
 
         Returns:
             The path to the created thumbnail. If creation fails or is
@@ -385,7 +386,7 @@ class Plot:
             return source_path.name
 
         LOG.trace('Creating thumbnail for %s', source_path)
-        cmd = THUMBNAIL_CMD(str(source_path), str(thumb_path))
+        cmd = THUMBNAIL_CMD(str(source_path), str(thumb_path), thumbnail_size)
 
         # Create a copy of the environment without LD_LIBRARY_PATH to avoid conflicts.
         env = os.environ.copy()

@@ -10,20 +10,20 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
 
     Derives flux densities for point-source transfer calibrators using flux models for reference calibrators.
     The absolute flux scale is transferred from the amplitude calibrator to the phase calibrator and other
-    secondary calibrators, which is subsequently transferred to the science target via :py:func:`hif_applycal <hif_applycal>`.
+    secondary calibrators, which is subsequently transferred to the science target via :func:`~pipeline.hif.cli.hif_applycal`.
 
     The workflow (as illustrated in the WebLog logic diagram):
 
     .. figure:: /figures/PL2025_hifa_gfluxscale_all.png
-       :scale: 60%
+       :width: 60%
        :alt: Logical flow in hifa_gfluxscale
 
        Logical flow in ``hifa_gfluxscale``. Each box represents one ``gaincal``
        call per intent/field/Spectral Spec/EB. Italicized parameters originate
-       from :py:func:`hifa_spwphaseup <hifa_spwphaseup>`.
+       from :func:`~pipeline.hifa.cli.hifa_spwphaseup`.
 
     1. Phase-up calibration is performed for all science spws for each calibrator field using the spw
-       mapping/combine parameters and ``solint``/``gaintype`` established in :py:func:`hifa_spwphaseup <hifa_spwphaseup>`.
+       mapping/combine parameters and ``solint``/``gaintype`` established in :func:`~pipeline.hifa.cli.hifa_spwphaseup`.
     2. Amplitude-only solutions are computed (with ``gaintype='T'``, combining polarisations), pre-applying
        the phase solutions.
     3. Obvious outlier amplitude solutions are identified and flagged in the caltable.
@@ -36,14 +36,14 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
     values. Plots of amplitude vs. uv distance are shown.
 
     .. figure:: /figures/guide-img024.png
-       :scale: 60%
+       :width: 60%
        :alt: Limited uv ranges for resolved calibrators
 
        Example of limited uv ranges for deriving the flux scale on resolved
        solar system objects.
 
     .. figure:: /figures/guide-img025.png
-       :scale: 60%
+       :width: 60%
        :alt: Derived vs. catalog flux density plot
 
        Examples of derived vs. catalog flux density plots and associated QA
@@ -81,14 +81,11 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
            - QA = 0.5 if max deviation > 0.2
 
         The spectral consistency score can be low for reasons unrelated to the flux scale (e.g., low SNR
-        in some spws causing amplitude noise bias, or atmospheric absorption lines). Check :py:func:`hif_applycal <hif_applycal>`
+        in some spws causing amplitude noise bias, or atmospheric absorption lines). Check :func:`~pipeline.hif.cli.hif_applycal`
         to determine whether any low score represents a real science target issue.
 
         For very low SNR, the longer ``solint`` used in the phase-up can cause phase decoherence to be
         'baked in', artificially biasing amplitude gains upward and producing an incorrect flux scale.
-
-    Returns:
-        The results object for the pipeline task is returned.
 
     Examples:
         1. Compute flux values for the phase calibrator using model data from the amplitude calibrator:

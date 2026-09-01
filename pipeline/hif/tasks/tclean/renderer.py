@@ -593,11 +593,11 @@ class T2_4MDetailsTcleanRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                     have_polcal_fit = True
                     pol_session = r.polcal_fit['session']
                     if r.polcal_fit['pol_ratio'] != 'N/A':
-                        pol_ratio = f"{qaTool.getvalue(r.polcal_fit['pol_ratio'])[0]:6.2f} +/- {qaTool.getvalue(r.polcal_fit['err_pol_ratio'])[0]:6.2f}%"
+                        pol_ratio = f"{qaTool.getvalue(r.polcal_fit['pol_ratio']).item():6.2f} +/- {qaTool.getvalue(r.polcal_fit['err_pol_ratio']).item():6.2f}%"
                     else:
                         pol_ratio = 'N/A'
                     if r.polcal_fit['pol_angle'] != 'N/A':
-                        pol_angle = f"{qaTool.getvalue(r.polcal_fit['pol_angle'])[0]:7.2f} +/- {qaTool.getvalue(r.polcal_fit['err_pol_angle'])[0]:7.2f} deg"
+                        pol_angle = f"{qaTool.getvalue(r.polcal_fit['pol_angle']).item():7.2f} +/- {qaTool.getvalue(r.polcal_fit['err_pol_angle']).item():7.2f} deg"
                     else:
                         pol_angle = 'N/A'
                 else:
@@ -1538,11 +1538,11 @@ class T2_4MDetailsTcleanVlassCubeRenderer(basetemplates.T2_4MDetailsDefaultRende
                     have_polcal_fit = True
                     pol_session = r.polcal_fit['session']
                     if r.polcal_fit['pol_ratio'] != 'N/A':
-                        pol_ratio = f"{qaTool.getvalue(r.polcal_fit['pol_ratio'])[0]:6.2f} +/- {qaTool.getvalue(r.polcal_fit['err_pol_ratio'])[0]:6.2f}%"
+                        pol_ratio = f"{qaTool.getvalue(r.polcal_fit['pol_ratio']).item():6.2f} +/- {qaTool.getvalue(r.polcal_fit['err_pol_ratio']).item():6.2f}%"
                     else:
                         pol_ratio = 'N/A'
                     if r.polcal_fit['pol_angle'] != 'N/A':
-                        pol_angle = f"{qaTool.getvalue(r.polcal_fit['pol_angle'])[0]:7.2f} +/- {qaTool.getvalue(r.polcal_fit['err_pol_angle'])[0]:7.2f} deg"
+                        pol_angle = f"{qaTool.getvalue(r.polcal_fit['pol_angle']).item():7.2f} +/- {qaTool.getvalue(r.polcal_fit['err_pol_angle']).item():7.2f} deg"
                     else:
                         pol_angle = 'N/A'
                 else:

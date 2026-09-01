@@ -48,9 +48,6 @@ def hsdn_restoredata(vis=None, caltable=None, reffile=None,
     When importing the MS, if the output MS already exists in the output directory,
     the existing MS will be imported instead.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Restore the pipeline results for a single MS in a single session
 

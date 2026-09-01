@@ -31,10 +31,10 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         pixi_env:
           - casa674-py312
-          - casa675-py312
-          - casa675-py313
           - casa676-py312
           - casa676-py313
+          - casa677-py312
+          - casa677-py313
     name: "Unit Testing (${{ matrix.os }}, ${{ matrix.pixi_env }})"
 
     uses: ./.github/workflows/env-setup-run-template-pixi.yml
