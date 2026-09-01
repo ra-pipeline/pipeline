@@ -658,12 +658,7 @@ Pipeline).
 explanatory caption to the missed-line-channel diagnostic plots at the
 {func}`~pipeline.hsd.cli.hsd_imaging` stage, describing the
 single-peak/extended detection thresholds and the plot's color coding.
-```{figure} whatsnew/idea.png
----
-width: 812px
-align: center
----
-```
+
 {jira}`PIPE-3141` fixes an inverted
 channel range for the `hsd_imaging` moment-map plot in LSB data.
 
