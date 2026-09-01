@@ -136,8 +136,34 @@ def _compute_median_snr(caltable: str) -> dict:
     return median_snr
 
 
+HIGH_BANDS = {'U', 'K', 'A', 'Q', 'KU', 'KA', 'Ku', 'Ka'}
+LOW_BANDS = {'4', 'P', 'L', 'S', 'C', 'X'}
+
+
+def is_high_frequency_band(band: str | None, m=None, spw_list: list | None = None) -> bool:
+    """Determine whether the specified band or SPWs correspond to Ku-band or higher (>= 12 GHz)."""
+    if band is not None:
+        band_clean = str(band).strip()
+        if band_clean in HIGH_BANDS or band_clean.upper() in HIGH_BANDS:
+            return True
+        if band_clean in LOW_BANDS or band_clean.upper() in LOW_BANDS:
+            return False
+
+    # Fallback to SPW reference frequency if band name is unclassified or ambiguous
+    if m is not None and spw_list:
+        for spwid in spw_list:
+            try:
+                spw_obj = m.get_spectral_window(int(spwid))
+                if float(spw_obj.ref_frequency.value) >= 12.0e9:
+                    return True
+            except Exception:
+                pass
+    return False
+
+
 def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypecaltable=None,
-                bpdgain_touse=None, solint=None, append=None, executor=None, solnorm=None):
+                bpdgain_touse=None, solint=None, append=None, executor=None, solnorm=None,
+                bpsolint_mode='auto', band=None):
     """Run CASA task bandpass."""
     m = context.observing_run.get_ms(vis)
     bandpass_field_select_string = context.evla['msinfo'][m.name].bandpass_field_select_string
@@ -202,13 +228,34 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
 
         executor.execute(job)
 
-    # PIPE-2512:  Re-run bandpass for low-S/N SPWs with smoothing
     # PIPE-3064: Check if caltable exists (may not if band is fully flagged)
     if not os.path.exists(caltable):
         LOG.warning(
-            'Bandpass calibration table %s does not exist (band may be fully flagged). Skipping S/N analysis.', caltable
+            'Bandpass calibration table %s does not exist (band may be fully flagged). '
+            'Skipping bandpass spectral solint optimization.',
+            caltable,
         )
         return {}
+
+    # PIPE-2512 / PIPE-3239: Re-run bandpass for low-S/N SPWs with smoothing if enabled
+    mode = str(bpsolint_mode).lower().strip() if bpsolint_mode is not None else 'auto'
+    if mode not in ('on', 'auto', 'off'):
+        LOG.warning(f"Unrecognized bpsolint_mode='{bpsolint_mode}', defaulting to 'auto'.")
+        mode = 'auto'
+
+    if mode == 'off':
+        LOG.info("Bandpass spectral solint optimization is turned off (bpsolint_mode='off').")
+        return {}
+    elif mode == 'auto':
+        spw_list = [s.strip() for s in spw.split(',')] if spw else []
+        if not is_high_frequency_band(band, m=m, spw_list=spw_list):
+            LOG.info(
+                f'Bandpass spectral solint optimization is disabled for band {band} '
+                "(active only for Ku-band and higher frequencies in 'auto' mode)."
+            )
+            return {}
+    else:  # mode == 'on'
+        LOG.info(f"Bandpass spectral solint optimization is active for band {band} (bpsolint_mode='on').")
 
     median_snrs = _compute_median_snr(caltable)
     low_snr_spws = [spw for spw, snr in median_snrs.items() if snr < 50.0]
