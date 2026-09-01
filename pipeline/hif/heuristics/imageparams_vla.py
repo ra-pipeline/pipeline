@@ -1107,6 +1107,30 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         # Get fields observed with current spws (direct spw→field relationship)
         target_fields = self._get_fields_for_current_spws()
 
+        # If a field filter is specified, filter target_fields accordingly
+        if field and field.strip():
+            field_list = utils.safe_split(field)
+            selected_names = {utils.dequote(f.strip()) for f in field_list if f.strip()}
+
+            matching_fields = set()
+            ref_ms = self.observing_run.get_ms(self.vislist[0])
+            for fld in ref_ms.get_fields():
+                fld_name = utils.dequote(fld.name)
+                fld_source = utils.dequote(fld.source.name) if fld.source else ''
+                if fld_name in selected_names or str(fld.id) in selected_names or fld_source in selected_names:
+                    matching_fields.add(fld.name)
+                else:
+                    for sn in selected_names:
+                        if '*' in sn:
+                            pattern = sn.replace('*', '.*')
+                            if re.search(pattern, fld_name) or (fld_source and re.search(pattern, fld_source)):
+                                matching_fields.add(fld.name)
+                                break
+
+            target_fields = target_fields & matching_fields
+            if not target_fields:
+                return set()
+
         # For VLA, hpbw (in arcseconds) = 42.0e9 / observing frequency in Hz * 60.0
         hpbw = (42.0e9 / freq_hz) * 60.0  # hpbw in arcseconds
 

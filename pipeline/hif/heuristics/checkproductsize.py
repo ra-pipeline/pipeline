@@ -51,14 +51,17 @@ class CheckProductSizeHeuristics:
             else:
                 cubesizes[target['spw']] = cubesize
             productsize = 2.0 * (mfssize + cubesize)
-            # Since CAS-11363 this process technically only returns product sizes (keyed by spw)
-            # for the last target. The underlying assumption is that irrespective of the target
-            # all cubes for a given spw are the ~same size
-            productsizes[target['spw']] = productsize
+            # Accumulate product size per spw across all targets using this spw
+            if productsizes.get(target['spw']) is not None:
+                productsizes[target['spw']] += productsize
+            else:
+                productsizes[target['spw']] = productsize
             total_productsize += productsize
             LOG.info('Cube size for Field %s SPW %s nchan %d nbin %d imsize %d x %d is %.3g GB' % (target['field'], target['spw'], nchan, nbin, nx, ny, cubesize))
 
-        return cubesizes, max(cubesizes.values()), productsizes, total_productsize
+        maxcubesize = max(cubesizes.values()) if cubesizes else 0.0
+
+        return cubesizes, maxcubesize, productsizes, total_productsize
 
     def mitigate_sizes(self):
 
@@ -460,6 +463,7 @@ class CheckProductSizeHeuristics:
                 makeimlist_inputs.hm_cell = hm_cell_orig
                 imlist = makeimlist_result.targets
                 cubesizes, maxcubesize, productsizes, total_productsize = self.calculate_sizes(imlist)
+
                 # Save cube mitigated product size for logs
                 cube_mitigated_productsize = total_productsize
                 LOG.info('SpW mitigation leads to a maximum cube size of %.4f GB', maxcubesize)
@@ -472,18 +476,23 @@ class CheckProductSizeHeuristics:
                 LOG.info('Maximum cube size cannot be mitigated. Remaining factor with the maxcubesize is: %.4f.',
                          maxcubesize / self.inputs.maxcubesize)
                 LOG.info('But the maximum cube size is smaller than limit of %s GB.', self.inputs.maxcubelimit)
-        # Step 2 cause on total product size to exit                      
+        # Step 2 cause on total product size to exit (with 5% tolerance factor)
+        tolerance_factor = 1.05
         if (self.inputs.maxproductsize != -1.0) and (total_productsize > self.inputs.maxproductsize):
-            LOG.error('Product size cannot be mitigated. Remaining factor: %.4f.' % (total_productsize / self.inputs.maxproductsize / nfields))
-            return size_mitigation_parameters, \
-                   original_maxcubesize, original_productsize, \
-                   cube_mitigated_productsize, \
-                   maxcubesize, total_productsize, \
-                   original_imsize, mitigated_imsize, \
-                   True, \
-                   {'longmsg': 'Product size could not be mitigated. Remaining factor: %.4f.' % (total_productsize / self.inputs.maxproductsize / nfields), \
-                    'shortmsg': 'Product size could not be mitigated'}, \
-                   known_synthesized_beams
+            if total_productsize <= tolerance_factor * self.inputs.maxproductsize:
+                LOG.info('Total product size (%.4f GB) slightly exceeds maxproductsize (%s GB) but is within the 5%% tolerance limit (%.4f GB).',
+                         total_productsize, self.inputs.maxproductsize, tolerance_factor * self.inputs.maxproductsize)
+            else:
+                LOG.error('Product size cannot be mitigated. Remaining factor: %.4f.' % (total_productsize / self.inputs.maxproductsize / nfields))
+                return size_mitigation_parameters, \
+                       original_maxcubesize, original_productsize, \
+                       cube_mitigated_productsize, \
+                       maxcubesize, total_productsize, \
+                       original_imsize, mitigated_imsize, \
+                       True, \
+                       {'longmsg': 'Product size could not be mitigated. Remaining factor: %.4f.' % (total_productsize / self.inputs.maxproductsize / nfields), \
+                        'shortmsg': 'Product size could not be mitigated'}, \
+                       known_synthesized_beams
 
         # Check for case with many targets which will cause long run times in spite
         # of any mitigation.
