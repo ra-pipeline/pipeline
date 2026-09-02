@@ -519,6 +519,8 @@ class Editimlist(basetask.StandardTaskTemplate):
                                                             imagename_prefix=inp.context.project_structure.ousstatus_entity_id,
                                                             proj_params=inp.context.project_performance_parameters,
                                                             imaging_params=inp.context.imaging_parameters,
+                                                            contfile='cont.dat',
+                                                            linesfile='lines.dat',                                                            
                                                             processing_intents=inp.context.processing_intents,
                                                             imaging_mode=img_mode)
 

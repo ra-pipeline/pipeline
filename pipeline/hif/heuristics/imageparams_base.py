@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING
 
 import astropy.units as u
 import numpy as np
+
+import pipeline.infrastructure.utils as utils
 from astropy.coordinates import SkyCoord
 from casatasks.private.imagerhelpers.imager_base import PySynthesisImager
 from casatasks.private.imagerhelpers.imager_parallel_continuum import PyParallelContSynthesisImager
@@ -476,7 +478,7 @@ class ImageParamsHeuristics:
                         scan_dos = [scan for scan in ms.scans
                                     if intent in scan.intents
                                     and field in {f.name for f in scan.fields}]
-                        scanids = ','.join({str(scan.id) for scan in scan_dos})
+                        scanids = ','.join(utils.deduplicate(str(scan.id) for scan in scan_dos))
 
                         for spwid in spwids:
                             real_spwid = self.observing_run.virtual2real_spw_id(spwid, ms)
@@ -1170,9 +1172,9 @@ class ImageParamsHeuristics:
             # Check if there is a non-zero min/max angular resolution
             minAcceptableAngResolution = cqa.convert(self.proj_params.min_angular_resolution, 'arcsec')
             maxAcceptableAngResolution = cqa.convert(self.proj_params.max_angular_resolution, 'arcsec')
-            if cqa.getvalue(minAcceptableAngResolution)[0] == 0.0 or cqa.getvalue(maxAcceptableAngResolution)[0] == 0.0:
+            if cqa.getvalue(minAcceptableAngResolution).item() == 0.0 or cqa.getvalue(maxAcceptableAngResolution).item() == 0.0:
                 desired_angular_resolution = cqa.convert(self.proj_params.desired_angular_resolution, 'arcsec')
-                if cqa.getvalue(desired_angular_resolution)[0] != 0.0:
+                if cqa.getvalue(desired_angular_resolution).item() != 0.0:
                     minAcceptableAngResolution = cqa.mul(desired_angular_resolution, 0.8)
                     maxAcceptableAngResolution = cqa.mul(desired_angular_resolution, 1.2)
                 else:
@@ -1183,7 +1185,7 @@ class ImageParamsHeuristics:
 
             # Check if there is a non-zero sensitivity goal
             sensitivityGoal = cqa.convert(self.proj_params.desired_sensitivity, 'mJy')
-            if cqa.getvalue(sensitivityGoal)[0] == 0.0:
+            if cqa.getvalue(sensitivityGoal).item() == 0.0:
                 sensitivityGoal = cqa.convert(science_goals['sensitivity'], 'mJy')
 
         else:
