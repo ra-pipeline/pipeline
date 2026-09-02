@@ -42,8 +42,8 @@ def hif_checkproductsize(vis=None, maxcubesize=None, maxcubelimit=None, maxprodu
         a. Channel binning: set ``nbin=2`` if ``nchan`` == 7680 (single polarization)or 3840, or if ``nchan`` in 
            (1920, 960, 480) without prior online channel averaging.
         b. If still too large, primary beam (PB) level reduction: calculate the PB response level at which the largest cube size 
-           equals the max allowed. The formula used is ``PB_mitigation = exp(ln(0.2) * maxcubesize / current_cubesize)``.
-           This is adjusted for padding (``* 1.02``), capped at PB=0.7, and rounded to 2 significant digits. 
+           equals the max allowed. The formula used is ``PB_mitigation = exp(-ln(2.0) * maxcubesize / current_cubesize / 1.01)``,
+           with a cap at PB=0.7, and rounded up to 2 significant digits. 
            NOTE: this mitigation only applies to single fields (not mosaics) and uses the same mitigated FoV for all targets.
         c. If still too large, cell size reduction: change pixels-per-beam from 5 to 3.25 (if ``robust=+2``) or 3.0 (otherwise).
         d. If still too large, issue a warning that spectral window filtering will occur (later) if ``max(cubesize) > maxcubelimit``,
