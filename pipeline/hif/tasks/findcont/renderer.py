@@ -178,7 +178,7 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
         rows = []
         for field in sorted(set(ranges_dict.keys())):
-            row_field = utils.wrap_long_str(field)
+            row_field = utils.wrap_long_str(field, newline='<br>')
             for spw in map(str, sorted(map(int, set(ranges_dict[field].keys())))):
                 momdiffsnr = self._get_momdiffsnr(result, field, spw)
                 plotfile = self._get_plotfile(context, result, field, spw)
