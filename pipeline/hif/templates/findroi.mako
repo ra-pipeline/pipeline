@@ -95,7 +95,14 @@
 % if artifact_links:
 <ul>
 % for artifact in artifact_links:
-  <li><a href="${artifact.href}">${artifact.label}</a></li>
+  <li>
+  % if artifact.is_viewable:
+    <a href="${artifact.href}" class="replace-pre" data-title="${artifact.filename}">View</a> or
+    <a href="${artifact.href}" download="${artifact.filename}">download</a> ${artifact.label}
+  % else:
+    <a href="${artifact.href}" download="${artifact.filename}">download</a> ${artifact.label}
+  % endif
+  </li>
 % endfor
 </ul>
 % else:

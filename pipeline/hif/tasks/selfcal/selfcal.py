@@ -17,6 +17,7 @@ from astropy.utils.misc import JsonCustomEncoder
 import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
+import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.filenamer as filenamer
 import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.vdp as vdp
@@ -25,7 +26,7 @@ from pipeline.domain import DataType
 from pipeline.hif.heuristics.auto_selfcal import auto_selfcal
 from pipeline.hif.tasks.applycal import SerialIFApplycal
 from pipeline.hif.tasks.makeimlist import MakeImList
-from pipeline.infrastructure import callibrary, casa_tasks, casa_tools, task_registry, utils
+from pipeline.infrastructure import callibrary, casa_tasks, casa_tools, task_registry
 from pipeline.infrastructure.contfilehandler import contfile_to_chansel
 from pipeline.infrastructure.mpihelpers import TaskQueue
 
@@ -98,7 +99,9 @@ class SelfcalResults(basetask.Results):
 
             # Fetch the field names matching the given `calto.field` and `calto.intent`.
             # Use a set comprehension to collect unique field names, and join them into a single string.
-            field_name = ','.join({field.name for field in ms.get_fields(task_arg=calto.field, intent=calto.intent)})
+            field_name = ','.join(
+                utils.deduplicate(field.name for field in ms.get_fields(task_arg=calto.field, intent=calto.intent))
+            )
 
             # Retrieve the data type
             data_dtype = ms.get_data_type('DATA', field_name, spw_sel)

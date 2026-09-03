@@ -296,9 +296,9 @@ class MakeImages(basetask.StandardTaskTemplate):
 
                     # Export RMS of  sources
                     if self._is_target_for_sensitivity(worker_result, heuristics):
-                        s = self._get_image_rms_as_sensitivity(worker_result, target, heuristics)
-                        if s is not None:
-                            result.sensitivities_for_aqua.append(s)
+                        result.sensitivities_for_aqua.extend(
+                            self._get_image_rms_as_sensitivity(worker_result, target, heuristics)
+                        )
 
                     del heuristics
 
@@ -572,7 +572,7 @@ class MakeImages(basetask.StandardTaskTemplate):
 
     def _get_image_rms_as_sensitivity(self, result, target, heuristics):
         if not result.image:
-            return None
+            return []
 
         extension = 'tt0.' if result.multiterm else '' # Needed when nterms=2, see PIPE-1361
         # the tt0 needs to be inserted before the ending ".pbcor" in the image name
@@ -580,7 +580,7 @@ class MakeImages(basetask.StandardTaskTemplate):
         imname = result.image[:index] + extension + result.image[index:]
 
         if not os.path.exists(imname):
-            return None
+            return []
 
         cqa = casa_tools.quanta
         cell = target['cell'][0:2] if len(target['cell']) >= 2 else (target['cell'][0], target['cell'][0])
@@ -612,44 +612,50 @@ class MakeImages(basetask.StandardTaskTemplate):
             else:
                 is_representative = False
 
-        # Sensitivities are currently reported for Stokes I only. For IQUV imaging the
-        # correct values have to be fetched from the new parameters since the previous
-        # ones will contain mixtures of I, Q, U and V due to the "axes" parameter in
-        # the ia.statistics() calls (PIPE-2464). TODO: Refactor the code to have just
-        # one set of statistical parameters.
-        if result.stokes == 'IQUV':
-            pbcor_image_rms = result.image_rms_iquv[0]
-            pbcor_image_min = result.image_min_iquv[0]
-            pbcor_image_max = result.image_max_iquv[0]
-            nonpbcor_image_min = result.nonpbcor_image_min_iquv[0]
-            nonpbcor_image_max = result.nonpbcor_image_max_iquv[0]
-        else:
-            pbcor_image_rms = result.image_rms
-            pbcor_image_min = result.image_min
-            pbcor_image_max = result.image_max
-            nonpbcor_image_min = result.nonpbcor_image_min
-            nonpbcor_image_max = result.nonpbcor_image_max
+        common_kwargs = dict(
+            array=array,
+            intent=target['intent'],
+            field=target['field'],
+            spw=result.spw,
+            is_representative=is_representative,
+            bandwidth=chanwidth_of_image,
+            effective_bw=effectiveBW_of_image,
+            bwmode=result.hm_specmode,
+            beam=restoringbeam,
+            cell=cell,
+            robust=target['robust'],
+            uvtaper=target['uvtaper'],
+            theoretical_sensitivity=cqa.quantity(result.sensitivity, 'Jy/beam'),
+            imagename=imname.replace('.pbcor', ''),
+            datatype=result.datatype,
+        )
 
-        return Sensitivity(array=array,
-                           intent=target['intent'],
-                           field=target['field'],
-                           spw=result.spw,
-                           is_representative=is_representative,
-                           bandwidth=chanwidth_of_image,
-                           effective_bw=effectiveBW_of_image,
-                           bwmode=result.hm_specmode,
-                           beam=restoringbeam,
-                           cell=cell,
-                           robust=target['robust'],
-                           uvtaper=target['uvtaper'],
-                           theoretical_sensitivity=cqa.quantity(result.sensitivity, 'Jy/beam'),
-                           observed_sensitivity=cqa.quantity(pbcor_image_rms, 'Jy/beam'),
-                           pbcor_image_min=cqa.quantity(pbcor_image_min, 'Jy/beam'),
-                           pbcor_image_max=cqa.quantity(pbcor_image_max, 'Jy/beam'),
-                           nonpbcor_image_min=cqa.quantity(nonpbcor_image_min, 'Jy/beam'),
-                           nonpbcor_image_max=cqa.quantity(nonpbcor_image_max, 'Jy/beam'),
-                           imagename=imname.replace('.pbcor', ''),
-                           datatype=result.datatype)
+        # For IQUV imaging, per-Stokes stats are stored separately since the generic
+        # result.image_rms etc. mix all planes (PIPE-2464). Report one Sensitivity
+        # entry per Stokes plane (PIPE-3104).
+        if result.stokes == 'IQUV':
+            return [
+                Sensitivity(
+                    stokes=stokes,
+                    observed_sensitivity=cqa.quantity(result.image_rms_iquv[i], 'Jy/beam'),
+                    pbcor_image_min=cqa.quantity(result.image_min_iquv[i], 'Jy/beam'),
+                    pbcor_image_max=cqa.quantity(result.image_max_iquv[i], 'Jy/beam'),
+                    nonpbcor_image_min=cqa.quantity(result.nonpbcor_image_min_iquv[i], 'Jy/beam'),
+                    nonpbcor_image_max=cqa.quantity(result.nonpbcor_image_max_iquv[i], 'Jy/beam'),
+                    **common_kwargs,
+                )
+                for i, stokes in enumerate(['I', 'Q', 'U', 'V'])
+            ]
+
+        return [Sensitivity(
+            stokes='I',
+            observed_sensitivity=cqa.quantity(result.image_rms, 'Jy/beam'),
+            pbcor_image_min=cqa.quantity(result.image_min, 'Jy/beam'),
+            pbcor_image_max=cqa.quantity(result.image_max, 'Jy/beam'),
+            nonpbcor_image_min=cqa.quantity(result.nonpbcor_image_min, 'Jy/beam'),
+            nonpbcor_image_max=cqa.quantity(result.nonpbcor_image_max, 'Jy/beam'),
+            **common_kwargs,
+        )]
 
 
 class CleanTaskFactory:
