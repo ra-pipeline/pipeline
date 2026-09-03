@@ -48,17 +48,20 @@ Documentation Components
      - `ALMA Processing <https://almascience.nrao.edu/processing/science-pipeline>`__ (ALMA site)
    * - Documentation and API for each task :sup:`3`
      - `PDF <taskdocs.pdf>`__ :doc:`HTML <apisummary>`
-   * - Pipeline Dependencies
-     - :doc:`Dependencies <dependencies>`
 
 .. only:: internal
-	     
-.. list-table::
-   :header-rows: 1
-   :widths: 40 40
-   :class: pipedocs-frontpage
-   * - How to run the pipeline as a developer
-     - :doc:`Running Pipeline <devel/usage/running_pipeline>`
+
+   Developer & Internal Documentation
+   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  
+
+   .. list-table::
+      :widths: 40 40
+      :class: pipedocs-frontpage
+
+      * - How to run the pipeline as a developer
+        - :doc:`Running Pipeline <devel/usage/running_pipeline>`
+      * - Pipeline Dependencies
+        - :doc:`Dependencies <dependencies>`
 
 
 
