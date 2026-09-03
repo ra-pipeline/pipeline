@@ -1094,67 +1094,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                     # then that means the cell is the same size in x and y. If cell is
                     # empty then fill it with a heuristic result
 
-                    # Parse hm_cell to get optional pixperbeam setting
-                    cell = inputs.get_spw_hm_cell(filtered_spwlist_local[0])
-                    if isinstance(cell, str):
-                        pixperbeam = float(cell.split('ppb')[0])
-                        cell = []
-                    else:
-                        pixperbeam = 5.0
-
                     cells = {}
-                    if cell == []:
-                        synthesized_beams = {}
-                        min_cell = ['3600arcsec']
-                        for spwspec in filtered_spwlist_by_freq:
-                            # Use only fields that were observed in spwspec
-                            actual_field_intent_list = []
-                            for field_intent in field_intent_list:
-                                if (vislist_field_intent_spw_combinations.get(field_intent, None) is not None and
-                                        vislist_field_intent_spw_combinations[field_intent].get('spwids', None) is not None and
-                                        spwspec in list(map(str, vislist_field_intent_spw_combinations[field_intent]['spwids']))):
-                                    actual_field_intent_list.append(field_intent)
-
-                            synthesized_beams[spwspec], known_synthesized_beams = self.heuristics.synthesized_beam(
-                                field_intent_list=actual_field_intent_list, spwspec=spwspec, robust=robust, uvtaper=uvtaper,
-                                pixperbeam=pixperbeam, known_beams=known_synthesized_beams, force_calc=calcsb,
-                                parallel=parallel, shift=True)
-
-                            if synthesized_beams[spwspec] == 'invalid':
-                                LOG.warning(
-                                    'Beam for virtual spw %s and robust value of %.1f is invalid likely due to heavy flagging.', spwspec, robust)
-                                continue
-
-                            # Avoid recalculating every time since the dictionary will be cleared with the first recalculation request.
-                            calcsb = False
-                            # the heuristic cell is always the same for x and y as
-                            # the value derives from the single value returned by
-                            # imager.advise
-                            cells[spwspec] = self.heuristics.cell(
-                                beam=synthesized_beams[spwspec], pixperbeam=pixperbeam)
-                            if ('invalid' not in cells[spwspec]):
-                                min_cell = cells[spwspec] if (qaTool.convert(cells[spwspec][0], 'arcsec')[
-                                                              'value'] < qaTool.convert(min_cell[0], 'arcsec')['value']) else min_cell
-
-                            if '3600arcsec' not in min_cell:
-                                break
-
-                        if '3600arcsec' in min_cell:
-                            LOG.error(
-                                'Beams for all virtual spw list %s with robust value of %.1f is invalid. Cannot continue.', filtered_spwlist_by_freq, robust)
-                            result.error = True
-                            result.error_msg = 'Invalid beam'
-                            return result
-
-                        # Rounding to two significant figures
-                        min_cell = ['%.2g%s' % (np.asarray(qaTool.getvalue(min_cell[0])).item(), qaTool.getunit(min_cell[0]))]
-                        # Need to populate all spw keys because the imsize heuristic picks
-                        # up the lowest frequency spw.
-                        for spwspec in all_spw_keys:
-                            cells[spwspec] = min_cell
-                    else:
-                        for spwspec in all_spw_keys:
-                            cells[spwspec] = cell
 
                     # get primary beams
                     largest_primary_beams = {}
@@ -1183,18 +1123,77 @@ class MakeImList(basetask.StandardTaskTemplate):
                             phasecenters[field_intent[0]] = phasecenter
                             psf_phasecenters[field_intent[0]] = psf_phasecenter
 
-                    # if imsize not set then use heuristic code to calculate the
-                    # centers for each field/spwspec
-                    imsize = inputs.get_spw_hm_imsize(filtered_spwlist_local[0])
-                    if isinstance(imsize, str):
-                        sfpblimit = float(imsize.split('pb')[0])
-                        imsize = []
-                    else:
-                        sfpblimit = 0.2
-
                     imsizes = {}
-                    if imsize == []:
-                        for field_intent in field_intent_list:
+                    for field_intent in field_intent_list:
+                        # Parse hm_cell with field-specific lookup to get optional pixperbeam setting
+                        cell = inputs.get_spw_hm_cell(filtered_spwlist_local[0], field=field_intent[0])
+                        if isinstance(cell, str):
+                            pixperbeam = float(cell.split('ppb')[0])
+                            cell = []
+                        else:
+                            pixperbeam = 5.0
+
+                        # Calculate field-specific cells
+                        if cell == []:
+                            synthesized_beams = {}
+                            min_cell = ['3600arcsec']
+                            for spwspec in filtered_spwlist_by_freq:
+                                # Use only fields that were observed in spwspec
+                                if (vislist_field_intent_spw_combinations.get(field_intent, None) is not None and
+                                        vislist_field_intent_spw_combinations[field_intent].get('spwids', None) is not None and
+                                        spwspec in list(map(str, vislist_field_intent_spw_combinations[field_intent]['spwids']))):
+
+                                    synthesized_beams[spwspec], known_synthesized_beams = self.heuristics.synthesized_beam(
+                                        field_intent_list=[field_intent], spwspec=spwspec, robust=robust, uvtaper=uvtaper,
+                                        pixperbeam=pixperbeam, known_beams=known_synthesized_beams, force_calc=calcsb,
+                                        parallel=parallel, shift=True)
+
+                                    if synthesized_beams[spwspec] == 'invalid':
+                                        LOG.warning(
+                                            'Beam for virtual spw %s and robust value of %.1f is invalid likely due to heavy flagging.', spwspec, robust)
+                                        continue
+
+                                    # Avoid recalculating every time since the dictionary will be cleared with the first recalculation request.
+                                    calcsb = False
+                                    # the heuristic cell is always the same for x and y as
+                                    # the value derives from the single value returned by
+                                    # imager.advise
+                                    cells[(field_intent[0], spwspec)] = self.heuristics.cell(
+                                        beam=synthesized_beams[spwspec], pixperbeam=pixperbeam)
+                                    if ('invalid' not in cells[(field_intent[0], spwspec)]):
+                                        min_cell = cells[(field_intent[0], spwspec)] if (qaTool.convert(cells[(field_intent[0], spwspec)][0], 'arcsec')[
+                                                                          'value'] < qaTool.convert(min_cell[0], 'arcsec')['value']) else min_cell
+
+                                    if '3600arcsec' not in min_cell:
+                                        break
+
+                            if '3600arcsec' in min_cell:
+                                LOG.error(
+                                    'Beams for all virtual spw list %s with robust value of %.1f is invalid. Cannot continue.', filtered_spwlist_by_freq, robust)
+                                result.error = True
+                                result.error_msg = 'Invalid beam'
+                                return result
+
+                            # Rounding to two significant figures
+                            min_cell = ['%.2g%s' % (np.asarray(qaTool.getvalue(min_cell[0])).item(), qaTool.getunit(min_cell[0]))]
+                            # Need to populate all spw keys because the imsize heuristic picks
+                            # up the lowest frequency spw.
+                            for spwspec in all_spw_keys:
+                                cells[(field_intent[0], spwspec)] = min_cell
+                        else:
+                            for spwspec in all_spw_keys:
+                                cells[(field_intent[0], spwspec)] = cell
+
+                        # Parse hm_imsize with field-specific lookup
+                        imsize = inputs.get_spw_hm_imsize(filtered_spwlist_local[0], field=field_intent[0])
+                        if isinstance(imsize, str):
+                            sfpblimit = float(imsize.split('pb')[0])
+                            imsize = []
+                        else:
+                            sfpblimit = 0.2
+
+                        # Calculate field-specific imsizes
+                        if imsize == []:
                             max_x_size = 1
                             max_y_size = 1
                             for spwspec in min_freq_spwlist:
@@ -1206,7 +1205,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                                     # to imsize heuristics (used only for VLA), otherwise pass None to disable the feature.
                                     imsize_spwlist = filtered_spwlist_local if inputs.specmode == 'cont' else None
                                     h_imsize = self.heuristics.imsize(
-                                        fields=field_ids, cell=cells[spwspec],
+                                        fields=field_ids, cell=cells[(field_intent[0], spwspec)],
                                         primary_beam=largest_primary_beams[spwspec],
                                         sfpblimit=sfpblimit, min_pixels = inputs.minpix, centreonly=False,
                                         vislist=vislist_field_intent_spw_combinations[field_intent]['vislist'],
@@ -1242,9 +1241,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                                 # target is taken from this dictionary.
                                 for spwspec in all_spw_keys:
                                     imsizes[(field_intent[0], spwspec)] = [max_x_size, max_y_size]
-
-                    else:
-                        for field_intent in field_intent_list:
+                        else:
                             for spwspec in all_spw_keys:
                                 imsizes[(field_intent[0], spwspec)] = imsize
 
@@ -1499,11 +1496,11 @@ class MakeImList(basetask.StandardTaskTemplate):
                             else:
                                 stokes = self.heuristics.stokes(field_intent[1], inputs.intent)
 
-                            if spwspec_ok and (field_intent[0], spwspec) in imsizes and ('invalid' not in cells[spwspec]):
+                            if spwspec_ok and (field_intent[0], spwspec) in imsizes and ('invalid' not in cells[(field_intent[0], spwspec)]):
                                 LOG.debug(
                                   'field:%s intent:%s spw:%s cell:%s imsize:%s phasecenter:%s' %
                                   (field_intent[0], field_intent[1], adjusted_spwspec,
-                                   cells[spwspec], imsizes[(field_intent[0], spwspec)],
+                                   cells[(field_intent[0], spwspec)], imsizes[(field_intent[0], spwspec)],
                                    phasecenters[field_intent[0]]))
 
                                 # Remove MSs that do not contain data for the given field/intent combination
@@ -1579,7 +1576,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                                     spwsel_low_spread=low_spread,
                                     num_all_spws=num_all_spws,
                                     num_good_spws=num_good_spws,
-                                    cell=cells[spwspec],
+                                    cell=cells[(field_intent[0], spwspec)],
                                     imsize=imsizes[(field_intent[0], spwspec)],
                                     phasecenter=phasecenters[field_intent[0]],
                                     psf_phasecenter=psf_phasecenters[field_intent[0]],
