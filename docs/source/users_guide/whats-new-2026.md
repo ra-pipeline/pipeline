@@ -22,7 +22,7 @@ repository between October 2025 and August 2026, targeting release
   {func}`~pipeline.hif.cli.hif_makeimages` were updated to
   consume the new frame and data types. See
   {ref}`IF imaging heuristics <lsrk-refactor>`.
-- **Continuum finding task updated with a round of robustness and
+- **Continuum finding task updated** with a round of robustness and
   parameter-passing fixes (`uvrange` propagation, empty-baseline crash
   guards, y-axis limits) - see {ref}`IF imaging heuristics <findcontinuum>`.
 - **QA-message aggregation rolled out across most SD stages** so that
@@ -54,10 +54,9 @@ to these same tasks)*
 
 **Source Catalog Bailout**
 When {func}`~pipeline.hifa.cli.hifa_importdata` is called with ``dbservices=True``,
-if both test queries to the Source Catalog survey fail, the pipeline will halt. ({jira}`PIPE-2127`)
+if both test queries to the Source Catalog survey fail, the pipeline will halt. (*{jira}`PIPE-2127`*)
 <br>
 <br>
-
 **Low-SNR bandpass/gain heuristics extended to more stages.**
 The `combine='spw'` + `interp='linearPD'` low-SNR bandpass/phase-up
 heuristic developed for PL2025 was extended across more of the calibration
@@ -237,7 +236,7 @@ declined.
 umbrella ticket. End result:
 {func}`~pipeline.hif.cli.hif_findcont` now honors a `uvrange`
 set by a prior {func}`~pipeline.hif.cli.hif_makeimlist`
-(previously dropped); it calls `hif_makeimlist` intrinsically instead of
+(previously dropped); it calls `hif_makeimlist` internally instead of
 depending on recipe task ordering, gaining a `coarse`/`normal` mode switch
 that - after user feedback - defaults to `'normal'` (matching pre-refactor
 behavior); it exposes a `field` parameter for the AUDI/VUDI workflow; two
