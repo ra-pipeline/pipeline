@@ -145,50 +145,54 @@ class MakeImListInputs(vdp.StandardInputs):
     def get_spw_hm_cell(self, spwlist):
         """If possible obtain spwlist specific hm_cell, otherwise return generic value.
 
-        hif_checkproductsize() task determines the mitigation parameters. It does not know, however, about the
-        set spwlist in the hif_makeimlist call and determines mitigation parameters per band (complete spw set).
-        The band containing the set spwlist is determined by checking whether spwlist is a subset of the band
-        spw list. The mitigation parameters found for the matching band are applied to the set spwlist.
-
-        If no singluar band (spw set) is found that would contain spwlist, then the default hm_cell heuristics is
-        returned.
-
-        TODO: refactor and make hif_checkproductsize() (or a new task) spwlist aware."""
-
+        Retrieves mitigation parameters calculated by hif_checkproductsize() for the current target.
+        Uses composite key (field, spw) tuple to handle all cases: different targets same SPW, same target
+        different SPW, or same target same SPW.
+        """
         mitigated_hm_cell = None
         if 'TARGET' in self.intent and 'hm_cell' in self.context.size_mitigation_parameters:
             mitigated_hm_cell = self.context.size_mitigation_parameters['hm_cell']
 
+        # Look up mitigation parameters using composite key (field, spw) tuple
         multi_target_size_mitigation = self.context.size_mitigation_parameters.get('multi_target_size_mitigation', {})
         if multi_target_size_mitigation:
-            multi_target_spwlist = [spws for spws in multi_target_size_mitigation.keys() if set(
-                spwlist.split(',')).issubset(set(spws.split(',')))]
-            if len(multi_target_spwlist) == 1:
-                mitigated_hm_cell = multi_target_size_mitigation.get(multi_target_spwlist[0], {}).get('hm_cell')
+            mitigation_key = (self.field, spwlist)
+            if mitigation_key in multi_target_size_mitigation:
+                mitigated_hm_cell = multi_target_size_mitigation[mitigation_key].get('hm_cell')
 
-        if mitigated_hm_cell in [None, {}] or self.hm_cell:
+        # Prefer mitigation parameters over user-specified defaults
+        if mitigated_hm_cell not in [None, {}]:
+            return mitigated_hm_cell
+        elif self.hm_cell:
             return self.hm_cell
         else:
-            return mitigated_hm_cell
+            return []
 
     def get_spw_hm_imsize(self, spwlist):
         """If possible obtain spwlist specific hm_imsize, otherwise return generic value.
 
-        TODO: refactor and make hif_checkproductsize() (or a new task) spwlist aware.
+        Retrieves mitigation parameters calculated by hif_checkproductsize() for the current target.
+        Uses composite key (field, spw) tuple to handle all cases: different targets same SPW, same target
+        different SPW, or same target same SPW.
         """
         mitigated_hm_imsize = None
         if 'TARGET' in self.intent and 'hm_imsize' in self.context.size_mitigation_parameters:
             mitigated_hm_imsize = self.context.size_mitigation_parameters['hm_imsize']
+
+        # Look up mitigation parameters using composite key (field, spw) tuple
         multi_target_size_mitigation = self.context.size_mitigation_parameters.get('multi_target_size_mitigation', {})
         if multi_target_size_mitigation:
-            multi_target_spwlist = [spws for spws in multi_target_size_mitigation.keys() if set(
-                spwlist.split(',')).issubset(set(spws.split(',')))]
-            if len(multi_target_spwlist) == 1:
-                mitigated_hm_imsize = multi_target_size_mitigation.get(multi_target_spwlist[0], {}).get('hm_imsize')
-        if mitigated_hm_imsize in [None, {}] or self.hm_imsize:
+            mitigation_key = (self.field, spwlist)
+            if mitigation_key in multi_target_size_mitigation:
+                mitigated_hm_imsize = multi_target_size_mitigation[mitigation_key].get('hm_imsize')
+
+        # Prefer mitigation parameters over user-specified defaults
+        if mitigated_hm_imsize not in [None, {}]:
+            return mitigated_hm_imsize
+        elif self.hm_imsize:
             return self.hm_imsize
         else:
-            return mitigated_hm_imsize
+            return []
 
     # docstring and type hints: supplements hif_makeimlist
     def __init__(self, context, output_dir=None, vis=None, imagename=None, intent=None, field=None, spw=None, stokes= None,

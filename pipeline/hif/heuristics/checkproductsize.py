@@ -624,20 +624,20 @@ class CheckProductSizeHeuristics:
                 # Recalculate sizes with mitigation
                 local_makeimlist_inputs.hm_cell = im_specific_mitigation['hm_cell']
                 local_makeimlist_inputs.hm_imsize = im_specific_mitigation['hm_imsize']
-                makeimlist_inputs.known_synthesized_beams = known_synthesized_beams
-                makeimlist_task = makeimlist.MakeImList(makeimlist_inputs)
-                makeimlist_result = makeimlist_task.prepare()
-                known_synthesized_beams = makeimlist_result.synthesized_beams
-                local_imlist = makeimlist_result.targets
+                local_makeimlist_inputs.known_synthesized_beams = known_synthesized_beams
+                local_makeimlist_task = makeimlist.MakeImList(local_makeimlist_inputs)
+                local_makeimlist_result = local_makeimlist_task.prepare()
+                known_synthesized_beams = local_makeimlist_result.synthesized_beams
+                local_imlist = local_makeimlist_result.targets
                 # New sizes
                 cubesizes, maxcubesize, productsizes, im_productsize = self.calculate_sizes(local_imlist)
 
-                LOG.info('Size mitigation: image pixel count is still larger than allowed for target %s. Truncating '
-                         'image.' % (im['field']))
-                LOG.info('Size mitigation: Setting hm_cell to %s for target %s' % (im_specific_mitigation['hm_cell'],
-                                                                                   im['field']))
-                LOG.info('Size mitigation: Setting hm_imsize to %s for target %s' % (im_specific_mitigation['hm_imsize'],
-                                                                                     im['field']))
+                LOG.info('Size mitigation: image pixel count is still larger than allowed for target %s. Truncating image.',
+                         im['field'])
+                LOG.info('Size mitigation: Setting hm_cell to %s for target %s', im_specific_mitigation['hm_cell'],
+                         im['field'])
+                LOG.info('Size mitigation: Setting hm_imsize to %s for target %s', im_specific_mitigation['hm_imsize'],
+                         im['field'])
 
             # Save cube mitigated product size for logs
             total_productsize += im_productsize
@@ -646,9 +646,16 @@ class CheckProductSizeHeuristics:
             else:
                 mitigated_imsize.append(imsize_request)
 
-            # Store mitigation parameters per spw list
-            multi_target_size_mitigation[im['spw']] = im_specific_mitigation
-            if im_specific_mitigation != {}:
+            # Store mitigation parameters using composite key (field, spw) tuple to handle all cases:
+            # - Different targets, same SPW (Bug #4): pKu0 vs pKu15 in SPW 0-47
+            # - Same target, different SPW: pKu0 in SPW 0-23 vs SPW 24-47 (edge case)
+            # Tuple is idiomatic Python for composite keys and naturally immutable/hashable.
+            mitigation_key = (im['field'], im['spw'])
+            if mitigation_key not in multi_target_size_mitigation:
+                multi_target_size_mitigation[mitigation_key] = {}
+            # Only update if current target has mitigation parameters to add
+            if im_specific_mitigation:
+                multi_target_size_mitigation[mitigation_key].update(im_specific_mitigation)
                 is_mitigated = True
 
         # Store imaging target specific parameters in mitigation dictionary only if imsize is mitigated
