@@ -38,7 +38,7 @@ The WebLog provides both an overview of datasets and details of the pipeline pro
 pages of the WebLog will first give a single "representative" view, with further links to a more detailed view of
 all the plots associated with that calibration step. Some of these (those produced by the CASA tasks {func}`~casaplotms.plotms`
 and {func}`~casatasks.visualization.plotbandpass`) will have a "Plot command" link that provides the CASA command to reproduce
-the plot (see the example below). When viewing image products, a similar link will provide the {func}`~casatasks.imaging.tclean`
+the plot (">_" icon, see the example below; you may need to scroll down to see the command). When viewing image products, the same icon will provide the {func}`~casatasks.imaging.tclean`
 command that produced the image. For some stages, the detailed plots can be filtered by a combination of outlier, antenna and
 spectral window criteria. Where histograms are displayed, in modern web browsers it is possible to draw boxes on multiple
 histograms to select the plots associated with those data points. All pipeline stages are assigned a QA score to give
@@ -66,9 +66,10 @@ start and end time), a pipeline execution summary (pipeline & CASA versions, lin
 pipeline run date and duration), and an **Observation Summary** table. Clicking on the "environment" link next to the
 CASA version will open a popup detailing hardware and software used; see the processing environment example below.
 Clicking on the bar at the top of the home page (see the example below) enables navigation to **By Topic** or **By Task**.
+
 CASA relies on earth Geodetic information to determine the geometry of the array - this information is stored in the IERS
 Earth Orientation Parameters (eop2000, measured values), and IERS Predicted Earth orientation. Since it takes time to
-analyze measurements and update those in CASA, usually data processed within a month or two of the observation date uses the Predict table.
+analyze measurements and update those in CASA, usually data processed within a month or two of the observation date uses the Predict table. In such a case, the "End Time" column of the "Observation Summary" table on the Home page will have the words ``MS dates not fully covered by IERSeop2000. CASA will use IERSpredict.``.  In the unlikely case that the Geodetic information is out-of-date or corrupted, Red words will appear indicating that the observation dates are not present even in the Predict table, and a poor QA score will result.
 
 (fig-homepage)=
 **WebLog Home Page**
@@ -120,8 +121,7 @@ structure either as **Field Source Intent vs Time** or **Field Source ID vs Time
 (fig-overviewpage)=
 **MeasurementSet Overview Page**
 
-![MeasurementSet Overview Page. Click on the table headings in blue for more information about each category.](ms_overview_1.png)
-![MeasurementSet Overview Page. Click on the table headings in blue for more information about each category.](ms_overview_2.png)
+![MeasurementSet Overview Page. Click on the table headings in blue for more information about each category.](ms_overview.png)
 
 ## By Topic Summary Page
 
@@ -179,7 +179,7 @@ are more than one QA messages, the message corresponding to the lowest score wil
 and messages. Clicking this link will expand the QA score table to show all entries. Similarly, if there are more than one
 notifications, the most severe will be displayed along with a link to all notifications. These messages are color-coded by
 severity: green means the quality check were fine, blue are informative messages that should not impact the quality of the
-processing, and yellow and red indicate important notifications or that a QA heuristic was triggered (see {ref}`The Pipeline WebLog <sec-weblog>`).
+processing, and yellow and red indicate important notifications or that a QA heuristic was triggered.
 
 (fig-hifa-tsysflag-page-example)=
 **{func}`~pipeline.hifa.cli.hifa_tsysflag` task page**
@@ -204,7 +204,8 @@ Most sub-pages have further links in order to access a more detailed view of the
 labelled by the MeasurementSet name. Some of these plots can be filtered by entering one or more MS, antenna, or spectral
 window in the appropriate box. Still others have histograms of various metrics than can be selected using the cursor in a
 drag-and-drop sense to outline a range of histogram values and displays the plots for the MS/antenna/spw combinations that
-are responsible for those histogram values. An example of these subpages and plot filtering is given below, using the **By Task > hifa_tsysflag: Flag Tsys calibration** pages.
+are responsible for those histogram values. An example of these subpages and plot filtering is given below (the detailed subpage arrived at by clicking on a measurement set name in the {func}`~pipeline.hifa.cli.hifa_tysflag` page)
+
 
 (fig-filtertsysflag1)=
 **Unfiltered {func}`~pipeline.hifa.cli.hifa_tsysflag` sub-page**
@@ -231,7 +232,7 @@ To clear the grey box filters on the histograms, click on any white space in the
 (sec-qascores)=
 Pipeline tasks have QA scores associated with them in order to quantify the quality of the dataset and the calibration.
 These scores are designed to inform data inspection as part of the ALMA quality assurance or "QA2" process. When there
-are multiple QA heuristics for a stage (each with its own QA score), or scores are calculated separately for each ASDM in
+are multiple QA heuristics for a stage (each with its own QA score), or scores are calculated separately for each MeasurementSet in
 an observation, the overall task QA score is taken as the lowest of all computed scores. Valid QA scores have values
 between 0.0 and 1.0 and are colorized according to the following table:
 
@@ -239,7 +240,7 @@ between 0.0 and 1.0 and are colorized according to the following table:
 :widths: 20 20 60
 :header-rows: 1
 
-* - Score ($S$)
+* - Score ($QA$)
   - Color
   - Meaning
 * - $0.90 < S \leq 1.00$
