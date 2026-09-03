@@ -166,7 +166,7 @@ import pipeline.infrastructure.utils as utils
           <tr>
               <td>${utils.wrap_long_str(calimage['sourcename'], newline='<br>')}</td>
               <td>${calimage['sourcetype']}</td>
-              <td>${calimage['spwlist']}</td>
+              <td>${utils.find_ranges(calimage['spwlist'])}</td>
               <td>${os.path.basename(fitsfile)}</td>
           </tr>
         %endfor
@@ -195,7 +195,7 @@ import pipeline.infrastructure.utils as utils
           <tr>
               <td>${utils.wrap_long_str(calimage['sourcename'], newline='<br>')}</td>
               <td>${calimage['sourcetype']}</td>
-              <td>${calimage['spwlist']}</td>
+              <td>${utils.find_ranges(calimage['spwlist'])}</td>
               <td>${os.path.basename(fitsfile)}</td>
           </tr>
         %endfor
@@ -224,7 +224,7 @@ import pipeline.infrastructure.utils as utils
           <tr>
               <td>${utils.wrap_long_str(targetimage['sourcename'], newline='<br>')}</td>
               <td>${targetimage['sourcetype']}</td>
-              <td>${targetimage['spwlist']}</td>
+              <td>${utils.find_ranges(targetimage['spwlist'])}</td>
               <td>${os.path.basename(fitsfile)}</td>
           </tr>
         %endfor
@@ -253,7 +253,7 @@ import pipeline.infrastructure.utils as utils
           <tr>
               <td>${utils.wrap_long_str(targetimage['sourcename'], newline='<br>')}</td>
               <td>${targetimage['sourcetype']}</td>
-              <td>${targetimage['spwlist']}</td>
+              <td>${utils.find_ranges(targetimage['spwlist'])}</td>
               <td>${os.path.basename(fitsfile)}</td>
           </tr>
         %endfor
