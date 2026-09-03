@@ -142,21 +142,27 @@ class MakeImListInputs(vdp.StandardInputs):
             return 'cube'
         return 'mfs'
 
-    def get_spw_hm_cell(self, spwlist):
+    def get_spw_hm_cell(self, spwlist, field=None):
         """If possible obtain spwlist specific hm_cell, otherwise return generic value.
 
         Retrieves mitigation parameters calculated by hif_checkproductsize() for the current target.
         Uses composite key (field, spw) tuple to handle all cases: different targets same SPW, same target
         different SPW, or same target same SPW.
+
+        Args:
+            spwlist: Spectral window specification string.
+            field: Optional field name for custom lookup. If None, uses self.field.
         """
         mitigated_hm_cell = None
+        lookup_field = field if field is not None else self.field
+
         if 'TARGET' in self.intent and 'hm_cell' in self.context.size_mitigation_parameters:
             mitigated_hm_cell = self.context.size_mitigation_parameters['hm_cell']
 
         # Look up mitigation parameters using composite key (field, spw) tuple
         multi_target_size_mitigation = self.context.size_mitigation_parameters.get('multi_target_size_mitigation', {})
         if multi_target_size_mitigation:
-            mitigation_key = (self.field, spwlist)
+            mitigation_key = (lookup_field, spwlist)
             if mitigation_key in multi_target_size_mitigation:
                 mitigated_hm_cell = multi_target_size_mitigation[mitigation_key].get('hm_cell')
 
@@ -168,21 +174,27 @@ class MakeImListInputs(vdp.StandardInputs):
         else:
             return []
 
-    def get_spw_hm_imsize(self, spwlist):
+    def get_spw_hm_imsize(self, spwlist, field=None):
         """If possible obtain spwlist specific hm_imsize, otherwise return generic value.
 
         Retrieves mitigation parameters calculated by hif_checkproductsize() for the current target.
         Uses composite key (field, spw) tuple to handle all cases: different targets same SPW, same target
         different SPW, or same target same SPW.
+
+        Args:
+            spwlist: Spectral window specification string.
+            field: Optional field name for custom lookup. If None, uses self.field.
         """
         mitigated_hm_imsize = None
+        lookup_field = field if field is not None else self.field
+
         if 'TARGET' in self.intent and 'hm_imsize' in self.context.size_mitigation_parameters:
             mitigated_hm_imsize = self.context.size_mitigation_parameters['hm_imsize']
 
         # Look up mitigation parameters using composite key (field, spw) tuple
         multi_target_size_mitigation = self.context.size_mitigation_parameters.get('multi_target_size_mitigation', {})
         if multi_target_size_mitigation:
-            mitigation_key = (self.field, spwlist)
+            mitigation_key = (lookup_field, spwlist)
             if mitigation_key in multi_target_size_mitigation:
                 mitigated_hm_imsize = multi_target_size_mitigation[mitigation_key].get('hm_imsize')
 
@@ -1030,13 +1042,6 @@ class MakeImList(basetask.StandardTaskTemplate):
                         #LOG.error('No spws left for vis list {}'.format(','.join(os.path.basename(vis) for vis in vislist)))
                         continue
 
-                    # Parse hm_cell to get optional pixperbeam setting
-                    cell = inputs.get_spw_hm_cell(filtered_spwlist_local[0])
-                    if isinstance(cell, str):
-                        pixperbeam = float(cell.split('ppb')[0])
-                        cell = []
-                    else:
-                        pixperbeam = 5.0
 
                     # Add actual, possibly reduced cont spw combination to be able to properly populate the lookup tables later on
                     if inputs.specmode == 'cont':
@@ -1088,6 +1093,15 @@ class MakeImList(basetask.StandardTaskTemplate):
                     # cell is a list of form [cellx, celly]. If the list has form [cell]
                     # then that means the cell is the same size in x and y. If cell is
                     # empty then fill it with a heuristic result
+
+                    # Parse hm_cell to get optional pixperbeam setting
+                    cell = inputs.get_spw_hm_cell(filtered_spwlist_local[0])
+                    if isinstance(cell, str):
+                        pixperbeam = float(cell.split('ppb')[0])
+                        cell = []
+                    else:
+                        pixperbeam = 5.0
+
                     cells = {}
                     if cell == []:
                         synthesized_beams = {}
@@ -1177,6 +1191,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                         imsize = []
                     else:
                         sfpblimit = 0.2
+
                     imsizes = {}
                     if imsize == []:
                         for field_intent in field_intent_list:
