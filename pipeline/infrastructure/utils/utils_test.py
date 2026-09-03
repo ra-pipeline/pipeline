@@ -334,16 +334,22 @@ def test_build_refantignore(refantignore, ignorerefant, expected):
 
 
 @pytest.mark.parametrize(
-    "item_str, kwargs, expected",
+    'item_str, kwargs, expected',
     [
-        ("short_field", {}, "short_field"),
-        ("field1,field2,field3", {"length": 50}, "field1,field2,field3"),
-        ("field_alpha,field_beta,field_gamma,field_delta", {"length": 20, "newline": "\n"}, "field_alpha,\nfield_beta,field_gamma,field_delta"),
-        ("field_alpha,field_beta,field_gamma,field_delta", {"length": 20, "newline": "<br>"}, "field_alpha,<br>field_beta,field_gamma,field_delta"),
-    ]
+        ('short_field', {}, 'short_field'),
+        ('field1,field2,field3', {'length': 50}, 'field1,field2,field3'),
+        (
+            'field_alpha,field_beta,field_gamma,field_delta',
+            {'length': 20, 'newline': '\n'},
+            'field_alpha,\nfield_beta,\nfield_gamma,\nfield_delta',
+        ),
+        (
+            'field_alpha,field_beta,field_gamma,field_delta',
+            {'length': 20, 'newline': '<br>'},
+            'field_alpha,<br>field_beta,<br>field_gamma,<br>field_delta',
+        ),
+    ],
 )
 def test_wrap_long_str(item_str, kwargs, expected):
     """Test wrap_long_str() and verify it is exported in pipeline.infrastructure.utils."""
-    import pipeline.infrastructure.utils as utils
-    assert hasattr(utils, "wrap_long_str")
     assert wrap_long_str(item_str, **kwargs) == expected

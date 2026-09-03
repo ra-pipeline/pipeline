@@ -1142,12 +1142,12 @@ def list_to_str(value: list[Number | str] | NDArray) -> str:
     return ret
 
 
-def wrap_long_str(item_str: str, length: int = 50, newline: str = '\n') -> str:
+def wrap_long_str(item_str: str, length: int = 40, newline: str = '\n') -> str:
     r"""Wraps a long string by inserting newline escape sequences.
 
     Splits a comma-separated string into multiple lines when it exceeds
-    the specified length limit. Uses modulo arithmetic to detect when
-    adding the next item would wrap past the line length boundary.
+    the specified length limit. Breaks before an item if adding it would
+    cause the current line to exceed the specified length.
 
     Args:
         item_str: Comma separated list of items.
@@ -1162,23 +1162,22 @@ def wrap_long_str(item_str: str, length: int = 50, newline: str = '\n') -> str:
 
     item_list = item_str.split(',')
     wrapped_items = []
+    current_line_length = 0
 
-    # Process all items except the last one
-    for i in range(len(item_list) - 1):
-        # Check if adding the next item would exceed the line length limit
-        # by comparing the modulo of the string length before and after adding the item
-        current_length_mod = len(','.join(item_list[0:i])) % length
-        next_length_mod = len(','.join(item_list[0 : i + 1])) % length
+    for i, item in enumerate(item_list):
+        # Calculate what the line length would be after adding this item
+        # Account for the comma separator if this isn't the first item on the line
+        item_with_sep = (',' + item) if current_line_length > 0 else item
+        potential_length = current_line_length + len(item_with_sep)
 
-        if current_length_mod < next_length_mod:
-            # Line length limit not reached yet
-            wrapped_items.append(item_list[i])
+        if potential_length > length and current_line_length > 0:
+            # Adding this item would exceed the limit, start a new line
+            wrapped_items.append(f'{newline}{item}')
+            current_line_length = len(item)
         else:
-            # Line length limit reached, insert linebreak
-            wrapped_items.append(f'{newline}{item_list[i]}')
-
-    # Add the last item without condition
-    wrapped_items.append(item_list[-1])
+            # Item fits on the current line
+            wrapped_items.append(item)
+            current_line_length = potential_length
 
     return ','.join(wrapped_items)
 
