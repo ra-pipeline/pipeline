@@ -330,7 +330,7 @@ class SDK2JyCal(basetask.StandardTaskTemplate):
         # overwrite caltable if it exists
         caltable = common_params['caltable']
         if os.path.exists(caltable):
-            LOG.info(f"Overwriting existing caltable {caltable}")
+            LOG.warning(f"{caltable} exists. Will be overwritten.")
             if os.path.isdir(caltable):
                 shutil.rmtree(caltable)
             else:
