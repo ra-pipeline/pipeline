@@ -60,6 +60,10 @@ Documentation Components
 
       * - How to run the pipeline as a developer
         - :doc:`Running Pipeline <devel/usage/running_pipeline>`
+      * - Pixi Workflow for Development
+        - :doc:`Pixi Tasks <devel/setup/pixi_tasks>`
+      * - Building & Publishing Documentation
+        - :doc:`Documentation Builds <devel/setup/readthedocs>`
       * - Pipeline Dependencies
         - :doc:`Dependencies <dependencies>`
 
