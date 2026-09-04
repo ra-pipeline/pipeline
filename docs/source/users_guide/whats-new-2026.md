@@ -88,7 +88,7 @@ was refactored to use Nant-3 from VLA Memo 135 (Cornwell 1981)
 i.e. solution noise is infinite for a 3 antenna array.
 *Tickets: {jira}`PIPE-2901`.*
 <br>
-<br>	
+<br>
 **Polarization calibration recipe fix.**
 {jira}`PIPE-3016` unregisters the
 first spw-spw phase-offset table after the initial round of the
@@ -355,11 +355,6 @@ improving imaging performance.
 <br>
 <br>
 **Skycal / atmospheric-correction fixes.**
-{jira}`PIPE-2565` fixes the
-"Show plot command" feature for Amp-vs-Time plots, which only showed the
-last of several `plotms` calls used to build a multi-field overplot.
-{jira}`PIPE-2965` fixes a missing
-MS filter on the detailed Amp-vs-Freq plot page for some datasets.
 {jira}`PIPE-3198` fixes the
 Elevation Difference vs. Time plot showing flagged data points that should
 have been excluded.
@@ -381,17 +376,14 @@ CASA task's OpenMP threading is confirmed not to conflict with `mpicasa`.
 {jira}`PIPE-3167` fixes an old
 absolute-off-position naming convention (`Target_0`) being misread as both
 an off position and an independent target source.
-{jira}`PIPE-3119` combines pointing
-data across all antennas for the pointing-outlier heuristic, so a single
-bad antenna's valid data isn't misclassified as outliers when compared only
-against itself.
 <br>
 <br>
 <br>
 **Jy/K calibration.**
 {jira}`PIPE-2967` lets
 {func}`~pipeline.hsd.cli.hsd_k2jycal` fall back to a backup
-URL (JAO, then EA/NA/EU) if the primary Jy/K database query fails.
+URL (JAO, then EA/NA/EU) if the primary Jy/K database query fails using
+new CASA task (CAS-14704).
 {jira}`PIPE-3146` fixes the weblog
 incorrectly reporting a successful Jy/K database access when
 `dbservice=False`.
@@ -402,8 +394,6 @@ incorrectly reporting a successful Jy/K database access when
 {jira}`PIPE-2695` fixes
 {func}`~pipeline.hsd.cli.hsd_baseline` crashing when k-means clustering is attempted with fewer
 line detections than requested clusters.
-{jira}`PIPE-3001` audits and fixes
-confusion between real and virtual spw IDs in `baseline/worker.py`.
 {jira}`PIPE-2893` adds a `sinusoid`
 fitting-function option to
 {func}`~pipeline.hsd.cli.hsd_baseline`, with a new
@@ -419,16 +409,16 @@ to ±180°, which can split a raster map into two disjoint chunks) using
 {jira}`PIPE-3035` fixes Tier-0
 parallel parameter distribution for SD tasks, which assumed the scope
 attribute was always `vis` instead of `infiles`.
-{jira}`PIPE-3129` fixes missing
-per-beam XX/YY image products specific to the NRO Pipeline.
 {jira}`PIPE-2718` is a refactor of
 {func}`~pipeline.hsd.cli.hsd_applycal` display/QA code for filename consistency and simplification.
-{jira}`PIPE-2754` and
-{jira}`PIPE-2857` fix a trivial
-selected-table-object bug causing inconsistent ATM-cal data, and a
-randomly-changing color map in the XX-YY difference plot.
+{jira}`PIPE-2754` fixes a trivial
+selected-table-object bug causing inconsistent ATM-cal data.
 {jira}`PIPE-2954` fixes a misspelling
 ("futher" - "further") in a warning message.
+{jira}`PIPE-3119` combines pointing
+data across all antennas for the pointing-outlier heuristic, so a single
+bad antenna's valid data isn't misclassified as outliers when compared only
+against itself.
 
 ---
 
@@ -464,7 +454,7 @@ reports `UNKNOWN`, but the pipeline wasn't passing that through).
 respective TARGET and PHASE and PHASE and CHECK intents. If there are >5 TARGETs,
 the table reports only the least and most distant from the PHASE calibrator. For mosaics,
 a median field position is used, while the source name is suffixed with "mosaic".
-A large plus symbol represents each intent, while field IDs are annotated.  
+A large plus symbol represents each intent, while field IDs are annotated.
 ```{figure} whatsnew/PIPE65_importdata_PL2026_new.png
 ---
 width: 1062px
@@ -517,13 +507,13 @@ SemiPass candidate.
 <br>
 
 **{func}`~pipeline.hifa.cli.hifa_timegaincal`.**
-{jira}`PIPE-3026/3028` changes the score of the phase offset QA so that phase offsets for spw that are not mapped get scores of 0.75 (blue) instead of 0.50 (yellow), since such offsets should calibrate out. 
+{jira}`PIPE-3026/3028` changes the score of the phase offset QA so that phase offsets for spw that are not mapped get scores of 0.75 (blue) instead of 0.50 (yellow), since such offsets should calibrate out.
 <br>
 <br>
 
 **{func}`~pipeline.hif.cli.hif_makeimages` (repBW).**
 {jira}`PIPE-3082` changes the RepBW
-cube QA so the `mom8fc` subscore doesn't turn yellow. 
+cube QA so the `mom8fc` subscore doesn't turn yellow.
 <br>
 <br>
 
@@ -600,11 +590,11 @@ turn to
 {func}`~pipeline.hsd.cli.hsd_baseline`
 ({jira}`PIPE-3054`),
 {func}`~pipeline.hsd.cli.hsd_imaging`
-({jira}`PIPE-3104`), and finally
-`hsd_k2jycal`, {func}`~pipeline.hsd.cli.hsd_atmcor` and {func}`~pipeline.hsd.cli.hsd_blflag` together
-({jira}`PIPE-3143`) - {func}`~pipeline.hsd.cli.hsd_skycal`
-is deliberately left for separate treatment since its QA involves nested
-aggregation that doesn't fit the common pattern.
+({jira}`PIPE-3104`),
+{func}`~pipeline.hsd.cli.hsd_skycal`
+({jira}`PIPE-3152`), and finally
+{func}`~pipeline.hsd.cli.hsd_k2jycal`, {func}`~pipeline.hsd.cli.hsd_atmcor` and {func}`~pipeline.hsd.cli.hsd_blflag` together
+({jira}`PIPE-3143`).
 ```{figure} whatsnew/m100_stage7_accordion.png
 ---
 width: 938px
@@ -644,22 +634,34 @@ band is easy to spot (a PLWG request from {jira}`PIPEREQ-424`).
 <br>
 <br>
 
+**{func}`~pipeline.hsd.cli.hsd_applycal` weblog.**
+{jira}`PIPE-2857` fixes a
+randomly-changing color map in the XX-YY difference plot.
+
 **{func}`~pipeline.hsd.cli.hsd_baseline` weblog.**
 {jira}`PIPE-2867` fixes a
 "spectral"/"spectra" typo in the averaged-spectrum caption.
 {jira}`PIPE-2776` cleans up
-double/missing periods and inconsistent punctuation in `hsd_baseline`'s "By
+double/missing periods and inconsistent punctuation in {func}`~pipeline.hsd.cli.hsd_baseline`'s "By
 Topic" QA messages, aligning the style with the IF weblog.
 {jira}`PIPE-2894` adds a channel axis
 to the top panel of the sparse profile map (already done in the Nobeyama
 Pipeline).
+
+**{func}`~pipeline.hsd.cli.hsd_imaging` weblog.**
 {jira}`PIPE-3047` adds an
 explanatory caption to the missed-line-channel diagnostic plots at the
 {func}`~pipeline.hsd.cli.hsd_imaging` stage, describing the
 single-peak/extended detection thresholds and the plot's color coding.
-
 {jira}`PIPE-3141` fixes an inverted
-channel range for the `hsd_imaging` moment-map plot in LSB data.
+channel range for the {func}`~pipeline.hsd.cli.hsd_imaging` moment-map plot in LSB data.
+{jira}`PIPE-3226` fixes an issue that atmospheric features are not excluded
+from the contamination analysis properly.
+
+**{func}`~pipeline.hsd.cli.hsd_skycal` weblog.**
+{jira}`PIPE-2565` fixes the
+"Show plot command" feature for Amp-vs-Time plots, which only showed the
+last of several `plotms` calls used to build a multi-field overplot.
 
 **Tsys scan plot (shared page).**
 {jira}`PIPE-2869` - see
@@ -677,12 +679,9 @@ diagnostic plots.
 {jira}`PIPE-3109` fix `IndexError`
 crashes generating the channel-map and missed-line diagnostic plots when a
 clustering-derived line range extends outside the valid channel bounds.
-{jira}`PIPE-2399` fixes inconsistent
+{jira}`PIPE-2183/2399` fix inconsistent
 display of flagged data at the {func}`~pipeline.hsd.cli.hsd_blflag` stage - flagged points above
 the threshold line were sometimes rendered as unflagged.
-{jira}`PIPE-3192` fixes the
-{func}`~pipeline.hsd.cli.hsd_exportdata` weblog page not
-being generated properly.
 {jira}`PIPE-3194` fixes a recurrence
 of a previously-fixed (PIPE-2789) bug where some panels of the
 {func}`~pipeline.hsd.cli.hsd_applycal` XX-YY amplitude-difference-vs-frequency plot were empty.
