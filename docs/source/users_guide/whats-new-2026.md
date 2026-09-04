@@ -593,7 +593,7 @@ turn to
 ({jira}`PIPE-3104`),
 {func}`~pipeline.hsd.cli.hsd_skycal`
 ({jira}`PIPE-3152`), and finally
-`hsd_k2jycal`, {func}`~pipeline.hsd.cli.hsd_atmcor` and {func}`~pipeline.hsd.cli.hsd_blflag` together
+{func}`~pipeline.hsd.cli.hsd_k2jycal`, {func}`~pipeline.hsd.cli.hsd_atmcor` and {func}`~pipeline.hsd.cli.hsd_blflag` together
 ({jira}`PIPE-3143`).
 ```{figure} whatsnew/m100_stage7_accordion.png
 ---
