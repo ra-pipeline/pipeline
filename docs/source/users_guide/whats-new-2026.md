@@ -382,7 +382,8 @@ an off position and an independent target source.
 **Jy/K calibration.**
 {jira}`PIPE-2967` lets
 {func}`~pipeline.hsd.cli.hsd_k2jycal` fall back to a backup
-URL (JAO, then EA/NA/EU) if the primary Jy/K database query fails.
+URL (JAO, then EA/NA/EU) if the primary Jy/K database query fails using
+new CASA task (CAS-14704).
 {jira}`PIPE-3146` fixes the weblog
 incorrectly reporting a successful Jy/K database access when
 `dbservice=False`.
