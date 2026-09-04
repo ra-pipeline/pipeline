@@ -10,6 +10,7 @@ import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as scorecalc
 import pipeline.qa.utility.scorers as scorers
 from pipeline.infrastructure import casa_tasks, casa_tools
+from pipeline.infrastructure.renderer import rendererutils
 
 from . import resultobjects
 
@@ -173,6 +174,7 @@ class TcleanQAHandler(pqa.QAPlugin):
                                   applies_to=data_selection, weblog_location=pqa.WebLogLocation.HIDDEN))
 
         # MOM8_FC based score
+        # PIPE-3082 modifies mom8fc score if the hm_specmode is "repBW"
         if result.mom8_fc is not None and result.mom8_fc_peak_snr is not None:
             try:
                 mom8_fc_score = scorecalc.score_mom8_fc_image(result.mom8_fc,
@@ -180,6 +182,11 @@ class TcleanQAHandler(pqa.QAPlugin):
                                                               result.mom8_10_fc_histogram_asymmetry,
                                                               result.mom8_fc_max_segment_beams,
                                                               result.mom8_fc_frac_max_segment)
+                #PIPE-3082 score update max(lowest_blue_score,original_score) for repBW
+                if result.hm_specmode == 'repBW':
+                   #Update the score
+                   mom8_fc_score.score=max(rendererutils.SCORE_THRESHOLD_WARNING+0.01,mom8_fc_score.score)  
+
                 result.qa.pool.append(mom8_fc_score)
             except Exception as e:
                 LOG.warning('Exception scoring MOM8 FC image result: %s. Setting score to -0.1.' % (e))

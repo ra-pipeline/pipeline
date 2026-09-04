@@ -20,7 +20,7 @@ LOG = infrastructure.get_logger(__name__)
 
 class UVcontSubInputs(vdp.StandardInputs):
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.IM_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     fitorder = vdp.VisDependentProperty(default={})
     intent = vdp.VisDependentProperty(default='TARGET')
@@ -147,7 +147,7 @@ class SerialUVcontSub(basetask.StandardTaskTemplate):
         known_synthesized_beams = inputs.context.synthesized_beams
 
         datatype = None
-        for possible_datatype in inputs.processing_data_type:
+        for possible_datatype in inputs.processing_data_types:
             if possible_datatype in inputs.ms.data_column:
                 datatype = possible_datatype.name
                 break
@@ -165,7 +165,9 @@ class SerialUVcontSub(basetask.StandardTaskTemplate):
         makeimlist_inputs.specmode = 'mfs'
         makeimlist_inputs.clearlist = True
         makeimlist_inputs.known_synthesized_beams = known_synthesized_beams
-
+        # PIPE-2952: Explicitly specified uvrange to prevent excessive runtime
+        # caused by VLA imaging uvrange selection heuristics
+        makeimlist_inputs.uvrange = '>0.0lambda'
         # Create imlist
         makeimlist_task = makeimlist.MakeImList(makeimlist_inputs)
         makeimlist_result = makeimlist_task.prepare()
@@ -179,7 +181,7 @@ class SerialUVcontSub(basetask.StandardTaskTemplate):
         # order for weblog. Avoid saving the full list in the results object
         # because of the large heuristics objects which would bloat the context.
         field_intent_spw_list = []
-        topo_freq_fitorder_dict = nested_dict()
+        ms_frame_freq_fitorder_dict = nested_dict()
         for imaging_target in imlist:
             datacolumn = imaging_target['datacolumn']
 
@@ -202,14 +204,14 @@ class SerialUVcontSub(basetask.StandardTaskTemplate):
                                           'spw': real_spw})
 
             # Convert the cont.dat frequency ranges to TOPO
-            (_, _, spw_topo_freq_param_dict, _, _, _, _) = imaging_target['heuristics'].calc_topo_ranges(minimal_tclean_inputs)
+            (_, _, spw_ms_frame_freq_param_dict, _, _, _, _) = imaging_target['heuristics'].calc_ms_frame_ranges(minimal_tclean_inputs)
 
             field_ids = imaging_target['heuristics'].field(minimal_tclean_inputs.intent, minimal_tclean_inputs.field)[0]
 
-            fitspec[field_ids][real_spw]['chan'] = spw_topo_freq_param_dict[minimal_tclean_inputs.vis[0]][minimal_tclean_inputs.spw]
+            fitspec[field_ids][real_spw]['chan'] = spw_ms_frame_freq_param_dict[minimal_tclean_inputs.vis[0]][minimal_tclean_inputs.spw]
 
             # Collect frequency ranges for weblog
-            topo_freq_fitorder_dict[minimal_tclean_inputs.field][real_spw]['freq'] = spw_topo_freq_param_dict[minimal_tclean_inputs.vis[0]][minimal_tclean_inputs.spw]
+            ms_frame_freq_fitorder_dict[minimal_tclean_inputs.field][real_spw]['freq'] = spw_ms_frame_freq_param_dict[minimal_tclean_inputs.vis[0]][minimal_tclean_inputs.spw]
 
             # Default fit order
             fitspec[field_ids][real_spw]['fitorder'] = 1
@@ -227,14 +229,16 @@ class SerialUVcontSub(basetask.StandardTaskTemplate):
                     fitspec[field_ids][real_spw]['fitorder'] = 0
 
             # Collect fit order for weblog
-            topo_freq_fitorder_dict[minimal_tclean_inputs.field][real_spw]['fitorder'] = fitspec[field_ids][real_spw]['fitorder']
+            ms_frame_freq_fitorder_dict[minimal_tclean_inputs.field][real_spw]['fitorder'] = fitspec[field_ids][real_spw]['fitorder']
 
         result = UVcontSubResults()
         result.field_intent_spw_list = field_intent_spw_list
-        result.topo_freq_fitorder_dict = topo_freq_fitorder_dict
+        result.ms_frame_freq_fitorder_dict = ms_frame_freq_fitorder_dict
 
         if '_targets' in inputs.vis:
             outputvis = inputs.vis.replace('_targets', '_targets_line')
+        elif '_imaging' in inputs.vis:
+            outputvis = inputs.vis.replace('_imaging', '_imaging_line')
         else:
             outputvis = f"{inputs.vis.split('.ms')[0]}_line.ms"
         # Check if it already exists and remove it
@@ -367,7 +371,7 @@ class UVcontSubResults(basetask.Results):
         self.vis = None
         self.outputvis = None
         self.field_intent_spw_list = []
-        self.topo_freq_fitorder_dict = None
+        self.ms_frame_freq_fitorder_dict = None
         self.line_mses = []
         self.casa_uvcontsub_result = None
         self.error = False
@@ -402,7 +406,7 @@ class UVcontSubResults(basetask.Results):
         # Create targets flagging template file if it does not already exist
         for ms in self.line_mses:
             template_flagsfile = os.path.join(
-                self.inputs['output_dir'], os.path.splitext(os.path.basename(self.vis))[0] + '.flagtargetstemplate.txt')
+                self.inputs['output_dir'], os.path.splitext(os.path.basename(ms.name))[0] + '.flagtargetstemplate.txt')
             self._make_template_flagfile(template_flagsfile, 'User flagging commands file for the imaging pipeline')
 
         # Initialize callibrary

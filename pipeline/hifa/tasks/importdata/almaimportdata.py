@@ -183,7 +183,7 @@ class ALMAImportDataResults(importdata.ImportDataResults):
                 parang_plots = rendererutils.make_parang_plots(
                     context,
                     self,
-                    intent_lookup={'POLARIZATION': 'CALIBRATE_POLARIZATION#ON_SOURCE'},
+                    intent=['POLARIZATION'],
                 )
             else:
                 parang_plots = {}

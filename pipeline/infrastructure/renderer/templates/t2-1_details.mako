@@ -198,15 +198,27 @@ import os
 				</tr>
 				<tr>
 					<th>Min Zenith Angle</th>
-					<td>${zd_min} degrees at ${telmjd_min}</td>
+					% if zd_min is not None:
+						<td>${zd_min} degrees at ${telmjd_min}</td>
+					% else:
+						<td>N/A</td>
+					% endif
 				</tr>
 				<tr>
 					<th>Avg Zenith Angle</th>
-					<td>${zd_avg} degrees at ${telmjd_avg}</td>
+					% if zd_avg is not None:
+						<td>${zd_avg} degrees at ${telmjd_avg}</td>
+					% else:
+						<td>N/A</td>
+					% endif
 				</tr>
 				<tr>
 					<th>Max Zenith Angle</th>
-					<td>${zd_max} degrees at ${telmjd_max}</td>
+					% if zd_max is not None:
+						<td>${zd_max} degrees at ${telmjd_max}</td>
+					% else:
+						<td>N/A</td>
+					% endif
 				</tr>
 			</tbody>
 		</table>

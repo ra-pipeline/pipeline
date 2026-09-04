@@ -78,7 +78,7 @@ class ImageLibrary:
 class ImageItem:
     def __init__(self, imagename, sourcename, spwlist, specmode, sourcetype, stokes='',
                  datatype='', multiterm=None, imageplot='', metadata={}, imaging_params={},
-                 org_direction=None):
+                 org_direction=None, imagename_prefix=None):
         self.imagename = imagename
         self.sourcename = sourcename
         self.spwlist = spwlist
@@ -93,6 +93,7 @@ class ImageItem:
         self.org_direction = org_direction
         self.version = 1
         self.version_count = 1
+        self.imagename_prefix = imagename_prefix
 
     def __iter__(self):
         return iter(vars(self).items())

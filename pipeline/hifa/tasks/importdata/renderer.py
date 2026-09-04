@@ -22,22 +22,42 @@ class T2_4MDetailsALMAImportDataRenderer(renderer.T2_4MDetailsImportDataRenderer
         cache = result.metadata.get('weblog_importdata_parang', {}) if hasattr(result, 'metadata') else {}
         if cache:
             minparang = cache.get('minparang')
-            parang_ranges = cache.get('parang_ranges')
+            parang_ranges = cache.get('parang_ranges') or {'intents_found': False}
             parang_plots = cache.get('parang_plots', {})
         else:
             minparang = result.inputs['minparang']
-            parang_ranges = result.parang_ranges
-            if parang_ranges['intents_found']:
+            parang_ranges = getattr(result, 'parang_ranges', None) or {'intents_found': False}
+            if parang_ranges.get('intents_found'):
                 parang_plots = rendererutils.make_parang_plots(
                     pipeline_context,
                     result,
-                    intent_lookup={'POLARIZATION': 'CALIBRATE_POLARIZATION#ON_SOURCE'},
+                    intent=['POLARIZATION'],
                     )
             else:
                 parang_plots = {}
+
+        # PIPE-65 call new rendererutils task for separation angle plots
+        sepang_plots = rendererutils.make_separation_plots(
+            pipeline_context,
+            result,
+            )
+
+        if result.sep_angles:
+            # where is this from PIPE-836 removed the equivalant parang_ranges
+            # from almaimportdata ?
+            sep_table = rendererutils.sep_angles_for_table(
+                pipeline_context,
+                result.sep_angles,
+                sepang_plots,
+            )  # context is context, result is from QA
+        else:
+            sep_table = []
+
 
         mako_context.update({
             'minparang': minparang,
             'parang_ranges': parang_ranges,
             'parang_plots': parang_plots,
+            'sepangle_table': sep_table,
+            'sepangle_plots': sepang_plots
         })

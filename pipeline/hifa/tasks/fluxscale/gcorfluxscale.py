@@ -18,6 +18,7 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.sessionutils as sessionutils
+import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import FluxMeasurement
 from pipeline.h.tasks.common import commonfluxresults, mstools
@@ -462,13 +463,17 @@ class SerialGcorFluxscale(basetask.StandardTaskTemplate):
 
             # Compute the mean calibrated visibility flux for each field and
             # spw and add as flux measurement to the final result.
-            for fieldid in transfer_fieldids:
-                for spwid in spw_ids:
-                    mean_flux, std_flux = mstools.compute_mean_flux(self.inputs.ms, fieldid, spwid, self.inputs.transintent)
-                    if mean_flux:
-                        flux = domain.FluxMeasurement(spwid, mean_flux, origin=ORIGIN)
-                        flux.uncertainty = domain.FluxMeasurement(spwid, std_flux, origin=ORIGIN)
-                        result.measurements[fieldid].append(flux)
+            # Open the MS once for all (field, spw) reads (PIPE-3089).
+            with casa_tools.MSReader(self.inputs.ms.name) as openms:
+                for fieldid in transfer_fieldids:
+                    for spwid in spw_ids:
+                        mean_flux, std_flux = mstools.compute_mean_flux(
+                            self.inputs.ms, fieldid, spwid, self.inputs.transintent, ms_handle=openms
+                        )
+                        if mean_flux:
+                            flux = domain.FluxMeasurement(spwid, mean_flux, origin=ORIGIN)
+                            flux.uncertainty = domain.FluxMeasurement(spwid, std_flux, origin=ORIGIN)
+                            result.measurements[fieldid].append(flux)
         finally:
             # Restore the MS flagging state.
             LOG.info('Restoring back-up of flagging state.')
@@ -558,7 +563,9 @@ class SerialGcorFluxscale(basetask.StandardTaskTemplate):
         # Use only valid science spws covered by current intent(s) and field(s).
         fieldlist = inputs.ms.get_fields(task_arg=field)
         sci_spws = set(inputs.ms.get_spectral_windows(science_windows_only=True, intent=intent))
-        spws_to_solve = ','.join({str(spw.id) for fld in fieldlist for spw in fld.valid_spws.intersection(sci_spws)})
+        spws_to_solve = ','.join(
+            utils.deduplicate(str(spw.id) for fld in fieldlist for spw in fld.valid_spws.intersection(sci_spws))
+        )
 
         # Initialize gaincal task inputs.
         task_args = {

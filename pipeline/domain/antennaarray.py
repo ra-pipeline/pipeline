@@ -5,24 +5,15 @@ from __future__ import annotations
 import collections
 import itertools
 import math
-import warnings
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import Any, Sequence
 
 import numpy
-from pydantic import BaseModel, ConfigDict, Field as PydanticField, PrivateAttr
-
-from pipeline.domain import measures
-from pipeline.domain.antenna import Antenna
-from pipeline.domain.measures import Distance, DistanceUnits
-from pipeline.infrastructure import casa_tools
+from pydantic import BaseModel, ConfigDict, Field as PydanticField
 
 from . import measures
+from .antenna import Antenna
 from .measures import Distance, DistanceUnits
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-    from pipeline.domain import Antenna
+from pipeline.infrastructure import casa_tools
 
 Baseline = collections.namedtuple('Baseline', 'antenna1 antenna2 length')
 
@@ -41,8 +32,6 @@ class AntennaArray(BaseModel):
     baselines_m: numpy.ndarray | None = PydanticField(default=None, exclude=True)
     baseline_min: Baseline | None = PydanticField(default=None, exclude=True)
     baseline_max: Baseline | None = PydanticField(default=None, exclude=True)
-    _baselines: list[Baseline] = PrivateAttr(default_factory=list)
-
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
         validate_default=True,
@@ -88,8 +77,6 @@ class AntennaArray(BaseModel):
                 ),
             )
 
-        self._baselines = self.baselines_for_antennas([a.id for a in self.antennas])
-
     def __repr__(self) -> str:
         return 'AntennaArray({0!r}, {1}, {2!r})'.format(
             self.name,
@@ -130,16 +117,6 @@ class AntennaArray(BaseModel):
             for ant1, ant2 in itertools.combinations(unique_ids, 2)
         ]
 
-    @property
-    def baselines(self) -> list[Baseline]:
-        """Return a list of Baseline tuples for all antennas in the array."""
-        warnings.warn(
-            'AntennaArray.baselines is deprecated. Use AntennaArray.baselines_m instead.',
-            category=DeprecationWarning,
-            stacklevel=2,
-        )
-        return self._baselines
-
     @staticmethod
     def _calc_baseline_lookup(antennas: list[Any]) -> numpy.ndarray:
         if len(antennas) < 2:
@@ -151,8 +128,8 @@ class AntennaArray(BaseModel):
         qa = casa_tools.quanta
 
         def diff(ant1: Antenna, ant2: Antenna, attr: str) -> float:
-            v1 = qa.getvalue(ant1.offset[attr])[0]
-            v2 = qa.getvalue(ant2.offset[attr])[0]
+            v1 = qa.getvalue(ant1.offset[attr]).item()
+            v2 = qa.getvalue(ant2.offset[attr]).item()
             return v1 - v2
 
         for ant1, ant2 in itertools.combinations(antennas, 2):

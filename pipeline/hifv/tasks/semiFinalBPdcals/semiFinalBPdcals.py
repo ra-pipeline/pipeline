@@ -64,7 +64,7 @@ class semiFinalBPdcalsResults(basetask.Results):
     """
     def __init__(self, final=None, pool=None, preceding=None, bpdgain_touse=None,
                  gtypecaltable=None, ktypecaltable=None, bpcaltable=None, flaggedSolnApplycalbandpass=None,
-                 flaggedSolnApplycaldelay=None):
+                 flaggedSolnApplycaldelay=None, spw_solint=None):
         """
         Args:
             final(List, optional): Calibration list applied - not used
@@ -76,7 +76,7 @@ class semiFinalBPdcalsResults(basetask.Results):
             bpcaltable(Dict): Dictionary of tables per band
             flaggedSolnApplycalbandpass(Dict): returned from getCalFlaggedSoln for bpdgain_touse (per band)
             flaggedSolnApplycaldelay(Dict): returned from getCalFlaggedSoln for ktypecaltable (per band)
-
+            spw_solint(Dict): Dictionary of solints per spw per band
         """
 
         if final is None:
@@ -88,7 +88,6 @@ class semiFinalBPdcalsResults(basetask.Results):
 
         super().__init__()
 
-        # self.vis = None
         self.pool = pool[:]
         self.final = final[:]
         self.preceding = preceding[:]
@@ -99,6 +98,7 @@ class semiFinalBPdcalsResults(basetask.Results):
         self.bpcaltable = bpcaltable
         self.flaggedSolnApplycalbandpass = flaggedSolnApplycalbandpass
         self.flaggedSolnApplycaldelay = flaggedSolnApplycaldelay
+        self.spw_solint = spw_solint if spw_solint is not None else {}
 
 
 @task_registry.set_equivalent_casa_task('hifv_semiFinalBPdcals')
@@ -135,11 +135,12 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         bpdgain_touse = {}
         flaggedSolnApplycalbandpass = {}
         flaggedSolnApplycaldelay = {}
+        spw_solint_perband = {}
 
         for band, spwlist in band2spw.items():
 
             bpdgain_tousename, gtypecaltablename, ktypecaltablename, bpcaltablename, \
-            flaggedSolnApplycalbandpassperband, flaggedSolnApplycaldelayperband = self._do_semifinal(band, spwlist)
+            flaggedSolnApplycalbandpassperband, flaggedSolnApplycaldelayperband, spw_solint = self._do_semifinal(band, spwlist)
 
             gtypecaltable[band] = gtypecaltablename
             ktypecaltable[band] = ktypecaltablename
@@ -147,11 +148,11 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
             bpdgain_touse[band] = bpdgain_tousename
             flaggedSolnApplycalbandpass[band] = flaggedSolnApplycalbandpassperband
             flaggedSolnApplycaldelay[band] = flaggedSolnApplycaldelayperband
-
+            spw_solint_perband[band] = spw_solint
         return semiFinalBPdcalsResults(bpdgain_touse=bpdgain_touse, gtypecaltable=gtypecaltable,
                                        ktypecaltable=ktypecaltable, bpcaltable=bpcaltable,
                                        flaggedSolnApplycalbandpass=flaggedSolnApplycalbandpass,
-                                       flaggedSolnApplycaldelay=flaggedSolnApplycaldelay)
+                                       flaggedSolnApplycaldelay=flaggedSolnApplycaldelay, spw_solint=spw_solint_perband)
 
     def analyse(self, results):
         """Determine the best parameters by analysing the given jobs before returning any final jobs to execute.
@@ -181,6 +182,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
             bpcaltable(str):     BP cal table
             flaggedSolnApplycalbandpass(Dict):  returned from getCalFlaggedSoln for bpdgain_tous
             flaggedSolnApplycaldelay(Dict): returned from getCalFlaggedSoln for ktypecaltable
+            spw_solint(Dict): Dictionary of solints per spw
 
         """
         LOG.info("Executing for band {!s}  spws: {!s}".format(band, ','.join(spwlist)))
@@ -225,13 +227,15 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         while fracFlaggedSolns > critfrac and flagcount < 4:
             self._do_ktype_delaycal(caltable=ktypecaltable, addcaltable=gtypecaltable,
                                     RefAntOutput=RefAntOutput, spw=','.join(spwlist))
+            flagcount += 1
+            if not os.path.exists(ktypecaltable):
+                break
             flaggedSolnResult = getCalFlaggedSoln(ktypecaltable)
             fracFlaggedSolns = self._check_flagSolns(flaggedSolnResult, RefAntOutput)
 
             LOG.info("Fraction of flagged solutions = " + str(flaggedSolnResult['all']['fraction']))
             LOG.info("Median fraction of flagged solutions per antenna = " +
                      str(flaggedSolnResult['antmedian']['fraction']))
-            flagcount += 1
 
         LOG.info("Delay calibration complete for band {!s}".format(band))
 
@@ -243,7 +247,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         bpdgain_touse = tablebase + table_suffix[0]
 
         LOG.debug("WEAKBP: " + str(self.inputs.weakbp))
-
+        spw_solint = {}
         if self.inputs.weakbp:
             LOG.debug("USING WEAKBP HEURISTICS")
             interp = weakbp(self.inputs.vis, bpcaltable, context=self.inputs.context, RefAntOutput=RefAntOutput,
@@ -251,13 +255,12 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
                             executor=self._executor, spw=','.join(spwlist))
         else:
             LOG.debug("Using REGULAR heuristics")
-            do_bandpass(self.inputs.vis, bpcaltable, context=self.inputs.context, RefAntOutput=RefAntOutput,
+            spw_solint = do_bandpass(self.inputs.vis, bpcaltable, context=self.inputs.context, RefAntOutput=RefAntOutput,
                         spw=','.join(spwlist), ktypecaltable=ktypecaltable, bpdgain_touse=bpdgain_touse,
                         solint='inf', append=False, executor=self._executor)
 
             AllCalTables = sorted(self.inputs.context.callibrary.active.get_caltable())
             AllCalTables.append(ktypecaltable)
-            # AllCalTables.append(bpdgain_touse)
             AllCalTables.append(bpcaltable)
             ntables = len(AllCalTables)
             interp = [''] * ntables
@@ -266,12 +269,15 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
 
         self._do_applycal(ktypecaltable=ktypecaltable, bpdgain_touse=bpdgain_touse,
                           bpcaltable=bpcaltable, interp=interp, spw=','.join(spwlist))
-
-        flaggedSolnApplycalbandpass = getCalFlaggedSoln(bpdgain_touse)
-        flaggedSolnApplycaldelay = getCalFlaggedSoln(ktypecaltable)
+        flaggedSolnApplycalbandpass = {}
+        flaggedSolnApplycaldelay = {}
+        if os.path.exists(bpdgain_touse):
+            flaggedSolnApplycalbandpass = getCalFlaggedSoln(bpdgain_touse)
+        if os.path.exists(ktypecaltable):
+            flaggedSolnApplycaldelay = getCalFlaggedSoln(ktypecaltable)
 
         return bpdgain_touse, gtypecaltable, ktypecaltable, bpcaltable, flaggedSolnApplycalbandpass, \
-               flaggedSolnApplycaldelay
+               flaggedSolnApplycaldelay, spw_solint
 
     def _do_gtype_delaycal(self, caltable: str = None, RefAntOutput: list[str] = None, spwlist: list[str] = []) -> bool:
         """Perform a G-Type delay calibration with CASA task gaincal
@@ -357,7 +363,8 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         # ref antenna string needs to be lower case for gaincal
 
         GainTables = sorted(self.inputs.context.callibrary.active.get_caltable())
-        GainTables.append(addcaltable)
+        if os.path.exists(addcaltable):
+            GainTables.append(addcaltable)
 
         delaycal_task_args = {'vis': self.inputs.vis,
                               'caltable': caltable,
@@ -456,7 +463,8 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         # ref antenna string needs to be lower case for gaincal
 
         GainTables = sorted(self.inputs.context.callibrary.active.get_caltable())
-        GainTables.append(addcaltable)
+        if os.path.exists(addcaltable):
+            GainTables.append(addcaltable)
 
         bpdgains_task_args = {'vis': self.inputs.vis,
                               'caltable': caltable,
@@ -529,9 +537,11 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         LOG.info("Applying semi-final delay and BP calibrations to all calibrators")
 
         AllCalTables = sorted(self.inputs.context.callibrary.active.get_caltable())
-        AllCalTables.append(ktypecaltable)
+        if os.path.exists(ktypecaltable):
+            AllCalTables.append(ktypecaltable)
         # AllCalTables.append(bpdgain_touse)
-        AllCalTables.append(bpcaltable)
+        if os.path.exists(bpcaltable):
+            AllCalTables.append(bpcaltable)
 
         ntables=len(AllCalTables)
 

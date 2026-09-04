@@ -1,10 +1,13 @@
-"""Unit tests for SpectralWindow prototype (Phase 5)."""
+"""Tests for the Pydantic-based SpectralWindow domain object."""
 
 import json
 import unittest
 from unittest.mock import patch
 
-from pipeline.domain import measures
+import numpy
+import pytest
+
+from pipeline.domain import measures, spectralwindow
 from pipeline.domain.spectralwindow import SpectralWindow
 
 
@@ -13,11 +16,11 @@ class DummyQuanta:
         return {'value': value['value'], 'unit': unit}
 
     def getvalue(self, value):
-        return [value['value']]
+        return numpy.asarray([value['value']])
 
 
 class TestSpectralWindow(unittest.TestCase):
-    """Test SpectralWindow implementation."""
+    """Test SpectralWindow creation and serialization."""
 
     def setUp(self) -> None:
         self.ref_freq = {
@@ -57,9 +60,7 @@ class TestSpectralWindow(unittest.TestCase):
 
         minfreq = measures.Frequency(95.0, measures.FrequencyUnits.HERTZ)
         maxfreq = measures.Frequency(205.0, measures.FrequencyUnits.HERTZ)
-        ch_min, ch_max = spw.channel_range(minfreq, maxfreq)
-
-        self.assertEqual((ch_min, ch_max), (0, 1))
+        self.assertEqual(spw.channel_range(minfreq, maxfreq), (0, 1))
 
     def test_serialization_to_dict(self) -> None:
         with patch('pipeline.domain.spectralwindow.casa_tools.quanta', DummyQuanta()):
@@ -73,8 +74,54 @@ class TestSpectralWindow(unittest.TestCase):
         with patch('pipeline.domain.spectralwindow.casa_tools.quanta', DummyQuanta()):
             spw = SpectralWindow(**self.data)
 
-        json_str = spw.to_json()
-        parsed = json.loads(json_str)
-
+        parsed = json.loads(spw.to_json())
         self.assertEqual(parsed['name'], 'SPW0')
         self.assertEqual(parsed['mean_freq'], 150.0)
+
+
+_NCHAN = 4
+_REF_FREQ = {'m0': {'value': 1.0, 'unit': 'GHz'}, 'refer': 'LSRK'}
+_CHAN_FREQS = numpy.array([100.0e9, 100.1e9, 100.2e9, 100.3e9])
+_CHAN_WIDTHS = numpy.array([15625000.0] * _NCHAN)
+_CHAN_EFFECTIVE_BWS = numpy.array([15625000.0] * _NCHAN)
+_CHAN_RESOLUTIONS = numpy.array([31250000.0] * _NCHAN)
+
+
+@pytest.fixture
+def mock_casa_tools():
+    """Mock casa_tools.quanta, which requires a live CASA environment."""
+    with patch('pipeline.domain.spectralwindow.casa_tools') as mock:
+        mock.quanta.convertfreq.return_value = {'value': 100e9, 'unit': 'Hz'}
+        mock.quanta.getvalue.return_value = numpy.array([100e9])
+        yield mock
+
+
+def _make_spw(chan_resolutions=None):
+    return spectralwindow.SpectralWindow(
+        id=0,
+        name='test_spw',
+        type='TDM',
+        bandwidth=2000000000.0,
+        ref_freq=_REF_FREQ,
+        mean_freq=100e9,
+        chan_freqs=_CHAN_FREQS,
+        chan_widths=_CHAN_WIDTHS,
+        chan_effective_bws=_CHAN_EFFECTIVE_BWS,
+        sideband=1,
+        baseband=1,
+        receiver=None,
+        freq_lo=None,
+        chan_resolutions=chan_resolutions,
+    )
+
+
+def test_resolution_returns_frequency_when_set(mock_casa_tools):
+    """Return a Frequency when channel resolutions are available."""
+    spw = _make_spw(chan_resolutions=_CHAN_RESOLUTIONS)
+    assert spw.resolution == measures.Frequency(31250000.0, measures.FrequencyUnits.HERTZ)
+
+
+def test_resolution_returns_none_when_absent(mock_casa_tools):
+    """Return None when channel resolutions are unavailable."""
+    spw = _make_spw()
+    assert spw.resolution is None

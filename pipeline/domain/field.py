@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime
 import json
 import pprint
 from typing import TYPE_CHECKING, Any
@@ -16,7 +15,7 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from pipeline.domain import SpectralWindow, State, Source
-    from pipeline.infrastructure.utils.casa_types import DirectionDict, EpochDict, QuantityDict
+    from pipeline.infrastructure.utils.casa_types import DirectionDict, EpochDict
 
 _pprinter = pprint.PrettyPrinter(width=1e99)
 
@@ -34,8 +33,6 @@ class Field(BaseModel):
         states: State objects associated with the field.
         valid_spws: SpectralWindow objects associated with the field.
         flux_densities: Flux measurements associated with the field.
-        zd: Zenith distance quantity dictionary.
-        telmjd: Modified Julian Date epoch dictionary.
     """
 
     id: int = PydanticField(..., description='Field identifier')
@@ -51,9 +48,6 @@ class Field(BaseModel):
         description='Flux density measurements',
     )
     source: Source | None = PydanticField(default=None, exclude=True, description='Linked source object')
-    zd: QuantityDict | None = PydanticField(default=None, description='Zenith distance')
-    telmjd: EpochDict | None = PydanticField(default=None, description='TELMJD epoch')
-
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
         populate_by_name=True,
@@ -164,27 +158,6 @@ class Field(BaseModel):
         ]:
             if source_type.find(intent) != -1:
                 self.intents.add(intent)
-
-    def set_zd_telmjd(self, observatory: str) -> None:
-        """Calculate and set the zenith distance at the observation mid-time.
-
-        Args:
-            observatory: Name of the observatory (e.g., 'VLA', 'ALMA').
-        """
-        # Mean observing time
-        mjd_epoch = datetime.datetime(1858, 11, 17, tzinfo=datetime.timezone.utc)
-        start_time = mjd_epoch + datetime.timedelta(seconds=min(self.time))
-        end_time = mjd_epoch + datetime.timedelta(seconds=max(self.time))
-        mid_time = utils.obs_midtime(start_time, end_time)
-
-        zd_rad = utils.compute_zenith_distance(
-            field_direction=self.direction,
-            epoch=mid_time,
-            observatory=observatory,
-        )
-
-        self.zd = casa_tools.quanta.convert(zd_rad, 'deg')
-        self.telmjd = mid_time['m0']
 
     def __str__(self) -> str:
         return '<Field {id}: name=\'{name}\' intents=\'{intents}\'>'.format(

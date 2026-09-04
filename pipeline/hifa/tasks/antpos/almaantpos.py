@@ -87,10 +87,10 @@ class ALMAAntposInputs(antpos.AntposInputs):
                 Example: ['ngc5921.gcal']
 
             hm_antpos: 
-                - `'online'` : Query ALMA database through CASA task `getantposalma` or reuse 
-                pre-existing queried/downloaded JSON files. Files follow the naming pattern 
-                `{eb_name}.{antposfile}`. For multi-MS pipeline runs, the MS basename 
-                is appended to the filename (e.g., `uid___A002_X123_X4567.antennapos.json`).
+                - `'online'` : Query ALMA database through CASA task `getantposalma` or reuse
+                  pre-existing queried/downloaded JSON files. Files follow the naming pattern
+                  `{eb_name}.{antposfile}`. For multi-MS pipeline runs, the MS basename
+                  is appended to the filename (e.g., `uid___A002_X123_X4567.antennapos.json`).
                 - `'manual'` : Use user-provided corrections.
                 - `'file'` : Load corrections from a single old-style CSV antenna position file.
                 

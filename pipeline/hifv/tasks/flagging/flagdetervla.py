@@ -188,7 +188,7 @@ class FlagDeterVLAInputs(flagdeterbase.FlagDeterBaseInputs):
     FlagDeterVLAInputs defines the inputs for the FlagDeterVLA pipeline task.
     """
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     baseband = vdp.VisDependentProperty(default=True)
     clip = vdp.VisDependentProperty(default=True)

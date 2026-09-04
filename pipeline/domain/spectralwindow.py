@@ -199,6 +199,32 @@ class Channel:
     def high(self) -> measures.Frequency:
         return self.frequency_range.high
 
+    def contains(self, frequency: measures.Frequency | measures.FrequencyRange) -> bool:
+        """Return whether the channel contains the given frequency or range."""
+        return self.frequency_range.contains(frequency)
+
+    def convert_to(self, newUnits: dict = measures.FrequencyUnits.GIGAHERTZ) -> measures.FrequencyRange:
+        """Convert both channel endpoints to the given units."""
+        return self.frequency_range.convert_to(newUnits)
+
+    def getOverlapWith(self, other: measures.FrequencyRange) -> measures.FrequencyRange:
+        """Return the region of overlap with another frequency range."""
+        return self.frequency_range.getOverlapWith(other)
+
+    def getGapBetween(self, other: measures.FrequencyRange) -> measures.FrequencyRange | None:
+        """Return the frequency gap between this channel and another range."""
+        return self.frequency_range.getGapBetween(other)
+
+    def overlaps(self, other: Channel) -> bool:
+        """Return whether this channel overlaps another channel."""
+        if isinstance(other, Channel):
+            return self.frequency_range.overlaps(other.frequency_range)
+        return False
+
+    def set(self, frequency1: measures.Frequency, frequency2: measures.Frequency) -> None:
+        """Set the channel frequency range from the given endpoints."""
+        self.frequency_range.set(frequency1, frequency2)
+
 
 class SpectralWindowWithChannelSelection:
     """Proxy that applies a channel selection to a spectral window."""
@@ -279,6 +305,10 @@ class SpectralWindow(BaseModel):
     median_receptor_angle: numpy.ndarray | None = PydanticField(default=None, description='Median receptor angle')
     specline_window: bool = PydanticField(default=False, description='Spectral line window flag')
     grouping_id: str | None = PydanticField(default=None, description='Grouping ID')
+    chan_resolutions: Sequence[int | float] | None = PydanticField(
+        default=None,
+        description='Per-channel spectral resolutions in Hz',
+    )
     intents: set[str] = PydanticField(default_factory=set, description='Observing intents')
 
     mean_frequency: measures.Frequency | None = PydanticField(default=None, exclude=True)
@@ -295,7 +325,14 @@ class SpectralWindow(BaseModel):
         validate_default=True,
     )
 
-    @field_validator('chan_freqs', 'chan_widths', 'chan_effective_bws', 'transitions', mode='before')
+    @field_validator(
+        'chan_freqs',
+        'chan_widths',
+        'chan_effective_bws',
+        'chan_resolutions',
+        'transitions',
+        mode='before',
+    )
     @classmethod
     def convert_numpy_to_list(cls, v: Any) -> list[int | float] | list[str] | Any:
         """Convert numpy arrays to lists for Pydantic validation."""
@@ -308,7 +345,7 @@ class SpectralWindow(BaseModel):
             self.transitions = ['Unknown']
 
         ref_freq_hz = casa_tools.quanta.convertfreq(self.ref_freq['m0'], 'Hz')
-        ref_freq_val = casa_tools.quanta.getvalue(ref_freq_hz)[0]
+        ref_freq_val = casa_tools.quanta.getvalue(ref_freq_hz).item()
         self._ref_frequency = measures.Frequency(ref_freq_val, measures.FrequencyUnits.HERTZ)
         self._ref_frequency_frame = self.ref_freq['refer']
 
@@ -362,6 +399,13 @@ class SpectralWindow(BaseModel):
     def centre_frequency(self) -> measures.Frequency:
         """Return the center frequency of the SpectralWindow."""
         return self._centre_frequency
+
+    @property
+    def resolution(self) -> measures.Frequency | None:
+        """Return the first channel's spectral resolution, if available."""
+        if self.chan_resolutions is None:
+            return None
+        return measures.Frequency(float(self.chan_resolutions[0]), measures.FrequencyUnits.HERTZ)
 
     @property
     def num_channels(self) -> int:
@@ -497,6 +541,9 @@ class SpectralWindow(BaseModel):
             'median_receptor_angle': self.median_receptor_angle,
             'specline_window': self.specline_window,
             'grouping_id': self.grouping_id,
+            'chan_resolutions': None
+            if self.chan_resolutions is None
+            else list(self.chan_resolutions),
         }
 
     def to_json(self) -> str:

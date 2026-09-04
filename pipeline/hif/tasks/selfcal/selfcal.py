@@ -17,6 +17,7 @@ from astropy.utils.misc import JsonCustomEncoder
 import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
+import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.filenamer as filenamer
 import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.vdp as vdp
@@ -25,7 +26,7 @@ from pipeline.domain import DataType
 from pipeline.hif.heuristics.auto_selfcal import auto_selfcal
 from pipeline.hif.tasks.applycal import SerialIFApplycal
 from pipeline.hif.tasks.makeimlist import MakeImList
-from pipeline.infrastructure import callibrary, casa_tasks, casa_tools, task_registry, utils
+from pipeline.infrastructure import callibrary, casa_tasks, casa_tools, task_registry
 from pipeline.infrastructure.contfilehandler import contfile_to_chansel
 from pipeline.infrastructure.mpihelpers import TaskQueue
 
@@ -47,7 +48,7 @@ class SelfcalResults(basetask.Results):
         self.selfcal_resources = selfcal_resources
 
     def merge_with_context(self, context):
-        """See :method:`~pipeline.infrastructure.api.Results.merge_with_context`."""
+        """See :meth:`~pipeline.infrastructure.api.Results.merge_with_context`."""
 
         # save selfcal results into the Pipeline context
         if context.selfcal_targets:
@@ -98,7 +99,9 @@ class SelfcalResults(basetask.Results):
 
             # Fetch the field names matching the given `calto.field` and `calto.intent`.
             # Use a set comprehension to collect unique field names, and join them into a single string.
-            field_name = ','.join({field.name for field in ms.get_fields(task_arg=calto.field, intent=calto.intent)})
+            field_name = ','.join(
+                utils.deduplicate(field.name for field in ms.get_fields(task_arg=calto.field, intent=calto.intent))
+            )
 
             # Retrieve the data type
             data_dtype = ms.get_data_type('DATA', field_name, spw_sel)
@@ -132,7 +135,7 @@ class SelfcalInputs(vdp.StandardInputs):
     # potentially we could allow REGCAL_CONTLINE_ALL here (e.g. tmp ms splitted from 'corrected' data column),
     # but there is no space for applying final selfcal solutions to the data.
 
-    processing_data_type = [DataType.REGCAL_CONT_SCIENCE, DataType.REGCAL_CONTLINE_SCIENCE]
+    processing_data_types = [DataType.REGCAL_CONT_SCIENCE, DataType.REGCAL_CONTLINE_SCIENCE]
 
     field = vdp.VisDependentProperty(default='')
 
@@ -613,12 +616,12 @@ class Selfcal(basetask.StandardTaskTemplate):
         inputs = self.inputs
         if inputs.vis in (None, [], ''):
             # If no suitable datatype, by-pass the hif_selfcal stage.
-            required_data_type_desc = ', '.join(dt.name for dt in SelfcalInputs.processing_data_type)
+            required_data_type_desc = ', '.join(dt.name for dt in SelfcalInputs.processing_data_types)
 
             LOG.warning('No data matching any of the required datatypes: %s; '
                         'please review the registered MS datatype information.',
                         required_data_type_desc)
-                
+
             return SelfcalResults([], None, None, None, False)
 
         if not isinstance(inputs.vis, list):

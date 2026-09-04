@@ -6,6 +6,7 @@ from .hif_checkproductsize import hif_checkproductsize
 from .hif_correctedampflag import hif_correctedampflag
 from .hif_editimlist import hif_editimlist
 from .hif_findcont import hif_findcont
+from .hif_findroi import hif_findroi
 from .hif_lowgainflag import hif_lowgainflag
 from .hif_makecutoutimages import hif_makecutoutimages
 from .hif_makeimages import hif_makeimages
@@ -27,6 +28,7 @@ __all__ = [
     'hif_correctedampflag',
     'hif_editimlist',
     'hif_findcont',
+    'hif_findroi',
     'hif_lowgainflag',
     'hif_makecutoutimages',
     'hif_makeimages',

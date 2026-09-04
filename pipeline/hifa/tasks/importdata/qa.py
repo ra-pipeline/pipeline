@@ -10,7 +10,7 @@ import pipeline.qa.scorecalculator as qacalc
 from pipeline import infrastructure
 from pipeline.h.tasks.exportdata import aqua
 from pipeline.hifa.tasks.importdata import almaimportdata
-
+from pipeline.infrastructure.utils import ms_separation_angles
 if TYPE_CHECKING:
     from pipeline.domain import MeasurementSet
     from pipeline.infrastructure.basetask import Results
@@ -40,6 +40,15 @@ class ALMAImportDataListQAHandler(pqa.QAPlugin):
 
         result.qa.pool.extend(parang_scores)
         result.parang_ranges = parang_ranges
+
+        # PIPE-65 separation angles of TARGET with PHASE and CHECK
+        sep_angle_dict = ms_separation_angles(mses)
+        result.sep_angles = sep_angle_dict
+
+        # Make scores for separations angles - all 1.0 for now just to report information
+        # hidden from weblog accordion for current implementation
+        sepang_scores = qacalc.score_separation_angles(mses, result.sep_angles)
+        result.qa.pool.extend(sepang_scores)
 
 
 class ALMAImportDataQAHandler(pqa.QAPlugin):
@@ -75,14 +84,13 @@ class ALMAImportDataQAHandler(pqa.QAPlugin):
 
         # Check for flux service status codes
         score9 = _check_fluxservicestatuscodes(result)
-
+        
         # Add all scores to QA score pool in result.
         result.qa.pool.extend(polcal_scores)
         result.qa.pool.extend([score2, score4, score6, score8, score9])
         result.qa.pool.extend(scores3)
         result.qa.pool.extend(scores5)
         result.qa.pool.extend(scores7)
-
 
 def _check_polintents(recipe_name: str, mses: list[MeasurementSet]) -> list[pqa.QAScore]:
     """
