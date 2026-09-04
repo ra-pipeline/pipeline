@@ -671,7 +671,7 @@ diagnostic plots.
 {jira}`PIPE-3109` fix `IndexError`
 crashes generating the channel-map and missed-line diagnostic plots when a
 clustering-derived line range extends outside the valid channel bounds.
-{jira}`PIPE-2399` fixes inconsistent
+{jira}`PIPE-2183/2399` fix inconsistent
 display of flagged data at the {func}`~pipeline.hsd.cli.hsd_blflag` stage - flagged points above
 the threshold line were sometimes rendered as unflagged.
 {jira}`PIPE-3194` fixes a recurrence
