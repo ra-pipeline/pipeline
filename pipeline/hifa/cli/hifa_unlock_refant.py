@@ -15,9 +15,6 @@ def hifa_unlock_refant(vis=None):
 
     The refant list can be locked with the hifa_lock_refant task.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Unlock the refant list for all MSes in pipeline context:
 

@@ -1014,8 +1014,8 @@ class Longitude(EquatorialArc):
 
         The parsed value, if not a legal value for longitude, will be
         normalised in such a way that it is transformed to a legal value. To be
-         legal, magnitude must be greater than or equal zero and less than or
-         equal to one full circle, in the given units.
+        legal, magnitude must be greater than or equal zero and less than or
+        equal to one full circle, in the given units.
 
         Args:
             value: A string that will be converted into a longitude.

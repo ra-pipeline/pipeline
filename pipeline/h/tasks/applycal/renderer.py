@@ -18,9 +18,12 @@ import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.filenamer as filenamer
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.utils as utils
+from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.displays.summary import UVChart
 from pipeline.infrastructure.renderer.basetemplates import JsonPlotRenderer
-from ..common import flagging_renderer_utils as flagutils, mstools
+
+from ..common import flagging_renderer_utils as flagutils
+from ..common import mstools
 from ..common.displays import applycal as applycal
 
 LOG = infrastructure.logging.get_logger(__name__)
@@ -265,7 +268,12 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         if utils.contains_single_dish(pipeline_context):
             uv_plots = None
         else:
-            uv_plots = self.create_uv_plots(pipeline_context, result, weblog_dir)
+            # PIPE_1780: Custom plot parameters.
+            custom_plot_par = {"avgscan": False, "avgtime": "999999",
+                               "correlation": "XX,YY", "avgchannel": ""}
+            
+            uv_plots = self.create_uv_plots(context=pipeline_context, results=result, weblog_dir=weblog_dir,
+                                            plot_par=custom_plot_par)
 
         # PIPE-615: Add links to the hif_applycal weblog for viewing each
         # callibrary table (and store all callibrary tables in the weblog
@@ -316,19 +324,39 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         })
 
     @staticmethod
-    def create_uv_plots(context, results, weblog_dir):
+    def create_uv_plots(context, results, weblog_dir, plot_par:dict=None):
         uv_plots = collections.defaultdict(list)
-
+        
         for result in results:
             vis = os.path.basename(result.inputs['vis'])
-            ms = context.observing_run.get_ms(vis)
-
-            plot = UVChart(context, ms, customflagged=True, output_dir=weblog_dir, title_prefix="Post applycal: ").plot()
-
+            ms  = context.observing_run.get_ms(vis)
+            # PIPE-1780:
+            if plot_par is not None:
+                spw_plot_string = ""
+                # Reduce number of channels (performance optim.)
+                _, rep_spw_id = ms.get_representative_source_spw()
+                id_int  = None
+                rep_spw = None
+                l_nchan = None
+                
+                if rep_spw_id is not None:
+                    id_int  = rep_spw_id
+                    l_nchan = len(ms.get_spectral_window(rep_spw_id).channels)
+                else: #rep_spw id is None (not exist). Select first available SPW.
+                    id_int  = ms.get_spectral_windows()[0].id #rep_spw.id
+                    l_nchan = len(ms.get_spectral_windows()[0].channels)
+                
+                # Plot a three channels to optimise image creation
+                spw_plot_string = str(id_int)+":"+str(l_nchan//2)+";"+str(l_nchan//4)+";"+str((3*l_nchan)//4)
+                plot_par["spw"] = spw_plot_string
+            
+            plot = UVChart(context, ms, custom_plot_flags=plot_par, customflagged=True,
+                           output_dir=weblog_dir, title_prefix="Post applycal: ").plot()
+            
             # PIPE-1294: only attached valid plot wrapper objects.
             if plot is not None:
                 uv_plots[vis].append(plot)
-
+            
         return uv_plots
 
     def create_science_plots(self, context, results):
@@ -445,6 +473,7 @@ class T2_4MDetailsApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         Create science plots for result
 
         Create science plots for result.
+
         Args:
             context:            Pipeline Context
             result:             Applycal Results
@@ -812,14 +841,18 @@ def get_brightest_field(ms, source, intent='TARGET'):
 
     # a list of (field, field flux) tuples
     mean_flux = []
-    for field in fields_for_source:
-        fluxes_for_field = []
-        for spwid in spw_ids:
-            fluxes_for_field_and_spw = mstools.compute_mean_flux(ms, field.id, spwid, intent)[0]
-            if fluxes_for_field_and_spw:
-                fluxes_for_field.append(fluxes_for_field_and_spw)
-        if fluxes_for_field:
-            mean_flux.append((field, sum(fluxes_for_field) / len(fluxes_for_field)))
+    # Open the MS once for all (field, spw) reads. This avoids paying the MS
+    # open cost (which is especially high for lazy-import MSes whose DATA column
+    # is ASDM-backed) once per combination instead of n_fields * n_spws times.
+    with casa_tools.MSReader(ms.name) as openms:
+        for field in fields_for_source:
+            fluxes_for_field = []
+            for spwid in spw_ids:
+                fluxes_for_field_and_spw = mstools.compute_mean_flux(ms, field.id, spwid, intent, ms_handle=openms)[0]
+                if fluxes_for_field_and_spw:
+                    fluxes_for_field.append(fluxes_for_field_and_spw)
+            if fluxes_for_field:
+                mean_flux.append((field, sum(fluxes_for_field) / len(fluxes_for_field)))
 
     LOG.debug('Median flux for %s targets:', intent)
     for field, field_flux in mean_flux:

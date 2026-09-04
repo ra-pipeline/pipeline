@@ -9,7 +9,7 @@ class CleanTarget(dict):
         self['intent'] = None               # string
         self['spw'] = None                  # string
         self['spwsel_lsrk'] = None          # dictionary
-        self['spwsel_topo'] = None          # list
+        self['spwsel_ms_frame'] = None      # list
         self['spwsel_all_cont'] = None      # boolean
         self['spwsel_low_bandwidth'] = None # boolean
         self['spwsel_low_spread'] = None    # boolean

@@ -66,16 +66,16 @@ class T2_4MDetailsCheckProductSizeRenderer(basetemplates.T2_4MDetailsDefaultRend
             except:
                 beam_vs_minAR_maxAR = 'N/A'
             beamRatio = '%.2f' % (float(cqa.getvalue(result.beamRatios[(robust, str(uvtaper))])[0]))
-            if cqa.getvalue(item['cell'][0])[0] != 0.0 and cqa.getvalue(item['cell'][1])[0] != 0.0:
+            if cqa.getvalue(item['cell'][0]).item() != 0.0 and cqa.getvalue(item['cell'][1]).item() != 0.0:
                 cell = '%.2g x %.2g arcsec' % (cqa.getvalue(cqa.convert(item['cell'][0], 'arcsec'))[0], cqa.getvalue(cqa.convert(item['cell'][1], 'arcsec'))[0])
             else:
                 cell = 'N/A'
-            if cqa.getvalue(item['bandwidth'])[0] != 0.0:
+            if cqa.getvalue(item['bandwidth']).item() != 0.0:
                 bandwidth = '%.4g MHz' % (cqa.getvalue(cqa.convert(item['bandwidth'], 'MHz'))[0])
             else:
                 bandwidth = 'N/A'
             bwmode = item['bwmode']
-            if cqa.getvalue(item['theoretical_sensitivity'])[0] != 0.0:
+            if cqa.getvalue(item['theoretical_sensitivity']).item() != 0.0:
                 sensitivity = '%.3g Jy/beam' % (cqa.getvalue(cqa.convert(item['theoretical_sensitivity'], 'Jy/beam'))[0])
             else:
                 sensitivity = 'N/A'

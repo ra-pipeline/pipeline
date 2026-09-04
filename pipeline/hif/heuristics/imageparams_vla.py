@@ -25,6 +25,44 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
                                        linesfile, imaging_params, processing_intents)
         self.imaging_mode = 'VLA'
 
+    def get_sourcename(
+        self, vislist: list[str] | str, fieldlist: list[str] | str, intent: str, as_list: bool = False  # noqa: ARG002
+    ) -> list[str] | str:
+        """Get source name(s) from a measurement set list for given field and intent selections.
+
+        For VLA, return field names from the field selection (string field name), normalized and deduplicated,
+        in the requested format (list if as_list=True, else comma-separated string).
+
+        Args:
+            vislist: Measurement set file path(s). Accepted for API compatibility but not used,
+                as field selection is already validated upstream.
+            fieldlist: Field name(s) to normalize and return.
+            intent: Observation intent. Accepted for API compatibility but not used, as field
+                selection is already validated upstream.
+            as_list: If True, return deduplicated field names as list; otherwise as comma-separated string.
+
+        Returns:
+            List of field names if as_list=True, otherwise comma-separated string of field names.
+
+        Note: Unlike the base class, ALMA/VLA assume fieldlist contains pre-resolved
+        field names (not IDs) and don't filter by intent, as field selection has
+        already been validated upstream.
+        """
+        # Normalize fieldlist to a list
+        if isinstance(fieldlist, str):
+            normalized_field_list = [f.strip() for f in fieldlist.split(',') if f.strip()]
+        else:
+            normalized_field_list = fieldlist if fieldlist else []
+
+        # Deduplicate
+        deduplicated = utils.deduplicate(normalized_field_list)
+
+        # Return in requested format
+        if as_list:
+            return deduplicated
+        else:
+            return ','.join(deduplicated)
+
     def robust(self, specmode=None) -> float:
         """Tclean robust parameter heuristics.
         See PIPE-680 and CASR-543"""
@@ -448,7 +486,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         else:
             return threshold
 
-    def imsize(self, fields, cell, primary_beam, sfpblimit=None, max_pixels=None,
+    def imsize(self, fields, cell, primary_beam, sfpblimit=None, max_pixels=None, min_pixels=None,
                centreonly=False, vislist=None, spwspec=None, intent: str = '', joint_intents: str = '',
                specmode=None) -> list | int:
         """
@@ -468,6 +506,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         :param sfpblimit: single field primary beam response. If provided then imsize is chosen such that the image
             edge is at normalised primary beam level equals to sfpblimit.
         :param max_pixels: maximum allowed pixel count, integer. The same limit is applied along both image axes.
+        :param min_pixels: minimum allowed pixel count, integer. The same limit is applied along both image axes.
         :param centreonly: if True, then ignore the spread of field centers.
         :param vislist: list of visibility path string to be used for imaging. If not set then use all visibilities
             in the context.
@@ -478,7 +517,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         :return: two element list of pixel count along x and y image axes.
         """
         if specmode in ('cube', 'repBW'):
-            return super().imsize(fields, cell, primary_beam, sfpblimit=sfpblimit, max_pixels=max_pixels,
+            return super().imsize(fields, cell, primary_beam, sfpblimit=sfpblimit, max_pixels=max_pixels, min_pixels=min_pixels,
                                   centreonly=centreonly, vislist=vislist, intent=intent, specmode=specmode)
         else:
             if spwspec is not None:
@@ -493,7 +532,7 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
                     # equivalent to second minimum of the Airy diffraction pattern; m = 2.233 in theta = m*lambda/D
                     sfpblimit = 0.016
 
-            return super().imsize(fields, cell, primary_beam, sfpblimit=sfpblimit, max_pixels=max_pixels,
+            return super().imsize(fields, cell, primary_beam, sfpblimit=sfpblimit, max_pixels=max_pixels, min_pixels=min_pixels,
                                   centreonly=centreonly, vislist=vislist, intent=intent, specmode=specmode)
 
     def imagename(self, output_dir=None, intent=None, field=None, spwspec=None, specmode=None, band=None, datatype: str = None) -> str:
@@ -723,16 +762,50 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
             else:
                 raise Exception('Cannot select representative target from TARGET intent.')
 
-        repr_source = target_sources[0]
+        # Iterate through target sources to find the first one with sufficient unflagged data
+        # (at least 5% non-flagged data in at least one SPW)
+        repr_source = None
+        repr_source_flag_stats_spw = None  # Will hold flag statistics for the selected representative source
+        min_unflagged_fraction = 0.05  # Minimum acceptable unflagged fraction (5%)
 
-        # Determine least flagged spectral window
-        job = casa_tasks.flagdata(vis=repr_ms.name, field=utils.fieldname_for_casa(repr_source), mode='summary')
-        flag_stats = job.execute()
-        flag_stats_spw = flag_stats['spw']
+        for source_candidate in target_sources:
+            job = casa_tasks.flagdata(
+                vis=repr_ms.name, field=utils.fieldname_for_casa(source_candidate), mode="summary"
+            )
+            flag_stats = job.execute()
+            flag_stats_spw = flag_stats["spw"]
 
+            # Calculate the unflagged fraction (ratio of unflagged to total data) for each SPW
+            unflagged_fractions = {
+                str(spw.id): (flag_stats_spw[str(spw.id)]["total"] - flag_stats_spw[str(spw.id)]["flagged"])
+                / flag_stats_spw[str(spw.id)]["total"]
+                for spw in repr_ms.get_spectral_windows()
+                if str(spw.id) in flag_stats_spw and flag_stats_spw[str(spw.id)]["total"] > 0
+            }
+            LOG.info("Source %s unflagged fractions by spw: %s", source_candidate, unflagged_fractions)
+
+            # Check if this source has sufficient unflagged data in any SPW (>= 5%)
+            has_sufficient_data = any(frac >= min_unflagged_fraction for frac in unflagged_fractions.values())
+
+            if has_sufficient_data:
+                repr_source = source_candidate
+                repr_source_flag_stats_spw = flag_stats_spw
+                LOG.info(
+                    "Selected %s as representative source (meets %.0f%% threshold)",
+                    repr_source,
+                    min_unflagged_fraction * 100,
+                )
+                break
+
+        if repr_source is None:
+            raise Exception(
+                f"No suitable representative target found with at least {min_unflagged_fraction:.0%} unflagged data from {target_sources}"
+            )
+
+        # Calculate flagging fraction for each SPW using the representative source's flag stats
         spw_flagfrac = {
-            spw: flag_stats_spw[str(spw.id)]['flagged'] / flag_stats_spw[str(spw.id)]['total']
-            for spw in repr_ms.get_spectral_windows() if str(spw.id) in flag_stats_spw
+            spw: repr_source_flag_stats_spw[str(spw.id)]['flagged'] / repr_source_flag_stats_spw[str(spw.id)]['total']
+            for spw in repr_ms.get_spectral_windows() if str(spw.id) in repr_source_flag_stats_spw
         }
 
         # Select SPW with minimum flagging fraction

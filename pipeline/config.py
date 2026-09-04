@@ -158,9 +158,9 @@ def casatasks_startup(casa_config: dict[str, str | None], loglevel: str | None =
                      desired settings. Values can be None, in which case the attribute
                      is not modified.
         loglevel: Optional pipeline log level string:
-                        critical, error, warning, attention, info, debug, todo, trace.
-                  If provided, the CASA log filter level is adjusted accordingly. If None,
-                  casa loglevel defaults to 'INFO1'.
+            critical, error, warning, attention, info, debug, todo, trace.
+            If provided, the CASA log filter level is adjusted accordingly. If None,
+            casa loglevel defaults to 'INFO1'.
 
     Returns:
         A tuple containing:

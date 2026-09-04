@@ -16,9 +16,6 @@ def hsdn_exportdata(pprfile=None, targetimages=None, products_dir=None):
     - a tar file per MS containing the final flags version and blparam
     - a tar file containing the file web log
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Export the pipeline results for a single session to the data products
         directory

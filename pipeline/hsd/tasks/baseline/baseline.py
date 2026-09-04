@@ -43,7 +43,7 @@ class SDBaselineInputs(vdp.StandardInputs):
     """Inputs for baseline subtraction task."""
 
     # Search order of input vis
-    processing_data_type = [DataType.ATMCORR, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.ATMCORR, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     infiles = vdp.VisDependentProperty(default='', null_input=['', None, [], ['']])
     spw = vdp.VisDependentProperty(default='')
@@ -640,6 +640,7 @@ class SDBaseline(basetask.StandardTaskTemplate):
             channelmap_range = maskline_result.outcome['channelmap_range']
             cluster_info = maskline_result.outcome['cluster_info']
             flag_digits = maskline_result.outcome['flag_digits']
+            flagged_edges = maskline_result.outcome['flagged_edges']
 
             # register ids to per MS id collection
             for i in member_list:
@@ -654,7 +655,8 @@ class SDBaseline(basetask.StandardTaskTemplate):
                               'channelmap_range': channelmap_range,
                               'clusters': cluster_info,
                               'flag_digits': flag_digits,
-                              'org_direction': org_direction})
+                              'org_direction': org_direction,
+                              'flagged_edges': flagged_edges})
 
         # - end of the loop over reduction group
 

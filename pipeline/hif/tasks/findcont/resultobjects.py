@@ -34,6 +34,7 @@ class FindContResult(basetask.Results):
         self.momDiffSNRs = momDiffSNRs
         self.skip_stage = skip_stage
         self.warning_details = {} if warning_details is None else warning_details
+        self.imaging_summary = []
 
     def merge_with_context(self, context):
         aggregated_warnings = [

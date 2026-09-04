@@ -3,7 +3,6 @@ from __future__ import annotations
 import collections
 import itertools
 import math
-import warnings
 from typing import TYPE_CHECKING
 
 import numpy
@@ -108,8 +107,6 @@ class AntennaArray:
                 length=Distance(value=self.baseline_lookup[max_x][max_y], units=DistanceUnits.METRE)
             )
 
-        self._baselines = self.baselines_for_antennas([a.id for a in antennas])
-
     def __repr__(self) -> str:
         return 'AntennaArray({0!r}, {1}, {2!r})'.format(
             self.__name,
@@ -170,14 +167,6 @@ class AntennaArray:
             ) for ant1, ant2 in itertools.combinations(unique_ids, 2)
         ]
 
-    @property
-    def baselines(self) -> list[Baseline]:
-        """Return a list of Baseline tuples for all antennas in the array."""
-        warnings.warn('AntennaArray.baselines is deprecated. '
-                      'Use AntennaArray.baselines_m instead.',
-                      category=DeprecationWarning, stacklevel=2)
-        return self._baselines
-
     @staticmethod
     def _calc_baseline_lookup(antennas: list[Antenna]) -> numpy.ndarray:
         """
@@ -215,8 +204,8 @@ class AntennaArray:
             Function to return the position difference along the attr axis between two
             antennas. 
             """
-            v1 = qa.getvalue(ant1.offset[attr])[0]
-            v2 = qa.getvalue(ant2.offset[attr])[0]
+            v1 = qa.getvalue(ant1.offset[attr]).item()
+            v2 = qa.getvalue(ant2.offset[attr]).item()
             return v1-v2
 
         for (ant1, ant2) in itertools.combinations(antennas, 2):

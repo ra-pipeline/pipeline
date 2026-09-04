@@ -224,7 +224,7 @@ def test_get_spw_spec(spwid: int, expected: tuple[float, int, float]):
     """
     Test get_spw_spec.
 
-    Arg:
+    Args:
         spwid: A spwctral window ID to get spw specification.
         expected: An expected spw specification in a tuple of
             (the center frequency, nchan, resolution).
