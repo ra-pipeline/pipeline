@@ -80,7 +80,7 @@ class ObservingRun(BaseModel):
     @property
     def execblock_ids(self) -> list[str]:
         """Return unique execblock IDs from all measurement sets."""
-        return sorted({ms.execblock_id for ms in self.measurement_sets if ms.execblock_id})
+        return utils.deduplicate(ms.execblock_id for ms in self.measurement_sets)
 
     @property
     def observers(self) -> list[str]:

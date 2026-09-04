@@ -162,8 +162,10 @@ class ALMAApplycalQAHandler(pqa.QAPlugin):
         if 'ALMA' not in ms.antenna_array.name:
             return
 
-        pipe356_mode = os.environ.get('PIPE356_QA_MODE', 'ON').upper()
-        qa_preset = QA_PRESETS[pipe356_mode]
+        # PIPE-2716: we don't need this anymore
+        # pipe356_mode = os.environ.get('PIPE356_QA_MODE', 'ON').upper()
+        # qa_preset = QA_PRESETS[pipe356_mode]
+        qa_preset = QAPreset()
 
         # dict to hold all QA scores, keyed by intended web log destination
         qa_scores: dict[pqa.WebLogLocation, list[pqa.QAScore]] = {}
@@ -471,10 +473,11 @@ def get_qa_scores(
                 if duplicate_entry:
                     continue
 
+                # PIPE-2716: add intent information to applycalQA_outliers.txt
                 str_components = [
                     outlier_attr_to_str(o, attr, ms)
                     for attr in
-                    ('vis', 'scan', 'spw', 'ant', 'pol', 'reason', 'num_sigma', 'delta_physical', 'amp_freq_sym_off')
+                    ('vis', 'intent', 'scan', 'spw', 'ant', 'pol', 'reason', 'num_sigma', 'delta_physical', 'amp_freq_sym_off')
                 ]
                 msg = ' '.join(c for c in str_components if c != '')
                 debug_file.write(f'{msg}\n')

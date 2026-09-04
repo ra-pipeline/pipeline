@@ -428,17 +428,17 @@ def plot_data_trec(msw: mswrapper_sd.MSWrapperSD, thresholds: Union[dict, None] 
     return filename
 
 def plot_data(msw: mswrapper_sd.MSWrapperSD, thresholds: Union[dict, None] = None, plot_output_path: str = '.',
-                  colorlist: Union[list, str] = 'auto', detmsg: str = '') -> str:
+              colorlist: Union[list, str] = 'auto', detmsg: str = '') -> str:
     '''Task used the diagnostic plot of ON-source XX-YY data for pipeline weblog.
     param:
         msw: MSWrapperSD object with the data to be plotted
         thresholds (dict): Dictionary containing the thresholds used in the QA analysis of the dataset.
-        plot_output_path (str): Path to the output plot image file.
+        plot_output_path (str): Path to the directory where the output plot image file will be saved.
         colorlist (str or list): Either list of colors to use for each Trec curve, or 'auto' to assign
                                  random colors.
         detmsg (str): Detail message (optional) to be put under the title of the plot.
     Returns:
-        List of filenames of produced plots
+        Filename of the produced plot or "N/A" if no data was plotted
     '''
 
     #List of science scan list
@@ -472,6 +472,7 @@ def plot_data(msw: mswrapper_sd.MSWrapperSD, thresholds: Union[dict, None] = Non
     fig.set_size_inches(10, 8)
     #Upper section, data
     ax1 = plt.subplot(111)
+    data_plotted = False
     for k, scan in enumerate(scanlist):
         if msw.analysis[scan] is None:
             continue
@@ -490,23 +491,28 @@ def plot_data(msw: mswrapper_sd.MSWrapperSD, thresholds: Union[dict, None] = Non
             plt.plot(freqs[sciline], msw.analysis[scan]['ondata']['normdata'][sciline], 'sk', label='Sci.Line Chan')
         elif (np.sum(sciline) > 0):
             plt.plot(freqs[sciline], msw.analysis[scan]['ondata']['normdata'][sciline], 'sk')
+        data_plotted = True
 
-    plt.legend(loc='upper left', ncol=3, fontsize='x-small', title='XX-YY data')
-    #Y-axis
-    plt.ylabel('(XX-YY)/sigma (data norm. excess)')
-    #X-axis
-    plt.xlabel('Freq [GHz]')
-    plt.xlim(minfreq, maxfreq)
+    if data_plotted:
+        plt.legend(loc='upper left', ncol=3, fontsize='x-small', title='XX-YY data')
+        #Y-axis
+        plt.ylabel('(XX-YY)/sigma (data norm. excess)')
+        #X-axis
+        plt.xlabel('Freq [GHz]')
+        plt.xlim(minfreq, maxfreq)
 
-    #write titles and detections info
-    title = f'{msname}, {fieldname}, {antenna_id}:{msw.antenna}, Spw {msw.spw}'
-    if len(detmsg) > 0:
-        title = title + '\nOutliers '+detmsg
-    plt.suptitle(title)
-    #Save file and return filename
-    filename = f'{plot_output_path}/{msname}_{fieldname}_{msw.antenna}_Spw{msw.spw}_XX-YY_excess.png'
-    print('Plot filename: '+str(filename))
-    plt.savefig(filename, bbox_inches='tight')
+        #write titles and detections info
+        title = f'{msname}, {fieldname}, {antenna_id}:{msw.antenna}, Spw {msw.spw}'
+        if len(detmsg) > 0:
+            title = title + '\nOutliers '+detmsg
+        plt.suptitle(title)
+        #Save file and return filename
+        filename = f'{plot_output_path}/{msname}_{fieldname}_{msw.antenna}_Spw{msw.spw}_XX-YY_excess.png'
+        print('Plot filename: '+str(filename))
+        plt.savefig(filename, bbox_inches='tight')
+    else:
+        filename = "N/A"
+
     plt.close()
 
     return filename
@@ -610,7 +616,15 @@ def makeSummaryTable(qascore_list, plots_fnames, plfolder, working_folder = '.',
         msname = list(qascore.applies_to.vis)[0]
         spw = list(qascore.applies_to.spw)[0]
         antenna = list(qascore.applies_to.ant)[0]
-        scan = str(list(qascore.applies_to.scan)[0]).replace(',',';')
+        # --- tentative patch to prevent crashing (PIPE-3055)
+        #     be sure to follow the changes to shortmsg if it happens in sd_applycal_qa.py
+        # scan = str(list(qascore.applies_to.scan)[0]).replace(',',';')
+        if len(qascore.applies_to.scan) == 0 and \
+           (qascore.shortmsg == "Data is fully flagged" or qascore.shortmsg == "Only one polarization in data"):
+            scan = "all"
+        else:
+            scan = str(list(qascore.applies_to.scan)[0]).replace(',',';')
+        # --- end of tentative patch to prevent crashing
         #Metric data value
         metric_data = qascore.origin[1]
         #Search For Trec info and find maximum value

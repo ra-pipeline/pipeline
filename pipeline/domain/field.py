@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime
 import json
 import pprint
 from typing import Any
@@ -35,8 +34,6 @@ class Field(BaseModel):
         states: State objects associated with the field.
         valid_spws: SpectralWindow objects associated with the field.
         flux_densities: Flux measurements associated with the field.
-        zd: Zenith distance quantity dictionary.
-        telmjd: Modified Julian Date epoch dictionary.
     """
 
     id: int = PydanticField(..., description='Field identifier')
@@ -55,14 +52,6 @@ class Field(BaseModel):
         description='Flux density measurements',
     )
     source: Source | None = PydanticField(default=None, exclude=True, description='Linked source object')
-    zd: QuantityDict | dict[str, Any] | None = PydanticField(
-        default=None,
-        description='Zenith distance',
-    )
-    telmjd: QuantityDict | dict[str, Any] | None = PydanticField(
-        default=None,
-        description='TELMJD epoch',
-    )
 
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
@@ -233,23 +222,6 @@ class Field(BaseModel):
             if source_type.find(intent) != -1:
                 self.intents.add(intent)
 
-    def set_zd_telmjd(self, observatory: str) -> None:
-        """Calculate and set the zenith distance at the observation mid-time."""
-        # Mean observing time
-        mjd_epoch = datetime.datetime(1858, 11, 17, tzinfo=datetime.timezone.utc)
-        start_time = mjd_epoch + datetime.timedelta(seconds=min(self.time))
-        end_time = mjd_epoch + datetime.timedelta(seconds=max(self.time))
-        mid_time = utils.obs_midtime(start_time, end_time)
-
-        zd_rad = utils.compute_zenith_distance(
-            field_direction=self.direction,
-            epoch=mid_time,
-            observatory=observatory,
-        )
-
-        self.zd = casa_tools.quanta.convert(zd_rad, 'deg')
-        self.telmjd = mid_time['m0']
-
     def __str__(self) -> str:
         return '<Field {id}: name=\'{name}\' intents=\'{intents}\'>'.format(
             id=self.identifier,
@@ -306,8 +278,6 @@ class Field(BaseModel):
             states=getattr(field, 'states', set()),
             valid_spws=getattr(field, 'valid_spws', set()),
             flux_densities=getattr(field, 'flux_densities', set()),
-            zd=getattr(field, 'zd', None),
-            telmjd=getattr(field, 'telmjd', None),
         )
 
 

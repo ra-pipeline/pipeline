@@ -21,7 +21,7 @@ def test_uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small__PPR__regression():
         ppr=f'{ref_directory}/PPR.xml',
         input_dir='pl-unittest',
         expectedoutput_dir=ref_directory,
-        )
+    )
 
     pt.run()
 
@@ -40,7 +40,7 @@ def test_uid___A002_Xef72bb_X9d29__renorm_restore_procedure_hifa_image__regressi
         recipe='procedure_hifa_image.xml',
         input_dir=ref_directory,
         expectedoutput_dir=ref_directory,
-        )
+    )
 
     # copy files into products folder for restore
     if not pt.compare_only:
@@ -65,7 +65,7 @@ def test_uid___A002_Xc845c0_X7366__cycle5_restore_procedure_hifa_image__regressi
         recipe='procedure_hifa_image.xml',
         input_dir=ref_directory,
         expectedoutput_dir=ref_directory,
-        )
+    )
 
     # copy files for the restore into products folder
     if not pt.compare_only:
@@ -89,7 +89,7 @@ def test_uid___A002_Xc46ab2_X15ae__selfcal_restore_procedure_hifa_image__regress
         recipe='procedure_hifa_image.xml',
         input_dir=ref_directory,
         expectedoutput_dir=ref_directory,
-        )
+    )
 
     # copy files into products folder for restore
     if not pt.compare_only:
@@ -113,12 +113,11 @@ def test_2022_1_00207_S__uid___A001_X2d20_X373d__PPR__regression():
     ref_directory = 'pl-regressiontest/2022.1.00207.S'
 
     pt = PipelineTester(
-        visname=['uid___A002_X10b6f7c_X41d1',
-                 'uid___A002_X10b6f7c_X46cc'],
-        ppr=f"{ref_directory}/PPR.xml",
+        visname=['uid___A002_X10b6f7c_X41d1', 'uid___A002_X10b6f7c_X46cc'],
+        ppr=f'{ref_directory}/PPR.xml',
         input_dir=ref_directory,
         expectedoutput_dir=ref_directory,
-        )
+    )
 
     pt.run()
 
@@ -138,7 +137,7 @@ def test_2023_1_00228_S__uid___A002_X1199f9e_X7c24__procedure_hifa_calimage_diff
         recipe='procedure_hifa_calimage_diffgain.xml',
         input_dir=ref_directory,
         expectedoutput_dir=ref_directory,
-        )
+    )
 
     pt.run()
 
@@ -158,7 +157,7 @@ def test_E2E6_1_00010_S__uid___A002_Xd0a588_X2239__procedure_hifa_image__regress
         recipe='procedure_hifa_calimage.xml',
         input_dir=ref_directory,
         expectedoutput_dir=ref_directory,
-        )
+    )
 
     pt.run()
 
@@ -176,9 +175,8 @@ def test_csv_3899_eb2_small__procedure_hifa_calimage__regression():
         visname=['uid___A002_X1181695_X1c6a4_8ant.ms'],
         recipe='procedure_hifa_calimage.xml',
         input_dir=ref_directory,
-        output_dir='csv_3899_eb2_small',
         expectedoutput_dir=ref_directory,
-        )
+    )
 
     pt.run(omp_num_threads=1)
 
@@ -196,8 +194,7 @@ def test_uid___A002_Xee1eb6_Xc58d__procedure_hifa_calsurvey__regression():
         visname=['uid___A002_Xee1eb6_Xc58d'],
         recipe='procedure_hifa_calsurvey.xml',
         input_dir=ref_directory,
-        output_dir='uid___A002_Xee1eb6_Xc58d_calsurvey_output',
         expectedoutput_dir=ref_directory,
-        )
+    )
 
     pt.run()

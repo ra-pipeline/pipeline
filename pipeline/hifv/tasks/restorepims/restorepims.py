@@ -21,7 +21,7 @@ class RestorepimsResults(basetask.Results):
         self.mask_list = mask_list
 
     def merge_with_context(self, context):
-        """See :method:`~pipeline.infrastructure.api.Results.merge_with_context`."""
+        """See :meth:`~pipeline.infrastructure.api.Results.merge_with_context`."""
         return
 
     def __repr__(self):

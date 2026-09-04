@@ -22,7 +22,7 @@ class SelfcalResults(basetask.Results):
 
     def merge_with_context(self, context):
         """
-        See :method:`~pipeline.infrastructure.api.Results.merge_with_context`
+        See :meth:`~pipeline.infrastructure.api.Results.merge_with_context`
         """
         return
 
@@ -32,7 +32,7 @@ class SelfcalResults(basetask.Results):
 
 class SelfcalInputs(vdp.StandardInputs):
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     refantignore = vdp.VisDependentProperty(default='')
     combine = vdp.VisDependentProperty(default='spw,field')

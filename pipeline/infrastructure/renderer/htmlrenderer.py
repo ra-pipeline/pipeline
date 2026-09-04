@@ -43,6 +43,22 @@ if TYPE_CHECKING:
 LOG = infrastructure.logging.get_logger(__name__)
 
 
+def format_correlation_bits(ms, spw):
+    """Format the correlation-bits value for the Spectral Setup Details weblog page."""
+    correlation_bits = spw.correlation_bits
+
+    if correlation_bits == 'UNKNOWN':
+        return 'Unknown'
+
+    if correlation_bits:
+        return correlation_bits
+
+    if ms.correlator_name == 'ALMA_ACA':
+        return 'BITS_4x4'
+
+    return 'Unknown'
+
+
 def get_task_description(result_obj, context, include_stage=True):
     if not isinstance(result_obj, (list, basetask.ResultsList)):
         return get_task_description([result_obj, ], context)
@@ -342,13 +358,40 @@ class T1_1Renderer(RendererBase):
         CASA_MEMORY = "Memory available to pipeline"
         CGROUP_NUM_CPUS = "Cgroup CPU allocation"
         CGROUP_CPU_BANDWIDTH = "Cgroup CPU bandwidth"
-        CGROUP_CPU_WEIGHT = "CPU distribution within cgroup"
-        CGROUP_MEM_LIMIT = "Cgroup memory limit"
+        CGROUP_CPU_WEIGHT = 'CPU distribution within cgroup'
+        CGROUP_MEM_LIMIT = 'Cgroup memory limit'
+        PYTHON_VERSION = 'Python'
+        PLATFORM_TAG = 'Platform tag'
+        GPU_INFO = 'GPU'
 
         def description(self, ctx):
             if self is self.CASA_MEMORY:
                 return f'Memory available to {"pipeline" if utils.contains_single_dish(ctx) else "tclean"}'
             return self.value
+
+    class _LibraryVersionProp:
+        """Key for a dynamically-discovered library version row.
+
+        Acts as a drop-in replacement for an EnvironmentProperty enum member:
+        it is hashable, supports equality, and provides a description() method
+        so that EnvironmentTable can treat it uniformly.
+        """
+        __slots__ = ('_name',)
+
+        def __init__(self, name: str):
+            self._name = name
+
+        def description(self, ctx):
+            return self._name
+
+        def __hash__(self):
+            return hash(self._name)
+
+        def __eq__(self, other):
+            return isinstance(other, T1_1Renderer._LibraryVersionProp) and self._name == other._name
+
+        def __repr__(self):
+            return f'_LibraryVersionProp({self._name!r})'
 
     class EnvironmentTable:
         """
@@ -602,10 +645,24 @@ class T1_1Renderer(RendererBase):
             data_rows[props.ULIMIT_MEM].append(n.ulimit_mem)
             data_rows[props.ULIMIT_CPU].append(n.ulimit_cpu)
 
+            data_rows[props.PLATFORM_TAG].append(n.platform_tag)
+            data_rows[props.GPU_INFO].append(n.gpu_info)
+            data_rows[props.PYTHON_VERSION].append(n.python_version)
+            for pkg_name, detail in environment.dependency_details.items():
+                pkg_prop = T1_1Renderer._LibraryVersionProp(pkg_name)
+                data_rows[pkg_prop].append(detail['version'] if detail else 'N/A')
+
+        # Conditionally include GPU info row only if GPU is available
+        has_gpu = any(gpu_info and gpu_info != 'N/A' for gpu_info in data_rows[props.GPU_INFO])
+        host_info_rows = [props.HOSTNAME, props.OS, props.PLATFORM_TAG]
+        if has_gpu:
+            host_info_rows.append(props.GPU_INFO)
+        host_info_rows.extend([props.NUM_MPI_SERVERS, props.ULIMIT_FILES])
+
         tables = {
             "Host information": T1_1Renderer.EnvironmentTable(
                 ctx=ctx,
-                rows=[props.HOSTNAME, props.OS, props.NUM_MPI_SERVERS, props.ULIMIT_FILES],
+                rows=host_info_rows,
                 data=data_rows
             ),
             "CPU resources and limits": T1_1Renderer.EnvironmentTable(
@@ -620,6 +677,14 @@ class T1_1Renderer(RendererBase):
                 ctx=ctx,
                 rows=[props.HOSTNAME, props.RAM, props.SWAP, props.CGROUP_MEM_LIMIT,
                       props.ULIMIT_MEM, props.CASA_MEMORY],
+                data=data_rows
+            ),
+            "Python and library versions": T1_1Renderer.EnvironmentTable(
+                ctx=ctx,
+                rows=(
+                    [props.HOSTNAME, props.PYTHON_VERSION]
+                    + [T1_1Renderer._LibraryVersionProp(pkg) for pkg in environment.dependency_details]
+                ),
                 data=data_rows
             )
         }
@@ -941,34 +1006,13 @@ class T2_1DetailsRenderer:
         # Flatten all zenith angles and timestamps from all TARGET fields
         zd = [zd_val for field_data in data.values() for zd_val in field_data['zd']]
         telmjd = [time.timestamp() for field_data in data.values() for time in field_data['telmjd']]
-        if zd and telmjd:
-            # Retrieve min, average, and max zenith angle measurements and corresponding timestamps
-            zd_min_val = float(np.min(zd))
-            zd_avg_val = float(np.average(zd))
-            zd_max_val = float(np.max(zd))
-            telmjd_min_val = float(telmjd[zd.index(zd_min_val)])
-            telmjd_avg_val = float(np.average(telmjd))
-            telmjd_max_val = float(telmjd[zd.index(zd_max_val)])
-
-            zd_min = round(zd_min_val, 2)
-            zd_avg = round(zd_avg_val, 2)
-            zd_max = round(zd_max_val, 2)
-            telmjd_min = utils.format_datetime(datetime.datetime.fromtimestamp(telmjd_min_val))
-            telmjd_avg = utils.format_datetime(datetime.datetime.fromtimestamp(telmjd_avg_val))
-            telmjd_max = utils.format_datetime(datetime.datetime.fromtimestamp(telmjd_max_val))
-
-            # Create zenith angle vs time plot
-            task = summary.ZDTELMJDChart(context, ms, data)
-            zd_vs_telmjd_plot = task.plot()
+        # Retrieve min, average, and max zenith angle measurements and corresponding timestamps
+        if len(zd) > 0:
+            zd_min, zd_avg, zd_max = np.min(zd), np.average(zd), np.max(zd)
+            telmjd_min, telmjd_avg, telmjd_max = telmjd[zd.index(zd_min)], np.average(telmjd), telmjd[zd.index(zd_max)]
         else:
-            LOG.debug('No TARGET zenith angle samples found for %s; skipping ZD stats/plot.', ms.basename)
-            zd_min = 'n/a'
-            zd_avg = 'n/a'
-            zd_max = 'n/a'
-            telmjd_min = 'n/a'
-            telmjd_avg = 'n/a'
-            telmjd_max = 'n/a'
-            zd_vs_telmjd_plot = None
+            zd_min = zd_avg = zd_max = None
+            telmjd_min = telmjd_avg = telmjd_max = None
 
         dirname = os.path.join('session%s' % ms.session, ms.basename)
 
@@ -1037,23 +1081,22 @@ class T2_1DetailsRenderer:
             'weather_plot'    : weather_plot,
             'pwv_plot'        : pwv_plot,
             'azel_plot'       : azel_plot,
-            'el_vs_time_plot' : el_vs_time_plot,
-            'zd_telmjd_plot'  : zd_vs_telmjd_plot,
-            'is_singledish'   : utils.contains_single_dish(context),
-            'pointing_plot'   : pointing_plot,
-            'el_min'          : el_min,
-            'el_max'          : el_max,
-            'zd_min'          : round(zd_min, 2),
-            'zd_avg'          : round(zd_avg, 2),
-            'zd_max'          : round(zd_max, 2),
-            'telmjd_min'      : utils.format_datetime(
+            'el_vs_time_plot': el_vs_time_plot,
+            'is_singledish': utils.contains_single_dish(context),
+            'pointing_plot': pointing_plot,
+            'el_min': el_min,
+            'el_max': el_max,
+            'zd_min': round(zd_min, 2) if zd_min is not None else None,
+            'zd_avg': round(zd_avg, 2) if zd_avg is not None else None,
+            'zd_max': round(zd_max, 2) if zd_max is not None else None,
+            'telmjd_min': utils.format_datetime(
                 datetime.datetime.fromtimestamp(telmjd_min, tz=datetime.timezone.utc)
-                ),
-            'telmjd_avg'      : utils.format_datetime(
-                datetime.datetime.fromtimestamp(telmjd_avg, tz=datetime.timezone.utc)),
-            'telmjd_max'      : utils.format_datetime(
-                datetime.datetime.fromtimestamp(telmjd_max, tz=datetime.timezone.utc)),
-            'vla_basebands'   : vla_basebands
+            ) if telmjd_min is not None else None,
+            'telmjd_avg': utils.format_datetime(
+                datetime.datetime.fromtimestamp(telmjd_avg, tz=datetime.timezone.utc)) if telmjd_avg is not None else None,
+            'telmjd_max': utils.format_datetime(
+                datetime.datetime.fromtimestamp(telmjd_max, tz=datetime.timezone.utc)) if telmjd_max is not None else None,
+            'vla_basebands': vla_basebands
         }
 
     @classmethod
@@ -1238,8 +1281,11 @@ class T2_2_4Renderer(T2_2_XRendererBase):
         el_vs_time_plot = task.plot()
 
         data = compute_zd_telmjd_for_ms(ms)
-        task = summary.ZDTELMJDChart(context, ms, data)
-        zd_vs_telmjd_plot = task.plot()
+        if data:
+            task = summary.ZDTELMJDChart(context, ms, data)
+            zd_vs_telmjd_plot = task.plot()
+        else:
+            zd_vs_telmjd_plot = None
 
         # Create U-V plot, if necessary.
         if utils.contains_single_dish(context):
@@ -2042,11 +2088,24 @@ def compute_zd_telmjd_for_ms(
         offset from `mjd_epoch` (1858-11-17).
         Format: {field_id: {'zd': [zd1, zd2, ...], 'telmjd': [dt1, dt2, ...]}}
     """
-
     data = {}
     fields = ms.get_fields(intent='TARGET')
     observatory = ms.antenna_array.name
     mjd_epoch = datetime.datetime(1858, 11, 17, tzinfo=datetime.timezone.utc)
+
+    me = casa_tools.measures
+
+    # Observatory position frame is the same for all fields/timestamps.
+    # Set it once outside all loops.
+    obs_pos = me.observatory(observatory)
+    me.doframe(obs_pos)
+
+    # Reusable epoch dict — just update the value before each doframe.
+    epoch_dict = {
+        'm0': {'value': 0.0, 'unit': 'd'},
+        'refer': 'UTC',
+        'type': 'epoch',
+    }
 
     for field in fields:
         if field.id not in data:
@@ -2055,21 +2114,24 @@ def compute_zd_telmjd_for_ms(
                 'telmjd': [],
             }
 
-        # Calculate zenith distance for each unique timestamp in the field
+        zd_list = data[field.id]['zd']
+        tm_list = data[field.id]['telmjd']
+        field_dir = field._mdirection
+
         for time_seconds in field.time:
+            # field.time is seconds since 1858-11-17 (MJD origin)
+            mjd = float(time_seconds) / 86400.0
+            epoch_dict['m0']['value'] = mjd
+            me.doframe(epoch_dict)
+
+            # Convert field direction to horizontal coordinates
+            horizontal = me.measure(field_dir, 'AZELGEO')
+            zd_rad = np.pi / 2.0 - horizontal['m1']['value']
+            zd_deg = float(np.degrees(zd_rad))
+
             obs_time = mjd_epoch + datetime.timedelta(seconds=float(time_seconds))
-            epoch = casa_tools.measures.epoch('utc', obs_time.isoformat())
-
-            # Calculate zenith distance at this timestamp
-            zd_rad = utils.compute_zenith_distance(
-                field_direction=field._mdirection,
-                epoch=epoch,
-                observatory=observatory,
-            )
-            zd_deg = casa_tools.quanta.convert(zd_rad, 'deg')['value']
-
-            data[field.id]['zd'].append(zd_deg)
-            data[field.id]['telmjd'].append(obs_time)
+            zd_list.append(zd_deg)
+            tm_list.append(obs_time)
 
     return data
 

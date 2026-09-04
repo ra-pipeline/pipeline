@@ -539,9 +539,9 @@ class TsysData(object):
             except OSError:
                 LOG.info(f"Could not load {file}.")
 
-        m = re.match(r"(uid.+)\.ms\S+", tsystable)
-        assert m, "Could not extract ms file name from tsystable:{tsystable}"
-        msfile, asdm = m.group(1) + ".ms", f"../rawdata/{m.group(1)}"
+        m = re.match(r"^(.+?)\.ms\S*", tsystable)
+        assert m, f"Could not extract ms file name from tsystable:{tsystable}"
+        msfile = m.group(1) + ".ms"
         self.msfile = msfile
 
         assert tb.open(f"{tsystable}/ANTENNA"), f"Could not open {tsystable}/ANTENNA"

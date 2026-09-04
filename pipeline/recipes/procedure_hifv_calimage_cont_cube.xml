@@ -171,16 +171,6 @@
         </ParameterSet>
     </ProcessingCommand>
 
-    <ProcessingCommand>
-        <Command xmlns="">hif_checkproductsize</Command>
-        <ParameterSet>
-            <Parameter>
-                <Keyword xmlns="">maximsize</Keyword>
-                <Value xmlns="">16384</Value>
-            </Parameter>
-        </ParameterSet>
-    </ProcessingCommand>
-
     <!-- continuum subtraction -->
 
     <ProcessingCommand>
@@ -202,16 +192,6 @@
     </ProcessingCommand>
 
     <ProcessingCommand>
-        <Command xmlns="">hif_makeimlist</Command>
-        <ParameterSet>
-            <Parameter>
-                <Keyword xmlns="">specmode</Keyword>
-                <Value xmlns="">mfs</Value>
-            </Parameter>
-        </ParameterSet>
-    </ProcessingCommand>
-
-    <ProcessingCommand>
         <Command xmlns="">hif_findcont</Command>
         <ParameterSet>
         </ParameterSet>
@@ -224,6 +204,16 @@
     </ProcessingCommand>
 
     <!-- cont imaging -->
+
+    <ProcessingCommand>
+        <Command xmlns="">hif_checkproductsize</Command>
+        <ParameterSet>
+            <Parameter>
+                <Keyword xmlns="">maximsize</Keyword>
+                <Value xmlns="">16384</Value>
+            </Parameter>
+        </ParameterSet>
+    </ProcessingCommand>
 
     <ProcessingCommand>
         <Command xmlns="">hif_makeimlist</Command>
