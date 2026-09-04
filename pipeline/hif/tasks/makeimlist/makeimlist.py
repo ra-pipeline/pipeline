@@ -989,15 +989,18 @@ class MakeImList(basetask.StandardTaskTemplate):
                     # Need all spw keys (individual and cont) to distribute the
                     # cell and imsize heuristic results which work on the
                     # highest/lowest frequency spw only.
+
                     all_spw_keys = []
                     valid_data = {}
                     filtered_spwlist = []
+                    filtered_field_intent_list = []
                     valid_data[str(vislist)] = {}
+                    flagged_spws = {}  # Track flagged spws by (vis, field_intent)
+
                     for vis in vislist:
                         ms_domain_obj = inputs.context.observing_run.get_ms(vis)
                         valid_data[vis] = {}
                         for field_intent in field_intent_list:
-
                             valid_data[vis][field_intent] = {}
                             if field_intent not in valid_data[str(vislist)]:
                                 valid_data[str(vislist)][field_intent] = {}
@@ -1014,17 +1017,42 @@ class MakeImList(basetask.StandardTaskTemplate):
                                         # Also save cont selection
                                         all_spw_keys.append(','.join(map(str, observed_spwids_list)))
                                         for observed_spwid in map(str, observed_spwids_list):
-                                            valid_data[vis][field_intent][str(observed_spwid)] = self.heuristics.has_data(field_intent_list=[field_intent], spwspec=observed_spwid, vislist=[vis])[field_intent]
-                                            if not valid_data[vis][field_intent][str(observed_spwid)] and vis in observed_vis_list:
-                                                LOG.warning('Data for EB {}, field {}, spw {} is completely flagged.'.format(
-                                                    os.path.basename(vis), utils.condense_field_names(field_intent[0]), observed_spwid))
+                                            valid_data[vis][field_intent][observed_spwid] = self.heuristics.has_data(
+                                                field_intent_list=[field_intent], spwspec=observed_spwid, vislist=[vis]
+                                            )[field_intent]
+                                            if (
+                                                not valid_data[vis][field_intent][observed_spwid]
+                                                and vis in observed_vis_list
+                                            ):
+                                                # Accumulate flagged spws by (vis, field_intent)
+                                                key = (vis, field_intent)
+                                                if key not in flagged_spws:
+                                                    flagged_spws[key] = []
+                                                flagged_spws[key].append(observed_spwid)
                                             # Aggregated value per vislist (replace with lookup pattern later)
-                                            if str(observed_spwid) not in valid_data[str(vislist)][field_intent]:
-                                                valid_data[str(vislist)][field_intent][str(observed_spwid)] = valid_data[vis][field_intent][str(observed_spwid)]
+                                            if observed_spwid not in valid_data[str(vislist)][field_intent]:
+                                                valid_data[str(vislist)][field_intent][observed_spwid] = valid_data[
+                                                    vis
+                                                ][field_intent][observed_spwid]
                                             else:
-                                                valid_data[str(vislist)][field_intent][str(observed_spwid)] = valid_data[str(vislist)][field_intent][str(observed_spwid)] or valid_data[vis][field_intent][str(observed_spwid)]
-                                            if valid_data[vis][field_intent][str(observed_spwid)]:
+                                                valid_data[str(vislist)][field_intent][observed_spwid] = (
+                                                    valid_data[str(vislist)][field_intent][observed_spwid]
+                                                    or valid_data[vis][field_intent][observed_spwid]
+                                                )
+                                            if valid_data[vis][field_intent][observed_spwid]:
                                                 filtered_spwlist.append(observed_spwid)
+                                                filtered_field_intent_list.append(field_intent)
+
+                    # Log accumulated flagged spws (one message per EB/Field)
+                    for (vis, field_intent), flagged_list in flagged_spws.items():
+                        LOG.warning(
+                            'Data for EB {}, field {} is completely flagged for spws {}.'.format(
+                                os.path.basename(vis),
+                                utils.condense_field_names(field_intent[0]),
+                                utils.find_ranges(sorted(flagged_list, key=int)),
+                            )
+                        )
+
                     filtered_spwlist = sorted(list(set(filtered_spwlist)), key=int)
 
                     # Collapse cont spws
@@ -1039,9 +1067,22 @@ class MakeImList(basetask.StandardTaskTemplate):
                         # that case. Before PIPE-832 there used to be a provisional error message for
                         # potential other cases, but this probably never happened. For now just
                         # continuing in the loop.
-                        #LOG.error('No spws left for vis list {}'.format(','.join(os.path.basename(vis) for vis in vislist)))
+                        LOG.warning('No valid data found within receiver band %s. Skipping imaging targets for this band.', band)
                         continue
 
+                    # Save original field_intent_list to identify missed fields
+                    original_field_intent_list = field_intent_list
+                    field_intent_list = utils.deduplicate(filtered_field_intent_list)
+
+                    # Log warning for field_intents that had no valid data (preserving order of first appearance)
+                    for field_intent in original_field_intent_list:
+                        if field_intent not in field_intent_list:
+                            LOG.warning(
+                                'No valid data found for field %s intent %s within receiver band %s. Skipping.',
+                                utils.condense_field_names(field_intent[0]),
+                                field_intent[1],
+                                band,
+                            )
 
                     # Add actual, possibly reduced cont spw combination to be able to properly populate the lookup tables later on
                     if inputs.specmode == 'cont':
@@ -1133,7 +1174,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                         else:
                             pixperbeam = 5.0
 
-                        # Calculate field-specific cells
+                        # Calculate field-specific cells: identical across spwspecs within a receiver band
                         if cell == []:
                             synthesized_beams = {}
                             min_cell = ['3600arcsec']
@@ -1192,7 +1233,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                         else:
                             sfpblimit = 0.2
 
-                        # Calculate field-specific imsizes
+                        # Calculate field-specific imsizes: identical across spwspecs within a receiver band
                         if imsize == []:
                             max_x_size = 1
                             max_y_size = 1
