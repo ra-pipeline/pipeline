@@ -654,6 +654,8 @@ explanatory caption to the missed-line-channel diagnostic plots at the
 single-peak/extended detection thresholds and the plot's color coding.
 {jira}`PIPE-3141` fixes an inverted
 channel range for the `hsd_imaging` moment-map plot in LSB data.
+{jira}`PIPE-3226` fixes an issue that atmospheric features are not excluded
+from the contamination analysis properly.
 
 **{func}`~pipeline.hsd.cli.hsd_skycal` weblog.**
 {jira}`PIPE-2565` fixes the
