@@ -32,13 +32,15 @@ class testBPdcalsInputs(vdp.StandardInputs):
     doflagundernspwlimit = vdp.VisDependentProperty(default=False)
     flagbaddef = vdp.VisDependentProperty(default=True)
     refant = vdp.VisDependentProperty(default='')
+    bpsolint_mode = vdp.VisDependentProperty(default='auto')
 
     @vdp.VisDependentProperty
     def iglist(self):
         return {}
 
     # docstring and type hints: supplements hifv_testBPdcals
-    def __init__(self, context, vis=None, weakbp=None, refantignore=None, doflagundernspwlimit=None, flagbaddef=None, iglist=None, refant=None):
+    def __init__(self, context, vis=None, weakbp=None, refantignore=None, doflagundernspwlimit=None,
+                 flagbaddef=None, iglist=None, refant=None, bpsolint_mode=None):
         """Initialize Inputs.
 
         Args:
@@ -63,6 +65,10 @@ class testBPdcalsInputs(vdp.StandardInputs):
 
                 Example: refant = 'ea01, ea02'
 
+            bpsolint_mode(str, optional): Control bandpass spectral solint optimization heuristics.
+                Options: 'auto' (default; only optimize for Ku-band and higher frequencies),
+                'on' (optimize for all bands), 'off' (disable optimization for all bands).
+
         """
         super().__init__()
         self.context = context
@@ -75,6 +81,7 @@ class testBPdcalsInputs(vdp.StandardInputs):
         self.flagbaddef = flagbaddef
         self.iglist = iglist
         self.refant = refant
+        self.bpsolint_mode = bpsolint_mode
 
 
 class testBPdcalsResults(basetask.Results):
@@ -519,7 +526,8 @@ class testBPdcals(basetask.StandardTaskTemplate):
             interp = ''
             spw_solint = do_bandpass(self.inputs.vis, bpcaltable, context=self.inputs.context, RefAntOutput=RefAntOutput,
                         spw=','.join(spwlist), ktypecaltable=ktypecaltable, bpdgain_touse=bpdgain_touse,
-                        solint='inf', append=False, executor=self._executor)
+                        solint='inf', append=False, executor=self._executor,
+                        bpsolint_mode=self.inputs.bpsolint_mode, band=band)
 
             AllCalTables = sorted(self.inputs.context.callibrary.active.get_caltable())
             if os.path.exists(ktypecaltable):

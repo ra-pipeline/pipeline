@@ -3,7 +3,7 @@ import pipeline.h.cli.utils as utils
 
 # docstring and type hints: inherits from hifv.tasks.finalcals.finalcals.FinalcalsInputs.__init__
 @utils.cli_wrapper
-def hifv_finalcals(vis=None, weakbp=None, refantignore=None, refant=None, use_flux_cal=None):
+def hifv_finalcals(vis=None, weakbp=None, refantignore=None, refant=None, use_flux_cal=None, bpsolint_mode=None):
     """Compute final gain calibration tables.
 
     Examples:
