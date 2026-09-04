@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import inspect
+from contextvars import ContextVar
 from functools import wraps
 from typing import TYPE_CHECKING
 
@@ -18,11 +19,10 @@ from . import cli
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
-    from contextvars import ContextVar
     from typing import Any
 
 LOG = infrastructure.get_logger(__name__)
-propagate_stop_requested = contextvars.ContextVar('propagate_stop_requested', default=False)
+propagate_stop_requested = ContextVar('propagate_stop_requested', default=False)
 STOP_REQUESTED_ATTR = '_pipeline_stop_requested'
 STOP_REASON_ATTR = '_pipeline_stop_reason'
 
