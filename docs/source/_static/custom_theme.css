@@ -364,3 +364,24 @@ body.viewer-open {
 figure img, .figure img, article img:not(.no-zoom):not(.brand-logo) {
     cursor: zoom-in;
 }
+
+/* =============================================================================
+   Code Block & Text Block Line Wrapping
+   ============================================================================= */
+/* Allow plain text blocks (and explicitly marked wrap-text blocks) to wrap cleanly
+   without affecting Python, Bash, or other syntax-highlighted code blocks */
+.highlight-text pre,
+.highlight-none pre,
+.wrap-text pre,
+pre.literal-block {
+    white-space: pre-wrap !important;
+    word-break: break-word;
+}
+
+/* Enable auto-wrapping for literal-block (parsed-literal) while preserving monospace formatting */
+pre.literal-block {
+    white-space: pre-wrap !important;
+    word-wrap: break-word;
+    word-break: break-word;
+}
+
