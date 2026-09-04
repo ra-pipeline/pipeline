@@ -589,11 +589,11 @@ turn to
 {func}`~pipeline.hsd.cli.hsd_baseline`
 ({jira}`PIPE-3054`),
 {func}`~pipeline.hsd.cli.hsd_imaging`
-({jira}`PIPE-3104`), and finally
+({jira}`PIPE-3104`),
+{func}`~pipeline.hsd.cli.hsd_skycal`
+({jira}`PIPE-3152`), and finally
 `hsd_k2jycal`, {func}`~pipeline.hsd.cli.hsd_atmcor` and {func}`~pipeline.hsd.cli.hsd_blflag` together
-({jira}`PIPE-3143`) - {func}`~pipeline.hsd.cli.hsd_skycal`
-is deliberately left for separate treatment since its QA involves nested
-aggregation that doesn't fit the common pattern.
+({jira}`PIPE-3143`).
 ```{figure} whatsnew/m100_stage7_accordion.png
 ---
 width: 938px
