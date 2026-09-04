@@ -137,9 +137,8 @@ def _compute_median_snr(caltable: str) -> dict:
 
 
 def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypecaltable=None,
-                bpdgain_touse=None, solint=None, append=None, executor=None):
-    """Run CASA task bandpass"""
-
+                bpdgain_touse=None, solint=None, append=None, executor=None, solnorm=None):
+    """Run CASA task bandpass."""
     m = context.observing_run.get_ms(vis)
     bandpass_field_select_string = context.evla['msinfo'][m.name].bandpass_field_select_string
     bandpass_scan_select_string = context.evla['msinfo'][m.name].bandpass_scan_select_string
@@ -151,7 +150,8 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
         setjy_results = context.results[0].read().setjy_results
 
     BPGainTables = sorted(context.callibrary.active.get_caltable())
-    BPGainTables.append(ktypecaltable)
+    if os.path.exists(ktypecaltable):
+        BPGainTables.append(ktypecaltable)
     BPGainTables.append(bpdgain_touse)
 
     bandpass_task_args = {'vis': vis,
@@ -167,7 +167,7 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
                           'refant': ','.join(RefAntOutput),
                           'minblperant': minBL_for_cal,
                           'minsnr': 5.0,
-                          'solnorm': False,
+                          'solnorm': solnorm,
                           'bandtype': 'B',
                           'fillgaps': 0,
                           'smodel': [],
@@ -203,6 +203,13 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
         executor.execute(job)
 
     # PIPE-2512:  Re-run bandpass for low-S/N SPWs with smoothing
+    # PIPE-3064: Check if caltable exists (may not if band is fully flagged)
+    if not os.path.exists(caltable):
+        LOG.warning(
+            'Bandpass calibration table %s does not exist (band may be fully flagged). Skipping S/N analysis.', caltable
+        )
+        return {}
+
     median_snrs = _compute_median_snr(caltable)
     low_snr_spws = [spw for spw, snr in median_snrs.items() if snr < 50.0]
     good_snr_spws = [spw for spw, snr in median_snrs.items() if snr >= 50.0]
@@ -222,11 +229,18 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
         job = casa_tasks.bandpass(**bandpass_task_args)
         executor.execute(job)
     else:
-        LOG.warning("No SPWs with median S/N ≥ 50, so skipping bandpass run.")
+        LOG.warning(
+            'All SPWs have low median S/N (< 50). Skipping initial high-S/N bandpass solving; '
+            'will attempt to solve each SPW individually with smoothing.'
+        )
     spw_solint = {}
     # re-run the low-SNR SPWs individually with smoothing
     for bad_spw in low_snr_spws:
         snr = median_snrs[bad_spw]
+        # if S/N is very low, skip this SPW
+        if math.isclose(snr, 0.0, abs_tol=1e-6):
+            LOG.warning("SPW %s: median S/N ≈ 0, skipping bandpass re-run", bad_spw)
+            continue
         nchan = m.get_spectral_window(bad_spw).num_channels
         if nchan < 16:
             continue
@@ -241,11 +255,11 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
         solint_smooth = f"inf,{int(Nbin)}ch"
 
         LOG.info(f"SPW {bad_spw}: median S/N={snr:.1f}, rerunning with solint='{solint_smooth}'")
-
+        append = os.path.exists(caltable)
         bandpass_task_args.update({
             'spw': str(bad_spw),
             'solint': solint_smooth,
-            'append': True,
+            'append': append,
         })
 
         job = casa_tasks.bandpass(**bandpass_task_args)
@@ -255,16 +269,16 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
 
 
 def do_bandpassweakbp(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypecaltable=None,
-                      bpdgain_touse=None, solint=None, append=None):
-    """Run CASA task bandpass"""
-
+                      bpdgain_touse=None, solint=None, append=None, solnorm=None):
+    """Run CASA task bandpass."""
     m = context.observing_run.get_ms(vis)
     bandpass_field_select_string = context.evla['msinfo'][m.name].bandpass_field_select_string
     bandpass_scan_select_string = context.evla['msinfo'][m.name].bandpass_scan_select_string
     minBL_for_cal = vla_minbaselineforcal()
 
     BPGainTables = sorted(context.callibrary.active.get_caltable())
-    BPGainTables.append(ktypecaltable)
+    if os.path.exists(ktypecaltable):
+        BPGainTables.append(ktypecaltable)
     BPGainTables.append(bpdgain_touse)
 
     bandpass_task_args = {'vis': vis,
@@ -280,7 +294,7 @@ def do_bandpassweakbp(vis, caltable, context=None, RefAntOutput=None, spw=None, 
                           'refant': ','.join(RefAntOutput),
                           'minblperant': minBL_for_cal,
                           'minsnr': 5.0,
-                          'solnorm': False,
+                          'solnorm': solnorm,
                           'bandtype': 'B',
                           'fillgaps': 0,
                           'smodel': [],
@@ -298,13 +312,13 @@ def do_bandpassweakbp(vis, caltable, context=None, RefAntOutput=None, spw=None, 
 
 
 def weakbp(vis, caltable, context=None, RefAntOutput=None, ktypecaltable=None,
-           bpdgain_touse=None, solint=None, append=None, executor=None, spw=''):
+           bpdgain_touse=None, solint=None, append=None, executor=None, spw='', solnorm=None):
 
     m = context.observing_run.get_ms(vis)
     channels = m.get_vla_numchan()  # Number of channels before averaging
 
     bpjob = do_bandpassweakbp(vis, caltable, context=context, spw=spw, RefAntOutput=RefAntOutput,
-                              ktypecaltable=ktypecaltable, bpdgain_touse=bpdgain_touse, solint='inf', append=False)
+                              ktypecaltable=ktypecaltable, bpdgain_touse=bpdgain_touse, solint='inf', append=False, solnorm=solnorm)
     executor.execute(bpjob)
     (largechunk, spwids) = computeChanFlag(vis, caltable, context)
     # print largechunk, spwids

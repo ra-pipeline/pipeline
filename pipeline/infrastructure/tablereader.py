@@ -411,12 +411,6 @@ class MeasurementSetReader:
                 LOG.debug("Field "+str(field.id) + " not in spwsforfields dictionary.")
 
     @staticmethod
-    def set_field_zd_telmjd(ms: MeasurementSet) -> None:
-        observatory = ms.antenna_array.name.upper()
-        for field in ms.fields:
-            field.set_zd_telmjd(observatory)
-
-    @staticmethod
     def get_measurement_set(ms_file: str) -> MeasurementSet:
         LOG.info('Analysing {0}'.format(ms_file))
         ms = domain.MeasurementSet(ms_file)
@@ -525,8 +519,6 @@ class MeasurementSetReader:
             MeasurementSetReader.link_intents_to_spws(msmd, ms)
             LOG.info('Linking spectral windows to fields...')
             MeasurementSetReader.link_spws_to_fields(msmd, ms)
-            LOG.info('Setting zenith angle and telmjd to fields...')
-            MeasurementSetReader.set_field_zd_telmjd(ms)
             LOG.info('Populating ms.scans...')
             ms.scans = MeasurementSetReader.get_scans(msmd, ms)
 
@@ -1031,7 +1023,7 @@ class AntennaTable:
             position = msmd.antennaposition(i)
             offset = msmd.antennaoffset(i)
             diameter_m = casa_tools.quanta.convert(msmd.antennadiameter(i), 'm')
-            diameter = casa_tools.quanta.getvalue(diameter_m)[0]
+            diameter = casa_tools.quanta.getvalue(diameter_m).item()
 
             antenna = domain.Antenna(i, name, station, position, offset, diameter)
             antennas.append(antenna)

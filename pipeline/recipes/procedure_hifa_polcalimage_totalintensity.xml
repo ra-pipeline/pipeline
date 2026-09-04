@@ -261,24 +261,34 @@
     </ProcessingCommand>
 
     <ProcessingCommand>
-        <Command xmlns="">hif_makeimlist</Command>
+        <Command xmlns="">hif_findroi</Command>
         <ParameterSet>
-            <Parameter>
-                <Keyword xmlns="">specmode</Keyword>
-                <Value xmlns="">mfs</Value>
-            </Parameter>
         </ParameterSet>
     </ProcessingCommand>
 
     <ProcessingCommand>
         <Command xmlns="">hif_findcont</Command>
         <ParameterSet>
+            <Parameter>
+                <Keyword xmlns="">hm_mode</Keyword>
+                <Value xmlns="">coarse</Value>
+            </Parameter>
         </ParameterSet>
     </ProcessingCommand>
 
     <ProcessingCommand>
         <Command xmlns="">hif_uvcontsub</Command>
         <ParameterSet>
+        </ParameterSet>
+    </ProcessingCommand>
+
+    <ProcessingCommand>
+        <Command xmlns="">hif_makeimlist</Command>
+        <ParameterSet>
+            <Parameter>
+                <Keyword xmlns="">specmode</Keyword>
+                <Value xmlns="">mfs</Value>
+            </Parameter>
         </ParameterSet>
     </ProcessingCommand>
 

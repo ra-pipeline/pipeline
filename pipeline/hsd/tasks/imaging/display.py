@@ -14,7 +14,7 @@ import matplotlib
 import matplotlib.axes as axes
 import matplotlib.figure as figure
 import matplotlib.ticker as ticker
-import numpy
+import numpy as np
 from matplotlib.ticker import MultipleLocator
 from scipy import interpolate
 
@@ -36,7 +36,7 @@ from pipeline.infrastructure.displays.pointing import MapAxesManagerBase
 if TYPE_CHECKING:
     from collections.abc import Generator, Callable
 
-    from numpy.ma.core import MaskedArray
+    from np.ma.core import MaskedArray
 
     from pipeline.hsd.tasks.common.display import SDImageDisplayInputs
 
@@ -211,7 +211,7 @@ class SDChannelAveragedImageDisplay(SDImageDisplay):
         mask = self.mask
         for pol in range(self.npol):
             Total = (data.take([pol], axis=self.id_stokes) * mask.take([pol], axis=self.id_stokes)).squeeze()
-            Total = numpy.flipud(Total.transpose())
+            Total = np.flipud(Total.transpose())
             tmin = Total.min()
             tmax = Total.max()
 
@@ -361,7 +361,7 @@ class SDMomentMapDisplay(SDImageDisplay):
             for pol in range(self.npol):
 
                 masked_data = (data.take([pol], axis=self.id_stokes) * mask.take([pol], axis=self.id_stokes)).squeeze()
-                Total = numpy.flipud(masked_data.transpose())
+                Total = np.flipud(masked_data.transpose())
                 del masked_data
 
                 if moment_type == 'maximum' and chans == 'line_free':
@@ -373,14 +373,14 @@ class SDMomentMapDisplay(SDImageDisplay):
 
                     per_channel_stats = self.inputs.compute_per_channel_stats()
                     line_free_channels = self.inputs.get_line_free_channels()
-                    sigma = numpy.median(per_channel_stats['sigma'][line_free_channels])
+                    sigma = np.median(per_channel_stats['sigma'][line_free_channels])
                     tmax = 10 * sigma
 
                     # Since there is no guarantee in the above logic that tmax
                     # is always larger than tmin, or both tmin and tmax are
                     # finite value, this if-block is placed as a safeguard to
                     # make sure tmax >= tmin.
-                    if (not all(numpy.isfinite([tmin, tmax]))) or tmin > tmax:
+                    if (not all(np.isfinite([tmin, tmax]))) or tmin > tmax:
                         tmin = Total.min()
                         tmax = Total.max()
                 else:
@@ -689,7 +689,7 @@ class SDSparseMapDisplay(SDImageDisplay):
         plotter.setup_labels_relative(refpix, refval, increment)
 
         if hasattr(self, 'showatm') and self.showatm is True:
-            msid_list = numpy.unique(self.inputs.msid_list)
+            msid_list = np.unique(self.inputs.msid_list)
             for ms_id in msid_list:
                 ms = self.inputs.context.observing_run.measurement_sets[ms_id]
                 vis = ms.name
@@ -739,7 +739,7 @@ class SDSparseMapDisplay(SDImageDisplay):
                             qout = qa.convert(converted['m0'], outunit='GHz')
                             return qout['value']
 
-                    atm_freq = numpy.fromiter(map(_frameconv, atm_freq), dtype=atm_freq.dtype)
+                    atm_freq = np.fromiter(map(_frameconv, atm_freq), dtype=atm_freq.dtype)
                     me.done()
                 plotter.set_atm_transmission(atm_transmission, atm_freq)
 
@@ -747,9 +747,9 @@ class SDSparseMapDisplay(SDImageDisplay):
         data = self.data
         mask = self.mask
         for pol in range(self.npol):
-            Plot = numpy.zeros((num_panel, num_panel, (chan1 - chan0)), numpy.float32) + NoData
+            Plot = np.zeros((num_panel, num_panel, (chan1 - chan0)), np.float32) + NoData
             TotalSP = (data.take([pol], axis=self.id_stokes) * mask.take([pol], axis=self.id_stokes)).squeeze().sum(axis=(0, 1))
-            isvalid = numpy.any(mask.take([pol], axis=self.id_stokes).squeeze(), axis=2)
+            isvalid = np.any(mask.take([pol], axis=self.id_stokes).squeeze(), axis=2)
             Nsp = sum(isvalid.flatten())
             LOG.info('Nsp=%s' % Nsp)
             TotalSP /= Nsp
@@ -798,7 +798,7 @@ class SDSparseMapDisplay(SDImageDisplay):
 
         return plot_list
 
-    def _get_array_chunk(self, data: numpy.ndarray, blc: list[int], trc: list[int], axes: list[int]) -> numpy.ndarray:
+    def _get_array_chunk(self, data: np.ndarray, blc: list[int], trc: list[int], axes: list[int]) -> np.ndarray:
         """
         Return a slice of an array.
 
@@ -811,8 +811,8 @@ class SDSparseMapDisplay(SDImageDisplay):
         """
         array_shape = data.shape
         ndim = len(array_shape)
-        full_blc = numpy.zeros(ndim, dtype=int)
-        full_trc = numpy.array(array_shape)
+        full_blc = np.zeros(ndim, dtype=int)
+        full_trc = np.array(array_shape)
         for i in range(len(axes)):
             iax = axes[i]
             full_blc[iax] = max(blc[i], 0)
@@ -826,28 +826,6 @@ class SDChannelMapDisplay(SDImageDisplay):
     NhPanel = 5
     NvPanel = 3
     NUM_CHANNELMAP = NhPanel * NvPanel
-
-    @functools.cached_property
-    def extended_velocity( self ) -> numpy.ndarray:
-        """
-        Extend self.velocity for 1 channel to cover edge cases
-
-        Added for PIPE-2683.
-        In some cases, the code tries to lookup the velocity value at 1 channel beyond
-        the array range, in order to determine the (upper) boundary of an edge channel.
-        To cover this case, an extended velocity array is prepared by extrapolating
-        for 1 channel.
-
-        Returns:
-            extended ndarray of velocities
-        """
-        assert len(self.velocity) > 1
-
-        extended_velocity = numpy.append(
-            self.velocity,
-            self.velocity[-1] + ( self.velocity[-1] - self.velocity[-2] )
-        )
-        return extended_velocity
 
     def plot(self) -> list[logger.Plot]:
         """Create list of channel maps.
@@ -878,10 +856,10 @@ class SDChannelMapDisplay(SDImageDisplay):
 
         # if all pixels are masked, return fully masked array
         unweight_mask = unweight_ia.getchunk(getmask=True)
-        if numpy.all(numpy.logical_not(unweight_mask)):
+        if np.all(np.logical_not(unweight_mask)):
             unweight_ia.close()
-            sp_ave = numpy.ma.masked_array(numpy.zeros((self.npol, self.nchan), dtype=numpy.float32),
-                                           mask=numpy.ones((self.npol, self.nchan), dtype=bool))
+            sp_ave = np.ma.masked_array(np.zeros((self.npol, self.nchan), dtype=np.float32),
+                                        mask=np.ones((self.npol, self.nchan), dtype=bool))
             return sp_ave
 
         # average image spectra over map area taking mask into account
@@ -909,9 +887,9 @@ class SDChannelMapDisplay(SDImageDisplay):
         finally:
             collapsed_ia.close()
         # devive averaged image by averaged weight
-        data_weight_integ = numpy.ma.masked_array((data_integ / weight_integ), [not val for val in mask_integ],
-                                                  fill_value=0.0)
-        sp_ave = numpy.ma.masked_array(numpy.zeros((self.npol, self.nchan), dtype=numpy.float32))
+        data_weight_integ = np.ma.masked_array((data_integ / weight_integ), [not val for val in mask_integ],
+                                               fill_value=0.0)
+        sp_ave = np.ma.masked_array(np.zeros((self.npol, self.nchan), dtype=np.float32))
         if self.npol == 1:
             if len(data_weight_integ) == self.nchan:
                 sp_ave[0, :] = data_weight_integ
@@ -954,10 +932,10 @@ class SDChannelMapDisplay(SDImageDisplay):
             return plot_list
 
         # Set data
-        Map = numpy.zeros((self.NUM_CHANNELMAP,
-                           (self.y_max - self.y_min + 1),
-                           (self.x_max - self.x_min + 1)),
-                          dtype=numpy.float32)
+        Map = np.zeros((self.NUM_CHANNELMAP,
+                        (self.y_max - self.y_min + 1),
+                        (self.x_max - self.x_min + 1)),
+                       dtype=np.float32)
 
         # Swap (x,y) to match the clustering result
         grid_size_arcsec = self.grid_size * 3600.0
@@ -1073,7 +1051,7 @@ class SDChannelMapDisplay(SDImageDisplay):
 
                 # Draw Total Intensity Map
                 total = masked_data.sum(axis=2) * velocity_per_channel
-                total = numpy.flipud(total.transpose())
+                total = np.flipud(total.transpose())
 
                 # 2008/9/20 DEC Effect
                 plotted_objects.append(
@@ -1144,12 +1122,14 @@ class SDChannelMapDisplay(SDImageDisplay):
                         continue
                     C0 = idx_vertlines[i]
                     C1 = idx_vertlines[i+1]
-                    velo = (self.extended_velocity[C0] + self.extended_velocity[C1 - 1]) / 2.0 - velocity_line_center
-                    width = abs(self.extended_velocity[C0] - self.extended_velocity[C1])
-                    Title.append('(Vel,Wid) = (%.1f, %.1f) (km/s)' % (velo, width))
+                    velo = (vel_vertlines[i] + vel_vertlines[i + 1]) / 2
+                    width = abs(vel_vertlines[i] - vel_vertlines[i + 1])
+                    Title.append(
+                        f"(Vel,Wid) = ({velo:.1f}, {width:.1f}) (km/s)"
+                    )
                     NMap += 1
-                    _mask = masked_data[:, :, C0:C1].sum(axis=2) * velocity_per_channel
-                    Map[self.NUM_CHANNELMAP-1-i] = numpy.flipud(_mask.transpose())
+                    _map_data = masked_data[:, :, C0:C1].sum(axis=2) * velocity_per_channel
+                    Map[self.NUM_CHANNELMAP-1-i] = np.flipud(_map_data.transpose())
                 del masked_data
                 Vmax0 = Map.max()
                 Vmin0 = Map.min()
@@ -1368,7 +1348,11 @@ class SDChannelMapDisplay(SDImageDisplay):
             List[float]: relative velocities for red vertical lines
         """
         # interpolate function to calculate velocities using extrapolation
-        chan2vel = interpolate.interp1d(idx_vertlines, self.extended_velocity[idx_vertlines],
+        num_velocities = len(self.velocity)
+        vidx = np.array(idx_vertlines)
+        in_range_indices = vidx[np.logical_and(0 <= vidx, vidx < num_velocities)]
+        assert len(in_range_indices) > 0
+        chan2vel = interpolate.interp1d(in_range_indices, self.velocity[in_range_indices],
                                         bounds_error=False, fill_value='extrapolate')
 
         # get size of difference between the number of vertical lines and NUM_CHANNELMAP
@@ -1382,7 +1366,7 @@ class SDChannelMapDisplay(SDImageDisplay):
             idx_vertlines[:0] = [idx_vertlines[0] + i * slice_width for i in range(-_diff_len, 0)]
 
         # calculate relative velocities for red vertical lines
-        return chan2vel(numpy.array(idx_vertlines) - 0.5) - velocity_line_center
+        return chan2vel(np.array(idx_vertlines) - 0.5) - velocity_line_center
 
 
 class SDRmsMapDisplay(SDImageDisplay):
@@ -1403,7 +1387,7 @@ class SDRmsMapDisplay(SDImageDisplay):
 
         return plot_list
 
-    def __get_rms(self) -> numpy.ndarray:
+    def __get_rms(self) -> np.ndarray:
         """Compute baseline rms for each spatial pixel.
 
         Returns:
@@ -1412,7 +1396,7 @@ class SDRmsMapDisplay(SDImageDisplay):
         # reshape rms to a 3d array in shape, (nx_im, ny_im, npol_data)
         return self.__reshape_grid_table_values(self.inputs.result.outcome['rms'], float)
 
-    def __get_num_valid(self) -> numpy.ndarray:
+    def __get_num_valid(self) -> np.ndarray:
         """Compute number of valid spectra associated with each spatial pixel.
 
         Returns:
@@ -1421,7 +1405,7 @@ class SDRmsMapDisplay(SDImageDisplay):
         # reshape validsp to a 3d array in shape, (nx_im, ny_im, npol_data)
         return self.__reshape_grid_table_values(self.inputs.result.outcome['validsp'], int)
 
-    def __reshape_grid_table_values(self, array2d, dtype=None) -> numpy.ndarray:
+    def __reshape_grid_table_values(self, array2d, dtype=None) -> np.ndarray:
         """Reshape input 2-D array into 3-D array.
 
         The input two-dimensional array with shape (npol, nx * ny) into
@@ -1437,11 +1421,11 @@ class SDRmsMapDisplay(SDImageDisplay):
         # reshape 2d array in shape, (npol, nx*ny), to (nx, ny, npol)
         npol_data = len(array2d)
         # retruned value will be transposed
-        array3d = numpy.zeros((npol_data, self.ny, self.nx), dtype=dtype)
+        array3d = np.zeros((npol_data, self.ny, self.nx), dtype=dtype)
         for pol in range(npol_data):
             if len(array2d[pol]) == self.nx*self.ny:
-                array3d[pol, :, :] = numpy.array(array2d[pol]).reshape((self.ny, self.nx))
-        return numpy.flipud(array3d.transpose())
+                array3d[pol, :, :] = np.array(array2d[pol]).reshape((self.ny, self.nx))
+        return np.flipud(array3d.transpose())
 
     def __plot(self) -> list[logger.Plot]:
         """Create list of baseline rms maps.
@@ -1486,13 +1470,13 @@ class SDRmsMapDisplay(SDImageDisplay):
 #        for pol in xrange(self.npol):
         for pol in range(npol_data):
             rms_map = rms[:, :, pol] * (nvalid[:, :, pol] > 0)
-            rms_map = numpy.flipud(rms_map.transpose())
-            rms_map_v = rms_map[~numpy.isnan(rms_map)]
-            rms_map_v = rms_map[numpy.nonzero(rms_map)]
+            rms_map = np.flipud(rms_map.transpose())
+            rms_map_v = rms_map[~np.isnan(rms_map)]
+            rms_map_v = rms_map[np.nonzero(rms_map)]
             if len(rms_map_v) == 0:
                 continue
             # threshold values (minimum and maximum)
-            q_min, q_max = numpy.nanpercentile(rms_map_v, [thres_min, thres_max])
+            q_min, q_max = np.nanpercentile(rms_map_v, [thres_min, thres_max])
             # 2008/9/20 DEC Effect
             image = rms_axes.imshow(rms_map, vmin=q_min, vmax=q_max, interpolation='nearest', aspect=self.aspect, extent=Extent)
             xlim = rms_axes.get_xlim()
@@ -1655,7 +1639,7 @@ class SDSpectralMapDisplay(SDImageDisplay):
         factors = []
         for idx in self.image.id_direction:
             cell = qa.convert(qa.quantity(self.image.increments[idx], units[idx]), 'deg')['value']
-            factors.append(int(numpy.round(abs(self.grid_size / cell))))
+            factors.append(int(np.round(abs(self.grid_size / cell))))
         return factors
 
     def __plot_spectral_map(self) -> list[logger.Plot]:
@@ -1684,7 +1668,7 @@ class SDSpectralMapDisplay(SDImageDisplay):
             NH = int((self.x_max - self.x_min) // STEPX // NhPanel + 1)
             NV = int((self.y_max - self.y_min) // STEPY // NvPanel + 1)
             # an array with length of total number of spectra to be plotted (initialized by -1)
-            ROWS = numpy.zeros(NH * NV * NhPanel * NvPanel, dtype=int) - 1
+            ROWS = np.zeros(NH * NV * NhPanel * NvPanel, dtype=int) - 1
             # 2010/6/15 GK Change the plotting direction: UpperLeft->UpperRight->OneLineDown repeat...
             for x in range(0, self.nx, STEPX):
                 posx = (self.x_max - x)//STEPX // NhPanel
@@ -1753,8 +1737,8 @@ class SDSpectralMapDisplay(SDImageDisplay):
 
             # to eliminate max/min value due to bad pixel or bad fitting,
             #  1/10-th value from max and min are used instead
-#             valid_index = numpy.where(self.num_valid_spectrum[:,:,pol] > 0)
-            mask2d = numpy.any(mask.take([pol], axis=self.id_stokes).squeeze(), axis=2)
+#             valid_index = np.where(self.num_valid_spectrum[:,:,pol] > 0)
+            mask2d = np.any(mask.take([pol], axis=self.id_stokes).squeeze(), axis=2)
             valid_index = mask2d.nonzero()
             valid_data = data[valid_index[0], valid_index[1], chan0:chan1]
             ListMax = valid_data.max(axis=1)
@@ -1763,11 +1747,11 @@ class SDSpectralMapDisplay(SDImageDisplay):
             if len(ListMax) == 0:
                 continue
             if is_baselined:
-                ymax = numpy.sort(ListMax)[len(ListMax) - len(ListMax)//10 - 1]
-                ymin = numpy.sort(ListMin)[len(ListMin)//10]
+                ymax = np.sort(ListMax)[len(ListMax) - len(ListMax)//10 - 1]
+                ymin = np.sort(ListMin)[len(ListMin)//10]
             else:
-                ymax = numpy.sort(ListMax)[-1]
-                ymin = numpy.sort(ListMin)[1]
+                ymax = np.sort(ListMax)[-1]
+                ymin = np.sort(ListMin)[1]
             ymax = ymax + (ymax - ymin) * 0.2
             ymin = ymin - (ymax - ymin) * 0.1
             LOG.debug('ymin=%s, ymax=%s' % (ymin, ymax))

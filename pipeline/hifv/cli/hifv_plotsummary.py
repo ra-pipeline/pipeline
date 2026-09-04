@@ -6,9 +6,6 @@ import pipeline.h.cli.utils as utils
 def hifv_plotsummary(vis=None):
     """Create pipeline summary plots.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Execute the pipeline plotting task:
 

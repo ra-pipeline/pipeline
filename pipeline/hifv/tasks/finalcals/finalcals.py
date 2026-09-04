@@ -28,9 +28,10 @@ class FinalcalsInputs(vdp.StandardInputs):
     weakbp = vdp.VisDependentProperty(default=False)
     refantignore = vdp.VisDependentProperty(default='')
     refant = vdp.VisDependentProperty(default='')
+    use_flux_cal = vdp.VisDependentProperty(default=True)
 
     # docstring and type hints: supplements hifv_finalcals
-    def __init__(self, context, vis=None, weakbp=None, refantignore=None, refant=None):
+    def __init__(self, context, vis=None, weakbp=None, refantignore=None, refant=None, use_flux_cal=None):
         """Initialize Inputs.
 
         Args:
@@ -48,6 +49,12 @@ class FinalcalsInputs(vdp.StandardInputs):
 
                 Example: refant = 'ea01, ea02'
 
+            use_flux_cal(Boolean): Whether to use a standard flux density calibrator, default True.
+                If False, enables solution normalization in bandpass and gain calibration for observations
+                lacking a standard flux density calibrator (e.g., Rubin alert followup). When used in conjunction
+                with proper prior calibrations (gain curves and requantizer gains applied by default in hifv_priorcals),
+                this results in visibility data scaled to approximate Janskys without requiring a flux calibrator reference.
+
         """
         super().__init__()
         self.context = context
@@ -55,6 +62,7 @@ class FinalcalsInputs(vdp.StandardInputs):
         self._weakbp = weakbp
         self.refantignore = refantignore
         self.refant = refant
+        self.use_flux_cal = use_flux_cal
 
 
 class FinalcalsResults(basetask.Results):
@@ -132,6 +140,23 @@ class Finalcals(basetask.StandardTaskTemplate):
     """
     Inputs = FinalcalsInputs
 
+    @property
+    def _apply_solnorm(self):
+        """Determine whether to apply solution normalization.
+        
+        Returns True when NOT using a standard flux calibrator (i.e., for observations
+        lacking a flux calibrator reference). Makes the intent of 'not use_flux_cal'
+        more explicit and readable throughout the code.
+        
+        Note: Solution normalization alone is insufficient for flux scaling to Janskys.
+        It requires prior calibrations (gain curves, requantizer gains) to be applied
+        by hifv_priorcals (which occur by default).
+        
+        Returns:
+            bool: True if solution normalization should be applied, False otherwise
+        """
+        return not self.inputs.use_flux_cal
+
     def prepare(self):
         """Bulk of task execution occurs here.
 
@@ -142,7 +167,6 @@ class Finalcals(basetask.StandardTaskTemplate):
             FinalcalsResults()
 
         """
-
         m = self.inputs.context.observing_run.get_ms(self.inputs.vis)
         spw2band = m.get_vla_spw2band()
         band2spw = collections.defaultdict(list)
@@ -257,13 +281,14 @@ class Finalcals(basetask.StandardTaskTemplate):
 
                 interp = weakbp(self.inputs.vis, bpcaltable, context=self.inputs.context, RefAntOutput=RefAntOutput,
                                 ktypecaltable=ktypecaltable, bpdgain_touse=bpdgain_touse, solint='inf', append=append,
-                                executor=self._executor, spw=','.join(spwlist))
+                                executor=self._executor, spw=','.join(spwlist),
+                                solnorm=self._apply_solnorm)
             else:
                 LOG.debug("Using REGULAR heuristics")
                 interp = ''
                 spw_solint = do_bandpass(self.inputs.vis, bpcaltable, context=self.inputs.context, RefAntOutput=RefAntOutput,
-                            spw=','.join(spwlist), ktypecaltable=ktypecaltable, bpdgain_touse=bpdgain_touse, solint='inf', append=append,
-                            executor=self._executor)
+                                         spw=','.join(spwlist), ktypecaltable=ktypecaltable, bpdgain_touse=bpdgain_touse, solint='inf', append=append,
+                                         executor=self._executor, solnorm=self._apply_solnorm)
                 spw_solint_perband[band] = spw_solint
 
         LOG.info("Bandpass calibration complete")
@@ -321,7 +346,9 @@ class Finalcals(basetask.StandardTaskTemplate):
                 gain_solint2 = self.inputs.context.evla['msinfo'][m.name].gain_solint2[band]
                 self._do_calibratorgaincal(calMs, finalampgaincaltable, gain_solint2, 5.0,
                                            'ap', [phaseshortgaincaltable], refAnt,
-                                           refantmode=refantmode, spw=','.join(spwlist))
+                                           refantmode=refantmode, spw=','.join(spwlist),
+                                           solnorm=self._apply_solnorm,
+                                           normtype='median' if self._apply_solnorm else 'mean')
 
                 self._do_calibratorgaincal(calMs, finalphasegaincaltable, gain_solint2,
                                            3.0, 'p', [finalampgaincaltable], refAnt,
@@ -988,6 +1015,8 @@ class Finalcals(basetask.StandardTaskTemplate):
         refAnt: str,
         refantmode: str = 'flex',
         spw: str = '',
+        solnorm: bool = False,
+        normtype: str = 'mean',
     ) -> bool:
         """Execute the CASA task gaincal with the calibrator MS using a provided list of gaintables.
 
@@ -1001,6 +1030,8 @@ class Finalcals(basetask.StandardTaskTemplate):
             refAnt: CSV string of reference antennas
             refantmode: Reference antenna mode, defaults to 'flex'
             spw: Spectral window selection string
+            solnorm: Solution normalization flag, defaults to False. Set to True when use_flux_cal=False
+            normtype: Normalization type ('median' recommended when solnorm=True), defaults to 'mean'
 
         Returns:
             True if calibration succeeds, False otherwise
@@ -1032,7 +1063,7 @@ class Finalcals(basetask.StandardTaskTemplate):
                      'refant': refAnt.lower(),
                      'minblperant': minBL_for_cal,
                      'minsnr': minsnr,
-                     'solnorm': False,
+                     'solnorm': solnorm,
                      'gaintype': 'G',
                      'smodel': [],
                      'calmode': calmode,
@@ -1044,6 +1075,10 @@ class Finalcals(basetask.StandardTaskTemplate):
                      'parang': self.parang,
                      'uvrange': '',
                      'refantmode': refantmode}
+
+        # Add normtype to task args if solnorm is True
+        if solnorm and normtype:
+            task_args['normtype'] = normtype
 
         calscanslist = list(map(int, scanids_perband.split(',')))
         scanobjlist = m.get_scans(scan_id=calscanslist,

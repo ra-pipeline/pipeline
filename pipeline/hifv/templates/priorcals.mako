@@ -8,10 +8,10 @@ from pipeline.infrastructure.renderer import rendererutils
 
 <%block name="title">Prior calibrations</%block>
 
-<p>Gain curves, opacities, antenna position corrections, requantizer gains, TEC maps, and switched power plots
+<p>Gain curves + antenna efficiencies, opacities, antenna position corrections, requantizer gains, TEC maps, and switched power plots
 using the CASA task <b>gencal</b>.</p>
 
-	<h2>Gain Curves</h2>
+	<h2>Gain Curves and Efficiencies</h2>
 	
 	%for single_result in result:
 	    %if single_result.gc_result:

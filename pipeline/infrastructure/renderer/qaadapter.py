@@ -11,7 +11,7 @@ import weakref
 
 import pipeline.infrastructure as infrastructure
 
-LOG = infrastructure.get_logger(__name__)
+LOG = infrastructure.logging.get_logger(__name__)
 
 
 class Topic:

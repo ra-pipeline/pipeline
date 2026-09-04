@@ -496,9 +496,9 @@ class ObservingRun(object):
         return {ms.schedblock_id for ms in self.measurement_sets}
 
     @property
-    def execblock_ids(self) -> set[str]:
+    def execblock_ids(self) -> list[str]:
         """Return unique execution block ID(s) associated with the MSes in this observing run."""
-        return {ms.execblock_id for ms in self.measurement_sets}
+        return utils.deduplicate(ms.execblock_id for ms in self.measurement_sets)
 
     @property
     def observers(self) -> set[str]:

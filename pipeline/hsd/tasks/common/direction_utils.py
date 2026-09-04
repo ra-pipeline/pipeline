@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
 LOG = infrastructure.logging.get_logger(__name__)
 
-__all__ = { 'direction_shift', 'direction_offset', 'direction_recover', 'direction_convert' }
+__all__ = ['direction_shift', 'direction_offset', 'direction_recover', 'direction_convert']
 
 
 def direction_shift(direction: DirectionDict, reference: DirectionDict, origin: DirectionDict) -> DirectionDict:

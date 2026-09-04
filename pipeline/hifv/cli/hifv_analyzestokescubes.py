@@ -6,9 +6,6 @@ import pipeline.h.cli.utils as utils
 def hifv_analyzestokescubes(vis=None):
     """Characterize stokes IQUV flux densities as a function of frequency for VLASS Coarse Cube (CC) images.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Basic analyzestokescubes task
 

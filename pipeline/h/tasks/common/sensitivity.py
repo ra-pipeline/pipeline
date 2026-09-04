@@ -3,6 +3,7 @@ class Sensitivity(dict):  # noqa: D100
 
     def __init__(self, *args, **kwargs):  # noqa: D107
         self['array'] = None                   # string
+        self['stokes'] = None                  # string
         self['intent'] = None                  # string
         self['field'] = None                   # string
         self['spw'] = None                     # string

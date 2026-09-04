@@ -43,7 +43,7 @@ class TargetflagInputs(vdp.StandardInputs):
 
 
 class TargetflagResults(basetask.Results):
-    def __init__(self, jobs=None, summarydict=None):
+    def __init__(self, jobs=None, summarydict=None, use_contdat=False):
 
         if jobs is None:
             jobs = []
@@ -54,6 +54,7 @@ class TargetflagResults(basetask.Results):
 
         self.jobs = jobs
         self.summarydict = summarydict
+        self.use_contdat = use_contdat
 
     def __repr__(self):
         s = 'Targetflag (rflag mode) results:\n'
@@ -74,8 +75,9 @@ class Targetflag(basetask.StandardTaskTemplate):
         corrstring = m.get_vla_corrstring()
 
         fielddict = contfile_to_spwsel(self.inputs.vis, self.inputs.context)
-
+        use_contdat = False
         if fielddict != {}:
+            use_contdat = True
             LOG.info('cont.dat file present.  Using VLA Spectral Line Heuristics for task targetflag.')
 
         # LOG.info(self.inputs.intents)
@@ -141,7 +143,7 @@ class Targetflag(basetask.StandardTaskTemplate):
         summarydict = self._executor.execute(job)
         summaries.append(summarydict)
 
-        return TargetflagResults([rflag_result], summarydict=summaries)
+        return TargetflagResults([rflag_result], summarydict=summaries, use_contdat=use_contdat)
 
     def analyse(self, results):
         return results

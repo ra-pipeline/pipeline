@@ -34,7 +34,7 @@ class PlotSummaryResults(h_applycal.ApplycalResults):
         and marking any applied caltables, so removing them from subsequent
         on-the-fly calibration calculations.
 
-        See :method:`~pipeline.Results.merge_with_context`
+        See :meth:`~pipeline.Results.merge_with_context`
         """
         if not self.applied:
             LOG.error('No results to merge')

@@ -11,9 +11,6 @@ def h_save(filename: str | None = None) -> None:
     Args:
         filename: Optional target filename for saving the pipeline state.
 
-    Returns:
-        None
-
     Examples:
         Save the current state to a default file:
 

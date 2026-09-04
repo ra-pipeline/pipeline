@@ -76,10 +76,9 @@ class FlagTargetsALMAInputs(vdp.StandardInputs):
 
             template: Apply flagging templates; defaults to True.
 
-            filetemplate: The name of a text file that contains the flagging
-                template for issues with the science target data etc.
-                If the template flags files is undefined a name of the
-                form 'msname_flagtargetstemplate.txt' is assumed.
+            filetemplate: Text file containing flagging commands for science target data.
+                If undefined, defaults to the dataset parent MS name (usually based on uid)
+                with '.flagtargetstemplate.txt' suffix.
 
             parallel: Process multiple MeasurementSets in parallel using the casampi parallelization framework.
 

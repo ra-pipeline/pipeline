@@ -10,14 +10,11 @@ Code Block and Figure
     from pipeline.hif.cli.gotasks import *
 
 
-.. _buildmytasks: 
-https://casadocs.readthedocs.io/en/latest/api/casashell/buildmytasks.html
+.. _buildmytasks: https://casadocs.readthedocs.io/en/latest/api/casashell/buildmytasks.html
 
-.. _build:
-https://www.cv.nrao.edu/~rxue/pipeline_docs/bb_md/building_the_pipeline.html#optional-casa-cli-bindings
+.. _build: https://www.cv.nrao.edu/~rxue/pipeline_docs/bb_md/building_the_pipeline.html#optional-casa-cli-bindings
 
-.. _pipeline.initcli: 
-https://open-bitbucket.nrao.edu/projects/PIPE/repos/pipeline/browse/pipeline/__init__.py#164
+.. _pipeline.initcli: https://open-bitbucket.nrao.edu/projects/PIPE/repos/pipeline/browse/pipeline/__init__.py#164
 
 :ref:`same<buildmytasks>`
 :ref:`build<build>`
@@ -39,8 +36,3 @@ Citations (from .bib)
 
 References relevant to CASA and Pipeline:
 :cite:`2020ASPC..527..271R`, :cite:`2020ASPC..527..267E`, :cite:`2023PASP..135g4501H`
-
-
-.. bibliography::
-    :cited:
-    :style: astrostyle

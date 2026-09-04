@@ -60,7 +60,7 @@ class ImagePreCheckResults(basetask.Results):
 
     def merge_with_context(self, context):
         """
-        See :method:`~pipeline.infrastructure.api.Results.merge_with_context`
+        See :meth:`~pipeline.infrastructure.api.Results.merge_with_context`
         """
         # Calculated sensitivities for later stages
         if self.per_spw_cont_sensitivities_all_chan is not None:
@@ -236,7 +236,7 @@ class ImagePreCheck(basetask.StandardTaskTemplate):
         user_maxAllowedBeamAxialRatio = maxAllowedBeamAxialRatio
 
         # Use user selected angular resolution for calculation, if specified
-        if cqa.getvalue(userAngResolution)[0] != 0.0:
+        if cqa.getvalue(userAngResolution).item() != 0.0:
             minAcceptableAngResolution = user_minAcceptableAngResolution
             maxAcceptableAngResolution = user_maxAcceptableAngResolution
             maxAllowedBeamAxialRatio = user_maxAllowedBeamAxialRatio

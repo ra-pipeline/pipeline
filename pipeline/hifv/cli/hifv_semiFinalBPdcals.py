@@ -6,9 +6,6 @@ import pipeline.h.cli.utils as utils
 def hifv_semiFinalBPdcals(vis=None, weakbp=None, refantignore=None, refant=None):
     """Runs a second delay and bandpass calibration and applies to calibrators to setup for RFI flagging.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Heuristic flagging:
 

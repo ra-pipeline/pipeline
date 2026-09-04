@@ -1106,7 +1106,7 @@ class Fluxboot(basetask.StandardTaskTemplate):
 
             for fieldidstring in fieldidlist:
                 fieldid = int(fieldidstring)
-                uvrangestring = uvrange(self.setjy_results, fieldidstring)
+                uvrangestring = uvrange(self.setjy_results, fieldid)
                 task_args['field'] = fieldidstring
                 task_args['uvrange'] = uvrangestring
                 task_args['selectdata'] = True
@@ -1118,7 +1118,6 @@ class Fluxboot(basetask.StandardTaskTemplate):
                     self._executor.execute(job)
                 else:
                     LOG.warning("No data found for field id {!s} in {!s}".format(fieldidstring, calMs))
-            return True
         elif fluxflag and vlassmode:
             fieldobjlist = m.get_fields(name=field)
             fieldidlist = []
@@ -1140,11 +1139,21 @@ class Fluxboot(basetask.StandardTaskTemplate):
                     self._executor.execute(job)
                 else:
                     LOG.warning("No data found for field id {!s} in {!s}".format(fieldidstring, calMs))
-            return True
         else:
-            job = casa_tasks.gaincal(**task_args)
+            # Apply uvrange constraints from flux.csv for specific field
+            fieldobjlist = m.get_fields(name=field)
+            if fieldobjlist:
+                if len(fieldobjlist) > 1:
+                    LOG.debug('Multiple fields match name %s, using first (id=%s)', field, fieldobjlist[0].id)
+                fieldid = fieldobjlist[0].id
+                uvrangestring = uvrange(self.setjy_results, fieldid)
+                task_args['uvrange'] = uvrangestring
+                task_args['selectdata'] = True
+            else:
+                LOG.warning('Field %s not found in MS, uvrange constraints not applied', field)
 
-            return self._executor.execute(job)
+            job = casa_tasks.gaincal(**task_args)
+            self._executor.execute(job)
 
     def re_reference_polynomial(self, c1: list, original_ref_freq: float, new_ref_freq: float) -> list:
         """Re-reference polynomial

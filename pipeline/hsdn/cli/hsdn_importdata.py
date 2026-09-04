@@ -14,9 +14,6 @@ def hsdn_importdata(vis=None, session=None, hm_rasterscan=None, datacolumns=None
     If the ``overwrite`` input parameter is set to False, then when the output MS
     already exists in the output directory, the existing MS will be imported instead.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Load MS list in the ../rawdata subdirectory into the context:
 

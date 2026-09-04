@@ -22,7 +22,7 @@ def mock_casa_tools():
     """Mock casa_tools.quanta, which requires a live CASA environment."""
     with patch('pipeline.domain.spectralwindow.casa_tools') as mock:
         mock.quanta.convertfreq.return_value = {'value': 100e9, 'unit': 'Hz'}
-        mock.quanta.getvalue.return_value = [100e9]
+        mock.quanta.getvalue.return_value = numpy.array([100e9])
         yield mock
 
 
