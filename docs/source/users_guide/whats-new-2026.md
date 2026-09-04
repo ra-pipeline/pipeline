@@ -419,6 +419,7 @@ selected-table-object bug causing inconsistent ATM-cal data.
 data across all antennas for the pointing-outlier heuristic, so a single
 bad antenna's valid data isn't misclassified as outliers when compared only
 against itself.
+
 ---
 
 (if-weblog-qa)=
@@ -641,7 +642,7 @@ randomly-changing color map in the XX-YY difference plot.
 {jira}`PIPE-2867` fixes a
 "spectral"/"spectra" typo in the averaged-spectrum caption.
 {jira}`PIPE-2776` cleans up
-double/missing periods and inconsistent punctuation in `hsd_baseline`'s "By
+double/missing periods and inconsistent punctuation in {func}`~pipeline.hsd.cli.hsd_baseline`'s "By
 Topic" QA messages, aligning the style with the IF weblog.
 {jira}`PIPE-2894` adds a channel axis
 to the top panel of the sparse profile map (already done in the Nobeyama
@@ -653,7 +654,7 @@ explanatory caption to the missed-line-channel diagnostic plots at the
 {func}`~pipeline.hsd.cli.hsd_imaging` stage, describing the
 single-peak/extended detection thresholds and the plot's color coding.
 {jira}`PIPE-3141` fixes an inverted
-channel range for the `hsd_imaging` moment-map plot in LSB data.
+channel range for the {func}`~pipeline.hsd.cli.hsd_imaging` moment-map plot in LSB data.
 {jira}`PIPE-3226` fixes an issue that atmospheric features are not excluded
 from the contamination analysis properly.
 
