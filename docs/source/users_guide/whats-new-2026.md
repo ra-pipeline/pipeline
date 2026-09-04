@@ -358,8 +358,6 @@ improving imaging performance.
 {jira}`PIPE-2565` fixes the
 "Show plot command" feature for Amp-vs-Time plots, which only showed the
 last of several `plotms` calls used to build a multi-field overplot.
-{jira}`PIPE-2965` fixes a missing
-MS filter on the detailed Amp-vs-Freq plot page for some datasets.
 {jira}`PIPE-3198` fixes the
 Elevation Difference vs. Time plot showing flagged data points that should
 have been excluded.
@@ -402,8 +400,6 @@ incorrectly reporting a successful Jy/K database access when
 {jira}`PIPE-2695` fixes
 {func}`~pipeline.hsd.cli.hsd_baseline` crashing when k-means clustering is attempted with fewer
 line detections than requested clusters.
-{jira}`PIPE-3001` audits and fixes
-confusion between real and virtual spw IDs in `baseline/worker.py`.
 {jira}`PIPE-2893` adds a `sinusoid`
 fitting-function option to
 {func}`~pipeline.hsd.cli.hsd_baseline`, with a new
@@ -419,8 +415,6 @@ to ±180°, which can split a raster map into two disjoint chunks) using
 {jira}`PIPE-3035` fixes Tier-0
 parallel parameter distribution for SD tasks, which assumed the scope
 attribute was always `vis` instead of `infiles`.
-{jira}`PIPE-3129` fixes missing
-per-beam XX/YY image products specific to the NRO Pipeline.
 {jira}`PIPE-2718` is a refactor of
 {func}`~pipeline.hsd.cli.hsd_applycal` display/QA code for filename consistency and simplification.
 {jira}`PIPE-2754` and
@@ -680,9 +674,6 @@ clustering-derived line range extends outside the valid channel bounds.
 {jira}`PIPE-2399` fixes inconsistent
 display of flagged data at the {func}`~pipeline.hsd.cli.hsd_blflag` stage - flagged points above
 the threshold line were sometimes rendered as unflagged.
-{jira}`PIPE-3192` fixes the
-{func}`~pipeline.hsd.cli.hsd_exportdata` weblog page not
-being generated properly.
 {jira}`PIPE-3194` fixes a recurrence
 of a previously-fixed (PIPE-2789) bug where some panels of the
 {func}`~pipeline.hsd.cli.hsd_applycal` XX-YY amplitude-difference-vs-frequency plot were empty.
