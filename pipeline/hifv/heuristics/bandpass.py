@@ -102,62 +102,54 @@ def computeChanFlag(vis, caltable, context):
     return (largechunk, spwids)
 
 
-def _compute_median_snr(caltable: str) -> dict:
-    """Compute the median S/N for each SPW in the given caltable, ignoring flagged
-    and NaN values. Returns a dictionary mapping SPW ID to median S/N.
+def _compute_median_snr(caltable: str) -> dict[int, float]:
+    """Compute the median S/N for each SPW in the given caltable.
+
+    Flagged and NaN values are ignored when computing the median. If an SPW has
+    no valid SNR values or no rows in the caltable, its median S/N is set to 0.
+
+    Args:
+        caltable: Path to the CASA bandpass calibration table.
+
+    Returns:
+        Dictionary mapping spectral window ID to median S/N.
     """
-
     median_snr = {}
-
     with casa_tools.TableReader(caltable) as table:
-        # Get all unique SPWs
-        uniq_spws = np.unique(table.getcol('SPECTRAL_WINDOW_ID'))
-
-        for spw in uniq_spws:
-            # Query the subtable for this SPW
-            query_str = f'SPECTRAL_WINDOW_ID=={spw}'
-            subtable = table.query(query=query_str)
-            # Read SNR and FLAG columns
+        for spw in np.unique(table.getcol('SPECTRAL_WINDOW_ID')):
+            subtable = table.query(query=f'SPECTRAL_WINDOW_ID=={spw}')
             snr = subtable.getcol('SNR')
             flag = subtable.getcol('FLAG')
-            # Compute median SNR
-            if snr.size == 0:
-                median_snr[spw] = 0
-                subtable.close()
-                continue
-            valid_snr = snr[(~flag) & (~np.isnan(snr))].ravel()
-            # if there are no valid SNR values, set median to 0
-            if valid_snr.size:
-                median_snr[spw] = np.median(valid_snr)
-            else:
-                median_snr[spw] = 0
             subtable.close()
+
+            valid_snr = snr[(~flag) & (~np.isnan(snr))]
+            median_snr[int(spw)] = float(np.median(valid_snr)) if valid_snr.size else 0.0
 
     return median_snr
 
 
-HIGH_BANDS = {'U', 'K', 'A', 'Q', 'KU', 'KA', 'Ku', 'Ka'}
+HIGH_BANDS = {'U', 'K', 'A', 'Q', 'KU', 'KA'}
 LOW_BANDS = {'4', 'P', 'L', 'S', 'C', 'X'}
 
 
 def is_high_frequency_band(band: str | None, m=None, spw_list: list | None = None) -> bool:
     """Determine whether the specified band or SPWs correspond to Ku-band or higher (>= 12 GHz)."""
     if band is not None:
-        band_clean = str(band).strip()
-        if band_clean in HIGH_BANDS or band_clean.upper() in HIGH_BANDS:
+        band_name = str(band).strip().upper()
+        if band_name in HIGH_BANDS:
             return True
-        if band_clean in LOW_BANDS or band_clean.upper() in LOW_BANDS:
+        if band_name in LOW_BANDS:
             return False
 
     # Fallback to SPW reference frequency if band name is unclassified or ambiguous
     if m is not None and spw_list:
         for spwid in spw_list:
             try:
-                spw_obj = m.get_spectral_window(int(spwid))
-                if float(spw_obj.ref_frequency.value) >= 12.0e9:
+                if float(m.get_spectral_window(int(spwid)).ref_frequency.value) >= 12.0e9:
                     return True
-            except Exception:
-                pass
+            except Exception as e:
+                LOG.warning("Could not determine reference frequency for SPW %s: %s", spwid, e)
+                LOG.debug("Exception traceback during reference frequency evaluation for SPW %s:", spwid, exc_info=True)
     return False
 
 
@@ -240,7 +232,7 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
     # PIPE-2512 / PIPE-3239: Re-run bandpass for low-S/N SPWs with smoothing if enabled
     mode = str(bpsolint_mode).lower().strip() if bpsolint_mode is not None else 'auto'
     if mode not in ('on', 'auto', 'off'):
-        LOG.warning(f"Unrecognized bpsolint_mode='{bpsolint_mode}', defaulting to 'auto'.")
+        LOG.warning("Unrecognized bpsolint_mode='%s', defaulting to 'auto'.", bpsolint_mode)
         mode = 'auto'
 
     if mode == 'off':
@@ -250,12 +242,13 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
         spw_list = [s.strip() for s in spw.split(',')] if spw else []
         if not is_high_frequency_band(band, m=m, spw_list=spw_list):
             LOG.info(
-                f'Bandpass spectral solint optimization is disabled for band {band} '
-                "(active only for Ku-band and higher frequencies in 'auto' mode)."
+                'Bandpass spectral solint optimization is disabled for band %s '
+                "(active only for Ku-band and higher frequencies in 'auto' mode).",
+                band,
             )
             return {}
     else:  # mode == 'on'
-        LOG.info(f"Bandpass spectral solint optimization is active for band {band} (bpsolint_mode='on').")
+        LOG.info("Bandpass spectral solint optimization is active for band %s (bpsolint_mode='on').", band)
 
     median_snrs = _compute_median_snr(caltable)
     low_snr_spws = [spw for spw, snr in median_snrs.items() if snr < 50.0]

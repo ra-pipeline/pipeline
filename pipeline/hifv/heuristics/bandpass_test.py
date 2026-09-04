@@ -1,11 +1,12 @@
 """Unit tests for the pipeline/hifv/heuristics/bandpass.py module."""
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import MagicMock, Mock
 
 from pipeline.hifv.heuristics.bandpass import is_high_frequency_band
-from pipeline.hifv.tasks.testBPdcals.testBPdcals import testBPdcalsInputs
-from pipeline.hifv.tasks.semiFinalBPdcals.semiFinalBPdcals import semiFinalBPdcalsInputs
 from pipeline.hifv.tasks.finalcals.finalcals import FinalcalsInputs
+from pipeline.hifv.tasks.semiFinalBPdcals.semiFinalBPdcals import semiFinalBPdcalsInputs
+from pipeline.hifv.tasks.testBPdcals.testBPdcals import testBPdcalsInputs
 from pipeline.infrastructure.launcher import Context
 
 
@@ -70,6 +71,21 @@ def test_is_high_frequency_band_by_spw_frequency():
     assert is_high_frequency_band('UNKNOWN', m=mock_ms, spw_list=[0]) is False
     assert is_high_frequency_band(None, m=mock_ms, spw_list=[1]) is True
     assert is_high_frequency_band('UNKNOWN', m=mock_ms, spw_list=[1]) is True
+
+
+@patch('pipeline.hifv.heuristics.bandpass.LOG')
+def test_is_high_frequency_band_exception_logging(mock_log):
+    """Test that is_high_frequency_band logs warning and debug traceback when SPW lookup fails."""
+    mock_ms = MagicMock()
+    mock_ms.get_spectral_window.side_effect = RuntimeError("SPW lookup error")
+
+    result = is_high_frequency_band(None, m=mock_ms, spw_list=[42])
+
+    assert result is False
+    mock_log.warning.assert_called_once()
+    assert mock_log.warning.call_args[0][1] == 42
+    mock_log.debug.assert_called_once()
+    assert mock_log.debug.call_args[1].get('exc_info') is True
 
 
 def test_task_inputs_bpsolint_mode_defaults():
