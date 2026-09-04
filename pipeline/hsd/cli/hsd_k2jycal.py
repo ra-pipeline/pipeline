@@ -8,7 +8,7 @@ def hsd_k2jycal(dbservice=None, endpoint=None, reffile=None,
                 backup_urls=None):
     """Obtain the Kelvin-to-Jansky conversion factors.
 
-    Queries Kelvin-to-Jansky (Jy/K) conversion factors (when dbservice=True, the default)
+    Queries Kelvin-to-Jansky (Jy/K) conversion factors (when ``dbservice=True``, the default)
     or read them from a manually provided ``jyperk.csv`` file. Factors are stored per MS,
     per spw, per antenna, and per polarization.
 
