@@ -159,8 +159,9 @@ try:
     hif_mstransform()
     hifa_flagtargets() # uses *flagtargettemplate.txt
     hif_findroi() # experimental for PL2026, diagnostic-only
-    hif_findcont() # modifies cont.dat
+    hif_findcont(hm_mode='coarse') # modifies cont.dat
     hif_uvcontsub()
+    hif_makeimlist(specmode='mfs') # uses cont.dat
     hif_makeimages() # uses cont.dat
     hif_makeimlist(specmode='cont') # uses cont.dat
     hif_makeimages() # uses cont.dat
