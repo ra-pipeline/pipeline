@@ -13,14 +13,6 @@ repository between October 2025 and August 2026, targeting release
   stage identifies likely source regions ahead of continuum/line imaging using a fast
   algorithm developed under {jira}`PIPEREQ-414`, and has been integrated into the ALMA
   imaging recipes. See {ref}`IF imaging heuristics <hif_findroi>`.
-- **Imaging moves to an LSRK-frame MS ahead of continuum/line separation.**
-  {func}`~pipeline.hif.cli.hif_mstransform` now produces the
-  measurement sets used for imaging in the LSRK frame, and
-  {func}`~pipeline.hif.cli.hif_uvcontsub` /
-  {func}`~pipeline.hif.cli.hif_makeimlist` /
-  {func}`~pipeline.hif.cli.hif_makeimages` were updated to
-  consume the new frame and data types. See
-  {ref}`IF imaging heuristics <lsrk-refactor>`.
 - **Continuum finding task updated** with a round of robustness and
   parameter-passing fixes (`uvrange` propagation, empty-baseline crash
   guards, y-axis limits) — see {ref}`IF imaging heuristics <findcontinuum>`.
@@ -197,14 +189,12 @@ Example hif_findroi weblog summary and spectral ROI evidence view. The displayed
 {jira}`PIPE-3191`.*
 
 (lsrk-refactor)=
-**LSRK-frame imaging MS refactor.**
-The new imaging workflow was reworked end-to-end around an LSRK-frame
-imaging measurement set:
-
-- {func}`~pipeline.hif.cli.hif_mstransform` now produces the MS used for imaging (`REGCAL_CONTLINE_SCIENCE` / `IM_CONTLINE_SCIENCE` / `IM_LINE_SCIENCE` data types) already regridded to the **LSRK** frame, rather than delegating that to individual imaging stages.
-- {func}`~pipeline.hif.cli.hif_uvcontsub`, which previously assumed a fixed TOPO-MS / LSRK-or-SOURCE-`cont.dat` combination, was updated to work correctly with the new LSRK-frame MS.
-- {func}`~pipeline.hif.cli.hif_makeimlist` and {func}`~pipeline.hif.cli.hif_makeimages` were updated to accept the new data types, falling back to the legacy `targets`/`targets_line` MS when the new types are absent.
-- A related multi-day {func}`~pipeline.hif.cli.hif_uvcontsub` slowdown observed during VLA restores (when product mitigation had limited continuum finding to a handful of fields) was also resolved.
+**Imaging-MS support in `hif_mstransform`.**
+{func}`~pipeline.hif.cli.hif_mstransform` adds support for creating
+LSRK-regridded ``*_imaging.ms`` and ``*_imaging_line.ms`` products and
+registering the corresponding imaging data types. Standard PL2026 recipes
+continue to create and use the existing ``*_targets.ms`` and
+``*_targets_line.ms`` products for downstream imaging.
 
 *Tickets: {jira}`PIPE-3003`,
 {jira}`PIPE-3057`,
