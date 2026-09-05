@@ -13,9 +13,13 @@ repository between October 2025 and August 2026, targeting release
   stage identifies likely source regions ahead of continuum/line imaging using a fast
   algorithm developed under {jira}`PIPEREQ-414`, and has been integrated into the ALMA
   imaging recipes. See {ref}`IF imaging heuristics <hif_findroi>`.
-- **Continuum finding task updated** with a round of robustness and
-  parameter-passing fixes (`uvrange` propagation, empty-baseline crash
-  guards, y-axis limits) — see {ref}`IF imaging heuristics <findcontinuum>`.
+- **Continuum-finding imaging refactored.**
+  {func}`~pipeline.hif.cli.hif_findcont` now constructs its dirty-cube target
+  list internally, removing the separate pre-findcont
+  {func}`~pipeline.hif.cli.hif_makeimlist` stage from imaging recipes.
+  Standard PL2026 ALMA recipes use a new coarse mode to reduce processing
+  time, and the WebLog reports the effective continuum-finding imaging setup.
+  See {ref}`IF imaging heuristics <findcontinuum>`.
 - **QA-message aggregation rolled out across most SD stages** so that
   repeated warnings for the same metric/score collapse into a single
   accordion entry in the weblog, matching the IF weblog style — see
@@ -204,11 +208,28 @@ continue to create and use the existing ``*_targets.ms`` and
 
 (findcontinuum)=
 **Improvements to continuum finding.**
-`findContinuum.py` was updated to v9.6 under the PL2026 continuum-detection
-umbrella ticket:
+PL2026 changes how {func}`~pipeline.hif.cli.hif_findcont` plans its
+continuum-finding dirty cubes and updates `findContinuum.py` to v9.6:
 
-- {func}`~pipeline.hif.cli.hif_findcont` now honors a `uvrange` set by a prior {func}`~pipeline.hif.cli.hif_makeimlist` (which was previously dropped).
-- It calls `hif_makeimlist` internally rather than depending on recipe task ordering, gaining a `coarse`/`normal` mode switch that defaults to `'normal'` based on user feedback.
+- {func}`~pipeline.hif.cli.hif_findcont` now constructs its continuum-finding
+  target list internally using {func}`~pipeline.hif.cli.hif_makeimlist`
+  planning logic. The separate pre-findcont `hif_makeimlist` stages were
+  removed from the ALMA and VLA imaging recipes. In the ALMA recipes, the
+  later `hif_makeimlist` stage remains after
+  {func}`~pipeline.hif.cli.hif_uvcontsub` to plan the subsequent science
+  imaging.
+- The new `hm_mode` parameter controls the continuum-finding imaging setup.
+  The task default is `'normal'`, which preserves the behavior prior to
+  PL2026. Standard PL2026 ALMA recipes explicitly use `'coarse'`, which
+  reduces the cost of the dirty cubes through coarser pixel sampling, a
+  uv taper, a minimum image size, and lower-cost weighting settings.
+- The WebLog now identifies the selected mode and reports the effective
+  imaging parameters for each field and SPW.
+- For VLA targets where the imaging heuristics set a `uvrange` to exclude the
+  shortest baselines because of a strong short-baseline amplitude excess,
+  `hif_findcont` now applies that selection to its continuum-finding dirty
+  cubes. A `uvrange` supplied through `target_list` is likewise honored; these
+  selections were previously dropped.
 - A `field` parameter is now exposed for the AUDI/VUDI workflow.
 - Two crashes on edge cases with very few baseline channels (`nanmedian`/`np.min` on an empty channel selection) were resolved.
 - Automatic y-axis limits were adjusted so bright or maser lines do not leave excessive white space in the continuum-fit plot.
@@ -227,6 +248,7 @@ Continuum-fit plot with improved y-axis limits for bright spectral lines.
 {jira}`PIPE-3131`,
 {jira}`PIPE-3209`,
 {jira}`PIPE-3164`,
+{jira}`PIPE-3159`,
 {jira}`PIPE-3103`,
 {jira}`PIPE-3107`,
 {jira}`PIPE-850`,
