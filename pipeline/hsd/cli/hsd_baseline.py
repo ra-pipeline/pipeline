@@ -29,7 +29,7 @@ def hsd_baseline(
     coordinates of all pointings in that grid cell.
 
     .. figure:: /figures/hsd_baseline_representative.png
-       :scale: 60%
+       :width: 60%
        :alt: Representative position determination
 
        Examples of how representative positions are determined. Blue points are all
@@ -37,10 +37,10 @@ def hsd_baseline(
        representative positions (nearest valid pointing to the averaged coordinates).
 
     .. figure:: /figures/guide-img036.jpg
-       :scale: 60%
+       :width: 60%
        :alt: hsd_baseline WebLog page
 
-       Example of the :py:func:`hsd_baseline <hsd_baseline>` WebLog page showing the first three spectral
+       Example of the :func:`~pipeline.hsd.cli.hsd_baseline` WebLog page showing the first three spectral
        grid rows (before subtraction, averaged, after subtraction) for one spw.
 
     Detailed per-antenna spectral maps can be accessed from the detail pages by clicking the
@@ -70,61 +70,63 @@ def hsd_baseline(
     spectral rms ``sigma``.
 
     .. figure:: /figures/guide-image-new-baselineflatness.png
-       :scale: 60%
+       :width: 60%
        :alt: Baseline flatness evaluation
 
        Example of baseline flatness evaluation.
 
-    **Clustering analysis** for spectral line detection (developer plots, hidden by default;
-    enable with ``plotlevel='all'`` in ``h_init``):
+    .. only:: internal
 
-    *Detection*: grid cells with emission exceeding the threshold are identified. Yellow cells
-    have a single time-domain group with detected emission; cyan cells have more than one.
+       **Clustering analysis** for spectral line detection (developer plots, hidden by default;
+       enable with ``plotlevel='all'`` in ``h_init``):
 
-    .. figure:: /figures/guide-img037.png
-       :scale: 60%
-       :alt: Clustering detection
+       *Detection*: grid cells with emission exceeding the threshold are identified. Yellow cells
+       have a single time-domain group with detected emission; cyan cells have more than one.
 
-       Clustering detection step.
+       .. figure:: /figures/guide-img037.png
+          :width: 50%
+          :alt: Clustering detection
 
-    *Validation*: for each grid cell the ratio of spectra containing detected emission lines
-    (``Nmember``) to total spectra in the cell (``Nspectra``) is computed:
+          Clustering detection step.
 
-    - **Validated** if ``Nmember/Nspectra > 0.5``
-    - **Marginally validated** if ``Nmember/Nspectra > 0.3``
-    - **Questionable** if ``Nmember/Nspectra > 0.2``
+       *Validation*: for each grid cell the ratio of spectra containing detected emission lines
+       (``Nmember``) to total spectra in the cell (``Nspectra``) is computed:
 
-    .. figure:: /figures/guide-img038.png
-       :scale: 60%
-       :alt: Clustering validation
+       - **Validated** if ``Nmember/Nspectra > 0.5``
+       - **Marginally validated** if ``Nmember/Nspectra > 0.3``
+       - **Questionable** if ``Nmember/Nspectra > 0.2``
 
-       Clustering validation step.
+       .. figure:: /figures/guide-img038.png
+          :width: 50%
+          :alt: Clustering validation
 
-    *Smoothing*: the per-cell ratio is convolved with a Gaussian-like grid function to suppress
-    isolated single-line candidates and reinforce detections supported by neighboring cells.
+          Clustering validation step.
 
-    .. figure:: /figures/guide-img039.png
-       :scale: 60%
-       :alt: Clustering smoothing
+       *Smoothing*: the per-cell ratio is convolved with a Gaussian-like grid function to suppress
+       isolated single-line candidates and reinforce detections supported by neighboring cells.
 
-       Clustering smoothing step.
+       .. figure:: /figures/guide-img039.png
+          :width: 50%
+          :alt: Clustering smoothing
 
-    *Mask region determination*: in the validated area after smoothing, mask channel ranges are
-    computed over the spatial domain by inter/extrapolating the mask ranges of the averaged
-    spectra in validated cells and applied to each individual spectrum.
+          Clustering smoothing step.
 
-    .. figure:: /figures/guide-img040.png
-       :scale: 60%
-       :alt: Mask range calculation
+       *Mask region determination*: in the validated area after smoothing, mask channel ranges are
+       computed over the spatial domain by inter/extrapolating the mask ranges of the averaged
+       spectra in validated cells and applied to each individual spectrum.
 
-       Mask range calculation — in blue squares the mask
-       range is interpolated from validated cells.
+       .. figure:: /figures/guide-img040.png
+          :width: 50%
+          :alt: Mask range calculation
 
-    .. figure:: /figures/guide-img041.png
-       :scale: 60%
-       :alt: Clustering final
+          Mask range calculation — in blue squares the mask
+          range is interpolated from validated cells.
 
-       Clustering final example.
+       .. figure:: /figures/guide-img041.png
+          :width: 50%
+          :alt: Clustering final
+
+          Clustering final example.
 
     Notes:
         Three QA scores are computed:
@@ -132,10 +134,11 @@ def hsd_baseline(
         **Spectral line detection**:
 
         - QA = 1.0 if no edge-line and main line is narrow.
+        - QA = 0.88 if the deviation mask overlaps with spectral or atmospheric lines.
+        - QA = 0.80 if no spectral lines are detected.
+        - QA = 0.65 if a deviation mask exists but does not overlap spectral or atmospheric lines.
         - QA = 0.60 if no edge-line and main line is wide.
         - QA = 0.55 if edge-line detected (regardless of main line width).
-        - QA = 0.80 if no spectral lines are detected.
-        - QA = 0.88 if the deviation mask overlaps with spectral or atmospheric lines.
 
         **Baseline flatness** (MAX(mean) - MIN(mean) vs. sigma):
 
@@ -147,7 +150,7 @@ def hsd_baseline(
         line ranges is detected (triggering deviation masks).
 
     Warning:
-        :py:func:`hsd_baseline <hsd_baseline>` overwrites results from previous runs. If processing spws separately,
+        :func:`~pipeline.hsd.cli.hsd_baseline` overwrites results from previous runs. If processing spws separately,
         each spw must be taken through to the imaging stage before the next spw is processed::
 
             hsd_baseline(spw='0'); hsd_blflag(spw='0'); hsd_imaging(spw='0')

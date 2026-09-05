@@ -40,6 +40,45 @@ class FindROIInputs(vdp.StandardInputs):
         spw=None,
         parallel=None,
     ):
+        """Initialize inputs for the FindROI task.
+
+        Args:
+            context: Pipeline context object containing state information.
+
+            output_dir: Output directory.
+                Defaults to None, which corresponds to the current working directory.
+
+            vis: Input MeasurementSets. When ``vis`` is not specified, the task
+                selects an appropriate data type from the pipeline context in
+                the following order: ``REGCAL_CONTLINE_SCIENCE``,
+                ``REGCAL_CONTLINE_ALL``, ``SELFCAL_CONTLINE_SCIENCE``, and
+                ``RAW``. It uses the first data type for which matching
+                MeasurementSets are available. If suitable calibrated data are
+                not available, the task may fall back to raw data.
+
+                Examples: 'uid___A001_2c3_1.ms', ['uid___A001_2c3_1.ms', 'uid___A001_2c3_2.ms']
+
+            field: Science target field selection. By default, the task processes
+                all fields with the ``TARGET`` intent. Specify field names or IDs
+                to restrict the search.
+
+            spw: Spectral-window selection. By default, all science spectral
+                windows associated with the selected ``TARGET`` fields are
+                considered. CASA-style spectral-window selections may be used
+                to restrict the search. Fully flagged field/SPW combinations
+                are skipped; spectral windows are also omitted if no selected
+                field has usable data.
+
+            parallel: Enable MPI-based parallel processing. With the default
+                ``'automatic'`` setting, parallel processing is enabled when
+                multiple spectral windows are available and MPI execution is
+                configured.
+
+                Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
+
+                Default: ``'automatic'`` (automatically enabled if multiple
+                spectral windows are detected and parallel execution is available).
+        """
         super().__init__()
         self.context = context
         self.output_dir = output_dir

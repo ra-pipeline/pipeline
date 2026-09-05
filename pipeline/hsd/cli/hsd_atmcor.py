@@ -31,13 +31,12 @@ def hsd_atmcor(
     The WebLog shows a list of the calibrated MSs with the selected model parameters (``atmType``,
     ``h0``, ``dTem_dh``) and integrated spectra (amplitude vs. frequency) after correction;
     magenta curves show the atmospheric transmission. Spectra before correction can be found on the
-    :py:func:`hsd_applycal <hsd_applycal>` WebLog page.
+    :func:`~pipeline.hsd.cli.hsd_applycal` WebLog page.
 
     Notes:
         QA scoring:
 
         - QA = 1.0 if ATM correction is successfully applied.
-        - QA = N/A if ATM correction is not applied.
         - QA = 0.0 if an error occurs during the correction.
 
     Examples:

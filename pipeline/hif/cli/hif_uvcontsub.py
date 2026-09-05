@@ -7,12 +7,12 @@ def hif_uvcontsub(vis=None, field=None, intent=None, spw=None, fitorder=None, pa
     """Subtract the continuum from the uv-data using the ranges in ``cont.dat``.
 
     Fits and subtracts the continuum emission for each science target and spw independently using
-    the LSRK frequency ranges from the ``cont.dat`` file (produced by :py:func:`hif_findcont <hif_findcont>`). The
+    the LSRK frequency ranges from the ``cont.dat`` file (produced by :func:`~pipeline.hif.cli.hif_findcont`). The
     ``cont.dat`` LSRK ranges are translated to the topocentric (TOPO) frame per MS and reported
     in the WebLog.
 
     Starting in PL2024 the fit order is ``fitorder=1`` by default, but ``fitorder=0`` is used when
-    the ``LowBW`` or ``LowSpread`` condition was flagged for that spw in :py:func:`hif_findcont <hif_findcont>` (i.e.
+    the ``LowBW`` or ``LowSpread`` condition was flagged for that spw in :func:`~pipeline.hif.cli.hif_findcont` (i.e.
     the selected continuum bandwidth is very small or the selected channels are not well spread
     across the spw). For any spw listed in ``cont.dat`` with no channel ranges specified, the spw
     is treated as ``AllContinuum`` (PL2024+) and no line MS output is produced for that spw.

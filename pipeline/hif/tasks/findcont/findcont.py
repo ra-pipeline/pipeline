@@ -124,7 +124,7 @@ class FindContInputs(vdp.StandardInputs):
 
             hm_mode: Continuum-finding imaging mode. "coarse" applies the new fast local override  with
                 reduced pixels-per-beam sampling to optimize processing speed
-                and "normal" preserves the previous-cycle behavior.
+                and "normal" preserves the behavior prior to ALMA Cycle 13.
 
                 Default: ``'normal'``
 
