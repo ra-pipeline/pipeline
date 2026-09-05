@@ -41,9 +41,15 @@ def hif_findcont(vis=None, target_list=None, hm_mosweight=None,
     are not re-analyzed; only spws not listed are processed. The resulting ``cont.dat`` file (LSRK
     frequency ranges) is used by subsequent :func:`~pipeline.hif.cli.hif_uvcontsub` and :func:`~pipeline.hif.cli.hif_makeimages` stages.
 
-    Using ``hm_mode='coarse'`` applies the fast-imaging override with reduced
-    pixels-per-beam sampling to optimize processing speed. The default mode is
-    ``hm_mode='normal'`` to preserve the behavior prior to ALMA Cycle 13.
+    Using ``hm_mode='coarse'`` applies fast-imaging overrides to reduce the
+    cost of the continuum-finding dirty cubes. When the target list is
+    constructed internally for ALMA data, coarse mode uses 3 pixels per beam
+    for 12-m data or 4 pixels per beam when 7-m data are present, applies a
+    uv taper, and enforces a minimum image size of 64 pixels. In all coarse
+    mode runs, weighting is set to ``'briggs'``, and per-channel weight
+    density and mosaic weighting are disabled, regardless of the corresponding
+    ``hm_*`` parameters. The default mode is ``hm_mode='normal'``, which
+    preserves the behavior prior to PL2026.
 
     .. note::
        Starting from ALMA Cycle 13, standard ALMA recipes use ``hm_mode='coarse'``

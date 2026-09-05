@@ -118,12 +118,21 @@ class FindContInputs(vdp.StandardInputs):
                 ignored.
 
             hm_mosweight: Mosaic weighting. Defaults to '' to enable the automatic heuristics calculation.
-                Can be set to True or False manually.
+                Can be set to True or False manually. When
+                ``hm_mode='coarse'``, this parameter is overridden and set to
+                ``False``.
 
             hm_perchanweightdensity: Calculate the weight density for each channel independently.
-                Defaults to '' to enable the automatic heuristics calculation. Can be set to True or False manually.
+                Defaults to '' to enable the automatic heuristics calculation.
+                Can be set to True or False manually. When
+                ``hm_mode='coarse'``, this parameter is overridden and set to
+                ``False``.
 
-            hm_weighting: Weighting scheme (natural,uniform,briggs,briggsabs[experimental],briggsbwtaper[experimental])
+            hm_weighting: Weighting scheme
+                (natural, uniform, briggs, briggsabs[experimental],
+                briggsbwtaper[experimental]). When
+                ``hm_mode='coarse'``, this parameter is overridden and Briggs
+                weighting is used.
 
             hm_mode: Continuum-finding imaging mode. "coarse" applies the new fast local override  with
                 reduced pixels-per-beam sampling to optimize processing speed
