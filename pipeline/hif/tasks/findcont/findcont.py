@@ -108,6 +108,8 @@ class FindContInputs(vdp.StandardInputs):
 
             vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the <hifa,hifv>_importdata task.
                 '': use all MeasurementSets in the context
+                When an explicit list is supplied, ``datacolumn`` must also be
+                specified as ``'data'`` or ``'corrected'``.
 
                 Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
 
@@ -144,7 +146,10 @@ class FindContInputs(vdp.StandardInputs):
                 which will process all fields. Can be used to restrict processing to a subset of fields.
                 Only used if target_list is not specified.
 
-            datacolumn: Data column to image. Only to be used for manual overriding when the automatic choice by data type is not appropriate.
+            datacolumn: Data column to image. When ``vis`` is omitted, this
+                is optional and is selected automatically from the pipeline
+                data type. When ``vis`` is supplied explicitly, this must be
+                specified as ``'data'`` or ``'corrected'``.
 
             parallel: Use CASA/tclean built-in parallel imaging when possible.
 
