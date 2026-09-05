@@ -111,8 +111,11 @@ class FindContInputs(vdp.StandardInputs):
 
                 Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
 
-            target_list: Dictionary specifying targets to be imaged; blank will read list from context.
-                If target_list is specified, it takes precedence and the field parameter is ignored.
+            target_list: Dictionary specifying targets for continuum finding.
+                If not specified, ``hif_findcont`` constructs the target list
+                internally using ``hif_makeimlist`` planning. If specified,
+                ``target_list`` takes precedence and the ``field`` parameter is
+                ignored.
 
             hm_mosweight: Mosaic weighting. Defaults to '' to enable the automatic heuristics calculation.
                 Can be set to True or False manually.
