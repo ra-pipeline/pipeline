@@ -20,7 +20,9 @@ def hif_findcont(vis=None, target_list=None, hm_mosweight=None,
     2. **Pre-smoothing**: A boxcar smoothing kernel is applied to the mean spectrum prior to
        analysis. For Cycle 10+ data the kernel width is derived from the
        ``spectralDynamicRangeBandwidth`` ASDM attribute. For older data it is based on the
-       ``nbin`` factor from the preceding :func:`~pipeline.hif.cli.hif_makeimlist` stage, with additional heuristics
+       ``nbin`` value in the imaging target list, which is either supplied through
+       ``target_list`` or constructed internally using
+       :func:`~pipeline.hif.cli.hif_makeimlist` heuristics, with additional heuristics
        to skip smoothing for wide + narrow spw combinations, already-labeled continuum spws,
        and cases of strong line emission (peak SNR > 10: nbin limited to 2 for 12m, 3 for 7m).
     3. **Moment-difference contamination check**: Line-free channels are used to form ``mom8fc``
