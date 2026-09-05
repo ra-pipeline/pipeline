@@ -34,8 +34,8 @@ def hif_mstransform(vis=None, outputvis=None, field=None, intent=None, spw=None,
 
         >>> hif_mstransform()
 
-        2. Split only selected intents, for example phase and bandpass:
+        2. Transform a selected science target and spectral windows:
 
-        >>> hif_mstransform(intent='PHASE,BANDPASS')
+        >>> hif_mstransform(field='my_target', spw='0,1')
 
     """
