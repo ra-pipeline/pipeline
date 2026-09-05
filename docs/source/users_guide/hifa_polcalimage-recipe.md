@@ -41,7 +41,7 @@ The following is the ordered list of pipeline processing commands executed by th
 37. {func}`~pipeline.hif.cli.hif_mstransform` ()
 38. {func}`~pipeline.hifa.cli.hifa_flagtargets` ()
 39. {func}`~pipeline.hif.cli.hif_findroi` ()
-40. {func}`~pipeline.hif.cli.hif_findcont` ()
+40. {func}`~pipeline.hif.cli.hif_findcont` (hm_mode='coarse')
 41. {func}`~pipeline.hif.cli.hif_uvcontsub` ()
 42. {func}`~pipeline.hif.cli.hif_makeimlist` (specmode='mfs')
 43. {func}`~pipeline.hif.cli.hif_makeimages` ()
