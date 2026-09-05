@@ -33,7 +33,17 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
     - **Check Source Images**
       After creating per-EB, per-spw images of all check sources, the pipeline performs a Gaussian fit and evaluates
       positional offsets and flux ratios. Check source imaging uses the dynamic range modifiers for science targets.
-      An additional QA score is computed as the minimum of  the following two subscore: a positional offset subscore calculated from the difference between the position of the peak in the image to the checksources’ catalogued position in units of the synthesized beam (QA_offset=max[0.33, 1-min(1, offset/beam)] ), and a decorrelation subscore calculated from ratio of the fitted peak intensity to the fitted total flux density (QA_peak=max[0.33, 1-abs{1-Peak/flux} ] ). Low values of this score can indicate potential problems with phase transfer between the phase calibrator and science targets, but are less diagnostic at low signal to noise, or the more distant the check source is from the phase calibrator compared to the target
+      An additional QA score is computed as the minimum of two subscores. The
+      positional-offset subscore is calculated from the separation between the
+      Gaussian-fitted and cataloged positions in units of the synthesized beam
+      (``QA_offset = max[0.33, 1 - min(1, offset/beam)]``). The decorrelation
+      subscore is calculated from the ratio of the fitted peak intensity to the
+      fitted total flux density
+      (``QA_decorrelation = max[0.33, 1 - abs(1 - peak/flux)]``). Low values can
+      indicate potential problems with phase transfer between the phase
+      calibrator and science targets, but are less diagnostic at low
+      signal-to-noise ratio or when the check source is farther from the phase
+      calibrator than the science target.
     
       .. figure:: /figures/checksrc_table.png
          :alt: Check source QA table
@@ -229,13 +239,17 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
            - DR / 200
 
     Notes:
-        Three base QA scores apply to all imaging stages:
+        The following base QA behavior applies to ALMA imaging:
 
-        - QA = 0.0 if the clean algorithm diverges.
-        - QA = 0.34 if an expected image is not created.
-        - Third score = ratio of non-pbcor noise-annulus rms (0.3-0.2 PB level) to the product
-          of the theoretical noise and the DR correction factor. QA = 1.0 if that ratio <= 1.0;
-          QA = 0.0 if >= 5.0; linearly scaled between 1 and 5.
+        - QA = 0.34 when cleaning reports an error or an expected image is not
+          created.
+        - QA = 0.0 when the measured image RMS is NaN, indicating that cleaning
+          diverged.
+        - For a successfully created image, the image-RMS score compares the
+          non-primary-beam-corrected noise-annulus RMS with the theoretical
+          sensitivity after applying the dynamic-range correction. An
+          error-function scorer gives a score near 1.0 when the ratio is 1 and
+          approaches its lower limit of 0.34 as the ratio reaches 5.
 
         Additional QA is calculated for specific types of imaging (cube, check source, etc) as detailed above.
         
