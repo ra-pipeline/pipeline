@@ -1,6 +1,5 @@
 (sec-acknowledgement)=
-Citing Pipeline and CASA
-------------------------
+# Citations and Acknowledgements
 
 If you use **ALMA data** in your publications, you must include the official acknowledgement text found on the [ALMA publication acknowledgement page](https://almascience.eso.org/alma-data/publication-acknowledgement).
 
@@ -10,11 +9,11 @@ We thank you for additionally acknowledging the use of Pipeline and CASA, using 
 Data were calibrated using the ALMA Pipeline version 2025.1.0.37 and CASA 6.6.6-18 (:{cite}`2023PASP..135g4501H`, :{cite}`2022PASP..134k4501C`). Calibrated visibilities were downloaded from the ALMA Science Archive and restored, after which the CASA tclean task was used to image those visibilities.
 ```
 
-:::{important} Cite both Pipeline and CASA versions
+:::{important}
 Pipeline and CASA are **distinct software packages**, albeit often packaged together — citing both version numbers is essential for reproducibility and credit. See {ref}`Overview <sec-overview>` for more details.
 :::
 
-### Key Points When Citing
+## Guidelines
 
 * **Pipeline and CASA versions:** Available in the Weblog for all processed data, as well as from the following sources, depending on your delivery method:
 
