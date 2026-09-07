@@ -770,7 +770,9 @@ class SerialTimeGaincal(gtypegaincal.GTypeGaincal):
         # SpWs for which solutions are computed.
         fieldlist = inputs.ms.get_fields(task_arg=field)
         sci_spws = set(inputs.ms.get_spectral_windows(task_arg=spw, intent=intent))
-        spws_to_solve = ','.join({str(spw.id) for fld in fieldlist for spw in fld.valid_spws.intersection(sci_spws)})
+        spws_to_solve = ','.join(
+            utils.deduplicate(str(spw.id) for fld in fieldlist for spw in fld.valid_spws.intersection(sci_spws))
+        )
 
         task_args = {
             'output_dir': inputs.output_dir,
