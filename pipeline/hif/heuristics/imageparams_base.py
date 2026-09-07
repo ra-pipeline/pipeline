@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING
 
 import astropy.units as u
 import numpy as np
+
+import pipeline.infrastructure.utils as utils
 from astropy.coordinates import SkyCoord
 from casatasks.private.imagerhelpers.imager_base import PySynthesisImager
 from casatasks.private.imagerhelpers.imager_parallel_continuum import PyParallelContSynthesisImager
@@ -476,7 +478,7 @@ class ImageParamsHeuristics:
                         scan_dos = [scan for scan in ms.scans
                                     if intent in scan.intents
                                     and field in {f.name for f in scan.fields}]
-                        scanids = ','.join({str(scan.id) for scan in scan_dos})
+                        scanids = ','.join(utils.deduplicate(str(scan.id) for scan in scan_dos))
 
                         for spwid in spwids:
                             real_spwid = self.observing_run.virtual2real_spw_id(spwid, ms)
