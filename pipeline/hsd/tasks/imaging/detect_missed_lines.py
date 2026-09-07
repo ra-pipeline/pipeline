@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from astropy.stats import sigma_clip
 from matplotlib import figure
+from scipy import interpolate
 from scipy.ndimage import convolve, label
 from scipy.stats import median_abs_deviation
 
@@ -38,6 +39,7 @@ DEVIATION_THRESHOLD_MOMENT_MASK = 5.0
 MASK_LIMIT = 7.0
 SIGMA_CLIPPING_THRESHOLD = 6.0
 SIGMA_CLIPPING_MAX_ITERATIONS = 3
+MIN_GAP_WIDTH = 2
 
 
 class DetectMissedLines:
@@ -136,6 +138,8 @@ class DetectMissedLines:
         Returns:
             Dictionary with missed-line detetion results for two methods
             True if possible missed-line is detected, False if not
+        Raises:
+            ValueError: if unknown mask_mode is provided (should not happen)
         """
         # convert valid_lines to line_ranges (int) and revert channels if LSB
         line_ranges = []
@@ -155,22 +159,38 @@ class DetectMissedLines:
                  min(self.nchan-sum(self.edge)-1,
                      math.ceil(line_center + line_width / 2.0))])
 
-        detections = self._detect_over_deviation_threshold(
+        detections, excess_ranges = self._detect_over_deviation_threshold(
             line_ranges,
             linefree_ranges,
             extra_edge_channels,
             atm_channels
         )
 
-        if detections['single_beam']:
-            LOG.info("Field {} spw {}: Significant off-line-range emission detected at peak.".format( self.field_name, self.spwid_list[0]))
-        else:
-            LOG.info("Field {} spw {}: No significant off-line-range emission detected at peak.".format( self.field_name, self.spwid_list[0]))
+        for mask_mode in detections.keys():
+            str_field_spw = f"Field {self.field_name} spw {self.spwid_list[0]}:"
 
-        if detections['moment_mask']:
-            LOG.info("Field {} spw {}: Significant off-line-range extended emission detected.".format( self.field_name, self.spwid_list[0]))
-        else:
-            LOG.info("Field {} spw {}: No significant off-line-range extended emission detected.".format( self.field_name, self.spwid_list[0]))
+            # output detection messages
+            match mask_mode:
+                case 'single_beam':
+                    if detections[mask_mode]:
+                        str_msg = "Significant off-line-range emission detected at peak"
+                    else:
+                        str_msg = "No significant off-line-range emission detected at peak"
+                case 'moment_mask':
+                    if detections[mask_mode]:
+                        str_msg = "Significant off-line-range extended emission detected"
+                    else:
+                        str_msg = "No significant off-line-range extended emission detected"
+                case _:  # should not happen
+                    raise ValueError("Unknown mask_mode {}".format(mask_mode))
+            LOG.info(f"{str_field_spw} {str_msg}")
+
+            # output detected frequency ranges to LOG if any
+            if detections[mask_mode]:
+                spaces = " " * len(str_field_spw)
+                for freq, ch in zip(excess_ranges[mask_mode]['frequency'], excess_ranges[mask_mode]['channel']):
+                    LOG.info(f"{spaces}  {freq[0]:.6f} GHz - {freq[1]:.6f} GHz"
+                             f"  ({ch[0]}:{ch[1]})")
         return detections
 
     def _sigma_estimation(self, data: NDArray[floating], sigma: float, maxiters: int) -> float:
@@ -305,7 +325,7 @@ class DetectMissedLines:
             extra_edge_channels: list[int] = [0, 0],
             atm_channels: np.ndarray | list[bool] = [],
             width_threshold: int = 2
-    ) -> bool:
+    ) -> tuple[dict[str, bool], dict[list[float|int] | None]]:
         """
         Search for the missed lines and create the diagnostic plot
 
@@ -323,8 +343,10 @@ class DetectMissedLines:
             width_threshold : Threshold of chunk size in pixels. default is 2.
 
         Returns:
-            Dictionay of detection results for each method.
-            True if wide enough missed lines are detected, False if not.
+            Tuple of
+               - Dictionary of detection results for each method.
+                 True if wide enough missed lines are detected, False if not.
+               - Dictionary of list of excess ranges
         """
         # width_threshold is 2 or more
         width_threshold = max(width_threshold, 2)
@@ -341,6 +363,7 @@ class DetectMissedLines:
                   'moment_mask': fig.add_axes((0.55, 0.1, 0.43, 0.85))}
 
         detections = {'single_beam': False, 'moment_mask': False}
+        excess_ranges = {'single_beam': None, 'moment_mask': None}
 
         mask_modes = {
             'single_beam': (self._max_spec, DEVIATION_THRESHOLD_SINGLE_BEAM),
@@ -382,14 +405,60 @@ class DetectMissedLines:
                            ax[mask_mode],
                            line_ranges, z_linefree, z_other,
                            dev_threshold, mask_mode)
+
+            # pick excess ranges
+            if detections[mask_mode]:
+                excess_ranges[mask_mode] = self._pick_excess_ranges(z_linefree,
+                                                                    dev_threshold,
+                                                                    min_gap_width=MIN_GAP_WIDTH)
         if self.do_plot:
             self._finalize_plot(fig, detections)
 
-        return detections
+        return detections, excess_ranges
+
+    def _pick_excess_ranges(self, z: NpArray1D, dev_threshold: float, min_gap_width=2) -> dict[str, int|float]:
+        """
+        pick excess ranges applying anti-ringing method
+
+        Args:
+            z             : deviation/sigma
+            dev_threshold : threshold for excess determination
+            min_gap_width : minimum alowwed gap width
+                             gaps smaller than this will be filled for anti-ringing
+        Returns:
+            Dictionary of excess ranges in channels and frequencies
+        """
+        # excess flag
+        flag = (z > dev_threshold).astype(int)
+
+        # anti-ringing
+        labels, num = label(np.array(flag) == 0)
+        for idx in range(1, num + 1):
+            chunk = np.where(labels == idx)[0]
+            # exclude chunks at the edge
+            if chunk[0] != 0 and chunk[-1] != len(flag) - 1:
+                # fill small gaps
+                if len(chunk) < min_gap_width:
+                    flag[chunk[0]:chunk[-1]+1] = True
+
+        # detect where the flag flips
+        diff = np.diff(np.pad(flag, (1, 1), 'constant'))
+        ranges_ch = [[int(start), int(end) - 1] for start, end in zip(np.where(diff == 1)[0], np.where(diff == -1)[0])]
+
+        # convert channels to frequencies
+        _chan2freq = interpolate.interp1d(range(len(self.frequency)), self.frequency,
+                                          kind='linear',
+                                          bounds_error=False,
+                                          fill_value='extrapolate')
+        ranges_freq = [[float(_chan2freq(r[0] - 0.5)), float(_chan2freq(r[1] + 0.5))] for r in ranges_ch]
+
+        return { 'channel': ranges_ch, 'frequency': ranges_freq}
 
     def _finalize_plot(self, fig: figure.Figure, detections: list[bool]):
         """
-        trim-off unused space in the figure and save to png file
+        create final figure file with two plots
+
+        plots for non-detection cases will remain blank with corresponding messages
 
         Args:
             fig: matplotlib figure
