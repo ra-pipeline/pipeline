@@ -29,9 +29,10 @@ class FinalcalsInputs(vdp.StandardInputs):
     refantignore = vdp.VisDependentProperty(default='')
     refant = vdp.VisDependentProperty(default='')
     use_flux_cal = vdp.VisDependentProperty(default=True)
+    bpsolint_mode = vdp.VisDependentProperty(default='auto')
 
     # docstring and type hints: supplements hifv_finalcals
-    def __init__(self, context, vis=None, weakbp=None, refantignore=None, refant=None, use_flux_cal=None):
+    def __init__(self, context, vis=None, weakbp=None, refantignore=None, refant=None, use_flux_cal=None, bpsolint_mode=None):
         """Initialize Inputs.
 
         Args:
@@ -55,6 +56,10 @@ class FinalcalsInputs(vdp.StandardInputs):
                 with proper prior calibrations (gain curves and requantizer gains applied by default in hifv_priorcals),
                 this results in visibility data scaled to approximate Janskys without requiring a flux calibrator reference.
 
+            bpsolint_mode(str, optional): Control bandpass spectral solint optimization heuristics.
+                Options: 'auto' (default; only optimize for Ku-band and higher frequencies),
+                'on' (optimize for all bands), 'off' (disable optimization for all bands).
+
         """
         super().__init__()
         self.context = context
@@ -63,6 +68,7 @@ class FinalcalsInputs(vdp.StandardInputs):
         self.refantignore = refantignore
         self.refant = refant
         self.use_flux_cal = use_flux_cal
+        self.bpsolint_mode = bpsolint_mode
 
 
 class FinalcalsResults(basetask.Results):
@@ -288,7 +294,8 @@ class Finalcals(basetask.StandardTaskTemplate):
                 interp = ''
                 spw_solint = do_bandpass(self.inputs.vis, bpcaltable, context=self.inputs.context, RefAntOutput=RefAntOutput,
                                          spw=','.join(spwlist), ktypecaltable=ktypecaltable, bpdgain_touse=bpdgain_touse, solint='inf', append=append,
-                                         executor=self._executor, solnorm=self._apply_solnorm)
+                                         executor=self._executor, solnorm=self._apply_solnorm,
+                                         bpsolint_mode=self.inputs.bpsolint_mode, band=band)
                 spw_solint_perband[band] = spw_solint
 
         LOG.info("Bandpass calibration complete")
