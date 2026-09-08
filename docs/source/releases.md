@@ -12,10 +12,16 @@
   - Use in Operation
   - Download
 
+* - 2026.2.1
+  - 6.7.4-8
+  - - VLA/PL2026
+  -
+  - - 2026-10 (planned)
+  - 
+
 * - 2026.2.0
-  - 6.7.4-4
+  - 6.7.4-8
   - - ALMA/Cycle-13
-    - VLA/PL2026
   -
   - - 2026-10 (planned)
   -
