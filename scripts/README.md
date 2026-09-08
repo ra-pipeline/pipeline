@@ -9,6 +9,7 @@ This directory contains utility and maintenance scripts for developing, building
 - [1. `bundle_assets.py` — Weblog Asset Minification & Bundling](#1-bundle_assetspy--weblog-asset-minification--bundling)
 - [2. `procedure_add_parallel.py` — Parallel Procedure Generator](#2-procedure_add_parallelpy--parallel-procedure-generator)
 - [3. `update_references.py` — NASA/ADS Reference Synchronizer](#3-update_referencespy--nasaads-reference-synchronizer)
+- [4. `build_backend.py` — In-Tree PEP 517 Build Backend Wrapper](#4-build_backendpy--in-tree-pep-517-build-backend-wrapper)
 
 ---
 
@@ -29,6 +30,7 @@ This script replaces the legacy `MinifyJSCommand` and `MinifyCSSCommand` from `s
 ### Requirements
 
 Requires `csscompressor` and `jsmin`:
+
 ```bash
 pip install -r requirements_dev.txt
 ```
@@ -82,6 +84,7 @@ Fetches the latest Pipeline publication and bibliography records from the [NASA/
 ### Requirements
 
 Requires an active NASA/ADS developer API token. The script checks for the token in the following order:
+
 1. `--token` CLI argument
 2. `ADS_DEV_KEY`, `ADS_API_TOKEN`, or `ADSTOKEN` environment variables
 3. `~/.ads/dev_key` or `~/.ads/token` config files
@@ -100,3 +103,26 @@ python scripts/update_references.py --token <YOUR_TOKEN>
 python scripts/update_references.py --output custom_pipeline.bib
 ```
 
+---
+
+## 4. `build_backend.py` — In-Tree PEP 517 Build Backend Wrapper
+
+Wraps `setuptools.build_meta` to compute and inject the Pipeline package version on-demand during package building and installation (`pip install`, `python -m build`, `pixi`, `uv`).
+
+This in-tree backend replaces the legacy `setup.py` build hooks:
+
+- Dynamically calls `pipeline/infrastructure/version.py` using `get_version_string_from_git()`.
+- Generates `pipeline/_version.py` (read at runtime by `pipeline.environment.pipeline_revision`).
+- Generates the root `version` file (read by `setuptools` via `dynamic.version = { file = "version" }`).
+- Preserves the exact NRAO custom version scheme (`YEAR.MAJOR.MINOR.MICRO+<branch>-<commits>-g<hash>[-dirty]`) without requiring manual release scripts or external version-tagging plugins.
+
+Configured in `pyproject.toml`:
+
+```toml
+[build-system]
+requires = ["setuptools>=64.0", "packaging>=22.0.0", "wheel"]
+build-backend = "build_backend"
+backend-path = ["scripts"]
+```
+
+Included in `MANIFEST.in` (`include scripts/build_backend.py`) so that building or installing from source distribution tarballs (`sdist`) works seamlessly in isolated build environments.

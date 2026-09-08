@@ -166,8 +166,9 @@ tags
 # VSCode
 .vscode/
 
-# ignore _version.py, created by setup.py
+# auto-generated version files
 _version.py
+/version
 
 # auto-generated recipe scripts (any .py files except __init__.py and recipe_converter*.py)
 pipeline/recipes/python_recipes

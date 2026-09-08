@@ -4,7 +4,8 @@ requires = [
     "packaging>=22.0.0",
     "wheel",
 ]
-build-backend = "setuptools.build_meta"
+build-backend = "build_backend"
+backend-path = ["scripts"]
 
 [project]
 name = "Pipeline"
@@ -60,6 +61,7 @@ include = ["pipeline*"]
 ]
 
 [tool.setuptools.dynamic]
+version = { file = "version" }
 dependencies = { file = ["requirements.txt"] }
 optional-dependencies.dev = { file = ["requirements_dev.txt"] }
 optional-dependencies.docs = { file = ["requirements_docs.txt"] }
