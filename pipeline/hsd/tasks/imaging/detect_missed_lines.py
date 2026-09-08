@@ -442,7 +442,7 @@ class DetectMissedLines:
                     flag[chunk[0]:chunk[-1]+1] = 1
 
         # detect where the flag flips
-        diff = np.diff(np.pad(flag, (1, 1), 'constant'))
+        diff = np.diff(np.pad(flag, (1, 1), 'constant', constant_values=(0, 0)))
         ranges_ch = [[int(start), int(end) - 1] for start, end in zip(np.where(diff == 1)[0], np.where(diff == -1)[0])]
 
         # convert channels to frequencies
