@@ -13,42 +13,51 @@ def hifa_bandpass(vis=None, caltable=None, field=None, intent=None, spw=None, an
     This task self-calibrates the bandpass calibrator by first obtaining
     phase-only solutions on a short time interval determined by signal-to-noise.
     It then calculates the antenna-based bandpass phase and amplitude solutions
-    using an SNR-dependent frequency interval.
+    using an SNR-dependent frequency interval. The process is encoded in the
+    ``/hifa/tasks/bandpass/almaphcorbandpass.py`` function.
+
+    **Temporal Phase-Up Workflow**
+
+    As of PL2025, internal ``solint`` and ``combine`` options are computed to achieve the
+    target ``phaseupsnr``. The ``solint`` is calculated based on the SNR for each spw.
+    If ``solint`` per spw is not ``'int'``, the ``combine`` parameter is
+    set to ``'spw'`` as to combine data from all spectral windows, thereby
+    improving SNR. In this case, a temporary `gaincal` solution is made to
+    obtain per-spw phase-offsets to align the phases of all spws. The
+    ``solint`` is then recalculated based on the SNR for the aggregate bandwidth.
+    If ``solint`` is still not ``'int'`` but is less than ``phaseupmaxsolint``, an
+    integer multiple of the integration time is used, rounded-up from the computed ``solint``.
+    For ``solint`` exceeding ``phaseupmaxsolint`` the value is capped at the nearest
+    rounded-up integer factor multiple of the integration time. In these cases the ``phaseupsnr`` is
+    not met. The final `solint`  can marginally exceed ``phaseupmaxsolint`` if the whole
+    number of integrations just passes the limit, e.g. 10 x 6.048s = 60.48s.
+
+    The logical workflow is illustrated below:
+
+    .. figure:: /figures/PL2025_hifa_bandpass_phaseup.png
+       :width: 60%
+       :alt: Workflow for hifa_bandpass temporal phase-up
+
+       The logical workflow for the temporal phase-up process used in the
+       :func:`~pipeline.hifa.cli.hifa_bandpassflag` and :func:`~pipeline.hifa.cli.hifa_bandpass` tasks that compute the
+       `gaincal` `solint` and `combine` parameters.
+
+    **Frequency Interval Calculation**
+
+    The frequency interval for the final bandpass solution is determined by
+    SNR. Since PL2024, this interval is rounded to counteract the `floor()`
+    function in CASA, ensuring the interval has the desired number of
+    channels. If the interval needed to reach the required SNR results in
+    fewer than 8 channels, the interval is set to one-eighth of the
+    bandwidth, and the result is assigned a QA subscore of 0.70.
+
+    Since PL2024, the `hm_auto_fillgaps` parameter, if set to True (which is the default in the
+    calibration recipes), causes the `fillgaps` parameter of the underlying :func:`~casatasks.calibration.bandpass` task to
+    be set to 1/4 of each spw width, allowing the user to interpolate across a celestial
+    spectral feature in the bandpass calibrator spectrum. It also avoids gaps due to strong
+    atmospheric lines where the SNR of the solution fails to meet the threshold.
 
     Notes:
-        **Temporal Phase-Up Workflow**
-
-        As of PL2025, the `solint` and `combine` options are computed to achieve the
-        target `phaseupsnr`. If `solint` is not `'int'`, the `combine` parameter is
-        set to `'scan,spw'` to combine data from all spectral windows, thereby
-        improving SNR. In this case, a temporary `gaincal` solution is made to
-        obtain per-spw phase-offsets to align the phases of all spws. The
-        `solint` is then calculated based on the SNR for the aggregate bandwidth.
-
-        The logical workflow is illustrated below:
-
-        .. figure:: /figures/PL2025_hifa_bandpass_phaseup.png
-           :width: 60%
-           :alt: Workflow for hifa_bandpass temporal phase-up
-
-           The logical workflow for the temporal phase-up process used in the
-           :func:`~pipeline.hifa.cli.hifa_bandpassflag` and :func:`~pipeline.hifa.cli.hifa_bandpass` tasks that compute the
-           `gaincal` `solint` and `combine` parameters.
-
-        **Frequency Interval Calculation**
-
-        The frequency interval for the final bandpass solution is determined by
-        SNR. Since PL2024, this interval is rounded to counteract the `floor()`
-        function in CASA, ensuring the interval has the desired number of
-        channels. If the interval needed to reach the required SNR results in
-        fewer than 8 channels, the interval is set to one-eighth of the
-        bandwidth, and the result is assigned a QA subscore of 0.70.
-
-        Since PL2024, the `hm_auto_fillgaps` parameter, if set to True (which is the default in the
-        calibration recipes), causes the `fillgaps` parameter of the underlying :func:`~casatasks.calibration.bandpass` task to
-        be set to 1/4 of each spw width, allowing the user to interpolate across a celestial
-        spectral feature in the bandpass calibrator spectrum. It also avoids gaps due to strong
-        atmospheric lines where the SNR of the solution fails to meet the threshold.
 
         **WebLog Output and QA Metrics**
 

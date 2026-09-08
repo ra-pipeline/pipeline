@@ -75,56 +75,58 @@ def hsd_baseline(
 
        Example of baseline flatness evaluation.
 
-    **Clustering analysis** for spectral line detection (developer plots, hidden by default;
-    enable with ``plotlevel='all'`` in ``h_init``):
+    .. only:: internal
 
-    *Detection*: grid cells with emission exceeding the threshold are identified. Yellow cells
-    have a single time-domain group with detected emission; cyan cells have more than one.
+       **Clustering analysis** for spectral line detection (developer plots, hidden by default;
+       enable with ``plotlevel='all'`` in ``h_init``):
 
-    .. figure:: /figures/guide-img037.png
-       :width: 60%
-       :alt: Clustering detection
+       *Detection*: grid cells with emission exceeding the threshold are identified. Yellow cells
+       have a single time-domain group with detected emission; cyan cells have more than one.
 
-       Clustering detection step.
+       .. figure:: /figures/guide-img037.png
+          :width: 50%
+          :alt: Clustering detection
 
-    *Validation*: for each grid cell the ratio of spectra containing detected emission lines
-    (``Nmember``) to total spectra in the cell (``Nspectra``) is computed:
+          Clustering detection step.
 
-    - **Validated** if ``Nmember/Nspectra > 0.5``
-    - **Marginally validated** if ``Nmember/Nspectra > 0.3``
-    - **Questionable** if ``Nmember/Nspectra > 0.2``
+       *Validation*: for each grid cell the ratio of spectra containing detected emission lines
+       (``Nmember``) to total spectra in the cell (``Nspectra``) is computed:
 
-    .. figure:: /figures/guide-img038.png
-       :width: 60%
-       :alt: Clustering validation
+       - **Validated** if ``Nmember/Nspectra > 0.5``
+       - **Marginally validated** if ``Nmember/Nspectra > 0.3``
+       - **Questionable** if ``Nmember/Nspectra > 0.2``
 
-       Clustering validation step.
+       .. figure:: /figures/guide-img038.png
+          :width: 50%
+          :alt: Clustering validation
 
-    *Smoothing*: the per-cell ratio is convolved with a Gaussian-like grid function to suppress
-    isolated single-line candidates and reinforce detections supported by neighboring cells.
+          Clustering validation step.
 
-    .. figure:: /figures/guide-img039.png
-       :width: 60%
-       :alt: Clustering smoothing
+       *Smoothing*: the per-cell ratio is convolved with a Gaussian-like grid function to suppress
+       isolated single-line candidates and reinforce detections supported by neighboring cells.
 
-       Clustering smoothing step.
+       .. figure:: /figures/guide-img039.png
+          :width: 50%
+          :alt: Clustering smoothing
 
-    *Mask region determination*: in the validated area after smoothing, mask channel ranges are
-    computed over the spatial domain by inter/extrapolating the mask ranges of the averaged
-    spectra in validated cells and applied to each individual spectrum.
+          Clustering smoothing step.
 
-    .. figure:: /figures/guide-img040.png
-       :width: 60%
-       :alt: Mask range calculation
+       *Mask region determination*: in the validated area after smoothing, mask channel ranges are
+       computed over the spatial domain by inter/extrapolating the mask ranges of the averaged
+       spectra in validated cells and applied to each individual spectrum.
 
-       Mask range calculation — in blue squares the mask
-       range is interpolated from validated cells.
+       .. figure:: /figures/guide-img040.png
+          :width: 50%
+          :alt: Mask range calculation
 
-    .. figure:: /figures/guide-img041.png
-       :width: 60%
-       :alt: Clustering final
+          Mask range calculation — in blue squares the mask
+          range is interpolated from validated cells.
 
-       Clustering final example.
+       .. figure:: /figures/guide-img041.png
+          :width: 50%
+          :alt: Clustering final
+
+          Clustering final example.
 
     Notes:
         Three QA scores are computed:
