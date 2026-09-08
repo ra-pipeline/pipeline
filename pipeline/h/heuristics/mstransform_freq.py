@@ -80,6 +80,9 @@ def configure_frequency(
                 # clear_time_cache()
                 me.doframe(me.observatory(ref_ms.antenna_array.name))
                 me.doframe(target_source.direction)
+                # NOTE: for SD data, we may need to get reference time from MS by examining intent
+                # because TARGET and REFERENCE intents co-exists in the target field when
+                # OFF position strategy is not absolute OFF.
                 start_time = np.unique([f.time for f in target_source.fields])[0]
                 LOG.info(f"    DEBUG: {ms_obj.basename} {target_source.name} start_time {start_time} sec")
                 me.doframe(me.epoch(rf="UTC", v0=qa.quantity(start_time, "s")))
