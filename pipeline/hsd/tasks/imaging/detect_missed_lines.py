@@ -89,10 +89,10 @@ class DetectMissedLines:
             # check array shapes of image and weight
             if self.imagedata.shape != self.weightdata.shape:
                 raise ValueError(
-                    "Demensions of image ({}) and weight ({}) do not match".format(self.item.imagename, weightname)
+                    f"Dimensions of image ({self.item.imagename}) and weight ({weightname}) do not match."
                 )
         else:
-            LOG.warning("Weight file {} not found. Assuming weight=1.0 for all pixels.".format(weightname))
+            LOG.warning(f"Weight file {weightname} not found. Assuming weight=1.0 for all pixels.")
             self.weightdata = np.ones(np.shape(self.imagedata))
 
         # number of spectral channels
@@ -182,7 +182,7 @@ class DetectMissedLines:
                     else:
                         str_msg = "No significant off-line-range extended emission detected"
                 case _:  # should not happen
-                    raise ValueError("Unknown mask_mode {}".format(mask_mode))
+                    raise ValueError(f"Unknown mask_mode {mask_mode}")
             LOG.info(f"{str_field_spw} {str_msg}")
 
             # output detected frequency ranges to LOG if any
@@ -474,10 +474,10 @@ class DetectMissedLines:
         os.makedirs(stage_dir, exist_ok=True)
 
         # filename
-        plot_outfile = os.path.join(stage_dir, "{}.missedlines.png".format( self.item.imagename))
+        plot_outfile = os.path.join(stage_dir, f"{self.item.imagename}.missedlines.png")
 
         # save figure to file
-        LOG.info("Saving diagnostic plot for off-line-range emissions to {}".format(plot_outfile))
+        LOG.info(f"Saving diagnostic plot for off-line-range emissions to {plot_outfile}")
         fig.savefig(plot_outfile)
 
     def _plot(self,
@@ -539,7 +539,7 @@ class DetectMissedLines:
             ax.set_xlim(frequency_boundaries[0], frequency_boundaries[-1])
             ax.set_ylim(1.1 * np.nanmin( z_linefree),
                         1.1 * np.nanmax( z_linefree))
-            ax.set_xlabel('frequency (GHz) {}'.format(self.frequency_frame))
+            ax.set_xlabel('frequency (GHz) {self.frequency_frame}')
             ax.set_ylabel('deviation / sigma')
             ax.tick_params( direction='in')
             ax.legend(fontsize='small', ncols=3, loc='best', bbox_to_anchor=(0, 0, 1.0, 0.1))
@@ -556,6 +556,6 @@ class DetectMissedLines:
             case 'moment_mask':
                 mode = "extended"
             case _:
-                raise ValueError("Unknown mask_mode {}".format(mask_mode))
-        plot_title = "Field:{} spw:{} ({})".format( self.field_name, self.spwid_list[0], mode )
+                raise ValueError(f"Unknown mask_mode {mask_mode}")
+        plot_title = f"Field:{self.field_name,} spw:{self.spwid_list[0]} ({mode})"
         ax.set_title( plot_title )
