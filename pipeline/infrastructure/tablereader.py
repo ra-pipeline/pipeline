@@ -1023,7 +1023,7 @@ class AntennaTable:
             position = msmd.antennaposition(i)
             offset = msmd.antennaoffset(i)
             diameter_m = casa_tools.quanta.convert(msmd.antennadiameter(i), 'm')
-            diameter = casa_tools.quanta.getvalue(diameter_m)[0]
+            diameter = casa_tools.quanta.getvalue(diameter_m).item()
 
             antenna = domain.Antenna(i, name, station, position, offset, diameter)
             antennas.append(antenna)

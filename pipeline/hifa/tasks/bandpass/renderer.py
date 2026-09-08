@@ -149,10 +149,10 @@ class T2_4MDetailsBandpassRenderer(baserenderer.T2_4MDetailsBandpassRenderer):
         # If freqsolint in channels compute equivalent
         # frequency interval in MHz and vice versa
         if qa.getunit(qfreqsolint) == 'ch':
-            nchan = qa.getvalue(qfreqsolint)[0]
+            nchan = qa.getvalue(qfreqsolint).item()
             afreqsolint = timesolint + ',' + freqsolint + '(%fMHz)' % (1.0e-6 * nchan * median_chanwidth)
         else:
-            nchan = qa.getvalue(qa.convert(qfreqsolint, 'Hz'))[0] / median_chanwidth
+            nchan = qa.getvalue(qa.convert(qfreqsolint, 'Hz')).item() / median_chanwidth
             afreqsolint = timesolint + ',' + freqsolint  + '(%0.1fch)' % (nchan) 
 
         return afreqsolint

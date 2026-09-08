@@ -857,7 +857,7 @@ class SDImaging(basetask.StandardTaskTemplate):
         _spwid = str(rgp.combined.v_spws[REF_MS_ID])
         _spwobj = rgp.ref_ms.get_spectral_window(_spwid)
         _effective_bw = _cqa.quantity(_spwobj.channels.chan_effbws[0], 'Hz')
-        effbw = float(_cqa.getvalue(_effective_bw)[0])
+        effbw = float(_cqa.getvalue(_effective_bw).item())
         self._finalize_worker_result(self.inputs.context, rgp.imager_result, session=','.join(cp.session_names), sourcename=rgp.source_name,
                                      spwlist=rgp.v_spwids, antenna=rgp.ant_name, specmode=rgp.specmode,
                                      imagemode=cp.imagemode, stokes=self.stokes,
@@ -887,7 +887,7 @@ class SDImaging(basetask.StandardTaskTemplate):
         _spwid = str(rgp.combined.v_spws[REF_MS_ID])
         _spwobj = rgp.ref_ms.get_spectral_window(_spwid)
         _effective_bw = _cqa.quantity(_spwobj.channels.chan_effbws[0], 'Hz')
-        effbw = float(_cqa.getvalue(_effective_bw)[0])
+        effbw = float(_cqa.getvalue(_effective_bw).item())
         self._finalize_worker_result(self.inputs.context, rgp.imager_result_nro, session=','.join(cp.session_names), sourcename=rgp.source_name,
                                      spwlist=rgp.v_spwids, antenna=rgp.ant_name, specmode=rgp.specmode,
                                      imagemode=cp.imagemode, stokes=rgp.stokes_list[1],
@@ -1095,18 +1095,18 @@ class SDImaging(basetask.StandardTaskTemplate):
         _spwobj = rgp.ref_ms.get_spectral_window(_spwid)
         _effective_bw = _cqa.quantity(_spwobj.channels.chan_effbws[0], 'Hz')
         _theoretical_rms_aqua = pp.theoretical_rms if pp.brightnessunit == 'Jy/beam' else None  # for some telescopes, the unit might be different from 'Jy/beam'
-        _sensitivity = Sensitivity(array='TP', intent='TARGET', field=rgp.source_name,
+        _sensitivity = Sensitivity(array='TP', stokes=self.stokes, intent='TARGET', field=rgp.source_name,
                                    spw=_spwid, is_representative=pp.is_representative_source_and_spw,
                                    bandwidth=_bw, bwmode='cube', beam=pp.beam, cell=pp.qcell,
                                    observed_sensitivity=_cqa.quantity(pp.image_rms, pp.brightnessunit),
                                    effective_bw=_effective_bw, imagename=rgp.imagename,
                                    datatype=self.inputs.datatype.name, theoretical_sensitivity=_theoretical_rms_aqua)
-        _theoretical_noise = Sensitivity(array='TP', intent='TARGET', field=rgp.source_name,
+        _theoretical_noise = Sensitivity(array='TP', stokes=self.stokes, intent='TARGET', field=rgp.source_name,
                                          spw=_spwid, is_representative=pp.is_representative_source_and_spw,
                                          bandwidth=_bw, bwmode='cube', beam=pp.beam, cell=pp.qcell,
                                          theoretical_sensitivity=pp.theoretical_rms, observed_sensitivity=None)
         _sensitivity_info = SensitivityInfo(_sensitivity, pp.stat_freqs, (cp.is_not_nro()))
-        effbw = float(_cqa.getvalue(_effective_bw)[0])
+        effbw = float(_cqa.getvalue(_effective_bw).item())
         self._finalize_worker_result(self.inputs.context, rgp.imager_result, session=','.join(cp.session_names), sourcename=rgp.source_name,
                                      spwlist=rgp.combined.v_spws, antenna='COMBINED', specmode=rgp.specmode,
                                      imagemode=cp.imagemode, stokes=self.stokes,
@@ -1153,7 +1153,7 @@ class SDImaging(basetask.StandardTaskTemplate):
             _spwid = str(rgp.combined.v_spws[REF_MS_ID])
             _spwobj = rgp.ref_ms.get_spectral_window(_spwid)
             _effective_bw = _cqa.quantity(_spwobj.channels.chan_effbws[0], 'Hz')
-            effbw = float(_cqa.getvalue(_effective_bw)[0])
+            effbw = float(_cqa.getvalue(_effective_bw).item())
             self._finalize_worker_result(self.inputs.context, rgp.imager_result, session=','.join(cp.session_names), sourcename=rgp.source_name,
                                          spwlist=rgp.combined.v_spws, antenna='COMBINED', specmode=rgp.specmode,
                                          imagemode=cp.imagemode, stokes=rgp.stokes_list[1],
@@ -1684,7 +1684,7 @@ class SDImaging(basetask.StandardTaskTemplate):
         cqa = casa_tools.quanta
         beam_unit = cqa.getunit(pp.beam['major'])
         assert cqa.getunit(pp.beam['minor']) == beam_unit
-        beam_size = numpy.sqrt(cqa.getvalue(pp.beam['major'])[0] * cqa.getvalue(pp.beam['minor'])[0])
+        beam_size = numpy.sqrt(cqa.getvalue(pp.beam['major']).item() * cqa.getvalue(pp.beam['minor']).item())
         center_unit = 'deg'
         angle_unit = None
         for r in pp.raster_infos:

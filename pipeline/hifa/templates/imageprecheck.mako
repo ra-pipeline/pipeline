@@ -18,27 +18,27 @@ repr_source = result[0].repr_source
 repr_spw = '%s' % (result[0].repr_spw)
 reprBW_mode = '%s' % (result[0].reprBW_mode)
 reprBW_nbin = '%d' % (result[0].reprBW_nbin)
-repr_freq = '%.4f GHz' % (cqa.getvalue(cqa.convert(result[0].repr_target[1], 'GHz')))
-repr_bw = '%.4g MHz' % (cqa.getvalue(cqa.convert(result[0].repr_target[2], 'MHz')))
-sens_bw = '%.4g MHz' % (cqa.getvalue(cqa.convert(result[0].sensitivity_bandwidth, 'MHz')))
-minAR_v = cqa.getvalue(cqa.convert(result[0].minAcceptableAngResolution, 'arcsec'))
-maxAR_v = cqa.getvalue(cqa.convert(result[0].maxAcceptableAngResolution, 'arcsec'))
+repr_freq = '%.4f GHz' % (cqa.getvalue(cqa.convert(result[0].repr_target[1], 'GHz')).item())
+repr_bw = '%.4g MHz' % (cqa.getvalue(cqa.convert(result[0].repr_target[2], 'MHz')).item())
+sens_bw = '%.4g MHz' % (cqa.getvalue(cqa.convert(result[0].sensitivity_bandwidth, 'MHz')).item())
+minAR_v = cqa.getvalue(cqa.convert(result[0].minAcceptableAngResolution, 'arcsec')).item()
+maxAR_v = cqa.getvalue(cqa.convert(result[0].maxAcceptableAngResolution, 'arcsec')).item()
 minAR = '%#.3g arcsec' % (minAR_v)
 maxAR = '%#.3g arcsec' % (maxAR_v)
-maxBR_v = cqa.getvalue(result[0].maxAllowedBeamAxialRatio)[0]
+maxBR_v = cqa.getvalue(result[0].maxAllowedBeamAxialRatio).item()
 
 # SRDP user-specified min/max angular resolution
 user_minAR, userMaxAR = None, None
 if result[0].user_minAcceptableAngResolution:
-    user_minAR_v = cqa.getvalue(cqa.convert(result[0].user_minAcceptableAngResolution, 'arcsec'))
+    user_minAR_v = cqa.getvalue(cqa.convert(result[0].user_minAcceptableAngResolution, 'arcsec')).item()
     user_minAR = '%#.3g arcsec' % (user_minAR_v)
 
 if result[0].user_maxAcceptableAngResolution:
-    user_maxAR_v = cqa.getvalue(cqa.convert(result[0].user_maxAcceptableAngResolution, 'arcsec'))
+    user_maxAR_v = cqa.getvalue(cqa.convert(result[0].user_maxAcceptableAngResolution, 'arcsec')).item()
     user_maxAR = '%#.3g arcsec' % (user_maxAR_v)
 
-user_maxBR_v = cqa.getvalue(result[0].user_maxAllowedBeamAxialRatio)[0]
-sensitivityGoal_v = cqa.getvalue(cqa.convert(result[0].sensitivityGoal, 'mJy'))
+user_maxBR_v = cqa.getvalue(result[0].user_maxAllowedBeamAxialRatio).item()
+sensitivityGoal_v = cqa.getvalue(cqa.convert(result[0].sensitivityGoal, 'mJy')).item()
 sensitivityGoal = '%#.3g mJy' % (sensitivityGoal_v)
 robust = '%.1f' % (result[0].hm_robust)
 uvtaper = '%s' % (result[0].hm_uvtaper)

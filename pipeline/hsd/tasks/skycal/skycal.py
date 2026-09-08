@@ -551,7 +551,8 @@ def compute_elevation_difference(context: Context, results: SDSkyCalResults) -> 
                         selected = tb.query("&&".join([
                             f'FIELD_ID=={field_id_off}',
                             f'SPECTRAL_WINDOW_ID=={spw_id}',
-                            f'ANTENNA1=={antenna_id}'
+                            f'ANTENNA1=={antenna_id}',
+                            "NOT ALL(FLAG)"
                         ]))
                         timecal = selected.getcol('TIME') / 86400.0  # sec -> day
                         selected.close()
