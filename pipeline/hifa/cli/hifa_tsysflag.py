@@ -62,7 +62,7 @@ def hifa_tsysflag(vis=None, caltable=None,
       the fraction of entirely flagged antennas exceeds ``tmef1_limit`` (default: 0.666).
 
     Notes:
-        QA = 0.0 if additional flagging fraction >= 50%, QA = 1.0 if <= 5%, linearly interpolated between 0 and 1
+        QA = 0.5 if additional flagging fraction >= 50%, QA = 1.0 if <= 5%, linearly interpolated between 0.5 and 1
         for fractions between 5% and 50%. An additional score of 0.8 is assigned if any spw has an antenna that is
         fully flagged.
 

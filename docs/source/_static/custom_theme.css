@@ -54,7 +54,7 @@ table.small-font-table {
 /* The toggle button sits on the left edge of the TOC drawer. */
 .toc-drawer {
     position: relative;
-    transition: width 0.2s ease, min-width 0.2s ease;
+    /* transition: width 0.2s ease, min-width 0.2s ease; */ /* Removed to prevent FOUC animation on page load */
 }
 
 /* Wide-screen collapse logic — only on screens where Furo shows the inline TOC
@@ -129,18 +129,19 @@ div.nboutput.container div.output_area {
 
 .mermaid-reset-btn {
     position: absolute;
-    top: 0.4rem;
-    right: 1.0rem;
+    top: 0.35rem;
+    right: 2.8rem;
     z-index: 10;
 
-    width: 1.6rem;
-    height: 1.6rem;
+    width: 1.8rem;
+    height: 1.8rem;
     padding: 0;
 
     border: 1px solid var(--color-background-border);
-    border-radius: 0.25rem;
-    background: var(--color-background-secondary);
+    border-radius: 0.2rem;
+    background: var(--color-background-primary);
     color: var(--color-foreground-secondary);
+    box-shadow: 0 .125rem .25rem rgba(0,0,0,.075);
     cursor: pointer;
     font-size: 1rem;
     line-height: 1;
@@ -318,7 +319,7 @@ p.rubric {
    Image & Screenshot Drop Shadows
    =========================================================================== */
 /* Add a subtle drop-shadow to embedded screenshots to distinguish them from the background */
-figure img, .figure img, a[data-lightbox] img {
+figure img, .figure img {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
     border-radius: 4px;
     border: 1px solid var(--color-background-border, #e0e0e0);
@@ -341,3 +342,46 @@ figure figcaption, .figure figcaption, .caption-text {
     margin-top: 0.5em;
     line-height: 1.4;
 }
+
+/* Fix Mermaid alignment for "no-zoom" cases */
+.mermaid.align-center {
+    text-align: center;
+    display: flex;
+    justify-content: center;
+}
+.mermaid.align-center svg {
+    margin: 0 auto;
+}
+
+/* =============================================================================
+   Viewer.js Image Zoom Overrides & Fixes
+   ============================================================================= */
+/* Prevent Viewer.js from collapsing body height or triggering scroll-to-top in Furo theme */
+body.viewer-open {
+    overflow: visible !important;
+}
+
+figure img, .figure img, article img:not(.no-zoom):not(.brand-logo) {
+    cursor: zoom-in;
+}
+
+/* =============================================================================
+   Code Block & Text Block Line Wrapping
+   ============================================================================= */
+/* Allow plain text blocks (and explicitly marked wrap-text blocks) to wrap cleanly
+   without affecting Python, Bash, or other syntax-highlighted code blocks */
+.highlight-text pre,
+.highlight-none pre,
+.wrap-text pre,
+pre.literal-block {
+    white-space: pre-wrap !important;
+    word-break: break-word;
+}
+
+/* Enable auto-wrapping for literal-block (parsed-literal) while preserving monospace formatting */
+pre.literal-block {
+    white-space: pre-wrap !important;
+    word-wrap: break-word;
+    word-break: break-word;
+}
+

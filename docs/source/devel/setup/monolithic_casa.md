@@ -13,7 +13,7 @@ After downloading a CASA build, follow the instructions on the [CASA Installatio
 
 ### Dependency Requirements
 
-Following the change from [PIPE-1699](https://open-jira.nrao.edu/browse/PIPE-1699), Pipeline now specifies the required standard Python dependencies in a [requirements.txt](../requirements.txt) file, and recommends using `pip` to install them directly from the Python Package Index ([PyPI](https://pypi.org/)).
+Following the change from {jira}`PIPE-1699`, Pipeline now specifies the required standard Python dependencies in a [requirements.txt](../requirements.txt) file, and recommends using `pip` to install them directly from the Python Package Index ([PyPI](https://pypi.org/)).
 The [`pipeline/extern`](../pipeline/extern) directory now only contains the non-standard Python packages/modules contributed by the developers and heuristics development team.
 
 Note that this file is currently *not* used by [`setup.py`](../setup.py) to auto-install dependencies, and only serves as a reference for development and packaging purposes.

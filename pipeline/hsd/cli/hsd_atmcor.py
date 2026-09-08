@@ -37,7 +37,6 @@ def hsd_atmcor(
         QA scoring:
 
         - QA = 1.0 if ATM correction is successfully applied.
-        - QA = N/A if ATM correction is not applied.
         - QA = 0.0 if an error occurs during the correction.
 
     Examples:

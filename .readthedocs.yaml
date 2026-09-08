@@ -21,8 +21,26 @@ build:
     - curl -fsSL https://pixi.sh/install.sh | PIXI_VERSION=v0.71.0 bash
     - $HOME/.pixi/bin/pixi install -e docs
     - mkdir -p ~/.casa/data
+    
+    # 1. Build PUBLIC docs
     - $HOME/.pixi/bin/pixi run -e docs build-docs
-    - $HOME/.pixi/bin/pixi run -e docs build-pdf
     - mkdir --parents $READTHEDOCS_OUTPUT/html/ $READTHEDOCS_OUTPUT/pdf/
     - cp --recursive docs/_build/html/* $READTHEDOCS_OUTPUT/html/
-    - cp --recursive docs/_build/latex/*.pdf $READTHEDOCS_OUTPUT/pdf/
+    - cp docs/source/_static/robots.txt $READTHEDOCS_OUTPUT/html/robots.txt
+    
+    # 2. Build INTERNAL docs
+    # By using a separate BUILDDIR, we keep a separate doctree cache.
+    # By using `html_fast`, we skip re-generating the expensive _autosummary stubs.
+    - BUILD_INTERNAL_DOCS=1 $HOME/.pixi/bin/pixi run -e docs make -C docs html_fast BUILDDIR=_build_internal
+    - mkdir --parents $READTHEDOCS_OUTPUT/html/internal/
+    - cp --recursive docs/_build_internal/html/* $READTHEDOCS_OUTPUT/html/internal/
+    
+    # 3. Build PDFs and copy assets
+    - $HOME/.pixi/bin/pixi run -e docs build-pdfs
+    # RTD's official pdf/ staging folder (for the RTD downloads widget)
+    - cp docs/_build/latex/taskdocs.pdf $READTHEDOCS_OUTPUT/pdf/
+    # html/ folder (for relative links in README and offline viewing)
+    - cp docs/_build/latex/taskdocs.pdf $READTHEDOCS_OUTPUT/html/
+    - cp docs/_build/latex/users_guide.pdf $READTHEDOCS_OUTPUT/html/
+    - cp docs/_build/latex/taskdocs.pdf $READTHEDOCS_OUTPUT/html/internal/
+    - cp docs/_build/latex/users_guide.pdf $READTHEDOCS_OUTPUT/html/internal/

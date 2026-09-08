@@ -23,7 +23,7 @@ def hifa_restoredata(vis=None, session=None, products_dir=None, copytoraw=None, 
 
     The expected products per ASDM are:
 
-    - a compressed tar file of the final flag versions, e.g.
+    - a compressed tar file of the flag versions at the end of 1-EB calibration, e.g.
       ``uid___A002_X30a93d_X43e.ms.flagversions.tar.gz``
     - a text file with the applycal instructions, e.g.
       ``uid___A002_X30a93d_X43e.ms.calapply.txt``
@@ -35,10 +35,14 @@ def hifa_restoredata(vis=None, session=None, products_dir=None, copytoraw=None, 
     1. Imports the ASDM(s) to MS.
     2. Removes the default MS.flagversions directory created by the filler.
     3. Restores the final MS.flagversions directory stored by the pipeline.
-    4. Restores the final set of pipeline flags to the MS.
-    5. Restores the final calibration state of the MS.
-    6. Restores the final calibration tables for each MS.
-    7. Applies the calibration tables to each MS.
+    4. Restores the final set of 1-EB calibration pipeline flags to the MS.
+    5. Restores the final 1-EB calibration tables for each MS.
+    6. Applies the calibration tables to each MS.
+
+    Previously executed multi-EB calibration, including self-calibration, is not recovered by
+    `hifa_restoredata`.  To recover uv-subtracted visibilities, or apply previously generated
+    self-calibration, one must run additional steps as described in the 
+    :ref:`casapiperestorescript.py section<sec-piperestore>` of the User's Guide.
 
     Examples:
         1. Restore the pipeline results for a single ASDM in a single session:

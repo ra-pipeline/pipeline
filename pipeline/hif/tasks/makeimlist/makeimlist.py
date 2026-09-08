@@ -207,7 +207,7 @@ class MakeImListInputs(vdp.StandardInputs):
             vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the <hifa,hifv>_importdata task.
                 "": use all MeasurementSets in the context
 
-                Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
+                Examples: 'ngc5921.ms', ['ngc5921a.ms', 'ngc5921b.ms', 'ngc5921c.ms']
 
             imagename: Prefix for output image names, "" for automatic.
 
@@ -305,16 +305,27 @@ class MakeImListInputs(vdp.StandardInputs):
 
             uvtaper: uv-taper on outer baselines
 
-            clearlist: Clear any existing target list
+            clearlist: If True (default), replace the current pending imaging list
+                and associated information. If False, append the new entries to
+                the existing pending imaging list.
 
-            per_eb: Make an image target per EB
+            per_eb: Make an image target per EB. This option is mutually
+                exclusive with ``per_session``.
 
-            per_session: Make an image target per session
+            per_session: Make an image target per session. This option is
+                mutually exclusive with ``per_eb``.
 
             calcsb: Force (re-)calculation of sensitivities and beams
 
-            datatype: Data type(s) to image. The default '' selects the best available data type (e.g. selfcal over regcal) with
-                an automatic fallback to the next available data type.
+            datatype: Data type(s) to image. If ``datatype=''`` (default), the
+                task selects the first available matching data type from the
+                preference order defined by ``intent`` and ``specmode``, with
+                automatic fallback to later choices. For target imaging, the
+                preferred order begins with the corresponding imaging data
+                type, followed by self-calibrated and regular-calibrated
+                science data types. For non-target imaging,
+                ``REGCAL_CONTLINE_ALL`` is preferred, with ``RAW`` as a
+                fallback.
                 With the ``datatype`` parameter one can force the use of only
                 given data type(s) without a fallback. The data type(s) are
                 specified as comma separated string of keywords. Accepted

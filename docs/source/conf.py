@@ -119,8 +119,8 @@ extensions = [
     'IPython.sphinxext.ipython_directive',
     'cli_function_stubs',
     'parameter_linking',
-    'sphinxcontrib.lightbox2',
     'toc_sections',
+    'jira_links',
 ]
 
 add_module_names = False
@@ -154,11 +154,19 @@ smartquotes = False
 master_doc = 'index'
 
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#confval-release
-release = build_version = pipeline.environment.pipeline_revision  # used on the PDF cover
+# `build_version`: The raw, full pipeline revision (e.g. "2026.2.1.16+g64967c159-detached")
+build_version = pipeline.environment.pipeline_revision
+
+# `version`: The base short string (e.g. "2026.2.1.16").
+# Replaces |version| in texts. Used below for the HTML navbar (`project`) and browser tab (`html_title`).
 version = build_version.split('+')[0]
 
-# remove -detached suffix as readthedocs always uses git checkout --force to create a
-# detached state
+# `release`: Replaces |release| in texts. Crucially, the LaTeX builder injects this exactly onto the PDF Cover Page.
+# We set it to `version` so the PDF cover gets the clean, short string without messy git hashes.
+release = version
+
+# `build_version_short`: Removes -detached suffix (as RTD uses `git checkout --force`).
+# Used exclusively for the `copyright` string below, which appears in the footer of every HTML page.
 build_version_short = build_version.removesuffix('-detached').removesuffix('-dirty')
 
 # General information about the project.
@@ -186,7 +194,21 @@ language = 'en'
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This patterns also effect to html_static_path and html_extra_path
+# Default behavior
 exclude_patterns = ['_build', '**.ipynb_checkpoints', 'Thumbs.db', '.DS_Store']
+
+if os.environ.get('BUILD_INTERNAL_DOCS') == '1':
+    tags.add('internal')
+    project = project + ' (INTERNAL)'
+    # Prevent search engines and crawlers from indexing internal pages
+    html_meta = {
+        'robots': 'noindex, nofollow, noarchive, nosnippet',
+        'googlebot': 'noindex, nofollow, noarchive, nosnippet',
+    }
+else:
+    # PUBLIC BUILD: Exclude developer-only files/folders
+    # Note: adjust this list based on what internal docs actually exist
+    exclude_patterns.extend(['devel/*', 'internal_notes/*', 'inheritance.rst'])
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'default'  # 'sphinx', 'github-dark', ' default'
@@ -200,6 +222,7 @@ copybutton_prompt_is_regexp = True
 copybutton_remove_prompts = True
 copybutton_copy_empty_lines = False
 copybutton_only_copy_prompt_lines = True
+copybutton_exclude = ".linenos, .gp, .go, pre.mermaid, div.mermaid, .mermaid"
 
 # -- Options for HTML output -------------------------------------------
 
@@ -218,12 +241,22 @@ html_favicon = '_static/favicon-16x16.png'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will override the builtin "default.css".
 html_static_path = ['_static']
-html_css_files = ['custom_theme.css']
-html_js_files = ['furo_layout.js']
+html_css_files = [
+    'custom_theme.css',          # Custom theme overrides (loads last for CSS cascade priority)
+    'viewerjs/viewer.min.css',   # Viewer.js stylesheet (MIT)
+]
+html_js_files = [
+    'viewerjs/viewer.min.js',    # Viewer.js image viewer & inspection library (MIT)
+    'viewer_init.js',            # Auto-binds Viewer.js to all documentation figures/images
+    'furo_layout.js',            # Theme layout enhancements (TOC drawer toggle, Mermaid reset)
+]
 
 # -- Options for Mermaid output ---------------------------------------
 
 mermaid_d3_zoom = True
+mermaid_include_elk = True
+mermaid_include_zenuml = False
+mermaid_height = '1000px'
 myst_fence_as_directive = ['mermaid']
 
 # -- Options for HTMLHelp output ---------------------------------------
@@ -243,6 +276,10 @@ latex_elements = {
     'geometry': r'\usepackage[top=1.0in, bottom=1.0in, left=0.5in, right=0.5in]{geometry}',
     'preamble': r"""
   \usepackage{hyperref}
+  \usepackage{amssymb}
+  \DeclareUnicodeCharacter{2264}{\ensuremath{\le}}
+  \DeclareUnicodeCharacter{2265}{\ensuremath{\ge}}
+  \DeclareUnicodeCharacter{2273}{\ensuremath{\gtrsim}}
   % \usepackage{extsizes} % required to use font sizes other than 10, 11, or 12pt
   \usepackage{longtable}
   \setcounter{tocdepth}{1}
@@ -276,7 +313,10 @@ latex_use_modindex = False
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass
 # [howto, manual, or own class]).
-latex_documents = [('latex', 'taskdocs.tex', 'Pipeline Tasks Reference Manual', 'pipeline team', 'manual')]
+latex_documents = [
+    ('task_reference', 'taskdocs.tex', 'ALMA/VLA/NRO Pipeline: Task Reference Manual', 'Pipeline Contributors', 'manual'),
+    ('users_guide/index', 'users_guide.tex', 'ALMA Science Pipeline User’s Guide', 'Pipeline Contributors', 'manual'),
+]
 
 
 # -- Options for manual page output ------------------------------------
