@@ -939,7 +939,7 @@ def human_file_size(size_in_bytes: int | float) -> str:
         return f"{human_readable_size:.1f} {unit}"
 
 
-def set_to_data(s: set[Any | list[Any]], keep_list: bool = False)-> Any | list[Any]:
+def set_to_data(s: set[Any], keep_list: bool = False)-> Any | list[Any]:
     """
     Converts a set() to a list of a single value depending on what is contained within.
     Args:
