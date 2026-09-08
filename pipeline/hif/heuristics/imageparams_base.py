@@ -1474,7 +1474,7 @@ class ImageParamsHeuristics:
 
         return ncorr
 
-    def pblimits(self, pb: None | str, specmode: str | None = None):
+    def pblimits(self, pb: None | str, specmode: str | None = None, gridder: str | None = None):
 
         pblimit_image = 0.2
         pblimit_cleanmask = 0.3

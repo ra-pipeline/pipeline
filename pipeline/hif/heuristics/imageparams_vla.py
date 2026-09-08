@@ -202,18 +202,21 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
             # Use complete uvrange
             return '>0.0klambda', ratio
 
-    def pblimits(self, pb: None | str, specmode: str | None = None):
+    def pblimits(self, pb: None | str, specmode: str | None = None, gridder: str | None = None):
         """PB gain level at which to cut off normalizations (tclean parameter).
-        See PIPE-674 and CASR-543
+        
+        See PIPE-674, CASR-543, and PIPE-684
         """
         # pblimits used in pipeline tclean._do_iterative_imaging() method (eventually in cleanbox.py) for
         # computing statistics on residual image products.
         if (pb not in [None, '']):
-            pblimit_image, pblimit_cleanmask = super().pblimits(pb, specmode=specmode)
+            pblimit_image, pblimit_cleanmask = super().pblimits(pb, specmode=specmode, gridder=gridder)
         # used for setting CASA tclean task pblimit parameter in pipeline tclean.prepare() method
         else:
             if specmode == 'cube':
                 pblimit_image = 0.2
+            elif gridder == 'mosaic':
+                pblimit_image = 0.1
             else:
                 pblimit_image = -0.1
             pblimit_cleanmask = 0.3

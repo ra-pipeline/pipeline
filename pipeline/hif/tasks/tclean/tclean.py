@@ -320,11 +320,6 @@ class Tclean(cleanbase.CleanBase):
         # Get the image parameter heuristics
         self.image_heuristics = inputs.image_heuristics
 
-        # Set initial masking limits
-        self.pblimit_image, self.pblimit_cleanmask = self.image_heuristics.pblimits(None, inputs.specmode)
-        if not inputs.pblimit:
-            inputs.pblimit = self.pblimit_image
-
         # Remove MSs that do not contain data for the given field(s)
         _, visindexlist = self.image_heuristics.get_scanidlist(inputs.vis, inputs.field, inputs.intent)
         filtered_vislist = [inputs.vis[i] for i in visindexlist]
@@ -335,14 +330,20 @@ class Tclean(cleanbase.CleanBase):
 
         # Generate the image name if one is not supplied.
         if inputs.imagename in (None, ''):
-            inputs.imagename = self.image_heuristics.imagename(intent=inputs.intent,
-                                                               field=inputs.field,
-                                                               spwspec=inputs.spw,
-                                                               specmode=inputs.specmode)
+            inputs.imagename = self.image_heuristics.imagename(
+                intent=inputs.intent, field=inputs.field, spwspec=inputs.spw, specmode=inputs.specmode
+            )
 
         # Determine the default gridder
         if inputs.gridder in (None, ''):
             inputs.gridder = self.image_heuristics.gridder(inputs.intent, inputs.field)
+
+        # Set initial masking limits
+        self.pblimit_image, self.pblimit_cleanmask = self.image_heuristics.pblimits(
+            None, specmode=inputs.specmode, gridder=inputs.gridder
+        )
+        if not inputs.pblimit:
+            inputs.pblimit = self.pblimit_image
 
         # Determine deconvolver
         if inputs.deconvolver in (None, ''):
@@ -1200,7 +1201,9 @@ class Tclean(cleanbase.CleanBase):
 
         # Determine masking limits depending on PB
         extension = '.tt0' if result.multiterm else ''
-        self.pblimit_image, self.pblimit_cleanmask = self.image_heuristics.pblimits(result.flux+extension, specmode=inputs.specmode)
+        self.pblimit_image, self.pblimit_cleanmask = self.image_heuristics.pblimits(
+            result.flux + extension, specmode=inputs.specmode, gridder=inputs.gridder
+        )
 
         # Keep pblimits for mom8_fc QA statistics and score (PIPE-704)
         result.set_pblimit_image(self.pblimit_image)
