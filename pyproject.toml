@@ -3,8 +3,6 @@ requires = [
     "setuptools>=64.0",
     "packaging>=22.0.0",
     "wheel",
-    "csscompressor==0.9.5",
-    "jsmin==3.0.1",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -215,6 +213,9 @@ casatools = { version = ">=6.7.4.2", index = "https://casa-pip.nrao.edu/reposito
 
 # Update CASA data (configuration and runtime artifacts)
 update-data = "python -m casaconfig --update-all && python -m casaconfig --summary && python -m casaconfig --current-data"
+
+# Bundle and minify weblog static CSS/JS assets
+bundle-assets = "python scripts/bundle_assets.py"
 
 # --------------------------------------------------------------------------
 # Subsection Tasks (complex configurations)

@@ -26,6 +26,10 @@ twine                   # https://packaging.python.org/en/latest/key_projects/#t
 wheel                   # https://packaging.python.org/en/latest/key_projects/#wheel
 # setuptools_scm        # https://pypi.org/project/setuptools-scm/
 
+# Static Asset Bundling (for scripts/bundle_assets.py)
+csscompressor==0.9.5    # CSS minification for weblog templates
+jsmin==3.0.1            # JS minification for weblog templates
+
 # Profiling
 memray                  # https://github.com/bloomberg/memray
 line_profiler           # https://github.com/pyutils/line_profiler
