@@ -8,7 +8,7 @@
 
 # -- Core Runtime Dependencies --
 
-numpy>=2.0,<2.4                           # PIPE-2930: keep <2.4 until the compatibility is verified
+numpy>=2.0                                # Fundamental array computing library
 astropy~=7.2                              # Main astronomy library
 cachetools~=6.2                           # Extensible memoizing collections and decorators
 docstring-inheritance~=2.2                # For inheriting docstrings
