@@ -17,7 +17,7 @@ import pipeline.infrastructure as infrastructure
 from pipeline.domain.datatable import OnlineFlagIndex
 from pipeline.domain.spectralwindow import match_spw_basename
 from pipeline.infrastructure import casa_tools
-from pipeline.infrastructure.utils import absolute_path, relative_path, list_to_str
+from pipeline.infrastructure.utils import absolute_path, relative_path, list_to_str, deduplicate
 from . import compress
 
 if TYPE_CHECKING:
@@ -891,6 +891,9 @@ def make_row_map(src_ms: MeasurementSet, derived_vis: str,
         finally:
             tsel.close()
 
+    dst_field_id_list = deduplicate(field_id_list1)
+    dst_dd_id_list = deduplicate(data_desc_id_list1)
+
     for processor_id in processor_id_set:
 
         LOG.trace('PROCESSOR_ID %s' % processor_id)
@@ -908,6 +911,10 @@ def make_row_map(src_ms: MeasurementSet, derived_vis: str,
                 for field_id in fields[scan_number]:
                     LOG.trace('FIELD_ID %s' % field_id)
 
+                    # per-field, per-spw MS may not have all fields.
+                    if field_id not in dst_field_id_list:
+                        continue
+
                     for antenna in src_ms.antennas:
                         antenna_id = antenna.id
                         LOG.trace('ANTENNA_ID %s' % antenna_id)
@@ -917,6 +924,12 @@ def make_row_map(src_ms: MeasurementSet, derived_vis: str,
                             data_desc_id = data_desc.id
                             pol_id = data_desc.pol_id
                             spw_id = spw.id
+
+                            # per-field, per-spw MS may not have all spws/dds.
+                            dst_dd_id = derived_ddid_map[(to_derived_polid[pol_id], to_derived_spwid[spw_id])]
+                            if dst_dd_id not in dst_dd_id_list:
+                                continue
+
                             LOG.trace('START PROCESSOR %s SCAN %s DATA_DESC_ID %s ANTENNA %s FIELD %s' %
                                       (processor_id, scan_number, data_desc_id, antenna_id, field_id))
                             derived_pol_id = to_derived_polid[pol_id]
