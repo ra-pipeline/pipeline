@@ -380,9 +380,7 @@ if True:
         _ = find_peaks(model, prominence=0)  # v2.5
         _auxp, _auxpp = find_peaks(
             model,
-            prominence=np.mean(
-                np.sort(_[1]["prominences"])[-len(_[0]) : -len(_[0]) + 1]
-            ),
+            prominence= mp.min(_[1]["prominences"]), # AEG. bug, corrected PIPEREQ-449.
         )  # v2.5 # v3.2
         crossings = np.array(
             list(set(list(np.r_[_auxpp["left_bases"], _auxpp["right_bases"]])))
@@ -407,6 +405,9 @@ if True:
             ],
             dtype=int,
         )
+        if xp.shape[0] <= 1:
+            xp = np.array([[0, nchan - 1]])
+            return xp, lower_hug(model)
         # print(f'xp={xp}')
         baseline = np.interp(chans, xp, model[xp])
         xp_intervals = np.array([[xp[i], xp[i + 1]] for i in range(xp.shape[0] - 1)])
@@ -1669,7 +1670,8 @@ def get_tsys_contaminated_intervals(
             LOG.info("Large residual detected in %s spw %s field %s", vis, msg_spw, msg_field)
         # print(f" sigma_mad_dif={sigma_mad_dif} sigma_smooth_bp = {sigma_smooth_bp} sigma_quot={sigma_smooth_s/sigma_smooth_bp}")
 
-        co_telluric = co_telluric_intervals(spec_b / sigma_smooth_bp, freqs_b)
+        smoothed_normalized_bandpass = smoother(spec_b/sigma_smooth_bp, stype="sg")[0]
+        co_telluric = co_telluric_intervals(smoothed_normalized_bandpass, freqs_b)
 
         speaks, prominence_dictionary_source_peaks = find_peaks(
             spec_s / sigma_smooth_s,
