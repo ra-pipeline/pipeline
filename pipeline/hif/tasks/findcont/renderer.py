@@ -100,7 +100,7 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             if not isinstance(entry, dict):
                 continue
             rows.append(ImagingTR(
-                field=self._format_summary_value(entry.get('field')),
+                field=utils.wrap_long_str(self._format_summary_value(entry.get('field')), newline='<br>'),
                 spw=self._format_summary_value(entry.get('spw')),
                 datatype=self._format_summary_value(entry.get('datatype')),
                 phasecenter=self._format_summary_value(entry.get('phasecenter')),
@@ -283,7 +283,11 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             info = image.miscinfo()
             info['type'] = masktype
             info['virtspw'] = spw
-            info['field'] = field
+            # PIPE-3247: Use first field name of a composite field specification for the joint mask image header
+            if field:
+                info['field'] = field.split(',')[0].replace('"', '')
+            else:
+                info['field'] = field
             image.setmiscinfo(info)
 
         # create a plot object so we can access (thus generate) the thumbnail

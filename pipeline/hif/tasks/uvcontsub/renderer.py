@@ -34,10 +34,11 @@ class T2_4MDetailsUVcontSubRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
         table_rows = []
 
         for field_intent_spw in result.field_intent_spw_list:
-            source_intent = f'{field_intent_spw["field"]} {field_intent_spw["intent"]}'
             spw = f'{field_intent_spw["spw"]}'
             frange = result.ms_frame_freq_fitorder_dict[field_intent_spw['field']][field_intent_spw['spw']]['freq'].replace(';', ', ')
             fitorder = result.ms_frame_freq_fitorder_dict[field_intent_spw['field']][field_intent_spw['spw']]['fitorder']
+            source_intent = utils.wrap_long_str(field_intent_spw["field"], newline='<br>')
+            source_intent += f'<br>{field_intent_spw["intent"]}'
             row = UVcontSubParams(ms.basename,  frange, fitorder, source_intent, spw)
             table_rows.append(row)
 
