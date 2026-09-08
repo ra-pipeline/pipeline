@@ -11,6 +11,7 @@ import pipeline.infrastructure.tablereader as tablereader
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
+from pipeline.h.heuristics.mstransform_freq import configure_frequency
 from pipeline.hif.heuristics.auto_selfcal.selfcal_helpers import get_calinfo_from_ms
 from pipeline.hsd.tasks.common.inspection_util import generate_ms, inspect_reduction_group, merge_reduction_group
 from pipeline.infrastructure import casa_tasks, exceptions, mpihelpers, task_registry
@@ -71,12 +72,15 @@ class MstransformInputs(vdp.StandardInputs):
     @vdp.VisDependentProperty
     def outputvis(self):
         vis_root = os.path.splitext(self.vis)[0]
-        if self.input_data_type in [DataType.REGCAL_CONTLINE_ALL, DataType.ATMCORR]:
+        if self.input_data_type in [DataType.REGCAL_CONTLINE_ALL]:
             return vis_root + '_targets.ms'
         elif self.input_data_type in [DataType.SELFCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_SCIENCE]:
             return vis_root.replace('_targets', '_imaging') + '.ms'
         elif self.input_data_type in [DataType.SELFCAL_LINE_SCIENCE, DataType.REGCAL_LINE_SCIENCE]:
             return vis_root.replace('_targets_line', '_imaging_line') + '.ms'
+        elif self.input_data_type in [DataType.ATMCORR]:
+            # vis_root is <uid>.ms.atmcor
+            return vis_root.replace('.ms.atmcor', '_targets.ms')
         else:
             return None
 
@@ -182,13 +186,19 @@ class MstransformInputs(vdp.StandardInputs):
 
     chanbin = vdp.VisDependentProperty(default=1)
     timebin = vdp.VisDependentProperty(default='0s')
+    mode = vdp.VisDependentProperty(default='frequency')
+    start = vdp.VisDependentProperty(default='')
+    width = vdp.VisDependentProperty(default='')
+    nchan = vdp.VisDependentProperty(default=-1)
     per_spw = vdp.VisDependentProperty(default=False)
+    per_field = vdp.VisDependentProperty(default=False)
 
     parallel = sessionutils.parallel_inputs_impl(default=False)
 
     # docstring and type hints: supplements hif_mstransform
     def __init__(self, context, output_dir=None, vis=None, input_data_type=None, datacolumn=None, all_eph_obj=None, outputvis=None, output_data_type=None,
-                 outframe=None, regridms=None, field=None, intent=None, spw=None, chanbin=None, timebin=None, per_spw=None, parallel=None):
+                 outframe=None, regridms=None, field=None, intent=None, spw=None, chanbin=None, timebin=None, mode=None, start=None, width=None, nchan=None,
+                 per_spw=None, per_field=None, parallel=None):
         """Initialize Inputs.
 
         Args:
@@ -243,7 +253,17 @@ class MstransformInputs(vdp.StandardInputs):
 
             timebin: Bin width for time averaging. If timebin > 0s then timeaverage is automatically switched to True.
 
+            mode: Mode for regridding. Currently only ``'frequency'`` is supported.
+
+            start: start channel/frequency/velocity for regridding.
+
+            width: width of output channel for regridding.
+
+            nchan: number of output channels for regridding.
+
             per_spw: If True, execute mstransform separately for each spectral window in spw.
+
+            per_field: If True, execute mstransform separately for each field in field. Implies per_spw=True.
 
             parallel: Process multiple MeasurementSets in parallel using the casampi parallelization framework.
 
@@ -271,7 +291,12 @@ class MstransformInputs(vdp.StandardInputs):
         self.chanbin = chanbin
         self.timebin = timebin
         self.per_spw = per_spw
+        self.per_field = per_field
         self.parallel = parallel
+        self.mode = mode
+        self.start = start
+        self.width = width
+        self.nchan = nchan
 
     def to_casa_args(self):
 
@@ -293,7 +318,7 @@ class MstransformInputs(vdp.StandardInputs):
 
         # Remove a number of inputs parameters that
         # casatasks/mstransform does not support.
-        for key in ('parallel', 'per_spw', 'input_data_type', 'output_data_type', 'all_eph_obj'):
+        for key in ('parallel', 'per_spw', 'per_field', 'input_data_type', 'output_data_type', 'all_eph_obj'):
             d.pop(key, None)
 
         return d
@@ -537,10 +562,46 @@ class Mstransform(sessionutils.ParallelTemplate):
                     valid_args_list_per_spw.append(args_spw)
 
             valid_args_list = valid_args_list_per_spw
+        elif inputs.per_field:
+            valid_args_list_per_field = []
+            vis_list = utils.deduplicate([args.get('vis') for args in valid_args_list])
+            observing_run = inputs.context.observing_run
+            frequency_config = configure_frequency(
+                observing_run,
+                [observing_run.get_ms(vis) for vis in vis_list]
+            )
+            for args in valid_args_list:
+                if args.get('outframe', '') not in ['LSRK', 'REST']:
+                    continue
+
+                for (source_name, vspw_id), freq_config in frequency_config.items():
+                    args_field = args.copy()
+                    ms = observing_run.get_ms(args_field['vis'])
+                    sources = [s for s in ms.sources if s.name == source_name]
+                    if len(sources) == 0:
+                        continue
+                    target_fields = [f for f in ms.fields if f.source.name == source_name]
+                    args_field['field'] = ','.join([str(f.id) for f in target_fields])
+                    spw_id = observing_run.virtual2real_spw_id(vspw_id, ms)
+                    args_field['spw'] = str(spw_id)
+                    base, ext = os.path.splitext(args_field['outputvis'])
+                    args_field['outputvis'] = f'{base}.{utils.fieldname_clean(source_name)}.spw{spw_id}{ext}'
+                    args_field['mode'] = "frequency"
+                    args_field['start'] = "{value}{unit}".format(**freq_config["start"])
+                    args_field['width'] = "{value}{unit}".format(**freq_config["width"])
+                    args_field['nchan'] = freq_config['nchan']
+                    valid_args_list_per_field.append(args_field)
+            if len(valid_args_list_per_field) > 0:
+                valid_args_list = valid_args_list_per_field
 
         if inputs.per_spw:
             LOG.info(
                 'Mstransform will be executed per SPW; the number of tasks to be executed is %d',
+                len(valid_args_list),
+            )
+        elif inputs.per_field:
+            LOG.info(
+                'Mstransform will be executed per field and SPW; the number of tasks to be executed is %d',
                 len(valid_args_list),
             )
         else:

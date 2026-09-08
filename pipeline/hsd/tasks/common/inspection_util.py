@@ -159,7 +159,7 @@ def inspect_reduction_group(ms: MeasurementSet) -> dict[int, MSReductionGroupDes
     ms = ms
     science_windows = ms.get_spectral_windows(science_windows_only=True)
     if hasattr(ms, 'calibration_strategy'):
-        field_list = ms.calibration_strategy['field_strategy'].keys()
+        field_list = sorted(set(ms.calibration_strategy['field_strategy'].keys()).intersection([f.id for f in ms.fields]))
     else:
         field_list = [f.id for f in ms.get_fields(intent='TARGET')]
     for field_id in field_list:
