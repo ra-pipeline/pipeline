@@ -439,7 +439,7 @@ class DetectMissedLines:
             if chunk[0] != 0 and chunk[-1] != len(flag) - 1:
                 # fill small gaps
                 if len(chunk) < min_gap_width:
-                    flag[chunk[0]:chunk[-1]+1] = 1
+                    flag[chunk] = 1
 
         # detect where the flag flips
         diff = np.diff(np.pad(flag, (1, 1), 'constant', constant_values=(0, 0)))
