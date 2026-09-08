@@ -314,7 +314,7 @@ latex_use_modindex = False
 # (source start file, target name, title, author, documentclass
 # [howto, manual, or own class]).
 latex_documents = [
-    ('task_reference', 'taskdocs.tex', 'ALMA/VLA/NRO Pipeline: Task Reference Manual', 'Pipeline Contributors', 'manual'),
+    ('task_reference', 'taskdocs.tex', r'Task Reference Manual \\[2ex] {\LARGE ALMA/VLA/NRO Pipeline}', 'Pipeline Contributors', 'manual'),
     ('users_guide/index', 'users_guide.tex', 'ALMA Science Pipeline User’s Guide', 'Pipeline Contributors', 'manual'),
 ]
 
