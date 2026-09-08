@@ -111,7 +111,7 @@ class DetectMissedLines:
         self.frequency_frame = self.image.frequency_frame
 
         # pixel scale and beam size
-        self.pixel_scale = np.abs(self.image.direction_axis( 1, unit='deg' )[2] )  # 1: Declination
+        self.pixel_scale = np.abs(self.image.direction_axis(1, unit='deg')[2])  # 1: Declination
         self.beam_size = self.image.beam_size  # in degrees
 
     def analyze(
@@ -325,7 +325,7 @@ class DetectMissedLines:
             extra_edge_channels: list[int] = [0, 0],
             atm_channels: np.ndarray | list[bool] = [],
             width_threshold: int = 2
-    ) -> tuple[dict[str, bool], dict[list[float|int] | None]]:
+    ) -> tuple[dict[str, bool], dict[list[float | int] | None]]:
         """
         Search for the missed lines and create the diagnostic plot
 
@@ -383,7 +383,7 @@ class DetectMissedLines:
             # deviation/sigma of line ranges
             z_line = np.full(z_all.shape[0], np.nan)
             for line in line_ranges:
-                z_line[line[0]:line[1]+1 ] = z_all[ line[0]:line[1]+1]
+                z_line[line[0]:line[1]+1] = z_all[line[0]:line[1]+1]
 
             # invalidate edge channels
             if extra_edge_channels[0] > 0:
@@ -396,7 +396,7 @@ class DetectMissedLines:
                 z_linefree[atm_channels] = np.nan
 
             # deviation/sigma of other ranges
-            z_other = np.where( np.isnan(z_line) & np.isnan(z_linefree), z_all, np.nan)
+            z_other = np.where(np.isnan(z_line) & np.isnan(z_linefree), z_all, np.nan)
 
             # find channels which exceed deviation_threshold
             detections[mask_mode] = self._detect_excess(z_linefree, dev_threshold, width_threshold)
@@ -416,7 +416,7 @@ class DetectMissedLines:
 
         return detections, excess_ranges
 
-    def _pick_excess_ranges(self, z: NpArray1D, dev_threshold: float, min_gap_width=2) -> dict[str, int|float]:
+    def _pick_excess_ranges(self, z: NpArray1D, dev_threshold: float, min_gap_width=2) -> dict[str, int | float]:
         """
         pick excess ranges applying anti-ringing method
 
@@ -452,7 +452,7 @@ class DetectMissedLines:
                                           fill_value='extrapolate')
         ranges_freq = [[float(_chan2freq(r[0] - 0.5)), float(_chan2freq(r[1] + 0.5))] for r in ranges_ch]
 
-        return { 'channel': ranges_ch, 'frequency': ranges_freq}
+        return {'channel': ranges_ch, 'frequency': ranges_freq}
 
     def _finalize_plot(self, fig: figure.Figure, detections: list[bool]):
         """
@@ -518,7 +518,7 @@ class DetectMissedLines:
                           color='magenta', label='masked', baseline=None)
 
             # paint the line ranges
-            for idx, line in enumerate( line_ranges ):
+            for idx, line in enumerate(line_ranges):
                 label = "line range" if idx == 0 else None
                 ax.axvspan(self.frequency[line[0]] - increment/2.0,
                            self.frequency[line[1]] + increment/2.0,
@@ -527,7 +527,7 @@ class DetectMissedLines:
             # mark the excesses
             z_excess = np.where(z_linefree > dev_threshold, z_linefree, np.nan)
             ax.scatter(self.frequency, z_excess, color='red', marker='.',
-                       label='excess' )
+                       label='excess')
 
             # draw the threshold line
             ax.hlines(dev_threshold, np.min(self.frequency), np.max(self.frequency),
@@ -537,11 +537,11 @@ class DetectMissedLines:
 
             # figure parameters
             ax.set_xlim(frequency_boundaries[0], frequency_boundaries[-1])
-            ax.set_ylim(1.1 * np.nanmin( z_linefree),
-                        1.1 * np.nanmax( z_linefree))
+            ax.set_ylim(1.1 * np.nanmin(z_linefree),
+                        1.1 * np.nanmax(z_linefree))
             ax.set_xlabel('frequency (GHz) {self.frequency_frame}')
             ax.set_ylabel('deviation / sigma')
-            ax.tick_params( direction='in')
+            ax.tick_params(direction='in')
             ax.legend(fontsize='small', ncols=3, loc='best', bbox_to_anchor=(0, 0, 1.0, 0.1))
             ax.grid()
             ax.get_xaxis().get_major_formatter().set_useOffset(False)
@@ -557,5 +557,5 @@ class DetectMissedLines:
                 mode = "extended"
             case _:
                 raise ValueError(f"Unknown mask_mode {mask_mode}")
-        plot_title = f"Field:{self.field_name,} spw:{self.spwid_list[0]} ({mode})"
-        ax.set_title( plot_title )
+        plot_title = f"Field:{self.field_name}, spw:{self.spwid_list[0]} ({mode})"
+        ax.set_title(plot_title)
