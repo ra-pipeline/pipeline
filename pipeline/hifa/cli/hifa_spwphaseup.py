@@ -14,7 +14,7 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
     - Determines the spectral window mapping or combination mode, ``gaintype`` and
       ``solint``, for each independent BANDPASS, AMPLITUDE, DIFFGAIN, PHASE and CHECK
       source, to use when specifically solving the phaseup - phase as a function of (short, ideally integration)
-      time - in subsequent stages (mapping/combine mode isused in :func:`~pipeline.hifa.cli.hifa_gfluxscaleflag`,
+      time - in subsequent stages (mapping/combine mode is used in :func:`~pipeline.hifa.cli.hifa_gfluxscaleflag`,
       combine mode is used in :func:`~pipeline.hifa.cli.hifa_diffgaincal` for band-to-band modes, all parameters
       are used in :func:`~pipeline.hifa.cli.hifa_gfluxscale` and :func:`~pipeline.hifa.cli.hifa_timegaincal`).
 
@@ -25,7 +25,7 @@ def hifa_spwphaseup(vis=None, caltable=None, field=None, intent=None, spw=None, 
     - Compute the baseline based phase RMS using the phaseup solutions generated for the BANDPASS intent.
       The phase RMS measured over a given timescale can provide insights about (de)coherence.
 
-    **Determining mapping.combine mode and solint/gaintype**
+    **Determining mapping/combine mode and solint/gaintype**
    
     As part of the first function, if ``hm_spwmapmode='auto'``, then the spectral
     window mapping or combination mode, ``gaintype`` and ``solint``, are computed for
