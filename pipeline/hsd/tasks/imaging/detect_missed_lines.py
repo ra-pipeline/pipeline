@@ -416,7 +416,7 @@ class DetectMissedLines:
 
         return detections, excess_ranges
 
-    def _pick_excess_ranges(self, z: sdtyping.NpArray1D, dev_threshold: float, min_gap_width: int = 2) -> dict[str, int | float]:
+    def _pick_excess_ranges(self, z: sdtyping.NpArray1D, dev_threshold: float, min_gap_width: int = MIN_GAP_WIDTH) -> dict[str, int | float]:
         """
         pick excess ranges applying anti-ringing method
 
