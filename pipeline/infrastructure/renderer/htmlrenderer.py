@@ -1380,8 +1380,12 @@ class T2_2_7Renderer(T2_2_XRendererBase):
         offset_pointings = []
         task = pointing.SingleDishPointingChart(context, ms)
         if utils.contains_single_dish(context):
+            available_field_ids = [f.id for f in ms.fields]
             for antenna in ms.antennas:
                 for target, reference in ms.calibration_strategy['field_strategy'].items():
+                    if target not in available_field_ids:
+                        continue
+
                     LOG.debug('target field id %s / reference field id %s' % (target, reference))
                     # pointing pattern without OFF-SOURCE intents
                     plotres = task.plot(antenna=antenna, target_field_id=target,
