@@ -120,7 +120,7 @@ class ImagePreCheckInputs(vdp.StandardInputs):
             vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the hifa_importdata task.
                 '': use all MeasurementSets in the context
 
-                Examples: ``'ngc5921.ms'``, ``['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']``
+                Examples: ``'ngc5921.ms'``, ``['ngc5921a.ms', 'ngc5921b.ms', 'ngc5921c.ms']``
 
             desired_angular_resolution: User specified angular resolution goal string. When this parameter is set, uvtapering may be performed.
                 '': automatic from performance parameters (default).

@@ -9,8 +9,8 @@ def hifa_gaincalsnr(vis=None, field=None, intent=None, spw=None, bwedgefrac=None
 
     The gaincal solution signal-to-noise is determined as follows:
 
-    - For each data set the list of source(s) to use for the per-scan gaincal
-      solution signal-to-noise estimation is compiled based on the values of the
+    - For each data set the list of source(s) to use for the per-scan and per-integration
+      gaincal solution signal-to-noise estimation is compiled based on the values of the
       field, intent, and spw parameters.
 
     - Source fluxes are determined for each spw and source combination.
@@ -41,11 +41,11 @@ def hifa_gaincalsnr(vis=None, field=None, intent=None, spw=None, bwedgefrac=None
       determined from the SYSCAL table. Medians are computed first by channel,
       then by antenna, in order to reduce sensitivity to deviant values.
 
-    - The science spw parameters, exposure time(s), and integration time(s) are
+    - The science spw parameters, scan time(s), and integration time(s) are
       determined.
 
-    - The per scan sensitivity and signal-to-noise estimates are computed per
-      science spectral window. Nominal Tsys and sensitivity values per receiver
+    - Both the per scan and per integration sensitivity and signal-to-noise estimates
+      are computed per science spectral window. Nominal Tsys and sensitivity values per receiver
       band provide by the ALMA project are used for this estimate.
 
     - The QA score is based on how many signal-to-noise estimates greater than

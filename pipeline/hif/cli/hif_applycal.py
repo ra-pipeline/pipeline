@@ -21,10 +21,14 @@ def hif_applycal(vis=None, field=None, intent=None, spw=None, antenna=None, para
     plots for each calibrator. For each antenna a linear function is fitted to the data per scan per
     polarisation, and the slope/offset is compared to the equivalent fit for all antennas. Outliers must
     exceed set thresholds (10% or 10% per 2 GHz for amplitude offset/slope, or 6 deg or 6 deg per 2 GHz
-    for phase offset/slope) to generate a QA message. Details of deviant antennas are reported in the
-    expandable QA messages at the top of the page and in an ``applycalQA_outliers.txt`` file. Note
-    that amplitude-frequency offsets symmetric in XX/YY and phase-frequency offsets for CHECK sources are
-    excluded from the outlier QA.
+    for phase offset/slope) to generate a QA score. For outliers above the set thresholds, a decreasing QA
+    score from 0.74 to 0.34 is assigned based on how significant the outlier is. However, amplitude-frequency
+    offsets that are symmetric in XX/YY are assigned a fixed score of 0.80 (since these do not affect imaging),
+    and phase-frequency offsets for CHECK sources are assigned a fix score of 0.85 (since these are diagnostic
+    and do not affect source calibration). An aggregated summary of outliers is reported in the expandable QA
+    messages at the top of the page, and details reported in an `applycalQA_outliers.txt` file linked to at
+    the bottom.
+
 
     It is important to note that not all reported outliers are (1) visible in the corresponding plots in
     hif_applycal (which are averaged over all scans), or (2) consequential to the final products (since the
@@ -33,12 +37,12 @@ def hif_applycal(vis=None, field=None, intent=None, spw=None, antenna=None, para
     for problems. For data that are delivered as QA2 Pass, one can assume that the data reviewers have
     checked these messages and concluded that the overall calibration is not significantly compromised.
     
-    A uv-coverage plot (before and after calibration flags) is provided for the representative source and
+    A uv-coverage plot is provided for the representative source and
     spw.
 
     Notes:
-        Flagging QA: 0.0 if the additional flag fraction on the science target >= 50%; 1.0 if <= 5%;
-        linearly interpolated between 0 and 1 for fractions between 5% and 50%.
+        Flagging QA: 0.0 if the additional flag fraction on the science target >= 79%; 1.0 if <= 24%;
+        linearly interpolated between 0 and 1 for fractions between 79% and 24%.
 
     Examples:
         1. Apply the calibration to the target data:

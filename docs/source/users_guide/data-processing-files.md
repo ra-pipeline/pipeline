@@ -3,7 +3,7 @@
 ## Archived scripts
 
 (sec-allscripts)=
-There are several scripts that are archived with ALMA data deliveries. These are described in the document **ALMA QA2 Data Products** (sometimes cycle-specific) available from the `ALMA Science Portal <https://almascience.nrao.edu/processing/science-pipeline>`_ under the "Processing" tab. The particular scripts for a specific dataset should also be described in the QA2 report archived with the data products. This report will vary based on how the data were processed (pipeline calibrated & imaged; pipeline calibrated & manually imaged; manually calibrated & pipeline imaged, manually calibrated & manually imaged).
+There are several scripts that are archived with ALMA data deliveries. These are described in the document **ALMA QA2 Data Products** (sometimes cycle-specific) available from the `ALMA Science Portal <https://almascience.org>` under the "Processing" tab. The particular scripts for a specific dataset should also be described in the QA2 report archived with the data products. This report will vary based on how the data were processed (pipeline calibrated & imaged; pipeline calibrated & manually imaged; manually calibrated & pipeline imaged, manually calibrated & manually imaged).
 
 The scripts produced by the pipeline are archived with the data and have file names like:
 `member.<mous_uid>.<recipe>.casa_pipescript.py` and `member.<mous_uid>.<recipe>.casa_piperestorescript.py`.
@@ -20,8 +20,8 @@ However, one can also run the pipeline `casa_piperestorescript.py` using the ste
 (sec-helperfileintro)=
 Both the IF and SD pipeline use a number of text files that, if present, will affect the pipeline results (e.g. by applying manually identified flags or by updating calibrator fluxes or antenna positions before calculating the calibration tables). These files are particularly useful for users to over-ride the default pipeline behavior when re-running the pipeline at home, as more fully described in {ref}`Pipeline re-processing considerations <sec-pipescriptreprocess>` below. They include the following:
 
-- `flux.csv`: This file is used by the IF pipeline to update the flux of calibrators. The flux of the calibrator with the "AMPLITUDE" intent will affect the overall flux scale of the data. If this file is not present where the pipeline is run and {func}`hifa_importdata <pipeline.hifa.cli.hifa_importdata>` parameter `dbservice` is True, the pipeline will attempt to contact the ALMA source catalog (at the URL specified by the environment variable `FLUX_SERVICE_URL`) for previously recorded flux densities, and if that doesn't succeed, the fluxes in the ASDM(s) will be used, representing the best flux estimate at the time the SB was executed. If no flux value appears in either the flux.csv file or the ASDM, a flux of 1.0 Jy is adopted.
-- `jyperk.csv` or `jyperk_query.csv`: These files are used by the SD pipeline to update the "Kelvin to Jansky" calibration factors which set the overall flux scale of the data. The SD pipeline will use a file specified by {func}`hsd_k2jycal <pipeline.hsd.cli.hsd_k2jycal>` parameter `reffile`. If they are not present where the pipeline is run and the pipeline database query parameter (`dbservice`) is True, conversion factors are obtained via the database. If they are not present and `dbservice` is False, conversion factors of unity are assumed.
+- `flux.csv`: This file is used by the IF pipeline to update the flux of calibrators. The flux of the calibrator with the "AMPLITUDE" intent will affect the overall flux scale of the data. If this file is not present where the pipeline is run and {func}`~pipeline.hifa.cli.hifa_importdata` parameter `dbservice` is True, the pipeline will attempt to contact the ALMA source catalog (at the URL specified by the environment variable `FLUX_SERVICE_URL`) for previously recorded flux densities, and if that doesn't succeed, the fluxes in the ASDM(s) will be used, representing the best flux estimate at the time the SB was executed. If no flux value appears in either the flux.csv file or the ASDM, a flux of 1.0 Jy is adopted.
+- `jyperk.csv` or `jyperk_query.csv`: These files are used by the SD pipeline to update the "Kelvin to Jansky" calibration factors which set the overall flux scale of the data. The SD pipeline will use a file specified by {func}`~pipeline.hsd.cli.hsd_k2jycal` parameter `reffile`. If they are not present where the pipeline is run and the pipeline database query parameter (`dbservice`) is True, conversion factors are obtained via the database. If they are not present and `dbservice` is False, conversion factors of unity are assumed.
 - `uid*antennapos.json` or `antennapos.csv`: uid*antennapos.json files are used by the IF pipeline to update the positions of the antenna elements. The pipeline will, by default, query an online database to retrieve these files, but if already present in the working directory then the existing files will be used instead (e.g. if one were to want to manually control the antenna position corrections). Alternatively, an antennapos.csv file can be supplied in conjunction with hm_antpos='file' to provide antenna position corrections.
 - `uid*flagtemplate.txt`: This file is used to add additional CASA flagging commands that will be applied to the data before the calibration tables are calculated.
 - `uid*flagtsystemplate.txt`: This file is used to add additional CASA flagging commands that will be applied to the Tsys spws before the calibration tables are calculated.
@@ -45,26 +45,27 @@ To restore data calibrated by the pipeline, one can either run `scriptForPI.py` 
 
 - A calibrated MS for each ASDM with a name like `uid___A002_Xe50c9e_X1297.ms`.
 
-Running the script through {func}`hsd_atmcor <pipeline.hsd.cli.hsd_atmcor>` command will additionally create:
+Running the script through {func}`~pipeline.hsd.cli.hsd_atmcor` command will additionally create:
 - A calibrated, atmospheric-corrected MS for each ASDM with a name like
 
   `uid___A002_Xe50c9e_X1297.ms.atmcor.atmtype1`.
 
   The pipeline "automatic" mode reproduces correction for atmospheric effects.
 
-Note that the *baseline subtraction is not done for the restored calibrated MS*. Running the script through {func}`hsd_atmcor <pipeline.hsd.cli.hsd_atmcor>` and {func}`hsd_baseline <pipeline.hsd.cli.hsd_baseline>` commands will additionally create:
+Note that the *baseline subtraction is not done for the restored calibrated MS*. Running the script through {func}`~pipeline.hsd.cli.hsd_atmcor` and {func}`~pipeline.hsd.cli.hsd_baseline` commands will additionally create:
 - A calibrated, atmospheric-corrected, baseline-subtracted MS for each ASDM with a name like
 
   `uid___A002_Xe50c9e_X1297.ms.atmcor.atmtype1_bl`.
 
-  The pipeline "automatic" mode reproduces the baseline subtraction. If instead the user may want to set the mask ranges to be used for baseline subtraction, CASA task {func}`CASA/sdbaseline <casatasks.single.sdbaseline>` is recommended. In this case, please be aware that a WebLog is not generated for CASA tasks. If the baseline subtraction is done with the CASA task {func}`CASA/sdbaseline <casatasks.single.sdbaseline>`, any further Pipeline tasks cannot be used.
+  The pipeline "automatic" mode reproduces the baseline subtraction. If instead the user may want to set the mask ranges to be used for baseline subtraction, CASA task {func}`~casatasks.single.sdbaseline` is recommended. In this case, please be aware that a WebLog is not generated for CASA tasks. If the baseline subtraction is done with the CASA task {func}`~casatasks.single.sdbaseline`, any further Pipeline tasks cannot be used.
 
-Running the script additionally through {func}`hsd_blflag <pipeline.hsd.cli.hsd_blflag>` command will result in:
-- flagging based on the baseline rms for each ASDM. The {func}`hsd_blflag <pipeline.hsd.cli.hsd_blflag>` command has to be run after {func}`hsd_baseline <pipeline.hsd.cli.hsd_baseline>` at least once. In the standard recipe, {func}`hsd_baseline <pipeline.hsd.cli.hsd_baseline>` and {func}`hsd_blflag <pipeline.hsd.cli.hsd_blflag>` are repeated twice to improve the quality of baseline detection.
+Running the script additionally through {func}`~pipeline.hsd.cli.hsd_blflag` command will result in:
+- flagging based on the baseline rms for each ASDM. The {func}`~pipeline.hsd.cli.hsd_blflag` command has to be run after {func}`~pipeline.hsd.cli.hsd_baseline` at least once. In the standard recipe, {func}`~pipeline.hsd.cli.hsd_baseline` and {func}`~pipeline.hsd.cli.hsd_blflag` are repeated twice to improve the quality of baseline detection.
 
-Running the script through the {func}`hsd_imaging <pipeline.hsd.cli.hsd_imaging>` command will additionally create:
+Running the script through the {func}`~pipeline.hsd.cli.hsd_imaging` command will additionally create:
 - native resolution images per spectral window, antenna, and source.
 
+(sec-piperestore)=
 ### Results from running the IF `casapiperestorescript.py`
 
 - A calibrated MS for each ASDM with a name like `uid___A002_Xe50c9e_X1297.ms`, containing all sources including calibrators, with calibrated data in the CORRECTED column.
@@ -75,11 +76,12 @@ It is often desirable to subsequently run the first few steps of the imaging pip
 1. navigate to the **calibrated/working** directory
 2. copy `cont.dat` ({ref}`cont.dat <sec-cont-dat>`) into that directory - it is likely to be found inside **calibration/\*auxproducts.tgz**
 3. if you still have casa running from having just run `scriptForPI.py` or `casa_piperestorescript.py`, then you have an active Pipeline session, and new pipeline task calls will use the active **Context** — for example, the MSs are already known in that **Context**.
-4. if not, you will have to start `casa --pipeline`, and run {func}`h_init <pipeline.h.cli.h_init>` and then {func}`hifa_importdata <pipeline.hifa.cli.hifa_importdata>` with the list of recently-restored, calibrated MSs, to start a new pipeline session.
-5. run {func}`hif_mstransform <pipeline.hif.cli.hif_mstransform>` to create `*_targets.ms`, with calibrated continuum+line target data in the DATA column.
-6. next, run {func}`hif_makeimlist <pipeline.hif.cli.hif_makeimlist>`(specmode="mfs");
-{func}`hif_findcont <pipeline.hif.cli.hif_findcont>`(). It should use your existing `cont.dat` and not have to recalculate anything.
-7. finally, run {func}`hif_uvcontsub <pipeline.hif.cli.hif_uvcontsub>`(). Now your `*.targets_line.ms` will have continuum-subtracted line visibilities in the DATA column.
+4. if not, you will have to start `casa --pipeline`, and run {func}`~pipeline.h.cli.h_init` and then {func}`~pipeline.hifa.cli.hifa_importdata` with the list of recently-restored, calibrated MSs, to start a new pipeline session.
+5. run {func}`~pipeline.hif.cli.hif_mstransform` to create `*_targets.ms`, with calibrated continuum+line target data in the DATA column.
+6. next, run {func}`~pipeline.hif.cli.hif_makeimlist`(specmode="mfs");
+{func}`~pipeline.hif.cli.hif_findcont`(). It should use your existing `cont.dat` and not have to recalculate anything.
+7. finally, run {func}`~pipeline.hif.cli.hif_uvcontsub`(). Now your `*.targets_line.ms` will have continuum-subtracted line visibilities in the DATA column.
+8. If self-calibration was applied during the original processing, it can be recovered by running {func}`~pipeline.hif.cli.hif_selfcal`(). This will re-apply existing solutions and store them in the CORRECTED_DATA column. Note that `*.targets.ms` must be created first, since the calibration tables created by {func}`~pipeline.hif.cli.hif_selfcal` refer to `*.targets.ms` and not the original measurement sets.
 
 ## The Pipeline processing script: `casa_pipescript.py`
 
@@ -153,11 +155,13 @@ try:
     hifa_imageprecheck()
     hif_checkproductsize(maxcubesize=40.0, maxcubelimit=60.0, maxproductsize=500.0)
     hifa_exportdata()
+    # Start of imaging pipeline commands
     hif_mstransform()
     hifa_flagtargets() # uses *flagtargettemplate.txt
-    hif_makeimlist(specmode='mfs') # uses cont.dat
-    hif_findcont() # modifies cont.dat
+    hif_findroi() # experimental for PL2026, diagnostic-only
+    hif_findcont(hm_mode='coarse') # modifies cont.dat
     hif_uvcontsub()
+    hif_makeimlist(specmode='mfs') # uses cont.dat
     hif_makeimages() # uses cont.dat
     hif_makeimlist(specmode='cont') # uses cont.dat
     hif_makeimages() # uses cont.dat
@@ -172,6 +176,7 @@ try:
     hif_makeimages()
     hif_makeimlist(specmode='repBW', datatype='selfcal')
     hif_makeimages()
+    hifa_exportdata()
 finally:
     h_save()
 ```
@@ -194,7 +199,7 @@ Running the script will create:
 
 ### Results from running the interferometric `casa_pipescript.py`
 
-Running the script through the first {func}`hif_makeimages <pipeline.hif.cli.hif_makeimages>` command (calibrator imaging) will create:
+Running the script through the first {func}`~pipeline.hif.cli.hif_makeimages` command (calibrator imaging) will create:
 - A calibrated MS for each ASDM with a name like `uid___A00X_XXXX_XXX.ms`. This ms includes both calibrator and science data and all spectral windows, with the raw data in the DATA column, and the calibrated continuum + line data in the CORRECTED column.
 - Continuum images of the bandpass, phase, and (if present) check source calibrators (1 per spectral window for the bandpass and phase and 1 per spectral window per EB for the check source, in `*.image` format). To view a `*.image` file e.g. use [casaviewer](https://casadocs.readthedocs.io/en/stable/api/casaviewer.html) `image_file_name`.
 - A `pipeline-*/html` directory containing:
@@ -207,14 +212,14 @@ Running the script through the first {func}`hif_makeimages <pipeline.hif.cli.hif
 CASA support for the standalone viewer is not expected to continue indefinitely (it is already gone for MacOS), and users are encouraged to switch to the CARTA viewer <http://cartavis.org> for CASA images.
 ```
 
-Running the script through the {func}`hif_mstransform <pipeline.hif.cli.hif_mstransform>` command will additionally create:
+Running the script through the {func}`~pipeline.hif.cli.hif_mstransform` command will additionally create:
 - A calibrated MS for each ASDM containing only science target data (only science targets and spectral windows), with a name like `uid___A00X_XXXX_XXX_targets.ms`. This ms will have the calibrated continuum + line data in the DATA column.
 
-Running the script through {func}`hif_uvcontsub <pipeline.hif.cli.hif_uvcontsub>` command will result in:
+Running the script through {func}`~pipeline.hif.cli.hif_uvcontsub` command will result in:
 - The science-target only MS `uid___A00X_XXXX_XXX_targets_line.ms`, with the calibrated continuum-subtracted line data in the DATA column.
 
-Running the script through the final {func}`hif_makeimages <pipeline.hif.cli.hif_makeimages>` command (science target spectral line imaging) will additionally create:
-- Per-spw continuum images, aggregate continuum images, and continuum subtracted image cubes of at least some science targets (the number of targets may be reduced automatically — see the mitigation section of {func}`hif_checkproductsize <pipeline.hif.cli.hif_checkproductsize>`).
+Running the script through the final {func}`~pipeline.hif.cli.hif_makeimages` command (science target spectral line imaging) will additionally create:
+- Per-spw continuum images, aggregate continuum images, and continuum subtracted image cubes of at least some science targets (the number of targets may be reduced automatically — see the mitigation section of {func}`~pipeline.hif.cli.hif_checkproductsize`).
 
 ## CASA equivalent commands file: `casa_commands.log`
 

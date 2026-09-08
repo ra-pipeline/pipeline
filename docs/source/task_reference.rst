@@ -15,3 +15,8 @@ Pipeline Tasks (from autosummary)
    hifv.cli
    hsd.cli
    hsdn.cli
+
+.. toctree::
+   :hidden:
+
+   references

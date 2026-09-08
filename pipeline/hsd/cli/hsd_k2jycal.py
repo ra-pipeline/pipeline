@@ -6,12 +6,11 @@ import pipeline.h.cli.utils as utils
 def hsd_k2jycal(dbservice=None, endpoint=None, reffile=None,
                 infiles=None, caltable=None,
                 backup_urls=None):
-    """Obtain and apply the Kelvin-to-Jansky conversion factors.
+    """Obtain the Kelvin-to-Jansky conversion factors.
 
-    Reads Kelvin-to-Jansky (Jy/K) conversion factors from a ``jyperk_query.csv`` file (when
-    ``dbservice=True``, the default, these are queried from the online database) or from a
-    manually provided ``jyperk.csv`` file. Factors are stored per MS, per spw, per antenna,
-    and per polarization.
+    Queries Kelvin-to-Jansky (Jy/K) conversion factors (when ``dbservice=True``, the default)
+    or read them from a manually provided ``jyperk.csv`` file. Factors are stored per MS,
+    per spw, per antenna, and per polarization.
 
     The WebLog lists the applied Jy/K factors and displays plots of them:
 

@@ -73,7 +73,7 @@ def hifa_fluxcalflag(vis=None, field=None, intent=None, spw=None, threshold=None
         **QA Scoring**
 
         A QA score of 0.66 is set if a spw-map was required, otherwise 1.0. There is an additional QA score based
-        on the incremental amount of flagging: 0.0 if the flag fraction is >=50%, 1.0 if <=5%, linearly
+        on the incremental amount of flagging: 0.5 if the flag fraction is >=50%, 1.0 if <=5%, linearly
         interpolated in between.
 
     Examples:
