@@ -7,9 +7,8 @@ on:
     paths:
       - "docs/**"
       - "pipeline/**"
+      - "scripts/**"
       - ".github/workflows/**"
-      - "environment*.yml"
-      - "setup.py"
       - "pyproject.toml"
   # Allow manual triggering
   workflow_dispatch:
