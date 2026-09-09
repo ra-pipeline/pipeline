@@ -1,4 +1,3 @@
-
 """This module contains unit tests for the daskhelpers module.
 
 The tests cover the following functionalities:
@@ -14,7 +13,10 @@ installed.
 To run these tests, use the following command:
 
 ```bash
+# In an activated development environment (e.g. Pixi/Conda):
 pytest -vs pipeline/infrastructure/daskhelpers_test.py
+
+# In a monolithic CASA environment (PYTHONNOUSERSITE=1 ${casa_dir}/bin/python3):
 casa_python -m pytest -vs pipeline/infrastructure/daskhelpers_test.py
 ```
 """
@@ -40,7 +42,7 @@ if TYPE_CHECKING:
     from typing import Any
 
     from dask.distributed import Client
-    from numpy import generic, floating
+    from numpy import floating, generic
     from numpy.typing import NDArray
 
 

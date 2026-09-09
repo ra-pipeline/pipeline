@@ -11,6 +11,21 @@ If you don't already have CASA installed, you can find recent builds at [CASA pr
 
 After downloading a CASA build, follow the instructions on the [CASA Installation Guide](https://casadocs.readthedocs.io/en/stable/notebooks/usingcasa.html#Full-Installation-of-CASA-5-and-6) to install CASA.
 
+### Environment Shortcuts
+
+Throughout this guide, `casa_bin` refers to the path to the CASA `bin` directory:
+- On Linux, it is the `bin/` directory inside the unpacked CASA tarball, e.g. `casa-6.7.1-13-py3.10-gpu.el8/bin`.
+- On macOS, it is typically `/Applications/CASA.app/Contents/MacOS`.
+
+`PYTHONNOUSERSITE=1` is used to prevent the Python interpreter and `pip` from checking or loading packages from the user's local site-packages directory (`~/.local/lib/pythonX.Y/site-packages`). This is necessary to isolate your user site-packages directory from your CASA development environment, which is confined to the unpacked CASA tarball directory.
+
+To simplify executing commands within CASA's isolated Python environment and avoid accidentally using the wrong environment tools, set up these shell aliases:
+
+```console
+alias casa_pip='PYTHONNOUSERSITE=1 ${casa_bin}/pip3 --disable-pip-version-check'
+alias casa_python='PYTHONNOUSERSITE=1 ${casa_bin}/python3'
+```
+
 ### Dependency Requirements
 
 Pipeline specifies all required standard Python dependencies directly in [`pyproject.toml`](../pyproject.toml) (`[project.dependencies]`).
@@ -22,24 +37,47 @@ The developer team maintains `pyproject.toml` to reflect the current state of de
 To install these dependencies into CASA's Python environment without installing the Pipeline package itself, run the helper script:
 
 ```console
-PYTHONNOUSERSITE=1 ${casa_bin}/python3 scripts/install_dependencies.py
+casa_python scripts/install_dependencies.py
 ```
 
 Or to include development tools (testing, linters, profilers):
 
 ```console
-PYTHONNOUSERSITE=1 ${casa_bin}/python3 scripts/install_dependencies.py --dev
+casa_python scripts/install_dependencies.py --dev
 ```
 
-Note that here `casa_bin` is the path to the CASA `bin` directory.
-On macOS, this is typically `/Applications/CASA.app/Contents/MacOS`; on Linux, it is the `bin/` directory inside the unpacked CASA tarball, e.g. `casa-6.5.3-28-py3.8/bin`. `PYTHONNOUSERSITE=1` is used to prevent the `pip` command from checking dependencies from the user's site-packages directory. This is necessary to isolate the user's site-packages directory from your CASA development environment, which is generally confined to the unpacked CASA tarball directory. You may create a series of alias shortcuts to avoid accidentally using the wrong Python environment and tools:
+*(Alternatively, without aliases: `PYTHONNOUSERSITE=1 ${casa_bin}/python3 scripts/install_dependencies.py`)*
 
+:::{tip} Prefer a traditional `requirements.txt`?
+If you want to generate a standard `requirements.txt` file (e.g. for inspection or installing with `casa_pip install -r requirements.txt`), you can extract them directly from `pyproject.toml`:
+
+**Using a standard Python 3.11+ one-liner** (zero dependencies, uses built-in `tomllib`):
 ```console
-alias casa_pip='PYTHONNOUSERSITE=1 ${casa_bin}/pip3 --disable-pip-version-check'
-alias casa_python='PYTHONNOUSERSITE=1 ${casa_bin}/python3'
+# Core runtime dependencies:
+python3 -c 'import tomllib as t; \
+  d = t.load(open("pyproject.toml", "rb")); \
+  print(*d["project"]["dependencies"], sep="\n")' > requirements.txt
+
+# Development dependencies:
+python3 -c 'import tomllib as t; \
+  d = t.load(open("pyproject.toml", "rb")); \
+  print(*d["project"]["optional-dependencies"]["dev"], sep="\n")' \
+  > requirements-dev.txt
+
+# Direct installation without saving to disk:
+casa_pip install $(python3 -c 'import tomllib as t; \
+  d = t.load(open("pyproject.toml", "rb")); \
+  print(*d["project"]["dependencies"])')
 ```
 
-The `pip` command above should install the dependencies in the CASA site-packages directory, which can be verified with this:
+**Using `scripts/install_dependencies.py --export`**:
+```console
+python3 scripts/install_dependencies.py --export requirements.txt
+python3 scripts/install_dependencies.py --dev --export requirements-dev.txt
+```
+:::
+
+The dependency installation in the CASA site-packages directory can be verified inside CASA:
 
 ```python
 CASA <1>: import astropy

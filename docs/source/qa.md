@@ -83,6 +83,11 @@ git clone --branch "${pipe_ver}" --single-branch \
 # Install third-party pipeline requirements inside CASA's Python environment
 echo "Installing pipeline requirements..."
 PYTHONNOUSERSITE=1 "${casa_ver}/bin/python3" pipeline/scripts/install_dependencies.py
+# (Alternative: extract requirements.txt first if preferred):
+# python3 -c 'import tomllib as t; \
+#   d = t.load(open("pipeline/pyproject.toml", "rb")); \
+#   print(*d["project"]["dependencies"], sep="\n")' > requirements.txt
+# PYTHONNOUSERSITE=1 "${casa_ver}/bin/pip3" install -r requirements.txt
 
 
 # Install pipeline package into CASA

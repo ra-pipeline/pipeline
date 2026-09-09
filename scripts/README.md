@@ -147,6 +147,7 @@ This utility is designed for monolithic CASA environments where third-party pack
 | `--docs` | Includes documentation dependencies (`project.optional-dependencies.docs`). |
 | `--exp` | Includes experimental toolbox dependencies (`project.optional-dependencies.exp`). |
 | `--all` | Includes all optional dependency groups (`dev`, `docs`, `exp`). |
+| `--export [FILE]`, `-o` | Exports dependencies in `requirements.txt` format to FILE (or stdout if omitted). |
 | `--dry-run` | Prints resolved packages and equivalent `pip` command without installing. |
 | `--upgrade-strategy` | Sets `pip` upgrade strategy (default: `only-if-needed`). |
 
@@ -159,6 +160,27 @@ PYTHONNOUSERSITE=1 ${casa_bin}/python3 scripts/install_dependencies.py
 # With development tools (testing, linters):
 PYTHONNOUSERSITE=1 ${casa_bin}/python3 scripts/install_dependencies.py --dev
 
+# Export to a traditional requirements.txt file:
+python scripts/install_dependencies.py --export requirements.txt
+python scripts/install_dependencies.py --dev --export requirements-dev.txt
+
 # Dry-run inspection:
 python scripts/install_dependencies.py --dry-run --all
+```
+
+### Standalone Oneliner (Without Helper Script)
+
+To extract dependencies directly from `pyproject.toml` into a `requirements.txt` using only standard Python 3.11+ (built-in `tomllib`):
+
+```bash
+# Core requirements.txt:
+python3 -c 'import tomllib as t; \
+  d = t.load(open("pyproject.toml", "rb")); \
+  print(*d["project"]["dependencies"], sep="\n")' > requirements.txt
+
+# Dev requirements-dev.txt:
+python3 -c 'import tomllib as t; \
+  d = t.load(open("pyproject.toml", "rb")); \
+  print(*d["project"]["optional-dependencies"]["dev"], sep="\n")' \
+  > requirements-dev.txt
 ```
