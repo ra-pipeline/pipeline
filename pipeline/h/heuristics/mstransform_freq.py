@@ -23,7 +23,7 @@ qa = casa_tools.quanta
 def configure_frequency(
     observing_run: ObservingRun,
     ms_list: list[MeasurementSet],
-):
+) -> dict[tuple[str, int], dict[str, int | dict[str, float | str]]]:
     # get list of virtual spw ids
     ref_ms = ms_list[0]
     sci_spw_virtual_ids = [
