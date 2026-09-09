@@ -20,7 +20,7 @@ try:
 except ImportError as e:
     sys.exit(
         f"Error: Missing required dependency for asset bundling: {e}\n"
-        f"Please install 'csscompressor' and 'jsmin' (e.g. via 'pip install -r requirements_dev.txt')."
+        "Please install 'csscompressor' and 'jsmin' (e.g. via 'pip install .[dev]' or 'python scripts/install_dependencies.py --dev')."
     )
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")

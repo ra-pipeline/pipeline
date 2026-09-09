@@ -10,6 +10,7 @@ This directory contains utility and maintenance scripts for developing, building
 - [2. `procedure_add_parallel.py` — Parallel Procedure Generator](#2-procedure_add_parallelpy--parallel-procedure-generator)
 - [3. `update_references.py` — NASA/ADS Reference Synchronizer](#3-update_referencespy--nasaads-reference-synchronizer)
 - [4. `build_backend.py` — In-Tree PEP 517 Build Backend Wrapper](#4-build_backendpy--in-tree-pep-517-build-backend-wrapper)
+- [5. `install_dependencies.py` — Monolithic CASA Dependency Installer](#5-install_dependenciespy--monolithic-casa-dependency-installer)
 
 ---
 
@@ -19,9 +20,9 @@ Bundles and minifies static JavaScript and CSS assets used by the Pipeline HTML 
 
 This script replaces the legacy `MinifyJSCommand` and `MinifyCSSCommand` from `setup.py`, allowing assets to be bundled independently of the package installation process.
 
-### Bundles Created
+### Bundles Overview
 
-| Target Bundle | Source Location | Source Files Combined | Minification Tool |
+| Bundle | Destination Directory | Source Files | Minifier |
 | :--- | :--- | :--- | :--- |
 | **`pipeline_common.min.js`** | `.../resources/js/` | `jquery-3.3.1.js`, `holder.js`, `lazyload.js`, `jquery.fancybox.js`, `plotcmd.js`, `tcleancmd.js`, `purl.js`, `bootstrap.js`, `pipeline.js` | `jsmin` |
 | **`pipeline_plots.min.js`** | `.../resources/js/` | `select2.js`, `d3.v3.js` | `jsmin` |
@@ -32,7 +33,9 @@ This script replaces the legacy `MinifyJSCommand` and `MinifyCSSCommand` from `s
 Requires `csscompressor` and `jsmin`:
 
 ```bash
-pip install -r requirements_dev.txt
+pip install .[dev]
+# or in monolithic CASA:
+python scripts/install_dependencies.py --dev
 ```
 
 ### Usage
@@ -126,3 +129,36 @@ backend-path = ["scripts"]
 ```
 
 Included in `MANIFEST.in` (`include scripts/build_backend.py`) so that building or installing from source distribution tarballs (`sdist`) works seamlessly in isolated build environments.
+
+---
+
+## 5. `install_dependencies.py` — Monolithic CASA Dependency Installer
+
+Extracts and installs Pipeline third-party dependencies from `pyproject.toml` into the active Python environment without installing the Pipeline package itself.
+
+This utility is designed for monolithic CASA environments where third-party packages must be installed into CASA's internal Python `site-packages` while keeping the Pipeline working copy separate (e.g., paired at runtime via `sys.path` or `PIPE_PATH`):
+
+### Options
+
+| Flag | Description |
+| :--- | :--- |
+| *(default)* | Installs core runtime dependencies (`project.dependencies`). |
+| `--dev` | Includes development, testing, and linting dependencies (`project.optional-dependencies.dev`). |
+| `--docs` | Includes documentation dependencies (`project.optional-dependencies.docs`). |
+| `--exp` | Includes experimental toolbox dependencies (`project.optional-dependencies.exp`). |
+| `--all` | Includes all optional dependency groups (`dev`, `docs`, `exp`). |
+| `--dry-run` | Prints resolved packages and equivalent `pip` command without installing. |
+| `--upgrade-strategy` | Sets `pip` upgrade strategy (default: `only-if-needed`). |
+
+### Usage
+
+```bash
+# In a monolithic CASA environment (using CASA's python):
+PYTHONNOUSERSITE=1 ${casa_bin}/python3 scripts/install_dependencies.py
+
+# With development tools (testing, linters):
+PYTHONNOUSERSITE=1 ${casa_bin}/python3 scripts/install_dependencies.py --dev
+
+# Dry-run inspection:
+python scripts/install_dependencies.py --dry-run --all
+```

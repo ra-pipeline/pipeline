@@ -82,11 +82,8 @@ git clone --branch "${pipe_ver}" --single-branch \
 
 # Install third-party pipeline requirements inside CASA's Python environment
 echo "Installing pipeline requirements..."
-PYTHONNOUSERSITE=1 "${casa_ver}/bin/pip3" install \
-    --disable-pip-version-check \
-    --upgrade-strategy=only-if-needed \
-    --use-pep517 \
-    -r pipeline/requirements.txt
+PYTHONNOUSERSITE=1 "${casa_ver}/bin/python3" pipeline/scripts/install_dependencies.py
+
 
 # Install pipeline package into CASA
 echo "Installing pipeline package..."
