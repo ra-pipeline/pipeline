@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+
 from setuptools import build_meta as _orig
 
 _ROOT = Path(__file__).resolve().parent.parent
@@ -40,14 +41,7 @@ def _ensure_version() -> str:
 
     # 2. If Git metadata is not available (e.g. building from an unpacked sdist tarball),
     # preserve any previously generated version file.
-    ver_txt = _ROOT / 'version'
     ver_py = _ROOT / 'pipeline' / '_version.py'
-
-    if not ver and ver_txt.is_file():
-        try:
-            ver = ver_txt.read_text(encoding='utf-8').strip()
-        except Exception:
-            pass
 
     if not ver and ver_py.is_file():
         try:
@@ -62,16 +56,13 @@ def _ensure_version() -> str:
     if not ver:
         ver = '0.0.dev0'
 
-    # Write pipeline/_version.py (for runtime imports by pipeline.environment)
+    # Write pipeline/_version.py (for runtime imports and setuptools dynamic attr)
     ver_py.write_text(
         '# File generated on-demand during build/install\n'
         '# do not change, do not track in version control\n'
         f"version = '{ver}'\n",
         encoding='utf-8',
     )
-
-    # Write root version file (read by setuptools dynamic version = { file = "version" })
-    ver_txt.write_text(f'{ver}\n', encoding='utf-8')
 
     _cached_version = ver
     return ver
@@ -83,26 +74,31 @@ def _ensure_version() -> str:
 
 
 def get_requires_for_build_wheel(config_settings=None):
+    """Return dependencies required for building a wheel."""
     _ensure_version()
     return _orig.get_requires_for_build_wheel(config_settings)
 
 
 def get_requires_for_build_sdist(config_settings=None):
+    """Return dependencies required for building an sdist."""
     _ensure_version()
     return _orig.get_requires_for_build_sdist(config_settings)
 
 
 def prepare_metadata_for_build_wheel(metadata_directory, config_settings=None):
+    """Prepare metadata (.dist-info) for building a wheel."""
     _ensure_version()
     return _orig.prepare_metadata_for_build_wheel(metadata_directory, config_settings)
 
 
 def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
+    """Build a wheel distribution."""
     _ensure_version()
     return _orig.build_wheel(wheel_directory, config_settings, metadata_directory)
 
 
 def build_sdist(sdist_directory, config_settings=None):
+    """Build a source distribution (sdist)."""
     _ensure_version()
     return _orig.build_sdist(sdist_directory, config_settings)
 
@@ -113,16 +109,19 @@ def build_sdist(sdist_directory, config_settings=None):
 
 
 def get_requires_for_build_editable(config_settings=None):
+    """Return dependencies required for building an editable installation."""
     _ensure_version()
     return _orig.get_requires_for_build_editable(config_settings)
 
 
 def prepare_metadata_for_build_editable(metadata_directory, config_settings=None):
+    """Prepare metadata for building an editable installation."""
     _ensure_version()
     return _orig.prepare_metadata_for_build_editable(metadata_directory, config_settings)
 
 
 def build_editable(wheel_directory, config_settings=None, metadata_directory=None):
+    """Build an editable wheel distribution."""
     _ensure_version()
     return _orig.build_editable(wheel_directory, config_settings, metadata_directory)
 

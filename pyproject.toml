@@ -133,11 +133,10 @@ include = ["pipeline*"]
     '*.txt',
     '*.xml',
     '*.yaml',  # Data files
-    'version', # Build/version files
 ]
 
 [tool.setuptools.dynamic]
-version = { file = "version" }
+version = { attr = "pipeline._version.version" }
 
 [tool.ruff]
 line-length = 120

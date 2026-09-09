@@ -115,8 +115,7 @@ Wraps `setuptools.build_meta` to compute and inject the Pipeline package version
 This in-tree backend replaces the legacy `setup.py` build hooks:
 
 - Dynamically calls `pipeline/infrastructure/version.py` using `get_version_string_from_git()`.
-- Generates `pipeline/_version.py` (read at runtime by `pipeline.environment.pipeline_revision`).
-- Generates the root `version` file (read by `setuptools` via `dynamic.version = { file = "version" }`).
+- Generates `pipeline/_version.py` (read at runtime by `pipeline.environment.pipeline_revision` and by `setuptools` via `dynamic.version = { attr = "pipeline._version.version" }`).
 - Preserves the exact NRAO custom version scheme (`YEAR.MAJOR.MINOR.MICRO+<branch>-<commits>-g<hash>[-dirty]`) without requiring manual release scripts or external version-tagging plugins.
 
 Configured in `pyproject.toml`:
