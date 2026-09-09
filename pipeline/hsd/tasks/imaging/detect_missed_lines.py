@@ -325,7 +325,7 @@ class DetectMissedLines:
             extra_edge_channels: list[int] = [0, 0],
             atm_channels: np.ndarray | list[bool] = [],
             width_threshold: int = 2
-    ) -> tuple[dict[str, bool], dict[list[float | int] | None]]:
+    ) -> tuple[dict[str, bool], dict[str, list[float | int] | None]]:
         """
         Search for the missed lines and create the diagnostic plot
 
@@ -416,7 +416,7 @@ class DetectMissedLines:
 
         return detections, excess_ranges
 
-    def _pick_excess_ranges(self, z: sdtyping.NpArray1D, dev_threshold: float, min_gap_width: int = MIN_GAP_WIDTH) -> dict[str, int | float]:
+    def _pick_excess_ranges(self, z: sdtyping.NpArray1D, dev_threshold: float, min_gap_width: int = MIN_GAP_WIDTH) -> dict[str, list[float | int]]:
         """
         pick excess ranges applying anti-ringing method
 
@@ -539,7 +539,7 @@ class DetectMissedLines:
             ax.set_xlim(frequency_boundaries[0], frequency_boundaries[-1])
             ax.set_ylim(1.1 * np.nanmin(z_linefree),
                         1.1 * np.nanmax(z_linefree))
-            ax.set_xlabel('frequency (GHz) {self.frequency_frame}')
+            ax.set_xlabel(f'frequency (GHz) {self.frequency_frame}')
             ax.set_ylabel('deviation / sigma')
             ax.tick_params(direction='in')
             ax.legend(fontsize='small', ncols=3, loc='best', bbox_to_anchor=(0, 0, 1.0, 0.1))
