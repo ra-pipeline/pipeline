@@ -102,16 +102,9 @@ Unix command-line tools:
 - `pytest-xdist`
 - `pytest-html`
 - `pytest-xvfb`
-- `pytest-forked`
 
 ### Code quality
 
-- `black`
-- `isort`
-- `flake8`
-- `pylint`
-- `pydocstyle`
-- `pycodestyle`
 - `ruff`
 - `pre-commit`
 - `memray`

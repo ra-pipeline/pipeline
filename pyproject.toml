@@ -51,15 +51,8 @@ dev = [
     "pytest-cov",
     "pytest-html",
     "pytest-xvfb",
-    "pytest-forked",
     "junit2html",
     # Code Quality & Style
-    "black",
-    "isort",
-    "flake8",
-    "pylint",
-    "pydocstyle",
-    "pycodestyle",
     "ruff",
     "pre-commit",
     # Packaging Tools
@@ -72,7 +65,6 @@ dev = [
     # Profiling & Analysis
     "memray",
     "line_profiler",
-    "johnnydep",
 ]
 docs = [
     # Core Dependencies
