@@ -9,7 +9,7 @@ import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.sessionutils as sessionutils
 import pipeline.infrastructure.tablereader as tablereader
 import pipeline.infrastructure.vdp as vdp
-from pipeline.domain import DataType
+from pipeline.domain import DataType, SubMS
 from pipeline.hif.heuristics.auto_selfcal.selfcal_helpers import get_calinfo_from_ms
 from pipeline.infrastructure import casa_tasks, exceptions, mpihelpers, task_registry
 from pipeline.infrastructure.mpihelpers import TaskQueue
@@ -328,6 +328,49 @@ class SerialMstransform(basetask.StandardTaskTemplate):
             LOG.debug('Error creating output MS %s' % (os.path.basename(result.outputvis)))
             return result
 
+        if self.inputs.per_spw:
+            real_spw_id = None
+            virtual_spw_id = None
+            if self.inputs.spw:
+                try:
+                    spw_strs = [s.strip() for s in str(self.inputs.spw).split(',') if s.strip()]
+                    if len(spw_strs) == 1:
+                        real_spw_id = int(spw_strs[0])
+                        try:
+                            virtual_spw_id = self.inputs.context.observing_run.real2virtual_spw_id(
+                                real_spw_id, self.inputs.ms
+                            )
+                        except Exception:
+                            virtual_spw_id = None
+                except Exception:
+                    pass
+
+            field_ids = []
+            source_name = None
+            if self.inputs.field:
+                try:
+                    selected_fields = self.inputs.ms.get_fields(task_arg=self.inputs.field)
+                    field_ids = [f.id for f in selected_fields]
+                    unique_sources = {f.source.name for f in selected_fields if hasattr(f, 'source') and f.source}
+                    if len(unique_sources) == 1:
+                        source_name = next(iter(unique_sources))
+                except Exception:
+                    pass
+
+            parent_ms = getattr(self.inputs.ms, 'parent_ms', self.inputs.ms)
+            sub_ms = SubMS(
+                name=result.outputvis,
+                parent_ms=parent_ms,
+                source_name=source_name,
+                real_spw_id=real_spw_id,
+                virtual_spw_id=virtual_spw_id,
+                field_ids=field_ids,
+                data_type=result.output_data_type,
+                data_column='DATA',
+            )
+            result.sub_mses.append(sub_ms)
+            return result
+
         # Import the new measurement set.
         to_import = os.path.relpath(result.outputvis)
         observing_run = tablereader.ObservingRunReader.get_observing_run(to_import)
@@ -366,10 +409,11 @@ class MstransformResults(basetask.Results):
         self.outputvis = outputvis
         self.output_data_type = output_data_type
         self.mses = []
+        self.sub_mses = []
 
     def merge_with_context(self, context):
         # Check for an output vis
-        if not self.mses:
+        if not self.mses and not self.sub_mses:
             LOG.info('No hif_mstransform results to merge')
             return
 
@@ -377,19 +421,42 @@ class MstransformResults(basetask.Results):
 
         # Adding mses to context
         for ms in self.mses:
-            LOG.info('Adding {} to context'.format(ms.name))
+            LOG.info('Adding %s to context', ms.name)
             target.add_measurement_set(ms)
 
+        # Register sub_mses to their parent_ms in context
+        for sub_ms in self.sub_mses:
+            try:
+                parent_ms = context.observing_run.get_ms(sub_ms.parent_ms.name)
+            except KeyError:
+                try:
+                    parent_ms = context.observing_run.get_ms(sub_ms.parent_ms.basename)
+                except KeyError:
+                    parent_ms = sub_ms.parent_ms
+
+            sub_ms.parent_ms = parent_ms
+            LOG.info('Adding SubMS %s to parent MS %s', sub_ms.name, parent_ms.name)
+            parent_ms.add_subms(sub_ms)
+
+        all_target_mses = self.mses + self.sub_mses
+
+        output_dir = (
+            self.inputs.get('output_dir', context.output_dir)
+            if isinstance(self.inputs, dict) and 'output_dir' in self.inputs
+            else context.output_dir
+        )
+
         # Create targets flagging template file if it does not already exist
-        for ms in self.mses:
+        for ms in all_target_mses:
             template_flagsfile = os.path.join(
-                self.inputs['output_dir'], os.path.splitext(os.path.basename(ms.name))[0] + '.flagtargetstemplate.txt')
+                output_dir, os.path.splitext(os.path.basename(ms.name))[0] + '.flagtargetstemplate.txt'
+            )
             self._make_template_flagfile(template_flagsfile, 'User flagging commands file for the imaging pipeline')
 
-        # Initialize callibrary
+        # Initialize callibrary for newly generated full MeasurementSets
         for ms in self.mses:
             calto = callibrary.CalTo(vis=ms.name)
-            LOG.info('Registering {} with callibrary'.format(ms.name))
+            LOG.info('Registering %s with callibrary', ms.name)
             context.callibrary.add(calto, [])
 
     def _make_template_flagfile(self, outfile, titlestr):
@@ -405,8 +472,10 @@ class MstransformResults(basetask.Results):
         s = 'MstransformResults:\n'
         if self.vis:
             s += '\tOriginal MS {vis} transformed to {outputvis}\n'.format(
-                vis=os.path.basename(self.vis),
-                outputvis=os.path.basename(self.outputvis))
+                vis=os.path.basename(self.vis), outputvis=os.path.basename(self.outputvis)
+            )
+        if self.sub_mses:
+            s += f'\tCreated SubMS partitions: {len(self.sub_mses)}\n'
 
         return s
 

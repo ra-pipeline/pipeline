@@ -23,7 +23,17 @@ if TYPE_CHECKING:
 
     from numpy import floating
 
-    from pipeline.domain import Antenna, AntennaArray, DataDescription, DataType, Field, Polarization, Scan, State
+    from pipeline.domain import (
+        Antenna,
+        AntennaArray,
+        DataDescription,
+        DataType,
+        Field,
+        Polarization,
+        Scan,
+        State,
+        SubMS,
+    )
     from pipeline.infrastructure.tablereader import RetrieveByIndexContainer
 
 LOG = infrastructure.logging.get_logger(__name__)
@@ -168,6 +178,7 @@ class MeasurementSet:
         self.phaseup_caltable_for_phase_rms = []  # PIPE-1624
         self.reference_spwmap: list[int] | None = None
         self.spwmaps: dict = {}  # PIPE-1154
+        self.sub_mses: list[SubMS] = []  # PIPE-3250
 
         # Polarisation calibration requires the refant list be frozen, after
         # which subsequent gaincal calls are executed with
@@ -1556,6 +1567,10 @@ class MeasurementSet:
             in the MS.
         """
         if dtype not in self.data_column.keys():
+            if self.has_subms(dtype):
+                matching_subs = self.get_subms(source, spw, dtype)
+                if matching_subs:
+                    return matching_subs[0].data_column.get(dtype, 'DATA')
             return None
 
         if source is None and spw is None:
@@ -1600,6 +1615,12 @@ class MeasurementSet:
             selection.
         """
         if column not in self.data_column.values():
+            if self.has_subms():
+                matching_subs = self.get_subms(source, spw)
+                for sub in matching_subs:
+                    dt = sub.get_data_type(column)
+                    if dt is not None:
+                        return dt
             return None
 
         # Invert dictionary. This should not lead to wrong mappings
@@ -1714,3 +1735,60 @@ class MeasurementSet:
                 el.append(func([el0, el1]))
 
         return func(az), func(el)
+
+    def add_subms(self, subms: SubMS) -> None:
+        """Register a child SubMS slice under this MeasurementSet."""
+        for existing in self.sub_mses:
+            if existing.name == subms.name:
+                return
+        self.sub_mses.append(subms)
+
+    def get_subms(
+        self,
+        source: str | None = None,
+        spw: int | str | None = None,
+        data_type: DataType | None = None,
+    ) -> list[SubMS]:
+        """Retrieve child SubMS slices matching given filters.
+
+        Args:
+            source: Source name or comma-separated list of source names.
+            spw: Real or virtual SPW ID (or comma-separated list of IDs).
+            data_type: DataType filter.
+
+        Returns:
+            List of matching SubMS objects.
+        """
+        matches = self.sub_mses
+        if data_type is not None:
+            matches = [s for s in matches if s.data_type == data_type]
+        if source is not None and source.strip():
+            source_names = {utils.dequote(s.strip()) for s in source.split(',') if s.strip()}
+            matches = [s for s in matches if s.source_name in source_names]
+        if spw is not None and str(spw).strip():
+            try:
+                spw_ids = set(utils.range_to_list(str(spw)))
+            except Exception:
+                spw_ids = {int(i) for i in str(spw).split(',') if i.strip().isdigit()}
+            matches = [s for s in matches if s.real_spw_id in spw_ids or s.virtual_spw_id in spw_ids]
+        return matches
+
+    def has_subms(self, data_type: DataType | None = None) -> bool:
+        """Check if any child SubMS slices exist matching optional data_type."""
+        if not self.sub_mses:
+            return False
+        if data_type is None:
+            return True
+        return any(s.data_type == data_type for s in self.sub_mses)
+
+    def get_vis(
+        self,
+        source: str | None = None,
+        spw: int | str | None = None,
+        data_type: DataType | None = None,
+    ) -> str:
+        """Return on-disk path to matching SubMS if available, otherwise return self.name."""
+        matches = self.get_subms(source=source, spw=spw, data_type=data_type)
+        if matches:
+            return matches[0].name
+        return self.name

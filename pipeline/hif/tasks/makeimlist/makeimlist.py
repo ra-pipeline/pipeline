@@ -1372,7 +1372,12 @@ class MakeImList(basetask.StandardTaskTemplate):
 
                                 datacolumn = local_datacolumn
 
-                                if not inputs.per_eb and original_vislist_field_intent_spw_combinations[field_intent]['vislist'] != [k.basename for k in local_ms_objects_and_columns.keys()]:
+                                if (
+                                    not inputs.per_eb
+                                    or any(hasattr(k, 'parent_ms') for k in local_ms_objects_and_columns.keys())
+                                ) and original_vislist_field_intent_spw_combinations[field_intent]['vislist'] != [
+                                    k.basename for k in local_ms_objects_and_columns.keys()
+                                ]:
                                     vislist_field_intent_spw_combinations[field_intent]['vislist'] = [k.basename for k in local_ms_objects_and_columns.keys()]
                                     if automatic_datatype_choice and local_selected_datatype_str != selected_datatype_str:
                                         LOG.warning(
@@ -1508,7 +1513,21 @@ class MakeImList(basetask.StandardTaskTemplate):
                                     filtered_vislist = domain_filtered_vislist
                                 else:
                                     # Filter MSs with fully flagged field/spw selections
-                                    filtered_vislist = [v for v in domain_filtered_vislist if valid_data[v][field_intent][str(adjusted_spwspec)]]
+                                    def _is_valid_data(v, f_intent, spw_str):
+                                        if v in valid_data and f_intent in valid_data[v] and spw_str in valid_data[v][f_intent]:
+                                            return valid_data[v][f_intent][spw_str]
+                                        try:
+                                            ms_obj = inputs.context.observing_run.get_ms(v)
+                                        except KeyError:
+                                            ms_obj = None
+                                        parent = getattr(ms_obj, 'parent_ms', None)
+                                        if parent:
+                                            for p_key in (parent.basename, parent.name):
+                                                if p_key in valid_data and f_intent in valid_data[p_key] and spw_str in valid_data[p_key][f_intent]:
+                                                    return valid_data[p_key][f_intent][spw_str]
+                                        return False
+
+                                    filtered_vislist = [v for v in domain_filtered_vislist if _is_valid_data(v, field_intent, str(adjusted_spwspec))]
 
                                 # Save the filtered vislist
                                 if target_heuristics.vislist != filtered_vislist:
@@ -1522,8 +1541,20 @@ class MakeImList(basetask.StandardTaskTemplate):
                                 #  baselines by default. The cross baselines with antennas not listed (for TARGET images
                                 #  the antennas with the minority antenna sizes are not listed) could be added in some
                                 #  future configurations by removing this character.
-                                antenna = [','.join(map(str, antenna_ids.get(os.path.basename(v), '')))+'&'
-                                           for v in filtered_vislist]
+                                def _get_antenna_ids_str(v):
+                                    bname = os.path.basename(v)
+                                    if bname in antenna_ids:
+                                        return ','.join(map(str, antenna_ids[bname]))
+                                    try:
+                                        ms_obj = inputs.context.observing_run.get_ms(v)
+                                    except KeyError:
+                                        ms_obj = None
+                                    parent = getattr(ms_obj, 'parent_ms', None)
+                                    if parent and parent.basename in antenna_ids:
+                                        return ','.join(map(str, antenna_ids[parent.basename]))
+                                    return ''
+
+                                antenna = [_get_antenna_ids_str(v) + '&' for v in filtered_vislist]
 
                                 drcorrect, maxthreshold = self._get_drcorrect_maxthreshold(
                                     field_intent[0], actual_spwspec, local_selected_datatype_str)

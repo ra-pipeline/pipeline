@@ -128,18 +128,15 @@ def _get_groupingid_spectralspec_from_alma_spw_name(spw_name: str) -> tuple[str 
     return groupingid, spectralspec
 
 
-def _get_ms_name(ms: MeasurementSet | str) -> str:
-    return ms.name if isinstance(ms, domain.MeasurementSet) else ms
+def _get_ms_name(ms: MeasurementSet | domain.SubMS | str) -> str:
+    return getattr(ms, 'name', ms)
 
 
-def _get_ms_basename(ms: MeasurementSet | str) -> str:
-    return ms.basename if isinstance(ms, domain.MeasurementSet) else ms
+def _get_ms_basename(ms: MeasurementSet | domain.SubMS | str) -> str:
+    return getattr(ms, 'basename', ms)
 
 
-def _get_science_goal_value(
-        science_goals: NDArray[np.str_],
-        goal_keyword: str
-        ) -> str:
+def _get_science_goal_value(science_goals: NDArray[np.str_], goal_keyword: str) -> str:
     value = None
     for science_goal in science_goals:
         keyword = science_goal.split('=')[0].replace(' ', '')

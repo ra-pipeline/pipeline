@@ -12,3 +12,4 @@ from .source import Source
 from .spectralwindow import SpectralWindow, SpectralWindowWithChannelSelection
 from .state import State
 from .datatable import DataTableImpl as DataTable
+from .subms import SubMS

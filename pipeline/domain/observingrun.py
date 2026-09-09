@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
     from datetime import datetime
 
-    from pipeline.domain import DataType, MeasurementSet
+    from pipeline.domain import DataType, MeasurementSet, SubMS
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -161,7 +161,7 @@ class ObservingRun(object):
         self.measurement_sets.append(ms)
         self.measurement_sets.sort(key=sort_measurement_set)
 
-    def get_ms(self, name: str = None, intent: str = None) -> MeasurementSet:
+    def get_ms(self, name: str = None, intent: str = None) -> MeasurementSet | SubMS:
         """Returns the first measurement set matching the given identifier.
 
         Identifier precedence is name then intent.
@@ -177,17 +177,27 @@ class ObservingRun(object):
             KeyError, if no measurement set is found for given name or intent.
         """
         if name:
+            basename = os.path.basename(name)
             for ms in self.measurement_sets:
-                if name in (ms.name, ms.basename):
+                if name in (ms.name, ms.basename) or basename in (ms.name, ms.basename):
                     return ms
 
+            name_with_suffix = f'{name}.ms'
+            basename_with_suffix = f'{basename}.ms'
             for ms in self.measurement_sets:
                 # single dish data are registered without the MS suffix
-                with_suffix = '%s.ms' % name
-                if with_suffix in (ms.name, ms.basename):
+                if name_with_suffix in (ms.name, ms.basename) or basename_with_suffix in (ms.name, ms.basename):
                     return ms
 
-            raise KeyError('No measurement set found with name {0}'.format(name))
+            # Also check child SubMSes
+            for ms in self.measurement_sets:
+                for sub in getattr(ms, 'sub_mses', []):
+                    if name in (sub.name, sub.basename) or basename in (sub.name, sub.basename):
+                        return sub
+                    if name_with_suffix in (sub.name, sub.basename) or basename_with_suffix in (sub.name, sub.basename):
+                        return sub
+
+            raise KeyError(f'No measurement set found with name {name}')
 
         if intent:
             # Remove any extraneous characters, as intent could be specified
@@ -197,7 +207,7 @@ class ObservingRun(object):
                 for field in ms.fields:
                     if intent in field.intents:
                         return ms
-            raise KeyError('No measurement set found with intent {0}'.format(intent))
+            raise KeyError(f'No measurement set found with intent {intent}')
 
     def get_measurement_sets(self, names: str | None = None, intents: Iterable | str | None = None,
                              fields: Iterable | str | None = None) -> list[MeasurementSet]:
@@ -239,10 +249,16 @@ class ObservingRun(object):
 
         return candidates
 
-    def get_measurement_sets_of_type(self, dtypes: list[DataType], msonly: bool = True, source: str | None = None,
-                                     spw: str | None = None, vis: list[str] | None = None) \
-            -> list[MeasurementSet] | tuple[collections.OrderedDict, DataType | None]:
-        """Return a list of MeasurementSet domain object with matching DataType.
+    def get_measurement_sets_of_type(
+        self,
+        dtypes: list[DataType],
+        msonly: bool = True,
+        source: str | None = None,
+        spw: str | None = None,
+        vis: list[str] | None = None,
+        return_chunks: bool | None = None,
+    ) -> list[MeasurementSet | SubMS] | tuple[collections.OrderedDict, DataType | None]:
+        """Return a list of MeasurementSet or SubMS domain object with matching DataType.
 
         The method returns a list of MSes of the first matching DataType in the
         list of dtypes.
@@ -260,36 +276,84 @@ class ObservingRun(object):
             spw: Filter for particular virtual spw specification (comma
                 separated list of virtual IDs).
             vis: Filter for list of MS names (list of strings)
+            return_chunks: If True, return child SubMS slices. If False, return
+                parent MeasurementSet objects. If None, automatically returns SubMS
+                slices when source or spw filtering is requested and SubMS slices
+                exist, otherwise returns parent MeasurementSet objects.
 
         Returns:
-            When msonly is True, a list of MeasurementSet domain objects of
-            a matching DataType (and optionally sources and spws) is returned.
+            When msonly is True, a list of MeasurementSet or SubMS domain objects
+            of a matching DataType (and optionally sources and spws) is returned.
             Otherwise, a tuple of an ordered dictionary and a matched DataType
             (and optionally sources and spws) is returned. The ordered
-            dictionary stores matching MS domain objects as keys and matching
-            data column names as values. The order of elements is that appears
-            in measurement_sets list attribute.
+            dictionary stores matching domain objects as keys and matching
+            data column names as values.
         """
         found = []
         column = []
         for dtype in dtypes:
             for ms in self.measurement_sets:
-                # Filter for vis list
-                if isinstance(vis, list):
-                    if ms.name not in vis:
-                        continue
+                # Filter for virtual SPW IDs mapped to real IDs
                 if spw is not None:
-                    real_spw_ids = ','.join(str(self.virtual2real_spw_id(spw_id, ms)) for spw_id in spw.split(',') if self.virtual2real_spw_id(spw_id, ms) is not None)
-                    if not real_spw_ids:
-                        real_spw_ids = None
+                    try:
+                        v_spw_ids = utils.range_to_list(str(spw))
+                    except Exception:
+                        v_spw_ids = [int(s) for s in str(spw).split(',') if s.strip().isdigit()]
+
+                    real_spw_ids = [
+                        self.virtual2real_spw_id(spw_id, ms)
+                        for spw_id in v_spw_ids
+                        if self.virtual2real_spw_id(spw_id, ms) is not None
+                    ]
+                    real_spw_ids_str = ','.join(str(s) for s in real_spw_ids) if real_spw_ids else None
                 else:
                     real_spw_ids = None
-                dcol = ms.get_data_column(dtype, source, real_spw_ids)
-                if dcol is not None:
-                    found.append(ms)
-                    column.append(dcol)
+                    real_spw_ids_str = None
+
+                # Normalize vis filter
+                vis_filter = (
+                    set(vis) if isinstance(vis, (list, tuple, set)) else ({vis} if isinstance(vis, str) else None)
+                )
+
+                # Check if this parent MS has matching SubMS chunks
+                sub_candidates = []
+                if hasattr(ms, 'has_subms') and ms.has_subms(dtype):
+                    sub_candidates = ms.get_subms(source=source, spw=real_spw_ids_str, data_type=dtype)
+
+                # Determine whether to return SubMS chunks or parent MS
+                has_matching_sub_in_vis = bool(
+                    vis_filter and any(sub.name in vis_filter or sub.basename in vis_filter for sub in sub_candidates)
+                )
+                should_return_subms = (return_chunks is True) or (
+                    return_chunks is None
+                    and (source is not None or spw is not None or has_matching_sub_in_vis)
+                    and len(sub_candidates) > 0
+                )
+
+                if should_return_subms and sub_candidates:
+                    parent_names = {ms.name, ms.basename}
+                    for sub in sub_candidates:
+                        if vis_filter is not None:
+                            if (
+                                sub.name not in vis_filter
+                                and sub.basename not in vis_filter
+                                and not parent_names.intersection(vis_filter)
+                            ):
+                                continue
+                        found.append(sub)
+                        column.append(sub.get_data_column(dtype, source, real_spw_ids_str) or 'DATA')
+                else:
+                    if vis_filter is not None:
+                        if ms.name not in vis_filter and ms.basename not in vis_filter:
+                            continue
+                    dcol = ms.get_data_column(dtype, source, real_spw_ids_str)
+                    if dcol is not None:
+                        found.append(ms)
+                        column.append(dcol)
+
             if len(found) > 0:
                 break
+
         if len(found) > 0:
             LOG.debug('Found {} MSes with type {}'.format(len(found), dtype))
         else:
@@ -298,13 +362,13 @@ class ObservingRun(object):
             return found
         else:
             if len(found) > 0:
-                ms_dict = collections.OrderedDict( (m, c) for m, c in zip(found, column))
+                ms_dict = collections.OrderedDict((m, c) for m, c in zip(found, column))
                 return ms_dict, dtype
             else:
                 return collections.OrderedDict(), None
 
     @staticmethod
-    def get_real_spw_id_by_name(spw_name: str | None, target_ms: MeasurementSet) -> int | None:
+    def get_real_spw_id_by_name(spw_name: str | None, target_ms: MeasurementSet | SubMS) -> int | None:
         """Translate a (science) spw name to the real spw ID for a given MS.
 
         Args:
@@ -315,6 +379,7 @@ class ObservingRun(object):
             Real spectral window ID for given spectral window name in given MS,
             or None if name was not found in the given MS.
         """
+        target_ms = getattr(target_ms, 'parent_ms', target_ms)
         spw_id = None
         for spw in target_ms.get_spectral_windows(science_windows_only=True):
             if match_spw_basename(spw.name, spw_name):
@@ -340,7 +405,7 @@ class ObservingRun(object):
         """
         return self.virtual_science_spw_names.get(spw_name, None)
 
-    def virtual2real_spw_id(self, spw_id: int | str, target_ms: MeasurementSet) -> int | None:
+    def virtual2real_spw_id(self, spw_id: int | str, target_ms: MeasurementSet | SubMS) -> int | None:
         """Translate a virtual (science) spw ID to the real one for a given MS.
 
         Args:
@@ -352,6 +417,7 @@ class ObservingRun(object):
             MS. Returns None if either the given virtual spw ID does not exist
             or the given virtual spw ID does not appear in given MS.
         """
+        target_ms = getattr(target_ms, 'parent_ms', target_ms)
         spw_name = self.virtual_science_spw_ids.get(int(spw_id), None)
         if spw_name:
             return self.get_real_spw_id_by_name(spw_name, target_ms)
@@ -359,7 +425,7 @@ class ObservingRun(object):
             LOG.warning('Virtual SPW ID %s not found in the virtual SPW mapping table.', spw_id)
             return None
 
-    def real2virtual_spw_id(self, spw_id: int | str, target_ms: MeasurementSet) -> int | None:
+    def real2virtual_spw_id(self, spw_id: int | str, target_ms: MeasurementSet | SubMS) -> int | None:
         """Translate a real (science) spw ID of a given MS to the virtual one for this pipeline run.
 
         Args:
@@ -371,9 +437,10 @@ class ObservingRun(object):
             name of the given real spectral window ID in the given MS, or None
             if the spectral window name was not found.
         """
+        target_ms = getattr(target_ms, 'parent_ms', target_ms)
         return self.get_virtual_spw_id_by_name(target_ms.get_spectral_window(int(spw_id)).name)
 
-    def real2real_spw_id(self, spw_id: int | str, source_ms: MeasurementSet, target_ms: MeasurementSet) -> int | None:
+    def real2real_spw_id(self, spw_id: int | str, source_ms: MeasurementSet | SubMS, target_ms: MeasurementSet | SubMS) -> int | None:
         """Translates a real spectral window (SPW) ID from one MS to another.
 
         The translation is done via via the pipeline's virtual SPW ID mapping.
@@ -387,6 +454,8 @@ class ObservingRun(object):
             The corresponding real SPW ID in the target MS, or None if the mapping
             could not be performed (e.g., if the virtual SPW ID was not found for the source SPW).
         """
+        source_ms = getattr(source_ms, 'parent_ms', source_ms)
+        target_ms = getattr(target_ms, 'parent_ms', target_ms)
         # Obtain the virtual SPW ID from the source MeasurementSet
         virtual_spw_id = self.real2virtual_spw_id(spw_id, source_ms)
 
