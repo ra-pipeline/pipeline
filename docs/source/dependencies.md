@@ -117,7 +117,7 @@ Declared under `[project.optional-dependencies.docs]` in `pyproject.toml`. Key p
 - `sphinx` with `furo` theme
 - `myst-parser`, `myst-nb` (Markdown and notebook support)
 - `sphinxcontrib-mermaid` (diagram support)
-- `sphinx-automodapi`, `sphinx-autoapi` (API docs)
+- `sphinx-automodapi` (API docs)
 - `sphinx-copybutton`, `sphinxcontrib-bibtex`
 
 ### Version control

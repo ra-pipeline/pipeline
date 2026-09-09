@@ -67,26 +67,18 @@ dev = [
     "line_profiler",
 ]
 docs = [
-    # Core Dependencies
-    "future",
-    "urllib3",
     # Markdown and Jupyter Support
     "myst-parser",
     "myst_nb",
     "linkify-it-py",
     "jupytext",
-    "nbsphinx",
-    "ipympl",
-    "nodejs",
     # Sphinx and Extensions
     "furo>=2024.1.29",
-    "sphinx_rtd_theme",
     "sphinxcontrib-bibtex",
     "sphinx-astrorefs",
     "sphinx-copybutton",
     "sphinx-markdown-tables",
     "sphinx-automodapi",
-    "sphinx-autoapi",
     "sphinxcontrib-mermaid",
 ]
 exp = [
