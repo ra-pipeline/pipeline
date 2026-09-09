@@ -18,12 +18,12 @@ dependencies = [
     "astropy~=7.2",
     "cachetools~=6.2",
     "docstring-inheritance~=2.2",
-    "intervaltree~=3.1",
+    "intervaltree~=3.2",
     "logutils~=0.3",
-    "mako~=1.3",
-    "pypubsub==4.0.3",
+    "mako~=1.4",
+    "pypubsub==4.0.7",
     # -- Optional & Tooling Dependencies --
-    "bdsf~=1.13; sys_platform != 'darwin' or python_version <= '3.12'",
+    "bdsf~=1.14",
     "ps_mem~=3.14",
 ]
 
