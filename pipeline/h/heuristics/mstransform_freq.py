@@ -100,12 +100,13 @@ def configure_frequency(
 
             if is_lsb:
                 width = chan_width * -1.0
-                start_freq = math.floor(max_lsrk_freq / 100) * 100  # round down to nearest 100 Hz
+                start_freq = max_lsrk_freq
             else:
                 width = chan_width
-                start_freq = math.ceil(min_lsrk_freq / 100) * 100  # round up to nearest 100 Hz
+                start_freq = min_lsrk_freq
 
-            start_freq += width / 2 # channel edge -> channel center
+            start_freq += width * 0.01  # shift 1% of width
+            start_freq += width / 2  # channel edge -> channel center
 
             # store the configuration
             key = (source_name, vspw_id)
