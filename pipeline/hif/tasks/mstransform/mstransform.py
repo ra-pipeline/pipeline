@@ -568,7 +568,8 @@ class Mstransform(sessionutils.ParallelTemplate):
             observing_run = inputs.context.observing_run
             frequency_config = configure_frequency(
                 observing_run,
-                [observing_run.get_ms(vis) for vis in vis_list]
+                [observing_run.get_ms(vis) for vis in vis_list],
+                utils.contains_single_dish(inputs.context)
             )
             for args in valid_args_list:
                 if args.get('outframe', '') not in ['LSRK', 'REST']:

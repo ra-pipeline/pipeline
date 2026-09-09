@@ -23,6 +23,7 @@ qa = casa_tools.quanta
 def configure_frequency(
     observing_run: ObservingRun,
     ms_list: list[MeasurementSet],
+    is_single_dish: bool
 ) -> dict[tuple[str, int], dict[str, int | dict[str, float | str]]]:
     # get list of virtual spw ids
     ref_ms = ms_list[0]
@@ -80,10 +81,16 @@ def configure_frequency(
                 # clear_time_cache()
                 me.doframe(me.observatory(ref_ms.antenna_array.name))
                 me.doframe(target_source.direction)
-                # NOTE: for SD data, we may need to get reference time from MS by examining intent
-                # because TARGET and REFERENCE intents co-exists in the target field when
-                # OFF position strategy is not absolute OFF.
-                start_time = np.unique([f.time for f in target_source.fields])[0]
+                if is_single_dish:
+                    with casa_tools.MSReader(ms_obj.name) as _ms:
+                        _ms.msselect({
+                            "scanintent": "OBSERVE_TARGET#ON_SOURCE",
+                            "spw": str(spw_id),
+                            "field": ",".join(map(lambda x: str(x.id), target_source.fields))
+                        })
+                        start_time = np.min(_ms.getdata(["time"])["time"])
+                else:
+                    start_time = np.unique([f.time for f in target_source.fields])[0]
                 LOG.info(f"    DEBUG: {ms_obj.basename} {target_source.name} start_time {start_time} sec")
                 me.doframe(me.epoch(rf="UTC", v0=qa.quantity(start_time, "s")))
                 _max_freq = me.measure(v=me.frequency(rf="TOPO", v0=qa.quantity(max_topo_freq, "Hz")), rf="LSRK")["m0"]["value"]
