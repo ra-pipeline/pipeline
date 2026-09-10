@@ -15,7 +15,7 @@ dynamic = ["version"]
 dependencies = [
     # -- Core Runtime Dependencies --
     "numpy>=2.0",
-    "astropy~=7.2",
+    "astropy~=8.0",
     "cachetools~=6.2",
     "docstring-inheritance~=2.2",
     "intervaltree~=3.2",
