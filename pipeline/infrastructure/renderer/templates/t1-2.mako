@@ -38,7 +38,12 @@ import pipeline.infrastructure.utils as utils
 	<tbody>
 		% for row in ms_summary_rows:
 		<tr>
-		  <td><a href="${row.href}">${row.ms}</a></td>
+		  <td>
+		    <a href="${row.href}">${row.ms}</a>
+		    % if getattr(row, 'is_logical', False) and getattr(row, 'sub_mses', []):
+		    <span class="label label-info">Logical (${len(row.sub_mses)} SpW Slices)</span>
+		    % endif
+		  </td>
 		  <td>${utils.commafy(row.receivers)}</td>
 		  <td>${row.num_antennas}</td>
 		  <td>${row.time_start}</td>

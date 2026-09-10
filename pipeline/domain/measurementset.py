@@ -15,6 +15,7 @@ import numpy as np
 
 from pipeline import infrastructure
 from pipeline.domain import measures, spectralwindow
+from pipeline.domain.datatype import DataType
 from pipeline.infrastructure import casa_tools, tablereader, utils
 from pipeline.infrastructure.launcher import current_task_name
 
@@ -126,17 +127,22 @@ class MeasurementSet:
             spectral windows; used in subsequent calibration tasks
             (ALMA-interferometry-only).
     """
-    def __init__(self, name: str, session: str | None = None) -> None:
-        """
-        Initialize a MeasurementSet object.
+
+    is_logical: bool = False
+
+    def __init__(self, name: str, session: str | None = None, is_logical: bool = False) -> None:
+        """Initialize a MeasurementSet object.
 
         Args:
             name: A path to MS.
             session: Name of session associated with MS.
+            is_logical: If True, indicates this is an in-memory logical
+                MeasurementSet representing partitioned SubMS slices.
         """
         # Attributes based on input arguments.
         self.name: str = name
         self.session: str | None = session
+        self.is_logical: bool = is_logical
 
         # Other attributes populated at init.
         self.exclude_num_chans: tuple[int, int] = (1, 4)
@@ -197,14 +203,17 @@ class MeasurementSet:
         self.reference_antenna_locked: bool = False
 
     def _calc_filesize(self) -> measures.FileSize:
-        """
-        Calculate the disk usage of this measurement set.
-        """
+        """Calculate the disk usage of this measurement set."""
+        if getattr(self, 'is_logical', False):
+            total_bytes = sum(getattr(sub_ms.filesize, 'value', 0) for sub_ms in getattr(self, 'sub_mses', []))
+            return measures.FileSize(total_bytes, measures.FileSizeUnits.BYTES)
+
         total_bytes = 0
-        for dirpath, _, filenames in os.walk(self.name):
-            for f in filenames:
-                fp = os.path.join(dirpath, f)
-                total_bytes += os.path.getsize(fp)
+        if os.path.exists(self.name):
+            for dirpath, _, filenames in os.walk(self.name):
+                for f in filenames:
+                    fp = os.path.join(dirpath, f)
+                    total_bytes += os.path.getsize(fp)
 
         return measures.FileSize(total_bytes,
                                  measures.FileSizeUnits.BYTES)
@@ -801,6 +810,9 @@ class MeasurementSet:
         if task_arg in (None, ''):
             task_arg = '*'
 
+        if getattr(self, 'is_logical', False) and task_arg == '*' and not with_channels:
+            return list(self.spectral_windows)
+
         # expand spw tuples into a range per spw, eg. spw9 : 1,2,3,4,5
         selected = collections.defaultdict(set)
         for (spw, start, end, step) in utils.spw_arg_to_id(self.name, task_arg, self.spectral_windows):
@@ -909,6 +921,11 @@ class MeasurementSet:
     @property
     def start_time(self) -> dict:
         """Return start time for this measurement set as CASA 'epoch' measure dictionary."""
+        if not self.scans:
+            raw_ms = getattr(self, '_raw_ms', None)
+            if raw_ms is not None and getattr(raw_ms, 'scans', None):
+                return raw_ms.start_time
+            return {'m0': {'value': 0.0, 'unit': 'd'}, 'refer': 'UTC'}
         earliest, _ = min([(scan, utils.get_epoch_as_datetime(scan.start_time)) for scan in self.scans],
                           key=operator.itemgetter(1))
         return earliest.start_time
@@ -916,6 +933,11 @@ class MeasurementSet:
     @property
     def end_time(self) -> dict:
         """Return end time for this measurement set as CASA 'epoch' measure dictionary."""
+        if not self.scans:
+            raw_ms = getattr(self, '_raw_ms', None)
+            if raw_ms is not None and getattr(raw_ms, 'scans', None):
+                return raw_ms.end_time
+            return {'m0': {'value': 0.0, 'unit': 'd'}, 'refer': 'UTC'}
         latest, _ = max([(scan, utils.get_epoch_as_datetime(scan.end_time)) for scan in self.scans],
                         key=operator.itemgetter(1))
         return latest.end_time
@@ -1210,13 +1232,13 @@ class MeasurementSet:
             return baseband_spws
 
     def get_integration_time_stats(
-            self,
-            intent: str | None = None,
-            spw: str | None = None,
-            science_windows_only: bool = False,
-            stat_type: str = "max",
-            band: str | None = None,
-            ) -> float:
+        self,
+        intent: str | None = None,
+        spw: str | None = None,
+        science_windows_only: bool = False,
+        stat_type: str = 'max',
+        band: str | None = None,
+    ) -> float:
         """Get the given statistcs of integration time.
 
         Args:
@@ -1229,72 +1251,70 @@ class MeasurementSet:
         Returns
             Computed statistics value.
         """
-        LOG.debug('inefficiency - MSFlagger reading file to get median integration '
-                  'time for science targets')
+        if getattr(self, 'is_logical', False):
+            if self.sub_mses and os.path.exists(self.sub_mses[0].name):
+                return self.sub_mses[0].get_integration_time_stats(
+                    intent=intent, spw=spw, science_windows_only=science_windows_only, stat_type=stat_type, band=band
+                )
+            if getattr(self, '_raw_ms', None) and os.path.exists(self._raw_ms.name):
+                return self._raw_ms.get_integration_time_stats(
+                    intent=intent, spw=spw, science_windows_only=science_windows_only, stat_type=stat_type, band=band
+                )
+            return 0.0
+
+        LOG.debug('inefficiency - MSFlagger reading file to get median integration time for science targets')
 
         # get the field IDs and state IDs for fields in the measurement set,
         # filtering by intent if necessary
         if intent:
-            field_ids = [field.id for field in self.fields
-                         if intent in field.intents]
-            state_ids = [state.id for state in self.states
-                         if intent in state.intents]
+            field_ids = [field.id for field in self.fields if intent in field.intents]
+            state_ids = [state.id for state in self.states if intent in state.intents]
         else:
             field_ids = [field.id for field in self.fields]
             state_ids = [state.id for state in self.states]
 
-        if spw is None:
-            spws = self.spectral_windows
-        else:
-
+        if spw is not None:
             try:
                 # Put csv string of spws into a list
                 spw_string_list = spw.split(',')
 
-                # Get all spw objects
-                all_spws = self.spectral_windows
+                # Test that spw list is integers
+                [int(s) for s in spw_string_list]
 
-                # Filter out the science spw objects
-                spws = [ispw for ispw in all_spws if str(ispw.id) in spw_string_list]
-            except:
-                LOG.error("Incorrect spw string format.")
-        if band is not None:
-            if self.antenna_array.name not in ('VLA', 'EVLA'):
-                LOG.warning(
-                    'The band parameter is only applicable to VLA data. For non-VLA datasets, '
-                    'it has no effect on the maximum integration time calculation.'
-                )
-            spw2band = self.get_vla_spw2band()
-            spws = [spw_obj for spw_obj in spws if spw2band[spw_obj.id].lower() == band.lower()]
-            science_spw_dd_ids = [self.get_data_description(spw).id for spw in spws]
+                # Convert to integer
+                spws_list = [int(s) for s in spw_string_list]
+
+                # Select spw objects matching list of integer spws
+                spws = [s for s in self.spectral_windows if s.id in spws_list]
+
+            except Exception:
+                LOG.error('Cannot parse SpW selection: %s', spw)
+                return 0.0
+
+        # science Windows only
         if science_windows_only:
-            # now get the science spws, those used for scientific intent
-            science_spws = [
-                ispw for ispw in spws
-                if ispw.num_channels not in self.exclude_num_chans
-                and not ispw.intents.isdisjoint(['BANDPASS', 'AMPLITUDE', 'PHASE',
-                                                'TARGET'])]
-            LOG.debug('science spws are: %s' % [ispw.id for ispw in science_spws])
-            # and the science fields/states
-            science_field_ids = [
-                fid for fid in field_ids
-                if not set(self.fields[fid].intents).isdisjoint(['BANDPASS', 'AMPLITUDE',
-                                                                 'PHASE', 'TARGET'])]
-            science_state_ids = [
-                sid for sid in state_ids
-                if not set(self.states[sid].intents).isdisjoint(['BANDPASS', 'AMPLITUDE',
-                                                                 'PHASE', 'TARGET'])]
+            science_field_ids = [field.id for field in self.get_fields(intent='TARGET')]
+            science_spws = [s.id for s in self.get_spectral_windows(science_windows_only=True)]
+            science_spw_dd_ids = [self.get_data_description(spw_id).id for spw_id in science_spws]
 
-            science_spw_dd_ids = [self.get_data_description(spw).id for spw in science_spws]
+        if spw is not None:
+            # Need to select only spws
+            science_spws = [s.id for s in self.get_spectral_windows(task_arg=spw)]
+            science_spw_dd_ids = [self.get_data_description(spw_id).id for spw_id in science_spws]
+
+        if band is not None:
+            # band takes precedence over spw
+            science_spws = [s.id for s in self.get_spectral_windows(band_name=band)]
+            science_spw_dd_ids = [self.get_data_description(spw_id).id for spw_id in science_spws]
 
         # VLA datasets have an empty STATE table; in the main table such rows
         # have a state ID of -1.
         if not state_ids:
             state_ids = [-1]
 
-        state_str = utils.list_to_str(science_state_ids if science_windows_only else state_ids)
+        state_str = utils.list_to_str(state_ids)
         field_str = utils.list_to_str(science_field_ids if science_windows_only else field_ids)
-        spw_str = utils.list_to_str(science_spw_dd_ids) if science_windows_only or band is not None else ""
+        spw_str = utils.list_to_str(science_spw_dd_ids) if science_windows_only or band is not None else ''
 
         taql = f"(STATE_ID IN {state_str} AND FIELD_ID IN {field_str}" + \
             (f" AND DATA_DESC_ID IN {spw_str}" if spw_str else "") + ")"
@@ -1319,6 +1339,13 @@ class MeasurementSet:
         Returns:
             Dictionary of on-source times for selected field ID(s) and intent(s).
         """
+        if getattr(self, 'is_logical', False):
+            if self.sub_mses and os.path.exists(self.sub_mses[0].name):
+                return self.sub_mses[0].get_times_on_source_per_field_id(field=field, intent=intent)
+            if getattr(self, '_raw_ms', None) and os.path.exists(self._raw_ms.name):
+                return self._raw_ms.get_times_on_source_per_field_id(field=field, intent=intent)
+            return {}
+
         field_ids = [field.id for field in self.fields if intent in field.intents]
         state_ids = [state.id for state in self.states if intent in state.intents]
         scan_ids = [s.id for s in self.get_scans(field=field, scan_intent=intent)]
@@ -1430,17 +1457,19 @@ class MeasurementSet:
         self._session = value
 
     def all_colnames(self) -> list[str]:
-        """
-        Return all available column names for this MS.
-        """
+        """Return all available column names for this MS."""
+        if getattr(self, 'is_logical', False):
+            if self.sub_mses and os.path.exists(self.sub_mses[0].name):
+                return self.sub_mses[0].all_colnames()
+            if getattr(self, '_raw_ms', None) and os.path.exists(self._raw_ms.name):
+                return self._raw_ms.all_colnames()
+            return ['DATA']
         with casa_tools.TableReader(self.name) as table:
             colnames = table.colnames()
         return colnames
 
     def data_colnames(self) -> list[str]:
-        """
-        Return all data column names for this MS.
-        """
+        """Return all data column names for this MS."""
         return [colname for colname in self.all_colnames() if colname in ('DATA', 'FLOAT_DATA', 'CORRECTED_DATA')]
 
     def set_data_type_dicts(self, data_type_per_column: dict, data_types_per_source_and_spw: dict) -> None:
@@ -1449,12 +1478,11 @@ class MeasurementSet:
         MS HISTORY entries as they would already exist when calling this
         method. Also do not auto-generate the per source and spw lookup
         dictionary from the per column information since it might have a
-        sparse structure (e.g. selfcal use case).
+        different structure.
 
         Args:
-            data_type_per_column: Data type per column lookup dictionary
-            data_types_per_source_and_spw: Data type per source and spw
-                lookup dictionary.
+            data_type_per_column: Dictionary mapping DataType to column name
+            data_types_per_source_and_spw: Dictionary mapping (source, spw) tuples to lists of DataType
         """
         self.data_column = data_type_per_column
         self.data_types_per_source_and_spw = data_types_per_source_and_spw
@@ -1534,7 +1562,7 @@ class MeasurementSet:
         # Write data type lookup dictionaries to MS history (PIPEREQ-195). This is a
         # minimum fallback implementation and should be replaced by a properly
         # structured solution with sub-tables or other kind of metadata (maybe only in MSv4).
-        if save_to_ms:
+        if save_to_ms and not getattr(self, 'is_logical', False) and os.path.exists(self.name):
             with casa_tools.MSReader(self.name) as ms:
                 ms.writehistory(
                     f"data_type_per_column = {dict((k.name, v) for k, v in self.data_column.items())}",
@@ -1544,6 +1572,8 @@ class MeasurementSet:
                     f"data_types_per_source_and_spw = {dict((k, [item.name for item in v]) for k, v in self.data_types_per_source_and_spw.items())}",
                     origin="Datatype Handler",
                 )
+
+    set_data_type = set_data_column
 
     def get_data_column(self, dtype: DataType, source: str | None = None, spw: str | None = None) -> str | None:
         """
@@ -1742,6 +1772,227 @@ class MeasurementSet:
             if existing.name == subms.name:
                 return
         self.sub_mses.append(subms)
+        subms.parent_ms = self
+
+        if getattr(self, 'is_logical', False):
+            self.filesize = self._calc_filesize()
+
+            # Synchronize metadata from slice/raw_ms if needed
+            raw_ms = getattr(self, '_raw_ms', None)
+            if raw_ms is not None:
+                # Ensure slice SPW is present in self.spectral_windows
+                if subms.real_spw_id is not None:
+                    current_spw_ids = {s.id for s in self.spectral_windows}
+                    if subms.real_spw_id not in current_spw_ids:
+                        matching_spws = [
+                            s for s in getattr(raw_ms, 'spectral_windows', []) if s.id == subms.real_spw_id
+                        ]
+                        if matching_spws:
+                            new_spws = list(self.spectral_windows) + matching_spws
+                            self.spectral_windows = (
+                                tablereader.RetrieveByIndexContainer(new_spws)
+                                if hasattr(tablereader, 'RetrieveByIndexContainer')
+                                else new_spws
+                            )
+                            for spec, sids in getattr(raw_ms, 'spectralspec_spwmap', {}).items():
+                                if subms.real_spw_id in sids:
+                                    if spec not in self.spectralspec_spwmap:
+                                        self.spectralspec_spwmap[spec] = []
+                                    if subms.real_spw_id not in self.spectralspec_spwmap[spec]:
+                                        self.spectralspec_spwmap[spec].append(subms.real_spw_id)
+
+                # Ensure slice fields and sources are present in self.fields and self.sources
+                if subms.field_ids:
+                    current_field_ids = {f.id for f in self.fields}
+                    missing_field_ids = set(subms.field_ids) - current_field_ids
+                    if missing_field_ids:
+                        matching_fields = [f for f in getattr(raw_ms, 'fields', []) if f.id in missing_field_ids]
+                        if matching_fields:
+                            new_fields = list(self.fields) + matching_fields
+                            self.fields = (
+                                tablereader.RetrieveByIndexContainer(new_fields)
+                                if hasattr(tablereader, 'RetrieveByIndexContainer')
+                                else new_fields
+                            )
+                            new_src_names = {
+                                f.source.name for f in matching_fields if getattr(f, 'source', None) and f.source
+                            }
+                            current_src_names = {s.name for s in self.sources}
+                            missing_sources = [
+                                s
+                                for s in getattr(raw_ms, 'sources', [])
+                                if s.name in (new_src_names - current_src_names)
+                            ]
+                            if missing_sources:
+                                new_sources = list(self.sources) + missing_sources
+                                self.sources = (
+                                    tablereader.RetrieveByIndexContainer(new_sources)
+                                    if hasattr(tablereader, 'RetrieveByIndexContainer')
+                                    else new_sources
+                                )
+
+                # Update data_types_per_source_and_spw for this slice
+                for source in self.sources:
+                    if subms.source_name and source.name != subms.source_name:
+                        continue
+                    if subms.real_spw_id is not None:
+                        key = (source.name, subms.real_spw_id)
+                        if key not in self.data_types_per_source_and_spw:
+                            self.data_types_per_source_and_spw[key] = []
+                        if subms.data_type not in self.data_types_per_source_and_spw[key]:
+                            self.data_types_per_source_and_spw[key].append(subms.data_type)
+
+    @classmethod
+    def create_logical_targets_ms(
+        cls,
+        raw_ms: MeasurementSet,
+        name: str,
+        sub_mses: Sequence[SubMS] | None = None,
+        data_type: DataType = DataType.REGCAL_CONTLINE_SCIENCE,
+    ) -> MeasurementSet:
+        """Synthesize an in-memory logical MeasurementSet representing partitioned science targets.
+
+        Args:
+            raw_ms: The parent or origin Execution Block MeasurementSet.
+            name: The target MS name (e.g. '<msroot>_targets.ms').
+            sub_mses: Optional initial child SubMS slices.
+            data_type: Pipeline DataType (defaults to DataType.REGCAL_CONTLINE_SCIENCE).
+
+        Returns:
+            A logical MeasurementSet instance with science metadata and child SubMS partitions.
+        """
+        logical_ms = cls(name=name, session=getattr(raw_ms, 'session', None), is_logical=True)
+        logical_ms.origin_ms = getattr(raw_ms, 'origin_ms', None) or getattr(raw_ms, 'name', name)
+        logical_ms._raw_ms = raw_ms
+
+        # Inherit execution-block metadata
+        acs_version = getattr(raw_ms, 'acs_software_version', None)
+        acs_build = getattr(raw_ms, 'acs_software_build_version', None)
+        if acs_version is None and hasattr(raw_ms, '_raw_ms') and raw_ms._raw_ms is not None:
+            acs_version = getattr(raw_ms._raw_ms, 'acs_software_version', None)
+            acs_build = getattr(raw_ms._raw_ms, 'acs_software_build_version', None)
+        logical_ms.acs_software_version = acs_version
+        logical_ms.acs_software_build_version = acs_build
+        logical_ms.antenna_array = getattr(raw_ms, 'antenna_array', None)
+        logical_ms.array_name = getattr(raw_ms, 'array_name', '')
+        logical_ms.correlator_name = getattr(raw_ms, 'correlator_name', None)
+        logical_ms.observer = getattr(raw_ms, 'observer', '')
+        logical_ms.observing_modes = list(getattr(raw_ms, 'observing_modes', []))
+        logical_ms.project_id = getattr(raw_ms, 'project_id', '')
+        logical_ms.schedblock_id = getattr(raw_ms, 'schedblock_id', '')
+        logical_ms.execblock_id = getattr(raw_ms, 'execblock_id', '')
+        logical_ms.science_goals = dict(getattr(raw_ms, 'science_goals', {}))
+        logical_ms.representative_target = getattr(raw_ms, 'representative_target', (None, None, None))
+        logical_ms.representative_window = getattr(raw_ms, 'representative_window', None)
+        logical_ms.polarizations = list(getattr(raw_ms, 'polarizations', []))
+        logical_ms.states = list(getattr(raw_ms, 'states', []))
+
+        # Select science spectral windows with TARGET intent
+        sci_spws = (
+            list(raw_ms.get_spectral_windows(science_windows_only=True))
+            if hasattr(raw_ms, 'get_spectral_windows')
+            else list(getattr(raw_ms, 'spectral_windows', []))
+        )
+        target_sci_spws = [s for s in sci_spws if 'TARGET' in getattr(s, 'intents', set())]
+        if target_sci_spws:
+            sci_spws = target_sci_spws
+
+        if sub_mses:
+            sub_spw_ids = {s.real_spw_id for s in sub_mses if s.real_spw_id is not None}
+            if sub_spw_ids:
+                matching_spws = [s for s in getattr(raw_ms, 'spectral_windows', []) if s.id in sub_spw_ids]
+                if matching_spws:
+                    sci_spws = matching_spws
+
+        logical_ms.spectral_windows = (
+            tablereader.RetrieveByIndexContainer(sci_spws)
+            if hasattr(tablereader, 'RetrieveByIndexContainer')
+            else sci_spws
+        )
+
+        # Select science TARGET fields
+        target_fields = (
+            list(raw_ms.get_fields(intent='TARGET'))
+            if hasattr(raw_ms, 'get_fields')
+            else [f for f in getattr(raw_ms, 'fields', []) if 'TARGET' in getattr(f, 'intents', set())]
+        )
+        if not target_fields:
+            target_fields = list(getattr(raw_ms, 'fields', []))
+
+        if sub_mses:
+            sub_field_ids = {fid for s in sub_mses for fid in s.field_ids}
+            sub_sources = {s.source_name for s in sub_mses if s.source_name}
+            if sub_field_ids:
+                target_fields = [f for f in target_fields if f.id in sub_field_ids]
+            elif sub_sources:
+                target_fields = [
+                    f for f in target_fields if getattr(f, 'source', None) and f.source.name in sub_sources
+                ]
+
+        logical_ms.fields = (
+            tablereader.RetrieveByIndexContainer(target_fields)
+            if hasattr(tablereader, 'RetrieveByIndexContainer')
+            else target_fields
+        )
+
+        # Filter sources
+        target_source_names = {f.source.name for f in target_fields if getattr(f, 'source', None) and f.source}
+        raw_sources = getattr(raw_ms, 'sources', [])
+        target_sources = [s for s in raw_sources if s.name in target_source_names]
+        if not target_sources:
+            target_sources = list(raw_sources)
+
+        logical_ms.sources = (
+            tablereader.RetrieveByIndexContainer(target_sources)
+            if hasattr(tablereader, 'RetrieveByIndexContainer')
+            else target_sources
+        )
+
+        # Filter data descriptions
+        sci_spw_ids = {s.id for s in sci_spws}
+        raw_dds = getattr(raw_ms, 'data_descriptions', [])
+        target_dds = [dd for dd in raw_dds if getattr(dd, 'spw', None) and dd.spw.id in sci_spw_ids]
+        logical_ms.data_descriptions = (
+            tablereader.RetrieveByIndexContainer(target_dds)
+            if hasattr(tablereader, 'RetrieveByIndexContainer')
+            else target_dds
+        )
+
+        # Filter scans
+        target_field_ids = {f.id for f in target_fields}
+        raw_scans = getattr(raw_ms, 'scans', [])
+        target_scans = [
+            s
+            for s in raw_scans
+            if 'TARGET' in getattr(s, 'intents', set())
+            or {f.id for f in getattr(s, 'fields', [])}.intersection(target_field_ids)
+        ]
+        if not target_scans:
+            target_scans = list(raw_scans)
+        logical_ms.scans = target_scans
+
+        # spectralspec_spwmap
+        raw_specmap = getattr(raw_ms, 'spectralspec_spwmap', {})
+        if raw_specmap:
+            logical_ms.spectralspec_spwmap = {
+                spec: [sid for sid in sids if sid in sci_spw_ids]
+                for spec, sids in raw_specmap.items()
+                if any(sid in sci_spw_ids for sid in sids)
+            }
+
+        # Data types and columns
+        logical_ms.data_column[data_type] = 'DATA'
+        for source in target_sources:
+            for spw in sci_spws:
+                logical_ms.data_types_per_source_and_spw[(source.name, spw.id)] = [data_type]
+
+        # Attach sub_mses if provided
+        if sub_mses:
+            for s in sub_mses:
+                logical_ms.add_subms(s)
+
+        logical_ms.filesize = logical_ms._calc_filesize()
+        return logical_ms
 
     def get_subms(
         self,
@@ -1766,11 +2017,16 @@ class MeasurementSet:
             source_names = {utils.dequote(s.strip()) for s in source.split(',') if s.strip()}
             matches = [s for s in matches if s.source_name in source_names]
         if spw is not None and str(spw).strip():
-            try:
-                spw_ids = set(utils.range_to_list(str(spw)))
-            except Exception:
-                spw_ids = {int(i) for i in str(spw).split(',') if i.strip().isdigit()}
-            matches = [s for s in matches if s.real_spw_id in spw_ids or s.virtual_spw_id in spw_ids]
+            spw_tokens = [tok.split(':')[0].strip() for tok in str(spw).split(',') if tok.strip()]
+            spw_ids = set()
+            for tok in spw_tokens:
+                try:
+                    spw_ids.update(utils.range_to_list(tok))
+                except Exception:
+                    if tok.isdigit():
+                        spw_ids.add(int(tok))
+            if spw_ids:
+                matches = [s for s in matches if s.real_spw_id in spw_ids or s.virtual_spw_id in spw_ids]
         return matches
 
     def has_subms(self, data_type: DataType | None = None) -> bool:
@@ -1792,3 +2048,17 @@ class MeasurementSet:
         if matches:
             return matches[0].name
         return self.name
+
+    def get_subms_paths(
+        self,
+        source: str | None = None,
+        spw: int | str | None = None,
+        data_type: DataType | None = None,
+    ) -> list[str]:
+        """Return on-disk paths to matching SubMS slices if available, otherwise [self.name]."""
+        matches = self.get_subms(source=source, spw=spw, data_type=data_type)
+        if matches:
+            return [s.name for s in matches]
+        return [self.name]
+
+    get_subms_path = get_vis

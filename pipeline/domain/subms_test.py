@@ -1,16 +1,25 @@
-"""Unit tests for SubMS and hierarchical MeasurementSet domain model (PIPE-3250)."""
+import os
 
 import pytest
 
-from pipeline.domain import Antenna, AntennaArray, DataType, Field, MeasurementSet, ObservingRun, Source, SpectralWindow, SubMS
+from pipeline.domain import (
+    DataType,
+    MeasurementSet,
+    ObservingRun,
+    SubMS,
+)
 
 
 @pytest.fixture
 def mock_observing_run(monkeypatch):
     """Create a mock ObservingRun with a parent MeasurementSet and attached SubMS slices."""
     import datetime
+
     from pipeline.infrastructure import utils
-    monkeypatch.setattr(utils, 'spw_arg_to_id', lambda name, arg, spws: [(s.id, 0, s.num_channels - 1, 1) for s in spws])
+
+    monkeypatch.setattr(
+        utils, 'spw_arg_to_id', lambda name, arg, spws: [(s.id, 0, s.num_channels - 1, 1) for s in spws]
+    )
     monkeypatch.setattr(utils, 'field_arg_to_id', lambda name, arg, fields: [f for f in fields])
     monkeypatch.setattr(utils, 'get_epoch_as_datetime', lambda epoch: datetime.datetime(2026, 1, 1, 0, 0, 0))
 
@@ -199,9 +208,7 @@ def test_observing_run_subms_resolution(mock_observing_run):
     assert res_parent[0] is parent_ms
 
     # 3. get_measurement_sets_of_type with source & spw returns child SubMS
-    res_sub = obs_run.get_measurement_sets_of_type(
-        [DataType.IM_LINE_SCIENCE], msonly=True, source='TargetA', spw='0'
-    )
+    res_sub = obs_run.get_measurement_sets_of_type([DataType.IM_LINE_SCIENCE], msonly=True, source='TargetA', spw='0')
     assert len(res_sub) == 1
     assert res_sub[0] is sub16
 
@@ -231,9 +238,7 @@ def test_observing_run_subms_resolution(mock_observing_run):
     assert res_vis_parent[0] is sub16
 
     # 6b. vis specified as SubMS basename
-    res_vis_sub = obs_run.get_measurement_sets_of_type(
-        [DataType.IM_LINE_SCIENCE], msonly=True, vis=[sub16.basename]
-    )
+    res_vis_sub = obs_run.get_measurement_sets_of_type([DataType.IM_LINE_SCIENCE], msonly=True, vis=[sub16.basename])
     assert len(res_vis_sub) == 1
     assert res_vis_sub[0] is sub16
 
@@ -256,6 +261,7 @@ def test_observing_run_subms_resolution(mock_observing_run):
 def test_subms_pickling_and_serialization():
     """Test that SubMS and parent MS serialize/deserialize via pickle without recursion error."""
     import pickle
+
     from pipeline.hif.tasks.mstransform.mstransform import MstransformResults
 
     parent_ms = MeasurementSet(name='/path/to/uid___A002_X123_X456.ms', session='session_1')
@@ -326,9 +332,7 @@ def test_subms_robustness_and_spw_ranges(mock_observing_run):
     assert sub16.get_data_type('DATA', spw='20~25') is None
 
     # 3. ObservingRun virtual SPW range query
-    chunks = obs_run.get_measurement_sets_of_type(
-        [DataType.IM_LINE_SCIENCE], source='TargetA', spw='0~1', msonly=True
-    )
+    chunks = obs_run.get_measurement_sets_of_type([DataType.IM_LINE_SCIENCE], source='TargetA', spw='0~1', msonly=True)
     assert chunks == [sub16]
 
     # 4. Field without source in SubMS.get_fields
@@ -348,3 +352,100 @@ def test_subms_robustness_and_spw_ranges(mock_observing_run):
     assert obs_run.get_real_spw_id_by_name(spw_name, sub16) == 16
 
 
+def test_create_logical_targets_ms(mock_observing_run):
+    """Test synthesis of logical MeasurementSet parent for partitioned SubMS slices."""
+    obs_run, raw_ms = mock_observing_run
+
+    sub16 = SubMS(
+        name='/path/to/uid___A002_X123_X456_targets.spw16.ms',
+        parent_ms=raw_ms,
+        source_name='TargetA',
+        real_spw_id=16,
+        virtual_spw_id=0,
+        field_ids=[0],
+        data_type=DataType.REGCAL_CONTLINE_SCIENCE,
+    )
+    sub18 = SubMS(
+        name='/path/to/uid___A002_X123_X456_targets.spw18.ms',
+        parent_ms=raw_ms,
+        source_name='TargetA',
+        real_spw_id=18,
+        virtual_spw_id=1,
+        field_ids=[0],
+        data_type=DataType.REGCAL_CONTLINE_SCIENCE,
+    )
+
+    raw_ms.acs_software_version = '28ab550e9d'
+    raw_ms.acs_software_build_version = 'ONLINE-CYCLE10-B-34-2024-04-17-05-00-00'
+
+    logical_ms = MeasurementSet.create_logical_targets_ms(
+        raw_ms=raw_ms,
+        name='/path/to/uid___A002_X123_X456_targets.ms',
+        sub_mses=[sub16, sub18],
+        data_type=DataType.REGCAL_CONTLINE_SCIENCE,
+    )
+
+    # 1. Verification of logical status and provenance
+    assert logical_ms.is_logical is True
+    assert logical_ms.name == '/path/to/uid___A002_X123_X456_targets.ms'
+    assert logical_ms.basename == 'uid___A002_X123_X456_targets.ms'
+    assert logical_ms.origin_ms == raw_ms.name
+    assert logical_ms.session == raw_ms.session
+
+    # 2. Metadata inheritance
+    assert logical_ms.acs_software_version == '28ab550e9d'
+    assert logical_ms.acs_software_build_version == 'ONLINE-CYCLE10-B-34-2024-04-17-05-00-00'
+    assert sub16.acs_software_version == '28ab550e9d'
+    assert sub16.acs_software_build_version == 'ONLINE-CYCLE10-B-34-2024-04-17-05-00-00'
+    assert logical_ms.antenna_array == raw_ms.antenna_array
+    assert len(logical_ms.antennas) == 2
+    assert len(logical_ms.fields) == 1
+    assert logical_ms.fields[0].name == 'TargetA_0'
+    assert len(logical_ms.spectral_windows) == 2
+    spw_ids = [s.id for s in logical_ms.spectral_windows]
+    assert spw_ids == [16, 18]
+
+    # 3. Child SubMS relationship and re-parenting
+    assert logical_ms.has_subms() is True
+    assert logical_ms.has_subms(DataType.REGCAL_CONTLINE_SCIENCE) is True
+    assert not logical_ms.has_subms(DataType.RAW)
+    assert len(logical_ms.sub_mses) == 2
+    assert sub16.parent_ms is logical_ms
+    assert sub18.parent_ms is logical_ms
+    # sub_ms.origin_ms resolves through logical_ms to raw_ms
+    assert sub16.origin_ms == raw_ms.name
+    assert sub18.origin_ms == raw_ms.name
+
+    # 4. Registration into ObservingRun
+    obs_run.add_measurement_set(logical_ms)
+    assert len(obs_run.measurement_sets) == 2
+    assert obs_run.measurement_sets[1] is logical_ms
+
+    # 5. Queries via ObservingRun
+    assert obs_run.get_ms(logical_ms.name) is logical_ms
+    assert obs_run.get_ms(sub16.name) is sub16
+    assert obs_run.get_ms(os.path.basename(sub18.name)) is sub18
+
+    # Top-level query returns logical parent MS
+    top_mses = obs_run.get_measurement_sets_of_type([DataType.REGCAL_CONTLINE_SCIENCE], msonly=True)
+    assert top_mses == [logical_ms]
+
+    # Target + SPW query returns specific SubMS slice
+    slice_16 = obs_run.get_measurement_sets_of_type(
+        [DataType.REGCAL_CONTLINE_SCIENCE], source='TargetA', spw='0', msonly=True
+    )
+    assert slice_16 == [sub16]
+
+    slice_18 = obs_run.get_measurement_sets_of_type(
+        [DataType.REGCAL_CONTLINE_SCIENCE], source='TargetA', spw='1', msonly=True
+    )
+    assert slice_18 == [sub18]
+
+    # 6. Test get_subms_path and get_subms_paths
+    assert logical_ms.get_subms_path(spw=16) == sub16.name
+    assert logical_ms.get_subms_paths(spw='16,18') == [sub16.name, sub18.name]
+    assert logical_ms.get_subms_paths(spw='16:0~127') == [sub16.name]
+    assert sub16.get_subms_path() == sub16.name
+    assert sub16.get_subms_paths() == [sub16.name]
+    assert sub16.has_subms() is False
+    assert sub16.get_subms() == [sub16]

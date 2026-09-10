@@ -285,7 +285,7 @@ $(document).ready(function() {
                             % for row in session_group:
                                 % if pcontext.project_summary.telescope == 'ALMA':
                                 <!-- If either the ACS software version or build version is different from the previous value, display the new software and build versions. -->
-                                    % if row.acs_software_version != acs_version or row.acs_software_build_version != software_build_version:
+                                    % if (row.acs_software_version != acs_version or row.acs_software_build_version != software_build_version) and (row.acs_software_version is not None or row.acs_software_build_version is not None):
                                         <td colspan="${numcol}"><b>ACS Version:</b> ${row.acs_software_version}, <b>Build Version:</b> ${row.acs_software_build_version} </td>
                                         <% 
                                         acs_version = row.acs_software_version
@@ -294,7 +294,12 @@ $(document).ready(function() {
                                     % endif
                                 % endif
                                 <tr>
-                                    <td><a href="${row.href}">${row.ms}</a></td>
+                                    <td>
+                                        <a href="${row.href}">${row.ms}</a>
+                                        % if getattr(row, 'is_logical', False) and getattr(row, 'sub_mses', []):
+                                        <span class="label label-info">Logical (${len(row.sub_mses)} SpW Slices)</span>
+                                        % endif
+                                    </td>
                                     <td>${utils.commafy(row.receivers, quotes=False)}</td>
                                     <td>${row.num_antennas}</td>
                                     <td>${utils.format_datetime(row.time_start)}</td>

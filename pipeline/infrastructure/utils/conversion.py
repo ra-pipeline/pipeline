@@ -326,7 +326,7 @@ def field_arg_to_id(ms_path: str, field_arg: str | int, all_fields) -> list[int]
     Returns:
         A list of field IDs.
     """
-    if USE_CASA_PARSING_ROUTINES:
+    if USE_CASA_PARSING_ROUTINES and os.path.exists(ms_path):
         try:
             all_indices = _convert_arg_to_id('field', ms_path, str(field_arg))
             return all_indices['field'].tolist()
@@ -352,19 +352,33 @@ def spw_arg_to_id(ms_path: str, spw_arg: str | int, all_spws) -> list[tuple[int,
     Returns:
         A list of (spw, chan_start, chan_end, step) lists.
     """
-    if USE_CASA_PARSING_ROUTINES:
+    if USE_CASA_PARSING_ROUTINES and os.path.exists(ms_path):
         all_indices = _convert_arg_to_id('spw', ms_path, str(spw_arg))
         # filter out channel tuples whose spw is not in the spw entry
-        return [(spw, start, end, step)
-                for (spw, start, end, step) in all_indices['channel']
-                if spw in all_indices['spw']]
+        return [
+            (spw, start, end, step) for (spw, start, end, step) in all_indices['channel'] if spw in all_indices['spw']
+        ]
 
     else:
-        atoms = _parse_spw(spw_arg, all_spws)
+        all_spw_ids = [s.id for s in all_spws] if all_spws else []
+        atoms = _parse_spw(spw_arg, all_spw_ids)
+        spw_map = {s.id: s for s in all_spws} if all_spws else {}
         spws = []
         for atom in atoms:
-            spw = [spw for spw in all_spws if spw.id == atom.spw].pop()
-            spws.append((spw.id, 0, len(spw.channels.chan_freqs), 1))
+            spw_id = atom.spw if hasattr(atom, 'spw') else atom
+            channels = atom.channels if hasattr(atom, 'channels') else set()
+            if spw_id in spw_map:
+                spw = spw_map[spw_id]
+                num_chans = (
+                    spw.num_channels
+                    if hasattr(spw, 'num_channels')
+                    else (len(spw.channels.chan_freqs) if hasattr(spw, 'channels') and spw.channels else 0)
+                )
+                if channels:
+                    for ch in sorted(channels):
+                        spws.append((spw.id, ch, ch, 1))
+                else:
+                    spws.append((spw.id, 0, max(0, num_chans - 1), 1))
         return spws
 
 
@@ -378,7 +392,7 @@ def ant_arg_to_id(ms_path: str, ant_arg: str | int, all_antennas) -> list[int]:
     Returns
         A list of antenna IDs.
     """
-    if USE_CASA_PARSING_ROUTINES:
+    if USE_CASA_PARSING_ROUTINES and os.path.exists(ms_path):
         all_indices = _convert_arg_to_id('baseline', ms_path, str(ant_arg))
         return all_indices['antenna1'].tolist()
     else:

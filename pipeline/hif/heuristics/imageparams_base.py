@@ -487,11 +487,24 @@ class ImageParamsHeuristics:
                                 continue
 
                             try:
-                                taql = f"{'||'.join(['ANTENNA1==%d' % i for i in antenna_ids[os.path.basename(vis)]])}&&" \
-                                       f"{'||'.join(['ANTENNA2==%d' % i for i in antenna_ids[os.path.basename(vis)]])}"
-                                rtn = casa_tools.imager.selectvis(vis=vis,
-                                                                  field=field, spw=real_spwid, scan=scanids,
-                                                                  taql=taql, usescratch=False, writeaccess=False)
+                                subms_vis = (
+                                    ms.get_vis(source=field, spw=real_spwid)
+                                    if (getattr(ms, 'is_logical', False) or not os.path.exists(vis))
+                                    else vis
+                                )
+                                taql = (
+                                    f'{"||".join(["ANTENNA1==%d" % i for i in antenna_ids[os.path.basename(vis)]])}&&'
+                                    f'{"||".join(["ANTENNA2==%d" % i for i in antenna_ids[os.path.basename(vis)]])}'
+                                )
+                                rtn = casa_tools.imager.selectvis(
+                                    vis=subms_vis,
+                                    field=field,
+                                    spw=real_spwid,
+                                    scan=scanids,
+                                    taql=taql,
+                                    usescratch=False,
+                                    writeaccess=False,
+                                )
                                 if rtn is True:
                                     # flag to say that imager has some valid data to work
                                     # on
@@ -503,11 +516,26 @@ class ImageParamsHeuristics:
                                 pass
 
                         if valid_data_for_vis:
-                            valid_vis_list.append(vis)
-                            valid_scanids_list.append(scanids)
-                            valid_real_spwid_list.append(','.join(map(str, valid_real_spwid_list_for_vis)))
-                            valid_virtual_spwid_list.append(','.join(map(str, valid_virtual_spwid_list_for_vis)))
-                            valid_antenna_ids_list.append(f"{','.join(map(str, antenna_ids[os.path.basename(vis)]))}&")
+                            if getattr(ms, 'is_logical', False) or not os.path.exists(vis):
+                                for r_spwid, v_spwid in zip(
+                                    valid_real_spwid_list_for_vis, valid_virtual_spwid_list_for_vis
+                                ):
+                                    sub_vis = ms.get_vis(source=field, spw=r_spwid)
+                                    valid_vis_list.append(sub_vis)
+                                    valid_scanids_list.append(scanids)
+                                    valid_real_spwid_list.append(str(r_spwid))
+                                    valid_virtual_spwid_list.append(str(v_spwid))
+                                    valid_antenna_ids_list.append(
+                                        f'{",".join(map(str, antenna_ids[os.path.basename(vis)]))}&'
+                                    )
+                            else:
+                                valid_vis_list.append(vis)
+                                valid_scanids_list.append(scanids)
+                                valid_real_spwid_list.append(','.join(map(str, valid_real_spwid_list_for_vis)))
+                                valid_virtual_spwid_list.append(','.join(map(str, valid_virtual_spwid_list_for_vis)))
+                                valid_antenna_ids_list.append(
+                                    f'{",".join(map(str, antenna_ids[os.path.basename(vis)]))}&'
+                                )
 
                     if not valid_data[(field, intent)]:
                         # no point carrying on for this field/intent
@@ -729,11 +757,24 @@ class ImageParamsHeuristics:
                             continue
                         try:
                             antenna_ids = self.antenna_ids(field_intent[1], [os.path.basename(vis)])
-                            taql = f"{'||'.join(['ANTENNA1==%d' % i for i in antenna_ids[os.path.basename(vis)]])}&&" \
-                                   f"{'||'.join(['ANTENNA2==%d' % i for i in antenna_ids[os.path.basename(vis)]])}"
-                            rtn = casa_tools.imager.selectvis(vis=vis, field=field_intent[0],
-                                                              taql=taql, spw=real_spwspec,
-                                                              scan=scanids, usescratch=False, writeaccess=False)
+                            taql = (
+                                f'{"||".join(["ANTENNA1==%d" % i for i in antenna_ids[os.path.basename(vis)]])}&&'
+                                f'{"||".join(["ANTENNA2==%d" % i for i in antenna_ids[os.path.basename(vis)]])}'
+                            )
+                            subms_vis = (
+                                ms.get_vis(source=field_intent[0], spw=real_spwspec)
+                                if (getattr(ms, 'is_logical', False) or not os.path.exists(vis))
+                                else vis
+                            )
+                            rtn = casa_tools.imager.selectvis(
+                                vis=subms_vis,
+                                field=field_intent[0],
+                                taql=taql,
+                                spw=real_spwspec,
+                                scan=scanids,
+                                usescratch=False,
+                                writeaccess=False,
+                            )
                             if rtn is True:
                                 aipsfieldofview = '%4.1farcsec' % (2.0 * np.asarray(self.largest_primary_beam_size(spwspec, field_intent[1])).item())
                                 # Need to run advise to check if the current selection is completely flagged

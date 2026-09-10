@@ -243,9 +243,18 @@ class WeatherChart:
             return self._get_plot_object()
 
         LOG.debug('Creating new Weather plot')
+        vis = self.ms.name
+        if getattr(self.ms, 'is_logical', False) or not os.path.exists(vis):
+            if getattr(self.ms, 'origin_ms', None) and os.path.exists(self.ms.origin_ms.name):
+                vis = self.ms.origin_ms.name
+            elif getattr(self.ms, 'sub_mses', None) and len(self.ms.sub_mses) > 0:
+                vis = self.ms.sub_mses[0].name
+            else:
+                return None
+
         try:
             # Based on the analysisUtils method
-            plotweather.plot_weather(vis=self.ms.name, figfile=self.figfile)
+            plotweather.plot_weather(vis=vis, figfile=self.figfile)
         except:
             return None
         finally:
@@ -650,8 +659,17 @@ class PWVChart:
         if os.path.exists(self.figfile):
             return self._get_plot_object()
 
+        vis = self.ms.name
+        if getattr(self.ms, 'is_logical', False) or not os.path.exists(vis):
+            if getattr(self.ms, 'origin_ms', None) and os.path.exists(self.ms.origin_ms.name):
+                vis = self.ms.origin_ms.name
+            elif getattr(self.ms, 'sub_mses', None) and len(self.ms.sub_mses) > 0:
+                vis = self.ms.sub_mses[0].name
+            else:
+                return None
+
         try:
-            plotpwv.plotPWV(self.ms.name, figfile=self.figfile)
+            plotpwv.plotPWV(vis, figfile=self.figfile)
         except:
             LOG.debug('Could not create PWV plot')
             return None
@@ -1127,9 +1145,16 @@ class UVChart:
             LOG.debug('Disabling UV coverage plot due to being unable to find a set of parameters to plot.')
             return None
 
+        vis_to_use = self.ms.name
+        if not os.path.exists(vis_to_use) and hasattr(self.ms, 'get_vis'):
+            vis_to_use = self.ms.get_vis(source=self.field, spw=self.spw_id)
+        if not os.path.exists(vis_to_use):
+            LOG.debug('Disabling UV coverage plot for %s: %s does not exist on disk.', self.ms.basename, vis_to_use)
+            return None
+
         # inputs based on analysisUtils.plotElevationSummary
         task_args = {
-            'vis': self.ms.name,
+            'vis': vis_to_use,
             'xaxis': 'uwave',
             'yaxis': 'vwave',
             'title': self.title,

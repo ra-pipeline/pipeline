@@ -325,7 +325,8 @@ class T1_1Renderer(RendererBase):
                 'receivers '
                 'num_antennas beamsize_min beamsize_max '
                 'time_start time_end time_on_source '
-                'baseline_min baseline_max baseline_rms')
+                'baseline_min baseline_max baseline_rms '
+                'is_logical sub_mses')
     TableRowNRO = collections.namedtuple(
                 'TablerowNRO', 
                 'ousstatus_entity_id schedblock_id schedblock_name session '
@@ -334,7 +335,7 @@ class T1_1Renderer(RendererBase):
                 'num_antennas beamsize_min beamsize_max '
                 'time_start time_end time_on_source '
                 'baseline_min baseline_max baseline_rms '
-                'merge2_version')
+                'merge2_version is_logical sub_mses')
 
     class EnvironmentProperty(enum.Enum):
         """
@@ -535,7 +536,9 @@ class T1_1Renderer(RendererBase):
                                             baseline_min=baseline_min,
                                             baseline_max=baseline_max,
                                             baseline_rms=baseline_rms,
-                                            merge2_version=getattr(ms, 'merge2_version', 'N/A'))
+                                            merge2_version=getattr(ms, 'merge2_version', 'N/A'),
+                                            is_logical=getattr(ms, 'is_logical', False),
+                                            sub_mses=getattr(ms, 'sub_mses', []))
             else:
                 row = T1_1Renderer.TableRow(ousstatus_entity_id=context.project_structure.ousstatus_entity_id,
                                             schedblock_id=ms.schedblock_id,
@@ -557,7 +560,9 @@ class T1_1Renderer(RendererBase):
                                             time_on_source=time_on_source,
                                             baseline_min=baseline_min,
                                             baseline_max=baseline_max,
-                                            baseline_rms=baseline_rms)
+                                            baseline_rms=baseline_rms,
+                                            is_logical=getattr(ms, 'is_logical', False),
+                                            sub_mses=getattr(ms, 'sub_mses', []))
 
             ms_summary_rows.append(row)
 
@@ -708,7 +713,8 @@ class T1_2Renderer(RendererBase):
                 'receivers '
                 'num_antennas beamsize_min beamsize_max '
                 'time_start time_end time_on_source '
-                'baseline_min baseline_max baseline_rms')
+                'baseline_min baseline_max baseline_rms '
+                'is_logical sub_mses')
 
     @staticmethod
     def get_display_context(context):
@@ -750,7 +756,9 @@ class T1_2Renderer(RendererBase):
                                         time_on_source=time_on_source,
                                         baseline_min=baseline_min,
                                         baseline_max=baseline_max,
-                                        baseline_rms=baseline_rms)
+                                        baseline_rms=baseline_rms,
+                                        is_logical=getattr(ms, 'is_logical', False),
+                                        sub_mses=getattr(ms, 'sub_mses', []))
 
             ms_summary_rows.append(row)
 
@@ -937,6 +945,15 @@ class T2_1DetailsRenderer:
                                 'listobs.txt')
 
         if not os.path.exists(listfile):
+            if getattr(ms, 'is_logical', False) or not os.path.exists(ms.name):
+                LOG.debug('Writing synthetic listobs for logical MeasurementSet %s', ms.basename)
+                os.makedirs(os.path.dirname(listfile), exist_ok=True)
+                with open(listfile, 'w') as f:
+                    f.write(f'Logical MeasurementSet: {ms.basename}\n')
+                    f.write(f'Partitioned into {len(getattr(ms, "sub_mses", []))} SubMS slice(s):\n')
+                    for sub in getattr(ms, 'sub_mses', []):
+                        f.write(f'  - {sub.basename}\n')
+                return
             LOG.debug('Writing listobs output to %s' % listfile)
             task = casa_tasks.listobs(vis=ms.name, listfile=listfile)
             task.execute()
@@ -991,26 +1008,37 @@ class T2_1DetailsRenderer:
         task = summary.PWVChart(context, ms)
         pwv_plot = task.plot()
 
-        task = summary.AzElChart(context, ms)
-        azel_plot = task.plot()
+        if getattr(ms, 'is_logical', False) or not os.path.exists(ms.name):
+            azel_plot = None
+            el_vs_time_plot = None
+        else:
+            task = summary.AzElChart(context, ms)
+            azel_plot = task.plot()
 
-        task = summary.ElVsTimeChart(context, ms)
-        el_vs_time_plot = task.plot()
+            task = summary.ElVsTimeChart(context, ms)
+            el_vs_time_plot = task.plot()
 
         # Get min, max elevation (all fields excluding POINTING, SIDEBAND, ATMOSPHERE)
-        el_min = "%.2f" % ms.compute_az_el_for_ms(min)[1]
-        el_max = "%.2f" % ms.compute_az_el_for_ms(max)[1]
+        try:
+            el_min = "%.2f" % ms.compute_az_el_for_ms(min)[1]
+            el_max = "%.2f" % ms.compute_az_el_for_ms(max)[1]
+        except Exception:
+            el_min = el_max = "0.00"
 
         # Get zenith angle statistics for TARGET fields only
-        data = compute_zd_telmjd_for_ms(ms)
-        # Flatten all zenith angles and timestamps from all TARGET fields
-        zd = [zd_val for field_data in data.values() for zd_val in field_data['zd']]
-        telmjd = [time.timestamp() for field_data in data.values() for time in field_data['telmjd']]
-        # Retrieve min, average, and max zenith angle measurements and corresponding timestamps
-        if len(zd) > 0:
-            zd_min, zd_avg, zd_max = np.min(zd), np.average(zd), np.max(zd)
-            telmjd_min, telmjd_avg, telmjd_max = telmjd[zd.index(zd_min)], np.average(telmjd), telmjd[zd.index(zd_max)]
-        else:
+        try:
+            data = compute_zd_telmjd_for_ms(ms)
+            # Flatten all zenith angles and timestamps from all TARGET fields
+            zd = [zd_val for field_data in data.values() for zd_val in field_data['zd']]
+            telmjd = [time.timestamp() for field_data in data.values() for time in field_data['telmjd']]
+            # Retrieve min, average, and max zenith angle measurements and corresponding timestamps
+            if len(zd) > 0:
+                zd_min, zd_avg, zd_max = np.min(zd), np.average(zd), np.max(zd)
+                telmjd_min, telmjd_avg, telmjd_max = telmjd[zd.index(zd_min)], np.average(telmjd), telmjd[zd.index(zd_max)]
+            else:
+                zd_min = zd_avg = zd_max = None
+                telmjd_min = telmjd_avg = telmjd_max = None
+        except Exception:
             zd_min = zd_avg = zd_max = None
             telmjd_min = telmjd_avg = telmjd_max = None
 
@@ -1058,6 +1086,22 @@ class T2_1DetailsRenderer:
         else:
             pointing_plot = None
 
+        sub_ms_rows = []
+        for sub in getattr(ms, 'sub_mses', []):
+            spw = ms.get_spectral_window(sub.real_spw_id)
+            sub_ms_rows.append({
+                'name': sub.basename,
+                'real_spw': sub.real_spw_id if sub.real_spw_id is not None else 'N/A',
+                'virtual_spw': sub.virtual_spw_id if sub.virtual_spw_id is not None else 'N/A',
+                'band': spw.band if spw else 'N/A',
+                'centre_freq': str(spw.centre_frequency) if spw else 'N/A',
+                'bandwidth': str(spw.bandwidth) if spw else 'N/A',
+                'num_channels': spw.num_channels if spw else 'N/A',
+                'source': sub.source_name or (', '.join(f.name for f in sub.get_fields()) if hasattr(sub, 'get_fields') else 'N/A'),
+                'data_type': sub.data_type.name if hasattr(sub.data_type, 'name') else str(sub.data_type),
+                'filesize': str(sub.filesize),
+            })
+
         return {
             'pcontext'        : context,
             'ms'              : ms,
@@ -1096,7 +1140,8 @@ class T2_1DetailsRenderer:
                 datetime.datetime.fromtimestamp(telmjd_avg, tz=datetime.timezone.utc)) if telmjd_avg is not None else None,
             'telmjd_max': utils.format_datetime(
                 datetime.datetime.fromtimestamp(telmjd_max, tz=datetime.timezone.utc)) if telmjd_max is not None else None,
-            'vla_basebands': vla_basebands
+            'vla_basebands': vla_basebands,
+            'sub_ms_rows': sub_ms_rows,
         }
 
     @classmethod
@@ -1107,13 +1152,14 @@ class T2_1DetailsRenderer:
                 # now that the details pages are written per MS rather than having
                 # tabs for each MS, we don't need to write them each time as
                 # importdata will not affect their content.
-                if os.path.exists(filename):
+                if os.path.exists(filename) and os.path.getsize(filename) > 0:
                     continue
 
+                display_context = cls.get_display_context(context, ms)
+                template = weblog.TEMPLATE_LOOKUP.get_template(cls.template)
+                rendered = template.render(**display_context)
                 with cls.get_file(filename) as fileobj:
-                    template = weblog.TEMPLATE_LOOKUP.get_template(cls.template)
-                    display_context = cls.get_display_context(context, ms)
-                    fileobj.write(template.render(**display_context))
+                    fileobj.write(rendered)
 
 
 class T2_2_XRendererBase:
@@ -1144,11 +1190,14 @@ class T2_2_XRendererBase:
             # now that the details pages are written per MS rather than having
             # tabs for each MS, we don't need to write them each time as
             # importdata will not affect their content.
-            if not os.path.exists(filename):
-                with cls.get_file(filename) as fileobj:
-                    template = weblog.TEMPLATE_LOOKUP.get_template(cls.template)
-                    display_context = cls.get_display_context(context, ms)
-                    fileobj.write(template.render(**display_context))
+            if os.path.exists(filename) and os.path.getsize(filename) > 0:
+                continue
+
+            display_context = cls.get_display_context(context, ms)
+            template = weblog.TEMPLATE_LOOKUP.get_template(cls.template)
+            rendered = template.render(**display_context)
+            with cls.get_file(filename) as fileobj:
+                fileobj.write(rendered)
 
 
 class T2_2_1Renderer(T2_2_XRendererBase):
@@ -1235,6 +1284,10 @@ class T2_2_3Renderer(T2_2_XRendererBase):
             plot_ants = None
             plot_ants_plog = None
             plot_uv = None
+        elif getattr(ms, 'is_logical', False) or not os.path.exists(ms.name):
+            plot_ants = None
+            plot_ants_plog = None
+            plot_uv = None
         else:
             # Create regular antenna positions plot.
             task = summary.PlotAntsChart(context, ms)
@@ -1271,28 +1324,35 @@ class T2_2_4Renderer(T2_2_XRendererBase):
 
     @staticmethod
     def get_display_context(context, ms):
-        task = summary.AzElChart(context, ms)
-        azel_plot = task.plot()
-
-        task = summary.SunTrackChart(context, ms)
-        suntrack_plot = task.plot()
-
-        task = summary.ElVsTimeChart(context, ms)
-        el_vs_time_plot = task.plot()
-
-        data = compute_zd_telmjd_for_ms(ms)
-        if data:
-            task = summary.ZDTELMJDChart(context, ms, data)
-            zd_vs_telmjd_plot = task.plot()
-        else:
+        if getattr(ms, 'is_logical', False) or not os.path.exists(ms.name):
+            azel_plot = None
+            suntrack_plot = None
+            el_vs_time_plot = None
             zd_vs_telmjd_plot = None
-
-        # Create U-V plot, if necessary.
-        if utils.contains_single_dish(context):
             plot_uv = None
         else:
-            task = summary.UVChart(context, ms, title_prefix="Initial ")
-            plot_uv = task.plot()
+            task = summary.AzElChart(context, ms)
+            azel_plot = task.plot()
+
+            task = summary.SunTrackChart(context, ms)
+            suntrack_plot = task.plot()
+
+            task = summary.ElVsTimeChart(context, ms)
+            el_vs_time_plot = task.plot()
+
+            data = compute_zd_telmjd_for_ms(ms)
+            if data:
+                task = summary.ZDTELMJDChart(context, ms, data)
+                zd_vs_telmjd_plot = task.plot()
+            else:
+                zd_vs_telmjd_plot = None
+
+            # Create U-V plot, if necessary.
+            if utils.contains_single_dish(context):
+                plot_uv = None
+            else:
+                task = summary.UVChart(context, ms, title_prefix="Initial ")
+                plot_uv = task.plot()
 
         dirname = os.path.join('session%s' % ms.session,
                                ms.basename)

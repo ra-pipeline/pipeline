@@ -1,6 +1,7 @@
 import collections.abc
 import operator
 import os
+import re
 import shutil
 
 import pipeline.infrastructure as infrastructure
@@ -9,7 +10,7 @@ import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.sessionutils as sessionutils
 import pipeline.infrastructure.tablereader as tablereader
 import pipeline.infrastructure.vdp as vdp
-from pipeline.domain import DataType, SubMS
+from pipeline.domain import DataType, MeasurementSet, SubMS
 from pipeline.hif.heuristics.auto_selfcal.selfcal_helpers import get_calinfo_from_ms
 from pipeline.infrastructure import casa_tasks, exceptions, mpihelpers, task_registry
 from pipeline.infrastructure.mpihelpers import TaskQueue
@@ -180,12 +181,13 @@ class MstransformInputs(vdp.StandardInputs):
     chanbin = vdp.VisDependentProperty(default=1)
     timebin = vdp.VisDependentProperty(default='0s')
     per_spw = vdp.VisDependentProperty(default=False)
+    base_outputvis = vdp.VisDependentProperty(default=None)
 
     parallel = sessionutils.parallel_inputs_impl(default=False)
 
     # docstring and type hints: supplements hif_mstransform
     def __init__(self, context, output_dir=None, vis=None, input_data_type=None, datacolumn=None, all_eph_obj=None, outputvis=None, output_data_type=None,
-                 outframe=None, regridms=None, field=None, intent=None, spw=None, chanbin=None, timebin=None, per_spw=None, parallel=None):
+                 outframe=None, regridms=None, field=None, intent=None, spw=None, chanbin=None, timebin=None, per_spw=None, parallel=None, base_outputvis=None):
         """Initialize Inputs.
 
         Args:
@@ -269,6 +271,7 @@ class MstransformInputs(vdp.StandardInputs):
         self.timebin = timebin
         self.per_spw = per_spw
         self.parallel = parallel
+        self.base_outputvis = base_outputvis
 
     def to_casa_args(self):
 
@@ -290,7 +293,7 @@ class MstransformInputs(vdp.StandardInputs):
 
         # Remove a number of inputs parameters that
         # casatasks/mstransform does not support.
-        for key in ('parallel', 'per_spw', 'input_data_type', 'output_data_type', 'all_eph_obj'):
+        for key in ('parallel', 'per_spw', 'input_data_type', 'output_data_type', 'all_eph_obj', 'base_outputvis'):
             d.pop(key, None)
 
         return d
@@ -367,6 +370,7 @@ class SerialMstransform(basetask.StandardTaskTemplate):
                 field_ids=field_ids,
                 data_type=result.output_data_type,
                 data_column='DATA',
+                base_outputvis=getattr(self.inputs, 'base_outputvis', None),
             )
             result.sub_mses.append(sub_ms)
             return result
@@ -424,21 +428,41 @@ class MstransformResults(basetask.Results):
             LOG.info('Adding %s to context', ms.name)
             target.add_measurement_set(ms)
 
-        # Register sub_mses to their parent_ms in context
+        # Register sub_mses to their logical parent MS in context
+        logical_mses = []
         for sub_ms in self.sub_mses:
+            base_outputvis = getattr(sub_ms, 'base_outputvis', None)
+            if not base_outputvis:
+                base_outputvis = re.sub(r'\.spw\d+\.ms$', '.ms', sub_ms.name)
+
             try:
-                parent_ms = context.observing_run.get_ms(sub_ms.parent_ms.name)
+                logical_ms = context.observing_run.get_ms(base_outputvis)
             except KeyError:
-                try:
-                    parent_ms = context.observing_run.get_ms(sub_ms.parent_ms.basename)
-                except KeyError:
-                    parent_ms = sub_ms.parent_ms
+                raw_ms = sub_ms.parent_ms
+                if raw_ms.name not in [m.name for m in context.observing_run.measurement_sets]:
+                    try:
+                        raw_ms = context.observing_run.get_ms(raw_ms.name)
+                    except KeyError:
+                        try:
+                            raw_ms = context.observing_run.get_ms(raw_ms.basename)
+                        except KeyError:
+                            pass
 
-            sub_ms.parent_ms = parent_ms
-            LOG.info('Adding SubMS %s to parent MS %s', sub_ms.name, parent_ms.name)
-            parent_ms.add_subms(sub_ms)
+                logical_ms = MeasurementSet.create_logical_targets_ms(
+                    raw_ms=raw_ms,
+                    name=base_outputvis,
+                    data_type=self.output_data_type or sub_ms.data_type,
+                )
+                LOG.info('Adding logical parent MeasurementSet %s to context', logical_ms.name)
+                context.observing_run.add_measurement_set(logical_ms)
 
-        all_target_mses = self.mses + self.sub_mses
+            logical_ms.add_subms(sub_ms)
+            sub_ms.parent_ms = logical_ms
+            if logical_ms not in logical_mses:
+                logical_mses.append(logical_ms)
+            LOG.info('Adding SubMS %s to logical parent MS %s', sub_ms.name, logical_ms.name)
+
+        all_target_mses = self.mses + logical_mses
 
         output_dir = (
             self.inputs.get('output_dir', context.output_dir)
@@ -584,6 +608,7 @@ class Mstransform(sessionutils.ParallelTemplate):
                     args_spw = args.copy()
                     args_spw['spw'] = spw
                     base, ext = os.path.splitext(args_spw['outputvis'])
+                    args_spw['base_outputvis'] = args_spw['outputvis']
                     args_spw['outputvis'] = f'{base}.spw{spw}{ext}'
                     valid_args_list_per_spw.append(args_spw)
 

@@ -34,6 +34,7 @@ class SubMS:
         data_type: DataType = DataType.IM_LINE_SCIENCE,
         data_column: str = 'DATA',
         freq_config: dict[str, Any] | None = None,
+        base_outputvis: str | None = None,
     ) -> None:
         self.name: str = os.path.abspath(name)
         self.parent_ms: MeasurementSet = getattr(parent_ms, 'parent_ms', parent_ms)
@@ -44,6 +45,7 @@ class SubMS:
         self.data_type: DataType = data_type
         self.data_column: dict[DataType, str] = {data_type: data_column}
         self.freq_config: dict[str, Any] = freq_config or {}
+        self.base_outputvis: str | None = os.path.abspath(base_outputvis) if base_outputvis else None
 
     @property
     def basename(self) -> str:
@@ -69,6 +71,16 @@ class SubMS:
     def antenna_array(self) -> Any:
         """Delegate antenna array to parent MS."""
         return self.parent_ms.antenna_array
+
+    @property
+    def acs_software_version(self) -> str | None:
+        """Delegate ACS software version to parent MS."""
+        return getattr(self.parent_ms, 'acs_software_version', None)
+
+    @property
+    def acs_software_build_version(self) -> str | None:
+        """Delegate ACS software build version to parent MS."""
+        return getattr(self.parent_ms, 'acs_software_build_version', None)
 
     @property
     def filesize(self) -> measures.FileSize:
@@ -156,6 +168,26 @@ class SubMS:
         """Update data column mapping."""
         self.data_type = dtype
         self.data_column[dtype] = column
+
+    def get_vis(self, *args: Any, **kwargs: Any) -> str:
+        """Return on-disk path to this sub-MS."""
+        return self.name
+
+    def get_subms_path(self, *args: Any, **kwargs: Any) -> str:
+        """Return on-disk path to this sub-MS."""
+        return self.name
+
+    def get_subms_paths(self, *args: Any, **kwargs: Any) -> list[str]:
+        """Return list containing this sub-MS path."""
+        return [self.name]
+
+    def has_subms(self, *args: Any, **kwargs: Any) -> bool:
+        """A SubMS is an atomic slice and contains no child SubMSes."""
+        return False
+
+    def get_subms(self, *args: Any, **kwargs: Any) -> list[SubMS]:
+        """Return self as the matching SubMS slice."""
+        return [self]
 
     def __getattr__(self, name: str) -> Any:
         """Delegate unhandled attribute lookups to parent MeasurementSet."""

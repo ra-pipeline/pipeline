@@ -1529,11 +1529,33 @@ class MakeImList(basetask.StandardTaskTemplate):
 
                                     filtered_vislist = [v for v in domain_filtered_vislist if _is_valid_data(v, field_intent, str(adjusted_spwspec))]
 
+                                # If logical parent MS or MS has child SubMS slices, expand filtered_vislist to physical SubMS paths
+                                final_vislist = []
+                                for v in filtered_vislist:
+                                    try:
+                                        ms_obj = inputs.context.observing_run.get_ms(v)
+                                    except KeyError:
+                                        ms_obj = None
+                                    if ms_obj and (
+                                        getattr(ms_obj, 'is_logical', False)
+                                        or (hasattr(ms_obj, 'has_subms') and ms_obj.has_subms())
+                                    ):
+                                        sub_paths = ms_obj.get_subms_paths(source=field_intent[0], spw=actual_spwspec)
+                                        if sub_paths and all(os.path.exists(p) for p in sub_paths):
+                                            final_vislist.extend(sub_paths)
+                                        else:
+                                            final_vislist.append(v)
+                                    else:
+                                        final_vislist.append(v)
+
                                 # Save the filtered vislist
-                                if target_heuristics.vislist != filtered_vislist:
+                                if target_heuristics.vislist != final_vislist:
                                     LOG.warning(
-                                        f'''Modifying vis list from {target_heuristics.vislist} to {filtered_vislist}''')
-                                    target_heuristics.vislist = filtered_vislist
+                                        'Modifying vis list from %s to %s',
+                                        target_heuristics.vislist,
+                                        final_vislist,
+                                    )
+                                    target_heuristics.vislist = final_vislist
 
                                 # Get list of antenna IDs
                                 antenna_ids = target_heuristics.antenna_ids(inputs.intent)
@@ -1554,7 +1576,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                                         return ','.join(map(str, antenna_ids[parent.basename]))
                                     return ''
 
-                                antenna = [_get_antenna_ids_str(v) + '&' for v in filtered_vislist]
+                                antenna = [_get_antenna_ids_str(v) + '&' for v in final_vislist]
 
                                 drcorrect, maxthreshold = self._get_drcorrect_maxthreshold(
                                     field_intent[0], actual_spwspec, local_selected_datatype_str)
@@ -1621,7 +1643,7 @@ class MakeImList(basetask.StandardTaskTemplate):
                                     uvtaper=uvtaper,
                                     stokes=stokes,
                                     heuristics=target_heuristics,
-                                    vis=filtered_vislist,
+                                    vis=final_vislist,
                                     datacolumn=datacolumn,
                                     datatype=local_selected_datatype_str,
                                     datatype_info=local_selected_datatype_info,

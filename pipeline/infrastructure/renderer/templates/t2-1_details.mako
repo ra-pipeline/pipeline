@@ -81,6 +81,46 @@ import os
 		
 </div>
 
+% if sub_ms_rows:
+<div class="row">
+	<div class="col-md-12">
+		<h3>Component SubMS Slices</h3>
+		<p>This logical MeasurementSet is partitioned into the following on-disk per-spectral-window slices:</p>
+		<table class="table table-bordered table-striped table-condensed" summary="Component SubMS Slices">
+			<thead>
+				<tr>
+					<th>SubMS Name</th>
+					<th>SpW (Real)</th>
+					<th>SpW (Virtual)</th>
+					<th>Band</th>
+					<th>Center Freq</th>
+					<th>Bandwidth</th>
+					<th>Channels</th>
+					<th>Target / Field</th>
+					<th>Data Type</th>
+					<th>Size</th>
+				</tr>
+			</thead>
+			<tbody>
+				% for sub in sub_ms_rows:
+				<tr>
+					<td><code>${sub['name']}</code></td>
+					<td>${sub['real_spw']}</td>
+					<td>${sub['virtual_spw']}</td>
+					<td>${sub['band']}</td>
+					<td>${sub['centre_freq']}</td>
+					<td>${sub['bandwidth']}</td>
+					<td>${sub['num_channels']}</td>
+					<td>${sub['source']}</td>
+					<td>${sub['data_type']}</td>
+					<td>${sub['filesize']}</td>
+				</tr>
+				% endfor
+			</tbody>
+		</table>
+	</div>
+</div>
+% endif
 
 <div class="row">
 	<div class="col-md-6">
@@ -226,18 +266,8 @@ import os
 </div>
 
 <div class="row">        
+	% if weather_plot is not None and os.path.exists(weather_plot.thumbnail):
 	<div class="col-md-6">
-        % if weather_plot is None or not os.path.exists(weather_plot.thumbnail):
-        <h3>Weather</h3>
-        <div class="col-md-6">
-            <div class="thumbnail">
-                <img data-src="holder.js/250x188/text:Not Available">
-                <div class="caption">
-                    <h4>Weather plot</h4>
-                </div>
-            </div>
-        </div>
-        % else:
 		<a href="${os.path.relpath(weather_plot.abspath, pcontext.report_dir)}" data-fancybox>
 			<h3>Weather</h3>
 		</a>
@@ -255,8 +285,8 @@ import os
 				</div>
 			</div>
 		</div>
-        % endif
 	</div>
+	% endif
 
 	% if pcontext.project_summary.telescope.lower() in ('alma') and pwv_plot is not None:
 	

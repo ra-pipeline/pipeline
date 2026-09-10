@@ -173,10 +173,11 @@ def test_serial_mstransform_analyse_per_spw(mock_context, tmp_path):
 
 
 def test_mstransform_results_merge_with_context_subms(mock_context, tmp_path):
-    """Test that MstransformResults merges SubMS into parent_ms without polluting top-level MS list."""
+    """Test that MstransformResults creates a logical parent MS and attaches SubMS slices."""
     ms = mock_context.observing_run.measurement_sets[0]
-    subvis16 = str(tmp_path / 'uid___A002_X123_X456_targets.ms.spw16')
-    subvis18 = str(tmp_path / 'uid___A002_X123_X456_targets.ms.spw18')
+    subvis16 = str(tmp_path / 'uid___A002_X123_X456_targets.spw16.ms')
+    subvis18 = str(tmp_path / 'uid___A002_X123_X456_targets.spw18.ms')
+    base_outputvis = str(tmp_path / 'uid___A002_X123_X456_targets.ms')
 
     sub16 = SubMS(
         name=subvis16,
@@ -185,6 +186,7 @@ def test_mstransform_results_merge_with_context_subms(mock_context, tmp_path):
         real_spw_id=16,
         virtual_spw_id=0,
         data_type=DataType.IM_LINE_SCIENCE,
+        base_outputvis=base_outputvis,
     )
     sub18 = SubMS(
         name=subvis18,
@@ -193,6 +195,7 @@ def test_mstransform_results_merge_with_context_subms(mock_context, tmp_path):
         real_spw_id=18,
         virtual_spw_id=1,
         data_type=DataType.IM_LINE_SCIENCE,
+        base_outputvis=base_outputvis,
     )
 
     result = MstransformResults(vis=ms.name, outputvis=subvis16, output_data_type=DataType.IM_LINE_SCIENCE)
@@ -201,38 +204,56 @@ def test_mstransform_results_merge_with_context_subms(mock_context, tmp_path):
 
     result.merge_with_context(mock_context)
 
-    # 1. Parent MS retains its top-level status; context.observing_run.measurement_sets only has the 1 parent MS
-    assert len(mock_context.observing_run.measurement_sets) == 1
+    # 1. ObservingRun contains raw MS and logical targets MS
+    assert len(mock_context.observing_run.measurement_sets) == 2
     assert mock_context.observing_run.measurement_sets[0] is ms
+    logical_targets_ms = mock_context.observing_run.measurement_sets[1]
+    assert logical_targets_ms.is_logical is True
+    assert logical_targets_ms.name == base_outputvis
+    assert logical_targets_ms.origin_ms == ms.name
 
-    # 2. Both SubMSes are registered in parent MS
-    assert len(ms.sub_mses) == 2
-    assert ms.has_subms() is True
-    assert ms.has_subms(DataType.IM_LINE_SCIENCE) is True
+    # 2. Both SubMSes are registered in logical parent MS
+    assert len(logical_targets_ms.sub_mses) == 2
+    assert logical_targets_ms.has_subms() is True
+    assert logical_targets_ms.has_subms(DataType.IM_LINE_SCIENCE) is True
+    assert sub16.parent_ms is logical_targets_ms
+    assert sub18.parent_ms is logical_targets_ms
 
-    # 3. get_ms finds SubMS by name and basename
+    # 3. get_ms finds logical targets MS and SubMS by name and basename
+    assert mock_context.observing_run.get_ms(base_outputvis) is logical_targets_ms
     assert mock_context.observing_run.get_ms(subvis16) is sub16
     assert mock_context.observing_run.get_ms(os.path.basename(subvis18)) is sub18
 
-    # 4. ObservingRun queries with source and spw resolve to SubMS
+    # 4. Top-level query returns logical parent MS
+    top_mses = mock_context.observing_run.get_measurement_sets_of_type(
+        dtypes=[DataType.IM_LINE_SCIENCE], msonly=True
+    )
+    assert top_mses == [logical_targets_ms]
+
+    # 5. ObservingRun queries with source and spw resolve to SubMS
     chunks, dt = mock_context.observing_run.get_measurement_sets_of_type(
         dtypes=[DataType.IM_LINE_SCIENCE], msonly=False, source='TargetSource', spw='16'
     )
     assert dt == DataType.IM_LINE_SCIENCE
     assert list(chunks.keys()) == [sub16]
 
-    # 5. Callibrary registration is skipped for SubMS slices (reserved for full MSes in self.mses)
+    # 6. Flagging template file created for logical targets MS
+    flag_template = os.path.join(str(tmp_path), 'uid___A002_X123_X456_targets.flagtargetstemplate.txt')
+    assert os.path.exists(flag_template)
+
+    # 7. Callibrary registration is skipped for SubMS slices
     assert mock_context.callibrary.add.call_count == 0
 
 
 def test_mstransform_results_merge_with_context_detached_copy(mock_context, tmp_path):
-    """Test that SubMS created on a detached/pickled copy of parent_ms attaches to live context MS."""
+    """Test that SubMS created on a detached copy of parent_ms creates logical parent correctly."""
     import copy
 
     ms = mock_context.observing_run.measurement_sets[0]
     detached_ms = copy.deepcopy(ms)
 
-    subvis = str(tmp_path / 'uid___A002_X123_X456_targets.ms.spw16')
+    subvis = str(tmp_path / 'uid___A002_X123_X456_targets.spw16.ms')
+    base_outputvis = str(tmp_path / 'uid___A002_X123_X456_targets.ms')
     sub = SubMS(
         name=subvis,
         parent_ms=detached_ms,
@@ -240,6 +261,7 @@ def test_mstransform_results_merge_with_context_detached_copy(mock_context, tmp_
         real_spw_id=16,
         virtual_spw_id=0,
         data_type=DataType.IM_LINE_SCIENCE,
+        base_outputvis=base_outputvis,
     )
 
     result = MstransformResults(vis=ms.name, outputvis=subvis, output_data_type=DataType.IM_LINE_SCIENCE)
@@ -248,8 +270,7 @@ def test_mstransform_results_merge_with_context_detached_copy(mock_context, tmp_
 
     result.merge_with_context(mock_context)
 
-    # SubMS should have re-attached to live ms in context, and live ms should have the subms registered
-    assert sub in ms.sub_mses
-    assert sub.parent_ms is ms
+    logical_targets_ms = mock_context.observing_run.get_ms(base_outputvis)
+    assert sub in logical_targets_ms.sub_mses
+    assert sub.parent_ms is logical_targets_ms
     assert mock_context.observing_run.get_ms(subvis) is sub
-    assert mock_context.observing_run.get_ms(os.path.basename(subvis)) is sub
