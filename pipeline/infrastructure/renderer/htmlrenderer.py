@@ -965,6 +965,7 @@ class T2_1DetailsRenderer:
                             f.write('=' * 80 + '\n')
                             f.write(f'SubMS Slice {i}/{len(sub_mses)}: {sub.basename}\n')
                             f.write('=' * 80 + '\n\n')
+                            tmpname = None
                             try:
                                 with tempfile.NamedTemporaryFile(mode='w+', delete=False) as tf:
                                     tmpname = tf.name
@@ -974,10 +975,15 @@ class T2_1DetailsRenderer:
                                 with open(tmpname, 'r') as tf:
                                     f.write(tf.read())
                                     f.write('\n\n')
-                                os.remove(tmpname)
                             except Exception as e:
                                 LOG.warning('Could not generate listobs for SubMS %s: %s', sub.basename, e)
                                 f.write(f'Could not run listobs for {sub.basename}: {e}\n\n')
+                            finally:
+                                if tmpname and os.path.exists(tmpname):
+                                    try:
+                                        os.remove(tmpname)
+                                    except Exception:
+                                        pass
                 return
             LOG.debug('Writing listobs output to %s' % listfile)
             task = casa_tasks.listobs(vis=ms.name, listfile=listfile)

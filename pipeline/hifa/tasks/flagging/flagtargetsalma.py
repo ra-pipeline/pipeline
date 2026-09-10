@@ -342,7 +342,8 @@ class SerialFlagTargetsALMA(basetask.StandardTaskTemplate):
                             (real_spw is not None and int(base_id) == real_spw)
                             or (virt_spw is not None and int(base_id) == virt_spw)
                         ):
-                            matching_tokens.append(f"0{chan_sel}")
+                            target_id = real_spw if real_spw is not None else base_id
+                            matching_tokens.append(f"{target_id}{chan_sel}")
                         elif real_spw is None and virt_spw is None:
                             matching_tokens.append(tok)
 

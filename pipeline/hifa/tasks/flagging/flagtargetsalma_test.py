@@ -65,7 +65,7 @@ def test_filter_flag_commands_for_subms():
     filtered = SerialFlagTargetsALMA._filter_flag_commands_for_subms(flag_cmds, sub16)
 
     assert "mode='summary' name='before'" in filtered
-    assert "mode='manual' spw='0:10~50' antenna='PM02'" in filtered
+    assert "mode='manual' spw='16:10~50' antenna='PM02'" in filtered
     assert not any("18:10~50" in c for c in filtered)
     assert not any("other_source" in c for c in filtered)
     assert "mode='manual' field='helms30' antenna='PM02'" in filtered

@@ -251,7 +251,7 @@ class ContFileHandler:
             ms_frame_chan_selection = []
             ms_frame_freq_selection = []
             try:
-                if field != -1:
+                if field != -1 and real_spw_id is not None:
                     for freq_range in freq_ranges:
                         if refer == 'LSRK':
                             result = suTool.advisechansel(msname=msname, fieldid=field, spwselection=str(real_spw_id),
@@ -276,14 +276,18 @@ class ContFileHandler:
                                                           freqframe=ms_frame, getfreqrange=True)
                             fLow = float(qaTool.getvalue(qaTool.convert(result['freqstart'], 'GHz'))[0])
                             fHigh = float(qaTool.getvalue(qaTool.convert(result['freqend'], 'GHz'))[0])
-                            ms_frame_freq_selection.append((fLow, fHigh))
+                            if 0 < fLow < fHigh:
+                                ms_frame_freq_selection.append((fLow, fHigh))
                             suTool.done()
             except Exception as e:
                 LOG.info('Cannot calculate %s range for MS %s Field %s SPW %s. Exception: %s' % (ms_frame, msname, field, real_spw_id, e))
 
             ms_frame_chan_selections.append(';'.join('%d~%d' % (item[0], item[1]) for item in ms_frame_chan_selection))
-            ms_frame_freq_selections.append('%s %s' % (';'.join('%.10f~%.10fGHz' %
-                                                              (float(item[0]), float(item[1])) for item in ms_frame_freq_selection), ms_frame))
+            if ms_frame_freq_selection:
+                ms_frame_freq_selections.append('%s %s' % (';'.join('%.10f~%.10fGHz' %
+                                                                  (float(item[0]), float(item[1])) for item in ms_frame_freq_selection), ms_frame))
+            else:
+                ms_frame_freq_selections.append('')
 
         return ms_frame_freq_selections, ms_frame_chan_selections, aggregate_frame_bw, ms_frame
 
@@ -338,11 +342,15 @@ def contfile_to_spwsel(vis, context, contfile='cont.dat', use_realspw=True):
         if not fieldid_list:
             continue
 
-        spwstring = ''
+        spw_items = []
         for virt_spw_id in contdict['fields'][field]:
+            if context.observing_run.virtual2real_spw_id(virt_spw_id, ms) is None:
+                continue
             spw_name = context.observing_run.virtual_science_spw_ids[int(virt_spw_id)]
             crange_list = [crange for crange in contdict['fields'][field]
                            [virt_spw_id]['ranges'] if crange not in ('NONE', 'ALL', 'ALLCONT')]
+            if not crange_list:
+                continue
             if crange_list[0]['refer'] in ('LSRK', 'SOURCE'):
                 LOG.info("Converting from %s to MS native frame...", crange_list[0]['refer'])
                 sname = field
@@ -355,28 +363,30 @@ def contfile_to_spwsel(vis, context, contfile='cont.dat', use_realspw=True):
                 freq_ranges, _, _, ms_frame = contfile_handler.to_ms_frame(
                     cranges_spwsel[sname][virt_spw_id], [vis], [field_id], int(virt_spw_id),
                     context.observing_run, spw_name)
-                freq_ranges_list = freq_ranges[0].split(';')
-                spwstring = spwstring + virt_spw_id + ':'
-                for freqrange in freq_ranges_list:
-                    spwstring = spwstring + freqrange.replace(' %s' % (ms_frame), '') + ';'
-                spwstring = spwstring[:-1]
-                spwstring = spwstring + ','
+                freq_ranges_list = [r.strip() for r in freq_ranges[0].split(';') if r.strip()]
+                if not freq_ranges_list:
+                    continue
+                spw_part = virt_spw_id + ':' + ';'.join(
+                    freqrange.replace(' %s' % (ms_frame), '') for freqrange in freq_ranges_list
+                )
+                spw_items.append(spw_part)
 
             if crange_list[0]['refer'] == 'TOPO':
                 LOG.info("Using TOPO frequency specified in {!s}".format(contfile))
                 ms_frame = 'TOPO'
-                spwstring = spwstring + virt_spw_id + ':'
-                for freqrange in crange_list:
-                    spwstring = spwstring + str(freqrange['range'][0]) + '~' + str(freqrange['range'][1]) + 'GHz;'
-                spwstring = spwstring[:-1]
-                spwstring = spwstring + ','
+                spw_part = virt_spw_id + ':' + ';'.join(
+                    str(freqrange['range'][0]) + '~' + str(freqrange['range'][1]) + 'GHz'
+                    for freqrange in crange_list
+                )
+                spw_items.append(spw_part)
 
-        # remove appending semicolon
-        spwstring = spwstring[:-1]
+        spwstring = ','.join(spw_items)
 
         if use_realspw:
-            spwstring = context.observing_run.get_real_spwsel([spwstring], [vis])
-        fielddict[field] = spwstring[0]
+            real_spwsel_list = context.observing_run.get_real_spwsel([spwstring], [vis])
+            fielddict[field] = real_spwsel_list[0] if real_spwsel_list and real_spwsel_list[0] else ''
+        else:
+            fielddict[field] = spwstring
 
     LOG.info("Using frequencies in %s reference frame:" % (ms_frame))
     for field, spwsel in fielddict.items():

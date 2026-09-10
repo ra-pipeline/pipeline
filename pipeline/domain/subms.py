@@ -136,6 +136,19 @@ class SubMS:
             return [s for s in parent_spws if s.id == self.real_spw_id]
         return parent_spws
 
+    @property
+    def spectral_windows(self) -> list[SpectralWindow]:
+        """Return spectral windows corresponding to this sub-MS slice."""
+        if self.real_spw_id is not None:
+            return [s for s in self.parent_ms.spectral_windows if s.id == self.real_spw_id]
+        return self.parent_ms.spectral_windows
+
+    def get_spectral_window(self, spw_id: int | str) -> SpectralWindow:
+        """Return spectral window matching ID if it belongs to this slice."""
+        if self.real_spw_id is not None and int(spw_id) != self.real_spw_id:
+            raise KeyError(f"No spectral window with ID '{spw_id}' found in {self.basename}")
+        return self.parent_ms.get_spectral_window(spw_id)
+
     def get_data_column(self, dtype: DataType, source: str | None = None, spw: str | None = None) -> str | None:
         """Return data column name for given DataType."""
         if source is not None and self.source_name is not None and source != self.source_name:
@@ -214,7 +227,7 @@ class SubMS:
         return False
 
     def matches_spw(self, spw: int | str) -> bool:
-        """Check if a given real, virtual, or local SPW ID matches this slice.
+        """Check if a given real or virtual SPW ID matches this slice.
 
         Args:
             spw: SPW ID (as int or str).
@@ -228,22 +241,24 @@ class SubMS:
         if not s_str.isdigit():
             return False
         s_int = int(s_str)
-        return s_int in (self.real_spw_id, self.virtual_spw_id, 0)
+        matched_ids = {s for s in (self.real_spw_id, self.virtual_spw_id) if s is not None}
+        return s_int in matched_ids
 
     def to_local_spw(self, spw: int | str | None = None) -> str:
-        """Convert a parent real or virtual SPW ID to the local SPW ID in this slice.
+        """Convert a parent real or virtual SPW ID to the local on-disk SPW ID in this slice.
 
-        For SPW-partitioned slices, the local on-disk SPW ID is '0'.
+        Since mstransform operates with reindex=False, the on-disk SPW ID in the
+        SubMS slice preserves the original real_spw_id.
 
         Args:
-            spw: Optional parent SPW ID.
+            spw: Optional parent SPW ID (real or virtual).
 
         Returns:
-            Local SPW ID string ('0' if partitioned by SPW, else str(spw)).
+            Local on-disk SPW ID string (str(self.real_spw_id) if set, else str(spw)).
         """
         if self.real_spw_id is not None:
-            return '0'
-        return '0' if spw is None else str(spw)
+            return str(self.real_spw_id)
+        return '' if spw is None else str(spw)
 
     def derive_outputvis(self, suffix: str = '_line') -> str:
         """Derive an output SubMS path by inserting suffix before partition tokens.

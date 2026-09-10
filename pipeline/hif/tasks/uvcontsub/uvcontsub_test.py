@@ -105,17 +105,17 @@ def test_prepare_logical_ms(tmp_path):
     # Check first slice parameters
     call_args_list = task._executor.execute.call_args_list
     job0 = call_args_list[0][0][0]
-    assert job0.kw['spw'] == '0'
-    assert '0' in job0.kw['fitspec']['1']
-    assert job0.kw['fitspec']['1']['0']['chan'] == '0~10;110~120'
+    assert job0.kw['spw'] == '16'
+    assert '16' in job0.kw['fitspec']['1']
+    assert job0.kw['fitspec']['1']['16']['chan'] == '0~10;110~120'
     assert result.sub_mses[0].data_type == DataType.REGCAL_LINE_SCIENCE
     assert result.sub_mses[0].name.endswith('_targets_line.src1.spw0.ms')
 
     # Check second slice parameters
     job1 = call_args_list[1][0][0]
-    assert job1.kw['spw'] == '0'
-    assert '0' in job1.kw['fitspec']['1']
-    assert job1.kw['fitspec']['1']['0']['chan'] == '5~25;90~115'
+    assert job1.kw['spw'] == '18'
+    assert '18' in job1.kw['fitspec']['1']
+    assert job1.kw['fitspec']['1']['18']['chan'] == '5~25;90~115'
     assert result.sub_mses[1].data_type == DataType.REGCAL_LINE_SCIENCE
     assert result.sub_mses[1].name.endswith('_targets_line.src1.spw1.ms')
 

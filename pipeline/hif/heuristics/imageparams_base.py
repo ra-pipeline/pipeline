@@ -492,6 +492,8 @@ class ImageParamsHeuristics:
                                     if (getattr(ms, 'is_logical', False) or not os.path.exists(vis))
                                     else vis
                                 )
+                                if not os.path.exists(subms_vis):
+                                    continue
                                 taql = (
                                     f'{"||".join(["ANTENNA1==%d" % i for i in antenna_ids[os.path.basename(vis)]])}&&'
                                     f'{"||".join(["ANTENNA2==%d" % i for i in antenna_ids[os.path.basename(vis)]])}'
@@ -776,6 +778,8 @@ class ImageParamsHeuristics:
                                 if (getattr(ms, 'is_logical', False) or not os.path.exists(vis))
                                 else vis
                             )
+                            if not os.path.exists(subms_vis):
+                                continue
                             rtn = casa_tools.imager.selectvis(
                                 vis=subms_vis,
                                 field=field_intent[0],
@@ -1198,6 +1202,7 @@ class ImageParamsHeuristics:
         cqa = casa_tools.quanta
 
         repr_ms = self.observing_run.get_ms(self.vislist[0])
+        repr_ms = getattr(repr_ms, 'parent_ms', repr_ms)
         repr_target = repr_ms.representative_target
 
         reprBW_mode = 'nbin'
@@ -1661,24 +1666,46 @@ class ImageParamsHeuristics:
                             # Convert to TOPO
                             spw_name = self.observing_run.virtual_science_spw_ids[int(spwid)]
                             ms_frame_freq_selections, ms_frame_chan_selections, aggregate_spw_lsrk_bw, ms_frame = contfile_handler.to_ms_frame(inputs.spwsel_lsrk['spw%s' % (spwid)], inputs.vis, ref_field_ids, spwid, self.observing_run, spw_name)
-                            spw_ms_frame_freq_param_lists.append(['%s:%s' % (spwid, ms_frame_freq_selection.split()[0]) for ms_frame_freq_selection in ms_frame_freq_selections])
-                            spw_ms_frame_chan_param_lists.append(['%s:%s' % (spwid, ms_frame_chan_selection.split()[0]) for ms_frame_chan_selection in ms_frame_chan_selections])
-                            for i in range(len(inputs.vis)):
-                                spw_ms_frame_freq_param_dict[os.path.basename(inputs.vis[i])][spwid] = ms_frame_freq_selections[i].split()[0]
-                                spw_ms_frame_chan_param_dict[os.path.basename(inputs.vis[i])][spwid] = ms_frame_chan_selections[i].split()[0]
+                            freq_param_list = []
+                            chan_param_list = []
+                            for i, v in enumerate(inputs.vis):
+                                ms_do = self.observing_run.get_ms(v)
+                                real_spw = self.observing_run.virtual2real_spw_id(spwid, ms_do)
+                                f_sel = ms_frame_freq_selections[i].split()[0] if (real_spw is not None and ms_frame_freq_selections[i].strip()) else ''
+                                c_sel = ms_frame_chan_selections[i].split()[0] if (real_spw is not None and ms_frame_chan_selections[i].strip()) else ''
+                                freq_param_list.append(f'{spwid}:{f_sel}' if f_sel else '')
+                                chan_param_list.append(f'{spwid}:{c_sel}' if c_sel else '')
+                                spw_ms_frame_freq_param_dict[os.path.basename(v)][spwid] = f_sel
+                                spw_ms_frame_chan_param_dict[os.path.basename(v)][spwid] = c_sel
+                            spw_ms_frame_freq_param_lists.append(freq_param_list)
+                            spw_ms_frame_chan_param_lists.append(chan_param_list)
                             # Count only one selection !
-                            for ms_frame_freq_range in ms_frame_freq_selections[0].split(';'):
-                                f1, sep, f2, unit = p.findall(ms_frame_freq_range)[0]
-                                ms_frame_freq_ranges.append((float(f1), float(f2)))
+                            ref_selection = next((sel for sel in ms_frame_freq_selections if sel.strip()), '')
+                            if ref_selection:
+                                for ms_frame_freq_range in ref_selection.split()[0].split(';'):
+                                    matches = p.findall(ms_frame_freq_range)
+                                    if matches and matches[0][0]:
+                                        f1, sep, f2, unit = matches[0]
+                                        ms_frame_freq_ranges.append((float(f1), float(f2)))
                         else:
                             LOG.warning('Cannot convert {!s} frequency selection properly to TOPO. Using plain ranges for all MSs.'.format(refer))
-                            spw_ms_frame_freq_param_lists.append(['%s:%s' % (spwid, freq_selection)] * len(inputs.vis))
-                            # TODO: Need to derive real channel ranges
-                            spw_ms_frame_chan_param_lists.append(['%s:0~%s' % (spwid, spw_info.num_channels - 1)] * len(inputs.vis))
-                            for i in range(len(inputs.vis)):
-                                spw_ms_frame_freq_param_dict[os.path.basename(inputs.vis[i])][spwid] = freq_selection.split()[0]
-                                # TODO: Need to derive real channel ranges
-                                spw_ms_frame_chan_param_dict[os.path.basename(inputs.vis[i])][spwid] = '0~%d' % (spw_info.num_channels - 1)
+                            freq_param_list = []
+                            chan_param_list = []
+                            for v in inputs.vis:
+                                ms_do = self.observing_run.get_ms(v)
+                                real_spw = self.observing_run.virtual2real_spw_id(spwid, ms_do)
+                                if real_spw is not None:
+                                    freq_param_list.append(f'{spwid}:{freq_selection}')
+                                    chan_param_list.append(f'{spwid}:0~{spw_info.num_channels - 1}')
+                                    spw_ms_frame_freq_param_dict[os.path.basename(v)][spwid] = freq_selection.split()[0]
+                                    spw_ms_frame_chan_param_dict[os.path.basename(v)][spwid] = f'0~{spw_info.num_channels - 1}'
+                                else:
+                                    freq_param_list.append('')
+                                    chan_param_list.append('')
+                                    spw_ms_frame_freq_param_dict[os.path.basename(v)][spwid] = ''
+                                    spw_ms_frame_chan_param_dict[os.path.basename(v)][spwid] = ''
+                            spw_ms_frame_freq_param_lists.append(freq_param_list)
+                            spw_ms_frame_chan_param_lists.append(chan_param_list)
                             # Count only one selection !
                             aggregate_spw_lsrk_bw = '0.0GHz'
                             for freq_range in freq_selection.split(';'):
@@ -1687,21 +1714,41 @@ class ImageParamsHeuristics:
                                 delta_f = qaTool.sub('%s%s' % (f2, unit), '%s%s' % (f1, unit))
                                 aggregate_spw_lsrk_bw = qaTool.add(aggregate_spw_lsrk_bw, delta_f)
                     else:
-                        spw_ms_frame_freq_param_lists.append([spwid] * len(inputs.vis))
-                        spw_ms_frame_chan_param_lists.append([spwid] * len(inputs.vis))
-                        for msname in inputs.vis:
-                            spw_ms_frame_freq_param_dict[os.path.basename(msname)][spwid] = ''
-                            spw_ms_frame_chan_param_dict[os.path.basename(msname)][spwid] = ''
+                        freq_param_list = []
+                        chan_param_list = []
+                        for v in inputs.vis:
+                            ms_do = self.observing_run.get_ms(v)
+                            real_spw = self.observing_run.virtual2real_spw_id(spwid, ms_do)
+                            if real_spw is not None:
+                                freq_param_list.append(str(spwid))
+                                chan_param_list.append(str(spwid))
+                            else:
+                                freq_param_list.append('')
+                                chan_param_list.append('')
+                            spw_ms_frame_freq_param_dict[os.path.basename(v)][spwid] = ''
+                            spw_ms_frame_chan_param_dict[os.path.basename(v)][spwid] = ''
+                        spw_ms_frame_freq_param_lists.append(freq_param_list)
+                        spw_ms_frame_chan_param_lists.append(chan_param_list)
                         ms_frame_freq_ranges.append((min_frequency, max_frequency))
                         aggregate_spw_lsrk_bw = '%.10fGHz' % (max_frequency - min_frequency)
                         if (inputs.spwsel_lsrk['spw%s' % (spwid)] not in ('ALL', 'ALLCONT')) and (inputs.intent == 'TARGET') and (inputs.specmode in ('mfs', 'cont') and self.warn_missing_cont_ranges()):
                             LOG.warning('No continuum frequency selection for Target Field %s SPW %s' % (inputs.field, spwid))
                 else:
-                    spw_ms_frame_freq_param_lists.append([spwid] * len(inputs.vis))
-                    spw_ms_frame_chan_param_lists.append([spwid] * len(inputs.vis))
-                    for msname in inputs.vis:
-                        spw_ms_frame_freq_param_dict[os.path.basename(msname)][spwid] = ''
-                        spw_ms_frame_chan_param_dict[os.path.basename(msname)][spwid] = ''
+                    freq_param_list = []
+                    chan_param_list = []
+                    for v in inputs.vis:
+                        ms_do = self.observing_run.get_ms(v)
+                        real_spw = self.observing_run.virtual2real_spw_id(spwid, ms_do)
+                        if real_spw is not None:
+                            freq_param_list.append(str(spwid))
+                            chan_param_list.append(str(spwid))
+                        else:
+                            freq_param_list.append('')
+                            chan_param_list.append('')
+                        spw_ms_frame_freq_param_dict[os.path.basename(v)][spwid] = ''
+                        spw_ms_frame_chan_param_dict[os.path.basename(v)][spwid] = ''
+                    spw_ms_frame_freq_param_lists.append(freq_param_list)
+                    spw_ms_frame_chan_param_lists.append(chan_param_list)
                     ms_frame_freq_ranges.append((min_frequency, max_frequency))
                     aggregate_spw_lsrk_bw = '%.10fGHz' % (max_frequency - min_frequency)
                     if (inputs.intent == 'TARGET') and (inputs.specmode in ('mfs', 'cont') and self.warn_missing_cont_ranges()):
@@ -1711,8 +1758,8 @@ class ImageParamsHeuristics:
 
             aggregate_lsrk_bw = qaTool.add(aggregate_lsrk_bw, aggregate_spw_lsrk_bw)
 
-        spw_ms_frame_freq_param = [','.join(spwsel_per_ms) for spwsel_per_ms in [[spw_ms_frame_freq_param_list_per_ms[i] for spw_ms_frame_freq_param_list_per_ms in spw_ms_frame_freq_param_lists] for i in range(len(inputs.vis))]]
-        spw_ms_frame_chan_param = [','.join(spwsel_per_ms) for spwsel_per_ms in [[spw_ms_frame_chan_param_list_per_ms[i] for spw_ms_frame_chan_param_list_per_ms in spw_ms_frame_chan_param_lists] for i in range(len(inputs.vis))]]
+        spw_ms_frame_freq_param = [','.join([s for s in spwsel_per_ms if s]) for spwsel_per_ms in [[spw_ms_frame_freq_param_list_per_ms[i] for spw_ms_frame_freq_param_list_per_ms in spw_ms_frame_freq_param_lists] for i in range(len(inputs.vis))]]
+        spw_ms_frame_chan_param = [','.join([s for s in spwsel_per_ms if s]) for spwsel_per_ms in [[spw_ms_frame_chan_param_list_per_ms[i] for spw_ms_frame_chan_param_list_per_ms in spw_ms_frame_chan_param_lists] for i in range(len(inputs.vis))]]
 
         # Calculate total bandwidth
         total_ms_frame_bw = '0.0GHz'
@@ -1993,6 +2040,8 @@ class ImageParamsHeuristics:
             for intSpw in map(int, spw.split(',')):
                 try:
                     real_spwid = self.observing_run.virtual2real_spw_id(intSpw, self.observing_run.get_ms(msname))
+                    if real_spwid is None:
+                        continue
                     spw_do = ms.get_spectral_window(real_spwid)
 
                     # For multi-tuning EBs, a field may be observed in just a subset of
@@ -2190,6 +2239,8 @@ class ImageParamsHeuristics:
         """
 
         real_spwid = self.observing_run.virtual2real_spw_id(spw, ms_do)
+        if real_spwid is None:
+            return 0.0, 0.0, 0.0, None
         chansel_sensitivities = []
         chansel_centerfreqs = []
         sens_bw = 0.0

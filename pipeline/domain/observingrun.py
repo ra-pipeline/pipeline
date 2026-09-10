@@ -456,7 +456,6 @@ class ObservingRun(object):
             Real spectral window ID for given spectral window name in given MS,
             or None if name was not found in the given MS.
         """
-        target_ms = getattr(target_ms, 'parent_ms', target_ms)
         spw_id = None
         for spw in target_ms.get_spectral_windows(science_windows_only=True):
             if match_spw_basename(spw.name, spw_name):
@@ -494,7 +493,6 @@ class ObservingRun(object):
             MS. Returns None if either the given virtual spw ID does not exist
             or the given virtual spw ID does not appear in given MS.
         """
-        target_ms = getattr(target_ms, 'parent_ms', target_ms)
         spw_name = self.virtual_science_spw_ids.get(int(spw_id), None)
         if spw_name:
             return self.get_real_spw_id_by_name(spw_name, target_ms)
@@ -514,8 +512,11 @@ class ObservingRun(object):
             name of the given real spectral window ID in the given MS, or None
             if the spectral window name was not found.
         """
-        target_ms = getattr(target_ms, 'parent_ms', target_ms)
-        return self.get_virtual_spw_id_by_name(target_ms.get_spectral_window(int(spw_id)).name)
+        try:
+            spw = target_ms.get_spectral_window(int(spw_id))
+            return self.get_virtual_spw_id_by_name(spw.name)
+        except (KeyError, AttributeError):
+            return None
 
     def real2real_spw_id(self, spw_id: int | str, source_ms: MeasurementSet | SubMS, target_ms: MeasurementSet | SubMS) -> int | None:
         """Translates a real spectral window (SPW) ID from one MS to another.

@@ -226,8 +226,14 @@ def test_observing_run_subms_resolution(mock_observing_run):
     assert res_parent_forced[0] is parent_ms
 
     # 5. SPW ID translations accepting SubMS directly
+    assert [s.id for s in sub16.spectral_windows] == [16]
+    assert sub16.get_spectral_window(16).id == 16
+    with pytest.raises(KeyError):
+        sub16.get_spectral_window(22)
     assert obs_run.virtual2real_spw_id(0, sub16) == 16
+    assert obs_run.virtual2real_spw_id(1, sub16) is None
     assert obs_run.real2virtual_spw_id(16, sub16) == 0
+    assert obs_run.real2virtual_spw_id(22, sub16) is None
 
     # 6. get_measurement_sets_of_type with vis filtering
     # 6a. vis specified as parent MS basename
@@ -522,8 +528,9 @@ def test_subms_helpers_and_matching():
     assert subms.matches_spw(18) is False
 
     # Test to_local_spw
-    assert subms.to_local_spw(16) == '0'
-    assert subms.to_local_spw(None) == '0'
+    assert subms.to_local_spw(16) == '16'
+    assert subms.to_local_spw(0) == '16'
+    assert subms.to_local_spw(None) == '16'
 
     # Test derive_outputvis
     assert subms.derive_outputvis('_line') == '/path/to/uid___targets_line.src1.spw0.ms'

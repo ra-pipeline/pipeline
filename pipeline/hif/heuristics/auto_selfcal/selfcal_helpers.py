@@ -1066,6 +1066,16 @@ def get_SNR_self_individual(
 
     SNR = max(selfcal_library['SNR_orig'], selfcal_library['intflux_orig'] / selfcal_library['e_intflux_orig'])
 
+    total_effective_bandwidth = sum(
+        selfcal_library[v]['per_spw_stats'][selfcal_library['spw_map'][s][v]]['effective_bandwidth']
+        for s in selfcal_library['spw_map']
+        for v in [next((v for v in selfcal_library['vislist'] if v in selfcal_library['spw_map'][s]), None)]
+        if v is not None and v in selfcal_library and 'per_spw_stats' in selfcal_library[v]
+        and selfcal_library['spw_map'][s][v] in selfcal_library[v]['per_spw_stats']
+    )
+    if total_effective_bandwidth == 0.0:
+        total_effective_bandwidth = 1.0
+
     solint_snr = {}
     solint_snr_per_spw = {}
     for solint in solints:
@@ -1094,7 +1104,7 @@ def get_SNR_self_individual(
                                 selfcal_library[selfcal_library['vislist'][i]]['per_spw_stats'][
                                     selfcal_library['spw_map'][spw][selfcal_library['vislist'][i]]
                                 ]['effective_bandwidth']
-                                / selfcal_library[selfcal_library['vislist'][i]]['total_effective_bandwidth']
+                                / total_effective_bandwidth
                             )
                             ** 0.5
                         )
@@ -1115,14 +1125,14 @@ def get_SNR_self_individual(
             )
             solint_snr[solint] = selfcal_library['per_scan_SNR']
             for spw in selfcal_library['spw_map']:
-                vis = selfcal_library['vislist'][0]
+                vis = next((v for v in selfcal_library['vislist'] if v in selfcal_library['spw_map'][spw]), selfcal_library['vislist'][0])
                 true_spw = selfcal_library['spw_map'][spw][vis]
                 solint_snr_per_spw[solint][str(spw)] = (
                     SNR
                     / ((n_ant - 3) ** 0.5 * (selfcal_library['Total_TOS'] / selfcal_library['Median_scan_time']) ** 0.5)
                     * (
                         selfcal_library[vis]['per_spw_stats'][true_spw]['effective_bandwidth']
-                        / selfcal_library[vis]['total_effective_bandwidth']
+                        / total_effective_bandwidth
                     )
                     ** 0.5
                 )
@@ -1137,7 +1147,7 @@ def get_SNR_self_individual(
             )
             solint_snr[solint] = selfcal_library['per_scan_SNR']
             for spw in selfcal_library['spw_map']:
-                vis = selfcal_library['vislist'][0]
+                vis = next((v for v in selfcal_library['vislist'] if v in selfcal_library['spw_map'][spw]), selfcal_library['vislist'][0])
                 true_spw = selfcal_library['spw_map'][spw][vis]
                 solint_snr_per_spw[solint][str(spw)] = (
                     SNR
@@ -1151,21 +1161,21 @@ def get_SNR_self_individual(
                     )
                     * (
                         selfcal_library[vis]['per_spw_stats'][true_spw]['effective_bandwidth']
-                        / selfcal_library[vis]['total_effective_bandwidth']
+                        / total_effective_bandwidth
                     )
                     ** 0.5
                 )
         elif solint == 'int':
             solint_snr[solint] = SNR / ((n_ant - 3) ** 0.5 * (selfcal_library['Total_TOS'] / integration_time) ** 0.5)
             for spw in selfcal_library['spw_map']:
-                vis = selfcal_library['vislist'][0]
+                vis = next((v for v in selfcal_library['vislist'] if v in selfcal_library['spw_map'][spw]), selfcal_library['vislist'][0])
                 true_spw = selfcal_library['spw_map'][spw][vis]
                 solint_snr_per_spw[solint][str(spw)] = (
                     SNR
                     / ((n_ant - 3) ** 0.5 * (selfcal_library['Total_TOS'] / integration_time) ** 0.5)
                     * (
                         selfcal_library[vis]['per_spw_stats'][true_spw]['effective_bandwidth']
-                        / selfcal_library[vis]['total_effective_bandwidth']
+                        / total_effective_bandwidth
                     )
                     ** 0.5
                 )
@@ -1173,14 +1183,14 @@ def get_SNR_self_individual(
             solint_float = float(solint.replace('s', '').replace('_ap', ''))
             solint_snr[solint] = SNR / ((n_ant - 3) ** 0.5 * (selfcal_library['Total_TOS'] / solint_float) ** 0.5)
             for spw in selfcal_library['spw_map']:
-                vis = selfcal_library['vislist'][0]
+                vis = next((v for v in selfcal_library['vislist'] if v in selfcal_library['spw_map'][spw]), selfcal_library['vislist'][0])
                 true_spw = selfcal_library['spw_map'][spw][vis]
                 solint_snr_per_spw[solint][str(spw)] = (
                     SNR
                     / ((n_ant - 3) ** 0.5 * (selfcal_library['Total_TOS'] / solint_float) ** 0.5)
                     * (
                         selfcal_library[vis]['per_spw_stats'][true_spw]['effective_bandwidth']
-                        / selfcal_library[vis]['total_effective_bandwidth']
+                        / total_effective_bandwidth
                     )
                     ** 0.5
                 )
@@ -1216,7 +1226,8 @@ def get_sensitivity(vislist, selfcal_library, field='', specmode='mfs', virtual_
         if virtual_spw == 'all':
             im.selectvis(vis=vis, field=field, spw=selfcal_library[vis]['spws'])
         else:
-            im.selectvis(vis=vis, field=field, spw=selfcal_library['spw_map'][virtual_spw][vis])
+            if vis in selfcal_library['spw_map'][virtual_spw]:
+                im.selectvis(vis=vis, field=field, spw=selfcal_library['spw_map'][virtual_spw][vis])
 
     casa_tools.imager.defineimage(mode=specmode, stokes='I', cellx=cellsize, celly=cellsize, nx=imsize, ny=imsize)
     casa_tools.imager.weight(type='briggs', robust=robust)
