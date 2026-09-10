@@ -378,9 +378,12 @@ if True:
             return xp, lower_hug(model)
 
         _ = find_peaks(model, prominence=0)  # v2.5
+        if len(_[1]["prominences"]) == 0:
+            return xp, lower_hug(model)
+
         _auxp, _auxpp = find_peaks(
             model,
-            prominence= mp.min(_[1]["prominences"]), # AEG. bug, corrected PIPEREQ-449.
+            prominence= np.min(_[1]["prominences"]), # AEG. bug, corrected PIPEREQ-449.
         )  # v2.5 # v3.2
         crossings = np.array(
             list(set(list(np.r_[_auxpp["left_bases"], _auxpp["right_bases"]])))
