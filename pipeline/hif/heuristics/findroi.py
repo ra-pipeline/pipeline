@@ -540,6 +540,23 @@ def get_ddid_spw_inventory(vis: str, ms: Any) -> list[dict[str, Any]]:
         })
     dd_rows.sort(key=lambda row: row['ddid'])
     rows = []
+    if not os.path.exists(vis) and getattr(ms, 'has_subms', lambda: False)():
+        tb_obj = _get_tb()
+        for row in dd_rows:
+            spw_id = row['spw_id']
+            matching_subs = ms.get_subms(spw=spw_id)
+            nrows = 0
+            for sub in matching_subs:
+                if os.path.exists(sub.name):
+                    try:
+                        tb_obj.open(sub.name)
+                        nrows += int(tb_obj.nrows())
+                        tb_obj.close()
+                    except Exception:
+                        pass
+            rows.append(dict(row, nrows=int(nrows)))
+        return rows
+
     tb_obj = _get_tb()
     tb_obj.open(vis)
     for row in dd_rows:
@@ -3496,6 +3513,7 @@ def _process_spw(
     uv_taper_sigma_uv: float | None = None,
     uv_taper_fwhm_cell: float = 2.0,
     executor: Any | None = None,
+    sub_vis_by_eb_source_spw: dict[tuple[str, int, int], tuple[str, int]] | None = None,
 ) -> dict[str, Any]:
     '''Process one SPW and return per-field spectra and evidence.'''
     t_all = time.perf_counter()
@@ -3539,9 +3557,17 @@ def _process_spw(
             cache_key = (outframe, None if outframe == 'LSRK' else int(source_id))
             if cache_key not in ms_cache:
                 frame_tag = f'{tag}_eb{eb_idx}' if outframe == 'LSRK' else f'{tag}_src{int(source_id)}_eb{eb_idx}'
+                vis_to_regrid, spw_to_regrid = vis, real_spw_id
+                if sub_vis_by_eb_source_spw:
+                    sub_info = (
+                        sub_vis_by_eb_source_spw.get((vis, int(source_id), real_spw_id))
+                        or sub_vis_by_eb_source_spw.get((os.path.basename(vis), int(source_id), real_spw_id))
+                    )
+                    if sub_info:
+                        vis_to_regrid, spw_to_regrid = sub_info
                 _, regridded_ms, dt_bin, dt_regrid = _prepare_regridded_ms(
-                    vis,
-                    real_spw_id,
+                    vis_to_regrid,
+                    spw_to_regrid,
                     outframe,
                     timebin_sec,
                     tmp_dir,
@@ -4174,6 +4200,29 @@ def run_findroi_mpi(
         len(field_groups),
     )
 
+    sub_vis_by_eb_source_spw: dict[tuple[str, int, int], tuple[str, int]] = {}
+    for vis_item in vis_list:
+        ms_item = _context_ms_for_vis(context, vis_item)
+        if ms_item and getattr(ms_item, 'has_subms', lambda: False)():
+            for sid, fids in field_groups.items():
+                sname = source_names_by_id.get(int(sid))
+                for _, _, v_spw_id in sci_spw:
+                    spw_map = _real_spw_ids_by_vis(
+                        context,
+                        [vis_item],
+                        virtual_spw_id=v_spw_id,
+                        fallback_spw_id=v_spw_id,
+                    )
+                    r_spw_id = spw_map.get(vis_item, v_spw_id)
+                    matches = ms_item.get_subms(source=sname, spw=r_spw_id)
+                    if not matches and sname:
+                        matches = ms_item.get_subms(source=sname)
+                    if matches:
+                        match_sub = matches[0]
+                        local_spw = int(match_sub.to_local_spw(r_spw_id))
+                        sub_vis_by_eb_source_spw[(vis_item, int(sid), int(r_spw_id))] = (match_sub.name, local_spw)
+                        sub_vis_by_eb_source_spw[(os.path.basename(vis_item), int(sid), int(r_spw_id))] = (match_sub.name, local_spw)
+
     args = []
     for ddid, spw_name, virtual_spw_id in sci_spw:
         field_names = [field_names_by_id.get(int(fid), str(fid))
@@ -4211,6 +4260,7 @@ def run_findroi_mpi(
             neg_extent_delta_thr, neg_extent_trim_frac,
             tmp_dir, tmp_overwrite, verbose, save_moment0, save_cube,
             uv_taper_auto_eff, uv_taper_sigma_uv_eff, uv_taper_fwhm_cell, executor,
+            sub_vis_by_eb_source_spw,
         ))
 
     spw_results = None

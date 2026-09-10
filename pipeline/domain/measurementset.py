@@ -8,6 +8,7 @@ import datetime
 import itertools
 import operator
 import os
+import shutil
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
@@ -1329,8 +1330,7 @@ class MeasurementSet:
                 return float(np.median(integration))
 
     def get_times_on_source_per_field_id(self, field: str, intent: str) -> dict[int, floating]:
-        """
-        Return on-source time for given field ID(s) and intent(s).
+        """Return on-source time for given field ID(s) and intent(s).
 
         Args:
             field: Field name(s) to return times for.
@@ -1340,10 +1340,11 @@ class MeasurementSet:
             Dictionary of on-source times for selected field ID(s) and intent(s).
         """
         if getattr(self, 'is_logical', False):
-            if self.sub_mses and os.path.exists(self.sub_mses[0].name):
-                return self.sub_mses[0].get_times_on_source_per_field_id(field=field, intent=intent)
-            if getattr(self, '_raw_ms', None) and os.path.exists(self._raw_ms.name):
-                return self._raw_ms.get_times_on_source_per_field_id(field=field, intent=intent)
+            raw_ms = getattr(self, '_raw_ms', None)
+            while getattr(raw_ms, 'is_logical', False):
+                raw_ms = getattr(raw_ms, '_raw_ms', None)
+            if raw_ms and hasattr(raw_ms, 'get_times_on_source_per_field_id'):
+                return raw_ms.get_times_on_source_per_field_id(field=field, intent=intent)
             return {}
 
         field_ids = [field.id for field in self.fields if intent in field.intents]
@@ -2074,3 +2075,42 @@ class MeasurementSet:
         return [self.name]
 
     get_subms_path = get_vis
+
+    @staticmethod
+    def derive_outputvis(vis: str, suffix: str = '_line') -> str:
+        """Derive outputvis name by replacing '_targets' with '_targets<suffix>' or appending suffix.
+
+        Args:
+            vis: MeasurementSet path or basename.
+            suffix: Suffix to insert (e.g. '_line', '_selfcal').
+
+        Returns:
+            Modified vis path string.
+        """
+        norm_suffix = suffix if suffix.startswith('_') else f'_{suffix}'
+        if '_targets' in vis:
+            return vis.replace('_targets', f'_targets{norm_suffix}', 1)
+        elif '_imaging' in vis:
+            return vis.replace('_imaging', f'_imaging{norm_suffix}', 1)
+        elif norm_suffix in vis:
+            return vis
+        return f'{vis.split(".ms")[0]}{norm_suffix}.ms'
+
+    @staticmethod
+    def copy_xml_files(src_ms: str, dst_ms: str, filenames: Sequence[str] | None = None) -> None:
+        """Copy essential ASDM XML metadata files (e.g. SpectralWindow.xml) from source MS to target MS.
+
+        Args:
+            src_ms: Source MeasurementSet directory.
+            dst_ms: Destination MeasurementSet directory.
+            filenames: Optional list of XML filenames to copy.
+        """
+        if filenames is None:
+            filenames = ['SpectralWindow.xml', 'DataDescription.xml']
+        for xml_filename in filenames:
+            src_file = os.path.join(src_ms, xml_filename)
+            dst_file = os.path.join(dst_ms, xml_filename)
+            if os.path.exists(src_file) and os.path.exists(dst_ms):
+                LOG.info('Copying %s to %s', xml_filename, os.path.basename(dst_ms))
+                LOG.trace('Copying %s: %s to %s', xml_filename, src_file, dst_file)
+                shutil.copyfile(src_file, dst_file)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import TYPE_CHECKING, Any, Sequence
 
 from pipeline.domain import measures
@@ -188,6 +189,89 @@ class SubMS:
     def get_subms(self, *args: Any, **kwargs: Any) -> list[SubMS]:
         """Return self as the matching SubMS slice."""
         return [self]
+
+    def matches_field(self, field: int | str) -> bool:
+        """Check if a given field ID or field/source name matches this slice.
+
+        Args:
+            field: Field ID (as int or str) or field/source name string.
+
+        Returns:
+            True if the field belongs to this slice.
+        """
+        f_str = str(field).strip()
+        if self.source_name and f_str == self.source_name:
+            return True
+        if self.field_ids and f_str.isdigit() and int(f_str) in self.field_ids:
+            return True
+        if hasattr(self, 'get_fields'):
+            try:
+                for f in self.get_fields():
+                    if str(f.id) == f_str or f.name == f_str:
+                        return True
+            except Exception:
+                pass
+        return False
+
+    def matches_spw(self, spw: int | str) -> bool:
+        """Check if a given real, virtual, or local SPW ID matches this slice.
+
+        Args:
+            spw: SPW ID (as int or str).
+
+        Returns:
+            True if the SPW ID corresponds to this slice.
+        """
+        if self.real_spw_id is None and self.virtual_spw_id is None:
+            return True
+        s_str = str(spw).strip()
+        if not s_str.isdigit():
+            return False
+        s_int = int(s_str)
+        return s_int in (self.real_spw_id, self.virtual_spw_id, 0)
+
+    def to_local_spw(self, spw: int | str | None = None) -> str:
+        """Convert a parent real or virtual SPW ID to the local SPW ID in this slice.
+
+        For SPW-partitioned slices, the local on-disk SPW ID is '0'.
+
+        Args:
+            spw: Optional parent SPW ID.
+
+        Returns:
+            Local SPW ID string ('0' if partitioned by SPW, else str(spw)).
+        """
+        if self.real_spw_id is not None:
+            return '0'
+        return '0' if spw is None else str(spw)
+
+    def derive_outputvis(self, suffix: str = '_line') -> str:
+        """Derive an output SubMS path by inserting suffix before partition tokens.
+
+        For example:
+            'uid___A002_X123_targets.helms30.spw0.ms' with suffix '_line' ->
+            'uid___A002_X123_targets_line.helms30.spw0.ms'
+
+        Args:
+            suffix: Suffix to insert (e.g. '_line', '_selfcal').
+
+        Returns:
+            Modified SubMS path string.
+        """
+        norm_suffix = suffix if suffix.startswith('_') else f'_{suffix}'
+        name = self.name
+        if '_targets' in name:
+            return name.replace('_targets', f'_targets{norm_suffix}', 1)
+        elif '_imaging' in name:
+            return name.replace('_imaging', f'_imaging{norm_suffix}', 1)
+        elif norm_suffix in name:
+            return name
+        else:
+            m = re.search(r'(\.[^.]+\.spw\d+\.ms|\.spw\d+\.ms|\.[^.]+\.ms|\.ms)$', name)
+            if m:
+                idx = m.start(1)
+                return f'{name[:idx]}{norm_suffix}{name[idx:]}'
+            return f'{name.split(".ms")[0]}{norm_suffix}.ms'
 
     def __getattr__(self, name: str) -> Any:
         """Delegate unhandled attribute lookups to parent MeasurementSet."""

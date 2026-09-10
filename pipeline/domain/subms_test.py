@@ -449,3 +449,140 @@ def test_create_logical_targets_ms(mock_observing_run):
     assert sub16.get_subms_paths() == [sub16.name]
     assert sub16.has_subms() is False
     assert sub16.get_subms() == [sub16]
+
+
+def test_logical_ms_weather_and_pwv_chart_fallback(monkeypatch, tmp_path):
+    """Test WeatherChart and PWVChart fallback to origin_ms (which is a str) without AttributeError."""
+    from pipeline.infrastructure.displays.summary import PWVChart, WeatherChart
+    from pipeline.infrastructure.launcher import Context
+
+    context = Context()
+    context.report_dir = str(tmp_path)
+
+    raw_path = tmp_path / 'raw.ms'
+    raw_path.mkdir()
+
+    ms = MeasurementSet(name=str(tmp_path / 'logical.ms'), session='session_1')
+    ms.is_logical = True
+    ms.origin_ms = str(raw_path)
+
+    called_vis = {}
+
+    def mock_plot_weather(vis, figfile):
+        called_vis['weather'] = vis
+
+    def mock_plot_pwv(vis, figfile):
+        called_vis['pwv'] = vis
+
+    from pipeline.infrastructure.displays import summary
+
+    monkeypatch.setattr(summary.plotweather, 'plot_weather', mock_plot_weather)
+    monkeypatch.setattr(summary.plotpwv, 'plotPWV', mock_plot_pwv)
+
+    weather_chart = WeatherChart(context, ms)
+    weather_chart.plot()
+    assert called_vis.get('weather') == str(raw_path)
+
+    pwv_chart = PWVChart(context, ms)
+    pwv_chart.plot()
+    assert called_vis.get('pwv') == str(raw_path)
+
+
+def test_subms_helpers_and_matching():
+    """Test SubMS query and derivation helper methods."""
+
+    class MockParent:
+        basename = 'uid___targets.ms'
+        session = 'session_1'
+
+        def get_fields(self, **kwargs):
+            return [SimpleNamespace(id=1, name='SRC1')]
+
+    parent = MockParent()
+    subms = SubMS(
+        name='/path/to/uid___targets.src1.spw0.ms',
+        parent_ms=parent,
+        source_name='SRC1',
+        real_spw_id=16,
+        virtual_spw_id=0,
+        field_ids=[1],
+    )
+
+    # Test matches_field
+    assert subms.matches_field('SRC1') is True
+    assert subms.matches_field(1) is True
+    assert subms.matches_field('1') is True
+    assert subms.matches_field('OTHER') is False
+
+    # Test matches_spw
+    assert subms.matches_spw(16) is True
+    assert subms.matches_spw('16') is True
+    assert subms.matches_spw(0) is True
+    assert subms.matches_spw('0') is True
+    assert subms.matches_spw(18) is False
+
+    # Test to_local_spw
+    assert subms.to_local_spw(16) == '0'
+    assert subms.to_local_spw(None) == '0'
+
+    # Test derive_outputvis
+    assert subms.derive_outputvis('_line') == '/path/to/uid___targets_line.src1.spw0.ms'
+    assert MeasurementSet.derive_outputvis('/path/to/uid___targets.ms', '_line') == '/path/to/uid___targets_line.ms'
+
+
+def test_observing_run_register_sub_mses(mock_observing_run, tmp_path):
+    """Test ObservingRun.register_sub_mses synthesizes logical parent MS and attaches SubMS slices."""
+    obs_run, raw_eb = mock_observing_run
+
+    sub_path = str(tmp_path / 'uid___targets.src1.spw0.ms')
+    base_outputvis = str(tmp_path / 'uid___targets.ms')
+
+    sub = SubMS(
+        name=sub_path,
+        parent_ms=raw_eb,
+        source_name='TargetA',
+        real_spw_id=16,
+        virtual_spw_id=0,
+        field_ids=[0],
+        base_outputvis=base_outputvis,
+    )
+
+    logical_mses = obs_run.register_sub_mses([sub], data_type=DataType.REGCAL_CONTLINE_SCIENCE)
+
+    assert len(logical_mses) == 1
+    logical_ms = logical_mses[0]
+    assert logical_ms.name == base_outputvis
+    assert logical_ms.is_logical is True
+    assert logical_ms.has_subms() is True
+    assert len(logical_ms.get_subms()) == 1
+    assert sub.parent_ms is logical_ms
+    assert obs_run.get_ms(base_outputvis) is logical_ms
+
+
+def test_logical_ms_and_subms_times_on_source(mock_observing_run, monkeypatch, tmp_path):
+    """Verify get_times_on_source_per_field_id on logical MS and SubMS delegates to raw MS without recursion."""
+    obs_run, raw_eb = mock_observing_run
+    monkeypatch.setattr(raw_eb, 'get_times_on_source_per_field_id', lambda field, intent: {0: 42.0})
+
+    sub_path = str(tmp_path / 'uid___targets.src1.spw0.ms')
+    base_outputvis = str(tmp_path / 'uid___targets.ms')
+
+    sub = SubMS(
+        name=sub_path,
+        parent_ms=raw_eb,
+        source_name='TargetA',
+        real_spw_id=16,
+        virtual_spw_id=0,
+        field_ids=[0],
+        base_outputvis=base_outputvis,
+    )
+    logical_mses = obs_run.register_sub_mses([sub], data_type=DataType.REGCAL_CONTLINE_SCIENCE)
+    logical_ms = logical_mses[0]
+
+    # Test logical MS delegation to raw_ms
+    res_logical = logical_ms.get_times_on_source_per_field_id(field='TargetA', intent='TARGET')
+    assert res_logical == {0: 42.0}
+
+    # Test SubMS delegation through parent logical MS to raw EB
+    res_sub = sub.get_times_on_source_per_field_id(field='TargetA', intent='TARGET')
+    assert res_sub == {0: 42.0}

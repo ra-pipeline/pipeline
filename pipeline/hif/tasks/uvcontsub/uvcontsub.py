@@ -10,7 +10,7 @@ import pipeline.infrastructure.sessionutils as sessionutils
 import pipeline.infrastructure.tablereader as tablereader
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
-from pipeline.domain import DataType
+from pipeline.domain import DataType, MeasurementSet, SubMS
 from pipeline.hif.tasks.makeimlist import makeimlist
 from pipeline.infrastructure import casa_tasks, task_registry
 from pipeline.infrastructure.utils import nested_dict
@@ -231,6 +231,21 @@ class SerialUVcontSub(basetask.StandardTaskTemplate):
             # Collect fit order for weblog
             ms_frame_freq_fitorder_dict[minimal_tclean_inputs.field][real_spw]['fitorder'] = fitspec[field_ids][real_spw]['fitorder']
 
+        is_logical_ms = getattr(inputs.ms, 'is_logical', False) or (
+            hasattr(inputs.ms, 'has_subms') and inputs.ms.has_subms() and not os.path.exists(inputs.vis)
+        )
+
+        if is_logical_ms:
+            return self._prepare_logical_ms(
+                datacolumn=datacolumn,
+                intent=intent,
+                fitspec=fitspec,
+                fields=fields,
+                real_spws=real_spws,
+                field_intent_spw_list=field_intent_spw_list,
+                ms_frame_freq_fitorder_dict=ms_frame_freq_fitorder_dict,
+            )
+
         result = UVcontSubResults()
         result.field_intent_spw_list = field_intent_spw_list
         result.ms_frame_freq_fitorder_dict = ms_frame_freq_fitorder_dict
@@ -270,9 +285,105 @@ class SerialUVcontSub(basetask.StandardTaskTemplate):
 
         return result
 
+    def _prepare_logical_ms(
+        self,
+        datacolumn,
+        intent,
+        fitspec,
+        fields,
+        real_spws,
+        field_intent_spw_list,
+        ms_frame_freq_fitorder_dict,
+    ):
+        """Prepare and execute uvcontsub across all component SubMS slices of a logical MS."""
+        inputs = self.inputs
+        result = UVcontSubResults()
+        result.field_intent_spw_list = field_intent_spw_list
+        result.ms_frame_freq_fitorder_dict = ms_frame_freq_fitorder_dict
+
+        outputvis = MeasurementSet.derive_outputvis(inputs.vis, '_line')
+        sub_mses = inputs.ms.get_subms()
+        sub_line_mses = []
+        casa_results = []
+
+        LOG.info(
+            'Executing uvcontsub across %d SubMS slice(s) for logical MS %s',
+            len(sub_mses),
+            inputs.ms.basename,
+        )
+
+        fitspec_dict = fitspec.as_plain_dict() if hasattr(fitspec, 'as_plain_dict') else fitspec
+
+        for sub_ms in sub_mses:
+            sub_outputvis = sub_ms.derive_outputvis('_line')
+
+            if os.path.exists(sub_outputvis):
+                LOG.info('Removing %s from disk', sub_outputvis)
+                shutil.rmtree(sub_outputvis)
+
+            # Match fields for this sub_ms
+            matched_fields = [f for f in fields.keys() if sub_ms.matches_field(f)]
+            if not matched_fields:
+                matched_fields = [sub_ms.source_name] if getattr(sub_ms, 'source_name', None) else list(fields.keys())
+
+            # Match SPW and adapt fitspec
+            sub_fitspec = nested_dict()
+            for fid, spw_map in fitspec_dict.items():
+                for s_id, spec_dict in spw_map.items():
+                    if sub_ms.matches_spw(s_id):
+                        sub_fitspec[fid][sub_ms.to_local_spw(s_id)] = spec_dict
+
+            sub_fitspec_plain = sub_fitspec.as_plain_dict() if hasattr(sub_fitspec, 'as_plain_dict') else sub_fitspec
+
+            uvcontsub_args = {
+                'vis': sub_ms.name,
+                'datacolumn': datacolumn,
+                'outputvis': sub_outputvis,
+                'intent': utils.to_CASA_intent(inputs.ms, intent),
+                'fitspec': sub_fitspec_plain,
+                'field': ','.join(matched_fields),
+                'spw': sub_ms.to_local_spw(','.join(real_spws.keys())),
+            }
+            uvcontsub_job = casa_tasks.uvcontsub(**uvcontsub_args)
+            try:
+                casa_res = self._executor.execute(uvcontsub_job)
+            except Exception as e:
+                LOG.warning('Caught uvcontsub exception: %s', e)
+                casa_res = {'error': str(e)}
+
+            MeasurementSet.copy_xml_files(sub_ms.name, sub_outputvis)
+
+            sub_line_ms = SubMS(
+                name=sub_outputvis,
+                parent_ms=getattr(inputs.ms, 'parent_ms', inputs.ms),
+                source_name=getattr(sub_ms, 'source_name', None),
+                real_spw_id=sub_ms.real_spw_id,
+                virtual_spw_id=sub_ms.virtual_spw_id,
+                field_ids=getattr(sub_ms, 'field_ids', []),
+                data_type=DataType.REGCAL_LINE_SCIENCE,
+                data_column='DATA',
+                base_outputvis=outputvis,
+            )
+            sub_line_mses.append(sub_line_ms)
+            casa_results.append(casa_res)
+
+        result.vis = inputs.vis
+        result.outputvis = outputvis
+        result.sub_mses = sub_line_mses
+        result.casa_uvcontsub_result = casa_results[0] if len(casa_results) == 1 else casa_results
+
+        return result
+
     def analyse(self, result):
 
         if not result.mitigation_error and not result.skip_stage:
+            if getattr(result, 'sub_mses', None):
+                for sub_ms in result.sub_mses:
+                    if not os.path.exists(sub_ms.name):
+                        LOG.debug('Error creating science targets line SubMS %s', os.path.basename(sub_ms.name))
+                        return result
+                return result
+
             # Check for existence of the output vis.
             if not os.path.exists(result.outputvis):
                 LOG.debug('Error creating science targets line MS %s' % (os.path.basename(result.outputvis)))
@@ -373,6 +484,7 @@ class UVcontSubResults(basetask.Results):
         self.field_intent_spw_list = []
         self.ms_frame_freq_fitorder_dict = None
         self.line_mses = []
+        self.sub_mses = []
         self.casa_uvcontsub_result = None
         self.error = False
         self.error_msg = ''
@@ -383,12 +495,36 @@ class UVcontSubResults(basetask.Results):
             LOG.info("Skipping hif_uvcontsub due to VLA spectral lines MS not existing.")
             return
 
+        target = context.observing_run
+
+        if getattr(self, 'sub_mses', None):
+            fallback_parent = getattr(self.inputs, 'ms', None)
+            logical_mses = target.register_sub_mses(
+                self.sub_mses,
+                data_type=DataType.REGCAL_LINE_SCIENCE,
+                fallback_parent=fallback_parent,
+            )
+
+            output_dir = (
+                self.inputs.get('output_dir', context.output_dir)
+                if isinstance(self.inputs, dict) and 'output_dir' in self.inputs
+                else getattr(self.inputs, 'output_dir', context.output_dir) or context.output_dir
+            )
+
+            for ms in logical_mses:
+                template_flagsfile = os.path.join(
+                    output_dir, os.path.splitext(os.path.basename(ms.name))[0] + '.flagtargetstemplate.txt'
+                )
+                self._make_template_flagfile(template_flagsfile, 'User flagging commands file for the imaging pipeline')
+                calto = callibrary.CalTo(vis=ms.name)
+                LOG.info('Registering %s with callibrary', ms.name)
+                context.callibrary.add(calto, [])
+            return
+
         # Check for an output vis
         if not self.line_mses:
             LOG.error('No hif_uvcontsub results to merge')
             return
-
-        target = context.observing_run
 
         # Adding line mses to context
         for ms in self.line_mses:
@@ -404,9 +540,15 @@ class UVcontSubResults(basetask.Results):
             target.add_measurement_set(ms)
 
         # Create targets flagging template file if it does not already exist
+        output_dir = (
+            self.inputs.get('output_dir', context.output_dir)
+            if isinstance(self.inputs, dict) and 'output_dir' in self.inputs
+            else getattr(self.inputs, 'output_dir', context.output_dir) or context.output_dir
+        )
         for ms in self.line_mses:
             template_flagsfile = os.path.join(
-                self.inputs['output_dir'], os.path.splitext(os.path.basename(ms.name))[0] + '.flagtargetstemplate.txt')
+                output_dir, os.path.splitext(os.path.basename(ms.name))[0] + '.flagtargetstemplate.txt'
+            )
             self._make_template_flagfile(template_flagsfile, 'User flagging commands file for the imaging pipeline')
 
         # Initialize callibrary

@@ -403,13 +403,7 @@ class SerialMstransform(basetask.StandardTaskTemplate):
 
     @staticmethod
     def _copy_xml_files(vis, outputvis):
-        for xml_filename in ['SpectralWindow.xml', 'DataDescription.xml']:
-            vis_source = os.path.join(vis, xml_filename)
-            outputvis_targets_contline = os.path.join(outputvis, xml_filename)
-            if os.path.exists(vis_source) and os.path.exists(outputvis):
-                LOG.info('Copying %s from original MS to transformed MS', xml_filename)
-                LOG.trace('Copying %s: %s to %s', xml_filename, vis_source, outputvis_targets_contline)
-                shutil.copyfile(vis_source, outputvis_targets_contline)
+        MeasurementSet.copy_xml_files(vis, outputvis)
 
     @staticmethod
     def _update_history(vis, outputvis):
@@ -439,42 +433,10 @@ class MstransformResults(basetask.Results):
             target.add_measurement_set(ms)
 
         # Register sub_mses to their logical parent MS in context
-        logical_mses = []
-        for sub_ms in self.sub_mses:
-            base_outputvis = getattr(sub_ms, 'base_outputvis', None)
-            if not base_outputvis:
-                name = sub_ms.name
-                if getattr(sub_ms, 'source_name', None):
-                    clean_src = re.sub(r'[^a-zA-Z0-9_\-+]', '_', sub_ms.source_name)
-                    name = re.sub(rf'\.{re.escape(clean_src)}(\.|$)', r'\1', name)
-                base_outputvis = re.sub(r'\.spw\d+\.ms$', '.ms', name)
-
-            try:
-                logical_ms = context.observing_run.get_ms(base_outputvis)
-            except KeyError:
-                raw_ms = sub_ms.parent_ms
-                if raw_ms.name not in [m.name for m in context.observing_run.measurement_sets]:
-                    try:
-                        raw_ms = context.observing_run.get_ms(raw_ms.name)
-                    except KeyError:
-                        try:
-                            raw_ms = context.observing_run.get_ms(raw_ms.basename)
-                        except KeyError:
-                            pass
-
-                logical_ms = MeasurementSet.create_logical_targets_ms(
-                    raw_ms=raw_ms,
-                    name=base_outputvis,
-                    data_type=self.output_data_type or sub_ms.data_type,
-                )
-                LOG.info('Adding logical parent MeasurementSet %s to context', logical_ms.name)
-                context.observing_run.add_measurement_set(logical_ms)
-
-            logical_ms.add_subms(sub_ms)
-            sub_ms.parent_ms = logical_ms
-            if logical_ms not in logical_mses:
-                logical_mses.append(logical_ms)
-            LOG.info('Adding SubMS %s to logical parent MS %s', sub_ms.name, logical_ms.name)
+        logical_mses = target.register_sub_mses(
+            self.sub_mses,
+            data_type=self.output_data_type or DataType.REGCAL_CONTLINE_SCIENCE,
+        )
 
         all_target_mses = self.mses + logical_mses
 

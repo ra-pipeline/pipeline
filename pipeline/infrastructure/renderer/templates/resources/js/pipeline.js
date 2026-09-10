@@ -85,6 +85,12 @@ pipeline.pages = pipeline.pages || function() {
             } else if (msParam) {
                 anchorId = 'sidebar_' + msParam.replace(/[^a-zA-Z0-9]/gi, '_');
             }
+            if (!anchorId || $("a#" + anchorId).length === 0) {
+                var firstSidebar = $("ul.nav-sidebar li a:first");
+                if (firstSidebar.length) {
+                    anchorId = firstSidebar.prop("id");
+                }
+            }
             var href = anchorId ? $("a#" + anchorId).prop("href") : undefined;
 
             var onSuccess = [function() {
@@ -967,6 +973,9 @@ pipeline.detailsframe = pipeline.detailsframe || (function() {
     module.getQueryUrl = function() {
         if (loadedHref) {
             var path = loadedHref.substring(loadedHref.lastIndexOf('/') + 1, loadedHref.length);
+            if (path === 't2-1_details.html') {
+                return "";
+            }
             return "&subpage=" + path;
         } else {
             return "";
@@ -1053,9 +1062,26 @@ pipeline.history = pipeline.history || (function() {
 
     var getUrl = function(state) {
         var loc = window.location;
-        var path = loc.pathname.substring(loc.pathname.lastIndexOf('/') + 1, loc.pathname.length);
+        var fullPath = loc.pathname.substring(loc.pathname.lastIndexOf('/') + 1, loc.pathname.length);
+        var path = fullPath.split('&')[0].split('?')[0];
         var hash = loc.hash || '';
-        return path + pipeline.appContainer.getQueryUrl() + pipeline.sidebar.getQueryUrl() + pipeline.msselector.getQueryUrl() + pipeline.detailsframe.getQueryUrl() + hash;
+
+        var params = [];
+        var addParam = function(q) {
+            if (!q) return;
+            var cleaned = q.replace(/^[?&]+/, '');
+            if (cleaned) {
+                params.push(cleaned);
+            }
+        };
+
+        addParam(pipeline.appContainer.getQueryUrl());
+        addParam(pipeline.sidebar.getQueryUrl());
+        addParam(pipeline.msselector.getQueryUrl());
+        addParam(pipeline.detailsframe.getQueryUrl());
+
+        var queryString = params.length > 0 ? ('?' + params.join('&')) : '';
+        return path + queryString + hash;
     };
 
     return module;

@@ -245,8 +245,10 @@ class WeatherChart:
         LOG.debug('Creating new Weather plot')
         vis = self.ms.name
         if getattr(self.ms, 'is_logical', False) or not os.path.exists(vis):
-            if getattr(self.ms, 'origin_ms', None) and os.path.exists(self.ms.origin_ms.name):
-                vis = self.ms.origin_ms.name
+            origin = getattr(self.ms, 'origin_ms', None)
+            origin_name = getattr(origin, 'name', origin) if origin else None
+            if origin_name and os.path.exists(origin_name):
+                vis = origin_name
             elif getattr(self.ms, 'sub_mses', None) and len(self.ms.sub_mses) > 0:
                 vis = self.ms.sub_mses[0].name
             else:
@@ -661,8 +663,10 @@ class PWVChart:
 
         vis = self.ms.name
         if getattr(self.ms, 'is_logical', False) or not os.path.exists(vis):
-            if getattr(self.ms, 'origin_ms', None) and os.path.exists(self.ms.origin_ms.name):
-                vis = self.ms.origin_ms.name
+            origin = getattr(self.ms, 'origin_ms', None)
+            origin_name = getattr(origin, 'name', origin) if origin else None
+            if origin_name and os.path.exists(origin_name):
+                vis = origin_name
             elif getattr(self.ms, 'sub_mses', None) and len(self.ms.sub_mses) > 0:
                 vis = self.ms.sub_mses[0].name
             else:
@@ -1420,7 +1424,9 @@ class SpwIdVsFreqChart:
         """
         filename = self.inputs.output
         ms = self.inputs.ms
-        origin_filename = filename.replace(ms.basename, ms.origin_ms)
+        origin_ms_val = getattr(ms, 'origin_ms', None)
+        origin_basename = os.path.basename(origin_ms_val) if origin_ms_val else ms.basename
+        origin_filename = filename.replace(ms.basename, origin_basename)
         if os.path.exists(filename):
             return self._get_plot_object()
         elif os.path.exists(origin_filename):

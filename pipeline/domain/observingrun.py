@@ -5,6 +5,7 @@ import collections
 import itertools
 import operator
 import os
+import re
 from typing import TYPE_CHECKING
 
 import pipeline.infrastructure as infrastructure
@@ -160,6 +161,82 @@ class ObservingRun(object):
 
         self.measurement_sets.append(ms)
         self.measurement_sets.sort(key=sort_measurement_set)
+
+    def register_sub_mses(
+        self,
+        sub_mses: Sequence[SubMS],
+        data_type: DataType,
+        fallback_parent: MeasurementSet | None = None,
+    ) -> list[MeasurementSet]:
+        """Register SubMS slices to their logical parent MeasurementSets in the observing run.
+
+        Finds or synthesizes the logical parent MeasurementSet for each slice,
+        registers the slice under the logical parent, and updates the parent/child links.
+
+        Args:
+            sub_mses: List of SubMS domain objects.
+            data_type: Pipeline DataType of the logical parent and slices.
+            fallback_parent: Optional fallback parent MeasurementSet if not resolvable from SubMS.
+
+        Returns:
+            List of logical parent MeasurementSets that were created or updated.
+        """
+        from .measurementset import MeasurementSet
+
+        logical_mses: dict[str, MeasurementSet] = {}
+
+        for sub_ms in sub_mses:
+            base_outputvis = getattr(sub_ms, 'base_outputvis', None)
+            if not base_outputvis:
+                name = sub_ms.name
+                if getattr(sub_ms, 'source_name', None):
+                    clean_src = re.sub(r'[^a-zA-Z0-9_\-+]', '_', sub_ms.source_name)
+                    name = re.sub(rf'\.{re.escape(clean_src)}(\.|$)', r'\1', name)
+                base_outputvis = re.sub(r'\.spw\d+\.ms$', '.ms', name)
+
+            if base_outputvis not in logical_mses:
+                try:
+                    logical_ms = self.get_ms(base_outputvis)
+                except KeyError:
+                    # Remove any stale entry with same basename
+                    try:
+                        index = [existing_ms.basename for existing_ms in self.measurement_sets].index(
+                            os.path.basename(base_outputvis)
+                        )
+                        LOG.info('Removing %s from context', base_outputvis)
+                        self.measurement_sets.pop(index)
+                    except ValueError:
+                        pass
+
+                    raw_ms = getattr(sub_ms, 'parent_ms', None) or fallback_parent
+                    if hasattr(raw_ms, '_raw_ms') and raw_ms._raw_ms is not None:
+                        raw_ms = raw_ms._raw_ms
+                    if raw_ms and raw_ms.name not in [m.name for m in self.measurement_sets]:
+                        try:
+                            raw_ms = self.get_ms(raw_ms.name)
+                        except KeyError:
+                            try:
+                                raw_ms = self.get_ms(raw_ms.basename)
+                            except KeyError:
+                                pass
+
+                    logical_ms = MeasurementSet.create_logical_targets_ms(
+                        raw_ms=raw_ms,
+                        name=base_outputvis,
+                        data_type=data_type or sub_ms.data_type,
+                    )
+                    LOG.info('Adding logical parent MeasurementSet %s to context', logical_ms.name)
+                    self.add_measurement_set(logical_ms)
+
+                logical_mses[base_outputvis] = logical_ms
+            else:
+                logical_ms = logical_mses[base_outputvis]
+
+            logical_ms.add_subms(sub_ms)
+            sub_ms.parent_ms = logical_ms
+            LOG.info('Adding SubMS %s to logical parent MS %s', sub_ms.name, logical_ms.name)
+
+        return list(logical_mses.values())
 
     def get_ms(self, name: str = None, intent: str = None) -> MeasurementSet | SubMS:
         """Returns the first measurement set matching the given identifier.

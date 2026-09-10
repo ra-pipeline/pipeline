@@ -15,6 +15,7 @@ import re
 import shelve
 import shutil
 import sys
+import tempfile
 from importlib.resources import files
 from typing import TYPE_CHECKING
 
@@ -949,11 +950,34 @@ class T2_1DetailsRenderer:
             if getattr(ms, 'is_logical', False) or not os.path.exists(ms.name):
                 LOG.debug('Writing synthetic listobs for logical MeasurementSet %s', ms.basename)
                 os.makedirs(os.path.dirname(listfile), exist_ok=True)
+
                 with open(listfile, 'w') as f:
                     f.write(f'Logical MeasurementSet: {ms.basename}\n')
-                    f.write(f'Partitioned into {len(getattr(ms, "sub_mses", []))} SubMS slice(s):\n')
-                    for sub in getattr(ms, 'sub_mses', []):
-                        f.write(f'  - {sub.basename}\n')
+                    sub_mses = getattr(ms, 'sub_mses', [])
+                    f.write(f'Partitioned into {len(sub_mses)} SubMS slice(s):\n\n')
+                    for i, sub in enumerate(sub_mses, 1):
+                        f.write(f'  {i}. {sub.basename}\n')
+                    f.write('\n')
+
+                    for i, sub in enumerate(sub_mses, 1):
+                        sub_path = getattr(sub, 'name', None)
+                        if sub_path and os.path.exists(sub_path):
+                            f.write('=' * 80 + '\n')
+                            f.write(f'SubMS Slice {i}/{len(sub_mses)}: {sub.basename}\n')
+                            f.write('=' * 80 + '\n\n')
+                            try:
+                                with tempfile.NamedTemporaryFile(mode='w+', delete=False) as tf:
+                                    tmpname = tf.name
+                                os.remove(tmpname)
+                                task = casa_tasks.listobs(vis=sub_path, listfile=tmpname, overwrite=True)
+                                task.execute()
+                                with open(tmpname, 'r') as tf:
+                                    f.write(tf.read())
+                                    f.write('\n\n')
+                                os.remove(tmpname)
+                            except Exception as e:
+                                LOG.warning('Could not generate listobs for SubMS %s: %s', sub.basename, e)
+                                f.write(f'Could not run listobs for {sub.basename}: {e}\n\n')
                 return
             LOG.debug('Writing listobs output to %s' % listfile)
             task = casa_tasks.listobs(vis=ms.name, listfile=listfile)

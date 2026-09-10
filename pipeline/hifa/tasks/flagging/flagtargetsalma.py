@@ -1,4 +1,5 @@
 import os
+import re
 import string
 
 from casatasks.private import flaghelper
@@ -50,7 +51,38 @@ class FlagTargetsALMAInputs(vdp.StandardInputs):
         # method always used the original MS name template. Thus changing to
         # the real MS root name.
         vis_root = os.path.splitext(os.path.basename(self.vis))[0]
-        return vis_root + '.flagtargetstemplate.txt'
+        template = vis_root + '.flagtargetstemplate.txt'
+        output_dir = getattr(self, 'output_dir', None) or ''
+
+        def _resolve(filename):
+            if os.path.exists(filename):
+                return filename
+            if output_dir and os.path.exists(os.path.join(output_dir, filename)):
+                return os.path.join(output_dir, filename)
+            return None
+
+        resolved = _resolve(template)
+        if resolved:
+            return resolved
+
+        if hasattr(self, 'ms') and self.ms:
+            # Check if this is a SubMS slice or logical MS, falling back to parent/origin MS template
+            candidates = []
+            if hasattr(self.ms, 'parent_ms') and self.ms.parent_ms:
+                parent_root = os.path.splitext(os.path.basename(self.ms.parent_ms.name))[0]
+                candidates.append(parent_root + '.flagtargetstemplate.txt')
+            origin = getattr(self.ms, 'origin_ms', None)
+            if origin:
+                origin_name = getattr(origin, 'name', origin) if not isinstance(origin, str) else origin
+                origin_root = os.path.splitext(os.path.basename(origin_name))[0]
+                candidates.append(origin_root + '.flagtargetstemplate.txt')
+                candidates.append(origin_root + '_targets.flagtargetstemplate.txt')
+            for candidate in candidates:
+                cand_resolved = _resolve(candidate)
+                if cand_resolved:
+                    return cand_resolved
+
+        return os.path.join(output_dir, template) if output_dir and os.path.exists(os.path.join(output_dir, template)) else template
 
     @vdp.VisDependentProperty
     def inpfile(self):
@@ -176,6 +208,13 @@ class SerialFlagTargetsALMA(basetask.StandardTaskTemplate):
         # everywhere
         inputs = self.inputs
 
+        # Check if the target MS is an in-memory logical MS or represents on-disk SubMS slices
+        is_logical = getattr(inputs.ms, 'is_logical', False) or (
+            not os.path.exists(inputs.vis) and getattr(inputs.ms, 'has_subms', lambda: False)()
+        )
+        if is_logical and getattr(inputs.ms, 'has_subms', lambda: False)():
+            return self._prepare_logical_ms()
+
         # get the flagdata command string required for the results
         flag_cmds = self._get_flag_commands()
         flag_str = '\n'.join(flag_cmds)
@@ -191,8 +230,9 @@ class SerialFlagTargetsALMA(basetask.StandardTaskTemplate):
         task_args = inputs.to_casa_args()
 
         # create and execute a flagdata job using these task arguments
+        executor = getattr(self, '_executor', None) or basetask.Executor(inputs.context)
         job = casa_tasks.flagdata(**task_args)
-        summary_dict = self._executor.execute(job)
+        summary_dict = executor.execute(job)
 
         agent_summaries = dict((v['name'], v) for v in summary_dict.values())
 
@@ -204,6 +244,178 @@ class SerialFlagTargetsALMA(basetask.StandardTaskTemplate):
 
         # return the results object, which will be used for the weblog
         return FlagTargetsALMAResults(summary_reps, flag_cmds)
+
+    def _prepare_logical_ms(self):
+        """Prepare and execute flagdata jobs across all component SubMS slices of a logical MS."""
+        inputs = self.inputs
+        sub_mses = inputs.ms.get_subms()
+
+        flag_cmds = self._get_flag_commands()
+        flag_str = '\n'.join(flag_cmds)
+
+        # Write overall parent flag commands file for logging and weblog archive
+        with open(inputs.inpfile, 'w') as stream:
+            stream.writelines(flag_str)
+
+        LOG.info('Executing flagdata across %d SubMS slice(s) for logical MS %s', len(sub_mses), inputs.ms.basename)
+        LOG.debug('Flag commands for %s:\n%s', inputs.vis, flag_str)
+
+        output_dir = inputs.output_dir or ''
+        merged_summary_dict = {}
+        executor = getattr(self, '_executor', None) or basetask.Executor(inputs.context)
+
+        for sub_ms in sub_mses:
+            sub_cmds = self._filter_flag_commands_for_subms(flag_cmds, sub_ms)
+            sub_root = os.path.splitext(sub_ms.basename)[0]
+            sub_inpfile = os.path.join(output_dir, f"{sub_root}.flagtargetscmds.txt")
+            with open(sub_inpfile, 'w') as stream:
+                stream.writelines('\n'.join(sub_cmds))
+
+            task_args = {
+                'vis': sub_ms.name,
+                'mode': 'list',
+                'action': 'apply',
+                'inpfile': sub_inpfile,
+                'flagbackup': inputs.flagbackup,
+            }
+
+            job = casa_tasks.flagdata(**task_args)
+            sub_summary_dict = executor.execute(job)
+            self._merge_flagdata_summaries(merged_summary_dict, sub_summary_dict, sub_ms)
+
+        agent_summaries = dict((v['name'], v) for v in merged_summary_dict.values())
+        ordered_agents = ['before', 'template']
+        summary_reps = [agent_summaries[agent] for agent in ordered_agents if agent in agent_summaries]
+
+        return FlagTargetsALMAResults(summary_reps, flag_cmds)
+
+    @staticmethod
+    def _filter_flag_commands_for_subms(flag_cmds, sub_ms):
+        """Filter and adapt flagging commands for a component SubMS slice.
+
+        Args:
+            flag_cmds: List of flag command strings.
+            sub_ms: The SubMS domain object.
+
+        Returns:
+            List of command strings applicable to this SubMS slice.
+        """
+        sub_cmds = []
+        for cmd in flag_cmds:
+            # Summary commands apply to all slices
+            if "mode='summary'" in cmd or 'mode="summary"' in cmd:
+                sub_cmds.append(cmd)
+                continue
+
+            # Check field match
+            field_match = re.search(r"field=['\"]([^'\"]+)['\"]", cmd)
+            if field_match:
+                specified_fields = [f.strip() for f in field_match.group(1).split(',')]
+                if hasattr(sub_ms, 'matches_field'):
+                    if not any(sub_ms.matches_field(f) for f in specified_fields):
+                        continue
+                else:
+                    src_name = getattr(sub_ms, 'source_name', None)
+                    field_names = [f.name for f in sub_ms.get_fields()] if hasattr(sub_ms, 'get_fields') else []
+                    field_ids = [str(f.id) for f in sub_ms.get_fields()] if hasattr(sub_ms, 'get_fields') else []
+                    if src_name:
+                        field_names.append(src_name)
+                    if not any(sf in field_names or sf in field_ids for sf in specified_fields):
+                        continue
+
+            # Check spw match
+            spw_match = re.search(r"spw=['\"]([^'\"]+)['\"]", cmd)
+            if spw_match:
+                specified_spw = spw_match.group(1)
+                spw_tokens = [tok.strip() for tok in specified_spw.split(',')]
+
+                matching_tokens = []
+                for tok in spw_tokens:
+                    base_id = tok.split(':')[0].strip()
+                    chan_sel = tok[len(base_id):] if ':' in tok else ''
+                    if hasattr(sub_ms, 'matches_spw') and sub_ms.matches_spw(base_id):
+                        matching_tokens.append(f"{sub_ms.to_local_spw(base_id)}{chan_sel}")
+                    elif not hasattr(sub_ms, 'matches_spw'):
+                        real_spw = getattr(sub_ms, 'real_spw_id', None)
+                        virt_spw = getattr(sub_ms, 'virtual_spw_id', None)
+                        if base_id.isdigit() and (
+                            (real_spw is not None and int(base_id) == real_spw)
+                            or (virt_spw is not None and int(base_id) == virt_spw)
+                        ):
+                            matching_tokens.append(f"0{chan_sel}")
+                        elif real_spw is None and virt_spw is None:
+                            matching_tokens.append(tok)
+
+                if not matching_tokens:
+                    continue
+
+                new_spw_spec = ','.join(matching_tokens)
+                cmd = re.sub(r"spw=['\"][^'\"]+['\"]", f"spw='{new_spw_spec}'", cmd)
+
+            sub_cmds.append(cmd)
+
+        return sub_cmds
+
+    @staticmethod
+    def _merge_flagdata_summaries(accum_dict, sub_summary_dict, sub_ms):
+        """Merge a SubMS flagdata summary dictionary into an accumulated summary dictionary.
+
+        Args:
+            accum_dict: Accumulated summary dictionary (keyed by report ID, e.g. 'report0').
+            sub_summary_dict: Summary dictionary returned from flagdata on sub_ms.
+            sub_ms: The SubMS domain object for this slice.
+        """
+        if not sub_summary_dict or not isinstance(sub_summary_dict, dict):
+            return
+
+        spw_map = {}
+        if getattr(sub_ms, 'real_spw_id', None) is not None:
+            spw_map['0'] = str(sub_ms.real_spw_id)
+            spw_map[0] = str(sub_ms.real_spw_id)
+
+        name_to_key = {rep['name']: k for k, rep in accum_dict.items() if isinstance(rep, dict) and 'name' in rep}
+
+        for sub_key, sub_rep in sub_summary_dict.items():
+            if not isinstance(sub_rep, dict) or 'name' not in sub_rep:
+                continue
+            rep_name = sub_rep['name']
+            if rep_name in name_to_key:
+                target_rep = accum_dict[name_to_key[rep_name]]
+            else:
+                target_rep = {
+                    'name': rep_name,
+                    'type': sub_rep.get('type', 'summary'),
+                    'flagged': 0.0,
+                    'total': 0.0,
+                }
+                accum_dict[sub_key] = target_rep
+                name_to_key[rep_name] = sub_key
+
+            target_rep['flagged'] += float(sub_rep.get('flagged', 0.0))
+            target_rep['total'] += float(sub_rep.get('total', 0.0))
+
+            breakdown_keys = ['scan', 'antenna', 'field', 'correlation', 'observation', 'array', 'spw']
+            for cat in breakdown_keys:
+                if cat not in sub_rep or not isinstance(sub_rep[cat], dict):
+                    continue
+                if cat not in target_rep:
+                    target_rep[cat] = {}
+
+                for item_key, item_val in sub_rep[cat].items():
+                    if not isinstance(item_val, dict):
+                        continue
+                    target_item_key = item_key
+                    if cat == 'spw' and item_key in spw_map:
+                        target_item_key = spw_map[item_key]
+
+                    if target_item_key in target_rep[cat]:
+                        target_rep[cat][target_item_key]['flagged'] += float(item_val.get('flagged', 0.0))
+                        target_rep[cat][target_item_key]['total'] += float(item_val.get('total', 0.0))
+                    else:
+                        target_rep[cat][target_item_key] = {
+                            'flagged': float(item_val.get('flagged', 0.0)),
+                            'total': float(item_val.get('total', 0.0)),
+                        }
 
     def analyse(self, results):
         """
