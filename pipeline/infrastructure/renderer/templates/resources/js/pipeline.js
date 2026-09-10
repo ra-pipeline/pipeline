@@ -75,16 +75,38 @@ pipeline.pages = pipeline.pages || function() {
         var innerModule = {};
 
         var f = function() {
-            // Load MS details into panel is 'ms=x' given in URL
-            var anchorId = $.url().param('sidebar').replace(/[^a-zA-Z0-9]/gi, '_');
-            var href = $("a#" + anchorId).prop("href");
+            var targetHash = window.location.hash;
+            // Load MS details into panel if 'sidebar=x' or 'ms=x' given in URL
+            var sidebarParam = $.url().param('sidebar');
+            var msParam = $.url().param('ms');
+            var anchorId;
+            if (sidebarParam) {
+                anchorId = sidebarParam.replace(/[^a-zA-Z0-9]/gi, '_');
+            } else if (msParam) {
+                anchorId = 'sidebar_' + msParam.replace(/[^a-zA-Z0-9]/gi, '_');
+            }
+            var href = anchorId ? $("a#" + anchorId).prop("href") : undefined;
 
             var onSuccess = [function() {
-                pipeline.sidebar.setActive(anchorId);
+                if (anchorId) {
+                    pipeline.sidebar.setActive(anchorId);
+                }
 
                 // replace rather than push, as the current state was
                 // incomplete. We've now made it whole by loading the stage.
                 pipeline.history.replaceState();
+
+                var hash = targetHash || window.location.hash;
+                if (hash && hash !== '#') {
+                    var hashTarget = $(hash);
+                    if (hashTarget.length) {
+                        setTimeout(function() {
+                            $('html, body').animate({
+                                scrollTop: hashTarget.offset().top - 70
+                            }, 250);
+                        }, 100);
+                    }
+                }
             }];
 
             if (typeof href != 'undefined') {
@@ -96,7 +118,9 @@ pipeline.pages = pipeline.pages || function() {
             $(window).on("popstate", function(event) { // Note: We are using statechange instead of popstate
                 var state = window.history.state; // Note: We are using History.getState() instead of event.state
                 // console.log("popstate: " + JSON.stringify(state));
-                pipeline.history.setComponentState(state["componentState"]);
+                if (state && state["componentState"]) {
+                    pipeline.history.setComponentState(state["componentState"]);
+                }
             });
 
             $('ul.nav-sidebar li a').on("click", function(evt) {
@@ -116,6 +140,47 @@ pipeline.pages = pipeline.pages || function() {
                 }];
 
                 pipeline.detailsframe.load(href, onSuccess);
+            });
+
+            $(document).off("click.subms_anchor").on("click.subms_anchor", 'a[href^="#"]:not([data-toggle]):not([data-slide])', function(e) {
+                var targetId = $(this).attr("href");
+                if (!targetId || targetId === "#" || $(this).data("toggle") || $(this).data("slide")) {
+                    return;
+                }
+                try {
+                    var target = $(targetId);
+                    if (target.length) {
+                        e.preventDefault();
+                        $('html, body').animate({
+                            scrollTop: target.offset().top - 70
+                        }, 250);
+                        if (history.pushState) {
+                            var curState = window.history.state || { componentState: pipeline.history.getComponentState() };
+                            history.pushState(curState, null, targetId);
+                        } else {
+                            location.hash = targetId;
+                        }
+                    }
+                } catch (err) {
+                    // Ignore syntax errors from invalid selector strings
+                }
+            });
+
+            $(window).off("hashchange.subms_anchor").on("hashchange.subms_anchor", function() {
+                if (window.location.hash && window.location.hash !== '#') {
+                    try {
+                        var hashTarget = $(window.location.hash);
+                        if (hashTarget.length) {
+                            setTimeout(function() {
+                                $('html, body').animate({
+                                    scrollTop: hashTarget.offset().top - 70
+                                }, 250);
+                            }, 50);
+                        }
+                    } catch (err) {
+                        // Ignore syntax errors from invalid selector strings
+                    }
+                }
             });
 
             f();
@@ -989,7 +1054,8 @@ pipeline.history = pipeline.history || (function() {
     var getUrl = function(state) {
         var loc = window.location;
         var path = loc.pathname.substring(loc.pathname.lastIndexOf('/') + 1, loc.pathname.length);
-        return path + pipeline.appContainer.getQueryUrl() + pipeline.sidebar.getQueryUrl() + pipeline.msselector.getQueryUrl() + pipeline.detailsframe.getQueryUrl();
+        var hash = loc.hash || '';
+        return path + pipeline.appContainer.getQueryUrl() + pipeline.sidebar.getQueryUrl() + pipeline.msselector.getQueryUrl() + pipeline.detailsframe.getQueryUrl() + hash;
     };
 
     return module;

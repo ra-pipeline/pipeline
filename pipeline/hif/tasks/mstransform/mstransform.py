@@ -156,7 +156,10 @@ class MstransformInputs(vdp.StandardInputs):
     # science spws which include calibration spws.
     @vdp.VisDependentProperty
     def spw(self):
-        science_target_intents = set(self.intent.split(','))
+        # Find all the spws with TARGET intent. These may be a subset of the
+        # science spws which also include calibrator spws.
+        clean_intent = self.intent.replace('*', '') if self.intent else 'TARGET'
+        science_target_intents = set(clean_intent.split(','))
         science_target_spws = []
 
         science_spws = [spw for spw in self.ms.get_spectral_windows(science_windows_only=True)]
@@ -168,7 +171,8 @@ class MstransformInputs(vdp.StandardInputs):
 
     @spw.convert
     def spw(self, value):
-        science_target_intents = set(self.intent.split(','))
+        clean_intent = self.intent.replace('*', '') if self.intent else 'TARGET'
+        science_target_intents = set(clean_intent.split(','))
         science_target_spws = []
 
         science_spws = [spw for spw in self.ms.get_spectral_windows(task_arg=value, science_windows_only=True)]
@@ -181,13 +185,16 @@ class MstransformInputs(vdp.StandardInputs):
     chanbin = vdp.VisDependentProperty(default=1)
     timebin = vdp.VisDependentProperty(default='0s')
     per_spw = vdp.VisDependentProperty(default=False)
+    per_source = vdp.VisDependentProperty(default=False)
+    source_name = vdp.VisDependentProperty(default=None)
     base_outputvis = vdp.VisDependentProperty(default=None)
 
     parallel = sessionutils.parallel_inputs_impl(default=False)
 
     # docstring and type hints: supplements hif_mstransform
     def __init__(self, context, output_dir=None, vis=None, input_data_type=None, datacolumn=None, all_eph_obj=None, outputvis=None, output_data_type=None,
-                 outframe=None, regridms=None, field=None, intent=None, spw=None, chanbin=None, timebin=None, per_spw=None, parallel=None, base_outputvis=None):
+                 outframe=None, regridms=None, field=None, intent=None, spw=None, chanbin=None, timebin=None, per_spw=None, per_source=None, source_name=None,
+                 parallel=None, base_outputvis=None):
         """Initialize Inputs.
 
         Args:
@@ -270,6 +277,8 @@ class MstransformInputs(vdp.StandardInputs):
         self.chanbin = chanbin
         self.timebin = timebin
         self.per_spw = per_spw
+        self.per_source = per_source
+        self.source_name = source_name
         self.parallel = parallel
         self.base_outputvis = base_outputvis
 
@@ -293,7 +302,7 @@ class MstransformInputs(vdp.StandardInputs):
 
         # Remove a number of inputs parameters that
         # casatasks/mstransform does not support.
-        for key in ('parallel', 'per_spw', 'input_data_type', 'output_data_type', 'all_eph_obj', 'base_outputvis'):
+        for key in ('parallel', 'per_spw', 'per_source', 'source_name', 'input_data_type', 'output_data_type', 'all_eph_obj', 'base_outputvis'):
             d.pop(key, None)
 
         return d
@@ -331,7 +340,7 @@ class SerialMstransform(basetask.StandardTaskTemplate):
             LOG.debug('Error creating output MS %s' % (os.path.basename(result.outputvis)))
             return result
 
-        if self.inputs.per_spw:
+        if self.inputs.per_spw or getattr(self.inputs, 'per_source', False):
             real_spw_id = None
             virtual_spw_id = None
             if self.inputs.spw:
@@ -349,14 +358,15 @@ class SerialMstransform(basetask.StandardTaskTemplate):
                     pass
 
             field_ids = []
-            source_name = None
+            source_name = getattr(self.inputs, 'source_name', None)
             if self.inputs.field:
                 try:
                     selected_fields = self.inputs.ms.get_fields(task_arg=self.inputs.field)
                     field_ids = [f.id for f in selected_fields]
-                    unique_sources = {f.source.name for f in selected_fields if hasattr(f, 'source') and f.source}
-                    if len(unique_sources) == 1:
-                        source_name = next(iter(unique_sources))
+                    if not source_name:
+                        unique_sources = {f.source.name for f in selected_fields if hasattr(f, 'source') and f.source}
+                        if len(unique_sources) == 1:
+                            source_name = next(iter(unique_sources))
                 except Exception:
                     pass
 
@@ -433,7 +443,11 @@ class MstransformResults(basetask.Results):
         for sub_ms in self.sub_mses:
             base_outputvis = getattr(sub_ms, 'base_outputvis', None)
             if not base_outputvis:
-                base_outputvis = re.sub(r'\.spw\d+\.ms$', '.ms', sub_ms.name)
+                name = sub_ms.name
+                if getattr(sub_ms, 'source_name', None):
+                    clean_src = re.sub(r'[^a-zA-Z0-9_\-+]', '_', sub_ms.source_name)
+                    name = re.sub(rf'\.{re.escape(clean_src)}(\.|$)', r'\1', name)
+                base_outputvis = re.sub(r'\.spw\d+\.ms$', '.ms', name)
 
             try:
                 logical_ms = context.observing_run.get_ms(base_outputvis)
@@ -594,6 +608,45 @@ class Mstransform(sessionutils.ParallelTemplate):
             inputs.input_data_type = original_input_data_type
             inputs.all_eph_obj = original_all_eph_obj
 
+        if inputs.per_source:
+            valid_args_list_per_source = []
+            for args in valid_args_list:
+                try:
+                    ms = self.inputs.context.observing_run.get_ms(args['vis'])
+                except KeyError:
+                    ms = self.inputs.context.observing_run.get_ms(os.path.basename(args['vis']))
+
+                field_arg = args.get('field')
+                intent_arg = args.get('intent')
+                clean_intent = intent_arg.replace('*', '') if intent_arg else None
+                if field_arg:
+                    fields = ms.get_fields(task_arg=field_arg, intent=clean_intent)
+                elif clean_intent:
+                    fields = ms.get_fields(intent=clean_intent)
+                else:
+                    fields = ms.fields
+
+                sources_dict = collections.OrderedDict()
+                for f in fields:
+                    src_name = f.source.name if hasattr(f, 'source') and f.source else f.name
+                    sources_dict.setdefault(src_name, []).append(f)
+
+                if not sources_dict:
+                    valid_args_list_per_source.append(args)
+                    continue
+
+                for src_name, src_fields in sources_dict.items():
+                    args_src = args.copy()
+                    clean_src = re.sub(r'[^a-zA-Z0-9_\-+]', '_', src_name)
+                    base, ext = os.path.splitext(args_src['outputvis'])
+                    args_src['base_outputvis'] = args_src.get('base_outputvis') or args_src['outputvis']
+                    args_src['outputvis'] = f'{base}.{clean_src}{ext}'
+                    args_src['field'] = ','.join(str(f.id) for f in src_fields)
+                    args_src['source_name'] = src_name
+                    valid_args_list_per_source.append(args_src)
+
+            valid_args_list = valid_args_list_per_source
+
         if inputs.per_spw:
             valid_args_list_per_spw = []
             for args in valid_args_list:
@@ -608,13 +661,23 @@ class Mstransform(sessionutils.ParallelTemplate):
                     args_spw = args.copy()
                     args_spw['spw'] = spw
                     base, ext = os.path.splitext(args_spw['outputvis'])
-                    args_spw['base_outputvis'] = args_spw['outputvis']
+                    args_spw['base_outputvis'] = args_spw.get('base_outputvis') or args_spw['outputvis']
                     args_spw['outputvis'] = f'{base}.spw{spw}{ext}'
                     valid_args_list_per_spw.append(args_spw)
 
             valid_args_list = valid_args_list_per_spw
 
-        if inputs.per_spw:
+        if inputs.per_source and inputs.per_spw:
+            LOG.info(
+                'Mstransform will be executed per source and per SPW; the number of tasks to be executed is %d',
+                len(valid_args_list),
+            )
+        elif inputs.per_source:
+            LOG.info(
+                'Mstransform will be executed per source; the number of tasks to be executed is %d',
+                len(valid_args_list),
+            )
+        elif inputs.per_spw:
             LOG.info(
                 'Mstransform will be executed per SPW; the number of tasks to be executed is %d',
                 len(valid_args_list),

@@ -9,6 +9,7 @@ import operator
 import os
 
 import pipeline.domain.measures as measures
+import pipeline.infrastructure.renderer.rendererutils as rendererutils
 import pipeline.infrastructure.utils as utils
 from pipeline.environment import iers_info
 
@@ -297,7 +298,7 @@ $(document).ready(function() {
                                     <td>
                                         <a href="${row.href}">${row.ms}</a>
                                         % if getattr(row, 'is_logical', False) and getattr(row, 'sub_mses', []):
-                                        <span class="label label-info">Logical (${len(row.sub_mses)} SpW Slices)</span>
+                                        <a href="${row.href}#subms_slices_table" class="label label-info" title="View component SubMS slices for ${row.ms}">${rendererutils.get_subms_badge_label(row.sub_mses)}</a>
                                         % endif
                                     </td>
                                     <td>${utils.commafy(row.receivers, quotes=False)}</td>

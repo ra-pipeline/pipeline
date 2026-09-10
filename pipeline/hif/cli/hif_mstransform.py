@@ -4,7 +4,7 @@ import pipeline.h.cli.utils as utils
 # docstring and type hints: inherits from hif.tasks.mstransform.mstransform.MstransformInputs.__init__
 @utils.cli_wrapper
 def hif_mstransform(vis=None, outputvis=None, field=None, intent=None, spw=None, chanbin=None, timebin=None,
-                    per_spw=None, parallel=None):
+                    per_spw=None, per_source=None, parallel=None):
     """Transform selected calibrated data into new MeasurementSets.
 
     For each execution block, calibrated visibilities are transformed from the

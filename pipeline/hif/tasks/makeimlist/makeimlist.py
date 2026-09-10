@@ -10,7 +10,7 @@ import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.sessionutils as sessionutils
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
-from pipeline.domain import DataType
+from pipeline.domain import DataType, SubMS
 from pipeline.hif.heuristics import imageparams_factory
 from pipeline.hif.tasks.makeimages.resultobjects import MakeImagesResult
 from pipeline.infrastructure import casa_tools, task_registry
@@ -1334,7 +1334,11 @@ class MakeImList(basetask.StandardTaskTemplate):
                                 if local_selected_datatype is None:
                                     expected_num_targets -= 1
                                     LOG.warning(
-                                        f'Data type {selected_datatype_str} is not available for field {field_intent[0]} SPW {adjusted_spwspec} in the chosen vis list. Skipping imaging target.')
+                                        'Data type %s is not available for field %s SPW %s in the chosen vis list. Skipping imaging target.',
+                                        selected_datatype_str,
+                                        field_intent[0],
+                                        adjusted_spwspec,
+                                    )
                                     continue
 
                                 local_selected_datatype_str = local_selected_datatype.name
@@ -1344,19 +1348,30 @@ class MakeImList(basetask.StandardTaskTemplate):
                                 if local_selected_datatype_str != selected_datatype_str:
                                     if automatic_datatype_choice:
                                         LOG.warning(
-                                            f'Data type {selected_datatype_str} is not available for field {field_intent[0]} SPW {adjusted_spwspec}. Falling back to data type {local_selected_datatype_str}.')
+                                            'Data type %s is not available for field %s SPW %s. Falling back to data type %s.',
+                                            selected_datatype_str,
+                                            field_intent[0],
+                                            adjusted_spwspec,
+                                            local_selected_datatype_str,
+                                        )
                                         local_selected_datatype_info = f'{local_selected_datatype_str} instead of {selected_datatype_str} due to source/spw selection'
                                     else:
                                         # Manually selected data type unavailable -> skip making an imaging target
                                         expected_num_targets -= 1
                                         LOG.warning(
-                                            f'Data type {selected_datatype_str} is not available for field {field_intent[0]} SPW {adjusted_spwspec} in the chosen vis list. Skipping imaging target.')
+                                            'Data type %s is not available for field %s SPW %s in the chosen vis list. Skipping imaging target.',
+                                            selected_datatype_str,
+                                            field_intent[0],
+                                            adjusted_spwspec,
+                                        )
                                         continue
 
                                 if local_columns != []:
                                     if not all(local_column == local_columns[0] for local_column in local_columns):
                                         LOG.warning(
-                                            f'Data type based column selection changes among MSes: {",".join(f"{k.basename}: {v}" for k, v in local_ms_objects_and_columns.items())}.')
+                                            'Data type based column selection changes among MSes: %s.',
+                                            ','.join(f'{k.basename}: {v}' for k, v in local_ms_objects_and_columns.items()),
+                                        )
 
                                 if local_columns != []:
                                     if local_columns[0] == 'DATA':
@@ -1364,10 +1379,10 @@ class MakeImList(basetask.StandardTaskTemplate):
                                     elif local_columns[0] == 'CORRECTED_DATA':
                                         local_datacolumn = 'corrected'
                                     else:
-                                        LOG.warning(f'Unknown column name {local_columns[0]}')
+                                        LOG.warning('Unknown column name %s', local_columns[0])
                                         local_datacolumn = ''
                                 else:
-                                    LOG.warning(f'Empty list of columns')
+                                    LOG.warning('Empty list of columns')
                                     local_datacolumn = ''
 
                                 datacolumn = local_datacolumn
@@ -1381,14 +1396,33 @@ class MakeImList(basetask.StandardTaskTemplate):
                                     vislist_field_intent_spw_combinations[field_intent]['vislist'] = [k.basename for k in local_ms_objects_and_columns.keys()]
                                     if automatic_datatype_choice and local_selected_datatype_str != selected_datatype_str:
                                         LOG.warning(
-                                            f'''Modifying vis list from {original_vislist_field_intent_spw_combinations[field_intent]['vislist']} to {vislist_field_intent_spw_combinations[field_intent]['vislist']} for fallback data type {local_selected_datatype_str}.''')
+                                            'Modifying vis list from %s to %s for fallback data type %s.',
+                                            original_vislist_field_intent_spw_combinations[field_intent]['vislist'],
+                                            vislist_field_intent_spw_combinations[field_intent]['vislist'],
+                                            local_selected_datatype_str,
+                                        )
+                                    elif any(isinstance(k, SubMS) for k in local_ms_objects_and_columns):
+                                        LOG.info(
+                                            'Selected SubMS partition %s for field %s spw %s',
+                                            vislist_field_intent_spw_combinations[field_intent]['vislist'],
+                                            field_intent[0],
+                                            adjusted_spwspec,
+                                        )
                                     else:
                                         LOG.warning(
-                                            f'''Modifying vis list from {original_vislist_field_intent_spw_combinations[field_intent]['vislist']} to {vislist_field_intent_spw_combinations[field_intent]['vislist']} for data type {local_selected_datatype_str}.''')
+                                            'Modifying vis list from %s to %s for data type %s.',
+                                            original_vislist_field_intent_spw_combinations[field_intent]['vislist'],
+                                            vislist_field_intent_spw_combinations[field_intent]['vislist'],
+                                            local_selected_datatype_str,
+                                        )
 
                                     if vislist_field_intent_spw_combinations[field_intent]['vislist'] == []:
                                         LOG.warning(
-                                            f'Empty vis list for field {field_intent[0]} specmode {specmode} data type {local_selected_datatype_str}. Skipping imaging target.')
+                                            'Empty vis list for field %s specmode %s data type %s. Skipping imaging target.',
+                                            field_intent[0],
+                                            specmode,
+                                            local_selected_datatype_str,
+                                        )
                                         continue
                             else:
                                 datacolumn = global_datacolumn
@@ -1542,16 +1576,16 @@ class MakeImList(basetask.StandardTaskTemplate):
                                     ):
                                         sub_paths = ms_obj.get_subms_paths(source=field_intent[0], spw=actual_spwspec)
                                         if sub_paths and all(os.path.exists(p) for p in sub_paths):
-                                            final_vislist.extend(sub_paths)
+                                            final_vislist.extend([os.path.basename(p) for p in sub_paths])
                                         else:
-                                            final_vislist.append(v)
+                                            final_vislist.append(os.path.basename(v))
                                     else:
-                                        final_vislist.append(v)
+                                        final_vislist.append(os.path.basename(v))
 
                                 # Save the filtered vislist
                                 if target_heuristics.vislist != final_vislist:
-                                    LOG.warning(
-                                        'Modifying vis list from %s to %s',
+                                    LOG.info(
+                                        'Resolved physical SubMS vis list from %s to %s',
                                         target_heuristics.vislist,
                                         final_vislist,
                                     )

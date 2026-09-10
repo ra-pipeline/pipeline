@@ -718,3 +718,33 @@ def get_multiple_line_string(values: Iterable[Any], str_format: str = '{}', sepa
         return ''
 
     return separator.join(str_format.format(value) for value in values)
+
+
+def get_subms_badge_label(sub_mses: Iterable[Any]) -> str:
+    """Return an informative badge label describing the partitioning scheme of a logical MS.
+
+    Examples:
+        - Only SpW partitioning: 'Logical (4 SpW Slices)'
+        - Only Source partitioning: 'Logical (2 Source Slices)'
+        - Both Source and SpW partitioning: 'Logical (4 Slices)'
+        - Single slice: 'Logical (1 Slice)'
+        - Generic/fallback: 'Logical (4 Slices)'
+    """
+    sub_ms_list = list(sub_mses) if sub_mses else []
+    if not sub_ms_list:
+        return 'Logical'
+
+    n = len(sub_ms_list)
+    suffix = 'Slice' if n == 1 else 'Slices'
+    has_spw = any(getattr(s, 'real_spw_id', None) is not None for s in sub_ms_list)
+    has_source = any(getattr(s, 'source_name', None) is not None for s in sub_ms_list)
+
+    if has_spw and has_source:
+        return f'Logical ({n} {suffix})'
+    elif has_spw:
+        return f'Logical ({n} SpW {suffix})'
+    elif has_source:
+        return f'Logical ({n} Source {suffix})'
+    else:
+        return f'Logical ({n} {suffix})'
+

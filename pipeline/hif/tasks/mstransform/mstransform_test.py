@@ -98,12 +98,16 @@ def test_mstransform_inputs_to_casa_args(mock_context):
         vis=ms.name,
         outputvis=str(mock_context.output_dir + '/output.ms'),
         per_spw=True,
+        per_source=True,
+        source_name='TargetSource',
         spw='16,18',
         parallel=True,
     )
 
     casa_args = inputs.to_casa_args()
     assert 'per_spw' not in casa_args
+    assert 'per_source' not in casa_args
+    assert 'source_name' not in casa_args
     assert 'parallel' not in casa_args
     assert 'input_data_type' not in casa_args
     assert 'output_data_type' not in casa_args
@@ -274,3 +278,143 @@ def test_mstransform_results_merge_with_context_detached_copy(mock_context, tmp_
     assert sub in logical_targets_ms.sub_mses
     assert sub.parent_ms is logical_targets_ms
     assert mock_context.observing_run.get_ms(subvis) is sub
+
+
+def test_mstransform_get_task_args_list_per_source(mock_context):
+    """Test that Mstransform decomposes multi-source data into per-source tasks."""
+    ms = mock_context.observing_run.measurement_sets[0]
+
+    class MockSource:
+        def __init__(self, source_id, name):
+            self.id = source_id
+            self.name = name
+            self.is_eph_obj = False
+
+    class MockField:
+        def __init__(self, field_id, name, source):
+            self.id = field_id
+            self.name = name
+            self.source = source
+            self.intents = {'TARGET'}
+            self.valid_spws = {16, 18, 20}
+
+    src_a = MockSource(1, 'SourceA')
+    src_b = MockSource(2, 'SourceB')
+    f0 = MockField(0, 'SourceA_point1', src_a)
+    f1 = MockField(1, 'SourceA_point2', src_a)
+    f2 = MockField(2, 'SourceB_point1', src_b)
+    ms.fields = [f0, f1, f2]
+    ms.sources = [src_a, src_b]
+
+    inputs = MstransformInputs(
+        context=mock_context,
+        vis=ms.name,
+        input_data_type=DataType.REGCAL_CONTLINE_ALL,
+        output_data_type=DataType.IM_LINE_SCIENCE,
+        per_source=True,
+        intent='*TARGET*',
+    )
+    task = Mstransform(inputs)
+
+    with (
+        mock.patch.object(task, '_frames_consistent', return_value=True),
+        mock.patch.object(task, '_conversion_possible', return_value=True),
+    ):
+        args_list = task._get_task_args_list()
+
+    assert len(args_list) == 2
+    sources = [a['source_name'] for a in args_list]
+    assert sources == ['SourceA', 'SourceB']
+    assert args_list[0]['field'] == '0,1'  # mosaic fields grouped together
+    assert args_list[1]['field'] == '2'
+    assert '.SourceA.ms' in args_list[0]['outputvis']
+    assert '.SourceB.ms' in args_list[1]['outputvis']
+    assert args_list[0]['base_outputvis'] != args_list[0]['outputvis']
+    assert args_list[0]['base_outputvis'].endswith('_targets.ms')
+
+
+def test_mstransform_get_task_args_list_per_source_and_per_spw(mock_context):
+    """Test that Mstransform creates a grid of tasks when both per_source and per_spw are True."""
+    ms = mock_context.observing_run.measurement_sets[0]
+
+    class MockSource:
+        def __init__(self, source_id, name):
+            self.id = source_id
+            self.name = name
+            self.is_eph_obj = False
+
+    class MockField:
+        def __init__(self, field_id, name, source):
+            self.id = field_id
+            self.name = name
+            self.source = source
+            self.intents = {'TARGET'}
+            self.valid_spws = {16, 18}
+
+    src_a = MockSource(1, 'SourceA')
+    src_b = MockSource(2, 'SourceB')
+    f0 = MockField(0, 'SourceA', src_a)
+    f1 = MockField(1, 'SourceB', src_b)
+    ms.fields = [f0, f1]
+    ms.sources = [src_a, src_b]
+
+    inputs = MstransformInputs(
+        context=mock_context,
+        vis=ms.name,
+        input_data_type=DataType.REGCAL_CONTLINE_ALL,
+        output_data_type=DataType.IM_LINE_SCIENCE,
+        per_source=True,
+        per_spw=True,
+        spw='16,18',
+        intent='*TARGET*',
+    )
+    task = Mstransform(inputs)
+
+    with (
+        mock.patch.object(task, '_frames_consistent', return_value=True),
+        mock.patch.object(task, '_conversion_possible', return_value=True),
+    ):
+        args_list = task._get_task_args_list()
+
+    assert len(args_list) == 4
+    expected_pairs = [
+        ('SourceA', '16'),
+        ('SourceA', '18'),
+        ('SourceB', '16'),
+        ('SourceB', '18'),
+    ]
+    actual_pairs = [(a['source_name'], a['spw']) for a in args_list]
+    assert actual_pairs == expected_pairs
+    for a in args_list:
+        assert f'.{a["source_name"]}.spw{a["spw"]}.ms' in a['outputvis']
+        assert a['base_outputvis'].endswith('_targets.ms')
+
+
+def test_serial_mstransform_analyse_per_source(mock_context, tmp_path):
+    """Test that SerialMstransform.analyse produces a SubMS with per-source configuration."""
+    ms = mock_context.observing_run.measurement_sets[0]
+    outputvis = str(tmp_path / 'uid___A002_X123_X456_targets.TargetSource.ms')
+    base_outputvis = str(tmp_path / 'uid___A002_X123_X456_targets.ms')
+    os.makedirs(outputvis, exist_ok=True)
+
+    inputs = MstransformInputs(
+        context=mock_context,
+        vis=ms.name,
+        field='0',
+        per_source=True,
+        source_name='TargetSource',
+        outputvis=outputvis,
+        base_outputvis=base_outputvis,
+        output_data_type=DataType.IM_LINE_SCIENCE,
+    )
+    task = SerialMstransform(inputs)
+    result = MstransformResults(vis=ms.name, outputvis=outputvis, output_data_type=DataType.IM_LINE_SCIENCE)
+
+    task.analyse(result)
+
+    assert len(result.sub_mses) == 1
+    sub_ms = result.sub_mses[0]
+    assert isinstance(sub_ms, SubMS)
+    assert sub_ms.source_name == 'TargetSource'
+    assert sub_ms.base_outputvis == os.path.abspath(base_outputvis)
+    assert sub_ms.real_spw_id is None

@@ -720,7 +720,8 @@ class T1_2Renderer(RendererBase):
     def get_display_context(context):
         ms_summary_rows = []
         for ms in get_mses_by_time(context):
-            href = os.path.join('t2-1.html?ms=%s' % ms.basename)
+            link = 'sidebar_%s' % re.sub(r'[^a-zA-Z0-9]', '_', ms.basename)
+            href = os.path.join('t2-1.html?sidebar=%s' % link)
 
             num_antennas = len(ms.antennas)
             # times should be passed as Python datetimes
@@ -944,7 +945,7 @@ class T2_1DetailsRenderer:
                                 ms.basename,
                                 'listobs.txt')
 
-        if not os.path.exists(listfile):
+        if not os.path.exists(listfile) or getattr(ms, 'is_logical', False) or getattr(ms, 'sub_mses', []):
             if getattr(ms, 'is_logical', False) or not os.path.exists(ms.name):
                 LOG.debug('Writing synthetic listobs for logical MeasurementSet %s', ms.basename)
                 os.makedirs(os.path.dirname(listfile), exist_ok=True)
@@ -1088,7 +1089,10 @@ class T2_1DetailsRenderer:
 
         sub_ms_rows = []
         for sub in getattr(ms, 'sub_mses', []):
-            spw = ms.get_spectral_window(sub.real_spw_id)
+            try:
+                spw = ms.get_spectral_window(sub.real_spw_id) if sub.real_spw_id is not None else None
+            except KeyError:
+                spw = None
             sub_ms_rows.append({
                 'name': sub.basename,
                 'real_spw': sub.real_spw_id if sub.real_spw_id is not None else 'N/A',
@@ -1151,8 +1155,9 @@ class T2_1DetailsRenderer:
                 filename = cls.get_filename(context, session, ms)
                 # now that the details pages are written per MS rather than having
                 # tabs for each MS, we don't need to write them each time as
-                # importdata will not affect their content.
-                if os.path.exists(filename) and os.path.getsize(filename) > 0:
+                # importdata will not affect their content. However, for logical MSes
+                # with dynamic SubMS partitions, always re-render to reflect new slices.
+                if not (getattr(ms, 'is_logical', False) or getattr(ms, 'sub_mses', [])) and os.path.exists(filename) and os.path.getsize(filename) > 0:
                     continue
 
                 display_context = cls.get_display_context(context, ms)

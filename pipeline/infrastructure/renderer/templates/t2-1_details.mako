@@ -14,6 +14,14 @@ import os
 <h1>Overview of '${ms.basename}'</h1>
 </div>
 
+% if sub_ms_rows:
+<div class="alert alert-info">
+	<span class="glyphicon glyphicon-info-sign"></span>
+	<strong>Logical MeasurementSet:</strong> This dataset is partitioned into <strong>${len(sub_ms_rows)} on-disk SubMS slice${'s' if len(sub_ms_rows) != 1 else ''}</strong>.
+	<a href="#subms_slices_table" class="alert-link pull-right">View Component Slices &darr;</a>
+</div>
+% endif
+
 <div class="row">
 	<div class="col-md-6">
 		<h3>Observation Execution Time</h3>
@@ -81,47 +89,6 @@ import os
 		
 </div>
 
-% if sub_ms_rows:
-<div class="row">
-	<div class="col-md-12">
-		<h3>Component SubMS Slices</h3>
-		<p>This logical MeasurementSet is partitioned into the following on-disk per-spectral-window slices:</p>
-		<table class="table table-bordered table-striped table-condensed" summary="Component SubMS Slices">
-			<thead>
-				<tr>
-					<th>SubMS Name</th>
-					<th>SpW (Real)</th>
-					<th>SpW (Virtual)</th>
-					<th>Band</th>
-					<th>Center Freq</th>
-					<th>Bandwidth</th>
-					<th>Channels</th>
-					<th>Target / Field</th>
-					<th>Data Type</th>
-					<th>Size</th>
-				</tr>
-			</thead>
-			<tbody>
-				% for sub in sub_ms_rows:
-				<tr>
-					<td><code>${sub['name']}</code></td>
-					<td>${sub['real_spw']}</td>
-					<td>${sub['virtual_spw']}</td>
-					<td>${sub['band']}</td>
-					<td>${sub['centre_freq']}</td>
-					<td>${sub['bandwidth']}</td>
-					<td>${sub['num_channels']}</td>
-					<td>${sub['source']}</td>
-					<td>${sub['data_type']}</td>
-					<td>${sub['filesize']}</td>
-				</tr>
-				% endfor
-			</tbody>
-		</table>
-	</div>
-</div>
-% endif
-
 <div class="row">
 	<div class="col-md-6">
 		<a class="replace" href='${os.path.join(dirname, "t2-2-1.html")}'><h3>Spatial Setup</h3></a>
@@ -163,6 +130,48 @@ import os
 		</table>
 	</div>
 </div>
+
+% if sub_ms_rows:
+<div class="row" id="subms_slices_table" style="scroll-margin-top: 70px;">
+	<div class="col-md-12">
+		<a id="subms_slices_table_anchor" name="subms_slices_table"></a>
+		<h3 id="subms_slices_header">Component SubMS Slices</h3>
+		<p>This logical MeasurementSet is partitioned into the following on-disk SubMS slice(s):</p>
+		<table class="table table-bordered table-striped table-condensed" summary="Component SubMS Slices">
+			<thead>
+				<tr>
+					<th>SubMS Name</th>
+					<th>SpW (Real)</th>
+					<th>SpW (Virtual)</th>
+					<th>Band</th>
+					<th>Center Freq</th>
+					<th>Bandwidth</th>
+					<th>Channels</th>
+					<th>Target / Field</th>
+					<th>Data Type</th>
+					<th>Size</th>
+				</tr>
+			</thead>
+			<tbody>
+				% for sub in sub_ms_rows:
+				<tr>
+					<td><code>${sub['name']}</code></td>
+					<td>${sub['real_spw']}</td>
+					<td>${sub['virtual_spw']}</td>
+					<td>${sub['band']}</td>
+					<td>${sub['centre_freq']}</td>
+					<td>${sub['bandwidth']}</td>
+					<td>${sub['num_channels']}</td>
+					<td>${sub['source']}</td>
+					<td>${sub['data_type']}</td>
+					<td>${sub['filesize']}</td>
+				</tr>
+				% endfor
+			</tbody>
+		</table>
+	</div>
+</div>
+% endif
 
 <div class="row">
 	<div class="col-md-6">

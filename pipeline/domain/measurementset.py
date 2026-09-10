@@ -1836,7 +1836,12 @@ class MeasurementSet:
                     if subms.source_name and source.name != subms.source_name:
                         continue
                     if subms.real_spw_id is not None:
-                        key = (source.name, subms.real_spw_id)
+                        spw_ids = [subms.real_spw_id]
+                    else:
+                        sci_spws = [s.id for s in self.get_spectral_windows(science_windows_only=True)]
+                        spw_ids = sci_spws if sci_spws else [s.id for s in self.spectral_windows]
+                    for sid in spw_ids:
+                        key = (source.name, sid)
                         if key not in self.data_types_per_source_and_spw:
                             self.data_types_per_source_and_spw[key] = []
                         if subms.data_type not in self.data_types_per_source_and_spw[key]:
@@ -2015,7 +2020,11 @@ class MeasurementSet:
             matches = [s for s in matches if s.data_type == data_type]
         if source is not None and source.strip():
             source_names = {utils.dequote(s.strip()) for s in source.split(',') if s.strip()}
-            matches = [s for s in matches if s.source_name in source_names]
+            resolved_source_names = set(source_names)
+            for f in self.fields:
+                if f.name in source_names and hasattr(f, 'source') and f.source:
+                    resolved_source_names.add(f.source.name)
+            matches = [s for s in matches if s.source_name in resolved_source_names or s.source_name is None]
         if spw is not None and str(spw).strip():
             spw_tokens = [tok.split(':')[0].strip() for tok in str(spw).split(',') if tok.strip()]
             spw_ids = set()
@@ -2026,7 +2035,10 @@ class MeasurementSet:
                     if tok.isdigit():
                         spw_ids.add(int(tok))
             if spw_ids:
-                matches = [s for s in matches if s.real_spw_id in spw_ids or s.virtual_spw_id in spw_ids]
+                matches = [
+                    s for s in matches
+                    if s.real_spw_id in spw_ids or s.virtual_spw_id in spw_ids or s.real_spw_id is None
+                ]
         return matches
 
     def has_subms(self, data_type: DataType | None = None) -> bool:
