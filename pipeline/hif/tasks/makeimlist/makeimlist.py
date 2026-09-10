@@ -1396,26 +1396,27 @@ class MakeImList(basetask.StandardTaskTemplate):
 
                                 datacolumn = local_datacolumn
 
+                                parent_ms_basenames = [
+                                    getattr(k, 'parent_ms', k).basename for k in local_ms_objects_and_columns.keys()
+                                ]
+                                seen = set()
+                                parent_ms_basenames = [b for b in parent_ms_basenames if not (b in seen or seen.add(b))]
+
                                 if (
                                     not inputs.per_eb
-                                    or any(hasattr(k, 'parent_ms') for k in local_ms_objects_and_columns.keys())
-                                ) and original_vislist_field_intent_spw_combinations[field_intent]['vislist'] != [
-                                    k.basename for k in local_ms_objects_and_columns.keys()
-                                ]:
-                                    vislist_field_intent_spw_combinations[field_intent]['vislist'] = [k.basename for k in local_ms_objects_and_columns.keys()]
-                                    if automatic_datatype_choice and local_selected_datatype_str != selected_datatype_str:
+                                    and original_vislist_field_intent_spw_combinations[field_intent]['vislist']
+                                    != parent_ms_basenames
+                                ):
+                                    vislist_field_intent_spw_combinations[field_intent]['vislist'] = parent_ms_basenames
+                                    if (
+                                        automatic_datatype_choice
+                                        and local_selected_datatype_str != selected_datatype_str
+                                    ):
                                         LOG.warning(
                                             'Modifying vis list from %s to %s for fallback data type %s.',
                                             original_vislist_field_intent_spw_combinations[field_intent]['vislist'],
                                             vislist_field_intent_spw_combinations[field_intent]['vislist'],
                                             local_selected_datatype_str,
-                                        )
-                                    elif any(isinstance(k, SubMS) for k in local_ms_objects_and_columns):
-                                        LOG.info(
-                                            'Selected SubMS partition %s for field %s spw %s',
-                                            vislist_field_intent_spw_combinations[field_intent]['vislist'],
-                                            field_intent[0],
-                                            adjusted_spwspec,
                                         )
                                     else:
                                         LOG.warning(
@@ -1591,14 +1592,20 @@ class MakeImList(basetask.StandardTaskTemplate):
                                     else:
                                         final_vislist.append(os.path.basename(v))
 
-                                # Save the filtered vislist
-                                if target_heuristics.vislist != final_vislist:
-                                    LOG.info(
-                                        'Resolved physical SubMS vis list from %s to %s',
+                                # Save the filtered vislist in heuristics
+                                if target_heuristics.vislist != filtered_vislist:
+                                    LOG.warning(
+                                        'Modifying vis list from %s to %s',
                                         target_heuristics.vislist,
+                                        filtered_vislist,
+                                    )
+                                    target_heuristics.vislist = filtered_vislist
+
+                                if any(os.path.basename(v) != os.path.basename(p) for v, p in zip(filtered_vislist, final_vislist)) or len(filtered_vislist) != len(final_vislist):
+                                    LOG.info(
+                                        'Resolved physical SubMS vis list for target execution: %s',
                                         final_vislist,
                                     )
-                                    target_heuristics.vislist = final_vislist
 
                                 # Get list of antenna IDs
                                 antenna_ids = target_heuristics.antenna_ids(inputs.intent)

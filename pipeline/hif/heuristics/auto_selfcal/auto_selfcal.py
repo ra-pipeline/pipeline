@@ -111,6 +111,7 @@ class SelfcalHeuristics:
 
         LOG.info('recreating observing run from per-selfcal-target MS(es): %r', self.vislist)
         self.image_heuristics.observing_run = self.get_observing_run(self.vislist)
+        self.image_heuristics.vislist = self.vislist
 
     @staticmethod
     def get_observing_run(ms_files):
