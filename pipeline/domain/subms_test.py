@@ -228,8 +228,11 @@ def test_observing_run_subms_resolution(mock_observing_run):
     # 5. SPW ID translations accepting SubMS directly
     assert [s.id for s in sub16.spectral_windows] == [16]
     assert sub16.get_spectral_window(16).id == 16
+    assert sub16.get_spectral_window(None) is None
     with pytest.raises(KeyError):
         sub16.get_spectral_window(22)
+    with pytest.raises(KeyError):
+        sub16.get_spectral_window('invalid')
     assert obs_run.virtual2real_spw_id(0, sub16) == 16
     assert obs_run.virtual2real_spw_id(1, sub16) is None
     assert obs_run.real2virtual_spw_id(16, sub16) == 0

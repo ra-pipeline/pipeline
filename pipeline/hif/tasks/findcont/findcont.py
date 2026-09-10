@@ -608,24 +608,31 @@ class FindCont(basetask.StandardTaskTemplate):
                     # Try detecting continuum frequency ranges
 
                     # Determine the representative source name and spwid for the ms
-                    repsource_name, repsource_spwid = ref_ms.get_representative_source_spw()
+                    repr_ms = getattr(ref_ms, 'parent_ms', ref_ms)
+                    repsource_name, repsource_spwid = repr_ms.get_representative_source_spw()
 
                     # Determine reprBW mode
-                    repr_target, _, repr_spw, _, reprBW_mode, real_repr_target, _, _, _, _ = image_heuristics.representative_target()
-                    real_repr_spw = context.observing_run.virtual2real_spw_id(int(repr_spw), ref_ms)
-                    real_repr_spw_obj = ref_ms.get_spectral_window(real_repr_spw)
+                    repr_target, _, repr_spw, _, reprBW_mode, real_repr_target, _, _, _, _ = (
+                        image_heuristics.representative_target()
+                    )
+                    real_repr_spw = context.observing_run.virtual2real_spw_id(int(repr_spw), repr_ms)
+                    real_repr_spw_obj = repr_ms.get_spectral_window(real_repr_spw)
 
-                    if reprBW_mode in ['nbin', 'repr_spw']:
+                    if reprBW_mode in ['nbin', 'repr_spw'] and real_repr_spw_obj is not None:
                         # Approximate reprBW with nbin
-                        physicalBW_of_1chan = float(real_repr_spw_obj.channels[0].getWidth().convert_to(measures.FrequencyUnits.HERTZ).value)
-                        reprBW_nbin = int(qaTool.getvalue(qaTool.convert(repr_target[2], 'Hz'))[0]/physicalBW_of_1chan + 0.5)
+                        physicalBW_of_1chan = float(
+                            real_repr_spw_obj.channels[0].getWidth().convert_to(measures.FrequencyUnits.HERTZ).value
+                        )
+                        reprBW_nbin = int(
+                            qaTool.getvalue(qaTool.convert(repr_target[2], 'Hz'))[0] / physicalBW_of_1chan + 0.5
+                        )
                     else:
                         reprBW_nbin = 1
 
                     spw_transitions = ref_ms.get_spectral_window(real_spwid).transitions
                     single_continuum = any(['Single_Continuum' in t for t in spw_transitions])
                     # PIPE-1855: use spectralDynamicRangeBandWidth from SBSummary if available
-                    dynrange_bw = ref_ms.science_goals.get('spectralDynamicRangeBandWidth', None)
+                    dynrange_bw = repr_ms.science_goals.get('spectralDynamicRangeBandWidth', None)
 
                     if dynrange_bw is not None:  # None means that a value was not provided, and it should remain None
                         dynrange_bw = qaTool.tos(dynrange_bw)
@@ -655,11 +662,15 @@ class FindCont(basetask.StandardTaskTemplate):
                         if warning_msg:
                             LOG.warning('Field {field}, spw {spw}: {warning_msg}'.format(field=target['field'], spw=spwid, warning_msg=warning_msg))
 
-                    is_repsource = (repsource_name == target['field']) and (repsource_spwid == spwid)
-                    chanfrac = {'fraction'    : single_range_channel_fraction,
-                                'field'       : target['field'],
-                                'spw'         : spwid,
-                                'is_repsource': is_repsource}
+                    is_repsource = (repsource_name == target['field']) and (
+                        str(repsource_spwid) == str(spwid) or repsource_spwid == real_spwid
+                    )
+                    chanfrac = {
+                        'fraction': single_range_channel_fraction,
+                        'field': target['field'],
+                        'spw': spwid,
+                        'is_repsource': is_repsource,
+                    }
 
                     single_range_channel_fractions.append(chanfrac)
 

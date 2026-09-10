@@ -143,11 +143,17 @@ class SubMS:
             return [s for s in self.parent_ms.spectral_windows if s.id == self.real_spw_id]
         return self.parent_ms.spectral_windows
 
-    def get_spectral_window(self, spw_id: int | str) -> SpectralWindow:
+    def get_spectral_window(self, spw_id: int | str | None) -> SpectralWindow | None:
         """Return spectral window matching ID if it belongs to this slice."""
-        if self.real_spw_id is not None and int(spw_id) != self.real_spw_id:
+        if spw_id is None:
+            return None
+        try:
+            spw_id_int = int(spw_id)
+        except (ValueError, TypeError):
+            raise KeyError(f"Invalid spectral window ID '{spw_id}' in {self.basename}")
+        if self.real_spw_id is not None and spw_id_int != self.real_spw_id:
             raise KeyError(f"No spectral window with ID '{spw_id}' found in {self.basename}")
-        return self.parent_ms.get_spectral_window(spw_id)
+        return self.parent_ms.get_spectral_window(spw_id_int)
 
     def get_data_column(self, dtype: DataType, source: str | None = None, spw: str | None = None) -> str | None:
         """Return data column name for given DataType."""
