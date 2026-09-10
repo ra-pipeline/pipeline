@@ -587,6 +587,15 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         qaTool = casa_tools.quanta
         do_parallel = mpihelpers.parse_mpi_input_parameter(parallel)
 
+        # Fallback to serial mode if parallel was requested but MPI is not available
+        if do_parallel and not mpihelpers.is_mpi_ready():
+            LOG.warning(
+                'Parallel synthesis imaging was requested (parallel=%s) but no CASA MPI session is active. '
+                'Falling back to serial imaging mode.',
+                parallel,
+            )
+            do_parallel = False
+
         if not phasecenter:
             LOG.error(f"No phasecenter is provided.")
 
