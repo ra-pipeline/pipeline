@@ -345,7 +345,8 @@ class MakeImListInputs(vdp.StandardInputs):
 
             datacolumn: Data column to image. Only to be used for manual overriding when the automatic choice by data type is not appropriate.
 
-            parallel: Use the CASA imager parallel processing when possible.
+            parallel: Turn on CASA MPI parallel synthesis imaging (``tclean(parallel=True)`` / ``PyParallelContSynthesisImager``).
+                If ``'automatic'``, parallel imaging is enabled only when running inside an active ``mpicasa`` session.
 
                 Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
 
