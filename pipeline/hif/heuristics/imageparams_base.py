@@ -106,13 +106,19 @@ class ImageParamsHeuristics:
             self.spwids.update(spwidsclean)
 
     def get_ref_msname(self, spwid):
-        """
-        Get the first MS name that contains data for the given spw ID.
-        """
+        """Get the first MS name that contains data for the given spw ID."""
         for msname in self.vislist:
             real_spwid = self.observing_run.virtual2real_spw_id(spwid, self.observing_run.get_ms(msname))
             if real_spwid is not None:
                 return msname
+        # If vislist contains SubMS slices, fall back to the parent MS if it contains data for the SPW
+        for msname in self.vislist:
+            ms = self.observing_run.get_ms(msname)
+            parent_ms = getattr(ms, 'parent_ms', None)
+            if parent_ms is not None:
+                real_spwid = self.observing_run.virtual2real_spw_id(spwid, parent_ms)
+                if real_spwid is not None:
+                    return parent_ms.name
         raise Exception(f'Vis list {self.vislist} does not contain any MS with data for spw {spwid}')
 
     def primary_beam_size(self, spwid, intent):
