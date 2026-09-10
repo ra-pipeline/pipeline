@@ -6,6 +6,7 @@ import contextlib
 import glob
 import logging
 import os
+import re
 import shutil
 import time
 import traceback
@@ -1882,24 +1883,30 @@ def importdata(vislist, all_targets, telescope):
 
     gaincalibrator_dict = {}
     for vis in vislist:
-        parent_vis_check = vis.replace('_targets.ms', '.ms').replace('_targets_cont.ms', '.ms')
+        parent_vis_check = re.sub(r'_targets.*\.ms$', '.ms', vis)
         parent_vis = None
-        if os.path.exists('../'+parent_vis_check):
-            parent_vis = '../'+parent_vis_check
-        elif os.path.exists('./'+parent_vis_check):
-            parent_vis = './'+parent_vis_check
+        if parent_vis_check != vis:
+            if os.path.exists(parent_vis_check):
+                parent_vis = parent_vis_check
+            elif os.path.exists('../' + os.path.basename(parent_vis_check)):
+                parent_vis = '../' + os.path.basename(parent_vis_check)
+            elif os.path.exists('./' + os.path.basename(parent_vis_check)):
+                parent_vis = './' + os.path.basename(parent_vis_check)
 
         viskey = vis
 
         gaincalibrator_dict[viskey] = {}
         if parent_vis is not None:
             gaincalibrator_dict[viskey] = get_calinfo_from_ms(parent_vis)
-            LOG.info('retrieved phase calibrator scan information from the parent MS of %s: %s', vis, parent_vis)
-        else:
+            if gaincalibrator_dict[viskey]:
+                LOG.info('retrieved phase calibrator scan information from the parent MS of %s: %s', vis, parent_vis)
+
+        if not gaincalibrator_dict[viskey]:
             gaincalibrator_dict_vis = get_calinfo_from_ms_history(vis)
             if gaincalibrator_dict_vis:
                 gaincalibrator_dict[viskey] = gaincalibrator_dict_vis
                 LOG.info('retrieved phase calibrator scan information from the history table of %s.', vis)
+
         if not gaincalibrator_dict[viskey]:
             LOG.warning('Unable to retrieve phase calibrator scan information from %s or its parent MS', vis)
         else:
@@ -2140,12 +2147,15 @@ def triage_calibrators(vis, target, potential_calibrators, max_distance=10.0, ma
 
     gaincalibrator_dict = {}
 
-    parent_vis_check = vis.replace('_targets.ms', '.ms').replace('_targets_cont.ms', '.ms')
+    parent_vis_check = re.sub(r'_targets.*\.ms$', '.ms', vis)
     parent_vis = None
-    if os.path.exists('../'+parent_vis_check):
-        parent_vis = '../'+parent_vis_check
-    elif os.path.exists('./'+parent_vis_check):
-        parent_vis = './'+parent_vis_check
+    if parent_vis_check != vis:
+        if os.path.exists(parent_vis_check):
+            parent_vis = parent_vis_check
+        elif os.path.exists('../' + os.path.basename(parent_vis_check)):
+            parent_vis = '../' + os.path.basename(parent_vis_check)
+        elif os.path.exists('./' + os.path.basename(parent_vis_check)):
+            parent_vis = './' + os.path.basename(parent_vis_check)
 
     if parent_vis is not None:
         msmd.open(parent_vis)
@@ -2166,6 +2176,18 @@ def triage_calibrators(vis, target, potential_calibrators, max_distance=10.0, ma
         msmd.close()
     else:
         gaincal_info_found = False
+
+    if not gaincal_info_found:
+        calinfo_hist = get_calinfo_from_ms_history(vis)
+        if calinfo_hist:
+            for field_name, fdict in calinfo_hist.items():
+                gaincalibrator_dict[field_name] = {
+                    "scans": np.array(fdict["scans"]),
+                    "phasecenter": fdict["phasecenter"],
+                    "intent": fdict["intent"],
+                    "times": np.array(fdict["times"]),
+                }
+            gaincal_info_found = len(gaincalibrator_dict) > 0
 
     all_targets = potential_calibrators + [target]
 
