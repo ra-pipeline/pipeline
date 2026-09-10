@@ -6,32 +6,43 @@ import pipeline.h.cli.utils as utils
 def hifa_imageprecheck(vis=None, desired_angular_resolution=None, calcsb=None, parallel=None):
     """Select the optimal Briggs ``robust`` parameter and compute sensitivity estimates for science targets.
 
-    Uses the representative source and spw containing the representative frequency (set by the PI in the OT)
-    to compute synthesized beam and sensitivity estimates for the aggregate and representative bandwidths over
-    a range of Briggs ``robust`` values. The WebLog reports a table of beamsize and sensitivity per ``robust``
-    value. If no representative target/frequency information is available the first target and center of the
-    first spw are used (e.g. pre-Cycle 5 data does not have this information available).
+    Uses the representative source and spectral window associated with the PI-selected representative frequency,
+    when available, to calculate predicted synthesized beams and theoretical sensitivity estimates for representative
+    and aggregate ``TARGET`` bandwidths. The WebLog reports a table of predicted beam sizes and theoretical
+    sensitivity estimates for each ``robust`` value.
 
-    The ``robust`` value is selected from the range 0.0-2.0 by checking in order: +0.5, +1.0, 0.0, +2.0.
-    Values below 0.0 are not considered (poorer noise characteristics, compromised extended emission recovery).
-    For the ACA 7-m array only ``robust=+0.5`` is considered.
+    If representative-target metadata are unavailable, the task falls back to the first available source with
+    ``TARGET`` intent and the center frequency of the first available spectral window. If no such source exists, it
+    tries selected calibration intents. This fallback is used, for example, for pre-Cycle 5 data that do not have
+    representative-target metadata.
 
-    The selected ``cell`` and ``imsize`` are stored in the pipeline context and reused for all subsequent
-    imaging stages (continuum, cube, representative bandwidth) to ensure consistent image coordinates.
+    For 12-m data, the task evaluates Briggs ``robust`` values 0.0, +0.5, +1.0, and +2.0. Values below 0.0 are not
+    considered. When multiple values produce an acceptable beam area, it selects them in the preference order +0.5,
+    0.0, +1.0, +2.0. For ACA 7-m data, only ``robust=+0.5`` is evaluated.
+
+    The selection compares predicted synthesized beam area with the area range implied by the requested
+    angular-resolution range. The major and minor axes are reported separately, but they are not required to fall
+    independently within the requested range.
+
+    The selected ``robust`` value is written to the pipeline context for later imaging. The task also writes the
+    selected ``uvtaper`` when it is non-empty; a non-default taper may be calculated for the requested-resolution
+    ``ALMA-SRDP`` case. The ``cell`` and ``imsize`` values calculated while testing candidate beams remain local to
+    imageprecheck; later imaging stages calculate image geometry from the selected beam and current imaging inputs.
 
     Notes:
-        QA score based on fit between the predicted synthesized beam and the PI-requested angular resolution
-        (AR) range:
+        QA is based on the predicted synthesized beam area relative to the
+        PI-requested angular-resolution area range:
 
-        - QA = 1.0 (green): both major and minor axes within the AR range with ``robust=+0.5``.
-        - QA = 0.85 (blue): both axes within the AR range with a ``robust`` value other than +0.5.
-        - QA = 0.50 (yellow): at least one axis outside the AR range but the beam area within the
-          area range corresponding to the PI-requested AR range.
-        - QA = 0.25 (red): beam area falls outside the PI-requested AR area range for all ``robust``
-          values, meaning imaging products are unlikely to meet PI goals.
+        - QA = 1.0 (green): no beam goal is available, or the ``robust=+0.5`` beam
+          area is within the requested range.
+        - QA = 0.85 (blue): a non-default ``robust`` value produces a beam area within
+          the requested range.
+        - QA = 0.25 (red): no tested ``robust`` value produces an acceptable beam area,
+          the beam is too large or too small, or the requested area falls in a gap
+          between the available ``robust`` choices.
 
-        An additional factor of 1.0 vs. 0.5 is applied based on whether representative target/frequency
-        information was successfully identified.
+        The beam axial ratios are reported in the WebLog but are not used as an
+        independent selection criterion.
 
     Examples:
         1. Run with default settings to select the best robust parameter prior to imaging:

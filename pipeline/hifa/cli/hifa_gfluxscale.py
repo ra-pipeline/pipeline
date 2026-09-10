@@ -9,12 +9,13 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
     """Transfer the absolute flux scale from amplitude calibrator to secondary calibrators and science targets.
 
     Derives flux densities for point-source transfer calibrators using flux models for reference calibrators.
-    The absolute flux scale is transferred from the amplitude calibrator to the phase calibrator and other
-    secondary calibrators, which is subsequently transferred to the science target via :func:`~pipeline.hif.cli.hif_applycal`.
+    The absolute flux scale is transferred from the AMPLITUDE calibrator (often the same field as BANDPASS)
+    to the PHASE calibrator and other secondary calibrators (CHECK, DIFFGAIN, and BANDPASS if not AMPLITUDE), 
+    which is subsequently transferred to the science target via :func:`~pipeline.hif.cli.hif_applycal`.
 
-    The workflow (as illustrated in the WebLog logic diagram):
+    The workflow (as illustrated in the workflow logic diagram):
 
-    .. figure:: /figures/PL2025_hifa_gfluxscale_all.png
+    .. figure:: /figures/PL2026_hifa_gfluxscale_workflowtitle.png
        :width: 60%
        :alt: Logical flow in hifa_gfluxscale
 
@@ -24,12 +25,23 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
 
     1. Phase-up calibration is performed for all science spws for each calibrator field using the spw
        mapping/combine parameters and ``solint``/``gaintype`` established in :func:`~pipeline.hifa.cli.hifa_spwphaseup`.
-    2. Amplitude-only solutions are computed (with ``gaintype='T'``, combining polarisations), pre-applying
-       the phase solutions.
-    3. Obvious outlier amplitude solutions are identified and flagged in the caltable.
+       If there are other intents, e.g. BANDPASS, DIFFGAIN, that share the same field as the AMPLITUDE and
+       are observed in different scans, then the phase-up is explicitly only performed on the intent
+       AMPLITUDE and exclusively only that observing scan. Generally, ALMA uses the same field for
+       BANDPASS and AMPLITUDE and it is usually observed in the same scan. During the gaincal processes for
+       each field, if there are multiple fields per INTENT and/or more than one Spectral Spec (tuning setup)
+       then a new caltable is created each time. Note that the phase solutions for the CHECK source(s)
+       are saved and are shown in :func:`~pipeline.hifa.cli.hifa_timegaincal` in the plot of "Diagnostic Phase vs. time".
+    2. Amplitude-only solutions are computed (with ``gaintype='T'``, combining polarizations), pre-applying
+       the phase solutions.  ``gaintype='T'`` allows polarized calibrators to have differing flux densities
+       in their calibrated XX and YY visibilities, and thereby avoids introducing any false polarization
+       into the science targets. Again, if there are other intents that are the same field as the AMPLITUDE,
+       only the AMPLITUDE intent is explicitly solved. For those intents that are the same field as the
+       AMPLITUDE, a :func:`~casatasks.calibration.setjy` call is made to correctly set the flux scale.
+    3. Obvious outlier amplitude solutions are identified and flagged in the caltable. Phase gaintables are not assessed.
     4. The flux scale is transferred from the reference calibrators to the transfer calibrators using
        ``refspwmap`` for windows without data in the reference calibrators.
-    5. The computed flux density values are written to the MODEL_DATA column via ``setjy``.
+    5. The computed flux density values are written to the MODEL_DATA column via :func:`~casatasks.calibration.setjy`.
 
     The WebLog lists the derived flux scale factors and calibrated flux densities (measured by vector-averaged
     calibrated visibility amplitude) for all non-amplitude calibrators, together with the ALMA Source Catalog
@@ -84,8 +96,23 @@ def hifa_gfluxscale(vis=None, reference=None, transfer=None, refintent=None, tra
         in some spws causing amplitude noise bias, or atmospheric absorption lines). Check :func:`~pipeline.hif.cli.hif_applycal`
         to determine whether any low score represents a real science target issue.
 
-        For very low SNR, the longer ``solint`` used in the phase-up can cause phase decoherence to be
+        High values in the Flagged data summary table on the WebLog page are indicative of low SNR achieved
+        on the corresponding object, even after attempting the best calibration possible according to 
+        the :func:`~pipeline.hifa.cli.hifa_spwphaseup` low SNR cascade. In all cases, the percentages in both the before and 
+        after columns will naturally be higher than the corresponding values seen on the later hif_applycal stage because in
+        that stage the phase solutions are scan-based, and thus have a higher SNR.
+    
+        For very low SNR (low scores), the use of long ``solint`` in the phase-up can cause phase decoherence to be
         'baked in', artificially biasing amplitude gains upward and producing an incorrect flux scale.
+
+        One QA score is computed for non-SSO AMPLITUDE calibrators:
+ 
+        1. **Amplitude stability**: A QA score is calculated using the baseline-averaged calibrated visibility amplitude vs. time behavior during the scan. 
+           If the spread of the amplitudes between the 1st and last quintiles is greater than 13% of the median amplitude, then a QA score of 0.66 is given, 
+           decreasing linearly with a larger amplitude spread to a minimum score of 0.34 when the spread is greater than 26% of the median amplitude. 
+           Low scores in this metric may indicate that the observing conditions are too unstable to trust the flux transfer from the amplitude 
+           calibrator to the science fields. 
+
 
     Examples:
         1. Compute flux values for the phase calibrator using model data from the amplitude calibrator:
