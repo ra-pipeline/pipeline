@@ -6,11 +6,11 @@ If you use **ALMA data** in your publications, you must include the official ack
 We thank you for additionally acknowledging the use of Pipeline and CASA, using a format similar to the following:
 
 ```{parsed-literal}
-Data were calibrated using the ALMA Pipeline version 2025.1.0.37 and CASA 6.6.6-18 (:{cite}`2023PASP..135g4501H`, :{cite}`2022PASP..134k4501C`). Calibrated visibilities were downloaded from the ALMA Science Archive and restored, after which the CASA tclean task was used to image those visibilities.
+Data were calibrated using the ALMA Pipeline version 2026.2.0.27 and CASA 6.7.4-8 (:{cite}`2023PASP..135g4501H`, :{cite}`2022PASP..134k4501C`). Calibrated visibilities were downloaded from the ALMA Science Archive and restored, after which the CASA tclean task was used to image those visibilities.
 ```
 
 :::{important}
-Pipeline and CASA are **distinct software packages**, albeit often packaged together — citing both version numbers is essential for reproducibility and credit. See {ref}`Overview <sec-overview>` for more details.
+Pipeline and CASA are **distinct software packages**, albeit often packaged together — citing both version numbers is essential for reproducibility and credit. See {ref}`Overview <sec-overview>` for more details about the software design.
 :::
 
 ## Guidelines
