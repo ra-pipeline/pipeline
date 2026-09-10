@@ -570,6 +570,16 @@ class ImageParamsHeuristics:
                             _, phasecenter = self.phasecenter(field_ids, vislist=valid_vis_list, shift_to_nearest_field=shift,
                                                               primary_beam=largest_primary_beam_size, intent=intent)
                         do_parallel = mpihelpers.parse_mpi_input_parameter(parallel)
+
+                        # Fallback to serial mode if parallel was requested but MPI is not available
+                        if do_parallel and not mpihelpers.is_mpi_ready():
+                            LOG.warning(
+                                'Parallel synthesis imaging was requested (parallel=%s) but no CASA MPI session is active. '
+                                'Falling back to serial imager (PySynthesisImager).',
+                                parallel,
+                            )
+                            do_parallel = False
+
                         paramList = ImagerParameters(msname=valid_vis_list,
                                                      scan=valid_scanids_list,
                                                      antenna=valid_antenna_ids_list,
