@@ -54,4 +54,37 @@ def test_to_ms_frame(selection, msnames, fields, spw_id, observing_run, result):
     assert cfh.to_ms_frame(selection, msnames, fields, spw_id, observing_run) == result
 
 
+def test_to_ms_frame_missing_spw_in_advisechansel(monkeypatch):
+    """Test to_ms_frame gracefully handles when synthesisutils.advisechansel does not include the target spw."""
+    mock_su = Mock()
+    mock_su.advisechansel.return_value = {'spw': [99], 'start': [0], 'nchan': [10]}
+    monkeypatch.setattr(contfilehandler.casa_tools, 'synthesisutils', mock_su)
 
+    obs_run = Mock(spec=domain.ObservingRun)
+    obs_run.virtual2real_spw_id.return_value = 15
+    obs_run.get_ms.return_value = mock_ms('uid___test.ms')
+
+    cfh = contfilehandler.ContFileHandler(casa_tools.utils.resolve('pl-unittest/cont.dat'))
+    # spw 15 is not in [99], so it should be skipped and return empty selections
+    freqs, chans, bw, frame = cfh.to_ms_frame('214.5~215.5GHz LSRK', ['uid___test.ms'], ['0'], '0', obs_run)
+    assert freqs == ['']
+    assert chans == ['']
+
+
+def test_contfile_to_spwsel_empty_spwstring(monkeypatch):
+    """Test contfile_to_spwsel handles empty spwstring without calling get_real_spwsel or crashing."""
+    mock_context = Mock()
+    mock_ms_obj = Mock()
+    mock_field = Mock()
+    mock_field.name = 'FieldA'
+    mock_field.id = 0
+    mock_ms_obj.fields = [mock_field]
+    mock_context.observing_run.get_ms.return_value = mock_ms_obj
+
+    # When contdict has FieldA but no SPWs, spw_items is empty -> spwstring == ''
+    mock_contdict = {'fields': {'FieldA': {}}}
+    monkeypatch.setattr(contfilehandler.ContFileHandler, 'read', lambda self, warn_nonexist=False: mock_contdict)
+
+    res = contfilehandler.contfile_to_spwsel('uid___test.ms', mock_context,
+                                             contfile=casa_tools.utils.resolve('pl-unittest/cont.dat'), use_realspw=True)
+    assert res == {'FieldA': ''}

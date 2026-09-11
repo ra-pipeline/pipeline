@@ -262,7 +262,10 @@ class ContFileHandler:
                                                           freqstart=freq_range[0], freqend=freq_range[1], freqstep=100.,
                                                           freqframe='SOURCE', ephemtable='TRACKFIELD')
                         suTool.done()
-                        spw_index = result['spw'].tolist().index(real_spw_id)
+                        spw_list = result['spw'].tolist() if 'spw' in result and hasattr(result['spw'], 'tolist') else []
+                        if real_spw_id not in spw_list:
+                            continue
+                        spw_index = spw_list.index(real_spw_id)
                         start = result['start'][spw_index]
                         stop = start + result['nchan'][spw_index] - 1
                         # Optionally skip edge channels
@@ -383,8 +386,11 @@ def contfile_to_spwsel(vis, context, contfile='cont.dat', use_realspw=True):
         spwstring = ','.join(spw_items)
 
         if use_realspw:
-            real_spwsel_list = context.observing_run.get_real_spwsel([spwstring], [vis])
-            fielddict[field] = real_spwsel_list[0] if real_spwsel_list and real_spwsel_list[0] else ''
+            if spwstring:
+                real_spwsel_list = context.observing_run.get_real_spwsel([spwstring], [vis])
+                fielddict[field] = real_spwsel_list[0] if real_spwsel_list and real_spwsel_list[0] else ''
+            else:
+                fielddict[field] = ''
         else:
             fielddict[field] = spwstring
 

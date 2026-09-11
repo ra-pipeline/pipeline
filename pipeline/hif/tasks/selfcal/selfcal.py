@@ -1184,6 +1184,8 @@ class Selfcal(basetask.StandardTaskTemplate):
                 vis, self.inputs.context, contfile=self.inputs.contfile, excludechans=True)
 
             for field, lines_sel in lines_sel_dict.items():
+                if not lines_sel:
+                    continue
                 LOG.info("Flagging lines in field {} with the spw selection {}".format(field, lines_sel))
                 # lines_sel_dict is keyed with original field names, which might not be safe for CASA/field
                 # selections.

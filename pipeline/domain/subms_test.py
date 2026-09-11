@@ -596,3 +596,56 @@ def test_logical_ms_and_subms_times_on_source(mock_observing_run, monkeypatch, t
     # Test SubMS delegation through parent logical MS to raw EB
     res_sub = sub.get_times_on_source_per_field_id(field='TargetA', intent='TARGET')
     assert res_sub == {0: 42.0}
+
+
+def test_subms_fields_and_sources_properties(mock_observing_run, tmp_path):
+    """Verify SubMS.fields and SubMS.sources properties filter by source_name or field_ids."""
+    obs_run, raw_eb = mock_observing_run
+
+    # Add a second source & field to parent MS
+    class MockSource:
+        def __init__(self, source_id, name):
+            self.id = source_id
+            self.name = name
+
+    class MockField:
+        def __init__(self, field_id, name, source):
+            self.id = field_id
+            self.name = name
+            self.source = source
+            self.intents = {'TARGET'}
+
+    src_b = MockSource(1, 'TargetB')
+    fld_b = MockField(1, 'TargetB_0', src_b)
+    raw_eb.fields.append(fld_b)
+    raw_eb.sources.append(src_b)
+
+    sub_path = str(tmp_path / 'uid___targets.src1.spw0.ms')
+    base_outputvis = str(tmp_path / 'uid___targets.ms')
+
+    sub = SubMS(
+        name=sub_path,
+        parent_ms=raw_eb,
+        source_name='TargetA',
+        real_spw_id=16,
+        virtual_spw_id=0,
+        field_ids=[0],
+        base_outputvis=base_outputvis,
+    )
+
+    # SubMS.fields should only return fields for TargetA (id 0)
+    assert len(sub.fields) == 1
+    assert sub.fields[0].id == 0
+    assert sub.fields[0].name == 'TargetA_0'
+
+    # SubMS.sources should only return TargetA
+    assert len(sub.sources) == 1
+    assert sub.sources[0].name == 'TargetA'
+
+
+def test_observing_run_get_real_spwsel_empty_and_whitespace(mock_observing_run):
+    """Verify ObservingRun.get_real_spwsel gracefully handles empty and whitespace strings."""
+    obs_run, raw_eb = mock_observing_run
+
+    res = obs_run.get_real_spwsel(['', '   '], [raw_eb.name, raw_eb.name])
+    assert res == [None, None]

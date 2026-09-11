@@ -566,7 +566,14 @@ class ObservingRun(object):
         for spwsel_item, ms_name in zip(spwsel, vis):
             real_spwsel_items: list[str] = []
 
+            if not spwsel_item or not spwsel_item.strip():
+                real_spwsel.append(None)
+                continue
+
             for spw_item in spwsel_item.split(','):
+                spw_item = spw_item.strip()
+                if not spw_item:
+                    continue
                 if ':' not in spw_item:
                     # Handle simple spw ID without channel selection
                     real_spw_id = self.virtual2real_spw_id(int(spw_item), self.get_ms(ms_name))

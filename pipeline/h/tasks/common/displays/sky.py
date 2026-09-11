@@ -132,7 +132,8 @@ class SkyDisplay:
         last_result = context.results[-1]
 
         # PIPE-1083: when making VLA/SS hif_makeimages sky plot, we default to 400 dpi
-        if last_result.taskname == 'hif_makeimages':
+        last_taskname = getattr(last_result, 'taskname', None)
+        if last_taskname == 'hif_makeimages':
             if last_result.results:
                 first_result = last_result.results[0]
                 if first_result.imaging_mode in ('VLA', 'EVLA', 'JVLA') or first_result.imaging_mode.startswith('VLASS'):
@@ -140,7 +141,7 @@ class SkyDisplay:
 
         # PIPE-1083: when making sky plots for the tasks/stages below, we default to 400 dpi.
         #     hif_makermsimages, hif_makecutoutsimages, and hifv_pbcor
-        if last_result.taskname in ('hif_makermsimages', 'hif_makecutoutimages', 'hifv_pbcor'):
+        if last_taskname in ('hif_makermsimages', 'hif_makecutoutimages', 'hifv_pbcor'):
             return 400.0
 
         return None
@@ -148,19 +149,20 @@ class SkyDisplay:
     def _get_vla_band(self, context, miscinfo) -> str | None:
         """Get the VLA band string, only for VLA aggregated cont imaging."""
         last_result = context.results[-1]
+        last_taskname = getattr(last_result, 'taskname', None)
 
         # Check if we should use band notation based on task and imaging mode
         use_band_notation = (
             # hif_makeimage VLA-PI cont imaging sky plots
             (
-                last_result.taskname == 'hif_makeimages'
+                last_taskname == 'hif_makeimages'
                 and last_result.results[0].imaging_mode in {'VLA', 'EVLA', 'JVLA'}
                 and miscinfo.get('specmode') == 'cont'
             )
             or
             # hifv_pbcor VLA-PI cont imaging sky plots
             (
-                last_result.taskname == 'hifv_pbcor'
+                last_taskname == 'hifv_pbcor'
                 and context.imaging_mode is None
                 and miscinfo.get('specmode') == 'cont'
             )

@@ -11,6 +11,7 @@ from pipeline.infrastructure import utils
 if TYPE_CHECKING:
     from pipeline.domain.field import Field
     from pipeline.domain.measurementset import MeasurementSet
+    from pipeline.domain.source import Source
     from pipeline.domain.spectralwindow import SpectralWindow
 
 
@@ -111,6 +112,18 @@ class SubMS:
         if self.source_name:
             return [f for f in parent_fields if getattr(f, 'source', None) and f.source.name == self.source_name]
         return parent_fields
+
+    @property
+    def fields(self) -> list[Field]:
+        """Return fields corresponding to this sub-MS slice."""
+        return self.get_fields()
+
+    @property
+    def sources(self) -> list[Source]:
+        """Return sources corresponding to this sub-MS slice."""
+        if self.source_name:
+            return [s for s in self.parent_ms.sources if s.name == self.source_name]
+        return self.parent_ms.sources
 
     def get_spectral_windows(
         self,
