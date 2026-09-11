@@ -90,3 +90,13 @@ For testing cases that require a specific `casa-data` version: since `casaconfig
 support rollback, use the Git repo approach. Note that versions of certain data (e.g. geodetic
 measures) in a Git checkout may occasionally lag behind those fetched by `casaconfig`'s
 auto-update mechanism from external providers (e.g. the ASTRO FTP server).
+
+## Preventing in-place measures update collisions (node-local staging, PIPE-2882)
+
+When running batch regression suites or automated overnight testing on shared cluster infrastructure (e.g. Slurm or HTCondor), pointing directly to live shared measures repositories (such as `/home/casa/data/distro`) risks test failures if daily maintenance cron jobs update measures tables in-place while tests are active ({jira}`PIPE-2882`).
+
+To completely isolate test runs from shared NFS updates:
+- Set the environment variable `PIPELINE_STAGE_LOCAL_MEASURES=true` before running pytest or regression suites.
+- The pipeline will automatically stage dynamic measures tables (`geodetic/`, ~9.5 MB) and link `ephemerides/` into node-local scratch storage (`$SLURM_TMPDIR`, `$_CONDOR_SCRATCH_DIR`, or `/tmp`), redirecting C++ casacore lookups and cleaning up on process exit.
+
+For full architectural details, multi-process concurrency handling, and configuration options, see {doc}`Node-Local Measures Staging (PIPE-2882) <../reference/measures_staging>`.

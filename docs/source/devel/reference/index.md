@@ -13,6 +13,7 @@ spectral_windows
 QA_scores
 FunctionIODumper
 parallelization
+measures_staging
 field_parameter
 FlaggingTasks
 ALMA-Imaging-Workflow

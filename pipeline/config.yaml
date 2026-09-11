@@ -9,6 +9,10 @@ pipeconfig:
   vlappr: # not used yet
   xvfb: false # option for directly spawn xvfb server from the python session, pyvirtualdisplay is required for xvfb=True
   omp_num_threads: 4 # not used yet
+  stage_local_measures: false # stage geodetic/ephemerides to node-local scratch to avoid NFS in-place update collisions
+  local_measures_source: null # custom source measures directory (defaults to auto-discovery from casaconfig/ctsys/CASADATA)
+  local_measures_base: null # custom scratch base directory (defaults to $SLURM_TMPDIR, $_CONDOR_SCRATCH_DIR, $TMPDIR, or /tmp)
+  cleanup_local_measures: true # remove staged directory at process exit
   dask:
     tier0futures: true
     autostart: false

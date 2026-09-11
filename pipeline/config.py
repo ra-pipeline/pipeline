@@ -9,10 +9,14 @@ The module aggregates configuration from multiple sources, including built-in de
 user-specific cache files, and local configuration files. It also manages the setup
 of CASA logging and environment settings based on the loaded configuration.
 """
+import atexit
 import copy
+import getpass
 import os
 import pathlib
 import pprint
+import shutil
+import sys
 from typing import Any
 
 import casaconfig.config
@@ -146,6 +150,138 @@ def nested_update(d: dict[str, Any], u: dict[str, Any]) -> dict[str, Any]:
     return d
 
 
+def stage_local_measures(source_path: str | None = None,
+                         base_dir: str | None = None,
+                         cleanup: bool | None = None) -> str | None:
+    """Stage dynamic measures tables (geodetic) and link ephemerides to node-local scratch storage.
+
+    This protects pipeline runs from mid-execution corruption caused by in-place
+    updates (e.g. daily cron rsync/git pull) on shared network mounts. Only geodetic/
+    (~9.5 MB) is actively modified by daily measures updates, so it is physically copied,
+    while static ephemerides/ (~415 MB) is symlinked (falling back to copy if symlink fails),
+    yielding a minimal ~9.5 MB footprint and near-instant staging (< 0.05s).
+
+    Args:
+        source_path: Source directory containing measures data (with geodetic/ subfolder).
+                     Defaults to pipeconfig.local_measures_source, $PIPELINE_LOCAL_MEASURES_SOURCE,
+                     $CASADATA, or casaconfig.config.measurespath / datapath.
+        base_dir: Scratch directory to hold the staged folder.
+                  Defaults to pipeconfig.local_measures_base, $PIPELINE_LOCAL_MEASURES_BASE,
+                  $SLURM_TMPDIR, $_CONDOR_SCRATCH_DIR, $TMPDIR, or /tmp.
+        cleanup: Whether to register an atexit handler to delete the staged folder upon exit.
+                 Defaults to $PIPELINE_CLEANUP_LOCAL_MEASURES or True.
+
+    Returns:
+        Absolute path to the staged measures directory, or None if staging fails.
+    """
+    if cleanup is None:
+        env_cleanup = os.environ.get('PIPELINE_CLEANUP_LOCAL_MEASURES')
+        cleanup = env_cleanup.lower() in ('true', '1', 'yes') if env_cleanup is not None else True
+    candidates = []
+    if source_path:
+        candidates.append(source_path)
+    if os.environ.get('PIPELINE_LOCAL_MEASURES_SOURCE'):
+        candidates.append(os.environ['PIPELINE_LOCAL_MEASURES_SOURCE'])
+    if os.environ.get('CASADATA'):
+        candidates.append(os.environ['CASADATA'])
+    if hasattr(casaconfig.config, 'measurespath') and casaconfig.config.measurespath:
+        candidates.append(casaconfig.config.measurespath)
+    if 'casatools' in sys.modules:
+        try:
+            import casatools
+            if hasattr(casatools.ctsys, 'measurespath'):
+                mpath = casatools.ctsys.measurespath()
+                if mpath:
+                    candidates.append(mpath)
+            if hasattr(casatools.ctsys, 'rundata'):
+                rpath = casatools.ctsys.rundata()
+                if rpath:
+                    candidates.append(rpath)
+        except Exception:
+            pass
+    if hasattr(casaconfig.config, 'datapath') and isinstance(casaconfig.config.datapath, list):
+        candidates.extend(casaconfig.config.datapath)
+    if 'casatools' in sys.modules:
+        try:
+            import casatools
+            if hasattr(casatools.ctsys, 'getpath'):
+                gpath = casatools.ctsys.getpath()
+                if isinstance(gpath, list):
+                    candidates.extend(gpath)
+        except Exception:
+            pass
+
+    resolved_source = None
+    for cand in candidates:
+        if cand and isinstance(cand, str):
+            expanded = os.path.abspath(os.path.expanduser(os.path.expandvars(cand)))
+            if os.path.isdir(os.path.join(expanded, 'geodetic')):
+                resolved_source = expanded
+                break
+
+    if not resolved_source:
+        sys.stderr.write("WARNING [pipeline]: Unable to locate valid source measures directory to stage locally.\n")
+        return None
+
+    if not base_dir:
+        base_dir = (
+            os.environ.get('PIPELINE_LOCAL_MEASURES_BASE')
+            or os.environ.get('SLURM_TMPDIR')
+            or os.environ.get('_CONDOR_SCRATCH_DIR')
+            or os.environ.get('CONDOR_SCRATCH_DIR')
+            or os.environ.get('TMPDIR')
+            or '/tmp'
+        )
+    base_dir = os.path.abspath(os.path.expanduser(os.path.expandvars(base_dir)))
+
+    try:
+        user = getpass.getuser()
+    except Exception:
+        user = os.environ.get('USER') or os.environ.get('LOGNAME') or 'casa'
+    job_id = (
+        os.environ.get('SLURM_JOB_ID')
+        or os.environ.get('CONDOR_JOB_ID')
+        or (f"{os.environ['ClusterId']}.{os.environ.get('ProcId', '0')}" if 'ClusterId' in os.environ else None)
+        or os.environ.get('JOB_ID')
+    )
+    pid = os.getpid()
+    folder_name = f"casarundata_{user}_{job_id}_{pid}" if job_id else f"casarundata_{user}_{pid}"
+    target_dir = os.path.join(base_dir, folder_name)
+
+    try:
+        os.makedirs(target_dir, exist_ok=True)
+        # 1. Copy dynamic geodetic tables (~9.5 MB) to protect against in-place cron updates
+        src_geo = os.path.join(resolved_source, 'geodetic')
+        dst_geo = os.path.join(target_dir, 'geodetic')
+        if os.path.isdir(src_geo) and not os.path.exists(dst_geo):
+            shutil.copytree(src_geo, dst_geo, dirs_exist_ok=True)
+
+        # 2. Link ephemerides: ephemerides (~415 MB) are static runtime data untouched by the
+        # daily measures cron. Symlinking satisfies casacore's internal ephemeris path requirements
+        # with zero copy overhead, keeping the process footprint at ~9.5 MB.
+        src_eph = os.path.join(resolved_source, 'ephemerides')
+        dst_eph = os.path.join(target_dir, 'ephemerides')
+        if os.path.isdir(src_eph) and not os.path.exists(dst_eph):
+            try:
+                os.symlink(src_eph, dst_eph)
+            except OSError:
+                shutil.copytree(src_eph, dst_eph, dirs_exist_ok=True)
+
+        if cleanup:
+            def _cleanup_dir():
+                try:
+                    if os.path.exists(target_dir):
+                        shutil.rmtree(target_dir, ignore_errors=True)
+                except Exception:
+                    pass
+            atexit.register(_cleanup_dir)
+
+        return target_dir
+    except Exception as exc:
+        sys.stderr.write(f"WARNING [pipeline]: Failed to stage measures locally to {target_dir}: {exc}. Falling back to {resolved_source}.\n")
+        return None
+
+
 def casatasks_startup(casa_config: dict[str, str | None], loglevel: str | None = None) -> tuple[str, str]:
     """Initializes a CASA session with custom configurations and log settings.
 
@@ -178,12 +314,54 @@ def casatasks_startup(casa_config: dict[str, str | None], loglevel: str | None =
     except ImportError:
         pass
 
+    # Check if local measures staging is requested
+    env_stage = os.environ.get('PIPELINE_STAGE_LOCAL_MEASURES')
+    if env_stage is not None:
+        stage_measures = env_stage.lower() in ('true', '1', 'yes')
+    else:
+        stage_measures = config.get('pipeconfig', {}).get('stage_local_measures', False)
+
+    if stage_measures:
+        local_source = config.get('pipeconfig', {}).get('local_measures_source')
+        local_base = config.get('pipeconfig', {}).get('local_measures_base')
+        env_cleanup = os.environ.get('PIPELINE_CLEANUP_LOCAL_MEASURES')
+        if env_cleanup is not None:
+            cleanup = env_cleanup.lower() in ('true', '1', 'yes')
+        else:
+            cleanup = config.get('pipeconfig', {}).get('cleanup_local_measures', True)
+        staged_path = stage_local_measures(source_path=local_source, base_dir=local_base, cleanup=cleanup)
+        if staged_path:
+            config['casaconfig']['measurespath'] = staged_path
+            config['casaconfig']['measures_auto_update'] = False
+            config['casaconfig']['data_auto_update'] = False
+            curr_datapath = config['casaconfig'].get('datapath')
+            if curr_datapath and isinstance(curr_datapath, list):
+                config['casaconfig']['datapath'] = [staged_path] + [p for p in curr_datapath if p != staged_path]
+            elif hasattr(casaconfig.config, 'datapath') and isinstance(casaconfig.config.datapath, list):
+                config['casaconfig']['datapath'] = [staged_path] + [p for p in casaconfig.config.datapath if p != staged_path]
+            else:
+                config['casaconfig']['datapath'] = [staged_path]
+
     # Update casaconfig attributes
     for key, value in config['casaconfig'].items():
         if value is None:
             config['casaconfig'][key] = getattr(casaconfig.config, key, None)
         else:
             setattr(casaconfig.config, key, value)
+
+    # In case casatools has already been initialized (e.g. monolithic CASA session)
+    if 'casatools' in sys.modules:
+        try:
+            import casatools
+            if config['casaconfig'].get('measurespath'):
+                mpath = config['casaconfig']['measurespath']
+                casatools.ctsys.setmeasurespath(mpath)
+                curr_path = casatools.ctsys.getpath()
+                if isinstance(curr_path, list):
+                    casatools.ctsys.setpath([mpath] + [p for p in curr_path if p != mpath])
+        except Exception:
+            pass
+
     # Initial import of casatasks with modified casaconfig setup
     import casatasks
 
@@ -197,6 +375,24 @@ def casatasks_startup(casa_config: dict[str, str | None], loglevel: str | None =
     # Adjust log filtering level
     casaloglevel = 'INFO1'
     casatasks.casalog.filter(casaloglevel)
+
+    # Log measures configuration and verification
+    try:
+        import casatools
+        mpath = casatools.ctsys.measurespath() if hasattr(casatools.ctsys, 'measurespath') else 'unknown'
+        res_geo = casatools.ctsys.resolve('geodetic') if hasattr(casatools.ctsys, 'resolve') else 'unknown'
+        res_eph = casatools.ctsys.resolve('ephemerides') if hasattr(casatools.ctsys, 'resolve') else 'unknown'
+        if stage_measures and staged_path:
+            casatasks.casalog.post(
+                f"Local measures staging active: {staged_path} (geodetic: {res_geo})",
+                priority='INFO', origin='pipeline.config'
+            )
+        casatasks.casalog.post(
+            f"CASA runtime measures: ctsys.measurespath={mpath}, geodetic={res_geo}, ephemerides={res_eph}",
+            priority='DEBUG', origin='pipeline.config'
+        )
+    except Exception:
+        pass
     # print('current:', casalogfile, casaloglevel)
     # Another approach is using environment variable / Workplugin for initialization
     # But they will likely arrive after the import

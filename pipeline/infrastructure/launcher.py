@@ -345,6 +345,15 @@ class Pipeline:
 
         self._link_casa_log(self.context)
 
+        # Log active measures path at debug level
+        try:
+            import casatools
+            mpath = casatools.ctsys.measurespath() if hasattr(casatools.ctsys, 'measurespath') else 'unknown'
+            res_geo = casatools.ctsys.resolve('geodetic') if hasattr(casatools.ctsys, 'resolve') else 'unknown'
+            LOG.debug('CASA runtime measures path: %s (geodetic: %s)', mpath, res_geo)
+        except Exception:
+            pass
+
         # define the plot level as a global setting rather than on the
         # context, as we want it to be a session-wide setting and adjustable
         # mid-session for interactive use.

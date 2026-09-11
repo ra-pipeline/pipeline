@@ -267,6 +267,20 @@ def log_host_environment():
             f'\tAvailable memory: {domain.measures.FileSize(env.casa_memory, domain.measures.FileSizeUnits.BYTES)}'
         )
 
+        try:
+            import casatools
+            mpath = casatools.ctsys.measurespath() if hasattr(casatools.ctsys, 'measurespath') else 'unknown'
+            res_geo = casatools.ctsys.resolve('geodetic') if hasattr(casatools.ctsys, 'resolve') else 'unknown'
+            res_eph = casatools.ctsys.resolve('ephemerides') if hasattr(casatools.ctsys, 'resolve') else 'unknown'
+            LOG.debug(
+                'CASA measures data locations:\n'
+                f'\tmeasurespath: {mpath}\n'
+                f'\tgeodetic: {res_geo}\n'
+                f'\tephemerides: {res_eph}'
+            )
+        except Exception:
+            pass
+
         if infrastructure.daskhelpers.is_daskclient_allowed():
             LOG.debug('Dependency details:')
             for dep_name, dep_detail in environment.dependency_details.items():
