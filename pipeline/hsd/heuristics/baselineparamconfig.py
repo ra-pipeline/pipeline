@@ -508,7 +508,7 @@ class BaselineFitParamConfig(api.Heuristic, abc.ABC):
         specific to fitting. For polynomial fitting, fitting function and
         fitting order are included in the dictionary. For cubic spline
         (cspline) fitting, number of segments in addition to fitting function
-        and fitting order are included. Fitting function can fallback to 'poly'
+        and fitting order are included. Fitting function can fall back to 'poly'
         even if input fitting function is 'cspline' when too many edge channels
         are flagged and user instructs to do so. Please see the implementation
         of SwitchPolynomialWhenLargeMaskAtEdgeHeuristic for detail about

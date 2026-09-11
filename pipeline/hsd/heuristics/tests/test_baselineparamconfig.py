@@ -118,10 +118,10 @@ class TestBaselineFitParamConfig:
 
     def test_get_fit_param_cspline(self, heuristic_cspline):
         edge = fitorder.EdgeChannels(0, 0)
-        result = heuristic_cspline._get_fit_param(polyorder=2, nchan=100, edge=edge, nchan_without_edge=100,
-                                                  nchan_masked=0, masklist=[])
+        result = heuristic_cspline._get_fit_param(polyorder=2, nchan=10, edge=edge, nchan_without_edge=5,
+                                                  nchan_masked=0, masklist=[[0,1], [0,2], [5,6], [7,8], [3,4]])
         assert result[BLP.FUNC] == 'cspline'
-        assert result[BLP.NPIECE] == 2
+        assert result[BLP.NPIECE] == 1
         assert result[BLP.ORDER] == 0
 
     def test_get_fit_param_sinusoid(self):
@@ -192,7 +192,7 @@ class TestBaselineFitParamConfig:
                 antenna_id=0,
                 field_id=0,
                 spw_id=0,
-                fit_order='automatic',
+                fit_order=2,
                 edge=(5, 5),
                 deviation_mask=None,
                 blparam='test.blparam'
