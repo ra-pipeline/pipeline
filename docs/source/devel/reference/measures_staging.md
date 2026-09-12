@@ -35,9 +35,9 @@ While a full CASA runtime data distribution is ~3.3 GB (encompassing beam models
 * **Static ephemeris tables (`ephemerides/`, ~415 MB)**: Solar system ephemerides (`DE405`, `DE200`, `JPL-Horizons`) and bundled `splatalogue` spectral line tables are static runtime data that are **never touched** by the daily measures cron (remaining unchanged since 2021).
 * **Casacore path requirements**: Casacore C++'s internal ephemeris engine (`MeasJPL`) queries `measurespath/ephemerides` directly for planetary and solar system body coordinates (e.g. Mars, Uranus, Sun, Titan calibrators).
 
-To optimize I/O performance and disk footprint while guaranteeing complete astrometric accuracy and crash protection:
+To optimize I/O performance and disk footprint while guaranteeing complete astrometric accuracy, crash protection, and compatibility:
 1. The pipeline **physically copies** `geodetic/` (~9.5 MB) to scratch, completely insulating active runs from NFS cron updates.
-2. The pipeline **symlinks** `ephemerides/` (`os.symlink`) pointing to the source repository. If symlink creation fails (e.g. due to filesystem limitations), it automatically falls back to a physical copy.
+2. The pipeline **symlinks** `ephemerides/` and any other static directories (`alma/`, `catalogs/`, `nrao/`, etc.) from the source repository. This satisfies Casacore C++ table lookups, prevents `casaconfig` validation warnings (`casarundata is invalid`), and adds zero disk overhead. If symlink creation fails (e.g. due to filesystem limitations), `ephemerides/` automatically falls back to a physical copy.
 
 This yields a tiny **~9.5 MB** copy payload per process that completes in **< 0.05 seconds**.
 

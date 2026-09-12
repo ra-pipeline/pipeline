@@ -153,13 +153,14 @@ def nested_update(d: dict[str, Any], u: dict[str, Any]) -> dict[str, Any]:
 def stage_local_measures(source_path: str | None = None,
                          base_dir: str | None = None,
                          cleanup: bool | None = None) -> str | None:
-    """Stage dynamic measures tables (geodetic) and link ephemerides to node-local scratch storage.
+    """Stage dynamic measures tables (geodetic) and link static rundata to node-local scratch storage.
 
     This protects pipeline runs from mid-execution corruption caused by in-place
     updates (e.g. daily cron rsync/git pull) on shared network mounts. Only geodetic/
     (~9.5 MB) is actively modified by daily measures updates, so it is physically copied,
-    while static ephemerides/ (~415 MB) is symlinked (falling back to copy if symlink fails),
-    yielding a minimal ~9.5 MB footprint and near-instant staging (< 0.05s).
+    while static ephemerides/ (~415 MB) and other static rundata directories (alma, catalogs,
+    nrao, etc.) are symlinked (falling back to copy if symlink fails), yielding a minimal
+    ~9.5 MB footprint, near-instant staging (< 0.05s), and satisfying casaconfig validation.
 
     Args:
         source_path: Source directory containing measures data (with geodetic/ subfolder).
@@ -256,16 +257,28 @@ def stage_local_measures(source_path: str | None = None,
         if os.path.isdir(src_geo) and not os.path.exists(dst_geo):
             shutil.copytree(src_geo, dst_geo, dirs_exist_ok=True)
 
-        # 2. Link ephemerides: ephemerides (~415 MB) are static runtime data untouched by the
-        # daily measures cron. Symlinking satisfies casacore's internal ephemeris path requirements
-        # with zero copy overhead, keeping the process footprint at ~9.5 MB.
-        src_eph = os.path.join(resolved_source, 'ephemerides')
-        dst_eph = os.path.join(target_dir, 'ephemerides')
-        if os.path.isdir(src_eph) and not os.path.exists(dst_eph):
-            try:
-                os.symlink(src_eph, dst_eph)
-            except OSError:
-                shutil.copytree(src_eph, dst_eph, dirs_exist_ok=True)
+        # 2. Link static runtime data: ephemerides (~415 MB), catalogs, alma, nrao, etc.
+        # These are static runtime tables untouched by the daily measures cron. Symlinking them
+        # satisfies casacore C++ path resolution and casaconfig directory structure validation
+        # (avoiding 'casarundata is invalid' warnings) with zero copy overhead, keeping the
+        # process disk footprint at ~9.5 MB.
+        try:
+            entries = os.listdir(resolved_source)
+        except Exception:
+            entries = ['ephemerides']
+
+        for item in entries:
+            if item == 'geodetic' or item.startswith('.'):
+                continue
+            src_item = os.path.join(resolved_source, item)
+            dst_item = os.path.join(target_dir, item)
+            if not os.path.exists(dst_item):
+                try:
+                    os.symlink(src_item, dst_item)
+                except OSError:
+                    # Fallback for ephemerides if symlinks are not permitted on the filesystem
+                    if item == 'ephemerides' and os.path.isdir(src_item):
+                        shutil.copytree(src_item, dst_item, dirs_exist_ok=True)
 
         if cleanup:
             def _cleanup_dir():
