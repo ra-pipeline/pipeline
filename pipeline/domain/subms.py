@@ -195,10 +195,20 @@ class SubMS:
                 return dt
         return None
 
-    def set_data_column(self, dtype: DataType, column: str) -> None:
+    def set_data_column(
+        self,
+        dtype: DataType,
+        column: str,
+        source: str | None = None,
+        spw: str | None = None,
+        overwrite: bool = False,
+        **kwargs: Any,
+    ) -> None:
         """Update data column mapping."""
         self.data_type = dtype
         self.data_column[dtype] = column
+        if self.parent_ms:
+            self.parent_ms.data_column[dtype] = column
 
     def get_vis(self, *args: Any, **kwargs: Any) -> str:
         """Return on-disk path to this sub-MS."""

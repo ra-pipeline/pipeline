@@ -68,6 +68,7 @@ def mock_observing_run(monkeypatch):
             self.name = name
             self.source = source
             self.intents = {'TARGET'}
+            self.valid_spws = {spw16, spw18}
 
     source_target = MockSource(0, 'TargetA')
     field0 = MockField(0, 'TargetA_0', source_target)
@@ -649,3 +650,34 @@ def test_observing_run_get_real_spwsel_empty_and_whitespace(mock_observing_run):
 
     res = obs_run.get_real_spwsel(['', '   '], [raw_eb.name, raw_eb.name])
     assert res == [None, None]
+
+
+def test_callibrary_interval_calstate_subms(mock_observing_run, tmp_path):
+    """Verify IntervalCalState.create_from_context indexes child SubMS slices."""
+    from pipeline.infrastructure import callibrary
+    from pipeline.infrastructure.launcher import Context
+
+    obs_run, raw_eb = mock_observing_run
+    sub_path = str(tmp_path / 'uid___targets.src1.spw0.ms')
+    base_outputvis = str(tmp_path / 'uid___targets.ms')
+
+    sub = SubMS(
+        name=sub_path,
+        parent_ms=raw_eb,
+        source_name='TargetA',
+        real_spw_id=16,
+        virtual_spw_id=0,
+        field_ids=[0],
+        base_outputvis=base_outputvis,
+    )
+    obs_run.register_sub_mses([sub], data_type=DataType.REGCAL_CONTLINE_SCIENCE)
+
+    ctx = Context()
+    ctx.observing_run = obs_run
+
+    calstate = callibrary.IntervalCalState.create_from_context(ctx)
+    assert sub_path in calstate.shape
+    assert sub_path in calstate.id_to_intent
+    assert sub_path in calstate.id_to_field
+    assert sub_path in calstate.data
+

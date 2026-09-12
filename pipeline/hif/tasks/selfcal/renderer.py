@@ -779,10 +779,13 @@ class SelfcalMosaicRenderer(T2_4MDetailsSelfcalRenderer):
         for subfield in subfields:
             cleantarget_subfield = copy.deepcopy(cleantarget)
             cleantarget_subfield['field_name'] = cleantarget_subfield['field_name'] + f'_field_{subfield}'
-            cleantarget_subfield['sc_lib'] = cleantarget['sc_lib'][subfield]
+            cleantarget_subfield['sc_lib'] = cleantarget['sc_lib'].get(subfield, cleantarget['sc_lib'].get(str(subfield)))
             cleantarget_subfield['sc_lib_mosaic'] = cleantarget['sc_lib']
             cleantarget_subfield['sc_subfield'] = subfield
-            phasecenter = subfields_phasecenters[subfield]
+            if isinstance(subfields_phasecenters, list):
+                phasecenter = subfields_phasecenters[subfield]
+            else:
+                phasecenter = subfields_phasecenters.get(subfield, subfields_phasecenters.get(str(subfield)))
             ref = cleantarget['phasecenter'].split(None, 1)
             cleantarget_subfield['phasecenter'] = radec_to_string(ref, phasecenter[0], phasecenter[1])
             cleantarget_subfields.append(cleantarget_subfield)

@@ -22,7 +22,7 @@ import pipeline.infrastructure.filenamer as filenamer
 import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.vdp as vdp
 from pipeline import environment
-from pipeline.domain import DataType
+from pipeline.domain import DataType, SubMS
 from pipeline.hif.heuristics.auto_selfcal import auto_selfcal
 from pipeline.hif.tasks.applycal import SerialIFApplycal
 from pipeline.hif.tasks.makeimlist import MakeImList
@@ -543,15 +543,18 @@ class Selfcal(basetask.StandardTaskTemplate):
                 vis_base = os.path.splitext(os.path.basename(vis))[0]
                 if vis_base.endswith('_cont'):
                     vis_base = vis_base[:-5]
+                eb_root = vis_base[:-8] if vis_base.endswith('_targets') else vis_base
                 for idx, gaintable in enumerate(sc_lib[vis]['gaintable_final']):
-                    for vis_calto in vislist_calto:
-                        if vis_calto.startswith(vis_base):
-                            gaintable = os.path.join(sc_workdir, sc_lib[vis]['gaintable_final'][idx])
-                            if gaintable not in caltable_list:
-                                caltable_list.append(gaintable)
-                            if os.path.exists(gaintable):
-                                if gaintable not in caltable_ready:
-                                    caltable_ready.append(gaintable)
+                    for ms in mses:
+                        ms_basename = os.path.basename(ms.name)
+                        origin_name = getattr(ms, 'origin_ms', '')
+                        if ms_basename.startswith(eb_root) or origin_name.startswith(eb_root) or vis_base in ms_basename:
+                            gaintable_path = os.path.join(sc_workdir, sc_lib[vis]['gaintable_final'][idx])
+                            if gaintable_path not in caltable_list:
+                                caltable_list.append(gaintable_path)
+                            if os.path.exists(gaintable_path):
+                                if gaintable_path not in caltable_ready:
+                                    caltable_ready.append(gaintable_path)
         LOG.info('selfcal/caltable(s) request : %r', caltable_list)
         LOG.info('selfcal/caltable(s) ready   : %r', caltable_ready)
 
@@ -879,25 +882,41 @@ class Selfcal(basetask.StandardTaskTemplate):
                 vis_base = os.path.splitext(os.path.basename(vis))[0]
                 if vis_base.endswith('_cont'):
                     vis_base = vis_base[:-5]
+                eb_root = vis_base[:-8] if vis_base.endswith('_targets') else vis_base
+
                 for idx, gaintable in enumerate(sc_lib[vis]['gaintable_final']):
-                    for vis_calto in vislist_calto:
-                        if vis_calto.startswith(vis_base):
+                    spwmap_final = sc_lib[vis]['spwmap_final']
+                    if any(not isinstance(spwmap, list) for spwmap in spwmap_final) or not spwmap_final:
+                        spwmap_final = [spwmap_final]
 
-                            # workaround a potential issue from heuristics.auto_selfcal when gaintable has only one element, when it's not a list of list.
-                            spwmap_final = sc_lib[vis]['spwmap_final']
-                            if any(not isinstance(spwmap, list) for spwmap in spwmap_final) or not spwmap_final:
-                                spwmap_final = [spwmap_final]
+                    gaintable_path = os.path.join(sc_workdir, sc_lib[vis]['gaintable_final'][idx])
+                    calfrom = callibrary.CalFrom(
+                        gaintable=gaintable_path, interp=sc_lib[vis]['applycal_interpolate_final'][idx],
+                        calwt=False, spwmap=spwmap_final[idx],
+                        caltype='gaincal')
 
-                            gaintable = os.path.join(sc_workdir, sc_lib[vis]['gaintable_final'][idx])
-                            calfrom = callibrary.CalFrom(
-                                gaintable=gaintable, interp=sc_lib[vis]['applycal_interpolate_final'][idx],
-                                calwt=False, spwmap=spwmap_final[idx],
-                                caltype='gaincal')
+                    for ms in mses:
+                        ms_basename = os.path.basename(ms.name)
+                        origin_name = getattr(ms, 'origin_ms', '')
+                        if not (ms_basename.startswith(eb_root) or origin_name.startswith(eb_root) or vis_base in ms_basename):
+                            continue
+
+                        # If ms is logical or has SubMS slices, apply directly to the matching physical slices
+                        if getattr(ms, 'is_logical', False) or bool(getattr(ms, 'sub_mses', [])):
+                            matching_subs = ms.get_subms(source=cleantarget['field'])
+                            for subms in matching_subs:
+                                sub_spw = str(subms.real_spw_id) if subms.real_spw_id is not None else cleantarget['spw_real'][vis]
+                                calto = callibrary.CalTo(
+                                    vis=subms.name, field=cleantarget['field'],
+                                    spw=sub_spw)
+                                calapps.append(callibrary.CalApplication(calto, calfrom))
+                                vislist.append(subms.name)
+                        else:
                             calto = callibrary.CalTo(
-                                vis=vis_calto, field=cleantarget['field'],
+                                vis=ms.name, field=cleantarget['field'],
                                 spw=cleantarget['spw_real'][vis])
                             calapps.append(callibrary.CalApplication(calto, calfrom))
-                            vislist.append(vis_calto)
+                            vislist.append(ms.name)
 
         for calapp in calapps:
             self.inputs.context.callibrary.add(calapp.calto, calapp.calfrom)
@@ -1024,19 +1043,43 @@ class Selfcal(basetask.StandardTaskTemplate):
 
     def _split_scaltargets(self, scal_targets):
         """Split the input MSes into smaller MSes per cleantargets effeciently."""
-        # mt_inputvis_list aggregates input vis argument values of expected mstransform calls
-        # therefore len(mt_inputvis_list) represents the number of ms to be split out
-        mt_inputvis_list = [(vis, '_CONTLINE_' in target['datatype'])
-                            for target in scal_targets for vis in target['vis']]
+        # For each target, determine the extraction source MSes and datacolumns.
+        # In hierarchical SubMS mode (PIPE-3250), target visibilities are partitioned into
+        # single-SPW slices. To allow auto_selfcal to solve with multi-SPW combination
+        # (gaincal combine='spw'), we extract an on-demand multi-SPW working copy directly
+        # from the calibrated parent EB MS (DataType.REGCAL_CONTLINE_ALL in CORRECTED_DATA)
+        # into sc_workdir.
+        target_eb_map = {}
+        for target in scal_targets:
+            eb_dict = {}
+            for vis in target['vis']:
+                ms = self.inputs.context.observing_run.get_ms(vis)
+                is_subms = isinstance(ms, SubMS) or getattr(ms, 'is_logical', False) or bool(getattr(ms, 'sub_mses', []))
+                source_ms = None
+                datacolumn = 'data'
+                if is_subms:
+                    origin_ms_name = getattr(ms, 'origin_ms', None)
+                    if origin_ms_name:
+                        raw_ms = self.inputs.context.observing_run.get_ms(origin_ms_name)
+                        if raw_ms:
+                            source_ms = raw_ms
+                            datacolumn = 'corrected'
+                if source_ms is None:
+                    source_ms = ms
+                    datacolumn = 'data'
+                if source_ms.name not in eb_dict:
+                    eb_dict[source_ms.name] = (source_ms, datacolumn)
+            target_eb_map[id(target)] = list(eb_dict.values())
 
-        parallel = mpihelpers.parse_parallel_input_parameter(self.inputs.parallel)
-        taskqueue_parallel_request = len(mt_inputvis_list) > 1 and parallel
-
-        inputvis_list = utils.deduplicate([m[0] for m in mt_inputvis_list])
+        inputvis_list = utils.deduplicate([
+            src_ms.name for eb_list in target_eb_map.values() for src_ms, _ in eb_list
+        ])
         outputvis_list = []
 
-        # PIPE-2497: Attempting line flagging for all input visibilities,
-        # regardless of whether the datatype is "CONTLINE" or "CONT".
+        parallel = mpihelpers.parse_parallel_input_parameter(self.inputs.parallel)
+        taskqueue_parallel_request = len(inputvis_list) > 1 and parallel
+
+        # Flag lines on the input source visibilities before splitting
         self._flag_lines(inputvis_list)
 
         with utils.ignore_pointing(inputvis_list):
@@ -1060,17 +1103,18 @@ class Selfcal(basetask.StandardTaskTemplate):
                     spw_real = {}
                     field = target['field']
                     uvrange = target['uvrange']
-                    for vis in target['vis']:
 
-                        # we use virtualspw here for the naming convention (similar to the imaging naming convention).
-                        real_spwsel = self.inputs.context.observing_run.get_real_spwsel([target['spw']], [vis])[0]
-                        spw_real[vis] = real_spwsel
-                        outputvis = os.path.join(sc_workdir, os.path.basename(vis))
+                    eb_sources = target_eb_map.get(id(target), [])
+                    for source_ms, datacolumn in eb_sources:
+                        real_spwsel = self.inputs.context.observing_run.get_real_spwsel([target['spw']], [source_ms.name])[0]
+                        eb_root = os.path.splitext(source_ms.basename)[0]
+                        if eb_root.endswith('_targets'):
+                            eb_root = eb_root[:-8]
+                        outputvis_name = f'{eb_root}_targets.ms'
+                        outputvis = os.path.join(sc_workdir, outputvis_name)
                         self._remove_ms(outputvis)
 
-                        ms = self.inputs.context.observing_run.get_ms(vis)
-                        spws = ms.get_spectral_windows(real_spwsel)
-
+                        spws = source_ms.get_spectral_windows(real_spwsel)
                         mean_freq = np.mean([float(spw.mean_frequency.to_units(
                             measures.FrequencyUnits.HERTZ)) for spw in spws])
                         bwarray = np.array([float(spw.bandwidth.to_units(measures.FrequencyUnits.HERTZ))
@@ -1079,13 +1123,15 @@ class Selfcal(basetask.StandardTaskTemplate):
                         chanwidth_desired_hz = self.get_desired_width(mean_freq)
                         chanbin = self.get_spw_chanbin(bwarray, chanarray, chanwidth_desired_hz)
 
-                        task_args = {'vis': vis, 'outputvis': outputvis, 'field': field, 'spw': real_spwsel,
-                                     'uvrange': uvrange, 'chanaverage': True, 'chanbin': chanbin, 'usewtspectrum': True,
-                                     'datacolumn': 'data', 'reindex': False, 'keepflags': True}
-                        outputvis_list.append((vis, outputvis))
+                        intent = f"*{target.get('intent', 'TARGET')}*"
+                        task_args = {'vis': source_ms.name, 'outputvis': outputvis, 'field': field, 'intent': intent,
+                                     'spw': real_spwsel, 'uvrange': uvrange, 'chanaverage': True, 'chanbin': chanbin,
+                                     'usewtspectrum': True, 'datacolumn': datacolumn, 'reindex': False, 'keepflags': True}
+                        outputvis_list.append((source_ms.name, outputvis))
 
                         tq.add_jobrequest(casa_tasks.mstransform, task_args, executor=self._executor)
-                        vislist.append(os.path.basename(outputvis))
+                        vislist.append(outputvis_name)
+                        spw_real[outputvis_name] = real_spwsel
 
                     target['sc_workdir'] = sc_workdir
                     target['spw_real'] = spw_real

@@ -1642,24 +1642,28 @@ class IntervalCalState:
         if LOG.isEnabledFor(logging.TRACE):
             LOG.trace('Creating new CalLibrary from context')
 
+        all_mses = list(context.observing_run.measurement_sets)
+        for ms in context.observing_run.measurement_sets:
+            all_mses.extend(getattr(ms, 'sub_mses', []))
+
         # holds a mapping of numeric intent ID to string intent for each ms.
         id_to_intent = {ms.name: get_intent_id_map(ms)
-                        for ms in context.observing_run.measurement_sets}
+                        for ms in all_mses}
 
         # holds a mapping of numeric ID to field name for each ms.
         id_to_field = {ms.name: {field.id: field.name for field in ms.fields}
-                       for ms in context.observing_run.measurement_sets}
+                       for ms in all_mses}
 
         calstate = IntervalCalState()
         calstate.id_to_intent.update(id_to_intent)
         calstate.id_to_field.update(id_to_field)
 
         interval_trees = {ms.name: create_interval_tree_for_ms(ms)
-                          for ms in context.observing_run.measurement_sets}
+                          for ms in all_mses}
         calstate.data.update(interval_trees)
 
         # the shape is never modified and hence can be shared between calstates
-        for ms in context.observing_run.measurement_sets:
+        for ms in all_mses:
             calstate.shape[ms.name] = get_calstate_shape(ms)
 
         calstate.data = trim_to_valid_data_selection(calstate)
