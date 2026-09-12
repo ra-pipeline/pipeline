@@ -178,39 +178,20 @@ def stage_local_measures(source_path: str | None = None,
     if cleanup is None:
         env_cleanup = os.environ.get('PIPELINE_CLEANUP_LOCAL_MEASURES')
         cleanup = env_cleanup.lower() in ('true', '1', 'yes') if env_cleanup is not None else True
-    candidates = []
-    if source_path:
-        candidates.append(source_path)
-    if os.environ.get('PIPELINE_LOCAL_MEASURES_SOURCE'):
-        candidates.append(os.environ['PIPELINE_LOCAL_MEASURES_SOURCE'])
-    if os.environ.get('CASADATA'):
-        candidates.append(os.environ['CASADATA'])
-    if hasattr(casaconfig.config, 'measurespath') and casaconfig.config.measurespath:
-        candidates.append(casaconfig.config.measurespath)
+    candidates = [
+        source_path,
+        os.environ.get('PIPELINE_LOCAL_MEASURES_SOURCE'),
+        os.environ.get('CASADATA'),
+        getattr(casaconfig.config, 'measurespath', None),
+    ]
     if 'casatools' in sys.modules:
         try:
             import casatools
-            if hasattr(casatools.ctsys, 'measurespath'):
-                mpath = casatools.ctsys.measurespath()
-                if mpath:
-                    candidates.append(mpath)
-            if hasattr(casatools.ctsys, 'rundata'):
-                rpath = casatools.ctsys.rundata()
-                if rpath:
-                    candidates.append(rpath)
+            candidates.extend([casatools.ctsys.measurespath(), casatools.ctsys.rundata()])
+            candidates.extend(casatools.ctsys.getpath() or [])
         except Exception:
             pass
-    if hasattr(casaconfig.config, 'datapath') and isinstance(casaconfig.config.datapath, list):
-        candidates.extend(casaconfig.config.datapath)
-    if 'casatools' in sys.modules:
-        try:
-            import casatools
-            if hasattr(casatools.ctsys, 'getpath'):
-                gpath = casatools.ctsys.getpath()
-                if isinstance(gpath, list):
-                    candidates.extend(gpath)
-        except Exception:
-            pass
+    candidates.extend(getattr(casaconfig.config, 'datapath', []) or [])
 
     resolved_source = None
     for cand in candidates:
@@ -347,11 +328,9 @@ def casatasks_startup(casa_config: dict[str, str | None], loglevel: str | None =
             config['casaconfig']['measurespath'] = staged_path
             config['casaconfig']['measures_auto_update'] = False
             config['casaconfig']['data_auto_update'] = False
-            curr_datapath = config['casaconfig'].get('datapath')
-            if curr_datapath and isinstance(curr_datapath, list):
+            curr_datapath = config['casaconfig'].get('datapath') or getattr(casaconfig.config, 'datapath', [])
+            if isinstance(curr_datapath, list):
                 config['casaconfig']['datapath'] = [staged_path] + [p for p in curr_datapath if p != staged_path]
-            elif hasattr(casaconfig.config, 'datapath') and isinstance(casaconfig.config.datapath, list):
-                config['casaconfig']['datapath'] = [staged_path] + [p for p in casaconfig.config.datapath if p != staged_path]
             else:
                 config['casaconfig']['datapath'] = [staged_path]
 
@@ -362,16 +341,14 @@ def casatasks_startup(casa_config: dict[str, str | None], loglevel: str | None =
         else:
             setattr(casaconfig.config, key, value)
 
-    # In case casatools has already been initialized (e.g. monolithic CASA session)
-    if 'casatools' in sys.modules:
+    # In monolithic CASA, casatools is pre-imported; update ctsys directly
+    if 'casatools' in sys.modules and config['casaconfig'].get('measurespath'):
         try:
             import casatools
-            if config['casaconfig'].get('measurespath'):
-                mpath = config['casaconfig']['measurespath']
-                casatools.ctsys.setmeasurespath(mpath)
-                curr_path = casatools.ctsys.getpath()
-                if isinstance(curr_path, list):
-                    casatools.ctsys.setpath([mpath] + [p for p in curr_path if p != mpath])
+            mpath = config['casaconfig']['measurespath']
+            casatools.ctsys.setmeasurespath(mpath)
+            curr_path = casatools.ctsys.getpath() or []
+            casatools.ctsys.setpath([mpath] + [p for p in curr_path if p != mpath])
         except Exception:
             pass
 
@@ -392,9 +369,9 @@ def casatasks_startup(casa_config: dict[str, str | None], loglevel: str | None =
     # Log measures configuration and verification
     try:
         import casatools
-        mpath = casatools.ctsys.measurespath() if hasattr(casatools.ctsys, 'measurespath') else 'unknown'
-        res_geo = casatools.ctsys.resolve('geodetic') if hasattr(casatools.ctsys, 'resolve') else 'unknown'
-        res_eph = casatools.ctsys.resolve('ephemerides') if hasattr(casatools.ctsys, 'resolve') else 'unknown'
+        mpath = casatools.ctsys.measurespath()
+        res_geo = casatools.ctsys.resolve('geodetic')
+        res_eph = casatools.ctsys.resolve('ephemerides')
         if stage_measures and staged_path:
             casatasks.casalog.post(
                 f"Local measures staging active: {staged_path} (geodetic: {res_geo})",
