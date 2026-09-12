@@ -1492,13 +1492,26 @@ def get_nterms(fracbw, nt1snr=3.0):
 
 
 def get_mean_freq(vislist, spwsarray):
-    tb.open(vislist[0]+'/SPECTRAL_WINDOW')
-    freqarray = tb.getcol('REF_FREQUENCY')
-    tb.close()
-    meanfreq = np.mean(freqarray[spwsarray[vislist[0]]])
-    minfreq = np.min(freqarray[spwsarray[vislist[0]]])
-    maxfreq = np.max(freqarray[spwsarray[vislist[0]]])
-    fracbw = np.abs(maxfreq-minfreq)/meanfreq
+    """Aggregate frequency statistics across all MeasurementSets in vislist."""
+    all_freqs = []
+    for vis in vislist:
+        if vis in spwsarray:
+            spws = np.asarray(spwsarray[vis]).ravel().astype(int)
+            if len(spws) > 0:
+                with casa_tools.TableReader(os.path.join(vis, 'SPECTRAL_WINDOW')) as table:
+                    freqarray = table.getcol('REF_FREQUENCY')
+                valid_spws = [s for s in spws if 0 <= s < len(freqarray)]
+                if len(valid_spws) > 0:
+                    all_freqs.extend(freqarray[valid_spws].tolist())
+    if len(all_freqs) == 0:
+        with casa_tools.TableReader(os.path.join(vislist[0], 'SPECTRAL_WINDOW')) as table:
+            freqarray = table.getcol('REF_FREQUENCY')
+        all_freqs = freqarray.tolist()
+    all_freqs = np.array(all_freqs)
+    meanfreq = np.mean(all_freqs)
+    minfreq = np.min(all_freqs)
+    maxfreq = np.max(all_freqs)
+    fracbw = np.abs(maxfreq - minfreq) / meanfreq if meanfreq != 0.0 else 0.0
     return meanfreq, maxfreq, minfreq, fracbw
 
 
