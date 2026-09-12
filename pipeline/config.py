@@ -150,6 +150,27 @@ def nested_update(d: dict[str, Any], u: dict[str, Any]) -> dict[str, Any]:
     return d
 
 
+# ------------------------------------------------------------------------------
+# Unified In-Flight Measures Redirection & Bootstrapping Strategy:
+#
+# To ensure robust measures table resolution across all execution environments
+# (modular Python, monolithic interactive CASA, MPI cluster execution):
+#
+# 1. Early staging: stage_local_measures() runs during pipeline.config load,
+#    updating casaconfig.config.measurespath and disabling auto-updates before
+#    CASA modules are imported. In modular Python, this prevents casatools from
+#    triggering auto-updates or encountering read locks on shared NFS during import.
+#
+# 2. Unified in-flight C++ redirection: After casatasks and casatools are
+#    loaded, casatasks_startup() unconditionally invokes:
+#      casatools.ctsys.setmeasurespath(staged_path)
+#      casatools.ctsys.setpath([staged_path] + ...)
+#    This dynamically binds the underlying casacore C++ table resolver
+#    (casatools::State) in memory for both modular and monolithic CASA,
+#    guaranteeing a unified, identical code path regardless of launch mode.
+# ------------------------------------------------------------------------------
+
+
 def stage_local_measures(source_path: str | None = None,
                          base_dir: str | None = None,
                          cleanup: bool | None = None) -> str | None:
@@ -315,6 +336,7 @@ def casatasks_startup(casa_config: dict[str, str | None], loglevel: str | None =
     else:
         stage_measures = config.get('pipeconfig', {}).get('stage_local_measures', False)
 
+    staged_path: str | None = None
     if stage_measures:
         local_source = config.get('pipeconfig', {}).get('local_measures_source')
         local_base = config.get('pipeconfig', {}).get('local_measures_base')
@@ -341,48 +363,38 @@ def casatasks_startup(casa_config: dict[str, str | None], loglevel: str | None =
         else:
             setattr(casaconfig.config, key, value)
 
-    # In monolithic CASA, casatools is pre-imported; update ctsys directly
-    if 'casatools' in sys.modules and config['casaconfig'].get('measurespath'):
-        try:
-            import casatools
-            mpath = config['casaconfig']['measurespath']
-            casatools.ctsys.setmeasurespath(mpath)
-            curr_path = casatools.ctsys.getpath() or []
-            casatools.ctsys.setpath([mpath] + [p for p in curr_path if p != mpath])
-        except Exception:
-            pass
-
-    # Initial import of casatasks with modified casaconfig setup
+    # Initial import of CASA modules with modified casaconfig setup
     import casatasks
+    import casatools
 
     # Get the current casalogfile
     casalogfile = casatasks.casalog.logfile()
 
-    # adjust the log filtering level for casalogsink
+    # Adjust log filtering level for casalogsink
     # by default, modify filter to get INFO1 message which the pipeline
     # treats as ATTENTION level.
-
-    # Adjust log filtering level
     casaloglevel = 'INFO1'
     casatasks.casalog.filter(casaloglevel)
 
+    # Synchronize C++ ctsys runtime in-flight (unified for modular and monolithic CASA)
+    if staged_path:
+        casatools.ctsys.setmeasurespath(staged_path)
+        curr_path = casatools.ctsys.getpath() or []
+        casatools.ctsys.setpath([staged_path] + [p for p in curr_path if p != staged_path])
+
     # Log measures configuration and verification
-    try:
-        import casatools
-        mpath = casatools.ctsys.measurespath()
-        res_geo = casatools.ctsys.resolve('geodetic')
-        res_eph = casatools.ctsys.resolve('ephemerides')
-        if stage_measures and staged_path:
-            casatasks.casalog.post(
-                f"Local measures staging active: {staged_path} (geodetic: {res_geo})",
-                priority='INFO', origin='pipeline.config'
-            )
+    mpath = casatools.ctsys.measurespath()
+    res_geo = casatools.ctsys.resolve('geodetic')
+    res_eph = casatools.ctsys.resolve('ephemerides')
+    if staged_path:
         casatasks.casalog.post(
-            f"CASA runtime measures: ctsys.measurespath={mpath}, geodetic={res_geo}, ephemerides={res_eph}",
-            priority='DEBUG', origin='pipeline.config'
+            f"Local measures staging active: {staged_path} (geodetic: {res_geo})",
+            priority='INFO', origin='pipeline.config'
         )
-    except Exception:
-        pass
+    casatasks.casalog.post(
+        f"CASA runtime measures: ctsys.measurespath={mpath}, geodetic={res_geo}, ephemerides={res_eph}",
+        priority='DEBUG', origin='pipeline.config'
+    )
     # print('current:', casalogfile, casaloglevel)
     # Another approach is using environment variable / Workplugin for initialization
     # But they will likely arrive after the import

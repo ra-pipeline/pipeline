@@ -16,6 +16,8 @@ import pickle
 import pprint
 from typing import TYPE_CHECKING
 
+import casatools
+
 from pipeline import domain, environment
 
 from . import callibrary, casa_tools, eventbus, imagelibrary, logging, project, utils
@@ -347,15 +349,11 @@ class Pipeline:
 
         # Log active measures path at debug level
         if LOG.isEnabledFor(logging.DEBUG):
-            try:
-                import casatools
-                LOG.debug(
-                    'CASA runtime measures path: %s (geodetic: %s)',
-                    casatools.ctsys.measurespath(),
-                    casatools.ctsys.resolve('geodetic'),
-                )
-            except Exception:
-                pass
+            LOG.debug(
+                'CASA runtime measures path: %s (geodetic: %s)',
+                casatools.ctsys.measurespath(),
+                casatools.ctsys.resolve('geodetic'),
+            )
 
         # define the plot level as a global setting rather than on the
         # context, as we want it to be a session-wide setting and adjustable

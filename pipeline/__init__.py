@@ -268,19 +268,16 @@ def log_host_environment():
         )
 
         if LOG.isEnabledFor(infrastructure.logging.DEBUG):
-            try:
-                import casatools
-                LOG.debug(
-                    'CASA measures data locations:\n'
-                    '\tmeasurespath: %s\n'
-                    '\tgeodetic: %s\n'
-                    '\tephemerides: %s',
-                    casatools.ctsys.measurespath(),
-                    casatools.ctsys.resolve('geodetic'),
-                    casatools.ctsys.resolve('ephemerides'),
-                )
-            except Exception:
-                pass
+            import casatools
+            LOG.debug(
+                'CASA measures data locations:\n'
+                '\tmeasurespath: %s\n'
+                '\tgeodetic: %s\n'
+                '\tephemerides: %s',
+                casatools.ctsys.measurespath(),
+                casatools.ctsys.resolve('geodetic'),
+                casatools.ctsys.resolve('ephemerides'),
+            )
 
         if infrastructure.daskhelpers.is_daskclient_allowed():
             LOG.debug('Dependency details:')

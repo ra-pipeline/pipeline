@@ -56,17 +56,24 @@ target_dir = os.path.join(base_dir, folder_name)
 * **Safe Sibling Cleanup**: Each process registers an `atexit` hook (`shutil.rmtree`) targeting strictly its own directory. Python's `rmtree` safely unlinks the `ephemerides` symlink without touching the underlying source files.
 * **Negligible Disk Footprint**: 16 concurrent MPI worker ranks on a single host consume only **~152 MB** ($16 \times 9.5\text{ MB}$) of scratch space, easily fitting into any `/tmp` `tmpfs` RAM disk (even 500 MB).
 
-### 3. Dynamic C++ Runtime Redirection (`casatools.ctsys`)
+### 3. Unified In-Flight Redirection & Bootstrapping Strategy
 
-In monolithic CASA sessions (`bin/casa` / `mpicasa`), CASA boots and initializes its C++ runtime (`casatools.ctsys`) before the pipeline is imported. When `pipeline` is imported, `casatasks_startup()` intercepts the active session:
+To ensure robust measures table resolution across all execution environments (modular Python, monolithic interactive CASA, MPI cluster execution), the pipeline employs a **unified two-phase synchronization strategy**:
 
-```python
-if 'casatools' in sys.modules:
-    casatools.ctsys.setmeasurespath(staged_path)
-    casatools.ctsys.setpath([staged_path] + [p for p in curr_path if p != staged_path])
-```
+1. **Early Staging (`pipeline.config`)**:
+   * `stage_local_measures()` executes when `pipeline.config` is loaded (at the top of `pipeline/__init__.py`), before `domain`, `environment`, or `infrastructure` import CASA.
+   * Setting `casaconfig.config.measurespath` and disabling auto-updates before `casatools` imports protects modular Python (`bin/python3`) from network auto-update collisions or filesystem contention on shared NFS mounts during `casatools/__init__.py` module initialization.
+   * Because `casatools` only evaluates `casaconfig.config` once upon initial import, pre-configuring `casaconfig` ensures clean startup.
+   * **Why it cannot live in `pipeline.environment` or `pipeline.infrastructure`**: `environment.py` imports `casatasks`, and `infrastructure.logging` imports `from casatasks import casalog` at module level. `casatasks/__init__.py` unconditionally imports `from casatools import logsink`, which would prematurely import `casatools` before staging can run.
 
-This dynamically redirects the underlying casacore C++ table resolver (`ctsys.resolve()`), guaranteeing that all subsequent pipeline tasks (`hifa_flagdata`, `hifa_image`, etc.) query the local scratch tables.
+2. **Unified In-Flight C++ Redirection (`ctsys.setmeasurespath` / `ctsys.setpath`)**:
+   * After CASA modules are imported, `casatasks_startup()` unconditionally synchronizes the C++ runtime:
+     ```python
+     casatools.ctsys.setmeasurespath(staged_path)
+     casatools.ctsys.setpath([staged_path] + [p for p in curr_path if p != staged_path])
+     ```
+   * These C++ methods directly update `casatools::State::setDistroDataPath()` and `casatools::State::setDataPath()` in memory under mutex protection.
+   * This unified in-flight call eliminates special-case branching between modular and monolithic CASA (`bin/casa` / `mpicasa`): both environments execute the exact same instructions and bind casacore's runtime resolver to the node-local scratch tables.
 
 ### 4. Resilient Fallback
 
