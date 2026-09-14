@@ -17,6 +17,13 @@ def hif_makeimlist(vis=None, imagename=None, intent=None, field=None,
     :func:`~pipeline.hif.cli.hif_makeimages` stage, and reports them on the WebLog page. 
     The ``specmode`` can be ``'mfs'`` for per-spw continuum multi-frequency synthesis images,
     ``'cont'`` for aggregate mfs continuum images of several spectral windows, or ``'cube'`` for spectral cubes.
+    If ``specmode`` is not specified, it defaults to ``'cube'`` for
+    ``intent='TARGET'`` and to ``'mfs'`` for other intents. Standard ALMA
+    recipes override this default when aggregate continuum, polarization,
+    check-source, or representative-bandwidth products are required.
+    When ``datatype`` is not specified, the task selects the first available
+    matching data type from the preference order associated with the requested
+    intent and ``specmode``.
     The first time the task is run in standard recipes is in preparation for making per-spw mfs images
     of the calibrators. The cell and imsize is chosen separately per band, so that more appropriate choices are
     made for multi-band data including BandToBandInterferometry.
@@ -59,16 +66,28 @@ def hif_makeimlist(vis=None, imagename=None, intent=None, field=None,
       ``robust`` value from ``hifa_imageprecheck`` and any mitigation from ``hif_checkproductsize``.
 
     - **Representative Bandwidth Target Cube**
-      If the PI-requested spectral resolution (bandwidth for sensitivity) is at least 4x larger than the correlator
-      channel width, then in addition to cubes created at that correlator width, the representative source and spw
-      are imaged at the PI's requested resolution.
+      The representative-bandwidth heuristic first determines whether the
+      PI-requested bandwidth is represented by aggregate continuum imaging,
+      per-spw continuum imaging, or a separate representative-bandwidth cube.
+      No separate RepBW cube is created when the requested bandwidth is
+      classified as covered by aggregate (``specmode='cont'``) or per-spw
+      (``specmode='mfs'``) continuum imaging. Otherwise, a separate RepBW cube
+      is created when the requested bandwidth is strictly greater than four
+      times the default cube channel width after any ``hif_checkproductsize``
+      channel binning.
 
     The cell size is set to the minimum consistent with the UV coverage. The image size is set from the
-    cell size and primary beam size. If ``clearlist=True`` (default), any existing imaging list entries
-    for the same intent are replaced.
+    cell size and primary beam size. If ``clearlist=True`` (default), the current pending imaging list
+    and associated information are replaced before the new entries are written. Replacement is not
+    limited to entries with the same intent.
 
     Notes:
-        QA = fraction of images successfully added to the list compared to the total expected.
+        QA includes a primary score based on the fraction of expected imaging
+        targets successfully added to the list. Task errors and size-mitigation
+        errors receive a score of 0.0; when no clean targets are expected, the
+        primary score becomes ``None``. Aggregate continuum targets also
+        receive an additional score indicating whether continuum ranges were
+        found for their spectral windows.
 
     Examples:
         1. Make a list of science target images to be cleaned, one image per science spw:

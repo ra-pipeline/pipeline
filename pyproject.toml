@@ -391,7 +391,13 @@ build-docs = { cmd = "make html_docs", cwd = "docs" }
 # Incremental docs build — reuses doctrees and autosummary stubs (much faster for dev)
 build-docs-fast = { cmd = "make html_fast", cwd = "docs" }
 # Build PDF (LaTeX) docs
-build-pdf = { cmd = "make latexpdf", cwd = "docs" }
+build-pdfs = { cmd = "make latexpdf", cwd = "docs" }
+# Build Task Reference PDF
+build-pdf-taskdocs = { cmd = "make latex && cd _build/latex && make taskdocs.pdf", cwd = "docs" }
+# Build User Guide PDF
+build-pdf-userguide = { cmd = "make latex && cd _build/latex && make users_guide.pdf", cwd = "docs" }
+# Update BibTeX references from NASA/ADS public library
+update-references = { cmd = "python scripts/update_references.py" }
 
 [tool.pixi.environments]
 # default + docs share a solve-group so the docs build always uses the same locked deps as the default runtime

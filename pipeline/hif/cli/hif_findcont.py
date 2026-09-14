@@ -20,27 +20,40 @@ def hif_findcont(vis=None, target_list=None, hm_mosweight=None,
     2. **Pre-smoothing**: A boxcar smoothing kernel is applied to the mean spectrum prior to
        analysis. For Cycle 10+ data the kernel width is derived from the
        ``spectralDynamicRangeBandwidth`` ASDM attribute. For older data it is based on the
-       ``nbin`` factor from the preceding :func:`~pipeline.hif.cli.hif_makeimlist` stage, with additional heuristics
+       ``nbin`` value in the imaging target list, which is either supplied through
+       ``target_list`` or constructed internally using
+       :func:`~pipeline.hif.cli.hif_makeimlist` heuristics, with additional heuristics
        to skip smoothing for wide + narrow spw combinations, already-labeled continuum spws,
        and cases of strong line emission (peak SNR > 10: nbin limited to 2 for 12m, 3 for 7m).
     3. **Moment-difference contamination check**: Line-free channels are used to form ``mom8fc``
        and ``mom0fc`` images; the scaled-subtracted ``momDiff`` image peak SNR is computed.
        If ``momDiffSNR > 8`` (or > 11.5 for high-atm-variation spws), contamination is likely.
        Two remediation paths are tried: **Amend Mask** (logic code starts with ``A``) or
-       **Only Extra Mask** (code starts with ``E``). Further steps include channel intersection,
-       extra-mask, and ``autoLower`` (``X``, ``Y``) iterations. The final logic path code and
-       momDiffSNR are shown in the plot legend and the WebLog table.
+       **Only Extra Mask** (code starts with ``E``). Further steps include channel intersection (code ``I``),
+       extra-mask, and up to two rounds of ``autoLower`` (codes ``X`` and ``Y``) iterations. The final logic path code is
+       shown in the plot legend, and the momDiffSNR is shown there and in the WebLog table.
     4. **AllContinuum check**: If a single range covers >= 92.5% of the channels (>= 91% for
        spws with < 75 channels), the spw is declared ``AllContinuum`` and no cube is subsequently
-       cleaned.
+       cleaned. Note that the ``AllContinuum`` assessment is performed prior to the search for (and exclusion of) large gaps in the baseline (blue) points.
+       Thus, results with a single range can be narrower than this threshold and still be labelled as ``AllContinuum``.
 
     If a ``cont.dat`` file already exists in the working directory, spws with pre-defined ranges
     are not re-analyzed; only spws not listed are processed. The resulting ``cont.dat`` file (LSRK
     frequency ranges) is used by subsequent :func:`~pipeline.hif.cli.hif_uvcontsub` and :func:`~pipeline.hif.cli.hif_makeimages` stages.
 
-    Using ``hm_mode='coarse'`` applies the fast-imaging override with reduced
-    pixels-per-beam sampling to optimize processing speed. The default mode is
-    ``hm_mode='normal'`` to preserve the previous-cycle behavior.
+    Using ``hm_mode='coarse'`` applies fast-imaging overrides to reduce the
+    cost of the continuum-finding dirty cubes. When the target list is
+    constructed internally for ALMA data, coarse mode uses 3 pixels per beam
+    for 12-m data or 4 pixels per beam when 7-m data are present, applies a
+    uv taper, and enforces a minimum image size of 64 pixels. In all coarse
+    mode runs, weighting is set to ``'briggs'``, and per-channel weight
+    density and mosaic weighting are disabled, regardless of the corresponding
+    ``hm_*`` parameters. The default mode is ``hm_mode='normal'``, which
+    preserves the behavior prior to PL2026.
+
+    .. note::
+       Starting from ALMA Cycle 13, standard ALMA recipes use ``hm_mode='coarse'``
+       by default at the recipe workflow level.
 
     .. figure:: /figures/guide-img029.png
        :width: 60%

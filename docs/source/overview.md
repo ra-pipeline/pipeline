@@ -1,4 +1,19 @@
+(sec-overview)=
 # Pipeline Overview
+
+## What is the Pipeline?
+
+The Pipeline is a python software package that allows the **stateful**, **automated** processing of interferometric and single dish data, using CASA tasks and tools for the actual manipulation of visibilities and images.  Pipeline functionality includes:
+- extensive heuristics for calibration, flagging, and imaging, which are used to construct the optimal calls to CASA tasks
+- an infrastructure to keep track of both the data properties, and the processing state (calibrations that have been derived and applied, step in a processing recipe, etc)
+- extensive heuristics for Quality Assessment and for generating a rich Weblog of plots and diagnostics with all the details of the data and how they were processed.
+
+The Pipeline is data and metadata driven i.e. no human interaction is required to process using the default heuristics that are detected to be appropriate for a given set of data. However, a command line task interface is provided that allows adjustment of the heuristics and outputs (e.g. image sizes and weighting in cleaning) for specific use cases.
+
+
+
+
+### How is the Pipeline run?
 
 The Pipeline can be invoked in three ways, depending on the use case:
 

@@ -144,23 +144,37 @@ class FindContInputs(vdp.StandardInputs):
 
             vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the <hifa,hifv>_importdata task.
                 '': use all MeasurementSets in the context
+                When an explicit list is supplied, ``datacolumn`` must also be
+                specified as ``'data'`` or ``'corrected'``.
 
                 Examples: 'ngc5921.ms', ['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']
 
-            target_list: Dictionary specifying targets to be imaged; blank will read list from context.
-                If target_list is specified, it takes precedence and the field parameter is ignored.
+            target_list: Dictionary specifying targets for continuum finding.
+                If not specified, ``hif_findcont`` constructs the target list
+                internally using ``hif_makeimlist`` planning. If specified,
+                ``target_list`` takes precedence and the ``field`` parameter is
+                ignored.
 
             hm_mosweight: Mosaic weighting. Defaults to '' to enable the automatic heuristics calculation.
-                Can be set to True or False manually.
+                Can be set to True or False manually. When
+                ``hm_mode='coarse'``, this parameter is overridden and set to
+                ``False``.
 
             hm_perchanweightdensity: Calculate the weight density for each channel independently.
-                Defaults to '' to enable the automatic heuristics calculation. Can be set to True or False manually.
+                Defaults to '' to enable the automatic heuristics calculation.
+                Can be set to True or False manually. When
+                ``hm_mode='coarse'``, this parameter is overridden and set to
+                ``False``.
 
-            hm_weighting: Weighting scheme (natural,uniform,briggs,briggsabs[experimental],briggsbwtaper[experimental])
+            hm_weighting: Weighting scheme
+                (natural, uniform, briggs, briggsabs[experimental],
+                briggsbwtaper[experimental]). When
+                ``hm_mode='coarse'``, this parameter is overridden and Briggs
+                weighting is used.
 
             hm_mode: Continuum-finding imaging mode. "coarse" applies the new fast local override  with
                 reduced pixels-per-beam sampling to optimize processing speed
-                and "normal" preserves the previous-cycle behavior.
+                and "normal" preserves the behavior prior to ALMA Cycle 13.
 
                 Default: ``'normal'``
 
@@ -168,7 +182,10 @@ class FindContInputs(vdp.StandardInputs):
                 which will process all fields. Can be used to restrict processing to a subset of fields.
                 Only used if target_list is not specified.
 
-            datacolumn: Data column to image. Only to be used for manual overriding when the automatic choice by data type is not appropriate.
+            datacolumn: Data column to image. When ``vis`` is omitted, this
+                is optional and is selected automatically from the pipeline
+                data type. When ``vis`` is supplied explicitly, this must be
+                specified as ``'data'`` or ``'corrected'``.
 
             parallel: Use CASA/tclean built-in parallel imaging when possible.
 

@@ -18,7 +18,7 @@ b.) demote an antenna to the end of the list (lowest priority):
 - `hifa_polcalflag`
 - `h*_tsysflag`
 
-Note: [PIPE-1664](https://open-jira.nrao.edu/browse/PIPE-1664) proposes to add a "refant list update" step to `hifa_gfluxscaleflag`.
+Note: {jira}`PIPE-1664` proposes to add a "refant list update" step to `hifa_gfluxscaleflag`.
 
 A couple of reference antenna utility functions are bundled in
 `pipeline.infrastructure.refantflag` (introduced in PIPE-1759):
@@ -129,8 +129,8 @@ Identifying a Tsys spectral window is defined in `h.heuristics.tsysspwmap` as ei
 The concept of "diffgain reference" and "diffgain on-source" spectral windows was introduced in PL2024 as part of adding
 support for calibration band-to-band observations that use a differential gain calibrator. Relevant tickets:
 
-- [PIPE-2079](https://open-jira.nrao.edu/browse/PIPE-2079)
-- [PIPE-2145](https://open-jira.nrao.edu/browse/PIPE-2145)
+- {jira}`PIPE-2079`
+- {jira}`PIPE-2145`
 
 Within Pipeline, these two kinds are identified as science spectral windows that cover either the `DIFFGAINREF` or
 the `DIFFGAINSRC` intent, e.g.:

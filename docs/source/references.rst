@@ -4,5 +4,4 @@ References
 ==========
 
 .. bibliography::
-   :all:
    :style: astrostyle

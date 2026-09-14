@@ -18,7 +18,8 @@ def hifa_tsysflagcontamination(
 
     Identifies and flags channel ranges in the Tsys spectrum where astronomical line emission is detected.
     Differences in line emission profiles due to variations in spatial position and spectral resolution between
-    the Tsys spectrum and the autocorrelation spectrum can introduce mis-calibration in the affected channels.
+    the Tsys spectrum and the autocorrelation spectrum can introduce mis-calibration in the affected channels
+    (see details in this `knowledge-base article <https://help.almascience.org/kb/articles/what-are-the-amplitude-calibration-issues-caused-by-alma-s-normalization-strategy>`__).    
     This task corrects the Tsys contamination; :func:`~pipeline.hifa.cli.hifa_renorm` handles the corresponding autocorrelation issue.
 
     The heuristics compare Tsys spectra from CALIBRATE_ATMOSPHERE scans toward the science source (and
