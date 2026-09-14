@@ -44,33 +44,24 @@ jobs:
       pixi_env: ${{ matrix.pixi_env }}
       test_data: unit
       task: test-unit
+      # Only upload artifacts for a single reference configuration:
+      #   - ubuntu-latest OS
+      #   - casa674-py312 environment
+      #
+      # Other matrix combinations (macOS and newer CASA versions) run tests
+      # for compatibility coverage, but do not upload artifacts to avoid race
+      # conditions and conflicting uploads. Downstream upload_codecov is wired
+      # to download this specific artifact name: "pytest-results-ubuntu-latest".
+      #
+      # Standard GitHub Runner specs:
+      #   ubuntu-latest: 4 vCPUs / 16 GB RAM (public), 2 vCPUs / 8 GB RAM (private)
+      #   macos-latest:  3 vCPUs / 7 GB RAM (M1 Apple Silicon)
+      # (pytest uses '-n logical' in pixi task to auto-scale across runner cores).
       artifact_name: ${{ (matrix.os == 'ubuntu-latest' && matrix.pixi_env == 'casa674-py312') && 'pytest-results-ubuntu-latest' || '' }}
       artifact_path: |
         coverage.xml
         htmlcov/
         junit.xml
-
-  upload_pages:
-    name: Upload Coverage to Pages
-    needs: test
-    runs-on: ubuntu-latest
-    if: |
-      needs.test.result == 'success' &&
-      github.ref == 'refs/heads/main'
-    permissions:
-      contents: write
-    steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: pytest-results-ubuntu-latest
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: htmlcov
-          destination_dir: coverage_unit
 
   upload_codecov:
     name: Upload Coverage to CodeCov
@@ -79,12 +70,12 @@ jobs:
     if: needs.test.result == 'success'
     steps:
       - name: Checkout Full History for Codecov
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: pytest-results-ubuntu-latest
 
