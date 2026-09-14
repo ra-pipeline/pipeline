@@ -1,9 +1,5 @@
 [build-system]
-requires = [
-    "setuptools>=64.0",
-    "packaging>=22.0.0",
-    "wheel",
-]
+requires = ["setuptools>=64.0", "packaging>=22.0.0", "wheel"]
 build-backend = "build_backend"
 backend-path = ["scripts"]
 
@@ -95,15 +91,8 @@ exp = [
     # Logging
     "wurlitzer",
 ]
-devdocs = [
-    "Pipeline[dev]",
-    "Pipeline[docs]",
-]
-all = [
-    "Pipeline[dev]",
-    "Pipeline[docs]",
-    "Pipeline[exp]",
-]
+devdocs = ["Pipeline[dev]", "Pipeline[docs]"]
+all = ["Pipeline[dev]", "Pipeline[docs]", "Pipeline[exp]"]
 
 [project.urls]
 Documentation = "https://almascience.nrao.edu/processing/science-pipeline"
@@ -278,39 +267,6 @@ update-data = "python -m casaconfig --update-all && python -m casaconfig --summa
 bundle-assets = "python scripts/bundle_assets.py"
 
 # --------------------------------------------------------------------------
-# Subsection Tasks (complex configurations)
-# --------------------------------------------------------------------------
-
-# Launch interactive CASA shell
-[tool.pixi.tasks.casa]
-cmd = "python -m casashell"
-
-[tool.pixi.tasks.casa.env]
-PYTHONWARNINGS = "ignore::SyntaxWarning"
-
-# Launch CASA with MPI support (for parallel workflows)
-[tool.pixi.tasks.casampi]
-description = "Launch CASA MPI with safety flags. Override ranks with CASA_NPROCS (default: 4)."
-cmd = """\
-sh -c 'mpirun -display-allocation -display-map -oversubscribe \
---mca btl ^openib --mca btl_vader_single_copy_mechanism none --bind-to none \
--x FI_PROVIDER -x OMP_NUM_THREADS -x OPENBLAS_NUM_THREADS \
--x PATH -x PYTHONNOUSERSITE \
--n ${CASA_NPROCS:-4} \
-python -m casashell "$@"' _\
-"""
-
-[tool.pixi.tasks.casampi.env]
-PYTHONWARNINGS = "ignore::SyntaxWarning"
-FI_PROVIDER = "^psm3"
-PMIX_MCA_pcompress_base_silence_warning = "1"
-OMP_PLACES = "threads"
-OMP_PROC_BIND = "false"
-OMP_NUM_THREADS = "1"
-OPENBLAS_NUM_THREADS = "1"
-PYTHONNOUSERSITE = "1"
-
-# --------------------------------------------------------------------------
 # Testing Tasks
 # --------------------------------------------------------------------------
 
@@ -343,6 +299,38 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
   -c "import pytest; pytest.main(['$PIXI_PROJECT_ROOT/tests/regression/fast/alma_if_fast_test.py::test_uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small__PPR__regression'])"
 """
 
+# --------------------------------------------------------------------------
+# Subsection Tasks (complex configurations)
+# --------------------------------------------------------------------------
+
+# Launch interactive CASA shell
+[tool.pixi.tasks.casa]
+cmd = "python -m casashell"
+
+[tool.pixi.tasks.casa.env]
+PYTHONWARNINGS = "ignore::SyntaxWarning"
+
+# Launch CASA with MPI support (for parallel workflows)
+[tool.pixi.tasks.casampi]
+description = "Launch CASA MPI with safety flags. Override ranks with CASA_NPROCS (default: 4)."
+cmd = """\
+sh -c 'mpirun -display-allocation -display-map -oversubscribe \
+--mca btl ^openib --mca btl_vader_single_copy_mechanism none --bind-to none \
+-x FI_PROVIDER -x OMP_NUM_THREADS -x OPENBLAS_NUM_THREADS \
+-x PATH -x PYTHONNOUSERSITE \
+-n ${CASA_NPROCS:-4} \
+python -m casashell "$@"' _\
+"""
+
+[tool.pixi.tasks.casampi.env]
+PYTHONWARNINGS = "ignore::SyntaxWarning"
+FI_PROVIDER = "^psm3"
+PMIX_MCA_pcompress_base_silence_warning = "1"
+OMP_PLACES = "threads"
+OMP_PROC_BIND = "false"
+OMP_NUM_THREADS = "1"
+OPENBLAS_NUM_THREADS = "1"
+PYTHONNOUSERSITE = "1"
 
 # --------------------------------------------------------------------------
 # Feature: CASA ver6.7.4 (PL2026-CASA branch) — Python 3.12
