@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_babd7a45cb95d714___init___py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
-            created at 2026-08-20 16:14 +0000
+            created at 2026-09-14 16:06 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -233,10 +233,10 @@
     <p class="exc show_exc"><span class="n"><a id="t149" href="#t149">149</a></span><span class="t">        <span class="com"># If freqsolint in channels compute equivalent</span>&nbsp;</span><span class="r"></span></p>
     <p class="exc show_exc"><span class="n"><a id="t150" href="#t150">150</a></span><span class="t">        <span class="com"># frequency interval in MHz and vice versa</span>&nbsp;</span><span class="r"></span></p>
     <p class="exc show_exc"><span class="n"><a id="t151" href="#t151">151</a></span><span class="t">        <span class="key">if</span> <span class="nam">qa</span><span class="op">.</span><span class="nam">getunit</span><span class="op">(</span><span class="nam">qfreqsolint</span><span class="op">)</span> <span class="op">==</span> <span class="str">&#x27;ch&#x27;</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="exc show_exc"><span class="n"><a id="t152" href="#t152">152</a></span><span class="t">            <span class="nam">nchan</span> <span class="op">=</span> <span class="nam">qa</span><span class="op">.</span><span class="nam">getvalue</span><span class="op">(</span><span class="nam">qfreqsolint</span><span class="op">)</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
+    <p class="exc show_exc"><span class="n"><a id="t152" href="#t152">152</a></span><span class="t">            <span class="nam">nchan</span> <span class="op">=</span> <span class="nam">qa</span><span class="op">.</span><span class="nam">getvalue</span><span class="op">(</span><span class="nam">qfreqsolint</span><span class="op">)</span><span class="op">.</span><span class="nam">item</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="exc show_exc"><span class="n"><a id="t153" href="#t153">153</a></span><span class="t">            <span class="nam">afreqsolint</span> <span class="op">=</span> <span class="nam">timesolint</span> <span class="op">+</span> <span class="str">&#x27;,&#x27;</span> <span class="op">+</span> <span class="nam">freqsolint</span> <span class="op">+</span> <span class="str">&#x27;(%fMHz)&#x27;</span> <span class="op">%</span> <span class="op">(</span><span class="num">1.0e-6</span> <span class="op">*</span> <span class="nam">nchan</span> <span class="op">*</span> <span class="nam">median_chanwidth</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="exc show_exc"><span class="n"><a id="t154" href="#t154">154</a></span><span class="t">        <span class="key">else</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="exc show_exc"><span class="n"><a id="t155" href="#t155">155</a></span><span class="t">            <span class="nam">nchan</span> <span class="op">=</span> <span class="nam">qa</span><span class="op">.</span><span class="nam">getvalue</span><span class="op">(</span><span class="nam">qa</span><span class="op">.</span><span class="nam">convert</span><span class="op">(</span><span class="nam">qfreqsolint</span><span class="op">,</span> <span class="str">&#x27;Hz&#x27;</span><span class="op">)</span><span class="op">)</span><span class="op">[</span><span class="num">0</span><span class="op">]</span> <span class="op">/</span> <span class="nam">median_chanwidth</span>&nbsp;</span><span class="r"></span></p>
+    <p class="exc show_exc"><span class="n"><a id="t155" href="#t155">155</a></span><span class="t">            <span class="nam">nchan</span> <span class="op">=</span> <span class="nam">qa</span><span class="op">.</span><span class="nam">getvalue</span><span class="op">(</span><span class="nam">qa</span><span class="op">.</span><span class="nam">convert</span><span class="op">(</span><span class="nam">qfreqsolint</span><span class="op">,</span> <span class="str">&#x27;Hz&#x27;</span><span class="op">)</span><span class="op">)</span><span class="op">.</span><span class="nam">item</span><span class="op">(</span><span class="op">)</span> <span class="op">/</span> <span class="nam">median_chanwidth</span>&nbsp;</span><span class="r"></span></p>
     <p class="exc show_exc"><span class="n"><a id="t156" href="#t156">156</a></span><span class="t">            <span class="nam">afreqsolint</span> <span class="op">=</span> <span class="nam">timesolint</span> <span class="op">+</span> <span class="str">&#x27;,&#x27;</span> <span class="op">+</span> <span class="nam">freqsolint</span>  <span class="op">+</span> <span class="str">&#x27;(%0.1fch)&#x27;</span> <span class="op">%</span> <span class="op">(</span><span class="nam">nchan</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="exc show_exc"><span class="n"><a id="t157" href="#t157">157</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="exc show_exc"><span class="n"><a id="t158" href="#t158">158</a></span><span class="t">        <span class="key">return</span> <span class="nam">afreqsolint</span>&nbsp;</span><span class="r"></span></p>
@@ -249,7 +249,7 @@
             <a class="nav" href="z_babd7a45cb95d714___init___py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
-            created at 2026-08-20 16:14 +0000
+            created at 2026-09-14 16:06 +0000
         </p>
     </div>
 </footer>
