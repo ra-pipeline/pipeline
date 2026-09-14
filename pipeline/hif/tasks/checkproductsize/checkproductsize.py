@@ -63,8 +63,10 @@ class CheckProductSizeInputs(vdp.StandardInputs):
 
             calcsb: Force (re-)calculation of sensitivities and beams
 
-            parallel: Turn on CASA MPI parallel synthesis imaging (``tclean(parallel=True)`` / ``PyParallelContSynthesisImager``).
+            parallel: Turn on CASA MPI parallel synthesis imaging (``PyParallelContSynthesisImager``).
                 If ``'automatic'``, parallel imaging is enabled only when running inside an active ``mpicasa`` session.
+                If ``True`` or ``'true'``, parallel imaging is requested; if no active ``mpicasa`` session is detected,
+                a warning is logged and execution automatically falls back to serial mode (``PySynthesisImager``).
 
                 Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
 

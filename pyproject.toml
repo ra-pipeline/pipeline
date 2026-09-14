@@ -3,16 +3,30 @@ requires = [
     "setuptools>=64.0",
     "packaging>=22.0.0",
     "wheel",
-    "csscompressor==0.9.5",
-    "jsmin==3.0.1",
 ]
-build-backend = "setuptools.build_meta"
+build-backend = "build_backend"
+backend-path = ["scripts"]
 
 [project]
 name = "Pipeline"
 description = "Pipeline"
 requires-python = ">= 3.12"
-dynamic = ["version", "dependencies", "optional-dependencies"]
+dynamic = ["version"]
+dependencies = [
+    # -- Core Runtime Dependencies --
+    "numpy>=2.0",
+    "astropy~=8.0",
+    "cachetools~=6.2",
+    "docstring-inheritance~=2.2",
+    "intervaltree~=3.2",
+    "logutils~=0.3",
+    "mako~=1.4",
+    "pypubsub==4.0.7",
+    # -- Optional & Tooling Dependencies --
+    "bdsf~=1.14",
+    "ps_mem~=3.14",
+]
+
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
@@ -28,6 +42,68 @@ authors = [
     { name = "National Astronomical Observatory of Japan" },
 ]
 keywords = ["astronomy", "pipeline", "ALMA", "VLA", "radio-astronomy"]
+
+[project.optional-dependencies]
+dev = [
+    # Testing Framework
+    "pytest>=7.3",
+    "pytest-xdist",
+    "pytest-cov",
+    "pytest-html",
+    "pytest-xvfb",
+    "junit2html",
+    # Code Quality & Style
+    "ruff",
+    "pre-commit",
+    # Packaging Tools
+    "build",
+    "twine",
+    "wheel",
+    # Static Asset Bundling (for scripts/bundle_assets.py)
+    "csscompressor==0.9.5",
+    "jsmin==3.0.1",
+    # Profiling & Analysis
+    "memray",
+    "line_profiler",
+]
+docs = [
+    # Markdown and Jupyter Support
+    "myst-parser",
+    "myst_nb",
+    "linkify-it-py",
+    "jupytext",
+    # Sphinx and Extensions
+    "furo>=2024.1.29",
+    "sphinxcontrib-bibtex",
+    "sphinx-astrorefs",
+    "sphinx-copybutton",
+    "sphinx-markdown-tables",
+    "sphinx-automodapi",
+    "sphinxcontrib-mermaid",
+]
+exp = [
+    # Data Science & Development Environment
+    "jupyterlab",
+    "jupyter-console",
+    "ipywidgets",
+    # Distributed Computing
+    "dask[distributed]",
+    "dask_jobqueue",
+    "bokeh>=3.1.0",
+    # Display Tools
+    "pyvirtualdisplay>=3.0",
+    # Logging
+    "wurlitzer",
+]
+devdocs = [
+    "Pipeline[dev]",
+    "Pipeline[docs]",
+]
+all = [
+    "Pipeline[dev]",
+    "Pipeline[docs]",
+    "Pipeline[exp]",
+]
 
 [project.urls]
 Documentation = "https://almascience.nrao.edu/processing/science-pipeline"
@@ -57,24 +133,10 @@ include = ["pipeline*"]
     '*.txt',
     '*.xml',
     '*.yaml',  # Data files
-    '*.egg',
-    'version', # Build/version files
 ]
 
 [tool.setuptools.dynamic]
-dependencies = { file = ["requirements.txt"] }
-optional-dependencies.dev = { file = ["requirements_dev.txt"] }
-optional-dependencies.docs = { file = ["requirements_docs.txt"] }
-optional-dependencies.exp = { file = ["requirements_exp.txt"] }
-optional-dependencies.devdocs = { file = [
-    "requirements_dev.txt",
-    "requirements_docs.txt",
-] }
-optional-dependencies.all = { file = [
-    "requirements_dev.txt",
-    "requirements_docs.txt",
-    "requirements_exp.txt",
-] }
+version = { attr = "pipeline._version.version" }
 
 [tool.ruff]
 line-length = 120
@@ -190,15 +252,11 @@ imagemagick = "*"        # required by Pipeline (Jupyter notebook → RST conver
 
 
 [tool.pixi.pypi-dependencies]
-# Install the current project in editable mode
-# This picks up dependencies from requirements.txt, which is still
-# used for monolithic installations.
-# Also install the 'dev' extras to ensure development dependencies are available.
+# Install the current project in editable mode with 'dev' extras
 pipeline = { path = ".", editable = true, extras = ["dev"] }
 # https://casadocs.readthedocs.io/en/stable/notebooks/introduction.html#Known-Issues
 protobuf = "==3.20.*" # casaplotms still requires ver<=3.20
 grpcio = ">=1.62"
-six = ">=1.17"
 
 casampi = { version = ">=0.5.5", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 casaplotms = { version = ">=2.5.3", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
@@ -216,38 +274,8 @@ casatools = { version = ">=6.7.4.2", index = "https://casa-pip.nrao.edu/reposito
 # Update CASA data (configuration and runtime artifacts)
 update-data = "python -m casaconfig --update-all && python -m casaconfig --summary && python -m casaconfig --current-data"
 
-# --------------------------------------------------------------------------
-# Testing Tasks
-# --------------------------------------------------------------------------
-
-# Run unit tests with coverage
-test-unit = """
-cd $INIT_CWD && \
-PYTHONNOUSERSITE=1 python -m pytest \
-  -n logical --max-worker-restart=1 \
-  --junitxml=unit-results.xml \
-  --cov=pipeline --cov-append --cov-report=html --cov-report=xml \
-  $PIXI_PROJECT_ROOT/pipeline/
-"""
-
-# Run fast regression tests in a serial CASA session (xdist, no mpi)
-test-regression = """
-cd $INIT_CWD && \
-OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
-  python -m pytest -n 12 --dist worksteal \
-  -m \"not mpi\" \
-  --junitxml=regression-results.xml \
-  --cov=pipeline --cov-append --cov-report=html --cov-report=xml \
-  $PIXI_PROJECT_ROOT/tests/regression/fast/
-"""
-
-# Run a single small ALMA-IF fast regression test (pltest1)
-test-pltest1 = """
-cd $INIT_CWD && \
-OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
-  python -m casashell --nogui --log2term \
-  -c \"import pytest; pytest.main(['$PIXI_PROJECT_ROOT/tests/regression/fast/alma_if_fast_test.py::test_uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small__PPR__regression'])\"
-"""
+# Bundle and minify weblog static CSS/JS assets
+bundle-assets = "python scripts/bundle_assets.py"
 
 # --------------------------------------------------------------------------
 # Subsection Tasks (complex configurations)

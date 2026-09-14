@@ -8,10 +8,11 @@ on:
       - "docs/**"
       - "pipeline/**"
       - "tests/**"
+      - "scripts/**"
       - ".github/workflows/**"
-      - "environment*.yml"
       - "pyproject.toml"
-      - "setup.py"
+      - "pixi.lock"
+      - "MANIFEST.in"
   pull_request:
     branches:
       - "**"

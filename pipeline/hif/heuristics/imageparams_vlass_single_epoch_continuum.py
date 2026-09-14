@@ -591,7 +591,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         if do_parallel and not mpihelpers.is_mpi_ready():
             LOG.warning(
                 'Parallel synthesis imaging was requested (parallel=%s) but no CASA MPI session is active. '
-                'Falling back to serial imaging mode.',
+                'Falling back to serial imager (PySynthesisImager).',
                 parallel,
             )
             do_parallel = False

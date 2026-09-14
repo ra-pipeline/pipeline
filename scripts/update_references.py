@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Fetch and update the Pipeline BibTeX references from the NASA/ADS public library.
+"""Fetch and update the Pipeline BibTeX references from the NASA/ADS public library.
 
 Library URL: https://ui.adsabs.harvard.edu/public-libraries/w9Eg1EwtTAK14nz2CuQ2Fg
 

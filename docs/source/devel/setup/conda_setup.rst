@@ -24,7 +24,6 @@ Step-by-step
 .. _casatasks: https://casadocs.readthedocs.io/en/stable/api/casatasks.html
 .. _casatools: https://casadocs.readthedocs.io/en/stable/api/casatools.html
 .. _casampi: https://casadocs.readthedocs.io/en/stable/notebooks/parallel-processing.html#Advanced:-Interface-Framework
-.. _requirements.txt: https://open-bitbucket.nrao.edu/projects/PIPE/repos/pipeline/browse/requirements.txt
 .. _pyproject.toml: https://open-bitbucket.nrao.edu/projects/PIPE/repos/pipeline/browse/pyproject.toml
 
 
@@ -120,16 +119,17 @@ Step-by-step
 
   .. note::
 
-    `pyproject.toml`_ and `requirements.txt`_
+    Dependency Specification
 
     - ``environment.yml`` is no longer committed to the repository. Generate it on demand with
       ``pixi project export conda-environment`` as shown above (see :doc:`pixi_tasks`).
       Its purpose is to define a self-contained Python environment with all `CASA6`_ components
       and dependencies required by `Pipeline`_.
-    - `pyproject.toml`_ handles `Pipeline`_ packaging and build system requirements.
-    - A separate `requirements.txt`_ handles `Pipeline`_ core/functional dependencies.
-      The separation is intentional for balancing different needs / use cases,
-      e.g. monolithic and modular `CASA6`_ builds, developer/testing installation setups, etc.
+    - `pyproject.toml`_ serves as the single source of truth for `Pipeline`_ packaging, build system,
+      and runtime/development dependencies.
+    - For monolithic `CASA6`_ installations, ``scripts/install_dependencies.py`` is provided to install
+      dependencies into CASA's Python environment without installing `Pipeline`_ itself.
+
 
 Run `Pipeline`_
 ---------------

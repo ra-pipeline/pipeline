@@ -7,10 +7,10 @@ on:
     paths:
       - "docs/**"
       - "pipeline/**"
+      - "scripts/**"
       - ".github/workflows/**"
-      - "environment*.yml"
-      - "setup.py"
       - "pyproject.toml"
+      - "pixi.lock"
   # Allow manual triggering
   workflow_dispatch:
 
