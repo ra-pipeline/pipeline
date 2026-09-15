@@ -139,14 +139,20 @@ def log_qa(method):
         # get the size of the CASA log before task execution
         qascore = method(self, *args, **kw)
         if basetask.DISABLE_WEBLOG:
-            if isinstance(qascore, tuple):
-                _qascore = qascore[0]
+            def _log_qa_message(x: Any):
+                if not isinstance(x, pqa.QAScore):
+                    return
+
+                if x.score >= rendererutils.SCORE_THRESHOLD_SUBOPTIMAL:
+                    LOG.info(x.longmsg)
+                else:
+                    LOG.warning(x.longmsg)
+
+            if isinstance(qascore, (tuple, list)):
+                for _qascore in qascore:
+                    _log_qa_message(_qascore)
             else:
-                _qascore = qascore
-            if _qascore.score >= rendererutils.SCORE_THRESHOLD_SUBOPTIMAL:
-                LOG.info(_qascore.longmsg)
-            else:
-                LOG.warning(_qascore.longmsg)
+                _log_qa_message(qascore)
         return qascore
 
     return f
