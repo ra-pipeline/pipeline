@@ -43,13 +43,13 @@ jobs:
     runs-on: ${{ inputs.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           fetch-tags: true
 
       - name: Install Pixi
-        uses: prefix-dev/setup-pixi@v0.9.6
+        uses: prefix-dev/setup-pixi@v0.10.2
         with:
           pixi-version: v0.71.0
           environments: ${{ inputs.pixi_env }}
@@ -94,7 +94,7 @@ jobs:
           PYEOF
 
       - name: Cache casarundata
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: casarundata
           key: casarundata
@@ -114,30 +114,58 @@ jobs:
         if: inputs.test_data == 'unit'
         shell: bash
         run: |
-          # Get the latest commit hash from the remote repository's default branch
-          # This will be used as part of the cache key.
-          echo "sha=$(git ls-remote https://open-bitbucket.nrao.edu/scm/pipe/pipeline-testdata.git HEAD | awk '{ print $1 }')" >> "$GITHUB_OUTPUT"
+          source .github/scripts/git-resilient.sh
+          SHA=$(retry_cmd git ls-remote https://open-bitbucket.nrao.edu/scm/pipe/pipeline-testdata.git HEAD 2>/dev/null | awk '{ print $1 }' || true)
+          if [ -z "$SHA" ]; then
+            echo "::warning::Could not resolve testdata commit hash from Bitbucket. Using fallback cache key."
+            SHA="fallback"
+          fi
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
 
       - name: Cache pipeline-testdata
         if: inputs.test_data == 'unit'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: cache-testdata
         with:
           path: pipeline-testdata
           key: pipeline-testdata-unit-${{ steps.testdata-commit.outputs.sha }}
+          restore-keys: |
+            pipeline-testdata-unit-
 
       - name: Checkout and LFS pull test data
         if: inputs.test_data == 'unit' && steps.cache-testdata.outputs.cache-hit != 'true'
+        shell: bash
         run: |
-          # This creates the directory 'pipeline-testdata' INSIDE the current workspace ($GITHUB_WORKSPACE)
+          source .github/scripts/git-resilient.sh
+
+          TESTDATA_URL="https://open-bitbucket.nrao.edu/scm/pipe/pipeline-testdata.git"
+
           if [ ! -d "pipeline-testdata/.git" ]; then
-            git clone --filter=blob:none --sparse \
-              https://open-bitbucket.nrao.edu/scm/pipe/pipeline-testdata.git pipeline-testdata
+            echo "No existing cache found. Performing sparse clone..."
+            retry_cmd git clone --filter=blob:none --sparse "$TESTDATA_URL" pipeline-testdata
+            cd pipeline-testdata
+            git sparse-checkout set pl-unittest
+          else
+            echo "Existing cache restored. Updating incrementally..."
+            cd pipeline-testdata
+            git sparse-checkout set pl-unittest
+            retry_cmd git remote set-url origin "$TESTDATA_URL" || true
+            if ! retry_cmd git fetch origin; then
+              echo "::warning::Incremental fetch from Bitbucket failed; using restored cache data."
+            else
+              git checkout -f FETCH_HEAD || git checkout -f master || true
+            fi
           fi
-          cd pipeline-testdata
-          # Configure sparse checkout & Pull LFS files
-          git sparse-checkout set pl-unittest
-          git lfs pull
+
+          echo "Pulling LFS test files..."
+          retry_cmd git lfs pull || {
+            if [ -d "pl-unittest" ]; then
+              echo "::warning::LFS pull failed, but pl-unittest directory exists from cache. Proceeding with caution."
+            else
+              echo "::error::LFS pull failed and no cached test data is available."
+              exit 1
+            fi
+          }
 
       - name: Run Pixi Task
         if: inputs.task != ''
@@ -154,8 +182,9 @@ jobs:
 
       - name: Upload Artifacts
         if: inputs.artifact_name != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.artifact_name }}
           path: ${{ inputs.artifact_path }}
           if-no-files-found: warn
+
