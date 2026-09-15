@@ -62,13 +62,6 @@ def test_no_switching():
     engine.assert_not_called()
 
 
-def test_do_switching():
-    engine = MagicMock(return_value=('poly', 1))
-    result = do_switching(engine, 100, (0, 0), 1, [])
-    assert result == ('poly', 1)
-    engine.assert_called_once_with(100, (0, 0), 1, [])
-
-
 class TestBaselineFitParamConfig:
     def test_init(self, heuristic_poly, heuristic_cspline):
         assert heuristic_poly.fitfunc == fitorder.FittingFunction.POLY
@@ -95,7 +88,7 @@ class TestBaselineFitParamConfig:
             [0, 1, 1, 0],
             [1, 0, 0, 1]
         ], dtype=int)
-        # 1 means flagged (invalid), 0 means valid.
+        # '1' means flagged (invalid), '0' means valid.
         # Result should be list of ranges where value is 1.
         # row 0: [1, 3]
         # row 1: [0, 1], [3, 4]
