@@ -5080,6 +5080,10 @@ def score_amp_vs_time_plots(context: Context, result: SDApplycalResults) -> list
     Returns:
         A List which contains QAScore objects..
     """
+    if basetask.DISABLE_WEBLOG:
+        # skip scoring if weblog is disabled
+        return []
+
     vis = os.path.basename(result.inputs['vis'])
     ms = context.observing_run.get_ms(vis)
     spwids = [spw.id for spw in ms.get_spectral_windows()]
