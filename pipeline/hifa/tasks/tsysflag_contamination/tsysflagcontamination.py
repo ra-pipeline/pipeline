@@ -19,18 +19,19 @@ from pipeline.infrastructure.basetask import StandardTaskTemplate
 from pipeline.infrastructure.exceptions import PipelineException
 from pipeline.infrastructure.pipelineqa import QAScore, TargetDataSelection
 
+import pipeline.infrastructure.launcher as launcher # PIPE-3257, to use context in the extern code
+
+
 __all__ = ["TsysFlagContamination", "TsysFlagContaminationInputs"]
 
 LOG = infrastructure.logging.get_logger(__name__)
 
-# QA score for multi-source, multi-tuning EBs, full polarization EBs, etc.
-# that cannot be processed by the heuristic. The intent is that these EBs
-# be directed to the QA slow lane for inspection and potential manual
-# flagging of line contamination
+# QA score for unprocessable data. Missing BP or DSB
 UNPROCESSABLE_DATA_QA_SCORE = 0.6
 
 # short summary message when heuristic sees data is it not validated for
-UNPROCESSABLE_DATA_QA_SHORTMSG = 'Heuristics not applied'
+# PIPE-3257 the heuristics is applied, but the flagging is not.
+UNPROCESSABLE_DATA_QA_SHORTMSG = 'Flagging not applied' 
 
 
 class TsysFlagContaminationInputs(vdp.StandardInputs):
@@ -184,6 +185,7 @@ class ExternFunctionArguments:
     pl_run_dir: str
     plots_path: str
     single_polarization: bool
+    context: launcher.Context # PIPE-3257
 
     @staticmethod
     def from_inputs(inputs: TsysFlagContaminationInputs) -> ExternFunctionArguments:
@@ -285,10 +287,11 @@ class SerialTsysFlagContamination(StandardTaskTemplate):
         if self._contains_dsb():
             filetemplate = None
 
+            reason = "DSB"
             s = QAScore(
                 score=UNPROCESSABLE_DATA_QA_SCORE,
                 shortmsg=UNPROCESSABLE_DATA_QA_SHORTMSG,
-                longmsg=f"Heuristic not applied: DSB data in {self.inputs.vis}.",
+                longmsg=f"Heuristic not applied: {reason} data in {self.inputs.vis}.",
                 applies_to=TargetDataSelection(vis={self.inputs.vis}),
             )
             result.qascores_from_task.append(s)
@@ -337,17 +340,21 @@ class SerialTsysFlagContamination(StandardTaskTemplate):
         pl_run_dir = fn_args.pl_run_dir
         plots_path = fn_args.plots_path
         single_polarization = fn_args.single_polarization
+        context = fn_args.context
 
         tsys = TsysData(
-            tsystable=tsystable,
-            load_pickle=True,
+            tsystable=tsystable, # remove pickle/bz2 PIPE-3257
             single_polarization=single_polarization,
         )
+        # Process Tsys spws that actually calibrate a TARGET spw only
+        # Excludes the low-frequency reference band of a
+        # Band-to-Band (B2B) PIPE-3257 
 
         line_contamination_intervals, warnings_list, plot_wrappers, qascores = (
             extern.get_tsys_contaminated_intervals(
                 tsys,
                 plot=diagnostic_plots,
+                spwlist=list(tsys.inversetsysmap.keys()),
                 remove_n_extreme=remove_n_extreme,
                 relative_detection_factor=relative_detection_factor,
                 savefigfile=f"{plots_path}/{vis}.tsyscontamination",
@@ -453,92 +460,7 @@ class SerialTsysFlagContamination(StandardTaskTemplate):
         Preflight checks to identify data that the heuristic cannot handle.
         """
         qa_scores = []
-        qa_scores.extend(self._assert_not_multisource_multituning())
-        qa_scores.extend(self._assert_not_full_polarization())
         qa_scores.extend(self._assert_bandpass_is_present())
-        return qa_scores
-
-    def _assert_not_multisource_multituning(self) -> list[QAScore]:
-        """
-        Returns a list containing an appropriate QAScore if multitunings are
-        present, otherwise an empty list is returned.
-        """
-        ms = self.inputs.ms
-        qa_scores = []
-
-        # Algorithm to detect multi-source multi-tuning EBs is:
-        #
-        # 1. Identify all Field-Id with CALIBRATE_ATMOSPHERE intents.
-        # 2. Among those Field-Ids identified above, identify all which are
-        #    associated with OBSERVE_TARGET intent (in other scans)
-        # 3. If there is more than 1 distinct Field IDs with the above two
-        #    requirements, then the EB is "multi-source"
-        # 4. If in addition the EB has more than one science spectral spec
-        #    (disregarding pointing spectral specs etc.), then the EB is
-        #    "multi-tuning multi-source" type.
-        dual_intent_fields = {
-            target_field
-            # So, mapping the implementation to the algorithm above, we:
-            # 1. identify all fields with ATMOSPHERE intent
-            for tsys_field in ms.get_fields(intent="ATMOSPHERE")
-            # 2. get scans for that field that are also associated with TARGET
-            #    intent...
-            for target_scan_on_tsys_field in ms.get_scans(
-                scan_intent="TARGET", field=tsys_field.id
-            )
-            #   ... and iterate over the fields for that scan...
-            for target_field in target_scan_on_tsys_field.fields
-            #   ... but only if this TARGET scan does not also have ATMOSPHERE
-            #   intent, i.e., this has to be TARGET intent in *other* scans
-            #   associated with the Tsys field, not the *same* scan
-            if "ATMOSPHERE" not in target_scan_on_tsys_field.intents
-        }
-        # 3. it's a multi-source EB if more than 1 field meets this requirement
-        is_multi_source_eb = len(dual_intent_fields) > 1
-
-        # 4. If in addition the EB has more than one science spectral spec
-        #    (disregarding pointing spectral specs etc.), then the EB is
-        #    "multi-tuning multi-source" type.
-        science_specs = {
-            spw.spectralspec
-            for spw in ms.get_spectral_windows(science_windows_only=True)
-        }
-        is_multi_tuning_eb = len(science_specs) > 1
-
-        if is_multi_tuning_eb and is_multi_source_eb:
-            s = QAScore(
-                score=UNPROCESSABLE_DATA_QA_SCORE,
-                shortmsg=UNPROCESSABLE_DATA_QA_SHORTMSG,
-                longmsg=f"Heuristic not applied: multi-source multi-tuning data present in {ms.basename}.",
-                applies_to=TargetDataSelection(vis={ms.basename}),
-            )
-            qa_scores.append(s)
-
-        return qa_scores
-
-    def _assert_not_full_polarization(self) -> list[QAScore]:
-        """
-        Returns a list containing an appropriate QAScore if full polarization
-        data are present, otherwise an empty list is returned.
-        """
-        qa_scores = []
-
-        ms = self.inputs.ms
-        science_spws = ms.get_spectral_windows(science_windows_only=True)
-
-        num_corr_axes = {
-            len(ms.get_data_description(spw=spw.id).corr_axis)
-            for spw in science_spws
-        }
-        if any(n > 2 for n in num_corr_axes):
-            s = QAScore(
-                score=UNPROCESSABLE_DATA_QA_SCORE,
-                shortmsg=UNPROCESSABLE_DATA_QA_SHORTMSG,
-                longmsg=f"Heuristic not applied: full-polarization data present in {ms.basename}.",
-                applies_to=TargetDataSelection(vis={ms.basename}),
-            )
-            qa_scores.append(s)
-
         return qa_scores
 
     def _assert_bandpass_is_present(self) -> list[QAScore]:

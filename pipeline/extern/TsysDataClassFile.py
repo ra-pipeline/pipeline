@@ -1,8 +1,6 @@
-import bz2
 import itertools
 import math
 import os
-import pickle
 import re
 
 import numpy as np
@@ -13,6 +11,7 @@ from casatools import msmetadata as msmdtool
 from casatools import quanta as qatool
 from casatools import table as tbtool
 
+import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.logging
 from pipeline.extern.almahelpers import tsysspwmap
 from pipeline.infrastructure import casa_tools
@@ -28,7 +27,7 @@ tb = tbtool()
 usePWV = [99.0, 5.186, 5.186, 2.748, 2.748, 1.796, 1.262, 0.913, 0.658, 0.472, 0.472]
 WEATHER_DATA_GROUPING = 5  # 5 s grouping
 
-VERSION = 3.4
+VERSION = 3.7 # changes for PIPEREQ-449
 
 
 def getband(freq):
@@ -488,9 +487,10 @@ class TsysData(object):
         self,
         tsystable=None,
         oldobject=None,
-        load_pickle=False,
         single_polarization=False,
+        context=None, # PIPEREQ-449: pbz2/pickle caching removed
     ):
+        self.context = context
         self.tsystable = tsystable
         if tsystable is None:
             return None
@@ -506,38 +506,6 @@ class TsysData(object):
             self.ch_frq = oldobject.ch_frq
             self.msspec = oldobject.msspec
             return None
-        if load_pickle:
-            file = f"{self.tsystable}.tsysdata.pbz2"
-            try:
-                with bz2.BZ2File(file, "rb") as reader:
-                    data_dict = pickle.load(reader)
-                    assert (
-                        "VERSION" in data_dict
-                    ), "No version information in the picke file!"
-                    assert (
-                        data_dict["VERSION"] >= VERSION
-                    ), f"Version of pickle is {data_dict['VERSION']} < {VERSION}, which is the version of the script."
-                self.msfile = data_dict["msfile"]
-                self.tsysfields = data_dict["tsysfields"]
-                self.tsysdata = data_dict["tsysdata"]
-                self.specfields = data_dict["specfields"]
-                self.specdata = data_dict["specdata"]
-                self.absorptionfields = data_dict["absorptionfields"]
-                self.absorptiondata = data_dict["absorptiondata"]
-                self.inversetsysmap = data_dict["inversetsysmap"]
-                self.ch_frq = data_dict["ch_frq"]
-                freqMHz, chan, numchannels = chanfreq_records_to_functions(
-                    data_dict["ch_frq"]
-                )
-                self.msspec = dict(
-                    (
-                        (spw, (freqMHz[spw], chan[spw], numchannels[spw]))
-                        for spw in freqMHz.keys()
-                    )
-                )  # v2.4
-                return
-            except OSError:
-                LOG.info(f"Could not load {file}.")
 
         m = re.match(r"^(.+?)\.ms\S*", tsystable)
         assert m, f"Could not extract ms file name from tsystable:{tsystable}"
@@ -584,22 +552,84 @@ class TsysData(object):
 
         assert msmd.open(msfile), f"Could not open metadata for {msfile}"
         self.tsysmap = TsysData.tsysmap(
-            vis=msfile, tsystable=tsystable, msmdtool_instance=msmd
-        )  # v2.4
+            vis=msfile, tsystable=tsystable, msmdtool_instance=msmd, context=self.context
+        )  # v3.7, context-aware
         auxi = dict()
         for k, v in self.tsysmap.items():
             auxi.setdefault(v, []).append(k)
         self.inversetsysmap = auxi.copy()
 
-        intent = dict()
+        # intent = dict()
+        # for scan in set(list(scans)):
+        #     # This is a bit tricky. We need all intents on the source _name_ associated with the scan. Necessary for mosaics.
+        #     fieldnumbers_for_fieldname = msmd.fieldsforname(
+        #         msmd.fieldnames()[msmd.fieldsforscan(scan)[0]]
+        #     )
+        #     all_intents = []
+        #     for f in fieldnumbers_for_fieldname:
+        #         all_intents += msmd.intentsforfield(f)
+        #     _ii = []
+        #     # print(all_intents)
+        #     if "CALIBRATE_BANDPASS#ON_SOURCE" in all_intents:
+        #         _ii.append("bandpass")
+        #     if "CALIBRATE_PHASE#ON_SOURCE" in all_intents:
+        #         _ii.append("phasecal")
+        #     if "OBSERVE_TARGET#ON_SOURCE" in all_intents:
+        #         _ii.append("science")
+        #     if len(_ii) == 0:
+        #         _ii = ["other"]
+        #     intent[scan] = ",".join(_ii)
+        # msmd.done()
+        # break
+
+        # --- PIPEREQ-449 BP=PH. Drop the PH intents. 
+        atm_scans_by_fieldname = dict()
         for scan in set(list(scans)):
-            # This is a bit tricky. We need all intents on the source _name_ associated with the scan. Necessary for mosaics.
-            fieldnumbers_for_fieldname = msmd.fieldsforname(
-                msmd.fieldnames()[msmd.fieldsforscan(scan)[0]]
-            )
+            fieldname = msmd.fieldnames()[msmd.fieldsforscan(scan)[0]]
+            atm_scans_by_fieldname.setdefault(fieldname, []).append(scan)
+
+        bandpass_scan_for_fieldname = dict()
+        ignored_scans = set()
+        for fieldname, atm_scans in atm_scans_by_fieldname.items():
+            fieldnumbers_for_fieldname = msmd.fieldsforname(fieldname)
             all_intents = []
             for f in fieldnumbers_for_fieldname:
                 all_intents += msmd.intentsforfield(f)
+
+            is_bandpass = "CALIBRATE_BANDPASS#ON_SOURCE" in all_intents
+            is_phasecal = "CALIBRATE_PHASE#ON_SOURCE" in all_intents
+            if not (is_bandpass and is_phasecal):
+                continue  # normal, single-role field: unaffected by this case.
+
+            bp_scans = [
+                s for s in msmd.scansforintent("CALIBRATE_BANDPASS#ON_SOURCE")
+                if fieldnumbers_for_fieldname[0] in msmd.fieldsforscan(s)
+            ]
+            assert bp_scans, (
+                f"No CALIBRATE_BANDPASS#ON_SOURCE scan found for field "
+                f"'{fieldname}', which is expected to be the bandpass source."
+            )
+            bp_scan = bp_scans[0]
+            bandpass_scan_for_fieldname[fieldname] = bp_scan
+
+            # closest scan number wins; ties prefer the scan *before* the
+            # bandpass scan
+            closest_scan = min(atm_scans, key=lambda s: (abs(s - bp_scan), s > bp_scan))
+            ignored_scans.update(s for s in atm_scans if s != closest_scan)
+
+        intent = dict()
+        for scan in set(list(scans)):
+            # This is a bit tricky. We need all intents on the source _name_ associated with the scan. Necessary for mosaics.
+            fieldname = msmd.fieldnames()[msmd.fieldsforscan(scan)[0]]
+            fieldnumbers_for_fieldname = msmd.fieldsforname(fieldname)
+            all_intents = []
+            for f in fieldnumbers_for_fieldname:
+                all_intents += msmd.intentsforfield(f)
+            if fieldname in bandpass_scan_for_fieldname:
+                # bandpass == phasecal source: force a clean single-role label
+                # on the one retained scan (the others are dropped below).
+                intent[scan] = "bandpass"
+                continue
             _ii = []
             # print(all_intents)
             if "CALIBRATE_BANDPASS#ON_SOURCE" in all_intents:
@@ -612,7 +642,6 @@ class TsysData(object):
                 _ii = ["other"]
             intent[scan] = ",".join(_ii)
         msmd.done()
-        # break
 
         atmos_transmission = ATMtrans(
             msfile=msfile, scans=set(list(scans)), spws=set(list(spws))
@@ -621,28 +650,62 @@ class TsysData(object):
             np.array([np.all(_ <= 1) for _ in atmos_transmission.values()])
         ), "Not all transmission curves <=1! Something is wrong!"
 
+        # flags = []
+        # tsys = []
+        # intents = []
+
+        # for recn, antenna, scan, spw in zip(range(1, nrows + 1), ant1, scans, spws):
+        #     flagspec = np.sum(tsysflag[f"r{recn}"][:, :, 0], axis=0) > 0
+        #     spec = fparam[f"r{recn}"][
+        #         :, :, 0
+        #     ]  # np.mean(fparam[f'r{recn}'][:,:,0], axis=0) # here the polarization average occurs.
+        #     spec[:, flagspec] = np.nan  # same flags per polarization are ensured.
+        #     flags.append(flagspec)
+        #     tsys.append(spec)
+        #     intents.append(intent[scan])
+
+        # self.tsysfields = ["spw", "scan", "intent", "field", "antenna", "flags", "tsys"]
+        # self.tsysdata = np.array(
+        #     [
+        #         list(spws),
+        #         list(scans),
+        #         intents,
+        #         list(fields),
+        #         list(ant_names[ant1]),
+        #         flags,
+        #         tsys,
+        #     ],
+        #     dtype=object,
+        # )
+        ## PIPEREQ-449 AEG
         flags = []
         tsys = []
         intents = []
 
-        for recn, antenna, scan, spw in zip(range(1, nrows + 1), ant1, scans, spws):
+        for recn, antenna, scan, spw, field in zip(
+            range(1, nrows + 1), ant1, scans, spws, fields
+        ):
+            if scan in ignored_scans:
+                continue        
             flagspec = np.sum(tsysflag[f"r{recn}"][:, :, 0], axis=0) > 0
-            spec = fparam[f"r{recn}"][
-                :, :, 0
-            ]  # np.mean(fparam[f'r{recn}'][:,:,0], axis=0) # here the polarization average occurs.
-            spec[:, flagspec] = np.nan  # same flags per polarization are ensured.
+            spec = fparam[f"r{recn}"][:, :, 0]
+            spec[:, flagspec] = np.nan
             flags.append(flagspec)
             tsys.append(spec)
             intents.append(intent[scan])
+            kept_spws.append(spw)
+            kept_scans.append(scan)
+            kept_fields.append(field)
+            kept_antnames.append(ant_names[antenna])
 
         self.tsysfields = ["spw", "scan", "intent", "field", "antenna", "flags", "tsys"]
         self.tsysdata = np.array(
             [
-                list(spws),
-                list(scans),
+                kept_spws,
+                kept_scans,
                 intents,
-                list(fields),
-                list(ant_names[ant1]),
+                kept_fields,
+                kept_antnames,
                 flags,
                 tsys,
             ],
@@ -677,8 +740,19 @@ class TsysData(object):
         self.absorptiondata = np.array([spws, scans, absorptions], dtype=object)
 
     def tsysmap(
-        vis, tsystable, msmdtool_instance, intent="OBSERVE_TARGET#ON_SOURCE"
-    ):  # v2.4, this function
+        vis, tsystable, msmdtool_instance=None, intent="OBSERVE_TARGET#ON_SOURCE",
+        context=None,
+    ):  # v3.7, updated for PIPEREQ-449
+        """
+        science spw map to  tys-spw
+        context give, use it. Needs previous tsyscal populating it 
+        with the correct mapping.
+        """
+        if context is not None:
+            return TsysData._tsysmap_from_context(
+                context=context, vis=vis, tsystable=tsystable
+            )
+
         _tsysmap = np.array(tsysspwmap(vis=vis, tsystable=tsystable))
         mymsmd = msmdtool_instance
         # mymsmd.open(vis)
@@ -715,6 +789,44 @@ class TsysData(object):
                 "%s not found in this dataset. Available intents: " % (intent),
                 allIntents,
             )
+    def _tsysmap_from_context(context, vis, tsystable, intent="TARGET"):
+        """
+        Retrieve the Tsys spwmap that h_tsyscal already computed and
+        registered in the pipeline context's calibration library when it
+        applied the Tsys caltable 
+        """
+        ms = context.observing_run.get_ms(os.path.basename(vis))
+        tsystable_basename = os.path.basename(tsystable)
+
+        calto = callibrary.CalTo(vis=ms.name)
+        calstate = context.callibrary.get_calstate(calto)
+
+        spwmap = None
+        for _, calfroms in calstate.merged().items():
+            for calfrom in calfroms:
+                if (
+                    calfrom.caltype == "tsys"
+                    and os.path.basename(calfrom.gaintable) == tsystable_basename
+                ):
+                    spwmap = calfrom.spwmap
+                    break
+            if spwmap is not None:
+                break
+
+        assert spwmap, (
+            f"tsysmap: no registered Tsys calibration with spwmap found in "
+            f"the context callibrary for {tsystable} on {ms.basename}. "
+        )
+
+        science_spws = ms.get_spectral_windows(intent=intent, science_windows_only=True)
+        # spwmap is CASA's applycal-ready flat array (spwmap[i] for every
+        # spw id in the MS); ids beyond its length were trimmed because
+        # they map to themselves.
+        return {
+            sci_spw.id: (spwmap[sci_spw.id] if sci_spw.id < len(spwmap) else sci_spw.id)
+            for sci_spw in science_spws
+        }
+
 
     class IntentException(Exception):  # v2.4
         pass

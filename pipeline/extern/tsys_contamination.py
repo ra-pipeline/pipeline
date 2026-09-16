@@ -12,15 +12,14 @@
 # 11-07-2023. Version 3.3. Changes to find_repeated peaks. Filter on prominence over 5. Making the large contamination warning on full spw.
 #                          Channel avoidance in puff.
 # 25-09-2023. Version 3.4. Subtracting a cubic fitting to detect peaks in the bandpass.
+# 16-09-2026. Version 3.7. Includes PIPE-3240 and PIPE-3257
 from ..infrastructure.renderer import logger as pllogger
 
-VERSION = "3.5"
+VERSION = "3.7"
 
-import bz2
 import glob
 import itertools
 import os
-import pickle
 import re
 import subprocess
 import warnings
@@ -369,7 +368,7 @@ if True:
             peaks = np.r_[0, peaks]
         if (
             model[-1] == np.max(model)
-            and atm_1[-1] == np.min(atm_1)
+            and atm_1[-1] == np.max(atm_1) # AEG. bug, corrected PIPEREQ-449.
             and atm_2[-1] == np.max(atm_2)
         ):
             peaks = np.r_[peaks, nchan - 1]
@@ -1263,24 +1262,6 @@ if True:
         return intersection_intervals(a, complement_intervals(b))
 
 
-def save_tsysdata(tsysdata):
-    file = f"{tsysdata.tsystable}.tsysdata.pbz2"
-    data_dict = {
-        "VERSION": float(VERSION[0:3]),
-        "tsystable": tsysdata.tsystable,
-        "msfile": tsysdata.msfile,
-        "tsysfields": tsysdata.tsysfields,
-        "tsysdata": tsysdata.tsysdata,
-        "specfields": tsysdata.specfields,
-        "specdata": tsysdata.specdata,
-        "absorptionfields": tsysdata.absorptionfields,
-        "absorptiondata": tsysdata.absorptiondata,
-        "inversetsysmap": tsysdata.inversetsysmap,
-        "ch_frq": tsysdata.ch_frq,
-    }
-    with bz2.BZ2File(file, "wb") as w:
-        pickle.dump(data_dict, w)
-
 
 def find_prominent_peaks_in_atm(
     n_sigma_atm, atm_model, temperature, sigma, frequencies=None
@@ -1587,8 +1568,12 @@ def get_tsys_contaminated_intervals(
     large_residual = []
     # assert False, average_science.values()
     corr = np.arange((list(average_science.values())[0]).shape[0])
+
+    valid_keys = set(average_science.keys()) & set(average_bp.keys())
     for spw, field in itertools.product(spwlist, fieldlist):
         if intent_dict[field] == "bandpass":
+            continue
+        if key not in valid_keys: # safeguard for multi-multi. PIPE-3257
             continue
         key = f"{spw}_{field}"
         LOG.info("-- %s", key)
@@ -2170,7 +2155,6 @@ def main():
     for tsystable in tsystables[0:]:
         tsys = TsysData(
             tsystable=tsystable,
-            load_pickle=True,
             single_polarization=(
                 tsystable == "uid___A002_X10ac6bc_Xc408.ms.h_tsyscal.s6_1.tsyscal.tbl"
             ),
@@ -2192,9 +2176,7 @@ def main():
         for k, v in scan_field_dict.items():
             field_scanlist_dict.setdefault(v, []).append(k)
 
-        file = f"{tsys.tsystable}.tsysdata.pbz2"
-        if not os.path.exists(file):
-            save_tsysdata(tsys)
+        # PIPEREQ-449: pbz2/pickle caching removed
         baktbl = f"{tsystable}.bak"
         if not os.path.exists(baktbl):
             # rmtree(baktbl)
