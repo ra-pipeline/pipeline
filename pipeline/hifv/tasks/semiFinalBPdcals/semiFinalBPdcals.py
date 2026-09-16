@@ -2,7 +2,6 @@ import collections
 import os
 import shutil
 
-import numpy as np
 import pipeline.hif.heuristics.findrefant as findrefant
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -422,13 +421,13 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         """Change reference antenna list based on a critical fraction of flagged solutions (defined in the domain ms object).
 
         Args:
-            flaggedSolnResult (dict): Breakdown of flagged solutions.
-            RefAntOutput (list[str], optional): List of string antenna values to use as reference antennas - ['ea01', 'ea24', ...].
+            flaggedSolnResult: Breakdown of flagged solutions.
+            RefAntOutput: List of string antenna values to use as reference antennas - ['ea01', 'ea24', ...].
 
         Returns:
-            tuple[float, list[str]]:
-                fracFlaggedSolns (float): fraction of flagged solutions used in this function.
-                RefAntOutput (list[str]): List of string antenna values to use as reference antennas - ['ea01', 'ea24', ...].
+            Tuple containing:
+                fracFlaggedSolns: Fraction of flagged solutions used in this function.
+                RefAntOutput: List of string antenna values to use as reference antennas - ['ea01', 'ea24', ...].
                     Modified if fraction of flagged solutions is greater than critical fraction.
 
         """
@@ -444,7 +443,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         critfrac = m.get_vla_critfrac()
 
         if fracFlaggedSolns > critfrac:
-            RefAntOutput = np.delete(RefAntOutput, 0)
+            RefAntOutput = RefAntOutput[1:] if RefAntOutput else []
             self.inputs.context.observing_run.measurement_sets[0].reference_antenna = ','.join(RefAntOutput)
             LOG.info('Not enough good solutions, trying a different reference antenna.')
             if len(RefAntOutput) > 0:
