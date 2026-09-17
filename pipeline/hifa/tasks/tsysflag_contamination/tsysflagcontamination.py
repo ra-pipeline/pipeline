@@ -210,6 +210,7 @@ class ExternFunctionArguments:
             pl_run_dir=inputs.context.output_dir,
             plots_path=weblog_dir,
             single_polarization=single_polarization,
+            context=context,
         )
 
 
@@ -291,7 +292,7 @@ class SerialTsysFlagContamination(StandardTaskTemplate):
             s = QAScore(
                 score=UNPROCESSABLE_DATA_QA_SCORE,
                 shortmsg=UNPROCESSABLE_DATA_QA_SHORTMSG,
-                longmsg=f"Heuristic not applied: {reason} data in {self.inputs.vis}.",
+                longmsg=f"Flagging not applied: {reason} data in {self.inputs.vis}.",
                 applies_to=TargetDataSelection(vis={self.inputs.vis}),
             )
             result.qascores_from_task.append(s)
@@ -345,6 +346,7 @@ class SerialTsysFlagContamination(StandardTaskTemplate):
         tsys = TsysData(
             tsystable=tsystable, # remove pickle/bz2 PIPE-3257
             single_polarization=single_polarization,
+            context=context,
         )
         # Process Tsys spws that actually calibrate a TARGET spw only
         # Excludes the low-frequency reference band of a
