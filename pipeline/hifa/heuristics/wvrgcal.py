@@ -127,49 +127,56 @@ class WvrgcalHeuristics:
                 subtable.done()
 
     def _calculate_tie(self, ms):
-        # get target ids and directions
-        targets = [(field.id, field.name, field.mdirection) for field in ms.fields if 'TARGET' in field.intents]
+        # get target source ids and directions
+        targets = [
+            (field.source_id, field.source.name if getattr(field, 'source', None) else field.name, field.mdirection)
+            for field in ms.fields
+            if 'TARGET' in field.intents
+        ]
         if not targets:
             LOG.debug('No science targets in %s', ms.basename)
             return []
 
-        # tie all target fields, assuming they are close to each other
+        # tie all target sources, assuming they are close to each other
         tied_targets_ids = [target[0] for target in targets]
         tied_targets_names = [target[1] for target in targets]
 
-        # get ids and directions of phase calibrators
+        # get source ids and directions of phase calibrators
         #     this may be a cycle 0 relic and need modification in the future so
         #     that multiple intents are properly handled
-        phases = [(field.id, field.name, field.mdirection) for field in ms.fields
-                  if 'PHASE' in field.intents
-                  and 'BANDPASS' not in field.intents
-                  and 'AMPLITUDE' not in field.intents]
+        phases = [
+            (field.source_id, field.source.name if getattr(field, 'source', None) else field.name, field.mdirection)
+            for field in ms.fields
+            if 'PHASE' in field.intents
+            and 'BANDPASS' not in field.intents
+            and 'AMPLITUDE' not in field.intents
+        ]
 
         # add phase calibrators to tie if they are less than 15 degrees from target
         tied_phases_ids = []
         tied_phases_names = []
         for phase in phases:
             separation = casa_tools.measures.separation(phase[2], targets[0][2])
-            LOG.info('Calibrator: %s (id: %s) distance from target: %s%s',
+            LOG.info('Calibrator: %s (source id: %s) distance from target: %s%s',
                      phase[1], phase[0], separation['value'], separation['unit'])
             if casa_tools.quanta.le(separation, '15deg'):
                 tied_phases_ids.append(phase[0])
                 tied_phases_names.append(phase[1])
-        LOG.info('phase calibrators tied to target (ids): %s', tied_phases_ids)
+        LOG.info('phase calibrators tied to target (source ids): %s', tied_phases_ids)
         LOG.info('phase calibrators tied to target (names): %s', tied_phases_names)
 
         # assemble the full tie
         tied_ids = deduplicate(tied_phases_ids + tied_targets_ids)
         tied_names = deduplicate(tied_phases_names + tied_targets_names)
 
-        LOG.info('Final tied fields (ids): %s', tied_ids)
-        LOG.info('Final tied fields (names): %s', tied_names)
+        LOG.info('Final tied sources (ids): %s', tied_ids)
+        LOG.info('Final tied sources (names): %s', tied_names)
 
         # and format it
         if len(tied_ids) > 1:
-            # PIPE-3202/CAS-14850: Due to the field selection parsing behavior of the wvrgcal task's tie parameter,
-            # field specifications must be provided as string-formatted IDs rather than field names.
-            tie = [str(field_id) for field_id in tied_ids]
+            # PIPE-3202/CAS-14850: Due to the source selection parsing behavior of the wvrgcal task's tie parameter,
+            # source specifications must be provided as string-formatted IDs rather than source/field names.
+            tie = [str(source_id) for source_id in tied_ids]
             tie = [','.join(tie)]
             return tie
         else:

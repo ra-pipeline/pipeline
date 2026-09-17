@@ -26,9 +26,10 @@ class semiFinalBPdcalsInputs(vdp.StandardInputs):
     weakbp = vdp.VisDependentProperty(default=False)
     refantignore = vdp.VisDependentProperty(default='')
     refant = vdp.VisDependentProperty(default='')
+    bpsolint_mode = vdp.VisDependentProperty(default='auto')
 
     # docstring and type hints: supplements hifv_semiFinalBPdcals
-    def __init__(self, context, vis=None, weakbp=None, refantignore=None, refant=None):
+    def __init__(self, context, vis=None, weakbp=None, refantignore=None, refant=None, bpsolint_mode=None):
         """Initialize Inputs.
 
         Args:
@@ -47,6 +48,10 @@ class semiFinalBPdcalsInputs(vdp.StandardInputs):
 
                 Example: refant = 'ea01, ea02'
 
+            bpsolint_mode(str, optional): Control bandpass spectral solint optimization heuristics.
+                Options: 'auto' (default; only optimize for Ku-band and higher frequencies),
+                'on' (optimize for all bands), 'off' (disable optimization for all bands).
+
         """
         super().__init__()
         self.context = context
@@ -54,6 +59,7 @@ class semiFinalBPdcalsInputs(vdp.StandardInputs):
         self._weakbp = weakbp
         self.refantignore = refantignore
         self.refant = refant
+        self.bpsolint_mode = bpsolint_mode
 
 
 class semiFinalBPdcalsResults(basetask.Results):
@@ -257,7 +263,8 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
             LOG.debug("Using REGULAR heuristics")
             spw_solint = do_bandpass(self.inputs.vis, bpcaltable, context=self.inputs.context, RefAntOutput=RefAntOutput,
                         spw=','.join(spwlist), ktypecaltable=ktypecaltable, bpdgain_touse=bpdgain_touse,
-                        solint='inf', append=False, executor=self._executor)
+                        solint='inf', append=False, executor=self._executor,
+                        bpsolint_mode=self.inputs.bpsolint_mode, band=band)
 
             AllCalTables = sorted(self.inputs.context.callibrary.active.get_caltable())
             AllCalTables.append(ktypecaltable)
