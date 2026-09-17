@@ -1573,9 +1573,9 @@ def get_tsys_contaminated_intervals(
     for spw, field in itertools.product(spwlist, fieldlist):
         if intent_dict[field] == "bandpass":
             continue
+        key = f"{spw}_{field}"
         if key not in valid_keys: # safeguard for multi-multi. PIPE-3257
             continue
-        key = f"{spw}_{field}"
         LOG.info("-- %s", key)
         _ = set(scans[(intents == "bandpass") * (spws == spw)].tolist())
         assert (

@@ -650,37 +650,10 @@ class TsysData(object):
             np.array([np.all(_ <= 1) for _ in atmos_transmission.values()])
         ), "Not all transmission curves <=1! Something is wrong!"
 
-        # flags = []
-        # tsys = []
-        # intents = []
-
-        # for recn, antenna, scan, spw in zip(range(1, nrows + 1), ant1, scans, spws):
-        #     flagspec = np.sum(tsysflag[f"r{recn}"][:, :, 0], axis=0) > 0
-        #     spec = fparam[f"r{recn}"][
-        #         :, :, 0
-        #     ]  # np.mean(fparam[f'r{recn}'][:,:,0], axis=0) # here the polarization average occurs.
-        #     spec[:, flagspec] = np.nan  # same flags per polarization are ensured.
-        #     flags.append(flagspec)
-        #     tsys.append(spec)
-        #     intents.append(intent[scan])
-
-        # self.tsysfields = ["spw", "scan", "intent", "field", "antenna", "flags", "tsys"]
-        # self.tsysdata = np.array(
-        #     [
-        #         list(spws),
-        #         list(scans),
-        #         intents,
-        #         list(fields),
-        #         list(ant_names[ant1]),
-        #         flags,
-        #         tsys,
-        #     ],
-        #     dtype=object,
-        # )
-        ## PIPEREQ-449 AEG
         flags = []
         tsys = []
         intents = []
+        kept_spws, kept_scans, kept_fields, kept_antnames = [], [], [], []
 
         for recn, antenna, scan, spw, field in zip(
             range(1, nrows + 1), ant1, scans, spws, fields
