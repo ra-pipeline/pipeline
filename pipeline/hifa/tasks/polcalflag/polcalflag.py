@@ -410,7 +410,7 @@ def create_plots(inputs, context, flagcmds, suffix=''):
     """
     # Exit early if weblog generation has been disabled
     if basetask.DISABLE_WEBLOG:
-        return [], []
+        return {'time': [], 'uvdist': []}
 
     calto = callibrary.CalTo(vis=inputs.vis)
     output_dir = context.output_dir
