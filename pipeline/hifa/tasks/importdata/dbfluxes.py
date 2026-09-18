@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-import certifi
 import collections
 import datetime
 import decimal
 import ssl
+import time
+import traceback
 import urllib
 from typing import TYPE_CHECKING, Any
 from xml.dom import minidom
 from xml.parsers.expat import ExpatError
 
+import certifi
 from pipeline import domain, infrastructure
 from pipeline.domain import measures
 from pipeline.h.tasks.common import commonfluxresults
@@ -24,6 +26,13 @@ LOG = infrastructure.logging.get_logger(__name__)
 ORIGIN_DB = 'DB'
 FLUX_SERVICE_URL = 'https://almascience.org/sc/flux'
 FLUX_SERVICE_URL_BACKUP = 'https://asa.alma.cl/sc/flux'
+TEST_OBS_TIME = datetime.datetime(2013, 3, 27, 7, 53, 3, 168000, tzinfo=datetime.timezone.utc)
+TEST_FREQ_HZ = '86837309056.169219970703125'
+TEST_SOURCENAME = 'J1427-4206'
+DEFAULT_HEADERS = {
+    'User-Agent': 'Mozilla/5.0',
+    'Accept': '*/*',
+}
 
 
 def get_flux_urls() -> tuple[str, str]:
@@ -33,20 +42,54 @@ def get_flux_urls() -> tuple[str, str]:
     return flux_url, backup_flux_url
 
 
+def check_service() -> tuple[str, str | None]:
+    """Test the flux catalogue service URLs (primary then backup) using a test query.
+
+    Returns:
+        tuple of (status, service_url)
+        where status is 'FIRSTURL', 'BACKUPURL', or 'FAIL',
+        and service_url is the working URL (or None if 'FAIL').
+    """
+    flux_url, backup_flux_url = get_flux_urls()
+
+    try:
+        LOG.info('Attempting test query at primary flux service: %s', flux_url)
+        fluxservice(flux_url, TEST_OBS_TIME, TEST_FREQ_HZ, TEST_SOURCENAME)
+        return 'FIRSTURL', flux_url
+    except Exception:
+        LOG.warning('Unable to execute initial test query with primary flux service.')
+        LOG.debug(traceback.format_exc())
+        try:
+            LOG.info('Attempting test query at backup flux service: %s', backup_flux_url)
+            fluxservice(backup_flux_url, TEST_OBS_TIME, TEST_FREQ_HZ, TEST_SOURCENAME)
+            return 'BACKUPURL', backup_flux_url
+        except Exception:
+            LOG.warning(
+                'Unable to execute backup test query with flux service.\n'
+                'Proceeding without using the online flux catalog service.'
+            )
+            LOG.debug(traceback.format_exc())
+            return 'FAIL', None
+
+
 def get_setjy_results(
-        mses: list[MeasurementSet]
-        ) -> tuple[list[FluxCalibrationResults], list[dict[str, Any]]]:
+    mses: list[MeasurementSet],
+    service_url: str | None = None,
+) -> tuple[list[FluxCalibrationResults], list[dict[str, Any]]]:
     """
     Get flux values from the database service reverting to the Source
     tables XML for backup values and store the values in the context
     """
+    if service_url is None:
+        service_url, _ = get_flux_urls()
+
     results = []
     qastatus = []
     for ms in mses:
         result = commonfluxresults.FluxCalibrationResults(ms.name)
         science_spw_ids = {spw.id for spw in ms.get_spectral_windows()}
 
-        fluxdb_results, qacodes = read_fluxes_db(ms)
+        fluxdb_results, qacodes = read_fluxes_db(ms, service_url=service_url)
 
         for source, measurements in fluxdb_results.items():
             m = [m for m in measurements if int(m.spw_id) in science_spw_ids]
@@ -65,35 +108,43 @@ def get_setjy_results(
 
 
 def read_fluxes_db(
-        ms: MeasurementSet,
-        ) -> tuple[collections.defaultdict[Source, list[FluxMeasurement]], list[dict[str, Any]] | None]:
+    ms: MeasurementSet,
+    service_url: str | None = None,
+) -> tuple[collections.defaultdict[Source, list[FluxMeasurement]], list[dict[str, Any]] | None]:
     """
     Read fluxes from the database server, defaulting to the Source XML table
     if no fluxes can be found
     """
+    if service_url is None:
+        service_url, _ = get_flux_urls()
+
     xml_measurements = fluxes.read_fluxes_nodb(ms)
 
     if not xml_measurements:
         # Source.xml could not be read or parsed. Fall back to catalogue query
-        return flux_nosourcexml(ms), None
+        return flux_nosourcexml(ms, service_url=service_url), None
 
-    results, qacodes = add_catalogue_fluxes(xml_measurements, ms)
+    results, qacodes = add_catalogue_fluxes(xml_measurements, ms, service_url=service_url)
 
     return results, qacodes
 
 
-def flux_nosourcexml(ms: MeasurementSet) -> collections.defaultdict[Source, list[tuple[FluxMeasurement | str | None]]]:
+def flux_nosourcexml(
+    ms: MeasurementSet,
+    service_url: str | None = None,
+) -> collections.defaultdict[Source, list[tuple[FluxMeasurement | str | None]]]:
     """
     Call the flux service and get the frequencies from the ms if no Source.xml is available
     """
     result = collections.defaultdict(list)
-    flux_url, _ = get_flux_urls()
+    if service_url is None:
+        service_url, _ = get_flux_urls()
 
     for source in ms.sources:
         for spw in ms.get_spectral_windows(science_windows_only=True):
             url, version, status_code, data_conditions, clarification, catalogue_measurement = query_online_catalogue(
-                flux_url, ms, spw, source
-                )
+                service_url, ms, spw, source
+            )
             if catalogue_measurement:
                 result[source].append(catalogue_measurement)
                 # set text for logging statements
@@ -107,8 +158,9 @@ def flux_nosourcexml(ms: MeasurementSet) -> collections.defaultdict[Source, list
                 spix = 'N/A'
                 age = 'N/A'
 
-            log_result(source, spw, 'N/A', catalogue_I, spix, age, url, version,
-                       status_code, data_conditions, clarification)
+            log_result(
+                source, spw, 'N/A', catalogue_I, spix, age, url, version, status_code, data_conditions, clarification
+            )
 
     return result
 
@@ -118,22 +170,25 @@ def buildurl(service_url: str, obs_time: datetime.datetime, frequency: str, sour
     # https://almascience.eso.org/sc/flux?DATE=10-August-2017&FREQUENCY=232101563000.0&NAME=J1924-2914&WEIGHTED=true&RESULT=1&CATALOGUE=5
     # New Example May 2019:
     # https://osf-sourcecat-2019apr.asa-test.alma.cl/sc/flux?DATE=27-March-2013&FREQUENCY=86837309056.169219970703125&WEIGHTED=true&RESULT=0&NAME=J1427-4206
-    date = f"{str(obs_time.day).zfill(2)}-{obs_time.strftime('%B')}-{obs_time.year}"
+    date = f'{str(obs_time.day).zfill(2)}-{obs_time.strftime("%B")}-{obs_time.year}'
     sourcename = sanitize_string(sourcename)
     urlparams = buildparams(sourcename, date, frequency)
 
     url = f'{service_url}?{urlparams}'
-    LOG.debug("SC URL: %s", url)
+    LOG.debug('SC URL: %s', url)
 
     return url
 
 
 def fluxservice(
-        service_url: str,
-        obs_time: datetime.datetime,
-        frequency: str,
-        sourcename: str,
-        ) -> dict[str, str | None]:
+    service_url: str,
+    obs_time: datetime.datetime,
+    frequency: str,
+    sourcename: str,
+    retries: int = 2,
+    retry_delay: float = 0.5,
+    headers: dict[str, str] | None = None,
+) -> dict[str, str | None]:
     """
     Usage of this online service requires:
         - service_url - url for the db service
@@ -141,20 +196,33 @@ def fluxservice(
         - frequency - we will get the frequency out of this in Hz
         - sourcename - name of the source
     """
-
     url = buildurl(service_url, obs_time, frequency, sourcename)
     LOG.info('Attempting query %s', url)
 
     ssl_context = ssl.create_default_context(cafile=certifi.where())
+    request_headers = DEFAULT_HEADERS if headers is None else headers
+    req = urllib.request.Request(url, headers=request_headers)
+
+    content = None
+    last_exception = None
+    for attempt in range(retries + 1):
+        try:
+            with urllib.request.urlopen(req, context=ssl_context, timeout=60.0) as response:
+                content = response.read()
+            break
+        except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as e:
+            last_exception = e
+            if attempt < retries:
+                LOG.warning(
+                    'Query attempt %d failed: %s. Retrying in %.1fs...', attempt + 1, e, retry_delay * (2**attempt)
+                )
+                time.sleep(retry_delay * (2**attempt))
+            else:
+                LOG.warning('Problem contacting flux service at: <a href="%s">%s</a>', url, url)
+                raise last_exception
 
     try:
-        response = urllib.request.urlopen(url, context=ssl_context, timeout=60.0)
-    except IOError:
-        LOG.warning('Problem contacting flux service at: <a href="%s">%s</a>', url, url)
-        raise
-
-    try:
-        dom = minidom.parse(response)
+        dom = minidom.parseString(content)
     except ExpatError:
         LOG.warning('Could not parse source catalogue response')
         raise
@@ -251,43 +319,16 @@ def query_online_catalogue(
 
 
 def add_catalogue_fluxes(
-        measurements: collections.defaultdict[Source, list[FluxMeasurement]],
-        ms: MeasurementSet,
-        ) -> tuple[collections.defaultdict[Source, list[FluxMeasurement]], list[dict[str, Any]]]:
+    measurements: collections.defaultdict[Source, list[FluxMeasurement]],
+    ms: MeasurementSet,
+    service_url: str | None = None,
+) -> tuple[collections.defaultdict[Source, list[FluxMeasurement]], list[dict[str, Any]]]:
     results = collections.defaultdict(list)
     qacodes = []  # Dictionaries will be added here for codes and warning messages from the sources catalog
     science_windows = ms.get_spectral_windows(science_windows_only=True)
 
-    # Test query to see if we need to switch to the backup URL
-    obs_time = datetime.datetime(2013, 3, 27, 7, 53, 3, 168000, tzinfo=datetime.timezone.utc)
-    freq_hz = '86837309056.169219970703125'
-    source_name = 'J1427-4206'
-    contact_fail = False
-    flux_url, backup_url = get_flux_urls()
-    try:
-        LOG.info("Test query...")
-        fluxservice(flux_url, obs_time, freq_hz, source_name)
-    except IOError:
-        # error contacting service
-        # LOG.warning("Could not contact the primary flux service at {!s}".format(flux_url))
-        flux_url = backup_url
-        contact_fail = True
-    except ExpatError:
-        # error parsing the XML table
-        LOG.warning("Table parsing issue.")
-        LOG.warning("Could not contact the primary flux service at {!s}".format(flux_url))
-        flux_url = backup_url
-        contact_fail = True
-
-    if contact_fail:
-        try:
-            # Try the backup URL at JAO
-            LOG.warning("Switching to backup url at: {!s}".format(flux_url))
-            LOG.info("Test query...")
-            fluxservice(flux_url, obs_time, freq_hz, source_name)
-        except IOError:
-            # LOG.error("Could not contact the backup flux service URL.")
-            return results, qacodes
+    if service_url is None:
+        service_url, _ = get_flux_urls()
 
     # Continue with required queries
     for source, xml_measurements in measurements.items():
@@ -298,7 +339,9 @@ def add_catalogue_fluxes(
             if spw not in science_windows:
                 continue
 
-            url, version, status_code, data_conditions, clarification, catalogue_measurement = query_online_catalogue(flux_url, ms, spw, source)
+            url, version, status_code, data_conditions, clarification, catalogue_measurement = query_online_catalogue(
+                service_url, ms, spw, source
+            )
 
             if catalogue_measurement:
                 # Catalogue doesn't return Q,U,V so adopt Q,U,V from XML

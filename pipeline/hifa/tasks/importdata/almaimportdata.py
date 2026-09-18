@@ -1,11 +1,6 @@
 from __future__ import annotations
 
-import ssl
-import traceback
-import urllib
 from typing import TYPE_CHECKING
-
-import certifi
 
 from pipeline import infrastructure
 from pipeline.h.tasks.importdata import fluxes, importdata
@@ -17,12 +12,7 @@ if TYPE_CHECKING:
     from pipeline.h.tasks.common.commonfluxresults import FluxCalibrationResults
     from pipeline.infrastructure.launcher import Context
 
-__all__ = [
-    'ALMAImportData',
-    'SerialALMAImportData',
-    'ALMAImportDataInputs',
-    'ALMAImportDataResults'
-]
+__all__ = ['ALMAImportData', 'SerialALMAImportData', 'ALMAImportDataInputs', 'ALMAImportDataResults']
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -196,36 +186,14 @@ class SerialALMAImportData(importdata.ImportData):
         # get the flux measurements from Source.xml for each MS
 
         if self.inputs.dbservice:
-            testquery = '?DATE=27-March-2013&FREQUENCY=86837309056.169219970703125&WEIGHTED=true&RESULT=1&NAME=J1427-4206&VERBOSE=1'
-            # Test for service response
-            flux_url, backup_flux_url = dbfluxes.get_flux_urls()
-            url = flux_url + testquery
-
-            try:
-                ssl_context = ssl.create_default_context(cafile=certifi.where())
-                LOG.info('Attempting test query at: %s', url)
-                urllib.request.urlopen(url, context=ssl_context, timeout=60.0)
-                xml_results, qastatus = dbfluxes.get_setjy_results(observing_run.measurement_sets)
-                fluxservice = 'FIRSTURL'
-            except Exception:
-                try:
-                    LOG.warning('Unable to execute initial test query with primary flux service.')
-                    traceback_msg = traceback.format_exc()
-                    LOG.debug(traceback_msg)
-                    ssl_context = ssl.create_default_context(cafile=certifi.where())
-                    url = backup_flux_url + testquery
-                    LOG.info('Attempting test query at backup: %s', url)
-                    urllib.request.urlopen(url, context=ssl_context, timeout=60.0)
-                    xml_results, qastatus = dbfluxes.get_setjy_results(observing_run.measurement_sets)
-                    fluxservice='BACKUPURL'
-                except Exception as e2:
-                    LOG.warning(('Unable to execute backup test query with flux service.\n'
-                                 'Proceeding without using the online flux catalog service.'))
-                    traceback_msg = traceback.format_exc()
-                    LOG.debug(traceback_msg)
-                    xml_results = fluxes.get_setjy_results(observing_run.measurement_sets)
-                    fluxservice = 'FAIL'
-                    qastatus = None
+            fluxservice, service_url = dbfluxes.check_service()
+            if fluxservice in ('FIRSTURL', 'BACKUPURL'):
+                xml_results, qastatus = dbfluxes.get_setjy_results(
+                    observing_run.measurement_sets, service_url=service_url
+                )
+            else:
+                xml_results = fluxes.get_setjy_results(observing_run.measurement_sets)
+                qastatus = None
         else:
             xml_results = fluxes.get_setjy_results(observing_run.measurement_sets)
             fluxservice = None
