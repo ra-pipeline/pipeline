@@ -2,6 +2,12 @@
 Contributors and Affiliations
 =============================
 
+.. note::
+
+   This list may be incomplete. We gratefully acknowledge all past and present contributors to the Pipeline.
+
+   Affiliations are based on institutional employment at the time of contribution and may not reflect an individual's current affiliation.
+
 - Ajay Vibhute (NRAO, 2024-current)
 - Akira Yoshino (NAOJ, 2017-2025)
 - Andrés E. Guzmán (JAO, 2024-current)
