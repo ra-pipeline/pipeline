@@ -73,8 +73,21 @@ except ImportError as error:
 def setup(app):
     # Raise docutils substitution line-length limit (default 10 000) so that
     # the Task inheritance diagram substitution (~14 500 chars) is not dropped.
-    app.connect('builder-inited',
-                lambda app: app.env.settings.update({'line_length_limit': 20_000}))
+    app.connect('builder-inited', lambda app: app.env.settings.update({'line_length_limit': 20_000}))
+
+    # PIPE-3252: Include ALMA tasks reference in User's Guide only for LaTeX (PDF)
+    # to enable internal hyperlinks, while omitting it from HTML to avoid duplicating
+    # the top-level API Reference section.
+    def on_builder_inited(app):
+        if app.builder.name != 'latex':
+            app.config.exclude_patterns.append('users_guide/alma_tasks.rst')
+
+    def on_source_read(app, docname, source):
+        if docname == 'users_guide/index' and app.builder.name == 'latex':
+            source[0] += '\n\n```{toctree}\n:maxdepth: 2\n\nalma_tasks\n```\n'
+
+    app.connect('builder-inited', on_builder_inited)
+    app.connect('source-read', on_source_read)
 
 
 # -- General configuration ---------------------------------------------
@@ -209,6 +222,10 @@ else:
     # PUBLIC BUILD: Exclude developer-only files/folders
     # Note: adjust this list based on what internal docs actually exist
     exclude_patterns.extend(['devel/*', 'internal_notes/*', 'inheritance.rst'])
+
+# Note: Builder-specific exclusions (e.g., excluding 'users_guide/alma_tasks.rst'
+# for HTML builds while keeping it for LaTeX) are dynamically appended in setup(app)
+# via the 'builder-inited' event because app.builder.name is only available at that stage.
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'default'  # 'sphinx', 'github-dark', ' default'
