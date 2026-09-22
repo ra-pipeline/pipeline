@@ -219,9 +219,17 @@ if os.environ.get('BUILD_INTERNAL_DOCS') == '1':
         'googlebot': 'noindex, nofollow, noarchive, nosnippet',
     }
 else:
-    # PUBLIC BUILD: Exclude developer-only files/folders
-    # Note: adjust this list based on what internal docs actually exist
-    exclude_patterns.extend(['devel/*', 'internal_notes/*', 'inheritance.rst'])
+    # PUBLIC BUILD: Exclude developer-only and internal files/folders
+    # IMPORTANT: If you add a new internal devel/ subfolder (e.g., devel/new_section/),
+    # you must also add 'devel/new_section/*' here so it is excluded from public builds.
+    exclude_patterns.extend([
+        'internal_notes/*',
+        'inheritance.rst',
+        'timeline*',
+        'devel/process/*',
+        'devel/reference/*',
+        'devel/misc/*',
+    ])
 
 # Note: Builder-specific exclusions (e.g., excluding 'users_guide/alma_tasks.rst'
 # for HTML builds while keeping it for LaTeX) are dynamically appended in setup(app)
