@@ -66,7 +66,9 @@ or if you are using recipereducer,
 pipeline.recipereducer.reduce(vis=['uid___A002_X30a93d_X43e'], loglevel='trace')
 ```
 
+```{only} internal
 To restrict log output to specific tools, see {doc}`/devel/reference/logging`.
+```
 
 ## Example
 
