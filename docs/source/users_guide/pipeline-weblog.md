@@ -1,4 +1,5 @@
 (sec-weblog)=
+
 # The Pipeline WebLog
 
 This section gives an overview of the Pipeline WebLog, which is a collection of webpages with diagnostic messages,
@@ -135,8 +136,6 @@ fraction of data flagged by antenna & spw for every calibrator and science targe
 ![The By Topic summary page. The figure has been truncated and excludes the bottom flagging for some intents.
 The page highlights the lowest QA scores, "Error!" and/or "Warning!" notifications along with the flagging summaries for each intent and spws.](bytopiclow.png)
 
-
-
 ## By Task Summary Page
 
 The **By Task** summary page (see the example below) gives a list of all the pipeline stages performed on the dataset. It is not
@@ -164,7 +163,7 @@ along with its QA score (colored bars to the right), computing run-time for each
 
 At the bottom of the **By Task** summary page are links to the CASA logs and supporting files and scripts. These include
 the complete CASA log file produced during the pipeline run, the pipeline restoration scripts described
-in {ref}`Archivedscripts <sec-allscripts>`: `casa_pipescript.py` and `casa_piperestorescript.py`, and the `casa_commands.log`
+in {ref}`Archived scripts <sec-allscripts>`: `casa_pipescript.py` and `casa_piperestorescript.py`, and the `casa_commands.log`
 file described in {ref}`CASA equivalent commands file <sec-casacommandslog>`.
 
 ## Task Pages
@@ -204,8 +203,7 @@ Most sub-pages have further links in order to access a more detailed view of the
 labelled by the MeasurementSet name. Some of these plots can be filtered by entering one or more MS, antenna, or spectral
 window in the appropriate box. Still others have histograms of various metrics than can be selected using the cursor in a
 drag-and-drop sense to outline a range of histogram values and displays the plots for the MS/antenna/spw combinations that
-are responsible for those histogram values. An example of these subpages and plot filtering is given below (the detailed subpage arrived at by clicking on a measurement set name in the {func}`~pipeline.hifa.cli.hifa_tysflag` page)
-
+are responsible for those histogram values. An example of these subpages and plot filtering is given below (the detailed subpage arrived at by clicking on a measurement set name in the {func}`~pipeline.hifa.cli.hifa_tsysflag` page)
 
 (fig-filtertsysflag1)=
 **Unfiltered {func}`~pipeline.hifa.cli.hifa_tsysflag` sub-page**
