@@ -219,7 +219,6 @@ environments:
       - pypi: ./
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casampi/0.6.0/casampi-0.6.0-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotms/2.9.1/casaplotms-2.9.1-py3-none-manylinux_2_28_x86_64.whl
-      - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotserver/2.1.1/casaplotserver-2.1.1-py3-none-manylinux_2_28_x86_64.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casashell/6.7.4.7/casashell-6.7.4.7-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatasks/6.7.4.7/casatasks-6.7.4.7-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatools/6.7.4.7/casatools-6.7.4.7-cp312-cp312-manylinux_2_28_x86_64.whl
@@ -480,7 +479,6 @@ environments:
       - pypi: ./
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casampi/0.6.0/casampi-0.6.0-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotms/2.9.1/casaplotms-2.9.1-py3-none-macosx_15_0_arm64.whl
-      - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotserver/2.1.1/casaplotserver-2.1.1-py3-none-macosx_15_0_arm64.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casashell/6.7.4.7/casashell-6.7.4.7-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatasks/6.7.4.7/casatasks-6.7.4.7-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatools/6.7.4.7/casatools-6.7.4.7-cp312-cp312-macosx_15_0_arm64.whl
@@ -771,7 +769,6 @@ environments:
       - pypi: ./
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casampi/0.6.0/casampi-0.6.0-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotms/2.9.1/casaplotms-2.9.1-py3-none-manylinux_2_28_x86_64.whl
-      - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotserver/2.1.1/casaplotserver-2.1.1-py3-none-manylinux_2_28_x86_64.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casashell/6.7.6.14/casashell-6.7.6.14-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatasks/6.7.6.14/casatasks-6.7.6.14-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatools/6.7.6.14/casatools-6.7.6.14-cp312-cp312-manylinux_2_28_x86_64.whl
@@ -1032,7 +1029,6 @@ environments:
       - pypi: ./
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casampi/0.6.0/casampi-0.6.0-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotms/2.9.1/casaplotms-2.9.1-py3-none-macosx_15_0_arm64.whl
-      - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotserver/2.1.1/casaplotserver-2.1.1-py3-none-macosx_15_0_arm64.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casashell/6.7.6.14/casashell-6.7.6.14-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatasks/6.7.6.14/casatasks-6.7.6.14-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatools/6.7.6.14/casatools-6.7.6.14-cp312-cp312-macosx_15_0_arm64.whl
@@ -1319,7 +1315,6 @@ environments:
       - pypi: ./
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casampi/0.6.0/casampi-0.6.0-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotms/2.9.1/casaplotms-2.9.1-py3-none-manylinux_2_28_x86_64.whl
-      - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotserver/2.1.1/casaplotserver-2.1.1-py3-none-manylinux_2_28_x86_64.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casashell/6.7.6.14/casashell-6.7.6.14-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatasks/6.7.6.14/casatasks-6.7.6.14-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatools/6.7.6.14/casatools-6.7.6.14-cp313-cp313-manylinux_2_28_x86_64.whl
@@ -1580,7 +1575,6 @@ environments:
       - pypi: ./
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casampi/0.6.0/casampi-0.6.0-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotms/2.9.1/casaplotms-2.9.1-py3-none-macosx_15_0_arm64.whl
-      - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotserver/2.1.1/casaplotserver-2.1.1-py3-none-macosx_15_0_arm64.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casashell/6.7.6.14/casashell-6.7.6.14-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatasks/6.7.6.14/casatasks-6.7.6.14-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatools/6.7.6.14/casatools-6.7.6.14-cp313-cp313-macosx_15_0_arm64.whl
@@ -1873,7 +1867,6 @@ environments:
       - pypi: ./
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casampi/0.6.0/casampi-0.6.0-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotms/2.9.1/casaplotms-2.9.1-py3-none-manylinux_2_28_x86_64.whl
-      - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotserver/2.1.1/casaplotserver-2.1.1-py3-none-manylinux_2_28_x86_64.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casashell/6.7.7.5/casashell-6.7.7.5-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatasks/6.7.7.5/casatasks-6.7.7.5-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatools/6.7.7.5/casatools-6.7.7.5-cp312-cp312-manylinux_2_28_x86_64.whl
@@ -2134,7 +2127,6 @@ environments:
       - pypi: ./
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casampi/0.6.0/casampi-0.6.0-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotms/2.9.1/casaplotms-2.9.1-py3-none-macosx_15_0_arm64.whl
-      - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotserver/2.1.1/casaplotserver-2.1.1-py3-none-macosx_15_0_arm64.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casashell/6.7.7.5/casashell-6.7.7.5-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatasks/6.7.7.5/casatasks-6.7.7.5-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatools/6.7.7.5/casatools-6.7.7.5-cp312-cp312-macosx_15_0_arm64.whl
@@ -2421,7 +2413,6 @@ environments:
       - pypi: ./
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casampi/0.6.0/casampi-0.6.0-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotms/2.9.1/casaplotms-2.9.1-py3-none-manylinux_2_28_x86_64.whl
-      - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotserver/2.1.1/casaplotserver-2.1.1-py3-none-manylinux_2_28_x86_64.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casashell/6.7.7.5/casashell-6.7.7.5-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatasks/6.7.7.5/casatasks-6.7.7.5-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatools/6.7.7.5/casatools-6.7.7.5-cp313-cp313-manylinux_2_28_x86_64.whl
@@ -2682,7 +2673,6 @@ environments:
       - pypi: ./
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casampi/0.6.0/casampi-0.6.0-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotms/2.9.1/casaplotms-2.9.1-py3-none-macosx_15_0_arm64.whl
-      - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotserver/2.1.1/casaplotserver-2.1.1-py3-none-macosx_15_0_arm64.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casashell/6.7.7.5/casashell-6.7.7.5-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatasks/6.7.7.5/casatasks-6.7.7.5-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatools/6.7.7.5/casatools-6.7.7.5-cp313-cp313-macosx_15_0_arm64.whl
@@ -2975,7 +2965,6 @@ environments:
       - pypi: ./
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casampi/0.6.0/casampi-0.6.0-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotms/2.9.1/casaplotms-2.9.1-py3-none-manylinux_2_28_x86_64.whl
-      - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotserver/2.1.1/casaplotserver-2.1.1-py3-none-manylinux_2_28_x86_64.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casashell/6.7.4.7/casashell-6.7.4.7-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatasks/6.7.4.7/casatasks-6.7.4.7-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatools/6.7.4.7/casatools-6.7.4.7-cp312-cp312-manylinux_2_28_x86_64.whl
@@ -3236,7 +3225,6 @@ environments:
       - pypi: ./
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casampi/0.6.0/casampi-0.6.0-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotms/2.9.1/casaplotms-2.9.1-py3-none-macosx_15_0_arm64.whl
-      - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotserver/2.1.1/casaplotserver-2.1.1-py3-none-macosx_15_0_arm64.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casashell/6.7.4.7/casashell-6.7.4.7-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatasks/6.7.4.7/casatasks-6.7.4.7-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatools/6.7.4.7/casatools-6.7.4.7-cp312-cp312-macosx_15_0_arm64.whl
@@ -3528,7 +3516,6 @@ environments:
       - pypi: ./
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casampi/0.6.0/casampi-0.6.0-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotms/2.9.1/casaplotms-2.9.1-py3-none-manylinux_2_28_x86_64.whl
-      - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotserver/2.1.1/casaplotserver-2.1.1-py3-none-manylinux_2_28_x86_64.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatasks/6.7.4.7/casatasks-6.7.4.7-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatools/6.7.4.7/casatools-6.7.4.7-cp312-cp312-manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/02/08/9c41fb51ab5b43eb21674aff13df270e8ba6c4b29c8624e328dc7a9482af/distlib-0.4.3-py2.py3-none-any.whl
@@ -3842,7 +3829,6 @@ environments:
       - pypi: ./
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casampi/0.6.0/casampi-0.6.0-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotms/2.9.1/casaplotms-2.9.1-py3-none-macosx_15_0_arm64.whl
-      - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotserver/2.1.1/casaplotserver-2.1.1-py3-none-macosx_15_0_arm64.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatasks/6.7.4.7/casatasks-6.7.4.7-py3-none-any.whl
       - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casatools/6.7.4.7/casatools-6.7.4.7-cp312-cp312-macosx_15_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/02/08/9c41fb51ab5b43eb21674aff13df270e8ba6c4b29c8624e328dc7a9482af/distlib-0.4.3-py2.py3-none-any.whl
@@ -9441,22 +9427,6 @@ packages:
   - grpcio
   - protobuf
   - casatasks
-- pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotserver/2.1.1/casaplotserver-2.1.1-py3-none-macosx_15_0_arm64.whl
-  name: casaplotserver
-  version: 2.1.1
-  sha256: 81a4d7aad84163d736429f979ba70f573c5d52b25a1308988024f7b8f6e90d9f
-  index: https://casa-pip.nrao.edu/repository/pypi-group/simple
-  requires_dist:
-  - grpcio
-  - protobuf
-- pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casaplotserver/2.1.1/casaplotserver-2.1.1-py3-none-manylinux_2_28_x86_64.whl
-  name: casaplotserver
-  version: 2.1.1
-  sha256: 8afc237f9f24476c0dd7d53ef59d94558ecf1219f8012e15ec8f62a2848d27de
-  index: https://casa-pip.nrao.edu/repository/pypi-group/simple
-  requires_dist:
-  - grpcio
-  - protobuf
 - pypi: https://casa-pip.nrao.edu/repository/pypi-group/packages/casashell/6.7.4.7/casashell-6.7.4.7-py3-none-any.whl
   name: casashell
   version: 6.7.4.7
