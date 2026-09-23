@@ -11,6 +11,7 @@
    releases
    qa
    references
+   Contributors <contributors>
 
 .. toctree::
    :hidden:
@@ -43,14 +44,21 @@
    :maxdepth: 2
    :caption: Developer Guide
 
-   timeline
-   dependencies
    devel/setup/index
    devel/usage/index
-   devel/process/index
    devel/codestyle/index
    devel/testing/index
-   devel/reference/index
-   devel/misc/index
+
+.. only:: internal
+
+   .. toctree::
+      :hidden:
+      :maxdepth: 2
+      :caption: Developer Guide (Internal)
+
+      timeline
+      devel/process/index
+      devel/reference/index
+      devel/misc/index
 
 

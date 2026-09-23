@@ -1,18 +1,19 @@
 # ALMA Pipeline Known Issues
 
-
 ## PL2026
 
-**2026.2.0.XX**
+**2026.2.0.27**
 
-### CASA
+### CASA 2026
 
 1. In {func}`~casatasks.imaging.tclean` `briggsbwtaper`, the fractional bandwidth is calculated per-chunk, so parallelizing with different breadth gives different answers ([CAS-14520](https://open-jira.nrao.edu/browse/CAS-14520) and {jira}`PIPE-2832`).
 2. **{func}`~pipeline.hifa.cli.hifa_wvrgcalflag`** will crash on source names that are integers because the CASA task [wvrgcal](https://casadocs.readthedocs.io/en/v6.6.6/api/tt/casatasks.calibration.wvrgcal.html) no longer supports them ([CAS-14850](https://open-jira.nrao.edu/browse/CAS-14850)).
 
-### Both Pipelines
+### Both Pipelines 2026
 
-### Interferometric Pipeline
+*None known at this time.*
+
+### Interferometric Pipeline 2026
 
 1. **{func}`~pipeline.hif.cli.hif_uvcontsub`** will not skip spws that have "NONE" in cont.dat. This situation doesn't arise in operations, but could arise if someone manually edits cont.dat ({jira}`PIPE-1898`)
 2. If the check source is so faint that no gain solutions can be found, then **{func}`~pipeline.hifa.cli.hifa_gfluxscale`** will crash ({jira}`PIPE-1468`).
@@ -28,10 +29,9 @@
 12. **{func}`~pipeline.hifa.cli.hifa_spwphaseup`** may incorrectly conclude for single-pol data that using "gaintype=T" could eke out enough SNR to use solint=int ({jira}`PIPE-2840`).
 13. In rare cases of old data (Cycle 1), chantol needs to be increased in **{func}`~pipeline.h.cli.h_tsyscal`** in the PPR in order for tsysspwmap to succeed on all spws ({jira}`PIPE-1440`).
 
-### Single Dish Pipeline
+### Single Dish Pipeline 2026
 
-
-
+*None known at this time.*
 
 ---
 
@@ -39,18 +39,18 @@
 
 **2025.1.0.35**
 
-### CASA
+### CASA 2025
 
 1. Any 2 GHz dual-polarization ACA spws with 256 channels are identified as TDM instead of FDM on Spectral Setup page (due to [CAS-14435](https://open-jira.nrao.edu/browse/CAS-14435)).
 2. In {func}`~casatasks.imaging.tclean` `briggsbwtaper`, the fractional bandwidth is calculated per-chunk, so parallelizing with different breadth gives different answers ([CAS-14520](https://open-jira.nrao.edu/browse/CAS-14520) and {jira}`PIPE-2832`).
 3. {func}`~casatasks.visualization.plotbandpass` will not produce a plot of overlay='antenna' if there is only one antenna in the cal table ([CAS-14657](https://open-jira.nrao.edu/browse/CAS-14657)). This impacts the single dish pipeline in {func}`~pipeline.hsd.cli.hsd_skycal` if the MOUS contains only 1 antenna ({jira}`PIPE-2825`).
 4. CASA versions < 6.6.6.18 incorrectly unwrapped phase when applying with linearPD interpolation. This could affect the calibration of B2B datasets.
 
-### Both Pipelines
+### Both Pipelines 2025
 
 1. FDM spws that have a small number of channels (<=256/Ncorr, e.g. <=128 for dual-pol) will be interpreted incorrectly as TDM by {func}`~pipeline.hifa.cli.hifa_flagdata` resulting in unnecessary edge channel flagging (0.03125% from each edge). This can happen in 4x4 bit mode with online channel averaging factors >= 8 ({jira}`PIPE-2320`).
 
-### Interferometric Pipeline
+### Interferometric Pipeline 2025
 
 1. **{func}`~pipeline.hif.cli.hif_uvcontsub`** will not skip spws that have "NONE" in cont.dat. This situation doesn't arise in operations, but could arise if someone manually edits cont.dat ({jira}`PIPE-1898`)
 2. If the check source is so faint that no gain solutions can be found, then **{func}`~pipeline.hifa.cli.hifa_gfluxscale`** will crash ({jira}`PIPE-1468`).
@@ -77,7 +77,7 @@
 23. In the polcal imaging recipe, the repBW **{func}`~pipeline.hif.cli.hif_makeimages`(repBW_fullpol)** stage of the pipeline is not using the clean threshold and mask from the corresponding repBW {func}`~pipeline.hif.cli.hif_makeimages`(repBW) Stokes I only imaging stage ({jira}`PIPE-3128`); as a result no cleaning is performed.
 24. **{func}`~pipeline.hifa.cli.hifa_wvrgcalflag`** will crash on source names that are integers because the CASA task [wvrgcal](https://casadocs.readthedocs.io/en/v6.6.6/api/tt/casatasks.calibration.wvrgcal.html) no longer supports them ([CAS-14850](https://open-jira.nrao.edu/browse/CAS-14850)).
 
-### Single Dish Pipeline
+### Single Dish Pipeline 2025
 
 1. In {func}`~pipeline.hsd.cli.hsd_flagdata`, there is a wrong unit (arcsec instead of degree) in the log message reporting max separation of pointing outlier ({jira}`PIPE-2920`).
 
@@ -157,18 +157,18 @@
 
 > *Items below this point were discovered after the PL2023 Google slides were released and frozen:*
 
-12. In {func}`~pipeline.hif.cli.hif_findcont`, spws with a single range of continuum channels identified might be declared AllCont even if they contain a significantly lesser amount of continuum than the nominal threshold of 91% ({jira}`PIPE-2034`).
-13. In {func}`~pipeline.hifa.cli.hifa_bandpass`, the plots of phase vs. frequency can take a long time to display in the weblog due to a change in behavior of a mathematical function due to an upgrade in the scipy version packaged with the pipeline ({jira}`PIPE-2035`).
-14. In full-polarization datasets, the {func}`~pipeline.hif.cli.hif_makeimages` page for the polcal has images of polarized intensity; the ">_" link which usually produces a popup with the tclean command, in this case just dims the screen without revealing a tclean command, because the image was not made with tclean. Clicking the image background will refresh the screen.
-15. FDM spws that have a small number of channels (<=256/Ncorr, e.g. <=128 for dual-pol) will be interpreted incorrectly as TDM by {func}`~pipeline.hifa.cli.hifa_flagdata` resulting in unnecessary edge channel flagging (0.03125% from each edge). This can happen in 4x4 bit mode (offered first in Cycle 10) with online channel averaging factors >= 8 ({jira}`PIPE-2320`).
-16. The Tsys field indicator in the mosaic pattern plot on the Spatial Setup page doesn't account for the angular offset of the field ({jira}`PIPE-2067`).
-17. The {func}`~pipeline.hif.cli.hif_applycal` page can fail to render if the uv coverage plot fails to be made due to flagging of data ({jira}`PIPE-1294`).
-18. Phase structure plots in {func}`~pipeline.hifa.cli.hifa_spwphaseup` will fail if the widest spw was flagged earlier ({jira}`PIPE-1871`).
-19. {func}`~pipeline.hifa.cli.hifa_gfluxscaleflag` crashes on MOUS with EBs that straddle Cycle 2 and Cycle 3 ({jira}`PIPE-2691`).
-20. The aggregate bandwidth listed on continuum {func}`~pipeline.hif.cli.hif_makeimages` pages does not account for the deterministic flagging of edge channels on TDM spws ({jira}`PIPE-2349`) and it does not account for spw overlap ({jira}`PIPEREQ-37`).
-21. If combine='spw' is used in gaincal calls, pipeline will crash in {func}`~pipeline.hifa.cli.hifa_gfluxscale` if the lowest index spw is fully flagged ({jira}`PIPE-128`).
-22. In rare cases of old data (Cycle 1), chantol needs to be increased in {func}`~pipeline.h.cli.h_tsyscal` PPR in order for tsysspwmap to succeed on all spws ({jira}`PIPE-1440`).
-23. For some older ALMA datasets (Cycle 3 to Cycle 8), the Spectral Setup Details page of the weblog might show an incorrect value for Correlation Bits column instead of "Unknown" which is what it should show prior to Cycle 9 ({jira}`PIPE-3095`).
+ 1. In {func}`~pipeline.hif.cli.hif_findcont`, spws with a single range of continuum channels identified might be declared AllCont even if they contain a significantly lesser amount of continuum than the nominal threshold of 91% ({jira}`PIPE-2034`).
+ 2. In {func}`~pipeline.hifa.cli.hifa_bandpass`, the plots of phase vs. frequency can take a long time to display in the weblog due to a change in behavior of a mathematical function due to an upgrade in the scipy version packaged with the pipeline ({jira}`PIPE-2035`).
+ 3. In full-polarization datasets, the {func}`~pipeline.hif.cli.hif_makeimages` page for the polcal has images of polarized intensity; the ">_" link which usually produces a popup with the tclean command, in this case just dims the screen without revealing a tclean command, because the image was not made with tclean. Clicking the image background will refresh the screen.
+ 4. FDM spws that have a small number of channels (<=256/Ncorr, e.g. <=128 for dual-pol) will be interpreted incorrectly as TDM by {func}`~pipeline.hifa.cli.hifa_flagdata` resulting in unnecessary edge channel flagging (0.03125% from each edge). This can happen in 4x4 bit mode (offered first in Cycle 10) with online channel averaging factors >= 8 ({jira}`PIPE-2320`).
+ 5. The Tsys field indicator in the mosaic pattern plot on the Spatial Setup page doesn't account for the angular offset of the field ({jira}`PIPE-2067`).
+ 6. The {func}`~pipeline.hif.cli.hif_applycal` page can fail to render if the uv coverage plot fails to be made due to flagging of data ({jira}`PIPE-1294`).
+ 7. Phase structure plots in {func}`~pipeline.hifa.cli.hifa_spwphaseup` will fail if the widest spw was flagged earlier ({jira}`PIPE-1871`).
+ 8. {func}`~pipeline.hifa.cli.hifa_gfluxscaleflag` crashes on MOUS with EBs that straddle Cycle 2 and Cycle 3 ({jira}`PIPE-2691`).
+ 9. The aggregate bandwidth listed on continuum {func}`~pipeline.hif.cli.hif_makeimages` pages does not account for the deterministic flagging of edge channels on TDM spws ({jira}`PIPE-2349`) and it does not account for spw overlap ({jira}`PIPEREQ-37`).
+10. If combine='spw' is used in gaincal calls, pipeline will crash in {func}`~pipeline.hifa.cli.hifa_gfluxscale` if the lowest index spw is fully flagged ({jira}`PIPE-128`).
+11. In rare cases of old data (Cycle 1), chantol needs to be increased in {func}`~pipeline.h.cli.h_tsyscal` PPR in order for tsysspwmap to succeed on all spws ({jira}`PIPE-1440`).
+12. For some older ALMA datasets (Cycle 3 to Cycle 8), the Spectral Setup Details page of the weblog might show an incorrect value for Correlation Bits column instead of "Unknown" which is what it should show prior to Cycle 9 ({jira}`PIPE-3095`).
 
 ---
 
@@ -339,4 +339,4 @@ See [CASA 6.1.X known issues](https://casa.nrao.edu/casadocs/casa-6.1.0/introduc
 
 Questions about the ALMA Pipeline may be submitted to the [ALMA Helpdesk](https://help.almascience.org/).
 
-Feedback specific to CASA should be sent to casa-feedback@nrao.edu.
+Feedback specific to CASA should be sent to <casa-feedback@nrao.edu>.

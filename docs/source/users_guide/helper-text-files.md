@@ -1,4 +1,5 @@
 (sec-helperfiledescription)=
+
 # Description of Pipeline "Helper" Text Files
 
 As mentioned in {ref}`Pipeline "Helper" text files <sec-helperfileintro>`, both the IF and SD pipeline use a number of text files that are read by various pipeline tasks (as indicated by comments `##` in the example {ref}`Single Dish <fig-sdcasapipescript>` and {ref}`IF <fig-if-casapipescript>` `casa_pipescript.py`), and which affect the pipeline results (e.g. by applying manually identified flags or by updating calibrator fluxes or antenna positions before calculating the calibration tables). These files are particularly useful for users to over-ride the default pipeline behavior when re-running the pipeline at home, as described in the following section. Below we describe all of the currently available control files, identifying whether they are used by the IF pipeline, SD pipeline, or both in the subsection heading.
@@ -20,7 +21,7 @@ The format of the `flux.csv` file is shown in the example below. It contains one
 (fig-fluxcsvfile)=
 **Example of a `flux.csv` file used by the interferometric pipeline (one per MOUS)**
 
-```csv
+```text
 ms,field,spw,I,Q,U,V,spix,uvmin,uvmax,comment
 uid___A002_Xca8fbf_X5733.ms,0,23,1.7632620185868495,0.0,0.0,0.0,-0.285,0.0,0.0,"# field=J1517-2422 intents=A..
 uid___A002_Xca8fbf_X5733.ms,0,25,1.7450149079637087,0.0,0.0,0.0,-0.285,0.0,0.0,"# field=J1517-2422 intents=A...
@@ -52,7 +53,7 @@ The format of the `jyperk_query.csv` file is shown in the example below. It cont
 (fig-jyperkfile)=
 **Example of a `jyperk_query.csv` file used by the single-dish pipeline (one per MOUS)**
 
-```csv
+```text
 MS,Antenna,Spwid,Polarization,Factor
 uid___A002_X85c183_X36f.ms,DA61,17,I,51.890035198
 uid___A002_X85c183_X36f.ms,PM03,17,I,51.890035198
@@ -135,7 +136,7 @@ The format of the `antennapos.csv` file is shown in the example below. It contai
 
 The offset units are in meters. Corrections that are comparable, or larger than the observing wavelength are consequential.
 
-```csv
+```text
 name,antenna,xoff,yoff,zoff,comment
 uid___A002_Xca8fbf_X5733.ms,DA41,-5.29597e-06,-1.16080e-05,-1.60051e-04,
 uid___A002_Xca8fbf_X5733.ms,DA42,-8.69576e-06,-2.61175e-04,-8.79318e-05,
@@ -202,6 +203,7 @@ Users should examine the science data (e.g. using the CASA task {func}`~casaplot
 ```
 
 (sec-cont-dat)=
+
 ## `cont.dat` (IF imaging pipeline)
 
 The pipeline-identified continuum frequency ranges, in LSRK units, for each spectral window of each source are entered into a file called `cont.dat` that is delivered with the pipeline products. This file lists the LSRK frequency ranges that were used to make the per-spw and aggregate continuum images, and for fitting and subtracting the continuum for the image cubes. When this file is in the directory where the pipeline is (re)run, the pipeline will use these entries directly instead of using its own heuristics (via the {func}`~pipeline.hif.cli.hif_findcont` task) to determine them. Therefore, a user can edit this file (or create their own) in order to use a different continuum range. Alternatively, a user-defined file name can be passed as an argument to the {func}`~pipeline.hif.cli.hif_makeimlist` task.
@@ -234,6 +236,6 @@ SpectralWindow: 29 X1913589666#ALMA_RB_06#BB_4#SW-01#FULL_RES
 The behavior of {func}`~pipeline.hif.cli.hif_findcont` and the subsequent continuum subtraction and continuum and line imaging commands is as follows:
 
 1. If the SpectralWindow line in `cont.dat` is followed by one or more frequency ranges, {func}`~pipeline.hif.cli.hif_findcont` will not run its heuristics on the spw. The task {func}`~pipeline.hif.cli.hif_uvcontsub` will use these frequency ranges to fit and subtract the continuum from this spw. Subsequent continuum images will include only these frequency ranges for this spw, and the spw line cubes will be made from the continuum subtracted data.
-2. If the SpectralWindow line exists, but is not followed by any ranges, {func}`~pipeline.hif.cli.hif_findcont` will not run its heuristics on the spw (if the delivered `cont.dat` file contains spw entries without ranges, this indicates that the {func}`~pipeline.hif.cli.hif_findcont` task failed to find any continuum frequency ranges). The task {func}`~pipeline.hif.cli.hif_uvcontsub` will currently assume this is an "all continuum" case and fit using all channels. 
+2. If the SpectralWindow line exists, but is not followed by any ranges, {func}`~pipeline.hif.cli.hif_findcont` will not run its heuristics on the spw (if the delivered `cont.dat` file contains spw entries without ranges, this indicates that the {func}`~pipeline.hif.cli.hif_findcont` task failed to find any continuum frequency ranges). The task {func}`~pipeline.hif.cli.hif_uvcontsub` will currently assume this is an "all continuum" case and fit using all channels.
 Subsequent continuum images will include the full frequency range for this spw (logging a message in the WebLog), and the spw line cubes will have had a continuum subtraction performed using all channels. Cube imaging "FC" moment map computation may fail due to the missing continuum ranges.
 3. If a spw is missing from `cont.dat` when {func}`~pipeline.hif.cli.hif_findcont` is run, then it will try to find the frequency ranges, and these will be used to make subsequent continuum images, and for continuum subtraction.
