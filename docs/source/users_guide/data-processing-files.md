@@ -3,7 +3,7 @@
 ## Archived scripts
 
 (sec-allscripts)=
-There are several scripts that are archived with ALMA data deliveries. These are described in the document **ALMA QA2 Data Products** (sometimes cycle-specific) available from the `ALMA Science Portal <https://almascience.org>` under the "Processing" tab. The particular scripts for a specific dataset should also be described in the QA2 report archived with the data products. This report will vary based on how the data were processed (pipeline calibrated & imaged; pipeline calibrated & manually imaged; manually calibrated & pipeline imaged, manually calibrated & manually imaged).
+There are several scripts that are archived with ALMA data deliveries. These are described in the document **ALMA QA2 Data Products** (sometimes cycle-specific) available from the [ALMA Science Portal](https://almascience.org) under the "Processing" tab. The particular scripts for a specific dataset should also be described in the QA2 report archived with the data products. This report will vary based on how the data were processed (pipeline calibrated & imaged; pipeline calibrated & manually imaged; manually calibrated & pipeline imaged, manually calibrated & manually imaged).
 
 The scripts produced by the pipeline are archived with the data and have file names like:
 `member.<mous_uid>.<recipe>.casa_pipescript.py` and `member.<mous_uid>.<recipe>.casa_piperestorescript.py`.
@@ -26,7 +26,7 @@ Both the IF and SD pipeline use a number of text files that, if present, will af
 - `uid*flagtemplate.txt`: This file is used to add additional CASA flagging commands that will be applied to the data before the calibration tables are calculated.
 - `uid*flagtsystemplate.txt`: This file is used to add additional CASA flagging commands that will be applied to the Tsys spws before the calibration tables are calculated.
 - `uid*flagtargetstemplate.txt`: This file is used to add additional CASA flagging commands that will be applied to the data after the calibration tables are calculated, but before science target imaging is performed.
-- `cont.dat`: This file is used to specify the continuum frequency ranges used for constructing the continuum images and creating the continuum-subtracted cubes. This particular file is described in more detail below {ref}`cont.dat (IF imaging pipeline) <sec-cont-dat>` and in the reimaging casaguide <https://casaguides.nrao.edu/index.php/ALMA_Imaging_Pipeline_Reprocessing>.
+- `cont.dat`: This file is used to specify the continuum frequency ranges used for constructing the continuum images and creating the continuum-subtracted cubes. This particular file is described in more detail below {ref}`cont.dat (IF imaging pipeline) <sec-cont-dat>` and in the [ALMA Imaging Pipeline Reprocessing Casaguide](https://casaguides.nrao.edu/index.php/ALMA_Imaging_Pipeline_Reprocessing).
 
 The format of each of these files is given in {ref}`Description of Pipeline Helper Text Files <sec-helperfiledescription>`.
 
@@ -38,7 +38,7 @@ To restore data calibrated by the pipeline, one can either run `scriptForPI.py` 
 - Create **rawdata/**, **working/**, and **products/** subdirectories.
 - Download the raw ASDMs from the archive and put them in **rawdata**/. Make sure the naming of the raw ALMA data is consistent with those provided in the script (e.g. if the data ends in .**asdm.sdm** then rename to not have this suffix).
 - Copy or move `*manifest.xml, *caltables.tgz, *flagversions.tgz, *auxproducts.tgz` and `*calapply.txt` to **products/.**
-- Copy `uid*casa_piperetorescript.py` to `working/casa_piperestorescript.py`.
+- Copy `uid*casa_piperestorescript.py` to `working/casa_piperestorescript.py`.
 - In **working/,** start `casa --pipeline`, and `execfile("casa_piperestorescript.py")`.
 
 ### Results from running the SD `casa_piperestorescript.py`
