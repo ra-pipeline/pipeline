@@ -11,6 +11,7 @@ Contributors and Affiliations
 - Ajay Vibhute (NRAO, 2024-current)
 - Akira Yoshino (NAOJ, 2017-2025)
 - Andrés E. Guzmán (JAO, 2024-current)
+- Andrew Lipnicky (NRAO, 2022-current)
 - Brian Kent (NRAO, 2012-2023)
 - Cristian Marocico (NOVA, 2026-current)
 - Darrell Schiebel (NRAO, 2016)
