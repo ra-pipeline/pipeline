@@ -28,7 +28,7 @@ Pipeline and CASA are **distinct software packages**, albeit often packaged toge
   * {cite}`2020ASPC..527..639M`: cite when using the ALMA Interferometric or Single-Dish Pipeline.
   * {cite}`2020ASPC..527..571K`: cite when using the [VLA](https://science.nrao.edu/facilities/vla/data-processing/pipeline) or [VLASS](https://public.nrao.edu/vlass) Pipeline.
   * {cite}`2022ASPC..532..397N`: cite when using the [Nobeyama 45m (NRO)](https://www.nao.ac.jp/en/telescopes/nobeyama45m) Pipeline.
-  * {cite}`2022PASP..134k4501C`: cite for all data processed with CASA.
+  * {cite}`2022PASP..134k4501C`: cite for all data processed with CASA (also see the [Citing CASA](https://casadocs.readthedocs.io/en/stable/notebooks/citing-casa.html) page on CASA Docs for an overview of additional CASA-related citations).
 
 * **Tailor the statement to your workflow:** Clearly state your specific data processing path — for example, whether you ran the pipeline yourself, calibrated or imaged manually in CASA, or directly used products from the ALMA Science Archive.
 
