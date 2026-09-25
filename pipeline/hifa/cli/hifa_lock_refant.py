@@ -4,9 +4,7 @@ import pipeline.h.cli.utils as utils
 # docstring and type hints: inherits from hifa.tasks.lock_refant.lock_refant.LockRefAntInputs.__init__
 @utils.cli_wrapper
 def hifa_lock_refant(vis=None, unregister_spwphaseup=None):
-    """Lock the reference antenna to a single antenna with ``refantmode='fixed'``.
-
-    Sets the reference antenna to a single antenna and sets ``refantmode='fixed'`` for all subsequent
+    """Sets the reference antenna to a single antenna and sets ``refantmode='fixed'`` for all subsequent
     calibration tasks, preventing any subsequent modification of the refant list.
 
     In the polarization (polcal and polcalimage) recipes, :func:`~pipeline.hifa.cli.hifa_bandpass` and :func:`~pipeline.hifa.cli.hifa_spwphaseup` are each

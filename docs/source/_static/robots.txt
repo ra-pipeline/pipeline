@@ -1,0 +1,22 @@
+# Block web search engines and crawlers from indexing internal docs
+User-agent: *
+Disallow: /internal/
+
+# Explicitly disallow AI / LLM scrapers
+User-agent: GPTBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: PerplexityBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /

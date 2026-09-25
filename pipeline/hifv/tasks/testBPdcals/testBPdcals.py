@@ -3,20 +3,13 @@ import os
 import shutil
 from collections import defaultdict
 
-import numpy as np
-
 import pipeline.hif.heuristics.findrefant as findrefant
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.vdp as vdp
-from pipeline.hifv.heuristics import getCalFlaggedSoln
-from pipeline.hifv.heuristics import weakbp, do_bandpass, uvrange
+from pipeline.hifv.heuristics import do_bandpass, getBCalStatistics, getCalFlaggedSoln, uvrange, weakbp
 from pipeline.hifv.heuristics.lib_EVLApipeutils import vla_minbaselineforcal
-from pipeline.infrastructure import casa_tasks
-from pipeline.infrastructure import task_registry
-from pipeline.infrastructure import utils
-from pipeline.hifv.heuristics import getBCalStatistics
-
+from pipeline.infrastructure import casa_tasks, task_registry, utils
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -32,13 +25,15 @@ class testBPdcalsInputs(vdp.StandardInputs):
     doflagundernspwlimit = vdp.VisDependentProperty(default=False)
     flagbaddef = vdp.VisDependentProperty(default=True)
     refant = vdp.VisDependentProperty(default='')
+    bpsolint_mode = vdp.VisDependentProperty(default='auto')
 
     @vdp.VisDependentProperty
     def iglist(self):
         return {}
 
     # docstring and type hints: supplements hifv_testBPdcals
-    def __init__(self, context, vis=None, weakbp=None, refantignore=None, doflagundernspwlimit=None, flagbaddef=None, iglist=None, refant=None):
+    def __init__(self, context, vis=None, weakbp=None, refantignore=None, doflagundernspwlimit=None,
+                 flagbaddef=None, iglist=None, refant=None, bpsolint_mode=None):
         """Initialize Inputs.
 
         Args:
@@ -63,6 +58,10 @@ class testBPdcalsInputs(vdp.StandardInputs):
 
                 Example: refant = 'ea01, ea02'
 
+            bpsolint_mode(str, optional): Control bandpass spectral solint optimization heuristics.
+                Options: 'auto' (default; only optimize for Ku-band and higher frequencies),
+                'on' (optimize for all bands), 'off' (disable optimization for all bands).
+
         """
         super().__init__()
         self.context = context
@@ -75,6 +74,7 @@ class testBPdcalsInputs(vdp.StandardInputs):
         self.flagbaddef = flagbaddef
         self.iglist = iglist
         self.refant = refant
+        self.bpsolint_mode = bpsolint_mode
 
 
 class testBPdcalsResults(basetask.Results):
@@ -400,16 +400,20 @@ class testBPdcals(basetask.StandardTaskTemplate):
         flagcount = 0
         flaggedSolnResult = {}
         while fracFlaggedSolns > critfrac and flagcount < 4:
+            if os.path.exists(ktypecaltable):
+                shutil.rmtree(ktypecaltable)
+            self._do_ktype_delaycal(
+                caltable=ktypecaltable, addcaltable=gtypecaltable, RefAntOutput=RefAntOutput, spw=','.join(spwlist)
+            )
             flagcount += 1
-            self._do_ktype_delaycal(caltable=ktypecaltable, addcaltable=gtypecaltable,
-                                    RefAntOutput=RefAntOutput, spw=','.join(spwlist))
             if not os.path.exists(ktypecaltable):
                 break
             flaggedSolnResult = getCalFlaggedSoln(ktypecaltable)
             (fracFlaggedSolns, RefAntOutput) = self._check_flagSolns(flaggedSolnResult, RefAntOutput)
-            LOG.info("Fraction of flagged solutions = " + str(flaggedSolnResult['all']['fraction']))
-            LOG.info("Median fraction of flagged solutions per antenna = " +
-                     str(flaggedSolnResult['antmedian']['fraction']))
+            LOG.info('Fraction of flagged solutions = %s', flaggedSolnResult['all']['fraction'])
+            LOG.info(
+                'Median fraction of flagged solutions per antenna = %s', flaggedSolnResult['antmedian']['fraction']
+            )
 
         # Do initial amplitude and phase gain solutions on the BPcalibrator and delay
         # calibrator; the amplitudes are used for flagging; only phase
@@ -519,7 +523,8 @@ class testBPdcals(basetask.StandardTaskTemplate):
             interp = ''
             spw_solint = do_bandpass(self.inputs.vis, bpcaltable, context=self.inputs.context, RefAntOutput=RefAntOutput,
                         spw=','.join(spwlist), ktypecaltable=ktypecaltable, bpdgain_touse=bpdgain_touse,
-                        solint='inf', append=False, executor=self._executor)
+                        solint='inf', append=False, executor=self._executor,
+                        bpsolint_mode=self.inputs.bpsolint_mode, band=band)
 
             AllCalTables = sorted(self.inputs.context.callibrary.active.get_caltable())
             if os.path.exists(ktypecaltable):
@@ -678,20 +683,19 @@ class testBPdcals(basetask.StandardTaskTemplate):
         return True
 
     def _check_flagSolns(self, flaggedSolnResult: dict, RefAntOutput: list[str] = None) -> tuple[float, list[str]]:
-        """Change reference antenna list based on a critical fraction of flagged solutions
-            (defined in the domain ms object)
+        """Change reference antenna list based on a critical fraction of flagged solutions (defined in the domain ms object).
 
         Args:
-            flaggedSolnResult(Dict): Breakdown of flagged solutions
-            RefAntOutput(List): List of string antenna values to use as reference antennas - ['ea01', 'ea24', ...]
+            flaggedSolnResult: Breakdown of flagged solutions.
+            RefAntOutput: List of string antenna values to use as reference antennas - ['ea01', 'ea24', ...].
 
         Returns:
-            fracFlaggedSolns(float):  fraction of flagged solutions used in this function
-            RefAntOutput(List): List of string antenna values to use as reference antennas - ['ea01', 'ea24', ...]
-                                Modified if fraction of flagged solutions is greater than critical fraction
+            Tuple containing:
+                fracFlaggedSolns: Fraction of flagged solutions used in this function.
+                RefAntOutput: List of string antenna values to use as reference antennas - ['ea01', 'ea24', ...].
+                    Modified if fraction of flagged solutions is greater than critical fraction.
 
         """
-
         if flaggedSolnResult['all']['total'] > 0:
             fracFlaggedSolns = flaggedSolnResult['antmedian']['fraction']
         else:
@@ -701,10 +705,11 @@ class testBPdcals(basetask.StandardTaskTemplate):
         critfrac = m.get_vla_critfrac()
 
         if fracFlaggedSolns > critfrac:
-            RefAntOutput = np.delete(RefAntOutput, 0)
+            RefAntOutput = RefAntOutput[1:] if RefAntOutput else []
             self.inputs.context.observing_run.measurement_sets[0].reference_antenna = ','.join(RefAntOutput)
-            LOG.info("Not enough good solutions, trying a different reference antenna.")
-            LOG.info("The pipeline will start with antenna "+RefAntOutput[0].lower()+" as the reference.")
+            LOG.info('Not enough good solutions, trying a different reference antenna.')
+            if len(RefAntOutput) > 0:
+                LOG.info('The pipeline will start with antenna %s as the reference.', RefAntOutput[0].lower())
 
         return fracFlaggedSolns, RefAntOutput
 

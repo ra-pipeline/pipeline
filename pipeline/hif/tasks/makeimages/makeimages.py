@@ -29,14 +29,10 @@ LOG = infrastructure.get_logger(__name__)
 class MakeImagesInputs(vdp.StandardInputs):
     """Inputs for hif_makeimages."""
 
-    # Search order of input vis
-    processing_data_types = [
-        DataType.SELFCAL_LINE_SCIENCE,
-        DataType.REGCAL_LINE_SCIENCE,
-        DataType.SELFCAL_CONTLINE_SCIENCE,
-        DataType.REGCAL_CONTLINE_SCIENCE,
-        DataType.REGCAL_CONTLINE_ALL,
-        DataType.RAW]
+    # The vis parameters are passed in via the clean target list
+    # generated in other tasks. Specifying any default here would
+    # render misleading vis selections in the weblog (PIPE-3052, PIPE-3231).
+    processing_data_types = []
 
     calcsb = vdp.VisDependentProperty(default=False)
     cleancontranges = vdp.VisDependentProperty(default=False)
@@ -198,6 +194,18 @@ class MakeImagesInputs(vdp.StandardInputs):
 
             parallel: Use CASA/tclean built-in parallel imaging for individual scientific targets, or, perform continuum imaging
                 of multiple target (calibrators) concurrently without the CASA/tclean built-in parallelization.
+
+                .. note::
+                    This note pertains specifically to CASA's built-in ``tclean`` parallel synthesis imaging
+                    (Tier-1 parallelization used for individual scientific targets). It is unrelated to Pipeline
+                    Tier-0 parallel processing (which dispatches separate calibrator imaging tasks concurrently across MPI servers).
+
+                    As documented in `CASAdocs synthesis imaging <https://casadocs.readthedocs.io/en/stable/notebooks/synthesis_imaging.html>`__:
+                    *"The tclean parameter 'parallel' is ignored for cube imaging. It is relevant only for continuum imaging."*
+                    Whenever running inside an active ``mpicasa`` session, CASA's built-in ``tclean`` automatically executes cube
+                    major cycles in parallel across available MPI processes, regardless of whether ``parallel`` is set to ``True``
+                    or ``False``. The ``parallel`` parameter primarily controls built-in parallelization for continuum imaging
+                    (``specmode='mfs'`` / ``'cont'``).
 
                 Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
 
@@ -468,7 +476,7 @@ class MakeImages(basetask.StandardTaskTemplate):
 
         imlist = utils.glob_ordered(imagename.replace('.image', '.*'))
 
-        vis_name = self.inputs.vis[0]
+        vis_name = tclean_result.vis[0]
         msobj = self.inputs.context.observing_run.get_ms(vis_name)
         job = casa_tasks.flagdata(vis=vis_name, mode='summary', spwchan=True,  spw=tclean_result.spw)
         flag_stats = self._executor.execute(job)

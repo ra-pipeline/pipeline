@@ -2450,7 +2450,7 @@ def detect_atm_channels(ms: MeasurementSet, spw: int) -> numpy.ndarray | None:
 
     spwlist = [spw]
     spwsetup = sdatm.getSpecSetup(ms.basename, spwlist=spwlist)
-    tau = sdatm.getCalAtmData(ms.basename, spwlist, spwsetup)[-2]
+    tau = sdatm.getTau(ms.basename, spwlist, spwsetup)
     skylines = sdatm.getskylines(tau[spw], spw, spwsetup, fraclevel=0.3, minpeaklevel=0.05)
     atm_masks = sdatm.skysel(skylines, linestouse='all')
 

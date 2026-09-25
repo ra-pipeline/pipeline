@@ -21,10 +21,10 @@ CASA <1>: import pipeline.infrastructure.executevlappr as eppr
 CASA <2>: eppr.executeppr('PPR_VLAT003.xml', importonly=False)
 ```
 
-## Series of steps invoking CASA Pipeline tasks
+## Series of steps invoking Pipeline tasks
 
 A pipeline run generates an executable script summarizing the steps performed. An older reference for VLA is the
-[VLA CASA Pipeline casaguide](https://casaguides.nrao.edu/index.php/VLA_CASA_Pipeline-CASA4.5.3) (CASA 4.5.3 era).
+[VLA Pipeline casaguide](https://casaguides.nrao.edu/index.php/VLA_CASA_Pipeline-CASA4.5.3) (CASA 4.5.3 era).
 
 A pipeline run will generate a file like the following:
 
@@ -84,7 +84,7 @@ CASA <1>: context = h_resume(filename='last')
 
 ## Creating and running Pipeline tasks in Python, bypassing the task interface
 
-At the lowest level of abstraction, we can bypass the CASA Pipeline Task interface, and work directly within
+At the lowest level of abstraction, we can bypass the Pipeline Task interface, and work directly within
 CASA / Python, by instantiating a Pipeline `InputsContainer` object for the Pipeline Task, using it to instantiate a
 Pipeline Task object, and then running its `execute` method to get the task result, as shown in the example below. Here,
 the example should be run in a directory where the Pipeline has been partly run, i.e. a context already exists.

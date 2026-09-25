@@ -8,7 +8,7 @@ Pipeline registers several custom pytest options. To list them all:
 casa_python -m pytest --help
 ```
 
-Here `casa_python` is an alias for `PYTHONNOUSERSITE=1 ${casa_dir}/bin/python3`.
+Here `casa_python` is an alias for `PYTHONNOUSERSITE=1 ${casa_dir}/bin/python3` (see {doc}`../setup/monolithic_casa`).
 
 ```{list-table}
 :header-rows: 1

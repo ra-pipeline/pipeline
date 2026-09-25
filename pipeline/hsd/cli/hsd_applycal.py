@@ -37,8 +37,7 @@ def hsd_applycal(vis=None, field=None, intent=None, spw=None, antenna=None,
         **XX-YY polarization difference QA**:
 
         - QA = 1.0 if no significant XX-YY polarization difference is detected.
-        - QA = 0.95-0.65 if an XX-YY deviation is detected.
-        - QA < 0.65 if a large XX-YY deviation outlier is detected.
+        - QA = 0.95-0.34 if significant XX-YY deviation is detected.
 
     Examples:
         1. Apply calibration to the science target data:
