@@ -284,14 +284,14 @@ class SerialApplycal(basetask.StandardTaskTemplate):
         # task. These extra MSes cause problems in weblog code downstream,
         # which expects results.applied to refer to just the MSes specified in
         # the inputs. Using hide_empty gives the data the expected shape.
-        merged = calstate.merged(hide_empty=True)
+        partition = calstate.application_partition(hide_empty=True)
 
         if os.getenv('DISABLE_CASA_CALLIBRARY', False):
             LOG.info('CASA callibrary disabled: reverting to non-callibrary applycal call')
-            jobs = jobs_without_calapply(merged, inputs, self.modify_task_args)
-        elif contains_uvcont_table(merged):
+            jobs = jobs_without_calapply(partition, inputs, self.modify_task_args)
+        elif contains_uvcont_table(partition):
             LOG.info('Calibration state contains uvcont tables: reverting to non-callibrary applycal call')
-            jobs = jobs_without_calapply(merged, inputs, self.modify_task_args)
+            jobs = jobs_without_calapply(partition, inputs, self.modify_task_args)
         else:
             LOG.info('No uvcont tables in calibration state: using CASA callibrary applycal.')
             jobs = jobs_with_calapply(calstate, inputs, self.modify_task_args)
@@ -322,7 +322,7 @@ class SerialApplycal(basetask.StandardTaskTemplate):
         job_results = [self._executor.execute(job) for job in jobs]
         flagdata_results = [job_result for job, job_result in zip(jobs, job_results) if job.fn_name == 'flagdata']
 
-        applied_calapps = [callibrary.CalApplication(calto, calfroms) for calto, calfroms in merged.items()]
+        applied_calapps = [callibrary.CalApplication(calto, calfroms) for calto, calfroms in partition.items()]
 
         # give a dict like {'abc123.ms': 'path/to/callibrary'}. The use of
         # dict assumes that there is only one jobrequest per MS, which is true
@@ -444,7 +444,7 @@ def jobs_with_calapply(calstate: IntervalCalState, inputs: ApplycalInputs, mod_f
                                                 inputs.context.subtask_counter)
     with open(calstate_file, "w") as applyfile:
         applyfile.write('# Apply file for %s\n' % (os.path.basename(inputs.vis)))
-        applyfile.write(calstate.as_applycal())
+        applyfile.write(calstate.application_applycal())
 
     task_args = inputs.to_casa_args()
 
