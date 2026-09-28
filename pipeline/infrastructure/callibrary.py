@@ -1255,11 +1255,165 @@ def expand_calstate_to_calapps(calstate: IntervalCalState) -> list[tuple[CalTo, 
 def consolidate_calibrations(all_my_calapps):
     """
     Consolidate a list of (CalTo, [CalFrom..]) 2-tuples into a smaller set of
+    equivalent applications by merging their data selection arguments.
+
+    Data selections are grouped by their complete ordered CalFrom stack; the
+    selections in each group are then merged one axis at a time, taking only
+    unions of selections already present, so coverage is unchanged. Given the
+    pairwise-disjoint fragments expand_calstate_to_calapps produces, the
+    emitted entries partition the registered space, each carrying its full
+    stack in the order it was registered. Per caltable this means the entries
+    are pairwise disjoint in spw x field x intent -- the condition CASA's
+    callibrary applycal enforces on the serialized file, which does not carry
+    antenna.
+
+    Exact-duplicate CalFroms within a single selection are collapsed
+    (calibration is not idempotent). A single selection that assigns one
+    caltable two different apply-parameter sets is a contradiction and raises
+    ValueError.
+
+    :param calapps: an iterable of (CalTo, [CalFrom..]) 2-tuples
+    :return: a list of (CalTo, [CalFrom..]) tuples
+    """
+    # Caltables only ever apply to a single MS, so partition by MS and rebuild
+    # within each partition; merging across MSes would iterate pointlessly over
+    # combinations that can never share a caltable.
+    vis_to_calapps = collections.defaultdict(list)
+    for calto, calfroms in all_my_calapps:
+        if len(calto.vis) > 1:
+            raise ValueError('Cannot handle calibrations that apply to multiple MSes')
+        if not calfroms:
+            continue
+        calfroms = _collapse_duplicate_calfroms(calfroms)
+        _reject_conflicting_calfroms(calto, calfroms)
+        vis = tuple(calto.vis)[0]
+        vis_to_calapps[vis].append((calto, calfroms))
+
+    result = []
+    for vis, calapps_for_vis in vis_to_calapps.items():
+        LOG.info('Consolidating calibrations for {}'.format(os.path.basename(vis)))
+
+        # Group the data selections by their complete ordered CalFrom stack.
+        # Fragments carrying the same stack are merged together; fragments with
+        # a different stack stay separate, so every cell keeps its whole stack
+        # in the order it was registered. A cell covered by several caltables
+        # already arrives as one fragment naming them all, so nothing needs
+        # rejoining across groups.
+        stack_to_selections = collections.OrderedDict()
+        for calto, calfroms in calapps_for_vis:
+            stack_to_selections.setdefault(tuple(calfroms), []).append(calto)
+
+        for stack, selections in stack_to_selections.items():
+            for merged_selection in _merge_selections(selections):
+                result.append((copy.deepcopy(merged_selection), list(stack)))
+
+    return result
+
+
+def _collapse_duplicate_calfroms(calfroms):
+    """
+    Drop exact-duplicate CalFroms from a stack, preserving order.
+
+    CalFrom is a flyweight, so an identical application is the same object.
+    CalState addition concatenates CalFrom lists on overlap and nothing else
+    removes the ``[cf, cf]`` it leaves behind; a repeated identical
+    application is never a valid instruction.
+    """
+    seen = set()
+    unique = []
+    for calfrom in calfroms:
+        if calfrom not in seen:
+            seen.add(calfrom)
+            unique.append(calfrom)
+    return unique
+
+
+def _reject_conflicting_calfroms(calto, calfroms):
+    """
+    Raise if one data selection assigns a single caltable two different
+    apply-parameter sets -- an upstream contradiction that CASA would
+    otherwise reject much later with an opaque ``Attempted duplicate
+    MSCalPatchKey!`` carrying no data selection.
+    """
+    by_gaintable = collections.defaultdict(list)
+    for calfrom in calfroms:
+        by_gaintable[calfrom.gaintable].append(calfrom)
+    for gaintable, group in by_gaintable.items():
+        if len(group) > 1:
+            raise ValueError(
+                'Conflicting apply parameters for {} over antenna={} field={} '
+                'spw={} intent={}: {} incompatible parameter sets'.format(
+                    gaintable, _format_axis(calto.antenna), _format_axis(calto.field),
+                    _format_axis(calto.spw), _format_axis(calto.intent), len(group)))
+
+
+def _format_axis(axis):
+    """Render a data-selection axis (a set of IDs/names) for a diagnostic."""
+    # a field axis can mix names and IDs (e.g. {'T1', 2, 3}) when some field
+    # names are unique within the MS and others are not; sort by str so a
+    # mixed axis doesn't raise TypeError comparing str against int.
+    return ','.join(str(value) for value in sorted(axis, key=str)) or "''"
+
+
+def _merge_selections(selections):
+    """
+    Merge pairwise-disjoint CalToArgs selections that share one ordered
+    CalFrom stack into a smaller equivalent set.
+
+    Two selections merge into their union when they are equal on every axis
+    but one; the merge axis is tried in the order spw, field, intent,
+    antenna, iterating to a fixed point. Only unions of selections already
+    present are taken, so coverage is unchanged and the result stays pairwise
+    disjoint.
+
+    The input selections must be pairwise disjoint -- they come from the
+    interval-tree expansion, which trims every axis. An empty field or intent
+    set is the "spans all values" sentinel and must not be mixed with explicit
+    values on the same axis.
+    """
+    merge_order = ('spw', 'field', 'intent', 'antenna')
+    merged = list(selections)
+
+    changed = True
+    while changed:
+        changed = False
+        for merge_axis in merge_order:
+            other_axes = [a for a in CalToArgs._fields if a != merge_axis]
+            groups = collections.OrderedDict()
+            for selection in merged:
+                key = tuple(frozenset(getattr(selection, a)) for a in other_axes)
+                groups.setdefault(key, []).append(selection)
+
+            next_merged = []
+            for group in groups.values():
+                if len(group) == 1:
+                    next_merged.append(group[0])
+                    continue
+                union = set().union(*(getattr(s, merge_axis) for s in group))
+                next_merged.append(group[0]._replace(**{merge_axis: union}))
+                changed = True
+            merged = next_merged
+
+    return merged
+
+
+def _consolidate_calibrations_legacy(all_my_calapps):
+    """
+    Consolidate a list of (CalTo, [CalFrom..]) 2-tuples into a smaller set of
     equivalent applications by consolidating their data selection arguments.
 
     This function works by merging the data selections of CalTo objects that
     have the same calibration application, as determined by the values and
     data selection present in the CalFroms.
+
+    This is the pre-PIPE-2610 implementation. IntervalCalState.merged() uses it
+    unconditionally, since it is the grouping view relied on by solver job
+    dispatch, the weblog and logging (see consolidate_calibrations() for the
+    solver-dispatch follow-up that would let application_partition() replace
+    it there too); for a fragmented calstate it may emit overlapping entries,
+    which is why it must not be used to apply or export calibration.
+    IntervalCalState.application_partition() falls back to it when the
+    PIPE2610_LEGACY_CONSOLIDATE environment variable is set.
 
     :param calapps: an iterable of (CalTo, [CalFrom..]) 2-tuples
     :return: a list of (CalTo, [CalFrom..]) tuples
@@ -1376,7 +1530,7 @@ def data_selection_contains(proposed: CalToArgs, calto_args: CalToArgs) -> bool:
                 not proposed.intent.isdisjoint(calto_args.intent)])
 
 
-def expand_calstate(calstate: IntervalCalState) -> list[tuple[CalToArgs, list[CalFrom]]]:
+def expand_calstate(calstate: IntervalCalState, legacy: bool = False) -> list[tuple[CalToArgs, list[CalFrom]]]:
     """
     Convert an IntervalCalState into the equivalent consolidated list of
     (CalToArgs, [CalFrom..]) 2-tuples.
@@ -1387,6 +1541,11 @@ def expand_calstate(calstate: IntervalCalState) -> list[tuple[CalToArgs, list[Ca
 
     Args:
         calstate: The IntervalCalState to convert.
+        legacy: Force the legacy consolidation regardless of the
+            PIPE2610_LEGACY_CONSOLIDATE environment flag. IntervalCalState.merged()
+            passes True here, as it must always use the legacy view;
+            IntervalCalState.application_partition() leaves this False and
+            lets the flag revert it instead.
 
     Returns:
         A list of (CalToArgs, [CalFrom..]) tuples.
@@ -1395,7 +1554,10 @@ def expand_calstate(calstate: IntervalCalState) -> list[tuple[CalToArgs, list[Ca
     unmerged = expand_calstate_to_calapps(calstate)
 
     # step 2: consolidate entries with identical calibrations
-    consolidated = consolidate_calibrations(unmerged)
+    if legacy or os.getenv('PIPE2610_LEGACY_CONSOLIDATE', False):
+        consolidated = _consolidate_calibrations_legacy(unmerged)
+    else:
+        consolidated = consolidate_calibrations(unmerged)
 
     # step 3: take the list of (CalToArgs, [CalFrom]) tuples, taking any
     # CalToArgs whose vis property targets multiple MSes and dividing them
@@ -1742,7 +1904,20 @@ class IntervalCalState:
                 if calfrom.caltype in caltypes}
 
     def merged(self, hide_empty=False):
-        calapps = expand_calstate(self)
+        """
+        Return the legacy grouping view of this calstate.
+
+        Used for solver job grouping, the weblog and logging (via
+        as_applycal() / __str__() / import_state()): a calibration
+        registered over several fields/spws stays one entry even when the
+        cells holding data do not form a rectangle, and this view must never
+        raise. It always uses the legacy consolidation and ignores
+        PIPE2610_LEGACY_CONSOLIDATE, which for a fragmented calstate can mean
+        overlapping entries. Use application_partition() instead wherever a
+        calibration state is applied or written out as applycal
+        instructions.
+        """
+        calapps = expand_calstate(self, legacy=True)
 
         if hide_empty:
             calapps = [ca for ca in calapps if len(ca[1]) > 0]
@@ -1751,9 +1926,38 @@ class IntervalCalState:
         # the tuple
         return dict(calapps)
 
+    def application_partition(self, hide_empty=False):
+        """
+        Return the application view of this calstate.
+
+        The entries returned partition the registered space: per caltable
+        they are pairwise disjoint in field x spw x intent (the condition
+        CASA's callibrary applycal enforces on export) and faithful to what
+        was registered, with every cell keeping its full ordered caltable
+        stack. Raises ValueError if a single data selection assigns one
+        caltable two different apply-parameter sets. Use this, or
+        application_applycal(), wherever a calibration state is applied or
+        written out as applycal instructions; use merged() for solver job
+        grouping, the weblog and logging. PIPE2610_LEGACY_CONSOLIDATE reverts
+        this to the same legacy consolidation merged() always uses.
+        """
+        calapps = expand_calstate(self)
+
+        if hide_empty:
+            calapps = [ca for ca in calapps if len(ca[1]) > 0]
+
+        return dict(calapps)
+
+    def application_applycal(self) -> str:
+        """Return application_partition() as applycal command strings, one line per entry."""
+        calapps = (CalApplication(calto, calfroms)
+                   for calto, calfroms in self.application_partition(hide_empty=True).items())
+
+        return '\n'.join([str(c) for c in calapps])
+
     def export_to_casa_callibrary(self, ms, callibfile):
         calapps = (CalApplication(calto, calfroms)
-                   for calto, calfroms in self.merged(hide_empty=True).items())
+                   for calto, calfroms in self.application_partition(hide_empty=True).items())
         append = False
         for calapp in calapps:
             casa_intents = utils.to_CASA_intent(ms, calapp.intent)
@@ -1882,7 +2086,7 @@ def fix_cycle0_data_selection(context: launcher.Context, calstate: IntervalCalSt
     # We can't trust Cycle 0 data intents. If this is Cycle 0 data we need
     # to resolve the intents to fields and add them to the CalTo data
     # selection to ensure that the correct data is selected.
-    for calto, calfroms in calstate.merged().items():
+    for calto, calfroms in calstate.application_partition().items():
         vis = calto.vis
         ms = context.observing_run.get_ms(vis)
         if utils.get_epoch_as_datetime(ms.start_time) > CYCLE_0_END_DATE:
@@ -1951,13 +2155,20 @@ class IntervalCalLibrary:
         """
         Export input calibration state to a file.
 
+        Uses the application partition, so a data selection with conflicting
+        apply parameters raises here rather than reaching CASA's callibrary
+        applycal. Re-importing the exported entries (import_state()) will
+        fragment the tree differently than the original registration, so
+        legacy grouping (merged()) of the reimported state may differ from
+        the original although per-cell calibration is unchanged.
+
         Args:
             calstate: Calibration state to export to a file.
             filename: Name for saved calibration state file.
         """
         filename = self._calc_filename(filename)
 
-        calapps = [CalApplication(k, v) for k, v in calstate.merged().items()]
+        calapps = [CalApplication(k, v) for k, v in calstate.application_partition().items()]
 
         with open(filename, 'w') as export_file:
             for ca in calapps:
