@@ -1,5 +1,4 @@
-"""
-scorecalculator_test.py : Unit tests for "qa/scorecalculator.py".
+"""scorecalculator_test.py : Unit tests for "qa/scorecalculator.py".
 
 Unit tests for "qa/scorecalculator.py"
 """
@@ -17,10 +16,11 @@ import pipeline.qa.scorecalculator as qacalc
         # round-off tests
         ([(5.0, 10, True)], [(0, 10)]),
         ([(5.2, 10.1, True)], [(0, 10)]),
-        ([(5.6, 10.1, True)], [(1, 11)])
-    ]
+        ([(5.6, 10.1, True)], [(1, 11)]),
+    ],
 )
 def test_get_line_ranges(lines: list[tuple[int, int, bool]], expected: list[tuple[int, int]]):
+    """Test get_line_ranges helper function."""
     line_ranges = qacalc.get_line_ranges(lines)
     assert line_ranges == expected
 
@@ -50,9 +50,10 @@ def test_get_line_ranges(lines: list[tuple[int, int, bool]], expected: list[tupl
         ([(2, 11)], 1024, (1, 0), False),
         ([(800, 1021)], 1024, (0, 2), True),
         ([(800, 1021)], 1024, (0, 1), False),
-    ]
+    ],
 )
 def test_examine_sd_edge_lines(lines: list[tuple[int, int]], nchan: int, edge: tuple[int, int], expected: float):
+    """Test examine_sd_edge_lines helper function."""
     score = qacalc.examine_sd_edge_lines(lines, nchan, edge)
     assert score == expected
 
@@ -77,9 +78,10 @@ def test_examine_sd_edge_lines(lines: list[tuple[int, int]], nchan: int, edge: t
         ([(501, 840)], 1024, (3, 2), True),
         ([(501, 840)], 1024, (5, 0), True),
         ([(501, 840)], 1024, (0, 5), True),
-    ]
+    ],
 )
 def test_examine_sd_wide_lines(lines: list[tuple[int, int]], nchan: int, edge: tuple[int, int], expected: float):
+    """Test examine_sd_wide_lines helper function."""
     score = qacalc.examine_sd_wide_lines(lines, nchan, edge)
     assert score == expected
 
@@ -93,8 +95,46 @@ def test_examine_sd_wide_lines(lines: list[tuple[int, int]], nchan: int, edge: t
         ((1, 1), 16, 1, [(3, 5), (9, 12)], [(2, 4), (8, 11)]),
         ((1, 0), 16, -1, [(3, 5), (9, 12)], [(3, 6), (10, 12)]),
         ((1, 1), 16, -1, [(3, 5), (9, 12)], [(2, 5), (9, 11)]),
-    ]
+    ],
 )
-def test_channel_ranges_for_image(edge: tuple[int, int], nchan: int, sideband: int, ranges: list[tuple[int, int]], expected: list[tuple[int, int]]):
+def test_channel_ranges_for_image(
+    edge: tuple[int, int], nchan: int, sideband: int, ranges: list[tuple[int, int]], expected: list[tuple[int, int]]
+):
+    """Test channel_ranges_for_image helper function."""
     ranges_image = qacalc.channel_ranges_for_image(edge, nchan, sideband, ranges)
     assert ranges_image == expected
+
+
+def test_scorecalculator_exports():
+    """Verify that scorecalculator re-exports all expected symbols."""
+    assert len(qacalc.__all__) == 117
+    for name in qacalc.__all__:
+        assert hasattr(qacalc, name), f'Missing symbol on scorecalculator: {name}'
+
+
+def test_submodule_exports():
+    """Verify that all submodule symbols are present both in the submodule and the facade."""
+    from pipeline.qa import common_scores, hif_scores, hifa_scores, hifv_scores, hsd_scores
+
+    submodules = [common_scores, hif_scores, hifa_scores, hifv_scores, hsd_scores]
+    total_symbols = 0
+    for mod in submodules:
+        assert hasattr(mod, '__all__')
+        assert len(mod.__all__) > 0
+        total_symbols += len(mod.__all__)
+        for sym in mod.__all__:
+            assert hasattr(mod, sym), f'{mod.__name__} missing symbol {sym}'
+            assert getattr(qacalc, sym) is getattr(mod, sym), (
+                f'{sym} on qacalc is not identical to {mod.__name__}.{sym}'
+            )
+    assert total_symbols == len(qacalc.__all__)
+
+
+def test_linear_score_calculation():
+    """Verify linear_score behavior from common_scores and qacalc."""
+    from pipeline.qa.common_scores import linear_score
+
+    assert linear_score(0.0, 0.0, 1.0, 0.0, 1.0) == 0.0
+    assert linear_score(0.5, 0.0, 1.0, 0.0, 1.0) == 0.5
+    assert linear_score(1.0, 0.0, 1.0, 0.0, 1.0) == 1.0
+    assert qacalc.linear_score(0.5, 0.0, 1.0, 0.0, 1.0) == 0.5
