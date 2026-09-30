@@ -293,5 +293,5 @@ xvfb-run -a casa --nogui --nologger -c pipeline/runpipeline.py ppr_file.xml
 ## References
 
 - [Interface Reference](pipeline_icd) — API documentation
-- [Dependencies](dependencies) — Required packages
+- [Dependencies](devel/setup/dependencies) — Required packages
 - [Developer Setup](devel/setup/index) — Local development environment

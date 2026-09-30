@@ -15,16 +15,20 @@
 * - 2026.2.1
   - 6.7.4-8
   - - VLA/PL2026
-  -
-  - - 2026-10 (planned)
-  - 
+  - - VLA [Calibration](https://science.nrao.edu/facilities/vla/data-processing/pipeline) and [Imaging](https://science.nrao.edu/facilities/vla/data-processing/pipeline/VIPL) Pipeline
+  - - 2026-10
+  - - [casa-6.7.4-8-pipeline-2026.2.1.49-py3.12.el8.tar.xz](https://casa.nrao.edu/download/distro/casa-pipeline/release/linux)
+    - [casa-6.7.4.8-pipeline-2026.2.1.49-15.0-arm64-py312.dmg](https://casa.nrao.edu/download/distro/casa-pipeline/release/osx15)
 
 * - 2026.2.0
   - 6.7.4-8
   - - ALMA/Cycle-13
-  -
-  - - 2026-10 (planned)
-  -
+  - - [ALMA Pipeline Users Guide](users_guide/index) (<a href="users_guide.pdf">PDF</a>)
+    - [ALMA PL2026 known issues](users_guide/known_issues)
+    - [Task Ref. Manual](apisummary) (<a href="taskdocs.pdf">PDF</a>)
+  - - 2026-10
+  - - [casa-6.7.4-8-pipeline-2026.2.0.27-py3.12.el8.tar.xz](https://casa.nrao.edu/download/distro/casa-pipeline/release/linux)
+    - [casa-6.7.4.8-pipeline-2026.2.0.27-15.0-arm64-py312.dmg](https://casa.nrao.edu/download/distro/casa-pipeline/release/osx15)
 
 * - 2026.1.0.5
   - 6.7.1-13-gpu
@@ -187,7 +191,7 @@
   - 5.6.2-3.
   - - VLA restore patch
   - - VLA [Calibration](https://science.nrao.edu/facilities/vla/data-processing/pipeline/CIPL_56)
-  - - 2020-02-13-2020-12-09
+  - - 2020-02-13/2020-12-09
   -
 
 * - r42904
@@ -260,7 +264,7 @@
   - 5.1.2
   - - VLA Fall 2017
   - - VLA [Calibration](https://science.nrao.edu/facilities/vla/data-processing/pipeline/CIPL%205.1.2)
-  - - 2018-01-30-2018-12-12
+  - - 2018-01-30/2018-12-12
   -
 
 * -
@@ -281,7 +285,7 @@
   - 5.1.0
   - - VLA Fall 2017
   -
-  - - 2017-09-18-2018-01-29
+  - - 2017-09-18/2018-01-29
   -
 
 * - Cycle4-R2-B, r39732
@@ -297,14 +301,14 @@
   - 4.7.1
   - - VLA Fall 2016
   -
-  - - 2016-08-08-2016-11-14, 2017-01-23-2017-04-05
+  - - 2016-08-08/2016-11-14, 2017-01-23/2017-04-05
   -
 
 * - r39339
   - 4.7.2
   - - VLA Fall 2016
   -
-  - - 2017-04-05-2017-09-18
+  - - 2017-04-05/2017-09-18
   -
 
 * - Cycle4-R2-B, r38377

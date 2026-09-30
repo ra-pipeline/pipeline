@@ -274,8 +274,6 @@ class FlagDeterALMASingleDishResults(flagdeterbase.FlagDeterBaseResults):
 
         # regenerate pointing plots
         if not basetask.DISABLE_WEBLOG:
-            ephem_names = casa_tools.measures.listcodes(casa_tools.measures.direction())['extra']
-            valid_ephem_names = [x for x in ephem_names if x != 'COMET']
             LOG.info('Regenerate pointing plots to update flag information')
             msobj = context.observing_run.get_ms(self.inputs['vis'])
             task = pointing.SingleDishPointingChart(context, msobj)
@@ -288,14 +286,10 @@ class FlagDeterALMASingleDishResults(flagdeterbase.FlagDeterBaseResults):
                               reference_field_id=reference, target_only=False)
 
                     # if the target is ephemeris, offset pointing pattern should also be plotted
-                    target_field = msobj.fields[target]
-                    source_name = target_field.source.name
-                    offset_pointings = []
-                    if source_name.upper() in valid_ephem_names:
-                        plotres = task.plot(revise_plot=True, antenna=antenna, target_field_id=target,
-                                            reference_field_id=reference, target_only=True, ofs_coord=True)
-                        if plotres is not None:
-                            offset_pointings.append(plotres)
+                    target_source = msobj.fields[target].source
+                    if target_source.is_eph_obj or target_source.is_known_eph_obj:
+                        task.plot(revise_plot=True, antenna=antenna, target_field_id=target,
+                                  reference_field_id=reference, target_only=True, ofs_coord=True)
 
 
 def update_flag_pointing(filename: str, flag_incomplete_raster: bool):

@@ -21,6 +21,19 @@ pixi run -e docs build-pdfs
 
 HTML output is written to `docs/_build/html/`. Open `docs/_build/html/index.html` in a browser to preview.
 
+### PDF (LaTeX) Prerequisites
+
+Building PDF documentation locally (`pixi run -e docs build-pdfs`) requires system LaTeX packages:
+
+- **Ubuntu/Debian:** Install [TeX Live](https://www.tug.org/texlive/) packages:
+  ```console
+  sudo apt-get install -y latexmk texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended
+  ```
+- **macOS:** Install [MacTeX](https://www.tug.org/mactex/) via Homebrew:
+  ```console
+  brew install --cask mactex-no-gui
+  ```
+
 ### Building the Internal Variant
 
 Pipeline documentation includes an "internal" variant with developer-only notes and sections. To build the internal variant locally, prepend the `BUILD_INTERNAL_DOCS=1` environment variable:

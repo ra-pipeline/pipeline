@@ -17,10 +17,31 @@
         var container = document.querySelector('article') || document.querySelector('.content') || document.querySelector('main') || document.body;
         if (!container) return;
 
+        function isExcludedImage(img) {
+            if (!img) return true;
+            if (img.classList.contains('no-zoom') || img.classList.contains('brand-logo') || img.classList.contains('icon') || img.classList.contains('badge')) {
+                return true;
+            }
+            var src = img.getAttribute('src') || '';
+            if (src.includes('shields.io') || src.includes('codecov.io') || src.includes('badge')) {
+                return true;
+            }
+            var parentLink = img.closest('a');
+            if (parentLink && parentLink.href) {
+                // If parent link points to a web page rather than an image asset, treat as a navigation link, not a zoomable lightbox image
+                var cleanUrl = parentLink.href.split('?')[0].split('#')[0].toLowerCase();
+                var isImageFile = /\.(png|jpe?g|gif|webp|svg|bmp|tiff)$/.test(cleanUrl);
+                if (!isImageFile) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         // Intercept clicks on any <a> tag wrapping a zoomable image to prevent page navigation / scroll jump
         container.addEventListener('click', function (e) {
             var img = e.target.closest('img');
-            if (img && !img.classList.contains('no-zoom') && !img.classList.contains('brand-logo') && !img.classList.contains('icon')) {
+            if (img && !isExcludedImage(img)) {
                 var parentLink = img.closest('a');
                 if (parentLink) {
                     e.preventDefault();
@@ -33,12 +54,9 @@
 
         // Initialize Viewer on the document content container
         new Viewer(container, {
-            // Filter out non-content images like brand logos and icons
+            // Filter out non-content images like brand logos, icons, badges, and external links
             filter: function (img) {
-                if (img.classList.contains('no-zoom') || img.classList.contains('brand-logo') || img.classList.contains('icon')) {
-                    return false;
-                }
-                return true;
+                return !isExcludedImage(img);
             },
             // Disable focus stealing to prevent the browser from rolling/scrolling the background page to top
             focus: false,

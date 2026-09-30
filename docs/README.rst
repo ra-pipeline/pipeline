@@ -4,16 +4,12 @@ Pipeline
 
 |Docs Pages| |Docs RTD| |Test Unit| |Codecov Unit|
 
-.. important::
-    This site provides *up-to-date and version-controlled* information, *automatically generated from the code repository*, to complement the official Pipeline portals from `ALMA <https://almascience.nrao.edu/processing/science-pipeline>`_ and `VLA <https://science.nrao.edu/facilities/vla/data-processing>`_.
-    
-    Pipeline documentation is in transition, and not all content is migrated here - the table below clarifies where to find different content. Some content is intended for Users, and some for Developers, but naturally there is significant overlap.
-       
-    Pipeline development is a collaborative effort led by `NRAO`_, `ESO`_, and `NAOJ`_, with additional contributions from `MPIfR`_, `NOVA`_ (from 2026), and `UKATC`_ (until 2025) under contract to `ESO`_.
+Pipeline development is a collaborative effort led by `NRAO`_, `ESO`_, and `NAOJ`_, with additional contributions from `MPIfR`_, `NOVA`_ (from 2026), and `UKATC`_ (until 2025) under contract to `ESO`_.
 
-.. important::
-   Please :doc:`Acknowledge <acknowledgement>` the Pipeline in your publications.
-    
+If your research makes use of the Pipeline, we would appreciate it if you acknowledge or cite it in your publications — see :doc:`Citations and Acknowledgements <acknowledgement>` for suggested phrasing and references.
+
+.. note::
+    This site provides version-controlled documentation built directly from the codebase to complement the official portals at `ALMA <https://almascience.nrao.edu/processing/science-pipeline>`_ and `VLA <https://science.nrao.edu/facilities/vla/data-processing>`_. As documentation is still transitioning here, please check the table below for where different guides are hosted.
 
 Official Repository
 -------------------
@@ -65,7 +61,7 @@ Documentation Components
       * - Building & Publishing Documentation
         - :doc:`Documentation Builds <devel/setup/readthedocs>`
       * - Pipeline Dependencies
-        - :doc:`Dependencies <dependencies>`
+        - :doc:`Dependencies <devel/setup/dependencies>`
 
 
 

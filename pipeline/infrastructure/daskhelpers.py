@@ -50,10 +50,10 @@ dask_available = all([dask_spec, distributed_spec, dask_jobqueue_spec])
 
 if importlib.util.find_spec('casampi'):
     from casampi.MPIEnvironment import MPIEnvironment
-    from mpi4py import MPI
+
     is_mpi_session = MPIEnvironment.is_mpi_enabled
     is_mpi_worker = MPIEnvironment.is_mpi_enabled and not MPIEnvironment.is_mpi_client
-    mpi_rank = MPI.COMM_WORLD.Get_rank()
+    mpi_rank = MPIEnvironment.mpi_processor_rank
 else:
     is_mpi_session = False
     is_mpi_worker = False
