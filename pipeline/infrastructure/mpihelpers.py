@@ -6,7 +6,8 @@ import pprint
 import tempfile
 from inspect import signature
 
-from pipeline.infrastructure import daskhelpers, exceptions, filenamer, logging
+from . import parslhelpers, exceptions, filenamer, logging
+from pipeline.infrastructure import daskhelpers
 from pipeline.infrastructure.utils import gen_hash, get_obj_size, human_file_size
 
 casampi_spec = importlib.util.find_spec('casampi')
@@ -511,7 +512,7 @@ def parse_mpi_input_parameter(input_arg):
 def parse_parallel_input_parameter(input_arg):
     lowercase = str(input_arg).lower()
     if lowercase == 'automatic':
-        return is_mpi_ready() or daskhelpers.is_dask_ready()
+        return is_mpi_ready() or daskhelpers.is_dask_ready() or parslhelpers.is_parsl_ready()
     elif lowercase == 'true':
         return True
     elif lowercase == 'false':
@@ -598,7 +599,7 @@ class TaskQueue:
         self.__results = []
         self.__executor = executor
         self.__mpi_server_list = mpi_server_list
-        self.__is_async_ready = daskhelpers.is_dask_ready() or is_mpi_ready()
+        self.__is_async_ready = daskhelpers.is_dask_ready() or is_mpi_ready() or parslhelpers.is_parsl_ready()
         self.__parallel_wanted = parallel
         self.__async = self.__parallel_wanted and self.__is_async_ready
         self.__unique = unique
@@ -606,6 +607,7 @@ class TaskQueue:
         LOG.info('TaskQueue initialized: ')
         LOG.info('    MPI server list: %s', self.__mpi_server_list)
         LOG.info('    Dask client:     %s', daskhelpers.daskclient)
+        LOG.info('    Parsl ready:     %s', parslhelpers.is_parsl_ready())
         LOG.info('    is_async  :      %s', self.__async)
 
     def __enter__(self):
@@ -681,7 +683,10 @@ class TaskQueue:
         # try different parallelization arrangement:
         #   dask/futures -> casampi -> serial
 
-        if self.__parallel_wanted and daskhelpers.is_dask_ready():
+        if self.__parallel_wanted and parslhelpers.is_parsl_ready():
+            executable = Tier0JobRequest(fn, job_args, executor=executor)
+            task = parslhelpers.ParslTask(executable)
+        elif self.__parallel_wanted and daskhelpers.is_dask_ready():
             executable = Tier0JobRequest(fn, job_args, executor=executor)
             task = daskhelpers.FutureTask(executable)
         elif self.__parallel_wanted and is_mpi_ready():
@@ -701,7 +706,10 @@ class TaskQueue:
 
         # try different parallelization arrangement:
         #   dask/futures -> casampi -> serial        
-        if self.__parallel_wanted and daskhelpers.is_dask_ready():
+        if self.__parallel_wanted and parslhelpers.is_parsl_ready():
+            executable = Tier0FunctionCall(fn, *args, use_pickle=use_pickle, **kwargs)
+            task = parslhelpers.ParslTask(executable)
+        elif self.__parallel_wanted and daskhelpers.is_dask_ready():
             executable = Tier0FunctionCall(fn, *args, use_pickle=use_pickle, **kwargs)
             task = daskhelpers.FutureTask(executable)
         elif self.__parallel_wanted and is_mpi_ready():
@@ -730,7 +738,14 @@ class TaskQueue:
         # try different parallelization arrangement:
         #   dask/futures -> casampi -> serial
 
-        if self.__parallel_wanted and daskhelpers.is_dask_ready():
+        if self.__parallel_wanted and parslhelpers.is_parsl_ready():
+            tmpfile = tempfile.NamedTemporaryFile(suffix='.context', dir=context.output_dir, delete=True)
+            tmpfile.close()
+            context_path = tmpfile.name
+            context.save(context_path)
+            executable = Tier0PipelineTask(task_cls, task_args, context_path)
+            task = parslhelpers.ParslTask(executable)
+        elif self.__parallel_wanted and daskhelpers.is_dask_ready():
             tmpfile = tempfile.NamedTemporaryFile(suffix='.context', dir=context.output_dir, delete=True)
             tmpfile.close()
             context_path = tmpfile.name

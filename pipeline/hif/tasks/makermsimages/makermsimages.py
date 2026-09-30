@@ -5,13 +5,11 @@ from scipy.stats import median_abs_deviation
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
-import pipeline.infrastructure.daskhelpers as daskhelpers
 import pipeline.infrastructure.imagelibrary as imagelibrary
-import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
-from pipeline.infrastructure import casa_tasks, casa_tools, task_registry
+from pipeline.infrastructure import daskhelpers, mpihelpers, parslhelpers, task_registry
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -116,7 +114,11 @@ class Makermsimages(basetask.StandardTaskTemplate):
                 LOG.info(f"Generating RMS image {rmsimagename} from {imagename}")
                 job_to_execute = casa_tasks.imdev(**self._get_imdev_args(imagename))
 
-                if tier0_imdev_enabled and daskhelpers.is_dask_ready():
+                if tier0_imdev_enabled and parslhelpers.is_parsl_ready():
+                    executable = mpihelpers.Tier0JobRequest(
+                        casa_tasks.imdev, job_to_execute.kw, executor=self._executor)
+                    queued_job = parslhelpers.ParslTask(executable)
+                elif tier0_imdev_enabled and daskhelpers.is_dask_ready():
                     executable = mpihelpers.Tier0JobRequest(
                         casa_tasks.imdev, job_to_execute.kw, executor=self._executor)
                     queued_job = daskhelpers.FutureTask(executable)

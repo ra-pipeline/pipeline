@@ -15,6 +15,7 @@ from pipeline.domain.spectralwindow import match_spw_basename
 from pipeline.infrastructure import basetask, exceptions, logging
 
 from . import daskhelpers
+from . import parslhelpers
 from . import mpihelpers, utils, vdp
 
 __all__ = [
@@ -255,7 +256,10 @@ class VDPTaskFactory:
                       'to execute the task on the MPIclient.')
             parallel_wanted = False
 
-        if parallel_wanted and daskhelpers.is_dask_ready():
+        if parallel_wanted and parslhelpers.is_parsl_ready():
+            executable = mpihelpers.Tier0PipelineTask(self.__task, valid_args, self.__context_path)
+            return valid_args, parslhelpers.ParslTask(executable)
+        elif parallel_wanted and daskhelpers.is_dask_ready():
             executable = mpihelpers.Tier0PipelineTask(self.__task, valid_args, self.__context_path)
             return valid_args, daskhelpers.FutureTask(executable)
         elif parallel_wanted and mpihelpers.is_mpi_ready():

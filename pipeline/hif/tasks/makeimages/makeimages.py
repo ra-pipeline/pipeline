@@ -11,6 +11,7 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.daskhelpers as daskhelpers
 import pipeline.infrastructure.mpihelpers as mpihelpers
+import pipeline.infrastructure.parslhelpers as parslhelpers
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.utils.imaging as imaging_utils
@@ -679,7 +680,7 @@ class CleanTaskFactory:
         """Save context to disk for MPI servers if needed and return self."""
         # If there's a possibility that we'll submit MPI jobs, save the context
         # to disk ready for import by the MPI servers.
-        if mpihelpers.mpiclient or daskhelpers.daskclient:
+        if mpihelpers.mpiclient or daskhelpers.daskclient or parslhelpers.is_parsl_ready():
             # Use the tempfile module to generate a unique temporary filename,
             # which we use as the output path for our pickled context
             tmpfile = tempfile.NamedTemporaryFile(suffix='.context',
@@ -736,11 +737,18 @@ class CleanTaskFactory:
         task_args = {k: v for k, v in task_args.items() if k in task_inputs_args}
 
         LOG.debug('MakeImages Parallelization Config:')
-        LOG.debug('parallel_wanted:             %s', parallel_wanted)
-        LOG.debug('daskhelpers.is_dask_ready(): %s', daskhelpers.is_dask_ready())
-        LOG.debug('mpihelpers.is_mpi_ready()    %s', mpihelpers.is_mpi_ready())
+        LOG.debug('parallel_wanted:              %s', parallel_wanted)
+        LOG.debug('parslhelpers.is_parsl_ready(): %s', parslhelpers.is_parsl_ready())
+        LOG.debug('daskhelpers.is_dask_ready():  %s', daskhelpers.is_dask_ready())
+        LOG.debug('mpihelpers.is_mpi_ready():    %s', mpihelpers.is_mpi_ready())
 
-        if parallel_wanted and daskhelpers.is_dask_ready():
+        if parallel_wanted and parslhelpers.is_parsl_ready():
+            task_args['parallel'] = False
+            executable = mpihelpers.Tier0PipelineTask(Tclean,
+                                                      task_args,
+                                                      self.__context_path)
+            return parslhelpers.ParslTask(executable)
+        elif parallel_wanted and daskhelpers.is_dask_ready():
             task_args['parallel'] = False
             executable = mpihelpers.Tier0PipelineTask(Tclean,
                                                       task_args,

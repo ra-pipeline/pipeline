@@ -1685,7 +1685,10 @@ finally:
 
                     # Add all the existing files (excluding the aqua report XML) from the old tarball to the new tarball
                     for member in files_to_keep:
-                        new_tar.addfile(member, tar.extractfile(member))
+                        if member.isreg():
+                            new_tar.addfile(member, tar.extractfile(member))
+                        else:
+                            new_tar.addfile(member)
 
                     # If an aqua file was already in the old weblog tarball, then add it under the same
                     # relative path/name. Else, add it into the weblog tarball.

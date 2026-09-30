@@ -23,7 +23,7 @@ import uuid
 from typing import TYPE_CHECKING
 
 import pipeline.infrastructure as infrastructure
-from pipeline.infrastructure import daskhelpers, mpihelpers
+from pipeline.infrastructure import mpihelpers, daskhelpers, parslhelpers
 from pipeline.infrastructure.jobrequest import JobRequest
 
 from .conversion import flatten, safe_split
@@ -449,7 +449,10 @@ def plotms_iterate(
             # CAS-11578, etc. are fixed.
             tier0_plots_enabled = 'ENABLE_TIER0_PLOTMS' in os.environ or mpihelpers.ENABLE_TIER0_PLOTMS
 
-            if tier0_plots_enabled and daskhelpers.is_dask_ready():
+            if tier0_plots_enabled and parslhelpers.is_parsl_ready():
+                executable = mpihelpers.Tier0JobRequest(casa_tasks.plotms, job_to_execute.kw)
+                queued_job = parslhelpers.ParslTask(executable)
+            elif tier0_plots_enabled and daskhelpers.is_dask_ready():
                 executable = mpihelpers.Tier0JobRequest(casa_tasks.plotms, job_to_execute.kw)
                 queued_job = daskhelpers.FutureTask(executable)
             elif tier0_plots_enabled and mpihelpers.is_mpi_ready():
