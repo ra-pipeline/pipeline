@@ -1,3 +1,4 @@
+import collections.abc
 import os
 
 import pipeline.infrastructure.basetask as basetask
@@ -6,6 +7,7 @@ import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as qacalc
 from . import mssplit
+from . import mstransform
 
 LOG = logging.get_logger(__name__)
 
@@ -46,3 +48,35 @@ class MsSplitListQAHandler(pqa.QAPlugin):
         mses = [r.inputs['vis'] for r in result]
         longmsg = 'No missing science targets cont+line MS(s) for %s' % utils.commafy(mses, quotes=False, conjunction='or')
         result.qa.all_unity_longmsg = longmsg
+
+
+class MstransformQAHandler(pqa.QAPlugin):
+    result_cls = mstransform.MstransformResults
+    child_cls = None
+    generating_task = mstransform.SerialMstransform
+
+    def handle(self, context, result):
+        # Check for existence of the transformed science targets MS.
+        if result.outputvis:
+            score1 = self._targets_ms_exists(os.path.dirname(result.outputvis), os.path.basename(result.outputvis))
+            result.qa.pool.append(score1)
+
+    def _targets_ms_exists(self, output_dir, target_ms):
+        """Check for the existence of the transformed science targets MS."""
+        return qacalc.score_path_exists(output_dir, target_ms, 'transformed science targets ms')
+
+
+class MstransformListQAHandler(pqa.QAPlugin):
+    """QA handler for a list containing MstransformResults."""
+
+    result_cls = collections.abc.Iterable
+    child_cls = mstransform.MstransformResults
+    generating_task = mstransform.SerialMstransform
+
+    def handle(self, context, result):
+        collated = utils.flatten([r.qa.pool for r in result])
+        result.qa.pool[:] = collated
+        mses = [r.inputs['vis'] for r in result if r.inputs.get('vis')]
+        longmsg = 'No missing science targets in transformed MS(s) for %s' % utils.commafy(mses, quotes=False, conjunction='or')
+        result.qa.all_unity_longmsg = longmsg
+

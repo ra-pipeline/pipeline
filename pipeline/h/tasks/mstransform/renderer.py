@@ -35,3 +35,36 @@ def make_split_table(context, results):
         rows.append(tr)
 
     return utils.merge_td_columns(rows)
+
+
+class T2_4MDetailsMstransformRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
+    def __init__(self, uri='mstransform.mako', 
+                 description='Transform MS',
+                 always_rerender=False):
+        super().__init__(uri=uri,
+                description=description, always_rerender=always_rerender)
+
+    def update_mako_context(self, mako_context, pipeline_context, results):
+        table_rows = make_mstransform_table(pipeline_context, results)
+        mako_context.update({'table_rows': table_rows})
+
+
+MstransformTR = collections.namedtuple('MstransformTR', 'vis outputvis')
+
+def make_mstransform_table(context, results):
+    # Will hold all the input and output MS(s)
+    rows = []
+
+    # Loop over the results
+    for single_result in results:
+        inputs = getattr(single_result, 'inputs', {})
+        vis = inputs.get('vis')
+        outputvis = inputs.get('outputvis')
+        if vis and outputvis:
+            vis_cell = os.path.basename(vis)
+            outputvis_cell = os.path.basename(outputvis)
+            tr = MstransformTR(vis_cell, outputvis_cell)
+            rows.append(tr)
+
+    return utils.merge_td_columns(rows)
+
