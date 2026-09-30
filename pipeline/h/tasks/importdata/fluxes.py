@@ -47,11 +47,107 @@ def get_setjy_results(mses):
     return results
 
 
+def _get_measurement_from_quantities(ms, spw, row_frequencies, row_iquvs):
+    """Select the flux measurement closest to spectral window centre frequency."""
+    if isinstance(spw, (int, str)):
+        spw = ms.get_spectral_window(spw)
+
+    by_delta = sorted([(abs(spw.centre_frequency - f), f, iquv) for f, iquv in zip(row_frequencies, row_iquvs)])
+
+    min_delta, closest_frequency, _ = by_delta[0]
+    joint_closest = [iquv for delta_f, _, iquv in by_delta if delta_f == min_delta]
+
+    if len(joint_closest) > 1:
+        LOG.trace('Averaging %d equally close measurements: %s', len(joint_closest), joint_closest)
+
+    mean_iquv = [reduce(lambda x, y: x + y, stokes) / len(joint_closest) for stokes in zip(*joint_closest)]
+
+    LOG.info('Closest flux measurement for %s spw %s found %s distant from centre of spw',
+             ms.basename, spw, min_delta)
+
+    if not spw.min_frequency < closest_frequency < spw.max_frequency:
+        LOG.info('Closest flux measurement for %s spw %s falls outside spw, %s distant from spectral window centre',
+                 ms.basename, spw, min_delta)
+
+    return domain.FluxMeasurement(spw.id, *mean_iquv, origin=ORIGIN_XML)
+
+
+def _read_fluxes_via_pyasdm(ms):
+    """Read fluxes from the Source table using pyasdm."""
+    try:
+        import pyasdm
+    except ImportError:
+        return None
+
+    candidate_dirs = [ms.name]
+    if hasattr(ms, 'origin_ms') and ms.origin_ms and ms.origin_ms != ms.name:
+        candidate_dirs.append(ms.origin_ms)
+
+    source_dir = None
+    for d in candidate_dirs:
+        if os.path.exists(os.path.join(d, 'Source.xml')) or os.path.exists(os.path.join(d, 'Source.bin')):
+            source_dir = d
+            break
+
+    if source_dir is None:
+        return None
+
+    asdm = pyasdm.ASDM()
+    source_table = asdm.getSource()
+    try:
+        source_table.setFromFile(source_dir)
+    except Exception:
+        xml_path = os.path.join(source_dir, 'Source.xml')
+        if not os.path.exists(xml_path):
+            return None
+        try:
+            with open(xml_path, 'r', encoding='utf-8') as f:
+                source_table.fromXML(f.read())
+        except Exception:
+            return None
+
+    result = collections.defaultdict(list)
+    all_ms_spw_ids = {spw.id for spw in ms.spectral_windows}
+    asdm_to_ms_spw_map = SpectralWindowTable.get_asdm_to_ms_spw_mapping(ms)
+
+    for row in source_table.get():
+        if not row.isFluxExists() or not row.isFrequencyExists():
+            continue
+
+        asdm_spw_id = row.getSpectralWindowId().getTagValue()
+        spw_id = asdm_to_ms_spw_map.get(asdm_spw_id, None)
+        if spw_id not in all_ms_spw_ids:
+            LOG.warning('Could not map ASDM spectral window %s to MS for %s', asdm_spw_id, ms.basename)
+            continue
+
+        source_id = row.getSourceId()
+        try:
+            source = ms.sources[source_id]
+        except Exception:
+            LOG.warning('Source index error with source #%s from Source.xml in %s.', source_id, ms.basename)
+            continue
+
+        row_frequencies = [measures.Frequency(f.get(), measures.FrequencyUnits.HERTZ) for f in row.getFrequency()]
+        row_iquvs = [
+            tuple(measures.FluxDensity(f.get(), measures.FluxDensityUnits.JANSKY) for f in stokes)
+            for stokes in row.getFlux()
+        ]
+
+        if not row_frequencies or not row_iquvs:
+            continue
+
+        m = _get_measurement_from_quantities(ms, spw_id, row_frequencies, row_iquvs)
+        result[source].append(m)
+
+    return result
+
+
 def read_fluxes_nodb(ms):
-    """
-    Read fluxes from the Source XML table translating from the ASDM
-    to MS spw ids as we go.
-    """
+    """Read fluxes from the Source XML table translating from the ASDM to MS spw ids as we go."""
+    pyasdm_result = _read_fluxes_via_pyasdm(ms)
+    if pyasdm_result is not None:
+        return pyasdm_result
+
     result = collections.defaultdict(list)
 
     source_table = os.path.join(ms.name, 'Source.xml')
@@ -96,7 +192,7 @@ def read_fluxes_nodb(ms):
         source_id = int(source_element)
         try:
             source = ms.sources[int(source_id)]
-        except Exception as e:
+        except Exception:
             LOG.warning('Source index error with source #%s from Source.xml in %s.', source_id, ms.basename)
             continue
 
@@ -124,48 +220,9 @@ def get_measurement(ms, spw, frequency_text, flux_text):
     """
     Construct the measurement
     """
-
-    # more than one measurement can be registered against the spectral
-    # window. These functions give a lists of frequencies and IQUV
-    # 4-tuples
     row_frequencies = to_hertz(frequency_text)
     row_iquvs = to_jansky(flux_text)
-
-    spw = ms.get_spectral_window(spw)
-
-    # Task: select flux measurement closest to spectral window centre
-    # frequency, taking the mean when measurements are equally distant
-
-    # first, sort the measurements by distance to spw centre
-    # frequency, annotating each tuple with the delta frequency
-    by_delta = sorted([(abs(spw.centre_frequency - f), f, iquv) for f, iquv in zip(row_frequencies, row_iquvs)])
-
-    # identify all measurements equally as close as this provisionally
-    # 'closest' measurement
-    min_delta, closest_frequency, _ = by_delta[0]
-    joint_closest = [iquv for delta_f, _, iquv in by_delta if delta_f == min_delta]
-
-    if len(joint_closest) > 1:
-        LOG.trace('Averaging {} equally close measurements: {}'.format(len(joint_closest), joint_closest))
-
-    # calculate the mean of these equally distant  measurements.
-    # joint_closest has at least one item, so we don't need to prime
-    # the reduce function with an empty accumulator
-    mean_iquv = [reduce(lambda x, y: x + y, stokes) / len(joint_closest) for stokes in zip(*joint_closest)]
-
-    LOG.info('Closest flux measurement for {} spw {} found {} distant from centre of spw)'
-             ''.format(ms.basename, spw, min_delta))
-
-    # Even if a mean was calculated, any alternative selection should
-    # be equally distant and therefore outside the sow range too
-    if not spw.min_frequency < closest_frequency < spw.max_frequency:
-        # This might become a warning once the PRTSPR-20823 fix is active
-        LOG.info('Closest flux measurement for {} spw {} falls outside spw, {} distant from spectral window centre'
-                 ''.format(ms.basename, spw, min_delta))
-
-    m = domain.FluxMeasurement(spw.id, *mean_iquv, origin=ORIGIN_XML)
-
-    return m
+    return _get_measurement_from_quantities(ms, spw, row_frequencies, row_iquvs)
 
 
 def to_jansky(flux_text):

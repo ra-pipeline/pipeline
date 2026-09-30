@@ -338,6 +338,8 @@ class SerialMstransform(basetask.StandardTaskTemplate):
             ms.session = self.inputs.ms.session
             LOG.debug('Setting data_column and origin_ms.')
             ms.origin_ms = self.inputs.ms.origin_ms
+            if hasattr(self.inputs.ms, 'asdm_spw_mapping') and self.inputs.ms.asdm_spw_mapping is not None:
+                ms.asdm_spw_mapping = dict(self.inputs.ms.asdm_spw_mapping)
             ms.set_data_column(result.output_data_type, 'DATA')
 
         result.mses.extend(observing_run.measurement_sets)

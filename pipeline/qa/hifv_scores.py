@@ -124,6 +124,61 @@ def score_vla_science_data_flagged_by_agents(ms, summaries, min_frac, max_frac, 
     return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin)
 
 
+def _has_zero_endtime_online_flags(ms) -> bool:
+    """Check if Flag table has any row with endTime == 0.
+
+    PIPE-2576: Part-5: endtime = 0 in flag table indicates online flags with unclosed time range.
+    PIPE-3268: Modernize Flag table parsing via pyasdm with origin_ms and binary table support.
+    """
+    candidate_dirs = [ms.name]
+    if hasattr(ms, 'origin_ms') and ms.origin_ms and ms.origin_ms != ms.name:
+        candidate_dirs.append(ms.origin_ms)
+
+    for d in candidate_dirs:
+        if not os.path.isdir(d):
+            continue
+
+        xml_path = os.path.join(d, 'Flag.xml')
+        bin_path = os.path.join(d, 'Flag.bin')
+        if not (os.path.exists(xml_path) or os.path.exists(bin_path)):
+            continue
+
+        try:
+            import pyasdm
+
+            asdm = pyasdm.ASDM()
+            flag_table = asdm.getFlag()
+            try:
+                flag_table.setFromFile(d)
+                for row in flag_table.get():
+                    if row.getEndTime().get() == 0:
+                        return True
+                return False
+            except Exception:
+                if os.path.exists(xml_path):
+                    with open(xml_path, 'r', encoding='utf-8') as f:
+                        flag_table.fromXML(f.read())
+                    for row in flag_table.get():
+                        if row.getEndTime().get() == 0:
+                            return True
+                    return False
+        except Exception:
+            pass
+
+        # Fallback to ElementTree for partial/non-compliant XML
+        if os.path.exists(xml_path):
+            try:
+                tree = ElementTree.parse(xml_path)
+                for flagset in tree.findall('row'):
+                    endtime = flagset.findtext('endTime')
+                    if endtime is not None and int(endtime) == 0:
+                        return True
+            except Exception:
+                pass
+
+    return False
+
+
 @log_qa
 def score_vla_agents(ms, summaries):
     """Get a score for the fraction of data flagged by online, shadow, and template agents.
@@ -215,22 +270,16 @@ def score_vla_agents(ms, summaries):
         qascore_list.append(pqa.QAScore(score_val, longmsg=msg, shortmsg=msg, origin=origin))
 
     # PIPE-2576: Part-5: endtime = 0 in flag.xml then score <0.5
-    flag_table = os.path.join(ms.name, 'Flag.xml')
-    if os.path.exists(flag_table):
-        source_element = ElementTree.parse(flag_table)
-        if source_element:
-            for flagset in source_element.findall('row'):
-                endtime = flagset.findtext('endTime')
-                if int(endtime):
-                    score_val = 0.3
-                    msg = 'In flag.xml for online flags, end time is 0'
-                    origin = pqa.QAOrigin(
-                        metric_name='score_flagdata',
-                        metric_score=score_val,
-                        metric_units='Total Fraction of data that is flagged',
-                    )
-                    qascore_list.append(pqa.QAScore(score_val, longmsg=msg, shortmsg=msg, origin=origin))
-                    break
+    # PIPE-3268: Modernize Flag table parsing via pyasdm with origin_ms and binary table support
+    if _has_zero_endtime_online_flags(ms):
+        score_val = 0.3
+        msg = 'In flag.xml for online flags, end time is 0'
+        origin = pqa.QAOrigin(
+            metric_name='score_flagdata',
+            metric_score=score_val,
+            metric_units='Total Fraction of data that is flagged',
+        )
+        qascore_list.append(pqa.QAScore(score_val, longmsg=msg, shortmsg=msg, origin=origin))
 
     return qascore_list
 

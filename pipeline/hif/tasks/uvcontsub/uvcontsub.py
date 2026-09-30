@@ -286,6 +286,9 @@ class SerialUVcontSub(basetask.StandardTaskTemplate):
             for ms in observing_run.measurement_sets:
                 LOG.debug('Setting session to %s for %s', self.inputs.ms.session, ms.basename)
                 ms.session = self.inputs.ms.session
+                ms.origin_ms = getattr(self.inputs.ms, 'origin_ms', None) or self.inputs.ms.name
+                if hasattr(self.inputs.ms, 'asdm_spw_mapping') and self.inputs.ms.asdm_spw_mapping is not None:
+                    ms.asdm_spw_mapping = dict(self.inputs.ms.asdm_spw_mapping)
                 ms.set_data_column(DataType.REGCAL_LINE_SCIENCE, 'DATA')
             result.line_mses.extend(observing_run.measurement_sets)
 

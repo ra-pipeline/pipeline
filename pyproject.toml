@@ -18,6 +18,7 @@ dependencies = [
     "logutils~=0.3",
     "mako~=1.4",
     "pypubsub==4.0.7",
+    "pyasdm>=0.0.7",
     # -- Optional & Tooling Dependencies --
     "bdsf~=1.14",
     "ps_mem~=3.14",
@@ -246,6 +247,7 @@ pipeline = { path = ".", editable = true, extras = ["dev"] }
 # https://casadocs.readthedocs.io/en/stable/notebooks/introduction.html#Known-Issues
 protobuf = "==3.20.*" # casaplotms still requires ver<=3.20
 grpcio = ">=1.62"
+pyasdm = ">=0.0.7"
 
 casampi = { version = ">=0.5.5", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 casaplotms = { version = ">=2.5.3", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }

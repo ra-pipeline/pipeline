@@ -136,19 +136,58 @@ class MsCalibrationTypeHeuristics(api.Heuristic):
 
 
 class AsdmCalibrationTypeHeuristics(api.Heuristic):
-    """
-    """
-    def calculate(self, filename):
+    """Determine single-dish calibration type by inspecting ASDM Scan table."""
+
+    def calculate(self, filename: str) -> str:
+        """Determine calibration type from ASDM Scan table.
+
+        Attempts reading via pyasdm to support both XML and binary MIME tables.
+        Falls back to xml.etree.ElementTree if pyasdm parsing fails or is unavailable.
+
+        Args:
+            filename: Path to ASDM directory.
+
+        Returns:
+            Calibration type ('ps' or 'none').
+        """
         caltype = 'none'
 
-        import xml.dom.minidom as DOM
-        scan_table = os.path.join(filename, 'Scan.xml')
-        dom3 = DOM.parse(scan_table)
-        rootnode = dom3.getElementsByTagName('scanIntent')[0]
-        intelm = rootnode
-        intstr = intelm.childNodes[0].data.encode('UTF-8')
-        if ( intstr.find( 'OBSERVE_TARGET' ) != -1 ):
-            caltype = 'ps'  # 'otf'
-        dom3.unlink()
+        try:
+            import pyasdm
+
+            asdm = pyasdm.ASDM()
+            scan_table = asdm.getScan()
+            try:
+                scan_table.setFromFile(filename)
+                for row in scan_table.get():
+                    intents = [str(x) for x in row.getScanIntent()]
+                    if any('OBSERVE_TARGET' in intent for intent in intents):
+                        return 'ps'
+                return 'none'
+            except Exception:
+                xml_path = os.path.join(filename, 'Scan.xml')
+                if os.path.exists(xml_path):
+                    with open(xml_path, 'r', encoding='utf-8') as f:
+                        scan_table.fromXML(f.read())
+                    for row in scan_table.get():
+                        intents = [str(x) for x in row.getScanIntent()]
+                        if any('OBSERVE_TARGET' in intent for intent in intents):
+                            return 'ps'
+                    return 'none'
+        except Exception:
+            pass
+
+        scan_table_xml = os.path.join(filename, 'Scan.xml')
+        if os.path.exists(scan_table_xml):
+            try:
+                import xml.etree.ElementTree as ElementTree
+
+                tree = ElementTree.parse(scan_table_xml)
+                for node in tree.findall('.//scanIntent'):
+                    if node.text and 'OBSERVE_TARGET' in node.text:
+                        return 'ps'
+            except Exception:
+                pass
 
         return caltype
+

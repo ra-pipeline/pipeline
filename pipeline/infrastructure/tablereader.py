@@ -892,84 +892,155 @@ class SpectralWindowTable:
         return receiver_info
 
     @staticmethod
-    def parse_spectral_window_ids_from_xml(xml_path: str) -> list:
-        """
-        Extract the spectral window ID element from each row of an XML file.
+    def _parse_spectral_window_ids_via_pyasdm(xml_path: str) -> list[int] | None:
+        """Extract spectral window IDs using pyasdm.
 
-        :param xml_path: path for XML file
-        :return: list of integer spectral window IDs
+        Handles both XML and binary MIME table formats.
         """
+        try:
+            import pyasdm
+        except ImportError:
+            return None
+
+        basename = os.path.basename(xml_path)
+        dirname = os.path.dirname(xml_path)
+        asdm = pyasdm.ASDM()
+
+        if basename in ('SpectralWindow.xml', 'SpectralWindow.bin'):
+            table = asdm.getSpectralWindow()
+        elif basename in ('DataDescription.xml', 'DataDescription.bin'):
+            table = asdm.getDataDescription()
+        else:
+            return None
+
+        # If the directory exists and contains table files, try setFromFile first
+        # to properly handle BulkStoreRef/MIME binary files
+        if dirname and os.path.isdir(dirname):
+            try:
+                table.setFromFile(dirname)
+                return [row.getSpectralWindowId().getTagValue() for row in table.get()]
+            except Exception:
+                pass
+
+        # Otherwise try fromXML directly on the file contents
+        try:
+            with open(xml_path, 'r', encoding='utf-8') as f:
+                xmlstr = f.read()
+            table.fromXML(xmlstr)
+            return [row.getSpectralWindowId().getTagValue() for row in table.get()]
+        except Exception:
+            return None
+
+    @staticmethod
+    def parse_spectral_window_ids_from_xml(xml_path: str) -> list[int]:
+        """Extract the spectral window ID element from each row of an XML file.
+
+        Attempts extraction via pyasdm first to support both standard XML and MIME
+        binary (.bin) tables. Falls back to xml.etree.ElementTree if pyasdm extraction
+        fails or is unavailable.
+
+        Args:
+            xml_path: Path for XML file.
+
+        Returns:
+            List of integer spectral window IDs.
+        """
+        pyasdm_ids = SpectralWindowTable._parse_spectral_window_ids_via_pyasdm(xml_path)
+        if pyasdm_ids is not None:
+            return pyasdm_ids
+
         ids = []
         try:
             root_element = xml.etree.ElementTree.parse(xml_path)
 
             for row in root_element.findall('row'):
                 element = row.findtext('spectralWindowId')
-                _, str_id = element.split('_')
-                ids.append(int(str_id))
-        except IOError:
-            LOG.info("Could not parse XML at: {}".format(xml_path))
+                if element is not None and '_' in element:
+                    _, str_id = element.split('_')
+                    ids.append(int(str_id))
+        except (IOError, xml.etree.ElementTree.ParseError):
+            LOG.info('Could not parse XML at: %s', xml_path)
 
         return ids
 
     @staticmethod
-    def get_data_description_spw_ids(ms: MeasurementSet) -> list:
-        """
-        Extract a list of spectral window IDs from the DataDescription XML for an
-        ASDM.
+    def get_data_description_spw_ids(ms: MeasurementSet) -> list[int]:
+        """Extract a list of spectral window IDs from the DataDescription XML for an ASDM.
 
-        This function assumes the XML has been copied across to the measurement
-        set directory.
+        Checks the measurement set directory first, with fallback to origin_ms if present.
 
-        :param ms: measurement set to inspect
-        :return: list of integers corresponding to ASDM spectral window IDs
+        Args:
+            ms: Measurement set to inspect.
+
+        Returns:
+            List of integers corresponding to ASDM spectral window IDs.
         """
         result = []
-        xml_path = os.path.join(ms.name, 'DataDescription.xml')
-        if not os.path.exists(xml_path):
-            LOG.info("No DataDescription XML found at {}.".format(xml_path))
-        else:
-            result = SpectralWindowTable.parse_spectral_window_ids_from_xml(xml_path)
+        candidate_dirs = [ms.name]
+        if hasattr(ms, 'origin_ms') and ms.origin_ms and ms.origin_ms != ms.name:
+            candidate_dirs.append(ms.origin_ms)
 
+        for candidate_dir in candidate_dirs:
+            for filename in ('DataDescription.xml', 'DataDescription.bin'):
+                xml_path = os.path.join(candidate_dir, filename)
+                if os.path.exists(xml_path):
+                    result = SpectralWindowTable.parse_spectral_window_ids_from_xml(xml_path)
+                    if result:
+                        return result
+
+        LOG.info('No DataDescription XML found for MS %s.', _get_ms_basename(ms))
         return result
 
     @staticmethod
-    def get_spectral_window_spw_ids(ms: MeasurementSet) -> list:
-        """
-        Extract a list of spectral window IDs from the SpectralWindow XML for an
-        ASDM.
+    def get_spectral_window_spw_ids(ms: MeasurementSet) -> list[int]:
+        """Extract a list of spectral window IDs from the SpectralWindow XML for an ASDM.
 
-        This function assumes the XML has been copied across to the measurement
-        set directory.
+        Checks the measurement set directory first, with fallback to origin_ms if present.
 
-        :param ms: measurement set to inspect
-        :return: list of integers corresponding to ASDM spectral window IDs
+        Args:
+            ms: Measurement set to inspect.
+
+        Returns:
+            List of integers corresponding to ASDM spectral window IDs.
         """
         result = []
-        xml_path = os.path.join(ms.name, 'SpectralWindow.xml')
-        if not os.path.exists(xml_path):
-            LOG.info("No SpectralWindow XML found at {}.".format(xml_path))
-        else:
-            result = SpectralWindowTable.parse_spectral_window_ids_from_xml(xml_path)
+        candidate_dirs = [ms.name]
+        if hasattr(ms, 'origin_ms') and ms.origin_ms and ms.origin_ms != ms.name:
+            candidate_dirs.append(ms.origin_ms)
 
+        for candidate_dir in candidate_dirs:
+            for filename in ('SpectralWindow.xml', 'SpectralWindow.bin'):
+                xml_path = os.path.join(candidate_dir, filename)
+                if os.path.exists(xml_path):
+                    result = SpectralWindowTable.parse_spectral_window_ids_from_xml(xml_path)
+                    if result:
+                        return result
+
+        LOG.info('No SpectralWindow XML found for MS %s.', _get_ms_basename(ms))
         return result
 
     @staticmethod
-    def get_asdm_to_ms_spw_mapping(ms: MeasurementSet) -> dict:
-        """
-        Get the mapping of ASDM spectral window ID to Measurement Set spectral
-        window ID.
+    def get_asdm_to_ms_spw_mapping(ms: MeasurementSet) -> dict[int, int]:
+        """Get the mapping of ASDM spectral window ID to Measurement Set spectral window ID.
 
-        This function requires the SpectralWindow and DataDescription ASDM XML
-        files to have been copied across to the measurement set directory.
+        Args:
+            ms: Measurement set to inspect.
 
-        :param ms: measurement set to inspect
-        :return: dict of ASDM spw: MS spw
+        Returns:
+            Dict of ASDM spw ID to MS spw ID.
         """
+        if getattr(ms, 'asdm_spw_mapping', None) is not None:
+            return ms.asdm_spw_mapping
+
         dd_spws = SpectralWindowTable.get_data_description_spw_ids(ms)
         spw_spws = SpectralWindowTable.get_spectral_window_spw_ids(ms)
         asdm_ids = [i for i in spw_spws if i in dd_spws] + [i for i in spw_spws if i not in dd_spws]
-        return {k: v for k, v in zip(asdm_ids, spw_spws)}
+        mapping = {k: v for k, v in zip(asdm_ids, spw_spws)}
+        try:
+            ms.asdm_spw_mapping = mapping
+        except Exception:
+            pass
+        return mapping
 
 
 class ObservationTable:
