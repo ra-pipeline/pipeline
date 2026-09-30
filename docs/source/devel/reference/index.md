@@ -10,6 +10,7 @@ logging
 weblog
 task_types
 spectral_windows
+asdm_metadata
 QA_scores
 FunctionIODumper
 parallelization
