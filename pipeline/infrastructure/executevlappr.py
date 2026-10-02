@@ -43,6 +43,12 @@ def executeppr(pprXmlFile: str, importonly: bool = True, loglevel: str = 'info',
             'summary'
         interactive: If True, print pipeline log to STDOUT.
     """
+    # Ensure CASA / Dask / host banner are initialized.  Idempotent: a no-op
+    # when the CLI (``pipeline run``) has already done it.  Required for
+    # callers that import :func:`executeppr` directly (CASA shell, scripts).
+    import pipeline
+    pipeline.initialize()
+
     # Delegate to Prefect flow when enabled.
     from .prefect_adapter import is_prefect_enabled
     if is_prefect_enabled():

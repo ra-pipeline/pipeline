@@ -361,6 +361,12 @@ def reduce(
     if vis is None:
         vis = []
 
+    # Ensure CASA / Dask / host banner are initialized.  Idempotent: a no-op
+    # when the CLI (``pipeline run``) has already done it.  Required for
+    # callers that import :func:`reduce` directly (CASA shell, scripts).
+    import pipeline
+    pipeline.initialize()
+
     # Delegate to Prefect flow when enabled.
     from pipeline.infrastructure.prefect_adapter import is_prefect_enabled
 

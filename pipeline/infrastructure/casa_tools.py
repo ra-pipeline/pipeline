@@ -9,7 +9,10 @@ import sys
 from inspect import signature
 
 import casatools
-from casatasks import casalog
+# NOTE: ``from casatasks import casalog`` is deferred to first access; see
+# ``__getattr__`` at the bottom of this module.  Importing casatasks eagerly
+# costs ~840 ms (it transitively imports scipy/matplotlib via casatasks private
+# modules) which we want to avoid paying at ``import pipeline`` time.
 
 from . import logging
 
@@ -139,16 +142,18 @@ synthesisutils = _logging_synthesisutils_cls()
 table = _logging_table_cls()
 utils = _logging_utils_cls()
 
-log = casalog
+# ``log`` / ``casalog`` are provided lazily via ``__getattr__`` below.
 
 def post_to_log(comment='', echo_to_screen=True):
-    log.post(comment)
+    from casatasks import casalog
+    casalog.post(comment)
     if echo_to_screen:
         sys.stdout.write('{0}\n'.format(comment))
 
 
 def set_log_origin(fromwhere=''):
-    log.origin(fromwhere)
+    from casatasks import casalog
+    casalog.origin(fromwhere)
 
 
 def context_manager_factory(tool_cls, finalisers=None):
@@ -227,6 +232,8 @@ ImagepolReader = context_manager_factory(_logging_imagepol_cls)
 
 # C extensions cannot be pickled, so ignore the CASA logger on pickle and
 # replace with it with the current CASA logger on unpickle
+# 'log' is excluded here because it is lazily initialised via __getattr__;
+# its copyreg pickler is registered there on first access.
 __tools = [
     'agentflagger',
     'atmosphere',
@@ -234,7 +241,6 @@ __tools = [
     'image',
     'imagepol',
     'imager',
-    'log',
     'measures',
     'ms',
     'quanta',
@@ -248,3 +254,19 @@ for tool in __tools:
     unpickler = lambda data: globals()[tool]
     pickler = lambda _: (unpickler, (tool, ))
     copyreg.pickle(tool_type, pickler, unpickler)
+
+
+def __getattr__(name):
+    """PEP 562: lazily resolve ``log`` and ``casalog`` to avoid importing
+    casatasks at ``import pipeline`` time (~840 ms startup cost)."""
+    if name in ('log', 'casalog'):
+        from casatasks import casalog as _cl
+        globals()['log'] = _cl
+        globals()['casalog'] = _cl
+        # Register copyreg pickler for the log singleton.
+        _log_type = type(_cl)
+        _unpickler = lambda data: globals()['log']
+        _pickler = lambda _: (_unpickler, ('log',))
+        copyreg.pickle(_log_type, _pickler, _unpickler)
+        return _cl
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')

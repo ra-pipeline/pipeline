@@ -6,7 +6,7 @@ from .taskregistry import task_registry
 
 from . import api
 from . import callibrary
-from . import casa_tools
+# casa_tools is loaded lazily via __getattr__ below to defer casatasks import (~840ms)
 from . import casa_tasks
 from . import contfilehandler
 from . import filenamer
@@ -15,7 +15,6 @@ from . import jobrequest
 from . import logging
 from . import mpihelpers
 from . import daskhelpers
-from . import utils
 from . import timetracker
 from .callibrary import CalLibrary, CalTo, CalFrom, CalApplication, CalState
 from .jobrequest import JobRequest
@@ -73,3 +72,21 @@ def generate_detail_plots(result=None):
 
     else:
         return PLOT_LEVEL >= _PLOT_DETAIL_THRESHOLDS['default']
+
+
+def __getattr__(name: str):
+    """Lazy-load infrastructure submodules that were deferred to avoid importing
+    casatasks eagerly. This is safe because these modules are only used when
+    explicitly accessed, and they may be used inside functions (not at module level).
+    """
+    if name == 'casa_tools':
+        import importlib
+        mod = importlib.import_module('.casa_tools', __package__)
+        globals()[name] = mod
+        return mod
+    if name == 'utils':
+        import importlib
+        mod = importlib.import_module('.utils', __package__)
+        globals()[name] = mod
+        return mod
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')

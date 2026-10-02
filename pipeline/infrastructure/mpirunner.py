@@ -14,7 +14,9 @@ from pathlib import Path
 from typing import Any, Callable
 
 import casaconfig.config
-import casatasks
+# NOTE: ``import casatasks`` previously lived here.  It is only needed by
+# :func:`call_with_mpi` to format the launcher script; we defer it to that
+# call site to avoid CASA C++ startup at ``pipeline`` import time.
 
 from pipeline import infrastructure
 
@@ -248,6 +250,10 @@ def _run_in_mpicasa_call(fn: Callable[..., Any], /, *args: Any, nproc: int | Non
 
     with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.pkl') as f_out:
         output_file = f_out.name
+
+    # Local import: defers casatasks (and CASA C++ startup) until an MPI
+    # subprocess is actually launched.
+    import casatasks
 
     try:
         script = textwrap.dedent(

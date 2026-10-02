@@ -146,71 +146,108 @@ def nested_update(d: dict[str, Any], u: dict[str, Any]) -> dict[str, Any]:
     return d
 
 
-def casatasks_startup(casa_config: dict[str, str | None], loglevel: str | None = None) -> tuple[str, str]:
-    """Initializes a CASA session with custom configurations and log settings.
+def casaconfig_startup(casa_config: dict[str, str | None] | None = None) -> dict:
+    """Load the merged session configuration and apply ``casaconfig`` attributes.
 
-    This function updates the casaconfig attributes, sets the CASA log file, and adjusts
-    the log filtering level for casalogsink.
+    This is intentionally lightweight: it does **not** import :mod:`casatasks`
+    and therefore does not trigger CASA C++ startup (log file creation, etc.).
+    It runs at module import time so that downstream modules that read
+    :data:`pipeline.config.config` see a fully-populated dict, while keeping
+    ``import pipeline`` cheap.
 
     Args:
-        casa_config: A dictionary containing CASA configuration attributes. Keys are
-                     attribute names (e.g., 'logfile', 'nworkers'), and values are the
-                     desired settings. Values can be None, in which case the attribute
-                     is not modified.
-        loglevel: Optional pipeline log level string:
-            critical, error, warning, attention, info, debug, todo, trace.
-            If provided, the CASA log filter level is adjusted accordingly. If None,
-            casa loglevel defaults to 'INFO1'.
+        casa_config: Reserved for future use; currently unused (kept for
+            backwards-compatible signature with the legacy
+            ``casatasks_startup`` entry point).
 
     Returns:
-        A tuple containing:
-            - The path to the CASA log file (str).
-            - The CASA log filter level (str).
+        The merged config dict (built-in defaults → user cache → ``./config.yaml``).
     """
-    # load the session configuration fom the built-in default and user config files
-    _session_config = get_config(__configs__)
-    config = copy.deepcopy(_session_config)
+    del casa_config  # currently unused; reserved for future per-call overrides
 
-    # load any configuration inheriated from the dask client
-    try:
+    # Suppress CASA log file creation during plain import (e.g. ``pipeline --help``).
+    # Importing ``casatasks`` (which happens indirectly when the CLI loads task modules)
+    # triggers ``casatools`` C++ startup and would create a ``casa-*.log`` in the CWD.
+    # Redirecting to ``/dev/null`` before that happens keeps the working directory clean.
+    # ``casatasks_startup()``, called explicitly from ``pipeline.initialize()``, will
+    # redirect to a real timestamped log file.
+    casaconfig.config.logfile = os.devnull
+
+    # load the session configuration from the built-in default and user config files
+    _session_config = get_config(__configs__)
+    cfg = copy.deepcopy(_session_config)
+
+    # load any configuration inherited from the dask client.
+    # Only merge if dask is already loaded — importing dask here at startup
+    # costs ~90ms even when no dask cluster is needed.
+    import sys
+    if 'dask' in sys.modules:
         import dask
-        config['casaconfig'].update(dask.config.config.get('casaconfig', {}))
-    except ImportError:
-        pass
+        cfg['casaconfig'].update(dask.config.config.get('casaconfig', {}))
 
     # Update casaconfig attributes
-    for key, value in config['casaconfig'].items():
+    for key, value in cfg['casaconfig'].items():
         if value is None:
-            config['casaconfig'][key] = getattr(casaconfig.config, key, None)
+            cfg['casaconfig'][key] = getattr(casaconfig.config, key, None)
         else:
             setattr(casaconfig.config, key, value)
-    # Initial import of casatasks with modified casaconfig setup
+
+    return cfg
+
+
+_CASATASKS_STARTED = False
+
+
+def casatasks_startup(loglevel: str | None = None) -> None:
+    """Import :mod:`casatasks` and configure the CASA log session.
+
+    Splits the casatasks-dependent half of the legacy startup out of import
+    time so that it can be invoked **explicitly** by pipeline entry points
+    (CLI ``run``, :func:`pipeline.recipereducer.reduce`,
+    :func:`pipeline.infrastructure.executeppr.executeppr`).  This avoids the
+    CASA C++ initialization cost for callers that only need ``import pipeline``
+    (``pipeline --help``, ``pipeline submit``, tooling, tests that don't run
+    a pipeline).
+
+    Idempotent: subsequent calls only re-apply the ``casalog`` filter / logfile
+    bookkeeping, which is cheap.
+
+    Args:
+        loglevel: Optional pipeline log level string (currently informational;
+            the CASA filter is fixed at ``INFO1`` so the pipeline can map
+            ``INFO1`` → ATTENTION).
+    """
+    global _CASATASKS_STARTED
+    del loglevel  # signature compatibility; not currently used here
+
+    # casatasks import triggers CASA C++ session creation (logfile, etc.) on
+    # first call.  Subsequent calls are no-ops at the import level.
     import casatasks
 
-    # Get the current casalogfile
+    # If the logfile was suppressed to /dev/null (the default set by casaconfig_startup
+    # to keep plain ``import pipeline`` clean), create a real timestamped log now that
+    # initialize() has been called.
+    if casatasks.casalog.logfile() == os.devnull:
+        import datetime
+        _ts = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
+        _real_logfile = os.path.join(os.getcwd(), f'casa-{_ts}.log')
+        casatasks.casalog.setlogfile(_real_logfile)
+
     casalogfile = casatasks.casalog.logfile()
 
-    # adjust the log filtering level for casalogsink
-    # by default, modify filter to get INFO1 message which the pipeline
-    # treats as ATTENTION level.
+    # adjust the log filtering level for casalogsink: by default, INFO1 lets
+    # the pipeline surface ATTENTION-level messages.
+    casatasks.casalog.filter('INFO1')
 
-    # Adjust log filtering level
-    casaloglevel = 'INFO1'
-    casatasks.casalog.filter(casaloglevel)
-    # print('current:', casalogfile, casaloglevel)
-    # Another approach is using environment variable / Workplugin for initialization
-    # But they will likely arrive after the import
-    # Here, we get configuration directl during Piipeline importing process.
-
-    # need the latest/actual casalogfile path to forward to worker
+    # record the actual logfile path so it can be forwarded to dask workers
     config['casaconfig']['logfile'] = casalogfile
 
-    if config['casaconfig'].get('log2term', False):
-        # only nesscary for plain Python session as a casashell session
-        # would use the casaconfig/log2term do it for you in monolithic CASA6.
+    if not _CASATASKS_STARTED and config['casaconfig'].get('log2term', False):
+        # only necessary for a plain Python session; a casashell session
+        # already wires log2term via casaconfig in monolithic CASA6.
         casatasks.casalog.showconsole(onconsole=True)
 
-    return config
+    _CASATASKS_STARTED = True
 
 
 def get_pipeline_config(key: str, default: Any = None, *, env_var: str | None = None, as_type: type | None = None) -> Any:
@@ -255,4 +292,4 @@ def get_pipeline_config(key: str, default: Any = None, *, env_var: str | None = 
     return value
 
 
-config = casatasks_startup({})
+config = casaconfig_startup()

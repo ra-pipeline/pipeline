@@ -22,7 +22,9 @@ if casampi_spec is None:
     # stub MPICommandClient too to keep IDE happy
     MPICommandClient = object
 else:
-    from casampi.MPICommandClient import MPICommandClient
+    # Defer the import of MPICommandClient (which pulls in casatools via
+    # casampi) until first use — saves ~200ms on import pipeline.
+    MPICommandClient = None
     from casampi.MPIEnvironment import MPIEnvironment
 
 # global variable for toggling MPI usage
@@ -541,7 +543,8 @@ mpi_server_list = None
 if MPIEnvironment.is_mpi_enabled:
     try:
         if MPIEnvironment.is_mpi_client:
-            __client = MPICommandClient()
+            from casampi.MPICommandClient import MPICommandClient as _MPICommandClient
+            __client = _MPICommandClient()
             # PIPE-1757: use the 'redirect' mode to forward tier0 messages to console stdout.
             #   * checkout different log_mode options in casampi.private.server_run.run()
             #   * also see the log_mode example here:

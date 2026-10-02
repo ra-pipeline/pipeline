@@ -27,9 +27,7 @@ from io import StringIO, TextIOWrapper
 from pathlib import Path
 from typing import AnyStr, Protocol
 
-import casatasks
-
-from .infrastructure import casa_tools, logging, mpihelpers, utils
+from .infrastructure import logging, mpihelpers, utils
 from .infrastructure.mpihelpers import MPIEnvironment
 from .infrastructure.version import get_version_string_from_git
 
@@ -221,6 +219,7 @@ class CommonEnvironment:
     """
 
     def __init__(self):
+        from .infrastructure import casa_tools
         logsink = casa_tools.logsink
 
         # number of physical cores as seen by CASA
@@ -708,6 +707,26 @@ class MacOSEnvironment(CommonEnvironment):
 
 
 # Determine pipeline version from Git or package.
+def _pipeline_revision_fast() -> str:
+    """Get pipeline version without a git subprocess call.
+
+    Uses only :mod:`importlib.metadata` and ``pipeline._version`` (if present).
+    This is cheap (< 50 ms) and safe to call at ``import pipeline`` time.
+    The full git-enhanced version is available via the lazy
+    :data:`pipeline_revision` module attribute.
+    """
+    version_str = 'unknown'
+    try:
+        version_str = version('pipeline')
+    except PackageNotFoundError:
+        pass
+    try:
+        from ._version import version as version_str  # noqa: F811
+    except ModuleNotFoundError:
+        pass
+    return version_str
+
+
 def _pipeline_revision() -> str:
     """
     Get a string describing the pipeline revision and branch of the executing
@@ -767,9 +786,39 @@ def _pipeline_revision() -> str:
     return version_str
 
 
-casa_version = casatasks.version()
-casa_version_string = casatasks.version_string()
-compare_casa_version = casa_tools.utils.compare_version
+# Lazy module-level attributes via PEP 562 __getattr__.
+# ``casa_version`` / ``casa_version_string`` defer casatasks import.
+# ``pipeline_revision`` defers the expensive git subprocess.
+# ``ENVIRONMENT``, ``dependency_details``, ``iers_info`` defer subprocess /
+# metadata / CASA-table I/O so that ``import pipeline`` stays fast.
+def __getattr__(name: str):
+    if name in ('casa_version', 'casa_version_string'):
+        import casatasks
+        value = casatasks.version() if name == 'casa_version' else casatasks.version_string()
+        globals()[name] = value
+        return value
+    if name == 'pipeline_revision':
+        value = _pipeline_revision()
+        globals()[name] = value
+        return value
+    if name == 'ENVIRONMENT':
+        value = EnvironmentFactory.create()
+        globals()[name] = value
+        return value
+    if name == 'dependency_details':
+        value = _get_dependency_details(_casa6_packages + _get_required_dependencies('pipeline'))
+        globals()[name] = value
+        return value
+    if name == 'iers_info':
+        value = utils.IERSInfo()
+        globals()[name] = value
+        return value
+    if name == 'compare_casa_version':
+        from .infrastructure import casa_tools
+        value = casa_tools.utils.compare_version
+        globals()[name] = value
+        return value
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
 
 
 def _get_gpu_info() -> str:
@@ -910,11 +959,8 @@ _casa6_packages = [
     'scipy',
     'matplotlib',
 ]
-dependency_details = _get_dependency_details(_casa6_packages + _get_required_dependencies('pipeline'))
-
-iers_info = utils.IERSInfo()
-pipeline_revision = _pipeline_revision()
-ENVIRONMENT = EnvironmentFactory.create()
+# NOTE: dependency_details, iers_info, pipeline_revision, and ENVIRONMENT are now
+# computed lazily on first access via __getattr__ above.
 
 
 def cluster_details():
@@ -922,7 +968,8 @@ def cluster_details():
     # see https://open-bitbucket.nrao.edu/projects/PIPE/repos/pipeline/pull-requests/1244/overview?commentId=13655
     global _cluster_details
     if _cluster_details is None:
-        env_details = [ENVIRONMENT]
+        import sys as _sys
+        env_details = [_sys.modules[__name__].ENVIRONMENT]
         if mpihelpers.is_mpi_ready():
             mpi_results = mpihelpers.mpiclient.push_command_request(
                 'pipeline.environment.ENVIRONMENT',

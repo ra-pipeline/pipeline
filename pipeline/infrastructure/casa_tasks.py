@@ -11,13 +11,21 @@ method will match those of the tasks in the CASA environment when this
 module was imported.
 """
 import functools
+import importlib.util
 import inspect
 import shutil
 import subprocess
 import sys
 
-import casaplotms
-import casatasks
+# NOTE: ``casaplotms`` and ``casatasks`` previously lived at module top.
+# Importing them eagerly triggers CASA C++ session startup (``casa-*.log``
+# creation, etc.) which we want to defer until an actual pipeline run
+# (see :func:`pipeline.initialize`).  This module is loaded as part of
+# ``pipeline.infrastructure``, so we install lightweight lazy proxies via
+# ``importlib.util.LazyLoader`` that defer module execution until first
+# attribute access.  The per-task wrappers below use
+# ``casatasks.<task>`` / ``casaplotms.<task>`` at call time, so the import
+# is deferred until a JobRequest is actually generated.
 
 from . import logging
 from .jobrequest import JobRequest
@@ -26,6 +34,31 @@ from .mpirunner import call_with_mpi
 LOG = logging.get_logger(__name__)
 
 __all__ = []
+
+
+def _lazy_import(name: str):
+    """Return a lazily-loaded module using :class:`importlib.util.LazyLoader`.
+
+    The module's code is not executed until the first attribute access.
+    If the module is already present in ``sys.modules`` (e.g. imported earlier
+    by another code path), the existing module object is returned as-is so we
+    never overwrite a fully-initialised module with an empty lazy shell.
+    """
+    if name in sys.modules:
+        return sys.modules[name]
+    spec = importlib.util.find_spec(name)
+    if spec is None:
+        raise ModuleNotFoundError(f'No module named {name!r}')
+    loader = importlib.util.LazyLoader(spec.loader)
+    spec.loader = loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    loader.exec_module(module)
+    return module
+
+
+casatasks = _lazy_import('casatasks')
+casaplotms = _lazy_import('casaplotms')
 
 
 def register_task(func):
@@ -221,13 +254,13 @@ def xvfb_plotms(self, *args, **kwargs):
         ret = "error"
     return ret
 
-# copy the casa/plotms callable attribute to the wrapper function.
 xvfb_plotms.__name__ = 'plotms'
-xvfb_plotms.__doc__ = casaplotms.plotms.__doc__
-xvfb_plotms.__wrapped__ = casaplotms.plotms.__call__
-xvfb_plotms.__signature__ = inspect.signature(casaplotms.plotms.__call__)
-xvfb_plotms.__defaults__ = casaplotms.plotms.__call__.__defaults__
-xvfb_plotms.__kwdefaults__ = casaplotms.plotms.__call__.__kwdefaults__
+# NOTE: copying ``casaplotms.plotms.{__doc__,__signature__,...}`` onto the
+# wrapper used to happen here at module load.  That eagerly imports
+# ``casaplotms`` (and transitively ``casatasks``/``casatools``), which we
+# now avoid.  Instead, the metadata is copied on demand by
+# :func:`_init_casa_signatures`, which is invoked from
+# :func:`pipeline.initialize`.
 
 
 @register_task
@@ -270,26 +303,61 @@ def statwt(*v, **k) -> JobRequest:
 
 
 def _with_tclean_signature(fn):
-    """Replace fn's signature with casatasks.tclean's, swapping in a typed parallel param."""
-    try:
-        params = [
-            p for p in inspect.signature(casatasks.tclean).parameters.values()
-            if p.name != 'parallel'
-        ]
-        params.append(
-            inspect.Parameter(
-                'parallel',
-                inspect.Parameter.KEYWORD_ONLY,
-                default=False,
-                annotation='bool | dict[str, int]',
-            )
-        )
-        fn.__signature__ = inspect.Signature(parameters=params)
-    except (TypeError, ValueError):  # pragma: no cover
-        # casatasks.tclean is a SWIG-wrapped callable; inspect.signature can
-        # legitimately fail on some CASA builds. Fall back to fn's own signature.
-        LOG.debug('Could not derive tclean signature for %s', fn, exc_info=True)
+    """Tag ``fn`` for deferred tclean-signature substitution.
+
+    Computing the signature requires importing ``casatasks``, so we only
+    record the function here; the real signature is wired up later by
+    :func:`_init_casa_signatures` (called from :func:`pipeline.initialize`).
+    """
+    _DEFERRED_TCLEAN_SIGS.append(fn)
     return fn
+
+
+_DEFERRED_TCLEAN_SIGS: list = []
+_CASA_SIGNATURES_INITIALIZED = False
+
+
+def _init_casa_signatures() -> None:
+    """Apply deferred CASA-derived metadata to wrapper functions.
+
+    Idempotent.  Imports ``casatasks`` and ``casaplotms`` (triggering CASA
+    startup as a side effect), so it must only be called once a real
+    pipeline run has been requested.
+    """
+    global _CASA_SIGNATURES_INITIALIZED
+    if _CASA_SIGNATURES_INITIALIZED:
+        return
+    _CASA_SIGNATURES_INITIALIZED = True
+
+    # plotms wrapper metadata (was previously eager at module load).
+    try:
+        plotms_call = casaplotms.plotms.__call__
+        xvfb_plotms.__doc__ = casaplotms.plotms.__doc__
+        xvfb_plotms.__wrapped__ = plotms_call
+        xvfb_plotms.__signature__ = inspect.signature(plotms_call)
+        xvfb_plotms.__defaults__ = plotms_call.__defaults__
+        xvfb_plotms.__kwdefaults__ = plotms_call.__kwdefaults__
+    except Exception:  # pragma: no cover - best-effort metadata copy
+        LOG.debug('Could not copy casaplotms.plotms metadata', exc_info=True)
+
+    # tclean signature substitution (was previously eager at module load).
+    for fn in _DEFERRED_TCLEAN_SIGS:
+        try:
+            params = [
+                p for p in inspect.signature(casatasks.tclean).parameters.values()
+                if p.name != 'parallel'
+            ]
+            params.append(
+                inspect.Parameter(
+                    'parallel',
+                    inspect.Parameter.KEYWORD_ONLY,
+                    default=False,
+                    annotation='bool | dict[str, int]',
+                )
+            )
+            fn.__signature__ = inspect.Signature(parameters=params)
+        except (TypeError, ValueError):  # pragma: no cover
+            LOG.debug('Could not derive tclean signature for %s', fn, exc_info=True)
 
 
 @_with_tclean_signature

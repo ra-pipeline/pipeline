@@ -74,6 +74,12 @@ def executeppr(pprXmlFile: str, importonly: bool = True, breakpoint: str = 'brea
        Resume execution from the 'breakpoint' in PPR.
        >>> executeppr('PPR_uid___A001_X14c3_X1dd.xml', importonly=False, bpaction='resume')
     """
+    # Ensure CASA / Dask / host banner are initialized.  Idempotent: a no-op
+    # when the CLI (``pipeline run``) has already done it.  Required for
+    # callers that import :func:`executeppr` directly (CASA shell, scripts).
+    import pipeline
+    pipeline.initialize()
+
     # Delegate to Prefect flow when enabled.
     from .prefect_adapter import is_prefect_enabled
     if is_prefect_enabled():

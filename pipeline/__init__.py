@@ -13,9 +13,6 @@ import threading
 import webbrowser
 from typing import TYPE_CHECKING
 
-import matplotlib
-from astropy.utils.iers import conf as iers_conf
-
 if TYPE_CHECKING:
     from typing import Any
 
@@ -23,14 +20,8 @@ if TYPE_CHECKING:
 # `casaconfig.config` attributes before importing casatasks/casatools
 from . import config, domain, environment, infrastructure
 
-__version__ = revision = environment.pipeline_revision
+__version__ = revision = environment._pipeline_revision_fast()
 
-
-# PIPE-2195: Extend auto_max_age to reduce the frequency of IERS Bulletin-A table auto-updates.
-# This change increases the maximum age of predictive data before auto-downloading is triggered.
-# Note that the default auto_max_age value is 30 days as of Astropy ver 6.0.1:
-# https://docs.astropy.org/en/stable/utils/iers.html
-iers_conf.auto_max_age = 180
 
 # set the loglevel of Pipeline Python loggers during the package initialization
 LOG = infrastructure.logging.get_logger(__name__)
@@ -341,76 +332,121 @@ def inherit_docstring_and_type_hints():
         doctools.inherit_annotations(task_class, cli_task)
 
 
-def _cli_dask_allowed() -> bool:
-    """Return False when invoked as the pipeline CLI without the ``run`` subcommand.
+_PIPELINE_INITIALIZED = False
 
-    ``pipeline/__init__.py`` is imported before ``pipeline/__main__.py`` runs,
-    so ``sys.argv`` is the only channel available here.  We suppress Dask
-    autostart for ``pipeline --help``, ``pipeline submit ...``, and bare
-    ``python -m pipeline`` invocations — only ``pipeline run ...`` gets a
-    cluster.
+
+def initialize(*, start_dask: bool | None = None, log_env: bool = True) -> None:
+    """Perform the heavy, side-effectful pipeline initialization explicitly.
+
+    Replaces the previous behaviour where ``import pipeline`` would
+    automatically:
+
+      * import :mod:`casatasks` and configure the CASA log session
+      * log the host environment banner
+      * start a local Dask cluster (when ``pipeconfig.dask.autostart`` is set)
+
+    These actions are now deferred until an entry point asks for them
+    (``pipeline run``, :func:`pipeline.recipereducer.reduce`,
+    :func:`pipeline.infrastructure.executeppr.executeppr`), so plain
+    ``import pipeline`` — and ``pipeline --help`` / ``pipeline submit`` —
+    stay cheap and free of CASA / Dask side effects.
+
+    The function is idempotent: calling it multiple times is safe and only
+    the first call does the expensive work.
+
+    Args:
+        start_dask: If ``None`` (default), defer to ``pipeconfig.dask.autostart``
+            in the merged config plus the existing ``is_daskclient_allowed`` /
+            non-MPI guards.  Pass ``False`` to force-skip Dask autostart even
+            when the config requests it (useful for tests / submission tools).
+        log_env: Whether to emit the ``Pipeline version … running on …``
+            banner with host / CPU / memory details.  Default ``True``.
     """
-    import sys
+    global _PIPELINE_INITIALIZED
+    if _PIPELINE_INITIALIZED:
+        return
+    _PIPELINE_INITIALIZED = True
+    try:
+        # 0. Set matplotlib backend and astropy IERS config.  These imports are
+        #    deferred from module level to keep ``import pipeline`` cheap.
+        import matplotlib
+        matplotlib.use('agg')
+        LOG.debug('Matplotlib backend set to %s', matplotlib.get_backend())
+        from astropy.utils.iers import conf as iers_conf
+        # PIPE-2195: increase max age to reduce IERS Bulletin-A auto-update frequency.
+        iers_conf.auto_max_age = 180
 
-    argv = sys.argv
-    LOG.debug('_cli_dask_allowed: sys.argv=%s', argv)
-    if not argv:
+        # 1. CASA log session setup (imports casatasks on first call).
+        config.casatasks_startup()
+
+        # 1b. Apply CASA-derived signatures/metadata to wrappers in
+        #     ``pipeline.infrastructure.casa_tasks`` (these were previously
+        #     computed eagerly at module load and would import casatasks /
+        #     casaplotms as a side effect).
+        from pipeline.infrastructure import casa_tasks as _casa_tasks
+
+        _casa_tasks._init_casa_signatures()
+
+        # 1c. Complement docstrings and type hints on CLI tasks.  This imports
+        #     ``pipeline.cli`` which in turn imports all task modules (including
+        #     ones with top-level ``from casatasks.private import …``), so it
+        #     must stay inside initialize() and not run at ``import pipeline`` time.
+        inherit_docstring_and_type_hints()
+
+        # 2. Host-environment banner — useful at the top of every real pipeline
+        #    run, but skipped for callers that explicitly opt out.
+        if log_env:
+            log_host_environment()
+
+        # 3. Optional Dask autostart — same guards as the previous import-time
+        #    block, but now driven by an explicit entry-point call.
+        if (
+            start_dask is not False
+            and config.config['pipeconfig']['dask']['autostart']
+            and infrastructure.daskhelpers.is_daskclient_allowed()
+            and not infrastructure.mpihelpers.MPIEnvironment.is_mpi_enabled
+        ):
+            # Automatically start a Dask cluster if allowed.  This is the same
+            # set of checks the legacy import-time block performed; the only
+            # change is that it now happens on demand instead of unconditionally.
+            infrastructure.daskhelpers.start_daskcluster()
+    except BaseException:
+        _PIPELINE_INITIALIZED = False
+        raise
+
+
+def is_using_xvfb() -> bool:
+    """Check if the current process is already running under an external Xvfb session.
+
+    This detects:
+    1. The explicit environment variable 'XVFB_RUN=1' (manually exported or set by wrapper scripts).
+    2. The standard 'XAUTHORITY' path containing 'xvfb-run', typically created by the xvfb-run utility.
+    """
+    if os.getenv('XVFB_RUN') == '1':
         return True
-    prog = os.path.basename(argv[0])
-    # Detect: python -m pipeline … or the 'pipeline' console script.
-    # When pixi (or some launchers) run `python -m pipeline`, argv[0] is '-m'
-    # rather than the __main__.py path, so we check for that too.
-    is_pipeline_cli = (
-        prog == 'pipeline'
-        or prog == '-m'  # pixi / some launchers set argv[0]='-m' for `python -m pipeline`
-        or argv[0].endswith('pipeline/__main__.py')
-        or (prog == '__main__.py' and 'pipeline' in argv[0])
-    )
-    # Note: `prog == '-m'` is intentionally broad — any `python -m <anything>` that
-    # also imports pipeline will have Dask autostart suppressed.  This is the safer
-    # direction (no accidental cluster spawns) and is acceptable in practice.
-    if not is_pipeline_cli:
-        return True
-    # CLI detected: only allow autostart when the subcommand is 'run'.
-    # argv[1] is the subcommand for both 'pipeline run' and 'python -m pipeline run'.
-    return len(argv) > 1 and argv[1] == 'run'
+
+    # xvfb-run typically sets XAUTHORITY to a path like /tmp/xvfb-run.XXXXXX/Xauthority
+    xauth = os.environ.get("XAUTHORITY", "")
+    return "xvfb-run" in xauth
 
 
-inherit_docstring_and_type_hints()
-
-if infrastructure.daskhelpers.is_daskclient_allowed() and _cli_dask_allowed():
-    log_host_environment()
-
-
-if config.config['pipeconfig'].get('xvfb', False) or infrastructure.daskhelpers.is_dask_worker():
+# Use env-var check only here: at ``import pipeline`` time there are no live
+# Worker instances, so ``Worker._instances`` would always be empty.  The
+# full ``is_dask_worker()`` (which imports dask.distributed) is deferred.
+_is_dask_worker_at_import = any(os.getenv(v) for v in ['DASK_WORKER_NAME', 'DASK_PARENT'])
+if config.config['pipeconfig'].get('xvfb', False) or _is_dask_worker_at_import:
     # Either xvfb is explicitly requested, or any Dask worker process, which should stay headless.
-    if os.getenv('XVFB_RUN') != '1' and not infrastructure.mpihelpers.is_mpi_server():
+    if not is_using_xvfb() and not infrastructure.mpihelpers.is_mpi_server():
         # Avoid starting another Xvfb instance if already running under xvfb-run.
         # Avoid starting Xvfb in the MPI server process to prevent multiple nested instances.
         # By design, casampi already starts Xvfb for all MPI worker processes.
         start_xvfb()
 
-# Use the `agg` backend for any process.
-# Tkinter (which Matplotlib often uses by default) are not thread-safe.
-matplotlib.use('agg')
-LOG.debug('Matplotlib backend set to %s', matplotlib.get_backend())
-
-
-if (
-    config.config['pipeconfig']['dask']['autostart']
-    and infrastructure.daskhelpers.is_daskclient_allowed()
-    and not infrastructure.mpihelpers.MPIEnvironment.is_mpi_enabled
-    and _cli_dask_allowed()
-):
-    # Automatically start a Dask cluster if allowed.
-    # However, this is generally discouraged because it can cause:
-    #   - Accidental recursive process creation
-    #   - Unintended Dask configurations in interactive sessions
-    #   - Slower import times due to Dask and distributed initialization
-    #   - Limited flexibility in cluster configuration
-    #     (we rely on configuration files and environment variables)
-    #   - Increased difficulty in testing
-    #   - etc.
-    # Therefore, it is recommended to start the Dask cluster explicitly
-    # within the main program when needed.
-    infrastructure.daskhelpers.start_daskcluster()
+# Note: Dask autostart, the host-environment banner, casatasks import, and
+# inherit_docstring_and_type_hints() used to happen here at module import time.
+# They are now deferred to :func:`initialize`, which is invoked explicitly by
+# pipeline entry points (``pipeline run``,
+# :func:`pipeline.recipereducer.reduce`,
+# :func:`pipeline.infrastructure.executeppr.executeppr`).  This keeps plain
+# ``import pipeline`` — and ``pipeline --help`` / ``pipeline submit`` — free
+# of CASA / Dask side effects.

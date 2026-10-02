@@ -10,9 +10,11 @@ import traceback
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-import casaplotms
-import casatasks
-import casatasks.private.tec_maps as tec_maps
+# NOTE: ``casaplotms``, ``casatasks`` and ``casatasks.private.tec_maps``
+# previously lived at module top.  Importing them eagerly triggers CASA C++
+# session startup (``casa-*.log`` creation, etc.), which we want to defer
+# until an actual pipeline run.  These names are now imported lazily inside
+# the helpers that use them.
 
 from .. import casa_tools, daskhelpers, mpihelpers
 from .. import logging as pipeline_logging
@@ -116,12 +118,14 @@ def capture_start(file_path, package_prefix='pipeline'):
     sys.stdout, sys.stderr = fd, fd
     from wurlitzer import sys_pipes_forever
     sys_pipes_forever(bufsize=0)
+    import casatasks
     casatasks.casalog.showconsole(onconsole=False)
     change_stream_for_all_streamhandlers(fd, package_prefix)
 
 
 def capture_stop(package_prefix='pipeline'):
     from wurlitzer import stop_sys_pipes
+    import casatasks
     stop_sys_pipes()
     sys.stdout.close()
     sys.stderr.close()
@@ -145,6 +149,7 @@ def capture_output(file_path=None):
     # clean out
 
     from wurlitzer import pipes
+    import casatasks
     casatasks.casalog.showconsole(onconsole=False)
 
     if file_path is None:
@@ -429,6 +434,7 @@ def shutdown_plotms() -> None:
 
     Note: This implementation follows the approach used in casaplotms.private.plotmstool.__stub_check()
     """
+    import casaplotms  # lazy: defer CASA C++ startup
     plotmstool = casaplotms.plotmstool
 
     if plotmstool.__proc is not None:
@@ -441,6 +447,7 @@ def shutdown_plotms() -> None:
 
 def reset_tec_maps_module():
     # PIPE-1432: reset casatasks/tec_maps.workDir as it's unaware of a CWD change.
+    import casatasks.private.tec_maps as tec_maps  # lazy: defer CASA C++ startup
     if hasattr(tec_maps, 'workDir'):
         tec_maps.workDir = os.getcwd() + '/'
 

@@ -183,6 +183,12 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     _setup_rawdata_symlink(ppr_file, rawdata_override=rawdata)
 
+    # Explicitly bootstrap CASA + Dask + host banner now that we know the
+    # user really wants to execute the pipeline.  ``import pipeline`` no
+    # longer does this on its own (see ``pipeline.initialize``).
+    import pipeline
+    pipeline.initialize()
+
     if ppr_file:
         ppr_path = Path(ppr_file).resolve()
         if not ppr_path.exists():

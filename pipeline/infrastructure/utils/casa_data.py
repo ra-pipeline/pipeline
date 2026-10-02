@@ -23,13 +23,24 @@ __all__ = [
     "from_mjd_to_datetime"
 ]
 
-# PIPE-1845: as of CASA version 6.5.4, CASA/setjy uses ctsys.resolve() to search for calibrator models. 
-# This search is influenced by the precedence list defined in CASA/config.py via the datapath variable. 
-# Meanwhile, casatools uses the path returned by ctsys.rundata() to locate essential CASA runtime data 
-# (e.g., IERS tables). Therefore, the Pipeline adopts the same methods used by casatools and casatasks 
-# to search for and examine the in-use data file's version and modification time.
-SOLAR_SYSTEM_MODELS_PATH = casa_tools.utils.resolve('alma/SolarSystemModels')
-IERS_TABLES_PATH = os.path.join(casa_tools.utils.rundata(), 'geodetic')
+# Lazily resolved on first use — avoids forcing ``import casatools`` at module
+# load time (which costs ~340ms including casatools.image).
+SOLAR_SYSTEM_MODELS_PATH: str | None = None
+IERS_TABLES_PATH: str | None = None
+
+
+def _solar_system_models_path() -> str:
+    global SOLAR_SYSTEM_MODELS_PATH
+    if SOLAR_SYSTEM_MODELS_PATH is None:
+        SOLAR_SYSTEM_MODELS_PATH = casa_tools.utils.resolve('alma/SolarSystemModels')
+    return SOLAR_SYSTEM_MODELS_PATH
+
+
+def _iers_tables_path() -> str:
+    global IERS_TABLES_PATH
+    if IERS_TABLES_PATH is None:
+        IERS_TABLES_PATH = os.path.join(casa_tools.utils.rundata(), 'geodetic')
+    return IERS_TABLES_PATH
 
 
 def get_file_md5(filename: str) -> str:
@@ -43,8 +54,10 @@ def get_iso_mtime(filename: str) -> str:
     return datetime.fromtimestamp(os.path.getmtime(filename), tz=timezone.utc).isoformat()
 
 
-def get_solar_system_model_files(ss_object: str, ss_path: str = SOLAR_SYSTEM_MODELS_PATH) -> list[str]:
+def get_solar_system_model_files(ss_object: str, ss_path: str | None = None) -> list[str]:
     """Return the data files corresponding to a Solar System object"""
+    if ss_path is None:
+        ss_path = _solar_system_models_path()
     models = glob(os.path.join(ss_path, "*.dat"))
     # NOTE: The filter function may fail in the unlikely case that an object name is
     #  contained in other object name or in the path. This may be refined later.
@@ -59,13 +72,15 @@ def get_filename_info(filename: str) -> dict[str, str]:
     return {"MD5": md5_hex, "mtime": mtime}
 
 
-def get_object_info_string(ss_object: str, ss_path: str = SOLAR_SYSTEM_MODELS_PATH) -> str:
+def get_object_info_string(ss_object: str, ss_path: str | None = None) -> str:
     """Get the file information (MD5 hash and modification date) for a given
     Solar System object.
 
     At the moment the function returns all the matching model files corresponding
     to an object.
     """
+    if ss_path is None:
+        ss_path = _solar_system_models_path()
     object_models = get_solar_system_model_files(ss_object, ss_path=ss_path)
     object_model_filenames = [os.path.split(o)[-1] for o in object_models]
     info_dict = {object_model_filenames[i]: get_filename_info(om) for i, om in enumerate(object_models)}
@@ -102,7 +117,7 @@ class IERSInfo():
     """
     IERS_tables = ("IERSpredict", "IERSeop2000")
 
-    def __init__(self, iers_path: str = IERS_TABLES_PATH, load_on_creation: bool = True):
+    def __init__(self, iers_path: str | None = None, load_on_creation: bool = True):
         """Create instance of IERS Tables info.
 
         In the option load_on_creation is set to False the information has to be manually
@@ -115,6 +130,8 @@ class IERSInfo():
         load_on_creation : bool, optional
             Do not load the IERS tables information when creating the instance
         """
+        if iers_path is None:
+            iers_path = _iers_tables_path()
         self.iers_path = iers_path
         if load_on_creation:
             self.load_info()

@@ -31,8 +31,6 @@ from importlib.resources import files
 from pprint import pformat
 from typing import TYPE_CHECKING
 
-import casatasks
-
 import pipeline.infrastructure as infrastructure
 from pipeline.config import config
 from pipeline.infrastructure.utils import get_obj_size, human_file_size
@@ -52,23 +50,19 @@ dask_available = all([dask_spec, distributed_spec, dask_jobqueue_spec])
 
 if importlib.util.find_spec('casampi'):
     from casampi.MPIEnvironment import MPIEnvironment
-
     is_mpi_session = MPIEnvironment.is_mpi_enabled
     is_mpi_worker = MPIEnvironment.is_mpi_enabled and not MPIEnvironment.is_mpi_client
-    mpi_rank = MPIEnvironment.mpi_processor_rank
+    # Only import mpi4py when actually in an MPI session; the C extension costs
+    # ~60ms even when MPI is not being used.
+    if is_mpi_session:
+        from mpi4py import MPI
+        mpi_rank = MPI.COMM_WORLD.Get_rank()
+    else:
+        mpi_rank = 0
 else:
     is_mpi_session = False
     is_mpi_worker = False
     mpi_rank = 0
-
-if dask_available and not is_mpi_worker:
-    # Avoid importing Dask in MPI worker processes because some Python libraries (e.g., signal)
-    # are restricted to the main thread of the main interpreter.
-    import dask
-    from dask.distributed import Client, LocalCluster
-    from dask.distributed import Worker
-    from dask_jobqueue import HTCondorCluster, SLURMCluster
-
 
 daskclient: Client | None = None
 tier0futures: bool = False
@@ -148,7 +142,11 @@ def is_worker() -> bool:
         True if the process is a Dask worker, False otherwise.
     """
     is_worker = False
-    if (Worker and Worker._instances) or is_mpi_session:
+    if dask_available and not is_mpi_worker:
+        from dask.distributed import Worker
+        if Worker._instances:
+            is_worker = True
+    if is_mpi_session:
         is_worker = True
     return is_worker
 
@@ -177,7 +175,11 @@ def is_daskclient_allowed() -> bool:
 
     # Disallow starting dask client if there are existing dask worker instances,
     # identified by weak references.
-    return dask_available and not (Worker and Worker._instances)
+    if dask_available and not is_mpi_worker:
+        from dask.distributed import Worker
+        if Worker._instances:
+            return False
+    return dask_available
 
 
 def parallel_map(fn, items):
@@ -212,9 +214,12 @@ def is_dask_worker() -> bool:
     Returns:
         True if the current process is a Dask worker, False otherwise.
     """
-    return any(os.getenv(var) for var in ['DASK_WORKER_NAME', 'DASK_PARENT']) or bool(
-        dask_available and Worker and Worker._instances
-    )
+    if any(os.getenv(var) for var in ['DASK_WORKER_NAME', 'DASK_PARENT']):
+        return True
+    if dask_available and not is_mpi_worker:
+        from dask.distributed import Worker
+        return bool(Worker._instances)
+    return False
 
 
 class FutureTask:
@@ -355,6 +360,7 @@ def session_startup(casa_config: dict[str, str | None], loglevel: str | None = N
                 pass
 
     # Initialize casatasks and get log file
+    import casatasks  # local import: keep CASA out of the package import path
 
     casalogfile = casatasks.casalog.logfile()
 
@@ -461,7 +467,9 @@ def start_daskcluster(
         Client: A Dask client instance if the cluster is successfully started,
                 None otherwise.
     """
-    from dask.distributed import WorkerPlugin
+    from dask.distributed import WorkerPlugin, Client, LocalCluster, Worker
+    from dask_jobqueue import HTCondorCluster, SLURMCluster
+    import dask
 
     global daskclient, tier0futures
 
@@ -473,7 +481,14 @@ def start_daskcluster(
 
         def setup(self, worker):
             from pipeline.infrastructure import logging as log_utils
+            import casatasks  # local import: keep CASA out of the package import path
             log_utils.DASK_WORKER_ID = f"daskworker-{worker.name}"
+
+            # Apply CASA-derived signatures/metadata to casa_tasks wrappers so
+            # that JobRequest introspection sees the correct tclean/plotms
+            # parameter names and does not strip them as "unexpected keywords".
+            from pipeline.infrastructure.casa_tasks import _init_casa_signatures
+            _init_casa_signatures()
             
             last_logfile = casatasks.casalog.logfile()
             if self.config.get('logfile'):
@@ -657,6 +672,7 @@ def start_daskcluster(
         )
 
         # prefer using plugin which automatically applied to new workers joined by scaling
+        import casatasks  # local import: keep CASA out of the package import path
         plugin = SetupPlugin(config={'logfile': casatasks.casalog.logfile()})
         daskclient.register_plugin(plugin)
 

@@ -11,9 +11,6 @@ import types
 from inspect import Parameter, signature
 from typing import TYPE_CHECKING
 
-import casaplotms
-import casatasks
-
 from . import logging, utils
 
 if TYPE_CHECKING:
@@ -331,6 +328,9 @@ def get_fn_name(fn):
 
     Note: as of CASA ver6.5, all genuine CASA tasks are callable class instances, rather than Python functions.
     """
+    # Lazy import: keep CASA out of the import path for non-execution CLI calls.
+    import casaplotms
+    import casatasks
 
     for m in (casatasks, casaplotms):
         for k in m.__all__:

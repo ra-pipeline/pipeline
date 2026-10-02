@@ -15,8 +15,6 @@ from typing import TYPE_CHECKING
 import cachetools
 import intervaltree
 
-from casatasks.private.callibrary import applycaltocallib
-
 from . import casa_tools, launcher, logging, utils
 
 if TYPE_CHECKING:
@@ -1752,6 +1750,9 @@ class IntervalCalState:
         return dict(calapps)
 
     def export_to_casa_callibrary(self, ms, callibfile):
+        # Lazy import: keep CASA out of the import path for non-execution CLI calls.
+        from casatasks.private.callibrary import applycaltocallib
+
         calapps = (CalApplication(calto, calfroms)
                    for calto, calfroms in self.merged(hide_empty=True).items())
         append = False

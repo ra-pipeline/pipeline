@@ -10,7 +10,11 @@ from logging import CRITICAL, DEBUG, ERROR, INFO, WARNING
 
 import logutils
 import logutils.colorize as colorize
-from casatasks import casalog
+# NOTE: ``from casatasks import casalog`` previously lived at module top.
+# Importing :mod:`casatasks` triggers CASA C++ session startup (creates a
+# ``casa-*.log`` file, etc.).  We now resolve ``casalog`` lazily inside the
+# functions that actually use it, keeping plain ``import pipeline`` (and
+# ``pipeline --help`` / ``pipeline submit``) free of CASA side effects.
 
 # Register three new logging levels with the standard logger
 TRACE = 5
@@ -56,6 +60,7 @@ def pipeline_origin(method):
     """Use 'pipeline' as the CASAlog Origin by default."""
     @functools.wraps(method)
     def pipeline_as_origin(self, *args, **kwargs):
+        from casatasks import casalog  # lazy: defer CASA C++ startup
         if casalog.getOrigin() != 'pipeline':
             casalog.origin('pipeline')
         retval = method(self, *args, **kwargs)
@@ -76,8 +81,9 @@ class CASALogHandler(logging.Handler):
         If log is not specified, the current CASA global logger is used.
         """
         logging.Handler.__init__(self)
-        if log is None:
-            log = casalog
+        # Defer ``casatasks.casalog`` resolution until ``emit`` is actually
+        # called.  Constructing a handler must not by itself trigger CASA
+        # C++ startup (which happens on first ``import casatasks``).
         self._log = log
         self.setFormatter(logging.Formatter('%(message)s', ''))
 
@@ -104,6 +110,11 @@ class CASALogHandler(logging.Handler):
             if DASK_WORKER_ID:
                 origin = f"{DASK_WORKER_ID}::{origin}"
             log = self._log
+            if log is None:
+                # First emit: resolve casalog now (triggers casatasks import).
+                from casatasks import casalog
+                log = casalog
+                self._log = log
             log.post(msg, priority, origin)
             self.flush()
         except (KeyboardInterrupt, SystemExit):
@@ -448,6 +459,7 @@ def log_filtermsg(msglist: str | list[str]):
     * casalog.filterMsg(None) will not alter/clear the internal filter list.
     * Each casalog.filterMsg(msg) call will add additional element(s) in the filter.
     """
+    from casatasks import casalog  # lazy: defer CASA C++ startup
     casalog.filterMsg(msglist)
     try:
         yield
