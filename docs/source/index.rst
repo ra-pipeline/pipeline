@@ -7,9 +7,11 @@
    :caption: Basics
 
    overview
+   acknowledgement
    releases
    qa
    references
+   Contributors <contributors>
 
 .. toctree::
    :hidden:
@@ -17,7 +19,14 @@
    :caption: API Reference
 
    apisummary
-   inheritance
+
+.. only:: internal
+
+   .. toctree::
+      :hidden:
+      :maxdepth: 3
+
+      inheritance
 
 .. toctree::
    :hidden:
@@ -25,7 +34,9 @@
    :caption: User Guides
 
    users_guide/index
+   users_guide/known_issues
    VLA Pipeline User's Guide <https://science.nrao.edu/facilities/vla/data-processing>
+   VLA Pipeline Known Issues <https://science.nrao.edu/facilities/vla/data-processing/pipeline#autotoc-item-autotoc-32>
    Nobeyama Pipeline User's Guide <https://www.nro.nao.ac.jp/projects/45m/data/otf/#casa>
 
 .. toctree::
@@ -33,14 +44,21 @@
    :maxdepth: 2
    :caption: Developer Guide
 
-   timeline
-   dependencies
    devel/setup/index
    devel/usage/index
-   devel/process/index
    devel/codestyle/index
    devel/testing/index
-   devel/reference/index
-   devel/misc/index
+
+.. only:: internal
+
+   .. toctree::
+      :hidden:
+      :maxdepth: 2
+      :caption: Developer Guide (Internal)
+
+      timeline
+      devel/process/index
+      devel/reference/index
+      devel/misc/index
 
 

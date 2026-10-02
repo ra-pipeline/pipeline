@@ -19,45 +19,25 @@ def hifa_diffgaincal(vis=None, flagging_frac_limit=None, hm_spwmapmode=None, mis
     observation. In very long observations, there may be a group of scans
     occurring during the middle.
 
-    The procedure for the phase calibration process is as follow:
+    The task first performs a temporary phase solution on the low frequency
+    "reference" data using ``solint='inf'``. Next, the "phase offset" solution
+    using the high frequency "on-source" data is made with scan combination.
+    Separately combining those scan encompassing the "start" and "end" DIFFGAIN
+    blocks respectively. The "reference" gaintable is also pre-applied. Finally,
+    temporary "residual" phase solutions are produced using the high frequency
+    data with ``solint='inf'`` while both the "reference" and "phase offset"
+    phase solutions are pre-applied.
 
-    - ``reference`` calibration uses the "reference" spectral setup, the "low"
-      frequency for band-to-band observations (this uses the intent DIFFGAINREF,
-      as implemented since PL2024). The solint is fixed as 'inf' (i.e.
-      solutions are made per scan). Spectral window combination is governed by
-      the hm_spwmapmode options described below. In standard pipeline operation
-      ``auto`` is used - basing spw combination upon SNR and flagging level.
-      These reference phase solutions are later applied on-the-fly while solving
-      the (band-to-band) ``phase offset``. The premise being that the ``reference``
-      solutions correct for atmospheric phase variability.
+    The "residual" solutions are designed as to scatter about zero degrees phase
+    with no drift, as shown in the figure below (right panel). The "residuals"
+    not limited by SNR should ideally be within +/-30 deg; acceptable-conditions data
+    should be within +/-50 deg. There should be no significant offset or outlier
+    solutions from the base zero degree phase. QA sub-scores are described below.
 
-    - ``phase offset`` (i.e. the band-to-band correction) calibration uses the
-      "on-source" spectral setup, the "high" frequency for band-to-band observations.
-      The above ``reference`` phase corrections are applied on-the-fly using a
-      linearPD interpolation - this corrects (scales) the phases according to the
-      different ratio of the frequency bands. The solint = 'inf' and each group of
-      scan blocks (combining groups of DIFFGAINSRC HF scans typically at the start
-      and end of the observation) are combined respectively. The phase offset
-      solution generally comprises of 2 time solutions per spw, per polarization
-      (effectively the instrumental offset between bands). If the observation is long,
-      approaching two hours, it is possible that there is an additional DIFFGAIN
-      observation also at the mid-point of the observations, thus making 3 scan groups,
-      and 3 solutions per spw per polarization. Spectral window combination is governed
-      by the hm_spwmapmode options described below. ``auto`` is used - basing spw
-      combination upon SNR and flag data. These solutions are stored in the
-      pipeline context for later application to the TARGET and CHECK intent(s).
-
-    - ``residual offset`` solutions are produced by applying both ``reference`` and
-      band-to-band ``phase offset`` solutions to the 'on-source' DIFFGAIN intent
-      on-the-fly, and subsequently solving phases per spw, per scan using
-      solint='inf'.  Spectral window combination is governed by the hm_spwmapmode
-      options described below. ``auto`` is used - basing spw combination upon SNR
-      and flagging level.
-
-    Residual solutions pre-apply all corrections and solve for the scan-based DIFFGAINSRC phases. These are
-    designed to scatter about zero degrees with no drift, as shown in the figure below (right panel). Residuals
-    not limited by SNR should ideally be within +/-30 deg; good-conditions data should be within +/-50 deg.
-    There should be no significant offset or outlier solutions from the base zero degree phase.
+    For all solves ``refantmode='strict'`` is used, such that the reference 
+    antenna as established in :func:`~pipeline.hif.cli.hif_refant` cannot be swapped
+    when data are flagged. If solutions are poor, one should investigate fixing
+    the reference antenna.
 
     .. list-table:: Diffgain Phase Correction and Residuals
        :widths: 1 1
@@ -65,19 +45,15 @@ def hifa_diffgaincal(vis=None, flagging_frac_limit=None, hm_spwmapmode=None, mis
        * - .. image:: /figures/uid___A002_X116120b_X2d3a.ms.hifa_diffgaincal.s17_3.spw45_47_49_51_53_55_57_59.solintinf.gpcal.tbl-spw47-TARGET_CHECK-phase_vs_time.png
          - .. image:: /figures/uid___A002_X116120b_X2d3a.ms.hifa_diffgaincal.s17_5.spw45_47_49_51_53_55_57_59.solintinf.gpcal.tbl-spw55-phase_vs_time.png
 
-    Plots in the hifa_diffgaincal weblog. The first set (left) shows the diffgain phase correction to be applied to the
+    **Plots in the weblog**: The first set (left) shows the diffgain phase correction to be applied to the
     target source (the band-to-band offset). A plot is shown for each spectral window, with phase correction data
-    points plotted per antenna and correlation as a function of time. The phase offsets are computed by pre-applying
-    the LF scan based phase-only solution to the diffgain calibrator data and computing new phase solutions for each
-    spw while combining scan groups at the start and end of the EB. The second set (right) shows the diffgain phase
-    residuals as a function of time. The residual phase solutions should scatter about zero with no drift and are
-    calculated by pre-applying the LF to HF phase solutions and the band-to-band offset. The new solutions are not
-    applied to the target.
+    points plotted per antenna and correlation as a function of time. The second set (right) shows the DIFFGAIN phase
+    residuals as a function of time. The residual phase solutions should scatter about zero with no drift or outliers.
 
     As of PL2025, low-SNR heuristics allow ``combine='spw'`` to be used in any of the three solve steps.
     The gaincal workflow and low SNR logical flow are shown in the figure below.
 
-    .. figure:: /figures/PL2025_hifa_diffgaincal_incHeuristic.png
+    .. figure:: /figures/PL2026_hifa_diffgaincal_incHeuristic_lowSNR.png
        :width: 60%
        :alt: Gain solution workflow for hifa_diffgaincal
 
@@ -101,12 +77,22 @@ def hifa_diffgaincal(vis=None, flagging_frac_limit=None, hm_spwmapmode=None, mis
           0.0 if any table is missing (which invalidates the calibration).
         - 0.9 (informative only) if ``combine='spw'`` was required for any of the three solve steps;
           1.0 otherwise.
+        - Residual solution phase offsets, rms, outliers:
+            - 1.0 if phase `parameter` is <30 deg
+            - 0.9 if phase `parameter` is between 30-50 deg
+            - 0.67 if phase `parameter` is between 50-70 deg
+            - 0.66 if phase `parameter` >=70 deg
 
-        Only used in band-to-band (diffgain) recipes.
+        :func:`~pipeline.hifa.cli.hifa_diffgaincal` is only used in band-to-band (diffgain) recipes, but other 
+        required pipeline tasks are DIFFGAIN-aware and handle band-to-band data correctly.
 
     Examples:
         1. Derive SpW phase offsets from differential gain calibrator.
 
         >>> hifa_diffgaincal()
+
+        2. Derive SpW phase offsets while using SpW combination for the high-frequency ``'offset'`` solve only.
+
+        >>> hifa_diffgaincal(hm_spwmapmode='offset')
 
     """

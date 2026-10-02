@@ -13,12 +13,20 @@ def hif_lowgainflag(vis=None, intent=None, spw=None, refant=None, flag_nmedian=N
 
     The task performs the following steps:
 
-    1. Performs an initial phase-up for the BANDPASS intent.
-    2. Creates a bandpass calibration table.
-    3. Creates a gain phase calibration table.
-    4. Creates a gain amplitude calibration table.
-    5. Uses the gain amplitude table to identify antennas with outlier gains per spw.
-    6. Applies flagging commands for the identified outlier antennas to the entire MS.
+    1. Performs an initial phase-up for the BANDPASS intent and creates a bandpass calibration table.
+       For ALMA data, since PL2026 this follows the low SNR heuristic process from
+       :func:`~pipeline.hifa.cli.hifa_bandpass` (``almaphcorbandpass.py``) that can trigger
+       ``combine='spw'`` if any spectral window has a phaseup SNR
+       lower than ``phaseupsnr=5``.
+    2. Creates a gain phase calibration table. The phase solve for ALMA data inherits any
+       low SNR parameters for ``combine`` and ``solint``. Default values are no combine, and ``solint='int'``.
+       If ``combine='spw'``, then before the phaseup solve, an additional phase offset calibration is made 
+       per spw using ``solint='inf'``.
+    3. Creates a gain amplitude calibration table. This uses parameters ``solint='inf'`` and ``gaintype='T'``.
+    4. Uses the gain amplitude table to identify antennas with outlier gains per spw.
+    5. Applies flagging commands for the identified outlier antennas to the entire MS.
+
+    All temporary gain tables are discarded after the task.
 
     A separate time x antenna matrix view is created per spw. Each point is the absolute gain amplitude for
     that antenna/timestamp. Antennas are flagged if their gain is:

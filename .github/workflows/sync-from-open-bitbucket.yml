@@ -15,29 +15,53 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout GitHub Repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0 # Fetch full history for proper merging
           token: ${{ secrets.GITHUB_TOKEN }} # Built-in token to push back to GitHub
 
-      - name: Add Bitbucket Remote & Fetch
+      - name: Configure Git and Fetch from Bitbucket
         run: |
+          source .github/scripts/git-resilient.sh
+
           git config user.name "GitHub Action Sync"
           git config user.email "action@github.com"
           
-          # Add your PUBLIC on-prem URL
+          # Add PUBLIC on-prem URL and fetch with resilience retries
           git remote add bitbucket https://open-bitbucket.nrao.edu/scm/pipe/pipeline.git
-          git fetch bitbucket
+
+          if ! retry_cmd git fetch bitbucket; then
+            if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
+              echo "::warning::open-bitbucket.nrao.edu appears to be offline or unreachable. Skipping scheduled sync until next run."
+              echo "SYNC_SKIPPED=true" >> "$GITHUB_ENV"
+              exit 0
+            else
+              echo "::error::Failed to fetch from open-bitbucket.nrao.edu."
+              exit 1
+            fi
+          fi
 
       - name: Sync Main Branch
+        if: env.SYNC_SKIPPED != 'true'
         run: |
           # Checkout main (from GitHub)
           git checkout main
           
+          # Check if there are new commits from Bitbucket to merge
+          LOCAL_SHA=$(git rev-parse HEAD)
+          REMOTE_SHA=$(git rev-parse bitbucket/main)
+
+          if [ "$LOCAL_SHA" = "$REMOTE_SHA" ]; then
+            echo "GitHub 'main' is already up to date with 'bitbucket/main' ($LOCAL_SHA). No sync needed."
+            exit 0
+          fi
+
+          echo "Merging changes: $LOCAL_SHA -> $REMOTE_SHA"
+
           # Merge changes from open-bitbucket's main
           # Using --ff-only ensures a clean history (fails if streams diverged)
           if ! git merge bitbucket/main --ff-only ; then
-            echo "ERROR: Failed to merge 'bitbucket/main' into 'main'. Manual conflict resolution is required."
+            echo "::error::Failed to merge 'bitbucket/main' into 'main' with --ff-only. Manual conflict resolution is required."
             echo "=== Git status ==="
             git status
             echo "=== Recent commit graph (last 10 commits across all refs) ==="
