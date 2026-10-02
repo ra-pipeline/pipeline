@@ -400,7 +400,7 @@ class DetectMissedLines:
 
             # find channels which exceed deviation_threshold
             detections[mask_mode] = self._detect_excess(z_linefree, dev_threshold, width_threshold)
-            if self.do_plot and detections[mask_mode]:
+            if self.do_plot:
                 self._plot(detections[mask_mode],
                            ax[mask_mode],
                            line_ranges, z_linefree, z_other,
