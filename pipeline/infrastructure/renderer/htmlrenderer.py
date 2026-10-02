@@ -2073,11 +2073,61 @@ def get_ms_attr_for_result(context, vis, accessor):
     return accessor(ms)
 
 
+def _decimate_timestamps(
+        times: np.ndarray,
+        min_interval: float = 1.0,
+        ) -> np.ndarray:
+    """Subsample timestamps to avoid unnecessarily dense sampling.
+
+    SQLD spectral windows can have sampling rates as high as 16ms, leading
+    to ~60k timestamps for a single field.  For weblog rendering and similar
+    purposes, a ~1s resolution is more than adequate.  This function selects
+    a subset of timestamps such that no two consecutive selected timestamps
+    are closer than *min_interval* seconds.
+
+    The first and last timestamps are always included to preserve the full
+    time range.
+
+    Args:
+        times: Array of timestamps (seconds since MJD epoch).
+        min_interval: Minimum spacing between selected timestamps (seconds).
+
+    Returns:
+        Decimated array of timestamps, in ascending time order.
+    """
+    if len(times) <= 1:
+        return times
+
+    # The greedy selection below assumes ascending order. Field.time comes from
+    # msmd.timesforfield() and is ascending in practice, but if that ever changes
+    # the unsorted input would silently decimate to almost nothing.
+    if not np.all(np.diff(times) >= 0):
+        times = np.sort(times)
+
+    # Always keep the first timestamp
+    keep_mask = np.zeros(len(times), dtype=bool)
+    keep_mask[0] = True
+    last_kept = times[0]
+
+    for i in range(1, len(times)):
+        if times[i] - last_kept >= min_interval:
+            keep_mask[i] = True
+            last_kept = times[i]
+
+    # Always keep the last timestamp
+    keep_mask[-1] = True
+
+    return times[keep_mask]
+
+
 def compute_zd_telmjd_for_ms(
         ms: MeasurementSet,
         ) -> dict[int, dict[str, list[float] | list[datetime.datetime]]]:
     """
-    Retrieve zenith angles (degrees) and times for TARGET fields at all timestamps.
+    Retrieve zenith angles (degrees) and times for TARGET fields at decimated timestamps.
+
+    Timestamps are decimated to ~1s resolution to avoid the unnecessarily dense
+    sampling of SQLD spectral windows (see PIPE-3189).
 
     Args:
         ms: The MeasurementSet object.
@@ -2118,7 +2168,8 @@ def compute_zd_telmjd_for_ms(
         tm_list = data[field.id]['telmjd']
         field_dir = field._mdirection
 
-        for time_seconds in field.time:
+        # Decimate timestamps to avoid dense SQLD sampling (PIPE-3189)
+        for time_seconds in _decimate_timestamps(field.time):
             # field.time is seconds since 1858-11-17 (MJD origin)
             mjd = float(time_seconds) / 86400.0
             epoch_dict['m0']['value'] = mjd
