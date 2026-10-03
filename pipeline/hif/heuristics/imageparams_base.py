@@ -569,7 +569,7 @@ class ImageParamsHeuristics:
                             # to the original phase center value.
                             _, phasecenter = self.phasecenter(field_ids, vislist=valid_vis_list, shift_to_nearest_field=shift,
                                                               primary_beam=largest_primary_beam_size, intent=intent)
-                        do_parallel = mpihelpers.parse_mpi_input_parameter(parallel)
+                        do_parallel = mpihelpers.parse_parallel_input_parameter(parallel)
 
                         # Fallback to serial mode if parallel was requested but MPI is not available
                         if do_parallel and not mpihelpers.is_mpi_ready():

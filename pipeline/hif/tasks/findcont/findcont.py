@@ -530,7 +530,7 @@ class FindCont(basetask.StandardTaskTemplate):
 
                     width = '%.7fMHz' % (channel_width / 1e6)
 
-                    parallel = mpihelpers.parse_mpi_input_parameter(inputs.parallel)
+                    parallel = mpihelpers.parse_parallel_input_parameter(inputs.parallel)
 
                     real_spwsel = context.observing_run.get_real_spwsel([str(spwid)]*len(vislist), vislist)
 

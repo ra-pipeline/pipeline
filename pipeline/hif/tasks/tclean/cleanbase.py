@@ -313,7 +313,7 @@ class CleanBase(basetask.StandardTaskTemplate):
         else:
             # For ephemeris objects, tclean/parallel was explicit set to False between 2018/07/10 and
             # 2021-02/16 due to a tclean bug (see CAS-11631 and PIPE-981)
-            parallel = all([mpihelpers.parse_mpi_input_parameter(inputs.parallel), 'TARGET' in inputs.intent])
+            parallel = all([mpihelpers.parse_parallel_input_parameter(inputs.parallel), 'TARGET' in inputs.intent])
 
         # PIPE-1878: calculate iteration/specmode-dependent threshold scaling factor (only used for VLA-PI) to correct the
         # potential tclean noise estimation bias.

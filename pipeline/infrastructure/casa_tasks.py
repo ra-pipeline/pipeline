@@ -11,6 +11,7 @@ method will match those of the tasks in the CASA environment when this
 module was imported.
 """
 import functools
+import inspect
 import shutil
 import subprocess
 import sys
@@ -21,6 +22,7 @@ import casatasks
 
 from . import logging
 from .jobrequest import JobRequest
+from .mpirunner import call_with_mpi
 
 LOG = logging.get_logger(__name__)
 
@@ -268,9 +270,43 @@ def statwt(*v, **k) -> JobRequest:
     return JobRequest(casatasks.statwt, *v, **k)
 
 
+def _with_tclean_signature(fn):
+    """Replace fn's signature with casatasks.tclean's, swapping in a typed parallel param."""
+    try:
+        params = [
+            p for p in inspect.signature(casatasks.tclean).parameters.values()
+            if p.name != 'parallel'
+        ]
+        params.append(
+            inspect.Parameter(
+                'parallel',
+                inspect.Parameter.KEYWORD_ONLY,
+                default=False,
+                annotation='bool | dict[str, int]',
+            )
+        )
+        fn.__signature__ = inspect.Signature(parameters=params)
+    except (TypeError, ValueError):
+        LOG.debug('Could not derive tclean signature for %s', fn, exc_info=True)
+    return fn
+
+
+@_with_tclean_signature
+def _tclean(*args, parallel=False, **kwargs):
+    """Execute casatasks.tclean with transparent serial/MPI dispatch.
+
+    Args:
+        *args: Positional arguments forwarded to tclean.
+        parallel: False runs serially in-process. True or a dict ``{'nproc': N}``
+            spawns an MPI subprocess (or delegates to the existing MPI client).
+        **kwargs: Keyword arguments forwarded to tclean.
+    """
+    return call_with_mpi(casatasks.tclean, *args, parallel=parallel, **kwargs)
+
+
 @register_task
 def tclean(*v, **k) -> JobRequest:
-    return JobRequest(casatasks.tclean, *v, **k)
+    return JobRequest(_tclean, *v, **k)
 
 
 @register_task

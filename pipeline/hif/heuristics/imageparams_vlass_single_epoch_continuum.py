@@ -585,7 +585,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         See CAS-13338 and PIPE-728
         """
         qaTool = casa_tools.quanta
-        do_parallel = mpihelpers.parse_mpi_input_parameter(parallel)
+        do_parallel = mpihelpers.parse_parallel_input_parameter(parallel)
 
         # Fallback to serial mode if parallel was requested but MPI is not available
         if do_parallel and not mpihelpers.is_mpi_ready():

@@ -768,13 +768,13 @@ class CleanTaskFactory:
     def __get_task_args(self, target):
         inputs = self.__inputs
 
-        parallel_wanted = mpihelpers.parse_mpi_input_parameter(inputs.parallel)
+        parallel_wanted = mpihelpers.parse_parallel_input_parameter(inputs.parallel)
 
-        # request Tier 1 tclean parallelisation if the user requested it, this
-        # is science target imaging, and we are running as an MPI client.
+        # Tier 1 tclean parallelisation: user requested it, this is science
+        # target imaging, and an MPI session or mpicasa subprocess is available.
         parallel = all([parallel_wanted,
                         'TARGET' in target['intent'],
-                        mpihelpers.is_mpi_ready()])
+                        mpihelpers.is_mpi_ready() or daskhelpers.is_dask_ready() or parslhelpers.is_parsl_ready()])
 
         image_heuristics = target['heuristics']
 

@@ -1491,7 +1491,7 @@ class Tclean(cleanbase.CleanBase):
         inputs = self.inputs
 
         if parallel is None:
-            parallel = mpihelpers.parse_mpi_input_parameter(inputs.parallel)
+            parallel = mpihelpers.parse_parallel_input_parameter(inputs.parallel)
 
         # if 'start' or 'width' are defined in velocity units, convert from frequency back
         # to velocity before tclean call. Added to support SRDP ALMA optimized imaging.
