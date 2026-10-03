@@ -6,9 +6,10 @@ import pprint
 import tempfile
 from inspect import signature
 
-from . import parslhelpers, exceptions, filenamer, logging
 from pipeline.infrastructure import daskhelpers
 from pipeline.infrastructure.utils import gen_hash, get_obj_size, human_file_size
+
+from . import exceptions, filenamer, logging, parslhelpers
 
 casampi_spec = importlib.util.find_spec('casampi')
 casalith_spec = importlib.util.find_spec('casalith')
@@ -36,8 +37,7 @@ LOG = logging.get_logger(__name__)
 
 class AsyncTask:
     def __init__(self, executable):
-        """
-        Create a new AsyncTask.
+        """Create a new AsyncTask.
 
         The referenced task will be immediately queued for asynchronous
         execution on an MPI server upon creation of an object.
@@ -59,8 +59,7 @@ class AsyncTask:
         )
 
     def get_result(self):
-        """
-        Get the result from the executed task.
+        """Get the result from the executed task.
 
         This method blocks until execution of the asynchronous task is
         complete.
@@ -119,7 +118,6 @@ class AsyncTask:
                 response['ret']: return from the server-side constructed PipelineTask/JobRequest executable
                 response['command']: the input command request string
         """
-
         LOG.debug(
             'Received a successful response from MPIserver-{server} for command_request_id={id}'.format(**response)
         )
@@ -150,8 +148,7 @@ class AsyncTask:
 
 class SyncTask:
     def __init__(self, task, executor=None):
-        """
-        Create a new SyncTask object.
+        """Create a new SyncTask object.
 
         Creation of a SyncTask does not result in immediate execution of the
         given task. Execution is delayed until the result is requested.
@@ -165,8 +162,7 @@ class SyncTask:
         self.__executor = executor
 
     def get_result(self):
-        """
-        Get the result from the executed task.
+        """Get the result from the executed task.
 
         This method starts execution of the wrapped task and blocks until
         execution is complete.
@@ -274,11 +270,22 @@ class Tier0PipelineTask(Executable):
             if task_name is not None:
                 filenamer.NamingTemplate.task = task_name
 
-            return lambda: task.execute()
+            # Defer deletion so the file survives a worker crash/reschedule retry.
+            task_args_path = self.__task_args_path
 
-        finally:
+            def _run():
+                try:
+                    return task.execute()
+                finally:
+                    if task_args_path and os.path.exists(task_args_path):
+                        os.unlink(task_args_path)
+
+            return _run
+
+        except Exception:
             if self.__task_args_path and os.path.exists(self.__task_args_path):
                 os.unlink(self.__task_args_path)
+            raise
 
     def __str__(self):
         return 'Tier0PipelineTask(%s, %s, %s)' % (self.__task_cls, self.__task_args_path, self.__context_path)
@@ -286,8 +293,7 @@ class Tier0PipelineTask(Executable):
 
 class Tier0JobRequest(Executable):
     def __init__(self, creator_fn, job_args, executor=None):
-        """
-        Create a new Tier0JobRequest representing a JobRequest to be executed
+        """Create a new Tier0JobRequest representing a JobRequest to be executed
         on an MPI server.
 
         :param creator_fn: the class of the CASA task to execute
@@ -327,8 +333,7 @@ class Tier0JobRequest(Executable):
 
 class Tier0FunctionCall(Executable):
     def __init__(self, fn, *args, executor=None, use_pickle=False, **kwargs):
-        """
-        Create a new Tier0FunctionCall for a function to be executed on an MPI
+        """Create a new Tier0FunctionCall for a function to be executed on an MPI
         server. The functions and arguments must be picklable objects.
         """
         super().__init__()
@@ -397,8 +402,7 @@ class Tier0FunctionCall(Executable):
 
 
 def mpiexec(tier0_executable):
-    """
-    Execute a pipeline task.
+    """Execute a pipeline task.
 
     This function is used to recreate and execute tasks/jobrequests on cluster nodes.
 
@@ -631,7 +635,7 @@ class TaskQueue:
         return self.__async
 
     def get_results(self, clear=False):
-        """get all queue results in a block fashion."""
+        """Get all queue results in a block fashion."""
         for idx, task in enumerate(self.__queue):
             if not self.__returned[idx]:
                 self.__results[idx] = task.get_result()

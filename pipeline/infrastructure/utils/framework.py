@@ -72,6 +72,9 @@ def is_top_level_task():
     if dask_worker:
         return False
 
+    if parslhelpers.is_parsl_worker():
+        return False
+
     return task_depth() == 1
 
 

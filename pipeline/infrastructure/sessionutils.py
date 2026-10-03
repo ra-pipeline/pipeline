@@ -187,7 +187,7 @@ class VDPTaskFactory:
     def __enter__(self):
         # If there's a possibility that we'll submit MPI jobs, save the context
         # to disk ready for import by the MPI servers.
-        if mpihelpers.mpiclient or daskhelpers.daskclient:
+        if mpihelpers.mpiclient or daskhelpers.daskclient or parslhelpers.is_parsl_ready():
             # Use the tempfile module to generate a unique temporary filename,
             # which we use as the output path for our pickled context
             tmpfile = tempfile.NamedTemporaryFile(suffix='.context',
