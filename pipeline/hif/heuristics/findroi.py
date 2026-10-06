@@ -4175,11 +4175,7 @@ def run_findroi_mpi(
     )
 
     args = []
-    target_field_names = utils.deduplicate(
-        field_names_by_id.get(int(fid), str(fid))
-        for field_ids in field_groups.values()
-        for fid in field_ids
-    )
+    target_field_names = utils.deduplicate(field_names_by_id.values())
     for ddid, spw_name, virtual_spw_id in sci_spw:
         has_unflagged_data = False
         has_inconclusive_probe = False
