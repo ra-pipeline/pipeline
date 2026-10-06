@@ -4186,8 +4186,8 @@ def run_findroi_mpi(
                     has_unflagged_data = True
                     break
                 elif probe_result is False:
-                    LOG.warning(
-                        'Data for EB %s, field %s, spw %s is completely flagged.',
+                    LOG.debug(
+                        'Data for EB %s, field %s, virtual spw %s is completely flagged.',
                         os.path.basename(vis_name),
                         field_name,
                         virtual_spw_id,
@@ -4197,6 +4197,7 @@ def run_findroi_mpi(
             if has_unflagged_data:
                 break
         if not has_unflagged_data and not has_inconclusive_probe:
+            LOG.warning('No unflagged data found in any EB/field for virtual spw %s; skipping.', virtual_spw_id)
             continue
         spw_ids_by_vis = _real_spw_ids_by_vis(
             context,
