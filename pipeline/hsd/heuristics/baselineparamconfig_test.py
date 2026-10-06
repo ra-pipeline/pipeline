@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import io
+import pathlib
+import shutil
+import unittest
+
 import numpy as np
 import pytest
 from unittest.mock import MagicMock, patch, mock_open
@@ -143,6 +147,8 @@ class TestBaselineFitParamConfig:
     @patch('pipeline.hsd.heuristics.baselineparamconfig.casa_tools.TableReader')
     @patch('pipeline.hsd.heuristics.baselineparamconfig.fitorder.FitOrderHeuristics')
     def test_calculate(self, mock_fitorder_heuristics, mock_table_reader, heuristic_poly):
+        import hashlib
+
         # Mocks for MeasurementSet and its components
         mock_ms = MagicMock()
         mock_ms.name = 'test.ms'
@@ -155,10 +161,12 @@ class TestBaselineFitParamConfig:
 
         mock_dd = MagicMock()
         mock_dd.num_polarizations = 2
+        # Maybe not
         mock_ms.get_data_description.return_value = mock_dd
 
         # Mock DataTable
         mock_datatable = MagicMock()
+
         # time_table format: [member_list, ...] where member_list is [origin_rows, datatable_row_idxs]
         member_list = [([0, 1], [10, 11])]
         mock_datatable.get_timetable.return_value = [member_list]
@@ -174,24 +182,21 @@ class TestBaselineFitParamConfig:
         mock_fo = mock_fitorder_heuristics.return_value
         mock_fo.calculate.return_value = 1
 
-        # Mock blparam file writing
-        m_open = mock_open()
+        _ = heuristic_poly.calculate(
+            datatable=mock_datatable,
+            ms=mock_ms,
+            rowmap={0: 0, 1: 1},
+            antenna_id=0,
+            field_id=0,
+            spw_id=0,
+            fit_order=2,
+            edge=(5, 5),
+            deviation_mask=None,
+            blparam='test.blparam'
+        )
 
-        with patch('pipeline.hsd.heuristics.baselineparamconfig.open', m_open):
-            result = heuristic_poly.calculate(
-                datatable=mock_datatable,
-                ms=mock_ms,
-                rowmap={0: 0, 1: 1},
-                antenna_id=0,
-                field_id=0,
-                spw_id=0,
-                fit_order=2,
-                edge=(5, 5),
-                deviation_mask=None,
-                blparam='test.blparam'
-            )
+        expected_contents = "db471c3de432288537df1187cd7c83e9b1e30c309958ecb4e30c3244e7d8a649"
+        assert hashlib.sha256(open('test.blparam','rb').read()).hexdigest() == expected_contents
 
-        assert result == 'test.blparam'
-        m_open.assert_called_with('test.blparam', 'a')
-        # Check that we wrote something to the file
-        m_open().write.assert_called()
+        # Clean up the file.
+        pathlib.Path("test.blparam").unlink(missing_ok=True)
