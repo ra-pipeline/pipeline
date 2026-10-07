@@ -100,20 +100,28 @@ def test_fluxservice_user_agent_and_retries():
 
     import urllib.error
 
-    with mock.patch(
-        'pipeline.hifa.tasks.importdata.dbfluxes.urllib.request.urlopen',
-        side_effect=[urllib.error.URLError('timeout'), BytesIO(xml_response)],
-    ) as mock_urlopen:
+    with (
+        mock.patch(
+            'pipeline.hifa.tasks.importdata.dbfluxes.urllib.request.urlopen',
+            side_effect=[
+                urllib.error.URLError('timeout'),
+                urllib.error.URLError('timeout'),
+                BytesIO(xml_response),
+            ],
+        ) as mock_urlopen,
+        mock.patch('pipeline.hifa.tasks.importdata.dbfluxes.time.sleep') as mock_sleep,
+    ):
         fluxdict = dbfluxes.fluxservice(
             'https://example.test/sc/flux',
             obs_time,
             '86837309056.169219970703125',
             'J1427-4206',
-            retries=1,
+            retries=2,
             retry_delay=0.01,
         )
 
-    assert mock_urlopen.call_count == 2
+    assert mock_urlopen.call_count == 3
+    assert mock_sleep.call_args_list == [mock.call(0.01), mock.call(0.02)]
     req = mock_urlopen.call_args_list[0][0][0]
     assert req.get_header('User-agent') == 'Mozilla/5.0'
     assert req.get_header('Accept') == '*/*'
