@@ -12,6 +12,7 @@ from xml.dom import minidom
 from xml.parsers.expat import ExpatError
 
 import certifi
+
 from pipeline import domain, infrastructure
 from pipeline.domain import measures
 from pipeline.h.tasks.common import commonfluxresults
@@ -76,9 +77,14 @@ def get_setjy_results(
     mses: list[MeasurementSet],
     service_url: str | None = None,
 ) -> tuple[list[FluxCalibrationResults], list[dict[str, Any]]]:
-    """
-    Get flux values from the database service reverting to the Source
-    tables XML for backup values and store the values in the context
+    """Get flux values from the database service, falling back to the Source table XML.
+
+    Args:
+        mses: Measurement sets for which to retrieve flux values.
+        service_url: Flux service URL to query. The configured primary URL is used when this is ``None``.
+
+    Returns:
+        Flux calibration results and any QA status entries returned by the service.
     """
     if service_url is None:
         service_url, _ = get_flux_urls()
@@ -111,9 +117,14 @@ def read_fluxes_db(
     ms: MeasurementSet,
     service_url: str | None = None,
 ) -> tuple[collections.defaultdict[Source, list[FluxMeasurement]], list[dict[str, Any]] | None]:
-    """
-    Read fluxes from the database server, defaulting to the Source XML table
-    if no fluxes can be found
+    """Read fluxes from the database server, defaulting to the Source XML table when necessary.
+
+    Args:
+        ms: Measurement set for which to retrieve flux values.
+        service_url: Flux service URL to query. The configured primary URL is used when this is ``None``.
+
+    Returns:
+        Flux measurements grouped by source and any QA status entries returned by the service.
     """
     if service_url is None:
         service_url, _ = get_flux_urls()
@@ -133,8 +144,14 @@ def flux_nosourcexml(
     ms: MeasurementSet,
     service_url: str | None = None,
 ) -> collections.defaultdict[Source, list[tuple[FluxMeasurement | str | None]]]:
-    """
-    Call the flux service and get the frequencies from the ms if no Source.xml is available
+    """Query the flux service using frequencies from a measurement set without Source.xml.
+
+    Args:
+        ms: Measurement set for which to retrieve flux values.
+        service_url: Flux service URL to query. The configured primary URL is used when this is ``None``.
+
+    Returns:
+        Flux measurements grouped by source.
     """
     result = collections.defaultdict(list)
     if service_url is None:
@@ -189,12 +206,23 @@ def fluxservice(
     retry_delay: float = 0.5,
     headers: dict[str, str] | None = None,
 ) -> dict[str, str | None]:
-    """
-    Usage of this online service requires:
-        - service_url - url for the db service
-        - obs_time - for getting the date
-        - frequency - we will get the frequency out of this in Hz
-        - sourcename - name of the source
+    """Query the online flux catalogue service.
+
+    Args:
+        service_url: URL for the database service.
+        obs_time: Observation time used to construct the query date.
+        frequency: Query frequency in Hz.
+        sourcename: Name of the source to query.
+        retries: Number of times to retry the query after the initial attempt.
+        retry_delay: Initial delay between attempts in seconds. The delay doubles after each failed attempt.
+        headers: HTTP request headers. The default headers are used when this is ``None``.
+
+    Returns:
+        A dictionary containing the values returned by the flux catalogue service.
+
+    Raises:
+        OSError: If all attempts to contact or read from the service fail.
+        ExpatError: If the service response cannot be parsed as XML.
     """
     url = buildurl(service_url, obs_time, frequency, sourcename)
     LOG.info('Attempting query %s', url)
@@ -204,22 +232,19 @@ def fluxservice(
     req = urllib.request.Request(url, headers=request_headers)
 
     content = None
-    last_exception = None
     for attempt in range(retries + 1):
         try:
             with urllib.request.urlopen(req, context=ssl_context, timeout=60.0) as response:
                 content = response.read()
             break
-        except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as e:
-            last_exception = e
-            if attempt < retries:
-                LOG.warning(
-                    'Query attempt %d failed: %s. Retrying in %.1fs...', attempt + 1, e, retry_delay * (2**attempt)
-                )
-                time.sleep(retry_delay * (2**attempt))
-            else:
+        except OSError as e:
+            if attempt >= retries:
                 LOG.warning('Problem contacting flux service at: <a href="%s">%s</a>', url, url)
-                raise last_exception
+                raise
+
+            delay = retry_delay * (2**attempt)
+            LOG.warning('Query attempt %d failed: %s. Retrying in %.1fs...', attempt + 1, e, delay)
+            time.sleep(delay)
 
     try:
         dom = minidom.parseString(content)
@@ -323,6 +348,16 @@ def add_catalogue_fluxes(
     ms: MeasurementSet,
     service_url: str | None = None,
 ) -> tuple[collections.defaultdict[Source, list[FluxMeasurement]], list[dict[str, Any]]]:
+    """Replace Source.xml measurements with available catalogue measurements.
+
+    Args:
+        measurements: Source.xml flux measurements grouped by source.
+        ms: Measurement set associated with the measurements.
+        service_url: Flux service URL to query. The configured primary URL is used when this is ``None``.
+
+    Returns:
+        Updated flux measurements grouped by source and any QA status entries returned by the service.
+    """
     results = collections.defaultdict(list)
     qacodes = []  # Dictionaries will be added here for codes and warning messages from the sources catalog
     science_windows = ms.get_spectral_windows(science_windows_only=True)

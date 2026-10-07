@@ -75,6 +75,7 @@ def test_fluxservice_reads_source_catalogue_columns_by_field_name():
 
 
 def test_fluxservice_user_agent_and_retries():
+    """Test request headers and retry behavior for the flux service."""
     xml_response = b"""<?xml version="1.0"?>
 <VOTABLE><RESOURCE><TABLE>
   <FIELD datatype="int" width="1" name="StatusCode"></FIELD>
@@ -135,9 +136,11 @@ def test_fluxservice_user_agent_and_retries():
 
 
 def test_fluxservice_raises_on_persistent_failure():
+    """Test that persistent flux service failures are raised."""
     obs_time = datetime.datetime(2013, 3, 27, 7, 53, 3, 168000, tzinfo=datetime.timezone.utc)
-    import pytest
     import urllib.error
+
+    import pytest
 
     with mock.patch(
         'pipeline.hifa.tasks.importdata.dbfluxes.urllib.request.urlopen',
@@ -157,6 +160,7 @@ def test_fluxservice_raises_on_persistent_failure():
 
 
 def test_check_service_primary_success():
+    """Test selection of the primary flux service."""
     flux_url, _ = dbfluxes.get_flux_urls()
     with mock.patch('pipeline.hifa.tasks.importdata.dbfluxes.fluxservice', return_value={'statuscode': '0'}) as mock_fs:
         status, url = dbfluxes.check_service()
@@ -168,6 +172,7 @@ def test_check_service_primary_success():
 
 
 def test_check_service_backup_success():
+    """Test selection of the backup flux service."""
     flux_url, backup_url = dbfluxes.get_flux_urls()
     with mock.patch(
         'pipeline.hifa.tasks.importdata.dbfluxes.fluxservice',
@@ -183,6 +188,7 @@ def test_check_service_backup_success():
 
 
 def test_check_service_both_fail():
+    """Test failure when neither flux service is available."""
     with mock.patch(
         'pipeline.hifa.tasks.importdata.dbfluxes.fluxservice',
         side_effect=IOError('Service unreachable'),
@@ -195,9 +201,10 @@ def test_check_service_both_fail():
 
 
 def test_add_catalogue_fluxes_uses_service_url_without_probe():
+    """Test use of the supplied service URL without an additional probe."""
     import collections
-    from pipeline.domain import FluxMeasurement
-    from pipeline.domain import measures
+
+    from pipeline.domain import FluxMeasurement, measures
 
     ms = mock.Mock()
     spw = mock.Mock()
