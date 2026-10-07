@@ -66,6 +66,9 @@ class Analyzestokescubes(basetask.StandardTaskTemplate):
         img_stats = self._get_imstat(imlist)
         for idx, roi_name in enumerate(roi_list):
             stats.setdefault(roi_name, copy.deepcopy(roi_stats_default))
+            if 'maxpos' not in img_stats[idx] or 'maxposf' not in img_stats[idx]:
+                LOG.warning('No peak available for ROI %s; skipping ROI.', roi_name)
+                continue
             stats[roi_name]['xy'] = (img_stats[idx]['maxpos'][0], img_stats[idx]['maxpos'][1])
             stats[roi_name]['world'] = img_stats[idx]['maxposf']
 
@@ -90,7 +93,8 @@ class Analyzestokescubes(basetask.StandardTaskTemplate):
                     beamarea = bm['major']['value']*bm['minor']['value']
 
                     for idx, roi_name in enumerate(roi_list):
-
+                        if stats[roi_name]['xy'] is None:
+                            continue
                         try:
                             npix_halfwidth = 1
                             blc = [stats[roi_name]['xy'][0]-npix_halfwidth, stats[roi_name]['xy'][1]-npix_halfwidth]
@@ -131,6 +135,7 @@ class Analyzestokescubes(basetask.StandardTaskTemplate):
 
         frequency_list = []
         imagename_list = []
+
         for imageitem in imlist:
             img_name = utils.glob_ordered(imageitem['imagename'].replace('.subim', '.pbcor.tt0.subim'))[0]
             imagename_list.append(img_name)
@@ -148,17 +153,22 @@ class Analyzestokescubes(basetask.StandardTaskTemplate):
             f'{imagename_freqhigh} has the highest reference frequency at {frequency_list[idx_freqhigh]} Hz.')
 
         mask_lel = self._get_mask(imagename_freqhigh)
-
         # do the peak search in the pbcor subimage at the lowest frequency
         LOG.info(f'Searching the intensity peaks using mask={mask_lel!r} in {imagename_freqlow}')
         with casa_tools.ImagepolReader(imagename_freqlow) as imagepol:
             img_stokesi = imagepol.stokesi()
             stokesi_stats = img_stokesi.statistics(robust=False, mask=mask_lel, stretch=True)
-            LOG.info('Found the Stokes-I intensity peak at {maxpos} / {maxposf}'.format(**stokesi_stats))
-            # stokesi_stats['maxradec_str'] = img_stokesi.coordsys().toworld([maxposx, maxposy], format='s')['string']
+            if 'maxpos' in stokesi_stats and 'maxposf' in stokesi_stats:
+                LOG.info('Found the Stokes-I intensity peak at {maxpos} / {maxposf}'.format(**stokesi_stats))
+            else:
+                LOG.info('No Stokes-I intensity peak found')
+
             img_linpolint = imagepol.linpolint()
             linpolint_stats = img_linpolint.statistics(robust=False, mask=mask_lel, stretch=True)
-            LOG.info('Found the LinearPol intensity peak at {maxpos} / {maxposf}'.format(**linpolint_stats))
+            if 'maxpos' in linpolint_stats and 'maxposf' in linpolint_stats:
+                LOG.info('Found the LinearPol intensity peak at {maxpos} / {maxposf}'.format(**linpolint_stats))
+            else:
+                LOG.info('No LinearPol intensity peak found')
 
         return (stokesi_stats, linpolint_stats)
 
