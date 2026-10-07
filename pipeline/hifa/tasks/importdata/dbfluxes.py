@@ -357,7 +357,7 @@ def log_result(
     # value[1]: 1 if measurements exist from at least two distinct bands, 0 otherwise
     # value[2]: 1 if there is at least one measurement on either side of the selected date, 0 otherwise
     # value[3]: for spectral index, 1 if a measurement in a band is bracketed in time by measurements in another
-    #           band, 0 otherwise
+    #           band, 0 otherwise (see ICT-26895/ICT-27420)
     decision = {'0': 'No', '1': 'Yes'}
 
     LOG.info('Source: %s spw: %s    ASDM flux: %s    Catalogue flux: %s', source.name, spw.id, asdm_I, catalogue_I)
