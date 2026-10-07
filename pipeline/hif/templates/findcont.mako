@@ -60,19 +60,9 @@ pixels per beam, are shown below.</p>
         <tbody>
         %for row in imaging_summary:
             <tr>
-                <td>${row.field}</td>
-                <td>${row.spw}</td>
-                <td>${row.datatype}</td>
-                <td>${row.phasecenter}</td>
-                <td>${row.ppb}</td>
-                <td>${row.cell}</td>
-                <td>${row.imsize}</td>
-                <td>${row.weighting}</td>
-                <td>${row.robust}</td>
-                <td>${row.uvtaper}</td>
-                <td>${row.mosweight}</td>
-                <td>${row.perchanweightdensity}</td>
-                <td>${row.nbins}</td>
+                %for td in row:
+                    ${td}
+                %endfor
             </tr>
         %endfor
         </tbody>

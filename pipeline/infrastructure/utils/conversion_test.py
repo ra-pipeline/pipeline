@@ -8,6 +8,7 @@ from .conversion import (
     _parse_field,
     _parse_spw,
     commafy,
+    condense_field_names,
     convert_paths_to_basenames,
     dequote,
     flatten,
@@ -52,6 +53,21 @@ def test_commafy(inp, kwargs, expected):
 def test_dequote(inp, expected):
     """Test dequote()"""
     assert dequote(inp) == expected
+
+
+@pytest.mark.parametrize("inp, kwargs, expected", [
+    ("single_field", {}, "single_field"),
+    ("field1,field2", {}, "field1,field2"),
+    ("field1, field2, field3", {'max_chars': 10}, "field1, field2, field3"),
+    ("field1, field2, field3", {'max_chars': 10, 'num_head': 1, 'num_tail': 1}, "field1, ..., field3 (3 fields)"),
+    ("field1, field2, field3, field4", {'max_chars': 10}, "field1, field2, ..., field4 (4 fields)"),
+    ("alpha, beta, gamma, delta, epsilon", {'max_chars': 20, 'num_head': 1, 'num_tail': 1}, "alpha, ..., epsilon (5 fields)"),
+    ("alpha, beta, gamma, delta, epsilon", {'max_chars': 20, 'num_head': 2, 'num_tail': 1}, "alpha, beta, ..., epsilon (5 fields)"),
+    ('"B2-1","B2-2","B2-3","B2-4"', {'max_chars': 15}, '"B2-1", "B2-2", ..., "B2-4" (4 fields)'),
+])
+def test_condense_field_names(inp, kwargs, expected):
+    """Test condense_field_names()"""
+    assert condense_field_names(inp, **kwargs) == expected
 
 
 @pytest.mark.parametrize("inp, expected", [

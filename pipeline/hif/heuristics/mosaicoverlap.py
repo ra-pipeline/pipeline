@@ -12,45 +12,50 @@ import pipeline.infrastructure.utils as utils
 c_mks = 2.99792458e8
 
 
-def mosaicOverlapFactorMS(ms, source, spw, diameter, intent='TARGET', fwhmfactor=1.13, taper=10.0, obscuration=0.75):
-    """
-    This routine computes the maximum sensitivity increase factor for a
-    mosaic. It handles an arbitrary mosaic pattern. It does not account for
-    flagging or different observing depths at different pointings. Defaulted
-    parameters take values appropriate for ALMA. The use2007formula parameter
-    in the primaryBeamArsec and gaussianBeamResponse methods default to True.
-    This parameter could be pulled up to the interface of this routine if
-    required.
+def mosaicOverlapFactorMS(
+    ms,
+    source: str,
+    spw: str | int | list[int],
+    diameter: float,
+    intent: str = 'TARGET',
+    fwhmfactor: float = 1.13,
+    taper: float = 10.0,
+    obscuration: float = 0.75,
+) -> float | None:
+    """Compute maximum sensitivity increase factor for a mosaic.
 
-    Inputs:
+    Handles arbitrary mosaic patterns. Does not account for flagging or different
+    observing depths at different pointings. Defaulted parameters are appropriate
+    for ALMA. The use2007formula parameter in primaryBeamArcsec and
+    gaussianBeamResponse methods defaults to True.
 
-             ms: The ms object from the pipeline context
-         source: The target source id or name
-            spw: Determine the frequency based on this spw or list of spws.
-       diameter: The effective antenna diameter in meters
-         intent: The target source intent
-     fwhmfactor: Factor passed to gaussianBeamResponse and primaryBeamArcsec
-          taper: The taper in DB which is used if fwhmfactor = None
-    obscuration: The diameter of the central obscuration in meters
+    Args:
+        ms: MS object from the pipeline context.
+        source: Target source as a string. Can be a source ID (e.g., '0'), a single
+            source name (e.g., 'M87'), or a composite source with comma-separated
+            field names (e.g., 'Field_A,Field_B,Field_C').
+        spw: Spectral window ID or list of IDs to determine the frequency.
+        diameter: Effective antenna diameter in meters.
+        intent: Target source intent.
+        fwhmfactor: Factor passed to gaussianBeamResponse and primaryBeamArcsec.
+        taper: Taper in dB, used if fwhmfactor is None.
+        obscuration: Diameter of the central obscuration in meters.
 
     Returns:
-
-    A single floating point value for the maximum sensitivity increase factor,
-    which is typically for the center of the mosaic but not necessarily so.  It is
-    meant to be applied to a theoretical rms computed based on the total time
-    spent on only one of the pointings of the mosaic.
-
+        Maximum sensitivity increase factor, typically for the center of the mosaic.
+        Applied to theoretical rms computed based on total time spent on only one
+        pointing of the mosaic. Returns None if no matching sources found.
     """
-
     # Find the fields associated with the selected mosaic source
     msource = []
     if source.isdigit():
         msource = [s for s in ms.sources if s.id == source]
     else:
-        msource = [s for s in ms.sources if utils.dequote(s.name) == utils.dequote(source)]
+        source_list = [utils.dequote(s.strip()) for s in source.split(",")]
+        msource = [s for s in ms.sources if utils.dequote(s.name) in source_list]
     if not msource:
         return None
-    fields = [f.id for f in msource[0].fields]
+    fields = [f.id for s in msource for f in s.fields]
 
     # Get all the fields for the selected intent
     science_fields = [f.id for f in ms.get_fields(intent=intent)]
@@ -138,33 +143,39 @@ def mosaicOverlapFactorMS(ms, source, spw, diameter, intent='TARGET', fwhmfactor
     return maxresponse
 
 
-def mosaicOverlapFactorVIS(vis, source, spw, diameter, fwhmfactor=1.13, taper=10.0, obscuration=0.75,
-                           intent='OBSERVE_TARGET#ON_SOURCE'):
-    """
-    This routine computes the maximum sensitivity increase factor for an ALMA
-    mosaic. It handles an arbitrary mosaic pattern. It does not account for
-    flagging or different observing depths at different pointings.
+def mosaicOverlapFactorVIS(
+    vis: str,
+    source: str,
+    spw: str | int | list[int],
+    diameter: float,
+    fwhmfactor: float = 1.13,
+    taper: float = 10.0,
+    obscuration: float = 0.75,
+    intent: str = 'OBSERVE_TARGET#ON_SOURCE',
+) -> float:
+    """Compute maximum sensitivity increase factor for an ALMA mosaic.
 
-    Inputs:
+    Handles arbitrary mosaic patterns. Does not account for flagging or different
+    observing depths at different pointings.
 
-           vis: The name of the measurement set
-        source: The source id or name
-           spw: determine the frequency based on this spw or list of spws.
-                Defaults to all with the specified intent.
-      diameter: The effective outer antenna diameter in meters
-    fwhmfactor: Factor passed to gaussianBeamResponse and primaryBeamArcsec
-         taper: The taper in DB
-   obscuration: The diameter of the central obscuration in meters
-        intent: The CASA data selection intent
+    Args:
+        vis: Name of the measurement set.
+        source: Target source as a string. Can be a source ID (e.g., '0'), a single
+            source name (e.g., 'M87'), or a composite source with comma-separated
+            field names (e.g., 'Field_A,Field_B,Field_C').
+        spw: Spectral window ID or list of IDs to determine the frequency.
+            Defaults to all with the specified intent.
+        diameter: Effective outer antenna diameter in meters.
+        fwhmfactor: Factor passed to gaussianBeamResponse and primaryBeamArcsec.
+        taper: Taper in dB.
+        obscuration: Diameter of the central obscuration in meters.
+        intent: CASA data selection intent.
 
     Returns:
-
-      A single floating point value for the maximum sensitivity increase factor,
-      which is typically the center of the mosaic but not necessarily so.  It is
-      meant to be applied to a theoretical rms computed based on the total time
-      spent on only one of the pointings of the mosaic.
+        Maximum sensitivity increase factor, typically for the center of the mosaic.
+        Applied to theoretical rms computed based on total time spent on only one
+        pointing of the mosaic.
     """
-
     # Get the science fields and frequencies
     with casa_tools.MSMDReader(vis) as msmd:
 

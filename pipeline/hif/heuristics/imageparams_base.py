@@ -14,25 +14,24 @@ from typing import TYPE_CHECKING
 
 import astropy.units as u
 import numpy as np
-
-import pipeline.infrastructure.utils as utils
-from astropy.coordinates import SkyCoord
-from casatasks.private.imagerhelpers.imager_base import PySynthesisImager
-from casatasks.private.imagerhelpers.imager_parallel_continuum import PyParallelContSynthesisImager
-from casatasks.private.imagerhelpers.input_parameters import ImagerParameters
-
 import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.contfilehandler as contfilehandler
 import pipeline.infrastructure.filenamer as filenamer
 import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.utils as utils
+from astropy.coordinates import SkyCoord
+from casatasks.private.imagerhelpers.imager_base import PySynthesisImager
+from casatasks.private.imagerhelpers.imager_parallel_continuum import PyParallelContSynthesisImager
+from casatasks.private.imagerhelpers.input_parameters import ImagerParameters
 from pipeline.hif.heuristics import mosaicoverlap
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.launcher import current_task_name
 from pipeline.infrastructure.utils.conversion import phasecenter_to_skycoord, refcode_to_skyframe
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from pipeline.hif.tasks.makeimlist.cleantarget import CleanTarget
     from pipeline.infrastructure.vdp import StandardInputs
 
@@ -160,26 +159,41 @@ class ImageParamsHeuristics:
         all_continuum_spwsel = {}
         low_bandwidth_spwsel = {}
         low_spread_spwsel = {}
+        source_names = []
+
+        # Collect MS source names
         for ms_ref in self.observing_run.get_measurement_sets():
-            for source_name in [s.name for s in ms_ref.sources]:
-                cont_ranges_spwsel[source_name] = {}
-                all_continuum_spwsel[source_name] = {}
-                low_bandwidth_spwsel[source_name] = {}
-                low_spread_spwsel[source_name] = {}
-                for spwid in self.spwids:
-                    cont_ranges_spwsel[source_name][str(spwid)] = 'NONE'
-                    all_continuum_spwsel[source_name][str(spwid)] = False
-                    low_bandwidth_spwsel[source_name][str(spwid)] = False
-                    low_spread_spwsel[source_name][str(spwid)] = False
+            source_names.extend(s.name for s in ms_ref.sources)
 
         contfile = self.contfile if self.contfile is not None else ''
+
+        # Also collect field names from contfile (handles composite mosaic sources created by heuristics).
+        # VLA mosaics use composite field names (e.g., "Field_A,Field_B") in contfile
+        # that don't exist individually in MS source table.
+        contfile_handler = None
+        if os.path.isfile(contfile):
+            contfile_handler = contfilehandler.ContFileHandler(contfile, warn_nonexist=True)
+            source_names.extend(contfile_handler.cont_ranges.get('fields', {}).keys())
+
+        # Deduplicate source names (same source can appear in multiple MSes or in both MS and contfile)
+        source_names = utils.deduplicate(source_names)
+
+        for source_name in source_names:
+            cont_ranges_spwsel[source_name] = {}
+            all_continuum_spwsel[source_name] = {}
+            low_bandwidth_spwsel[source_name] = {}
+            low_spread_spwsel[source_name] = {}
+            for spwid in self.spwids:
+                cont_ranges_spwsel[source_name][str(spwid)] = 'NONE'
+                all_continuum_spwsel[source_name][str(spwid)] = False
+                low_bandwidth_spwsel[source_name][str(spwid)] = False
+                low_spread_spwsel[source_name][str(spwid)] = False
+
         linesfile = self.linesfile if self.linesfile is not None else ''
 
         # read and merge continuum regions if contfile exists
-        if os.path.isfile(contfile):
-            LOG.info('Using continuum frequency ranges from %s to calculate continuum frequency selections.' % (contfile))
-
-            contfile_handler = contfilehandler.ContFileHandler(contfile, warn_nonexist=True)
+        if contfile_handler is not None:
+            LOG.info('Using continuum frequency ranges from %s to calculate continuum frequency selections.', contfile)
 
             # Collect the merged the ranges
             for field_name in cont_ranges_spwsel:
@@ -189,7 +203,7 @@ class ImageParamsHeuristics:
 
         # alternatively read and merge line regions and calculate continuum regions
         elif os.path.isfile(linesfile):
-            LOG.info('Using line frequency ranges from %s to calculate continuum frequency selections.' % (linesfile))
+            LOG.info('Using line frequency ranges from %s to calculate continuum frequency selections.', linesfile)
 
             p = re.compile(r'([\d.]*)(~)([\d.]*)(\D*)')
             try:
@@ -431,6 +445,7 @@ class ImageParamsHeuristics:
         # called at the end
         valid_data = {}
         makepsf_beams = []
+
         try:
             for field, intent in field_intent_list:
                 try:
@@ -453,6 +468,7 @@ class ImageParamsHeuristics:
                         local_known_beams = {}
                         raise Exception('uvtaper value changed (old: %s, new: %s). Re-calculating beams.' % (str(local_known_beams['uvtaper']), str(uvtaper)))
                     makepsf_beam = local_known_beams[field][intent][','.join(map(str, sorted(spwids)))]['beam']
+
                     LOG.info('Using previously calculated beam of %s for Field %s Intent %s SPW %s' %
                              (str(makepsf_beam), field, intent, ','.join(map(str, sorted(spwids)))))
                     if makepsf_beam != 'invalid':
@@ -475,9 +491,14 @@ class ImageParamsHeuristics:
                         valid_real_spwid_list_for_vis = []
                         valid_virtual_spwid_list_for_vis = []
                         ms = self.observing_run.get_ms(name=vis)
-                        scan_dos = [scan for scan in ms.scans
-                                    if intent in scan.intents
-                                    and field in {f.name for f in scan.fields}]
+
+                        scan_dos = [
+                            scan
+                            for scan in ms.scans
+                            if intent in scan.intents
+                            and any(part.strip() in {f.name for f in scan.fields} for part in field.split(','))
+                            ]
+
                         scanids = ','.join(utils.deduplicate(str(scan.id) for scan in scan_dos))
 
                         for spwid in spwids:
@@ -539,9 +560,12 @@ class ImageParamsHeuristics:
                         # Now get better estimate from makePSF
                         tmp_psf_filename = str(uuid.uuid4())
 
-                        gridder = self.gridder(intent, field, spwspec=spwspec)
+                        field_list = [f.strip() for f in field.split(",")]
+                        gridder = self.gridder(intent, field_list, spwspec=spwspec)
+                        field_ids = self.field(intent, field_list, vislist=valid_vis_list)
+                        # TODO: Check if mosweight needs to be updated to hande "," fields
                         mosweight = self.mosweight(intent, field)
-                        field_ids = self.field(intent, field, vislist=valid_vis_list)
+
                         # Get single field imsize
                         imsize_sf = self.imsize(fields=field_ids, cell=['%.2g%s' % (cellv, cellu)], primary_beam=largest_primary_beam_size, centreonly=True, vislist=valid_vis_list)
                         # If it is a mosaic, adjust the size to be somewhat larger than one PB, but not the full
@@ -560,7 +584,8 @@ class ImageParamsHeuristics:
                                 imsize = [nxpix, nypix]
                         else:
                             imsize = imsize_sf
-                        if self.is_eph_obj(field):
+                        fname = field.split(",")[0]
+                        if self.is_eph_obj(fname):
                             phasecenter = 'TRACKFIELD'
                         else:
                             # Note that the local phasecenter variable is intentionally set to the
@@ -727,9 +752,15 @@ class ImageParamsHeuristics:
                 valid_data[field_intent] = False
                 for vis in vislist:
                     ms = self.observing_run.get_ms(name=vis)
-                    scanids = [str(scan.id) for scan in ms.scans if
-                               field_intent[1] in scan.intents and
-                               field_intent[0] in [fld.name for fld in scan.fields]]
+
+                    field_names_to_check = [f.strip() for f in field_intent[0].split(',')]
+                    scanids = [
+                        str(scan.id)
+                        for scan in ms.scans
+                        if field_intent[1] in scan.intents and
+                        any(f in [fld.name for fld in scan.fields] for f in field_names_to_check)
+                    ]
+
                     if scanids != []:
                         scanids = ','.join(scanids)
                         # PIPE-2770: correctly handle virtual-to-real spwspec translation in edge cases with
@@ -774,9 +805,42 @@ class ImageParamsHeuristics:
         else:
             return 'standard'
 
-    def phasecenter(self, fields, centreonly=True, vislist=None, shift_to_nearest_field=False,
-                    primary_beam=None, intent='TARGET'):
+    def phasecenter(
+        self,
+        fields: Sequence[str],
+        centreonly: bool = True,
+        vislist: Sequence[str] | None = None,
+        shift_to_nearest_field: bool = False,
+        primary_beam: float | None = None,
+        intent: str = 'TARGET',
+    ):
+        """Calculate the phase center for single fields or mosaics.
 
+        Computes the geometric phase center (and optionally coordinates spread)
+        across all pointings in the provided MeasurementSets. For ephemeris targets,
+        source motion correction is applied. If ``shift_to_nearest_field=True`` and
+        the image center falls outside the pointings, the PSF phase center is shifted
+        to the nearest pointing.
+
+        Args:
+            fields: Sequence of comma-separated strings of integer field IDs per MS
+                (matching ``vislist``), e.g. ``['0,1,2', '0,1,2']`` or
+                ``['541,542,543', '663,664,665']``. Typically the output of ``self.field()``.
+            centreonly: If True, return ``(phase_center, psf_phase_center)``.
+                If False, also return coordinate spreads ``(phase_center, psf_phase_center, xspread, yspread)``.
+            vislist: Sequence of MS file paths. Defaults to ``self.vislist``.
+            shift_to_nearest_field: If True, shift PSF phase center to the nearest
+                field pointing if the calculated image center is > 0.408 * primary_beam away.
+            primary_beam: Primary beam size in arcsec, used for distance checks when
+                ``shift_to_nearest_field=True``.
+            intent: Observing intent (default ``'TARGET'``) used when resolving nearest
+                fields for PSF phase center shifting.
+
+        Returns:
+            - If ``centreonly=True``: ``(phase_center, psf_phase_center)`` strings.
+            - If ``centreonly=False``: ``(phase_center, psf_phase_center, xspread, yspread)``.
+            - ``(None, None)`` (or 4 Nones) if ``fields`` is empty or invalid.
+        """
         cme = casa_tools.measures
         cqa = casa_tools.quanta
 
@@ -915,7 +979,7 @@ class ImageParamsHeuristics:
         # If the image center is outside of the mosaic pointings, calculate a PSF phase center
         # pointing to the nearest field. Both the actual and the PSF phase centers are returned.
         if shift_to_nearest_field:
-            nearest_field_to_center = self.center_field_ids(vislist, field_names[0], intent, phase_center)[0]
+            nearest_field_to_center = self.center_field_ids(vislist, fields, intent, phase_center)[0]
             ms = self.observing_run.get_ms(name=vislist[0])
             nearest = ms.get_fields(field_id=nearest_field_to_center)[0].mdirection
             if primary_beam:
@@ -950,6 +1014,11 @@ class ImageParamsHeuristics:
 
         if vislist is None:
             vislist = self.vislist
+
+        # PIPE-684: for VLA mosaic there are mulitple comma separated fields
+        # so spliting on ","
+        if isinstance(field, str) and "," in field:
+            field = [f.strip() for f in field.split(",")]
 
         field_str_list = []
 
@@ -1450,7 +1519,7 @@ class ImageParamsHeuristics:
 
         return ncorr
 
-    def pblimits(self, pb: None | str, specmode: str | None = None):
+    def pblimits(self, pb: None | str, specmode: str | None = None, gridder: str | None = None):
 
         pblimit_image = 0.2
         pblimit_cleanmask = 0.3
@@ -1544,27 +1613,73 @@ class ImageParamsHeuristics:
 
         return 0.5
 
-    def center_field_ids(self, msnames, field, intent, phasecenter, exclude_intent=None):
+    def center_field_ids(
+        self,
+        msnames: Sequence[str],
+        fields: str | Sequence[str],
+        intent: str,
+        phasecenter: str | dict,
+        exclude_intent: str | None = None,
+    ) -> list[int]:
+        """Get per-MS IDs of the field closest to the phase center.
 
-        """Get per-MS IDs of field closest to the phase center."""
+        For each MeasurementSet in ``msnames``, this method finds the field ID of the
+        field with the specified observing ``intent`` whose direction has the smallest
+        angular separation from ``phasecenter``.
 
+        ``fields`` can be provided in two formats depending on the imaging mode:
+        - Single string (applied across all MSes): Either a single field name/ID
+          (e.g., ``'0841+708'``, ``'541'``) or comma-separated field names/IDs
+          (e.g., ``'svs47,svs48,svs49'``). Resolved via ``ms.get_fields(task_arg=...)``.
+        - Per-MS sequence of strings (aligned with ``msnames``): Where each element
+          is the field selection string for that corresponding MS (e.g.,
+          ``['0,1,2', '0,1,2']`` or ``['541,542,543', '663,664,665']``).
+
+        Special Handling & Edge Cases:
+        - ``phasecenter`` can be provided either as a coordinate string
+          (e.g., ``'ICRS 12h34m56s +12d34m56s'``) or as a pre-computed CASA direction
+          measure dictionary (as passed by ``calc_ms_frame_ranges``).
+        - If an MS contains no fields matching the criteria, or if separation
+          calculation fails, a debug message is logged and ``-1`` is appended for
+          that MS rather than raising an unhandled exception.
+
+        Args:
+            msnames: Sequence of MS file names/paths.
+            fields: Field selection string applied to all MSes, or a per-MS sequence
+                of field selection strings matching ``msnames``.
+            intent: Observing intent to match (e.g., ``'TARGET'``).
+            phasecenter: Phase center coordinates, either as a direction string
+                (e.g., ``'ICRS 12h34m56s +12d34m56s'``) or a CASA direction measure dictionary.
+            exclude_intent: Optional observing intent to exclude from matches.
+
+        Returns:
+            List of integer field IDs closest to ``phasecenter`` for each MS in
+            ``msnames``. If no matching field is found for an MS, ``-1`` is returned
+            for that MS.
+        """
         meTool = casa_tools.measures
         qaTool = casa_tools.quanta
         ref_field_ids = []
 
         # Phase center coordinates
-        pc_direc = meTool.source(phasecenter)
+        if isinstance(phasecenter, dict):
+            pc_direc = phasecenter
+        else:
+            pc_direc = meTool.source(phasecenter)
 
-        for msname in msnames:
+        for idx, msname in enumerate(msnames):
             try:
-                ms_obj = self.observing_run.get_ms(msname)
-                if exclude_intent is None:
-                    field_ids = [f.id for f in ms_obj.fields if (f.name == field) and (intent in f.intents)]
-                else:
-                    field_ids = [f.id for f in ms_obj.fields if (f.name == field) and (intent in f.intents) and (exclude_intent not in f.intents)]
-                separations = [qaTool.getvalue(meTool.separation(pc_direc, f.mdirection)) for f in ms_obj.fields if f.id in field_ids]
-                ref_field_ids.append(field_ids[separations.index(min(separations))])
-            except:
+                ms = self.observing_run.get_ms(msname)
+                field_arg = fields[idx] if isinstance(fields, (list, tuple)) else fields
+
+                matching_fields = ms.get_fields(task_arg=field_arg, intent=intent)
+                if exclude_intent:
+                    matching_fields = [f for f in matching_fields if exclude_intent not in f.intents]
+
+                separations = [qaTool.getvalue(meTool.separation(pc_direc, f.mdirection)) for f in matching_fields]
+                ref_field_ids.append(matching_fields[separations.index(min(separations))].id)
+            except Exception as e:
+                LOG.debug('Could not determine center field ID for MS %s: %s', msname, e)
                 ref_field_ids.append(-1)
 
         return ref_field_ids
@@ -1574,7 +1689,6 @@ class ImageParamsHeuristics:
 
         Note: we might consider consolidating this with the similar code in contfilehelper.
         """
-
         spw_ms_frame_freq_param_lists = []
         spw_ms_frame_chan_param_lists = []
         spw_ms_frame_freq_param_dict = collections.defaultdict(dict)
@@ -1928,7 +2042,6 @@ class ImageParamsHeuristics:
 
         Note: calc_reffreq is defaulted to False for backwards compatibility uses in imageprecheck.
         """
-
         cqa = casa_tools.quanta
 
         # Need to work on a local copy of known_sensitivities to avoid setting the
@@ -2063,8 +2176,20 @@ class ImageParamsHeuristics:
                         LOG.info('Effective BW heuristic: Correcting sensitivity for EB %s Field %s SPW %s by %.3g from %.3g Jy/beam to %.3g Jy/beam' % (os.path.basename(msname).replace('.ms', ''), field, str(intSpw), bw_corr_factor, chansel_corrected_center_field_sensitivity, center_field_sensitivity))
 
                     if gridder == 'mosaic':
-                        # Correct for mosaic overlap factor
-                        source_name = [f.source.name for f in ms.fields if (utils.dequote(f.name) == utils.dequote(field) and intent in f.intents)][0]
+                        field_list = [utils.dequote(x).strip() for x in field.split(',')]
+
+                        if "," in field:
+                            # Find the source name for the first matching field
+                            source_name_list = [
+                                f.source.name
+                                for f in ms.fields
+                                if utils.dequote(f.name).strip() in field_list and intent in f.intents
+                                ]
+                            source_name = ",".join(source_name_list)
+                        else:
+                            source_name = [f.source.name
+                                           for f in ms.fields if utils.dequote(f.name) ==
+                                           utils.dequote(field) and intent in f.intents][0]
                         # PIPE-1708: "Integer" source names consisting of just
                         # digits cause confusion in the mosaic overlap factor
                         # calculation. Adopting the "solution" of enquoting

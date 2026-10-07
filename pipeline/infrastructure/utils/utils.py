@@ -90,6 +90,7 @@ __all__ = [
     'remove_trailing_string',
     'string_to_val',
     'validate_url',
+    'wrap_long_str',
 ]
 
 # Import TypedDict definitions from centralized module for type checking only
@@ -1139,6 +1140,46 @@ def list_to_str(value: list[Number | str] | NDArray) -> str:
     else:
         ret = str(value)
     return ret
+
+
+def wrap_long_str(item_str: str, length: int = 40, newline: str = '\n') -> str:
+    r"""Wraps a long string by inserting newline escape sequences.
+
+    Splits a comma-separated string into multiple lines when it exceeds
+    the specified length limit. Breaks before an item if adding it would
+    cause the current line to exceed the specified length.
+
+    Args:
+        item_str: Comma separated list of items.
+        length: Maximum number of characters in a text line.
+        newline: String to insert for line breaks (e.g., '\n' or '</br>').
+
+    Returns:
+        String with newlines inserted to respect line length limit.
+    """
+    if len(item_str) <= length:
+        return item_str
+
+    item_list = item_str.split(',')
+    wrapped_items = []
+    current_line_length = 0
+
+    for i, item in enumerate(item_list):
+        # Calculate what the line length would be after adding this item
+        # Account for the comma separator if this isn't the first item on the line
+        item_with_sep = (',' + item) if current_line_length > 0 else item
+        potential_length = current_line_length + len(item_with_sep)
+
+        if potential_length > length and current_line_length > 0:
+            # Adding this item would exceed the limit, start a new line
+            wrapped_items.append(f'{newline}{item}')
+            current_line_length = len(item)
+        else:
+            # Item fits on the current line
+            wrapped_items.append(item)
+            current_line_length = potential_length
+
+    return ','.join(wrapped_items)
 
 
 def validate_url(url: str) -> bool:

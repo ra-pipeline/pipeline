@@ -1,6 +1,5 @@
 <%!
 import os
-import pipeline.infrastructure.utils as utils
 %>
 
 <%inherit file="t2-4m_details-base.mako"/>
@@ -161,15 +160,12 @@ import pipeline.infrastructure.utils as utils
    </thead>
    <tbody>
 %for r in result:
-    %for calimage in r.calimages[0]:
-        %for fitsfile in calimage['fitsfiles']:
+    %for row in r.calimages_merged:
           <tr>
-              <td>${utils.wrap_long_str(calimage['sourcename'], newline='<br>')}</td>
-              <td>${calimage['sourcetype']}</td>
-              <td>${utils.find_ranges(calimage['spwlist'])}</td>
-              <td>${os.path.basename(fitsfile)}</td>
+              %for td in row:
+                  ${td}
+              %endfor
           </tr>
-        %endfor
     %endfor
 %endfor
    </tbody>
@@ -190,15 +186,12 @@ import pipeline.infrastructure.utils as utils
    </thead>
    <tbody>
 %for r in result:
-    %for calimage in r.calimages[0]:
-        %for fitsfile in calimage['auxfitsfiles']:
+    %for row in r.calimages_aux_merged:
           <tr>
-              <td>${utils.wrap_long_str(calimage['sourcename'], newline='<br>')}</td>
-              <td>${calimage['sourcetype']}</td>
-              <td>${utils.find_ranges(calimage['spwlist'])}</td>
-              <td>${os.path.basename(fitsfile)}</td>
+              %for td in row:
+                  ${td}
+              %endfor
           </tr>
-        %endfor
     %endfor
 %endfor
    </tbody>
@@ -219,15 +212,12 @@ import pipeline.infrastructure.utils as utils
    </thead>
    <tbody>
 %for r in result:
-    %for targetimage in r.targetimages[0]:
-        %for fitsfile in targetimage['fitsfiles']:
+    %for row in r.targetimages_merged:
           <tr>
-              <td>${utils.wrap_long_str(targetimage['sourcename'], newline='<br>')}</td>
-              <td>${targetimage['sourcetype']}</td>
-              <td>${utils.find_ranges(targetimage['spwlist'])}</td>
-              <td>${os.path.basename(fitsfile)}</td>
+              %for td in row:
+                  ${td}
+              %endfor
           </tr>
-        %endfor
     %endfor
 %endfor
    </tbody>
@@ -248,15 +238,12 @@ import pipeline.infrastructure.utils as utils
    </thead>
    <tbody>
 %for r in result:
-    %for targetimage in r.targetimages[0]:
-        %for fitsfile in targetimage['auxfitsfiles']:
+    %for row in r.targetimages_aux_merged:
           <tr>
-              <td>${utils.wrap_long_str(targetimage['sourcename'], newline='<br>')}</td>
-              <td>${targetimage['sourcetype']}</td>
-              <td>${utils.find_ranges(targetimage['spwlist'])}</td>
-              <td>${os.path.basename(fitsfile)}</td>
+              %for td in row:
+                  ${td}
+              %endfor
           </tr>
-        %endfor
     %endfor
 %endfor
    </tbody>
