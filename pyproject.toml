@@ -249,7 +249,6 @@ grpcio = ">=1.62"
 
 casampi = { version = ">=0.5.5", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 casaplotms = { version = ">=2.5.3", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
-casaplotserver = { version = ">=1.8.2", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 casatasks = { version = ">=6.7.4.2", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 casatools = { version = ">=6.7.4.2", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 
@@ -309,6 +308,7 @@ cmd = "python -m casashell"
 
 [tool.pixi.tasks.casa.env]
 PYTHONWARNINGS = "ignore::SyntaxWarning"
+PYTHONPATH = "$PIXI_PROJECT_ROOT/scripts/stubs"
 
 # Launch CASA with MPI support (for parallel workflows)
 [tool.pixi.tasks.casampi]
@@ -317,7 +317,7 @@ cmd = """\
 sh -c 'mpirun -display-allocation -display-map -oversubscribe \
 --mca btl ^openib --mca btl_vader_single_copy_mechanism none --bind-to none \
 -x FI_PROVIDER -x OMP_NUM_THREADS -x OPENBLAS_NUM_THREADS \
--x PATH -x PYTHONNOUSERSITE \
+-x PATH -x PYTHONNOUSERSITE -x PYTHONPATH \
 -n ${CASA_NPROCS:-4} \
 python -m casashell "$@"' _\
 """
@@ -331,6 +331,7 @@ OMP_PROC_BIND = "false"
 OMP_NUM_THREADS = "1"
 OPENBLAS_NUM_THREADS = "1"
 PYTHONNOUSERSITE = "1"
+PYTHONPATH = "$PIXI_PROJECT_ROOT/scripts/stubs"
 
 # --------------------------------------------------------------------------
 # Feature: CASA ver6.7.4 (PL2026-CASA branch) — Python 3.12
