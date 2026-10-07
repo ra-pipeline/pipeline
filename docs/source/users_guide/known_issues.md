@@ -6,8 +6,17 @@
 
 ### CASA 2026
 
-1. In {func}`~casatasks.imaging.tclean` `briggsbwtaper`, the fractional bandwidth is calculated per-chunk, so parallelizing with different breadth gives different answers ([CAS-14520](https://open-jira.nrao.edu/browse/CAS-14520) and {jira}`PIPE-2832`).
-2. **{func}`~pipeline.hifa.cli.hifa_wvrgcalflag`** will crash on source names that are integers because the CASA task [wvrgcal](https://casadocs.readthedocs.io/en/v6.6.6/api/tt/casatasks.calibration.wvrgcal.html) no longer supports them ([CAS-14850](https://open-jira.nrao.edu/browse/CAS-14850)).
+1. In {func}`~casatasks.imaging.tclean` `briggsbwtaper`, the fractional bandwidth is calculated per-chunk, so parallelizing with different breadth gives different answers ({jira}`CAS-14520` and {jira}`PIPE-2832`).
+2. **{func}`~pipeline.hifa.cli.hifa_wvrgcalflag`** will crash on source names that are integers because the CASA task {func}`~casatasks.calibration.wvrgcal` no longer supports them ({jira}`CAS-14850`).
+3. There is a possibility that imaging multi-EB datasets where the SPW ID changes between the EBs with {func}`~casatasks.imaging.tclean` in parallel will produce an odd beam-size-per-channel, as shown below ({jira}`CAS-14874`).
+
+   ```{figure} cas14874_n8workers.png
+   ---
+   scale: 50 %
+   align: center
+   alt: Multi-EB parallel tclean beam size per channel anomaly (CAS-14874)
+   ---
+   ```
 
 ### Both Pipelines 2026
 
@@ -41,9 +50,9 @@
 
 ### CASA 2025
 
-1. Any 2 GHz dual-polarization ACA spws with 256 channels are identified as TDM instead of FDM on Spectral Setup page (due to [CAS-14435](https://open-jira.nrao.edu/browse/CAS-14435)).
-2. In {func}`~casatasks.imaging.tclean` `briggsbwtaper`, the fractional bandwidth is calculated per-chunk, so parallelizing with different breadth gives different answers ([CAS-14520](https://open-jira.nrao.edu/browse/CAS-14520) and {jira}`PIPE-2832`).
-3. {func}`~casatasks.visualization.plotbandpass` will not produce a plot of overlay='antenna' if there is only one antenna in the cal table ([CAS-14657](https://open-jira.nrao.edu/browse/CAS-14657)). This impacts the single dish pipeline in {func}`~pipeline.hsd.cli.hsd_skycal` if the MOUS contains only 1 antenna ({jira}`PIPE-2825`).
+1. Any 2 GHz dual-polarization ACA spws with 256 channels are identified as TDM instead of FDM on Spectral Setup page (due to {jira}`CAS-14435`).
+2. In {func}`~casatasks.imaging.tclean` `briggsbwtaper`, the fractional bandwidth is calculated per-chunk, so parallelizing with different breadth gives different answers ({jira}`CAS-14520` and {jira}`PIPE-2832`).
+3. {func}`~casatasks.visualization.plotbandpass` will not produce a plot of overlay='antenna' if there is only one antenna in the cal table ({jira}`CAS-14657`). This impacts the single dish pipeline in {func}`~pipeline.hsd.cli.hsd_skycal` if the MOUS contains only 1 antenna ({jira}`PIPE-2825`).
 4. CASA versions < 6.6.6.18 incorrectly unwrapped phase when applying with linearPD interpolation. This could affect the calibration of B2B datasets.
 
 ### Both Pipelines 2025
@@ -57,7 +66,7 @@
 3. In (i) the polcal recipe and in (ii) the B2B recipe, if the selected session reference antenna is fully flagged on any spw by hifa_gfluxscaleflag, then **{func}`~pipeline.hifa.cli.hifa_gfluxscale`** will crash. The workaround is to set a different reference antenna (or list of reference antennas) in the {func}`~pipeline.hif.cli.hif_refant` task in the PPR ({jira}`PIPE-1664`).
 4. On the Spectral Setup weblog page, multi-target datasets with multiple tunings not observed in all targets will not show the Transition names for spws associated with tunings beyond the first tuning ({jira}`PIPE-1909`).
 5. In **{func}`~pipeline.hifa.cli.hifa_spwphaseup`**, (i) if the refant drops out for the majority of solutions, then the Median Phase RMS assessment cannot be made; (ii) if there is low SNR in the bandpass solutions and the refant jumps in phase, then some antennas can incorrectly be identified as outliers by the Median Phase RMS assessment.
-6. FDM spws that have a small number of channels (<=256/Ncorr, e.g. <=128 for dual-pol) will be interpreted as TDM by **{func}`~pipeline.hifa.cli.hifa_flagdata`** resulting in unnecessary edge channel flagging (0.03125% from each edge). This can happen in 4x4 bit mode (first offered in Cycle 10) with online channel averaging factors >= 8 (PIPE-2320).
+6. FDM spws that have a small number of channels (<=256/Ncorr, e.g. <=128 for dual-pol) will be interpreted as TDM by **{func}`~pipeline.hifa.cli.hifa_flagdata`** resulting in unnecessary edge channel flagging (0.03125% from each edge). This can happen in 4x4 bit mode (first offered in Cycle 10) with online channel averaging factors >= 8 ({jira}`PIPE-2320`).
 7. **{func}`~pipeline.hifa.cli.hifa_gfluxscaleflag`** crashes on MOUS with EBs that straddle Cycle 2 and Cycle 3 ({jira}`PIPE-2691`).
 8. The aggregate bandwidth listed on continuum **{func}`~pipeline.hif.cli.hif_makeimages`** pages does not account for the deterministic flagging of edge channels on TDM spws ({jira}`PIPE-2349`) and it does not account for spw overlap ({jira}`PIPEREQ-37`).
 9. The **{func}`~pipeline.hifa.cli.hifa_tsysflagcontamination`** stage does not work for the B2B and full-polarization observing modes ({jira}`PIPE-2407`).
@@ -75,7 +84,7 @@
 21. PL version 2025.1.0.36, when a repBW cube was created, would sometimes only export one of the repBW cube and the full resolution cube for the same source and spw. This was corrected in 2025.1.0.37, and you can request the additional image from the helpdesk.
 22. For some older ALMA datasets (Cycle 3 to Cycle 8), the Spectral Setup Details page of the weblog might show an incorrect value for Correlation Bits column instead of "Unknown" which is what it should show prior to Cycle 9 ({jira}`PIPE-3095`).
 23. In the polcal imaging recipe, the repBW **{func}`~pipeline.hif.cli.hif_makeimages`(repBW_fullpol)** stage of the pipeline is not using the clean threshold and mask from the corresponding repBW {func}`~pipeline.hif.cli.hif_makeimages`(repBW) Stokes I only imaging stage ({jira}`PIPE-3128`); as a result no cleaning is performed.
-24. **{func}`~pipeline.hifa.cli.hifa_wvrgcalflag`** will crash on source names that are integers because the CASA task [wvrgcal](https://casadocs.readthedocs.io/en/v6.6.6/api/tt/casatasks.calibration.wvrgcal.html) no longer supports them ([CAS-14850](https://open-jira.nrao.edu/browse/CAS-14850)).
+24. **{func}`~pipeline.hifa.cli.hifa_wvrgcalflag`** will crash on source names that are integers because the CASA task {func}`~casatasks.calibration.wvrgcal` no longer supports them ({jira}`CAS-14850`).
 
 ### Single Dish Pipeline 2025
 
@@ -89,8 +98,8 @@
 
 ### CASA 2024
 
-1. Any 2 GHz dual-polarization ACA spws with 256 channels are identified as TDM instead of FDM on Spectral Setup page (due to [CAS-14435](https://open-jira.nrao.edu/browse/CAS-14435)).
-2. Plotbandpass will not produce a plot of overlay='antenna' if there is only one antenna in the cal table ([CAS-14657](https://open-jira.nrao.edu/browse/CAS-14657)). This impacts the single dish pipeline in {func}`~pipeline.hsd.cli.hsd_skycal` if the MOUS contains only 1 antenna ({jira}`PIPE-2825`).
+1. Any 2 GHz dual-polarization ACA spws with 256 channels are identified as TDM instead of FDM on Spectral Setup page (due to {jira}`CAS-14435`).
+2. Plotbandpass will not produce a plot of overlay='antenna' if there is only one antenna in the cal table ({jira}`CAS-14657`). This impacts the single dish pipeline in {func}`~pipeline.hsd.cli.hsd_skycal` if the MOUS contains only 1 antenna ({jira}`PIPE-2825`).
 
 ### Both Pipelines 2024
 
@@ -131,9 +140,9 @@
 ### CASA 2023
 
 1. Ephemeris imaging in MPIcasa remains unreliable. *PLWG recommends that due to this, all multi-EB ephemeris data be run in serial mode.*
-2. The tclean parameter psfphasecenter is still not functioning ([CAS-13899](https://open-jira.nrao.edu/browse/CAS-13899)). If you want to image a mosaic with no data at phase center, then you should make the image larger and move the phase center to a pointing that has data.
-3. Any 2 GHz dual-polarization spws with 256 channels on the ACA are identified as TDM instead of FDM on Spectral Setup page (due to [CAS-13362](https://open-jira.nrao.edu/browse/CAS-13362)).
-4. Plotbandpass will not produce a plot of overlay='antenna' if there is only one antenna in the cal table ([CAS-14657](https://open-jira.nrao.edu/browse/CAS-14657)). This impacts the single dish pipeline in {func}`~pipeline.hsd.cli.hsd_skycal` if the MOUS contains only 1 antenna ({jira}`PIPE-2825`).
+2. The tclean parameter psfphasecenter is still not functioning ({jira}`CAS-13899`). If you want to image a mosaic with no data at phase center, then you should make the image larger and move the phase center to a pointing that has data.
+3. Any 2 GHz dual-polarization spws with 256 channels on the ACA are identified as TDM instead of FDM on Spectral Setup page (due to {jira}`CAS-13362`).
+4. Plotbandpass will not produce a plot of overlay='antenna' if there is only one antenna in the cal table ({jira}`CAS-14657`). This impacts the single dish pipeline in {func}`~pipeline.hsd.cli.hsd_skycal` if the MOUS contains only 1 antenna ({jira}`PIPE-2825`).
 
 ### Both Pipelines 2023
 
@@ -146,7 +155,7 @@
 1. {func}`~pipeline.hif.cli.hif_uvcontsub` will not skip spws that have "NONE" in cont.dat. This situation doesn't arise in operations, but could arise if someone manually edits cont.dat ({jira}`PIPE-1898`)
 2. {func}`~pipeline.hif.cli.hif_selfcal` will fail for multi-EB single field projects with virtual spws — this is quite rare outside of polarization, and self-calibration of full-polarization projects is not fully validated in any case ({jira}`PIPE-1927`).
 3. If the check source is so faint that no gain solutions can be found, then {func}`~pipeline.hifa.cli.hifa_gfluxscale` will crash ({jira}`PIPE-1468`).
-4. An irregular mosaic with no pointing at the geometric center will likely fail, and the pipeline will warn you of this likelihood. Until the CASA bug with psfphasecenter is resolved ([CAS-13899](https://open-jira.nrao.edu/browse/CAS-13899)), create a larger image and put the phasecenter at a pointing with data. ({jira}`PIPE-98`)
+4. An irregular mosaic with no pointing at the geometric center will likely fail, and the pipeline will warn you of this likelihood. Until the CASA bug with psfphasecenter is resolved ({jira}`CAS-13899`), create a larger image and put the phasecenter at a pointing with data. ({jira}`PIPE-98`)
 5. In {func}`~pipeline.hifa.cli.hifa_antpos`, in the second table "Antenna Position Offsets Sorted By Total Offset", when there are two antennas with the same offset and the Total Offset column has a common value, the second antenna is not bolded in the same way as the first. ({jira}`PIPE-1631`).
 6. In the polcal recipe, if the selected session reference antenna is fully flagged on any spw by {func}`~pipeline.hifa.cli.hifa_gfluxscaleflag`, then {func}`~pipeline.hifa.cli.hifa_gfluxscale` will crash. The workaround is to set a different reference antenna (or list of reference antennas) in the {func}`~pipeline.hif.cli.hif_refant` task in the PPR ({jira}`PIPE-1664`).
 7. In the polcal recipe, {func}`~pipeline.hifa.cli.hifa_gfluxscale` can fail silently (pausing pipeline permanently) if the refant has 100% flagging on only 1 of the transfer targets (typically either PHASE or CHECK source) and it still exhibits the best score in {func}`~pipeline.hif.cli.hif_refant` ({jira}`PIPE-1805`). The workaround is to set geometry=False in {func}`~pipeline.hif.cli.hif_refant`.
@@ -180,33 +189,33 @@
 
 ### CASA 2022
 
-1. A bug in imaging ephemeris cubes ([CAS-13908](https://open-jira.nrao.edu/browse/CAS-13908)) will sometimes cause part of the cube being erroneously empty, clearly visible in the pipeline spectrum under "other QA images". *PLWG recommends that due to this, all multi-EB ephemeris data be run in serial mode.*
-2. The tclean parameter psfphasecenter is currently not functioning ([CAS-13899](https://open-jira.nrao.edu/browse/CAS-13899)). If you want to image a mosaic with no data at phase center, then you should make the image larger and move the phase center to a pointing that has data.
-3. Plotbandpass will not produce a plot of overlay='antenna' if there is only one antenna in the cal table ([CAS-14657](https://open-jira.nrao.edu/browse/CAS-14657)). This impacts the single dish pipeline in {func}`~pipeline.hsd.cli.hsd_skycal` if the MOUS contains only 1 antenna ({jira}`PIPE-2825`).
+1. A bug in imaging ephemeris cubes ({jira}`CAS-13908`) will sometimes cause part of the cube being erroneously empty, clearly visible in the pipeline spectrum under "other QA images". *PLWG recommends that due to this, all multi-EB ephemeris data be run in serial mode.*
+2. The tclean parameter psfphasecenter is currently not functioning ({jira}`CAS-13899`). If you want to image a mosaic with no data at phase center, then you should make the image larger and move the phase center to a pointing that has data.
+3. Plotbandpass will not produce a plot of overlay='antenna' if there is only one antenna in the cal table ({jira}`CAS-14657`). This impacts the single dish pipeline in {func}`~pipeline.hsd.cli.hsd_skycal` if the MOUS contains only 1 antenna ({jira}`PIPE-2825`).
 
 ### Both Pipelines 2022
 
 1. PL2022 doesn't import on MacOS — PL was never fully supported on MacOS, and unfortunately this one doesn't work at all. ***Fixed in 2022.2.0.68***
-2. 2 GHz dual-polarization spws with 256 channels on the ACA are identified as TDM instead of FDM on Spectral Setup page (due to [CAS-13362](https://open-jira.nrao.edu/browse/CAS-13362)).
+2. 2 GHz dual-polarization spws with 256 channels on the ACA are identified as TDM instead of FDM on Spectral Setup page (due to {jira}`CAS-13362`).
 3. The spw name column is missing from the All Spws tab of the Spectral Setup weblog page ({jira}`PIPE-1736`).
 
 ### Interferometric Pipeline 2022
 
 1. If the check source is so faint that no gain solutions can be found, then {func}`~pipeline.hifa.cli.hifa_gfluxscale` will crash ({jira}`PIPE-1468`).
-2. An irregular mosaic with no pointing at the geometric center will likely fail, and the pipeline will warn you of this likelihood. Until the CASA bug with psfphasecenter is resolved ([CAS-13899](https://open-jira.nrao.edu/browse/CAS-13899)), create a larger image and put the phasecenter at a pointing with data. ({jira}`PIPE-98`)
-3. The atmospheric transmission curves overlaid in {func}`~pipeline.h.cli.h_tsyscal`, {func}`~pipeline.hifa.cli.hifa_tsysflag`, and {func}`~pipeline.hifa.cli.hifa_bandpass` will be incorrect if any weather stations have non-sensical pressure data. ([CAS-13910](https://open-jira.nrao.edu/browse/CAS-13910))
+2. An irregular mosaic with no pointing at the geometric center will likely fail, and the pipeline will warn you of this likelihood. Until the CASA bug with psfphasecenter is resolved ({jira}`CAS-13899`), create a larger image and put the phasecenter at a pointing with data. ({jira}`PIPE-98`)
+3. The atmospheric transmission curves overlaid in {func}`~pipeline.h.cli.h_tsyscal`, {func}`~pipeline.hifa.cli.hifa_tsysflag`, and {func}`~pipeline.hifa.cli.hifa_bandpass` will be incorrect if any weather stations have non-sensical pressure data. ({jira}`CAS-13910`)
 4. This version of the pipeline won't run on Cycle 2 and earlier data that were labeled J2000 frame because astropy does not recognize J2000. The workaround is to set {func}`~pipeline.hifa.cli.hifa_flagdata`(lowtrans=False) in the PPR ({jira}`PIPE-1575` → *fixed PL2023*).
 5. For Single-pol data (there are none in C8, 2 approved C-rank in C9, so very rare):
    - The new calculation of achieved SNR in {func}`~pipeline.hifa.cli.hifa_spwphaseup` will issue a spurious red QA warning that the achieved SNR is zero — the actual calibration and data are fine, this is only a bug in the QA score calculation ({jira}`PIPE-1623`).
-   - Inaccurate warning and QA score in {func}`~pipeline.hifa.cli.hifa_spwphaseup` (PIPE-1625).
+   - Inaccurate warning and QA score in {func}`~pipeline.hifa.cli.hifa_spwphaseup` ({jira}`PIPE-1625`).
    - The new phase offsets QA score in {func}`~pipeline.hifa.cli.hifa_timegaincal` fails ({jira}`PIPE-1628`).
-   - {func}`~pipeline.h.cli.h_tsyscal` (hifa_tsyscal at the time) or {func}`~pipeline.hifa.cli.hifa_tsysflag` *might* fail due to the recent change to single-pol Tsys (ICT-15219), not communicated to the PL team and for which no E2E9 data were acquired.
-6. Band 5 data with science spws overlapping with the WVR spws might fail in hif_uvcontfit because of a CASA bug ([CAS-13843](https://open-jira.nrao.edu/browse/CAS-13843)) in calculating TOPO ranges for such spws ({jira}`PIPE-1530`). The workaround is to set a suitable continuum selection range for (only) the failing spw(s) in cont.dat prior to re-running the pipeline.
+   - {func}`~pipeline.h.cli.h_tsyscal` (hifa_tsyscal at the time) or {func}`~pipeline.hifa.cli.hifa_tsysflag` *might* fail due to the recent change to single-pol Tsys ({alma}`ICT-15219`), not communicated to the PL team and for which no E2E9 data were acquired.
+6. Band 5 data with science spws overlapping with the WVR spws might fail in hif_uvcontfit because of a CASA bug ({jira}`CAS-13843`) in calculating TOPO ranges for such spws ({jira}`PIPE-1530`). The workaround is to set a suitable continuum selection range for (only) the failing spw(s) in cont.dat prior to re-running the pipeline.
 7. In {func}`~pipeline.hifa.cli.hifa_antpos`, in the second table "Antenna Position Offsets Sorted By Total Offset", when there are two antennas with the same offset and the Total Offset column has a common value, the second antenna is not bolded in the same way as the first. ({jira}`PIPE-1631`).
 8. In {func}`~pipeline.hifa.cli.hifa_gfluxscaleflag`, the flagging summary table does not reflect flagging applied to the TARGET intent when flags for bad baselines are propagated from PHASE cal ({jira}`PIPE-1630`).
 9. In {func}`~pipeline.hifa.cli.hifa_spwphaseup`, (i) if several antennas of a CM+PM heterogeneous dataset are flagged on the bandpass calibrator, then the value of the Median Phase RMS in the table will be NaN and the QA score will be 0.0 ({jira}`PIPE-1633`); (ii) if the refant drops out for the majority of solutions the Median Phase RMS assessment cannot be made; (iii) if there is low SNR in the bandpass solutions and the refant jumps in phase then some antennas can incorrectly be identified as outliers by the Median Phase RMS assessment; (iv) the phase structure function plots are calculated from antenna-based gains, so baseline-based flags will not be reflected in the plot.
 10. For {func}`~pipeline.hif.cli.hif_makeimages`(cubes), if mom8fc score is yellow, it **rarely** means that continuum subtraction needs to be redone, but merely that in some circumstances the continuum image can be improved to reduce line contamination (see DRM training material).
-11. Due to CASA bug [CAS-13908](https://open-jira.nrao.edu/browse/CAS-13908), PLWG recommends that all multi-EB ephemeris data be run in serial.
+11. Due to CASA bug {jira}`CAS-13908`, PLWG recommends that all multi-EB ephemeris data be run in serial.
 12. Phase structure function plots in {func}`~pipeline.hifa.cli.hifa_wvrgcalflag` are calculated from antenna-based gains, so baseline-based flags will not be reflected ({jira}`PIPE-1661`).
 13. In the polcal recipe, if the selected session reference antenna is fully flagged on any spw by {func}`~pipeline.hifa.cli.hifa_gfluxscaleflag`, then {func}`~pipeline.hifa.cli.hifa_gfluxscale` will crash. The workaround is to set a different reference antenna (or list of reference antennas) in the {func}`~pipeline.hif.cli.hif_refant` task in the PPR. In a related issue, if the session reference antenna is fully flagged due to shadowing on only 1 of the transfer targets (and still wins the best score in {func}`~pipeline.hif.cli.hif_refant`), then {func}`~pipeline.hifa.cli.hifa_gfluxscale` will crash ({jira}`PIPE-1805`).
 14. {func}`~pipeline.hifa.cli.hifa_imageprecheck` will crash on mosaic observations of science targets that have integer names ({jira}`PIPE-1708`).
@@ -257,25 +266,25 @@ Oct 2021 – Oct 2022
 
 ### CASA 2021
 
-1. The bsend mechanism has a limit of 100 MB (introduced in 2014), which can cause the pipeline to fail (PIPE-1337) on MOUS with large numbers of EBs/spws/targets/integrations. So far, it has been seen only on a 42-EB 7m dataset. *fixed 2022*
-2. Plotbandpass will not produce a plot of overlay='antenna' if there is only one antenna in the cal table ([CAS-14657](https://open-jira.nrao.edu/browse/CAS-14657)). This impacts the single dish pipeline in {func}`~pipeline.hsd.cli.hsd_skycal` if the MOUS contains only 1 antenna ({jira}`PIPE-2825`).
+1. The bsend mechanism has a limit of 100 MB (introduced in 2014), which can cause the pipeline to fail ({jira}`PIPE-1337`) on MOUS with large numbers of EBs/spws/targets/integrations. So far, it has been seen only on a 42-EB 7m dataset. *fixed 2022*
+2. Plotbandpass will not produce a plot of overlay='antenna' if there is only one antenna in the cal table ({jira}`CAS-14657`). This impacts the single dish pipeline in {func}`~pipeline.hsd.cli.hsd_skycal` if the MOUS contains only 1 antenna ({jira}`PIPE-2825`).
 
 ### Interferometric Pipeline 2021
 
 1. CASA tclean sometimes exits with an unsupported code "0" — this generally is okay, but PL will capture that as a yellow warning in the weblog, and the data reducer should check the images for scientific acceptability. *fixed 2022*
 2. In the {func}`~pipeline.hifa.cli.hifa_renorm` (hifa_almarenorm at the time) PDF summary plot, if the first spw is narrow, subsequent spws even if wide will be missing the vertical segment boundary lines. This only affects the summary plot, so other plots in the PDF will show the lines. *fixed 2022*
-3. When spw mapping is in use, bad data can sometimes escape unassessed by {func}`~pipeline.hifa.cli.hifa_bandpassflag` and appear as bad in {func}`~pipeline.hifa.cli.hifa_timegaincal` and {func}`~pipeline.hif.cli.hif_applycal` (PIPE-838, to be fixed by PIPE-1154 where spw mapping and combination will be prohibited for all calibrators except the phase calibrator). *fixed 2022*
-4. If an spw is fully flagged for Tsys in {func}`~pipeline.hifa.cli.hifa_tsysflag`, then {func}`~pipeline.hifa.cli.hifa_gfluxscale` can crash (PIPE-1208). This is often due to poor or strongly-varying atmospheric transmission vs. frequency. The possible workarounds are to either: set the offending EB to SemiPass, raise ff_max_limit from 13 to 30 for {func}`~pipeline.hifa.cli.hifa_tsysflag` in the PPR, or flag the poorest transmission parts of the spw (both its Tsys solutions and visibility data). *fixed 2022*
+3. When spw mapping is in use, bad data can sometimes escape unassessed by {func}`~pipeline.hifa.cli.hifa_bandpassflag` and appear as bad in {func}`~pipeline.hifa.cli.hifa_timegaincal` and {func}`~pipeline.hif.cli.hif_applycal` ({jira}`PIPE-838`, to be fixed by {jira}`PIPE-1154` where spw mapping and combination will be prohibited for all calibrators except the phase calibrator). *fixed 2022*
+4. If an spw is fully flagged for Tsys in {func}`~pipeline.hifa.cli.hifa_tsysflag`, then {func}`~pipeline.hifa.cli.hifa_gfluxscale` can crash ({jira}`PIPE-1208`). This is often due to poor or strongly-varying atmospheric transmission vs. frequency. The possible workarounds are to either: set the offending EB to SemiPass, raise ff_max_limit from 13 to 30 for {func}`~pipeline.hifa.cli.hifa_tsysflag` in the PPR, or flag the poorest transmission parts of the spw (both its Tsys solutions and visibility data). *fixed 2022*
 5. For the {func}`~pipeline.hif.cli.hif_applycal` stage, the QA subscore for %newly flagged is not included in the overall score evaluation, meaning that a "!" or "?" can appear in the left navigation pane, different from the "By Topic" QA color bar for {func}`~pipeline.hif.cli.hif_applycal`. *fixed 2022*
-6. As in previous releases, in the {func}`~pipeline.hif.cli.hif_applycal` weblog, if there are multiple phase calibrators or check sources, their calibrated spectra are overlaid in the same plot (PIPE-432). *fixed 2022*
+6. As in previous releases, in the {func}`~pipeline.hif.cli.hif_applycal` weblog, if there are multiple phase calibrators or check sources, their calibrated spectra are overlaid in the same plot ({jira}`PIPE-432`). *fixed 2022*
 7. A bad score for the mom8fc can be erroneously triggered in cube {func}`~pipeline.hifa.cli.hifa_makeimages` when the channelized noise is not uniform in the findcont channels, and has some channels with significantly higher noise (e.g. in regions of deep atmospheric absorption), resulting in more pixels above the Peak/(medianChanMAD) than expected. No workaround — looking at weblog plots should make it clear that there is really no emission in the findcont channels. *improved 2022, may still require manual examination*
-8. <span style="color:red">Full-polarization datasets contain a {func}`~pipeline.hifa.cli.hifa_lock_refant`() task</span> — `pipelinemode="automatic"` must be removed from that task in casa_pipescript.py in order for casa_pipescript.py to run (PIPE-1226). casa_restorescript.py works without modification. *fixed 2022*
-9. MOUS with large numbers of EBs/spws/fields/integrations can exceed the 100MB memory footprint of bsend in CASA and crash (PIPE-1337). This feature was introduced in 2014 and a small increase has been requested (CAS-13656). *improved 2022*
-10. As in previous releases, in the {func}`~pipeline.hif.cli.hif_applycal` weblog, if there are multiple phase calibrators or check sources, their calibrated spectra are overlaid in the same plot (PIPE-432). *fixed 2022*
-11. If pointing is not performed in every EB of a full-polarization dataset, {func}`~pipeline.hif.cli.hif_makeimages` (check sources) can crash (PIPE-1364). *fixed 2022*
-12. If the check source is so faint that no gain solutions can be found, then {func}`~pipeline.hifa.cli.hifa_gfluxscale` will crash (PIPE-1468).
-13. An irregular mosaic with no pointing at the geometric center will likely fail, and the pipeline will warn you of this likelihood. You can use tclean with the psfphasecenter parameter to image manually. (PIPE-98)
-14. On the Spectral Setup weblog page, multi-target datasets with multiple tunings not observed in all targets will not show the Transition names for spws associated with tunings beyond the first tuning (PIPE-1909).
+8. Full-polarization datasets contain a {func}`~pipeline.hifa.cli.hifa_lock_refant` task — `pipelinemode="automatic"` must be removed from that task in casa_pipescript.py in order for casa_pipescript.py to run ({jira}`PIPE-1226`). casa_restorescript.py works without modification. *fixed 2022*
+9. MOUS with large numbers of EBs/spws/fields/integrations can exceed the 100MB memory footprint of bsend in CASA and crash ({jira}`PIPE-1337`). This feature was introduced in 2014 and a small increase has been requested ({jira}`CAS-13656`). *improved 2022*
+10. As in previous releases, in the {func}`~pipeline.hif.cli.hif_applycal` weblog, if there are multiple phase calibrators or check sources, their calibrated spectra are overlaid in the same plot ({jira}`PIPE-432`). *fixed 2022*
+11. If pointing is not performed in every EB of a full-polarization dataset, {func}`~pipeline.hif.cli.hif_makeimages` (check sources) can crash ({jira}`PIPE-1364`). *fixed 2022*
+12. If the check source is so faint that no gain solutions can be found, then {func}`~pipeline.hifa.cli.hifa_gfluxscale` will crash ({jira}`PIPE-1468`).
+13. An irregular mosaic with no pointing at the geometric center will likely fail, and the pipeline will warn you of this likelihood. You can use tclean with the psfphasecenter parameter to image manually. ({jira}`PIPE-98`)
+14. On the Spectral Setup weblog page, multi-target datasets with multiple tunings not observed in all targets will not show the Transition names for spws associated with tunings beyond the first tuning ({jira}`PIPE-1909`).
 15. ACA projects with multiple single-spw FDM tunings might experience odd flagging of non-edge channels ({jira}`PIPE-1991`). The work-around is to set edgespw=False in {func}`~pipeline.hifa.cli.hifa_flagdata`.
 16. In {func}`~pipeline.hif.cli.hif_findcont`, spws with a single range of continuum channels identified might be declared AllCont even if they contain a significantly lesser amount of continuum than the nominal threshold of 91% ({jira}`PIPE-2034`).
 17. The {func}`~pipeline.hif.cli.hif_applycal` page can fail to render if the uv coverage plot fails to be made due to flagging of data ({jira}`PIPE-1294`).
@@ -285,8 +294,8 @@ Oct 2021 – Oct 2022
 
 ### Single Dish Pipeline 2021
 
-0. Some task parameters in PPR are not selected properly. For example, {func}`~pipeline.hsd.cli.hsd_blflag` fails when spw is specified in PPR (PIPE-1298).
-1. {func}`~pipeline.hsd.cli.hsd_imaging` does not properly combine datasets associated with virtual spw. (PIPE-1478)
+0. Some task parameters in PPR are not selected properly. For example, {func}`~pipeline.hsd.cli.hsd_blflag` fails when spw is specified in PPR ({jira}`PIPE-1298`).
+1. {func}`~pipeline.hsd.cli.hsd_imaging` does not properly combine datasets associated with virtual spw. ({jira}`PIPE-1478`)
 
 ---
 
@@ -298,7 +307,7 @@ Release date Feb 2021
 
 See [CASA 6.1.X known issues](https://casa.nrao.edu/casadocs/casa-6.1.0/introduction/known-issues)
 
-1. Plotbandpass will not produce a plot of overlay='antenna' if there is only one antenna in the cal table ([CAS-14657](https://open-jira.nrao.edu/browse/CAS-14657)). This impacts the single dish pipeline in {func}`~pipeline.hsd.cli.hsd_skycal` if the MOUS contains only 1 antenna ({jira}`PIPE-2825`).
+1. Plotbandpass will not produce a plot of overlay='antenna' if there is only one antenna in the cal table ({jira}`CAS-14657`). This impacts the single dish pipeline in {func}`~pipeline.hsd.cli.hsd_skycal` if the MOUS contains only 1 antenna ({jira}`PIPE-2825`).
 
 ### Interferometric Pipeline 2020
 
@@ -307,7 +316,7 @@ See [CASA 6.1.X known issues](https://casa.nrao.edu/casadocs/casa-6.1.0/introduc
 2. A bad score for the mom8fc can be erroneously triggered in cube {func}`~pipeline.hif.cli.hif_makeimages`(cubes) when the channelized noise is not uniform in the findcont channels, and has some channels with significantly higher noise (e.g. in regions of deep atmospheric absorption), resulting in more pixels above the Peak/(medianChanMAD) than expected. No workaround — looking at weblog plots should make it clear that there is really no emission in the findcont channels.
 3. For full-polarization datasets, the amp vs. time detail plots (per antenna) in {func}`~pipeline.hif.cli.hif_applycal` do not include the calibrator scans with POLARIZATION intent, but the plots of calibration solutions in {func}`~pipeline.hifa.cli.hifa_timegaincal` do include them. The workaround is to run plotms manually if there is bad data in the parent plot (with all antennas overlaid) and you want to determine the subset of antennas involved.
 4. The amplitude vs uv distance version of the "before/after flagging" plots are not shown in {func}`~pipeline.hifa.cli.hifa_polcalflag`. Only the ampl. vs time plots are shown.
-5. Datasets suffering from the Cycle 7 correlator instrumental problem related to concurrent subarrays can have some outliers escape unflagged. But this issue was apparently fixed in SCCB-1042 (2021-05-20), so it should not affect the remainder of Cycle 7 data.
+5. Datasets suffering from the Cycle 7 correlator instrumental problem related to concurrent subarrays can have some outliers escape unflagged. But this issue was apparently fixed in {alma}`SCCB-1042` (2021-05-20), so it should not affect the remainder of Cycle 7 data.
 6. Antenna-based single-polarization, single-integration outliers not apparent in {func}`~pipeline.hifa.cli.hifa_polcalflag` can appear as amplitude outliers on the polarization calibrator in {func}`~pipeline.hif.cli.hif_applycal`.
 7. When spw mapping is used in {func}`~pipeline.hifa.cli.hifa_spwphaseup`, bad data on the bandpass calibrator can escape {func}`~pipeline.hifa.cli.hifa_bandpassflag` unflagged and appear as outliers in {func}`~pipeline.hif.cli.hif_applycal`, because the timegaincal solutions come from a different spw when applycal is run.
 8. The QA message in {func}`~pipeline.hifa.cli.hifa_gfluxscale` on the ratio of S_calibrated / S_catalog has an incorrectly calculated percentage.
@@ -315,10 +324,10 @@ See [CASA 6.1.X known issues](https://casa.nrao.edu/casadocs/casa-6.1.0/introduc
 10. Due to CASA changing how tasks are built, several tasks fail to completely render the "inp" input parameters (blank lines appear in the "inp" output). `help(taskname)` still lists all of the available parameters, and we strongly recommend users refer to the Reference Manual if task parameters are not clear. Affected tasks: {func}`~pipeline.hifa.cli.hifa_importdata`, {func}`~pipeline.hifa.cli.hifa_wvrgcalflag`, {func}`~pipeline.hif.cli.hif_lowgainflag`, {func}`~pipeline.hifa.cli.hifa_bandpassflag`, {func}`~pipeline.hifa.cli.hifa_bandpass`, {func}`~pipeline.hif.cli.hif_applycal`, {func}`~pipeline.hif.cli.hif_makeimlist`, {func}`~pipeline.hif.cli.hif_makeimages`, {func}`~pipeline.hifa.cli.hifa_imageprecheck`, {func}`~pipeline.hif.cli.hif_checkproductsize`, {func}`~pipeline.hifa.cli.hifa_exportdata`, {func}`~pipeline.hif.cli.hif_mstransform`, {func}`~pipeline.hif.cli.hif_findcont`, {func}`~pipeline.hsd.cli.hsd_importdata`, {func}`~pipeline.hsd.cli.hsd_flagdata`, {func}`~pipeline.hsd.cli.hsd_applycal`, {func}`~pipeline.hsd.cli.hsd_imaging`, {func}`~pipeline.hifa.cli.hifa_polcalflag`, hif_uvcontfit, {func}`~pipeline.hif.cli.hif_uvcontsub` (dryrun parameter only missing)
 11. In the Cycle 6, Cycle 7, and PL2020 releases: datasets with heterogeneous antenna diameters will also include the cross-diameter baselines in the science target imaging (rather than merely the 7m-7m or merely the 12m-12m baselines). The calibrator imaging stage correctly includes all baselines, as desired. For 7m array projects with 1 or more 12m antennas included, the effects on the resulting image are: a different effective PB response (slightly smaller), lower noise, a smaller synthesized beam, and (likely) a smaller LAS. Different science use cases may see the net difference as a positive or negative effect.
 12. In all pipeline releases through PL2020: FDM spws with 256 channels are being labeled as TDM on the Spectral Setup details page. This is due to faulty logic implemented in CASA::msmd.almaspws.
-13. Full-polarization datasets contain a {func}`~pipeline.hifa.cli.hifa_lock_refant`() task — `pipelinemode="automatic"` must be removed from that task in casa_pipescript.py in order for casa_pipescript.py to run. casa_restorescript.py works without modification.
-14. As in previous releases, in the {func}`~pipeline.hif.cli.hif_applycal` weblog, if there are multiple phase calibrators or check sources, their calibrated spectra are overlaid in the same plot (PIPE-432).
-15. If pointing is not performed in every EB of a full-polarization dataset, {func}`~pipeline.hif.cli.hif_makeimages` (check sources) can crash (PIPE-1364).
-16. If the check source is so faint that no gain solutions can be found, then {func}`~pipeline.hifa.cli.hifa_gfluxscale` will crash (PIPE-1468).
+13. Full-polarization datasets contain a {func}`~pipeline.hifa.cli.hifa_lock_refant` task — `pipelinemode="automatic"` must be removed from that task in casa_pipescript.py in order for casa_pipescript.py to run. casa_restorescript.py works without modification.
+14. As in previous releases, in the {func}`~pipeline.hif.cli.hif_applycal` weblog, if there are multiple phase calibrators or check sources, their calibrated spectra are overlaid in the same plot ({jira}`PIPE-432`).
+15. If pointing is not performed in every EB of a full-polarization dataset, {func}`~pipeline.hif.cli.hif_makeimages` (check sources) can crash ({jira}`PIPE-1364`).
+16. If the check source is so faint that no gain solutions can be found, then {func}`~pipeline.hifa.cli.hifa_gfluxscale` will crash ({jira}`PIPE-1468`).
 17. ACA projects with multiple single-spw FDM tunings might experience odd flagging of non-edge channels ({jira}`PIPE-1991`). The work-around is to set edgespw=False in {func}`~pipeline.hifa.cli.hifa_flagdata`.
 18. In {func}`~pipeline.hif.cli.hif_findcont`, spws with a single range of continuum channels identified might be declared AllCont even if they contain a significantly lesser amount of continuum than the nominal threshold of 91% ({jira}`PIPE-2034`).
 19. The aggregate bandwidth listed on continuum {func}`~pipeline.hif.cli.hif_makeimages` pages does not account for the deterministic flagging of edge channels on TDM spws ({jira}`PIPE-2349`) and it does not account for spw overlap ({jira}`PIPEREQ-37`).
