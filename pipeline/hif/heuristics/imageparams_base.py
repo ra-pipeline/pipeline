@@ -783,6 +783,7 @@ class ImageParamsHeuristics:
                                 casa_tools.imager.done()
                                 if rtn[0]:
                                     valid_data[field_intent] = True
+                                    break
                         except:
                             pass
 
