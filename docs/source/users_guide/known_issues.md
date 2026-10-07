@@ -8,6 +8,10 @@
 
 1. In {func}`~casatasks.imaging.tclean` `briggsbwtaper`, the fractional bandwidth is calculated per-chunk, so parallelizing with different breadth gives different answers ([CAS-14520](https://open-jira.nrao.edu/browse/CAS-14520) and {jira}`PIPE-2832`).
 2. **{func}`~pipeline.hifa.cli.hifa_wvrgcalflag`** will crash on source names that are integers because the CASA task [wvrgcal](https://casadocs.readthedocs.io/en/v6.6.6/api/tt/casatasks.calibration.wvrgcal.html) no longer supports them ([CAS-14850](https://open-jira.nrao.edu/browse/CAS-14850)).
+3. There is a possibility that imaging multi-EB datasets where the SPW ID changes between the EBs with {func}`~casatasks.imaging.tclean` in parallel will produce an odd beam-size-per-channel, as shown below.
+```{figure} cas14874_n8workers.png
+:scale: 25 %
+```
 
 ### Both Pipelines 2026
 
