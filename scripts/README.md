@@ -11,6 +11,7 @@ This directory contains utility and maintenance scripts for developing, building
 - [3. `update_references.py` — NASA/ADS Reference Synchronizer](#3-update_referencespy--nasaads-reference-synchronizer)
 - [4. `build_backend.py` — In-Tree PEP 517 Build Backend Wrapper](#4-build_backendpy--in-tree-pep-517-build-backend-wrapper)
 - [5. `install_dependencies.py` — Monolithic CASA Dependency Installer](#5-install_dependenciespy--monolithic-casa-dependency-installer)
+- [6. `dbfluxes_query.py` — Flux Catalogue Query](#6-dbfluxes_querypy--flux-catalogue-query)
 
 ---
 
@@ -183,3 +184,15 @@ python3 -c 'import tomllib as t; \
   print(*d["project"]["optional-dependencies"]["dev"], sep="\n")' \
   > requirements-dev.txt
 ```
+
+---
+
+## 6. `dbfluxes_query.py` — Flux Catalogue Query
+
+Runs a single lookup against the flux density catalogue service (`dbfluxes.fluxservice`) outside of a pipeline session, e.g. to check what the catalogue returns for a calibrator. Pipeline log messages go to stderr, so `--json` output can be piped.
+
+```bash
+pixi run python scripts/dbfluxes_query.py --name J1427-4206 --date 2013-03-27 --frequency 86.837309056e9 [--url URL] [--json]
+```
+
+Exit codes: `0` usable flux density returned, `1` service unreachable or response unparseable, `2` no row or no usable flux density. See the script docstring for details.
