@@ -77,7 +77,7 @@ git push origin <branchname>
 
 Create a Pull Request on Bitbucket to merge your branch into `main`. Any team member can review and approve, including yourself.
 
-If your changes include documentation updates, verify the rendered build on Read the Docs (see [Viewing Branch Builds on Read the Docs](../setup/readthedocs.md#viewing-branch-builds-on-read-the-docs)) and include the branch preview link in your PR description for reviewers.
+If your changes include documentation updates, verify the rendered build on Read the Docs (see [Previewing Branch Builds](../setup/readthedocs.md#previewing-branch-builds)) and include the branch preview link in your PR description for reviewers.
 
 ## 8. Code Review and Merge
 
