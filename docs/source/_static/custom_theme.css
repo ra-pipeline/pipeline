@@ -361,8 +361,13 @@ body.viewer-open {
     overflow: visible !important;
 }
 
-figure img, .figure img, article img:not(.no-zoom):not(.brand-logo) {
+figure img, .figure img, article img:not(.no-zoom):not(.brand-logo):not(.icon):not(.badge) {
     cursor: zoom-in;
+}
+
+/* Ensure badges and linked non-zoom images show standard pointer cursor */
+a img.no-zoom, a img.badge, a img[src*="shields.io"], a img[src*="codecov.io"] {
+    cursor: pointer !important;
 }
 
 /* =============================================================================

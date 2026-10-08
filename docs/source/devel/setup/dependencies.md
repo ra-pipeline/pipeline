@@ -50,7 +50,7 @@ thanks to the introduction of [casaconfig] and the migration of the
 The following libraries are required by Pipeline but are **not** included in
 the CASA6 monolithic distribution.
 
-Python packages (see also `requirements.txt` in the source repository):
+Python packages (declared under `[project.dependencies]` in `pyproject.toml`):
 
 - cachetools
 - docstring-inheritance
@@ -102,16 +102,9 @@ Unix command-line tools:
 - `pytest-xdist`
 - `pytest-html`
 - `pytest-xvfb`
-- `pytest-forked`
 
 ### Code quality
 
-- `black`
-- `isort`
-- `flake8`
-- `pylint`
-- `pydocstyle`
-- `pycodestyle`
 - `ruff`
 - `pre-commit`
 - `memray`
@@ -119,12 +112,12 @@ Unix command-line tools:
 
 ### Documentation
 
-See `requirements_docs.txt` in the source repository. Key packages:
+Declared under `[project.optional-dependencies.docs]` in `pyproject.toml`. Key packages:
 
 - `sphinx` with `furo` theme
 - `myst-parser`, `myst-nb` (Markdown and notebook support)
 - `sphinxcontrib-mermaid` (diagram support)
-- `sphinx-automodapi`, `sphinx-autoapi` (API docs)
+- `sphinx-automodapi` (API docs)
 - `sphinx-copybutton`, `sphinxcontrib-bibtex`
 
 ### Version control

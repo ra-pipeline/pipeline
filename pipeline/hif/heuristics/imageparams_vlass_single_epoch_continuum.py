@@ -302,10 +302,10 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
     def pb_correction(self) -> bool:
         return False
 
-    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None, gridder: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
 
-        pblimit_image, pblimit_cleanmask = super().pblimits(pb)
+        _, pblimit_cleanmask = super().pblimits(pb)
 
         # Overwrite pblimit_image (to be used in tclean as pblimit parameter) with
         # the VLASS-SE-CONT-MOSAIC specific value.
@@ -587,6 +587,15 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         qaTool = casa_tools.quanta
         do_parallel = mpihelpers.parse_mpi_input_parameter(parallel)
 
+        # Fallback to serial mode if parallel was requested but MPI is not available
+        if do_parallel and not mpihelpers.is_mpi_ready():
+            LOG.warning(
+                'Parallel synthesis imaging was requested (parallel=%s) but no CASA MPI session is active. '
+                'Falling back to serial imager (PySynthesisImager).',
+                parallel,
+            )
+            do_parallel = False
+
         if not phasecenter:
             LOG.error(f"No phasecenter is provided.")
 
@@ -742,7 +751,7 @@ class ImageParamsHeuristicsVlassSeContAWP2(ImageParamsHeuristicsVlassSeCont):
         """Tclean gridder parameter heuristics."""
         return 'awp2'
 
-    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None, gridder: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         _, pblimit_cleanmask = super().pblimits(pb)
 
@@ -770,7 +779,7 @@ class ImageParamsHeuristicsVlassSeContAWP2P001(ImageParamsHeuristicsVlassSeCont)
         """Tclean wprojplanes parameter heuristics."""
         return 1
 
-    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None, gridder: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         _, pblimit_cleanmask = super().pblimits(pb)
 
@@ -794,7 +803,7 @@ class ImageParamsHeuristicsVlassSeContAWPHPG(ImageParamsHeuristicsVlassSeCont):
         """Tclean gridder parameter heuristics."""
         return 'awphpg'
 
-    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None, gridder: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         _, pblimit_cleanmask = super().pblimits(pb)
 
@@ -822,7 +831,7 @@ class ImageParamsHeuristicsVlassSeContAWPHPGP001(ImageParamsHeuristicsVlassSeCon
         """Tclean wprojplanes parameter heuristics."""
         return 1
 
-    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None, gridder: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         _, pblimit_cleanmask = super().pblimits(pb)
 
@@ -887,7 +896,7 @@ class ImageParamsHeuristicsVlassSeContMosaic(ImageParamsHeuristicsVlassSeCont):
         # Might change to True based on stackholder feedback
         return False
 
-    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None, gridder: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         _, pblimit_cleanmask = super().pblimits(pb)
 

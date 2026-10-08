@@ -195,6 +195,18 @@ class MakeImagesInputs(vdp.StandardInputs):
             parallel: Use CASA/tclean built-in parallel imaging for individual scientific targets, or, perform continuum imaging
                 of multiple target (calibrators) concurrently without the CASA/tclean built-in parallelization.
 
+                .. note::
+                    This note pertains specifically to CASA's built-in ``tclean`` parallel synthesis imaging
+                    (Tier-1 parallelization used for individual scientific targets). It is unrelated to Pipeline
+                    Tier-0 parallel processing (which dispatches separate calibrator imaging tasks concurrently across MPI servers).
+
+                    As documented in `CASAdocs synthesis imaging <https://casadocs.readthedocs.io/en/stable/notebooks/synthesis_imaging.html>`__:
+                    *"The tclean parameter 'parallel' is ignored for cube imaging. It is relevant only for continuum imaging."*
+                    Whenever running inside an active ``mpicasa`` session, CASA's built-in ``tclean`` automatically executes cube
+                    major cycles in parallel across available MPI processes, regardless of whether ``parallel`` is set to ``True``
+                    or ``False``. The ``parallel`` parameter primarily controls built-in parallelization for continuum imaging
+                    (``specmode='mfs'`` / ``'cont'``).
+
                 Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
 
                 Default: ``'automatic'`` - optimizes the parallelization mode based on the imaging target type
@@ -278,9 +290,16 @@ class MakeImages(basetask.StandardTaskTemplate):
                 try:
                     worker_result = task.get_result()
                 except exceptions.PipelineException as ex:
-                    error_msg = ('Cleaning failure for field {!s}, intent {!s}, specmode {!s}, spw {!s}. '
-                                 'Exception from hif_tclean: {!s}'.format(
-                                 target['field'], target['intent'], target['specmode'], target['spw'], ex))
+                    error_msg = (
+                        'Cleaning failure for field {!s}, intent {!s}, specmode {!s}, spw {!s}. '
+                        'Exception from hif_tclean: {!s}'.format(
+                            utils.condense_field_names(target['field']),
+                            target['intent'],
+                            target['specmode'],
+                            target['spw'],
+                            ex,
+                        )
+                    )
                     worker_result = TcleanResult()
                     worker_result.qa.pool.append(pqa.QAScore(0.34, longmsg=error_msg, shortmsg='Cleaning failure'))
                     result.add_result(worker_result, target, outcome='failure')

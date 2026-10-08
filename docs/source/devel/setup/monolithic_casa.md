@@ -11,31 +11,73 @@ If you don't already have CASA installed, you can find recent builds at [CASA pr
 
 After downloading a CASA build, follow the instructions on the [CASA Installation Guide](https://casadocs.readthedocs.io/en/stable/notebooks/usingcasa.html#Full-Installation-of-CASA-5-and-6) to install CASA.
 
-### Dependency Requirements
+### Environment Shortcuts
 
-Following the change from {jira}`PIPE-1699`, Pipeline now specifies the required standard Python dependencies in a [requirements.txt](../requirements.txt) file, and recommends using `pip` to install them directly from the Python Package Index ([PyPI](https://pypi.org/)).
-The [`pipeline/extern`](../pipeline/extern) directory now only contains the non-standard Python packages/modules contributed by the developers and heuristics development team.
+Throughout this guide, `casa_bin` refers to the path to the CASA `bin` directory:
+- On Linux, it is the `bin/` directory inside the unpacked CASA tarball, e.g. `casa-6.7.1-13-py3.10-gpu.el8/bin`.
+- On macOS, it is typically `/Applications/CASA.app/Contents/MacOS`.
 
-Note that this file is currently *not* used by [`setup.py`](../setup.py) to auto-install dependencies, and only serves as a reference for development and packaging purposes.
-In addition, the list only includes dependencies that are *not* bundled in the monolith CASA release designated for the next Pipeline release, and their version specifications are continuously examined against potential compatibility issues with other Python packages already shipped in CASA.
-The developer team will maintain the file to reflect the current state of the dependency requirements across the development cycle.
+`PYTHONNOUSERSITE=1` is used to prevent the Python interpreter and `pip` from checking or loading packages from the user's local site-packages directory (`~/.local/lib/pythonX.Y/site-packages`). This is necessary to isolate your user site-packages directory from your CASA development environment, which is confined to the unpacked CASA tarball directory.
 
-To use this file manually, you can type the following command:
-
-```console
-PYTHONNOUSERSITE=1 ${casa_bin}/pip3 install --disable-pip-version-check \
-    --upgrade-strategy=only-if-needed -r requirements.txt
-```
-
-Note that here `casa_bin` is the path to the CASA `bin` directory.
-On macOS, this is typically `/Applications/CASA.app/Contents/MacOS`; on Linux, it is the `bin/` directory inside the unpacked CASA tarball, e.g. `casa-6.5.3-28-py3.8/bin`. `PYTHONNOUSERSITE=1` is used to prevent the `pip` command from checking dependencies from the user's site-packages directory. This is necessary to isolate the user's site-packages directory from your CASA development environment, which is generally confined to the unpacked CASA tarball directory. You may create a series of alias shortcuts to avoid accidentally using the wrong Python environment and tools:
+To simplify executing commands within CASA's isolated Python environment and avoid accidentally using the wrong environment tools, set up these shell aliases:
 
 ```console
 alias casa_pip='PYTHONNOUSERSITE=1 ${casa_bin}/pip3 --disable-pip-version-check'
 alias casa_python='PYTHONNOUSERSITE=1 ${casa_bin}/python3'
 ```
 
-The `pip` command above should install the dependencies in the CASA site-packages directory, which can be verified with this:
+### Dependency Requirements
+
+Pipeline specifies all required standard Python dependencies directly in [`pyproject.toml`](../pyproject.toml) (`[project.dependencies]`).
+The [`pipeline/extern`](../pipeline/extern) directory now only contains non-standard Python packages/modules contributed by the developers and heuristics development team.
+
+The dependency list only includes third-party packages that are *not* bundled in the monolithic CASA release designated for the next Pipeline release, and their version specifications are continuously examined against potential compatibility issues with other Python packages already shipped in CASA.
+The developer team maintains `pyproject.toml` to reflect the current state of dependency requirements across the development cycle.
+
+To install these dependencies into CASA's Python environment without installing the Pipeline package itself, run the helper script:
+
+```console
+casa_python scripts/install_dependencies.py
+```
+
+Or to include development tools (testing, linters, profilers):
+
+```console
+casa_python scripts/install_dependencies.py --dev
+```
+
+*(Alternatively, without aliases: `PYTHONNOUSERSITE=1 ${casa_bin}/python3 scripts/install_dependencies.py`)*
+
+:::{tip} Prefer a traditional `requirements.txt`?
+If you want to generate a standard `requirements.txt` file (e.g. for inspection or installing with `casa_pip install -r requirements.txt`), you can extract them directly from `pyproject.toml`:
+
+**Using a standard Python 3.11+ one-liner** (zero dependencies, uses built-in `tomllib`):
+```console
+# Core runtime dependencies:
+python3 -c 'import tomllib as t; \
+  d = t.load(open("pyproject.toml", "rb")); \
+  print(*d["project"]["dependencies"], sep="\n")' > requirements.txt
+
+# Development dependencies:
+python3 -c 'import tomllib as t; \
+  d = t.load(open("pyproject.toml", "rb")); \
+  print(*d["project"]["optional-dependencies"]["dev"], sep="\n")' \
+  > requirements-dev.txt
+
+# Direct installation without saving to disk:
+casa_pip install $(python3 -c 'import tomllib as t; \
+  d = t.load(open("pyproject.toml", "rb")); \
+  print(*d["project"]["dependencies"])')
+```
+
+**Using `scripts/install_dependencies.py --export`**:
+```console
+python3 scripts/install_dependencies.py --export requirements.txt
+python3 scripts/install_dependencies.py --dev --export requirements-dev.txt
+```
+:::
+
+The dependency installation in the CASA site-packages directory can be verified inside CASA:
 
 ```python
 CASA <1>: import astropy
@@ -113,5 +155,5 @@ Here `PIPE_PATH` is a shell environment variable that points at your Pipeline co
 Note that this use case will only work if the CASA installation has all dependency libraries required by the Pipeline package. For a pristine "vanilla" CASA build without Pipeline pre-installed, this can be done with:
 
 ```console
-casa_pip install --upgrade-strategy=only-if-needed -r requirements.txt
+casa_python scripts/install_dependencies.py
 ```

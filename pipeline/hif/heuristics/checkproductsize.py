@@ -51,14 +51,17 @@ class CheckProductSizeHeuristics:
             else:
                 cubesizes[target['spw']] = cubesize
             productsize = 2.0 * (mfssize + cubesize)
-            # Since CAS-11363 this process technically only returns product sizes (keyed by spw)
-            # for the last target. The underlying assumption is that irrespective of the target
-            # all cubes for a given spw are the ~same size
-            productsizes[target['spw']] = productsize
+            # Accumulate product size per spw across all targets using this spw
+            if productsizes.get(target['spw']) is not None:
+                productsizes[target['spw']] += productsize
+            else:
+                productsizes[target['spw']] = productsize
             total_productsize += productsize
             LOG.info('Cube size for Field %s SPW %s nchan %d nbin %d imsize %d x %d is %.3g GB' % (target['field'], target['spw'], nchan, nbin, nx, ny, cubesize))
 
-        return cubesizes, max(cubesizes.values()), productsizes, total_productsize
+        maxcubesize = max(cubesizes.values()) if cubesizes else 0.0
+
+        return cubesizes, maxcubesize, productsizes, total_productsize
 
     def mitigate_sizes(self):
 
@@ -460,6 +463,7 @@ class CheckProductSizeHeuristics:
                 makeimlist_inputs.hm_cell = hm_cell_orig
                 imlist = makeimlist_result.targets
                 cubesizes, maxcubesize, productsizes, total_productsize = self.calculate_sizes(imlist)
+
                 # Save cube mitigated product size for logs
                 cube_mitigated_productsize = total_productsize
                 LOG.info('SpW mitigation leads to a maximum cube size of %.4f GB', maxcubesize)
@@ -472,18 +476,23 @@ class CheckProductSizeHeuristics:
                 LOG.info('Maximum cube size cannot be mitigated. Remaining factor with the maxcubesize is: %.4f.',
                          maxcubesize / self.inputs.maxcubesize)
                 LOG.info('But the maximum cube size is smaller than limit of %s GB.', self.inputs.maxcubelimit)
-        # Step 2 cause on total product size to exit                      
+        # Step 2 cause on total product size to exit (with 5% tolerance factor)
+        tolerance_factor = 1.05
         if (self.inputs.maxproductsize != -1.0) and (total_productsize > self.inputs.maxproductsize):
-            LOG.error('Product size cannot be mitigated. Remaining factor: %.4f.' % (total_productsize / self.inputs.maxproductsize / nfields))
-            return size_mitigation_parameters, \
-                   original_maxcubesize, original_productsize, \
-                   cube_mitigated_productsize, \
-                   maxcubesize, total_productsize, \
-                   original_imsize, mitigated_imsize, \
-                   True, \
-                   {'longmsg': 'Product size could not be mitigated. Remaining factor: %.4f.' % (total_productsize / self.inputs.maxproductsize / nfields), \
-                    'shortmsg': 'Product size could not be mitigated'}, \
-                   known_synthesized_beams
+            if total_productsize <= tolerance_factor * self.inputs.maxproductsize:
+                LOG.info('Total product size (%.4f GB) slightly exceeds maxproductsize (%s GB) but is within the 5%% tolerance limit (%.4f GB).',
+                         total_productsize, self.inputs.maxproductsize, tolerance_factor * self.inputs.maxproductsize)
+            else:
+                LOG.error('Product size cannot be mitigated. Remaining factor: %.4f.' % (total_productsize / self.inputs.maxproductsize / nfields))
+                return size_mitigation_parameters, \
+                       original_maxcubesize, original_productsize, \
+                       cube_mitigated_productsize, \
+                       maxcubesize, total_productsize, \
+                       original_imsize, mitigated_imsize, \
+                       True, \
+                       {'longmsg': 'Product size could not be mitigated. Remaining factor: %.4f.' % (total_productsize / self.inputs.maxproductsize / nfields), \
+                        'shortmsg': 'Product size could not be mitigated'}, \
+                       known_synthesized_beams
 
         # Check for case with many targets which will cause long run times in spite
         # of any mitigation.
@@ -615,20 +624,20 @@ class CheckProductSizeHeuristics:
                 # Recalculate sizes with mitigation
                 local_makeimlist_inputs.hm_cell = im_specific_mitigation['hm_cell']
                 local_makeimlist_inputs.hm_imsize = im_specific_mitigation['hm_imsize']
-                makeimlist_inputs.known_synthesized_beams = known_synthesized_beams
-                makeimlist_task = makeimlist.MakeImList(makeimlist_inputs)
-                makeimlist_result = makeimlist_task.prepare()
-                known_synthesized_beams = makeimlist_result.synthesized_beams
-                local_imlist = makeimlist_result.targets
+                local_makeimlist_inputs.known_synthesized_beams = known_synthesized_beams
+                local_makeimlist_task = makeimlist.MakeImList(local_makeimlist_inputs)
+                local_makeimlist_result = local_makeimlist_task.prepare()
+                known_synthesized_beams = local_makeimlist_result.synthesized_beams
+                local_imlist = local_makeimlist_result.targets
                 # New sizes
                 cubesizes, maxcubesize, productsizes, im_productsize = self.calculate_sizes(local_imlist)
 
-                LOG.info('Size mitigation: image pixel count is still larger than allowed for target %s. Truncating '
-                         'image.' % (im['field']))
-                LOG.info('Size mitigation: Setting hm_cell to %s for target %s' % (im_specific_mitigation['hm_cell'],
-                                                                                   im['field']))
-                LOG.info('Size mitigation: Setting hm_imsize to %s for target %s' % (im_specific_mitigation['hm_imsize'],
-                                                                                     im['field']))
+                LOG.info('Size mitigation: image pixel count is still larger than allowed for target %s. Truncating image.',
+                         im['field'])
+                LOG.info('Size mitigation: Setting hm_cell to %s for target %s', im_specific_mitigation['hm_cell'],
+                         im['field'])
+                LOG.info('Size mitigation: Setting hm_imsize to %s for target %s', im_specific_mitigation['hm_imsize'],
+                         im['field'])
 
             # Save cube mitigated product size for logs
             total_productsize += im_productsize
@@ -637,9 +646,16 @@ class CheckProductSizeHeuristics:
             else:
                 mitigated_imsize.append(imsize_request)
 
-            # Store mitigation parameters per spw list
-            multi_target_size_mitigation[im['spw']] = im_specific_mitigation
-            if im_specific_mitigation != {}:
+            # Store mitigation parameters using composite key (field, spw) tuple to handle all cases:
+            # - Different targets, same SPW (Bug #4): pKu0 vs pKu15 in SPW 0-47
+            # - Same target, different SPW: pKu0 in SPW 0-23 vs SPW 24-47 (edge case)
+            # Tuple is idiomatic Python for composite keys and naturally immutable/hashable.
+            mitigation_key = (im['field'], im['spw'])
+            if mitigation_key not in multi_target_size_mitigation:
+                multi_target_size_mitigation[mitigation_key] = {}
+            # Only update if current target has mitigation parameters to add
+            if im_specific_mitigation:
+                multi_target_size_mitigation[mitigation_key].update(im_specific_mitigation)
                 is_mitigated = True
 
         # Store imaging target specific parameters in mitigation dictionary only if imsize is mitigated
