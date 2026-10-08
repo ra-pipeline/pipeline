@@ -440,7 +440,13 @@ class Editimlist(basetask.StandardTaskTemplate):
 
         # Use the ms object from the context to change field ids to fieldnames, if needed
         # PIPE-2949: Use the first MS in the list as the reference MS for field name / spw name resolution.
-        ref_ms_name = inp.vis[0]
+        if isinstance(inp.vis, str) and inp.vis:
+            vislist = [inp.vis]
+        elif isinstance(inp.vis, (list, tuple)) and inp.vis:
+            vislist = list(inp.vis)
+        else:
+            vislist = [ms.name for ms in inp.context.observing_run.measurement_sets]
+        ref_ms_name = vislist[0]
         ref_ms = inp.context.observing_run.get_ms(ref_ms_name)
         fieldnames = []
 
@@ -481,7 +487,8 @@ class Editimlist(basetask.StandardTaskTemplate):
                     spws = ref_ms.get_spectral_windows(science_windows_only=True)
                     for spw_ii in spws:
                         centre_freq = int(spw_ii.centre_frequency.to_units(measures.FrequencyUnits.MEGAHERTZ))
-                        spwid = spw_ii.id
+                        virt_spw_id = inp.context.observing_run.real2virtual_spw_id(spw_ii.id, ref_ms)
+                        spwid = virt_spw_id if virt_spw_id is not None else spw_ii.id
                         cfreq_spw[centre_freq] = spwid
 
                     user_freqs = inpdict['spw'].split(',')
@@ -501,11 +508,13 @@ class Editimlist(basetask.StandardTaskTemplate):
                 tmpspw_str = inpdict['spw']
                 for spw_ii in spws:
                     if spw_ii.name in inpdict['spw']:
-                        LOG.info('Using spwd id {id} for spw name {name}'.format(id=spw_ii.id, name=spw_ii.name))
-                        tmpspw_str = tmpspw_str.replace(spw_ii.name, str(spw_ii.id))
+                        virt_spw_id = inp.context.observing_run.real2virtual_spw_id(spw_ii.id, ref_ms)
+                        spwid_to_use = virt_spw_id if virt_spw_id is not None else spw_ii.id
+                        LOG.info('Using virtual spw id %s for spw name %s', spwid_to_use, spw_ii.name)
+                        tmpspw_str = tmpspw_str.replace(spw_ii.name, str(spwid_to_use))
                 for spw_jj in inpdict['spw'].replace(' ', '').split(','):
                     if spw_jj in tmpspw_str:  # if spwname hasn't been replaced with an id, then warn
-                        LOG.warning('spw name \'{name}\' was not found in {ms}'.format(name=spw_jj, ms=ref_ms_name))
+                        LOG.warning("spw name '%s' was not found in %s", spw_jj, ref_ms_name)
                 imlist_entry['spw'] = tmpspw_str
 
         # phasecenter is required user input (not determined by heuristics)
@@ -515,7 +524,7 @@ class Editimlist(basetask.StandardTaskTemplate):
 
         # note: heuristics.imageparams_base expects 'spw' to be a selection string.
         # For VLASS-SE-CUBE, 'spw' is the representational string of spw group list, e.g. spw="['1,2','3,4,5']"
-        th = imlist_entry['heuristics'] = iph.getHeuristics(vislist=inp.vis, spw=str(imlist_entry['spw']),
+        th = imlist_entry['heuristics'] = iph.getHeuristics(vislist=vislist, spw=str(imlist_entry['spw']),
                                                             observing_run=inp.context.observing_run,
                                                             imagename_prefix=inp.context.project_structure.ousstatus_entity_id,
                                                             proj_params=inp.context.project_performance_parameters,
@@ -735,6 +744,9 @@ class Editimlist(basetask.StandardTaskTemplate):
                     vis_list, field_list = zip(*vis_field_pairs)
                     imlist_entry['vis'] = list(vis_list)
                     imlist_entry['field'] = list(field_list)
+
+        if not imlist_entry.get('vis'):
+            imlist_entry['vis'] = list(th.vislist)
 
         if not imlist_entry['spw']:  # could be None or an empty string
             LOG.warning('spw is not specified')   # probably should raise an error rather than warning? - will likely fail later anyway
