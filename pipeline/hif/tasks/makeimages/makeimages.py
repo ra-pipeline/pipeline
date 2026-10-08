@@ -861,6 +861,8 @@ class CleanTaskFactory:
 
         if target['vis']:
             task_args['vis'] = target['vis']
+        elif image_heuristics and getattr(image_heuristics, 'vislist', None):
+            task_args['vis'] = image_heuristics.vislist
 
         if target['is_per_eb']:
             task_args['is_per_eb'] = target['is_per_eb']
