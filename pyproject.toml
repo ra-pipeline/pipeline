@@ -304,17 +304,26 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
 
 # Launch interactive CASA shell
 [tool.pixi.tasks.casa]
-cmd = "python -m casashell"
+cmd = """\
+sh -c '\
+c=$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4); \
+[ "$c" -gt 4 ] 2>/dev/null && c=4; \
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-$c}" OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-$c}"; \
+cd "${INIT_CWD:-.}" && exec python -m casashell "$@"' _\
+"""
 
 [tool.pixi.tasks.casa.env]
 PYTHONWARNINGS = "ignore::SyntaxWarning"
+OMP_PLACES = "threads"
+OMP_PROC_BIND = "false"
+PYTHONNOUSERSITE = "1"
 PYTHONPATH = "$PIXI_PROJECT_ROOT/scripts/stubs"
 
 # Launch CASA with MPI support (for parallel workflows)
 [tool.pixi.tasks.casampi]
 description = "Launch CASA MPI with safety flags. Override ranks with CASA_NPROCS (default: 4)."
 cmd = """\
-sh -c 'mpirun -display-allocation -display-map -oversubscribe \
+sh -c 'cd "${INIT_CWD:-.}" && mpirun -wdir "${INIT_CWD:-.}" -display-allocation -display-map -oversubscribe \
 --mca btl ^openib --mca btl_vader_single_copy_mechanism none --bind-to none \
 -x FI_PROVIDER -x OMP_NUM_THREADS -x OPENBLAS_NUM_THREADS \
 -x PATH -x PYTHONNOUSERSITE -x PYTHONPATH \
