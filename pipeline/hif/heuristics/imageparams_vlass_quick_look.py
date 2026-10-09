@@ -54,6 +54,10 @@ class ImageParamsHeuristicsVlassQl(ImageParamsHeuristics):
         """Tclean gridder parameter heuristics."""
         return 'mosaic'
 
+    @property
+    def uniform_band_cell(self) -> bool:
+        return False
+
     def cell(self, beam=None, pixperbeam=None) -> str | list:
         """Tclean cell parameter heuristics."""
         return ['1.0arcsec']

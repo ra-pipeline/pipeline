@@ -694,6 +694,16 @@ class ImageParamsHeuristics:
         except:
             return ['invalid']
 
+    @property
+    def uniform_band_cell(self) -> bool:
+        """Whether to enforce a uniform cell size across all fields within a receiver band.
+
+        For ALMA, cell size is kept identical for all targets within a receiver band
+        (prior to per-field size mitigation overrides).
+        For VLA / VLASS, cell size can be determined independently for each field.
+        """
+        return True
+
     def nchan_and_width(self, field_intent, spwspec):
         if field_intent == 'TARGET':
             # get the spwids in spwspec

@@ -65,6 +65,11 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         else:
             return ','.join(deduplicated)
 
+    @property
+    def uniform_band_cell(self) -> bool:
+        """For VLA, allow independent cell size determination per field."""
+        return False
+
     def robust(self, specmode=None) -> float:
         """Tclean robust parameter heuristics.
         See PIPE-680 and CASR-543"""
