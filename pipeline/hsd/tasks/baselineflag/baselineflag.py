@@ -509,7 +509,7 @@ class SerialSDBLFlag(basetask.StandardTaskTemplate):
                 field_sel = group_desc.field_name
             else:
                 # no field name is included in in_field, skip
-                LOG.info('Skip reduction group {:d}'.format(group_id))
+                LOG.trace('Skip reduction group %d' % group_id)
                 continue
 
             # Which group in group_desc list should be processed
@@ -518,7 +518,7 @@ class SerialSDBLFlag(basetask.StandardTaskTemplate):
 
             # skip this group if valid member list is empty
             if len(member_list) == 0:
-                LOG.info('Skip reduction group %d' % group_id)
+                LOG.trace('Skip reduction group %d' % group_id)
                 continue
 
             member_list.sort()  # list of group_desc IDs to flag
