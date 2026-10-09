@@ -85,8 +85,11 @@ class SDBLFlagInputs(vdp.StandardInputs):
         return sdutils.to_list(val)
 
     # Search order of input vis
-    processing_data_types = [DataType.ATMCORR,
-                             DataType.REGCAL_CONTLINE_ALL, DataType.RAW ]
+    processing_data_types = [
+        DataType.IM_LINE_SCIENCE,
+        DataType.ATMCORR,
+        DataType.REGCAL_CONTLINE_ALL, DataType.RAW
+    ]
 
     parallel = sessionutils.parallel_inputs_impl()
 
