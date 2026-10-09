@@ -7,15 +7,14 @@ As part of ongoing observatory tasks, fluxes of quasars are monitored and stored
 ([ALMA source catalogue](https://almascience.eso.org/sc/)).
 When running a project at the telescope the control software will assess the
 project and will select the calibrators for the observation. This is the point
-where a low signal-to-noise (SNR) workflow can begin, and one which the ({doc}`ALMA Pipeline <../overview>`)
+where a low signal-to-noise (SNR) workflow can begin, and one which the ({doc}`ALMA Pipeline <alma-science-pipeline>`)
 is designed to handle.
-
 
 ## What are low SNR calibrators
 
 For a given ALMA observation the integration and scan durations for calibrators are preset as are the
 initially required signal-to-noise values such that calibration will be successful. Calibrator sources are
-selected as to be strong enough as to provide sufficient signal for antenna based calibration solves. 
+selected as to be strong enough as to provide sufficient signal for antenna based calibration solves.
 For targets in some parts of the sky, there may not be a bright enough quasar close enough to the target to achieve the necessary signal-to-noise in each individual spectral window.
 The control software will then instead search for appropriate quasars assuming that the spectral windows can be combined in calibration by the ALMA Pipeline low SNR calibration workflow.
 
@@ -25,8 +24,8 @@ Thus, calibrators can fall into a low SNR category even if they were not initial
 In some cases already low SNR calibrators can become even weaker, i.e. 'very' low SNR and the ALMA Pipeline will employ
 specific low SNR workflow heuristics as to calibrate, as best as feasibly possible, the observations.
 
-
 ## Typical low SNR observations
+
 A large percentage of all ALMA observations have bright calibrators and do not invoke any low SNR workflow.
 Those that do typically fall into the following categories:
 
@@ -58,7 +57,7 @@ tasks as to make the best judgement in performing phase based solves, as detaile
 
 - {func}`~pipeline.hif.cli.hif_lowgainflag`: In order to flag the low amplitude gain solutions, phaseup on the BANDPASS intent is required as a pre-apply.
   Again, this necessitates a pre-bandpass phaseup and a bandpass temporary solution. The phaseup process used is that encoded for
-  {func}`~pipeline.hifa.cli.hifa_bandpass` (`almaphcorbandpass.py`) using ``phaseupsnr=5``. 
+  {func}`~pipeline.hifa.cli.hifa_bandpass` (`almaphcorbandpass.py`) using ``phaseupsnr=5``.
 
 - {func}`~pipeline.hifa.cli.hifa_bandpassflag`: Prior to investigating amplitude based flags, the bandpass must be solved for,
   that also requires the pre-apply of the phaseup for the BANDPASS intent. {func}`~pipeline.hifa.cli.hifa_bandpassflag`
@@ -90,7 +89,7 @@ tasks as to make the best judgement in performing phase based solves, as detaile
     and CHECK intents (PHASE and CHECK intents have a SNR threshold referenced to a ``solint='inf'`` as to
     avoid gaincal failures for very low SNR data where ``solint='int'`` is not possible when computing the SNR
     in the first instance). For any intent, if the SNR of any spw is below the threshold, that will be mapped to
-    another spw with an SNR above the threshold. If there are none above the threshold then ``combine='spw' is
+    another spw with an SNR above the threshold. If there are none above the threshold then ``combine='spw'`` is
     invoked. Thereafter, ``gaintype='T'`` can be used to further boost SNR, and ultimately longer ``solint`` (>'int')
     can be used - up to predefined limits - half the scan length ('inf'/2) for PHASE and CHECK intents, or 60 s for
     other intents.
@@ -108,14 +107,15 @@ tasks as to make the best judgement in performing phase based solves, as detaile
   occur on certain baseline in the array due to variable atmospheric conditions - then decoherence can be 'baked-in'. Thus,
   because the phaseup did not correct the phases, any amplitudes gains are biased upwards on the decoherent baselines.
 
-- {func}`~pipeline.hifa.cli.hifa_diffgaincal`: Only for band-to-band data, the low SNR process is explained in the {ref}` band-to-band <sec-diffgain>` section.
+- {func}`~pipeline.hifa.cli.hifa_diffgaincal`: Only for band-to-band data, the low SNR process is explained in the {ref}`band-to-band <sec-diffgain>` section.
 
 - {func}`~pipeline.hifa.cli.hifa_timegaincal`: The final phaseup solutions are created at this stage. For all intents assessed
   in {func}`~pipeline.hifa.cli.hifa_spwphaseup` the mapping or combine modes are used, along with parameters of ``solint`` and ``gaintype``.
   For these intents the phaseup are always pre-applied before determining the final amplitude gains, and in all except the PHASE and CHECK intents
-  the phaseup solves are applied to each intent themselves (i.e. self calibrated). 
+  the phaseup solves are applied to each intent themselves (i.e. self calibrated).
 
 ## Band-to-Band
+
 (sec-diffgain)=
 Since Cycle 11, the band-to-band mode can be used as the calibration technique for both the ACA and all 12 m arrays (see B2B link).
 This mode alliviates some low SNR issues, because the PHASE calibrator can be observated at a lower frequency band.
@@ -143,7 +143,6 @@ be achieved for the combination of ``solint`` and ``combine`` used in the three 
 - An added clause to avoid low SNR solves is to confirm (via a temporary gaintable) that the fraction of flagged data
   does not exceed 0.5, while the fraction of missing scans cannot exceed 0.7. If so ``combine='spw'`` is automatically used.
 
-
 ## Situations that could crash the ALMA Pipeline
 
 Fail modes are extremely rare:
@@ -157,8 +156,7 @@ Fail modes are extremely rare:
   simply have reduced in flux beyond even the full extent of the low SNR heuristics. When the ``minsnr`` is lower than 3,
   {func}`~casatasks.calibration.gaincal` will flag solutions. If a calibrator, after using ``combine='spw'`` and
   an increased ``solint``, fails in {func}`~casatasks.calibration.gaincal` the ALMA Pipeline will crash, but the
-  such a very weak calibrator is simply not suitable for the task and the data cannot be calibrated. 
-
+  such a very weak calibrator is simply not suitable for the task and the data cannot be calibrated.
 
 ## Principle of phaseup
 
